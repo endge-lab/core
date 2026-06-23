@@ -1,6 +1,6 @@
 {
   "name": "@endge/core",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "private": false,
   "license": "Apache-2.0",
   "type": "module",
@@ -50,7 +50,7 @@
     "@primevue/themes": "^4.0.0-rc.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
-    "pinia": "^2.1.7",
+    "pinia": "^3.0.4",
     "primeicons": "^6.0.1",
     "primevue": "^4.0.0-rc.1",
     "reflect-metadata": "^0.2.2",
