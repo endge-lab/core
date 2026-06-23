@@ -1,0 +1,45 @@
+{
+  "compilerOptions": {
+    "rootDir": "./src",
+
+    // Безопасность
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+
+    // Декораторы (если нужны)
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+
+    // Модули/таргет
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "node",
+
+    // Полезные флаги
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+
+    // Если есть JSX / Vue JSX
+    "jsx": "preserve",
+
+    // Локальные алиасы
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.d.ts",
+    "src/**/*.vue",
+    "src/**/*.scss",
+  ],
+  "exclude": [
+    "dist",
+    "node_modules",
+    "test"
+  ]
+}
