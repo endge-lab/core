@@ -11,11 +11,14 @@ import type {
   RComponentSFCSource_Parts,
   RComponentSFC_AST,
   RComponentSFC_IR,
+  RComponentSFC_RuntimeDependencies,
 } from '@/domain/types/component-sfc.types'
 import { parseComponentSFC } from '@/domain/services/compiler/component-sfc-parse'
 import { analyzeComponentSFCScript } from '@/domain/services/compiler/component-sfc-script'
+import { analyzeComponentSFCRuntimeDependencies } from '@/domain/services/compiler/component-sfc-dependencies'
 import { compileComponentSFCStyle } from '@/domain/services/compiler/component-sfc-style'
 import { compileComponentSFCTemplate } from '@/domain/services/compiler/component-sfc-template'
+import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component-sfc.types'
 
 /** Результат полного SFC compiler pipeline в core. */
 export interface ComponentSFCCompileResult {
@@ -33,6 +36,9 @@ export interface ComponentSFCCompileResult {
 
   /** Зависимости компонента. */
   dependencies: RComponentDependencies
+
+  /** Runtime-зависимости SFC v1, извлеченные из IR reads. */
+  runtimeDependencies: RComponentSFC_RuntimeDependencies
 
   /** Preview-only props для песочницы и debug UI. Не меняют contract. */
   previewProps: Record<string, unknown> | null
@@ -53,6 +59,7 @@ export function compileComponentSFC(source: string): ComponentSFCCompileResult {
       ir: null,
       contract: createEmptyComponentContract(),
       dependencies: createEmptyComponentDependencies(),
+      runtimeDependencies: createEmptyComponentSFCRuntimeDependencies(),
       previewProps: null,
       diagnostics,
     }
@@ -76,22 +83,25 @@ export function compileComponentSFC(source: string): ComponentSFCCompileResult {
     templateResult.dependencies,
   )
 
+  const ir: RComponentSFC_IR | null = templateResult.template
+    ? {
+        version: 1,
+        script: {
+          props: scriptResult.props,
+          locals: scriptResult.locals,
+        },
+        template: templateResult.template,
+        style: styleResult.style,
+      }
+    : null
+
   return {
     sourceParts: parseResult.sourceParts,
     ast: parseResult.ast,
-    ir: templateResult.template
-      ? {
-          version: 1,
-          script: {
-            props: scriptResult.props,
-            locals: scriptResult.locals,
-          },
-          template: templateResult.template,
-          style: styleResult.style,
-        }
-      : null,
+    ir,
     contract: scriptResult.contract,
     dependencies,
+    runtimeDependencies: analyzeComponentSFCRuntimeDependencies(ir),
     previewProps: scriptResult.previewProps,
     diagnostics,
   }

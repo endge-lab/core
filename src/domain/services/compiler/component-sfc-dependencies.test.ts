@@ -1,0 +1,92 @@
+import { describe, expect, it } from 'vitest'
+
+import { analyzeComponentSFCRuntimeDependencies } from '@/domain/services/compiler/component-sfc-dependencies'
+import { compileComponentSFC } from '@/domain/services/compiler/component-sfc-compile'
+
+describe('analyzeComponentSFCRuntimeDependencies', () => {
+  it('finds prop reads from interpolation, dynamic attrs and if directives', () => {
+    const ir = compileComponentSFC(`<script setup lang="ts">
+defineProps<{
+  flight: FlightLeg
+  compact?: boolean
+}>()
+</script>
+
+<template>
+<Flex col if="!compact">
+  <Badge :tone="flight.statusTone">{{ flight.number }}</Badge>
+</Flex>
+</template>`).ir
+
+    const deps = analyzeComponentSFCRuntimeDependencies(ir)
+
+    expect(deps.props.map(dep => `${dep.prop}.${dep.path.join('.')}`)).toEqual([
+      'compact.',
+      'flight.statusTone',
+      'flight.number',
+    ])
+  })
+
+  it('deduplicates same reads and ignores literals', () => {
+    const ir = compileComponentSFC(`<script setup lang="ts">
+defineProps<{
+  flight: FlightLeg
+}>()
+</script>
+
+<template>
+<Flex gap="2">
+  <Text>{{ flight.number }}</Text>
+  <Badge tone="success">{{ flight.number }}</Badge>
+</Flex>
+</template>`).ir
+
+    const deps = analyzeComponentSFCRuntimeDependencies(ir)
+
+    expect(deps.props).toHaveLength(1)
+    expect(deps.props[0]).toMatchObject({
+      prop: 'flight',
+      path: ['number'],
+    })
+  })
+
+  it('collects for source dependency without analyzing arbitrary script body', () => {
+    const ir = compileComponentSFC(`<script setup lang="ts">
+const localValue = flight.hidden
+defineProps<{
+  flights: FlightLeg[]
+}>()
+</script>
+
+<template>
+<Flex>
+  <Text for="flight in flights">{{ flight.number }}</Text>
+</Flex>
+</template>`).ir
+
+    const deps = analyzeComponentSFCRuntimeDependencies(ir)
+
+    expect(deps.props).toEqual([
+      expect.objectContaining({
+        prop: 'flights',
+        path: [],
+      }),
+    ])
+  })
+
+  it('ignores unsupported or global identifiers', () => {
+    const ir = compileComponentSFC(`<script setup lang="ts">
+defineProps<{
+  flight: FlightLeg
+}>()
+</script>
+
+<template>
+<Text>{{ Math.max(1, 2) }}</Text>
+</template>`).ir
+
+    const deps = analyzeComponentSFCRuntimeDependencies(ir)
+
+    expect(deps.props).toEqual([])
+  })
+})

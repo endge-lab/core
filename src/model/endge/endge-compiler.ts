@@ -135,6 +135,7 @@ export class EndgeCompiler extends EndgeModule {
             sourceParts: result.sourceParts,
             contract: result.contract,
             dependencies: result.dependencies,
+            runtimeDependencies: result.runtimeDependencies,
             previewProps: result.previewProps,
             ast: result.ast,
             ir: result.ir,

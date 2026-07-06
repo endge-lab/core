@@ -8,6 +8,7 @@ import type {
   RuntimeHostResource,
   RuntimeHostSnapshot,
   RuntimeHostStatus,
+  RuntimeHostUpdateContext,
 } from '@/domain/types/runtime-host.types'
 import type { ProgramArtifact } from '@/domain/types/program.types'
 import type { RuntimeKind } from '@/domain/types/runtime.types'
@@ -159,6 +160,16 @@ export abstract class RuntimeHostBase<
     this.resources.splice(0)
     this.channels.splice(0)
     ;(this as any).offAll?.()
+  }
+
+  /**
+   * Обрабатывает универсальный runtime update.
+   *
+   * Базовая реализация только прокидывает событие наружу, а конкретный host
+   * решает, как обновлять свои данные, запросы или render-boundary.
+   */
+  public update(ctx: RuntimeHostUpdateContext): void {
+    this.emit('update', ctx)
   }
 
   /**

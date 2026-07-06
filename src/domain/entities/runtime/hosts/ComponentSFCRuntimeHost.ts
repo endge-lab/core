@@ -7,14 +7,23 @@ import type {
 import type {
   RComponentSFC_AST,
   RComponentSFC_IR,
+  RComponentSFC_RuntimeDependencies,
   RComponentSFCSource_Parts,
 } from '@/domain/types/component-sfc.types'
 import type { ComponentSFCProgramPayload, ProgramDiagnostic } from '@/domain/types/program.types'
-import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime-host.types'
+import type {
+  RuntimeArtifactReader,
+  RuntimeHost,
+  RuntimeHostContext,
+  RuntimeHostInputSource,
+  RuntimeHostUpdateContext,
+} from '@/domain/types/runtime-host.types'
 
 import { Raph, RaphNode } from '@endge/raph'
 
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
+import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component-sfc.types'
+import { RUNTIME_BOUNDARY_UPDATE_PHASE_NAME } from '@/domain/types/runtime-host.types'
 
 function createDefaultSFCContext(target: RComponentRenderTarget | null): RuntimeHostContext<'component-sfc'> {
   return {
@@ -39,6 +48,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   RuntimeHostContext<'component-sfc'>,
   ComponentSFCProgramPayload
 > {
+  private _inputSource: RuntimeHostInputSource | null = null
+  private _raphInputDisposers: VoidFunction[] = []
+
   constructor(input: {
     id: string
     model: RComponentSFC
@@ -82,13 +94,17 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     const node = new RaphNode(Raph.app, {
       id: `${model.identity || model.id}-${id}`,
       meta: {
-        type: 'component-sfc',
+        ...meta,
+        type: 'runtime-node',
         kind: 'root',
+        runtimeId: id,
+        runtimeKind: 'runtime',
+        entityType: 'component-sfc',
+        entityIdentity: model.identity,
         entityId: model.id,
         componentIdentity: model.identity,
         parentRuntimeId: parent?.id ?? null,
         target,
-        ...meta,
       },
     })
 
@@ -108,9 +124,8 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
 
     host.syncArtifactState(target)
     Raph.app.addNode(node)
-    node.meta.runtimeId = host.id
-    node.meta.runtimeKind = 'runtime'
     host.addRaphNode(node)
+    host.setInputSource(meta.input)
     host.addResource({
       id: `node:${node.id}`,
       kind: 'raph-node',
@@ -156,6 +171,12 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     return this.getArtifactPayload()?.dependencies ?? null
   }
 
+  /** Возвращает runtime-зависимости SFC v1 из compiled artifact. */
+  public getRuntimeDependencies(): RComponentSFC_RuntimeDependencies {
+    return this.getArtifactPayload()?.runtimeDependencies
+      ?? createEmptyComponentSFCRuntimeDependencies()
+  }
+
   /** Возвращает parser-level AST из compiled artifact. */
   public getAst(): RComponentSFC_AST | null {
     return this.getArtifactPayload()?.ast ?? null
@@ -169,6 +190,43 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   /** Возвращает preview-only props из compiled artifact. */
   public getPreviewProps(): Record<string, unknown> | null {
     return this.getArtifactPayload()?.previewProps ?? null
+  }
+
+  /** Обновляет input source и пересобирает Raph subscriptions host-а. */
+  public setInputSource(input: RuntimeHostInputSource | null | undefined): void {
+    this._clearRaphInputSubscriptions()
+    this._inputSource = input ?? null
+
+    if (this._inputSource?.kind === 'raph')
+      this._bindRaphInputSource(this._inputSource)
+  }
+
+  /** Возвращает текущий input source host-а. */
+  public getInputSource(): RuntimeHostInputSource | null {
+    return this._inputSource
+  }
+
+  /**
+   * Получает runtime update от universal boundary phase.
+   *
+   * Core не знает про DOM/Vue/RevoGrid: host только фиксирует update-факт
+   * и сообщает render adapter-у, что входные props нужно перечитать.
+   */
+  public override update(ctx: RuntimeHostUpdateContext): void {
+    const now = new Date().toISOString()
+    this.setContext({
+      status: 'success',
+      updatedAt: now,
+      lastRenderAt: now,
+    })
+    this.emit('props:dirty', ctx)
+    super.update(ctx)
+  }
+
+  /** Очищает Raph subscriptions перед общим destroy host-а. */
+  public override destroy(): void {
+    this._clearRaphInputSubscriptions()
+    super.destroy()
   }
 
   /** Синхронизирует runtime context с текущим compiled artifact. */
@@ -209,7 +267,51 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
       capabilities: artifact.capabilities,
       diagnostics: artifact.diagnostics.length,
       dependencies: artifact.dependencies.length,
+      runtimeDependencies: artifact.payload.runtimeDependencies?.props.length ?? 0,
     }
+  }
+
+  private _bindRaphInputSource(input: Extract<RuntimeHostInputSource, { kind: 'raph' }>): void {
+    if (!this.node)
+      return
+
+    const deps = this.getRuntimeDependencies()
+    for (const dependency of deps.props) {
+      const binding = input.bindings[dependency.prop]
+      if (!binding?.path)
+        continue
+
+      const path = this._joinRaphPath(binding.path, dependency.path)
+      if (!path)
+        continue
+
+      const dispose = Raph.app.observeData(this.node, path, {
+        phase: RUNTIME_BOUNDARY_UPDATE_PHASE_NAME,
+        wildcardDynamic: binding.wildcardDynamic ?? true,
+      })
+      this._raphInputDisposers.push(dispose)
+    }
+  }
+
+  private _clearRaphInputSubscriptions(): void {
+    for (const dispose of this._raphInputDisposers)
+      dispose()
+    this._raphInputDisposers = []
+  }
+
+  private _joinRaphPath(basePath: string, childPath: string[]): string {
+    const base = String(basePath ?? '').trim().replace(/\.$/, '')
+    const child = childPath
+      .map(part => String(part ?? '').trim())
+      .filter(Boolean)
+      .join('.')
+
+    if (!base)
+      return child
+    if (!child)
+      return base
+
+    return `${base}.${child}`
   }
 }
 

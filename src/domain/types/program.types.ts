@@ -3,6 +3,7 @@ import type { RComponentContract, RComponentDependencies } from '@/domain/types/
 import type {
   RComponentSFC_AST,
   RComponentSFC_IR,
+  RComponentSFC_RuntimeDependencies,
   RComponentSFCSource_Parts,
 } from '@/domain/types/component-sfc.types'
 import type { DependencyGraph } from '@/domain/entities/data/DependencyGraph'
@@ -163,6 +164,9 @@ export interface ComponentSFCProgramPayload {
 
   /** Зависимости компонента: дочерние компоненты, data sources, actions, renderers. */
   dependencies: RComponentDependencies
+
+  /** Runtime-зависимости SFC v1, по которым host подписывается на input source. */
+  runtimeDependencies: RComponentSFC_RuntimeDependencies
 
   /** Preview-only props для песочницы/debug UI. Не являются runtime default props. */
   previewProps: Record<string, unknown> | null

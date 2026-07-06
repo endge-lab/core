@@ -2,7 +2,7 @@ import type { FlowExecutionResult, FlowExecutionState } from '@/domain/types/end
 import type { ProgramArtifact, ProgramEntityType } from '@/domain/types/program.types'
 import type { RuntimeEntityModelMap, RuntimeEntityType } from '@/domain/types/runtime-entity-map.types'
 import type { RuntimeKind } from '@/domain/types/runtime.types'
-import type { RaphNode } from '@endge/raph'
+import type { PhaseEvent, PhaseName, RaphFrameContext, RaphNode } from '@endge/raph'
 
 export type RuntimeHostStatus
   = 'created'
@@ -185,6 +185,9 @@ export interface RuntimeHostLifecycle {
 
   /** Корректно остановить host и освободить ресурсы. */
   destroy: () => Promise<void> | void
+
+  /** Обработать runtime update, пришедший из Raph boundary phase. */
+  update: (ctx: RuntimeHostUpdateContext) => Promise<void> | void
 }
 
 export interface RuntimeArtifactReader {
@@ -198,6 +201,47 @@ export interface RuntimeHostArtifactRef {
   entityType: ProgramEntityType
   id?: string | number
   identity?: string
+}
+
+/** Каноническое имя Raph-фазы, которая агрегирует dirty runtime-ноды к root host. */
+export const RUNTIME_BOUNDARY_UPDATE_PHASE_NAME = 'runtime-boundary-update' as PhaseName
+
+/** Локальный input source runtime-host-а без привязки к Raph. */
+export interface RuntimeHostLocalInputSource {
+  kind: 'local'
+  props: Record<string, unknown>
+}
+
+/** Binding входного prop на путь в Raph data storage. */
+export interface RuntimeHostRaphInputBinding {
+  path: string
+  wildcardDynamic?: boolean
+}
+
+/** Raph-backed input source runtime-host-а. */
+export interface RuntimeHostRaphInputSource {
+  kind: 'raph'
+  bindings: Record<string, RuntimeHostRaphInputBinding>
+}
+
+/** Унифицированный источник входных данных runtime-host-а. */
+export type RuntimeHostInputSource
+  = | RuntimeHostLocalInputSource
+    | RuntimeHostRaphInputSource
+
+/** Группа dirty-ноды, агрегированная к runtime boundary. */
+export interface RuntimeDirtyBoundary {
+  boundary: RaphNode
+  dirtyNodes: RaphNode[]
+  events: PhaseEvent[]
+}
+
+/** Контекст универсального runtime update, который получает root runtime-host. */
+export interface RuntimeHostUpdateContext {
+  node: RaphNode
+  events: PhaseEvent[]
+  boundaries: RuntimeDirtyBoundary[]
+  frame: RaphFrameContext
 }
 
 export interface RuntimeHost<
@@ -283,6 +327,9 @@ export interface RuntimeHost<
 
   /** Полностью заменить context host. */
   replaceContext: (context: TContext) => void
+
+  /** Обработать runtime update, пришедший из Raph boundary phase. */
+  update: (ctx: RuntimeHostUpdateContext) => Promise<void> | void
 
   /** Сериализовать host в снимок для UI/диагностики. */
   snapshot: () => RuntimeHostSnapshot

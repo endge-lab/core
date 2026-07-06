@@ -17,6 +17,7 @@ import { TableRuntimeStrategy } from '@/domain/services/runtime/strategies/Table
 import { ViewRuntimeStrategy } from '@/domain/services/runtime/strategies/ViewRuntimeStrategy'
 import { Endge } from '@/model/endge/endge'
 import { QueriesPhase } from '@/model/helpers/raph-phases/queries-phase'
+import { RuntimeBoundaryUpdatePhase } from '@/model/helpers/raph-phases/runtime-boundary-update-phase'
 
 export class EndgeRuntime extends EndgeModule {
   private _hosts = new RuntimeHostRegistry()
@@ -45,6 +46,7 @@ export class EndgeRuntime extends EndgeModule {
     }
     this._inited = true
 
+    Raph.addPhase(RuntimeBoundaryUpdatePhase.make())
     Raph.addPhase(QueriesPhase.make())
   }
 
