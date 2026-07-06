@@ -2,20 +2,15 @@ import type { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import type {
   RComponentContract,
   RComponentDependencies,
-  RComponentDiagnostic,
   RComponentRenderTarget,
 } from '@/domain/types/component-core.types'
-import {
-  createEmptyComponentContract,
-  createEmptyComponentDependencies,
-} from '@/domain/types/component-core.types'
-import { parseSFCSourceParts } from '@/domain/services/compiler/component-sfc-source-parts'
 import type {
   RComponentSFC_AST,
   RComponentSFC_IR,
   RComponentSFCSource_Parts,
 } from '@/domain/types/component-sfc.types'
-import type { RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime-host.types'
+import type { ComponentSFCProgramPayload, ProgramDiagnostic } from '@/domain/types/program.types'
+import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime-host.types'
 
 import { Raph, RaphNode } from '@endge/raph'
 
@@ -36,28 +31,14 @@ function createDefaultSFCContext(target: RComponentRenderTarget | null): Runtime
 /**
  * Runtime-host нового SFC-компонента.
  *
- * Здесь хранится все derived-состояние compiler/render pipeline, чтобы
- * persisted RComponentSFC оставался чистым описанием компонента.
+ * Host хранит lifecycle/runtime-состояние и читает compiler-derived данные
+ * из `ProgramArtifact<ComponentSFCProgramPayload>`.
  */
-export class ComponentSFCRuntimeHost extends RuntimeHostBase<'component-sfc'> {
-  /** Разложение canonical source по вкладкам/секциям. */
-  public sourceParts: RComponentSFCSource_Parts
-
-  /** Диагностика последнего runtime-разбора/компиляции. */
-  public diagnostics: RComponentDiagnostic[] = []
-
-  /** Контракт компонента после будущего compiler pass. */
-  public contract: RComponentContract = createEmptyComponentContract()
-
-  /** Зависимости компонента после будущего compiler pass. */
-  public dependencies: RComponentDependencies = createEmptyComponentDependencies()
-
-  /** AST последнего разбора. Заполняется SFC parser service. */
-  public ast: RComponentSFC_AST | null = null
-
-  /** Семантический IR. Заполняется SFC compiler service. */
-  public ir: RComponentSFC_IR | null = null
-
+export class ComponentSFCRuntimeHost extends RuntimeHostBase<
+  'component-sfc',
+  RuntimeHostContext<'component-sfc'>,
+  ComponentSFCProgramPayload
+> {
   constructor(input: {
     id: string
     model: RComponentSFC
@@ -65,6 +46,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<'component-sfc'> {
     parent?: RuntimeHost<any, any> | null
     title?: string
     meta?: Record<string, unknown>
+    artifactReader?: RuntimeArtifactReader | null
   }) {
     const target = normalizeTarget(input.meta?.target)
     super({
@@ -73,8 +55,13 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<'component-sfc'> {
       runtimeType: 'component-sfc-runtime-host',
       entityType: 'component-sfc',
       context: createDefaultSFCContext(target),
+      artifactReader: input.artifactReader,
+      artifactRef: {
+        entityType: 'component-sfc',
+        id: input.model.id,
+        identity: input.model.identity,
+      },
     })
-    this.sourceParts = parseSFCSourceParts(input.model.source)
   }
 
   /**
@@ -85,7 +72,8 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<'component-sfc'> {
     model: RComponentSFC
     meta?: Record<string, any>
     parent?: RuntimeHost<any, any> | null
-  }): RuntimeHost<'component-sfc'> {
+    artifactReader?: RuntimeArtifactReader | null
+  }): ComponentSFCRuntimeHost {
     const { id, model } = input
     const meta = input.meta ?? {}
     const parent = input.parent ?? null
@@ -115,9 +103,10 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<'component-sfc'> {
         parentRuntimeId: parent?.id ?? null,
         target,
       },
+      artifactReader: input.artifactReader,
     })
 
-    host.preparePlaceholders(target)
+    host.syncArtifactState(target)
     Raph.app.addNode(node)
     node.meta.runtimeId = host.id
     node.meta.runtimeKind = 'runtime'
@@ -130,11 +119,11 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<'component-sfc'> {
       payload: { meta: node.meta ?? {} },
     })
     host.addResource({
-      id: 'contract:component-sfc',
-      kind: 'contract',
-      title: 'SFC contract',
-      subtitle: 'Контракт будет заполнен compiler pipeline',
-      payload: { contract: host.contract, dependencies: host.dependencies },
+      id: 'artifact:component-sfc',
+      kind: 'meta',
+      title: 'Compiled SFC artifact',
+      subtitle: host.getArtifact()?.status ?? 'missing',
+      payload: host.makeArtifactResourcePayload(),
     })
     host.addChannel({
       id: 'channel:event-bus',
@@ -147,35 +136,80 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<'component-sfc'> {
     return host
   }
 
-  /** Обновляет runtime-derived состояние из persisted source. */
-  public preparePlaceholders(target: RComponentRenderTarget | null): void {
+  /** Возвращает разложенный canonical source из compiled artifact. */
+  public getSourceParts(): RComponentSFCSource_Parts | null {
+    return this.getArtifactPayload()?.sourceParts ?? null
+  }
+
+  /** Возвращает diagnostics compiled artifact. */
+  public getDiagnostics(): ProgramDiagnostic[] {
+    return this.getArtifact()?.diagnostics ?? []
+  }
+
+  /** Возвращает внешний контракт компонента из compiled artifact. */
+  public getContract(): RComponentContract | null {
+    return this.getArtifactPayload()?.contract ?? null
+  }
+
+  /** Возвращает зависимости компонента из compiled artifact. */
+  public getDependencies(): RComponentDependencies | null {
+    return this.getArtifactPayload()?.dependencies ?? null
+  }
+
+  /** Возвращает parser-level AST из compiled artifact. */
+  public getAst(): RComponentSFC_AST | null {
+    return this.getArtifactPayload()?.ast ?? null
+  }
+
+  /** Возвращает target-neutral semantic IR из compiled artifact. */
+  public getIr(): RComponentSFC_IR | null {
+    return this.getArtifactPayload()?.ir ?? null
+  }
+
+  /** Возвращает preview-only props из compiled artifact. */
+  public getPreviewProps(): Record<string, unknown> | null {
+    return this.getArtifactPayload()?.previewProps ?? null
+  }
+
+  /** Синхронизирует runtime context с текущим compiled artifact. */
+  public syncArtifactState(target: RComponentRenderTarget | null): void {
     const now = new Date().toISOString()
-    const source = this.model.source ?? ''
-
-    this.sourceParts = parseSFCSourceParts(source)
-    this.diagnostics = []
-    this.contract = createEmptyComponentContract()
-    this.dependencies = createEmptyComponentDependencies()
-    this.ast = null
-    this.ir = null
-
-    if (!source.trim()) {
-      this.diagnostics.push({
-        severity: 'warning',
-        code: 'sfc-source-empty',
-        message: 'SFC-компонент не содержит source.',
-      })
-    }
+    const artifact = this.getArtifact()
 
     this.setContext({
-      status: this.diagnostics.some(item => item.severity === 'error') ? 'error' : 'success',
+      status: artifact?.status === 'error' || !artifact ? 'error' : 'success',
       startedAt: now,
       updatedAt: now,
       target,
-      lastParseAt: now,
-      lastCompileAt: now,
+      lastParseAt: artifact ? now : null,
+      lastCompileAt: artifact ? now : null,
       lastRenderAt: null,
     })
+  }
+
+  /** Backward-compatible alias для старого runtime prepare API. */
+  public preparePlaceholders(target: RComponentRenderTarget | null): void {
+    this.syncArtifactState(target)
+  }
+
+  private makeArtifactResourcePayload(): Record<string, unknown> {
+    const artifact = this.getArtifact()
+    if (!artifact)
+      return {
+        entityType: 'component-sfc',
+        identity: this.entityIdentity,
+        missing: true,
+      }
+
+    return {
+      ref: artifact.ref,
+      status: artifact.status,
+      sourceHash: artifact.sourceHash,
+      compilerVersion: artifact.compilerVersion,
+      capabilities: artifact.capabilities,
+      diagnostics: artifact.diagnostics.length,
+      dependencies: artifact.dependencies.length,
+    }
   }
 }
 

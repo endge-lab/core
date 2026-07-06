@@ -1,19 +1,11 @@
-import type { RComponent } from '@/domain/types/component.types'
 import type { RuntimeEntityType } from '@/domain/types/runtime-entity-map.types'
-import type { RuntimeHostRegistrySnapshot } from '@/domain/types/runtime-registry.types'
+import type { AnyRuntimeStrategy, EndgeRuntimeSnapshot, RuntimeExecutableModel } from '@/domain/types/runtime.types'
 
 import { Raph } from '@endge/raph'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
-import type { RAction } from '@/domain/entities/reflect/RAction'
-import type { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
-import type { RComponentTable } from '@/domain/entities/reflect/RComponentTable'
-import type { RPage } from '@/domain/entities/reflect/RPage'
-import type { RProject } from '@/domain/entities/reflect/RProject'
-import type { RQuery } from '@/domain/entities/reflect/RQuery'
-import type { RView } from '@/domain/entities/reflect/RView'
 import { RuntimeHostRegistry } from '@/domain/entities/runtime/RuntimeHostRegistry'
-import type { AnyRuntimeHost, RuntimeStrategy } from '@/domain/services/runtime/RuntimeStrategy'
+import type { AnyRuntimeHost } from '@/domain/services/runtime/RuntimeStrategy'
 import { RuntimeStrategyRegistry } from '@/domain/services/runtime/RuntimeStrategyRegistry'
 import { ActionRuntimeStrategy } from '@/domain/services/runtime/strategies/ActionRuntimeStrategy'
 import { ComponentRuntimeStrategy } from '@/domain/services/runtime/strategies/ComponentRuntimeStrategy'
@@ -25,22 +17,6 @@ import { TableRuntimeStrategy } from '@/domain/services/runtime/strategies/Table
 import { ViewRuntimeStrategy } from '@/domain/services/runtime/strategies/ViewRuntimeStrategy'
 import { Endge } from '@/model/endge/endge'
 import { QueriesPhase } from '@/model/helpers/raph-phases/queries-phase'
-
-export type RuntimeExecutableModel
-  = | RQuery
-    | RComponentTable
-    | RAction
-    | RProject
-    | RView
-    | RPage
-    | RComponent
-    | RComponentSFC
-
-type AnyRuntimeStrategy = RuntimeStrategy<any, AnyRuntimeHost>
-
-export interface EndgeRuntimeSnapshot extends RuntimeHostRegistrySnapshot {
-  generatedAt: number
-}
 
 export class EndgeRuntime extends EndgeModule {
   private _hosts = new RuntimeHostRegistry()
@@ -292,6 +268,7 @@ export class EndgeRuntime extends EndgeModule {
       model,
       meta: hostMeta,
       parent,
+      artifacts: Endge.program,
     })
     if (!host) {
       return null
@@ -303,6 +280,7 @@ export class EndgeRuntime extends EndgeModule {
       model,
       meta: hostMeta,
       parent,
+      artifacts: Endge.program,
       host,
     })
     this.notify()

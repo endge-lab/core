@@ -1,6 +1,4 @@
-import type { AnyRuntimeHost, RuntimeStrategy } from '@/domain/services/runtime/RuntimeStrategy'
-
-type AnyRuntimeStrategy = RuntimeStrategy<any, AnyRuntimeHost>
+import type { AnyRuntimeStrategy } from '@/domain/types/runtime.types'
 
 /** Реестр runtime strategy, которые EndgeRuntime использует вместо switch/if factory. */
 export class RuntimeStrategyRegistry {

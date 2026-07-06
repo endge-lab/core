@@ -18,6 +18,7 @@ export class ComponentSFCRuntimeStrategy implements RuntimeStrategy<RComponentSF
       model: ctx.model,
       meta: ctx.meta,
       parent: ctx.parent,
+      artifactReader: ctx.artifacts,
     })
   }
 }

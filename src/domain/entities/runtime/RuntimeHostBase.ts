@@ -1,12 +1,15 @@
 import type { RuntimeEntityModelMap, RuntimeEntityType } from '@/domain/types/runtime-entity-map.types'
 import type {
+  RuntimeArtifactReader,
   RuntimeHost,
+  RuntimeHostArtifactRef,
   RuntimeHostChannel,
   RuntimeHostContext,
   RuntimeHostResource,
   RuntimeHostSnapshot,
   RuntimeHostStatus,
 } from '@/domain/types/runtime-host.types'
+import type { ProgramArtifact } from '@/domain/types/program.types'
 import type { RuntimeKind } from '@/domain/types/runtime.types'
 import type { RaphNode } from '@endge/raph'
 
@@ -16,9 +19,10 @@ import { EventBus } from '@endge/utils'
 export abstract class RuntimeHostBase<
   TType extends RuntimeEntityType,
   TContext extends RuntimeHostContext<TType> = RuntimeHostContext<TType>,
+  TArtifactPayload = unknown,
 >
   extends EventBus<Record<string, any>>
-  implements RuntimeHost<TType, TContext> {
+  implements RuntimeHost<TType, TContext, TArtifactPayload> {
   /** Уникальный runtime-id host. */
   public readonly id: string
 
@@ -70,6 +74,12 @@ export abstract class RuntimeHostBase<
   /** Список raph-нод, которыми владеет host. */
   private _raphNodes = new Map<string, RaphNode>()
 
+  /** Read-only доступ к compiled artifacts, если host связан с program artifact. */
+  private readonly _artifactReader: RuntimeArtifactReader | null
+
+  /** Ссылка на compiled artifact, связанный с host. */
+  private readonly _artifactRef: RuntimeHostArtifactRef | null
+
   constructor(input: {
 
     /** Уникальный runtime-id host. */
@@ -79,7 +89,7 @@ export abstract class RuntimeHostBase<
     parent?: RuntimeHost<any, any> | null
 
     /** Канонический runtime kind host. */
-    kind: RuntimeKind | 'runtime'
+    kind: RuntimeKind
 
     /** Техническое имя реализации host. */
     runtimeType: string
@@ -104,6 +114,12 @@ export abstract class RuntimeHostBase<
 
     /** Начальный контекст host (тип зависит от реализации). */
     context?: TContext
+
+    /** Read-only доступ к compiled artifacts. */
+    artifactReader?: RuntimeArtifactReader | null
+
+    /** Ссылка на artifact, который обслуживает этот host. */
+    artifactRef?: RuntimeHostArtifactRef | null
   }) {
     super([])
     this.id = String(input.id)
@@ -121,6 +137,8 @@ export abstract class RuntimeHostBase<
     this.channels = []
     this.meta = { ...(input.meta ?? {}) }
     this.context = (input.context ?? {} as TContext)
+    this._artifactReader = input.artifactReader ?? null
+    this._artifactRef = input.artifactRef ?? null
   }
 
   /**
@@ -199,6 +217,30 @@ export abstract class RuntimeHostBase<
     if (!this.node)
       this.node = node
     this.touch()
+  }
+
+  /**
+   * ACCESS
+   */
+  public getArtifact(): ProgramArtifact<TArtifactPayload> | null {
+    if (!this._artifactReader || !this._artifactRef)
+      return null
+
+    const idOrIdentity = this._artifactRef.id ?? this._artifactRef.identity
+    if (idOrIdentity == null)
+      return null
+
+    return this._artifactReader.getArtifact<TArtifactPayload>(
+      this._artifactRef.entityType,
+      idOrIdentity,
+    )
+  }
+
+  /**
+   * ACCESS
+   */
+  public getArtifactPayload(): TArtifactPayload | null {
+    return this.getArtifact()?.payload ?? null
   }
 
   /**

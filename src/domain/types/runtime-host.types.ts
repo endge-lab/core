@@ -1,4 +1,5 @@
 import type { FlowExecutionResult, FlowExecutionState } from '@/domain/types/endge-flow-runtime.types'
+import type { ProgramArtifact, ProgramEntityType } from '@/domain/types/program.types'
 import type { RuntimeEntityModelMap, RuntimeEntityType } from '@/domain/types/runtime-entity-map.types'
 import type { RuntimeKind } from '@/domain/types/runtime.types'
 import type { RaphNode } from '@endge/raph'
@@ -186,9 +187,23 @@ export interface RuntimeHostLifecycle {
   destroy: () => Promise<void> | void
 }
 
+export interface RuntimeArtifactReader {
+  getArtifact: <TPayload = unknown>(
+    entityType: ProgramEntityType,
+    idOrIdentity: string | number,
+  ) => ProgramArtifact<TPayload> | null
+}
+
+export interface RuntimeHostArtifactRef {
+  entityType: ProgramEntityType
+  id?: string | number
+  identity?: string
+}
+
 export interface RuntimeHost<
   TType extends RuntimeEntityType = RuntimeEntityType,
   TContext extends RuntimeHostContext<TType> = RuntimeHostContext<TType>,
+  TArtifactPayload = unknown,
 > extends RuntimeHostLifecycle {
   /** Уникальный runtime-id host. */
   readonly id: string
@@ -238,6 +253,12 @@ export interface RuntimeHost<
 
   /** Корневая raph-нода host (если есть). */
   readonly node: RaphNode | null
+
+  /** Возвращает compiled artifact, связанный с host, если он доступен. */
+  getArtifact: () => ProgramArtifact<TArtifactPayload> | null
+
+  /** Возвращает payload compiled artifact, связанный с host, если он доступен. */
+  getArtifactPayload: () => TArtifactPayload | null
 
   /** Изменить статус host и обновить updatedAt. */
   setStatus: (status: RuntimeHostStatus) => void

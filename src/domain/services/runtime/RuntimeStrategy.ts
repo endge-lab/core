@@ -1,4 +1,4 @@
-import type { RuntimeHost } from '@/domain/types/runtime-host.types'
+import type { RuntimeArtifactReader, RuntimeHost } from '@/domain/types/runtime-host.types'
 import type { RuntimeEntityType } from '@/domain/types/runtime-entity-map.types'
 
 export type RuntimeStrategyMeta = Record<string, any>
@@ -17,6 +17,9 @@ export interface RuntimeCreateContext<TModel = unknown> {
 
   /** Родительский runtime-host, если запуск вложенный. */
   parent: AnyRuntimeHost | null
+
+  /** Read-only доступ к compiled artifacts текущей Endge.program. */
+  artifacts: RuntimeArtifactReader
 }
 
 /** Контекст подключения runtime-host после регистрации в общем registry. */

@@ -1,10 +1,36 @@
 import type { RComponentTableColumn } from '@/domain/entities/reflect/RComponentTableColumn'
 import type { PhaseExecutorContext } from '@endge/raph'
+import type { RComponent } from '@/domain/types/component.types'
+import type { RAction } from '@/domain/entities/reflect/RAction'
+import type { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
+import type { RComponentTable } from '@/domain/entities/reflect/RComponentTable'
+import type { RPage } from '@/domain/entities/reflect/RPage'
+import type { RProject } from '@/domain/entities/reflect/RProject'
+import type { RQuery } from '@/domain/entities/reflect/RQuery'
+import type { RView } from '@/domain/entities/reflect/RView'
+import type { AnyRuntimeHost, RuntimeStrategy } from '@/domain/services/runtime/RuntimeStrategy'
+import type { RuntimeHostRegistrySnapshot } from '@/domain/types/runtime-registry.types'
 
 /**
  * Runtime kinds
  */
 export type RuntimeKind = 'query' | 'table' | 'table-column' | 'action' | 'runtime'
+
+export type RuntimeExecutableModel
+  = | RQuery
+    | RComponentTable
+    | RAction
+    | RProject
+    | RView
+    | RPage
+    | RComponent
+    | RComponentSFC
+
+export type AnyRuntimeStrategy = RuntimeStrategy<any, AnyRuntimeHost>
+
+export interface EndgeRuntimeSnapshot extends RuntimeHostRegistrySnapshot {
+  generatedAt: number
+}
 
 /**
  * Событие для query: изменение фильтра
