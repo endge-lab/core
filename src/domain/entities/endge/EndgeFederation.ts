@@ -26,6 +26,10 @@ export abstract class EndgeFederation {
     return this.host.isInitialized
   }
 
+  public static get isConfigured(): boolean {
+    return this.getOrCreateHost().isConfigured
+  }
+
   public static get isLoadingFromStorage(): boolean {
     return this.host.isHydrating
   }

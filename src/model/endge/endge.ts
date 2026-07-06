@@ -71,10 +71,11 @@ export class Endge extends EndgeFederation {
    */
   static async boot(ctx: EndgeBootContext): Promise<void> {
     const host = this.host
+    this.bootContext = ctx
+
     if (host.isInitialized)
       return
 
-    this.bootContext = ctx
     Endge.debug.enabled = true
 
     await this.setup(ctx)
