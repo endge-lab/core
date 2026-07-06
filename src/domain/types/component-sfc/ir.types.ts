@@ -78,6 +78,9 @@ export type RComponentSFC_IR_Tag
     | 'Flex'
     | 'Divider'
     | 'Component'
+    | 'Table'
+    | 'Column'
+    | 'Cell'
 
 /** IR element-узел, который renderer-слои могут читать без знания исходного синтаксиса. */
 export interface RComponentSFC_IR_ElementNode {

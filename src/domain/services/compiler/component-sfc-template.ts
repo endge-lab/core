@@ -49,6 +49,9 @@ const ALLOWED_TAGS = new Set<RComponentSFC_IR_Tag>([
   'Flex',
   'Divider',
   'Component',
+  'Table',
+  'Column',
+  'Cell',
 ])
 
 /** Компилирует AST template в renderer-neutral Endge SFC IR. */

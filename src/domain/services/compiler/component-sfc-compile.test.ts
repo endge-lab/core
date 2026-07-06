@@ -95,4 +95,29 @@ defineProps<{
     expect(result.contract.inputs.map(item => item.name)).toEqual(['flight', 'compact'])
     expect(result.ir?.template.roots[0]?.kind).toBe('element')
   })
+
+  it('accepts table structural primitives', () => {
+    const result = compileComponentSFC(`<script setup lang="ts">
+defineProps<{
+  flights: FlightLeg[]
+}>()
+</script>
+
+<template>
+<Table :rows="flights" row-key="id">
+  <Column key="number" title="Flight">
+    <Cell>
+      <Text>{{ row.number }}</Text>
+    </Cell>
+  </Column>
+</Table>
+</template>
+`)
+
+    expect(result.diagnostics.filter(item => item.code === 'sfc-template-tag-unsupported')).toEqual([])
+    expect(result.ir?.template.roots[0]).toMatchObject({
+      kind: 'element',
+      tag: 'Table',
+    })
+  })
 })

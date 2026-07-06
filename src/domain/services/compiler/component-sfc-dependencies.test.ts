@@ -74,6 +74,33 @@ defineProps<{
     ])
   })
 
+  it('collects table rows dependency and ignores row scoped reads', () => {
+    const ir = compileComponentSFC(`<script setup lang="ts">
+defineProps<{
+  flights: FlightLeg[]
+}>()
+</script>
+
+<template>
+<Table :rows="flights" row-key="id">
+  <Column key="number" title="Flight">
+    <Cell>
+      <Text>{{ row.number }} ({{ row.counter }})</Text>
+    </Cell>
+  </Column>
+</Table>
+</template>`).ir
+
+    const deps = analyzeComponentSFCRuntimeDependencies(ir)
+
+    expect(deps.props).toEqual([
+      expect.objectContaining({
+        prop: 'flights',
+        path: [],
+      }),
+    ])
+  })
+
   it('ignores unsupported or global identifiers', () => {
     const ir = compileComponentSFC(`<script setup lang="ts">
 defineProps<{

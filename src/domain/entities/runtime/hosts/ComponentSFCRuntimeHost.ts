@@ -285,12 +285,21 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
       if (!path)
         continue
 
-      const dispose = Raph.app.observeData(this.node, path, {
-        phase: RUNTIME_BOUNDARY_UPDATE_PHASE_NAME,
-        wildcardDynamic: binding.wildcardDynamic ?? true,
-      })
-      this._raphInputDisposers.push(dispose)
+      for (const observedPath of this._makeObservedRaphPaths(path, dependency.path)) {
+        const dispose = Raph.app.observeData(this.node, observedPath, {
+          phase: RUNTIME_BOUNDARY_UPDATE_PHASE_NAME,
+          wildcardDynamic: binding.wildcardDynamic ?? true,
+        })
+        this._raphInputDisposers.push(dispose)
+      }
     }
+  }
+
+  private _makeObservedRaphPaths(path: string, dependencyPath: string[]): string[] {
+    if (dependencyPath.length > 0)
+      return [path]
+
+    return [path, `${path}.*`]
   }
 
   private _clearRaphInputSubscriptions(): void {
