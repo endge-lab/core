@@ -63,7 +63,22 @@ describe('RuntimeBoundaryUpdatePhase', () => {
     expect(updates[0].events).toHaveLength(1)
   })
 
-  it('aggregates dirty boundary into root update', () => {
+  it('updates root host when nested data changes through deep wildcard observer', () => {
+    const { kernel, runtime, updates } = createFixture()
+    const root = createRuntimeNode(runtime, 'root', 'root')
+
+    runtime.addNode(root)
+    runtime.observeData(root, 'data.rows.*', { phase: RuntimeBoundaryUpdatePhase.PHASE_NAME })
+
+    kernel.set('data.rows[0].counter', 1)
+
+    expect(updates).toHaveLength(1)
+    expect(updates[0].node.id).toBe('root')
+    expect(updates[0].events).toHaveLength(1)
+    expect(updates[0].events[0].canonical).toBe('data.rows[0].counter')
+  })
+
+  it('updates dirty boundary directly', () => {
     const { kernel, runtime, updates } = createFixture()
     const root = createRuntimeNode(runtime, 'root', 'root')
     const boundary = createRuntimeNode(runtime, 'boundary', 'boundary')
@@ -75,13 +90,13 @@ describe('RuntimeBoundaryUpdatePhase', () => {
     kernel.set('data.boundary', 1)
 
     expect(updates).toHaveLength(1)
-    expect(updates[0].node.id).toBe('root')
+    expect(updates[0].node.id).toBe('boundary')
     expect(updates[0].boundaries).toHaveLength(1)
     expect(updates[0].boundaries[0].boundary.id).toBe('boundary')
     expect(updates[0].boundaries[0].dirtyNodes.map(node => node.id)).toEqual(['boundary'])
   })
 
-  it('aggregates dirty leaf into nearest boundary and root', () => {
+  it('updates nearest boundary when leaf is dirty', () => {
     const { kernel, runtime, updates } = createFixture()
     const root = createRuntimeNode(runtime, 'root', 'root')
     const boundary = createRuntimeNode(runtime, 'boundary', 'boundary')
@@ -95,12 +110,12 @@ describe('RuntimeBoundaryUpdatePhase', () => {
     kernel.set('data.leaf', 1)
 
     expect(updates).toHaveLength(1)
-    expect(updates[0].node.id).toBe('root')
+    expect(updates[0].node.id).toBe('boundary')
     expect(updates[0].boundaries[0].boundary.id).toBe('boundary')
     expect(updates[0].boundaries[0].dirtyNodes.map(node => node.id)).toEqual(['leaf'])
   })
 
-  it('merges several dirty leaf nodes in one boundary into one root update', () => {
+  it('merges several dirty leaf nodes in one boundary into one boundary update', () => {
     const { kernel, runtime, updates } = createFixture()
     const root = createRuntimeNode(runtime, 'root', 'root')
     const boundary = createRuntimeNode(runtime, 'boundary', 'boundary')
@@ -120,12 +135,13 @@ describe('RuntimeBoundaryUpdatePhase', () => {
     })
 
     expect(updates).toHaveLength(1)
+    expect(updates[0].node.id).toBe('boundary')
     expect(updates[0].boundaries).toHaveLength(1)
     expect(updates[0].boundaries[0].events).toHaveLength(2)
     expect(updates[0].boundaries[0].dirtyNodes.map(node => node.id).sort()).toEqual(['leaf-1', 'leaf-2'])
   })
 
-  it('keeps separate boundary records under the same root', () => {
+  it('updates separate top-level dirty boundaries independently', () => {
     const { kernel, runtime, updates } = createFixture()
     const root = createRuntimeNode(runtime, 'root', 'root')
     const firstBoundary = createRuntimeNode(runtime, 'boundary-1', 'boundary')
@@ -146,7 +162,27 @@ describe('RuntimeBoundaryUpdatePhase', () => {
       kernel.set('data.second', 2)
     })
 
+    expect(updates).toHaveLength(2)
+    expect(updates.map(update => update.node.id).sort()).toEqual(['boundary-1', 'boundary-2'])
+  })
+
+  it('prunes child boundary updates when root is dirty in same transaction', () => {
+    const { kernel, runtime, updates } = createFixture()
+    const root = createRuntimeNode(runtime, 'root', 'root')
+    const boundary = createRuntimeNode(runtime, 'boundary', 'boundary')
+
+    runtime.addNode(root)
+    root.addChild(boundary)
+    runtime.observeData(root, 'data.root', { phase: RuntimeBoundaryUpdatePhase.PHASE_NAME })
+    runtime.observeData(boundary, 'data.boundary', { phase: RuntimeBoundaryUpdatePhase.PHASE_NAME })
+
+    kernel.transaction(() => {
+      kernel.set('data.root', 1)
+      kernel.set('data.boundary', 2)
+    })
+
     expect(updates).toHaveLength(1)
-    expect(updates[0].boundaries.map(item => item.boundary.id).sort()).toEqual(['boundary-1', 'boundary-2'])
+    expect(updates[0].node.id).toBe('root')
+    expect(updates[0].boundaries).toEqual([])
   })
 })

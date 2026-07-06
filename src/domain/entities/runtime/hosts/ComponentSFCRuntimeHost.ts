@@ -7,12 +7,16 @@ import type {
 import type {
   RComponentSFC_AST,
   RComponentSFC_IR,
+  RComponentSFC_RuntimeBoundaryDependency,
   RComponentSFC_RuntimeDependencies,
+  RComponentSFC_RuntimeTableColumnDependency,
   RComponentSFCSource_Parts,
 } from '@/domain/types/component-sfc.types'
 import type { ComponentSFCProgramPayload, ProgramDiagnostic } from '@/domain/types/program.types'
 import type {
   RuntimeArtifactReader,
+  RuntimeBoundaryPatch,
+  RuntimeCollectionProjectionPatch,
   RuntimeHost,
   RuntimeHostContext,
   RuntimeHostInputSource,
@@ -125,7 +129,6 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     host.syncArtifactState(target)
     Raph.app.addNode(node)
     host.addRaphNode(node)
-    host.setInputSource(meta.input)
     host.addResource({
       id: `node:${node.id}`,
       kind: 'raph-node',
@@ -133,6 +136,8 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
       subtitle: `${node.meta?.type ?? 'node'}:${node.meta?.kind ?? 'root'}`,
       payload: { meta: node.meta ?? {} },
     })
+    host._createRuntimeBoundaryNodes(node)
+    host.setInputSource(meta.input)
     host.addResource({
       id: 'artifact:component-sfc',
       kind: 'meta',
@@ -219,6 +224,14 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
       updatedAt: now,
       lastRenderAt: now,
     })
+
+    const patch = this._makeBoundaryPatch(ctx)
+    if (patch) {
+      this.emit('boundary:dirty', patch)
+      super.update(ctx)
+      return
+    }
+
     this.emit('props:dirty', ctx)
     super.update(ctx)
   }
@@ -268,7 +281,84 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
       diagnostics: artifact.diagnostics.length,
       dependencies: artifact.dependencies.length,
       runtimeDependencies: artifact.payload.runtimeDependencies?.props.length ?? 0,
+      runtimeBoundaries: artifact.payload.runtimeDependencies?.boundaries.length ?? 0,
     }
+  }
+
+  private _createRuntimeBoundaryNodes(root: RaphNode): void {
+    const dependencies = this.getRuntimeDependencies()
+
+    for (const boundary of dependencies.boundaries) {
+      if (boundary.kind !== 'table')
+        continue
+
+      const tableNode = new RaphNode(Raph.app, {
+        id: `${root.id}:table:${boundary.id}`,
+        meta: {
+          type: 'runtime-node',
+          kind: 'boundary',
+          boundaryType: 'table',
+          boundaryId: boundary.id,
+          runtimeId: this.id,
+          runtimeKind: 'runtime',
+          entityType: 'component-sfc',
+          entityIdentity: this.entityIdentity,
+          sourceProp: boundary.sourceProp,
+          sourcePath: boundary.sourcePath,
+          rowKey: boundary.rowKey,
+        },
+      })
+
+      root.addChild(tableNode, { invalidate: false })
+      this.addRaphNode(tableNode)
+      this.addResource({
+        id: `node:${tableNode.id}`,
+        kind: 'raph-node',
+        title: tableNode.id,
+        subtitle: 'boundary:table',
+        payload: { meta: tableNode.meta ?? {} },
+      })
+
+      for (const column of boundary.columns)
+        this._createTableColumnBoundaryNode(tableNode, boundary, column)
+    }
+  }
+
+  private _createTableColumnBoundaryNode(
+    tableNode: RaphNode,
+    boundary: RComponentSFC_RuntimeBoundaryDependency,
+    column: RComponentSFC_RuntimeTableColumnDependency,
+  ): void {
+    const columnNode = new RaphNode(Raph.app, {
+      id: `${tableNode.id}:column:${column.id}`,
+      meta: {
+        type: 'runtime-node',
+        kind: 'boundary',
+        boundaryType: 'table-column',
+        boundaryId: column.id,
+        tableBoundaryId: boundary.id,
+        runtimeId: this.id,
+        runtimeKind: 'runtime',
+        entityType: 'component-sfc',
+        entityIdentity: this.entityIdentity,
+        sourceProp: boundary.sourceProp,
+        sourcePath: boundary.sourcePath,
+        rowKey: boundary.rowKey,
+        columnKey: column.key,
+        columnIndex: column.index,
+        rowReads: column.rowReads,
+      },
+    })
+
+    tableNode.addChild(columnNode, { invalidate: false })
+    this.addRaphNode(columnNode)
+    this.addResource({
+      id: `node:${columnNode.id}`,
+      kind: 'raph-node',
+      title: columnNode.id,
+      subtitle: `boundary:table-column:${column.key}`,
+      payload: { meta: columnNode.meta ?? {} },
+    })
   }
 
   private _bindRaphInputSource(input: Extract<RuntimeHostInputSource, { kind: 'raph' }>): void {
@@ -277,6 +367,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
 
     const deps = this.getRuntimeDependencies()
     for (const dependency of deps.props) {
+      if (this._isCoveredByPatchableBoundary(dependency.prop, dependency.path))
+        continue
+
       const binding = input.bindings[dependency.prop]
       if (!binding?.path)
         continue
@@ -292,6 +385,171 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
         })
         this._raphInputDisposers.push(dispose)
       }
+    }
+
+    this._bindRaphBoundaryInputSource(input, deps.boundaries)
+  }
+
+  private _bindRaphBoundaryInputSource(
+    input: Extract<RuntimeHostInputSource, { kind: 'raph' }>,
+    boundaries: RComponentSFC_RuntimeBoundaryDependency[],
+  ): void {
+    for (const boundary of boundaries) {
+      const binding = input.bindings[boundary.sourceProp]
+      if (!binding?.path)
+        continue
+
+      const sourcePath = this._joinRaphPath(binding.path, boundary.sourcePath)
+      if (!sourcePath)
+        continue
+
+      const tableNode = this._findRuntimeNodeByMeta('boundaryId', boundary.id)
+      if (tableNode) {
+        this._raphInputDisposers.push(Raph.app.observeData(tableNode, sourcePath, {
+          phase: RUNTIME_BOUNDARY_UPDATE_PHASE_NAME,
+          wildcardDynamic: binding.wildcardDynamic ?? true,
+        }))
+      }
+
+      for (const column of boundary.columns) {
+        const columnNode = this._findRuntimeNodeByMeta('boundaryId', column.id)
+        if (!columnNode)
+          continue
+
+        for (const observedPath of this._makeObservedColumnPaths(sourcePath, column)) {
+          this._raphInputDisposers.push(Raph.app.observeData(columnNode, observedPath, {
+            phase: RUNTIME_BOUNDARY_UPDATE_PHASE_NAME,
+            wildcardDynamic: binding.wildcardDynamic ?? true,
+          }))
+        }
+      }
+    }
+  }
+
+  private _isCoveredByPatchableBoundary(prop: string, path: string[]): boolean {
+    return this.getRuntimeDependencies().boundaries.some((boundary) => {
+      if (boundary.sourceProp !== prop)
+        return false
+
+      return boundary.sourcePath.every((part, index) => path[index] === part)
+    })
+  }
+
+  private _findRuntimeNodeByMeta(key: string, value: unknown): RaphNode | null {
+    const resource = this.resources.find((item) => {
+      if (item.kind !== 'raph-node')
+        return false
+
+      const meta = item.payload?.meta
+      return isRecord(meta) && meta[key] === value
+    })
+
+    const nodeId = String(resource?.title ?? '').trim()
+    if (!nodeId)
+      return null
+
+    return Raph.app.getNode(nodeId) ?? null
+  }
+
+  private _makeObservedColumnPaths(
+    sourcePath: string,
+    column: RComponentSFC_RuntimeTableColumnDependency,
+  ): string[] {
+    const reads = column.rowReads.length > 0 ? column.rowReads : [column.key]
+    return reads.map(read => `${sourcePath}[*].${read}`)
+  }
+
+  private _makeBoundaryPatch(ctx: RuntimeHostUpdateContext): RuntimeBoundaryPatch | null {
+    if (ctx.node.meta?.boundaryType === 'table-column')
+      return this._makeTableColumnPatch(ctx)
+
+    return null
+  }
+
+  private _makeTableColumnPatch(ctx: RuntimeHostUpdateContext): RuntimeBoundaryPatch | null {
+    const meta = ctx.node.meta ?? {}
+    const sourcePath = this._resolveBoundarySourcePath(meta)
+    if (!sourcePath)
+      return null
+
+    const itemIndex = this._extractCollectionItemIndex(sourcePath, ctx.events)
+    const itemPath = itemIndex == null ? null : `${sourcePath}[${itemIndex}]`
+    const rowKey = typeof meta.rowKey === 'string' ? meta.rowKey : null
+    const itemSnapshot = itemPath ? Raph.get(itemPath) : null
+    const itemKey = itemPath && rowKey ? Raph.get(`${itemPath}.${rowKey}`) : null
+    const changedPaths = ctx.events
+      .map(event => this._extractChangedPath(sourcePath, event.canonical))
+      .filter((path): path is string[] => Array.isArray(path))
+
+    const projection = this._makeColumnProjection(ctx.node)
+    const patch = {
+      kind: 'collection-projection-update',
+      boundaryId: String(meta.tableBoundaryId ?? ''),
+      boundaryType: 'table',
+      sourcePath,
+      itemIndex,
+      itemKey,
+      itemSnapshot,
+      changedPaths,
+      affectedProjections: projection ? [projection] : [],
+      events: ctx.events,
+      node: ctx.node,
+    } satisfies RuntimeBoundaryPatch
+
+    return patch.boundaryId ? patch : null
+  }
+
+  private _resolveBoundarySourcePath(meta: Record<string, unknown>): string {
+    if (this._inputSource?.kind !== 'raph')
+      return ''
+
+    const sourceProp = String(meta.sourceProp ?? '').trim()
+    const binding = this._inputSource.bindings[sourceProp]
+    if (!binding?.path)
+      return ''
+
+    const sourcePath = Array.isArray(meta.sourcePath)
+      ? meta.sourcePath.map(part => String(part))
+      : []
+
+    return this._joinRaphPath(binding.path, sourcePath)
+  }
+
+  private _extractCollectionItemIndex(sourcePath: string, events: RuntimeHostUpdateContext['events']): number | null {
+    const escaped = sourcePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const pattern = new RegExp(`^${escaped}\\[(\\d+)\\](?:\\.|$)`)
+
+    for (const event of events) {
+      const match = event.canonical.match(pattern)
+      if (match)
+        return Number(match[1])
+    }
+
+    return null
+  }
+
+  private _extractChangedPath(sourcePath: string, canonical: string): string[] | null {
+    const escaped = sourcePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const match = canonical.match(new RegExp(`^${escaped}\\[\\d+\\]\\.?(.+)?$`))
+    if (!match)
+      return null
+
+    return String(match[1] ?? '')
+      .split('.')
+      .map(part => part.trim())
+      .filter(Boolean)
+  }
+
+  private _makeColumnProjection(node: RaphNode): RuntimeCollectionProjectionPatch | null {
+    const key = String(node.meta?.columnKey ?? '').trim()
+    const index = Number(node.meta?.columnIndex)
+    if (!key || !Number.isFinite(index))
+      return null
+
+    return {
+      boundaryId: String(node.meta?.boundaryId ?? ''),
+      key,
+      index,
     }
   }
 
@@ -329,4 +587,8 @@ function normalizeTarget(raw: unknown): RComponentRenderTarget | null {
   return raw === 'dom' || raw === 'canvas'
     ? raw
     : null
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === 'object' && !Array.isArray(value)
 }

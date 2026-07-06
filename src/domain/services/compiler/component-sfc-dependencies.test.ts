@@ -99,6 +99,21 @@ defineProps<{
         path: [],
       }),
     ])
+    expect(deps.boundaries).toEqual([
+      expect.objectContaining({
+        kind: 'table',
+        sourceProp: 'flights',
+        sourcePath: [],
+        rowKey: 'id',
+        columns: [
+          expect.objectContaining({
+            key: 'number',
+            index: 0,
+            rowReads: ['number', 'counter'],
+          }),
+        ],
+      }),
+    ])
   })
 
   it('ignores unsupported or global identifiers', () => {

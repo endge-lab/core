@@ -244,6 +244,57 @@ export interface RuntimeHostUpdateContext {
   frame: RaphFrameContext
 }
 
+/** Проекция patchable collection boundary, которую можно обновить точечно. */
+export interface RuntimeCollectionProjectionPatch {
+  /** Boundary-id дочерней проекции, например колонки таблицы. */
+  boundaryId: string
+
+  /** Семантический ключ проекции, например key колонки. */
+  key: string
+
+  /** Индекс проекции в render target, например индекс колонки. */
+  index: number
+}
+
+/** Patch обновления части коллекции внутри runtime boundary. */
+export interface RuntimeCollectionProjectionUpdatePatch {
+  /** Тип patch payload. */
+  kind: 'collection-projection-update'
+
+  /** Boundary-id владельца коллекции, например Table. */
+  boundaryId: string
+
+  /** Тип boundary владельца коллекции. */
+  boundaryType: 'table'
+
+  /** Source path, на который подписана boundary-нода. */
+  sourcePath: string
+
+  /** Индекс элемента коллекции, если его можно извлечь из Raph event path. */
+  itemIndex: number | null
+
+  /** Ключ элемента коллекции, если runtime смог его прочитать. */
+  itemKey: unknown
+
+  /** Снимок элемента коллекции после изменения. */
+  itemSnapshot: unknown
+
+  /** Измененные относительные paths внутри элемента коллекции. */
+  changedPaths: string[][]
+
+  /** Проекции, которые зависят от измененных paths. */
+  affectedProjections: RuntimeCollectionProjectionPatch[]
+
+  /** Исходные события Raph, из которых собран patch. */
+  events: PhaseEvent[]
+
+  /** Raph-нода, которая стала верхней dirty boundary. */
+  node: RaphNode
+}
+
+/** Нейтральный patch runtime boundary для render adapter-а. */
+export type RuntimeBoundaryPatch = RuntimeCollectionProjectionUpdatePatch
+
 export interface RuntimeHost<
   TType extends RuntimeEntityType = RuntimeEntityType,
   TContext extends RuntimeHostContext<TType> = RuntimeHostContext<TType>,
