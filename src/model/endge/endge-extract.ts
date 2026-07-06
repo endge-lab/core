@@ -140,6 +140,9 @@ export class EndgeExtract extends EndgeModule {
       : currentValue
   }
 
+  /**
+   * Извлекает данные по DataPath с поддержкой root/current/component контекстов.
+   */
   pathV2(opts: {
     allData: any // _root данные с самого верхнего узла
     comData: any // текущие данные компонента

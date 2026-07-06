@@ -10,6 +10,9 @@ import {
   themeConfig,
 } from '@/domain/types/ui.types'
 
+/**
+ * UI-состояние ядра: zoom, theme и режим отображения времени.
+ */
 export class EndgeUI extends EndgeModule {
   //
   // ZOOM CONFIG
@@ -31,6 +34,9 @@ export class EndgeUI extends EndgeModule {
   private _theme: string
   private _isLocalTime: boolean
 
+  /**
+   * Восстанавливает UI-настройки из localStorage и применяет тему к document.
+   */
   constructor() {
     super()
 
@@ -45,6 +51,9 @@ export class EndgeUI extends EndgeModule {
   //
   // SNAPSHOT
   //
+  /**
+   * Возвращает полный snapshot UI-настроек.
+   */
   public get snapshot(): EndgeUISnapshot {
     return {
       zoom: this._zoom,
@@ -60,14 +69,23 @@ export class EndgeUI extends EndgeModule {
   //
   // ZOOM
   //
+  /**
+   * Возвращает текущий процент zoom.
+   */
   public get zoom(): number {
     return this._zoom
   }
 
+  /**
+   * Возвращает CSS-класс текущего zoom.
+   */
   public get zoomClass(): string {
     return `zoom-${this._zoom}`
   }
 
+  /**
+   * Устанавливает zoom с ограничением допустимого диапазона.
+   */
   public setZoom(value: number): void {
     const next: number = this.clampZoom(value)
     if (next === this._zoom)
@@ -78,20 +96,32 @@ export class EndgeUI extends EndgeModule {
     this.notify()
   }
 
+  /**
+   * Возвращает zoom к значению по умолчанию.
+   */
   public resetZoom(): void {
     this.setZoom(this.DEFAULT_ZOOM)
   }
 
+  /**
+   * Увеличивает zoom на один шаг.
+   */
   public zoomUp(): void {
     if (this._zoom < this.MAX_ZOOM)
       this.setZoom(this._zoom + this.STEP_ZOOM)
   }
 
+  /**
+   * Уменьшает zoom на один шаг.
+   */
   public zoomDown(): void {
     if (this._zoom > this.MIN_ZOOM)
       this.setZoom(this._zoom - this.STEP_ZOOM)
   }
 
+  /**
+   * Внутренний helper модуля: clamp Zoom.
+   */
   private clampZoom(value: number): number {
     const n: number = Math.round(Number(value))
     if (!Number.isFinite(n))
@@ -99,6 +129,9 @@ export class EndgeUI extends EndgeModule {
     return Math.min(this.MAX_ZOOM, Math.max(this.MIN_ZOOM, n))
   }
 
+  /**
+   * Считывает Zoom From LS.
+   */
   private readZoomFromLS(): number {
     if (typeof localStorage === 'undefined')
       return this.DEFAULT_ZOOM
@@ -107,6 +140,9 @@ export class EndgeUI extends EndgeModule {
     return this.clampZoom(n)
   }
 
+  /**
+   * Записывает Zoom To LS.
+   */
   private writeZoomToLS(value: number): void {
     if (typeof localStorage === 'undefined')
       return
@@ -116,14 +152,23 @@ export class EndgeUI extends EndgeModule {
   //
   // THEME
   //
+  /**
+   * Возвращает текущую тему.
+   */
   public get theme(): string {
     return this._theme
   }
 
+  /**
+   * Показывает, активна ли темная тема.
+   */
   public get isDark(): boolean {
     return this._theme === 'dark'
   }
 
+  /**
+   * Устанавливает тему, сохраняет ее и применяет CSS-классы к document.
+   */
   public setTheme(next: string): void {
     if (!themeConfig.availableThemes.includes(next))
       return
@@ -136,6 +181,9 @@ export class EndgeUI extends EndgeModule {
     this.notify()
   }
 
+  /**
+   * Считывает Theme From LS.
+   */
   private readThemeFromLS(): string {
     if (typeof localStorage === 'undefined')
       return themeConfig.defaultTheme
@@ -149,12 +197,18 @@ export class EndgeUI extends EndgeModule {
     return themeConfig.defaultTheme
   }
 
+  /**
+   * Записывает Theme To LS.
+   */
   private writeThemeToLS(value: string): void {
     if (typeof localStorage === 'undefined')
       return
     localStorage.setItem(themeConfig.storageKey, value)
   }
 
+  /**
+   * Применяет Theme To Document.
+   */
   private applyThemeToDocument(theme: string): void {
     if (typeof document === 'undefined')
       return
@@ -171,10 +225,16 @@ export class EndgeUI extends EndgeModule {
   //
   // TIME
   //
+  /**
+   * Показывает, используется ли локальное время вместо UTC.
+   */
   public get isLocalTime(): boolean {
     return this._isLocalTime
   }
 
+  /**
+   * Возвращает текущий режим времени для UI.
+   */
   public get timeZone(): TimeZoneMode {
     return this._isLocalTime ? 'LT' : 'UTC'
   }
@@ -199,6 +259,9 @@ export class EndgeUI extends EndgeModule {
     this.setLocalTime(!this._isLocalTime)
   }
 
+  /**
+   * Считывает Is Local Time From LS.
+   */
   private readIsLocalTimeFromLS(): boolean {
     if (typeof localStorage === 'undefined')
       return this.DEFAULT_IS_LOCAL_TIME
@@ -217,6 +280,9 @@ export class EndgeUI extends EndgeModule {
     return this.DEFAULT_IS_LOCAL_TIME
   }
 
+  /**
+   * Записывает Is Local Time To LS.
+   */
   private writeIsLocalTimeToLS(value: boolean): void {
     if (typeof localStorage === 'undefined')
       return

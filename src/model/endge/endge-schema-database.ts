@@ -7,11 +7,14 @@ import type {
 import type { QueriesPayloadFields } from '@/model/db/repositories/Queries_Repository'
 import type { AxiosError, AxiosInstance } from 'axios'
 
+import type { EndgeBootContext } from '@/domain/types/bootstrap.types'
+
 import { AppBus, Serialize } from '@endge/utils'
 import axios from 'axios'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { ReflectComponentToPayloadData, ReflectComponentToPlain } from '@/domain/entities/reflect/RComponent'
+import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RVersion } from '@/domain/entities/reflect/RVersion'
 import { ComponentType, FilterType, ParameterType, QueryType, ScriptType } from '@/domain/types/document.types'
 import { Endge } from '@/model/endge/endge'
@@ -19,6 +22,7 @@ import { queryPayloadDocToPlain } from '@/model/endge/endge-domain'
 import { Actions_Repository } from '@/model/db/repositories/Actions_Repository'
 import { BehaviorBindings_Repository } from '@/model/db/repositories/BehaviorBindings_Repository'
 import { Components_Repository } from '@/model/db/repositories/Components_Repository'
+import { ComponentSFCs_Repository } from '@/model/db/repositories/ComponentSFCs_Repository'
 import { Converters_Repository } from '@/model/db/repositories/Converters_Repository'
 import { Environments_Repository } from '@/model/db/repositories/Environments_Repository'
 import { Filters_Repository } from '@/model/db/repositories/Filters_Repository'
@@ -168,6 +172,21 @@ function normalizeQueryMockDataForPayload(raw: unknown): unknown {
   return null
 }
 
+/** Оставляет только targets, поддержанные SFC-моделью v1. */
+function normalizeComponentSFCTargets(raw: unknown): Array<'dom' | 'canvas'> {
+  if (!Array.isArray(raw))
+    return ['dom', 'canvas']
+
+  const targets = raw.filter((target): target is 'dom' | 'canvas' => target === 'dom' || target === 'canvas')
+  return targets.length ? Array.from(new Set(targets)) : ['dom', 'canvas']
+}
+
+/** Возвращает root-папку раздела "Компоненты" для SFC-документов. */
+async function resolveDefaultComponentFolder(repos: RepositoriesBag): Promise<number | string | null> {
+  const rootFolder = await repos.folders.findByIdentity('root-components')
+  return rootFolder?.id ?? null
+}
+
 function normalizeFlowDefinition(rawDefinition: any): Record<string, unknown> {
   if (!rawDefinition || typeof rawDefinition !== 'object' || Array.isArray(rawDefinition)) {
     return {
@@ -250,6 +269,7 @@ const ROOT_FOLDER_ENTITY_TYPE_BY_IDENTITY: Record<string, string> = {
  */
 export class EndgeSchemaStorage extends EndgeModule {
   public isFirstCheck = true
+  private _loadedSource: EndgeSchemaDump | null = null
 
   public payloadBaseAPI!: string
   public payloadSecret!: string
@@ -266,12 +286,14 @@ export class EndgeSchemaStorage extends EndgeModule {
   /** Список ошибок последней проверки (глобальный). */
   private _errors: EndgeSchemaError[] = []
 
-  /** Публичный readonly-геттер ошибок. */
+  /**
+   * Возвращает накопленные ошибки schema/payload слоя.
+   */
   public get ERRORS(): readonly EndgeSchemaError[] {
     return this._errors
   }
 
-  /** Подключённые репозитории (после init/refresh). */
+  /** Подключённые репозитории (после configurePayload/refresh). */
   public repositories: RepositoriesBag | null = null
 
   /**
@@ -296,6 +318,7 @@ export class EndgeSchemaStorage extends EndgeModule {
     'settings',
     'types',
     'components',
+    'component-sfcs',
     'scenarios',
     'actions',
     'queries',
@@ -318,7 +341,9 @@ export class EndgeSchemaStorage extends EndgeModule {
     'i18n-bundles',
   ]
 
-  /** Совокупное здоровье. */
+  /**
+   * Возвращает совокупное состояние здоровья Payload/schema слоя.
+   */
   public get isHealthy(): boolean {
     return (
       this.isPayloadAvailable
@@ -327,6 +352,9 @@ export class EndgeSchemaStorage extends EndgeModule {
     )
   }
 
+  /**
+   * Показывает, есть ли ошибки подключения, health-check или доступности коллекций.
+   */
   public get hasErrors(): boolean {
     return (
       !this.isPayloadAvailable
@@ -336,24 +364,16 @@ export class EndgeSchemaStorage extends EndgeModule {
   }
 
   /**
-   * Полная инициализация:
+   * Полная настройка Payload:
    *  - сохраняем baseURL / secret
    *  - создаём axios-клиент
    *  - вызываем refresh()
    *  - запускаем периодический refresh()
    */
-  public async init(): Promise<void>
-  public async init(opts: {
-    payloadBaseAPI: string
-    payloadSecret: string
-  }): Promise<void>
-  public async init(opts?: {
+  public async configurePayload(opts: {
     payloadBaseAPI: string
     payloadSecret: string
   }): Promise<void> {
-    if (!opts)
-      return
-
     this.payloadBaseAPI = opts.payloadBaseAPI
     this.payloadSecret = opts.payloadSecret
 
@@ -369,7 +389,7 @@ export class EndgeSchemaStorage extends EndgeModule {
       this.pushError({
         kind: 'PAYLOAD_NOT_CONFIGURED',
         message:
-          'Payload не сконфигурирован: baseURL или secret не заданы (см. init-параметры).',
+          'Payload не сконфигурирован: baseURL или secret не заданы (см. configurePayload-параметры).',
         details: {
           baseURLPresent: !!this.payloadBaseAPI,
           secretPresent: !!this.payloadSecret,
@@ -396,6 +416,46 @@ export class EndgeSchemaStorage extends EndgeModule {
     // }, 100000)
   }
 
+  /**
+   * На фазе `setup` настраивает Payload client, если boot идет через payload-provider.
+   */
+  public override async setup(ctx: EndgeBootContext): Promise<void> {
+    if (ctx.dataProvider !== 'payload')
+      return
+
+    await this.configurePayload({
+      payloadBaseAPI: ctx.payload?.baseAPI ?? '',
+      payloadSecret: ctx.payload?.secret ?? '',
+    })
+  }
+
+  /**
+   * На фазе `load` выгружает schema dump из Payload и сохраняет его внутри модуля.
+   */
+  public override async load(ctx: EndgeBootContext): Promise<void> {
+    if (ctx.dataProvider !== 'payload')
+      return
+
+    this._loadedSource = await this.exportAll()
+  }
+
+  /**
+   * Возвращает dump, загруженный на фазе `load`.
+   */
+  public getLoadedSource(): EndgeSchemaDump | null {
+    return this._loadedSource
+  }
+
+  /**
+   * Очищает загруженный schema dump при reset federation.
+   */
+  public override reset(): void {
+    this._loadedSource = null
+  }
+
+  /**
+   * Завершает health-check итерацию и уведомляет подписчиков.
+   */
   public logResult(): void {
     this.isFirstCheck = false
     this.notify()
@@ -417,6 +477,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         queries: new Queries_Repository(this.api),
         folders: new Folders_Repository(this.api),
         components: new Components_Repository(this.api),
+        componentSFCs: new ComponentSFCs_Repository(this.api),
         scenarios: new Scenarios_Repository(this.api),
         actions: new Actions_Repository(this.api),
         settings: new Settings_Repository(this.api),
@@ -499,17 +560,6 @@ export class EndgeSchemaStorage extends EndgeModule {
   }
 
   /**
-   * Загружает все сущности из Payload в Endge.domain и компилирует домен.
-   */
-  public async hydrateDomain(): Promise<EndgeSchemaDump> {
-    const dump = await this.exportAll()
-    Endge.domain.mergeFromPayload(dump)
-    Endge.domain.compile()
-    AppBus.emit('domainLoaded', undefined)
-    return dump
-  }
-
-  /**
    * Выгружает ВСЕ данные по всем коллекциям и приводит их
    * к «чистому» schema-формату (без storage-мета).
    */
@@ -526,6 +576,7 @@ export class EndgeSchemaStorage extends EndgeModule {
       types: [],
       queries: [],
       components: [],
+      componentSFCs: [],
       scenarios: [],
       actions: [],
       converters: [],
@@ -919,6 +970,30 @@ export class EndgeSchemaStorage extends EndgeModule {
       return base
     }
 
+    /** SFC-компонент из отдельной flat-коллекции payload. */
+    const normalizeComponentSFC = (raw: any) => {
+      return {
+        id: raw.id,
+        identity: raw.identity ?? '',
+        name: raw.displayName ?? raw.identity ?? '',
+        displayName: raw.displayName ?? raw.identity ?? '',
+        description: raw.description ?? null,
+        folderId: relationToId(raw.folder) ?? null,
+        project: relationToId(raw.project) ?? null,
+        kind: 'component-sfc',
+        type: ComponentType.SFC,
+        sourceKind: 'component-sfc',
+        source: typeof raw.source === 'string' ? raw.source : '',
+        supportedTargets: normalizeComponentSFCTargets(raw.supportedTargets),
+        modelVersion: Number(raw.modelVersion ?? 1),
+        meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
+        active: raw.active ?? true,
+        deletedAt: raw.deletedAt ?? null,
+        author: raw.author ?? null,
+        inherited: raw.inherited === true,
+      }
+    }
+
     const normalizeQuery = (raw: any) => {
       const folderId = relationToId(raw.folder)
       return {
@@ -1198,6 +1273,11 @@ export class EndgeSchemaStorage extends EndgeModule {
         return rows.map(normalizeComponentFromPayload)
       }),
 
+      load('componentSFCs', async () => {
+        const rows = await this.repositories!.componentSFCs.findAll()
+        return rows.map(normalizeComponentSFC)
+      }),
+
       load('scenarios', async () => {
         const rows = await this.repositories!.scenarios.findAll()
         return rows.map(normalizeSchemaEntity)
@@ -1320,6 +1400,8 @@ export class EndgeSchemaStorage extends EndgeModule {
     documentIdOrIdentity: string | number,
   ): any | null {
     const domain = Endge.domain
+    if (documentType === ComponentType.SFC)
+      return domain.getComponentSFC(documentIdOrIdentity)
     if (documentType === ComponentType.Table || documentType === ComponentType.DSL)
       return domain.getComponent(documentIdOrIdentity)
     if (documentType === QueryType.REST || documentType === QueryType.GraphQL || documentType === QueryType.Custom)
@@ -1387,6 +1469,9 @@ export class EndgeSchemaStorage extends EndgeModule {
   }
 
   /** Payload id документа из домена (для PATCH без лишнего GET). */
+  /**
+   * Разрешает Document Payload Id.
+   */
   private resolveDocumentPayloadId(
     documentIdOrIdentity: string | number,
     documentType: DomainDocumentType,
@@ -1399,6 +1484,9 @@ export class EndgeSchemaStorage extends EndgeModule {
     return null
   }
 
+  /**
+   * Проверяет is Malformed Payload Document Id.
+   */
   private isMalformedPayloadDocumentId(id: unknown): boolean {
     if (id == null)
       return true
@@ -1411,6 +1499,9 @@ export class EndgeSchemaStorage extends EndgeModule {
     return normalized === 'undefined' || normalized === 'null' || normalized === 'nan'
   }
 
+  /**
+   * Внутренний helper модуля: find Payload Document By Identity.
+   */
   private async findPayloadDocumentByIdentity(
     documentType: DomainDocumentType,
     identity: string,
@@ -1421,6 +1512,8 @@ export class EndgeSchemaStorage extends EndgeModule {
 
     if (documentType === ComponentType.Table || documentType === ComponentType.DSL)
       return repos.components.findByIdentity(identity)
+    if (documentType === ComponentType.SFC)
+      return repos.componentSFCs.findByIdentity(identity)
     if (documentType === QueryType.REST || documentType === QueryType.GraphQL || documentType === QueryType.Custom)
       return repos.queries.findByIdentity(identity)
     if (documentType === ScriptType.ScenarioSetup)
@@ -1463,6 +1556,9 @@ export class EndgeSchemaStorage extends EndgeModule {
     return null
   }
 
+  /**
+   * Разрешает Document Payload Id For Folder Patch.
+   */
   private async resolveDocumentPayloadIdForFolderPatch(
     documentIdOrIdentity: string | number,
     documentType: DomainDocumentType,
@@ -1492,6 +1588,9 @@ export class EndgeSchemaStorage extends EndgeModule {
     return this.isMalformedPayloadDocumentId(directPayloadId) ? null : directPayloadId
   }
 
+  /**
+   * Внутренний helper модуля: patch Document Folder By Payload Id.
+   */
   private async patchDocumentFolderByPayloadId(
     documentType: DomainDocumentType,
     documentPayloadId: number | string,
@@ -1506,6 +1605,8 @@ export class EndgeSchemaStorage extends EndgeModule {
 
     if (documentType === ComponentType.Table || documentType === ComponentType.DSL)
       return repos.components.patchFolder(documentPayloadId, folderPayloadId)
+    if (documentType === ComponentType.SFC)
+      return repos.componentSFCs.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === QueryType.REST || documentType === QueryType.GraphQL || documentType === QueryType.Custom)
       return repos.queries.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === ScriptType.ScenarioSetup)
@@ -1607,6 +1708,10 @@ export class EndgeSchemaStorage extends EndgeModule {
       await repos.components.softDelete(resolvedIdentity, folderId)
       return
     }
+    if (documentType === ComponentType.SFC) {
+      await repos.componentSFCs.softDelete(resolvedIdentity, folderId)
+      return
+    }
     if (
       documentType === QueryType.REST
       || documentType === QueryType.GraphQL
@@ -1659,6 +1764,10 @@ export class EndgeSchemaStorage extends EndgeModule {
 
     if (documentType === ComponentType.Table || documentType === ComponentType.DSL) {
       await repos.components.hardDelete(resolvedIdentity)
+      return
+    }
+    if (documentType === ComponentType.SFC) {
+      await repos.componentSFCs.hardDelete(resolvedIdentity)
       return
     }
     if (
@@ -1751,6 +1860,10 @@ export class EndgeSchemaStorage extends EndgeModule {
       await repos.components.restore(resolvedIdentity)
       return
     }
+    if (documentType === ComponentType.SFC) {
+      await repos.componentSFCs.restore(resolvedIdentity)
+      return
+    }
     if (
       documentType === QueryType.REST
       || documentType === QueryType.GraphQL
@@ -1785,6 +1898,9 @@ export class EndgeSchemaStorage extends EndgeModule {
     )
   }
 
+  /**
+   * Разрешает Folder Entity Type.
+   */
   private _resolveFolderEntityType(folder: {
     id?: string | number | null
     identity?: string | number | null
@@ -1910,6 +2026,9 @@ export class EndgeSchemaStorage extends EndgeModule {
     await repos.folders.deleteByIdentity(folderIdentity)
   }
 
+  /**
+   * Синхронизирует behavior bindings указанного owner с Payload и локальным доменом.
+   */
   public async syncOwnerBehaviorBindings(opts: {
     ownerType: string
     ownerId: number
@@ -2041,6 +2160,9 @@ export class EndgeSchemaStorage extends EndgeModule {
     }
   }
 
+  /**
+   * Синхронизирует presentation bindings указанного owner с Payload и локальным доменом.
+   */
   public async syncOwnerPresentationBindings(opts: {
     ownerType: string
     ownerId: number
@@ -2199,12 +2321,19 @@ export class EndgeSchemaStorage extends EndgeModule {
     if (data.folder === undefined && data.folderId !== undefined)
       data.folder = data.folderId
     if (data.folder !== undefined)
-      data.folder = await this.resolveFolderPayloadId(relationToId(data.folder))
+      data.folder = await this.resolveFolderPayloadId(relationToId(data.folder) ?? null)
 
     let saved: any = null
 
     if (documentType === ComponentType.Table || documentType === ComponentType.DSL) {
       saved = await repos.components.upsert(data as any)
+    }
+    else if (documentType === ComponentType.SFC) {
+      data.source = typeof data.source === 'string' ? data.source : ''
+      data.supportedTargets = normalizeComponentSFCTargets(data.supportedTargets)
+      data.modelVersion = Number(data.modelVersion ?? 1)
+      data.meta = (data.meta && typeof data.meta === 'object' && !Array.isArray(data.meta)) ? data.meta : {}
+      saved = await repos.componentSFCs.upsert(data as any)
     }
     else if (
       documentType === QueryType.REST
@@ -2355,6 +2484,31 @@ export class EndgeSchemaStorage extends EndgeModule {
           schema: ReflectComponentToPlain(component) ?? {},
         })
       }
+      this._applyPayloadDocToDomain(documentType, saved, documentId, true)
+      return
+    }
+
+    if (documentType === ComponentType.SFC) {
+      const component = ((opts?.model as any) ?? domain.getComponentSFC(documentId)) as RComponentSFC | null
+      if (!component)
+        throw new Error(`SFC-компонент не найден: ${documentId}`)
+
+      const existing = await repos.componentSFCs.findByIdentity(component.identity)
+      const fallbackFolder = existing?.folder ?? await resolveDefaultComponentFolder(repos)
+      const folder = component.folderId ?? relationToId(fallbackFolder) ?? null
+      const saved = await repos.componentSFCs.upsert({
+        identity: component.identity,
+        displayName: component.displayName ?? component.name ?? component.identity,
+        folder,
+        project: component.project ?? null,
+        source: component.source ?? '',
+        supportedTargets: normalizeComponentSFCTargets(component.supportedTargets),
+        modelVersion: Number(component.modelVersion ?? 1),
+        meta: (component.meta && typeof component.meta === 'object' && !Array.isArray(component.meta)) ? component.meta : {},
+        active: component.active ?? true,
+        author: component.author ?? undefined,
+        inherited: component.inherited === true,
+      })
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -3255,6 +3409,13 @@ export class EndgeSchemaStorage extends EndgeModule {
       )
       return
     }
+    if (documentType === ComponentType.SFC) {
+      removeBy(
+        x => Endge.domain.removeComponentSFCById(x),
+        x => Endge.domain.removeComponentSFC(x),
+      )
+      return
+    }
     if (documentType === QueryType.REST || documentType === QueryType.GraphQL || documentType === QueryType.Custom) {
       removeBy(
         x => Endge.domain.removeQueryById(x),
@@ -3420,9 +3581,14 @@ export class EndgeSchemaStorage extends EndgeModule {
     Endge.domain.notify()
   }
 
+  /**
+   * Возвращает Dump Key.
+   */
   private _getDumpKey(documentType: DomainDocumentType): keyof EndgeSchemaDump | '' {
     if (documentType === ComponentType.Table || documentType === ComponentType.DSL)
       return 'components'
+    if (documentType === ComponentType.SFC)
+      return 'componentSFCs'
     if (documentType === QueryType.REST || documentType === QueryType.GraphQL || documentType === QueryType.Custom)
       return 'queries'
     if (documentType === ScriptType.ScenarioSetup)
@@ -3466,6 +3632,9 @@ export class EndgeSchemaStorage extends EndgeModule {
     return ''
   }
 
+  /**
+   * Нормализует Payload Doc To Plain.
+   */
   private _normalizePayloadDocToPlain(documentType: DomainDocumentType, raw: any): any {
     if (documentType === QueryType.REST || documentType === QueryType.GraphQL || documentType === QueryType.Custom)
       return queryPayloadDocToPlain(raw)
@@ -3705,9 +3874,41 @@ export class EndgeSchemaStorage extends EndgeModule {
     if (documentType === ComponentType.Table || documentType === ComponentType.DSL) {
       return this._normalizeComponentPayloadDoc(raw)
     }
+    if (documentType === ComponentType.SFC) {
+      return this._normalizeComponentSFCPayloadDoc(raw)
+    }
     return null
   }
 
+  /**
+   * Нормализует Component SFCPayload Doc.
+   */
+  private _normalizeComponentSFCPayloadDoc(raw: any): any {
+    return {
+      id: raw.id,
+      identity: raw.identity ?? '',
+      name: raw.displayName ?? raw.identity ?? '',
+      displayName: raw.displayName ?? raw.identity ?? '',
+      description: raw.description ?? null,
+      folderId: relationToId(raw.folder) ?? null,
+      project: relationToId(raw.project) ?? null,
+      kind: 'component-sfc',
+      type: ComponentType.SFC,
+      sourceKind: 'component-sfc',
+      source: typeof raw.source === 'string' ? raw.source : '',
+      supportedTargets: normalizeComponentSFCTargets(raw.supportedTargets),
+      modelVersion: Number(raw.modelVersion ?? 1),
+      meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
+      active: raw.active ?? true,
+      deletedAt: raw.deletedAt ?? null,
+      author: raw.author ?? null,
+      inherited: raw.inherited === true,
+    }
+  }
+
+  /**
+   * Нормализует Component Payload Doc.
+   */
   private _normalizeComponentPayloadDoc(raw: any): any {
     const name = raw.displayName
     const type = raw.componentType ?? 'component-dsl'

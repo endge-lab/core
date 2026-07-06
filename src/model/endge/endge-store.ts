@@ -1,5 +1,8 @@
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 
+/**
+ * Простой key-value store с подписками по ключам и глобальными подписками.
+ */
 export class EndgeStore extends EndgeModule {
   static Default = 'default'
 
@@ -10,6 +13,9 @@ export class EndgeStore extends EndgeModule {
   private keyedSubscribers: Map<string, Set<() => void>> = new Map()
   private globalSubscribers: Set<(key: string) => void> = new Set()
 
+  /**
+   * Создает default store bucket.
+   */
   constructor() {
     super()
     this.state.set(EndgeStore.Default, null)

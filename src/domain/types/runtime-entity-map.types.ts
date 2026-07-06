@@ -1,4 +1,5 @@
 import type { RAction } from '@/domain/entities/reflect/RAction'
+import type { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import type { RComponentTable } from '@/domain/entities/reflect/RComponentTable'
 import type { RPage } from '@/domain/entities/reflect/RPage'
 import type { RProject } from '@/domain/entities/reflect/RProject'
@@ -18,6 +19,8 @@ export interface RuntimeEntityModelMap {
   view: RView
   /** Базовая доменная модель компонента. */
   component: RComponent
+  /** Доменная модель SFC-компонента нового API. */
+  'component-sfc': RComponentSFC
   /** Доменная модель запроса. */
   query: RQuery
   /** Доменная модель action. */

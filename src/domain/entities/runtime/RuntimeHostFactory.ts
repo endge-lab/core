@@ -4,6 +4,7 @@ import type { RuntimeHost } from '@/domain/types/runtime-host.types'
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 import { ActionRuntimeHost } from '@/domain/entities/runtime/hosts/ActionRuntimeHost'
 import { ComponentRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentRuntimeHost'
+import { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentSFCRuntimeHost'
 import { PageRuntimeHost } from '@/domain/entities/runtime/hosts/PageRuntimeHost'
 import { ProjectRuntimeHost } from '@/domain/entities/runtime/hosts/ProjectRuntimeHost'
 import { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
@@ -58,6 +59,14 @@ export function createRuntimeHost(
       return new ComponentRuntimeHost({
         id,
         model: model as RuntimeEntityModelMap['component'],
+        entityIdentity,
+        title,
+        meta,
+      })
+    case 'component-sfc':
+      return new ComponentSFCRuntimeHost({
+        id,
+        model: model as RuntimeEntityModelMap['component-sfc'],
         entityIdentity,
         title,
         meta,

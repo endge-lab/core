@@ -1,6 +1,6 @@
-import { Endge } from '@endge/core'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import type { DiagnosticsRecord } from '@/domain/types/diagnostics.types'
+import { Endge } from '@/model/endge/endge'
 
 const CHANNEL_NAME = 'endge-runtime-debug'
 const DIAGNOSTICS_RECORD_TYPE = 'diagnostics-record'
@@ -85,7 +85,10 @@ export class EndgeRuntimeDebugger extends EndgeModule {
   private _analysisByTabId: Record<string, string[]> = {}
   private _diagnosticsListener: ((record: DiagnosticsRecord) => void) | null = null
 
-  public init(): void {
+  /**
+   * Регистрирует консольную команду подключения вкладки к runtime debugger.
+   */
+  public override start(): void {
     Endge.console.register('debugTab', () => Endge.runtimeDebugger.activate(), 'Подключить текущую вкладку к Runtime Debug')
   }
 
@@ -93,14 +96,23 @@ export class EndgeRuntimeDebugger extends EndgeModule {
    * ACCESS
    */
 
+  /**
+   * Возвращает список вкладок, известных runtime debugger.
+   */
   public get tabs(): RuntimeDebugTab[] {
     return this._tabs
   }
 
+  /**
+   * Показывает, открыт ли BroadcastChannel для runtime debug.
+   */
   public get isListening(): boolean {
     return this._listenerChannel != null
   }
 
+  /**
+   * Возвращает накопленные результаты анализа для вкладки.
+   */
   public getAnalysis(tabId: string): string[] {
     const key = String(tabId ?? '')
     if (!key)
@@ -127,7 +139,7 @@ export class EndgeRuntimeDebugger extends EndgeModule {
   /**
    * Запустить прослушку канала (создать канал и накапливать вкладки). Вызывать из админки при init.
    */
-  public start(): void {
+  public startListening(): void {
     if (typeof BroadcastChannel === 'undefined' || this._listenerChannel != null)
       return
     console.log('[EndgeRuntimeDebugger] start: создаём канал прослушки', CHANNEL_NAME)
@@ -193,6 +205,9 @@ export class EndgeRuntimeDebugger extends EndgeModule {
     }
   }
 
+  /**
+   * Возвращает Channel.
+   */
   private _getChannel(): BroadcastChannel {
     if (!this._channel) {
       this._channel = new BroadcastChannel(CHANNEL_NAME)
@@ -201,6 +216,9 @@ export class EndgeRuntimeDebugger extends EndgeModule {
     return this._channel
   }
 
+  /**
+   * Возвращает Tab Id.
+   */
   private _getTabId(): string {
     if (this._tabId)
       return this._tabId
@@ -219,6 +237,9 @@ export class EndgeRuntimeDebugger extends EndgeModule {
     }
   }
 
+  /**
+   * Внутренний helper модуля: post Register.
+   */
   private _postRegister(): void {
     if (typeof BroadcastChannel === 'undefined')
       return
@@ -292,6 +313,9 @@ export class EndgeRuntimeDebugger extends EndgeModule {
     }
   }
 
+  /**
+   * Гарантирует Auto Register.
+   */
   private _ensureAutoRegister(): void {
     if (this._autoRegisterTimer != null)
       return
@@ -319,6 +343,9 @@ export class EndgeRuntimeDebugger extends EndgeModule {
   }
 
   /** Один раз подписаться на diagnostics и слать записи в канал. Не делаем на странице админки. */
+  /**
+   * Гарантирует Diagnostics Forwarding.
+   */
   private _ensureDiagnosticsForwarding(): void {
     if (this._diagnosticsListener != null)
       return

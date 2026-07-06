@@ -5,6 +5,9 @@ import { Raph } from '@endge/raph'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { Endge } from '@/model/endge/endge'
 
+/**
+ * Модуль загрузки и чтения external vocabs в Raph cache.
+ */
 export class EndgeVocabs extends EndgeModule {
   /**
    * slug -> namespace
@@ -15,6 +18,9 @@ export class EndgeVocabs extends EndgeModule {
   private _loadingRequests: number = 0
   loading: boolean = false
 
+  /**
+   * Строит индекс slug -> namespace из settings.general.vocabs.
+   */
   init(): void {
     const settings = Endge.domain.getSetting('general') as RSettings | undefined
     if (!settings) {
@@ -48,6 +54,9 @@ export class EndgeVocabs extends EndgeModule {
     this.index = nextIndex
   }
 
+  /**
+   * Загружает все collections конкретного vocab namespace в Raph.
+   */
   async loadNamespace(namespace: string): Promise<void> {
     const ns: string = String(namespace ?? '').trim()
     if (!ns)
@@ -119,6 +128,9 @@ export class EndgeVocabs extends EndgeModule {
     }
   }
 
+  /**
+   * Возвращает значения всех collections namespace или конкретного collection slug.
+   */
   getNamespaceValues(namespace: string, vocabs: string | null = null): Array<any> {
     const ns: string = String(namespace ?? '').trim()
     if (!ns)
@@ -227,6 +239,9 @@ export class EndgeVocabs extends EndgeModule {
     }
   }
 
+  /**
+   * Возвращает значения словаря по id, используя Raph cache и локальный fallback cache.
+   */
   getValuesById(vocabId: string | number): Array<any> {
     const cfg = this.resolveVocabConfigById(vocabId)
     if (!cfg)
@@ -248,10 +263,16 @@ export class EndgeVocabs extends EndgeModule {
     return bySlug
   }
 
+  /**
+   * Проверяет, есть ли загруженные значения словаря по id.
+   */
   hasCacheById(vocabId: string | number): boolean {
     return this.getValuesById(vocabId).length > 0
   }
 
+  /**
+   * Очищает cache словаря по id.
+   */
   clearCacheById(vocabId: string | number): void {
     const cfg = this.resolveVocabConfigById(vocabId)
     if (!cfg)
@@ -261,6 +282,9 @@ export class EndgeVocabs extends EndgeModule {
     Raph.set(`vocabsByIdentity.${cfg.identity}`, [])
   }
 
+  /**
+   * Загружает словарь по id и кладет результат в Raph cache.
+   */
   async loadById(vocabId: string | number, limit: number = 10000): Promise<void> {
     const cfg = this.resolveVocabConfigById(vocabId)
     if (!cfg)
@@ -286,6 +310,9 @@ export class EndgeVocabs extends EndgeModule {
     }
   }
 
+  /**
+   * Возвращает sample словаря по id, используя cache или сетевую загрузку.
+   */
   async getSampleById(vocabId: string | number, limit: number = 1): Promise<any[]> {
     const maxLimit = Math.max(1, Number(limit) || 1)
     const cfg = this.resolveVocabConfigById(vocabId)
@@ -324,6 +351,9 @@ export class EndgeVocabs extends EndgeModule {
     }
   }
 
+  /**
+   * Полностью загружает словарь по id или identity с постраничным обходом.
+   */
   async loadVocab(idOrIdentity: string | number): Promise<any[]> {
     const cfg = this.resolveVocabConfigByIdOrIdentity(idOrIdentity)
     if (!cfg)
@@ -394,15 +424,24 @@ export class EndgeVocabs extends EndgeModule {
     }
   }
 
+  /**
+   * Нормализует Vocab Id.
+   */
   private normalizeVocabId(vocabId: string | number): string {
     return String(vocabId ?? '').trim()
   }
 
+  /**
+   * Устанавливает By Identity Cache.
+   */
   private setByIdentityCache(identity: string, docs: any[]): void {
     this.byIdCache[identity] = Array.isArray(docs) ? docs : []
     Raph.set(`vocabsByIdentity.${identity}`, this.byIdCache[identity])
   }
 
+  /**
+   * Разрешает Vocab Config By Id.
+   */
   private resolveVocabConfigById(vocabId: string | number): { idKey: string; identity: string; baseApiUrl: string; slug: string } | null {
     const vocab = Endge.domain.getVocabById(vocabId) ?? Endge.domain.getVocabById(Number(vocabId))
     if (!vocab)
@@ -418,6 +457,9 @@ export class EndgeVocabs extends EndgeModule {
     return { idKey, identity, baseApiUrl, slug }
   }
 
+  /**
+   * Разрешает Vocab Config By Id Or Identity.
+   */
   private resolveVocabConfigByIdOrIdentity(idOrIdentity: string | number): { idKey: string; identity: string; baseApiUrl: string; slug: string } | null {
     const vocab = Endge.domain.getVocab(idOrIdentity)
     if (!vocab)
@@ -433,6 +475,9 @@ export class EndgeVocabs extends EndgeModule {
     return { idKey, identity, baseApiUrl, slug }
   }
 
+  /**
+   * Разрешает Base Url.
+   */
   private resolveBaseUrl(rawUrl: string): string {
     const raw = String(rawUrl ?? '').trim()
     if (!raw)
@@ -458,6 +503,9 @@ export class EndgeVocabs extends EndgeModule {
       .replace(/\/+$/, '')
   }
 
+  /**
+   * Внутренний helper модуля: extract Docs.
+   */
   private extractDocs(json: any): any[] {
     if (Array.isArray(json?.docs))
       return json.docs
@@ -466,6 +514,9 @@ export class EndgeVocabs extends EndgeModule {
     return []
   }
 
+  /**
+   * Устанавливает Loading State.
+   */
   private setLoadingState(next: boolean): void {
     if (next)
       this._loadingRequests += 1

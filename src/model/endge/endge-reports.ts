@@ -1,14 +1,21 @@
-import type { RuntimeHost } from '@endge/core'
+import type { RuntimeHost } from '@/domain/types/runtime-host.types'
 
-import { Endge, RComponentTableColumn_isHtml } from '@endge/core'
 import { Raph } from '@endge/raph'
 import ExcelJS from 'exceljs'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
+import { RComponentTableColumn_isHtml } from '@/domain/entities/reflect/RComponentTableColumn'
+import { Endge } from '@/model/endge/endge'
 
+/**
+ * Модуль генерации отчетов из runtime-таблиц.
+ */
 export class EndgeReports extends EndgeModule {
   //
   // Public API
   //
+  /**
+   * Создает Excel-файл по table runtime-host и инициирует скачивание в браузере.
+   */
   async downloadTable(
     runtime: RuntimeHost<'table'>,
     filename = 'report.xlsx',
@@ -35,6 +42,9 @@ export class EndgeReports extends EndgeModule {
     }
   }
 
+  /**
+   * Собирает Excel workbook для table runtime-host без скачивания файла.
+   */
   async buildTableWorkbook(
     runtime: RuntimeHost<'table'>,
   ): Promise<ExcelJS.Workbook> {
@@ -102,6 +112,9 @@ export class EndgeReports extends EndgeModule {
   //
   // Runtime/table helpers
   //
+  /**
+   * Возвращает Runtime Meta.
+   */
   private getRuntimeMeta(
     runtime: RuntimeHost<'table'>,
   ): { tableId: string, basePath: string } {
@@ -110,12 +123,18 @@ export class EndgeReports extends EndgeModule {
     return { tableId, basePath }
   }
 
+  /**
+   * Возвращает Source Var.
+   */
   private getSourceVar(tableModel: any): string {
     const keys = tableModel?.bindings?.keys ?? {}
     const firstKey = Object.keys(keys)[0]
     return String(firstKey || tableModel?.inputFields?.[tableModel?.sourceIndex]?.name || '')
   }
 
+  /**
+   * Считывает Rows.
+   */
   private readRows(basePath: string, sourceVar: string): any[] {
     const path = `${basePath}.${sourceVar}`
     const v = Raph.get(path, { vars: { store: basePath } })
@@ -125,6 +144,9 @@ export class EndgeReports extends EndgeModule {
   //
   // REPORTS CONFIG
   //
+  /**
+   * Возвращает Report Keys For Column.
+   */
   private getReportKeysForColumn(column: any): string[] {
     const dataPaths = column?.dataPaths ?? {}
     const allKeys = Object.keys(dataPaths)
@@ -147,6 +169,9 @@ export class EndgeReports extends EndgeModule {
     })
   }
 
+  /**
+   * Возвращает Report Cfg.
+   */
   private getReportCfg(column: any, key: string): any | null {
     const reports = column?.reports
     if (!reports || typeof reports !== 'object')
@@ -158,6 +183,9 @@ export class EndgeReports extends EndgeModule {
   //
   // Column value: join выбранные dataPaths values with ", "
   //
+  /**
+   * Возвращает Column Cell Value.
+   */
   private getColumnCellValue(
     basePath: string,
     rowIndex: number,
@@ -205,6 +233,9 @@ export class EndgeReports extends EndgeModule {
     return parts.map(x => (x instanceof Date ? x.toISOString() : String(x))).join(', ')
   }
 
+  /**
+   * Возвращает By Raph Path.
+   */
   private getByRaphPath(
     basePath: string,
     rowIndex: number,
@@ -228,6 +259,9 @@ export class EndgeReports extends EndgeModule {
     })
   }
 
+  /**
+   * Внутренний helper модуля: try Convert.
+   */
   private tryConvert(column: any, key: string, value: unknown): unknown {
     const spec = column?.dataConverters?.[key]
     if (!spec)
@@ -260,6 +294,9 @@ export class EndgeReports extends EndgeModule {
   //
   // FORMATTERS (для Excel-значения)
   //
+  /**
+   * Применяет Formatter.
+   */
   private applyFormatter(
     value: unknown,
     formatter: any,
@@ -315,6 +352,9 @@ export class EndgeReports extends EndgeModule {
     return this.coerceDefault(value)
   }
 
+  /**
+   * Внутренний helper модуля: coerce Default.
+   */
   private coerceDefault(value: unknown): string | number | boolean | Date {
     if (typeof value === 'string')
       return value
@@ -327,6 +367,9 @@ export class EndgeReports extends EndgeModule {
     return String(value)
   }
 
+  /**
+   * Преобразует значение в Date.
+   */
   private toDate(v: unknown): Date | null {
     if (v instanceof Date) {
       const t = v.getTime()
@@ -343,6 +386,9 @@ export class EndgeReports extends EndgeModule {
   //
   // APPLY EXCEL FORMATTING (numFmt) - для DateTime
   //
+  /**
+   * Применяет Cell Excel Formatting.
+   */
   private applyCellExcelFormatting(
     basePath: string,
     rowIndex: number,
@@ -373,6 +419,9 @@ export class EndgeReports extends EndgeModule {
       cell.numFmt = excelFmt
   }
 
+  /**
+   * Внутренний helper модуля: map Format To Excel Num Fmt.
+   */
   private mapFormatToExcelNumFmt(format: string): string | null {
     // DD/MM/YYYY -> dd/mm/yyyy (Excel)
     // DD.MM.YYYY -> dd.mm.yyyy
@@ -396,6 +445,9 @@ export class EndgeReports extends EndgeModule {
   //
   // Excel helpers
   //
+  /**
+   * Внутренний helper модуля: autofit Columns.
+   */
   private autofitColumns(ws: ExcelJS.Worksheet, maxScanRows: number): void {
     const colCount = ws.columnCount
     const rowCount = Math.min(ws.rowCount, maxScanRows)
@@ -412,6 +464,9 @@ export class EndgeReports extends EndgeModule {
     }
   }
 
+  /**
+   * Внутренний helper модуля: cell To String.
+   */
   private cellToString(v: ExcelJS.CellValue): string {
     if (v == null)
       return ''

@@ -1,13 +1,12 @@
-import { Raph } from '@endge/raph'
-
 import { EndgeFederation } from '@/domain/entities/endge/EndgeFederation'
-import { EndgeApp } from '@/model/endge/endge-app'
-import { EndgeAuth } from '@/model/endge/endge-auth'
+import type { EndgeBootContext } from '@/domain/types/bootstrap.types'
+import type { EndgeAuth } from '@/model/endge/endge-auth'
 import { EndgeBindingsBehavior } from '@/model/endge/endge-bindings-behavior'
 import { EndgeBind } from '@/model/endge/endge-bind'
-import { EndgeBootstrap } from '@/model/endge/endge-bootstrap'
 import { EndgeConsole } from '@/model/endge/endge-console'
+import { EndgeContext } from '@/model/endge/endge-context'
 import { EndgeContracts } from '@/model/endge/endge-contracts'
+import { EndgeCompiler } from '@/model/endge/endge-compiler'
 import { EndgeDebug } from '@/model/endge/endge-debug'
 import { EndgeDiagnostics } from '@/model/endge/endge-diagnostics'
 import { EndgeDomain } from '@/model/endge/endge-domain'
@@ -16,6 +15,7 @@ import { EndgeExtract } from '@/model/endge/endge-extract'
 import { EndgeFlow } from '@/model/endge/endge-flow'
 import { EndgeFlowRegistry } from '@/model/endge/endge-flow-registry'
 import { EndgeBindingsPresentation } from '@/model/endge/endge-bindings-presentation'
+import { EndgeProgram } from '@/model/endge/endge-program'
 import { EndgeQuery } from '@/model/endge/endge-query'
 import { EndgeRender } from '@/model/endge/endge-render'
 import { EndgeReports } from '@/model/endge/endge-reports'
@@ -32,27 +32,7 @@ import { EndgeUpdates } from '@/model/endge/endge-updates'
 import { EndgeVars } from '@/model/endge/endge-vars'
 import { EndgeVocabs } from '@/model/endge/endge-vocabs'
 import { EndgeUIRegistry } from '@/model/endge/endge-ui-registry'
-import { consoleLog } from '@/model/seed/actions/console_log'
-import { loadVocabs } from '@/model/seed/actions/load_vocabs'
-import { split } from '@/model/seed/converters/arrays/split'
-import { toArray } from '@/model/seed/converters/arrays/to-array'
-import { dateToDateString } from '@/model/seed/converters/date/date-to-date-string'
-import { dateToIsoString } from '@/model/seed/converters/date/date-to-iso-string'
-import { dateToIsoZ } from '@/model/seed/converters/date/date-to-iso-z'
-import { dateToTimeString } from '@/model/seed/converters/date/date-to-time-string'
-import { isoStringToDate } from '@/model/seed/converters/date/iso-string-to-date'
-import { isoStringToTimeString } from '@/model/seed/converters/date/iso-string-to-time-string'
-import { stringToDate } from '@/model/seed/converters/date/string-to-date'
-import { timeStringToDate } from '@/model/seed/converters/date/time-string-to-date'
-import { timestampToDate } from '@/model/seed/converters/date/timestamp-to-date'
-import { weekdaysRange } from '@/model/seed/converters/date/weekdays-range'
-import { jsonParse } from '@/model/seed/converters/json/json-parse'
-import { jsonStringify } from '@/model/seed/converters/json/json-stringify'
-import { numberToString } from '@/model/seed/converters/numbers/number-to-string'
-import { stringToNumber } from '@/model/seed/converters/numbers/string-to-number'
-import { defaultIfEmpty } from '@/model/seed/converters/strings/default-if-empty'
-import { stringToBoolean } from '@/model/seed/converters/strings/string-to-boolean'
-import { stringTrim } from '@/model/seed/converters/strings/string-trim'
+import { ENDGE_CORE_MODULES } from '@/model/config/endge-modules'
 
 /**
  * Единая статическая федерация Endge.
@@ -60,270 +40,69 @@ import { stringTrim } from '@/model/seed/converters/strings/string-trim'
  */
 export class Endge extends EndgeFederation {
   protected static override readonly federationId = 'endge'
+  private static bootContext: EndgeBootContext | null = null
 
-  /** Запрещаем `new Endge()` - работаем только через статическое API */
+  /**
+   * Запрещает создание экземпляров `Endge`.
+   * Федерация используется только через статический facade.
+   */
   private constructor() {
     super()
   }
 
+  /**
+   * Описывает системные модули ядра и создает их экземпляры.
+   * Порядок берется из `ENDGE_CORE_MODULES` и может быть уточнен через `before/after`.
+   */
   protected static override configureFederation(): void {
-    this.registerModule('app', new EndgeApp())
-    this.registerModule('bootstrap', new EndgeBootstrap())
-    this.registerModule('diagnostics', new EndgeDiagnostics())
-    this.registerModule('debug', new EndgeDebug())
-    this.registerModule('testing', new EndgeTesting())
-    this.registerModule('domain', new EndgeDomain())
-    this.registerModule('vocabs', new EndgeVocabs())
-    this.registerModule('extract', new EndgeExtract())
-    this.registerModule('flowRegistry', new EndgeFlowRegistry())
-    this.registerModule('flow', new EndgeFlow())
-    this.registerModule('render', new EndgeRender())
-    this.registerModule('store', new EndgeStore())
-    this.registerModule('script', new EndgeScript())
-    this.registerModule('runtime', new EndgeRuntime())
-    this.registerModule('vars', new EndgeVars())
-    this.registerModule('query', new EndgeQuery())
-    this.registerModule('auth', new EndgeAuth())
-    this.registerModule('schema', new EndgeSchemaStorage())
-    this.registerModule('updates', new EndgeUpdates())
-    this.registerModule('events', new EndgeEvents())
-    this.registerModule('sse', new EndgeSSE())
-    this.registerModule('ui', new EndgeUI())
-    this.registerModule('uiRegistry', new EndgeUIRegistry())
-    this.registerModule('reports', new EndgeReports())
-    this.registerModule('bind', new EndgeBind())
-    this.registerModule('console', new EndgeConsole())
-    this.registerModule('runtimeDebugger', new EndgeRuntimeDebugger())
-    this.registerModule('styles', new EndgeStyles())
-
-    //
-    // Faceted cascade
-    this.registerModule('contracts', new EndgeContracts())
-    this.registerModule('behaviorBindings', new EndgeBindingsBehavior())
-    this.registerModule('presentationBindings', new EndgeBindingsPresentation())
-  }
-
-  static get debug(): EndgeDebug {
-    return this.getModule<EndgeDebug>('debug')
-  }
-
-  static get diagnostics(): EndgeDiagnostics {
-    return this.getModule<EndgeDiagnostics>('diagnostics')
-  }
-
-  static get bootstrap(): EndgeBootstrap {
-    return this.getModule<EndgeBootstrap>('bootstrap')
-  }
-
-  static get testing(): EndgeTesting {
-    return this.getModule<EndgeTesting>('testing')
-  }
-
-  static get domain(): EndgeDomain {
-    return this.getModule<EndgeDomain>('domain')
-  }
-
-  static get vocabs(): EndgeVocabs {
-    return this.getModule<EndgeVocabs>('vocabs')
-  }
-
-  static get extract(): EndgeExtract {
-    return this.getModule<EndgeExtract>('extract')
-  }
-
-  static get flowRegistry(): EndgeFlowRegistry {
-    return this.getModule<EndgeFlowRegistry>('flowRegistry')
-  }
-
-  static get flow(): EndgeFlow {
-    return this.getModule<EndgeFlow>('flow')
-  }
-
-  static get render(): EndgeRender {
-    return this.getModule<EndgeRender>('render')
-  }
-
-  static get store(): EndgeStore {
-    return this.getModule<EndgeStore>('store')
-  }
-
-  static get script(): EndgeScript {
-    return this.getModule<EndgeScript>('script')
-  }
-
-  static get runtime(): EndgeRuntime {
-    return this.getModule<EndgeRuntime>('runtime')
-  }
-
-  static get vars(): EndgeVars {
-    return this.getModule<EndgeVars>('vars')
-  }
-
-  static get query(): EndgeQuery {
-    return this.getModule<EndgeQuery>('query')
-  }
-
-  static get auth(): EndgeAuth {
-    return this.getModule<EndgeAuth>('auth')
-  }
-
-  static get schema(): EndgeSchemaStorage {
-    return this.getModule<EndgeSchemaStorage>('schema')
-  }
-
-  static get updates(): EndgeUpdates {
-    return this.getModule<EndgeUpdates>('updates')
-  }
-
-  /** ACCESS */
-  static get contracts(): EndgeContracts {
-    return this.getModule<EndgeContracts>('contracts')
-  }
-
-  /** @deprecated Используйте Endge.contracts. */
-  static get eventContracts(): EndgeContracts {
-    return this.contracts
-  }
-
-  static get behaviorBindings(): EndgeBindingsBehavior {
-    return this.getModule<EndgeBindingsBehavior>('behaviorBindings')
-  }
-
-  static get presentationBindings(): EndgeBindingsPresentation {
-    return this.getModule<EndgeBindingsPresentation>('presentationBindings')
-  }
-
-  static get events(): EndgeEvents {
-    return this.getModule<EndgeEvents>('events')
-  }
-
-  static get sse(): EndgeSSE {
-    return this.getModule<EndgeSSE>('sse')
-  }
-
-  static get ui(): EndgeUI {
-    return this.getModule<EndgeUI>('ui')
-  }
-
-  static get uiRegistry(): EndgeUIRegistry {
-    return this.getModule<EndgeUIRegistry>('uiRegistry')
-  }
-
-  static get reports(): EndgeReports {
-    return this.getModule<EndgeReports>('reports')
-  }
-
-  static get bind(): EndgeBind {
-    return this.getModule<EndgeBind>('bind')
-  }
-
-  static get console(): EndgeConsole {
-    return this.getModule<EndgeConsole>('console')
-  }
-
-  static get runtimeDebugger(): EndgeRuntimeDebugger {
-    return this.getModule<EndgeRuntimeDebugger>('runtimeDebugger')
-  }
-
-  static get styles(): EndgeStyles {
-    return this.getModule<EndgeStyles>('styles')
-  }
-
-  static get app(): EndgeApp {
-    return this.getModule<EndgeApp>('app')
-  }
-
-  /** @deprecated Используйте Endge.app (getCurrentProject/setCurrentProject). */
-  static get project(): EndgeApp {
-    return this.app
-  }
-
-  static async setupWithPayload(opts: {
-    payloadBaseAPI: string
-    payloadSecret: string
-  }): Promise<void> {
-    await Endge.schema.init({
-      payloadBaseAPI: opts.payloadBaseAPI,
-      payloadSecret: opts.payloadSecret,
-    })
-  }
-
-  static async init(opts: {
-    debug: boolean
-    provider: 'payload' | 'plain'
-    payloadBaseAPI?: string
-    payloadSecret?: string
-    plainDomain?: any
-    vars: Record<string, any>
-  }): Promise<void> {
-    await this.runInitialization(async () => {
-      Endge.app.isDebug = opts.debug || false
-
-      await this.setup()
-      this.configureRaph()
-
-      Endge.vars.setEnvyRecord(opts.vars)
-
-      if (opts.provider === 'plain') {
-        Endge.domain.merge(opts.plainDomain)
-        Endge.domain.compile()
-      }
-      else {
-        await this.initializePayloadDomain({
-          payloadBaseAPI: opts.payloadBaseAPI!,
-          payloadSecret: opts.payloadSecret!,
-        })
-      }
-
-      await this.initModules()
-
-      Endge.styles.init(Endge.domain)
-
-      Endge.console.register('raph', () => { console.log(Raph.data) }, 'Текущее содержимое Raph')
-      Endge.console.register('domain', () => { console.log(Endge.domain) }, 'Текущий домен Endge')
-      Endge.console.exposeToGlobal()
-
-      Raph.reinitPhases()
-
-      this.hydrateRuntimeFilters()
-
-      //
-      // Converters
-      Endge.bind.converter('to-array', toArray)
-      Endge.bind.converter('split', split)
-      Endge.bind.converter('iso-string-to-date', isoStringToDate)
-      Endge.bind.converter('timestamp-to-date', timestampToDate)
-      Endge.bind.converter('date-to-iso-string', dateToIsoString)
-      Endge.bind.converter('date-to-iso-z', dateToIsoZ)
-      Endge.bind.converter('string-to-date', stringToDate)
-      Endge.bind.converter('date-to-date-string', dateToDateString)
-      Endge.bind.converter('date-to-time-string', dateToTimeString)
-      Endge.bind.converter('time-string-to-date', timeStringToDate)
-      Endge.bind.converter('iso-string-to-time-string', isoStringToTimeString)
-      Endge.bind.converter('weekdays-range', weekdaysRange)
-      Endge.bind.converter('string-trim', stringTrim)
-      Endge.bind.converter('default-if-empty', (value: unknown) => defaultIfEmpty(value))
-      Endge.bind.converter('string-to-boolean', stringToBoolean)
-      Endge.bind.converter('string-to-number', stringToNumber)
-      Endge.bind.converter('number-to-string', numberToString)
-      Endge.bind.converter('json-parse', jsonParse)
-      Endge.bind.converter('json-stringify', jsonStringify)
-
-      //
-      // Actions
-      for (const action of Endge.domain.getActions()) {
-        Endge.bind.action(action, 'console-log', consoleLog)
-        Endge.bind.action(action, 'load-vocabs', loadVocabs)
-      }
-    })
-  }
-
-  static async reset(): Promise<void> {
-    await this.resetModules()
+    for (const item of ENDGE_CORE_MODULES) {
+      this.defineModule({
+        key: item.key,
+        module: new item.module(),
+        before: item.before,
+        after: item.after,
+      })
+    }
   }
 
   /**
-   * Скачивание домена
+   * Запускает ядро по полному boot pipeline: `setup -> load -> build -> start`.
+   * Метод является единственной централизованной точкой старта `Endge`.
+   */
+  static async boot(ctx: EndgeBootContext): Promise<void> {
+    const host = this.host
+    if (host.isInitialized)
+      return
+
+    this.bootContext = ctx
+    Endge.debug.enabled = true
+
+    await this.setup(ctx)
+    await this.load(ctx)
+    await this.build(ctx)
+    await this.start(ctx)
+
+    host.isInitialized = true
+  }
+
+  /**
+   * Повторно выполняет фазу сборки производных структур для уже загруженного контекста.
+   * Если контекст явно не передан, используется контекст последнего `boot()`.
+   */
+  static override async build(ctx: EndgeBootContext = this.requireBootContext()): Promise<void> {
+    await super.build(ctx)
+  }
+
+  /**
+   * Сбрасывает runtime-состояние всех модулей и очищает сохраненный boot-контекст.
+   */
+  static override async reset(): Promise<void> {
+    await super.reset()
+    this.bootContext = null
+  }
+
+  /**
+   * Скачивает текущий домен как JSON-файл через браузерный download.
    */
   static async download(): Promise<void> {
     const bundle = {
@@ -346,37 +125,245 @@ export class Endge extends EndgeFederation {
     URL.revokeObjectURL(url)
   }
 
-  private static configureRaph(): void {
-    Raph.options({ debug: true })
+  /**
+   * Возвращает контекст последнего запуска или выбрасывает ошибку, если ядро еще не boot-нуто.
+   */
+  private static requireBootContext(): EndgeBootContext {
+    if (!this.bootContext)
+      throw new Error('[Endge] boot context is not available')
+
+    return this.bootContext
   }
 
-  private static async initializePayloadDomain(opts: {
-    payloadBaseAPI: string
-    payloadSecret: string
-  }): Promise<void> {
-    await Endge.setupWithPayload(opts)
-    await Endge.schema.hydrateDomain()
+  /**
+   * Доступ к модулю debug-логирования.
+   */
+  static get debug(): EndgeDebug {
+    return this.getModule<EndgeDebug>('debug')
   }
 
-  private static hydrateRuntimeFilters(): void {
-    try {
-      const raw = localStorage.getItem('endge:parameters')
-      if (!raw) { return }
+  /**
+   * Доступ к модулю диагностических событий, трасс и snapshots.
+   */
+  static get diagnostics(): EndgeDiagnostics {
+    return this.getModule<EndgeDiagnostics>('diagnostics')
+  }
 
-      const store = JSON.parse(raw) as Record<string, unknown>
-      if (!store || typeof store !== 'object') { return }
+  /**
+   * Доступ к модулю тестовых вспомогательных сценариев.
+   */
+  static get testing(): EndgeTesting {
+    return this.getModule<EndgeTesting>('testing')
+  }
 
-      for (const [identity, payload] of Object.entries(store)) {
-        if (!identity) { continue }
+  /**
+   * Доступ к persisted domain model.
+   */
+  static get domain(): EndgeDomain {
+    return this.getModule<EndgeDomain>('domain')
+  }
 
-        Raph.set(
-          identity.startsWith('parameters.') ? identity : `parameters.${identity}`,
-          payload,
-        )
-      }
-    }
-    catch (error) {
-      console.error(error)
-    }
+  /**
+   * Доступ к compiled program read-model.
+   */
+  static get program(): EndgeProgram {
+    return this.getModule<EndgeProgram>('program')
+  }
+
+  /**
+   * Доступ к компилятору домена в program artifacts.
+   */
+  static get compiler(): EndgeCompiler {
+    return this.getModule<EndgeCompiler>('compiler')
+  }
+
+  /**
+   * Доступ к модулю словарей.
+   */
+  static get vocabs(): EndgeVocabs {
+    return this.getModule<EndgeVocabs>('vocabs')
+  }
+
+  /**
+   * Доступ к модулю извлечения значений из доменных и runtime-структур.
+   */
+  static get extract(): EndgeExtract {
+    return this.getModule<EndgeExtract>('extract')
+  }
+
+  /**
+   * Доступ к registry flow handlers.
+   */
+  static get flowRegistry(): EndgeFlowRegistry {
+    return this.getModule<EndgeFlowRegistry>('flowRegistry')
+  }
+
+  /**
+   * Доступ к модулю выполнения flow/action сценариев.
+   */
+  static get flow(): EndgeFlow {
+    return this.getModule<EndgeFlow>('flow')
+  }
+
+  /**
+   * Доступ к модулю render-операций.
+   */
+  static get render(): EndgeRender {
+    return this.getModule<EndgeRender>('render')
+  }
+
+  /**
+   * Доступ к runtime store.
+   */
+  static get store(): EndgeStore {
+    return this.getModule<EndgeStore>('store')
+  }
+
+  /**
+   * Доступ к модулю выполнения пользовательских scripts.
+   */
+  static get script(): EndgeScript {
+    return this.getModule<EndgeScript>('script')
+  }
+
+  /**
+   * Доступ к runtime host manager.
+   */
+  static get runtime(): EndgeRuntime {
+    return this.getModule<EndgeRuntime>('runtime')
+  }
+
+  /**
+   * Доступ к модулю runtime/env variables.
+   */
+  static get vars(): EndgeVars {
+    return this.getModule<EndgeVars>('vars')
+  }
+
+  /**
+   * Доступ к модулю выполнения query.
+   */
+  static get query(): EndgeQuery {
+    return this.getModule<EndgeQuery>('query')
+  }
+
+  /**
+   * Доступ к auth-модулю.
+   */
+  static get auth(): EndgeAuth {
+    return this.getModule<EndgeAuth>('auth')
+  }
+
+  /**
+   * Доступ к schema storage и Payload-интеграции.
+   */
+  static get schema(): EndgeSchemaStorage {
+    return this.getModule<EndgeSchemaStorage>('schema')
+  }
+
+  /**
+   * Доступ к модулю приема updates.
+   */
+  static get updates(): EndgeUpdates {
+    return this.getModule<EndgeUpdates>('updates')
+  }
+
+  /**
+   * Доступ к contracts registry.
+   */
+  static get contracts(): EndgeContracts {
+    return this.getModule<EndgeContracts>('contracts')
+  }
+
+  /**
+   * Доступ к contracts registry через старое имя.
+   * @deprecated Используйте Endge.contracts.
+   */
+  static get eventContracts(): EndgeContracts {
+    return this.contracts
+  }
+
+  /**
+   * Доступ к resolver поведения по behavior bindings.
+   */
+  static get behaviorBindings(): EndgeBindingsBehavior {
+    return this.getModule<EndgeBindingsBehavior>('behaviorBindings')
+  }
+
+  /**
+   * Доступ к resolver презентации по presentation bindings.
+   */
+  static get presentationBindings(): EndgeBindingsPresentation {
+    return this.getModule<EndgeBindingsPresentation>('presentationBindings')
+  }
+
+  /**
+   * Доступ к event bus модулю.
+   */
+  static get events(): EndgeEvents {
+    return this.getModule<EndgeEvents>('events')
+  }
+
+  /**
+   * Доступ к SSE-модулю.
+   */
+  static get sse(): EndgeSSE {
+    return this.getModule<EndgeSSE>('sse')
+  }
+
+  /**
+   * Доступ к UI state модулю.
+   */
+  static get ui(): EndgeUI {
+    return this.getModule<EndgeUI>('ui')
+  }
+
+  /**
+   * Доступ к UI registry компонентов, renderers и presets.
+   */
+  static get uiRegistry(): EndgeUIRegistry {
+    return this.getModule<EndgeUIRegistry>('uiRegistry')
+  }
+
+  /**
+   * Доступ к модулю отчетов.
+   */
+  static get reports(): EndgeReports {
+    return this.getModule<EndgeReports>('reports')
+  }
+
+  /**
+   * Доступ к registry runtime bindings.
+   */
+  static get bind(): EndgeBind {
+    return this.getModule<EndgeBind>('bind')
+  }
+
+  /**
+   * Доступ к консольным debug-командам.
+   */
+  static get console(): EndgeConsole {
+    return this.getModule<EndgeConsole>('console')
+  }
+
+  /**
+   * Доступ к runtime debugger.
+   */
+  static get runtimeDebugger(): EndgeRuntimeDebugger {
+    return this.getModule<EndgeRuntimeDebugger>('runtimeDebugger')
+  }
+
+  /**
+   * Доступ к модулю компиляции и применения стилей.
+   */
+  static get styles(): EndgeStyles {
+    return this.getModule<EndgeStyles>('styles')
+  }
+
+  /**
+   * Доступ к прикладному контексту ядра: проект, окружение, локаль.
+   */
+  static get context(): EndgeContext {
+    return this.getModule<EndgeContext>('context')
   }
 }

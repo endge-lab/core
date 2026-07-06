@@ -88,6 +88,10 @@ function mergeContext(
     : undefined
 }
 
+/**
+ * Модуль диагностики Endge.
+ * Хранит traces/spans/events, политику сбора и экспорт диагностических записей.
+ */
 export class EndgeDiagnostics extends EndgeModule {
   // Политика и store разделены, чтобы runtime мог менять лимиты и фильтры без пересоздания модуля.
   private _policy: DiagnosticsPolicy = { ...DEFAULT_POLICY }
@@ -102,14 +106,23 @@ export class EndgeDiagnostics extends EndgeModule {
   private _openSpans = 0
   private _notifyScheduled = false
 
+  /**
+   * Возвращает идентификатор текущей диагностической сессии.
+   */
   public get sessionId(): string {
     return this._sessionId
   }
 
+  /**
+   * Возвращает копию текущей политики сбора диагностики.
+   */
   public get policy(): DiagnosticsPolicy {
     return { ...this._policy }
   }
 
+  /**
+   * Сериализует persistable-часть состояния диагностики.
+   */
   public override serialize(): unknown {
     if (!this._policy.persistPolicy)
       return undefined
@@ -117,6 +130,9 @@ export class EndgeDiagnostics extends EndgeModule {
     return { policy: this._policy }
   }
 
+  /**
+   * Восстанавливает политику диагностики из сохраненного snapshot.
+   */
   public override deserialize(payload: unknown): void {
     const raw = payload as { policy?: Partial<DiagnosticsPolicy> } | undefined
     if (!raw?.policy)
@@ -124,6 +140,9 @@ export class EndgeDiagnostics extends EndgeModule {
     this.setPolicy(raw.policy)
   }
 
+  /**
+   * Сбрасывает накопленные диагностические записи и runtime-счетчики.
+   */
   public override reset(): void {
     this._store.clear()
     this._exporters.clear()
@@ -136,6 +155,9 @@ export class EndgeDiagnostics extends EndgeModule {
     this.scheduleNotify()
   }
 
+  /**
+   * Обновляет политику сбора, лимиты и фильтры диагностики.
+   */
   public setPolicy(next: Partial<DiagnosticsPolicy>): void {
     this._policy = {
       ...this._policy,
@@ -150,6 +172,9 @@ export class EndgeDiagnostics extends EndgeModule {
     this.scheduleNotify()
   }
 
+  /**
+   * Регистрирует exporter для внешней отправки диагностических записей.
+   */
   public registerExporter(exporter: DiagnosticsExporter): void {
     const id = String(exporter?.id ?? '').trim()
     if (!id)
@@ -159,17 +184,25 @@ export class EndgeDiagnostics extends EndgeModule {
     this.scheduleNotify()
   }
 
+  /**
+   * Удаляет exporter по его id.
+   */
   public unregisterExporter(exporterId: string): void {
     if (this._exporters.delete(String(exporterId ?? '').trim()))
       this.scheduleNotify()
   }
 
-  /** Подписка на каждую новую запись (для экспорта в канал и т.п.). */
+  /**
+   * Подписывает listener на каждую новую диагностическую запись.
+   */
   public addRecordListener(fn: (record: DiagnosticsRecord) => void): void {
     if (typeof fn === 'function')
       this._recordListeners.add(fn)
   }
 
+  /**
+   * Снимает listener диагностических записей.
+   */
   public removeRecordListener(fn: (record: DiagnosticsRecord) => void): void {
     this._recordListeners.delete(fn)
   }
@@ -209,6 +242,9 @@ export class EndgeDiagnostics extends EndgeModule {
     return new DiagnosticsTrace(this, true, traceId, traceName, channel, level, startedAt, attrs, entities, context)
   }
 
+  /**
+   * Открывает дочерний span внутри trace.
+   */
   public startSpan(
     name: string,
     options: DiagnosticsScopeOptions & { traceId: string, parentSpanId?: string } = {
@@ -252,10 +288,16 @@ export class EndgeDiagnostics extends EndgeModule {
     return new DiagnosticsSpan(this, true, traceId, spanId, parentSpanId, spanName, channel, level, startedAt, attrs, entities, context)
   }
 
+  /**
+   * Создает неактивный span, когда policy не разрешает запись.
+   */
   public createInactiveSpan(traceId: string, parentSpanId: string | undefined): DiagnosticsSpan {
     return new DiagnosticsSpan(this, false, traceId, undefined, parentSpanId, 'inactive', undefined, 'info', Date.now(), undefined, undefined, undefined)
   }
 
+  /**
+   * Записывает диагностическое событие.
+   */
   public writeEvent(input: {
     message: string
     level: DiagnosticsLevel
@@ -292,6 +334,9 @@ export class EndgeDiagnostics extends EndgeModule {
     this.appendRecord(record)
   }
 
+  /**
+   * Записывает числовое измерение.
+   */
   public writeMeasurement(input: {
     name: string
     value: number
@@ -328,6 +373,9 @@ export class EndgeDiagnostics extends EndgeModule {
     this.appendRecord(record)
   }
 
+  /**
+   * Записывает snapshot произвольного payload.
+   */
   public writeSnapshot(input: {
     name: string
     payload?: unknown
@@ -362,6 +410,9 @@ export class EndgeDiagnostics extends EndgeModule {
     this.appendRecord(record)
   }
 
+  /**
+   * Записывает завершение trace и закрывает внутренний счетчик открытых trace.
+   */
   public writeTraceEnd(input: {
     name: string
     level: DiagnosticsLevel
@@ -396,6 +447,9 @@ export class EndgeDiagnostics extends EndgeModule {
     this.appendRecord(record)
   }
 
+  /**
+   * Записывает завершение span и закрывает внутренний счетчик открытых span.
+   */
   public writeSpanEnd(input: {
     name: string
     level: DiagnosticsLevel
@@ -434,22 +488,37 @@ export class EndgeDiagnostics extends EndgeModule {
     this.appendRecord(record)
   }
 
+  /**
+   * Возвращает диагностическую запись по id.
+   */
   public getRecord(recordId: number): DiagnosticsRecord | null {
     return this._store.getById(recordId)
   }
 
+  /**
+   * Возвращает последние диагностические записи.
+   */
   public getRecords(limit?: number): DiagnosticsRecord[] {
     return this._store.toArray(limit)
   }
 
+  /**
+   * Возвращает записи, относящиеся к trace.
+   */
   public getTraceRecords(traceId: string, limit?: number): DiagnosticsRecord[] {
     return this._store.getByTraceId(traceId, limit)
   }
 
+  /**
+   * Возвращает записи, связанные с доменной или runtime-сущностью.
+   */
   public getEntityRecords(type: string, id: string, limit?: number): DiagnosticsRecord[] {
     return this._store.getByEntity(type, id, limit)
   }
 
+  /**
+   * Выполняет фильтрованный запрос по диагностическим записям.
+   */
   public queryRecords(query: DiagnosticsRecordQuery = {}): DiagnosticsRecord[] {
     const limit = query.limit != null ? Math.max(1, Math.floor(query.limit)) : undefined
 
@@ -472,6 +541,9 @@ export class EndgeDiagnostics extends EndgeModule {
     })
   }
 
+  /**
+   * Возвращает агрегированные счетчики диагностики.
+   */
   public getCounters(): DiagnosticsCounters {
     return {
       totalRecords: this._store.size,
@@ -485,6 +557,9 @@ export class EndgeDiagnostics extends EndgeModule {
     }
   }
 
+  /**
+   * Возвращает snapshot состояния диагностики.
+   */
   public snapshot(options: { includeRecords?: boolean, limit?: number } = {}): DiagnosticsSnapshot {
     return {
       sessionId: this._sessionId,
@@ -494,6 +569,9 @@ export class EndgeDiagnostics extends EndgeModule {
     }
   }
 
+  /**
+   * Отправляет накопленные записи во все активные exporters.
+   */
   public async flushExporters(options: { limit?: number } = {}): Promise<void> {
     if (!this._policy.exportersEnabled || this._exporters.size === 0)
       return
@@ -511,6 +589,9 @@ export class EndgeDiagnostics extends EndgeModule {
       await exporter.export(records, meta)
   }
 
+  /**
+   * Проверяет, разрешает ли текущая policy записать событие указанного уровня и канала.
+   */
   public canCapture(level: DiagnosticsLevel, channel?: string): boolean {
     if (!this._policy.enabled) {
       this._droppedByPolicy += 1
@@ -541,6 +622,9 @@ export class EndgeDiagnostics extends EndgeModule {
     return true
   }
 
+  /**
+   * Внутренний helper модуля: append Record.
+   */
   private appendRecord(record: DiagnosticsRecord): void {
     const evicted = this._store.append(record)
     if (evicted)
@@ -550,11 +634,17 @@ export class EndgeDiagnostics extends EndgeModule {
       fn(record)
   }
 
+  /**
+   * Внутренний helper модуля: next Record Id.
+   */
   private nextRecordId(): number {
     this._recordId += 1
     return this._recordId
   }
 
+  /**
+   * Внутренний helper модуля: schedule Notify.
+   */
   private scheduleNotify(): void {
     if (this._notifyScheduled)
       return

@@ -53,29 +53,46 @@ export class EndgeAuth extends EndgeModule {
   // ---------------------------------------------------------------------------
   private _userInfo: any = null
 
+  /**
+   * Создает auth-модуль с изолированным axios instance.
+   */
   public constructor() {
     super()
   }
 
-  /** Axios, который уже умеет Authorization */
+  /**
+   * Возвращает axios instance, который автоматически использует Authorization header.
+   */
   public get axios(): AxiosInstance {
     return this.http
   }
 
+  /**
+   * Возвращает текущий access token.
+   */
   public get token(): string {
     return this.accessToken
   }
 
+  /**
+   * Возвращает активный auth-provider.
+   */
   public get provider(): 'keycloak_manual' | 'keycloak_form' {
     if (!this.auth) { return 'keycloak_form' }
     return this.auth.provider
   }
 
+  /**
+   * Показывает, есть ли действующий access token.
+   */
   public get isAuthenticated(): boolean {
     if (!this.accessToken || !this.accessExpiresAt) { return false }
     return !isAfter(new Date(), this.accessExpiresAt)
   }
 
+  /**
+   * Возвращает загруженный userinfo payload.
+   */
   public get userInfo(): any {
     return this._userInfo
   }
@@ -84,6 +101,9 @@ export class EndgeAuth extends EndgeModule {
   // INIT
   // ---------------------------------------------------------------------------
 
+  /**
+   * Инициализирует auth-конфигурацию из settings и восстанавливает токены из storage.
+   */
   public async init(): Promise<void> {
     await this.ensureInit()
     // Временно отключено: сервис авторизации не работает
@@ -96,6 +116,9 @@ export class EndgeAuth extends EndgeModule {
     // }
   }
 
+  /**
+   * Гарантирует Init.
+   */
   private async ensureInit(): Promise<void> {
     if (this.isInitialized) { return }
     if (this.initPromise) { return await this.initPromise }
@@ -110,6 +133,9 @@ export class EndgeAuth extends EndgeModule {
     }
   }
 
+  /**
+   * Внутренний helper модуля: init Once.
+   */
   private async initOnce(): Promise<void> {
     const settings: any = Endge.domain.getSetting('general')
     const auth: SettingsAuthSchema | undefined = settings?.auth
@@ -178,6 +204,9 @@ export class EndgeAuth extends EndgeModule {
     return await this.loginWithCredentials(u, p)
   }
 
+  /**
+   * Обновляет access token через refresh token.
+   */
   public async refresh(): Promise<boolean> {
     await this.ensureInit()
 
@@ -203,6 +232,9 @@ export class EndgeAuth extends EndgeModule {
     return true
   }
 
+  /**
+   * Проверяет срок access token и обновляет его при приближении истечения.
+   */
   public async checkAccessToken(): Promise<void> {
     await this.ensureInit()
 
@@ -220,6 +252,9 @@ export class EndgeAuth extends EndgeModule {
     await this.refresh()
   }
 
+  /**
+   * Выполняет logout, очищает storage, локальные токены и Authorization header.
+   */
   public async logout(): Promise<void> {
     await this.ensureInit()
 
@@ -251,6 +286,9 @@ export class EndgeAuth extends EndgeModule {
     this.notify()
   }
 
+  /**
+   * Останавливает фоновую проверку и обновление access token.
+   */
   public stopBackgroundRefresh(): void {
     if (!this.backgroundInterval) { return }
     clearInterval(this.backgroundInterval)
@@ -261,16 +299,25 @@ export class EndgeAuth extends EndgeModule {
   // INTERNAL
   // ---------------------------------------------------------------------------
 
+  /**
+   * Внутренний helper модуля: require Auth.
+   */
   private requireAuth(): SettingsAuthSchema {
-    if (!this.auth) { throw new Error('AODBAuth не инициализирован: auth отсутствует') }
+    if (!this.auth) { throw new Error('EndgeAuth не инициализирован: auth отсутствует') }
     return this.auth
   }
 
+  /**
+   * Внутренний helper модуля: require Service.
+   */
   private requireService(): KeycloakAuthService {
-    if (!this.service) { throw new Error('AODBAuth не инициализирован: service отсутствует') }
+    if (!this.service) { throw new Error('EndgeAuth не инициализирован: service отсутствует') }
     return this.service
   }
 
+  /**
+   * Внутренний helper модуля: login With Credentials.
+   */
   private async loginWithCredentials(
     username: string,
     password: string,
@@ -304,11 +351,17 @@ export class EndgeAuth extends EndgeModule {
     return stored
   }
 
+  /**
+   * Внутренний helper модуля: save To Storage.
+   */
   private saveToStorage(data: StoredAuthToken): void {
     const auth: SettingsAuthSchema = this.requireAuth()
     localStorage.setItem(auth.storageKey, JSON.stringify(data))
   }
 
+  /**
+   * Внутренний helper модуля: load From Storage.
+   */
   private async loadFromStorage(): Promise<void> {
     const auth: SettingsAuthSchema = this.requireAuth()
 
@@ -341,11 +394,17 @@ export class EndgeAuth extends EndgeModule {
     this.notify()
   }
 
+  /**
+   * Применяет Auth Header.
+   */
   private applyAuthHeader(accessToken: string): void {
     if (accessToken) { this.http.defaults.headers.common.Authorization = `Bearer ${accessToken}` }
     else { delete this.http.defaults.headers.common.Authorization }
   }
 
+  /**
+   * Проверяет is Stored Auth Token.
+   */
   private isStoredAuthToken(v: unknown): v is StoredAuthToken {
     if (typeof v !== 'object' || v === null) { return false }
     const r: Record<string, unknown> = v as Record<string, unknown>
@@ -354,6 +413,9 @@ export class EndgeAuth extends EndgeModule {
     )
   }
 
+  /**
+   * Запускает Background Refresh.
+   */
   private startBackgroundRefresh(): void {
     if (this.backgroundInterval) { return }
     this.backgroundInterval = setInterval((): void => {
@@ -361,6 +423,9 @@ export class EndgeAuth extends EndgeModule {
     }, 60_000)
   }
 
+  /**
+   * Полностью сбрасывает auth-состояние модуля.
+   */
   public reset(): void {
     // остановка фонового refresh
     if (this.backgroundInterval) {
@@ -398,6 +463,9 @@ export class EndgeAuth extends EndgeModule {
     this.notify()
   }
 
+  /**
+   * Гарантирует Authenticated.
+   */
   private async ensureAuthenticated(): Promise<void> {
     await this.ensureInit()
 
@@ -422,6 +490,9 @@ export class EndgeAuth extends EndgeModule {
     // keycloak_form: логин делает UI
   }
 
+  /**
+   * Возвращает token согласно режиму: none, manual или inherit.
+   */
   public async getAccessToken(
     opts: GetAccessTokenOpts = { mode: 'inherit' },
   ): Promise<string | undefined> {

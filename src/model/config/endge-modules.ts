@@ -1,0 +1,69 @@
+import type { EndgeModuleDefinition } from '@/domain/types/endge-modules.types'
+
+import { EndgeAuth } from '@/model/endge/endge-auth'
+import { EndgeBindingsBehavior } from '@/model/endge/endge-bindings-behavior'
+import { EndgeBindingsPresentation } from '@/model/endge/endge-bindings-presentation'
+import { EndgeBind } from '@/model/endge/endge-bind'
+import { EndgeCompiler } from '@/model/endge/endge-compiler'
+import { EndgeConsole } from '@/model/endge/endge-console'
+import { EndgeContext } from '@/model/endge/endge-context'
+import { EndgeContracts } from '@/model/endge/endge-contracts'
+import { EndgeDebug } from '@/model/endge/endge-debug'
+import { EndgeDiagnostics } from '@/model/endge/endge-diagnostics'
+import { EndgeDomain } from '@/model/endge/endge-domain'
+import { EndgeEvents } from '@/model/endge/endge-events'
+import { EndgeExtract } from '@/model/endge/endge-extract'
+import { EndgeFlow } from '@/model/endge/endge-flow'
+import { EndgeFlowRegistry } from '@/model/endge/endge-flow-registry'
+import { EndgeProgram } from '@/model/endge/endge-program'
+import { EndgeQuery } from '@/model/endge/endge-query'
+import { EndgeRender } from '@/model/endge/endge-render'
+import { EndgeReports } from '@/model/endge/endge-reports'
+import { EndgeRuntime } from '@/model/endge/endge-runtime'
+import { EndgeRuntimeDebugger } from '@/model/endge/endge-runtime-debugger'
+import { EndgeSchemaStorage } from '@/model/endge/endge-schema-database'
+import { EndgeScript } from '@/model/endge/endge-script'
+import { EndgeSSE } from '@/model/endge/endge-sse'
+import { EndgeStore } from '@/model/endge/endge-store'
+import { EndgeStyles } from '@/model/endge/endge-styles'
+import { EndgeTesting } from '@/model/endge/endge-testing'
+import { EndgeUI } from '@/model/endge/endge-ui'
+import { EndgeUIRegistry } from '@/model/endge/endge-ui-registry'
+import { EndgeUpdates } from '@/model/endge/endge-updates'
+import { EndgeVars } from '@/model/endge/endge-vars'
+import { EndgeVocabs } from '@/model/endge/endge-vocabs'
+
+export const ENDGE_CORE_MODULES: EndgeModuleDefinition[] = [
+  { key: 'context', module: EndgeContext },
+  { key: 'diagnostics', module: EndgeDiagnostics },
+  { key: 'debug', module: EndgeDebug },
+  { key: 'testing', module: EndgeTesting },
+  { key: 'schema', module: EndgeSchemaStorage },
+  { key: 'domain', module: EndgeDomain },
+  { key: 'program', module: EndgeProgram },
+  { key: 'compiler', module: EndgeCompiler },
+  { key: 'vocabs', module: EndgeVocabs },
+  { key: 'extract', module: EndgeExtract },
+  { key: 'flowRegistry', module: EndgeFlowRegistry },
+  { key: 'flow', module: EndgeFlow },
+  { key: 'render', module: EndgeRender },
+  { key: 'store', module: EndgeStore },
+  { key: 'script', module: EndgeScript },
+  { key: 'runtime', module: EndgeRuntime },
+  { key: 'vars', module: EndgeVars },
+  { key: 'query', module: EndgeQuery },
+  { key: 'auth', module: EndgeAuth },
+  { key: 'updates', module: EndgeUpdates },
+  { key: 'events', module: EndgeEvents },
+  { key: 'sse', module: EndgeSSE },
+  { key: 'ui', module: EndgeUI },
+  { key: 'uiRegistry', module: EndgeUIRegistry },
+  { key: 'reports', module: EndgeReports },
+  { key: 'bind', module: EndgeBind },
+  { key: 'console', module: EndgeConsole },
+  { key: 'runtimeDebugger', module: EndgeRuntimeDebugger },
+  { key: 'styles', module: EndgeStyles },
+  { key: 'contracts', module: EndgeContracts },
+  { key: 'behaviorBindings', module: EndgeBindingsBehavior },
+  { key: 'presentationBindings', module: EndgeBindingsPresentation },
+]

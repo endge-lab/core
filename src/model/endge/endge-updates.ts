@@ -2,7 +2,13 @@ import { Raph } from '@endge/raph'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { Endge } from '@/model/endge/endge'
 
+/**
+ * Модуль применения внешних update-сообщений к runtime state.
+ */
 export class EndgeUpdates extends EndgeModule {
+  /**
+   * Применяет сообщение обновления по профилю из настроек домена.
+   */
   public applyUpdateForProfile(
     profileIdentity: string,
     message: unknown,
@@ -109,6 +115,9 @@ export class EndgeUpdates extends EndgeModule {
 
   // ---------------- private ----------------
 
+  /**
+   * Применяет Delete.
+   */
   private applyDelete(
     profileIdentity: string,
     profile: any,
@@ -174,6 +183,9 @@ export class EndgeUpdates extends EndgeModule {
     return null
   }
 
+  /**
+   * Внутренний helper модуля: strip Trailing Prop.
+   */
   private stripTrailingProp(to: string): string | null {
     // если есть "].xxx" или ".xxx" - отрежем хвост после последней "."
     // но не ломаем случаи, где точка внутри переменных не актуальна уже после applyVars
@@ -290,6 +302,9 @@ export class EndgeUpdates extends EndgeModule {
     return true
   }
 
+  /**
+   * Внутренний helper модуля: delete By Dot Path.
+   */
   private deleteByDotPath(obj: any, path: string): void {
     const segs = String(path).split('.').filter(Boolean)
     if (segs.length === 0)
@@ -334,6 +349,9 @@ export class EndgeUpdates extends EndgeModule {
     return { basePath, selectorKey, selectorVal, restPath }
   }
 
+  /**
+   * Внутренний helper модуля: parent Path.
+   */
   private parentPath(path: string): string | null {
     const s = String(path ?? '')
     const i = s.lastIndexOf('.')
@@ -342,6 +360,9 @@ export class EndgeUpdates extends EndgeModule {
     return s.slice(0, i)
   }
 
+  /**
+   * Внутренний helper модуля: leaf Key.
+   */
   private leafKey(path: string): string | null {
     const s = String(path ?? '')
     const i = s.lastIndexOf('.')
@@ -351,6 +372,9 @@ export class EndgeUpdates extends EndgeModule {
     return leaf.length ? leaf : null
   }
 
+  /**
+   * Возвращает By Segs.
+   */
   private getBySegs(obj: any, segs: string[]): any {
     let cur: any = obj
     for (const key of segs) {
@@ -361,10 +385,16 @@ export class EndgeUpdates extends EndgeModule {
     return cur
   }
 
+  /**
+   * Возвращает By Path.
+   */
   private getByPath(obj: any, path: string): any {
     return path.split('.').reduce((acc, key) => acc?.[key], obj)
   }
 
+  /**
+   * Применяет Vars.
+   */
   private applyVars(path: string, vars: Record<string, string>): string {
     let out = path
     for (const k in vars) {

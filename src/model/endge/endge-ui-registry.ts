@@ -70,11 +70,17 @@ export class EndgeUIRegistry extends EndgeModule {
   private _renderersByRef = new Map<string, UIResolvedComponentRenderer>()
   private _rendererRefsByIndex = new Map<string, string[]>()
 
+  /**
+   * Создает registry и регистрирует системные UI definitions.
+   */
   public constructor() {
     super()
     this.reset()
   }
 
+  /**
+   * Очищает registry и восстанавливает default UI definitions.
+   */
   public override reset(): void {
     this._definitions.clear()
     this._configDefinitions.clear()
@@ -91,6 +97,9 @@ export class EndgeUIRegistry extends EndgeModule {
     this.registerJsxComponents(ENDGE_UI_DEFAULT_JSX_COMPONENTS)
   }
 
+  /**
+   * Возвращает snapshot зарегистрированных UI refs.
+   */
   public override serialize(): UIRegistrySnapshot {
     return {
       definitions: [...this._definitions.keys()],
@@ -102,6 +111,9 @@ export class EndgeUIRegistry extends EndgeModule {
     }
   }
 
+  /**
+   * Регистрирует UI component definitions.
+   */
   public registerDefinitions(definitions: UIComponentDefinition[]): void {
     for (const definition of definitions) {
       this._definitions.set(definition.id, clonePlainValue(definition))
@@ -109,6 +121,9 @@ export class EndgeUIRegistry extends EndgeModule {
     this.notify()
   }
 
+  /**
+   * Регистрирует config definitions для UI components.
+   */
   public registerConfigDefinitions(definitions: UIComponentConfigDefinition[]): void {
     for (const definition of definitions) {
       this._configDefinitions.set(definition.kind, clonePlainValue(definition))
@@ -116,6 +131,9 @@ export class EndgeUIRegistry extends EndgeModule {
     this.notify()
   }
 
+  /**
+   * Регистрирует preset components для palette/library.
+   */
   public registerPresetComponents(components: UIComponentPresetDocument[]): void {
     for (const component of components) {
       this._presetComponents.set(component.id, clonePlainValue(component))
@@ -123,6 +141,9 @@ export class EndgeUIRegistry extends EndgeModule {
     this.notify()
   }
 
+  /**
+   * Регистрирует JSX components для UI editor palette.
+   */
   public registerJsxComponents(components: UIJsxComponentDocument[]): void {
     for (const component of components) {
       this._jsxComponents.set(component.id, clonePlainValue(component))
@@ -130,6 +151,9 @@ export class EndgeUIRegistry extends EndgeModule {
     this.notify()
   }
 
+  /**
+   * Возвращает список UI definitions с optional фильтрацией.
+   */
   public listDefinitions(input?: {
     includeSystem?: boolean
     paletteOnly?: boolean
@@ -145,6 +169,9 @@ export class EndgeUIRegistry extends EndgeModule {
     })
   }
 
+  /**
+   * Возвращает группы visible definitions для palette.
+   */
   public listDefinitionGroups(): UIComponentDefinitionGroup[] {
     const groups = new Map<string, UIComponentDefinitionGroup>()
     for (const definition of this.listDefinitions({ paletteOnly: true })) {
@@ -159,6 +186,9 @@ export class EndgeUIRegistry extends EndgeModule {
     return [...groups.values()]
   }
 
+  /**
+   * Возвращает UI definition по ref.
+   */
   public getDefinition(definitionRef: string | null | undefined): UIComponentDefinition | null {
     if (!definitionRef) {
       return null
@@ -166,6 +196,9 @@ export class EndgeUIRegistry extends EndgeModule {
     return this._definitions.get(definitionRef) ?? null
   }
 
+  /**
+   * Возвращает UI definition или выбрасывает ошибку, если ref неизвестен.
+   */
   public getDefinitionOrThrow(definitionRef: string): UIComponentDefinition {
     const definition = this.getDefinition(definitionRef)
     if (!definition) {
@@ -174,6 +207,9 @@ export class EndgeUIRegistry extends EndgeModule {
     return definition
   }
 
+  /**
+   * Возвращает config definition по kind.
+   */
   public getConfigDefinition(kind: string | null | undefined): UIComponentConfigDefinition | null {
     if (!kind) {
       return null
@@ -181,14 +217,23 @@ export class EndgeUIRegistry extends EndgeModule {
     return this._configDefinitions.get(kind) ?? null
   }
 
+  /**
+   * Возвращает зарегистрированные preset components.
+   */
   public listPresetComponents(): UIComponentPresetDocument[] {
     return [...this._presetComponents.values()].map(item => clonePlainValue(item))
   }
 
+  /**
+   * Возвращает зарегистрированные JSX components.
+   */
   public listJsxComponents(): UIJsxComponentDocument[] {
     return [...this._jsxComponents.values()].map(item => clonePlainValue(item))
   }
 
+  /**
+   * Возвращает preset component по id.
+   */
   public getPresetComponent(componentId: string | null | undefined): UIComponentPresetDocument | null {
     if (!componentId) {
       return null
@@ -197,6 +242,9 @@ export class EndgeUIRegistry extends EndgeModule {
     return component ? clonePlainValue(component) : null
   }
 
+  /**
+   * Возвращает JSX component по id.
+   */
   public getJsxComponent(componentId: string | null | undefined): UIJsxComponentDocument | null {
     if (!componentId) {
       return null
@@ -205,6 +253,9 @@ export class EndgeUIRegistry extends EndgeModule {
     return component ? clonePlainValue(component) : null
   }
 
+  /**
+   * Регистрирует legacy renderer для runtime/view совместимости.
+   */
   public registerLegacyComponentRenderer(input: UILegacyComponentRendererRegistration): void {
     const renderer: UIResolvedLegacyComponentRenderer = {
       ref: input.ref,
@@ -228,6 +279,9 @@ export class EndgeUIRegistry extends EndgeModule {
     this.notify()
   }
 
+  /**
+   * Возвращает legacy renderer по его ссылке.
+   */
   public getLegacyComponentRendererByRef(rendererRef: string | null | undefined): UIResolvedLegacyComponentRenderer | null {
     if (!rendererRef) {
       return null
@@ -235,6 +289,9 @@ export class EndgeUIRegistry extends EndgeModule {
     return this._legacyRenderersByRef.get(rendererRef) ?? null
   }
 
+  /**
+   * Подбирает legacy renderer по явной ссылке или по параметрам старой component-модели.
+   */
   public resolveLegacyComponentRenderer(input: UIResolveLegacyComponentRendererOptions): UIResolvedLegacyComponentRenderer | null {
     if (input.rendererRef) {
       const explicit = this.getLegacyComponentRendererByRef(String(input.rendererRef).trim())
@@ -263,6 +320,9 @@ export class EndgeUIRegistry extends EndgeModule {
     return null
   }
 
+  /**
+   * Сопоставляет legacy primitive kind с definition ref нового UI registry.
+   */
   public resolveLegacyDefinitionRef(
     kind: UIPrimitiveKind,
     props?: Record<string, unknown> | null,
@@ -290,16 +350,25 @@ export class EndgeUIRegistry extends EndgeModule {
     return UI_COMPONENT_HOST_DEFINITION_ID
   }
 
+  /**
+   * Возвращает layout по умолчанию для definition.
+   */
   public getDefinitionDefaultLayout(definitionRef: string): UIAstNodeLayout | undefined {
     const definition = this.getDefinitionOrThrow(definitionRef)
     return definition.defaultLayout ? clonePlainValue(definition.defaultLayout) : undefined
   }
 
+  /**
+   * Возвращает props по умолчанию для definition.
+   */
   public getDefinitionDefaultProps(definitionRef: string): Record<string, unknown> {
     const definition = this.getDefinitionOrThrow(definitionRef)
     return clonePlainValue(definition.defaultProps)
   }
 
+  /**
+   * Создает UI AST node на основе definition и пользовательских patch-значений.
+   */
   public createNodeFromDefinition(input: UIRegistryNodeDraft): UIAstNodeBase {
     const definition = this.getDefinitionOrThrow(input.definitionRef)
     const nextLayout = definition.defaultLayout
@@ -332,6 +401,9 @@ export class EndgeUIRegistry extends EndgeModule {
     }
   }
 
+  /**
+   * Создает корневую page-ноду для UI AST.
+   */
   public createRootNode(input?: {
     id?: string
     propsPatch?: Record<string, unknown>
@@ -344,6 +416,9 @@ export class EndgeUIRegistry extends EndgeModule {
     }) as UIAstNodeBase<'page'>
   }
 
+  /**
+   * Нормализует node относительно зарегистрированной definition.
+   */
   public normalizeNodeDefinition<TNode extends UIAstNodeBase>(
     node: TNode,
   ): TNode {
@@ -367,6 +442,9 @@ export class EndgeUIRegistry extends EndgeModule {
     }
   }
 
+  /**
+   * Регистрирует renderer для definition/surface/role.
+   */
   public registerRenderer(input: UIComponentRendererRegistration): void {
     const renderer: UIResolvedComponentRenderer = {
       ref: input.ref,
@@ -392,6 +470,9 @@ export class EndgeUIRegistry extends EndgeModule {
     this.notify()
   }
 
+  /**
+   * Назначает renderer по умолчанию для роли и поверхности definition.
+   */
   public setDefaultRendererRef(
     definitionRef: string,
     surface: UIPresentationSurface,
@@ -427,6 +508,9 @@ export class EndgeUIRegistry extends EndgeModule {
     this.notify()
   }
 
+  /**
+   * Возвращает renderer по его ссылке.
+   */
   public getRendererByRef(rendererRef: string | null | undefined): UIResolvedComponentRenderer | null {
     if (!rendererRef) {
       return null
@@ -434,6 +518,9 @@ export class EndgeUIRegistry extends EndgeModule {
     return this._renderersByRef.get(rendererRef) ?? null
   }
 
+  /**
+   * Подбирает renderer по definition, surface, role и возможной явной ссылке.
+   */
   public resolveRenderer(input: UIResolveRendererOptions): UIResolvedComponentRenderer | null {
     const definition = this.getDefinition(input.definitionRef)
     if (!definition) {
@@ -500,6 +587,9 @@ export class EndgeUIRegistry extends EndgeModule {
     return null
   }
 
+  /**
+   * Возвращает Fallback Surfaces.
+   */
   private getFallbackSurfaces(surface: UIPresentationSurface): UIPresentationSurface[] {
     if (surface === 'admin') {
       return ['canvas', 'runtime']
@@ -510,6 +600,9 @@ export class EndgeUIRegistry extends EndgeModule {
     return ['admin', 'runtime']
   }
 
+  /**
+   * Возвращает Legacy Fallback Hosts.
+   */
   private getLegacyFallbackHosts(host: UILegacyComponentRenderHost): UILegacyComponentRenderHost[] {
     if (host === 'table-cell') {
       return ['view', 'canvas']

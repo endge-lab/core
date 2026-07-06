@@ -1,4 +1,5 @@
 import type { EndgeGlobalVar } from '@/domain/types/types'
+import type { EndgeBootContext } from '@/domain/types/bootstrap.types'
 
 import { Raph } from '@endge/raph'
 
@@ -30,19 +31,61 @@ export class EndgeVars extends EndgeModule {
   // Переопределение переменных среды
   private _envyRecord: EnvRecord = {}
 
-  init(): void {
-    this.syncAllToRaph()
+  /**
+   * Принимает runtime/env overrides из boot context.
+   */
+  public override setup(ctx: EndgeBootContext): void {
+    this.setEnvyRecord(ctx.vars)
   }
 
+  /**
+   * Синхронизирует итоговые значения переменных и runtime-фильтров в Raph.
+   */
+  public override start(): void {
+    this.syncAllToRaph()
+    this.hydrateRuntimeFilters()
+  }
+
+  /**
+   * Устанавливает внешние overrides переменных и сразу пересинхронизирует Raph.
+   */
   setEnvyRecord(envyRecord: EnvRecord): void {
     this._envyRecord = envyRecord ?? {}
     this.syncAllToRaph()
+  }
+
+  /**
+   * Внутренний helper модуля: hydrate Runtime Filters.
+   */
+  private hydrateRuntimeFilters(): void {
+    try {
+      const raw = localStorage.getItem('endge:parameters')
+      if (!raw) { return }
+
+      const store = JSON.parse(raw) as Record<string, unknown>
+      if (!store || typeof store !== 'object') { return }
+
+      for (const [identity, payload] of Object.entries(store)) {
+        if (!identity) { continue }
+
+        Raph.set(
+          identity.startsWith('parameters.') ? identity : `parameters.${identity}`,
+          payload,
+        )
+      }
+    }
+    catch (error) {
+      console.error(error)
+    }
   }
 
   // ========================================================================
   // DOMAIN
   // ========================================================================
 
+  /**
+   * Возвращает Domain Vars.
+   */
   private getDomainVars(): EndgeGlobalVar[] {
     try {
       const settings = Endge.domain.getSetting('general') as
@@ -65,7 +108,6 @@ export class EndgeVars extends EndgeModule {
         }
       })
 
-      console.log( 'getDomainVars', res)
       return res
     }
     catch (e) {
@@ -97,10 +139,16 @@ export class EndgeVars extends EndgeModule {
     return undefined
   }
 
+  /**
+   * Возвращает все доменные переменные с учетом overrides.
+   */
   getAll(): EndgeGlobalVar[] {
     return this.getDomainVars()
   }
 
+  /**
+   * Возвращает переменные в виде record, удобном для сериализации и debug UI.
+   */
   toRecord(): Record<string, { defaultValue: string, currentValue: string }> {
     const out: Record<string, { defaultValue: string, currentValue: string }> = {}
     for (const v of this.getDomainVars()) {
@@ -114,6 +162,9 @@ export class EndgeVars extends EndgeModule {
     return out
   }
 
+  /**
+   * Резолвит строку вида `{VAR}` в значение переменной и применяет optional coercion.
+   */
   resolve<T = string>(
     raw: unknown,
     options?: {
@@ -157,6 +208,9 @@ export class EndgeVars extends EndgeModule {
     }
   }
 
+  /**
+   * Приводит значение переменной к number.
+   */
   static toNumber(v: unknown): number {
     if (typeof v === 'number')
       return v
@@ -165,10 +219,16 @@ export class EndgeVars extends EndgeModule {
     return Number(String(v).trim())
   }
 
+  /**
+   * Приводит значение переменной к string.
+   */
   static toString(v: unknown): string {
     return v == null ? '' : String(v)
   }
 
+  /**
+   * Приводит значение переменной к boolean.
+   */
   static toBoolean(v: unknown): boolean {
     if (typeof v === 'boolean')
       return v
@@ -176,6 +236,9 @@ export class EndgeVars extends EndgeModule {
     return s === 'true' || s === '1'
   }
 
+  /**
+   * Внутренний helper модуля: parse Var Token.
+   */
   private static parseVarToken(
     token: string,
   ): { ok: true, name: string } | { ok: false, reason: string } {
@@ -212,6 +275,9 @@ export class EndgeVars extends EndgeModule {
   // Raph sync
   // ========================================================================
 
+  /**
+   * Внутренний helper модуля: sync All To Raph.
+   */
   private syncAllToRaph(): void {
     const vars: EndgeGlobalVar[] = this.getDomainVars()
     for (const v of vars) {
@@ -222,6 +288,9 @@ export class EndgeVars extends EndgeModule {
     }
   }
 
+  /**
+   * Внутренний helper модуля: sync One To Raph.
+   */
   private syncOneToRaph(name: string, value: string | undefined): void {
     Raph.app.set(`${Config.STORAGE_VARS_KEY}.${name}`, value)
   }

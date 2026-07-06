@@ -13,6 +13,9 @@ import {
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { Endge } from '@/model/endge/endge'
 
+/**
+ * Модуль подключения к SSE-каналу и трансляции сообщений в Endge events.
+ */
 export class EndgeSSE extends EndgeModule {
   private _sseManager: Nullable<SSEManager> = null
 
@@ -22,6 +25,9 @@ export class EndgeSSE extends EndgeModule {
   private _tokenCached: string | undefined
   private _tokenRefreshTimer: Nullable<ReturnType<typeof setInterval>> = null
 
+  /**
+   * Создает SSE-модуль и delayed executor для пакетного уведомления подписчиков.
+   */
   public constructor() {
     super()
 
@@ -32,11 +38,17 @@ export class EndgeSSE extends EndgeModule {
     })
   }
 
+  /**
+   * Предметный запуск SSE-подключения из внешнего кода.
+   */
   public async init(): Promise<void> {
     // console.log('[EndgeSSE] init')
     await this.startSSE()
   }
 
+  /**
+   * Сбрасывает SSE-подключение, delayed tasks и счетчик сообщений.
+   */
   public reset(): void {
     // console.log('[EndgeSSE] reset')
     this._delayExecutor.flushAll()
@@ -44,6 +56,9 @@ export class EndgeSSE extends EndgeModule {
     this._upsMeter.reset()
   }
 
+  /**
+   * Запускает SSE-подключение по настройкам из домена.
+   */
   public async startSSE(): Promise<void> {
     // console.group('[EndgeSSE] startSSE')
 
@@ -96,6 +111,9 @@ export class EndgeSSE extends EndgeModule {
     console.groupEnd()
   }
 
+  /**
+   * Публикует входящее SSE-сообщение в `Endge.events`.
+   */
   public emitCustomSSEEvent(message: unknown): void {
     if (!message)
       return
@@ -108,6 +126,9 @@ export class EndgeSSE extends EndgeModule {
     })
   }
 
+  /**
+   * Останавливает активное SSE-подключение и очистку token-cache.
+   */
   public stopSSE(): void {
     // console.log('[EndgeSSE] stopSSE')
 
@@ -124,6 +145,9 @@ export class EndgeSSE extends EndgeModule {
     this._tokenCached = undefined
   }
 
+  /**
+   * Переключает SSE-подключение между active и stopped.
+   */
   public toggleSSE(): void {
     if (this.isSSEActive) {
       this.stopSSE()
@@ -133,16 +157,25 @@ export class EndgeSSE extends EndgeModule {
     }
   }
 
+  /**
+   * Возвращает текущую скорость входящих SSE-сообщений.
+   */
   public get sseRate(): number {
     if (!this._sseManager)
       return 0
     return this._upsMeter.rate
   }
 
+  /**
+   * Показывает, активно ли SSE-подключение.
+   */
   public get isSSEActive(): boolean {
     return this._sseManager !== null && this._sseManager.isConnected
   }
 
+  /**
+   * Запускает Token Refresh Timer.
+   */
   private startTokenRefreshTimer(cfg: SettingsSSESchema): void {
     if (this._tokenRefreshTimer)
       return
@@ -152,6 +185,9 @@ export class EndgeSSE extends EndgeModule {
     }, 30_000)
   }
 
+  /**
+   * Внутренний helper модуля: refresh Token Cached.
+   */
   private async refreshTokenCached(cfg: SettingsSSESchema): Promise<void> {
     const mode: SettingsSSEAuthMode = cfg.authMode ?? 'inherit'
 

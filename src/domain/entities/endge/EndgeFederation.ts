@@ -1,23 +1,14 @@
-type EndgeFederationStage = 'setup' | 'init' | 'reset'
+import type { EndgeBootContext } from '@/domain/types/bootstrap.types'
+import type { EndgeModuleDescriptor, EndgePlugin } from '@/domain/types/endge-modules.types'
+import type { EndgeFederationHost } from '@/domain/types/federation.types'
 
-interface EndgeFederationLifecycleModule {
-  setup?: () => void | Promise<void>
-  init?: () => void | Promise<void>
-  reset?: () => void | Promise<void>
-  serialize?: () => unknown
-  deserialize?: (payload: unknown) => void
-}
+import type { EndgeModule } from '@/domain/entities/endge/EndgeModule'
+import { sortEndgeModuleDescriptors } from '@/domain/entities/endge/sort-endge-modules'
 
-export type EndgeFederationModule = object
-
-interface EndgeFederationHost {
-  isConfigured: boolean
-  isSetup: boolean
-  isInitialized: boolean
-  isHydrating: boolean
-  initPromise: Promise<void> | null
-  modules: Map<string, EndgeFederationModule>
-  state: Map<string, unknown>
+function toArray(value: string | string[] | undefined): string[] {
+  if (!value)
+    return []
+  return Array.isArray(value) ? value : [value]
 }
 
 /**
@@ -45,75 +36,147 @@ export abstract class EndgeFederation {
   protected static configureFederation(): void {}
 
   /**
-   * Регистрирует модуль в федерации.
-   * Порядок регистрации определяет дальнейший порядок `setup/init/reset`.
+   * Добавляет plugin в список расширений федерации.
+   * Plugin устанавливается во время конфигурации федерации, до boot.
    */
-  public static registerModule<T extends EndgeFederationModule>(key: string, module: T): T {
-    const normalizedKey = String(key ?? '').trim()
-    if (!normalizedKey)
-      throw new Error(`[${this.name}] module key is required`)
-    if (!module || typeof module !== 'object')
-      throw new Error(`[${this.name}] module "${normalizedKey}" must be an object`)
+  public static use(plugin: EndgePlugin): void {
+    const host = this.getOrCreateHost()
 
-    this.host.modules.set(normalizedKey, module)
-    return module
+    if (host.isConfigured || host.isInitialized)
+      throw new Error(`[${this.name}] plugins must be registered before federation configuration`)
+
+    const pluginId = String(plugin?.id ?? '').trim()
+    if (!pluginId)
+      throw new Error(`[${this.name}] plugin id is required`)
+    if (typeof plugin.install !== 'function')
+      throw new Error(`[${this.name}] plugin "${pluginId}" install() is required`)
+
+    if (host.plugins.some(item => item.id === pluginId))
+      return
+
+    host.plugins.push(plugin)
   }
 
   /**
-   * Выполняет `setup()` для всех модулей один раз до первого `init()`.
+   * Декларирует модуль федерации.
+   * Итоговый порядок строится после установки plugin-модулей.
    */
-  public static async setup(): Promise<void> {
+  public static defineModule<T extends EndgeModule>(descriptor: EndgeModuleDescriptor<T>): T {
+    const host = this.getOrCreateHost()
+    if (!host.isConfiguring)
+      throw new Error(`[${this.name}] defineModule() can be used only during federation configuration`)
+
+    const normalizedKey = String(descriptor.key ?? '').trim()
+    if (!normalizedKey)
+      throw new Error(`[${this.name}] module key is required`)
+    if (!descriptor.module)
+      throw new Error(`[${this.name}] module "${normalizedKey}" is required`)
+    if (host.moduleDescriptors.some(item => item.key === normalizedKey))
+      throw new Error(`[${this.name}] module "${normalizedKey}" is already defined`)
+
+    const normalizedDescriptor: EndgeModuleDescriptor<T> = {
+      ...descriptor,
+      key: normalizedKey,
+    }
+
+    const beforeIndex = toArray(descriptor.before)
+      .map(target => host.moduleDescriptors.findIndex(item => item.key === target))
+      .find(index => index >= 0)
+
+    if (beforeIndex != null) {
+      host.moduleDescriptors.splice(beforeIndex, 0, normalizedDescriptor)
+      return descriptor.module
+    }
+
+    const afterIndex = toArray(descriptor.after)
+      .map(target => host.moduleDescriptors.findIndex(item => item.key === target))
+      .find(index => index >= 0)
+
+    if (afterIndex != null) {
+      host.moduleDescriptors.splice(afterIndex + 1, 0, normalizedDescriptor)
+      return descriptor.module
+    }
+
+    host.moduleDescriptors.push(normalizedDescriptor)
+
+    return descriptor.module
+  }
+
+  public static defineModules(descriptors: EndgeModuleDescriptor[]): void {
+    for (const descriptor of descriptors)
+      this.defineModule(descriptor)
+  }
+
+  /**
+   * Выполняет `setup()` для всех модулей один раз до первого `start()`.
+   */
+  public static async setup(ctx: EndgeBootContext): Promise<void> {
     const host = this.host
     if (host.isSetup)
       return
 
-    await this.runLifecycle('setup')
+    for (const [key, module] of host.modules.entries()) {
+      try {
+        await module.setup(ctx)
+      }
+      catch (error) {
+        throw new Error(`[${this.name}] Failed to setup module "${key}": ${String(error)}`)
+      }
+    }
+
     host.isSetup = true
   }
 
-  /**
-   * Общий guard для одноразовой инициализации федерации.
-   */
-  protected static async runInitialization(task: () => Promise<void>): Promise<void> {
-    const host = this.host
-
-    if (host.isInitialized)
-      return
-
-    if (host.initPromise)
-      return await host.initPromise
-
-    host.initPromise = (async () => {
-      await task()
-      host.isInitialized = true
-    })()
-
-    try {
-      await host.initPromise
-    }
-    finally {
-      host.initPromise = null
+  public static async load(ctx: EndgeBootContext): Promise<void> {
+    for (const [key, module] of this.host.modules.entries()) {
+      try {
+        await module.load(ctx)
+      }
+      catch (error) {
+        throw new Error(`[${this.name}] Failed to load module "${key}": ${String(error)}`)
+      }
     }
   }
 
-  /**
-   * Выполняет `init()` для всех зарегистрированных модулей.
-   */
-  protected static async initModules(): Promise<void> {
-    await this.runLifecycle('init')
+  public static async build(ctx: EndgeBootContext): Promise<void> {
+    for (const [key, module] of this.host.modules.entries()) {
+      try {
+        await module.build(ctx)
+      }
+      catch (error) {
+        throw new Error(`[${this.name}] Failed to build module "${key}": ${String(error)}`)
+      }
+    }
+  }
+
+  public static async start(ctx: EndgeBootContext): Promise<void> {
+    for (const [key, module] of this.host.modules.entries()) {
+      try {
+        await module.start(ctx)
+      }
+      catch (error) {
+        throw new Error(`[${this.name}] Failed to start module "${key}": ${String(error)}`)
+      }
+    }
   }
 
   /**
    * Выполняет `reset()` у всех модулей и сбрасывает состояние федерации.
    */
-  protected static async resetModules(): Promise<void> {
-    await this.runLifecycle('reset')
+  public static async reset(): Promise<void> {
+    for (const [key, module] of this.host.modules.entries()) {
+      try {
+        await module.reset()
+      }
+      catch (error) {
+        console.warn(`[${this.name}] Failed to reset module "${key}":`, error)
+      }
+    }
 
     const host = this.host
     host.isSetup = false
     host.isInitialized = false
     host.isHydrating = false
-    host.initPromise = null
   }
 
   /**
@@ -127,12 +190,8 @@ export abstract class EndgeFederation {
     const payload: Record<string, unknown> = {}
 
     for (const [key, module] of this.host.modules.entries()) {
-      const lifecycleModule = module as EndgeFederationLifecycleModule
-      if (typeof lifecycleModule.serialize !== 'function')
-        continue
-
       try {
-        payload[key] = lifecycleModule.serialize()
+        payload[key] = module.serialize()
       }
       catch {
         // ignore one broken module
@@ -164,12 +223,8 @@ export abstract class EndgeFederation {
       const payload = (parsed && typeof parsed === 'object') ? parsed as Record<string, unknown> : {}
 
       for (const [key, module] of host.modules.entries()) {
-        const lifecycleModule = module as EndgeFederationLifecycleModule
-        if (typeof lifecycleModule.deserialize !== 'function')
-          continue
-
         try {
-          lifecycleModule.deserialize(payload[key])
+          module.deserialize(payload[key])
         }
         catch {
           // ignore one broken module
@@ -180,12 +235,8 @@ export abstract class EndgeFederation {
     }
     catch {
       for (const module of host.modules.values()) {
-        const lifecycleModule = module as EndgeFederationLifecycleModule
-        if (typeof lifecycleModule.deserialize !== 'function')
-          continue
-
         try {
-          lifecycleModule.deserialize(undefined)
+          module.deserialize(undefined)
         }
         catch {
           // ignore one broken module
@@ -201,7 +252,7 @@ export abstract class EndgeFederation {
     }
   }
 
-  protected static getModule<T>(key: string): T {
+  public static getModule<T extends EndgeModule = EndgeModule>(key: string): T {
     const normalizedKey = String(key ?? '').trim()
     const module = this.host.modules.get(normalizedKey)
 
@@ -211,57 +262,43 @@ export abstract class EndgeFederation {
     return module as T
   }
 
-  protected static getState<T>(key: string, factory: () => T): T {
-    const host = this.host
+  public static tryGetModule<T extends EndgeModule = EndgeModule>(key: string): T | null {
+    const normalizedKey = String(key ?? '').trim()
+    if (!normalizedKey)
+      return null
 
-    if (!host.state.has(key))
-      host.state.set(key, factory())
-
-    return host.state.get(key) as T
+    return (this.host.modules.get(normalizedKey) as T | undefined) ?? null
   }
 
-  protected static setState<T>(key: string, value: T): T {
-    this.host.state.set(key, value)
-    return value
+  public static hasModule(key: string): boolean {
+    const normalizedKey = String(key ?? '').trim()
+    return normalizedKey ? this.host.modules.has(normalizedKey) : false
   }
 
   protected static get host(): EndgeFederationHost {
-    const registry = EndgeFederation.registry()
-    const federationId = this.getFederationId()
-
-    let host = registry.get(federationId)
-    if (!host) {
-      host = EndgeFederation.createHost()
-      registry.set(federationId, host)
-    }
+    const host = this.getOrCreateHost()
 
     if (!host.isConfigured) {
-      host.isConfigured = true
+      host.isConfiguring = true
+      host.moduleDescriptors = []
+      host.modules.clear()
       try {
         this.configureFederation()
+        this.installPlugins()
+        this.finalizeModules()
+        host.isConfigured = true
       }
       catch (error) {
         host.isConfigured = false
+        host.installedPluginIds.clear()
         throw error
+      }
+      finally {
+        host.isConfiguring = false
       }
     }
 
     return host
-  }
-
-  private static async runLifecycle(stage: EndgeFederationStage): Promise<void> {
-    for (const [key, module] of this.host.modules.entries()) {
-      const action = (module as EndgeFederationLifecycleModule)[stage]
-      if (typeof action !== 'function')
-        continue
-
-      try {
-        await action.call(module)
-      }
-      catch (error) {
-        console.warn(`[${this.name}] Failed to ${stage} module "${key}":`, error)
-      }
-    }
   }
 
   private static getFederationId(): string {
@@ -271,13 +308,49 @@ export abstract class EndgeFederation {
   private static createHost(): EndgeFederationHost {
     return {
       isConfigured: false,
+      isConfiguring: false,
       isSetup: false,
       isInitialized: false,
       isHydrating: false,
-      initPromise: null,
-      modules: new Map<string, EndgeFederationModule>(),
-      state: new Map<string, unknown>(),
+      moduleDescriptors: [],
+      modules: new Map<string, EndgeModule>(),
+      plugins: [],
+      installedPluginIds: new Set<string>(),
     }
+  }
+
+  private static getOrCreateHost(): EndgeFederationHost {
+    const registry = EndgeFederation.registry()
+    const federationId = this.getFederationId()
+
+    let host = registry.get(federationId)
+    if (!host) {
+      host = EndgeFederation.createHost()
+      registry.set(federationId, host)
+    }
+
+    return host
+  }
+
+  private static installPlugins(): void {
+    const host = this.getOrCreateHost()
+
+    for (const plugin of host.plugins) {
+      if (host.installedPluginIds.has(plugin.id))
+        continue
+
+      plugin.install()
+      host.installedPluginIds.add(plugin.id)
+    }
+  }
+
+  private static finalizeModules(): void {
+    const host = this.getOrCreateHost()
+    const descriptors = sortEndgeModuleDescriptors(host.moduleDescriptors)
+
+    host.modules.clear()
+    for (const descriptor of descriptors)
+      host.modules.set(descriptor.key, descriptor.module)
   }
 
   private static registry(): Map<string, EndgeFederationHost> {

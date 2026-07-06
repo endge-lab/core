@@ -4,12 +4,76 @@ import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { RAction } from '@/domain/entities/reflect/RAction'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { Endge } from '@/model/endge/endge'
+import { consoleLog } from '@/model/seed/actions/console_log'
+import { loadVocabs } from '@/model/seed/actions/load_vocabs'
+import { split } from '@/model/seed/converters/arrays/split'
+import { toArray } from '@/model/seed/converters/arrays/to-array'
+import { dateToDateString } from '@/model/seed/converters/date/date-to-date-string'
+import { dateToIsoString } from '@/model/seed/converters/date/date-to-iso-string'
+import { dateToIsoZ } from '@/model/seed/converters/date/date-to-iso-z'
+import { dateToTimeString } from '@/model/seed/converters/date/date-to-time-string'
+import { isoStringToDate } from '@/model/seed/converters/date/iso-string-to-date'
+import { isoStringToTimeString } from '@/model/seed/converters/date/iso-string-to-time-string'
+import { stringToDate } from '@/model/seed/converters/date/string-to-date'
+import { timeStringToDate } from '@/model/seed/converters/date/time-string-to-date'
+import { timestampToDate } from '@/model/seed/converters/date/timestamp-to-date'
+import { weekdaysRange } from '@/model/seed/converters/date/weekdays-range'
+import { jsonParse } from '@/model/seed/converters/json/json-parse'
+import { jsonStringify } from '@/model/seed/converters/json/json-stringify'
+import { numberToString } from '@/model/seed/converters/numbers/number-to-string'
+import { stringToNumber } from '@/model/seed/converters/numbers/string-to-number'
+import { defaultIfEmpty } from '@/model/seed/converters/strings/default-if-empty'
+import { stringToBoolean } from '@/model/seed/converters/strings/string-to-boolean'
+import { stringTrim } from '@/model/seed/converters/strings/string-trim'
 
 /**
  * Привязка кастомного кода к существующим сущностям ядра.
  * Не связана с declarative bindings и event contracts.
  */
 export class EndgeBind extends EndgeModule {
+  /**
+   * Регистрирует built-in converters и runtime action handlers после загрузки домена.
+   */
+  public override start(): void {
+    this.registerDefaultConverters()
+    this.registerDefaultActions()
+  }
+
+  /**
+   * Регистрирует Default Converters.
+   */
+  private registerDefaultConverters(): void {
+    this.converter('to-array', toArray)
+    this.converter('split', split)
+    this.converter('iso-string-to-date', isoStringToDate)
+    this.converter('timestamp-to-date', timestampToDate)
+    this.converter('date-to-iso-string', dateToIsoString)
+    this.converter('date-to-iso-z', dateToIsoZ)
+    this.converter('string-to-date', stringToDate)
+    this.converter('date-to-date-string', dateToDateString)
+    this.converter('date-to-time-string', dateToTimeString)
+    this.converter('time-string-to-date', timeStringToDate)
+    this.converter('iso-string-to-time-string', isoStringToTimeString)
+    this.converter('weekdays-range', weekdaysRange)
+    this.converter('string-trim', stringTrim)
+    this.converter('default-if-empty', (value: unknown) => defaultIfEmpty(value))
+    this.converter('string-to-boolean', stringToBoolean)
+    this.converter('string-to-number', stringToNumber)
+    this.converter('number-to-string', numberToString)
+    this.converter('json-parse', jsonParse)
+    this.converter('json-stringify', jsonStringify)
+  }
+
+  /**
+   * Регистрирует Default Actions.
+   */
+  private registerDefaultActions(): void {
+    for (const action of Endge.domain.getActions()) {
+      this.action(action, 'console-log', consoleLog)
+      this.action(action, 'load-vocabs', loadVocabs)
+    }
+  }
+
   /**
    * Находит конвертер по identity и ставит кастомный обработчик (setCustom).
    * @param identity - id конвертера в домене
@@ -51,7 +115,7 @@ export class EndgeBind extends EndgeModule {
       const rawKey = String(meta.runtimeId ?? meta.actionId ?? '').trim()
       if (rawKey === id) { keys.push(rawKey); continue }
       if (meta.actionId != null) {
-        const refAction = Endge.domain.getAction(meta.actionId)
+        const refAction = Endge.domain.getAction(String(meta.actionId))
         if (refAction?.identity === id) { keys.push(rawKey) }
       }
     }
@@ -71,6 +135,9 @@ export class EndgeBind extends EndgeModule {
     executor: () => Promise<any>,
   ): boolean {
     const q = identityOrId instanceof RQuery ? identityOrId : Endge.domain.getQuery(identityOrId)
+    if (!q)
+      return false
+
     q.override({
       executor,
     })

@@ -17,6 +17,7 @@ import type { RBehaviorBinding } from '@/domain/entities/reflect/RBehaviorBindin
 import type { RPresentationBinding } from '@/domain/entities/reflect/RPresentationBinding'
 import type { RVocabs } from '@/domain/entities/reflect/RVocabs'
 import type { RI18nBundle } from '@/domain/entities/reflect/RI18nBundle'
+import type { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import type { RComponent } from '@/domain/types/component.types'
 
 /**
@@ -26,6 +27,7 @@ export enum ComponentType {
   Component = 'component',
   DSL = 'component-dsl',
   Table = 'component-table',
+  SFC = 'component-sfc',
 }
 
 /** Тип документа «Параметр» (коллекция parameters). */
@@ -128,4 +130,4 @@ export interface Document {
 /**
  * Описывает любой документ рефлекцию
  */
-export type RDocument = RComponent | RQuery | RScenario | RAction | RConverter | RIntegration | RView | RParameter | RFilter | RSettings | RPolicy | RStyle | RVocabs | RI18nBundle | RTenant | RBehaviorBinding | RPresentationBinding | RPageTemplate | RPage | RNavigation
+export type RDocument = RComponent | RComponentSFC | RQuery | RScenario | RAction | RConverter | RIntegration | RView | RParameter | RFilter | RSettings | RPolicy | RStyle | RVocabs | RI18nBundle | RTenant | RBehaviorBinding | RPresentationBinding | RPageTemplate | RPage | RNavigation

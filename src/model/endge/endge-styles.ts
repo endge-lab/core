@@ -2,12 +2,16 @@ import type { StyleBlocksPayload, StyleJsonBlock } from '@/domain/types/styles.t
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { EndgeJsxAttr } from '@/domain/types/jsx.types'
+import { Endge } from '@/model/endge/endge'
 
 /** Id тега <style>, в который подставляются скомпилированные стили домена. */
 export const ENDGE_STYLES_ELEMENT_ID = 'endge-styles-injected'
 
 /** Источник стилей для init (домен или аналог). */
 export interface EndgeStylesDomainSource {
+  /**
+   * Возвращает доменные style-документы для компиляции в CSS.
+   */
   getStyles(): Array<{ identity: string; styles: Record<string, unknown> }>
 }
 
@@ -16,12 +20,16 @@ export interface EndgeStylesDomainSource {
  * Преобразует блоки path + properties в селекторы и kebab-case свойства.
  */
 export class EndgeStyles extends EndgeModule {
-  /** camelCase → kebab-case */
+  /**
+   * Преобразует camelCase имя CSS-свойства в kebab-case.
+   */
   static camelToKebab(s: string): string {
     return s.replace(/([A-Z])/g, (m) => `-${m.toLowerCase()}`)
   }
 
-  /** Свойства в camelCase → строки "key: value;" в kebab-case */
+  /**
+   * Преобразует объект CSS-свойств в строки CSS declaration.
+   */
   static propertiesToDecls(properties: Record<string, string | number>): string[] {
     return Object.entries(properties).map(([k, v]) => {
       const key = EndgeStyles.camelToKebab(k)
@@ -29,7 +37,9 @@ export class EndgeStyles extends EndgeModule {
     })
   }
 
-  /** Проверка, является ли ключ селектором "<type>:<id>". */
+  /**
+   * Проверяет, является ли ключ style-блока селектором вида `<type>:<id>`.
+   */
   static isSelectorKey(key: string): boolean {
     const idx = key.indexOf(':')
     if (idx <= 0) return false
@@ -39,7 +49,9 @@ export class EndgeStyles extends EndgeModule {
       || t === 'tag'
   }
 
-  /** Преобразовать ключ селектора в CSS-селектор. */
+  /**
+   * Преобразует ключ style-селектора в CSS selector.
+   */
   static selectorKeyToCss(key: string): string {
     const idx = key.indexOf(':')
     if (idx <= 0) return ''
@@ -60,6 +72,9 @@ export class EndgeStyles extends EndgeModule {
   }
 
   /** Рекурсивно скомпилировать один JSON-блок в набор CSS-правил. */
+  /**
+   * Компилирует Json Block.
+   */
   private compileJsonBlock(block: StyleJsonBlock, parentSelector: string | null): string[] {
     const rules: string[] = []
     for (const [key, value] of Object.entries(block)) {
@@ -131,12 +146,16 @@ export class EndgeStyles extends EndgeModule {
   }
 
   /**
-   * Применить все стили домена в DOM: компиляция и вставка в <style id="...">.
-   * Вызывать после загрузки домена (например из Endge.init).
+   * Применяет стили домена на фазе `start`.
    */
-  init(): void
-  init(domain: EndgeStylesDomainSource): void
-  init(domain?: EndgeStylesDomainSource): void {
+  public override start(): void {
+    this.applyDomainStyles(Endge.domain)
+  }
+
+  /**
+   * Компилирует стили из доменного источника и вставляет их в DOM.
+   */
+  public applyDomainStyles(domain?: EndgeStylesDomainSource): void {
     if (typeof document === 'undefined') return
     if (!domain)
       return

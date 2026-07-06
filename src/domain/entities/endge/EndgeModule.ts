@@ -1,3 +1,5 @@
+import type { EndgeBootContext } from '@/domain/types/bootstrap.types'
+
 import { Subscribable } from '@endge/utils'
 
 /**
@@ -6,18 +8,32 @@ import { Subscribable } from '@endge/utils'
  */
 export abstract class EndgeModule extends Subscribable {
   /**
-   * Подготавливает модуль к работе до основного `init()`.
-   * Используется для одноразовой настройки зависимостей, подписок и runtime-структур.
+   * Подготавливает модуль до загрузки данных.
+   * Используется для настройки зависимостей, клиентов, registry и базовых опций.
    * Метод можно не переопределять.
    */
-  public setup(): void | Promise<void> {}
+  public setup(_ctx: EndgeBootContext): void | Promise<void> {}
 
   /**
-   * Инициализирует модуль после `setup()` и после восстановления состояния федерации из storage.
-   * Основная загрузка данных и запуск runtime-логики должны происходить здесь.
+   * Участвует в загрузке данных движка.
+   * Модуль выполняет только свою часть загрузки или принятия данных.
    * Метод можно не переопределять.
    */
-  public init(): void | Promise<void> {}
+  public load(_ctx: EndgeBootContext): void | Promise<void> {}
+
+  /**
+   * Строит производные структуры из загруженных данных.
+   * Здесь уместны normalize, validate, index и compile.
+   * Метод можно не переопределять.
+   */
+  public build(_ctx: EndgeBootContext): void | Promise<void> {}
+
+  /**
+   * Запускает живую инфраструктуру модуля после `load/build`.
+   * Здесь уместны subscriptions, runtime phases, watchers, adapters и debug hooks.
+   * Метод можно не переопределять.
+   */
+  public start(_ctx: EndgeBootContext): void | Promise<void> {}
 
   /**
    * Сбрасывает runtime-состояние модуля.

@@ -3,6 +3,9 @@ import type { RaphUpdateRunner } from '@/tools/updates-generator'
 import { startRaphUpdates } from '@/tools/updates-generator'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 
+/**
+ * Модуль управления тестовыми сценариями и генераторами updates.
+ */
 export class EndgeTesting extends EndgeModule {
   private _testingOptions: EndgeScenarioTestingOptions | null = null
   private _updatesRunner: RaphUpdateRunner | null = null
@@ -28,6 +31,9 @@ export class EndgeTesting extends EndgeModule {
     this.notify()
   }
 
+  /**
+   * Запускает генератор Raph updates согласно текущим testing options.
+   */
   startUpdatesThread(): void {
     if (this._testingOptions && this._testingOptions.updatesPerSeconds) {
       this._updatesRunner = startRaphUpdates({
@@ -39,6 +45,9 @@ export class EndgeTesting extends EndgeModule {
     }
   }
 
+  /**
+   * Останавливает активный генератор updates.
+   */
   stopUpdatesThread(): void {
     this._updatesRunner?.stop()
   }
@@ -47,6 +56,9 @@ export class EndgeTesting extends EndgeModule {
   // ACCESS
   //
 
+  /**
+   * Возвращает текущие настройки тестового сценария.
+   */
   get testingOptions(): EndgeScenarioTestingOptions | null {
     return this._testingOptions
   }

@@ -15,6 +15,7 @@ import { rndHex } from '@/domain/entities/debug/tools/base'
 import { buildLogTree } from '@/domain/entities/debug/tools/tree'
 
 export class EndgeDebug extends EndgeModule {
+  private _enabled = false
   private store = new MemoryStore(50_000, 'drop-oldest')
 
   private activeTrace: Correlation | null = null
@@ -22,14 +23,37 @@ export class EndgeDebug extends EndgeModule {
   private spanStartTime: number | null = null
   private spanStack: Correlation[] = []
 
+  /**
+   * Debug-модулю не нужна подготовка на фазе setup.
+   */
   setup(): void {}
+
+  /**
+   * Показывает, включен ли debug-режим.
+   */
+  public get enabled(): boolean {
+    return this._enabled
+  }
+
+  /**
+   * Включает или выключает debug-режим.
+   */
+  public set enabled(value: boolean) {
+    this._enabled = value
+  }
 
   /** ===== CORE ===== */
 
+  /**
+   * Возвращает все накопленные debug-записи.
+   */
   public getRecords(): LogRecord[] {
     return this.store.all()
   }
 
+  /**
+   * Очищает debug-store и активный trace/span context.
+   */
   public clear(): void {
     this.store.clear()
     this.activeTrace = null
@@ -39,6 +63,9 @@ export class EndgeDebug extends EndgeModule {
     this.notify()
   }
 
+  /**
+   * Внутренний helper модуля: emit.
+   */
   private emit(record: LogRecord): void {
     this.store.push(record)
     this.notify()
@@ -46,6 +73,9 @@ export class EndgeDebug extends EndgeModule {
 
   /** ===== TRACE / SPAN API ===== */
 
+  /**
+   * Открывает trace или возвращает уже активный trace.
+   */
   public startTrace(
     name: string,
     level: LogLevel = 'info',
@@ -67,6 +97,9 @@ export class EndgeDebug extends EndgeModule {
     return corr
   }
 
+  /**
+   * Завершает активный trace.
+   */
   public endTrace(level: LogLevel = 'info', attrs?: Attrs): void {
     if (!this.activeTrace)
       return
@@ -83,6 +116,9 @@ export class EndgeDebug extends EndgeModule {
     this.emit(end)
   }
 
+  /**
+   * Открывает вложенный span внутри активного trace.
+   */
   public startSpan(
     lane: string,
     name: string,
@@ -116,6 +152,9 @@ export class EndgeDebug extends EndgeModule {
     return corr
   }
 
+  /**
+   * Завершает активный span.
+   */
   public endSpan(level: LogLevel = 'info', attrs?: Attrs): void {
     const span = this.activeSpan
     if (!span)
@@ -139,6 +178,9 @@ export class EndgeDebug extends EndgeModule {
 
   /** ===== EVENT API ===== */
 
+  /**
+   * Записывает debug event, автоматически создавая trace/span при необходимости.
+   */
   public log(
     msg: string,
     level: LogLevel = 'info',
@@ -163,9 +205,9 @@ export class EndgeDebug extends EndgeModule {
     this.emit(ev)
   }
 
-  // Внутри класса EndgeDebugClass добавьте методы:
-
-  /** Найти узел-спан со всем его поддеревом по spanId. Возвращает null, если не найден. */
+  /**
+   * Находит span-узел со всем поддеревом по spanId.
+   */
   public getSpanSubtree(spanId: string): SpanNode | null {
     const records = this.store.all()
 
@@ -197,13 +239,17 @@ export class EndgeDebug extends EndgeModule {
     return null
   }
 
-  /** Вернуть только дочерние узлы спана (без самого спана), удобно для детальной панели. */
+  /**
+   * Возвращает только дочерние узлы span без самого span.
+   */
   public getSpanChildren(spanId: string): LogNode[] {
     const node = this.getSpanSubtree(spanId)
     return node?.children ?? []
   }
 
-  /** При необходимости - плоский список записей, попадающих внутрь спана (включая сам спан). */
+  /**
+   * Возвращает плоский список log-записей внутри span, включая сам span.
+   */
   public getSpanRecords(spanId: string): LogRecord[] {
     const subtree = this.getSpanSubtree(spanId)
     if (!subtree)
@@ -263,30 +309,51 @@ export class EndgeDebug extends EndgeModule {
 
   /** ===== SYNTACTIC SUGAR ===== */
 
+  /**
+   * Записывает event уровня trace.
+   */
   public trace(msg: string, data?: unknown, attrs?: Attrs): void {
     this.log(msg, 'trace', data, attrs)
   }
 
+  /**
+   * Записывает event уровня debug.
+   */
   public debug(msg: string, data?: unknown, attrs?: Attrs): void {
     this.log(msg, 'debug', data, attrs)
   }
 
+  /**
+   * Записывает event уровня info.
+   */
   public info(msg: string, data?: unknown, attrs?: Attrs): void {
     this.log(msg, 'info', data, attrs)
   }
 
+  /**
+   * Записывает event уровня warn.
+   */
   public warn(msg: string, data?: unknown, attrs?: Attrs): void {
     this.log(msg, 'warn', data, attrs)
   }
 
+  /**
+   * Записывает event уровня error.
+   */
   public error(msg: string, data?: unknown, attrs?: Attrs): void {
     this.log(msg, 'error', data, attrs)
   }
 
+  /**
+   * Записывает event уровня fatal.
+   */
   public fatal(msg: string, data?: unknown, attrs?: Attrs): void {
     this.log(msg, 'fatal', data, attrs)
   }
 
+  /**
+   * Записывает успешный info-event с визуальным статусом.
+   */
   public success(msg: string, data?: unknown, attrs?: Attrs): void {
     this.log(msg, 'info', data, {
       ...attrs,
@@ -295,6 +362,9 @@ export class EndgeDebug extends EndgeModule {
     })
   }
 
+  /**
+   * Возвращает сериализуемое представление debug-store.
+   */
   public toPlain(): object {
     return this.getRecords()
   }

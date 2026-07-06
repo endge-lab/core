@@ -10,7 +10,13 @@ import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { Endge } from '@/model/endge/endge'
 import { RQueryRest } from '@/domain/entities/reflect/RQueryRest'
 
+/**
+ * Модуль выполнения доменных query: custom executor, mock data и REST.
+ */
 export class EndgeQuery extends EndgeModule {
+  /**
+   * Создает query runner с переданным или дефолтным axios instance.
+   */
   constructor(
     private readonly http: AxiosInstance = axios.create({
       headers: { Accept: 'application/json' },
@@ -20,6 +26,9 @@ export class EndgeQuery extends EndgeModule {
   }
 
   /** Разрешает один элемент фильтра в объект (inline JSON или reference из Raph). space - из рантайма (meta.space). */
+  /**
+   * Разрешает Filter Item.
+   */
   private resolveFilterItem(item: RQueryFilter, space: string): Record<string, any> | null {
     if (item.mode === 'inline') {
       const json = item.inlineJson
@@ -56,6 +65,9 @@ export class EndgeQuery extends EndgeModule {
   }
 
   /** Собирает итоговый фильтр: последовательное слияние всех элементов q.filters. space - из рантайма. */
+  /**
+   * Собирает Merged Filter.
+   */
   private buildMergedFilter(q: RQueryRest, space: string): Record<string, any> | null {
     const list = (q as any).filters
     if (!Array.isArray(list) || list.length === 0)
@@ -71,6 +83,9 @@ export class EndgeQuery extends EndgeModule {
     return acc
   }
 
+  /**
+   * Внутренний helper модуля: deep Merge.
+   */
   private deepMerge(a: any, b: any): any {
     if (Array.isArray(a) || Array.isArray(b))
       return b
@@ -84,6 +99,9 @@ export class EndgeQuery extends EndgeModule {
     return out
   }
 
+  /**
+   * Выполняет query и сохраняет результат в Raph по identity запроса.
+   */
   async run(query: RQuery, params: Record<string, unknown> = {}): Promise<any> {
     let result: any
 
@@ -119,6 +137,9 @@ export class EndgeQuery extends EndgeModule {
   }
 
   /** Безопасно склеивает base и path с учётом слэшей; если path абсолютный - возвращаем его. */
+  /**
+   * Собирает Url.
+   */
   private buildUrl(base: string, path?: string | null): string {
     if (!path)
       return base
@@ -214,6 +235,9 @@ export class EndgeQuery extends EndgeModule {
     }
   }
 
+  /**
+   * Применяет Auth.
+   */
   private async applyAuth(
     auth: RQueryAuth | undefined,
     headers: Record<string, string>,

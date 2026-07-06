@@ -1,4 +1,6 @@
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
+import { Raph } from '@endge/raph'
+import { Endge } from '@/model/endge/endge'
 
 export interface EndgeConsoleCommandMeta {
   name: string
@@ -13,6 +15,16 @@ export interface EndgeConsoleCommandMeta {
 export class EndgeConsole extends EndgeModule {
   private _handlers = new Map<string, (...args: any[]) => any>()
   private _meta = new Map<string, EndgeConsoleCommandMeta>()
+  private _isExposed = false
+
+  /**
+   * Регистрирует стандартные debug-команды и публикует консольный facade.
+   */
+  public override start(): void {
+    this.register('raph', () => { console.log(Raph.data) }, 'Текущее содержимое Raph')
+    this.register('domain', () => { console.log(Endge.domain) }, 'Текущий домен Endge')
+    this.exposeToGlobal()
+  }
 
   /**
    * Регистрирует команду консоли. После exposeToGlobal() будет доступна как Endge[name]().
@@ -26,6 +38,8 @@ export class EndgeConsole extends EndgeModule {
       name: key,
       description: String(description ?? '').trim() || undefined,
     })
+    if (this._isExposed)
+      this.exposeToGlobal()
   }
 
   /**
@@ -35,6 +49,8 @@ export class EndgeConsole extends EndgeModule {
     const key = String(name ?? '').trim()
     this._handlers.delete(key)
     this._meta.delete(key)
+    if (this._isExposed)
+      this.exposeToGlobal()
   }
 
   /**
@@ -60,5 +76,6 @@ export class EndgeConsole extends EndgeModule {
     for (const [name, fn] of this._handlers)
       facade[name] = fn
     ;(globalThis as any).Endge = facade
+    this._isExposed = true
   }
 }

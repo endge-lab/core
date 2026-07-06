@@ -94,6 +94,20 @@ export interface ComponentRuntimeHostContext extends RuntimeHostContextBase {
   lastRenderAt: string | null
 }
 
+export interface ComponentSFCRuntimeHostContext extends RuntimeHostContextBase {
+  /** Target последней подготовки SFC. */
+  target: 'dom' | 'canvas' | null
+
+  /** Время последнего разбора source на вкладки. */
+  lastParseAt: string | null
+
+  /** Время последней подготовки compiler placeholders. */
+  lastCompileAt: string | null
+
+  /** Время последней попытки render/projection. */
+  lastRenderAt: string | null
+}
+
 export interface ViewRuntimeHostContext extends RuntimeHostContextBase {
   lastRenderAt: string | null
 }
@@ -111,6 +125,7 @@ export interface RuntimeHostContextMap {
   query: QueryRuntimeHostContext
   table: TableRuntimeHostContext
   component: ComponentRuntimeHostContext
+  'component-sfc': ComponentSFCRuntimeHostContext
   view: ViewRuntimeHostContext
   page: PageRuntimeHostContext
   project: ProjectRuntimeHostContext

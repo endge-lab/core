@@ -3,6 +3,7 @@ import type { Types_Repository } from '@/model/db/repositories/Types_Repository'
 import type { Queries_Repository } from '@/model/db/repositories/Queries_Repository'
 import type { Folders_Repository } from '@/model/db/repositories/Folders_Repository'
 import type { Components_Repository } from '@/model/db/repositories/Components_Repository'
+import type { ComponentSFCs_Repository } from '@/model/db/repositories/ComponentSFCs_Repository'
 import type { Scenarios_Repository } from '@/model/db/repositories/Scenarios_Repository'
 import type { Actions_Repository } from '@/model/db/repositories/Actions_Repository'
 import type { Settings_Repository } from '@/model/db/repositories/Settings_Repository'
@@ -30,6 +31,7 @@ export interface EndgeSchemaDump {
   queries: any[]
   folders: any[]
   components: any[]
+  componentSFCs: any[]
   scenarios: any[]
   actions: any[]
   converters: any[]
@@ -71,6 +73,7 @@ export type RepositoriesBag = {
   queries: Queries_Repository
   folders: Folders_Repository
   components: Components_Repository
+  componentSFCs: ComponentSFCs_Repository
   scenarios: Scenarios_Repository
   actions: Actions_Repository
   settings: Settings_Repository

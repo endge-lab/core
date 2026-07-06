@@ -1,21 +1,54 @@
-export type BootstrapStepName = string
+/**
+ * Источник получения доменных данных
+ * default - работа с внешним сервисом backend
+ * payload - @Deprecated внешний сервис на payload
+ * plain - данные подтягиваются из файла
+ */
+export type EndgeDataProvider =
+  | 'default'
+  | 'payload'
+  | 'plain'
 
-export interface BootstrapStep {
-  name: BootstrapStepName
-  run: () => Promise<void>
-  dependsOn?: readonly BootstrapStepName[]
+/**
+ * Конфигурация загрузки движка
+ * Сейчас пустой, потому что configurator грузит полный snapshot.
+ * Позже сюда добавятся tenantId/projectId/environmentId/entrypoint.
+ */
+export interface EndgeLoadScope {}
+
+export interface EndgePayloadProviderOptions {
+  baseAPI: string
+  secret: string
 }
 
-export type BootstrapEvent
-  = | { type: 'bootstrap:start', steps: BootstrapStepName[] }
-    | { type: 'bootstrap:plan', requested: BootstrapStepName[], expanded: BootstrapStepName[] }
-    | { type: 'step:skip', step: BootstrapStepName }
-    | { type: 'step:start', step: BootstrapStepName }
-    | { type: 'step:done', step: BootstrapStepName, ms: number }
-    | { type: 'step:error', step: BootstrapStepName, error: unknown }
-    | { type: 'bootstrap:done', steps: BootstrapStepName[] }
+export interface EndgeBootContext {
+  /**
+   * Источник получения доменных данных
+   */
+  dataProvider: EndgeDataProvider
 
-export interface AppBootstrapOptions {
-  strict?: boolean
-  onEvent?: (e: BootstrapEvent) => void
+  /**
+   * Граница загружаемых данных.
+   */
+  scope: EndgeLoadScope
+
+  /**
+   * Runtime/env vars, которые нужны ядру.
+   */
+  vars: Record<string, unknown>
+
+  /**
+   * Для plain provider.
+   */
+  plainSource?: unknown
+
+  /**
+   * Для payload provider.
+   */
+  payload?: EndgePayloadProviderOptions
+
+  /**
+   * Для отмены долгой загрузки/сборки.
+   */
+  signal?: AbortSignal
 }

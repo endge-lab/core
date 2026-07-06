@@ -10,7 +10,7 @@ type PatchField = {
 }
 
 const MESSAGES_PER_SECOND: number = 5
-const PROFILE_IDENTITY: string = 'aodb-updates'
+const PROFILE_IDENTITY: string = 'configurator-updates'
 const STORE_PATH: string = 'queries.schedule'
 
 function pick<T>(arr: readonly T[]): T {

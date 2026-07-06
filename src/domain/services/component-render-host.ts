@@ -3,8 +3,8 @@ import type { RuntimeScope } from '@/domain/entities/runtime/RuntimeScope'
 import type {
   ComponentType_Props,
   RenderComponentInfo,
-  RenderComponentType,
 } from '@/domain/types/types'
+import { RenderComponentType } from '@/domain/types/types'
 import type {
   UILegacyComponentRenderHost,
   UIResolvedLegacyComponentRenderer,

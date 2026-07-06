@@ -12,24 +12,32 @@ import { Endge } from '@/model/endge/endge'
 export class EndgeFlowRegistry extends EndgeModule {
   private _conditions = new Map<string, FlowConditionSpec>()
 
-  /** Регистрация условия. */
+  /**
+   * Регистрирует условие flow.
+   */
   registerCondition(spec: FlowConditionSpec): void {
     const id = String(spec?.id ?? '').trim()
     if (!id) return
     this._conditions.set(id, spec)
   }
 
-  /** Список спеок условий для UI. */
+  /**
+   * Возвращает список спецификаций условий для UI.
+   */
   listConditions(): FlowConditionSpec[] {
     return Array.from(this._conditions.values())
   }
 
-  /** Спека по id. */
+  /**
+   * Возвращает спецификацию условия по id.
+   */
   getCondition(id: string): FlowConditionSpec | undefined {
     return this._conditions.get(String(id).trim())
   }
 
-  /** Выполнение условия по id с контекстом и параметрами. */
+  /**
+   * Выполняет условие по id с runtime-контекстом и параметрами.
+   */
   async evaluateCondition(
     conditionId: string,
     ctx: FlowHandlerContext,
@@ -41,11 +49,16 @@ export class EndgeFlowRegistry extends EndgeModule {
     return Promise.resolve(result).then(Boolean)
   }
 
-  override init(): void {
+  /**
+   * Регистрирует стандартные flow-условия на стадии start.
+   */
+  override start(): void {
     this._registerDefaultConditions()
   }
 
-  /** Регистрация условий по умолчанию (в т.ч. «существует ли словарь»). */
+  /**
+   * Регистрирует условия по умолчанию.
+   */
   private _registerDefaultConditions(): void {
     this.registerCondition({
       id: 'vocab.exists',
@@ -60,10 +73,10 @@ export class EndgeFlowRegistry extends EndgeModule {
           acceptSectionTypes: [DomainSectionType.Vocabs],
         },
       ],
-      evaluate(ctx, params): boolean {
+      evaluate(_ctx, params): boolean {
         const vocabId = params?.vocab ?? params?.vocabId
         if (vocabId == null || vocabId === '') return false
-        const vocab = Endge.domain.getVocab(vocabId)
+        const vocab = Endge.domain.getVocab(String(vocabId))
         if (!vocab?.collectionSlug) return false
         const values = Endge.vocabs.getValues(vocab.collectionSlug)
         return Array.isArray(values) && values.length > 0

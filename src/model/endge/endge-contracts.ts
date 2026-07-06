@@ -32,10 +32,13 @@ export class EndgeContracts extends EndgeModule {
   /**
    * На старте модуля регистрирует канонический набор core-контрактов всех трёх фасетов.
    */
-  public override init(): void {
+  public override start(): void {
     this.registerContracts(ENDGE_CORE_DEFAULT_CONTRACTS)
   }
 
+  /**
+   * Очищает registry контрактов при reset federation.
+   */
   public override reset(): void {
     this.clear()
   }
@@ -88,6 +91,9 @@ export class EndgeContracts extends EndgeModule {
     this.notify()
   }
 
+  /**
+   * Возвращает все зарегистрированные контракты всех фасетов.
+   */
   public getAll(): EndgeContract[] {
     return [
       ...this._behaviorContracts,
@@ -96,6 +102,9 @@ export class EndgeContracts extends EndgeModule {
     ]
   }
 
+  /**
+   * Возвращает контракты конкретного фасета.
+   */
   public getByFacet(facet: EndgeFacetType): EndgeContract[] {
     switch (facet) {
       case FacetType.Behavior:
@@ -109,10 +118,16 @@ export class EndgeContracts extends EndgeModule {
     }
   }
 
+  /**
+   * Возвращает behavior contracts для типа сущности.
+   */
   public getBehaviorByEntity(entityType: FacetedCascadeEntityType): BehaviorContract[] {
     return [...(this._behaviorContractsByEntity.get(String(entityType ?? '').trim()) ?? [])]
   }
 
+  /**
+   * Возвращает behavior contract для конкретного события.
+   */
   public getBehaviorByEvent(
     entityType: FacetedCascadeEntityType,
     eventName: string,
@@ -121,6 +136,9 @@ export class EndgeContracts extends EndgeModule {
     return this._behaviorContractsByKey.get(key) ?? null
   }
 
+  /**
+   * Проверяет, разрешает ли behavior contract environment override.
+   */
   public supportsBehaviorOverride(
     entityType: FacetedCascadeEntityType,
     eventName: string,
@@ -128,6 +146,9 @@ export class EndgeContracts extends EndgeModule {
     return this.getBehaviorByEvent(entityType, eventName)?.supportsEnvironmentOverride === true
   }
 
+  /**
+   * Проверяет, разрешает ли behavior contract declarative binding.
+   */
   public supportsBehaviorBinding(
     entityType: FacetedCascadeEntityType,
     eventName: string,
@@ -135,10 +156,16 @@ export class EndgeContracts extends EndgeModule {
     return this.getBehaviorByEvent(entityType, eventName)?.supportsBinding !== false
   }
 
+  /**
+   * Возвращает presentation contracts для типа сущности.
+   */
   public getPresentationByEntity(entityType: FacetedCascadeEntityType): PresentationContract[] {
     return [...(this._presentationContractsByEntity.get(String(entityType ?? '').trim()) ?? [])]
   }
 
+  /**
+   * Возвращает presentation contract для конкретной роли.
+   */
   public getPresentationByRole(
     entityType: FacetedCascadeEntityType,
     role: string,
@@ -147,6 +174,9 @@ export class EndgeContracts extends EndgeModule {
     return this._presentationContractsByKey.get(key) ?? null
   }
 
+  /**
+   * Проверяет, разрешает ли presentation contract environment override.
+   */
   public supportsPresentationOverride(
     entityType: FacetedCascadeEntityType,
     role: string,
@@ -154,6 +184,9 @@ export class EndgeContracts extends EndgeModule {
     return this.getPresentationByRole(entityType, role)?.supportsEnvironmentOverride === true
   }
 
+  /**
+   * Проверяет, разрешает ли presentation contract declarative binding.
+   */
   public supportsPresentationBinding(
     entityType: FacetedCascadeEntityType,
     role: string,
@@ -161,35 +194,59 @@ export class EndgeContracts extends EndgeModule {
     return this.getPresentationByRole(entityType, role)?.supportsBinding !== false
   }
 
+  /**
+   * Возвращает все configuration contracts.
+   */
   public getAllConfiguration(): ConfigurationContract[] {
     return [...this._configurationContracts]
   }
 
+  /**
+   * Возвращает configuration contracts для типа сущности.
+   */
   public getConfigurationByEntity(entityType: string): ConfigurationContract[] {
     return [...(this._configurationContractsByEntity.get(String(entityType ?? '').trim()) ?? [])]
   }
 
+  /**
+   * Возвращает configuration contract для конкретного поля.
+   */
   public getConfigurationField(entityType: string, fieldPath: string): ConfigurationContract | null {
     const key = this._toConfigurationKey(entityType, fieldPath)
     return this._configurationContractsByKey.get(key) ?? null
   }
 
+  /**
+   * Проверяет, разрешен ли environment override для configuration field.
+   */
   public supportsConfigurationOverride(entityType: string, fieldPath: string): boolean {
     return this.getConfigurationField(entityType, fieldPath)?.supportsEnvironmentOverride === true
   }
 
+  /**
+   * Проверяет, разрешен ли binding для configuration field.
+   */
   public supportsConfigurationBinding(entityType: string, fieldPath: string): boolean {
     return this.getConfigurationField(entityType, fieldPath)?.supportsBinding !== false
   }
 
+  /**
+   * Проверяет, поддерживает ли configuration field watch.
+   */
   public supportsConfigurationWatch(entityType: string, fieldPath: string): boolean {
     return this.getConfigurationField(entityType, fieldPath)?.supportsWatch === true
   }
 
+  /**
+   * Проверяет, разрешены ли runtime-мутации для configuration field.
+   */
   public supportsRuntimeConfigurationMutation(entityType: string, fieldPath: string): boolean {
     return (this.getConfigurationField(entityType, fieldPath)?.runtimeMutationPolicy ?? 'none') !== 'none'
   }
 
+  /**
+   * Применяет Contracts.
+   */
   private _applyContracts(contracts: EndgeContract[], replaceAll: boolean): void {
     const behaviorByKey = replaceAll
       ? new Map<string, BehaviorContract>()
@@ -227,6 +284,9 @@ export class EndgeContracts extends EndgeModule {
     this._commitContracts(behaviorByKey, presentationByKey, configurationByKey)
   }
 
+  /**
+   * Применяет Configuration Contracts.
+   */
   private _applyConfigurationContracts(
     contracts: ConfigurationContract[],
     replaceAll: boolean,
@@ -246,6 +306,9 @@ export class EndgeContracts extends EndgeModule {
     this._commitContracts(behaviorByKey, presentationByKey, configurationByKey)
   }
 
+  /**
+   * Внутренний helper модуля: commit Contracts.
+   */
   private _commitContracts(
     behaviorByKey: Map<string, BehaviorContract>,
     presentationByKey: Map<string, PresentationContract>,
@@ -261,6 +324,9 @@ export class EndgeContracts extends EndgeModule {
     this.notify()
   }
 
+  /**
+   * Перестраивает внутренние индексы Behavior.
+   */
   private _rebuildBehaviorIndexes(): void {
     this._behaviorContractsByEntity.clear()
     this._behaviorContractsByKey.clear()
@@ -276,6 +342,9 @@ export class EndgeContracts extends EndgeModule {
     }
   }
 
+  /**
+   * Перестраивает внутренние индексы Presentation.
+   */
   private _rebuildPresentationIndexes(): void {
     this._presentationContractsByEntity.clear()
     this._presentationContractsByKey.clear()
@@ -291,6 +360,9 @@ export class EndgeContracts extends EndgeModule {
     }
   }
 
+  /**
+   * Перестраивает внутренние индексы Configuration.
+   */
   private _rebuildConfigurationIndexes(): void {
     this._configurationContractsByEntity.clear()
     this._configurationContractsByKey.clear()
@@ -306,6 +378,9 @@ export class EndgeContracts extends EndgeModule {
     }
   }
 
+  /**
+   * Нормализует Behavior Contract.
+   */
   private _normalizeBehaviorContract(contract: BehaviorContract): BehaviorContract | null {
     const entityType = String(contract.entityType ?? '').trim()
     const eventName = String(contract.eventName ?? '').trim()
@@ -328,6 +403,9 @@ export class EndgeContracts extends EndgeModule {
     }
   }
 
+  /**
+   * Нормализует Presentation Contract.
+   */
   private _normalizePresentationContract(contract: PresentationContract): PresentationContract | null {
     const entityType = String(contract.entityType ?? '').trim()
     const role = String(contract.role ?? '').trim()
@@ -350,6 +428,9 @@ export class EndgeContracts extends EndgeModule {
     }
   }
 
+  /**
+   * Нормализует Configuration Contract.
+   */
   private _normalizeConfigurationContract(
     contract: ConfigurationContract,
   ): ConfigurationContract | null {
@@ -375,6 +456,9 @@ export class EndgeContracts extends EndgeModule {
     }
   }
 
+  /**
+   * Создает Behavior Map.
+   */
   private _createBehaviorMap(contracts: BehaviorContract[]): Map<string, BehaviorContract> {
     const byKey = new Map<string, BehaviorContract>()
     for (const contract of contracts) {
@@ -383,6 +467,9 @@ export class EndgeContracts extends EndgeModule {
     return byKey
   }
 
+  /**
+   * Создает Presentation Map.
+   */
   private _createPresentationMap(contracts: PresentationContract[]): Map<string, PresentationContract> {
     const byKey = new Map<string, PresentationContract>()
     for (const contract of contracts) {
@@ -391,6 +478,9 @@ export class EndgeContracts extends EndgeModule {
     return byKey
   }
 
+  /**
+   * Создает Configuration Map.
+   */
   private _createConfigurationMap(contracts: ConfigurationContract[]): Map<string, ConfigurationContract> {
     const byKey = new Map<string, ConfigurationContract>()
     for (const contract of contracts) {
@@ -399,14 +489,23 @@ export class EndgeContracts extends EndgeModule {
     return byKey
   }
 
+  /**
+   * Преобразует значение в Behavior Key.
+   */
   private _toBehaviorKey(entityType: string, eventName: string): string {
     return `${FacetType.Behavior}::${String(entityType ?? '').trim()}::${String(eventName ?? '').trim()}`
   }
 
+  /**
+   * Преобразует значение в Presentation Key.
+   */
   private _toPresentationKey(entityType: string, role: string): string {
     return `${FacetType.Presentation}::${String(entityType ?? '').trim()}::${String(role ?? '').trim()}`
   }
 
+  /**
+   * Преобразует значение в Configuration Key.
+   */
   private _toConfigurationKey(entityType: string, fieldPath: string): string {
     return `${FacetType.Configuration}::${String(entityType ?? '').trim()}::${String(fieldPath ?? '').trim()}`
   }

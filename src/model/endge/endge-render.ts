@@ -4,6 +4,9 @@ import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { RenderComponentType } from '@/domain/types/types'
 import { Endge } from '@/model/endge/endge'
 
+/**
+ * Совместимый facade старого render registry поверх `Endge.uiRegistry`.
+ */
 export class EndgeRender extends EndgeModule {
   /**
    * @deprecated Используйте Endge.uiRegistry.registerLegacyComponentRenderer.

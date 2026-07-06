@@ -1,0 +1,411 @@
+# Endge SFC Syntax
+
+Документ фиксирует начальный набор тегов, атрибутов и стилей для нового Endge SFC-синтаксиса.
+
+Статус: проектный v1-контракт для будущего compiler/runtime pipeline. Синтаксис ориентирован на компоненты внутри ячеек таблиц и должен компилироваться в общий Endge SFC IR, который DOM и Nova renderer-слои смогут использовать каждый своим способом.
+
+## Базовая структура
+
+```vue
+<script setup lang="ts">
+defineProps<{
+  flight: FlightLeg
+  compact?: boolean
+}>()
+</script>
+
+<template>
+  <Flex col gap="2" p="4">
+    <Flex row gap="4" align="center">
+      <Text weight="600">{{ flight.number }}</Text>
+      <Badge :tone="flight.statusTone">{{ flight.status }}</Badge>
+    </Flex>
+
+    <Flex row gap="4" if="!compact">
+      <DateTime :value="flight.std" format="HH:mm" />
+      <Text color="muted">{{ flight.route }}</Text>
+    </Flex>
+
+    <Component is="best-time-horizontal-departure" :flight="flight" />
+  </Flex>
+</template>
+
+<style lang="endgecss" scoped>
+</style>
+```
+
+## Общие правила template
+
+Template не является DOM/HTML-шаблоном. Это абстрактное Endge UI дерево, которое компилятор превращает в общий IR, а затем в DOM или Nova projection.
+
+Разрешенные выражения:
+
+```vue
+<Text>{{ flight.number }}</Text>
+<Text :color="flight.statusColor">{{ flight.status }}</Text>
+<Text if="flight.active">{{ flight.number }}</Text>
+<Flex for="service in flight.services" :key="service.id">
+  <Text>{{ service.name }}</Text>
+</Flex>
+```
+
+Правила области видимости:
+
+- Имена верхнего уровня в выражениях должны приходить из `defineProps`.
+- Локальные имена могут появляться из `for`.
+- Новый канон не использует `$`. Legacy `$.field` может поддерживаться мигратором, но не является основным синтаксисом.
+- `v-if`, `v-for` и другие Vue-директивы не используются. Endge-директивы пишутся без `v-`.
+
+## Общие атрибуты
+
+Эти атрибуты поддерживаются всеми visual-тегами, если явно не указано обратное.
+
+### Flow
+
+| Атрибут | Тип | Назначение | Пример |
+|---|---|---|---|
+| `if` | expression | Условный рендер элемента. | `<Text if="flight.active">Active</Text>` |
+| `else-if` | expression | Альтернативное условие после `if`. | `<Text else-if="flight.cancelled">Cancelled</Text>` |
+| `else` | boolean | Альтернативный блок после `if`/`else-if`. | `<Text else>Unknown</Text>` |
+| `for` | expression | Повторение элемента по списку. | `<Flex for="item in items">...</Flex>` |
+| `:key` | expression | Стабильный ключ элемента в `for`. | `<Flex for="item in items" :key="item.id">...</Flex>` |
+
+### Data Binding
+
+| Синтаксис | Назначение | Пример |
+|---|---|---|
+| `{{ expression }}` | Текстовая интерполяция. | `<Text>{{ flight.number }}</Text>` |
+| `:attr="expression"` | Динамическое значение атрибута. | `<Badge :tone="flight.statusTone" />` |
+| `attr="value"` | Статическое значение атрибута. | `<Text color="muted">Route</Text>` |
+
+### Common Visual Attributes
+
+| Атрибут | Тип | Назначение | Пример |
+|---|---|---|---|
+| `id` | string | Локальный id элемента внутри template. Не используется для ссылки на доменный компонент. | `<Box id="main-cell" />` |
+| `class` | string | Семантический class для styles/projection metadata. | `<Box class="flight-card" />` |
+| `tooltip` / `:tooltip` | string / expression | Tooltip metadata. Renderer может использовать hover, title или inspector metadata. | `<Text :tooltip="flight.comment">{{ flight.commentShort }}</Text>` |
+| `visible` / `:visible` | boolean / expression | Мягкая видимость без удаления из дерева. Для v1 предпочтителен `if`. | `<Text :visible="flight.active" />` |
+
+## Style Attributes
+
+Style attributes являются renderer-neutral. Они не должны предполагать DOM/CSS напрямую.
+
+### Size
+
+| Атрибут | Тип | Назначение |
+|---|---|---|
+| `width` / `w` | number/string | Ширина элемента. |
+| `height` / `h` | number/string | Высота элемента. |
+| `minWidth` | number/string | Минимальная ширина. |
+| `maxWidth` | number/string | Максимальная ширина. |
+| `minHeight` | number/string | Минимальная высота. |
+| `maxHeight` | number/string | Максимальная высота. |
+
+### Spacing
+
+| Атрибут | Тип | Назначение |
+|---|---|---|
+| `p` | number/string | Padding со всех сторон. |
+| `px` | number/string | Горизонтальный padding. |
+| `py` | number/string | Вертикальный padding. |
+| `pt` | number/string | Верхний padding. |
+| `pr` | number/string | Правый padding. |
+| `pb` | number/string | Нижний padding. |
+| `pl` | number/string | Левый padding. |
+| `m` | number/string | Margin со всех сторон. |
+| `mx` | number/string | Горизонтальный margin. |
+| `my` | number/string | Вертикальный margin. |
+| `mt` | number/string | Верхний margin. |
+| `mr` | number/string | Правый margin. |
+| `mb` | number/string | Нижний margin. |
+| `ml` | number/string | Левый margin. |
+| `gap` | number/string | Расстояние между детьми в `Flex`. |
+
+`Spacer` как отдельный тег в v1 не вводится. Для table-cell компонентов достаточно `gap`, `p`, `m` и направленных spacing-атрибутов.
+
+### Colors And Tone
+
+| Атрибут | Тип | Назначение |
+|---|---|---|
+| `color` | token/string | Цвет текста/иконки. |
+| `bg` | token/string | Фон контейнера или бейджа. |
+| `tone` | token | Семантический тон: `neutral`, `muted`, `info`, `success`, `warning`, `danger`. |
+| `borderColor` | token/string | Цвет рамки. |
+
+### Border
+
+| Атрибут | Тип | Назначение |
+|---|---|---|
+| `borderWidth` | number/string | Толщина рамки. |
+| `borderColor` | token/string | Цвет рамки. |
+| `radius` / `r` | number/string | Скругление углов. |
+
+### Typography
+
+| Атрибут | Тип | Назначение |
+|---|---|---|
+| `size` | number/string | Размер текста. |
+| `weight` | string/number | Толщина текста: `400`, `500`, `600`, `700`, `normal`, `medium`, `semibold`, `bold`. |
+| `align` | string | Горизонтальное выравнивание: `left`, `center`, `right`. |
+| `valign` | string | Вертикальное выравнивание: `top`, `center`, `bottom`. |
+| `lineHeight` | number/string | Высота строки. |
+| `truncate` | boolean | Однострочное сокращение текста. |
+| `wrap` | boolean/string | Перенос текста: `true`, `false`, `normal`, `nowrap`. |
+
+## Tags
+
+## `Text`
+
+Текстовый primitive для строк, подписей и простых inline-значений.
+
+```vue
+<Text>{{ flight.number }}</Text>
+<Text color="muted" size="12">{{ flight.route }}</Text>
+<Text weight="600" truncate>{{ flight.longName }}</Text>
+```
+
+Атрибуты:
+
+| Атрибут | Тип | Назначение |
+|---|---|---|
+| `value` / `:value` | string / expression | Значение текста вместо children. |
+| `color` | token/string | Цвет текста. |
+| `size` | number/string | Размер текста. |
+| `weight` | string/number | Толщина текста. |
+| `align` | string | Горизонтальное выравнивание. |
+| `valign` | string | Вертикальное выравнивание. |
+| `lineHeight` | number/string | Высота строки. |
+| `truncate` | boolean | Обрезать текст в одну строку. |
+| `wrap` | boolean/string | Управление переносом. |
+| `tooltip` / `:tooltip` | string / expression | Tooltip metadata. |
+
+## `DateTime`
+
+Типизированное отображение даты/времени.
+
+```vue
+<DateTime :value="flight.std" format="HH:mm" />
+<DateTime :value="flight.updatedAt" format="dd.MM.yyyy HH:mm" timezone="Europe/Moscow" />
+```
+
+Атрибуты:
+
+| Атрибут | Тип | Назначение |
+|---|---|---|
+| `value` / `:value` | date/string/expression | Исходное значение даты/времени. |
+| `format` | string | Формат отображения. |
+| `timezone` | string | Часовой пояс. |
+| `empty` | string | Текст при пустом значении. |
+| `color` | token/string | Цвет текста. |
+| `size` | number/string | Размер текста. |
+| `weight` | string/number | Толщина текста. |
+| `align` | string | Горизонтальное выравнивание. |
+| `tooltip` / `:tooltip` | string / expression | Tooltip metadata. |
+
+## `Number`
+
+Типизированное отображение числа.
+
+```vue
+<Number :value="flight.delayMinutes" suffix=" min" />
+<Number :value="flight.loadFactor" decimals="1" suffix="%" />
+```
+
+Атрибуты:
+
+| Атрибут | Тип | Назначение |
+|---|---|---|
+| `value` / `:value` | number/expression | Исходное число. |
+| `decimals` | number/string | Количество знаков после запятой. |
+| `prefix` | string | Префикс перед числом. |
+| `suffix` | string | Суффикс после числа. |
+| `empty` | string | Текст при пустом значении. |
+| `color` | token/string | Цвет текста. |
+| `size` | number/string | Размер текста. |
+| `weight` | string/number | Толщина текста. |
+| `align` | string | Горизонтальное выравнивание. |
+| `tooltip` / `:tooltip` | string / expression | Tooltip metadata. |
+
+## `Icon`
+
+Иконка из registry. Конкретный renderer решает, как сопоставить `name` с иконкой.
+
+```vue
+<Icon name="alert-triangle" tone="warning" />
+<Icon :name="flight.statusIcon" :tone="flight.statusTone" size="14" />
+```
+
+Атрибуты:
+
+| Атрибут | Тип | Назначение |
+|---|---|---|
+| `name` / `:name` | string / expression | Имя иконки в registry. |
+| `size` | number/string | Размер иконки. |
+| `color` | token/string | Цвет иконки. |
+| `tone` | token | Семантический тон. |
+| `tooltip` / `:tooltip` | string / expression | Tooltip metadata. |
+
+## `Badge`
+
+Компактный статус, метка или категорийный label.
+
+```vue
+<Badge tone="success">On time</Badge>
+<Badge :tone="flight.statusTone">{{ flight.status }}</Badge>
+```
+
+Атрибуты:
+
+| Атрибут | Тип | Назначение |
+|---|---|---|
+| `value` / `:value` | string / expression | Текст бейджа вместо children. |
+| `tone` | token | Семантический тон. |
+| `color` | token/string | Цвет текста. |
+| `bg` | token/string | Фон. |
+| `size` | string | Размер: `xs`, `sm`, `md`. |
+| `radius` / `r` | number/string | Скругление. |
+| `tooltip` / `:tooltip` | string / expression | Tooltip metadata. |
+
+## `Dot`
+
+Маленький цветовой индикатор.
+
+```vue
+<Dot tone="success" />
+<Dot :tone="flight.statusTone" size="6" />
+```
+
+Атрибуты:
+
+| Атрибут | Тип | Назначение |
+|---|---|---|
+| `tone` | token | Семантический тон. |
+| `color` | token/string | Цвет точки. |
+| `size` | number/string | Размер точки. |
+| `tooltip` / `:tooltip` | string / expression | Tooltip metadata. |
+
+## `Box`
+
+Контейнер для фона, рамки, padding и группировки. Не задает layout детей, кроме базовых bounds.
+
+```vue
+<Box p="4" bg="surface" borderWidth="1" borderColor="muted" r="4">
+  <Text>{{ flight.number }}</Text>
+</Box>
+```
+
+Атрибуты:
+
+| Атрибут | Тип | Назначение |
+|---|---|---|
+| `bg` | token/string | Фон. |
+| `borderWidth` | number/string | Толщина рамки. |
+| `borderColor` | token/string | Цвет рамки. |
+| `radius` / `r` | number/string | Скругление. |
+| `p`, `px`, `py`, `pt`, `pr`, `pb`, `pl` | number/string | Padding. |
+| `m`, `mx`, `my`, `mt`, `mr`, `mb`, `ml` | number/string | Margin. |
+| `width` / `w` | number/string | Ширина. |
+| `height` / `h` | number/string | Высота. |
+| `tooltip` / `:tooltip` | string / expression | Tooltip metadata. |
+
+## `Flex`
+
+Единственный layout primitive v1. Используется для row/column композиции внутри ячеек.
+
+```vue
+<Flex col gap="2">
+  <Text>{{ flight.number }}</Text>
+  <Text color="muted">{{ flight.route }}</Text>
+</Flex>
+
+<Flex row gap="4" align="center" justify="space-between">
+  <Text>{{ flight.number }}</Text>
+  <Badge :tone="flight.statusTone">{{ flight.status }}</Badge>
+</Flex>
+```
+
+Атрибуты:
+
+| Атрибут | Тип | Назначение |
+|---|---|---|
+| `direction` | string | Направление: `row` или `column`. |
+| `row` | boolean | Shortcut для `direction="row"`. |
+| `col` | boolean | Shortcut для `direction="column"`. |
+| `gap` | number/string | Расстояние между детьми. |
+| `align` | string | Поперечное выравнивание: `start`, `center`, `end`, `stretch`. |
+| `justify` | string | Основное выравнивание: `start`, `center`, `end`, `space-between`. |
+| `wrap` | boolean/string | Перенос children: `true`, `false`, `wrap`, `nowrap`. |
+| `bg` | token/string | Фон контейнера. |
+| `borderWidth` | number/string | Толщина рамки. |
+| `borderColor` | token/string | Цвет рамки. |
+| `radius` / `r` | number/string | Скругление. |
+| `p`, `px`, `py`, `pt`, `pr`, `pb`, `pl` | number/string | Padding. |
+| `m`, `mx`, `my`, `mt`, `mr`, `mb`, `ml` | number/string | Margin. |
+| `width` / `w` | number/string | Ширина. |
+| `height` / `h` | number/string | Высота. |
+| `tooltip` / `:tooltip` | string / expression | Tooltip metadata. |
+
+Если одновременно указаны `row`, `col` и `direction`, приоритет должен быть у `direction`.
+
+## `Divider`
+
+Тонкий разделитель.
+
+```vue
+<Divider />
+<Divider orientation="vertical" />
+```
+
+Атрибуты:
+
+| Атрибут | Тип | Назначение |
+|---|---|---|
+| `orientation` | string | `horizontal` или `vertical`. |
+| `color` | token/string | Цвет линии. |
+| `width` / `w` | number/string | Длина или ширина, зависит от orientation. |
+| `height` / `h` | number/string | Высота, зависит от orientation. |
+| `thickness` | number/string | Толщина линии. |
+| `m`, `mx`, `my`, `mt`, `mr`, `mb`, `ml` | number/string | Margin. |
+
+## `Component`
+
+Встраивает другой доменный компонент по стабильной identity. Используется для переиспользования table-cell компонентов и постепенной миграции legacy DSL/SFC.
+
+```vue
+<Component is="flight-status-badge" :flight="flight" />
+<Component is="best-time-horizontal-departure" :flight="flight" :compact="compact" />
+```
+
+Атрибуты:
+
+| Атрибут | Тип | Назначение |
+|---|---|---|
+| `is` | string | Identity доменного компонента. |
+| `:is` | expression | Динамическая ссылка на identity. Использовать осторожно: сложнее валидировать dependencies. |
+| `:propName` | expression | Передача входа во вложенный компонент. |
+| `propName` | string | Статическое значение входа. |
+| `fallback` | string | Текст или renderer fallback, если компонент не найден. |
+
+`id` не используется для ссылки на доменный компонент, чтобы не смешивать DOM id, Payload id и stable identity.
+
+## Не входит в v1
+
+Эти элементы не входят в начальный набор, потому что они требуют отдельного lifecycle, overlay/focus/keyboard handling или сложного runtime:
+
+- `Drawer`
+- `Modal`
+- `Popover`
+- `Dropdown`
+- `Tabs`
+- `Form`
+- `Input`
+- `Select`
+- `Table`
+- `VirtualList`
+- `Value`
+- `Spacer`
+
+`Value` не вводится, потому что слишком абстрактен. В v1 используются конкретные форматтеры `Text`, `DateTime`, `Number`.
+
+`Spacer` не вводится, потому что для table-cell компонентов достаточно `gap`, `p`, `m` и направленных spacing-атрибутов.

@@ -10,12 +10,17 @@ import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { createActionContext } from '@/domain/entities/runtime/hosts/ActionRuntimeHost'
 import { Endge } from '@/model/endge/endge'
 
+/**
+ * Модуль исполнения compiled flow для action runtime-host.
+ */
 export class EndgeFlow extends EndgeModule {
   /*
    * PUBLIC
    */
 
-  /** Исполняет flow целиком внутри переданного action runtime-host и сохраняет результат в host.context. */
+  /**
+   * Исполняет flow целиком внутри переданного action runtime-host.
+   */
   async run(host: RuntimeHost<'action'>): Promise<void> {
     if (!host || host.kind !== 'action') {
       return
@@ -47,7 +52,7 @@ export class EndgeFlow extends EndgeModule {
       lastFlowResult: null,
     })
 
-    const compiled = action.compiledFlow
+    const compiled = this._getCompiledFlow(action)
     if (!compiled) {
       const result = this._createErrorResult(
         'flow.compile.missing',
@@ -119,7 +124,9 @@ export class EndgeFlow extends EndgeModule {
     })
   }
 
-  /** Исполняет один block внутри переданного action runtime-host. */
+  /**
+   * Исполняет один block внутри переданного action runtime-host.
+   */
   async runBlock(host: RuntimeHost<'action'>, blockId: string): Promise<FlowExecutionResult> {
     if (!host || host.kind !== 'action') {
       return this._createErrorResult(
@@ -137,7 +144,7 @@ export class EndgeFlow extends EndgeModule {
     }
 
     const action = host.model
-    const compiled = action.compiledFlow
+    const compiled = this._getCompiledFlow(action)
     if (!compiled) {
       return this._createErrorResult(
         'flow.compile.missing',
@@ -452,6 +459,9 @@ export class EndgeFlow extends EndgeModule {
    */
 
   /** Создаёт пустой flow-state для случаев, когда состояние ещё не инициализировано. */
+  /**
+   * Создает Default State.
+   */
   private _createDefaultState(input: Record<string, unknown> = {}): FlowExecutionState {
     const locals: Record<string, unknown> = {}
     return {
@@ -464,6 +474,9 @@ export class EndgeFlow extends EndgeModule {
   }
 
   /** Формирует канонический результат выполнения flow/block. */
+  /**
+   * Создает Execution Result.
+   */
   private _createExecutionResult(
     ok: boolean,
     state: FlowExecutionState,
@@ -477,6 +490,9 @@ export class EndgeFlow extends EndgeModule {
   }
 
   /** Преобразует параметры node в плоский объект значений для рантайма. */
+  /**
+   * Преобразует значение в Plain Params.
+   */
   private _toPlainParams(params: EndgeFlowNodeDefinition['params']): Record<string, unknown> {
     if (!params || typeof params !== 'object' || Array.isArray(params)) {
       return {}
@@ -493,6 +509,9 @@ export class EndgeFlow extends EndgeModule {
   }
 
   /** Собирает error-результат с единым форматом issue. */
+  /**
+   * Создает Error Result.
+   */
   private _createErrorResult(
     code: string,
     message: string,
@@ -555,6 +574,9 @@ export class EndgeFlow extends EndgeModule {
   }
 
   /** Создаёт дочерний action-runtime с новым контекстом и ссылкой на родительский контекст. */
+  /**
+   * Создает Action Runtime.
+   */
   private _createActionRuntime(
     action: RAction,
     input: Record<string, unknown> | unknown,
@@ -682,6 +704,9 @@ export class EndgeFlow extends EndgeModule {
   }
 
   /** Формирует runtime-контекст, который передаётся в custom/runtime handlers. */
+  /**
+   * Создает Flow Handler Context.
+   */
   private _createFlowHandlerContext(
     node: EndgeFlowNodeDefinition,
     state: FlowExecutionState,
@@ -699,7 +724,22 @@ export class EndgeFlow extends EndgeModule {
     }
   }
 
+  /**
+   * Возвращает Compiled Flow.
+   */
+  private _getCompiledFlow(action: RAction): ActionCompiledFlow | null {
+    const actionId = action.id
+    const actionIdentity = action.identity
+
+    return Endge.program.getActionFlow(actionId)
+      ?? (actionIdentity ? Endge.program.getActionFlow(actionIdentity) : null)
+      ?? action.compiledFlow
+  }
+
   /** Рекурсивно резолвит параметры node через текущий flow-state. */
+  /**
+   * Разрешает Node Params.
+   */
   private _resolveNodeParams(
     params: Record<string, unknown>,
     state: FlowExecutionState,
@@ -710,6 +750,9 @@ export class EndgeFlow extends EndgeModule {
   }
 
   /** Рекурсивно резолвит значение параметра: строки, массивы и объекты. */
+  /**
+   * Разрешает Value.
+   */
   private _resolveValue(value: unknown, state: FlowExecutionState): unknown {
     if (typeof value === 'string') {
       return this._resolveStringValue(value, state)
@@ -729,6 +772,9 @@ export class EndgeFlow extends EndgeModule {
   }
 
   /** Резолвит выражения вида `{ctx...}` в строках параметров node. */
+  /**
+   * Разрешает String Value.
+   */
   private _resolveStringValue(value: string, state: FlowExecutionState): unknown {
     const text = String(value)
     const fullExpressionPath = this._extractFullContextPath(text)
@@ -754,6 +800,9 @@ export class EndgeFlow extends EndgeModule {
   }
 
   /** Достаёт значение из flow-state по пути `ctx.*`. */
+  /**
+   * Возвращает Context Value.
+   */
   private _getContextValue(path: string, state: FlowExecutionState): unknown {
     const normalizedPath = String(path).trim()
     if (!normalizedPath.startsWith('ctx')) {
@@ -778,6 +827,9 @@ export class EndgeFlow extends EndgeModule {
   }
 
   /** Проверяет, является ли строка полным выражением контекста (`{ctx...}`). */
+  /**
+   * Внутренний helper модуля: extract Full Context Path.
+   */
   private _extractFullContextPath(text: string): string | null {
     if (!text.startsWith('{') || !text.endsWith('}')) {
       return null

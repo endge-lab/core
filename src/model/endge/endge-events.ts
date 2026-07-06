@@ -9,6 +9,10 @@ import { EndgeEvent } from '@/domain/types/events.types'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import type { EndgeCoreEventMap } from '@/model/config/events'
 
+/**
+ * Модуль событий Endge.
+ * Инкапсулирует core/custom event bus и небольшой runtime-кеш последних событий.
+ */
 export class EndgeEvents extends EndgeModule {
   // 0 - кеш отключён
   public static EVENTS_CACHE_SIZE = 0
@@ -18,6 +22,9 @@ export class EndgeEvents extends EndgeModule {
   // делаем изменяемым (не readonly), чтобы можно было пересоздавать
   private _cache: RingBuffer<CachedEvent> | null
 
+  /**
+   * Создает event bus с заранее известными core-событиями.
+   */
   constructor(predefinedEvents: (keyof EndgeCoreEventMap & string)[] = []) {
     super()
     this._bus = new EventBus<EndgeCoreEventMap, EndgeCustomEventMap>(
@@ -26,7 +33,9 @@ export class EndgeEvents extends EndgeModule {
     this._cache = this.makeCache(EndgeEvents.EVENTS_CACHE_SIZE)
   }
 
-  // наружная установка размера кеша (на инстансе)
+  /**
+   * Изменяет размер кеша последних событий для текущего экземпляра.
+   */
   public setCacheSize(next: number): void {
     const n = Math.max(0, Math.floor(Number(next) || 0))
     EndgeEvents.EVENTS_CACHE_SIZE = n
@@ -49,29 +58,46 @@ export class EndgeEvents extends EndgeModule {
     this.notify()
   }
 
+  /**
+   * Внутренний helper модуля: make Cache.
+   */
   private makeCache(n: number): RingBuffer<CachedEvent> | null {
     const size = Math.max(0, Math.floor(Number(n) || 0))
     return size > 0 ? new RingBuffer<CachedEvent>(size) : null
   }
 
+  /**
+   * Возвращает текущую емкость кеша событий.
+   */
   public get cacheSize(): number {
     return this._cache?.capacity ?? 0
   }
 
+  /**
+   * Возвращает количество событий, сохраненных в кеше.
+   */
   public get cachedCount(): number {
     return this._cache?.length ?? 0
   }
 
-  /** Снимок кеша (oldest -> newest). Если cacheSize=0 - [] */
+  /**
+   * Возвращает снимок кеша событий от старых к новым.
+   */
   public get lastEvents(): CachedEvent[] {
     return this._cache?.toArray() ?? []
   }
 
+  /**
+   * Очищает кеш последних событий.
+   */
   public clearCache(): void {
     this._cache?.clear()
     this.notify()
   }
 
+  /**
+   * Подписывает обработчик на типизированные core-события Endge.
+   */
   onEvent<K extends keyof EndgeCoreEventMap & string>(
     events: OneOrMany<K>,
     callback: (e: EndgeEvent<EndgeCoreEventMap[K]>) => void,
@@ -83,6 +109,9 @@ export class EndgeEvents extends EndgeModule {
     return () => this._bus.off(events, handler)
   }
 
+  /**
+   * Публикует типизированное core-событие Endge.
+   */
   emitEvent<K extends keyof EndgeCoreEventMap & string>(
     event: K,
     payload: EndgeCoreEventMap[K],
@@ -99,6 +128,9 @@ export class EndgeEvents extends EndgeModule {
     return e
   }
 
+  /**
+   * Подписывает обработчик на динамические пользовательские события.
+   */
   onDynamic<K extends keyof EndgeCustomEventMap & string>(
     events: OneOrMany<K>,
     callback: (e: EndgeEvent<EndgeCustomEventMap[K]>) => void,
@@ -110,6 +142,9 @@ export class EndgeEvents extends EndgeModule {
     return () => this._bus.offCustom(events, handler)
   }
 
+  /**
+   * Публикует динамическое пользовательское событие.
+   */
   emitDynamic<K extends keyof EndgeCustomEventMap & string>(
     event: K,
     payload: EndgeCustomEventMap[K],
@@ -126,6 +161,9 @@ export class EndgeEvents extends EndgeModule {
     return e
   }
 
+  /**
+   * Подписывает raw-callback на core-события без обертки EndgeEvent.
+   */
   public on<K extends keyof EndgeCoreEventMap & string>(
     events: OneOrMany<K>,
     callback: EventCallback<EndgeCoreEventMap[K]>,
@@ -133,6 +171,9 @@ export class EndgeEvents extends EndgeModule {
     this._bus.on(events, callback)
   }
 
+  /**
+   * Снимает raw-callback с core-событий.
+   */
   public off<K extends keyof EndgeCoreEventMap & string>(
     events: OneOrMany<K>,
     callback: EventCallback<EndgeCoreEventMap[K]>,
@@ -140,6 +181,9 @@ export class EndgeEvents extends EndgeModule {
     this._bus.off(events, callback)
   }
 
+  /**
+   * Подписывает raw-callback на пользовательские события.
+   */
   public onCustom<K extends keyof EndgeCustomEventMap & string>(
     events: OneOrMany<K>,
     callback: EventCallback<EndgeCustomEventMap[K]>,
@@ -147,6 +191,9 @@ export class EndgeEvents extends EndgeModule {
     this._bus.onCustom(events, callback)
   }
 
+  /**
+   * Снимает raw-callback с пользовательских событий.
+   */
   public offCustom<K extends keyof EndgeCustomEventMap & string>(
     events: OneOrMany<K>,
     callback: EventCallback<EndgeCustomEventMap[K]>,

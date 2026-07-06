@@ -407,7 +407,7 @@ export class EndgeResolveEngine<
    * если окружение явно не было передано в запрос резолва.
    */
   private _getCurrentEnvironmentId(): number | null {
-    const current = Endge.app.getCurrentEnvironment?.()
+    const current = Endge.context.getCurrentEnvironment?.()
     const currentId = this._normalizeId((current as any)?.id)
     if (currentId != null) { return currentId }
     return this._resolveEnvironmentId((current as any)?.identity ?? current)

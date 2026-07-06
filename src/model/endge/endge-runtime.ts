@@ -1,26 +1,28 @@
 import type { RComponent } from '@/domain/types/component.types'
 import type { RuntimeEntityType } from '@/domain/types/runtime-entity-map.types'
-import type { RuntimeHost } from '@/domain/types/runtime-host.types'
 import type { RuntimeHostRegistrySnapshot } from '@/domain/types/runtime-registry.types'
-import type { RuntimeKind } from '@/domain/types/runtime.types'
 
 import { Raph } from '@endge/raph'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
-import { RAction } from '@/domain/entities/reflect/RAction'
-import { RComponentTable } from '@/domain/entities/reflect/RComponentTable'
-import { RPage } from '@/domain/entities/reflect/RPage'
-import { RProject } from '@/domain/entities/reflect/RProject'
-import { RQuery } from '@/domain/entities/reflect/RQuery'
-import { RView } from '@/domain/entities/reflect/RView'
-import { ActionRuntimeHost } from '@/domain/entities/runtime/hosts/ActionRuntimeHost'
-import { ComponentRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentRuntimeHost'
-import { PageRuntimeHost } from '@/domain/entities/runtime/hosts/PageRuntimeHost'
-import { ProjectRuntimeHost } from '@/domain/entities/runtime/hosts/ProjectRuntimeHost'
-import { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
-import { TableRuntimeHost } from '@/domain/entities/runtime/hosts/TableRuntimeHost'
-import { ViewRuntimeHost } from '@/domain/entities/runtime/hosts/ViewRuntimeHost'
+import type { RAction } from '@/domain/entities/reflect/RAction'
+import type { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
+import type { RComponentTable } from '@/domain/entities/reflect/RComponentTable'
+import type { RPage } from '@/domain/entities/reflect/RPage'
+import type { RProject } from '@/domain/entities/reflect/RProject'
+import type { RQuery } from '@/domain/entities/reflect/RQuery'
+import type { RView } from '@/domain/entities/reflect/RView'
 import { RuntimeHostRegistry } from '@/domain/entities/runtime/RuntimeHostRegistry'
+import type { AnyRuntimeHost, RuntimeStrategy } from '@/domain/services/runtime/RuntimeStrategy'
+import { RuntimeStrategyRegistry } from '@/domain/services/runtime/RuntimeStrategyRegistry'
+import { ActionRuntimeStrategy } from '@/domain/services/runtime/strategies/ActionRuntimeStrategy'
+import { ComponentRuntimeStrategy } from '@/domain/services/runtime/strategies/ComponentRuntimeStrategy'
+import { ComponentSFCRuntimeStrategy } from '@/domain/services/runtime/strategies/ComponentSFCRuntimeStrategy'
+import { PageRuntimeStrategy } from '@/domain/services/runtime/strategies/PageRuntimeStrategy'
+import { ProjectRuntimeStrategy } from '@/domain/services/runtime/strategies/ProjectRuntimeStrategy'
+import { QueryRuntimeStrategy } from '@/domain/services/runtime/strategies/QueryRuntimeStrategy'
+import { TableRuntimeStrategy } from '@/domain/services/runtime/strategies/TableRuntimeStrategy'
+import { ViewRuntimeStrategy } from '@/domain/services/runtime/strategies/ViewRuntimeStrategy'
 import { Endge } from '@/model/endge/endge'
 import { QueriesPhase } from '@/model/helpers/raph-phases/queries-phase'
 
@@ -32,14 +34,9 @@ export type RuntimeExecutableModel
     | RView
     | RPage
     | RComponent
+    | RComponentSFC
 
-type RuntimeExecutionKind
-  = | RuntimeKind
-    | 'project'
-    | 'view'
-    | 'page'
-    | 'component'
-type AnyRuntimeHost = RuntimeHost<any, any>
+type AnyRuntimeStrategy = RuntimeStrategy<any, AnyRuntimeHost>
 
 export interface EndgeRuntimeSnapshot extends RuntimeHostRegistrySnapshot {
   generatedAt: number
@@ -47,13 +44,26 @@ export interface EndgeRuntimeSnapshot extends RuntimeHostRegistrySnapshot {
 
 export class EndgeRuntime extends EndgeModule {
   private _hosts = new RuntimeHostRegistry()
+  private _strategies = new RuntimeStrategyRegistry()
   private _nextRuntimeId = 0
   private _inited = false
+
+  public constructor() {
+    super()
+    this.registerDefaultStrategies()
+  }
+
+  /**
+   * Настраивает Raph runtime до загрузки и сборки домена.
+   */
+  public override setup(): void {
+    Raph.options({ debug: true })
+  }
 
   /**
    * Регистрирует runtime-фазы в Raph один раз.
    */
-  public init(): void {
+  public override start(): void {
     if (this._inited) {
       return
     }
@@ -69,12 +79,19 @@ export class EndgeRuntime extends EndgeModule {
     model: RuntimeExecutableModel,
     meta: Record<string, any> = {},
   ): AnyRuntimeHost | null {
-    const kind = this.detectKind(model)
-    if (!kind) {
+    const strategy = this._strategies.resolve(model)
+    if (!strategy) {
       console.error('[EndgeRuntime] Unsupported runtime model', model)
       return null
     }
-    return this.createHost(kind, model, meta)
+    return this.createHost(strategy, model, meta)
+  }
+
+  /**
+   * Регистрирует стратегию запуска runtime-сущности.
+   */
+  public registerStrategy(strategy: AnyRuntimeStrategy): void {
+    this._strategies.register(strategy)
   }
 
   /**
@@ -107,7 +124,7 @@ export class EndgeRuntime extends EndgeModule {
    * Полностью удалить snapshot runtime-host из debug-архива удалённых.
    */
   public removeDeletedRuntimeHostSnapshot(runtimeId: string): void {
-    if (!Endge.app.isDebug) {
+    if (!Endge.debug.enabled) {
       return
     }
 
@@ -120,7 +137,7 @@ export class EndgeRuntime extends EndgeModule {
    * Полностью очистить debug-архив удалённых runtime-host.
    */
   public clearDeletedRuntimeHostSnapshots(): void {
-    if (!Endge.app.isDebug) {
+    if (!Endge.debug.enabled) {
       return
     }
 
@@ -206,11 +223,14 @@ export class EndgeRuntime extends EndgeModule {
   /**
    * Корректно разрушает все зарегистрированные runtime-host.
    */
-  public reset(): void {
+  public override reset(): void {
     const hostIds = this._hosts.getAll().map(host => host.id)
     for (const runtimeId of hostIds) {
       this.destroyRuntimeInternal(runtimeId, false)
     }
+
+    Raph.clearPhases()
+    this._inited = false
 
     // Единый notify после batch-reset.
     this.notify()
@@ -233,7 +253,7 @@ export class EndgeRuntime extends EndgeModule {
       return
     }
 
-    if (Endge.app.isDebug) {
+    if (Endge.debug.enabled) {
       const snapshot = host.snapshot()
       this._hosts.rememberDeletedSnapshot({
         ...snapshot,
@@ -247,6 +267,7 @@ export class EndgeRuntime extends EndgeModule {
       })
     }
 
+    this._strategies.resolve(host.model)?.destroy?.({ host })
     host.destroy()
     if (shouldNotify) {
       this.notify()
@@ -254,46 +275,10 @@ export class EndgeRuntime extends EndgeModule {
   }
 
   /**
-   * Определяет runtime-kind по переданной модели.
-   */
-  private detectKind(
-    model: RuntimeExecutableModel,
-  ): RuntimeExecutionKind | null {
-    if (model instanceof RQuery || Array.isArray((model as any)?.filters)) {
-      return 'query'
-    }
-    if (
-      model instanceof RComponentTable
-      || (model as any)?.type === 'component-table'
-    ) {
-      return 'table'
-    }
-    if (
-      model instanceof RAction
-      || Array.isArray((model as any)?.definition?.nodes)
-    ) {
-      return 'action'
-    }
-    if (model instanceof RProject || (model as any)?.type === 'project') {
-      return 'project'
-    }
-    if (model instanceof RView || (model as any)?.type === 'view') {
-      return 'view'
-    }
-    if (model instanceof RPage || (model as any)?.type === 'page') {
-      return 'page'
-    }
-    if ((model as any)?.type?.startsWith?.('component-')) {
-      return 'component'
-    }
-    return null
-  }
-
-  /**
-   * Создаёт host конкретного kind и регистрирует его в runtime-registry.
+   * Создаёт host через runtime strategy и регистрирует его в runtime-registry.
    */
   private createHost(
-    kind: RuntimeExecutionKind,
+    strategy: AnyRuntimeStrategy,
     model: RuntimeExecutableModel,
     meta: Record<string, any>,
   ): AnyRuntimeHost | null {
@@ -302,72 +287,40 @@ export class EndgeRuntime extends EndgeModule {
     delete hostMeta.parent
 
     const runtimeId = this.createRuntimeId()
-    let host: AnyRuntimeHost | null = null
-
-    if (kind === 'query') {
-      host = QueryRuntimeHost.createRuntime({
-        id: runtimeId,
-        model: model as RQuery,
-        meta: hostMeta,
-        parent,
-      })
-    }
-    else if (kind === 'table') {
-      host = TableRuntimeHost.createRuntime({
-        id: runtimeId,
-        model: model as RComponentTable,
-        meta: hostMeta,
-        parent,
-      })
-    }
-    else if (kind === 'action') {
-      host = ActionRuntimeHost.createRuntime({
-        id: runtimeId,
-        model: model as RAction,
-        meta: hostMeta,
-        parent,
-      })
-    }
-    else if (kind === 'project') {
-      host = ProjectRuntimeHost.createRuntime({
-        id: runtimeId,
-        model: model as RProject,
-        meta: hostMeta,
-        parent,
-      })
-    }
-    else if (kind === 'view') {
-      host = ViewRuntimeHost.createRuntime({
-        id: runtimeId,
-        model: model as RView,
-        meta: hostMeta,
-        parent,
-      })
-    }
-    else if (kind === 'page') {
-      host = PageRuntimeHost.createRuntime({
-        id: runtimeId,
-        model: model as RPage,
-        meta: hostMeta,
-        parent,
-      })
-    }
-    else if (kind === 'component') {
-      host = ComponentRuntimeHost.createRuntime({
-        id: runtimeId,
-        model: model as RComponent,
-        meta: hostMeta,
-        parent,
-      })
-    }
-
+    const host = strategy.create({
+      id: runtimeId,
+      model,
+      meta: hostMeta,
+      parent,
+    })
     if (!host) {
       return null
     }
 
     this._hosts.register(host)
+    strategy.attach?.({
+      id: runtimeId,
+      model,
+      meta: hostMeta,
+      parent,
+      host,
+    })
     this.notify()
     return host
+  }
+
+  /**
+   * Регистрирует встроенные стратегии в порядке от специальных к общим.
+   */
+  private registerDefaultStrategies(): void {
+    this.registerStrategy(new QueryRuntimeStrategy())
+    this.registerStrategy(new TableRuntimeStrategy())
+    this.registerStrategy(new ComponentSFCRuntimeStrategy())
+    this.registerStrategy(new ActionRuntimeStrategy())
+    this.registerStrategy(new ProjectRuntimeStrategy())
+    this.registerStrategy(new ViewRuntimeStrategy())
+    this.registerStrategy(new PageRuntimeStrategy())
+    this.registerStrategy(new ComponentRuntimeStrategy())
   }
 
   /**
@@ -377,6 +330,9 @@ export class EndgeRuntime extends EndgeModule {
     return `runtime-${this._nextRuntimeId++}`
   }
 
+  /**
+   * Разрешает Parent Host.
+   */
   private resolveParentHost(rawParent: unknown): AnyRuntimeHost | null {
     if (!rawParent) {
       return null

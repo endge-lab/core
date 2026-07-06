@@ -4,6 +4,7 @@ import { randomString } from '@endge/utils'
 
 import { Endge } from '@/model/endge/endge'
 import { RComponentDSL } from '@/domain/entities/reflect/RComponentDSL'
+import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RComponentTable } from '@/domain/entities/reflect/RComponentTable'
 import { RField } from '@/domain/entities/reflect/RField'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
@@ -71,6 +72,22 @@ export class DocumentFactory {
         if (folderId != null) { item.folderId = folderId; (item as any).group = folderId }
         if (registerInDomain)
           Endge.domain.addComponent(item)
+        return item
+      }
+
+      case ComponentType.SFC: {
+        const item = new RComponentSFC()
+        item.id = id as unknown as number
+        item.identity = id
+        item.name = title
+        item.displayName = title
+        item.source = createDefaultSFCSource()
+        item.supportedTargets = ['dom', 'canvas']
+        item.modelVersion = 1
+        if (folderId != null)
+          item.folderId = folderId
+        if (registerInDomain)
+          Endge.domain.addComponentSFC(item)
         return item
       }
 
@@ -296,6 +313,8 @@ export class DocumentFactory {
     switch (type) {
       case ComponentType.Table:
         return 'Новая таблица'
+      case ComponentType.SFC:
+        return 'Новый SFC-компонент'
       case QueryType.GraphQL:
         return 'Новый GraphQL запрос'
       case ScriptType.ScenarioSetup:
@@ -332,4 +351,19 @@ export class DocumentFactory {
         return 'Без названия'
     }
   }
+}
+
+/** Дефолтный SFC-source для нового компонента. */
+function createDefaultSFCSource(): string {
+  return `<script setup lang="ts">
+const props = defineProps<Record<string, unknown>>()
+</script>
+
+<template>
+  <Text>{{ props.label ?? 'SFC' }}</Text>
+</template>
+
+<style lang="endgecss" scoped>
+</style>
+`
 }
