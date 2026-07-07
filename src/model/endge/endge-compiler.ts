@@ -59,6 +59,12 @@ export class EndgeCompiler extends EndgeModule {
     dbg.endTrace('info', { status: 'success' })
   }
 
+  /** Компилирует один query source в Endge.program без запуска остальных compiler-фаз. */
+  public buildQuery(entity: RQuery): ProgramArtifact<QueryProgramPayload> {
+    const context: ProgramCompileContext = { compilerVersion: ENDGE_COMPILER_VERSION }
+    return this.compileEntity('query', entity, context) as ProgramArtifact<QueryProgramPayload>
+  }
+
   /**
    * Регистрирует handler компиляции для поддерживаемого program entity.
    *
@@ -244,6 +250,16 @@ export class EndgeCompiler extends EndgeModule {
    * compiled artifact на уровне program read-model.
    */
   private _toStableSource(entity: any): unknown {
+    if (entity instanceof RQuery) {
+      return {
+        id: entity?.id ?? null,
+        identity: entity?.identity ?? null,
+        name: entity?.name ?? null,
+        source: entity?.source ?? null,
+        sourceVersion: entity?.sourceVersion ?? null,
+      }
+    }
+
     return {
       id: entity?.id ?? null,
       identity: entity?.identity ?? null,
@@ -269,17 +285,13 @@ export class EndgeCompiler extends EndgeModule {
     }
   }
 
-  /** Возвращает сохраненный query source или генерирует его из legacy полей. */
+  /** Возвращает сохраненный query source. Legacy generation больше не используется runtime compiler-ом. */
   private _resolveQuerySource(entity: RQuery): string {
     const source = typeof entity.source === 'string' ? entity.source.trim() : ''
     if (source)
       return source
 
-    const generated = Endge.source.generate('query', entity)
-    if (!generated.ok || !generated.source)
-      throw new Error(generated.message ?? `Failed to generate query source for "${entity.identity ?? entity.name}"`)
-
-    return generated.source
+    throw new Error(`Query source is required for "${entity.identity ?? entity.name ?? entity.id}".`)
   }
 
   /** Создает пустой query payload для error-artifact. */

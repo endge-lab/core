@@ -4,6 +4,7 @@ import type { ActionCompiledFlow, FlowHandlerContext, FlowValidationIssue } from
 import type { FlowExecutionResult, FlowExecutionState } from '@/domain/types/endge-flow-runtime.types'
 import type { FlowSwitchParams } from '@/domain/types/flow-condition.types'
 import type { EndgeFlowEdgeDefinition, EndgeFlowNodeDefinition } from '@/domain/types/endge-flow.types'
+import type { QueryProgramPayload } from '@/domain/types/program.types'
 import type { RuntimeHost } from '@/domain/types/runtime-host.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
@@ -176,7 +177,9 @@ export class EndgeFlow extends EndgeModule {
         ? node.meta as Record<string, unknown>
         : {}
       const resolvedParams = this._resolveNodeParams(this._toPlainParams(node.params), state)
-      const runtime = Endge.runtime.getRuntimeById<RAction>(host.id)
+      const runtime = Endge.runtime.getRuntimeById<RAction>(host.id) as unknown as {
+        emit: (event: string, payload: unknown) => void
+      } | null
 
       runtime?.emit('step:start', {
         stepId: node.id,
@@ -678,9 +681,11 @@ export class EndgeFlow extends EndgeModule {
     query: RQuery | null,
   ): Record<string, unknown> {
     const input = { ...resolvedParams }
-    const paramNames = query?.params instanceof Map
-      ? Array.from(query.params.keys()).map(name => String(name ?? '').trim()).filter(Boolean)
-      : []
+    const artifactId = query?.id ?? query?.identity
+    const artifact = artifactId != null
+      ? Endge.program.getQueryArtifact(artifactId)
+      : null
+    const paramNames = this._getQueryArtifactParamNames(artifact?.payload ?? null)
 
     if (paramNames.length === 0) {
       return input
@@ -701,6 +706,16 @@ export class EndgeFlow extends EndgeModule {
     }
 
     return input
+  }
+
+  private _getQueryArtifactParamNames(payload: QueryProgramPayload | null): string[] {
+    const params = payload?.params
+    if (!params || typeof params !== 'object' || Array.isArray(params))
+      return []
+
+    return Object.keys(params)
+      .map(name => String(name ?? '').trim())
+      .filter(Boolean)
   }
 
   /** Формирует runtime-контекст, который передаётся в custom/runtime handlers. */

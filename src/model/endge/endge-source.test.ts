@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
 
-import { RField } from '@/domain/entities/reflect/RField'
-import { RQueryFilter } from '@/domain/entities/reflect/RQueryFilter'
-import { RQueryRest } from '@/domain/entities/reflect/RQueryRest'
 import { ENDGE_CORE_MODULES } from '@/model/config/endge-modules'
 import { Endge } from '@/model/endge/endge'
 import { EndgeSource } from '@/model/endge/endge-source'
@@ -16,6 +13,7 @@ describe('EndgeSource', () => {
   it('registers query source strategy by default', () => {
     const strategy = Endge.source.resolveStrategy('query')
     const languageStrategy = Endge.source.resolveLanguageStrategy('query')
+    const patchStrategy = Endge.source.resolvePatchStrategy('query')
 
     expect(strategy).toMatchObject({
       id: 'source:query',
@@ -23,6 +21,10 @@ describe('EndgeSource', () => {
     })
     expect(languageStrategy).toMatchObject({
       id: 'source-language:query',
+      sourceKind: 'query',
+    })
+    expect(patchStrategy).toMatchObject({
+      id: 'source-patch:query',
       sourceKind: 'query',
     })
   })
@@ -47,24 +49,12 @@ describe('EndgeSource', () => {
       expect.objectContaining({ label: 'defineQuery' }),
       expect.objectContaining({ label: 'field' }),
       expect.objectContaining({ label: 'filter.inline' }),
+      expect.objectContaining({ label: 'env' }),
     ]))
   })
 
-  it('generates query source from legacy RQueryRest fields', () => {
-    const query = createQuery()
-    const result = Endge.source.generate('query', query)
-
-    expect(result.ok).toBe(true)
-    expect(result.source).toContain('defineQuery({')
-    expect(result.source).toContain("endpoint: env('API_BASE_URL')")
-    expect(result.source).toContain("path: '/flights'")
-    expect(result.source).toContain("filter.reference('flight-filter')")
-    expect(result.source).toContain("flightDate: field('DateTime').optional()")
-  })
-
   it('compiles query source into query program artifact payload', () => {
-    const generated = Endge.source.generate('query', createQuery())
-    const result = Endge.source.compile('query', generated.source!)
+    const result = Endge.source.compile('query', createQuerySource())
 
     expect(result.ok).toBe(true)
     expect(result.diagnostics).toEqual([])
@@ -124,6 +114,25 @@ defineQuery({
     expect(legacyResult.artifact).toMatchObject({ endpoint: '{ENDPOINT_AODB}' })
   })
 
+  it('treats empty response return field as no return schema', () => {
+    const result = Endge.source.compile('query', `
+defineQuery({
+  request: {
+    endpoint: env('ENDPOINT_AODB'),
+    path: '/select',
+  },
+  response: {
+    subField: 'items',
+    return: field(''),
+  },
+})
+`)
+
+    expect(result.ok).toBe(true)
+    expect(result.diagnostics).toEqual([])
+    expect(result.artifact).toMatchObject({ returnField: null })
+  })
+
   it('tracks unsupported query field diagnostics on the invalid field expression', () => {
     const source = `
 defineQuery({
@@ -144,25 +153,118 @@ defineQuery({
       end: start + 'DateTime'.length,
     }))
   })
+
+  it('patches query source slots without reprinting untouched author code', () => {
+    const source = `
+defineQuery({
+  // keep author comment
+  request: {
+    endpoint: env('API_BASE_URL'),
+    path: '/flights',
+    method: 'GET',
+  },
+})
+`
+
+    const result = Endge.source.patch('query', source, {
+      path: 'request.path',
+      value: '/schedule',
+    })
+
+    expect(result.ok).toBe(true)
+    expect(result.changed).toBe(true)
+    expect(result.source).toContain('// keep author comment')
+    expect(result.source).toContain("endpoint: env('API_BASE_URL')")
+    expect(result.source).toContain("path: '/schedule'")
+    expect(result.document).toMatchObject({
+      request: {
+        path: '/schedule',
+      },
+    })
+  })
+
+  it('patches query source with raw DSL expressions', () => {
+    const source = `
+defineQuery({
+  response: {
+    subField: 'items',
+    return: null,
+  },
+})
+`
+
+    const result = Endge.source.patch('query', source, {
+      path: 'response.return',
+      expression: "field('FlightLeg').array()",
+    })
+
+    expect(result.ok).toBe(true)
+    expect(result.source).toContain("return: field('FlightLeg').array()")
+    expect(result.document).toMatchObject({
+      response: {
+        return: {
+          type: 'FlightLeg',
+          isArray: true,
+        },
+      },
+    })
+  })
+
+  it('does not apply invalid raw DSL expressions', () => {
+    const source = `
+defineQuery({
+  response: {
+    return: null,
+  },
+})
+`
+
+    const result = Endge.source.patch('query', source, {
+      path: 'response.return',
+      expression: "field('FlightLeg",
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.changed).toBe(false)
+    expect(result.source).toBe(source)
+  })
 })
 
-function createQuery(): RQueryRest {
-  const query = new RQueryRest('Flights', new RField('result', 'FlightLeg', true))
-  query.id = 1
-  query.identity = 'flight-list'
-  query.endpoint = '{API_BASE_URL}'
-  query.query = '/flights'
-  query.method = 'GET'
-  query.headers = { Accept: 'application/json' }
-  query.timeoutMs = 10000
-  query.subField = 'items'
-  query.params.set('flightDate', new RField('flightDate', 'DateTime', false, true))
-  query.filters = [
-    new RQueryFilter({ mode: 'reference', filterId: 'flight-filter' }),
-    new RQueryFilter({ mode: 'inline', inlineJson: '{"active":true}' }),
-  ]
-  query.mockDataEnabled = true
-  query.mockData = '{"items":[]}'
+function createQuerySource(): string {
+  return `
+defineQuery({
+  kind: 'rest',
 
-  return query
+  request: {
+    endpoint: env('API_BASE_URL'),
+    path: '/flights',
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    auth: { mode: 'token' },
+    timeoutMs: 10000,
+  },
+
+  params: {
+    flightDate: field('DateTime').optional(),
+  },
+
+  filters: {
+    mode: 'merge',
+    items: [
+      filter.reference('flight-filter'),
+      filter.inline({ active: true }),
+    ],
+  },
+
+  response: {
+    subField: 'items',
+    return: field('FlightLeg').array(),
+  },
+
+  mock: {
+    enabled: true,
+    data: { items: [] },
+  },
+})
+`
 }

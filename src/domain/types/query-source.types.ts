@@ -102,6 +102,36 @@ export interface QuerySourceDocument {
   mock: QuerySourceMock
 }
 
+/** Публичные editor-slots, которые query source patcher умеет менять точечно. */
+export type QuerySourcePatchPath
+  = | 'kind'
+    | 'request.endpoint'
+    | 'request.path'
+    | 'request.method'
+    | 'request.headers'
+    | 'request.auth'
+    | 'request.timeoutMs'
+    | 'request.formUrlencoded'
+    | 'response.subField'
+    | 'response.return'
+    | 'mock.enabled'
+    | 'mock.data'
+
+/** Операция AST-патчинга query source. */
+export interface QuerySourcePatchOperation {
+  /** Изменяемый editor-slot. */
+  path: QuerySourcePatchPath
+
+  /** Новое normalized значение, если patcher должен сам напечатать expression. */
+  value?: unknown
+
+  /** Готовое source-expression для сложных DSL-значений: env(...), field(...), filter... */
+  expression?: string
+}
+
+/** Patch query source: одиночная операция или пачка операций. */
+export type QuerySourcePatch = QuerySourcePatchOperation | QuerySourcePatchOperation[]
+
 /** Результат генерации query source из legacy RQuery. */
 export interface QuerySourceGenerateResult {
   /** Сгенерированный source. */

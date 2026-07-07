@@ -25,8 +25,6 @@ import { RParameter } from '@/domain/entities/reflect/RParameter'
 import { RPolicy } from '@/domain/entities/reflect/RPolicy'
 import { RProject } from '@/domain/entities/reflect/RProject'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
-import { RQueryFilter } from '@/domain/entities/reflect/RQueryFilter'
-import { RQueryRest } from '@/domain/entities/reflect/RQueryRest'
 import { RScenario } from '@/domain/entities/reflect/RScenario'
 import { RSettings } from '@/domain/entities/reflect/RSettings'
 import { RStyle } from '@/domain/entities/reflect/RStyle'
@@ -3019,19 +3017,7 @@ export class EndgeDomain extends EndgeModule {
     }
     if (json.queries && Array.isArray(json.queries)) {
       json.queries.forEach((queryJson: any) => {
-        let query: RQuery
-        if (queryJson.type === QueryType.REST) {
-          query = Serialize.fromJSON(RQueryRest, queryJson)
-        }
-        else {
-          query = Serialize.fromJSON(RQuery, queryJson)
-        }
-        if (queryJson.filter != null && (!query.filters || query.filters.length === 0)) {
-          const legacy = Serialize.fromJSON(RQueryFilter, queryJson.filter)
-          if ((legacy as any).mode === 'runtime')
-            (legacy as any).mode = 'reference'
-          query.filters = [legacy]
-        }
+        const query = Serialize.fromJSON(RQuery, queryJson)
         out.queries.push(query)
       })
     }
@@ -3167,20 +3153,7 @@ export class EndgeDomain extends EndgeModule {
     // Парсим запросы
     if (json.queries && Array.isArray(json.queries)) {
       json.queries.forEach((queryJson: any) => {
-        let query
-        if (queryJson.type === QueryType.REST) {
-          query = Serialize.fromJSON(RQueryRest, queryJson)
-        }
-        else {
-          query = Serialize.fromJSON(RQuery, queryJson)
-        }
-        // Миграция: старый один filter → массив filters
-        if (queryJson.filter != null && (!query.filters || query.filters.length === 0)) {
-          const legacy = Serialize.fromJSON(RQueryFilter, queryJson.filter)
-          if ((legacy as any).mode === 'runtime')
-            (legacy as any).mode = 'reference'
-          query.filters = [legacy]
-        }
+        const query = Serialize.fromJSON(RQuery, queryJson)
         domain.addQuery(query)
       })
     }

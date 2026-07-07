@@ -7,7 +7,12 @@ import type {
   QuerySourceGenerateResult,
 } from '@/domain/types/query-source.types'
 
-import { RQueryRest } from '@/domain/entities/reflect/RQueryRest'
+type LegacyQueryFields = RQuery & {
+  method?: string
+  headers?: unknown
+  timeoutMs?: number
+  sendAsFormUrlencoded?: boolean
+}
 
 /** Генерирует query source v1 из текущих persisted/legacy полей RQuery. */
 export function generateQuerySource(query: RQuery): QuerySourceGenerateResult {
@@ -21,18 +26,18 @@ export function generateQuerySource(query: RQuery): QuerySourceGenerateResult {
 
 /** Создает canonical QuerySourceDocument из persisted/legacy RQuery. */
 export function createQuerySourceDocument(query: RQuery): QuerySourceDocument {
-  const rest = query instanceof RQueryRest ? query : query as Partial<RQueryRest>
+  const legacy = query as LegacyQueryFields
 
   return {
     kind: 'rest',
     request: {
       endpoint: String(query.endpoint ?? ''),
       path: String(query.query ?? ''),
-      method: String(rest.method ?? 'POST'),
-      headers: normalizeHeaders(rest.headers),
+      method: String(legacy.method ?? 'POST'),
+      headers: normalizeHeaders(legacy.headers),
       auth: query.auth ?? { mode: 'token' },
-      timeoutMs: typeof rest.timeoutMs === 'number' ? rest.timeoutMs : undefined,
-      formUrlencoded: rest.sendAsFormUrlencoded ? true : undefined,
+      timeoutMs: typeof legacy.timeoutMs === 'number' ? legacy.timeoutMs : undefined,
+      formUrlencoded: legacy.sendAsFormUrlencoded ? true : undefined,
     },
     params: fieldsMapToRecord(query.params),
     filters: {
@@ -124,6 +129,9 @@ function fieldsMapToRecord(params: Map<string, RField> | undefined): Record<stri
 function fieldToDocument(field: RField | undefined): QuerySourceField | null {
   if (!field)
     return null
+  const type = String(field.type ?? '').trim()
+  if (!type)
+    return null
 
   const params: Record<string, QuerySourceField> = {}
   for (const [name, param] of field.params ?? new Map<string, RField>()) {
@@ -133,7 +141,7 @@ function fieldToDocument(field: RField | undefined): QuerySourceField | null {
   }
 
   return {
-    type: field.type,
+    type,
     isArray: field.isArray || undefined,
     optional: field.optional || undefined,
     params: Object.keys(params).length ? params : undefined,

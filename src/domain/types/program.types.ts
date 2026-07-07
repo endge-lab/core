@@ -115,6 +115,19 @@ export interface ActionProgramPayload {
   compiledFlow: ActionCompiledFlow | null
 }
 
+/** Нормализованный filter item внутри query artifact. */
+export type QueryProgramFilterItem
+  = | {
+    mode: 'reference'
+    filterId: string
+    inlineJson?: null
+  }
+  | {
+    mode: 'inline'
+    filterId?: null
+    inlineJson: string
+  }
+
 /** Payload artifact для query-сущности. */
 export interface QueryProgramPayload {
   /** Parser-level AST query source, нужен для diagnostics/debug UI. */
@@ -157,7 +170,7 @@ export interface QueryProgramPayload {
   returnField: unknown
 
   /** Набор фильтров, применяемых к query. */
-  filters: unknown[]
+  filters: QueryProgramFilterItem[]
 
   /** Режим применения фильтров. */
   filterMode?: string

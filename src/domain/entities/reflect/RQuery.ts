@@ -55,7 +55,7 @@ export class RQuery extends REntity {
   @Type(() => RQueryFilter)
   filters: RQueryFilter[] = []
 
-  /** Source-first authoring representation v1. Пока не заменяет legacy поля runtime. */
+  /** Source-first authoring representation v1. Runtime/compiler use this as the query contract. */
   @Expose()
   source?: string
 

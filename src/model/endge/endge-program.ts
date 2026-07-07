@@ -8,6 +8,7 @@ import type {
   ProgramArtifactStatus,
   ProgramDiagnostic,
   ProgramEntityType,
+  QueryProgramPayload,
 } from '@/domain/types/program.types'
 
 type ProgramArtifactKey = string
@@ -103,6 +104,11 @@ export class EndgeProgram extends EndgeModule {
     const component = this.getArtifact<{ depGraph: DependencyGraph | null }>('component', idOrIdentity)
       ?? this.getArtifact<{ depGraph: DependencyGraph | null }>('table', idOrIdentity)
     return component?.payload.depGraph ?? null
+  }
+
+  /** Возвращает compiled query artifact по id или identity. */
+  public getQueryArtifact(idOrIdentity: string | number): ProgramArtifact<QueryProgramPayload> | null {
+    return this.getArtifact<QueryProgramPayload>('query', idOrIdentity)
   }
 
   /**

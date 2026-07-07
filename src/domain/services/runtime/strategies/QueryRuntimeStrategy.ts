@@ -7,7 +7,7 @@ export class QueryRuntimeStrategy implements RuntimeStrategy<RQuery> {
   public readonly entityType = 'query'
 
   public supports(model: unknown): model is RQuery {
-    return model instanceof RQuery || Array.isArray((model as any)?.filters)
+    return model instanceof RQuery
   }
 
   public create(ctx: Parameters<RuntimeStrategy<RQuery>['create']>[0]) {
@@ -16,6 +16,7 @@ export class QueryRuntimeStrategy implements RuntimeStrategy<RQuery> {
       model: ctx.model,
       meta: ctx.meta,
       parent: ctx.parent,
+      artifacts: ctx.artifacts,
     })
   }
 }

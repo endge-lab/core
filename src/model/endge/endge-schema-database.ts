@@ -4,6 +4,7 @@ import type {
   EndgeSchemaError,
   RepositoriesBag,
 } from '@/domain/types/schema.types'
+import type { EndgeFlowDefinition } from '@/domain/types/endge-flow.types'
 import type { QueriesPayloadFields } from '@/model/db/repositories/Queries_Repository'
 import type { AxiosError, AxiosInstance } from 'axios'
 
@@ -187,7 +188,7 @@ async function resolveDefaultComponentFolder(repos: RepositoriesBag): Promise<nu
   return rootFolder?.id ?? null
 }
 
-function normalizeFlowDefinition(rawDefinition: any): Record<string, unknown> {
+function normalizeFlowDefinition(rawDefinition: any): EndgeFlowDefinition {
   if (!rawDefinition || typeof rawDefinition !== 'object' || Array.isArray(rawDefinition)) {
     return {
       version: 1,
@@ -231,7 +232,7 @@ function normalizeFlowDefinition(rawDefinition: any): Record<string, unknown> {
     entrypoint,
     nodes: normalizedNodes,
     edges,
-  }
+  } as EndgeFlowDefinition
 }
 
 const ROOT_FOLDER_ENTITY_TYPE_BY_IDENTITY: Record<string, string> = {
@@ -2524,32 +2525,22 @@ export class EndgeSchemaStorage extends EndgeModule {
       if (!query)
         throw new Error(`Запрос не найден: ${documentId}`)
       const plain = Serialize.toPlain(query) as Record<string, any>
-      const mockDataPayload = normalizeQueryMockDataForPayload(query.mockData)
       const queryIdentity = String((query as any).identity ?? query.id ?? '')
-      const payload: QueriesPayloadFields = {
+      const existing = await repos.queries.findByIdentity(queryIdentity)
+      const payload: Partial<QueriesPayloadFields> & Pick<QueriesPayloadFields, 'identity' | 'displayName'> = {
         identity: queryIdentity,
         displayName: query.name ?? query.id,
-        type: plain.type,
-        endpoint: plain.endpoint,
-        query: plain.query,
         source: plain.source,
         sourceVersion: plain.sourceVersion,
-        subField: plain.subField,
-        method: plain.method,
-        headers: plain.headers,
-        timeoutMs: plain.timeoutMs,
-        sendAsFormUrlencoded: plain.sendAsFormUrlencoded,
-        params: plain.params,
-        returnField: plain.return ?? plain.returnField,
-        mockData: mockDataPayload,
-        mockDataEnabled: Boolean(query.mockDataEnabled),
-        auth: plain.auth,
-        filterMode: plain.filterMode,
-        filters: plain.filters,
         meta: (query.meta && typeof query.meta === 'object' && !Array.isArray(query.meta)) ? query.meta : {},
         inherited: Boolean((query as any).inherited),
       }
-      const saved = await repos.queries.upsert(payload)
+      const saved = existing
+        ? await repos.queries.update((existing as any).id, payload)
+        : await repos.queries.create({
+            ...payload,
+            type: plain.type ?? QueryType.REST,
+          })
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -2681,8 +2672,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       const converterIdentity = String((converter as any).identity ?? plain.id ?? converter.id ?? '')
       let folderId: number | string | undefined
       const existing = await repos.converters.findByIdentity(converterIdentity)
-      if (existing && (existing.folderId ?? existing.folder) != null) {
-        folderId = existing.folderId ?? existing.folder
+      if (existing && (((existing as any).folderId ?? existing.folder) != null)) {
+        folderId = (existing as any).folderId ?? existing.folder
       }
       else {
         const folderDoc = await repos.folders.findByIdentity('root-converters')
@@ -2707,8 +2698,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       const integrationIdentity = String((integration as any).identity ?? plain.id ?? integration.id ?? '')
       let folderId: number | string | undefined
       const existing = await repos.integrations.findByIdentity(integrationIdentity)
-      if (existing && (existing.folderId ?? existing.folder) != null) {
-        folderId = existing.folderId ?? existing.folder
+      if (existing && (((existing as any).folderId ?? existing.folder) != null)) {
+        folderId = (existing as any).folderId ?? existing.folder
       }
       else {
         const folderDoc = await repos.folders.findByIdentity('root-integrations')
@@ -3038,8 +3029,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       const plain = view.toPlain()
       let folderId: number | string | undefined
       const existing = await repos.views.findByIdentity(plain.identity)
-      if (existing && (existing.folderId ?? existing.folder) != null) {
-        folderId = existing.folderId ?? existing.folder
+      if (existing && (((existing as any).folderId ?? existing.folder) != null)) {
+        folderId = (existing as any).folderId ?? existing.folder
       }
       else {
         const folderDoc = await repos.folders.findByIdentity('root-views')
@@ -3351,8 +3342,9 @@ export class EndgeSchemaStorage extends EndgeModule {
     if (replaceRef != null)
       this._removeDomainDocumentByType(documentType, replaceRef)
     Endge.domain.merge({ [key]: [plain] })
-    if (notifyDomainChanged)
-      AppBus.emit('domainChanged', undefined)
+    if (notifyDomainChanged) {
+      (AppBus.emit as (event: string, payload?: unknown) => void)('domainChanged', undefined)
+    }
   }
 
   /**

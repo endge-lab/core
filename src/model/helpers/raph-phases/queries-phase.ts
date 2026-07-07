@@ -21,6 +21,9 @@ export class QueriesPhase {
         for (const { node } of ctxs) {
           const runtimeId = node.meta?.runtimeId
           const filterId = node.meta?.filterId
+          const filterIds = Array.isArray(node.meta?.filterIds)
+            ? node.meta.filterIds.map(item => String(item)).filter(Boolean)
+            : (filterId ? [String(filterId)] : [])
           const queryIdRaw = node.meta?.entityId
 
           if (queryIdRaw == null)
@@ -37,15 +40,6 @@ export class QueriesPhase {
           if (!query)
             continue
 
-          // запросы только с inline-фильтрами не реактивны
-          const hasReference = (query as any).filters?.some((f: any) => f.mode === 'reference')
-          if (!hasReference) {
-            console.info(
-              `[queries phase] skip inline-only query "${query.identity}"`,
-            )
-            continue
-          }
-
           // пространство фильтра из рантайма (meta.space)
           const space = node.meta?.space ?? 'default'
           query.run({ filterSpace: space }).catch((e) => {
@@ -56,9 +50,9 @@ export class QueriesPhase {
           })
 
           // уведомляем runtime о смене фильтра
-          if (runtimeId && filterId) {
+          if (runtimeId && filterIds.length) {
             const host = Endge.runtime.getRuntimeById(String(runtimeId))
-            host?.emit('filter:change', { filterId })
+            host?.emit('filter:change', { filterId: filterIds[0], filterIds })
           }
         }
       },

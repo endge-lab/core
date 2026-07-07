@@ -45,6 +45,7 @@ export class DocumentFactory {
    */
   static create(type: DomainDocumentType, options?: DocumentFactoryOptions): RDocument {
     const id = (options?.id?.trim() || randomString(5))
+    const entityId = id as unknown as number
     const title = (options?.name?.trim() || DocumentFactory.defaultTitle(type))
     const folderId = options?.folderId ?? undefined
     const registerInDomain = options?.registerInDomain !== false
@@ -53,7 +54,7 @@ export class DocumentFactory {
     switch (type) {
       case ComponentType.DSL: {
         const item = new RComponentDSL()
-        item.id = id
+        item.id = entityId
         item.identity = id
         item.name = title
         item.type = type
@@ -65,7 +66,7 @@ export class DocumentFactory {
 
       case ComponentType.Table: {
         const item = new RComponentTable()
-        item.id = id
+        item.id = entityId
         item.identity = id
         item.type = type
         item.name = title
@@ -77,7 +78,7 @@ export class DocumentFactory {
 
       case ComponentType.SFC: {
         const item = new RComponentSFC()
-        item.id = id as unknown as number
+        item.id = entityId
         item.identity = id
         item.name = title
         item.displayName = title
@@ -91,20 +92,11 @@ export class DocumentFactory {
         return item
       }
 
-      case QueryType.GraphQL: {
+      case QueryType.GraphQL:
+      case QueryType.REST:
+      case QueryType.Custom: {
         const item = new RQuery(title, field)
-        item.id = id
-        item.identity = id
-        item.type = type
-        if (folderId != null) item.folderId = folderId
-        if (registerInDomain)
-          Endge.domain.addQuery(item)
-        return item
-      }
-
-      case QueryType.REST: {
-        const item = new RQuery(title, field)
-        item.id = id
+        item.id = entityId
         item.identity = id
         item.type = type
         item.source = Endge.source.createDefault('query')
@@ -117,7 +109,7 @@ export class DocumentFactory {
 
       case ScriptType.ScenarioSetup: {
         const item = new RScenario()
-        item.id = id
+        item.id = entityId
         item.identity = id
         item.name = title
         item.type = ScriptType.ScenarioSetup
@@ -129,7 +121,7 @@ export class DocumentFactory {
 
       case 'action': {
         const item = new RAction()
-        item.id = id as unknown as number
+        item.id = entityId
         item.identity = id
         item.name = title
         item.displayName = title
@@ -148,7 +140,7 @@ export class DocumentFactory {
 
       case 'integration': {
         const item = new RIntegration()
-        item.id = id
+        item.id = entityId
         item.identity = id
         item.name = title
         if (folderId != null) item.folderId = folderId
@@ -159,7 +151,7 @@ export class DocumentFactory {
 
       case 'view': {
         const item = new RView()
-        item.id = id
+        item.id = entityId
         item.identity = id
         item.name = title
         if (folderId != null) item.folderId = folderId
@@ -170,7 +162,7 @@ export class DocumentFactory {
 
       case 'environment': {
         const item = new REnvironment()
-        item.id = id
+        item.id = entityId
         item.identity = id
         item.name = title
         if (folderId != null) item.folderId = folderId
@@ -181,7 +173,7 @@ export class DocumentFactory {
 
       case 'policy': {
         const item = new RPolicy()
-        item.id = id
+        item.id = entityId
         item.identity = id
         item.name = title
         if (folderId != null) item.folderId = folderId
@@ -192,7 +184,7 @@ export class DocumentFactory {
 
       case 'tenant': {
         const item = new RTenant()
-        item.id = id
+        item.id = entityId
         item.identity = id
         item.name = title
         item.displayName = title
@@ -205,7 +197,7 @@ export class DocumentFactory {
 
       case 'behavior-binding': {
         const item = new RBehaviorBinding()
-        item.id = id as unknown as number
+        item.id = entityId
         item.identity = id
         item.name = title
         item.displayName = title
@@ -219,7 +211,7 @@ export class DocumentFactory {
 
       case 'presentation-binding': {
         const item = new RPresentationBinding()
-        item.id = id as unknown as number
+        item.id = entityId
         item.identity = id
         item.name = title
         item.displayName = title
@@ -232,7 +224,7 @@ export class DocumentFactory {
 
       case 'style': {
         const item = new RStyle()
-        item.id = id
+        item.id = entityId
         item.identity = id
         item.name = title
         item.styles = {}
@@ -244,7 +236,7 @@ export class DocumentFactory {
 
       case 'page-template': {
         const item = new RPageTemplate()
-        item.id = id
+        item.id = entityId
         item.identity = id
         item.name = title
         if (folderId != null) item.folderId = folderId
@@ -255,7 +247,7 @@ export class DocumentFactory {
 
       case 'page': {
         const item = new RPage()
-        item.id = id
+        item.id = entityId
         item.identity = id
         item.name = title
         if (folderId != null) item.folderId = folderId
@@ -266,7 +258,7 @@ export class DocumentFactory {
 
       case 'navigation': {
         const item = new RNavigation()
-        item.id = id
+        item.id = entityId
         item.identity = id
         item.name = title
         if (folderId != null) item.folderId = folderId
@@ -277,7 +269,7 @@ export class DocumentFactory {
 
       case 'vocabs': {
         const item = new RVocabs()
-        item.id = id
+        item.id = entityId
         item.identity = id
         item.name = title
         item.displayName = title
@@ -291,7 +283,7 @@ export class DocumentFactory {
 
       case 'i18n-bundles': {
         const item = new RI18nBundle()
-        item.id = id
+        item.id = entityId
         item.identity = id
         item.name = title
         item.displayName = title
@@ -318,7 +310,9 @@ export class DocumentFactory {
       case ComponentType.SFC:
         return 'Новый SFC-компонент'
       case QueryType.GraphQL:
-        return 'Новый GraphQL запрос'
+      case QueryType.REST:
+      case QueryType.Custom:
+        return 'Новый запрос'
       case ScriptType.ScenarioSetup:
         return 'Новый Сценарий'
       case 'action':

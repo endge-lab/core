@@ -93,6 +93,45 @@ export interface SourceEngineCompileResult extends SourceEngineResult {
   diagnostics?: unknown[]
 }
 
+/** Результат parse source без обязательной runtime-компиляции. */
+export interface SourceParseResult<TDocument = unknown> extends SourceEngineResult {
+  /** Parser-level AST. */
+  ast?: unknown
+
+  /** Нормализованный source document. */
+  document?: TDocument
+
+  /** Diagnostics, найденные parser/compiler-ом. */
+  diagnostics?: unknown[]
+}
+
+/** Результат patch source-документа. */
+export interface SourcePatchResult<TDocument = unknown> extends SourceParseResult<TDocument> {
+  /** Новый source-документ. */
+  source: string
+
+  /** Был ли source реально изменен. */
+  changed: boolean
+}
+
+/** Strategy source patching для одного source-kind. */
+export interface SourcePatchStrategy<TPatch = unknown, TDocument = unknown> {
+  /** Стабильный id стратегии для debug/плагинов. */
+  id: string
+
+  /** Тип source-документа, который обслуживает стратегия. */
+  sourceKind: SourceKind
+
+  /** Проверяет, может ли стратегия обслужить переданный source-kind. */
+  supports: (sourceKind: SourceKind | string) => boolean
+
+  /** Парсит source в editor-facing normalized document. */
+  parse: (source: string) => SourceParseResult<TDocument>
+
+  /** Применяет минимальный patch, сохраняя остальной авторский source. */
+  patch: (source: string, patch: TPatch) => SourcePatchResult<TDocument>
+}
+
 /** Strategy source engine для одного source-kind. */
 export interface SourceEngineStrategy {
   /** Стабильный id стратегии для debug/плагинов. */

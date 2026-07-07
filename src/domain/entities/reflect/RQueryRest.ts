@@ -1,6 +1,6 @@
 import { Expose } from 'class-transformer'
 import { RQuery } from './RQuery'
-import type { HttpMethod } from '@/domain/types/query.types'
+import type { HttpMethod } from '@/domain/types/api.types'
 
 export class RQueryRest extends RQuery {
   /** HTTP-метод (по умолчанию POST) */

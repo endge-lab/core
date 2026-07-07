@@ -288,17 +288,18 @@ function readFieldOrNullProperty(
   if (t.isNullLiteral(expression))
     return null
 
-  return parseFieldExpression(expression, diagnostics, sourcePath)
+  return parseFieldExpression(expression, diagnostics, sourcePath, { emptyFieldAsNull: true })
 }
 
 function parseFieldExpression(
   node: t.Expression,
   diagnostics: DiagnosticDraft[],
   sourcePath: string,
+  options: { emptyFieldAsNull?: boolean } = {},
 ): QuerySourceField | null {
   if (t.isObjectExpression(node)) {
     const type = readStringProperty(node, 'type')
-    if (!type)
+    if (!type?.trim())
       return null
 
     return {
@@ -332,7 +333,7 @@ function parseFieldExpression(
   let type: string | null = null
   if (t.isIdentifier(current.callee, { name: 'field' })) {
     const rawType = expressionToUnknown(current.arguments[0], diagnostics, sourcePath)
-    type = typeof rawType === 'string' ? rawType : null
+    type = typeof rawType === 'string' ? rawType.trim() : null
   }
   else if (
     t.isMemberExpression(current.callee)
@@ -342,8 +343,11 @@ function parseFieldExpression(
     type = normalizeFieldType(current.callee.property.name)
   }
 
-  if (!type)
+  if (!type) {
+    if (options.emptyFieldAsNull)
+      return null
     return unsupportedField(diagnostics, sourcePath, node)
+  }
 
   const field: QuerySourceField = { type }
   for (const modifier of modifiers) {

@@ -7,18 +7,24 @@ import type {
   SourceLanguageStrategy,
   SourceLanguageValidationResult,
   SourceKind,
+  SourceParseResult,
+  SourcePatchResult,
+  SourcePatchStrategy,
 } from '@/domain/types/source-engine.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { SourceEngineRegistry } from '@/domain/services/source-engine/SourceEngineRegistry'
 import { SourceLanguageRegistry } from '@/domain/services/source-engine/SourceLanguageRegistry'
+import { SourcePatchRegistry } from '@/domain/services/source-engine/SourcePatchRegistry'
 import { QuerySourceEngineStrategy } from '@/domain/services/source-engine/strategies/QuerySourceEngineStrategy'
 import { QuerySourceLanguageStrategy } from '@/domain/services/source-engine/strategies/QuerySourceLanguageStrategy'
+import { QuerySourcePatchStrategy } from '@/domain/services/source-engine/strategies/QuerySourcePatchStrategy'
 
 /** Модуль authoring-операций над source-документами Endge. */
 export class EndgeSource extends EndgeModule {
   private readonly _strategies = new SourceEngineRegistry()
   private readonly _languageStrategies = new SourceLanguageRegistry()
+  private readonly _patchStrategies = new SourcePatchRegistry()
 
   public constructor() {
     super()
@@ -37,6 +43,12 @@ export class EndgeSource extends EndgeModule {
     this.notify()
   }
 
+  /** Регистрирует source patch strategy. Повторная регистрация с тем же id заменяет старую. */
+  public registerPatchStrategy(strategy: SourcePatchStrategy): void {
+    this._patchStrategies.register(strategy)
+    this.notify()
+  }
+
   /** Возвращает копию списка зарегистрированных source strategies. */
   public listStrategies(): SourceEngineStrategy[] {
     return this._strategies.list()
@@ -47,6 +59,11 @@ export class EndgeSource extends EndgeModule {
     return this._languageStrategies.list()
   }
 
+  /** Возвращает копию списка зарегистрированных source patch strategies. */
+  public listPatchStrategies(): SourcePatchStrategy[] {
+    return this._patchStrategies.list()
+  }
+
   /** Возвращает стратегию для указанного source-kind. */
   public resolveStrategy(sourceKind: SourceKind | string): SourceEngineStrategy | null {
     return this._strategies.resolve(sourceKind)
@@ -55,6 +72,11 @@ export class EndgeSource extends EndgeModule {
   /** Возвращает language strategy для указанного source-kind. */
   public resolveLanguageStrategy(sourceKind: SourceKind | string): SourceLanguageStrategy | null {
     return this._languageStrategies.resolve(sourceKind)
+  }
+
+  /** Возвращает patch strategy для указанного source-kind. */
+  public resolvePatchStrategy(sourceKind: SourceKind | string): SourcePatchStrategy | null {
+    return this._patchStrategies.resolve(sourceKind)
   }
 
   /** Генерирует source для указанного source-kind через зарегистрированную strategy. */
@@ -83,6 +105,20 @@ export class EndgeSource extends EndgeModule {
     return strategy.compile(source)
   }
 
+  /** Парсит source указанного source-kind в normalized editor document. */
+  public parse<TDocument = unknown>(sourceKind: SourceKind | string, source: string): SourceParseResult<TDocument> {
+    return this._resolveRequiredPatchStrategy(sourceKind).parse(source) as SourceParseResult<TDocument>
+  }
+
+  /** Патчит source указанного source-kind, сохраняя нетронутые участки авторского кода. */
+  public patch<TPatch = unknown, TDocument = unknown>(
+    sourceKind: SourceKind | string,
+    source: string,
+    patch: TPatch,
+  ): SourcePatchResult<TDocument> {
+    return this._resolveRequiredPatchStrategy(sourceKind).patch(source, patch) as SourcePatchResult<TDocument>
+  }
+
   /** Возвращает базовый source для новой сущности указанного source-kind. */
   public createDefault(sourceKind: SourceKind | string): string {
     return this._resolveRequiredLanguageStrategy(sourceKind).createDefaultSource()
@@ -102,6 +138,7 @@ export class EndgeSource extends EndgeModule {
   private _registerDefaultStrategies(): void {
     this._strategies.register(new QuerySourceEngineStrategy())
     this._languageStrategies.register(new QuerySourceLanguageStrategy())
+    this._patchStrategies.register(new QuerySourcePatchStrategy())
   }
 
   /** Возвращает strategy или бросает явную ошибку для некорректного source-kind. */
@@ -118,6 +155,15 @@ export class EndgeSource extends EndgeModule {
     const strategy = this._languageStrategies.resolve(sourceKind)
     if (!strategy)
       throw new Error(`Source language strategy is not registered for "${sourceKind}".`)
+
+    return strategy
+  }
+
+  /** Возвращает patch strategy или бросает явную ошибку для некорректного source-kind. */
+  private _resolveRequiredPatchStrategy(sourceKind: SourceKind | string): SourcePatchStrategy {
+    const strategy = this._patchStrategies.resolve(sourceKind)
+    if (!strategy)
+      throw new Error(`Source patch strategy is not registered for "${sourceKind}".`)
 
     return strategy
   }
