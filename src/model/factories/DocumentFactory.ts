@@ -6,6 +6,7 @@ import { Endge } from '@/model/endge/endge'
 import { RComponentDSL } from '@/domain/entities/reflect/RComponentDSL'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RComponentTable } from '@/domain/entities/reflect/RComponentTable'
+import { RDataView } from '@/domain/entities/reflect/RDataView'
 import { RField } from '@/domain/entities/reflect/RField'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { REnvironment } from '@/domain/entities/reflect/REnvironment'
@@ -104,6 +105,21 @@ export class DocumentFactory {
         if (folderId != null) item.folderId = folderId
         if (registerInDomain)
           Endge.domain.addQuery(item)
+        return item
+      }
+
+      case 'data-view': {
+        const item = new RDataView()
+        item.id = entityId
+        item.identity = id
+        item.name = title
+        item.displayName = title
+        item.source = Endge.source.createDefault('data-view')
+        item.sourceVersion = 1
+        if (folderId != null)
+          item.folderId = folderId
+        if (registerInDomain)
+          Endge.domain.addDataView(item)
         return item
       }
 
@@ -313,6 +329,8 @@ export class DocumentFactory {
       case QueryType.REST:
       case QueryType.Custom:
         return 'Новый запрос'
+      case 'data-view':
+        return 'Новый Data View'
       case ScriptType.ScenarioSetup:
         return 'Новый Сценарий'
       case 'action':

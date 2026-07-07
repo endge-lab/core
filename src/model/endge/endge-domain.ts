@@ -14,6 +14,7 @@ import {
 } from '@/domain/entities/reflect/RComponent'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RConverter } from '@/domain/entities/reflect/RConverter'
+import { RDataView } from '@/domain/entities/reflect/RDataView'
 import { REnvironment } from '@/domain/entities/reflect/REnvironment'
 import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { RFolder } from '@/domain/entities/reflect/RFolder'
@@ -90,6 +91,27 @@ export function queryPayloadDocToPlain(doc: any): any {
   }
 }
 
+/** Собирает plain-объект DataView из документа Payload. */
+export function dataViewPayloadDocToPlain(doc: any): any {
+  const folderId = relationToId(doc?.folder ?? doc?.folderId)
+  return {
+    id: doc?.id,
+    identity: doc?.identity,
+    name: doc?.displayName ?? doc?.name,
+    displayName: doc?.displayName ?? doc?.name,
+    description: doc?.description,
+    source: doc?.source,
+    sourceVersion: doc?.sourceVersion ?? 1,
+    folderId,
+    project: relationToId(doc?.project) ?? null,
+    meta: (doc?.meta && typeof doc.meta === 'object' && !Array.isArray(doc.meta)) ? doc.meta : {},
+    active: doc?.active !== false,
+    author: doc?.author,
+    inherited: doc?.inherited === true,
+    deletedAt: doc?.deletedAt ?? null,
+  }
+}
+
 /**
  * EndgeDomain – менеджер доменных данных.
  * Он заменяет ReflectDomain и объединяет управление типами, запросами и компонентами.
@@ -104,6 +126,7 @@ export interface EndgeDomainParsed {
   projects: RProject[]
   types: RType[]
   queries: RQuery[]
+  dataViews: RDataView[]
   actions: RAction[]
   converters: RConverter[]
   integrations: RIntegration[]
@@ -135,6 +158,9 @@ export class EndgeDomain extends EndgeModule {
 
   private _queriesById: Map<number, RQuery> = new Map()
   private _queriesByIdentity: Map<string, RQuery> = new Map()
+
+  private _dataViewsById: Map<string | number, RDataView> = new Map()
+  private _dataViewsByIdentity: Map<string, RDataView> = new Map()
 
   private _componentsById: Map<string | number, RComponent> = new Map()
   private _componentsByIdentity: Map<string, RComponent> = new Map()
@@ -248,6 +274,8 @@ export class EndgeDomain extends EndgeModule {
     this._typesByIdentity.clear()
     this._queriesById.clear()
     this._queriesByIdentity.clear()
+    this._dataViewsById.clear()
+    this._dataViewsByIdentity.clear()
     this._componentsById.clear()
     this._componentsByIdentity.clear()
     this._componentSFCsById.clear()
@@ -325,6 +353,8 @@ export class EndgeDomain extends EndgeModule {
 
     const queriesRaw = Array.isArray(payload?.queries) ? payload.queries : []
     const queriesPlain = queriesRaw.map((row: any) => queryPayloadDocToPlain(row))
+    const dataViewsRaw = Array.isArray((payload as any)?.dataViews) ? (payload as any).dataViews : []
+    const dataViewsPlain = dataViewsRaw.map((row: any) => dataViewPayloadDocToPlain(row))
     const projectsRaw = Array.isArray(payload?.projects) ? payload.projects : []
     const settingsRaw = Array.isArray(payload?.settings) ? payload.settings : []
     const parametersRaw = Array.isArray(payload?.parameters) ? payload.parameters : []
@@ -360,6 +390,7 @@ export class EndgeDomain extends EndgeModule {
     const normalized = {
       types: typesRaw,
       queries: queriesPlain,
+      dataViews: dataViewsPlain,
       components: componentsRaw,
       componentSFCs: componentSFCsRaw,
       scenarios: scenariosRaw,
@@ -693,6 +724,76 @@ export class EndgeDomain extends EndgeModule {
    */
   hasQuery(identity: string): boolean {
     return this.hasQueryByIdentity(identity)
+  }
+
+  /**
+   * Методы для работы с DataView.
+   */
+  getDataViews(): RDataView[] {
+    return Array.from(this._dataViewsByIdentity.values())
+  }
+
+  /** Возвращает DataView по id. */
+  getDataViewById(id: string | number): RDataView | null {
+    return this._dataViewsById.get(id) ?? null
+  }
+
+  /** Возвращает DataView по identity. */
+  getDataViewByIdentity(identity: string): RDataView | null {
+    return this._dataViewsByIdentity.get(identity) ?? null
+  }
+
+  /** Возвращает DataView по id или identity. */
+  getDataView(idOrIdentity: string | number): RDataView | null {
+    return this.getDataViewById(idOrIdentity)
+      || this.getDataViewById(Number(idOrIdentity))
+      || this.getDataViewByIdentity(String(idOrIdentity))
+  }
+
+  /** Добавляет DataView в домен и обновляет индексы. */
+  addDataView(dataView: RDataView): void {
+    if (this._dataViewsByIdentity.has(dataView.identity) || this._dataViewsById.has(dataView.id))
+      return
+
+    this._dataViewsById.set(dataView.id, dataView)
+    this._dataViewsByIdentity.set(dataView.identity, dataView)
+    this.notify()
+  }
+
+  /** Удаляет DataView из домена по id. */
+  removeDataViewById(id: string | number): void {
+    const dataView = this.getDataViewById(id)
+    if (!dataView)
+      return
+
+    this._dataViewsById.delete(dataView.id)
+    this._dataViewsByIdentity.delete(dataView.identity)
+    this.notify()
+  }
+
+  /** Удаляет DataView из домена по identity. */
+  removeDataViewByIdentity(identity: string): void {
+    const dataView = this._dataViewsByIdentity.get(identity)
+    if (!dataView)
+      return
+
+    this._dataViewsById.delete(dataView.id)
+    this._dataViewsByIdentity.delete(dataView.identity)
+    this.notify()
+  }
+
+  /** Удаляет DataView из домена по id или identity. */
+  removeDataView(idOrIdentity: string | number): void {
+    const dataView = this.getDataView(idOrIdentity)
+    if (!dataView)
+      return
+
+    this.removeDataViewById(dataView.id)
+  }
+
+  /** Проверяет наличие DataView по identity. */
+  hasDataView(identity: string): boolean {
+    return this._dataViewsByIdentity.has(identity)
   }
 
   /**
@@ -2887,6 +2988,7 @@ export class EndgeDomain extends EndgeModule {
       queries: this.getQueries()
         .filter(x => x.type !== 'query-custom')
         .map(x => Serialize.toPlain(x)),
+      dataViews: this.getDataViews().map(x => Serialize.toPlain(x)),
       components: this.getComponents().map(x => ReflectComponentToPlain(x)),
       componentSFCs: this.getComponentSFCs().map(x => x.toPlain()),
       scenarios: this.getScenarios().map(x => Serialize.toPlain(x)),
@@ -2979,6 +3081,7 @@ export class EndgeDomain extends EndgeModule {
       projects: [],
       types: [],
       queries: [],
+      dataViews: [],
       actions: [],
       converters: [],
       integrations: [],
@@ -3019,6 +3122,11 @@ export class EndgeDomain extends EndgeModule {
       json.queries.forEach((queryJson: any) => {
         const query = Serialize.fromJSON(RQuery, queryJson)
         out.queries.push(query)
+      })
+    }
+    if (json.dataViews && Array.isArray(json.dataViews)) {
+      json.dataViews.forEach((dataViewJson: any) => {
+        out.dataViews.push(Serialize.fromJSON(RDataView, dataViewJson))
       })
     }
     if (json.actions && Array.isArray(json.actions)) {
@@ -3101,6 +3209,7 @@ export class EndgeDomain extends EndgeModule {
     parsed.projects.forEach(p => this.addProject(p))
     parsed.types.forEach(t => this.addType(t))
     parsed.queries.forEach(q => this.addQuery(q))
+    parsed.dataViews.forEach(dv => this.addDataView(dv))
     parsed.actions.forEach(a => this.addAction(a))
     parsed.converters.forEach(c => this.addConverter(c))
     parsed.integrations.forEach(i => this.addIntegration(i))
@@ -3155,6 +3264,13 @@ export class EndgeDomain extends EndgeModule {
       json.queries.forEach((queryJson: any) => {
         const query = Serialize.fromJSON(RQuery, queryJson)
         domain.addQuery(query)
+      })
+    }
+
+    // Парсим DataView.
+    if (json.dataViews && Array.isArray(json.dataViews)) {
+      json.dataViews.forEach((dataViewJson: any) => {
+        domain.addDataView(Serialize.fromJSON(RDataView, dataViewJson))
       })
     }
 

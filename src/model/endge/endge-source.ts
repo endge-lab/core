@@ -16,6 +16,8 @@ import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { SourceEngineRegistry } from '@/domain/services/source-engine/SourceEngineRegistry'
 import { SourceLanguageRegistry } from '@/domain/services/source-engine/SourceLanguageRegistry'
 import { SourcePatchRegistry } from '@/domain/services/source-engine/SourcePatchRegistry'
+import { DataViewSourceEngineStrategy } from '@/domain/services/source-engine/strategies/DataViewSourceEngineStrategy'
+import { DataViewSourceLanguageStrategy } from '@/domain/services/source-engine/strategies/DataViewSourceLanguageStrategy'
 import { QuerySourceEngineStrategy } from '@/domain/services/source-engine/strategies/QuerySourceEngineStrategy'
 import { QuerySourceLanguageStrategy } from '@/domain/services/source-engine/strategies/QuerySourceLanguageStrategy'
 import { QuerySourcePatchStrategy } from '@/domain/services/source-engine/strategies/QuerySourcePatchStrategy'
@@ -137,7 +139,9 @@ export class EndgeSource extends EndgeModule {
   /** Регистрирует встроенные strategies ядра. */
   private _registerDefaultStrategies(): void {
     this._strategies.register(new QuerySourceEngineStrategy())
+    this._strategies.register(new DataViewSourceEngineStrategy())
     this._languageStrategies.register(new QuerySourceLanguageStrategy())
+    this._languageStrategies.register(new DataViewSourceLanguageStrategy())
     this._patchStrategies.register(new QuerySourcePatchStrategy())
   }
 

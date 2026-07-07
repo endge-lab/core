@@ -8,6 +8,7 @@ import { EndgeCompiler } from '@/model/endge/endge-compiler'
 import { EndgeConsole } from '@/model/endge/endge-console'
 import { EndgeContext } from '@/model/endge/endge-context'
 import { EndgeContracts } from '@/model/endge/endge-contracts'
+import { EndgeDataView } from '@/model/endge/endge-data-view'
 import { EndgeDebug } from '@/model/endge/endge-debug'
 import { EndgeDiagnostics } from '@/model/endge/endge-diagnostics'
 import { EndgeDomain } from '@/model/endge/endge-domain'
@@ -54,6 +55,7 @@ export const ENDGE_CORE_MODULES: EndgeModuleDefinition[] = [
   { key: 'runtime', module: EndgeRuntime },
   { key: 'vars', module: EndgeVars },
   { key: 'query', module: EndgeQuery },
+  { key: 'dataView', module: EndgeDataView },
   { key: 'auth', module: EndgeAuth },
   { key: 'updates', module: EndgeUpdates },
   { key: 'events', module: EndgeEvents },

@@ -19,12 +19,13 @@ import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RVersion } from '@/domain/entities/reflect/RVersion'
 import { ComponentType, FilterType, ParameterType, QueryType, ScriptType } from '@/domain/types/document.types'
 import { Endge } from '@/model/endge/endge'
-import { queryPayloadDocToPlain } from '@/model/endge/endge-domain'
+import { dataViewPayloadDocToPlain, queryPayloadDocToPlain } from '@/model/endge/endge-domain'
 import { Actions_Repository } from '@/model/db/repositories/Actions_Repository'
 import { BehaviorBindings_Repository } from '@/model/db/repositories/BehaviorBindings_Repository'
 import { Components_Repository } from '@/model/db/repositories/Components_Repository'
 import { ComponentSFCs_Repository } from '@/model/db/repositories/ComponentSFCs_Repository'
 import { Converters_Repository } from '@/model/db/repositories/Converters_Repository'
+import { DataViews_Repository } from '@/model/db/repositories/DataViews_Repository'
 import { Environments_Repository } from '@/model/db/repositories/Environments_Repository'
 import { Filters_Repository } from '@/model/db/repositories/Filters_Repository'
 import { Folders_Repository } from '@/model/db/repositories/Folders_Repository'
@@ -188,6 +189,15 @@ async function resolveDefaultComponentFolder(repos: RepositoriesBag): Promise<nu
   return rootFolder?.id ?? null
 }
 
+/** Возвращает root-папку раздела по identity. */
+async function resolveDefaultFolderByIdentity(
+  repos: RepositoriesBag,
+  identity: string,
+): Promise<number | string | null> {
+  const rootFolder = await repos.folders.findByIdentity(identity)
+  return rootFolder?.id ?? null
+}
+
 function normalizeFlowDefinition(rawDefinition: any): EndgeFlowDefinition {
   if (!rawDefinition || typeof rawDefinition !== 'object' || Array.isArray(rawDefinition)) {
     return {
@@ -239,6 +249,7 @@ const ROOT_FOLDER_ENTITY_TYPE_BY_IDENTITY: Record<string, string> = {
   'root-projects': 'projects',
   'root-types': 'types',
   'root-queries': 'queries',
+  'root-data-views': 'data-views',
   'root-components': 'components',
   'root-scenarios': 'scenarios',
   'root-actions': 'actions',
@@ -323,6 +334,7 @@ export class EndgeSchemaStorage extends EndgeModule {
     'scenarios',
     'actions',
     'queries',
+    'data-views',
     'parameters',
     'filters',
     'converters',
@@ -476,6 +488,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         projects: new Projects_Repository(this.api),
         types: new Types_Repository(this.api),
         queries: new Queries_Repository(this.api),
+        dataViews: new DataViews_Repository(this.api),
         folders: new Folders_Repository(this.api),
         components: new Components_Repository(this.api),
         componentSFCs: new ComponentSFCs_Repository(this.api),
@@ -576,6 +589,7 @@ export class EndgeSchemaStorage extends EndgeModule {
       folders: [],
       types: [],
       queries: [],
+      dataViews: [],
       components: [],
       componentSFCs: [],
       scenarios: [],
@@ -1026,6 +1040,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       }
     }
 
+    const normalizeDataView = (raw: any) => dataViewPayloadDocToPlain(raw)
+
     const normalizeFolder = (raw: any) => {
       return {
         id: raw.id,
@@ -1271,6 +1287,11 @@ export class EndgeSchemaStorage extends EndgeModule {
         return rows.map(normalizeQuery)
       }),
 
+      load('dataViews', async () => {
+        const rows = await this.repositories!.dataViews.findAll()
+        return rows.map(normalizeDataView)
+      }),
+
       load('components', async () => {
         const rows = await this.repositories!.components.findAll()
         return rows.map(normalizeComponentFromPayload)
@@ -1409,6 +1430,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       return domain.getComponent(documentIdOrIdentity)
     if (documentType === QueryType.REST || documentType === QueryType.GraphQL || documentType === QueryType.Custom)
       return domain.getQuery(documentIdOrIdentity)
+    if (documentType === 'data-view')
+      return domain.getDataView(documentIdOrIdentity)
     if (documentType === ScriptType.ScenarioSetup)
       return domain.getScenario(documentIdOrIdentity)
     if (documentType === ParameterType.DefaultParameter)
@@ -1519,6 +1542,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       return repos.componentSFCs.findByIdentity(identity)
     if (documentType === QueryType.REST || documentType === QueryType.GraphQL || documentType === QueryType.Custom)
       return repos.queries.findByIdentity(identity)
+    if (documentType === 'data-view')
+      return repos.dataViews.findByIdentity(identity)
     if (documentType === ScriptType.ScenarioSetup)
       return repos.scenarios.findByIdentity(identity)
     if (documentType === ParameterType.DefaultParameter)
@@ -1612,6 +1637,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       return repos.componentSFCs.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === QueryType.REST || documentType === QueryType.GraphQL || documentType === QueryType.Custom)
       return repos.queries.patchFolder(documentPayloadId, folderPayloadId)
+    if (documentType === 'data-view')
+      return repos.dataViews.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === ScriptType.ScenarioSetup)
       return repos.scenarios.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === ParameterType.DefaultParameter)
@@ -1723,6 +1750,10 @@ export class EndgeSchemaStorage extends EndgeModule {
       await repos.queries.softDelete(resolvedIdentity, folderId)
       return
     }
+    if (documentType === 'data-view') {
+      await repos.dataViews.softDelete(resolvedIdentity, folderId)
+      return
+    }
     if (documentType === ScriptType.ScenarioSetup) {
       await repos.scenarios.softDelete(resolvedIdentity, folderId)
       return
@@ -1779,6 +1810,10 @@ export class EndgeSchemaStorage extends EndgeModule {
       || documentType === QueryType.Custom
     ) {
       await repos.queries.hardDelete(resolvedIdentity)
+      return
+    }
+    if (documentType === 'data-view') {
+      await repos.dataViews.hardDelete(resolvedIdentity)
       return
     }
     if (documentType === ScriptType.ScenarioSetup) {
@@ -1873,6 +1908,10 @@ export class EndgeSchemaStorage extends EndgeModule {
       || documentType === QueryType.Custom
     ) {
       await repos.queries.restore(resolvedIdentity)
+      return
+    }
+    if (documentType === 'data-view') {
+      await repos.dataViews.restore(resolvedIdentity)
       return
     }
     if (documentType === ScriptType.ScenarioSetup) {
@@ -2346,6 +2385,12 @@ export class EndgeSchemaStorage extends EndgeModule {
       data.mockData = normalizeQueryMockDataForPayload(data.mockData)
       saved = await repos.queries.upsert(data as any)
     }
+    else if (documentType === 'data-view') {
+      data.source = typeof data.source === 'string' ? data.source : ''
+      data.sourceVersion = Number(data.sourceVersion ?? 1)
+      data.meta = (data.meta && typeof data.meta === 'object' && !Array.isArray(data.meta)) ? data.meta : {}
+      saved = await repos.dataViews.upsert(data as any)
+    }
     else if (documentType === ScriptType.ScenarioSetup) {
       if (data.schema == null)
         data.schema = {}
@@ -2541,6 +2586,31 @@ export class EndgeSchemaStorage extends EndgeModule {
             ...payload,
             type: plain.type ?? QueryType.REST,
           })
+      this._applyPayloadDocToDomain(documentType, saved, documentId, true)
+      return
+    }
+
+    if (documentType === 'data-view') {
+      const dataView = ((opts?.model as any) ?? domain.getDataView(documentId)) as any
+      if (!dataView)
+        throw new Error(`DataView не найден: ${documentId}`)
+
+      const existing = await repos.dataViews.findByIdentity(dataView.identity)
+      const fallbackFolder = existing?.folder ?? await resolveDefaultFolderByIdentity(repos, 'root-data-views')
+      const folder = dataView.folderId ?? relationToId(fallbackFolder) ?? null
+      const saved = await repos.dataViews.upsert({
+        identity: String(dataView.identity ?? documentId),
+        displayName: dataView.displayName ?? dataView.name ?? String(dataView.identity ?? documentId),
+        description: dataView.description ?? null,
+        folder,
+        project: dataView.project ?? null,
+        source: dataView.source ?? '',
+        sourceVersion: Number(dataView.sourceVersion ?? 1),
+        meta: (dataView.meta && typeof dataView.meta === 'object' && !Array.isArray(dataView.meta)) ? dataView.meta : {},
+        active: dataView.active ?? true,
+        author: dataView.author ?? undefined,
+        inherited: dataView.inherited === true,
+      })
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -3419,6 +3489,13 @@ export class EndgeSchemaStorage extends EndgeModule {
       )
       return
     }
+    if (documentType === 'data-view') {
+      removeBy(
+        x => Endge.domain.removeDataViewById(x),
+        x => Endge.domain.removeDataView(x),
+      )
+      return
+    }
     if (documentType === ScriptType.ScenarioSetup) {
       removeBy(
         x => Endge.domain.removeScenarioById(x),
@@ -3587,6 +3664,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       return 'componentSFCs'
     if (documentType === QueryType.REST || documentType === QueryType.GraphQL || documentType === QueryType.Custom)
       return 'queries'
+    if (documentType === 'data-view')
+      return 'dataViews'
     if (documentType === ScriptType.ScenarioSetup)
       return 'scenarios'
     if (documentType === ParameterType.DefaultParameter)
@@ -3634,6 +3713,8 @@ export class EndgeSchemaStorage extends EndgeModule {
   private _normalizePayloadDocToPlain(documentType: DomainDocumentType, raw: any): any {
     if (documentType === QueryType.REST || documentType === QueryType.GraphQL || documentType === QueryType.Custom)
       return queryPayloadDocToPlain(raw)
+    if (documentType === 'data-view')
+      return dataViewPayloadDocToPlain(raw)
     if (documentType === ParameterType.DefaultParameter) {
       return {
         id: raw.id,

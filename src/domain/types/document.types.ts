@@ -8,6 +8,7 @@ import type { RPageTemplate } from '@/domain/entities/reflect/RPageTemplate'
 import type { RPage } from '@/domain/entities/reflect/RPage'
 import type { RNavigation } from '@/domain/entities/reflect/RNavigation'
 import type { RQuery } from '@/domain/entities/reflect/RQuery'
+import type { RDataView } from '@/domain/entities/reflect/RDataView'
 import type { RScenario } from '@/domain/entities/reflect/RScenario'
 import type { RSettings } from '@/domain/entities/reflect/RSettings'
 import type { RPolicy } from '@/domain/entities/reflect/RPolicy'
@@ -57,6 +58,7 @@ export enum DomainSectionType {
   Type = 'type',
   Component = 'component',
   Query = 'query',
+  DataView = 'data-view',
   Scenario = 'scenario',
   Action = 'action',
   Converter = 'converter',
@@ -92,6 +94,7 @@ export type DomainDocumentType
     | 'type'
     | 'action'
     | 'converter'
+    | 'data-view'
     | 'integration'
     | 'view'
     | 'page-template'
@@ -130,4 +133,4 @@ export interface Document {
 /**
  * Описывает любой документ рефлекцию
  */
-export type RDocument = RComponent | RComponentSFC | RQuery | RScenario | RAction | RConverter | RIntegration | RView | RParameter | RFilter | RSettings | RPolicy | RStyle | RVocabs | RI18nBundle | RTenant | RBehaviorBinding | RPresentationBinding | RPageTemplate | RPage | RNavigation
+export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RScenario | RAction | RConverter | RIntegration | RView | RParameter | RFilter | RSettings | RPolicy | RStyle | RVocabs | RI18nBundle | RTenant | RBehaviorBinding | RPresentationBinding | RPageTemplate | RPage | RNavigation

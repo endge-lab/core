@@ -1,6 +1,7 @@
 import type { Projects_Repository } from '@/model/db/repositories/Projects_Repository'
 import type { Types_Repository } from '@/model/db/repositories/Types_Repository'
 import type { Queries_Repository } from '@/model/db/repositories/Queries_Repository'
+import type { DataViews_Repository } from '@/model/db/repositories/DataViews_Repository'
 import type { Folders_Repository } from '@/model/db/repositories/Folders_Repository'
 import type { Components_Repository } from '@/model/db/repositories/Components_Repository'
 import type { ComponentSFCs_Repository } from '@/model/db/repositories/ComponentSFCs_Repository'
@@ -29,6 +30,7 @@ export interface EndgeSchemaDump {
   projects: any[]
   types: any[]
   queries: any[]
+  dataViews: any[]
   folders: any[]
   components: any[]
   componentSFCs: any[]
@@ -71,6 +73,7 @@ export type RepositoriesBag = {
   projects: Projects_Repository
   types: Types_Repository
   queries: Queries_Repository
+  dataViews: DataViews_Repository
   folders: Folders_Repository
   components: Components_Repository
   componentSFCs: ComponentSFCs_Repository

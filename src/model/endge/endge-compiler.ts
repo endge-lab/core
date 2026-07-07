@@ -1,6 +1,7 @@
 import type { EndgeBootContext } from '@/domain/types/bootstrap.types'
 import type {
   ComponentSFCProgramPayload,
+  DataViewProgramPayload,
   EntityCompilerHandler,
   ProgramArtifact,
   ProgramArtifactRef,
@@ -13,6 +14,7 @@ import type {
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
+import { RDataView } from '@/domain/entities/reflect/RDataView'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { compileComponentSFC } from '@/domain/services/compiler/component-sfc-compile'
 import { ENDGE_COMPILER_VERSION } from '@/model/config/compiler'
@@ -55,6 +57,9 @@ export class EndgeCompiler extends EndgeModule {
     if (!this.compilePhase('query', ENDGE_LOG_LANES.QUERIES, 'query source', Endge.domain.getQueries(), context))
       return
 
+    if (!this.compilePhase('data-view', ENDGE_LOG_LANES.QUERIES, 'data views', Endge.domain.getDataViews(), context))
+      return
+
     dbg.info('Проект успешно скомпилирован', { icon: 'ti ti-check text-xl' })
     dbg.endTrace('info', { status: 'success' })
   }
@@ -63,6 +68,12 @@ export class EndgeCompiler extends EndgeModule {
   public buildQuery(entity: RQuery): ProgramArtifact<QueryProgramPayload> {
     const context: ProgramCompileContext = { compilerVersion: ENDGE_COMPILER_VERSION }
     return this.compileEntity('query', entity, context) as ProgramArtifact<QueryProgramPayload>
+  }
+
+  /** Компилирует один DataView source в Endge.program без запуска остальных compiler-фаз. */
+  public buildDataView(entity: RDataView): ProgramArtifact<DataViewProgramPayload> {
+    const context: ProgramCompileContext = { compilerVersion: ENDGE_COMPILER_VERSION }
+    return this.compileEntity('data-view', entity, context) as ProgramArtifact<DataViewProgramPayload>
   }
 
   /**
@@ -175,6 +186,25 @@ export class EndgeCompiler extends EndgeModule {
         })
       },
     })
+
+    this.registerHandler<RDataView, DataViewProgramPayload>({
+      entityType: 'data-view',
+      compile: (entity, context) => {
+        const source = this._resolveDataViewSource(entity)
+        const result = Endge.source.compile('data-view', source)
+        const artifact = result.artifact as DataViewProgramPayload | undefined
+
+        return this._makeArtifact(entity, 'data-view', context, {
+          capabilities: ['compilable', 'runnable', 'data-provider'],
+          payload: {
+            ...this._makeEmptyDataViewPayload(),
+            ...(artifact ?? {}),
+            sourceDocument: (result.document as DataViewProgramPayload['sourceDocument']) ?? null,
+          },
+          diagnostics: (result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[],
+        })
+      },
+    })
   }
 
   /**
@@ -250,7 +280,7 @@ export class EndgeCompiler extends EndgeModule {
    * compiled artifact на уровне program read-model.
    */
   private _toStableSource(entity: any): unknown {
-    if (entity instanceof RQuery) {
+    if (entity instanceof RQuery || entity instanceof RDataView) {
       return {
         id: entity?.id ?? null,
         identity: entity?.identity ?? null,
@@ -294,6 +324,15 @@ export class EndgeCompiler extends EndgeModule {
     throw new Error(`Query source is required for "${entity.identity ?? entity.name ?? entity.id}".`)
   }
 
+  /** Возвращает сохраненный DataView source. */
+  private _resolveDataViewSource(entity: RDataView): string {
+    const source = typeof entity.source === 'string' ? entity.source.trim() : ''
+    if (source)
+      return source
+
+    throw new Error(`DataView source is required for "${entity.identity ?? entity.name ?? entity.id}".`)
+  }
+
   /** Создает пустой query payload для error-artifact. */
   private _makeEmptyQueryPayload(): QueryProgramPayload {
     return {
@@ -304,6 +343,17 @@ export class EndgeCompiler extends EndgeModule {
       params: {},
       returnField: null,
       filters: [],
+    }
+  }
+
+  /** Создает пустой DataView payload для error-artifact. */
+  private _makeEmptyDataViewPayload(): DataViewProgramPayload {
+    return {
+      type: 'data-view',
+      mode: 'manual',
+      sourceDocument: null,
+      transform: null,
+      steps: [],
     }
   }
 

@@ -1,5 +1,6 @@
 import type { ActionCompiledFlow } from '@/domain/types/action.types'
 import type { RComponentContract, RComponentDependencies } from '@/domain/types/component-core.types'
+import type { DataViewManualTransform, DataViewPipelineStep, DataViewSourceDocument } from '@/domain/types/data-view-source.types'
 import type {
   RComponentSFC_AST,
   RComponentSFC_IR,
@@ -17,6 +18,7 @@ export type ProgramEntityType
     | 'component-sfc'
     | 'action'
     | 'query'
+    | 'data-view'
     | 'scenario'
 
 /** Итоговый статус artifact после компиляции и валидации. */
@@ -180,6 +182,24 @@ export interface QueryProgramPayload {
 
   /** Mock payload query. */
   mockData?: unknown
+}
+
+/** Payload artifact для DataView: executable read-model без persisted runtime state. */
+export interface DataViewProgramPayload {
+  /** Тип artifact для diagnostics/debug UI. */
+  type: 'data-view'
+
+  /** Режим выполнения source: manual transform или декларативный pipeline. */
+  mode: 'manual' | 'pipeline'
+
+  /** Canonical source document для debug/preview UI. */
+  sourceDocument: DataViewSourceDocument | null
+
+  /** Compiled manual transform. Используется только в mode=manual. */
+  transform: DataViewManualTransform | null
+
+  /** Compiled pipeline steps. Используется только в mode=pipeline. */
+  steps: DataViewPipelineStep[]
 }
 
 /** Payload artifact для legacy component/table ветки. */

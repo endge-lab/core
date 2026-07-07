@@ -6,6 +6,7 @@ import { EndgeBind } from '@/model/endge/endge-bind'
 import { EndgeConsole } from '@/model/endge/endge-console'
 import { EndgeContext } from '@/model/endge/endge-context'
 import { EndgeContracts } from '@/model/endge/endge-contracts'
+import { EndgeDataView } from '@/model/endge/endge-data-view'
 import { EndgeCompiler } from '@/model/endge/endge-compiler'
 import { EndgeDebug } from '@/model/endge/endge-debug'
 import { EndgeDiagnostics } from '@/model/endge/endge-diagnostics'
@@ -254,6 +255,13 @@ export class Endge extends EndgeFederation {
    */
   static get query(): EndgeQuery {
     return this.getModule<EndgeQuery>('query')
+  }
+
+  /**
+   * Доступ к модулю выполнения DataView transformations.
+   */
+  static get dataView(): EndgeDataView {
+    return this.getModule<EndgeDataView>('dataView')
   }
 
   /**

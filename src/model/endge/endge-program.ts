@@ -2,6 +2,7 @@ import type { ActionCompiledFlow } from '@/domain/types/action.types'
 import type { DependencyGraph } from '@/domain/entities/data/DependencyGraph'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import type {
+  DataViewProgramPayload,
   EndgeProgramSnapshot,
   ProgramArtifact,
   ProgramArtifactRef,
@@ -109,6 +110,11 @@ export class EndgeProgram extends EndgeModule {
   /** Возвращает compiled query artifact по id или identity. */
   public getQueryArtifact(idOrIdentity: string | number): ProgramArtifact<QueryProgramPayload> | null {
     return this.getArtifact<QueryProgramPayload>('query', idOrIdentity)
+  }
+
+  /** Возвращает compiled DataView artifact по id или identity. */
+  public getDataViewArtifact(idOrIdentity: string | number): ProgramArtifact<DataViewProgramPayload> | null {
+    return this.getArtifact<DataViewProgramPayload>('data-view', idOrIdentity)
   }
 
   /**
