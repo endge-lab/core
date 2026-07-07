@@ -26,7 +26,7 @@ export class RQuery extends REntity {
   endpoint!: string
 
   @Expose()
-  subField!: string = 'items'
+  subField: string = 'items'
 
   @Expose()
   @TypeMap(RField, 'name')
@@ -54,6 +54,14 @@ export class RQuery extends REntity {
   @Expose()
   @Type(() => RQueryFilter)
   filters: RQueryFilter[] = []
+
+  /** Source-first authoring representation v1. Пока не заменяет legacy поля runtime. */
+  @Expose()
+  source?: string
+
+  /** Версия source syntax для миграций и diagnostics. */
+  @Expose()
+  sourceVersion?: number
 
   constructor(name?: string, returnField?: RField) {
     super()
@@ -94,7 +102,7 @@ export class RQuery extends REntity {
    * Выполнение запроса
    */
   async run(params: object = {}): Promise<any> {
-    return Endge.query.run(this, params)
+    return Endge.query.run(this, params as Record<string, unknown>)
   }
 
   override duplicate(options: DuplicateOptions): RQuery {

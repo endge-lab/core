@@ -70,6 +70,8 @@ export function queryPayloadDocToPlain(doc: any): any {
     name: doc?.displayName ?? doc?.name,
     type: doc?.type ?? QueryType.REST,
     query: doc?.query,
+    source: doc?.source,
+    sourceVersion: doc?.sourceVersion,
     return: doc?.returnField ?? doc?.return,
     endpoint: doc?.endpoint,
     subField: doc?.subField,

@@ -8,10 +8,12 @@ import type {
   ProgramCompileContext,
   ProgramDiagnostic,
   ProgramEntityType,
+  QueryProgramPayload,
 } from '@/domain/types/program.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
+import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { compileComponentSFC } from '@/domain/services/compiler/component-sfc-compile'
 import { ENDGE_COMPILER_VERSION } from '@/model/config/compiler'
 import { ENDGE_LOG_LANES } from '@/model/config/debug'
@@ -48,6 +50,9 @@ export class EndgeCompiler extends EndgeModule {
     dbg.startTrace('compile', 'info')
 
     if (!this.compilePhase('component-sfc', ENDGE_LOG_LANES.COMPONENTS, 'SFC-компонентов', Endge.domain.getComponentSFCs(), context))
+      return
+
+    if (!this.compilePhase('query', ENDGE_LOG_LANES.QUERIES, 'query source', Endge.domain.getQueries(), context))
       return
 
     dbg.info('Проект успешно скомпилирован', { icon: 'ti ti-check text-xl' })
@@ -144,6 +149,26 @@ export class EndgeCompiler extends EndgeModule {
         })
       },
     })
+
+    this.registerHandler<RQuery, QueryProgramPayload>({
+      entityType: 'query',
+      compile: (entity, context) => {
+        const source = this._resolveQuerySource(entity)
+        const result = Endge.source.compile('query', source)
+        const artifact = result.artifact as QueryProgramPayload | undefined
+
+        return this._makeArtifact(entity, 'query', context, {
+          capabilities: ['compilable', 'runnable', 'data-provider'],
+          payload: {
+            ...this._makeEmptyQueryPayload(),
+            ...(artifact ?? {}),
+            ast: result.ast ?? null,
+            sourceDocument: result.document ?? null,
+          },
+          diagnostics: (result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[],
+        })
+      },
+    })
   }
 
   /**
@@ -226,8 +251,47 @@ export class EndgeCompiler extends EndgeModule {
       type: entity?.type ?? null,
       kind: entity?.kind ?? null,
       source: entity?.source ?? null,
+      sourceVersion: entity?.sourceVersion ?? null,
+      endpoint: entity?.endpoint ?? null,
+      query: entity?.query ?? null,
+      method: entity?.method ?? null,
+      headers: entity?.headers ?? null,
+      auth: entity?.auth ?? null,
+      params: entity?.params ? Array.from(entity.params.entries?.() ?? []) : null,
+      filterMode: entity?.filterMode ?? null,
+      filters: entity?.filters ?? null,
+      subField: entity?.subField ?? null,
+      returnField: entity?.returnField ?? null,
+      mockData: entity?.mockData ?? null,
+      mockDataEnabled: entity?.mockDataEnabled ?? null,
       definition: entity?.definition ?? null,
       updatedAt: entity?.updatedAt ?? null,
+    }
+  }
+
+  /** Возвращает сохраненный query source или генерирует его из legacy полей. */
+  private _resolveQuerySource(entity: RQuery): string {
+    const source = typeof entity.source === 'string' ? entity.source.trim() : ''
+    if (source)
+      return source
+
+    const generated = Endge.source.generate('query', entity)
+    if (!generated.ok || !generated.source)
+      throw new Error(generated.message ?? `Failed to generate query source for "${entity.identity ?? entity.name}"`)
+
+    return generated.source
+  }
+
+  /** Создает пустой query payload для error-artifact. */
+  private _makeEmptyQueryPayload(): QueryProgramPayload {
+    return {
+      type: 'query-rest',
+      endpoint: '',
+      query: '',
+      subField: 'items',
+      params: {},
+      returnField: null,
+      filters: [],
     }
   }
 

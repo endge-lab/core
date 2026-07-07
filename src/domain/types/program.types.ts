@@ -59,6 +59,12 @@ export interface ProgramDiagnostic {
 
   /** Путь внутри source/model: например script, template, style или definition.nodes. */
   sourcePath?: string
+
+  /** Абсолютный offset начала проблемного фрагмента в source. */
+  start?: number
+
+  /** Абсолютный offset конца проблемного фрагмента в source. */
+  end?: number
 }
 
 /** Зависимость compiled artifact от другой доменной сущности или внешней capability. */
@@ -111,14 +117,35 @@ export interface ActionProgramPayload {
 
 /** Payload artifact для query-сущности. */
 export interface QueryProgramPayload {
+  /** Parser-level AST query source, нужен для diagnostics/debug UI. */
+  ast?: unknown
+
+  /** Canonical authoring-модель query source. */
+  sourceDocument?: unknown
+
   /** Тип query: REST, GraphQL, custom или другой поддерживаемый источник. */
   type: string
+
+  /** HTTP method для REST query. */
+  method?: string
 
   /** Endpoint или базовая ссылка источника данных. */
   endpoint: string
 
   /** Тело запроса, GraphQL document или custom query expression. */
   query: string
+
+  /** Заголовки REST query. */
+  headers?: Record<string, string>
+
+  /** Auth config, подготовленный для runtime query layer. */
+  auth?: unknown
+
+  /** Request timeout для REST query. */
+  timeoutMs?: number
+
+  /** Отправлять body как application/x-www-form-urlencoded. */
+  sendAsFormUrlencoded?: boolean
 
   /** Подполе результата, которое runtime должен считать основным payload. */
   subField: string
@@ -131,6 +158,15 @@ export interface QueryProgramPayload {
 
   /** Набор фильтров, применяемых к query. */
   filters: unknown[]
+
+  /** Режим применения фильтров. */
+  filterMode?: string
+
+  /** Включены ли mock data для query. */
+  mockDataEnabled?: boolean
+
+  /** Mock payload query. */
+  mockData?: unknown
 }
 
 /** Payload artifact для legacy component/table ветки. */

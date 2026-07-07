@@ -23,6 +23,7 @@ import { EndgeRuntime } from '@/model/endge/endge-runtime'
 import { EndgeRuntimeDebugger } from '@/model/endge/endge-runtime-debugger'
 import { EndgeSchemaStorage } from '@/model/endge/endge-schema-database'
 import { EndgeScript } from '@/model/endge/endge-script'
+import { EndgeSource } from '@/model/endge/endge-source'
 import { EndgeSSE } from '@/model/endge/endge-sse'
 import { EndgeStore } from '@/model/endge/endge-store'
 import { EndgeStyles } from '@/model/endge/endge-styles'
@@ -176,6 +177,13 @@ export class Endge extends EndgeFederation {
    */
   static get compiler(): EndgeCompiler {
     return this.getModule<EndgeCompiler>('compiler')
+  }
+
+  /**
+   * Доступ к authoring-модулю source-документов.
+   */
+  static get source(): EndgeSource {
+    return this.getModule<EndgeSource>('source')
   }
 
   /**

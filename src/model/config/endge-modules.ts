@@ -23,6 +23,7 @@ import { EndgeRuntime } from '@/model/endge/endge-runtime'
 import { EndgeRuntimeDebugger } from '@/model/endge/endge-runtime-debugger'
 import { EndgeSchemaStorage } from '@/model/endge/endge-schema-database'
 import { EndgeScript } from '@/model/endge/endge-script'
+import { EndgeSource } from '@/model/endge/endge-source'
 import { EndgeSSE } from '@/model/endge/endge-sse'
 import { EndgeStore } from '@/model/endge/endge-store'
 import { EndgeStyles } from '@/model/endge/endge-styles'
@@ -42,6 +43,7 @@ export const ENDGE_CORE_MODULES: EndgeModuleDefinition[] = [
   { key: 'domain', module: EndgeDomain },
   { key: 'program', module: EndgeProgram },
   { key: 'compiler', module: EndgeCompiler },
+  { key: 'source', module: EndgeSource },
   { key: 'vocabs', module: EndgeVocabs },
   { key: 'extract', module: EndgeExtract },
   { key: 'flowRegistry', module: EndgeFlowRegistry },

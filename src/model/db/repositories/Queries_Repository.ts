@@ -7,6 +7,8 @@ export interface QueriesPayloadFields {
   type?: string
   endpoint?: string
   query?: string
+  source?: string
+  sourceVersion?: number
   subField?: string
   method?: string
   headers?: any

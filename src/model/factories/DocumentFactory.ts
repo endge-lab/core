@@ -107,6 +107,8 @@ export class DocumentFactory {
         item.id = id
         item.identity = id
         item.type = type
+        item.source = Endge.source.createDefault('query')
+        item.sourceVersion = 1
         if (folderId != null) item.folderId = folderId
         if (registerInDomain)
           Endge.domain.addQuery(item)
