@@ -19,9 +19,10 @@ export const QUERY_DEFAULT_SOURCE = `defineQuery({
     items: [],
   },
 
-  response: {
-    subField: 'items',
-    return: null,
+  outputs: {
+    raw: output()
+      .from(response('items'))
+      .toStore(),
   },
 
   mock: {

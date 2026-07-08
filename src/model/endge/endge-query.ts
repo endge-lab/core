@@ -41,6 +41,7 @@ export class EndgeQuery extends EndgeModule {
     return this.executor.execute({
       query,
       payload: artifact.payload,
+      children: artifact.children ?? [],
       vars: params,
     })
   }

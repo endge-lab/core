@@ -42,7 +42,6 @@ import { ENDGE_CORE_MODULES } from '@/model/config/endge-modules'
  */
 export class Endge extends EndgeFederation {
   protected static override readonly federationId = 'endge'
-  private static bootContext: EndgeBootContext | null = null
 
   /**
    * Запрещает создание экземпляров `Endge`.
@@ -71,37 +70,12 @@ export class Endge extends EndgeFederation {
    * Запускает ядро по полному boot pipeline: `setup -> load -> build -> start`.
    * Метод является единственной централизованной точкой старта `Endge`.
    */
-  static async boot(ctx: EndgeBootContext): Promise<void> {
-    const host = this.host
-    this.bootContext = ctx
-
-    if (host.isInitialized)
+  static override async boot(ctx: EndgeBootContext): Promise<void> {
+    if (this.isInitialized)
       return
 
     Endge.debug.enabled = true
-
-    await this.setup(ctx)
-    await this.load(ctx)
-    await this.build(ctx)
-    await this.start(ctx)
-
-    host.isInitialized = true
-  }
-
-  /**
-   * Повторно выполняет фазу сборки производных структур для уже загруженного контекста.
-   * Если контекст явно не передан, используется контекст последнего `boot()`.
-   */
-  static override async build(ctx: EndgeBootContext = this.requireBootContext()): Promise<void> {
-    await super.build(ctx)
-  }
-
-  /**
-   * Сбрасывает runtime-состояние всех модулей и очищает сохраненный boot-контекст.
-   */
-  static override async reset(): Promise<void> {
-    await super.reset()
-    this.bootContext = null
+    await super.boot(ctx)
   }
 
   /**
@@ -126,16 +100,6 @@ export class Endge extends EndgeFederation {
     a.click()
 
     URL.revokeObjectURL(url)
-  }
-
-  /**
-   * Возвращает контекст последнего запуска или выбрасывает ошибку, если ядро еще не boot-нуто.
-   */
-  private static requireBootContext(): EndgeBootContext {
-    if (!this.bootContext)
-      throw new Error('[Endge] boot context is not available')
-
-    return this.bootContext
   }
 
   /**

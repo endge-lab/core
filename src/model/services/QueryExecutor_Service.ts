@@ -1,5 +1,5 @@
 import type { RQuery } from '@/domain/entities/reflect/RQuery'
-import type { QueryProgramFilterItem, QueryProgramPayload } from '@/domain/types/program.types'
+import type { ProgramArtifact, QueryProgramFilterItem, QueryProgramOutput, QueryProgramPayload } from '@/domain/types/program.types'
 import type { RQueryAuth } from '@/domain/types/query.types'
 import type { AxiosInstance } from 'axios'
 
@@ -15,6 +15,9 @@ export interface QueryExecutionContext {
   /** Runtime-ready query payload из Endge.program. */
   payload: QueryProgramPayload
 
+  /** Локальные artifacts, принадлежащие query artifact. */
+  children?: ProgramArtifact[]
+
   /** Входные параметры одноразового или реактивного запуска. */
   vars?: Record<string, unknown>
 }
@@ -27,18 +30,63 @@ export class QueryExecutor_Service {
     }),
   ) {}
 
-  /** Выполняет query artifact и записывает результат в Raph по identity query. */
+  /** Выполняет query artifact и вычисляет output graph. */
   public async execute(context: QueryExecutionContext): Promise<any> {
     const result = context.payload.mockDataEnabled
       ? this._readMockData(context.payload.mockData)
       : await this._executeByProtocol(context.payload, context.vars ?? {})
 
-    const queryIdentity = String(context.query.identity ?? '').trim()
-    const subField = String(context.payload.subField ?? 'items').trim() || 'items'
-    if (queryIdentity)
-      Raph.set(`queries.${queryIdentity}.${subField}`, result)
+    if (!context.payload.outputs.length)
+      return result
 
-    return result
+    return this._resolveOutputs(result, context)
+  }
+
+  /** Вычисляет output graph строго в порядке source document. */
+  private _resolveOutputs(
+    response: unknown,
+    context: QueryExecutionContext,
+  ): Record<string, unknown> {
+    const values: Record<string, unknown> = {}
+
+    for (const output of context.payload.outputs) {
+      let value = this._readOutputSource(output, response, values)
+      for (const dataViewRef of output.dataViews)
+        value = Endge.dataView.runRef(dataViewRef, value, undefined, { children: context.children ?? [] })
+
+      values[output.key] = value
+      if (output.store)
+        Raph.set(this._resolveStoreKey(output, context.query), value)
+    }
+
+    return values
+  }
+
+  /** Читает source output из backend response или предыдущего output. */
+  private _readOutputSource(
+    output: QueryProgramOutput,
+    response: unknown,
+    values: Record<string, unknown>,
+  ): unknown {
+    if (output.source.type === 'response')
+      return output.source.path == null ? response : this._path(response, output.source.path)
+
+    if (!(output.source.key in values))
+      throw new Error(`Query output "${output.key}" references missing output "${output.source.key}".`)
+
+    return values[output.source.key]
+  }
+
+  /** Возвращает default/custom store key для output. */
+  private _resolveStoreKey(output: QueryProgramOutput, query: RQuery): string {
+    if (output.store?.mode === 'custom' && output.store.key)
+      return output.store.key
+
+    const queryIdentity = String(query.identity ?? query.id ?? '').trim()
+    if (!queryIdentity)
+      throw new Error(`Query output "${output.key}" cannot be stored without query identity.`)
+
+    return `queries.${queryIdentity}.${output.key}`
   }
 
   /** Выбирает protocol executor по compiled artifact type. */
@@ -143,6 +191,18 @@ export class QueryExecutor_Service {
     catch {
       return raw
     }
+  }
+
+  /** Читает dot-path из backend response без исключений. */
+  private _path(source: unknown, path: string): unknown {
+    const parts = String(path ?? '').split('.').filter(Boolean)
+    let current: any = source
+    for (const part of parts) {
+      if (current == null)
+        return undefined
+      current = current[part]
+    }
+    return current
   }
 
   /** Разрешает один filter item в object payload. */

@@ -1,5 +1,6 @@
 import type { RQueryAuth, RQueryFilterApplyMode } from '@/domain/types/query.types'
 import type { ProgramDiagnostic, QueryProgramPayload } from '@/domain/types/program.types'
+import type { DataViewRef } from '@/domain/types/data-view-source.types'
 
 /** Поддерживаемые kind query source v1. */
 export type QuerySourceKind = 'rest'
@@ -63,15 +64,6 @@ export interface QuerySourceRequest {
   formUrlencoded?: boolean
 }
 
-/** Source-описание response части запроса. */
-export interface QuerySourceResponse {
-  /** Подполе результата, которое считается основным payload. */
-  subField: string
-
-  /** Описание возвращаемого поля. */
-  return: QuerySourceField | null
-}
-
 /** Source-описание mock-режима запроса. */
 export interface QuerySourceMock {
   /** Включены ли mock data. */
@@ -80,6 +72,30 @@ export interface QuerySourceMock {
   /** Mock payload. */
   data: unknown
 }
+
+export type QueryOutputSource
+  = | {
+    type: 'response'
+    path: string | null
+  }
+  | {
+    type: 'output'
+    key: string
+  }
+
+export interface QueryOutputStoreTarget {
+  mode: 'default' | 'custom'
+  key?: string
+}
+
+export interface QuerySourceOutput {
+  key: string
+  source: QueryOutputSource
+  dataViews: DataViewRef[]
+  store: QueryOutputStoreTarget | null
+}
+
+export type QuerySourceOutputs = QuerySourceOutput[]
 
 /** Canonical authoring-модель query source v1. */
 export interface QuerySourceDocument {
@@ -95,8 +111,8 @@ export interface QuerySourceDocument {
   /** Фильтры запроса. */
   filters: QuerySourceFilters
 
-  /** Response config. */
-  response: QuerySourceResponse
+  /** Ordered output graph: response/output sources, transforms and store targets. */
+  outputs: QuerySourceOutputs
 
   /** Mock config. */
   mock: QuerySourceMock
@@ -112,8 +128,7 @@ export type QuerySourcePatchPath
     | 'request.auth'
     | 'request.timeoutMs'
     | 'request.formUrlencoded'
-    | 'response.subField'
-    | 'response.return'
+    | 'outputs'
     | 'mock.enabled'
     | 'mock.data'
 

@@ -1,4 +1,5 @@
 import type { EndgeBootContext } from '@/domain/types/bootstrap.types'
+import type { DataViewRef, DataViewPipelineStep } from '@/domain/types/data-view-source.types'
 import type {
   ComponentSFCProgramPayload,
   DataViewProgramPayload,
@@ -26,6 +27,7 @@ import { Endge } from '@/model/endge/endge'
  */
 export class EndgeCompiler extends EndgeModule {
   private readonly handlers = new Map<ProgramEntityType, EntityCompilerHandler<any, any>>()
+  private _localDataViewCounter = 0
 
   /**
    * Создает singleton-bound compiler module и регистрирует стандартные handlers.
@@ -159,6 +161,7 @@ export class EndgeCompiler extends EndgeModule {
             dependencies: result.dependencies,
             runtimeDependencies: result.runtimeDependencies,
             previewProps: result.previewProps,
+            previewOptions: result.previewOptions,
             ast: result.ast,
             ir: result.ir,
           },
@@ -173,16 +176,24 @@ export class EndgeCompiler extends EndgeModule {
         const source = this._resolveQuerySource(entity)
         const result = Endge.source.compile('query', source)
         const artifact = result.artifact as QueryProgramPayload | undefined
+        const local = artifact
+          ? this._materializeQueryLocalDataViews(artifact, entity, context)
+          : { payload: undefined, children: [], diagnostics: [], dependencies: [] }
 
         return this._makeArtifact(entity, 'query', context, {
           capabilities: ['compilable', 'runnable', 'data-provider'],
           payload: {
             ...this._makeEmptyQueryPayload(),
-            ...(artifact ?? {}),
+            ...(local.payload ?? artifact ?? {}),
             ast: result.ast ?? null,
             sourceDocument: result.document ?? null,
           },
-          diagnostics: (result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[],
+          dependencies: local.dependencies,
+          diagnostics: [
+            ...((result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]),
+            ...local.diagnostics,
+          ],
+          children: local.children,
         })
       },
     })
@@ -193,15 +204,23 @@ export class EndgeCompiler extends EndgeModule {
         const source = this._resolveDataViewSource(entity)
         const result = Endge.source.compile('data-view', source)
         const artifact = result.artifact as DataViewProgramPayload | undefined
+        const local = artifact
+          ? this._materializeDataViewLocalDataViews(artifact, entity, context)
+          : { payload: undefined, children: [], diagnostics: [], dependencies: [] }
 
         return this._makeArtifact(entity, 'data-view', context, {
           capabilities: ['compilable', 'runnable', 'data-provider'],
           payload: {
             ...this._makeEmptyDataViewPayload(),
-            ...(artifact ?? {}),
+            ...(local.payload ?? artifact ?? {}),
             sourceDocument: (result.document as DataViewProgramPayload['sourceDocument']) ?? null,
           },
-          diagnostics: (result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[],
+          dependencies: local.dependencies,
+          diagnostics: [
+            ...((result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]),
+            ...local.diagnostics,
+          ],
+          children: local.children,
         })
       },
     })
@@ -222,6 +241,7 @@ export class EndgeCompiler extends EndgeModule {
       capabilities: ProgramCapability[]
       dependencies?: ProgramArtifact<TPayload>['dependencies']
       diagnostics?: Omit<ProgramDiagnostic, 'entityRef'>[]
+      children?: ProgramArtifact[]
     },
   ): ProgramArtifact<TPayload> {
     const ref = this._makeRef(entity, entityType)
@@ -242,7 +262,203 @@ export class EndgeCompiler extends EndgeModule {
       dependencies: options.dependencies ?? [],
       capabilities: options.capabilities,
       payload: options.payload,
+      children: options.children?.length ? options.children : undefined,
     }
+  }
+
+  /** Материализует локальные DataView внутри query output graph в child artifacts. */
+  private _materializeQueryLocalDataViews(
+    payload: QueryProgramPayload,
+    entity: RQuery,
+    context: ProgramCompileContext,
+  ): {
+      payload: QueryProgramPayload
+      children: ProgramArtifact[]
+      diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
+      dependencies: ProgramArtifact['dependencies']
+    } {
+    const ownerRef = this._makeRef(entity, 'query')
+    const children: ProgramArtifact[] = []
+    const diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[] = []
+    const dependencies: ProgramArtifact['dependencies'] = []
+
+    const outputs = payload.outputs.map(output => ({
+      ...output,
+      dataViews: this._materializeDataViewRefs(
+        output.dataViews,
+        ownerRef.identity,
+        `outputs.${output.key}.dataView`,
+        context,
+        children,
+        diagnostics,
+        dependencies,
+      ),
+    }))
+
+    return {
+      payload: { ...payload, outputs },
+      children,
+      diagnostics,
+      dependencies,
+    }
+  }
+
+  /** Материализует локальные DataView внутри DataView pipeline steps в child artifacts. */
+  private _materializeDataViewLocalDataViews(
+    payload: DataViewProgramPayload,
+    entity: RDataView | { id?: string | number, identity?: string, name?: string },
+    context: ProgramCompileContext,
+  ): {
+      payload: DataViewProgramPayload
+      children: ProgramArtifact[]
+      diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
+      dependencies: ProgramArtifact['dependencies']
+    } {
+    const ownerRef = this._makeRef(entity, 'data-view')
+    const children: ProgramArtifact[] = []
+    const diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[] = []
+    const dependencies: ProgramArtifact['dependencies'] = []
+
+    const steps = this._materializeDataViewRefsInSteps(
+      payload.steps,
+      ownerRef.identity,
+      'steps',
+      context,
+      children,
+      diagnostics,
+      dependencies,
+    )
+
+    return {
+      payload: { ...payload, steps },
+      children,
+      diagnostics,
+      dependencies,
+    }
+  }
+
+  /** Материализует локальные DataView refs внутри pipeline steps. */
+  private _materializeDataViewRefsInSteps(
+    steps: DataViewPipelineStep[],
+    ownerIdentity: string,
+    sourcePath: string,
+    context: ProgramCompileContext,
+    children: ProgramArtifact[],
+    diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[],
+    dependencies: ProgramArtifact['dependencies'],
+  ): DataViewPipelineStep[] {
+    return steps.map((step, index) => {
+      if (step.type !== 'from' || !step.dataViews?.length)
+        return step
+
+      return {
+        ...step,
+        dataViews: this._materializeDataViewRefs(
+          step.dataViews,
+          ownerIdentity,
+          `${sourcePath}.${index}.dataView`,
+          context,
+          children,
+          diagnostics,
+          dependencies,
+        ),
+      }
+    })
+  }
+
+  /** Заменяет inline DataView refs на local refs и собирает external dependencies. */
+  private _materializeDataViewRefs(
+    refs: DataViewRef[],
+    ownerIdentity: string,
+    sourcePath: string,
+    context: ProgramCompileContext,
+    children: ProgramArtifact[],
+    diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[],
+    dependencies: ProgramArtifact['dependencies'],
+  ): DataViewRef[] {
+    return refs.map((ref, index) => {
+      if (ref.kind === 'external') {
+        dependencies.push({
+          entityType: 'data-view',
+          id: ref.identity,
+          identity: ref.identity,
+          role: 'data-view',
+        })
+        return ref
+      }
+
+      if (ref.kind === 'local')
+        return ref
+
+      const child = this._compileLocalDataViewArtifact(
+        ref.source,
+        ownerIdentity,
+        `${sourcePath}.${index}`,
+        context,
+      )
+      children.push(child)
+      diagnostics.push(...child.diagnostics.map(diagnostic => ({
+        severity: diagnostic.severity,
+        code: diagnostic.code,
+        message: diagnostic.message,
+        sourcePath: `${sourcePath}.${index}${diagnostic.sourcePath ? `.${diagnostic.sourcePath}` : ''}`,
+        start: diagnostic.start,
+        end: diagnostic.end,
+      })))
+
+      return {
+        kind: 'local',
+        ref: {
+          entityType: 'data-view',
+          id: child.ref.id,
+          identity: child.ref.identity,
+        },
+      }
+    })
+  }
+
+  /** Компилирует локальный DataView source в child artifact без записи в Endge.program. */
+  private _compileLocalDataViewArtifact(
+    source: string,
+    ownerIdentity: string,
+    sourcePath: string,
+    context: ProgramCompileContext,
+  ): ProgramArtifact<DataViewProgramPayload> {
+    const result = Endge.source.compile('data-view', source)
+    const artifact = result.artifact as DataViewProgramPayload | undefined
+    const entity = {
+      id: `${ownerIdentity}::${sourcePath}::${this._localDataViewCounter += 1}`,
+      identity: `${ownerIdentity}::${sourcePath}`,
+      name: `${ownerIdentity}::${sourcePath}`,
+      source,
+      sourceVersion: 1,
+    }
+    const children: ProgramArtifact[] = []
+    const diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[] = [
+      ...((result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]),
+    ]
+    const dependencies: ProgramArtifact['dependencies'] = []
+    let payload: DataViewProgramPayload = {
+      ...this._makeEmptyDataViewPayload(),
+      ...(artifact ?? {}),
+      sourceDocument: (result.document as DataViewProgramPayload['sourceDocument']) ?? null,
+    }
+
+    if (artifact) {
+      const local = this._materializeDataViewLocalDataViews(payload, entity, context)
+      payload = local.payload
+      children.push(...local.children)
+      diagnostics.push(...local.diagnostics)
+      dependencies.push(...local.dependencies)
+    }
+
+    return this._makeArtifact(entity, 'data-view', context, {
+      capabilities: ['compilable', 'runnable', 'data-provider'],
+      payload,
+      diagnostics,
+      dependencies,
+      children,
+    })
   }
 
   /**
@@ -339,10 +555,9 @@ export class EndgeCompiler extends EndgeModule {
       type: 'query-rest',
       endpoint: '',
       query: '',
-      subField: 'items',
       params: {},
-      returnField: null,
       filters: [],
+      outputs: [],
     }
   }
 

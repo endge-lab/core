@@ -12,7 +12,11 @@ import type {
   RComponentSFC_RuntimeTableColumnDependency,
   RComponentSFCSource_Parts,
 } from '@/domain/types/component-sfc.types'
-import type { ComponentSFCProgramPayload, ProgramDiagnostic } from '@/domain/types/program.types'
+import type {
+  ComponentSFCPreviewOptions,
+  ComponentSFCProgramPayload,
+  ProgramDiagnostic,
+} from '@/domain/types/program.types'
 import type {
   RuntimeArtifactReader,
   RuntimeBoundaryPatch,
@@ -195,6 +199,11 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   /** Возвращает preview-only props из compiled artifact. */
   public getPreviewProps(): Record<string, unknown> | null {
     return this.getArtifactPayload()?.previewProps ?? null
+  }
+
+  /** Возвращает preview-only runtime options из compiled artifact. */
+  public getPreviewOptions(): ComponentSFCPreviewOptions | null {
+    return this.getArtifactPayload()?.previewOptions ?? null
   }
 
   /** Обновляет input source и пересобирает Raph subscriptions host-а. */

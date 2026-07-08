@@ -73,13 +73,14 @@ const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
     detail: 'Query params schema',
   },
   {
-    label: 'response',
+    label: 'outputs',
     kind: 'property',
-    insertText: `response: {
-  subField: 'items',
-  return: null,
+    insertText: `outputs: {
+  raw: output()
+    .from(response('items'))
+    .toStore(),
 },`,
-    detail: 'Response mapping',
+    detail: 'Query output graph',
   },
   {
     label: 'filters',
@@ -98,6 +99,38 @@ const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
   data: null,
 },`,
     detail: 'Mock data config',
+  },
+  {
+    label: 'output',
+    kind: 'function',
+    insertText: `output().from(response('items')).toStore()`,
+    detail: 'Описывает output из response или предыдущего output',
+  },
+  {
+    label: 'response',
+    kind: 'function',
+    insertText: `response('items')`,
+    detail: 'Selector backend response',
+  },
+  {
+    label: 'dataView',
+    kind: 'function',
+    insertText: `dataView('data-view-identity')`,
+    detail: 'Ссылка на доменный DataView',
+  },
+  {
+    label: 'defineDataView',
+    kind: 'snippet',
+    insertText: `defineDataView({
+  mode: 'pipeline',
+  steps: [
+    from('').as('row'),
+    map({
+      ...spread('row'),
+    }),
+  ],
+})`,
+    detail: 'Локальный pipeline DataView',
   },
   {
     label: 'field',

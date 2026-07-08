@@ -8,6 +8,10 @@ import {
   createEmptyComponentDependencies,
 } from '@/domain/types/component-core.types'
 import type {
+  ComponentSFCPreviewOptions,
+  ComponentSFCPreviewProps,
+} from '@/domain/types/program.types'
+import type {
   RComponentSFCSource_Parts,
   RComponentSFC_AST,
   RComponentSFC_IR,
@@ -41,7 +45,10 @@ export interface ComponentSFCCompileResult {
   runtimeDependencies: RComponentSFC_RuntimeDependencies
 
   /** Preview-only props для песочницы и debug UI. Не меняют contract. */
-  previewProps: Record<string, unknown> | null
+  previewProps: ComponentSFCPreviewProps | null
+
+  /** Preview-only runtime options для песочницы компонента. */
+  previewOptions: ComponentSFCPreviewOptions | null
 
   /** Все diagnostics pipeline. */
   diagnostics: RComponentDiagnostic[]
@@ -61,6 +68,7 @@ export function compileComponentSFC(source: string): ComponentSFCCompileResult {
       dependencies: createEmptyComponentDependencies(),
       runtimeDependencies: createEmptyComponentSFCRuntimeDependencies(),
       previewProps: null,
+      previewOptions: null,
       diagnostics,
     }
   }
@@ -103,6 +111,7 @@ export function compileComponentSFC(source: string): ComponentSFCCompileResult {
     dependencies,
     runtimeDependencies: analyzeComponentSFCRuntimeDependencies(ir),
     previewProps: scriptResult.previewProps,
+    previewOptions: scriptResult.previewOptions,
     diagnostics,
   }
 }

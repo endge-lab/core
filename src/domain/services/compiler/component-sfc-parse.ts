@@ -327,9 +327,13 @@ function extractPreviewPropsDeclaration(content: string, baseOffset: number): RC
       const argument = expression.arguments?.[0]
       if (!argument || argument.start == null || argument.end == null)
         return null
+      const optionsArgument = expression.arguments?.[1]
 
       return {
         source: content.slice(argument.start, argument.end).trim(),
+        optionsSource: optionsArgument?.start != null && optionsArgument?.end != null
+          ? content.slice(optionsArgument.start, optionsArgument.end).trim()
+          : null,
         range: {
           start: baseOffset + Number(statement.start ?? argument.start),
           end: baseOffset + Number(statement.end ?? argument.end),

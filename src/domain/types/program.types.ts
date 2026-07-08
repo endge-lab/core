@@ -1,6 +1,11 @@
 import type { ActionCompiledFlow } from '@/domain/types/action.types'
 import type { RComponentContract, RComponentDependencies } from '@/domain/types/component-core.types'
-import type { DataViewManualTransform, DataViewPipelineStep, DataViewSourceDocument } from '@/domain/types/data-view-source.types'
+import type {
+  DataViewManualTransform,
+  DataViewPipelineStep,
+  DataViewRef,
+  DataViewSourceDocument,
+} from '@/domain/types/data-view-source.types'
 import type {
   RComponentSFC_AST,
   RComponentSFC_IR,
@@ -109,6 +114,9 @@ export interface ProgramArtifact<TPayload = unknown> {
 
   /** Typed payload конкретного artifact: SFC IR, compiled flow, query plan и т.п. */
   payload: TPayload
+
+  /** Локальные compiled artifacts, принадлежащие только этому artifact. */
+  children?: ProgramArtifact[]
 }
 
 /** Payload artifact для action: скомпилированный flow или null при ошибке компиляции. */
@@ -129,6 +137,28 @@ export type QueryProgramFilterItem
     filterId?: null
     inlineJson: string
   }
+
+export type QueryProgramOutputSource
+  = | {
+    type: 'response'
+    path: string | null
+  }
+  | {
+    type: 'output'
+    key: string
+  }
+
+export interface QueryProgramOutputStoreTarget {
+  mode: 'default' | 'custom'
+  key?: string
+}
+
+export interface QueryProgramOutput {
+  key: string
+  source: QueryProgramOutputSource
+  dataViews: DataViewRef[]
+  store: QueryProgramOutputStoreTarget | null
+}
 
 /** Payload artifact для query-сущности. */
 export interface QueryProgramPayload {
@@ -162,14 +192,8 @@ export interface QueryProgramPayload {
   /** Отправлять body как application/x-www-form-urlencoded. */
   sendAsFormUrlencoded?: boolean
 
-  /** Подполе результата, которое runtime должен считать основным payload. */
-  subField: string
-
   /** Параметры query, сохраненные в нормализованном виде. */
   params: unknown
-
-  /** Описание возвращаемого поля или типа результата. */
-  returnField: unknown
 
   /** Набор фильтров, применяемых к query. */
   filters: QueryProgramFilterItem[]
@@ -182,6 +206,9 @@ export interface QueryProgramPayload {
 
   /** Mock payload query. */
   mockData?: unknown
+
+  /** Ordered output graph, который runtime вычисляет после backend response. */
+  outputs: QueryProgramOutput[]
 }
 
 /** Payload artifact для DataView: executable read-model без persisted runtime state. */
@@ -238,13 +265,45 @@ export interface ComponentSFCProgramPayload {
   runtimeDependencies: RComponentSFC_RuntimeDependencies
 
   /** Preview-only props для песочницы/debug UI. Не являются runtime default props. */
-  previewProps: Record<string, unknown> | null
+  previewProps: ComponentSFCPreviewProps | null
+
+  /** Preview-only runtime options: seed local store, run queries/actions etc. */
+  previewOptions: ComponentSFCPreviewOptions | null
 
   /** Parser-level AST SFC source, нужен для diagnostics и debug UI. */
   ast: RComponentSFC_AST | null
 
   /** Target-neutral semantic IR, который renderer-слои используют для DOM/Nova. */
   ir: RComponentSFC_IR | null
+}
+
+export type ComponentSFCPreviewLiteral
+  = | null
+    | string
+    | number
+    | boolean
+    | ComponentSFCPreviewLiteral[]
+    | { [key: string]: ComponentSFCPreviewLiteral }
+
+export interface ComponentSFCPreviewStoreProp {
+  type: 'store'
+  path: string
+}
+
+export type ComponentSFCPreviewPropValue
+  = | ComponentSFCPreviewLiteral
+    | ComponentSFCPreviewStoreProp
+
+export type ComponentSFCPreviewProps = Record<string, ComponentSFCPreviewPropValue>
+
+export interface ComponentSFCPreviewRunTarget {
+  type: 'query'
+  identity: string
+}
+
+export interface ComponentSFCPreviewOptions {
+  seed?: Record<string, ComponentSFCPreviewLiteral>
+  run?: ComponentSFCPreviewRunTarget[]
 }
 
 /** Payload artifact для settings. */

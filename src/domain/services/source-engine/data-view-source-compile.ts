@@ -1,5 +1,6 @@
 import type {
   DataViewExpression,
+  DataViewRef,
   DataViewManualTransform,
   DataViewPathOperation,
   DataViewPipelineStep,
@@ -123,7 +124,7 @@ function parseDocument(
     return { mode, transform: transform ?? undefined }
   }
 
-  const steps = stepsNode ? readPipelineSteps(stepsNode, diagnostics) : []
+  const steps = stepsNode ? readPipelineSteps(stepsNode, source, diagnostics) : []
   if (!steps.length) {
     diagnostics.push(createDiagnostic(
       'error',
@@ -158,14 +159,14 @@ function readManualTransform(
   return null
 }
 
-function readPipelineSteps(node: t.ArrayExpression, diagnostics: DiagnosticDraft[]): DataViewPipelineStep[] {
+function readPipelineSteps(node: t.ArrayExpression, source: string, diagnostics: DiagnosticDraft[]): DataViewPipelineStep[] {
   const steps: DataViewPipelineStep[] = []
 
   for (const element of node.elements) {
     if (!element || !t.isExpression(element))
       continue
 
-    const step = readPipelineStep(unwrapExpression(element), diagnostics)
+    const step = readPipelineStep(unwrapExpression(element), source, diagnostics)
     if (step)
       steps.push(step)
   }
@@ -173,10 +174,10 @@ function readPipelineSteps(node: t.ArrayExpression, diagnostics: DiagnosticDraft
   return steps
 }
 
-function readPipelineStep(node: t.Expression, diagnostics: DiagnosticDraft[]): DataViewPipelineStep | null {
+function readPipelineStep(node: t.Expression, source: string, diagnostics: DiagnosticDraft[]): DataViewPipelineStep | null {
   const expression = unwrapExpression(node)
 
-  const from = readFromStep(expression)
+  const from = readFromStep(expression, source, diagnostics)
   if (from)
     return from
 
@@ -196,31 +197,102 @@ function readPipelineStep(node: t.Expression, diagnostics: DiagnosticDraft[]): D
   return null
 }
 
-function readFromStep(node: t.Expression) {
-  if (t.isCallExpression(node) && isIdentifierCallee(node, 'from')) {
-    return {
-      type: 'from' as const,
-      source: readStringArgument(node, 0) ?? '',
-      as: 'item',
+function readFromStep(node: t.Expression, source: string, diagnostics: DiagnosticDraft[]) {
+  const chain = collectFromChain(node)
+  if (!chain)
+    return null
+
+  let as = 'item'
+  const dataViews: DataViewRef[] = []
+
+  for (const call of chain.modifiers) {
+    if (call.name === 'as') {
+      as = readStringArgumentFromArgs(call.arguments, 0) ?? 'item'
+      continue
     }
+
+    if (call.name === 'dataView') {
+      const dataViewRef = readDataViewRef(call.arguments[0], source, diagnostics)
+      if (dataViewRef)
+        dataViews.push(dataViewRef)
+      continue
+    }
+
+    diagnostics.push(createDiagnostic(
+      'warning',
+      'data-view-source-from-method-unsupported',
+      `from(...).${call.name}(...) не поддерживается в DataView pipeline v1.`,
+      'steps',
+    ))
   }
-
-  if (!t.isCallExpression(node) || !t.isMemberExpression(node.callee))
-    return null
-
-  const member = node.callee
-  if (!isIdentifierProperty(member, 'as'))
-    return null
-
-  const base = unwrapExpression(member.object as t.Expression)
-  if (!t.isCallExpression(base) || !isIdentifierCallee(base, 'from'))
-    return null
 
   return {
     type: 'from' as const,
-    source: readStringArgument(base, 0) ?? '',
-    as: readStringArgument(node, 0) ?? 'item',
+    source: readStringArgument(chain.base, 0) ?? '',
+    as,
+    dataViews: dataViews.length ? dataViews : undefined,
   }
+}
+
+function collectFromChain(
+  node: t.Expression,
+): { base: t.CallExpression, modifiers: Array<{ name: string, arguments: t.CallExpression['arguments'] }> } | null {
+  let current = unwrapExpression(node)
+  const modifiers: Array<{ name: string, arguments: t.CallExpression['arguments'] }> = []
+
+  while (t.isCallExpression(current) && t.isMemberExpression(current.callee)) {
+    const name = getPropertyName(current.callee.property)
+    if (!name || !t.isExpression(current.callee.object))
+      return null
+
+    modifiers.unshift({ name, arguments: current.arguments })
+    current = unwrapExpression(current.callee.object)
+  }
+
+  if (!t.isCallExpression(current) || !isIdentifierCallee(current, 'from'))
+    return null
+
+  return { base: current, modifiers }
+}
+
+function readDataViewRef(
+  node: t.CallExpression['arguments'][number] | undefined,
+  source: string,
+  diagnostics: DiagnosticDraft[],
+): DataViewRef | null {
+  if (!node || !t.isExpression(node)) {
+    diagnostics.push(createDiagnostic('error', 'data-view-source-dataview-missing', 'from(...).dataView(...) должен получить DataView.', 'steps'))
+    return null
+  }
+
+  const expression = unwrapExpression(node)
+  if (t.isCallExpression(expression) && isIdentifierCallee(expression, 'dataView')) {
+    const identity = expression.arguments[0]
+    if (identity && t.isStringLiteral(identity))
+      return { kind: 'external', identity: identity.value }
+  }
+
+  if (t.isCallExpression(expression) && isIdentifierCallee(expression, 'defineDataView')) {
+    if (isManualDataViewDefinition(expression.arguments[0])) {
+      diagnostics.push(createDiagnostic(
+        'error',
+        'data-view-source-local-dataview-manual-unsupported',
+        'Локальные DataView внутри DataView в v1 поддерживают только mode: pipeline.',
+        'steps',
+      ))
+    }
+
+    if (typeof expression.start === 'number' && typeof expression.end === 'number')
+      return { kind: 'inline', source: source.slice(expression.start, expression.end) }
+  }
+
+  diagnostics.push(createDiagnostic(
+    'error',
+    'data-view-source-dataview-unsupported',
+    'from(...).dataView(...) поддерживает dataView("identity") или defineDataView({...}).',
+    'steps',
+  ))
+  return null
 }
 
 function readJoinStep(node: t.Expression, diagnostics: DiagnosticDraft[]) {
@@ -396,7 +468,11 @@ function readStringProperty(node: t.ObjectExpression, name: string): string | nu
 }
 
 function readStringArgument(node: t.CallExpression, index: number): string | null {
-  const arg = node.arguments[index]
+  return readStringArgumentFromArgs(node.arguments, index)
+}
+
+function readStringArgumentFromArgs(args: t.CallExpression['arguments'], index: number): string | null {
+  const arg = args[index]
   return arg && t.isStringLiteral(arg) ? arg.value : null
 }
 
@@ -446,6 +522,22 @@ function isIdentifierCallee(node: t.CallExpression, name: string): boolean {
 
 function isIdentifierProperty(node: t.MemberExpression, name: string): boolean {
   return getPropertyName(node.property) === name
+}
+
+function isManualDataViewDefinition(node: t.Node | null | undefined): boolean {
+  if (!node || !t.isExpression(node))
+    return false
+
+  const definition = unwrapExpression(node)
+  if (!t.isObjectExpression(definition))
+    return false
+
+  const mode = readStringProperty(definition, 'mode')
+  const hasTransform = definition.properties.some(property =>
+    (t.isObjectMethod(property) || t.isObjectProperty(property)) && getPropertyName(property.key) === 'transform',
+  )
+  const hasSteps = Boolean(readPropertyValue(definition, 'steps'))
+  return mode === 'manual' || (hasTransform && !hasSteps)
 }
 
 function getPropertyName(node: t.Node): string | null {

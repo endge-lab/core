@@ -3,6 +3,11 @@ import { parse as parseTS } from '@babel/parser'
 import type { RComponentContract, RComponentDiagnostic } from '@/domain/types/component-core.types'
 import { createEmptyComponentContract } from '@/domain/types/component-core.types'
 import type {
+  ComponentSFCPreviewLiteral,
+  ComponentSFCPreviewOptions,
+  ComponentSFCPreviewProps,
+} from '@/domain/types/program.types'
+import type {
   RComponentSFC_AST_Script,
   RComponentSFC_IR_LocalBinding,
   RComponentSFC_IR_Prop,
@@ -20,7 +25,10 @@ export interface ComponentSFCScriptAnalysisResult {
   locals: RComponentSFC_IR_LocalBinding[]
 
   /** Preview-only props для SFC Playground. Не входят в runtime contract. */
-  previewProps: Record<string, unknown> | null
+  previewProps: ComponentSFCPreviewProps | null
+
+  /** Preview-only runtime options для запуска песочницы компонента. */
+  previewOptions: ComponentSFCPreviewOptions | null
 
   /** Diagnostics script pass. */
   diagnostics: RComponentDiagnostic[]
@@ -44,6 +52,7 @@ export function analyzeComponentSFCScript(script: RComponentSFC_AST_Script | nul
       props: [],
       locals: [],
       previewProps: null,
+      previewOptions: null,
       diagnostics,
     }
   }
@@ -61,8 +70,8 @@ export function analyzeComponentSFCScript(script: RComponentSFC_AST_Script | nul
     ? parsePropsSource(script.props.source)
     : []
   const previewPropsResult = script.previewProps
-    ? parsePreviewPropsSource(script.previewProps.source)
-    : { value: null, diagnostics: [] }
+    ? parsePreviewPropsSource(script.previewProps.source, script.previewProps.optionsSource)
+    : { props: null, options: null, diagnostics: [] }
 
   diagnostics.push(...previewPropsResult.diagnostics)
 
@@ -82,7 +91,8 @@ export function analyzeComponentSFCScript(script: RComponentSFC_AST_Script | nul
         name: binding.name,
         sourceRange: binding.range,
       })),
-    previewProps: previewPropsResult.value,
+    previewProps: previewPropsResult.props,
+    previewOptions: previewPropsResult.options,
     diagnostics,
   }
 }
@@ -115,25 +125,35 @@ function parsePropsSource(source: string): RComponentSFC_IR_Prop[] {
   return props
 }
 
-function parsePreviewPropsSource(source: string): { value: Record<string, unknown> | null, diagnostics: RComponentDiagnostic[] } {
+function parsePreviewPropsSource(
+  source: string,
+  optionsSource?: string | null,
+): { props: ComponentSFCPreviewProps | null, options: ComponentSFCPreviewOptions | null, diagnostics: RComponentDiagnostic[] } {
+  const diagnostics: RComponentDiagnostic[] = []
+
   try {
     const ast = parseTS(`const __preview = ${source}`, {
       sourceType: 'module',
       plugins: ['typescript'],
     }) as any
     const declaration = ast.program.body[0]?.declarations?.[0]
-    const value = readPreviewLiteral(declaration?.init)
+    const value = readPreviewPropsObject(declaration?.init)
 
     if (value.ok && value.value && typeof value.value === 'object' && !Array.isArray(value.value)) {
+      const options = optionsSource
+        ? parsePreviewOptionsSource(optionsSource, diagnostics)
+        : null
       return {
-        value: value.value as Record<string, unknown>,
-        diagnostics: [],
+        props: value.value as ComponentSFCPreviewProps,
+        options,
+        diagnostics,
       }
     }
   }
   catch {
     return {
-      value: null,
+      props: null,
+      options: null,
       diagnostics: [{
         severity: 'warning',
         code: 'sfc-preview-props-invalid',
@@ -144,22 +164,163 @@ function parsePreviewPropsSource(source: string): { value: Record<string, unknow
   }
 
   return {
-    value: null,
+    props: null,
+    options: null,
     diagnostics: [{
       severity: 'warning',
       code: 'sfc-preview-props-unsupported',
-      message: 'definePreviewProps поддерживает только object literal с literal-значениями.',
+      message: 'definePreviewProps поддерживает object literal с literal-значениями или fromStore("path").',
       sourcePath: 'script',
     }],
   }
 }
 
-function readPreviewLiteral(node: any): { ok: true, value: unknown } | { ok: false } {
-  if (!node)
+function parsePreviewOptionsSource(
+  source: string,
+  diagnostics: RComponentDiagnostic[],
+): ComponentSFCPreviewOptions | null {
+  try {
+    const ast = parseTS(`const __previewOptions = ${source}`, {
+      sourceType: 'module',
+      plugins: ['typescript'],
+    }) as any
+    const declaration = ast.program.body[0]?.declarations?.[0]
+    const value = readPreviewOptionsObject(declaration?.init)
+    if (value.ok)
+      return value.value
+  }
+  catch {
+    diagnostics.push({
+      severity: 'warning',
+      code: 'sfc-preview-options-invalid',
+      message: 'Второй аргумент definePreviewProps должен быть валидным object literal.',
+      sourcePath: 'script',
+    })
+    return null
+  }
+
+  diagnostics.push({
+    severity: 'warning',
+    code: 'sfc-preview-options-unsupported',
+    message: 'definePreviewProps options поддерживает seed object и run: [query("identity")].',
+    sourcePath: 'script',
+  })
+  return null
+}
+
+function readPreviewPropsObject(node: any): { ok: true, value: ComponentSFCPreviewProps } | { ok: false } {
+  const expression = unwrapPreviewExpression(node)
+  if (!expression || expression.type !== 'ObjectExpression')
     return { ok: false }
 
-  if (node.type === 'TSAsExpression' || node.type === 'TSSatisfiesExpression' || node.type === 'TypeCastExpression')
-    return readPreviewLiteral(node.expression)
+  const object: ComponentSFCPreviewProps = {}
+  for (const property of expression.properties ?? []) {
+    if (property.type !== 'ObjectProperty' || property.computed)
+      return { ok: false }
+
+    const key = readObjectKey(property.key)
+    const value = readPreviewPropValue(property.value)
+    if (!key || !value.ok)
+      return { ok: false }
+
+    object[key] = value.value
+  }
+
+  return { ok: true, value: object }
+}
+
+function readPreviewPropValue(node: any): { ok: true, value: ComponentSFCPreviewProps[string] } | { ok: false } {
+  const expression = unwrapPreviewExpression(node)
+  const storeRef = readFromStoreExpression(expression)
+  if (storeRef)
+    return { ok: true, value: storeRef }
+
+  return readPreviewLiteral(expression)
+}
+
+function readPreviewOptionsObject(node: any): { ok: true, value: ComponentSFCPreviewOptions } | { ok: false } {
+  const expression = unwrapPreviewExpression(node)
+  if (!expression || expression.type !== 'ObjectExpression')
+    return { ok: false }
+
+  const options: ComponentSFCPreviewOptions = {}
+  for (const property of expression.properties ?? []) {
+    if (property.type !== 'ObjectProperty' || property.computed)
+      return { ok: false }
+
+    const key = readObjectKey(property.key)
+    if (key === 'seed') {
+      const value = readPreviewLiteral(property.value)
+      if (!value.ok || !value.value || typeof value.value !== 'object' || Array.isArray(value.value))
+        return { ok: false }
+      options.seed = value.value as Record<string, ComponentSFCPreviewLiteral>
+      continue
+    }
+
+    if (key === 'run') {
+      const value = readPreviewRunTargets(property.value)
+      if (!value.ok)
+        return { ok: false }
+      options.run = value.value
+      continue
+    }
+
+    return { ok: false }
+  }
+
+  return { ok: true, value: options }
+}
+
+function readPreviewRunTargets(node: any): { ok: true, value: ComponentSFCPreviewOptions['run'] } | { ok: false } {
+  const expression = unwrapPreviewExpression(node)
+  if (!expression || expression.type !== 'ArrayExpression')
+    return { ok: false }
+
+  const run: NonNullable<ComponentSFCPreviewOptions['run']> = []
+  for (const item of expression.elements ?? []) {
+    const queryRef = readQueryExpression(unwrapPreviewExpression(item))
+    if (!queryRef)
+      return { ok: false }
+    run.push(queryRef)
+  }
+
+  return { ok: true, value: run }
+}
+
+function readFromStoreExpression(node: any): { type: 'store', path: string } | null {
+  if (
+    node?.type !== 'CallExpression'
+    || node.callee?.type !== 'Identifier'
+    || node.callee.name !== 'fromStore'
+  ) {
+    return null
+  }
+
+  const argument = readPreviewLiteral(node.arguments?.[0])
+  return argument.ok && typeof argument.value === 'string'
+    ? { type: 'store', path: argument.value }
+    : null
+}
+
+function readQueryExpression(node: any): { type: 'query', identity: string } | null {
+  if (
+    node?.type !== 'CallExpression'
+    || node.callee?.type !== 'Identifier'
+    || node.callee.name !== 'query'
+  ) {
+    return null
+  }
+
+  const argument = readPreviewLiteral(node.arguments?.[0])
+  return argument.ok && typeof argument.value === 'string'
+    ? { type: 'query', identity: argument.value }
+    : null
+}
+
+function readPreviewLiteral(node: any): { ok: true, value: ComponentSFCPreviewLiteral } | { ok: false } {
+  node = unwrapPreviewExpression(node)
+  if (!node)
+    return { ok: false }
 
   if (node.type === 'StringLiteral' || node.type === 'NumericLiteral' || node.type === 'BooleanLiteral')
     return { ok: true, value: node.value }
@@ -178,7 +339,7 @@ function readPreviewLiteral(node: any): { ok: true, value: unknown } | { ok: fal
     return { ok: true, value: node.quasis?.[0]?.value?.cooked ?? '' }
 
   if (node.type === 'ArrayExpression') {
-    const items: unknown[] = []
+    const items: ComponentSFCPreviewLiteral[] = []
     for (const item of node.elements ?? []) {
       const value = readPreviewLiteral(item)
       if (!value.ok)
@@ -189,7 +350,7 @@ function readPreviewLiteral(node: any): { ok: true, value: unknown } | { ok: fal
   }
 
   if (node.type === 'ObjectExpression') {
-    const object: Record<string, unknown> = {}
+    const object: Record<string, ComponentSFCPreviewLiteral> = {}
     for (const property of node.properties ?? []) {
       if (property.type !== 'ObjectProperty' || property.computed)
         return { ok: false }
@@ -205,6 +366,19 @@ function readPreviewLiteral(node: any): { ok: true, value: unknown } | { ok: fal
   }
 
   return { ok: false }
+}
+
+function unwrapPreviewExpression(node: any): any {
+  let current = node
+  while (
+    current?.type === 'TSAsExpression'
+    || current?.type === 'TSSatisfiesExpression'
+    || current?.type === 'TypeCastExpression'
+    || current?.type === 'ParenthesizedExpression'
+  ) {
+    current = current.expression
+  }
+  return current
 }
 
 function readObjectKey(node: any): string | null {

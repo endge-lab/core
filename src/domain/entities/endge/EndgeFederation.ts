@@ -40,6 +40,24 @@ export abstract class EndgeFederation {
   protected static configureFederation(): void {}
 
   /**
+   * Запускает федерацию по полному lifecycle pipeline: `setup -> load -> build -> start`.
+   */
+  public static async boot(ctx: EndgeBootContext): Promise<void> {
+    const host = this.host
+    if (host.isInitialized)
+      return
+
+    host.bootContext = ctx
+
+    await this.setup(ctx)
+    await this.load(ctx)
+    await this.build(ctx)
+    await this.start(ctx)
+
+    host.isInitialized = true
+  }
+
+  /**
    * Добавляет plugin в список расширений федерации.
    * Plugin устанавливается во время конфигурации федерации, до boot.
    */
@@ -114,7 +132,7 @@ export abstract class EndgeFederation {
   /**
    * Выполняет `setup()` для всех модулей один раз до первого `start()`.
    */
-  public static async setup(ctx: EndgeBootContext): Promise<void> {
+  public static async setup(ctx: EndgeBootContext = this.requireBootContext()): Promise<void> {
     const host = this.host
     if (host.isSetup)
       return
@@ -131,7 +149,7 @@ export abstract class EndgeFederation {
     host.isSetup = true
   }
 
-  public static async load(ctx: EndgeBootContext): Promise<void> {
+  public static async load(ctx: EndgeBootContext = this.requireBootContext()): Promise<void> {
     for (const [key, module] of this.host.modules.entries()) {
       try {
         await module.load(ctx)
@@ -142,7 +160,7 @@ export abstract class EndgeFederation {
     }
   }
 
-  public static async build(ctx: EndgeBootContext): Promise<void> {
+  public static async build(ctx: EndgeBootContext = this.requireBootContext()): Promise<void> {
     for (const [key, module] of this.host.modules.entries()) {
       try {
         await module.build(ctx)
@@ -153,7 +171,7 @@ export abstract class EndgeFederation {
     }
   }
 
-  public static async start(ctx: EndgeBootContext): Promise<void> {
+  public static async start(ctx: EndgeBootContext = this.requireBootContext()): Promise<void> {
     for (const [key, module] of this.host.modules.entries()) {
       try {
         await module.start(ctx)
@@ -181,6 +199,7 @@ export abstract class EndgeFederation {
     host.isSetup = false
     host.isInitialized = false
     host.isHydrating = false
+    host.bootContext = null
   }
 
   /**
@@ -316,6 +335,7 @@ export abstract class EndgeFederation {
       isSetup: false,
       isInitialized: false,
       isHydrating: false,
+      bootContext: null,
       moduleDescriptors: [],
       modules: new Map<string, EndgeModule>(),
       plugins: [],
@@ -334,6 +354,14 @@ export abstract class EndgeFederation {
     }
 
     return host
+  }
+
+  private static requireBootContext(): EndgeBootContext {
+    const ctx = this.host.bootContext
+    if (!ctx)
+      throw new Error(`[${this.name}] boot context is not available`)
+
+    return ctx
   }
 
   private static installPlugins(): void {

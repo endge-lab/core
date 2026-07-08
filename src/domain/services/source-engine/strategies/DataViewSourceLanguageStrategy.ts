@@ -79,6 +79,8 @@ const DATA_VIEW_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'transform', kind: 'function', insertText: `transform(input, tools) {\n  return input\n}`, detail: 'Manual transform' },
   { label: 'steps', kind: 'property', insertText: `steps: [\n  from('items').as('item'),\n  map({})\n],`, detail: 'Pipeline steps' },
   { label: 'from', kind: 'function', insertText: `from('items').as('item')`, detail: 'Берет input array' },
+  { label: 'from.dataView', kind: 'function', insertText: `from('items').dataView(dataView('normalize')).as('item')`, detail: 'Применяет DataView перед map' },
+  { label: 'dataView', kind: 'function', insertText: `dataView('data-view-identity')`, detail: 'Ссылка на доменный DataView' },
   { label: 'join', kind: 'function', insertText: `join('attrs').by({ left: 'item.id', right: 'itemId', as: 'attrs' })`, detail: 'Связка по ключам' },
   { label: 'map', kind: 'function', insertText: `map({\n  id: path('item.id'),\n})`, detail: 'Формирует output row' },
   { label: 'spread', kind: 'function', insertText: `...spread('item')`, detail: 'Копирует объект в output row перед переопределениями' },

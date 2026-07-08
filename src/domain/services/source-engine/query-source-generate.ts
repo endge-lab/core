@@ -56,10 +56,17 @@ export function createQuerySourceDocument(query: RQuery): QuerySourceDocument {
         }
       }),
     },
-    response: {
-      subField: query.subField ?? 'items',
-      return: fieldToDocument(query.returnField),
-    },
+    outputs: [
+      {
+        key: 'raw',
+        source: {
+          type: 'response',
+          path: query.subField ?? 'items',
+        },
+        dataViews: [],
+        store: { mode: 'default' },
+      },
+    ],
     mock: {
       enabled: Boolean(query.mockDataEnabled),
       data: parseMockData(query.mockData),
@@ -94,10 +101,7 @@ export function printQuerySourceDocument(document: QuerySourceDocument): string 
     items: ${printFilterItems(document.filters.items, 2)},
   },
 
-  response: {
-    subField: ${printValue(document.response.subField)},
-    return: ${document.response.return ? printField(document.response.return) : 'null'},
-  },
+  outputs: ${printOutputs(document.outputs, 1)},
 
   mock: {
     enabled: ${document.mock.enabled ? 'true' : 'false'},
@@ -105,6 +109,42 @@ export function printQuerySourceDocument(document: QuerySourceDocument): string 
   },
 })
 `
+}
+
+function printOutputs(outputs: QuerySourceDocument['outputs'], depth: number): string {
+  if (!outputs.length)
+    return '{}'
+
+  const indent = '  '.repeat(depth)
+  const childIndent = '  '.repeat(depth + 1)
+  const lines = outputs.map(output => `${childIndent}${printKey(output.key)}: ${printOutput(output)},`)
+  return `{\n${lines.join('\n')}\n${indent}}`
+}
+
+function printOutput(output: QuerySourceDocument['outputs'][number]): string {
+  let out = `output().from(${printOutputSource(output.source)})`
+  for (const dataView of output.dataViews) {
+    if (dataView.kind === 'external')
+      out += `.dataView(dataView(${printValue(dataView.identity)}))`
+    if (dataView.kind === 'inline')
+      out += `.dataView(${dataView.source})`
+  }
+
+  if (output.store) {
+    out += output.store.mode === 'custom' && output.store.key
+      ? `.toStore(${printValue(output.store.key)})`
+      : '.toStore()'
+  }
+
+  return out
+}
+
+function printOutputSource(source: QuerySourceDocument['outputs'][number]['source']): string {
+  if (source.type === 'output')
+    return printValue(source.key)
+  return source.path == null
+    ? 'response()'
+    : `response(${printValue(source.path)})`
 }
 
 function normalizeHeaders(headers: unknown): Record<string, string> {

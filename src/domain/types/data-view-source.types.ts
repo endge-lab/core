@@ -22,6 +22,31 @@ export interface DataViewFromStep {
   type: 'from'
   source: string
   as: string
+  dataViews?: DataViewRef[]
+}
+
+export type DataViewRef
+  = | DataViewExternalRef
+    | DataViewInlineRef
+    | DataViewLocalRef
+
+export interface DataViewExternalRef {
+  kind: 'external'
+  identity: string
+}
+
+export interface DataViewInlineRef {
+  kind: 'inline'
+  source: string
+}
+
+export interface DataViewLocalRef {
+  kind: 'local'
+  ref: {
+    entityType: 'data-view'
+    id: string | number
+    identity: string
+  }
 }
 
 export interface DataViewJoinStep {

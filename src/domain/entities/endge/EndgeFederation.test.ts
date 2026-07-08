@@ -50,15 +50,9 @@ describe('EndgeFederation stages', () => {
         this.defineModule({ key: 'second', module: new TestModule('second') })
       }
 
-      public static async bootForTest(ctx: EndgeBootContext): Promise<void> {
-        await this.setup(ctx)
-        await this.load(ctx)
-        await this.build(ctx)
-        await this.start(ctx)
-      }
     }
 
-    await TestFederation.bootForTest(createBootContext())
+    await TestFederation.boot(createBootContext())
 
     expect(calls).toEqual([
       'first:setup',
@@ -70,6 +64,10 @@ describe('EndgeFederation stages', () => {
       'first:start',
       'second:start',
     ])
+    expect(TestFederation.isInitialized).toBe(true)
+
+    await TestFederation.boot(createBootContext())
+    expect(calls).toHaveLength(8)
   })
 
   it('continues reset after a module reset error', async () => {
@@ -109,6 +107,32 @@ describe('EndgeFederation stages', () => {
     finally {
       warnSpy.mockRestore()
     }
+  })
+
+  it('reuses boot context for repeated lifecycle stages', async () => {
+    const calls: string[] = []
+
+    class BuildModule extends EndgeModule {
+      public override build(ctx: EndgeBootContext): void {
+        calls.push(`build:${ctx.dataProvider}`)
+      }
+    }
+
+    class TestFederation extends EndgeFederation {
+      protected static override readonly federationId = `test-boot-context-${Date.now()}-${Math.random()}`
+
+      protected static override configureFederation(): void {
+        this.defineModule({ key: 'build', module: new BuildModule() })
+      }
+    }
+
+    await TestFederation.boot(createBootContext())
+    await TestFederation.build()
+
+    expect(calls).toEqual(['build:plain', 'build:plain'])
+
+    await TestFederation.reset()
+    await expect(TestFederation.build()).rejects.toThrow('[TestFederation] boot context is not available')
   })
 
   it('orders constrained modules before their targets', async () => {

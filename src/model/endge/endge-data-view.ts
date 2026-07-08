@@ -1,9 +1,10 @@
 import type {
   DataViewExpression,
+  DataViewRef,
   DataViewPathOperation,
   DataViewRunTools,
 } from '@/domain/types/data-view-source.types'
-import type { DataViewProgramPayload } from '@/domain/types/program.types'
+import type { DataViewProgramPayload, ProgramArtifact } from '@/domain/types/program.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { RDataView } from '@/domain/entities/reflect/RDataView'
@@ -15,23 +16,71 @@ export class EndgeDataView extends EndgeModule {
   /** Выполняет DataView по id/identity/model над переданным input object. */
   public run(
     dataViewOrId: RDataView | string | number,
-    input: Record<string, unknown>,
+    input: unknown,
     tools?: Partial<DataViewRunTools>,
   ): unknown {
     const dataView = this._resolveDataView(dataViewOrId)
     const artifact = this._resolveArtifact(dataView)
+    return this.runPayload(artifact.payload, input, tools, {
+      children: artifact.children ?? [],
+    })
+  }
+
+  /** Выполняет уже скомпилированный DataView artifact без поиска в домене. */
+  public runArtifact(
+    artifact: ProgramArtifact<DataViewProgramPayload>,
+    input: unknown,
+    tools?: Partial<DataViewRunTools>,
+  ): unknown {
+    if (artifact.status === 'error') {
+      const message = artifact.diagnostics[0]?.message ?? `DataView artifact has compile errors for "${artifact.ref.identity}".`
+      throw new Error(message)
+    }
+
+    return this.runPayload(artifact.payload, input, tools, {
+      children: artifact.children ?? [],
+    })
+  }
+
+  /** Выполняет уже скомпилированный DataView payload. */
+  public runPayload(
+    artifact: DataViewProgramPayload,
+    input: unknown,
+    tools?: Partial<DataViewRunTools>,
+    context: { children?: ProgramArtifact[] } = {},
+  ): unknown {
     const runTools = this._createTools(tools)
 
     if (artifact.mode === 'manual')
       return this._runManual(artifact, input, runTools)
 
-    return this._runPipeline(artifact, input, runTools)
+    return this._runPipeline(artifact, input, runTools, context)
+  }
+
+  /** Выполняет DataView-ссылку из query/DataView artifact. */
+  public runRef(
+    ref: DataViewRef,
+    input: unknown,
+    tools?: Partial<DataViewRunTools>,
+    context: { children?: ProgramArtifact[] } = {},
+  ): unknown {
+    if (ref.kind === 'external')
+      return this.run(ref.identity, input, tools)
+
+    if (ref.kind === 'inline')
+      return this.runSource(ref.source, input, tools)
+
+    const artifact = this._findLocalDataViewArtifact(ref, context.children ?? [])
+    if (!artifact)
+      throw new Error(`Local DataView artifact not found: "${ref.ref.identity}".`)
+
+    return this.runArtifact(artifact, input, tools)
   }
 
   /** Выполняет DataView source без записи artifact в `Endge.program`. */
   public runSource(
     source: string,
-    input: Record<string, unknown>,
+    input: unknown,
     tools?: Partial<DataViewRunTools>,
   ): unknown {
     const result = compileDataViewSource(source)
@@ -41,12 +90,7 @@ export class EndgeDataView extends EndgeModule {
     if (!result.artifact)
       throw new Error('DataView source не создал artifact.')
 
-    const artifact = result.artifact as DataViewProgramPayload
-    const runTools = this._createTools(tools)
-    if (artifact.mode === 'manual')
-      return this._runManual(artifact, input, runTools)
-
-    return this._runPipeline(artifact, input, runTools)
+    return this.runPayload(result.artifact as DataViewProgramPayload, input, tools)
   }
 
   /** Возвращает DataView model из домена или входного экземпляра. */
@@ -62,7 +106,7 @@ export class EndgeDataView extends EndgeModule {
   }
 
   /** Возвращает compiled artifact, компилируя DataView локально при необходимости. */
-  private _resolveArtifact(dataView: RDataView): DataViewProgramPayload {
+  private _resolveArtifact(dataView: RDataView): ProgramArtifact<DataViewProgramPayload> {
     const artifact = Endge.program.getDataViewArtifact(dataView.id ?? dataView.identity)
       ?? Endge.compiler.buildDataView(dataView)
     if (artifact.status === 'error') {
@@ -70,13 +114,13 @@ export class EndgeDataView extends EndgeModule {
       throw new Error(message)
     }
 
-    return artifact.payload
+    return artifact
   }
 
   /** Выполняет manual transform в controlled wrapper текущего frontend runtime. */
   private _runManual(
     artifact: DataViewProgramPayload,
-    input: Record<string, unknown>,
+    input: unknown,
     tools: DataViewRunTools,
   ): unknown {
     const body = artifact.transform?.body ?? ''
@@ -85,15 +129,16 @@ export class EndgeDataView extends EndgeModule {
       const { convert, pick, path, template } = tools;
       ${body}
     `
-    const fn = new Function('input', 'tools', wrappedBody) as (input: Record<string, unknown>, tools: DataViewRunTools) => unknown
+    const fn = new Function('input', 'tools', wrappedBody) as (input: unknown, tools: DataViewRunTools) => unknown
     return fn(input, tools)
   }
 
   /** Интерпретирует декларативные pipeline steps без eval. */
   private _runPipeline(
     artifact: DataViewProgramPayload,
-    input: Record<string, unknown>,
+    input: unknown,
     tools: DataViewRunTools,
+    context: { children?: ProgramArtifact[] },
   ): unknown {
     let rows: unknown[] = []
     let alias = 'item'
@@ -101,7 +146,9 @@ export class EndgeDataView extends EndgeModule {
 
     for (const step of artifact.steps) {
       if (step.type === 'from') {
-        const value = tools.path(input, step.source)
+        let value = tools.path(input, step.source)
+        for (const ref of step.dataViews ?? [])
+          value = this.runRef(ref, value, tools, context)
         rows = Array.isArray(value) ? value : []
         alias = step.as || 'item'
       }
@@ -148,7 +195,7 @@ export class EndgeDataView extends EndgeModule {
 
   /** Вычисляет join-result для текущей строки pipeline. */
   private _resolveJoin(
-    input: Record<string, unknown>,
+    input: unknown,
     scope: Record<string, unknown>,
     join: { source: string, left: string, right: string },
     tools: DataViewRunTools,
@@ -242,5 +289,26 @@ export class EndgeDataView extends EndgeModule {
       current = current[part]
     }
     return current
+  }
+
+  /** Ищет локальный DataView artifact среди child artifacts, включая вложенные children. */
+  private _findLocalDataViewArtifact(
+    ref: Extract<DataViewRef, { kind: 'local' }>,
+    children: ProgramArtifact[],
+  ): ProgramArtifact<DataViewProgramPayload> | null {
+    for (const child of children) {
+      if (
+        child.ref.entityType === 'data-view'
+        && (child.ref.identity === ref.ref.identity || child.ref.id === ref.ref.id)
+      ) {
+        return child as ProgramArtifact<DataViewProgramPayload>
+      }
+
+      const nested = this._findLocalDataViewArtifact(ref, child.children ?? [])
+      if (nested)
+        return nested
+    }
+
+    return null
   }
 }

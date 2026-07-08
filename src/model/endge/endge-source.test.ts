@@ -71,8 +71,14 @@ describe('EndgeSource', () => {
       endpoint: '{API_BASE_URL}',
       query: '/flights',
       method: 'GET',
-      subField: 'items',
       filterMode: 'merge',
+      outputs: [
+        {
+          key: 'raw',
+          source: { type: 'response', path: 'items' },
+          store: { mode: 'default' },
+        },
+      ],
     })
   })
 
@@ -114,7 +120,7 @@ defineQuery({
     expect(legacyResult.artifact).toMatchObject({ endpoint: '{ENDPOINT_AODB}' })
   })
 
-  it('treats empty response return field as no return schema', () => {
+  it('returns diagnostics for legacy response block', () => {
     const result = Endge.source.compile('query', `
 defineQuery({
   request: {
@@ -128,9 +134,13 @@ defineQuery({
 })
 `)
 
-    expect(result.ok).toBe(true)
-    expect(result.diagnostics).toEqual([])
-    expect(result.artifact).toMatchObject({ returnField: null })
+    expect(result.ok).toBe(false)
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'query-source-response-unsupported',
+        severity: 'error',
+      }),
+    ]))
   })
 
   it('tracks unsupported query field diagnostics on the invalid field expression', () => {
@@ -186,42 +196,39 @@ defineQuery({
   it('patches query source with raw DSL expressions', () => {
     const source = `
 defineQuery({
-  response: {
-    subField: 'items',
-    return: null,
-  },
+  outputs: {},
 })
 `
 
     const result = Endge.source.patch('query', source, {
-      path: 'response.return',
-      expression: "field('FlightLeg').array()",
+      path: 'outputs',
+      expression: `{
+  raw: output().from(response('items')).toStore(),
+}`,
     })
 
     expect(result.ok).toBe(true)
-    expect(result.source).toContain("return: field('FlightLeg').array()")
+    expect(result.source).toContain("raw: output().from(response('items')).toStore()")
     expect(result.document).toMatchObject({
-      response: {
-        return: {
-          type: 'FlightLeg',
-          isArray: true,
+      outputs: [
+        {
+          key: 'raw',
+          source: { type: 'response', path: 'items' },
         },
-      },
+      ],
     })
   })
 
   it('does not apply invalid raw DSL expressions', () => {
     const source = `
 defineQuery({
-  response: {
-    return: null,
-  },
+  outputs: {},
 })
 `
 
     const result = Endge.source.patch('query', source, {
-      path: 'response.return',
-      expression: "field('FlightLeg",
+      path: 'outputs',
+      expression: "{ raw: output().from(response('items')",
     })
 
     expect(result.ok).toBe(false)
@@ -256,9 +263,10 @@ defineQuery({
     ],
   },
 
-  response: {
-    subField: 'items',
-    return: field('FlightLeg').array(),
+  outputs: {
+    raw: output()
+      .from(response('items'))
+      .toStore(),
   },
 
   mock: {

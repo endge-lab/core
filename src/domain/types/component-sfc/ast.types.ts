@@ -53,8 +53,11 @@ export interface RComponentSFC_AST_PropsDeclaration {
 
 /** AST объявления definePreviewProps. */
 export interface RComponentSFC_AST_PreviewPropsDeclaration {
-  /** Исходный текст object literal, переданный в definePreviewProps. */
+  /** Исходный текст первого аргумента, переданного в definePreviewProps. */
   source: string
+
+  /** Исходный текст второго аргумента preview options, если он указан. */
+  optionsSource?: string | null
 
   /** Позиция объявления definePreviewProps в полном source. */
   range: RComponentSFC_SourceRange
