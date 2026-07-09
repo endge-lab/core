@@ -23,7 +23,7 @@ describe('EndgeWorkspace', () => {
   it('returns locale labels by mode', () => {
     const workspace = new EndgeWorkspace()
 
-    expect(workspace.getLocaleLabel('ru', 'nativeLabel')).toBe('Русский')
+    expect(workspace.getLocaleLabel('ru', 'displayName')).toBe('Русский')
     expect(workspace.getLocaleLabel('en', 'shortLabel')).toBe('EN')
     expect(workspace.getLocaleLabel('kk', 'shortLabel')).toBe('kk')
   })

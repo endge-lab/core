@@ -41,8 +41,11 @@ export class EndgeAuthProfiles extends EndgeModule {
   public getDefaultProfile(): RAuthProfile | AuthProfileSchema | null {
     const profiles = Endge.domain.getAuthProfiles()
       .filter(profile => profile.active !== false && !profile.deletedAt)
+    const defaultIdentity = String(Endge.workspace.defaultAuthProfileIdentity ?? '').trim()
+    if (defaultIdentity)
+      return profiles.find(profile => profile.identity === defaultIdentity) ?? null
     if (profiles.length > 0)
-      return profiles[0] ?? null
+      return null
     return this.createLegacySettingsProfile()
   }
 

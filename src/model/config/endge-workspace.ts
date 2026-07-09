@@ -3,15 +3,18 @@ import type { EndgeWorkspaceDefinition, EndgeWorkspaceLocale } from '@/domain/ty
 export const DEFAULT_ENDGE_WORKSPACE = {
   identity: 'default',
   displayName: 'Default Workspace',
+  vars: [],
+  sse: undefined,
   locales: [
-    { code: 'en', label: 'English', nativeLabel: 'English', shortLabel: 'EN' },
-    { code: 'ru', label: 'Russian', nativeLabel: 'Русский', shortLabel: 'RU' },
+    { code: 'en', displayName: 'English', shortLabel: 'EN' },
+    { code: 'ru', displayName: 'Русский', shortLabel: 'RU' },
   ],
   defaultLocale: 'ru',
   fallbackLocale: 'ru',
+  defaultAuthProfileIdentity: null,
 } satisfies EndgeWorkspaceDefinition
 
-export type EndgeWorkspaceLocaleLabelMode = keyof Pick<EndgeWorkspaceLocale, 'label' | 'nativeLabel' | 'shortLabel'>
+export type EndgeWorkspaceLocaleLabelMode = keyof Pick<EndgeWorkspaceLocale, 'displayName' | 'shortLabel'>
 
 let ACTIVE_ENDGE_WORKSPACE: EndgeWorkspaceDefinition = DEFAULT_ENDGE_WORKSPACE
 
@@ -35,7 +38,7 @@ export function normalizeWorkspaceLocale(locale: string | null | undefined): str
 
 export function getWorkspaceLocaleLabel(
   locale: string,
-  mode: EndgeWorkspaceLocaleLabelMode = 'label',
+  mode: EndgeWorkspaceLocaleLabelMode = 'displayName',
 ): string {
   return ACTIVE_ENDGE_WORKSPACE.locales.find(item => item.code === locale)?.[mode] ?? locale
 }

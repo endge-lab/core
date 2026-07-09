@@ -64,7 +64,7 @@ describe('EndgeContext locale', () => {
       ...DEFAULT_ENDGE_WORKSPACE,
       locales: [
         ...DEFAULT_ENDGE_WORKSPACE.locales,
-        { code: 'kk', label: 'Kazakh', nativeLabel: 'Қазақша', shortLabel: 'KK' },
+        { code: 'kk', displayName: 'Қазақша', shortLabel: 'KK' },
       ],
       defaultLocale: 'kk',
     })

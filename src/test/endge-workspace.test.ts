@@ -18,9 +18,11 @@ describe('EndgeWorkspace', () => {
     const workspace = normalizeEndgeWorkspaceDefinition({
       identity: 'workspace-a',
       displayName: 'Workspace A',
+      vars: [],
+      sse: undefined,
       locales: [
-        { code: 'en', label: 'English', nativeLabel: 'English', shortLabel: 'EN' },
-        { code: 'kk', label: 'Kazakh', nativeLabel: 'Қазақша', shortLabel: 'KK' },
+        { code: 'en', displayName: 'English', shortLabel: 'EN' },
+        { code: 'kk', displayName: 'Қазақша', shortLabel: 'KK' },
       ],
       defaultLocale: 'kk',
       fallbackLocale: 'en',
@@ -29,12 +31,15 @@ describe('EndgeWorkspace', () => {
     expect(workspace).toEqual({
       identity: 'workspace-a',
       displayName: 'Workspace A',
+      vars: [],
+      sse: undefined,
       locales: [
-        { code: 'en', label: 'English', nativeLabel: 'English', shortLabel: 'EN' },
-        { code: 'kk', label: 'Kazakh', nativeLabel: 'Қазақша', shortLabel: 'KK' },
+        { code: 'en', displayName: 'English', shortLabel: 'EN' },
+        { code: 'kk', displayName: 'Қазақша', shortLabel: 'KK' },
       ],
       defaultLocale: 'kk',
       fallbackLocale: 'en',
+      defaultAuthProfileIdentity: null,
     })
   })
 
@@ -51,6 +56,6 @@ describe('EndgeWorkspace', () => {
 
     expect(supportsWorkspaceLocale('kk')).toBe(true)
     expect(normalizeWorkspaceLocale('missing')).toBe('kk')
-    expect(getWorkspaceLocaleLabel('kk', 'nativeLabel')).toBe('Қазақша')
+    expect(getWorkspaceLocaleLabel('kk', 'displayName')).toBe('Қазақша')
   })
 })

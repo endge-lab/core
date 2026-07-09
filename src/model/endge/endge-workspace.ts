@@ -1,5 +1,10 @@
 import type { EndgeBootContext } from '@/domain/types/bootstrap.types'
-import type { EndgeWorkspaceDefinition, EndgeWorkspaceLocale } from '@/domain/types/workspace.types'
+import type {
+  EndgeWorkspaceDefinition,
+  EndgeWorkspaceLocale,
+  EndgeWorkspaceSSEConfig,
+  EndgeWorkspaceVar,
+} from '@/domain/types/workspace.types'
 import type { EndgeWorkspaceLocaleLabelMode } from '@/model/config/endge-workspace'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
@@ -46,12 +51,24 @@ export class EndgeWorkspace extends EndgeModule {
     return this._current.locales
   }
 
+  get vars(): EndgeWorkspaceVar[] {
+    return this._current.vars
+  }
+
+  get sse(): EndgeWorkspaceSSEConfig | undefined {
+    return this._current.sse
+  }
+
   get defaultLocale(): string {
     return this._current.defaultLocale
   }
 
   get fallbackLocale(): string {
     return this._current.fallbackLocale
+  }
+
+  get defaultAuthProfileIdentity(): string | null {
+    return this._current.defaultAuthProfileIdentity
   }
 
   supportsLocale(locale: string | null | undefined): boolean {
@@ -62,7 +79,7 @@ export class EndgeWorkspace extends EndgeModule {
     return normalizeWorkspaceLocale(locale)
   }
 
-  getLocaleLabel(locale: string, mode: EndgeWorkspaceLocaleLabelMode = 'label'): string {
+  getLocaleLabel(locale: string, mode: EndgeWorkspaceLocaleLabelMode = 'displayName'): string {
     return getWorkspaceLocaleLabel(locale, mode)
   }
 

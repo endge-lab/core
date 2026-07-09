@@ -1,17 +1,33 @@
 export interface EndgeWorkspaceLocale {
   code: string
-  label: string
-  nativeLabel: string
+  displayName: string
   shortLabel: string
   direction?: 'ltr' | 'rtl'
+}
+
+export type EndgeWorkspaceSSEAuthMode = 'inherit' | 'profile' | 'manual' | 'none'
+
+export interface EndgeWorkspaceVar {
+  name: string
+  defaultValue: string
+}
+
+export interface EndgeWorkspaceSSEConfig {
+  url: string
+  authMode?: EndgeWorkspaceSSEAuthMode
+  authProfileIdentity?: string | null
+  manualToken?: string | null
 }
 
 export interface EndgeWorkspaceDefinition {
   identity: string
   displayName: string
+  vars: EndgeWorkspaceVar[]
+  sse?: EndgeWorkspaceSSEConfig
   locales: EndgeWorkspaceLocale[]
   defaultLocale: string
   fallbackLocale: string
+  defaultAuthProfileIdentity: string | null
 }
 
 export type EndgeWorkspaceDefinitionInput = Partial<EndgeWorkspaceDefinition> & Record<string, unknown>

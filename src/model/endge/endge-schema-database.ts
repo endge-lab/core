@@ -16,6 +16,7 @@ import axios from 'axios'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { ReflectComponentToPayloadData, ReflectComponentToPlain } from '@/domain/entities/reflect/RComponent'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
+import { normalizeEndgeWorkspaceDefinition } from '@/domain/entities/reflect/RWorkspace'
 import { RVersion } from '@/domain/entities/reflect/RVersion'
 import { ComponentType, FilterType, ParameterType, QueryType, ScriptType } from '@/domain/types/document.types'
 import { Endge } from '@/model/endge/endge'
@@ -122,6 +123,11 @@ function shouldInjectWorkspace(
 
   const collection = extractPayloadCollectionFromUrl(url)
   return collection != null && WORKSPACE_SCOPED_PAYLOAD_COLLECTIONS.has(collection)
+}
+
+function shouldOverridePayloadDocumentLock(method: unknown): boolean {
+  const normalizedMethod = String(method ?? '').trim().toLowerCase()
+  return normalizedMethod === 'patch' || normalizedMethod === 'delete'
 }
 
 /** Связь в сущности храним по id связанной сущности (не identity). */
@@ -552,6 +558,13 @@ export class EndgeSchemaStorage extends EndgeModule {
 
   private installWorkspaceRequestInterceptor(): void {
     this.api.interceptors.request.use(async (config) => {
+      if (shouldOverridePayloadDocumentLock(config.method)) {
+        config.params = {
+          ...(config.params ?? {}),
+          overrideLock: 'true',
+        }
+      }
+
       if (!shouldInjectWorkspace(config.method, config.url, config.data))
         return config
 
@@ -829,9 +842,12 @@ export class EndgeSchemaStorage extends EndgeModule {
         identity: raw.identity,
         name: raw.name ?? raw.displayName,
         displayName: raw.displayName ?? raw.name,
+        vars: raw.vars ?? [],
+        sse: raw.sse ?? undefined,
         locales: raw.locales ?? raw.availableLocales ?? [],
         defaultLocale: raw.defaultLocale ?? raw.default_locale,
         fallbackLocale: raw.fallbackLocale ?? raw.fallback_locale,
+        defaultAuthProfileIdentity: raw.defaultAuthProfileIdentity ?? raw.default_auth_profile_identity ?? null,
       }
     }
 
@@ -2701,6 +2717,39 @@ export class EndgeSchemaStorage extends EndgeModule {
     }
 
     const domain = Endge.domain
+
+    if (documentType === 'workspace') {
+      const workspace = normalizeEndgeWorkspaceDefinition(opts?.model ?? Endge.workspace.current)
+      const saved = await repos.workspaces!.upsert({
+        identity: workspace.identity,
+        displayName: workspace.displayName,
+        vars: workspace.vars.map(item => ({
+          name: item.name,
+          defaultValue: item.defaultValue,
+        })),
+        sse: workspace.sse
+          ? {
+              url: workspace.sse.url,
+              authMode: workspace.sse.authMode ?? 'inherit',
+              authProfileIdentity: workspace.sse.authProfileIdentity ?? null,
+              manualToken: workspace.sse.manualToken ?? null,
+            }
+          : undefined,
+        locales: workspace.locales.map(locale => ({
+          identity: locale.code,
+          displayName: locale.displayName || locale.code,
+          code: locale.code,
+          shortLabel: locale.shortLabel,
+          direction: locale.direction ?? 'ltr',
+        })),
+        defaultLocale: workspace.defaultLocale,
+        fallbackLocale: workspace.fallbackLocale,
+        defaultAuthProfileIdentity: workspace.defaultAuthProfileIdentity,
+      })
+      Endge.workspace.apply(saved)
+      AppBus.emit('domainChanged')
+      return
+    }
 
     if (documentType === 'settings') {
       const settings = ((opts?.model as any) ?? domain.getSetting(documentId)) as any

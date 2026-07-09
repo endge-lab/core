@@ -1,6 +1,5 @@
 import type {
   SettingsSSEAuthMode,
-  SettingsSSESchema,
 } from '@/domain/types/settings.types'
 import type { Nullable } from '@endge/utils'
 
@@ -12,6 +11,13 @@ import {
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { Endge } from '@/model/endge/endge'
+
+type EndgeSSEConfig = {
+  url: string
+  authMode?: SettingsSSEAuthMode
+  authProfileIdentity?: string | null
+  manualToken?: string | null
+}
 
 /**
  * Модуль подключения к SSE-каналу и трансляции сообщений в Endge events.
@@ -63,15 +69,9 @@ export class EndgeSSE extends EndgeModule {
     // console.group('[EndgeSSE] startSSE')
 
     const settings = Endge.domain.getSetting('general')
-    if (!settings) {
-      console.warn('[EndgeSSE] settings:general not found')
-      // console.groupEnd()
-      return
-    }
-
-    const cfg: SettingsSSESchema | undefined = settings.sse
+    const cfg: EndgeSSEConfig | undefined = Endge.workspace.sse ?? settings?.sse
     if (!cfg?.url) {
-      console.warn('[EndgeSSE] settings.sse.url is empty')
+      console.warn('[EndgeSSE] sse url is empty')
       // console.groupEnd()
       return
     }
@@ -176,7 +176,7 @@ export class EndgeSSE extends EndgeModule {
   /**
    * Запускает Token Refresh Timer.
    */
-  private startTokenRefreshTimer(cfg: SettingsSSESchema): void {
+  private startTokenRefreshTimer(cfg: EndgeSSEConfig): void {
     if (this._tokenRefreshTimer)
       return
 
@@ -188,7 +188,7 @@ export class EndgeSSE extends EndgeModule {
   /**
    * Внутренний helper модуля: refresh Token Cached.
    */
-  private async refreshTokenCached(cfg: SettingsSSESchema): Promise<void> {
+  private async refreshTokenCached(cfg: EndgeSSEConfig): Promise<void> {
     const mode: SettingsSSEAuthMode = cfg.authMode ?? 'inherit'
 
     // console.group('[EndgeSSE] refreshTokenCached')

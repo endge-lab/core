@@ -13,13 +13,15 @@ type EnvRecord = Record<string, unknown>
  * EndgeVars - контроллер глобальных переменных.
  *
  * Источник списка переменных:
- *  - settings.general.vars в домене (Endge.domain.getSetting('general'))
+ *  - workspace.vars
+ *  - legacy fallback: settings.general.vars
  *
  * Источники значений и приоритеты:
- *  1) ENVY (если задано) - самый высокий приоритет
+ *  1) ENVY/runtime vars (если задано) - самый высокий приоритет
  *  2) Vite env: import.meta.env.VITE_<NAME> (напрямую, без сканирования)
  *     - имя переменной внутри системы: без префикса (ENDPOINT_AUTH -> VITE_ENDPOINT_AUTH)
- *  3) settings.general.vars (домен)
+ *  3) workspace.vars
+ *  4) legacy settings.general.vars
  *
  * Особенности:
  *  - сам класс НЕ хранит данные, только читает их из домена
@@ -88,6 +90,19 @@ export class EndgeVars extends EndgeModule {
    */
   private getDomainVars(): EndgeGlobalVar[] {
     try {
+      const workspaceVars = Endge.workspace.vars
+      if (workspaceVars.length > 0) {
+        return workspaceVars.map((item) => {
+          const name = String(item.name ?? '').trim()
+          const val = this.getExternalValue(name) ?? item.defaultValue
+          return {
+            name,
+            defaultValue: String(item.defaultValue ?? ''),
+            currentValue: String(val ?? ''),
+          }
+        })
+      }
+
       const settings = Endge.domain.getSetting('general') as
         | { vars?: EndgeGlobalVar[] }
         | undefined
@@ -97,9 +112,7 @@ export class EndgeVars extends EndgeModule {
 
         let val = item.defaultValue
 
-        if (this._envyRecord[item.name]) {
-          val = this._envyRecord[item.name]
-        }
+        val = this.getExternalValue(item.name) ?? val
 
         return {
           name: String(item.name ?? '').trim(),
@@ -131,6 +144,10 @@ export class EndgeVars extends EndgeModule {
     if (!key)
       return undefined
 
+    const external = this.getExternalValue(key)
+    if (external != null)
+      return String(external)
+
     const vars: EndgeGlobalVar[] = this.getDomainVars()
     const v: EndgeGlobalVar | undefined = vars.find((x: EndgeGlobalVar) => x.name === key)
     if (v)
@@ -143,7 +160,20 @@ export class EndgeVars extends EndgeModule {
    * Возвращает все доменные переменные с учетом overrides.
    */
   getAll(): EndgeGlobalVar[] {
-    return this.getDomainVars()
+    const vars = this.getDomainVars()
+    const used = new Set(vars.map(item => item.name))
+    for (const [name, value] of Object.entries(this._envyRecord)) {
+      const key = String(name ?? '').trim()
+      if (!key || used.has(key))
+        continue
+      used.add(key)
+      vars.push({
+        name: key,
+        defaultValue: '',
+        currentValue: String(value ?? ''),
+      })
+    }
+    return vars
   }
 
   /**
@@ -279,7 +309,7 @@ export class EndgeVars extends EndgeModule {
    * Внутренний helper модуля: sync All To Raph.
    */
   private syncAllToRaph(): void {
-    const vars: EndgeGlobalVar[] = this.getDomainVars()
+    const vars: EndgeGlobalVar[] = this.getAll()
     for (const v of vars) {
       if (!v.name)
         continue
@@ -293,5 +323,24 @@ export class EndgeVars extends EndgeModule {
    */
   private syncOneToRaph(name: string, value: string | undefined): void {
     Raph.app.set(`${Config.STORAGE_VARS_KEY}.${name}`, value)
+  }
+
+  private getExternalValue(name: string): unknown {
+    const key = String(name ?? '').trim()
+    if (!key)
+      return undefined
+    if (Object.prototype.hasOwnProperty.call(this._envyRecord, key))
+      return this._envyRecord[key]
+
+    const viteEnv = (import.meta as any)?.env
+    const viteKey = `VITE_${key}`
+    if (viteEnv && Object.prototype.hasOwnProperty.call(viteEnv, viteKey))
+      return viteEnv[viteKey]
+
+    const globalEnv = (globalThis as any).__ENDGE_ENV__
+    if (globalEnv && Object.prototype.hasOwnProperty.call(globalEnv, key))
+      return globalEnv[key]
+
+    return undefined
   }
 }

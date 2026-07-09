@@ -1,5 +1,16 @@
 import type { AxiosInstance } from 'axios'
 
+export type WorkspacePayloadData = {
+  identity: string
+  displayName: string
+  vars?: unknown
+  sse?: unknown
+  locales: unknown
+  defaultLocale?: string | null
+  fallbackLocale?: string | null
+  defaultAuthProfileIdentity?: string | null
+}
+
 export class Workspaces_Repository {
   constructor(private readonly api: AxiosInstance) {}
 
@@ -31,5 +42,22 @@ export class Workspaces_Repository {
     })
 
     return docs[0] ?? null
+  }
+
+  async create(data: WorkspacePayloadData) {
+    const r = await this.api.post('/workspaces', data)
+    return r.data
+  }
+
+  async update(id: number | string, data: Partial<WorkspacePayloadData>) {
+    const r = await this.api.patch(`/workspaces/${id}`, data)
+    return r.data
+  }
+
+  async upsert(data: WorkspacePayloadData) {
+    const existing = await this.findByIdentity(data.identity)
+    if (!existing)
+      return this.create(data)
+    return this.update(existing.id, data)
   }
 }
