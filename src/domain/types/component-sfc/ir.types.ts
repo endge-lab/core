@@ -81,6 +81,9 @@ export type RComponentSFC_IR_Tag
     | 'Table'
     | 'Column'
     | 'Cell'
+    | 'ColumnMenu'
+    | 'MenuItem'
+    | 'MenuSeparator'
 
 /** IR element-узел, который renderer-слои могут читать без знания исходного синтаксиса. */
 export interface RComponentSFC_IR_ElementNode {

@@ -16,6 +16,7 @@ import type {
   RComponentSFC_IR_Value,
 } from '@/domain/types/component-sfc.types'
 import { compileComponentSFCExpression } from '@/domain/services/compiler/component-sfc-expression'
+import { normalizeComponentSFCTableColumnMenu } from '@/domain/services/compiler/component-sfc-table-menu'
 import { normalizeComponentSFCTableSort } from '@/domain/services/compiler/component-sfc-table-sort'
 
 /** Контекст компиляции template в IR. */
@@ -53,6 +54,9 @@ const ALLOWED_TAGS = new Set<RComponentSFC_IR_Tag>([
   'Table',
   'Column',
   'Cell',
+  'ColumnMenu',
+  'MenuItem',
+  'MenuSeparator',
 ])
 
 /** Компилирует AST template в renderer-neutral Endge SFC IR. */
@@ -175,8 +179,10 @@ function compileElementNode(
     sourceRange: node.range,
   }
 
-  if (element.tag === 'Table')
+  if (element.tag === 'Table') {
     diagnostics.push(...normalizeComponentSFCTableSort(element).diagnostics)
+    diagnostics.push(...normalizeComponentSFCTableColumnMenu(element).diagnostics)
+  }
 
   return element
 }

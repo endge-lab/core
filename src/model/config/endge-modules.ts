@@ -4,6 +4,7 @@ import { EndgeAuth } from '@/model/endge/endge-auth'
 import { EndgeBindingsBehavior } from '@/model/endge/endge-bindings-behavior'
 import { EndgeBindingsPresentation } from '@/model/endge/endge-bindings-presentation'
 import { EndgeBind } from '@/model/endge/endge-bind'
+import { EndgeCommands } from '@/model/endge/endge-commands'
 import { EndgeCompiler } from '@/model/endge/endge-compiler'
 import { EndgeConsole } from '@/model/endge/endge-console'
 import { EndgeContext } from '@/model/endge/endge-context'
@@ -64,6 +65,7 @@ export const ENDGE_CORE_MODULES: EndgeModuleDefinition[] = [
   { key: 'uiRegistry', module: EndgeUIRegistry },
   { key: 'reports', module: EndgeReports },
   { key: 'bind', module: EndgeBind },
+  { key: 'commands', module: EndgeCommands },
   { key: 'console', module: EndgeConsole },
   { key: 'runtimeDebugger', module: EndgeRuntimeDebugger },
   { key: 'styles', module: EndgeStyles },

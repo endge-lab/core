@@ -3,6 +3,7 @@ import type { EndgeBootContext } from '@/domain/types/bootstrap.types'
 import type { EndgeAuth } from '@/model/endge/endge-auth'
 import { EndgeBindingsBehavior } from '@/model/endge/endge-bindings-behavior'
 import { EndgeBind } from '@/model/endge/endge-bind'
+import { EndgeCommands } from '@/model/endge/endge-commands'
 import { EndgeConsole } from '@/model/endge/endge-console'
 import { EndgeContext } from '@/model/endge/endge-context'
 import { EndgeContracts } from '@/model/endge/endge-contracts'
@@ -318,6 +319,13 @@ export class Endge extends EndgeFederation {
    */
   static get bind(): EndgeBind {
     return this.getModule<EndgeBind>('bind')
+  }
+
+  /**
+   * Доступ к runtime command registry.
+   */
+  static get commands(): EndgeCommands {
+    return this.getModule<EndgeCommands>('commands')
   }
 
   /**
