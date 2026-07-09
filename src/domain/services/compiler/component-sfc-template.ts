@@ -16,6 +16,7 @@ import type {
   RComponentSFC_IR_Value,
 } from '@/domain/types/component-sfc.types'
 import { compileComponentSFCExpression } from '@/domain/services/compiler/component-sfc-expression'
+import { normalizeComponentSFCTableSort } from '@/domain/services/compiler/component-sfc-table-sort'
 
 /** Контекст компиляции template в IR. */
 export interface ComponentSFCTemplateCompileContext {
@@ -162,7 +163,7 @@ function compileElementNode(
   if (node.tag === 'Component')
     collectComponentDependency(props.is, dependencies)
 
-  return {
+  const element: RComponentSFC_IR_ElementNode = {
     id,
     kind: 'element',
     tag: node.tag as RComponentSFC_IR_Tag,
@@ -173,6 +174,11 @@ function compileElementNode(
       .filter((child): child is RComponentSFC_IR_Node => child != null),
     sourceRange: node.range,
   }
+
+  if (element.tag === 'Table')
+    diagnostics.push(...normalizeComponentSFCTableSort(element).diagnostics)
+
+  return element
 }
 
 function compileAttributes(
