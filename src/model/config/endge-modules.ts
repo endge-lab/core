@@ -36,8 +36,10 @@ import { EndgeUIRegistry } from '@/model/endge/endge-ui-registry'
 import { EndgeUpdates } from '@/model/endge/endge-updates'
 import { EndgeVars } from '@/model/endge/endge-vars'
 import { EndgeVocabs } from '@/model/endge/endge-vocabs'
+import { EndgeWorkspace } from '@/model/endge/endge-workspace'
 
 export const ENDGE_CORE_MODULES: EndgeModuleDefinition[] = [
+  { key: 'workspace', module: EndgeWorkspace },
   { key: 'context', module: EndgeContext },
   { key: 'diagnostics', module: EndgeDiagnostics },
   { key: 'debug', module: EndgeDebug },

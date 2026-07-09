@@ -1,85 +1,135 @@
-import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
+import type {
+  EndgePersistenceDriver,
+  EndgePersistenceOptions,
+  EndgePersistenceScope,
+  EndgeSessionIdentityProvider,
+  EndgeStorageAdapter,
+} from '@/domain/types/context-persistence.types'
 
-const LS_KEY = 'endge-context'
+import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
+import { DEFAULT_ENDGE_WORKSPACE, normalizeWorkspaceLocale } from '@/model/config/endge-workspace'
+import {
+  EndgeStorageAdapterRegistry,
+  normalizePersistence,
+  type EndgePersistenceInput,
+} from '@/model/endge/context/EndgeStorageAdapterRegistry'
+import { RuntimeStateController } from '@/model/endge/context/RuntimeStateController'
+import { DisabledContextAdapter } from '@/model/endge/context/adapters/DisabledContextAdapter'
+import { LocalStorageContextAdapter } from '@/model/endge/context/adapters/LocalStorageContextAdapter'
+
+const CONTEXT_STORAGE_KEY = 'endge:context:v1'
+const LEGACY_CONTEXT_STORAGE_KEY = 'endge-context'
+
+const DEFAULT_SCOPE: EndgePersistenceScope = {
+  workspaceId: 'default',
+  tenantId: 'default',
+  projectId: 'default',
+  environmentId: 'dev',
+  userId: 'anonymous',
+}
 
 export interface EndgeContextSnapshot {
+  workspace: string | null
+  tenant: string | null
   project: string | null
   environment: string | null
+  user: string | null
   locale: string | null
 }
 
+export interface EndgeContextPersistenceConfig {
+  context?: EndgePersistenceDriver | EndgePersistenceOptions | null
+}
+
 /**
- * Контекст выполнения Endge: выбранный проект, среда и локаль.
- * Сериализация в localStorage через saveToStorage/loadFromStorage.
+ * Контекст выполнения Endge: текущий workspace/project/environment/user scope
+ * и координатор persistence-инфраструктуры приложения.
  */
 export class EndgeContext extends EndgeModule {
-  private _currentProject: string | null = null
-  private _currentEnvironment: string | null = null
-  private _currentLocale: string = 'en'
+  private readonly _adapters = new EndgeStorageAdapterRegistry()
+  private readonly _runtimeControllers = new Map<string, RuntimeStateController>()
+
+  private _contextPersistence: EndgePersistenceOptions = { driver: 'local' }
+  private _currentWorkspace: string = DEFAULT_SCOPE.workspaceId
+  private _currentTenant: string = DEFAULT_SCOPE.tenantId
+  private _currentProject: string = DEFAULT_SCOPE.projectId
+  private _currentEnvironment: string = DEFAULT_SCOPE.environmentId
+  private _currentUser: string = DEFAULT_SCOPE.userId
+  private _currentLocale: string = DEFAULT_ENDGE_WORKSPACE.defaultLocale
+  private _sessionProvider: EndgeSessionIdentityProvider | null = null
   private _isHydrating = false
 
-  /**
-   * Создает контекст и сразу пытается восстановить snapshot из localStorage.
-   */
-  constructor() {
+  public constructor() {
     super()
+    this.registerStorageAdapter(new LocalStorageContextAdapter())
+    this.registerStorageAdapter(new DisabledContextAdapter())
     this.loadFromStorage()
   }
 
-  /**
-   * Показывает, идет ли сейчас восстановление контекста из localStorage.
-   */
   get isLoadingFromStorage(): boolean {
     return this._isHydrating
   }
 
-  /**
-   * Возвращает сериализуемый snapshot выбранного проекта, окружения и локали.
-   */
+  public registerStorageAdapter(adapter: EndgeStorageAdapter): void {
+    this._adapters.register(adapter)
+  }
+
+  public configurePersistence(config: EndgeContextPersistenceConfig): void {
+    if (config.context == null) {
+      return
+    }
+
+    this._contextPersistence = normalizePersistence(config.context)
+    this.saveToStorage()
+  }
+
+  public setSessionIdentityProvider(provider: EndgeSessionIdentityProvider | null): void {
+    this._sessionProvider = provider
+    this.notify()
+  }
+
   public override serialize(): EndgeContextSnapshot {
     return {
+      workspace: this._currentWorkspace,
+      tenant: this._currentTenant,
       project: this._currentProject,
       environment: this._currentEnvironment,
+      user: this._currentUser,
       locale: this._currentLocale || null,
     }
   }
 
-  /**
-   * Восстанавливает контекст из snapshot или выставляет значения по умолчанию.
-   */
-  public override deserialize(payload: EndgeContextSnapshot | undefined): void {
-    this._currentProject = payload?.project ?? null
-    this._currentEnvironment = payload?.environment ?? 'dev'
-    this._currentLocale = payload?.locale && ['en', 'ru'].includes(payload.locale) ? payload.locale : 'en'
+  public override deserialize(payload: Partial<EndgeContextSnapshot> | undefined): void {
+    this._currentWorkspace = normalizeScopePart(payload?.workspace, DEFAULT_SCOPE.workspaceId)
+    this._currentTenant = normalizeScopePart(payload?.tenant, DEFAULT_SCOPE.tenantId)
+    this._currentProject = normalizeScopePart(payload?.project, DEFAULT_SCOPE.projectId)
+    this._currentEnvironment = normalizeScopePart(payload?.environment, DEFAULT_SCOPE.environmentId)
+    this._currentUser = normalizeScopePart(payload?.user, DEFAULT_SCOPE.userId)
+    this._currentLocale = normalizeWorkspaceLocale(payload?.locale)
   }
 
-  /**
-   * Сохраняет текущий контекст в localStorage.
-   */
-  saveToStorage(): void {
-    if (this._isHydrating)
+  public saveToStorage(): void {
+    if (this._isHydrating) {
       return
+    }
+
     try {
-      const out = this.serialize()
-      if (typeof localStorage !== 'undefined')
-        localStorage.setItem(LS_KEY, JSON.stringify(out))
+      this.resolveAdapter(this._contextPersistence).write(CONTEXT_STORAGE_KEY, this.serialize())
     }
     catch {
       /* ignore */
     }
   }
 
-  /**
-   * Загружает snapshot контекста из localStorage и применяет его к модулю.
-   */
-  loadFromStorage(): EndgeContextSnapshot | undefined {
+  public loadFromStorage(): EndgeContextSnapshot | undefined {
     this._isHydrating = true
     try {
-      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(LS_KEY) : null
-      const parsed = raw ? JSON.parse(raw) : undefined
-      const obj = (parsed && typeof parsed === 'object') ? parsed : undefined
-      this.deserialize(obj)
-      return obj
+      const adapter = this.resolveAdapter(this._contextPersistence)
+      const snapshot = adapter.read<EndgeContextSnapshot>(CONTEXT_STORAGE_KEY)
+        ?? adapter.read<Partial<EndgeContextSnapshot>>(LEGACY_CONTEXT_STORAGE_KEY)
+
+      this.deserialize(snapshot)
+      return this.serialize()
     }
     catch {
       this.deserialize(undefined)
@@ -92,67 +142,142 @@ export class EndgeContext extends EndgeModule {
     }
   }
 
-  /**
-   * Возвращает identity текущего проекта.
-   */
-  getCurrentProject(): string | null {
+  public getPersistenceScope(): EndgePersistenceScope {
+    const session = this.resolveSessionIdentity()
+
+    return {
+      workspaceId: this._currentWorkspace,
+      tenantId: session.tenantId,
+      projectId: this._currentProject,
+      environmentId: this._currentEnvironment,
+      userId: session.userId,
+    }
+  }
+
+  public createRuntimeStateController(input: {
+    runtimeId: string
+    persistence?: EndgePersistenceInput
+  }): RuntimeStateController {
+    const runtimeId = normalizeRequiredScopePart(input.runtimeId, 'runtimeId')
+    const existing = this._runtimeControllers.get(runtimeId)
+    if (existing) {
+      return existing
+    }
+
+    const controller = new RuntimeStateController({
+      runtimeId,
+      scope: this.getPersistenceScope(),
+      adapter: this.resolveAdapter(input.persistence ?? { driver: 'local' }),
+    })
+    this._runtimeControllers.set(runtimeId, controller)
+    return controller
+  }
+
+  public getRuntimeStateController(runtimeId: string): RuntimeStateController | null {
+    return this._runtimeControllers.get(String(runtimeId ?? '').trim()) ?? null
+  }
+
+  public destroyRuntimeStateController(runtimeId: string): void {
+    this._runtimeControllers.delete(String(runtimeId ?? '').trim())
+  }
+
+  public getCurrentWorkspace(): string {
+    return this._currentWorkspace
+  }
+
+  public setCurrentWorkspace(identity: string | null): void {
+    this.setScopeValue('_currentWorkspace', identity, DEFAULT_SCOPE.workspaceId)
+  }
+
+  public getCurrentTenant(): string {
+    return this.resolveSessionIdentity().tenantId
+  }
+
+  public setCurrentTenant(identity: string | null): void {
+    this.setScopeValue('_currentTenant', identity, DEFAULT_SCOPE.tenantId)
+  }
+
+  public getCurrentProject(): string {
     return this._currentProject
   }
 
-  /**
-   * Устанавливает текущий проект и уведомляет подписчиков при изменении.
-   */
-  setCurrentProject(identity: string | null): void {
-    const next = identity === '' ? null : identity
-    if (next === this._currentProject)
-      return
-    this._currentProject = next
-    this.saveToStorage()
-    this.notify()
+  public setCurrentProject(identity: string | null): void {
+    this.setScopeValue('_currentProject', identity, DEFAULT_SCOPE.projectId)
   }
 
-  /**
-   * Возвращает identity текущего окружения.
-   */
-  getCurrentEnvironment(): string {
-    return this._currentEnvironment ?? 'dev'
+  public getCurrentEnvironment(): string {
+    return this._currentEnvironment
   }
 
-  /**
-   * Устанавливает текущее окружение и сохраняет контекст.
-   */
-  setCurrentEnvironment(identity: string | null): void {
-    const next = (identity === '' || identity == null) ? 'dev' : identity
-    if (next === this._currentEnvironment)
-      return
-    this._currentEnvironment = next
-    this.saveToStorage()
-    this.notify()
+  public setCurrentEnvironment(identity: string | null): void {
+    this.setScopeValue('_currentEnvironment', identity, DEFAULT_SCOPE.environmentId)
   }
 
-  /**
-   * Возвращает текущую локаль интерфейса.
-   */
+  public getCurrentUser(): string {
+    return this.resolveSessionIdentity().userId
+  }
+
+  public setCurrentUser(identity: string | null): void {
+    this.setScopeValue('_currentUser', identity, DEFAULT_SCOPE.userId)
+  }
+
   get currentLocale(): string {
-    return this._currentLocale || 'en'
+    return this._currentLocale || DEFAULT_ENDGE_WORKSPACE.defaultLocale
   }
 
-  /**
-   * Устанавливает текущую локаль с fallback на `en`.
-   */
   set currentLocale(value: string) {
-    const next = (value === 'ru' || value === 'en') ? value : 'en'
-    if (next === this._currentLocale)
+    const next = normalizeWorkspaceLocale(value)
+    if (next === this._currentLocale) {
       return
+    }
     this._currentLocale = next
     this.saveToStorage()
     this.notify()
   }
 
-  /**
-   * Явно устанавливает текущую локаль через method-style API.
-   */
-  setCurrentLocale(locale: string | null): void {
-    this.currentLocale = (locale === 'ru' || locale === 'en') ? locale : 'en'
+  public setCurrentLocale(locale: string | null): void {
+    this.currentLocale = normalizeWorkspaceLocale(locale)
   }
+
+  private resolveAdapter(persistence: EndgePersistenceInput): EndgeStorageAdapter {
+    return this._adapters.resolve(persistence)
+  }
+
+  private resolveSessionIdentity(): { tenantId: string, userId: string } {
+    const external = this._sessionProvider?.getCurrentIdentity() ?? null
+
+    return {
+      tenantId: normalizeScopePart(external?.tenantId ?? this._currentTenant, DEFAULT_SCOPE.tenantId),
+      userId: normalizeScopePart(external?.userId ?? this._currentUser, DEFAULT_SCOPE.userId),
+    }
+  }
+
+  private setScopeValue(
+    field: '_currentWorkspace' | '_currentTenant' | '_currentProject' | '_currentEnvironment' | '_currentUser',
+    identity: string | null,
+    fallback: string,
+  ): void {
+    const next = normalizeScopePart(identity, fallback)
+    if (next === this[field]) {
+      return
+    }
+
+    this[field] = next
+    this.saveToStorage()
+    this.notify()
+  }
+}
+
+function normalizeScopePart(value: unknown, fallback: string): string {
+  const normalized = String(value ?? '').trim()
+  return normalized || fallback
+}
+
+function normalizeRequiredScopePart(value: unknown, field: string): string {
+  const normalized = String(value ?? '').trim()
+  if (!normalized) {
+    throw new Error(`[EndgeContext] ${field} is required.`)
+  }
+
+  return normalized
 }

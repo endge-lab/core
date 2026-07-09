@@ -14,11 +14,19 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
    * ACCESS
    */
   public register<T extends RuntimeHost<any, any>>(host: T): T {
+    const runtimeId = String(host.id ?? '').trim()
+    if (!runtimeId) {
+      throw new Error('[RuntimeHostRegistry] Runtime host id is required.')
+    }
+    if (this._hosts.has(runtimeId)) {
+      throw new Error(`[RuntimeHostRegistry] Runtime host "${runtimeId}" is already registered.`)
+    }
+
     const key = this.entityKey(host.entityType, host.entityIdentity)
     const set = this._indexByEntity.get(key) ?? new Set<string>()
-    set.add(host.id)
+    set.add(runtimeId)
     this._indexByEntity.set(key, set)
-    this._hosts.set(host.id, host)
+    this._hosts.set(runtimeId, host)
     return host
   }
 

@@ -246,6 +246,7 @@ export class EndgeRuntime extends EndgeModule {
     }
 
     this._strategies.resolve(host.model)?.destroy?.({ host })
+    Endge.context.destroyRuntimeStateController(id)
     host.destroy()
     if (shouldNotify) {
       this.notify()
@@ -264,7 +265,12 @@ export class EndgeRuntime extends EndgeModule {
     const hostMeta = { ...(meta ?? {}) }
     delete hostMeta.parent
 
-    const runtimeId = this.createRuntimeId()
+    const runtimeId = this.resolveRuntimeId(hostMeta.id)
+    if (this._hosts.getById(runtimeId)) {
+      console.error(`[EndgeRuntime] Runtime host "${runtimeId}" is already active.`)
+      return null
+    }
+
     const host = strategy.create({
       id: runtimeId,
       model,
@@ -276,7 +282,20 @@ export class EndgeRuntime extends EndgeModule {
       return null
     }
 
-    this._hosts.register(host)
+    try {
+      this._hosts.register(host)
+    }
+    catch (error) {
+      console.error('[EndgeRuntime] Failed to register runtime host', error)
+      host.destroy()
+      return null
+    }
+
+    host.attachRuntimeState(Endge.context.createRuntimeStateController({
+      runtimeId: host.id,
+      persistence: host.meta.persistence as any,
+    }))
+
     strategy.attach?.({
       id: runtimeId,
       model,
@@ -308,6 +327,11 @@ export class EndgeRuntime extends EndgeModule {
    */
   private createRuntimeId(): string {
     return `runtime-${this._nextRuntimeId++}`
+  }
+
+  private resolveRuntimeId(value: unknown): string {
+    const explicit = String(value ?? '').trim()
+    return explicit || this.createRuntimeId()
   }
 
   /**

@@ -2,13 +2,14 @@ import type { RI18nBundle } from '@/domain/entities/reflect/RI18nBundle'
 import type { I18nLocaleMessages, I18nMessagesOptions, I18nTranslateOptions } from '@/domain/types/i18n.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
+import { DEFAULT_ENDGE_WORKSPACE } from '@/model/config/endge-workspace'
 import { Endge } from '@/model/endge/endge'
 
 /**
  * Runtime-доступ к доменным словарям переводов.
  */
 export class EndgeI18n extends EndgeModule {
-  private _fallbackLocale = 'en'
+  private _fallbackLocale = DEFAULT_ENDGE_WORKSPACE.fallbackLocale
   private _offContext: (() => void) | null = null
   private _offDomain: (() => void) | null = null
   private readonly _messagesByLocale = new Map<string, Map<string, string>>()
@@ -20,6 +21,7 @@ export class EndgeI18n extends EndgeModule {
   public override setup(): void {
     this._offContext?.()
     this._offDomain?.()
+    this._fallbackLocale = Endge.workspace.fallbackLocale
     this._offContext = Endge.context.subscribe(() => this.notify())
     this._offDomain = Endge.domain.subscribe(() => this.rebuildIndexes())
   }
@@ -28,6 +30,7 @@ export class EndgeI18n extends EndgeModule {
    * Компилирует активные i18n-bundles в плоские индексы для O(1) lookup.
    */
   public override build(): void {
+    this._fallbackLocale = Endge.workspace.fallbackLocale
     this.rebuildIndexes()
   }
 
@@ -39,6 +42,7 @@ export class EndgeI18n extends EndgeModule {
     this._offDomain?.()
     this._offContext = null
     this._offDomain = null
+    this._fallbackLocale = DEFAULT_ENDGE_WORKSPACE.fallbackLocale
     this._messagesByLocale.clear()
     this._messagesByBundle.clear()
   }

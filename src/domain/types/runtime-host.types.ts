@@ -1,4 +1,5 @@
 import type { FlowExecutionResult, FlowExecutionState } from '@/domain/types/endge-flow-runtime.types'
+import type { RuntimeStateControllerLike } from '@/domain/types/context-persistence.types'
 import type { ProgramArtifact, ProgramEntityType } from '@/domain/types/program.types'
 import type { RuntimeEntityModelMap, RuntimeEntityType } from '@/domain/types/runtime-entity-map.types'
 import type { RuntimeKind } from '@/domain/types/runtime.types'
@@ -346,6 +347,9 @@ export interface RuntimeHost<
   /** Контекст runtime-host (тип зависит от host). */
   context: TContext
 
+  /** Runtime-scoped persistence controller, если host запущен с persistence. */
+  readonly runtimeState: RuntimeStateControllerLike | null
+
   /** Корневая raph-нода host (если есть). */
   readonly node: RaphNode | null
 
@@ -378,6 +382,9 @@ export interface RuntimeHost<
 
   /** Полностью заменить context host. */
   replaceContext: (context: TContext) => void
+
+  /** Привязать runtime-scoped persistence controller. */
+  attachRuntimeState: (runtimeState: RuntimeStateControllerLike | null) => void
 
   /** Обработать runtime update, пришедший из Raph boundary phase. */
   update: (ctx: RuntimeHostUpdateContext) => Promise<void> | void

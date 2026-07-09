@@ -35,6 +35,7 @@ import { EndgeUI } from '@/model/endge/endge-ui'
 import { EndgeUpdates } from '@/model/endge/endge-updates'
 import { EndgeVars } from '@/model/endge/endge-vars'
 import { EndgeVocabs } from '@/model/endge/endge-vocabs'
+import { EndgeWorkspace } from '@/model/endge/endge-workspace'
 import { EndgeUIRegistry } from '@/model/endge/endge-ui-registry'
 import { ENDGE_CORE_MODULES } from '@/model/config/endge-modules'
 
@@ -362,5 +363,12 @@ export class Endge extends EndgeFederation {
    */
   static get context(): EndgeContext {
     return this.getModule<EndgeContext>('context')
+  }
+
+  /**
+   * Доступ к frontend workspace profile: локали и будущие runtime capabilities.
+   */
+  static get workspace(): EndgeWorkspace {
+    return this.getModule<EndgeWorkspace>('workspace')
   }
 }

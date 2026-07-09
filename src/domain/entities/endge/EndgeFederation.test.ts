@@ -218,6 +218,8 @@ describe('EndgeFederation stages', () => {
 
     expect(keys.indexOf('schema')).toBeGreaterThanOrEqual(0)
     expect(keys.indexOf('domain')).toBeGreaterThanOrEqual(0)
+    expect(keys.indexOf('workspace')).toBeGreaterThanOrEqual(0)
+    expect(keys.indexOf('workspace')).toBeLessThan(keys.indexOf('context'))
     expect(keys.indexOf('schema')).toBeLessThan(keys.indexOf('domain'))
     expect(keys.indexOf('domain')).toBeLessThan(keys.indexOf('compiler'))
     expect(keys.indexOf('compiler')).toBeLessThan(keys.indexOf('runtime'))

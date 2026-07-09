@@ -1,4 +1,5 @@
 import type { RuntimeEntityModelMap, RuntimeEntityType } from '@/domain/types/runtime-entity-map.types'
+import type { RuntimeStateControllerLike } from '@/domain/types/context-persistence.types'
 import type {
   RuntimeArtifactReader,
   RuntimeHost,
@@ -71,6 +72,9 @@ export abstract class RuntimeHostBase<
 
   /** Корневая raph-нода host (первая добавленная). */
   public node: RaphNode | null = null
+
+  /** Runtime-scoped persistence controller. */
+  public runtimeState: RuntimeStateControllerLike | null = null
 
   /** Список raph-нод, которыми владеет host. */
   private _raphNodes = new Map<string, RaphNode>()
@@ -214,6 +218,11 @@ export abstract class RuntimeHostBase<
 
   public replaceContext(context: TContext): void {
     this.context = context
+    this.touch()
+  }
+
+  public attachRuntimeState(runtimeState: RuntimeStateControllerLike | null): void {
+    this.runtimeState = runtimeState
     this.touch()
   }
 
