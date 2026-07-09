@@ -17,6 +17,7 @@ import { EndgeExtract } from '@/model/endge/endge-extract'
 import { EndgeFlow } from '@/model/endge/endge-flow'
 import { EndgeFlowRegistry } from '@/model/endge/endge-flow-registry'
 import { EndgeBindingsPresentation } from '@/model/endge/endge-bindings-presentation'
+import { EndgeI18n } from '@/model/endge/endge-i18n'
 import { EndgeProgram } from '@/model/endge/endge-program'
 import { EndgeQuery } from '@/model/endge/endge-query'
 import { EndgeRender } from '@/model/endge/endge-render'
@@ -157,6 +158,13 @@ export class Endge extends EndgeFederation {
    */
   static get vocabs(): EndgeVocabs {
     return this.getModule<EndgeVocabs>('vocabs')
+  }
+
+  /**
+   * Доступ к модулю переводов из доменных i18n-bundles.
+   */
+  static get i18n(): EndgeI18n {
+    return this.getModule<EndgeI18n>('i18n')
   }
 
   /**

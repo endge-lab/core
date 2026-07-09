@@ -17,6 +17,7 @@ import { EndgeEvents } from '@/model/endge/endge-events'
 import { EndgeExtract } from '@/model/endge/endge-extract'
 import { EndgeFlow } from '@/model/endge/endge-flow'
 import { EndgeFlowRegistry } from '@/model/endge/endge-flow-registry'
+import { EndgeI18n } from '@/model/endge/endge-i18n'
 import { EndgeProgram } from '@/model/endge/endge-program'
 import { EndgeQuery } from '@/model/endge/endge-query'
 import { EndgeRender } from '@/model/endge/endge-render'
@@ -47,6 +48,7 @@ export const ENDGE_CORE_MODULES: EndgeModuleDefinition[] = [
   { key: 'compiler', module: EndgeCompiler },
   { key: 'source', module: EndgeSource },
   { key: 'vocabs', module: EndgeVocabs },
+  { key: 'i18n', module: EndgeI18n },
   { key: 'extract', module: EndgeExtract },
   { key: 'flowRegistry', module: EndgeFlowRegistry },
   { key: 'flow', module: EndgeFlow },
