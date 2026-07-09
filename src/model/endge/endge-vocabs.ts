@@ -97,9 +97,7 @@ export class EndgeVocabs extends EndgeModule {
 
     const base = baseApiUrl.replace(/\/+$/, '')
 
-    const isAuth: boolean = Endge.auth.isAuthenticated
-    if (!isAuth)
-      return
+    const headers = await this.resolveAuthHeaders({ authMode: 'inherit' })
 
     for (const col of collections) {
       const slug = col?.name
@@ -109,7 +107,7 @@ export class EndgeVocabs extends EndgeModule {
       const url = `${base}/${slug}`
 
       try {
-        const res = await fetch(`${url}?limit=10000`)
+        const res = await fetch(`${url}?limit=10000`, { headers })
         const json = await res.json()
 
         let docs: any[] = []
@@ -219,12 +217,11 @@ export class EndgeVocabs extends EndgeModule {
       return []
 
     const base = String(space.baseApiUrl).replace(/\/+$/, '')
-    if (!Endge.auth.isAuthenticated)
-      return []
+    const headers = await this.resolveAuthHeaders({ authMode: 'inherit' })
 
     try {
       const url = `${base}/${slug}?limit=${Math.max(1, limit)}`
-      const res = await fetch(url)
+      const res = await fetch(url, { headers })
       const json = await res.json()
       let docs: any[] = []
       if (Array.isArray(json?.docs))
@@ -289,8 +286,7 @@ export class EndgeVocabs extends EndgeModule {
     const cfg = this.resolveVocabConfigById(vocabId)
     if (!cfg)
       return
-    if (!Endge.auth.isAuthenticated)
-      return
+    const headers = await this.resolveAuthHeaders(cfg)
 
     const maxLimit = Math.max(1, Number(limit) || 10000)
     const baseUrl = this.resolveBaseUrl(cfg.baseApiUrl)
@@ -299,7 +295,7 @@ export class EndgeVocabs extends EndgeModule {
 
     const url = `${baseUrl}/${cfg.slug}?limit=${maxLimit}`
     try {
-      const res = await fetch(url)
+      const res = await fetch(url, { headers })
       const json = await res.json()
       const docs = this.extractDocs(json)
       this.setByIdentityCache(cfg.identity, docs)
@@ -329,8 +325,7 @@ export class EndgeVocabs extends EndgeModule {
       return bySlugCached.slice(0, maxLimit)
     }
 
-    if (!Endge.auth.isAuthenticated)
-      return []
+    const headers = await this.resolveAuthHeaders(cfg)
 
     const baseUrl = this.resolveBaseUrl(cfg.baseApiUrl)
     if (!baseUrl)
@@ -338,7 +333,7 @@ export class EndgeVocabs extends EndgeModule {
 
     try {
       const url = `${baseUrl}/${cfg.slug}?limit=${maxLimit}`
-      const res = await fetch(url)
+      const res = await fetch(url, { headers })
       const json = await res.json()
       const docs = this.extractDocs(json)
       this.setByIdentityCache(cfg.identity, docs)
@@ -358,8 +353,7 @@ export class EndgeVocabs extends EndgeModule {
     const cfg = this.resolveVocabConfigByIdOrIdentity(idOrIdentity)
     if (!cfg)
       return []
-    if (!Endge.auth.isAuthenticated)
-      return []
+    const headers = await this.resolveAuthHeaders(cfg)
 
     const baseUrl = this.resolveBaseUrl(cfg.baseApiUrl)
     if (!baseUrl)
@@ -373,7 +367,7 @@ export class EndgeVocabs extends EndgeModule {
     try {
       while (true) {
         const url = `${baseUrl}/${cfg.slug}?limit=${pageSize}&page=${page}`
-        const res = await fetch(url)
+        const res = await fetch(url, { headers })
         const json = await res.json()
         const docs = this.extractDocs(json)
 
@@ -442,7 +436,7 @@ export class EndgeVocabs extends EndgeModule {
   /**
    * Разрешает Vocab Config By Id.
    */
-  private resolveVocabConfigById(vocabId: string | number): { idKey: string; identity: string; baseApiUrl: string; slug: string } | null {
+  private resolveVocabConfigById(vocabId: string | number): { idKey: string; identity: string; baseApiUrl: string; slug: string; authMode: 'inherit' | 'profile' | 'manual' | 'none'; authProfileIdentity?: string | null } | null {
     const vocab = Endge.domain.getVocabById(vocabId) ?? Endge.domain.getVocabById(Number(vocabId))
     if (!vocab)
       return null
@@ -454,13 +448,13 @@ export class EndgeVocabs extends EndgeModule {
     if (!idKey || !identity || !baseApiUrl || !slug)
       return null
 
-    return { idKey, identity, baseApiUrl, slug }
+    return { idKey, identity, baseApiUrl, slug, authMode: vocab.authMode ?? 'inherit', authProfileIdentity: vocab.authProfileIdentity ?? null }
   }
 
   /**
    * Разрешает Vocab Config By Id Or Identity.
    */
-  private resolveVocabConfigByIdOrIdentity(idOrIdentity: string | number): { idKey: string; identity: string; baseApiUrl: string; slug: string } | null {
+  private resolveVocabConfigByIdOrIdentity(idOrIdentity: string | number): { idKey: string; identity: string; baseApiUrl: string; slug: string; authMode: 'inherit' | 'profile' | 'manual' | 'none'; authProfileIdentity?: string | null } | null {
     const vocab = Endge.domain.getVocab(idOrIdentity)
     if (!vocab)
       return null
@@ -472,7 +466,18 @@ export class EndgeVocabs extends EndgeModule {
     if (!idKey || !identity || !baseApiUrl || !slug)
       return null
 
-    return { idKey, identity, baseApiUrl, slug }
+    return { idKey, identity, baseApiUrl, slug, authMode: vocab.authMode ?? 'inherit', authProfileIdentity: vocab.authProfileIdentity ?? null }
+  }
+
+  private async resolveAuthHeaders(cfg: { authMode?: 'inherit' | 'profile' | 'manual' | 'none'; authProfileIdentity?: string | null }): Promise<Record<string, string>> {
+    const mode = cfg.authMode ?? 'inherit'
+    if (mode === 'none')
+      return {}
+    const session = await Endge.authProfiles.resolveRequestAuth({
+      mode,
+      authProfileIdentity: cfg.authProfileIdentity ?? undefined,
+    })
+    return session.headers ?? {}
   }
 
   /**

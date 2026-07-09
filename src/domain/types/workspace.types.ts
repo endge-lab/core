@@ -13,3 +13,5 @@ export interface EndgeWorkspaceDefinition {
   defaultLocale: string
   fallbackLocale: string
 }
+
+export type EndgeWorkspaceDefinitionInput = Partial<EndgeWorkspaceDefinition> & Record<string, unknown>

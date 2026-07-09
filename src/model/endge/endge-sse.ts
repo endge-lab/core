@@ -201,11 +201,10 @@ export class EndgeSSE extends EndgeModule {
         = mode === 'none'
           ? undefined
           : mode === 'manual'
-            ? await Endge.auth.getAccessToken({
-                mode: 'manual',
-                manualToken: cfg.manualToken ?? '',
-              })
-            : await Endge.auth.getAccessToken({ mode: 'inherit' })
+            ? (await Endge.authProfiles.resolveRequestAuth({ mode: 'manual', manualToken: cfg.manualToken ?? '' })).accessToken
+            : mode === 'profile'
+              ? (await Endge.authProfiles.resolveRequestAuth({ mode: 'profile', authProfileIdentity: cfg.authProfileIdentity })).accessToken
+              : (await Endge.authProfiles.resolveRequestAuth({ mode: 'inherit' })).accessToken
 
       this._tokenCached = token
 

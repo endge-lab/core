@@ -149,10 +149,11 @@ export interface SettingsUpdateProfileSchema {
   fields: SettingsUpdateFieldSchema[]
 }
 
-export type SettingsSSEAuthMode = 'inherit' | 'none' | 'manual'
+export type SettingsSSEAuthMode = 'inherit' | 'profile' | 'none' | 'manual'
 
 export interface SettingsSSESchema {
   url: string
   authMode?: SettingsSSEAuthMode
+  authProfileIdentity?: string
   manualToken?: string
 }

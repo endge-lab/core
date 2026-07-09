@@ -138,7 +138,7 @@ export class EndgeAuth extends EndgeModule {
    */
   private async initOnce(): Promise<void> {
     const settings: any = Endge.domain.getSetting('general')
-    const auth: SettingsAuthSchema | undefined = settings?.auth
+    const auth: SettingsAuthSchema | undefined = settings?.auth ?? this.getAuthFromProfile()
 
     if (!auth) { throw new Error('Settings.general.auth отсутствует') }
 
@@ -154,6 +154,27 @@ export class EndgeAuth extends EndgeModule {
 
     await this.loadFromStorage()
     this.startBackgroundRefresh()
+  }
+
+  private getAuthFromProfile(): SettingsAuthSchema | undefined {
+    const profile = Endge.domain.getAuthProfiles()
+      .find(item => item.active !== false && (item.adapterId === 'keycloak_manual' || item.adapterId === 'keycloak_form'))
+    if (!profile)
+      return undefined
+    const config = profile.config ?? {}
+    const provider = profile.adapterId
+    return {
+      provider,
+      KeycloakBaseUrl: String(config.KeycloakBaseUrl ?? ''),
+      storageKey: String(config.storageKey ?? `endge.auth.${profile.identity}`),
+      clientId: String(config.clientId ?? ''),
+      scope: String(config.scope ?? ''),
+      refreshSkewMs: Number(config.refreshSkewMs ?? 30_000),
+      tokenPath: config.tokenPath == null ? undefined : String(config.tokenPath),
+      logoutPath: config.logoutPath == null ? undefined : String(config.logoutPath),
+      login: config.login == null ? undefined : String(config.login),
+      password: config.password == null ? undefined : String(config.password),
+    } as SettingsAuthSchema
   }
 
   // ---------------------------------------------------------------------------

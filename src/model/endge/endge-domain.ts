@@ -7,6 +7,7 @@ import type { EndgeSchemaDump } from '@/domain/types/schema.types'
 import { Serialize } from '@endge/utils'
 
 import { RAction } from '@/domain/entities/reflect/RAction'
+import { RAuthProfile } from '@/domain/entities/reflect/RAuthProfile'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import {
   ReflectComponentFromPlain,
@@ -138,6 +139,7 @@ export interface EndgeDomainParsed {
   styles: RStyle[]
   vocabs: RVocabs[]
   i18nBundles: RI18nBundle[]
+  authProfiles: RAuthProfile[]
   views: RView[]
   pageTemplates: RPageTemplate[]
   pages: RPage[]
@@ -218,6 +220,9 @@ export class EndgeDomain extends EndgeModule {
 
   private _vocabsById: Map<string | number, RVocabs> = new Map()
   private _vocabsByIdentity: Map<string, RVocabs> = new Map()
+
+  private _authProfilesById: Map<string | number, RAuthProfile> = new Map()
+  private _authProfilesByIdentity: Map<string, RAuthProfile> = new Map()
 
   private _i18nBundlesById: Map<string | number, RI18nBundle> = new Map()
   private _i18nBundlesByIdentity: Map<string, RI18nBundle> = new Map()
@@ -314,6 +319,8 @@ export class EndgeDomain extends EndgeModule {
     this._stylesByIdentity.clear()
     this._vocabsById.clear()
     this._vocabsByIdentity.clear()
+    this._authProfilesById.clear()
+    this._authProfilesByIdentity.clear()
     this._i18nBundlesById.clear()
     this._i18nBundlesByIdentity.clear()
     this._pageTemplatesById.clear()
@@ -374,6 +381,7 @@ export class EndgeDomain extends EndgeModule {
     const policiesRaw = Array.isArray(payload?.policies) ? payload.policies : []
     const stylesRaw = Array.isArray(payload?.styles) ? payload.styles : []
     const vocabsRaw = Array.isArray(payload?.vocabs) ? payload.vocabs : []
+    const authProfilesRaw = Array.isArray((payload as any)?.authProfiles) ? (payload as any).authProfiles : []
     const i18nBundlesRaw = Array.isArray((payload as any)?.i18nBundles) ? (payload as any).i18nBundles : []
     const pageTemplatesRaw = Array.isArray(payload?.pageTemplates) ? payload.pageTemplates : []
     const pagesRaw = Array.isArray(payload?.pages) ? payload.pages : []
@@ -407,6 +415,7 @@ export class EndgeDomain extends EndgeModule {
       policies: policiesRaw,
       styles: stylesRaw,
       vocabs: vocabsRaw,
+      authProfiles: authProfilesRaw,
       i18nBundles: i18nBundlesRaw,
       pageTemplates: pageTemplatesRaw,
       pages: pagesRaw,
@@ -2007,6 +2016,57 @@ export class EndgeDomain extends EndgeModule {
   }
 
   /**
+   * Методы для работы с профилями авторизации.
+   */
+  getAuthProfiles(): RAuthProfile[] {
+    return Array.from(this._authProfilesById.values())
+  }
+
+  getAuthProfileById(id: string | number): RAuthProfile | null {
+    return this._authProfilesById.get(id) ?? null
+  }
+
+  getAuthProfileByIdentity(identity: string): RAuthProfile | null {
+    return this._authProfilesByIdentity.get(identity) ?? null
+  }
+
+  getAuthProfile(idOrIdentity: string | number): RAuthProfile | null {
+    return this.getAuthProfileById(idOrIdentity)
+      || this.getAuthProfileById(Number(idOrIdentity))
+      || this.getAuthProfileByIdentity(String(idOrIdentity))
+  }
+
+  addAuthProfile(profile: RAuthProfile): void {
+    if (this._authProfilesByIdentity.has(profile.identity) || this._authProfilesById.has(profile.id))
+      return
+    this._authProfilesById.set(profile.id, profile)
+    this._authProfilesByIdentity.set(profile.identity, profile)
+    this.notify()
+  }
+
+  removeAuthProfileById(id: string | number): void {
+    const profile = this._authProfilesById.get(id)
+    if (!profile)
+      return
+    this._authProfilesById.delete(profile.id)
+    this._authProfilesByIdentity.delete(profile.identity)
+    this.notify()
+  }
+
+  removeAuthProfileByIdentity(identity: string): void {
+    const profile = this._authProfilesByIdentity.get(identity)
+    if (!profile)
+      return
+    this._authProfilesById.delete(profile.id)
+    this._authProfilesByIdentity.delete(profile.identity)
+    this.notify()
+  }
+
+  removeAuthProfile(identity: string): void {
+    this.removeAuthProfileByIdentity(identity)
+  }
+
+  /**
    * Проверяет наличие Vocab по id или identity.
    */
   hasVocab(identity: string): boolean {
@@ -3007,6 +3067,7 @@ export class EndgeDomain extends EndgeModule {
       policies: this.getPolicies().map(x => Serialize.toPlain(x)),
       styles: this.getStyles().map(x => x.toPlain()),
       vocabs: this.getVocabs().map(x => x.toPlain()),
+      authProfiles: this.getAuthProfiles().map(x => x.toPlain()),
       i18nBundles: this.getI18nBundles().map(x => x.toPlain()),
       pageTemplates: this.getPageTemplates().map(x => x.toPlain()),
       pages: this.getPages().map(x => x.toPlain()),
@@ -3092,6 +3153,7 @@ export class EndgeDomain extends EndgeModule {
       policies: [],
       styles: [],
       vocabs: [],
+      authProfiles: [],
       i18nBundles: [],
       views: [],
       pageTemplates: [],
@@ -3159,6 +3221,9 @@ export class EndgeDomain extends EndgeModule {
     if (json.vocabs && Array.isArray(json.vocabs)) {
       json.vocabs.forEach((vocabJson: any) => out.vocabs.push(Serialize.fromJSON(RVocabs, vocabJson)))
     }
+    if (json.authProfiles && Array.isArray(json.authProfiles)) {
+      json.authProfiles.forEach((profileJson: any) => out.authProfiles.push(RAuthProfile.fromPlain(profileJson)))
+    }
     if (json.i18nBundles && Array.isArray(json.i18nBundles)) {
       json.i18nBundles.forEach((bundleJson: any) => out.i18nBundles.push(Serialize.fromJSON(RI18nBundle, bundleJson)))
     }
@@ -3220,6 +3285,7 @@ export class EndgeDomain extends EndgeModule {
     parsed.policies.forEach(p => this.addPolicy(p))
     parsed.styles.forEach(s => this.addStyle(s))
     parsed.vocabs.forEach(v => this.addVocabs(v))
+    parsed.authProfiles.forEach(p => this.addAuthProfile(p))
     parsed.i18nBundles.forEach(b => this.addI18nBundles(b))
     parsed.views.forEach(v => this.addView(v))
     parsed.pageTemplates.forEach(t => this.addPageTemplate(t))
@@ -3314,6 +3380,9 @@ export class EndgeDomain extends EndgeModule {
     }
     if (json.vocabs && Array.isArray(json.vocabs)) {
       json.vocabs.forEach((vocabJson: any) => domain.addVocabs(Serialize.fromJSON(RVocabs, vocabJson)))
+    }
+    if (json.authProfiles && Array.isArray(json.authProfiles)) {
+      json.authProfiles.forEach((profileJson: any) => domain.addAuthProfile(RAuthProfile.fromPlain(profileJson)))
     }
     if (json.i18nBundles && Array.isArray(json.i18nBundles)) {
       json.i18nBundles.forEach((bundleJson: any) => domain.addI18nBundles(Serialize.fromJSON(RI18nBundle, bundleJson)))

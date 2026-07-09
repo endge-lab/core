@@ -39,7 +39,7 @@ export class RQuery extends REntity {
   mockDataEnabled: boolean = false
 
   @Expose()
-  auth: RQueryAuth = { mode: 'token' }
+  auth: RQueryAuth = { mode: 'inherit' }
 
   @Exclude()
   customExecutor: Nullable<() => Promise<any>> = null

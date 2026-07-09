@@ -19,6 +19,7 @@ import type { RPresentationBinding } from '@/domain/entities/reflect/RPresentati
 import type { RVocabs } from '@/domain/entities/reflect/RVocabs'
 import type { RI18nBundle } from '@/domain/entities/reflect/RI18nBundle'
 import type { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
+import type { RAuthProfile } from '@/domain/entities/reflect/RAuthProfile'
 import type { RComponent } from '@/domain/types/component.types'
 
 /**
@@ -75,6 +76,7 @@ export enum DomainSectionType {
   Navigation = 'navigation',
   Vocabs = 'vocabs',
   I18nBundles = 'i18n-bundles',
+  AuthProfile = 'auth-profile',
   Settings = 'settings',
   Project = 'project',
 }
@@ -107,6 +109,7 @@ export type DomainDocumentType
     | 'presentation-binding'
     | 'vocabs'
     | 'i18n-bundles'
+    | 'auth-profile'
     | 'tenant'
     | 'settings'
     | 'project'
@@ -133,4 +136,4 @@ export interface Document {
 /**
  * Описывает любой документ рефлекцию
  */
-export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RScenario | RAction | RConverter | RIntegration | RView | RParameter | RFilter | RSettings | RPolicy | RStyle | RVocabs | RI18nBundle | RTenant | RBehaviorBinding | RPresentationBinding | RPageTemplate | RPage | RNavigation
+export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RScenario | RAction | RConverter | RIntegration | RView | RParameter | RFilter | RSettings | RPolicy | RStyle | RVocabs | RI18nBundle | RAuthProfile | RTenant | RBehaviorBinding | RPresentationBinding | RPageTemplate | RPage | RNavigation

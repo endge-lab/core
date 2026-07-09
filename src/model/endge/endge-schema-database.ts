@@ -20,7 +20,9 @@ import { RVersion } from '@/domain/entities/reflect/RVersion'
 import { ComponentType, FilterType, ParameterType, QueryType, ScriptType } from '@/domain/types/document.types'
 import { Endge } from '@/model/endge/endge'
 import { dataViewPayloadDocToPlain, queryPayloadDocToPlain } from '@/model/endge/endge-domain'
+import { DEFAULT_ENDGE_WORKSPACE } from '@/model/config/endge-workspace'
 import { Actions_Repository } from '@/model/db/repositories/Actions_Repository'
+import { AuthProfiles_Repository } from '@/model/db/repositories/AuthProfiles_Repository'
 import { BehaviorBindings_Repository } from '@/model/db/repositories/BehaviorBindings_Repository'
 import { Components_Repository } from '@/model/db/repositories/Components_Repository'
 import { ComponentSFCs_Repository } from '@/model/db/repositories/ComponentSFCs_Repository'
@@ -47,6 +49,80 @@ import { Versions_Repository } from '@/model/db/repositories/Versions_Repository
 import { Views_Repository } from '@/model/db/repositories/Views_Repository'
 import { Vocabs_Repository } from '@/model/db/repositories/Vocabs_Repository'
 import { I18nBundles_Repository } from '@/model/db/repositories/I18nBundles_Repository'
+import { Workspaces_Repository } from '@/model/db/repositories/Workspaces_Repository'
+
+const WORKSPACE_SCOPED_PAYLOAD_COLLECTIONS = new Set([
+  'actions',
+  'auth-profiles',
+  'behavior-bindings',
+  'components',
+  'component-sfcs',
+  'converters',
+  'data-views',
+  'environments',
+  'filters',
+  'folders',
+  'i18n-bundles',
+  'integrations',
+  'navigations',
+  'page-templates',
+  'pages',
+  'parameters',
+  'policies',
+  'presentation-bindings',
+  'projects',
+  'queries',
+  'scenarios',
+  'settings',
+  'styles',
+  'tenants',
+  'types',
+  'versions',
+  'views',
+  'vocabs',
+])
+
+function extractPayloadCollectionFromUrl(url: unknown): string | null {
+  const text = String(url ?? '').trim()
+  if (!text)
+    return null
+
+  const pathname = text
+    .replace(/^https?:\/\/[^/]+/i, '')
+    .split('?')[0]
+    .replace(/^\/+/, '')
+
+  return pathname.split('/')[0] || null
+}
+
+function isPlainPayloadBody(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function hasWorkspaceValue(data: Record<string, unknown>): boolean {
+  const value = data.workspace
+  if (value == null)
+    return false
+  if (typeof value === 'string')
+    return value.trim().length > 0
+
+  return true
+}
+
+function shouldInjectWorkspace(
+  method: unknown,
+  url: unknown,
+  data: unknown,
+): data is Record<string, unknown> {
+  const normalizedMethod = String(method ?? 'get').toLowerCase()
+  if (normalizedMethod !== 'post' && normalizedMethod !== 'patch')
+    return false
+  if (!isPlainPayloadBody(data) || hasWorkspaceValue(data))
+    return false
+
+  const collection = extractPayloadCollectionFromUrl(url)
+  return collection != null && WORKSPACE_SCOPED_PAYLOAD_COLLECTIONS.has(collection)
+}
 
 /** Связь в сущности храним по id связанной сущности (не identity). */
 function relationToId(v: any): string | number | null | undefined {
@@ -267,6 +343,7 @@ const ROOT_FOLDER_ENTITY_TYPE_BY_IDENTITY: Record<string, string> = {
   'root-navigations': 'navigations',
   'root-vocabs': 'vocabs',
   'root-i18n-bundles': 'i18n-bundles',
+  'root-auth-profiles': 'auth-profiles',
   'root-settings': 'settings',
   'root-behavior-bindings': 'behavior-bindings',
   'root-presentation-bindings': 'presentation-bindings',
@@ -294,6 +371,9 @@ export class EndgeSchemaStorage extends EndgeModule {
 
   /** Внутренний axios-клиент Payload. */
   private api!: AxiosInstance
+
+  private _payloadWorkspaceIdCache: { identity: string, id: string | number } | null = null
+  private _payloadWorkspaceIdPromise: Promise<string | number> | null = null
 
   /** Список ошибок последней проверки (глобальный). */
   private _errors: EndgeSchemaError[] = []
@@ -352,6 +432,7 @@ export class EndgeSchemaStorage extends EndgeModule {
     'styles',
     'vocabs',
     'i18n-bundles',
+    'auth-profiles',
   ]
 
   /**
@@ -396,6 +477,8 @@ export class EndgeSchemaStorage extends EndgeModule {
     this.areCollectionsAvailable = false
     this.repositories = null
     this.collectionsInfo = {}
+    this._payloadWorkspaceIdCache = null
+    this._payloadWorkspaceIdPromise = null
 
     // 0) проверка настроек
     if (!this.payloadBaseAPI || !this.payloadSecret) {
@@ -419,6 +502,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         Authorization: `Bearer ${this.payloadSecret}`,
       },
     })
+    this.installWorkspaceRequestInterceptor()
 
     // первый запуск проверки
     await this.refresh()
@@ -466,6 +550,94 @@ export class EndgeSchemaStorage extends EndgeModule {
     this._loadedSource = null
   }
 
+  private installWorkspaceRequestInterceptor(): void {
+    this.api.interceptors.request.use(async (config) => {
+      if (!shouldInjectWorkspace(config.method, config.url, config.data))
+        return config
+
+      config.data.workspace = await this.resolvePayloadWorkspaceId()
+      return config
+    })
+  }
+
+  private getCurrentWorkspaceIdentity(): string {
+    const fromContext = Endge.context.getCurrentWorkspace?.()
+    const fromWorkspace = Endge.workspace.current?.identity
+    const identity = String(
+      fromContext || fromWorkspace || DEFAULT_ENDGE_WORKSPACE.identity,
+    ).trim()
+
+    return identity || DEFAULT_ENDGE_WORKSPACE.identity
+  }
+
+  private async resolvePayloadWorkspaceId(): Promise<string | number> {
+    const identity = this.getCurrentWorkspaceIdentity()
+    if (this._payloadWorkspaceIdCache?.identity === identity)
+      return this._payloadWorkspaceIdCache.id
+
+    if (!this._payloadWorkspaceIdPromise) {
+      this._payloadWorkspaceIdPromise = this.fetchPayloadWorkspaceId(identity)
+        .finally(() => {
+          this._payloadWorkspaceIdPromise = null
+        })
+    }
+
+    const id = await this._payloadWorkspaceIdPromise
+    this._payloadWorkspaceIdCache = { identity, id }
+    return id
+  }
+
+  private async fetchPayloadWorkspaceId(identity: string): Promise<string | number> {
+    const doc = await this.repositories?.workspaces.findByIdentity(identity)
+      ?? await this.fetchPayloadWorkspaceByIdentity(identity)
+
+    if (!doc?.id) {
+      throw new Error(
+        `[EndgeSchemaStorage] Workspace "${identity}" не найден в Payload. Сначала создай или засиди workspace.`,
+      )
+    }
+
+    return doc.id
+  }
+
+  private async fetchPayloadWorkspaceByIdentity(identity: string): Promise<any | null> {
+    const params = {
+      limit: 1,
+      'where[identity][equals]': identity,
+    }
+
+    try {
+      const r = await this.api.get('/workspaces', { params })
+      return r.data.docs?.[0] ?? null
+    }
+    catch {
+      const r = await this.api.get('/workspace', { params })
+      return r.data.docs?.[0] ?? null
+    }
+  }
+
+  private async ensurePayloadRootFolder(params: {
+    identity: string
+    displayName: string
+    entityType: string
+  }): Promise<string | number | null> {
+    const repos = this.repositories
+    if (!repos)
+      return null
+
+    const existing = await repos.folders.findByIdentity(params.identity)
+    if (existing?.id != null)
+      return existing.id
+
+    const created = await repos.folders.create({
+      identity: params.identity,
+      displayName: params.displayName,
+      entityType: params.entityType,
+    })
+
+    return created?.id ?? null
+  }
+
   /**
    * Завершает health-check итерацию и уведомляет подписчиков.
    */
@@ -509,9 +681,11 @@ export class EndgeSchemaStorage extends EndgeModule {
         styles: new Styles_Repository(this.api),
         vocabs: new Vocabs_Repository(this.api),
         i18nBundles: new I18nBundles_Repository(this.api),
+        authProfiles: new AuthProfiles_Repository(this.api),
         pageTemplates: new PageTemplates_Repository(this.api),
         pages: new Pages_Repository(this.api),
         navigations: new Navigations_Repository(this.api),
+        workspaces: new Workspaces_Repository(this.api),
       }
     }
 
@@ -585,6 +759,7 @@ export class EndgeSchemaStorage extends EndgeModule {
     }
 
     const dump: EndgeSchemaDump = {
+      workspaces: [],
       projects: [],
       folders: [],
       types: [],
@@ -600,6 +775,7 @@ export class EndgeSchemaStorage extends EndgeModule {
       settings: [],
       vocabs: [],
       i18nBundles: [],
+      authProfiles: [],
       parameters: [],
       filters: [],
       versions: [],
@@ -644,6 +820,18 @@ export class EndgeSchemaStorage extends EndgeModule {
         code: raw.code ?? raw.identity ?? '',
         description: raw.description ?? null,
         folderId: relationToId(raw.folder) ?? null,
+      }
+    }
+
+    const normalizeWorkspace = (raw: any) => {
+      return {
+        id: raw.id,
+        identity: raw.identity,
+        name: raw.name ?? raw.displayName,
+        displayName: raw.displayName ?? raw.name,
+        locales: raw.locales ?? raw.availableLocales ?? [],
+        defaultLocale: raw.defaultLocale ?? raw.default_locale,
+        fallbackLocale: raw.fallbackLocale ?? raw.fallback_locale,
       }
     }
 
@@ -1104,6 +1292,26 @@ export class EndgeSchemaStorage extends EndgeModule {
         mode: raw.mode === 'internal' ? 'internal' : 'external_payload',
         baseApiUrl: raw.baseApiUrl ?? null,
         collectionSlug: raw.collectionSlug ?? null,
+        authMode: raw.authMode ?? 'inherit',
+        authProfileIdentity: raw.authProfileIdentity ?? null,
+        folderId: relationToId(raw.folder) ?? null,
+        active: raw.active !== false,
+        deletedAt: raw.deletedAt ?? null,
+        meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
+      }
+    }
+
+    const normalizeAuthProfile = (raw: any) => {
+      return {
+        id: raw.id,
+        identity: raw.identity,
+        name: raw.displayName,
+        displayName: raw.displayName,
+        description: raw.description ?? null,
+        adapterId: raw.adapterId ?? 'manual_token',
+        config: (raw.config && typeof raw.config === 'object' && !Array.isArray(raw.config)) ? raw.config : {},
+        credentialRefs: (raw.credentialRefs && typeof raw.credentialRefs === 'object' && !Array.isArray(raw.credentialRefs)) ? raw.credentialRefs : {},
+        persist: raw.persist ?? 'localStorage',
         folderId: relationToId(raw.folder) ?? null,
         active: raw.active !== false,
         deletedAt: raw.deletedAt ?? null,
@@ -1277,6 +1485,11 @@ export class EndgeSchemaStorage extends EndgeModule {
         return rows.map(normalizeProject)
       }),
 
+      load('workspaces', async () => {
+        const rows = await this.repositories!.workspaces!.findAll()
+        return rows.map(normalizeWorkspace)
+      }),
+
       load('types', async () => {
         const rows = await this.repositories!.types.findAll()
         return rows.map(normalizeSchemaEntity)
@@ -1320,6 +1533,11 @@ export class EndgeSchemaStorage extends EndgeModule {
       load('vocabs', async () => {
         const rows = await this.repositories!.vocabs.findAll()
         return rows.map(normalizeVocabs)
+      }),
+
+      load('authProfiles', async () => {
+        const rows = await this.repositories!.authProfiles.findAll()
+        return rows.map(normalizeAuthProfile)
       }),
 
       load('i18nBundles', async () => {
@@ -1470,6 +1688,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       return domain.getSetting(documentIdOrIdentity)
     if (documentType === 'vocabs')
       return domain.getVocab(documentIdOrIdentity)
+    if (documentType === 'auth-profile')
+      return domain.getAuthProfile(documentIdOrIdentity)
     if (documentType === 'i18n-bundles')
       return domain.getI18nBundle(documentIdOrIdentity)
     if (documentType === 'project')
@@ -1576,6 +1796,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       return repos.navigations.findByIdentity(identity)
     if (documentType === 'vocabs')
       return repos.vocabs.findByIdentity(identity)
+    if (documentType === 'auth-profile')
+      return repos.authProfiles.findByIdentity(identity)
     if (documentType === 'i18n-bundles')
       return repos.i18nBundles.findByIdentity(identity)
     if (documentType === 'project')
@@ -1671,6 +1893,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       return repos.navigations.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === 'vocabs')
       return repos.vocabs.patchFolder(documentPayloadId, folderPayloadId)
+    if (documentType === 'auth-profile')
+      return repos.authProfiles.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === 'i18n-bundles')
       return repos.i18nBundles.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === 'project')
@@ -1862,6 +2086,10 @@ export class EndgeSchemaStorage extends EndgeModule {
     }
     if (documentType === 'vocabs') {
       await repos.vocabs.hardDelete(resolvedIdentity)
+      return
+    }
+    if (documentType === 'auth-profile') {
+      await repos.authProfiles.hardDelete(resolvedIdentity)
       return
     }
     if (documentType === 'i18n-bundles') {
@@ -2428,6 +2656,19 @@ export class EndgeSchemaStorage extends EndgeModule {
     }
     else if (documentType === 'vocabs') {
       saved = await repos.vocabs.upsert(data as any)
+    }
+    else if (documentType === 'auth-profile') {
+      const payload = data as Record<string, any>
+      if (payload.folder == null) {
+        const folderId = await this.ensurePayloadRootFolder({
+          identity: 'root-auth-profiles',
+          displayName: 'Аутентификация',
+          entityType: 'auth-profiles',
+        })
+        if (folderId != null)
+          payload.folder = folderId
+      }
+      saved = await repos.authProfiles.upsert(payload as any)
     }
     else if (documentType === 'i18n-bundles') {
       saved = await repos.i18nBundles.upsert(data as any)
@@ -3025,6 +3266,8 @@ export class EndgeSchemaStorage extends EndgeModule {
         mode: 'external_payload' | 'internal'
         baseApiUrl?: string | null
         collectionSlug?: string | null
+        authMode?: 'inherit' | 'profile' | 'manual' | 'none'
+        authProfileIdentity?: string | null
         active?: boolean
         folderId?: string | number | null
         meta?: Record<string, unknown>
@@ -3046,6 +3289,56 @@ export class EndgeSchemaStorage extends EndgeModule {
         mode: plain.mode ?? 'external_payload',
         baseApiUrl: plain.baseApiUrl ?? null,
         collectionSlug: plain.collectionSlug ?? null,
+        authMode: plain.authMode ?? 'inherit',
+        authProfileIdentity: plain.authProfileIdentity ?? null,
+        active: plain.active !== false,
+        folder: folderId,
+        deletedAt: null,
+        meta: plain.meta ?? {},
+      })
+      this._applyPayloadDocToDomain(documentType, saved, documentId, true)
+      return
+    }
+
+    if (documentType === 'auth-profile') {
+      const profile = ((opts?.model as any) ?? domain.getAuthProfile(documentId)) as any
+      if (!profile)
+        throw new Error(`Профиль авторизации не найден: ${documentId}`)
+      const plain = profile.toPlain() as {
+        id: string | number
+        identity: string
+        name: string
+        displayName?: string
+        description?: string | null
+        adapterId?: 'keycloak_manual' | 'keycloak_form' | 'manual_token'
+        config?: Record<string, unknown>
+        credentialRefs?: Record<string, string | undefined>
+        persist?: 'localStorage' | 'sessionStorage' | 'memory'
+        active?: boolean
+        folderId?: string | number | null
+        meta?: Record<string, unknown>
+      }
+      const profileIdentity = String((profile as any).identity ?? plain.identity ?? plain.id ?? '')
+      let folderId: number | string | undefined
+      const existing = await repos.authProfiles.findByIdentity(profileIdentity)
+      if (existing && ((existing as any).folderId ?? (existing as any).folder) != null) {
+        folderId = (existing as any).folderId ?? (existing as any).folder
+      }
+      else {
+        folderId = await this.ensurePayloadRootFolder({
+          identity: 'root-auth-profiles',
+          displayName: 'Аутентификация',
+          entityType: 'auth-profiles',
+        }) ?? undefined
+      }
+      const saved = await repos.authProfiles.upsert({
+        identity: profileIdentity,
+        displayName: plain.displayName ?? plain.name ?? profileIdentity,
+        description: plain.description ?? null,
+        adapterId: plain.adapterId ?? 'manual_token',
+        config: plain.config ?? {},
+        credentialRefs: plain.credentialRefs ?? {},
+        persist: plain.persist ?? 'localStorage',
         active: plain.active !== false,
         folder: folderId,
         deletedAt: null,
@@ -3621,6 +3914,12 @@ export class EndgeSchemaStorage extends EndgeModule {
         x => Endge.domain.removeVocabs(x),
       )
     }
+    if (documentType === 'auth-profile') {
+      removeBy(
+        x => Endge.domain.removeAuthProfileById(x),
+        x => Endge.domain.removeAuthProfile(x),
+      )
+    }
     if (documentType === 'i18n-bundles') {
       removeBy(
         x => Endge.domain.removeI18nBundlesById(x),
@@ -3702,6 +4001,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       return 'navigations'
     if (documentType === 'vocabs')
       return 'vocabs'
+    if (documentType === 'auth-profile')
+      return 'authProfiles'
     if (documentType === 'i18n-bundles')
       return 'i18nBundles'
     return ''
@@ -3912,6 +4213,25 @@ export class EndgeSchemaStorage extends EndgeModule {
         mode: raw.mode === 'internal' ? 'internal' : 'external_payload',
         baseApiUrl: raw.baseApiUrl ?? null,
         collectionSlug: raw.collectionSlug ?? null,
+        authMode: raw.authMode ?? 'inherit',
+        authProfileIdentity: raw.authProfileIdentity ?? null,
+        folderId: relationToId(raw.folder) ?? null,
+        active: raw.active !== false,
+        deletedAt: raw.deletedAt ?? null,
+        meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
+      }
+    }
+    if (documentType === 'auth-profile') {
+      return {
+        id: raw.id,
+        identity: raw.identity,
+        name: raw.displayName,
+        displayName: raw.displayName,
+        description: raw.description ?? null,
+        adapterId: raw.adapterId ?? 'manual_token',
+        config: (raw.config && typeof raw.config === 'object' && !Array.isArray(raw.config)) ? raw.config : {},
+        credentialRefs: (raw.credentialRefs && typeof raw.credentialRefs === 'object' && !Array.isArray(raw.credentialRefs)) ? raw.credentialRefs : {},
+        persist: raw.persist ?? 'localStorage',
         folderId: relationToId(raw.folder) ?? null,
         active: raw.active !== false,
         deletedAt: raw.deletedAt ?? null,

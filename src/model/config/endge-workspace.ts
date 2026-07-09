@@ -13,19 +13,29 @@ export const DEFAULT_ENDGE_WORKSPACE = {
 
 export type EndgeWorkspaceLocaleLabelMode = keyof Pick<EndgeWorkspaceLocale, 'label' | 'nativeLabel' | 'shortLabel'>
 
+let ACTIVE_ENDGE_WORKSPACE: EndgeWorkspaceDefinition = DEFAULT_ENDGE_WORKSPACE
+
+export function setActiveEndgeWorkspace(workspace: EndgeWorkspaceDefinition): void {
+  ACTIVE_ENDGE_WORKSPACE = workspace
+}
+
+export function getActiveEndgeWorkspace(): EndgeWorkspaceDefinition {
+  return ACTIVE_ENDGE_WORKSPACE
+}
+
 export function supportsWorkspaceLocale(locale: string | null | undefined): boolean {
   const code = String(locale ?? '').trim()
-  return DEFAULT_ENDGE_WORKSPACE.locales.some(item => item.code === code)
+  return ACTIVE_ENDGE_WORKSPACE.locales.some(item => item.code === code)
 }
 
 export function normalizeWorkspaceLocale(locale: string | null | undefined): string {
   const code = String(locale ?? '').trim()
-  return supportsWorkspaceLocale(code) ? code : DEFAULT_ENDGE_WORKSPACE.defaultLocale
+  return supportsWorkspaceLocale(code) ? code : ACTIVE_ENDGE_WORKSPACE.defaultLocale
 }
 
 export function getWorkspaceLocaleLabel(
   locale: string,
   mode: EndgeWorkspaceLocaleLabelMode = 'label',
 ): string {
-  return DEFAULT_ENDGE_WORKSPACE.locales.find(item => item.code === locale)?.[mode] ?? locale
+  return ACTIVE_ENDGE_WORKSPACE.locales.find(item => item.code === locale)?.[mode] ?? locale
 }

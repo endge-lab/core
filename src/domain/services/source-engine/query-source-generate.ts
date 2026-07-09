@@ -35,7 +35,7 @@ export function createQuerySourceDocument(query: RQuery): QuerySourceDocument {
       path: String(query.query ?? ''),
       method: String(legacy.method ?? 'POST'),
       headers: normalizeHeaders(legacy.headers),
-      auth: query.auth ?? { mode: 'token' },
+      auth: query.auth ?? { mode: 'inherit' },
       timeoutMs: typeof legacy.timeoutMs === 'number' ? legacy.timeoutMs : undefined,
       formUrlencoded: legacy.sendAsFormUrlencoded ? true : undefined,
     },

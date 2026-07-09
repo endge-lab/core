@@ -24,6 +24,7 @@ import { RPageTemplate } from '@/domain/entities/reflect/RPageTemplate'
 import { RPage } from '@/domain/entities/reflect/RPage'
 import { RNavigation } from '@/domain/entities/reflect/RNavigation'
 import { RAction } from '@/domain/entities/reflect/RAction'
+import { RAuthProfile } from '@/domain/entities/reflect/RAuthProfile'
 import { ComponentType, QueryType, ScriptType } from '@/domain/types/document.types'
 
 export interface DocumentFactoryOptions {
@@ -311,6 +312,23 @@ export class DocumentFactory {
         return item
       }
 
+      case 'auth-profile': {
+        const item = new RAuthProfile()
+        item.id = entityId
+        item.identity = id
+        item.name = title
+        item.displayName = title
+        item.adapterId = 'manual_token'
+        item.config = {}
+        item.credentialRefs = {}
+        item.persist = 'localStorage'
+        item.active = true
+        if (folderId != null) item.folderId = folderId
+        if (registerInDomain)
+          Endge.domain.addAuthProfile(item)
+        return item
+      }
+
       default:
         throw new Error(`Unknown DocumentType: ${type}`)
     }
@@ -361,6 +379,8 @@ export class DocumentFactory {
         return 'Новый словарь'
       case 'i18n-bundles':
         return 'Новый словарь переводов'
+      case 'auth-profile':
+        return 'Новый профиль авторизации'
       default:
         return 'Без названия'
     }

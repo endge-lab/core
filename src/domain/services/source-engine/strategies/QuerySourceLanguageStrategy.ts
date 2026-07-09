@@ -59,7 +59,7 @@ const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
   method: 'GET',
   headers: {},
   auth: {
-    mode: 'token',
+    mode: 'inherit',
   },
 },`,
     detail: 'HTTP request config',
@@ -161,7 +161,7 @@ const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
     label: 'auth.token',
     kind: 'value',
     insertText: `auth: {
-  mode: 'token',
+  mode: 'inherit',
 },`,
     detail: 'Token auth config',
   },

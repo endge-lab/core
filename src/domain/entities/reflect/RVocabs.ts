@@ -26,6 +26,12 @@ export class RVocabs extends REntity {
   @Expose()
   override active: boolean = true
 
+  @Expose()
+  authMode: 'inherit' | 'profile' | 'manual' | 'none' = 'inherit'
+
+  @Expose()
+  authProfileIdentity?: string | null = null
+
   static fromPayload(json: any): RVocabs {
     const v = new RVocabs()
     v.id = json.id
@@ -36,6 +42,8 @@ export class RVocabs extends REntity {
     v.mode = json.mode === 'internal' ? 'internal' : 'external_payload'
     v.baseApiUrl = json.baseApiUrl ?? null
     v.collectionSlug = json.collectionSlug ?? null
+    v.authMode = normalizeVocabAuthMode(json.authMode)
+    v.authProfileIdentity = json.authProfileIdentity ?? null
     v.folderId = json.folder?.id ?? json.folder ?? null
     v.active = json.active !== false
     v.applyStorageMeta(json)
@@ -52,6 +60,8 @@ export class RVocabs extends REntity {
     v.mode = json.mode === 'internal' ? 'internal' : 'external_payload'
     v.baseApiUrl = json.baseApiUrl ?? null
     v.collectionSlug = json.collectionSlug ?? null
+    v.authMode = normalizeVocabAuthMode(json.authMode)
+    v.authProfileIdentity = json.authProfileIdentity ?? null
     v.folderId = json.folderId ?? json.folder ?? null
     v.active = json.active !== false
     v.meta = (json.meta && typeof json.meta === 'object' && !Array.isArray(json.meta)) ? json.meta : {}
@@ -68,6 +78,8 @@ export class RVocabs extends REntity {
       mode: this.mode,
       baseApiUrl: this.baseApiUrl ?? null,
       collectionSlug: this.collectionSlug ?? null,
+      authMode: this.authMode ?? 'inherit',
+      authProfileIdentity: this.authProfileIdentity ?? null,
       folderId: this.folderId ?? null,
       active: this.active !== false,
       meta: this.meta ?? {},
@@ -99,4 +111,11 @@ export class RVocabs extends REntity {
     plain.folderId = null
     return Serialize.fromJSON(RVocabs, plain)
   }
+}
+
+function normalizeVocabAuthMode(value: unknown): 'inherit' | 'profile' | 'manual' | 'none' {
+  const mode = String(value ?? '').trim()
+  if (mode === 'profile' || mode === 'manual' || mode === 'none')
+    return mode
+  return 'inherit'
 }

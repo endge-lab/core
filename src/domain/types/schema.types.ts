@@ -10,6 +10,7 @@ import type { Actions_Repository } from '@/model/db/repositories/Actions_Reposit
 import type { Settings_Repository } from '@/model/db/repositories/Settings_Repository'
 import type { Vocabs_Repository } from '@/model/db/repositories/Vocabs_Repository'
 import type { I18nBundles_Repository } from '@/model/db/repositories/I18nBundles_Repository'
+import type { AuthProfiles_Repository } from '@/model/db/repositories/AuthProfiles_Repository'
 import type { Parameters_Repository } from '@/model/db/repositories/Parameters_Repository'
 import type { Filters_Repository } from '@/model/db/repositories/Filters_Repository'
 import type { Converters_Repository } from '@/model/db/repositories/Converters_Repository'
@@ -25,8 +26,11 @@ import type { Styles_Repository } from '@/model/db/repositories/Styles_Repositor
 import type { Tenants_Repository } from '@/model/db/repositories/Tenants_Repository'
 import type { BehaviorBindings_Repository } from '@/model/db/repositories/BehaviorBindings_Repository'
 import type { PresentationBindings_Repository } from '@/model/db/repositories/PresentationBindings_Repository'
+import type { Workspaces_Repository } from '@/model/db/repositories/Workspaces_Repository'
 
 export interface EndgeSchemaDump {
+  workspaces?: any[]
+  workspace?: any
   projects: any[]
   types: any[]
   queries: any[]
@@ -42,6 +46,7 @@ export interface EndgeSchemaDump {
   settings: any[]
   vocabs: any[]
   i18nBundles: any[]
+  authProfiles: any[]
   parameters: any[]
   filters: any[]
   versions: any[]
@@ -70,6 +75,7 @@ export interface EndgeSchemaError {
 }
 
 export type RepositoriesBag = {
+  workspaces?: Workspaces_Repository
   projects: Projects_Repository
   types: Types_Repository
   queries: Queries_Repository
@@ -82,6 +88,7 @@ export type RepositoriesBag = {
   settings: Settings_Repository
   vocabs: Vocabs_Repository
   i18nBundles: I18nBundles_Repository
+  authProfiles: AuthProfiles_Repository
   parameters: Parameters_Repository
   filters: Filters_Repository
   converters: Converters_Repository

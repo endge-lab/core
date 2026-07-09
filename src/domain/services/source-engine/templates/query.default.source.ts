@@ -8,7 +8,7 @@ export const QUERY_DEFAULT_SOURCE = `defineQuery({
     method: 'GET',
     headers: {},
     auth: {
-      mode: 'token',
+      mode: 'inherit',
     },
   },
 

@@ -131,7 +131,7 @@ function parseDocument(
       path: requestNode ? readStringLikeProperty(requestNode, 'path', diagnostics) ?? '' : '',
       method: requestNode ? readStringProperty(requestNode, 'method') ?? 'POST' : 'POST',
       headers: requestNode ? readStringRecordProperty(requestNode, 'headers', diagnostics) : {},
-      auth: requestNode ? readAuthProperty(requestNode, diagnostics) : { mode: 'token' },
+      auth: requestNode ? readAuthProperty(requestNode, diagnostics) : { mode: 'inherit' },
       timeoutMs: requestNode ? readNumberProperty(requestNode, 'timeoutMs') : undefined,
       formUrlencoded: requestNode ? readBooleanProperty(requestNode, 'formUrlencoded') || undefined : undefined,
     },
@@ -721,12 +721,16 @@ function readAuthProperty(
 ): RQueryAuth {
   const raw = readUnknownProperty(node, 'auth', diagnostics)
   if (!raw || typeof raw !== 'object' || Array.isArray(raw))
-    return { mode: 'token' }
+    return { mode: 'inherit' }
 
   const auth = raw as Partial<RQueryAuth>
-  return auth.mode === 'none'
-    ? { ...auth, mode: 'none' }
-    : { ...auth, mode: 'token' }
+  if (auth.mode === 'none')
+    return { ...auth, mode: 'none' }
+  if (auth.mode === 'manual')
+    return { ...auth, mode: 'manual' }
+  if (auth.mode === 'profile')
+    return { ...auth, mode: 'profile' }
+  return { ...auth, mode: 'inherit' }
 }
 
 function readUnknownProperty(

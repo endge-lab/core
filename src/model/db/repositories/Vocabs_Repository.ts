@@ -8,6 +8,8 @@ export interface VocabDoc {
   mode: 'external_payload' | 'internal'
   baseApiUrl?: string | null
   collectionSlug?: string | null
+  authMode?: 'inherit' | 'profile' | 'manual' | 'none'
+  authProfileIdentity?: string | null
   active?: boolean
   folder?: number | string | null
   deletedAt?: string | null
@@ -45,6 +47,8 @@ export class Vocabs_Repository {
     mode: 'external_payload' | 'internal'
     baseApiUrl?: string | null
     collectionSlug?: string | null
+    authMode?: 'inherit' | 'profile' | 'manual' | 'none'
+    authProfileIdentity?: string | null
     active?: boolean
     folder?: number | string | null
     deletedAt?: string | null
@@ -66,6 +70,8 @@ export class Vocabs_Repository {
       mode: 'external_payload' | 'internal'
       baseApiUrl: string | null
       collectionSlug: string | null
+      authMode: 'inherit' | 'profile' | 'manual' | 'none'
+      authProfileIdentity: string | null
       active: boolean
       folder: number | string | null
       deletedAt: string | null
@@ -83,6 +89,8 @@ export class Vocabs_Repository {
     mode: 'external_payload' | 'internal'
     baseApiUrl?: string | null
     collectionSlug?: string | null
+    authMode?: 'inherit' | 'profile' | 'manual' | 'none'
+    authProfileIdentity?: string | null
     active?: boolean
     folder?: number | string | null
     deletedAt?: string | null
@@ -97,6 +105,8 @@ export class Vocabs_Repository {
       mode: data.mode,
       baseApiUrl: data.baseApiUrl ?? null,
       collectionSlug: data.collectionSlug ?? null,
+      authMode: data.authMode ?? 'inherit',
+      authProfileIdentity: data.authProfileIdentity ?? null,
       active: data.active !== false,
       folder: data.folder ?? null,
       deletedAt: data.deletedAt ?? null,

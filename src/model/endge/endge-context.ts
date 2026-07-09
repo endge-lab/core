@@ -56,6 +56,7 @@ export class EndgeContext extends EndgeModule {
   private _currentEnvironment: string = DEFAULT_SCOPE.environmentId
   private _currentUser: string = DEFAULT_SCOPE.userId
   private _currentLocale: string = DEFAULT_ENDGE_WORKSPACE.defaultLocale
+  private _pendingLocale: string | null = null
   private _sessionProvider: EndgeSessionIdentityProvider | null = null
   private _isHydrating = false
 
@@ -105,7 +106,10 @@ export class EndgeContext extends EndgeModule {
     this._currentProject = normalizeScopePart(payload?.project, DEFAULT_SCOPE.projectId)
     this._currentEnvironment = normalizeScopePart(payload?.environment, DEFAULT_SCOPE.environmentId)
     this._currentUser = normalizeScopePart(payload?.user, DEFAULT_SCOPE.userId)
-    this._currentLocale = normalizeWorkspaceLocale(payload?.locale)
+    const rawLocale = normalizeOptionalText(payload?.locale)
+    const locale = normalizeWorkspaceLocale(rawLocale)
+    this._currentLocale = locale
+    this._pendingLocale = rawLocale && rawLocale !== locale ? rawLocale : null
   }
 
   public saveToStorage(): void {
@@ -231,12 +235,25 @@ export class EndgeContext extends EndgeModule {
       return
     }
     this._currentLocale = next
+    this._pendingLocale = null
     this.saveToStorage()
     this.notify()
   }
 
   public setCurrentLocale(locale: string | null): void {
     this.currentLocale = normalizeWorkspaceLocale(locale)
+  }
+
+  public reconcileCurrentLocaleWithWorkspace(): void {
+    const pending = this._pendingLocale
+    const next = normalizeWorkspaceLocale(pending ?? this._currentLocale)
+    this._pendingLocale = null
+    if (next === this._currentLocale)
+      return
+
+    this._currentLocale = next
+    this.saveToStorage()
+    this.notify()
   }
 
   private resolveAdapter(persistence: EndgePersistenceInput): EndgeStorageAdapter {
@@ -271,6 +288,11 @@ export class EndgeContext extends EndgeModule {
 function normalizeScopePart(value: unknown, fallback: string): string {
   const normalized = String(value ?? '').trim()
   return normalized || fallback
+}
+
+function normalizeOptionalText(value: unknown): string | null {
+  const normalized = String(value ?? '').trim()
+  return normalized || null
 }
 
 function normalizeRequiredScopePart(value: unknown, field: string): string {

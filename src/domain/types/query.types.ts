@@ -1,9 +1,10 @@
 import { Expose } from 'class-transformer'
 
-export type RQueryAuthMode = 'none' | 'token'
+export type RQueryAuthMode = 'none' | 'token' | 'inherit' | 'profile' | 'manual'
 
 export interface RQueryAuth {
   mode: RQueryAuthMode
+  authProfileIdentity?: string
 
   /**
    * Необязательный ручной токен. Если НЕ задан, будет взят из Endge.auth.

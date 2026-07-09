@@ -1,6 +1,7 @@
 import type { EndgeModuleDefinition } from '@/domain/types/endge-modules.types'
 
 import { EndgeAuth } from '@/model/endge/endge-auth'
+import { EndgeAuthProfiles } from '@/model/endge/endge-auth-profiles'
 import { EndgeBindingsBehavior } from '@/model/endge/endge-bindings-behavior'
 import { EndgeBindingsPresentation } from '@/model/endge/endge-bindings-presentation'
 import { EndgeBind } from '@/model/endge/endge-bind'
@@ -49,6 +50,7 @@ export const ENDGE_CORE_MODULES: EndgeModuleDefinition[] = [
   { key: 'program', module: EndgeProgram },
   { key: 'compiler', module: EndgeCompiler },
   { key: 'source', module: EndgeSource },
+  { key: 'authProfiles', module: EndgeAuthProfiles },
   { key: 'vocabs', module: EndgeVocabs },
   { key: 'i18n', module: EndgeI18n },
   { key: 'extract', module: EndgeExtract },

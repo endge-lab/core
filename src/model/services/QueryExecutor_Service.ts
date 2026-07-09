@@ -295,7 +295,7 @@ export class QueryExecutor_Service {
     headers: Record<string, string>,
     qs?: Record<string, unknown>,
   ): Promise<void> {
-    const current: RQueryAuth = auth ?? { mode: 'token' }
+    const current: RQueryAuth = auth ?? { mode: 'inherit' }
 
     if (current.mode === 'none') {
       const headerName = current.headerName ?? 'Authorization'
@@ -303,13 +303,8 @@ export class QueryExecutor_Service {
       return
     }
 
-    const manualRaw = Endge.vars.resolve(current.manualToken) ?? current.manualToken
-    const token = manualRaw
-      ? await Endge.auth.getAccessToken({
-          mode: 'manual',
-          manualToken: manualRaw,
-        })
-      : await Endge.auth.getAccessToken({ mode: 'inherit' })
+    const session = await Endge.authProfiles.resolveRequestAuth(current)
+    const token = session.accessToken
 
     if (!token)
       return

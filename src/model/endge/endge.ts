@@ -1,6 +1,7 @@
 import { EndgeFederation } from '@/domain/entities/endge/EndgeFederation'
 import type { EndgeBootContext } from '@/domain/types/bootstrap.types'
 import type { EndgeAuth } from '@/model/endge/endge-auth'
+import type { EndgeAuthProfiles } from '@/model/endge/endge-auth-profiles'
 import { EndgeBindingsBehavior } from '@/model/endge/endge-bindings-behavior'
 import { EndgeBind } from '@/model/endge/endge-bind'
 import { EndgeCommands } from '@/model/endge/endge-commands'
@@ -243,6 +244,13 @@ export class Endge extends EndgeFederation {
    */
   static get auth(): EndgeAuth {
     return this.getModule<EndgeAuth>('auth')
+  }
+
+  /**
+   * Доступ к профилям авторизации и adapter registry.
+   */
+  static get authProfiles(): EndgeAuthProfiles {
+    return this.getModule<EndgeAuthProfiles>('authProfiles')
   }
 
   /**

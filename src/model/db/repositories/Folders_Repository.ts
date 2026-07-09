@@ -26,6 +26,7 @@ export class Folders_Repository {
     identity: string
     displayName: string
     entityType: string
+    workspace?: number | string | null
     parent?: string | null
   }) {
     const r = await this.api.post('/folders', data)
@@ -37,6 +38,7 @@ export class Folders_Repository {
     identity: string
     displayName: string
     entityType: string
+    workspace?: number | string | null
     parent?: string | null
   }>) {
     const r = await this.api.patch(`/folders/${id}`, data)
@@ -47,6 +49,7 @@ export class Folders_Repository {
     identity: string
     displayName: string
     entityType: string
+    workspace?: number | string | null
     parent?: string | null
   }) {
     const existing = await this.findByIdentity(data.identity)
