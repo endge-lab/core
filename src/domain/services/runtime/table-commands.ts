@@ -15,22 +15,36 @@ export function createTableRuntimeCommands(): RuntimeCommand<TableColumnCommandC
       id: TABLE_RUNTIME_COMMAND_IDS.columnPinLeft,
       label: TABLE_RUNTIME_COMMAND_IDS.columnPinLeft,
       surface: 'table-column-header',
-      canExecute: context => context.pinState !== 'left' && hasTargetMethod(context, 'setColumnPin'),
+      canExecute: context => canChangeColumnPin(context) && context.pinState !== 'left' && hasTargetMethod(context, 'setColumnPin'),
       execute: context => executeSetColumnPin(context, 'left'),
     },
     {
       id: TABLE_RUNTIME_COMMAND_IDS.columnPinRight,
       label: TABLE_RUNTIME_COMMAND_IDS.columnPinRight,
       surface: 'table-column-header',
-      canExecute: context => context.pinState !== 'right' && hasTargetMethod(context, 'setColumnPin'),
+      canExecute: context => canChangeColumnPin(context) && context.pinState !== 'right' && hasTargetMethod(context, 'setColumnPin'),
       execute: context => executeSetColumnPin(context, 'right'),
     },
     {
       id: TABLE_RUNTIME_COMMAND_IDS.columnUnpin,
       label: TABLE_RUNTIME_COMMAND_IDS.columnUnpin,
       surface: 'table-column-header',
-      canExecute: context => context.pinState !== 'none' && hasTargetMethod(context, 'setColumnPin'),
+      canExecute: context => canChangeColumnPin(context) && context.pinState !== 'none' && hasTargetMethod(context, 'setColumnPin'),
       execute: context => executeSetColumnPin(context, 'none'),
+    },
+    {
+      id: TABLE_RUNTIME_COMMAND_IDS.columnResetPin,
+      label: TABLE_RUNTIME_COMMAND_IDS.columnResetPin,
+      surface: 'table-column-header',
+      canExecute: context => canChangeColumnPin(context) && context.pinState !== context.defaultPinState && hasTargetMethod(context, 'resetColumnPin'),
+      execute: context => executeResetColumnPin(context),
+    },
+    {
+      id: TABLE_RUNTIME_COMMAND_IDS.columnResetAllPins,
+      label: TABLE_RUNTIME_COMMAND_IDS.columnResetAllPins,
+      surface: 'table-column-header',
+      canExecute: context => canChangePin(context) && context.hasPinChanges && hasTargetMethod(context, 'resetAllPins'),
+      execute: context => executeResetAllPins(context),
     },
     {
       id: TABLE_RUNTIME_COMMAND_IDS.sortSetColumnAsc,
@@ -67,6 +81,14 @@ function canChangeColumnSort(context: TableColumnCommandContext): boolean {
   return context.sortable && canChangeSort(context)
 }
 
+function canChangeColumnPin(context: TableColumnCommandContext): boolean {
+  return context.pinnable && canChangePin(context)
+}
+
+function canChangePin(context: TableColumnCommandContext): boolean {
+  return context.pinMode !== 'disabled'
+}
+
 function canChangeSort(context: TableColumnCommandContext): boolean {
   return context.sortMode !== 'disabled' && context.sortMode !== 'fixed'
 }
@@ -77,6 +99,14 @@ function hasTargetMethod(context: TableColumnCommandContext, method: TableTarget
 
 async function executeSetColumnPin(context: TableColumnCommandContext, side: TableColumnPinSide): Promise<void> {
   await requireTargetMethod(context, 'setColumnPin')(context.columnKey, side)
+}
+
+async function executeResetColumnPin(context: TableColumnCommandContext): Promise<void> {
+  await requireTargetMethod(context, 'resetColumnPin')(context.columnKey)
+}
+
+async function executeResetAllPins(context: TableColumnCommandContext): Promise<void> {
+  await requireTargetMethod(context, 'resetAllPins')()
 }
 
 async function executeSetColumnSort(context: TableColumnCommandContext, direction: TableSortDirection): Promise<void> {

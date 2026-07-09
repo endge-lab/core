@@ -37,6 +37,8 @@ export const TABLE_RUNTIME_COMMAND_IDS = {
   columnPinLeft: 'table.column.pinLeft',
   columnPinRight: 'table.column.pinRight',
   columnUnpin: 'table.column.unpin',
+  columnResetPin: 'table.column.resetPin',
+  columnResetAllPins: 'table.column.resetAllPins',
   sortSetColumnAsc: 'table.sort.setColumnAsc',
   sortSetColumnDesc: 'table.sort.setColumnDesc',
   sortClearColumn: 'table.sort.clearColumn',
@@ -53,6 +55,8 @@ export interface TableColumnSortState {
 
 export interface TableRuntimeCommandTarget {
   setColumnPin?: (columnKey: string, side: TableColumnPinSide) => void | Promise<void>
+  resetColumnPin?: (columnKey: string) => void | Promise<void>
+  resetAllPins?: () => void | Promise<void>
   setColumnSort?: (columnKey: string, direction: TableSortDirection) => void | Promise<void>
   clearColumnSort?: (columnKey: string) => void | Promise<void>
   clearAllSort?: () => void | Promise<void>
@@ -65,7 +69,11 @@ export interface TableColumnCommandContext extends RuntimeCommandContext {
   target: TableRuntimeCommandTarget
   columnKey: string
   columnIndex: number
+  pinnable: boolean
+  pinMode: 'enabled' | 'disabled'
   pinState: TableColumnPinSide
+  defaultPinState: TableColumnPinSide
+  hasPinChanges: boolean
   sortable: boolean
   sortMode: TableSortMode
   sortState: TableColumnSortState

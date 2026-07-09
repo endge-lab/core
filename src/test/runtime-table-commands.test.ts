@@ -107,6 +107,70 @@ describe('Runtime table commands', () => {
     expect(registry.canExecute(TABLE_RUNTIME_COMMAND_IDS.sortSetColumnAsc, context)).toBe(false)
     expect(registry.canExecute(TABLE_RUNTIME_COMMAND_IDS.sortSetColumnDesc, context)).toBe(false)
   })
+
+  it('runs column pin commands against the table runtime target', async () => {
+    const registry = createRegistry()
+    const setColumnPin = vi.fn()
+    const context = createContext({
+      target: {
+        setColumnPin,
+      },
+    })
+
+    expect(registry.canExecute(TABLE_RUNTIME_COMMAND_IDS.columnPinLeft, context)).toBe(true)
+
+    await registry.execute(TABLE_RUNTIME_COMMAND_IDS.columnPinLeft, context)
+
+    expect(setColumnPin).toHaveBeenCalledWith('number', 'left')
+  })
+
+  it('resets column pin and all pins to default state', async () => {
+    const registry = createRegistry()
+    const resetColumnPin = vi.fn()
+    const resetAllPins = vi.fn()
+    const context = createContext({
+      pinState: 'left',
+      defaultPinState: 'none',
+      hasPinChanges: true,
+      target: {
+        resetColumnPin,
+        resetAllPins,
+      },
+    })
+
+    expect(registry.canExecute(TABLE_RUNTIME_COMMAND_IDS.columnResetPin, context)).toBe(true)
+    expect(registry.canExecute(TABLE_RUNTIME_COMMAND_IDS.columnResetAllPins, context)).toBe(true)
+
+    await registry.execute(TABLE_RUNTIME_COMMAND_IDS.columnResetPin, context)
+    await registry.execute(TABLE_RUNTIME_COMMAND_IDS.columnResetAllPins, context)
+
+    expect(resetColumnPin).toHaveBeenCalledWith('number')
+    expect(resetAllPins).toHaveBeenCalledTimes(1)
+  })
+
+  it('disables pin commands when column pinning is disabled or column is not pinnable', () => {
+    const registry = createRegistry()
+    const target = {
+      setColumnPin: vi.fn(),
+      resetColumnPin: vi.fn(),
+      resetAllPins: vi.fn(),
+    }
+    const disabledContext = createContext({
+      pinMode: 'disabled',
+      hasPinChanges: true,
+      target,
+    })
+    const nonPinnableContext = createContext({
+      pinnable: false,
+      hasPinChanges: true,
+      target,
+    })
+
+    expect(registry.canExecute(TABLE_RUNTIME_COMMAND_IDS.columnPinLeft, disabledContext)).toBe(false)
+    expect(registry.canExecute(TABLE_RUNTIME_COMMAND_IDS.columnResetAllPins, disabledContext)).toBe(false)
+    expect(registry.canExecute(TABLE_RUNTIME_COMMAND_IDS.columnPinRight, nonPinnableContext)).toBe(false)
+    expect(registry.canExecute(TABLE_RUNTIME_COMMAND_IDS.columnResetPin, nonPinnableContext)).toBe(false)
+  })
 })
 
 function createRegistry(): RuntimeCommandRegistry {
@@ -126,7 +190,11 @@ function createContext(
     target: {},
     columnKey: 'number',
     columnIndex: 0,
+    pinnable: true,
+    pinMode: 'enabled',
     pinState: 'none',
+    defaultPinState: 'none',
+    hasPinChanges: false,
     sortable: true,
     sortMode: 'multiple',
     sortState: {

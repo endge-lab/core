@@ -17,6 +17,7 @@ import type {
 } from '@/domain/types/component-sfc.types'
 import { compileComponentSFCExpression } from '@/domain/services/compiler/component-sfc-expression'
 import { normalizeComponentSFCTableColumnMenu } from '@/domain/services/compiler/component-sfc-table-menu'
+import { normalizeComponentSFCTableColumnPin } from '@/domain/services/compiler/component-sfc-table-pin'
 import { normalizeComponentSFCTableSort } from '@/domain/services/compiler/component-sfc-table-sort'
 
 /** Контекст компиляции template в IR. */
@@ -181,6 +182,7 @@ function compileElementNode(
 
   if (element.tag === 'Table') {
     diagnostics.push(...normalizeComponentSFCTableSort(element).diagnostics)
+    diagnostics.push(...normalizeComponentSFCTableColumnPin(element).diagnostics)
     diagnostics.push(...normalizeComponentSFCTableColumnMenu(element).diagnostics)
   }
 
