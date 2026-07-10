@@ -13,6 +13,7 @@ import type {
   RComponentSFCSource_Parts,
 } from '@/domain/types/component-sfc.types'
 import type { DependencyGraph } from '@/domain/entities/data/DependencyGraph'
+import type { QueryProgramProp, SourceExpressionIR } from '@/domain/types/source-expression.types'
 
 /** Тип доменной сущности, для которой compiler может построить program artifact. */
 export type ProgramEntityType
@@ -23,6 +24,8 @@ export type ProgramEntityType
     | 'action'
     | 'query'
     | 'data-view'
+    | 'filter'
+    | 'composition'
 
 /** Итоговый статус artifact после компиляции и валидации. */
 export type ProgramArtifactStatus = 'valid' | 'warning' | 'error'
@@ -123,19 +126,6 @@ export interface ActionProgramPayload {
   compiledFlow: ActionCompiledFlow | null
 }
 
-/** Нормализованный filter item внутри query artifact. */
-export type QueryProgramFilterItem
-  = | {
-    mode: 'reference'
-    filterId: string
-    inlineJson?: null
-  }
-  | {
-    mode: 'inline'
-    filterId?: null
-    inlineJson: string
-  }
-
 export type QueryProgramOutputSource
   = | {
     type: 'response'
@@ -147,8 +137,9 @@ export type QueryProgramOutputSource
   }
 
 export interface QueryProgramOutputStoreTarget {
-  mode: 'default' | 'custom'
+  mode: 'default' | 'custom' | 'prop'
   key?: string
+  prop?: string
 }
 
 export interface QueryProgramOutput {
@@ -160,6 +151,9 @@ export interface QueryProgramOutput {
 
 /** Payload artifact для query-сущности. */
 export interface QueryProgramPayload {
+  /** Версия source syntax, определяющая runtime contract. */
+  sourceVersion: number
+
   /** Parser-level AST query source, нужен для diagnostics/debug UI. */
   ast?: unknown
 
@@ -190,14 +184,14 @@ export interface QueryProgramPayload {
   /** Отправлять body как application/x-www-form-urlencoded. */
   sendAsFormUrlencoded?: boolean
 
-  /** Параметры query, сохраненные в нормализованном виде. */
-  params: unknown
+  /** Единственный runtime input contract Query. */
+  props: QueryProgramProp[]
 
-  /** Набор фильтров, применяемых к query. */
-  filters: QueryProgramFilterItem[]
+  /** Безопасный request.body IR. При null отправляется пустой object payload. */
+  requestBody: SourceExpressionIR | null
 
-  /** Режим применения фильтров. */
-  filterMode?: string
+  /** Props, которые участвуют в вычислении store key и фиксируются при mount. */
+  stableProps: string[]
 
   /** Включены ли mock data для query. */
   mockDataEnabled?: boolean

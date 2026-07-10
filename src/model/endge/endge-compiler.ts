@@ -1,5 +1,7 @@
 import type { EndgeBootContext } from '@/domain/types/bootstrap.types'
 import type { DataViewRef, DataViewPipelineStep } from '@/domain/types/data-view-source.types'
+import type { FilterProgramPayload } from '@/domain/types/filter-source.types'
+import type { CompositionProgramPayload } from '@/domain/types/composition-source.types'
 import type {
   ComponentSFCProgramPayload,
   DataViewProgramPayload,
@@ -17,6 +19,8 @@ import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RDataView } from '@/domain/entities/reflect/RDataView'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
+import { RFilter } from '@/domain/entities/reflect/RFilter'
+import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { compileComponentSFC } from '@/domain/services/compiler/component-sfc-compile'
 import { ENDGE_COMPILER_VERSION } from '@/model/config/compiler'
 import { ENDGE_LOG_LANES } from '@/model/config/debug'
@@ -28,6 +32,7 @@ import { Endge } from '@/model/endge/endge'
 export class EndgeCompiler extends EndgeModule {
   private readonly handlers = new Map<ProgramEntityType, EntityCompilerHandler<any, any>>()
   private _localDataViewCounter = 0
+  private _localFilterCounter = 0
 
   /**
    * Создает singleton-bound compiler module и регистрирует стандартные handlers.
@@ -56,10 +61,16 @@ export class EndgeCompiler extends EndgeModule {
     if (!this.compilePhase('component-sfc', ENDGE_LOG_LANES.COMPONENTS, 'SFC-компонентов', Endge.domain.getComponentSFCs(), context))
       return
 
+    if (!this.compilePhase('data-view', ENDGE_LOG_LANES.QUERIES, 'data views', Endge.domain.getDataViews(), context))
+      return
+
+    if (!this.compilePhase('filter', ENDGE_LOG_LANES.QUERIES, 'filter source', Endge.domain.getFilters(), context))
+      return
+
     if (!this.compilePhase('query', ENDGE_LOG_LANES.QUERIES, 'query source', Endge.domain.getQueries(), context))
       return
 
-    if (!this.compilePhase('data-view', ENDGE_LOG_LANES.QUERIES, 'data views', Endge.domain.getDataViews(), context))
+    if (!this.compilePhase('composition', ENDGE_LOG_LANES.COMPONENTS, 'compositions', Endge.domain.getCompositions(), context))
       return
 
     dbg.info('Проект успешно скомпилирован', { icon: 'ti ti-check text-xl' })
@@ -76,6 +87,16 @@ export class EndgeCompiler extends EndgeModule {
   public buildDataView(entity: RDataView): ProgramArtifact<DataViewProgramPayload> {
     const context: ProgramCompileContext = { compilerVersion: ENDGE_COMPILER_VERSION }
     return this.compileEntity('data-view', entity, context) as ProgramArtifact<DataViewProgramPayload>
+  }
+
+  public buildFilter(entity: RFilter): ProgramArtifact<FilterProgramPayload> {
+    const context: ProgramCompileContext = { compilerVersion: ENDGE_COMPILER_VERSION }
+    return this.compileEntity('filter', entity, context) as ProgramArtifact<FilterProgramPayload>
+  }
+
+  public buildComposition(entity: RComposition): ProgramArtifact<CompositionProgramPayload> {
+    const context: ProgramCompileContext = { compilerVersion: ENDGE_COMPILER_VERSION }
+    return this.compileEntity('composition', entity, context) as ProgramArtifact<CompositionProgramPayload>
   }
 
   /**
@@ -176,15 +197,19 @@ export class EndgeCompiler extends EndgeModule {
         const source = this._resolveQuerySource(entity)
         const result = Endge.source.compile('query', source)
         const artifact = result.artifact as QueryProgramPayload | undefined
-        const local = artifact
+        const localDataViews = artifact
           ? this._materializeQueryLocalDataViews(artifact, entity, context)
           : { payload: undefined, children: [], diagnostics: [], dependencies: [] }
+        const local = localDataViews.payload
+          ? this._materializeQueryLocalFilters(localDataViews.payload, entity, context, localDataViews)
+          : localDataViews
 
         return this._makeArtifact(entity, 'query', context, {
           capabilities: ['compilable', 'runnable', 'data-provider'],
           payload: {
             ...this._makeEmptyQueryPayload(),
             ...(local.payload ?? artifact ?? {}),
+            sourceVersion: Number(entity.sourceVersion ?? 2) || 2,
             ast: result.ast ?? null,
             sourceDocument: result.document ?? null,
           },
@@ -221,6 +246,63 @@ export class EndgeCompiler extends EndgeModule {
             ...local.diagnostics,
           ],
           children: local.children,
+        })
+      },
+    })
+
+    this.registerHandler<RFilter, FilterProgramPayload>({
+      entityType: 'filter',
+      compile: (entity, context) => {
+        const result = Endge.source.compile('filter', this._resolveFilterSource(entity))
+        const compiledPayload = result.artifact as FilterProgramPayload | undefined
+        const payload = compiledPayload
+          ? { ...compiledPayload, sourceVersion: Number(entity.sourceVersion ?? 1) || 1 }
+          : undefined
+        const dependencies: ProgramArtifact['dependencies'] = []
+        for (const field of payload?.fields ?? []) {
+          if (field.vocab) {
+            dependencies.push({
+              entityType: 'vocabs',
+              id: field.vocab.identity,
+              identity: field.vocab.identity,
+              role: 'vocab',
+            })
+            if (!Endge.domain.getVocab(field.vocab.identity)) {
+              ;(result.diagnostics ??= []).push({
+                severity: 'error',
+                code: 'filter-vocab-missing',
+                message: `Vocab "${field.vocab.identity}" не найден.`,
+                sourcePath: `fields.${field.key}.vocab`,
+              })
+            }
+          }
+        }
+        return this._makeArtifact(entity, 'filter', context, {
+          capabilities: ['compilable', 'executable', 'data-provider', 'configuration'],
+          payload: payload ?? this._makeEmptyFilterPayload(entity.sourceVersion),
+          dependencies,
+          diagnostics: (result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[],
+        })
+      },
+    })
+
+    this.registerHandler<RComposition, CompositionProgramPayload>({
+      entityType: 'composition',
+      compile: (entity, context) => {
+        const result = Endge.source.compile('composition', this._resolveCompositionSource(entity))
+        const compiledPayload = result.artifact as CompositionProgramPayload | undefined
+        const payload = compiledPayload
+          ? { ...compiledPayload, sourceVersion: Number(entity.sourceVersion ?? 1) || 1 }
+          : undefined
+        const validation = payload ? this._validateComposition(payload) : { diagnostics: [], dependencies: [] }
+        return this._makeArtifact(entity, 'composition', context, {
+          capabilities: ['compilable', 'executable', 'configuration'],
+          payload: payload ?? this._makeEmptyCompositionPayload(entity.sourceVersion),
+          dependencies: validation.dependencies,
+          diagnostics: [
+            ...((result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]),
+            ...validation.diagnostics,
+          ],
         })
       },
     })
@@ -301,6 +383,311 @@ export class EndgeCompiler extends EndgeModule {
       diagnostics,
       dependencies,
     }
+  }
+
+  /** Материализует локальные Filter defaults query props в child artifacts. */
+  private _materializeQueryLocalFilters(
+    payload: QueryProgramPayload,
+    entity: RQuery,
+    context: ProgramCompileContext,
+    seed: {
+      children: ProgramArtifact[]
+      diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
+      dependencies: ProgramArtifact['dependencies']
+    },
+  ): {
+      payload: QueryProgramPayload
+      children: ProgramArtifact[]
+      diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
+      dependencies: ProgramArtifact['dependencies']
+    } {
+    const children = [...seed.children]
+    const diagnostics = [...seed.diagnostics]
+    const dependencies = [...seed.dependencies]
+    const ownerIdentity = String(entity.identity ?? entity.id)
+
+    const props = payload.props.map((prop) => {
+      const source = prop.defaultSource
+      if (!source)
+        return prop
+
+      if (source.kind === 'filter') {
+        if (prop.type !== 'Object') {
+          diagnostics.push({
+            severity: 'error',
+            code: 'query-filter-default-prop-type',
+            message: `Filter output default поддерживается только для Object prop; "${prop.key}" имеет тип ${prop.type}.`,
+            sourcePath: `props.${prop.key}.from`,
+          })
+        }
+        dependencies.push({
+          entityType: 'filter',
+          id: source.identity,
+          identity: source.identity,
+          role: 'query-prop-default',
+        })
+        const filterArtifact = Endge.program.getFilterArtifact(source.identity)
+        if (!filterArtifact) {
+          diagnostics.push({
+            severity: 'error',
+            code: 'query-filter-default-missing',
+            message: `Filter "${source.identity}" не найден в compiled program.`,
+            sourcePath: `props.${prop.key}.from`,
+          })
+        }
+        else if (filterArtifact.status === 'error') {
+          diagnostics.push({
+            severity: 'error',
+            code: 'query-filter-default-invalid',
+            message: `Filter "${source.identity}" содержит compile errors.`,
+            sourcePath: `props.${prop.key}.from`,
+          })
+        }
+        else if (!filterArtifact.payload.outputs.some(output => output.key === source.output)) {
+          diagnostics.push({
+            severity: 'error',
+            code: 'query-filter-default-output-missing',
+            message: `Filter "${source.identity}" не содержит output "${source.output}".`,
+            sourcePath: `props.${prop.key}.from`,
+          })
+        }
+        else if (filterArtifact.payload.outputs.find(output => output.key === source.output)?.kind !== 'json') {
+          diagnostics.push({
+            severity: 'error',
+            code: 'query-filter-default-output-kind',
+            message: `Filter output "${source.identity}.${source.output}" должен иметь kind json.`,
+            sourcePath: `props.${prop.key}.from`,
+          })
+        }
+        return prop
+      }
+
+      if (source.kind === 'local-filter')
+        return prop
+
+      const child = this._compileLocalFilterArtifact(
+        source.source,
+        ownerIdentity,
+        `props.${prop.key}.from`,
+        context,
+      )
+      children.push(child)
+      if (prop.type !== 'Object') {
+        diagnostics.push({
+          severity: 'error',
+          code: 'query-filter-default-prop-type',
+          message: `Локальный Filter output default поддерживается только для Object prop; "${prop.key}" имеет тип ${prop.type}.`,
+          sourcePath: `props.${prop.key}.from`,
+        })
+      }
+      diagnostics.push(...child.diagnostics.map(item => ({
+        severity: item.severity,
+        code: item.code,
+        message: item.message,
+        sourcePath: `props.${prop.key}.from${item.sourcePath ? `.${item.sourcePath}` : ''}`,
+        start: item.start,
+        end: item.end,
+      })))
+      if (!child.payload.outputs.some(output => output.key === source.output)) {
+        diagnostics.push({
+          severity: 'error',
+          code: 'query-local-filter-default-output-missing',
+          message: `Локальный Filter не содержит output "${source.output}".`,
+          sourcePath: `props.${prop.key}.from`,
+        })
+      }
+      else if (child.payload.outputs.find(output => output.key === source.output)?.kind !== 'json') {
+        diagnostics.push({
+          severity: 'error',
+          code: 'query-local-filter-default-output-kind',
+          message: `Локальный Filter output "${source.output}" должен иметь kind json.`,
+          sourcePath: `props.${prop.key}.from`,
+        })
+      }
+      return {
+        ...prop,
+        defaultSource: {
+          kind: 'local-filter' as const,
+          ref: child.ref as { entityType: 'filter', id: string | number, identity: string },
+          output: source.output,
+        },
+      }
+    })
+
+    return { payload: { ...payload, props }, children, diagnostics, dependencies }
+  }
+
+  /** Компилирует owned Filter artifact без регистрации в Endge.program. */
+  private _compileLocalFilterArtifact(
+    source: string,
+    ownerIdentity: string,
+    sourcePath: string,
+    context: ProgramCompileContext,
+  ): ProgramArtifact<FilterProgramPayload> {
+    const result = Endge.source.compile('filter', source)
+    const payload = result.artifact as FilterProgramPayload | undefined
+    const diagnostics = [
+      ...((result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]),
+    ]
+    for (const field of payload?.fields ?? []) {
+      if (field.vocab && !Endge.domain.getVocab(field.vocab.identity)) {
+        diagnostics.push({
+          severity: 'error',
+          code: 'filter-vocab-missing',
+          message: `Vocab "${field.vocab.identity}" не найден.`,
+          sourcePath: `fields.${field.key}.vocab`,
+        })
+      }
+    }
+    const entity = {
+      id: `${ownerIdentity}::${sourcePath}::${this._localFilterCounter += 1}`,
+      identity: `${ownerIdentity}::${sourcePath}`,
+      name: `${ownerIdentity}::${sourcePath}`,
+      source,
+      sourceVersion: 1,
+    }
+    return this._makeArtifact(entity, 'filter', context, {
+      capabilities: ['compilable', 'executable', 'data-provider', 'configuration'],
+      payload: payload ?? this._makeEmptyFilterPayload(1),
+      diagnostics,
+      dependencies: (payload?.fields ?? [])
+        .filter(field => field.vocab)
+        .map(field => ({
+          entityType: 'vocabs',
+          id: field.vocab!.identity,
+          identity: field.vocab!.identity,
+          role: 'vocab',
+        })),
+    })
+  }
+
+  /** Проверяет domain/program references и stable-prop bindings Composition. */
+  private _validateComposition(payload: CompositionProgramPayload): {
+    diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
+    dependencies: ProgramArtifact['dependencies']
+  } {
+    const diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[] = []
+    const dependencies: ProgramArtifact['dependencies'] = []
+
+    for (const runtime of payload.runtimes) {
+      dependencies.push({
+        entityType: runtime.kind,
+        id: runtime.identity,
+        identity: runtime.identity,
+        role: 'composition-runtime',
+      })
+
+      if (runtime.kind === 'filter') {
+        const artifact = Endge.program.getFilterArtifact(runtime.identity)
+        if (!artifact)
+          diagnostics.push({ severity: 'error', code: 'composition-filter-missing', message: `Filter "${runtime.identity}" не найден.`, sourcePath: `runtimes.${runtime.name}` })
+        else if (artifact.status === 'error')
+          diagnostics.push({ severity: 'error', code: 'composition-filter-invalid', message: `Filter "${runtime.identity}" содержит compile errors.`, sourcePath: `runtimes.${runtime.name}` })
+      }
+      else if (runtime.kind === 'query') {
+        const artifact = Endge.program.getQueryArtifact(runtime.identity)
+        if (!artifact) {
+          diagnostics.push({ severity: 'error', code: 'composition-query-missing', message: `Query "${runtime.identity}" не найден.`, sourcePath: `runtimes.${runtime.name}` })
+          continue
+        }
+        if (artifact.status === 'error') {
+          diagnostics.push({ severity: 'error', code: 'composition-query-invalid', message: `Query "${runtime.identity}" содержит compile errors.`, sourcePath: `runtimes.${runtime.name}` })
+          continue
+        }
+        const propNames = new Set(artifact.payload.props.map(prop => prop.key))
+        for (const [propName, binding] of Object.entries(runtime.props)) {
+          if (artifact.payload.requestBody && !propNames.has(propName)) {
+            diagnostics.push({
+              severity: 'error',
+              code: 'composition-query-prop-missing',
+              message: `Query "${runtime.identity}" не объявляет prop "${propName}".`,
+              sourcePath: `runtimes.${runtime.name}.withProps.${propName}`,
+            })
+          }
+          if (artifact.payload.stableProps.includes(propName) && binding.kind !== 'literal') {
+            diagnostics.push({
+              severity: 'error',
+              code: 'composition-query-stable-prop-dynamic',
+              message: `Query prop "${propName}" участвует в store key и должен быть literal/default.`,
+              sourcePath: `runtimes.${runtime.name}.withProps.${propName}`,
+            })
+          }
+        }
+      }
+      else {
+        const componentSFC = Endge.domain.getComponentSFC(runtime.identity)
+        const component = Endge.domain.getComponent(runtime.identity)
+        if (componentSFC && component) {
+          diagnostics.push({ severity: 'error', code: 'composition-component-ambiguous', message: `Component identity "${runtime.identity}" неоднозначна.`, sourcePath: `runtimes.${runtime.name}` })
+        }
+        else if (!componentSFC && !component) {
+          diagnostics.push({ severity: 'error', code: 'composition-component-missing', message: `Component "${runtime.identity}" не найден.`, sourcePath: `runtimes.${runtime.name}` })
+        }
+      }
+    }
+
+    for (const output of payload.outputs) {
+      if (!output.output)
+        continue
+      const runtime = payload.runtimes.find(item => item.name === output.runtime)
+      const outputExists = runtime?.kind === 'filter'
+        ? Endge.program.getFilterArtifact(runtime.identity)?.payload.outputs.some(item => item.key === output.output)
+        : runtime?.kind === 'query'
+          ? Endge.program.getQueryArtifact(runtime.identity)?.payload.outputs.some(item => item.key === output.output)
+          : false
+      if (!outputExists) {
+        diagnostics.push({
+          severity: 'error',
+          code: 'composition-output-selection-missing',
+          message: `Runtime "${runtime?.identity ?? output.runtime}" не содержит output "${output.output}".`,
+          sourcePath: `outputs.${output.key}`,
+        })
+      }
+    }
+
+    for (const target of payload.runtimes) {
+      for (const [propName, binding] of Object.entries(target.props)) {
+        if (binding.kind !== 'output')
+          continue
+        const source = payload.runtimes.find(item => item.name === binding.runtime)
+        if (!source)
+          continue
+        const outputExists = source.kind === 'filter'
+          ? Endge.program.getFilterArtifact(source.identity)?.payload.outputs.some(item => item.key === binding.output)
+          : source.kind === 'query'
+            ? Endge.program.getQueryArtifact(source.identity)?.payload.outputs.some(item => item.key === binding.output)
+            : false
+        if (!outputExists) {
+          diagnostics.push({
+            severity: 'error',
+            code: 'composition-binding-output-missing',
+            message: `Runtime "${binding.runtime}" не содержит output "${binding.output}".`,
+            sourcePath: `runtimes.${target.name}.withProps.${propName}`,
+          })
+        }
+      }
+    }
+
+    for (const reaction of payload.reactions) {
+      if (reaction.kind !== 'change')
+        continue
+      const source = payload.runtimes.find(item => item.name === reaction.runtime)
+      const outputExists = source?.kind === 'filter'
+        ? Endge.program.getFilterArtifact(source.identity)?.payload.outputs.some(item => item.key === reaction.output)
+        : source?.kind === 'query'
+          ? Endge.program.getQueryArtifact(source.identity)?.payload.outputs.some(item => item.key === reaction.output)
+          : false
+      if (!outputExists) {
+        diagnostics.push({
+          severity: 'error',
+          code: 'composition-reaction-output-missing',
+          message: `Reaction source "${reaction.runtime}.${reaction.output}" не существует.`,
+          sourcePath: `reactions.${reaction.runtime}.${reaction.output}`,
+        })
+      }
+    }
+
+    return { diagnostics, dependencies }
   }
 
   /** Материализует локальные DataView внутри DataView pipeline steps в child artifacts. */
@@ -496,7 +883,7 @@ export class EndgeCompiler extends EndgeModule {
    * compiled artifact на уровне program read-model.
    */
   private _toStableSource(entity: any): unknown {
-    if (entity instanceof RQuery || entity instanceof RDataView) {
+    if (entity instanceof RQuery || entity instanceof RDataView || entity instanceof RFilter || entity instanceof RComposition) {
       return {
         id: entity?.id ?? null,
         identity: entity?.identity ?? null,
@@ -514,18 +901,6 @@ export class EndgeCompiler extends EndgeModule {
       kind: entity?.kind ?? null,
       source: entity?.source ?? null,
       sourceVersion: entity?.sourceVersion ?? null,
-      endpoint: entity?.endpoint ?? null,
-      query: entity?.query ?? null,
-      method: entity?.method ?? null,
-      headers: entity?.headers ?? null,
-      auth: entity?.auth ?? null,
-      params: entity?.params ? Array.from(entity.params.entries?.() ?? []) : null,
-      filterMode: entity?.filterMode ?? null,
-      filters: entity?.filters ?? null,
-      subField: entity?.subField ?? null,
-      returnField: entity?.returnField ?? null,
-      mockData: entity?.mockData ?? null,
-      mockDataEnabled: entity?.mockDataEnabled ?? null,
       definition: entity?.definition ?? null,
       updatedAt: entity?.updatedAt ?? null,
     }
@@ -549,14 +924,48 @@ export class EndgeCompiler extends EndgeModule {
     throw new Error(`DataView source is required for "${entity.identity ?? entity.name ?? entity.id}".`)
   }
 
+  /** Возвращает Filter source без fallback на legacy fields. */
+  private _resolveFilterSource(entity: RFilter): string {
+    return typeof entity.source === 'string' ? entity.source : ''
+  }
+
+  /** Возвращает сохраненный Composition source. */
+  private _resolveCompositionSource(entity: RComposition): string {
+    return typeof entity.source === 'string' ? entity.source : ''
+  }
+
   /** Создает пустой query payload для error-artifact. */
   private _makeEmptyQueryPayload(): QueryProgramPayload {
     return {
       type: 'query-rest',
+      sourceVersion: 2,
       endpoint: '',
       query: '',
-      params: {},
-      filters: [],
+      props: [],
+      requestBody: null,
+      stableProps: [],
+      outputs: [],
+    }
+  }
+
+  /** Создает пустой Filter payload для error-artifact. */
+  private _makeEmptyFilterPayload(sourceVersion = 1): FilterProgramPayload {
+    return {
+      type: 'filter',
+      sourceVersion,
+      fields: [],
+      defaults: {},
+      outputs: [],
+    }
+  }
+
+  /** Создает пустой Composition payload для error-artifact. */
+  private _makeEmptyCompositionPayload(sourceVersion = 1): CompositionProgramPayload {
+    return {
+      type: 'composition',
+      sourceVersion,
+      runtimes: [],
+      reactions: [],
       outputs: [],
     }
   }

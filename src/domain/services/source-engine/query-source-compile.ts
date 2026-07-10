@@ -3,22 +3,23 @@ import type {
   QueryOutputStoreTarget,
   QuerySourceCompileResult,
   QuerySourceDocument,
-  QuerySourceField,
-  QuerySourceFilterItem,
   QuerySourceOutput,
 } from '@/domain/types/query-source.types'
 import type { ProgramDiagnostic, QueryProgramPayload } from '@/domain/types/program.types'
 import type { RQueryAuth } from '@/domain/types/query.types'
 import type { DataViewRef } from '@/domain/types/data-view-source.types'
+import type { QueryProgramProp } from '@/domain/types/source-expression.types'
 
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
 
 import { QueryType } from '@/domain/types/document.types'
+import { compileSourceCallback } from '@/domain/services/source-engine/source-expression-compile'
+import { compileSourceField } from '@/domain/services/source-engine/source-field-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
-/** Компилирует query source v1 в canonical document и query artifact payload. */
+/** Компилирует source-only Query v2 в canonical document и query artifact payload. */
 export function compileQuerySource(source: string): QuerySourceCompileResult {
   const diagnostics: DiagnosticDraft[] = []
 
@@ -109,11 +110,23 @@ function parseDocument(
   }
 
   const requestNode = readObjectProperty(node, 'request')
-  const paramsNode = readObjectProperty(node, 'params')
-  const filtersNode = readObjectProperty(node, 'filters')
+  const propsNode = readPropertyValue(node, 'props')
   const responseNode = readObjectProperty(node, 'response')
   const outputsNode = readObjectProperty(node, 'outputs')
   const mockNode = readObjectProperty(node, 'mock')
+
+  for (const key of ['params', 'filters']) {
+    const legacy = readPropertyValue(node, key)
+    if (legacy) {
+      diagnostics.push(createDiagnostic(
+        'error',
+        'query-source-legacy-property',
+        `Query source v2 не поддерживает legacy поле "${key}". Используйте props/request.body/outputs.`,
+        key,
+        legacy,
+      ))
+    }
+  }
 
   if (responseNode) {
     diagnostics.push(createDiagnostic(
@@ -123,6 +136,21 @@ function parseDocument(
       'response',
     ))
   }
+
+  const props = propsNode ? readProps(propsNode, source, diagnostics) : []
+  const requestBodyNode = requestNode ? readPropertyValue(requestNode, 'body') : null
+  const requestBody = requestBodyNode ? readRequestBody(requestBodyNode, diagnostics) : null
+  const propKeys = new Set(props.map(prop => prop.key))
+  if (propsNode && requestNode && (propsNode.start ?? 0) > (requestNode.start ?? 0)) {
+    diagnostics.push(createDiagnostic(
+      'error',
+      'query-source-props-order',
+      'props должен быть объявлен до request.',
+      'props',
+      propsNode,
+    ))
+  }
+  validateBodyPropReferences(requestBody, propKeys, diagnostics)
 
   return {
     kind: 'rest',
@@ -134,10 +162,10 @@ function parseDocument(
       auth: requestNode ? readAuthProperty(requestNode, diagnostics) : { mode: 'inherit' },
       timeoutMs: requestNode ? readNumberProperty(requestNode, 'timeoutMs') : undefined,
       formUrlencoded: requestNode ? readBooleanProperty(requestNode, 'formUrlencoded') || undefined : undefined,
+      body: requestBody,
     },
-    params: paramsNode ? readFieldRecord(paramsNode, diagnostics, 'params') : {},
-    filters: filtersNode ? readFilters(filtersNode, diagnostics) : { mode: 'merge' as const, items: [] },
-    outputs: outputsNode ? readOutputs(outputsNode, source, diagnostics) : [],
+    props,
+    outputs: outputsNode ? readOutputs(outputsNode, source, diagnostics, propKeys) : [],
     mock: {
       enabled: mockNode ? readBooleanProperty(mockNode, 'enabled') ?? false : false,
       data: mockNode ? readUnknownProperty(mockNode, 'data', diagnostics) ?? null : null,
@@ -148,6 +176,7 @@ function parseDocument(
 function createQueryArtifact(document: QuerySourceDocument): QueryProgramPayload {
   return {
     type: QueryType.REST,
+    sourceVersion: 2,
     method: document.request.method,
     endpoint: document.request.endpoint,
     query: document.request.path,
@@ -155,23 +184,12 @@ function createQueryArtifact(document: QuerySourceDocument): QueryProgramPayload
     auth: document.request.auth,
     timeoutMs: document.request.timeoutMs,
     sendAsFormUrlencoded: document.request.formUrlencoded,
-    params: document.params,
-    filters: document.filters.items.map(item => {
-      if (item.mode === 'reference') {
-        return {
-          mode: 'reference',
-          filterId: item.filterId,
-          inlineJson: null,
-        }
-      }
-
-      return {
-        mode: 'inline',
-        filterId: null,
-        inlineJson: JSON.stringify(item.value),
-      }
-    }),
-    filterMode: document.filters.mode,
+    props: document.props,
+    requestBody: document.request.body ?? null,
+    stableProps: document.outputs
+      .filter(output => output.store?.mode === 'prop' && output.store.prop)
+      .map(output => output.store!.prop!)
+      .filter((value, index, values) => values.indexOf(value) === index),
     mockDataEnabled: document.mock.enabled,
     mockData: document.mock.data,
     outputs: document.outputs.map(output => ({
@@ -183,10 +201,61 @@ function createQueryArtifact(document: QuerySourceDocument): QueryProgramPayload
   }
 }
 
+function readRequestBody(
+  node: t.Expression,
+  diagnostics: DiagnosticDraft[],
+) {
+  const expression = unwrapExpression(node)
+  if (!t.isCallExpression(expression) || !t.isIdentifier(expression.callee, { name: 'body' })) {
+    diagnostics.push(createDiagnostic('error', 'query-source-body-shape', 'request.body должен быть body(callback).', 'request.body', expression))
+    return null
+  }
+  return compileSourceCallback(expression.arguments[0], diagnostics, 'request.body')
+}
+
+function readProps(
+  node: t.Expression,
+  source: string,
+  diagnostics: DiagnosticDraft[],
+): QueryProgramProp[] {
+  const expression = unwrapExpression(node)
+  if (!t.isCallExpression(expression) || !t.isIdentifier(expression.callee, { name: 'defineProps' })) {
+    diagnostics.push(createDiagnostic('error', 'query-source-props-shape', 'props должен быть defineProps({...}).', 'props', expression))
+    return []
+  }
+  const definition = expression.arguments[0]
+  if (!definition || !t.isObjectExpression(definition)) {
+    diagnostics.push(createDiagnostic('error', 'query-source-props-object', 'defineProps принимает object literal.', 'props', expression))
+    return []
+  }
+
+  const props: QueryProgramProp[] = []
+  const declared = new Set<string>()
+  for (const property of definition.properties) {
+    if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
+      diagnostics.push(createDiagnostic('error', 'query-source-prop-property', 'defineProps допускает обычные properties.', 'props', property))
+      continue
+    }
+    const key = getPropertyName(property.key)
+    if (!key)
+      continue
+    if (declared.has(key)) {
+      diagnostics.push(createDiagnostic('error', 'query-source-prop-duplicate', `Prop "${key}" объявлен повторно.`, `props.${key}`, property))
+      continue
+    }
+    declared.add(key)
+    const parsed = compileSourceField(key, property.value, source, diagnostics, `props.${key}`)
+    if (parsed)
+      props.push({ ...parsed.field, defaultSource: parsed.defaultSource })
+  }
+  return props
+}
+
 function readOutputs(
   node: t.ObjectExpression,
   source: string,
   diagnostics: DiagnosticDraft[],
+  propKeys: Set<string> = new Set(),
 ): QuerySourceOutput[] {
   const outputs: QuerySourceOutput[] = []
   const declared = new Set<string>()
@@ -218,6 +287,15 @@ function readOutputs(
 
     const output = readOutput(key, unwrapExpression(property.value), source, diagnostics)
     if (output) {
+      if (output.store?.mode === 'prop' && output.store.prop && !propKeys.has(output.store.prop)) {
+        diagnostics.push(createDiagnostic(
+          'error',
+          'query-source-store-prop-missing',
+          `Store prop "${output.store.prop}" не объявлен в defineProps.`,
+          `outputs.${key}.toStore`,
+          property,
+        ))
+      }
       if (output.source.type === 'output' && !declared.has(output.source.key)) {
         diagnostics.push(createDiagnostic(
           'error',
@@ -233,6 +311,35 @@ function readOutputs(
   }
 
   return outputs
+}
+
+function validateBodyPropReferences(
+  expression: import('@/domain/types/source-expression.types').SourceExpressionIR | null,
+  propKeys: Set<string>,
+  diagnostics: DiagnosticDraft[],
+): void {
+  if (!expression)
+    return
+  const visit = (node: import('@/domain/types/source-expression.types').SourceExpressionIR) => {
+    if (node.type === 'read') {
+      if (node.source !== 'prop') {
+        diagnostics.push(createDiagnostic('error', 'query-source-body-read', `request.body не поддерживает read source "${node.source}".`, 'request.body'))
+      }
+      else if (!propKeys.has(node.path)) {
+        diagnostics.push(createDiagnostic('error', 'query-source-body-prop-missing', `Prop "${node.path}" не объявлен в defineProps.`, 'request.body'))
+      }
+    }
+    else if (node.type === 'operation') {
+      node.arguments.forEach(visit)
+    }
+    else if (node.type === 'array') {
+      node.items.forEach(visit)
+    }
+    else if (node.type === 'object') {
+      Object.values(node.properties).forEach(visit)
+    }
+  }
+  visit(expression)
 }
 
 function readOutput(
@@ -371,6 +478,12 @@ function readStoreTarget(
   if (t.isStringLiteral(expression))
     return { mode: 'custom', key: expression.value }
 
+  if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'prop' })) {
+    const prop = expression.arguments[0]
+    if (t.isStringLiteral(prop))
+      return { mode: 'prop', prop: prop.value }
+  }
+
   if (t.isObjectExpression(expression)) {
     const unsupported = expression.properties.some(property =>
       !t.isObjectProperty(property) || property.computed || getPropertyName(property.key) !== 'key',
@@ -392,7 +505,7 @@ function readStoreTarget(
   diagnostics.push(createDiagnostic(
     'error',
     'query-source-output-store-target',
-    '.toStore(...) принимает строковый key, объект { key } или вызывается без аргументов.',
+    '.toStore(...) принимает строковый key, prop(name), объект { key } или вызывается без аргументов.',
     sourcePath,
     expression,
   ))
@@ -453,234 +566,6 @@ function isManualDataViewDefinition(node: t.Node | null | undefined): boolean {
   )
   const hasSteps = Boolean(readPropertyValue(definition, 'steps'))
   return mode === 'manual' || (hasTransform && !hasSteps)
-}
-
-function readFilters(
-  node: t.ObjectExpression,
-  diagnostics: DiagnosticDraft[],
-) {
-  const mode = readStringProperty(node, 'mode') ?? 'merge'
-  const itemsNode = readPropertyValue(node, 'items')
-  const items: QuerySourceFilterItem[] = []
-
-  if (!itemsNode)
-    return { mode: 'merge' as const, items }
-
-  const value = unwrapExpression(itemsNode)
-  if (!t.isArrayExpression(value)) {
-    diagnostics.push(createDiagnostic(
-      'error',
-      'query-source-filters-items',
-      'filters.items должен быть массивом.',
-      'filters.items',
-    ))
-    return { mode: 'merge' as const, items }
-  }
-
-  value.elements.forEach((element, index) => {
-    const item = element ? parseFilterItem(unwrapExpression(element as t.Expression), diagnostics, `filters.items.${index}`) : null
-    if (item)
-      items.push(item)
-  })
-
-  return {
-    mode: mode === 'merge' ? mode : 'merge' as const,
-    items,
-  }
-}
-
-function parseFilterItem(
-  node: t.Expression,
-  diagnostics: DiagnosticDraft[],
-  sourcePath: string,
-): QuerySourceFilterItem | null {
-  const call = unwrapExpression(node)
-  if (!t.isCallExpression(call)) {
-    diagnostics.push(createDiagnostic(
-      'error',
-      'query-source-filter-call',
-      'Фильтр должен быть filter(...), filter.reference(...) или filter.inline(...).',
-      sourcePath,
-    ))
-    return null
-  }
-
-  if (t.isIdentifier(call.callee, { name: 'filter' })) {
-    const filterId = expressionToUnknown(call.arguments[0], diagnostics, sourcePath)
-    return typeof filterId === 'string'
-      ? { mode: 'reference', filterId }
-      : null
-  }
-
-  if (!t.isMemberExpression(call.callee)) {
-    diagnostics.push(createDiagnostic(
-      'error',
-      'query-source-filter-call',
-      'Фильтр должен быть filter(...), filter.reference(...) или filter.inline(...).',
-      sourcePath,
-    ))
-    return null
-  }
-
-  if (!t.isIdentifier(call.callee.object, { name: 'filter' }) || !t.isIdentifier(call.callee.property)) {
-    diagnostics.push(createDiagnostic(
-      'error',
-      'query-source-filter-call',
-      'Фильтр должен быть filter(...), filter.reference(...) или filter.inline(...).',
-      sourcePath,
-    ))
-    return null
-  }
-
-  const method = call.callee.property.name
-  if (method === 'reference') {
-    const filterId = expressionToUnknown(call.arguments[0], diagnostics, sourcePath)
-    return typeof filterId === 'string'
-      ? { mode: 'reference', filterId }
-      : null
-  }
-
-  if (method === 'inline') {
-    const value = expressionToUnknown(call.arguments[0], diagnostics, sourcePath)
-    return value && typeof value === 'object' && !Array.isArray(value)
-      ? { mode: 'inline', value: value as Record<string, unknown> }
-      : { mode: 'inline', value: {} }
-  }
-
-  diagnostics.push(createDiagnostic(
-    'error',
-    'query-source-filter-method',
-    `filter.${method} не поддерживается в query source v1.`,
-    sourcePath,
-  ))
-  return null
-}
-
-function readFieldRecord(
-  node: t.ObjectExpression,
-  diagnostics: DiagnosticDraft[],
-  sourcePath: string,
-): Record<string, QuerySourceField> {
-  const out: Record<string, QuerySourceField> = {}
-
-  for (const property of node.properties) {
-    if (!t.isObjectProperty(property) || property.computed)
-      continue
-
-    const key = getPropertyName(property.key)
-    if (!key)
-      continue
-
-    const field = parseFieldExpression(unwrapExpression(property.value as t.Expression), diagnostics, `${sourcePath}.${key}`)
-    if (field)
-      out[key] = field
-  }
-
-  return out
-}
-
-function parseFieldExpression(
-  node: t.Expression,
-  diagnostics: DiagnosticDraft[],
-  sourcePath: string,
-): QuerySourceField | null {
-  if (t.isObjectExpression(node)) {
-    const type = readStringProperty(node, 'type')
-    if (!type?.trim())
-      return null
-
-    return {
-      type,
-      isArray: readBooleanProperty(node, 'isArray') || undefined,
-      optional: readBooleanProperty(node, 'optional') || undefined,
-      params: readObjectProperty(node, 'params')
-        ? readFieldRecord(readObjectProperty(node, 'params')!, diagnostics, `${sourcePath}.params`)
-        : undefined,
-    }
-  }
-
-  let current: t.Expression = node
-  const modifiers: Array<{ name: string, argument?: t.CallExpression['arguments'][number] }> = []
-
-  while (t.isCallExpression(current) && t.isMemberExpression(current.callee)) {
-    const property: t.MemberExpression['property'] = current.callee.property
-    if (t.isIdentifier(property))
-      modifiers.push({ name: property.name, argument: current.arguments[0] })
-
-    if (!t.isExpression(current.callee.object))
-      return unsupportedField(diagnostics, sourcePath, node)
-
-    const next: t.Expression = unwrapExpression(current.callee.object)
-    current = next
-  }
-
-  if (!t.isCallExpression(current))
-    return unsupportedField(diagnostics, sourcePath, node)
-
-  let type: string | null = null
-  if (t.isIdentifier(current.callee, { name: 'field' })) {
-    const rawType = expressionToUnknown(current.arguments[0], diagnostics, sourcePath)
-    type = typeof rawType === 'string' ? rawType.trim() : null
-  }
-  else if (
-    t.isMemberExpression(current.callee)
-    && t.isIdentifier(current.callee.object, { name: 'field' })
-    && t.isIdentifier(current.callee.property)
-  ) {
-    type = normalizeFieldType(current.callee.property.name)
-  }
-
-  if (!type) {
-    return unsupportedField(diagnostics, sourcePath, node)
-  }
-
-  const field: QuerySourceField = { type }
-  for (const modifier of modifiers) {
-    if (modifier.name === 'array') {
-      field.isArray = true
-      continue
-    }
-    if (modifier.name === 'optional') {
-      field.optional = true
-      continue
-    }
-    if (modifier.name === 'params' && modifier.argument) {
-      const argument = unwrapExpression(modifier.argument as t.Expression)
-      if (t.isObjectExpression(argument))
-        field.params = readFieldRecord(argument, diagnostics, `${sourcePath}.params`)
-    }
-  }
-
-  return field
-}
-
-function unsupportedField(
-  diagnostics: DiagnosticDraft[],
-  sourcePath: string,
-  node: t.Expression,
-): null {
-  diagnostics.push(createDiagnostic(
-    'error',
-    'query-source-field-unsupported',
-    'Поле должно быть описано через field(...) или field.string().',
-    sourcePath,
-    node,
-  ))
-  return null
-}
-
-function normalizeFieldType(type: string): string {
-  const aliases: Record<string, string> = {
-    string: 'String',
-    number: 'Number',
-    boolean: 'Boolean',
-    date: 'Date',
-    datetime: 'DateTime',
-    object: 'Object',
-    unknown: 'Unknown',
-  }
-
-  return aliases[type] ?? type
 }
 
 function readStringLikeProperty(

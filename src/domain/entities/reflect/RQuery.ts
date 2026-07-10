@@ -1,117 +1,30 @@
-import type { QueryType } from '@/domain/types/document.types'
-import type { RQueryAuth, RQueryFilterApplyMode } from '@/domain/types/query.types'
-import type { Nullable } from '@endge/utils'
+import { QueryType } from '@/domain/types/document.types'
 
-import { Serialize, TypeMap } from '@endge/utils'
-import { Exclude, Expose, Type } from 'class-transformer'
+import { Expose } from 'class-transformer'
 
 import { Endge } from '@/model/endge/endge'
-import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
 import { REntity } from '@/domain/entities/reflect/REntity'
-import { RField } from '@/domain/entities/reflect/RField'
-import { RQueryFilter } from '@/domain/entities/reflect/RQueryFilter'
 
+/**
+ * Persisted Query document.
+ *
+ * Все transport, mock, input и output contracts живут исключительно в source;
+ * RQuery хранит только общие document-поля и source.
+ */
 export class RQuery extends REntity {
+  /** Внутренний document type для существующих registries; не persisted transport config. */
+  type: QueryType = QueryType.REST
+
+  /** Единственный persisted authoring-контракт Query. */
   @Expose()
-  type!: QueryType
+  source: string = ''
 
+  /** Версия Query source syntax. */
   @Expose()
-  query!: string
+  sourceVersion: number = 2
 
-  @Expose({ name: 'return' })
-  @Type(() => RField)
-  returnField!: RField
-
-  @Expose()
-  endpoint!: string
-
-  @Expose()
-  subField: string = 'items'
-
-  @Expose()
-  @TypeMap(RField, 'name')
-  params: Map<string, RField> = new Map()
-
-  @Expose()
-  mockData!: string
-
-  @Expose()
-  mockDataEnabled: boolean = false
-
-  @Expose()
-  auth: RQueryAuth = { mode: 'inherit' }
-
-  @Exclude()
-  customExecutor: Nullable<() => Promise<any>> = null
-
-  @Exclude()
-  customGenerator: Nullable<(opts: { count: number }) => Promise<any>> = null
-
-  /** Режим применения списка фильтров (пока только слияние). */
-  @Expose()
-  filterMode: RQueryFilterApplyMode = 'merge'
-
-  @Expose()
-  @Type(() => RQueryFilter)
-  filters: RQueryFilter[] = []
-
-  /** Source-first authoring representation v1. Runtime/compiler use this as the query contract. */
-  @Expose()
-  source?: string
-
-  /** Версия source syntax для миграций и diagnostics. */
-  @Expose()
-  sourceVersion?: number
-
-  constructor(name?: string, returnField?: RField) {
-    super()
-    if (name) {
-      this.name = name
-    }
-    if (returnField) {
-      this.returnField = returnField
-    }
-  }
-
-  /**
-   * Установка кастомных функций генерации и выполнения запроса
-   * @param opts.executor - функция выполнения запроса
-   * @param opts.generator - функция генерации данных (для моков)
-   */
-  override(opts: {
-    executor?: () => Promise<any>
-    generator?: (opts: { count: number }) => Promise<any>
-  }): void {
-    if (opts.executor) {
-      this.customExecutor = opts.executor
-    }
-    if (opts.generator) {
-      this.customGenerator = opts.generator
-    }
-  }
-
-  addParam(name: string, type: RField): void {
-    this.params.set(name, type)
-  }
-
-  getParams(): Map<string, RField> {
-    return this.params
-  }
-
-  /**
-   * Выполнение запроса
-   */
-  async run(params: object = {}): Promise<any> {
-    return Endge.query.run(this, params as Record<string, unknown>)
-  }
-
-  override duplicate(options: DuplicateOptions): RQuery {
-    const plain = Serialize.toPlain(this) as Record<string, any>
-    const name = (options.name ?? options.identity).trim() || options.identity
-    plain.identity = options.identity
-    plain.name = name
-    plain.displayName = name
-    plain.folderId = null
-    return Serialize.fromJSON(RQuery, plain)
+  /** Выполняет скомпилированный source Query через one-shot runtime session. */
+  async run(props: Record<string, unknown> = {}): Promise<any> {
+    return Endge.query.run(this, props)
   }
 }

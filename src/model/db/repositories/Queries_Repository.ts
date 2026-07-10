@@ -4,23 +4,8 @@ import type { AxiosInstance } from 'axios'
 export interface QueriesPayloadFields {
   identity: string
   displayName: string
-  type?: string
-  endpoint?: string
-  query?: string
   source?: string
   sourceVersion?: number
-  subField?: string
-  method?: string
-  headers?: any
-  timeoutMs?: number
-  sendAsFormUrlencoded?: boolean
-  params?: any
-  returnField?: any
-  mockData?: any
-  mockDataEnabled?: boolean
-  auth?: any
-  filterMode?: string
-  filters?: any
   author?: string
   active?: boolean
   meta?: Record<string, unknown>

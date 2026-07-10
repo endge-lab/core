@@ -10,6 +10,8 @@ export interface FilterDoc {
   deletedAt?: string | null
   author?: string | null
   fields: any[]
+  source: string
+  sourceVersion: number
 }
 
 export class Filters_Repository {
@@ -43,6 +45,8 @@ export class Filters_Repository {
     author?: string | null
     active?: boolean
     fields?: any[]
+    source?: string
+    sourceVersion?: number
     meta?: Record<string, unknown>
     inherited?: boolean
   }): Promise<FilterDoc> {
@@ -60,6 +64,8 @@ export class Filters_Repository {
       author: string | null
       active: boolean
       fields: any[]
+      source: string
+      sourceVersion: number
       meta: Record<string, unknown>
       inherited: boolean
     }>,
@@ -75,6 +81,8 @@ export class Filters_Repository {
     author?: string | null
     active?: boolean
     fields?: any[]
+    source?: string
+    sourceVersion?: number
     meta?: Record<string, unknown>
     inherited?: boolean
   }): Promise<FilterDoc> {

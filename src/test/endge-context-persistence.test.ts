@@ -120,6 +120,40 @@ describe('EndgeContext persistence', () => {
     expect(controller.get('table:flights', 'pin', [])).toEqual([{ key: 'number', side: 'left' }])
   })
 
+  it('separates active runtime id from durable storage id', () => {
+    const scope = {
+      workspaceId: 'workspace', tenantId: 'tenant', projectId: 'project',
+      environmentId: 'prod', userId: 'user',
+    }
+    const first = new RuntimeStateController({
+      runtimeId: 'runtime-a', storageId: 'schedule-filter', scope,
+      adapter: new LocalStorageContextAdapter(),
+    })
+    const second = new RuntimeStateController({
+      runtimeId: 'runtime-b', storageId: 'schedule-filter', scope,
+      adapter: new LocalStorageContextAdapter(),
+    })
+
+    first.set('filter:schedule', 'state', { airlineCodes: ['SU'] })
+
+    expect(first.runtimeId).not.toBe(second.runtimeId)
+    expect(first.storageId).toBe('schedule-filter')
+    expect(first.storageKey).toBe(second.storageKey)
+    expect(second.get('filter:schedule', 'state', {})).toEqual({ airlineCodes: ['SU'] })
+  })
+
+  it('isolates durable state when any context dimension changes', () => {
+    const base = {
+      workspaceId: 'workspace', tenantId: 'tenant', projectId: 'project',
+      environmentId: 'prod', userId: 'user',
+    }
+    const keys = (Object.keys(base) as Array<keyof typeof base>).map(key =>
+      buildRuntimeStateStorageKey({ ...base, [key]: `${base[key]}-other` }, 'schedule-filter'),
+    )
+    expect(new Set(keys).size).toBe(Object.keys(base).length)
+    expect(keys).not.toContain(buildRuntimeStateStorageKey(base, 'schedule-filter'))
+  })
+
   it('disabled adapter always returns fallback and does not write', () => {
     const adapter = new DisabledContextAdapter()
     const controller = new RuntimeStateController({

@@ -285,15 +285,24 @@ export class EndgeVocabs extends EndgeModule {
   /**
    * Полностью загружает словарь по id или identity с постраничным обходом.
    */
-  async loadVocab(idOrIdentity: string | number): Promise<any[]> {
+  async loadVocab(
+    idOrIdentity: string | number,
+    options: { throwOnError?: boolean } = {},
+  ): Promise<any[]> {
     const cfg = this.resolveVocabConfigByIdOrIdentity(idOrIdentity)
-    if (!cfg)
+    if (!cfg) {
+      if (options.throwOnError)
+        throw new Error(`Vocab "${String(idOrIdentity)}" не найден.`)
       return []
+    }
     const headers = await this.resolveAuthHeaders(cfg)
 
     const baseUrl = this.resolveBaseUrl(cfg.baseApiUrl)
-    if (!baseUrl)
+    if (!baseUrl) {
+      if (options.throwOnError)
+        throw new Error(`Vocab "${cfg.identity}" не содержит доступный baseApiUrl.`)
       return []
+    }
 
     const pageSize = 1000
     const allDocs: any[] = []
@@ -304,6 +313,8 @@ export class EndgeVocabs extends EndgeModule {
       while (true) {
         const url = `${baseUrl}/${cfg.slug}?limit=${pageSize}&page=${page}`
         const res = await fetch(url, { headers })
+        if (!res.ok)
+          throw new Error(`HTTP ${res.status} ${res.statusText}`.trim())
         const json = await res.json()
         const docs = this.extractDocs(json)
 
@@ -347,6 +358,8 @@ export class EndgeVocabs extends EndgeModule {
     }
     catch (e: any) {
       console.warn(`[EndgeVocabs.loadVocab] ${cfg.idKey}/${cfg.slug}:`, e?.message ?? e)
+      if (options.throwOnError)
+        throw e
       return []
     }
     finally {

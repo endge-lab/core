@@ -24,6 +24,7 @@ export function buildRuntimeStateStorageKey(
 
 export class RuntimeStateController implements RuntimeStateControllerLike {
   public readonly runtimeId: string
+  public readonly storageId: string
   public readonly storageKey: string
   public readonly scope: EndgePersistenceScope
 
@@ -31,13 +32,15 @@ export class RuntimeStateController implements RuntimeStateControllerLike {
 
   public constructor(input: {
     runtimeId: string
+    storageId?: string
     scope: EndgePersistenceScope
     adapter: EndgeStorageAdapter
   }) {
     this.runtimeId = normalizeRequiredId(input.runtimeId, 'runtimeId')
+    this.storageId = normalizeRequiredId(input.storageId ?? input.runtimeId, 'storageId')
     this.scope = { ...input.scope }
     this._adapter = input.adapter
-    this.storageKey = buildRuntimeStateStorageKey(this.scope, this.runtimeId)
+    this.storageKey = buildRuntimeStateStorageKey(this.scope, this.storageId)
   }
 
   public get<T>(entityKey: string, section: string, fallback: T): T {

@@ -160,6 +160,7 @@ export class EndgeContext extends EndgeModule {
 
   public createRuntimeStateController(input: {
     runtimeId: string
+    storageId?: string
     persistence?: EndgePersistenceInput
   }): RuntimeStateController {
     const runtimeId = normalizeRequiredScopePart(input.runtimeId, 'runtimeId')
@@ -170,6 +171,7 @@ export class EndgeContext extends EndgeModule {
 
     const controller = new RuntimeStateController({
       runtimeId,
+      storageId: input.storageId,
       scope: this.getPersistenceScope(),
       adapter: this.resolveAdapter(input.persistence ?? { driver: 'local' }),
     })

@@ -38,6 +38,7 @@ import { EndgeUpdates } from '@/model/endge/endge-updates'
 import { EndgeVars } from '@/model/endge/endge-vars'
 import { EndgeVocabs } from '@/model/endge/endge-vocabs'
 import { EndgeWorkspace } from '@/model/endge/endge-workspace'
+import { EndgeComposition } from '@/model/endge/endge-composition'
 
 export const ENDGE_CORE_MODULES: EndgeModuleDefinition[] = [
   { key: 'workspace', module: EndgeWorkspace },
@@ -63,6 +64,7 @@ export const ENDGE_CORE_MODULES: EndgeModuleDefinition[] = [
   { key: 'vars', module: EndgeVars },
   { key: 'query', module: EndgeQuery },
   { key: 'dataView', module: EndgeDataView },
+  { key: 'composition', module: EndgeComposition },
   { key: 'auth', module: EndgeAuth },
   { key: 'updates', module: EndgeUpdates },
   { key: 'events', module: EndgeEvents },

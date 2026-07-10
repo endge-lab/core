@@ -6,6 +6,8 @@ import axios from 'axios'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { Endge } from '@/model/endge/endge'
 import { QueryExecutor_Service } from '@/model/services/QueryExecutor_Service'
+import type { ProgramArtifact, QueryProgramPayload } from '@/domain/types/program.types'
+import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
 
 /**
  * Модуль выполнения доменных query: custom executor, mock data и REST.
@@ -38,11 +40,46 @@ export class EndgeQuery extends EndgeModule {
     if (artifact.status === 'error')
       throw new Error(`Query artifact has compile errors for "${query.identity ?? query.name ?? query.id}".`)
 
+    const host = Endge.runtime.execute(query, {
+      props: params,
+      persistence: 'disabled',
+    }) as QueryRuntimeHost | null
+    if (!host)
+      throw new Error(`Query runtime cannot be created for "${query.identity}".`)
+
+    try {
+      return await host.run()
+    }
+    finally {
+      Endge.runtime.destroyRuntimeTree(host.id)
+    }
+  }
+
+  /** Выполняет artifact для QueryRuntimeHost без преждевременной записи stores. */
+  public executeArtifact(input: {
+    query: RQuery
+    payload: QueryProgramPayload
+    children: ProgramArtifact[]
+    props: Record<string, unknown>
+    signal?: AbortSignal
+  }): Promise<any> {
     return this.executor.execute({
-      query,
-      payload: artifact.payload,
-      children: artifact.children ?? [],
-      vars: params,
+      query: input.query,
+      payload: input.payload,
+      children: input.children,
+      vars: input.props,
+      signal: input.signal,
+      writeStores: false,
     })
+  }
+
+  /** Записывает outputs только после latest-wins проверки host-а. */
+  public writeOutputStores(
+    payload: QueryProgramPayload,
+    query: RQuery,
+    props: Record<string, unknown>,
+    outputs: Record<string, unknown>,
+  ): void {
+    this.executor.writeOutputStores(payload, query, props, outputs)
   }
 }

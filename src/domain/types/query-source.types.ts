@@ -1,44 +1,10 @@
-import type { RQueryAuth, RQueryFilterApplyMode } from '@/domain/types/query.types'
+import type { RQueryAuth } from '@/domain/types/query.types'
 import type { ProgramDiagnostic, QueryProgramPayload } from '@/domain/types/program.types'
 import type { DataViewRef } from '@/domain/types/data-view-source.types'
+import type { QueryProgramProp, SourceExpressionIR } from '@/domain/types/source-expression.types'
 
 /** Поддерживаемые kind query source v1. */
 export type QuerySourceKind = 'rest'
-
-/** Описание поля в query source без привязки к class-transformer/RField. */
-export interface QuerySourceField {
-  /** Доменный тип поля. */
-  type: string
-
-  /** Признак массива. */
-  isArray?: boolean
-
-  /** Признак optional-поля. */
-  optional?: boolean
-
-  /** Параметры метода/объектного поля, если они есть. */
-  params?: Record<string, QuerySourceField>
-}
-
-/** Source-описание одного query filter item. */
-export type QuerySourceFilterItem
-  = | {
-    mode: 'reference'
-    filterId: string
-  }
-  | {
-    mode: 'inline'
-    value: Record<string, unknown>
-  }
-
-/** Source-описание фильтров запроса. */
-export interface QuerySourceFilters {
-  /** Режим применения фильтров. */
-  mode: RQueryFilterApplyMode
-
-  /** Ordered list фильтров. */
-  items: QuerySourceFilterItem[]
-}
 
 /** Source-описание HTTP request части REST-запроса. */
 export interface QuerySourceRequest {
@@ -62,6 +28,9 @@ export interface QuerySourceRequest {
 
   /** Отправлять body как application/x-www-form-urlencoded. */
   formUrlencoded?: boolean
+
+  /** Безопасный body expression для query source v2. */
+  body?: SourceExpressionIR | null
 }
 
 /** Source-описание mock-режима запроса. */
@@ -84,8 +53,9 @@ export type QueryOutputSource
   }
 
 export interface QueryOutputStoreTarget {
-  mode: 'default' | 'custom'
+  mode: 'default' | 'custom' | 'prop'
   key?: string
+  prop?: string
 }
 
 export interface QuerySourceOutput {
@@ -97,7 +67,7 @@ export interface QuerySourceOutput {
 
 export type QuerySourceOutputs = QuerySourceOutput[]
 
-/** Canonical authoring-модель query source v1. */
+/** Canonical authoring-модель source-only Query v2. */
 export interface QuerySourceDocument {
   /** Тип source query. */
   kind: QuerySourceKind
@@ -105,11 +75,8 @@ export interface QuerySourceDocument {
   /** Request config. */
   request: QuerySourceRequest
 
-  /** Параметры запроса. */
-  params: Record<string, QuerySourceField>
-
-  /** Фильтры запроса. */
-  filters: QuerySourceFilters
+  /** Единственный runtime input contract Query. */
+  props: QueryProgramProp[]
 
   /** Ordered output graph: response/output sources, transforms and store targets. */
   outputs: QuerySourceOutputs
@@ -128,6 +95,8 @@ export type QuerySourcePatchPath
     | 'request.auth'
     | 'request.timeoutMs'
     | 'request.formUrlencoded'
+    | 'request.body'
+    | 'props'
     | 'outputs'
     | 'mock.enabled'
     | 'mock.data'
@@ -146,15 +115,6 @@ export interface QuerySourcePatchOperation {
 
 /** Patch query source: одиночная операция или пачка операций. */
 export type QuerySourcePatch = QuerySourcePatchOperation | QuerySourcePatchOperation[]
-
-/** Результат генерации query source из legacy RQuery. */
-export interface QuerySourceGenerateResult {
-  /** Сгенерированный source. */
-  source: string
-
-  /** Canonical authoring-модель, из которой напечатан source. */
-  document: QuerySourceDocument
-}
 
 /** Результат компиляции query source. */
 export interface QuerySourceCompileResult {

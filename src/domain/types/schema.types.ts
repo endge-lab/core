@@ -25,6 +25,7 @@ import type { Tenants_Repository } from '@/model/db/repositories/Tenants_Reposit
 import type { BehaviorBindings_Repository } from '@/model/db/repositories/BehaviorBindings_Repository'
 import type { PresentationBindings_Repository } from '@/model/db/repositories/PresentationBindings_Repository'
 import type { Workspaces_Repository } from '@/model/db/repositories/Workspaces_Repository'
+import type { Compositions_Repository } from '@/model/db/repositories/Compositions_Repository'
 
 export interface EndgeSchemaDump {
   workspaces?: any[]
@@ -33,6 +34,7 @@ export interface EndgeSchemaDump {
   types: any[]
   queries: any[]
   dataViews: any[]
+  compositions: any[]
   folders: any[]
   components: any[]
   componentSFCs: any[]
@@ -76,6 +78,7 @@ export type RepositoriesBag = {
   types: Types_Repository
   queries: Queries_Repository
   dataViews: DataViews_Repository
+  compositions: Compositions_Repository
   folders: Folders_Repository
   components: Components_Repository
   componentSFCs: ComponentSFCs_Repository

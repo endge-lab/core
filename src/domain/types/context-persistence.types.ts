@@ -42,6 +42,7 @@ export interface RuntimeStateDocument {
 
 export interface RuntimeStateControllerLike {
   readonly runtimeId: string
+  readonly storageId: string
   readonly storageKey: string
   readonly scope: EndgePersistenceScope
 

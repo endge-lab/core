@@ -20,13 +20,14 @@ import { normalizeEndgeWorkspaceDefinition } from '@/domain/entities/reflect/RWo
 import { RVersion } from '@/domain/entities/reflect/RVersion'
 import { ComponentType, FilterType, ParameterType, QueryType } from '@/domain/types/document.types'
 import { Endge } from '@/model/endge/endge'
-import { dataViewPayloadDocToPlain, queryPayloadDocToPlain } from '@/model/endge/endge-domain'
+import { compositionPayloadDocToPlain, dataViewPayloadDocToPlain, queryPayloadDocToPlain } from '@/model/endge/endge-domain'
 import { DEFAULT_ENDGE_WORKSPACE } from '@/model/config/endge-workspace'
 import { Actions_Repository } from '@/model/db/repositories/Actions_Repository'
 import { AuthProfiles_Repository } from '@/model/db/repositories/AuthProfiles_Repository'
 import { BehaviorBindings_Repository } from '@/model/db/repositories/BehaviorBindings_Repository'
 import { Components_Repository } from '@/model/db/repositories/Components_Repository'
 import { ComponentSFCs_Repository } from '@/model/db/repositories/ComponentSFCs_Repository'
+import { Compositions_Repository } from '@/model/db/repositories/Compositions_Repository'
 import { Converters_Repository } from '@/model/db/repositories/Converters_Repository'
 import { DataViews_Repository } from '@/model/db/repositories/DataViews_Repository'
 import { Environments_Repository } from '@/model/db/repositories/Environments_Repository'
@@ -56,6 +57,7 @@ const WORKSPACE_SCOPED_PAYLOAD_COLLECTIONS = new Set([
   'behavior-bindings',
   'components',
   'component-sfcs',
+  'compositions',
   'converters',
   'data-views',
   'environments',
@@ -230,28 +232,6 @@ function toPayloadActionField(raw: any): { type: number | string | null, isArray
   }
 }
 
-function normalizeQueryMockDataForPayload(raw: unknown): unknown {
-  if (raw == null)
-    return null
-
-  if (typeof raw === 'string') {
-    const text = raw.trim()
-    if (!text)
-      return null
-    try {
-      return JSON.parse(text)
-    }
-    catch {
-      return null
-    }
-  }
-
-  if (typeof raw === 'object')
-    return raw
-
-  return null
-}
-
 /** Оставляет только targets, поддержанные SFC-моделью v1. */
 function normalizeComponentSFCTargets(raw: unknown): Array<'dom' | 'canvas'> {
   if (!Array.isArray(raw))
@@ -328,6 +308,7 @@ const ROOT_FOLDER_ENTITY_TYPE_BY_IDENTITY: Record<string, string> = {
   'root-types': 'types',
   'root-queries': 'queries',
   'root-data-views': 'data-views',
+  'root-compositions': 'compositions',
   'root-components': 'components',
   'root-actions': 'actions',
   'root-parameters': 'parameters',
@@ -413,6 +394,7 @@ export class EndgeSchemaStorage extends EndgeModule {
     'actions',
     'queries',
     'data-views',
+    'compositions',
     'parameters',
     'filters',
     'converters',
@@ -593,7 +575,7 @@ export class EndgeSchemaStorage extends EndgeModule {
   }
 
   private async fetchPayloadWorkspaceId(identity: string): Promise<string | number> {
-    const doc = await this.repositories?.workspaces.findByIdentity(identity)
+    const doc = await this.repositories?.workspaces?.findByIdentity(identity)
       ?? await this.fetchPayloadWorkspaceByIdentity(identity)
 
     if (!doc?.id) {
@@ -666,6 +648,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         types: new Types_Repository(this.api),
         queries: new Queries_Repository(this.api),
         dataViews: new DataViews_Repository(this.api),
+        compositions: new Compositions_Repository(this.api),
         folders: new Folders_Repository(this.api),
         components: new Components_Repository(this.api),
         componentSFCs: new ComponentSFCs_Repository(this.api),
@@ -768,6 +751,7 @@ export class EndgeSchemaStorage extends EndgeModule {
       types: [],
       queries: [],
       dataViews: [],
+      compositions: [],
       components: [],
       componentSFCs: [],
       actions: [],
@@ -1207,24 +1191,9 @@ export class EndgeSchemaStorage extends EndgeModule {
         id: raw.id,
         identity: raw.identity,
         name: raw.displayName,
-        type: raw.type ?? QueryType.REST,
-        query: raw.query,
-        source: raw.source,
-        sourceVersion: raw.sourceVersion,
-        return: raw.returnField ?? raw.return,
-        endpoint: raw.endpoint,
-        subField: raw.subField,
-        params: raw.params,
-        returnField: raw.returnField,
-        mockData: typeof raw.mockData === 'string' ? raw.mockData : (raw.mockData != null && typeof raw.mockData === 'object' ? JSON.stringify(raw.mockData) : ''),
-        mockDataEnabled: raw.mockDataEnabled === true || raw.mockDataEnabled === 1 || String(raw.mockDataEnabled).toLowerCase() === 'true',
-        auth: raw.auth,
-        filterMode: raw.filterMode,
-        filters: raw.filters,
-        method: raw.method,
-        headers: raw.headers,
-        timeoutMs: raw.timeoutMs,
-        sendAsFormUrlencoded: raw.sendAsFormUrlencoded,
+        type: QueryType.REST,
+        source: typeof raw.source === 'string' ? raw.source : '',
+        sourceVersion: Number(raw.sourceVersion ?? 2) || 2,
         folderId,
         project: relationToId(raw.project) ?? null,
         meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
@@ -1233,6 +1202,7 @@ export class EndgeSchemaStorage extends EndgeModule {
     }
 
     const normalizeDataView = (raw: any) => dataViewPayloadDocToPlain(raw)
+    const normalizeComposition = (raw: any) => compositionPayloadDocToPlain(raw)
 
     const normalizeFolder = (raw: any) => {
       return {
@@ -1356,6 +1326,8 @@ export class EndgeSchemaStorage extends EndgeModule {
         active: raw.active ?? true,
         deletedAt: raw.deletedAt ?? null,
         fields,
+        source: String(raw.source ?? ''),
+        sourceVersion: Number(raw.sourceVersion ?? 1) || 1,
         meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
         inherited: raw.inherited === true,
       }
@@ -1483,6 +1455,11 @@ export class EndgeSchemaStorage extends EndgeModule {
       load('dataViews', async () => {
         const rows = await this.repositories!.dataViews.findAll()
         return rows.map(normalizeDataView)
+      }),
+
+      load('compositions', async () => {
+        const rows = await this.repositories!.compositions.findAll()
+        return rows.map(normalizeComposition)
       }),
 
       load('components', async () => {
@@ -1620,6 +1597,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       return domain.getQuery(documentIdOrIdentity)
     if (documentType === 'data-view')
       return domain.getDataView(documentIdOrIdentity)
+    if (documentType === 'composition')
+      return domain.getComposition(documentIdOrIdentity)
     if (documentType === ParameterType.DefaultParameter)
       return domain.getParameter(documentIdOrIdentity)
     if (documentType === FilterType.DefaultFilter)
@@ -1730,6 +1709,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       return repos.queries.findByIdentity(identity)
     if (documentType === 'data-view')
       return repos.dataViews.findByIdentity(identity)
+    if (documentType === 'composition')
+      return repos.compositions.findByIdentity(identity)
     if (documentType === ParameterType.DefaultParameter)
       return repos.parameters.findByIdentity(identity)
     if (documentType === FilterType.DefaultFilter)
@@ -1825,6 +1806,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       return repos.queries.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === 'data-view')
       return repos.dataViews.patchFolder(documentPayloadId, folderPayloadId)
+    if (documentType === 'composition')
+      return repos.compositions.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === ParameterType.DefaultParameter)
       return repos.parameters.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === FilterType.DefaultFilter)
@@ -1940,6 +1923,10 @@ export class EndgeSchemaStorage extends EndgeModule {
       await repos.dataViews.softDelete(resolvedIdentity, folderId)
       return
     }
+    if (documentType === 'composition') {
+      await repos.compositions.softDelete(resolvedIdentity, folderId)
+      return
+    }
     if (documentType === ParameterType.DefaultParameter) {
       await repos.parameters.softDelete(resolvedIdentity, folderId)
       return
@@ -1996,6 +1983,10 @@ export class EndgeSchemaStorage extends EndgeModule {
     }
     if (documentType === 'data-view') {
       await repos.dataViews.hardDelete(resolvedIdentity)
+      return
+    }
+    if (documentType === 'composition') {
+      await repos.compositions.hardDelete(resolvedIdentity)
       return
     }
     if (documentType === ParameterType.DefaultParameter) {
@@ -2094,6 +2085,10 @@ export class EndgeSchemaStorage extends EndgeModule {
     }
     if (documentType === 'data-view') {
       await repos.dataViews.restore(resolvedIdentity)
+      return
+    }
+    if (documentType === 'composition') {
+      await repos.compositions.restore(resolvedIdentity)
       return
     }
     if (documentType === ParameterType.DefaultParameter) {
@@ -2560,7 +2555,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       || documentType === QueryType.GraphQL
       || documentType === QueryType.Custom
     ) {
-      data.mockData = normalizeQueryMockDataForPayload(data.mockData)
+      data.source = typeof data.source === 'string' ? data.source : ''
+      data.sourceVersion = Number(data.sourceVersion ?? 2) || 2
       saved = await repos.queries.upsert(data as any)
     }
     else if (documentType === 'data-view') {
@@ -2568,6 +2564,12 @@ export class EndgeSchemaStorage extends EndgeModule {
       data.sourceVersion = Number(data.sourceVersion ?? 1)
       data.meta = (data.meta && typeof data.meta === 'object' && !Array.isArray(data.meta)) ? data.meta : {}
       saved = await repos.dataViews.upsert(data as any)
+    }
+    else if (documentType === 'composition') {
+      data.source = typeof data.source === 'string' ? data.source : ''
+      data.sourceVersion = Number(data.sourceVersion ?? 1)
+      data.meta = (data.meta && typeof data.meta === 'object' && !Array.isArray(data.meta)) ? data.meta : {}
+      saved = await repos.compositions.upsert(data as any)
     }
     else if (documentType === 'action') {
       saved = await repos.actions.upsert(data as any)
@@ -2676,7 +2678,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         defaultAuthProfileIdentity: workspace.defaultAuthProfileIdentity,
       })
       Endge.workspace.apply(saved)
-      AppBus.emit('domainChanged')
+      ;(AppBus.emit as (event: string, payload?: unknown) => void)('domainChanged', undefined)
       return
     }
 
@@ -2781,10 +2783,7 @@ export class EndgeSchemaStorage extends EndgeModule {
       }
       const saved = existing
         ? await repos.queries.update((existing as any).id, payload)
-        : await repos.queries.create({
-            ...payload,
-            type: plain.type ?? QueryType.REST,
-          })
+        : await repos.queries.create(payload)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -2809,6 +2808,31 @@ export class EndgeSchemaStorage extends EndgeModule {
         active: dataView.active ?? true,
         author: dataView.author ?? undefined,
         inherited: dataView.inherited === true,
+      })
+      this._applyPayloadDocToDomain(documentType, saved, documentId, true)
+      return
+    }
+
+    if (documentType === 'composition') {
+      const composition = ((opts?.model as any) ?? domain.getComposition(documentId)) as any
+      if (!composition)
+        throw new Error(`Composition не найдена: ${documentId}`)
+
+      const existing = await repos.compositions.findByIdentity(composition.identity)
+      const fallbackFolder = existing?.folder ?? await resolveDefaultFolderByIdentity(repos, 'root-compositions')
+      const folder = composition.folderId ?? relationToId(fallbackFolder) ?? null
+      const saved = await repos.compositions.upsert({
+        identity: String(composition.identity ?? documentId),
+        displayName: composition.displayName ?? composition.name ?? String(composition.identity ?? documentId),
+        description: composition.description ?? null,
+        folder,
+        project: composition.project ?? null,
+        source: composition.source ?? '',
+        sourceVersion: Number(composition.sourceVersion ?? 1),
+        meta: (composition.meta && typeof composition.meta === 'object' && !Array.isArray(composition.meta)) ? composition.meta : {},
+        active: composition.active ?? true,
+        author: composition.author ?? undefined,
+        inherited: composition.inherited === true,
       })
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
@@ -2910,6 +2934,8 @@ export class EndgeSchemaStorage extends EndgeModule {
         ...(plain.author != null && plain.author !== '' && { author: plain.author }),
         active: plain.active,
         fields: fieldsForPayload,
+        source: String(plain.source ?? ''),
+        sourceVersion: Number(plain.sourceVersion ?? 1) || 1,
         meta: (plain.meta && typeof plain.meta === 'object' && !Array.isArray(plain.meta)) ? plain.meta : {},
         inherited: Boolean(plain.inherited ?? filter.inherited),
       })
@@ -3727,6 +3753,13 @@ export class EndgeSchemaStorage extends EndgeModule {
       )
       return
     }
+    if (documentType === 'composition') {
+      removeBy(
+        x => Endge.domain.removeCompositionById(x),
+        x => Endge.domain.removeComposition(x),
+      )
+      return
+    }
     if (documentType === ParameterType.DefaultParameter) {
       removeBy(
         x => Endge.domain.removeParameterById(x),
@@ -3896,6 +3929,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       return 'queries'
     if (documentType === 'data-view')
       return 'dataViews'
+    if (documentType === 'composition')
+      return 'compositions'
     if (documentType === ParameterType.DefaultParameter)
       return 'parameters'
     if (documentType === FilterType.DefaultFilter)
@@ -3945,6 +3980,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       return queryPayloadDocToPlain(raw)
     if (documentType === 'data-view')
       return dataViewPayloadDocToPlain(raw)
+    if (documentType === 'composition')
+      return compositionPayloadDocToPlain(raw)
     if (documentType === ParameterType.DefaultParameter) {
       return {
         id: raw.id,
@@ -3976,6 +4013,8 @@ export class EndgeSchemaStorage extends EndgeModule {
         active: raw.active ?? true,
         deletedAt: raw.deletedAt ?? null,
         fields,
+        source: String(raw.source ?? ''),
+        sourceVersion: Number(raw.sourceVersion ?? 1) || 1,
       }
     }
     if (documentType === 'type' || documentType === 'primitive') {

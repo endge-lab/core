@@ -15,8 +15,9 @@ import { ProjectRuntimeStrategy } from '@/domain/services/runtime/strategies/Pro
 import { QueryRuntimeStrategy } from '@/domain/services/runtime/strategies/QueryRuntimeStrategy'
 import { TableRuntimeStrategy } from '@/domain/services/runtime/strategies/TableRuntimeStrategy'
 import { ViewRuntimeStrategy } from '@/domain/services/runtime/strategies/ViewRuntimeStrategy'
+import { FilterRuntimeStrategy } from '@/domain/services/runtime/strategies/FilterRuntimeStrategy'
+import { CompositionRuntimeStrategy } from '@/domain/services/runtime/strategies/CompositionRuntimeStrategy'
 import { Endge } from '@/model/endge/endge'
-import { QueriesPhase } from '@/model/helpers/raph-phases/queries-phase'
 import { RuntimeBoundaryUpdatePhase } from '@/model/helpers/raph-phases/runtime-boundary-update-phase'
 
 export class EndgeRuntime extends EndgeModule {
@@ -47,7 +48,6 @@ export class EndgeRuntime extends EndgeModule {
     this._inited = true
 
     Raph.addPhase(RuntimeBoundaryUpdatePhase.make())
-    Raph.addPhase(QueriesPhase.make())
   }
 
   /**
@@ -293,6 +293,7 @@ export class EndgeRuntime extends EndgeModule {
 
     host.attachRuntimeState(Endge.context.createRuntimeStateController({
       runtimeId: host.id,
+      storageId: typeof host.meta.persistenceKey === 'string' ? host.meta.persistenceKey : host.id,
       persistence: host.meta.persistence as any,
     }))
 
@@ -312,6 +313,8 @@ export class EndgeRuntime extends EndgeModule {
    * Регистрирует встроенные стратегии в порядке от специальных к общим.
    */
   private registerDefaultStrategies(): void {
+    this.registerStrategy(new CompositionRuntimeStrategy())
+    this.registerStrategy(new FilterRuntimeStrategy())
     this.registerStrategy(new QueryRuntimeStrategy())
     this.registerStrategy(new TableRuntimeStrategy())
     this.registerStrategy(new ComponentSFCRuntimeStrategy())

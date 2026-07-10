@@ -1,6 +1,8 @@
 import type { RComponentTableColumn } from '@/domain/entities/reflect/RComponentTableColumn'
 import type { PhaseExecutorContext } from '@endge/raph'
 import type { RComponent } from '@/domain/types/component.types'
+import type { RFilter } from '@/domain/entities/reflect/RFilter'
+import type { RComposition } from '@/domain/entities/reflect/RComposition'
 import type { RAction } from '@/domain/entities/reflect/RAction'
 import type { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import type { RComponentTable } from '@/domain/entities/reflect/RComponentTable'
@@ -8,13 +10,19 @@ import type { RPage } from '@/domain/entities/reflect/RPage'
 import type { RProject } from '@/domain/entities/reflect/RProject'
 import type { RQuery } from '@/domain/entities/reflect/RQuery'
 import type { RView } from '@/domain/entities/reflect/RView'
-import type { AnyRuntimeHost, RuntimeStrategy } from '@/domain/services/runtime/RuntimeStrategy'
+import type { RuntimeStrategy } from '@/domain/services/runtime/RuntimeStrategy'
 import type { RuntimeHostRegistrySnapshot } from '@/domain/types/runtime-registry.types'
 
 /**
  * Runtime kinds
  */
-export type RuntimeKind = 'query' | 'table' | 'table-column' | 'action' | 'runtime'
+export type RuntimeKind = 'query' | 'filter' | 'composition' | 'table' | 'table-column' | 'action' | 'runtime'
+
+/** Параметры legacy execute() для Raph-backed компонентов. */
+export interface ExecuteOptions {
+  basePath: string
+  meta?: Record<string, unknown>
+}
 
 export type RuntimeExecutableModel
   = | RQuery
@@ -25,8 +33,10 @@ export type RuntimeExecutableModel
     | RPage
     | RComponent
     | RComponentSFC
+    | RFilter
+    | RComposition
 
-export type AnyRuntimeStrategy = RuntimeStrategy<any, AnyRuntimeHost>
+export type AnyRuntimeStrategy = RuntimeStrategy<any, any>
 
 export interface EndgeRuntimeSnapshot extends RuntimeHostRegistrySnapshot {
   generatedAt: number
@@ -141,6 +151,6 @@ export interface RuntimeProfiles {
   action: RuntimeProfile<'action', ActionRuntimeEvents>
 }
 
-export type RuntimeProfileByKind<K extends RuntimeKind> = RuntimeProfiles[K]
-export type RuntimeEventsByKind<K extends RuntimeKind>
+export type RuntimeProfileByKind<K extends keyof RuntimeProfiles> = RuntimeProfiles[K]
+export type RuntimeEventsByKind<K extends keyof RuntimeProfiles>
   = RuntimeProfileByKind<K>['events']

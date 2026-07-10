@@ -7,12 +7,23 @@ import type {
 } from '@/domain/types/source-engine.types'
 
 import { compileDataViewSource } from '@/domain/services/source-engine/data-view-source-compile'
+import { createTypeScriptLikeSourceSyntax } from '@/domain/services/source-engine/source-language-syntax'
 import { DATA_VIEW_DEFAULT_SOURCE } from '@/domain/services/source-engine/templates/data-view.default.source'
 
 /** Source language strategy для editor-facing операций RDataView source. */
 export class DataViewSourceLanguageStrategy implements SourceLanguageStrategy {
   public readonly id = 'source-language:data-view'
   public readonly sourceKind: SourceKind = 'data-view'
+  public readonly syntax = createTypeScriptLikeSourceSyntax({
+    alias: 'Endge DataView Source',
+    extension: '.endge-data-view.ts',
+    keywords: [
+      'convert', 'dataView', 'defineDataView', 'field', 'from', 'join', 'map', 'path',
+      'pick', 'spread', 'template', 'transform',
+    ],
+    functions: ['as', 'by', 'convert', 'dataView', 'find', 'from', 'join', 'map', 'pick'],
+    properties: ['input', 'left', 'manual', 'mode', 'pipeline', 'right', 'steps', 'tools'],
+  })
 
   /** Проверяет, что strategy обслуживает DataView source. */
   public supports(sourceKind: SourceKind | string): boolean {

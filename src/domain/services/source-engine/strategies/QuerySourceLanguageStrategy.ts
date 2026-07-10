@@ -7,12 +7,31 @@ import type {
 } from '@/domain/types/source-engine.types'
 
 import { compileQuerySource } from '@/domain/services/source-engine/query-source-compile'
+import { createTypeScriptLikeSourceSyntax } from '@/domain/services/source-engine/source-language-syntax'
 import { QUERY_DEFAULT_SOURCE } from '@/domain/services/source-engine/templates/query.default.source'
 
 /** Source language strategy для editor-facing операций RQuery source. */
 export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
   public readonly id = 'source-language:query'
   public readonly sourceKind: SourceKind = 'query'
+  public readonly syntax = createTypeScriptLikeSourceSyntax({
+    alias: 'Endge Query Source',
+    extension: '.endge-query.ts',
+    keywords: [
+      'body', 'compact', 'dataView', 'defineDataView', 'defineFilter', 'defineProps',
+      'defineQuery', 'endgeVar', 'env', 'field', 'filter', 'merge', 'output', 'prop',
+      'response',
+    ],
+    functions: [
+      'array', 'as', 'by', 'dataView', 'default', 'from', 'map', 'optional',
+      'options', 'toStore', 'vocab',
+    ],
+    properties: [
+      'auth', 'body', 'data', 'enabled', 'endpoint', 'formUrlencoded',
+      'headers', 'items', 'kind', 'method', 'mock', 'mode', 'outputs', 'path',
+      'props', 'request', 'timeoutMs',
+    ],
+  })
 
   /** Проверяет, что стратегия обслуживает query source. */
   public supports(sourceKind: SourceKind | string): boolean {
@@ -36,7 +55,7 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
     }
   }
 
-  /** Возвращает подсказки v1 для разрешенного query source API. */
+  /** Возвращает подсказки source-only Query v2 API. */
   public completions(_context: SourceLanguageContext): SourceLanguageCompletion[] {
     return QUERY_SOURCE_COMPLETIONS
   }
@@ -48,7 +67,29 @@ const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
     kind: 'snippet',
     insertText: QUERY_DEFAULT_SOURCE.trimEnd(),
     detail: 'Создать REST query source',
-    documentation: 'Минимальный валидный source для RQuery v1.',
+    documentation: 'Минимальный валидный source для RQuery v2.',
+  },
+  {
+    label: 'defineProps',
+    kind: 'property',
+    insertText: `props: defineProps({
+  filterPayload: field('Object').optional(),
+}),`,
+    detail: 'Query v2 props contract',
+  },
+  {
+    label: 'request.body',
+    kind: 'property',
+    insertText: `body: body(({ prop }) =>
+  merge({}, prop('filterPayload')),
+),`,
+    detail: 'Static request body IR',
+  },
+  {
+    label: 'field.from.filter',
+    kind: 'function',
+    insertText: `.from(filter('filter-identity').output('request'))`,
+    detail: 'Default Filter output for standalone Query',
   },
   {
     label: 'request',
@@ -65,14 +106,6 @@ const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
     detail: 'HTTP request config',
   },
   {
-    label: 'params',
-    kind: 'property',
-    insertText: `params: {
-  name: field('String'),
-},`,
-    detail: 'Query params schema',
-  },
-  {
     label: 'outputs',
     kind: 'property',
     insertText: `outputs: {
@@ -81,15 +114,6 @@ const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
     .toStore(),
 },`,
     detail: 'Query output graph',
-  },
-  {
-    label: 'filters',
-    kind: 'property',
-    insertText: `filters: {
-  mode: 'merge',
-  items: [],
-},`,
-    detail: 'Query filters',
   },
   {
     label: 'mock',
@@ -137,13 +161,7 @@ const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
     kind: 'function',
     insertText: `field('String')`,
     detail: 'Описание поля',
-    documentation: 'Поддерживает chain API: field(...).array().optional().params({...}).',
-  },
-  {
-    label: 'filter.inline',
-    kind: 'function',
-    insertText: `filter.inline({})`,
-    detail: 'Inline filter object',
+    documentation: 'Поддерживает chain API: field(...).array().optional().default(...).from(...).',
   },
   {
     label: 'filter',

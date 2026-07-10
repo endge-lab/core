@@ -1,5 +1,5 @@
 import type { RQuery } from '@/domain/entities/reflect/RQuery'
-import type { ProgramArtifact, QueryProgramFilterItem, QueryProgramOutput, QueryProgramPayload } from '@/domain/types/program.types'
+import type { ProgramArtifact, QueryProgramOutput, QueryProgramPayload } from '@/domain/types/program.types'
 import type { RQueryAuth } from '@/domain/types/query.types'
 import type { AxiosInstance } from 'axios'
 
@@ -7,6 +7,7 @@ import { Raph } from '@endge/raph'
 import axios from 'axios'
 
 import { Endge } from '@/model/endge/endge'
+import { evaluateSourceExpression } from '@/domain/services/source-engine/source-expression-evaluate'
 
 export interface QueryExecutionContext {
   /** Доменный query, которому принадлежит artifact. */
@@ -20,9 +21,15 @@ export interface QueryExecutionContext {
 
   /** Входные параметры одноразового или реактивного запуска. */
   vars?: Record<string, unknown>
+
+  /** Отложить запись stores до проверки latest-wins в QueryRuntimeHost. */
+  writeStores?: boolean
+
+  /** AbortSignal текущего runtime run. */
+  signal?: AbortSignal
 }
 
-/** Выполняет compiled query artifact без чтения legacy-полей RQuery. */
+/** Выполняет source-only compiled query artifact. */
 export class QueryExecutor_Service {
   public constructor(
     private readonly http: AxiosInstance = axios.create({
@@ -34,7 +41,7 @@ export class QueryExecutor_Service {
   public async execute(context: QueryExecutionContext): Promise<any> {
     const result = context.payload.mockDataEnabled
       ? this._readMockData(context.payload.mockData)
-      : await this._executeByProtocol(context.payload, context.vars ?? {})
+      : await this._executeByProtocol(context.payload, context.vars ?? {}, context.signal)
 
     if (!context.payload.outputs.length)
       return result
@@ -55,8 +62,8 @@ export class QueryExecutor_Service {
         value = Endge.dataView.runRef(dataViewRef, value, undefined, { children: context.children ?? [] })
 
       values[output.key] = value
-      if (output.store)
-        Raph.set(this._resolveStoreKey(output, context.query), value)
+      if (output.store && context.writeStores !== false)
+        Raph.set(this._resolveStoreKey(output, context.query, context.vars ?? {}), value)
     }
 
     return values
@@ -78,7 +85,25 @@ export class QueryExecutor_Service {
   }
 
   /** Возвращает default/custom store key для output. */
-  private _resolveStoreKey(output: QueryProgramOutput, query: RQuery): string {
+  public writeOutputStores(
+    payload: QueryProgramPayload,
+    query: RQuery,
+    props: Record<string, unknown>,
+    values: Record<string, unknown>,
+  ): void {
+    for (const output of payload.outputs) {
+      if (output.store)
+        Raph.set(this._resolveStoreKey(output, query, props), values[output.key])
+    }
+  }
+
+  private _resolveStoreKey(output: QueryProgramOutput, query: RQuery, props: Record<string, unknown> = {}): string {
+    if (output.store?.mode === 'prop' && output.store.prop) {
+      const key = String(props[output.store.prop] ?? '').trim()
+      if (!key)
+        throw new Error(`Query output "${output.key}" store prop "${output.store.prop}" is empty.`)
+      return key
+    }
     if (output.store?.mode === 'custom' && output.store.key)
       return output.store.key
 
@@ -93,9 +118,10 @@ export class QueryExecutor_Service {
   private async _executeByProtocol(
     payload: QueryProgramPayload,
     vars: Record<string, unknown>,
+    signal?: AbortSignal,
   ): Promise<any> {
     if (payload.type === 'query-rest')
-      return this._runRest(payload, vars)
+      return this._runRest(payload, vars, signal)
 
     throw new Error(`Unsupported query artifact type: ${payload.type}`)
   }
@@ -104,6 +130,7 @@ export class QueryExecutor_Service {
   private async _runRest(
     payload: QueryProgramPayload,
     vars: Record<string, unknown>,
+    signal?: AbortSignal,
   ): Promise<any> {
     const endpoint = Endge.vars.resolve(payload.endpoint) || payload.endpoint
     const queryPath = Endge.vars.resolve(payload.query) || payload.query
@@ -116,26 +143,18 @@ export class QueryExecutor_Service {
       | 'DELETE'
     const headers = { ...(payload.headers ?? {}) }
 
-    const filterSpace = typeof vars.filterSpace === 'string'
-      ? String(vars.filterSpace).trim() || 'default'
-      : 'default'
-    const baseFilter = this._buildMergedFilter(payload.filters, filterSpace)
-
-    const requestVars = { ...(vars ?? {}) }
-    delete requestVars.filterSpace
+    const sourceBody = payload.requestBody
+      ? evaluateSourceExpression(payload.requestBody, { props: vars ?? {} })
+      : {}
 
     let data: any
     let params: Record<string, any> | undefined
 
     if (method === 'GET' || method === 'DELETE') {
-      params = baseFilter
-        ? this._deepMerge(baseFilter, requestVars)
-        : requestVars
+      params = this._asRecord(sourceBody)
     }
     else {
-      const effectiveBody = baseFilter
-        ? this._deepMerge(baseFilter, requestVars)
-        : requestVars
+      const effectiveBody = this._asRecord(sourceBody)
 
       if (payload.sendAsFormUrlencoded) {
         const form = new URLSearchParams()
@@ -162,10 +181,13 @@ export class QueryExecutor_Service {
         params,
         data,
         timeout: payload.timeoutMs,
+        signal,
       })
       return response.data
     }
     catch (error: any) {
+      if (signal?.aborted || error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError' || error?.name === 'AbortError')
+        throw error
       const status = error?.response?.status
       const statusText = error?.response?.statusText
       const responsePayload = error?.response?.data
@@ -178,6 +200,12 @@ export class QueryExecutor_Service {
 
       throw new Error(`${message}\n${details}`)
     }
+  }
+
+  private _asRecord(value: unknown): Record<string, any> {
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? value as Record<string, any>
+      : {}
   }
 
   /** Читает mock payload из artifact. */
@@ -203,76 +231,6 @@ export class QueryExecutor_Service {
       current = current[part]
     }
     return current
-  }
-
-  /** Разрешает один filter item в object payload. */
-  private _resolveFilterItem(
-    item: QueryProgramFilterItem,
-    space: string,
-  ): Record<string, any> | null {
-    if (item.mode === 'inline') {
-      if (!item.inlineJson)
-        return null
-
-      try {
-        const value = JSON.parse(item.inlineJson)
-        return value && typeof value === 'object' && !Array.isArray(value)
-          ? value
-          : null
-      }
-      catch {
-        return null
-      }
-    }
-
-    const id = String(item.filterId ?? '').trim()
-    if (!id)
-      return null
-
-    const key = id.startsWith('filters.') ? id : `filters.${id}.${space}`
-    try {
-      const value = Raph.get(key)
-      return value && typeof value === 'object' && !Array.isArray(value)
-        ? value as Record<string, any>
-        : null
-    }
-    catch {
-      return null
-    }
-  }
-
-  /** Собирает merged filter из artifact filters. */
-  private _buildMergedFilter(
-    filters: QueryProgramFilterItem[] | undefined,
-    space: string,
-  ): Record<string, any> | null {
-    if (!Array.isArray(filters) || filters.length === 0)
-      return null
-
-    let out: Record<string, any> | null = null
-    for (const item of filters) {
-      const next = this._resolveFilterItem(item, space)
-      if (!next)
-        continue
-      out = out == null ? next : this._deepMerge(out, next)
-    }
-    return out
-  }
-
-  /** Deep merge для filters и runtime vars. */
-  private _deepMerge(a: any, b: any): any {
-    if (a == null || b == null)
-      return b
-    if (Array.isArray(a) || Array.isArray(b))
-      return b
-    if (typeof a !== 'object' || typeof b !== 'object')
-      return b
-
-    const out = { ...a }
-    for (const key of Object.keys(b))
-      out[key] = key in a ? this._deepMerge(a[key], b[key]) : b[key]
-
-    return out
   }
 
   /** Безопасно склеивает endpoint и path. */

@@ -13,6 +13,14 @@ export class RFilter extends REntity {
   @Expose()
   fields: FilterFieldItemSchema[] = []
 
+  /** Независимый source-first контракт нового Filter runtime. */
+  @Expose()
+  source: string = ''
+
+  /** Версия Filter source syntax. */
+  @Expose()
+  sourceVersion: number = 1
+
   get type(): DomainDocumentType {
     return FilterType.DefaultFilter
   }
@@ -35,6 +43,8 @@ export class RFilter extends REntity {
     f.active = raw.active ?? true
     f.inherited = raw.inherited === true
     f.fields = Array.isArray(raw.fields) ? raw.fields.map((x: any) => ({ ...x, multiple: x.multiple !== false })) : []
+    f.source = String(raw.source ?? '')
+    f.sourceVersion = Number(raw.sourceVersion ?? 1) || 1
     f.applyStorageMeta(raw)
     return f
   }
@@ -50,6 +60,8 @@ export class RFilter extends REntity {
     f.inherited = json.inherited === true
     f.deletedAt = json.deletedAt ?? null
     f.fields = Array.isArray(json.fields) ? json.fields.map(x => ({ ...x, multiple: x.multiple !== false })) : []
+    f.source = String(json.source ?? '')
+    f.sourceVersion = Number(json.sourceVersion ?? 1) || 1
     f.meta = (json.meta && typeof json.meta === 'object' && !Array.isArray(json.meta)) ? { ...json.meta } : {}
     return f
   }
@@ -63,6 +75,8 @@ export class RFilter extends REntity {
       active: this.active ?? true,
       deletedAt: this.deletedAt ?? null,
       fields: this.fields.map(x => ({ ...x })),
+      source: this.source,
+      sourceVersion: this.sourceVersion,
       meta: this.meta && Object.keys(this.meta).length > 0 ? { ...this.meta } : undefined,
       inherited: this.inherited ?? false,
     }

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Raph } from '@endge/raph'
 
 import { RDataView } from '@/domain/entities/reflect/RDataView'
@@ -216,6 +216,40 @@ defineQuery({
   })
 })
 
+describe('source-only Query request body', () => {
+  it('sends an empty payload when request.body is absent', async () => {
+    const request = vi.fn().mockResolvedValue({ data: { items: [] } })
+    const executor = new QueryExecutor_Service({ request } as any)
+    const query = createQuery('empty-body', '')
+
+    await executor.execute({
+      query,
+      payload: {
+        type: 'query-rest',
+        sourceVersion: 2,
+        endpoint: 'https://example.test',
+        query: '/select',
+        method: 'POST',
+        props: [
+          { key: 'filterPayload', type: 'Object', optional: true, array: false },
+          { key: 'storeRaw', type: 'String', optional: false, array: false },
+        ],
+        requestBody: null,
+        stableProps: ['storeRaw'],
+        outputs: [],
+      },
+      vars: {
+        filterPayload: { from: '2026-07-03' },
+        storeRaw: 'queries.schedule.raw',
+      },
+    })
+
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({
+      data: {},
+    }))
+  })
+})
+
 describe('DataView nested DataView pipeline', () => {
   beforeEach(() => {
     Endge.domain.reset()
@@ -303,7 +337,7 @@ defineDataView({
 })
 
 function createQuery(identity: string, source: string): RQuery {
-  const query = new RQuery(identity)
+  const query = new RQuery()
   query.id = stableId(identity)
   query.identity = identity
   query.name = identity

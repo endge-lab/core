@@ -16,6 +16,7 @@ import {
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RConverter } from '@/domain/entities/reflect/RConverter'
 import { RDataView } from '@/domain/entities/reflect/RDataView'
+import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { REnvironment } from '@/domain/entities/reflect/REnvironment'
 import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { RFolder } from '@/domain/entities/reflect/RFolder'
@@ -66,24 +67,9 @@ export function queryPayloadDocToPlain(doc: any): any {
     id: doc?.id,
     identity: doc?.identity,
     name: doc?.displayName ?? doc?.name,
-    type: doc?.type ?? QueryType.REST,
-    query: doc?.query,
-    source: doc?.source,
-    sourceVersion: doc?.sourceVersion,
-    return: doc?.returnField ?? doc?.return,
-    endpoint: doc?.endpoint,
-    subField: doc?.subField,
-    params: doc?.params,
-    returnField: doc?.returnField,
-    mockData: doc?.mockData,
-    mockDataEnabled: doc?.mockDataEnabled,
-    auth: doc?.auth,
-    filterMode: doc?.filterMode,
-    filters: doc?.filters,
-    method: doc?.method,
-    headers: doc?.headers,
-    timeoutMs: doc?.timeoutMs,
-    sendAsFormUrlencoded: doc?.sendAsFormUrlencoded,
+    type: QueryType.REST,
+    source: typeof doc?.source === 'string' ? doc.source : '',
+    sourceVersion: Number(doc?.sourceVersion ?? 2) || 2,
     folderId,
     meta: (doc?.meta && typeof doc.meta === 'object' && !Array.isArray(doc.meta)) ? doc.meta : {},
     inherited: doc?.inherited === true,
@@ -111,6 +97,26 @@ export function dataViewPayloadDocToPlain(doc: any): any {
   }
 }
 
+/** Собирает plain-объект Composition из документа Payload. */
+export function compositionPayloadDocToPlain(doc: any): any {
+  return {
+    id: doc?.id,
+    identity: doc?.identity,
+    name: doc?.displayName ?? doc?.name,
+    displayName: doc?.displayName ?? doc?.name,
+    description: doc?.description ?? null,
+    source: doc?.source ?? '',
+    sourceVersion: doc?.sourceVersion ?? 1,
+    folderId: relationToId(doc?.folder ?? doc?.folderId),
+    project: relationToId(doc?.project) ?? null,
+    meta: (doc?.meta && typeof doc.meta === 'object' && !Array.isArray(doc.meta)) ? doc.meta : {},
+    active: doc?.active !== false,
+    author: doc?.author,
+    inherited: doc?.inherited === true,
+    deletedAt: doc?.deletedAt ?? null,
+  }
+}
+
 /**
  * EndgeDomain – менеджер доменных данных.
  * Он заменяет ReflectDomain и объединяет управление типами, запросами и компонентами.
@@ -126,6 +132,7 @@ export interface EndgeDomainParsed {
   types: RType[]
   queries: RQuery[]
   dataViews: RDataView[]
+  compositions: RComposition[]
   actions: RAction[]
   converters: RConverter[]
   integrations: RIntegration[]
@@ -159,6 +166,9 @@ export class EndgeDomain extends EndgeModule {
 
   private _dataViewsById: Map<string | number, RDataView> = new Map()
   private _dataViewsByIdentity: Map<string, RDataView> = new Map()
+
+  private _compositionsById: Map<string | number, RComposition> = new Map()
+  private _compositionsByIdentity: Map<string, RComposition> = new Map()
 
   private _componentsById: Map<string | number, RComponent> = new Map()
   private _componentsByIdentity: Map<string, RComponent> = new Map()
@@ -271,6 +281,8 @@ export class EndgeDomain extends EndgeModule {
     this._queriesByIdentity.clear()
     this._dataViewsById.clear()
     this._dataViewsByIdentity.clear()
+    this._compositionsById.clear()
+    this._compositionsByIdentity.clear()
     this._componentsById.clear()
     this._componentsByIdentity.clear()
     this._componentSFCsById.clear()
@@ -348,6 +360,8 @@ export class EndgeDomain extends EndgeModule {
     const queriesPlain = queriesRaw.map((row: any) => queryPayloadDocToPlain(row))
     const dataViewsRaw = Array.isArray((payload as any)?.dataViews) ? (payload as any).dataViews : []
     const dataViewsPlain = dataViewsRaw.map((row: any) => dataViewPayloadDocToPlain(row))
+    const compositionsRaw = Array.isArray((payload as any)?.compositions) ? (payload as any).compositions : []
+    const compositionsPlain = compositionsRaw.map((row: any) => compositionPayloadDocToPlain(row))
     const projectsRaw = Array.isArray(payload?.projects) ? payload.projects : []
     const parametersRaw = Array.isArray(payload?.parameters) ? payload.parameters : []
     const filtersRaw = Array.isArray(payload?.filters) ? payload.filters : []
@@ -383,6 +397,7 @@ export class EndgeDomain extends EndgeModule {
       types: typesRaw,
       queries: queriesPlain,
       dataViews: dataViewsPlain,
+      compositions: compositionsPlain,
       components: componentsRaw,
       componentSFCs: componentSFCsRaw,
       folders: Array.isArray(payload?.folders) ? payload.folders : [],
@@ -785,6 +800,64 @@ export class EndgeDomain extends EndgeModule {
   /** Проверяет наличие DataView по identity. */
   hasDataView(identity: string): boolean {
     return this._dataViewsByIdentity.has(identity)
+  }
+
+  /** Возвращает все Composition. */
+  getCompositions(): RComposition[] {
+    return Array.from(this._compositionsByIdentity.values())
+  }
+
+  /** Возвращает Composition по id. */
+  getCompositionById(id: string | number): RComposition | null {
+    return this._compositionsById.get(id) ?? null
+  }
+
+  /** Возвращает Composition по identity. */
+  getCompositionByIdentity(identity: string): RComposition | null {
+    return this._compositionsByIdentity.get(identity) ?? null
+  }
+
+  /** Возвращает Composition по id или identity. */
+  getComposition(idOrIdentity: string | number): RComposition | null {
+    return this.getCompositionById(idOrIdentity)
+      ?? this.getCompositionById(Number(idOrIdentity))
+      ?? this.getCompositionByIdentity(String(idOrIdentity))
+  }
+
+  /** Добавляет Composition в домен. */
+  addComposition(composition: RComposition): void {
+    if (this._compositionsByIdentity.has(composition.identity) || this._compositionsById.has(composition.id))
+      return
+    this._compositionsById.set(composition.id, composition)
+    this._compositionsByIdentity.set(composition.identity, composition)
+    this.notify()
+  }
+
+  /** Удаляет Composition по id. */
+  removeCompositionById(id: string | number): void {
+    const composition = this.getCompositionById(id)
+    if (!composition)
+      return
+    this._compositionsById.delete(composition.id)
+    this._compositionsByIdentity.delete(composition.identity)
+    this.notify()
+  }
+
+  /** Удаляет Composition по identity. */
+  removeCompositionByIdentity(identity: string): void {
+    const composition = this.getCompositionByIdentity(identity)
+    if (!composition)
+      return
+    this._compositionsById.delete(composition.id)
+    this._compositionsByIdentity.delete(composition.identity)
+    this.notify()
+  }
+
+  /** Удаляет Composition по id или identity. */
+  removeComposition(idOrIdentity: string | number): void {
+    const composition = this.getComposition(idOrIdentity)
+    if (composition)
+      this.removeCompositionById(composition.id)
   }
 
   /**
@@ -2847,6 +2920,7 @@ export class EndgeDomain extends EndgeModule {
         .filter(x => x.type !== 'query-custom')
         .map(x => Serialize.toPlain(x)),
       dataViews: this.getDataViews().map(x => Serialize.toPlain(x)),
+      compositions: this.getCompositions().map(x => Serialize.toPlain(x)),
       components: this.getComponents().map(x => ReflectComponentToPlain(x)),
       componentSFCs: this.getComponentSFCs().map(x => x.toPlain()),
       actions: this.getActions().map(x => Serialize.toPlain(x)),
@@ -2939,6 +3013,7 @@ export class EndgeDomain extends EndgeModule {
       types: [],
       queries: [],
       dataViews: [],
+      compositions: [],
       actions: [],
       converters: [],
       integrations: [],
@@ -2983,6 +3058,11 @@ export class EndgeDomain extends EndgeModule {
     if (json.dataViews && Array.isArray(json.dataViews)) {
       json.dataViews.forEach((dataViewJson: any) => {
         out.dataViews.push(Serialize.fromJSON(RDataView, dataViewJson))
+      })
+    }
+    if (json.compositions && Array.isArray(json.compositions)) {
+      json.compositions.forEach((compositionJson: any) => {
+        out.compositions.push(Serialize.fromJSON(RComposition, compositionJson))
       })
     }
     if (json.actions && Array.isArray(json.actions)) {
@@ -3062,6 +3142,7 @@ export class EndgeDomain extends EndgeModule {
     parsed.types.forEach(t => this.addType(t))
     parsed.queries.forEach(q => this.addQuery(q))
     parsed.dataViews.forEach(dv => this.addDataView(dv))
+    parsed.compositions.forEach(composition => this.addComposition(composition))
     parsed.actions.forEach(a => this.addAction(a))
     parsed.converters.forEach(c => this.addConverter(c))
     parsed.integrations.forEach(i => this.addIntegration(i))
@@ -3122,6 +3203,11 @@ export class EndgeDomain extends EndgeModule {
     if (json.dataViews && Array.isArray(json.dataViews)) {
       json.dataViews.forEach((dataViewJson: any) => {
         domain.addDataView(Serialize.fromJSON(RDataView, dataViewJson))
+      })
+    }
+    if (json.compositions && Array.isArray(json.compositions)) {
+      json.compositions.forEach((compositionJson: any) => {
+        domain.addComposition(Serialize.fromJSON(RComposition, compositionJson))
       })
     }
 

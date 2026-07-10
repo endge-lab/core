@@ -7,7 +7,8 @@ import { RComponentDSL } from '@/domain/entities/reflect/RComponentDSL'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RComponentTable } from '@/domain/entities/reflect/RComponentTable'
 import { RDataView } from '@/domain/entities/reflect/RDataView'
-import { RField } from '@/domain/entities/reflect/RField'
+import { RComposition } from '@/domain/entities/reflect/RComposition'
+import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { REnvironment } from '@/domain/entities/reflect/REnvironment'
 import { RIntegration } from '@/domain/entities/reflect/RIntegration'
@@ -24,7 +25,7 @@ import { RPage } from '@/domain/entities/reflect/RPage'
 import { RNavigation } from '@/domain/entities/reflect/RNavigation'
 import { RAction } from '@/domain/entities/reflect/RAction'
 import { RAuthProfile } from '@/domain/entities/reflect/RAuthProfile'
-import { ComponentType, QueryType } from '@/domain/types/document.types'
+import { ComponentType, FilterType, QueryType } from '@/domain/types/document.types'
 
 export interface DocumentFactoryOptions {
   id?: string
@@ -50,7 +51,6 @@ export class DocumentFactory {
     const title = (options?.name?.trim() || DocumentFactory.defaultTitle(type))
     const folderId = options?.folderId ?? undefined
     const registerInDomain = options?.registerInDomain !== false
-    const field = new RField('input', 'null')
 
     switch (type) {
       case ComponentType.DSL: {
@@ -96,12 +96,14 @@ export class DocumentFactory {
       case QueryType.GraphQL:
       case QueryType.REST:
       case QueryType.Custom: {
-        const item = new RQuery(title, field)
+        const item = new RQuery()
         item.id = entityId
         item.identity = id
+        item.name = title
+        item.displayName = title
         item.type = type
         item.source = Endge.source.createDefault('query')
-        item.sourceVersion = 1
+        item.sourceVersion = 2
         if (folderId != null) item.folderId = folderId
         if (registerInDomain)
           Endge.domain.addQuery(item)
@@ -120,6 +122,36 @@ export class DocumentFactory {
           item.folderId = folderId
         if (registerInDomain)
           Endge.domain.addDataView(item)
+        return item
+      }
+
+      case 'composition': {
+        const item = new RComposition()
+        item.id = entityId
+        item.identity = id
+        item.name = title
+        item.displayName = title
+        item.source = Endge.source.createDefault('composition')
+        item.sourceVersion = 1
+        if (folderId != null)
+          item.folderId = folderId
+        if (registerInDomain)
+          Endge.domain.addComposition(item)
+        return item
+      }
+
+      case FilterType.DefaultFilter: {
+        const item = new RFilter()
+        item.id = entityId
+        item.identity = id
+        item.name = title
+        item.displayName = title
+        item.source = Endge.source.createDefault('filter')
+        item.sourceVersion = 1
+        if (folderId != null)
+          item.folderId = folderId
+        if (registerInDomain)
+          Endge.domain.addFilter(item)
         return item
       }
 
@@ -335,6 +367,10 @@ export class DocumentFactory {
         return 'Новый запрос'
       case 'data-view':
         return 'Новый Data View'
+      case 'composition':
+        return 'Новая композиция'
+      case FilterType.DefaultFilter:
+        return 'Новый фильтр'
       case 'action':
         return 'Новое действие'
       case 'integration':

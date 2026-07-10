@@ -2,7 +2,6 @@ import type { ActionStepHandler } from '@/domain/types/action.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { RAction } from '@/domain/entities/reflect/RAction'
-import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { Endge } from '@/model/endge/endge'
 import { consoleLog } from '@/model/seed/actions/console_log'
 import { loadVocabs } from '@/model/seed/actions/load_vocabs'
@@ -124,23 +123,4 @@ export class EndgeBind extends EndgeModule {
     return true
   }
 
-  /**
-   * Подвязывает кастомный executor и/или generator к запросу из домена.
-   * @param identityOrId - RQuery или id/identity запроса
-   * @param executor - функция выполнения запроса
-   * @returns true, если запрос найден и override применён
-   */
-  query(
-    identityOrId: RQuery | string | number,
-    executor: () => Promise<any>,
-  ): boolean {
-    const q = identityOrId instanceof RQuery ? identityOrId : Endge.domain.getQuery(identityOrId)
-    if (!q)
-      return false
-
-    q.override({
-      executor,
-    })
-    return true
-  }
 }

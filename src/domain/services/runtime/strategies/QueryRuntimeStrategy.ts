@@ -2,7 +2,7 @@ import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
 import type { RuntimeStrategy } from '@/domain/services/runtime/RuntimeStrategy'
 
-export class QueryRuntimeStrategy implements RuntimeStrategy<RQuery> {
+export class QueryRuntimeStrategy implements RuntimeStrategy<RQuery, QueryRuntimeHost> {
   public readonly id = 'runtime:query'
   public readonly entityType = 'query'
 
@@ -18,5 +18,9 @@ export class QueryRuntimeStrategy implements RuntimeStrategy<RQuery> {
       parent: ctx.parent,
       artifacts: ctx.artifacts,
     })
+  }
+
+  public attach(ctx: Parameters<NonNullable<RuntimeStrategy<RQuery, QueryRuntimeHost>['attach']>>[0]): void {
+    ctx.host.initializeDefaultSources()
   }
 }

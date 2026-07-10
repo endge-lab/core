@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 
-import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { ENDGE_CORE_MODULES } from '@/model/config/endge-modules'
 import { Endge } from '@/model/endge/endge'
 import { EndgeSource } from '@/model/endge/endge-source'
@@ -50,9 +49,27 @@ describe('EndgeSource', () => {
       expect.objectContaining({ label: 'defineQuery' }),
       expect.objectContaining({ label: 'field' }),
       expect.objectContaining({ label: 'filter' }),
-      expect.objectContaining({ label: 'filter.inline' }),
       expect.objectContaining({ label: 'env' }),
     ]))
+  })
+
+  it('keeps syntax highlighting patterns inside each source language strategy', () => {
+    const cases = [
+      ['query', 'defineQuery'],
+      ['data-view', 'defineDataView'],
+      ['filter', 'defineFilter'],
+      ['composition', 'defineComposition'],
+    ] as const
+
+    for (const [sourceKind, keyword] of cases) {
+      const strategy = Endge.source.resolveLanguageStrategy(sourceKind)
+      const rootPatterns = strategy?.syntax.tokenizer.root ?? []
+
+      expect(strategy?.syntax.extensions).toHaveLength(1)
+      expect(rootPatterns.some(rule => rule.token === 'keyword' && rule.pattern.test(keyword))).toBe(true)
+      expect(rootPatterns.some(rule => rule.token === 'comment')).toBe(true)
+      expect(rootPatterns.some(rule => rule.token === 'string')).toBe(true)
+    }
   })
 
   it('compiles query source into query program artifact payload', () => {
@@ -73,7 +90,7 @@ describe('EndgeSource', () => {
       endpoint: '{API_BASE_URL}',
       query: '/flights',
       method: 'GET',
-      filterMode: 'merge',
+      sourceVersion: 2,
       outputs: [
         {
           key: 'raw',
@@ -84,26 +101,20 @@ describe('EndgeSource', () => {
     })
   })
 
-  it('keeps legacy filter.reference source compatible', () => {
-    const result = Endge.source.compile('query', createQuerySource().replace(
-      "filter('flight-filter')",
-      "filter.reference('flight-filter')",
-    ))
+  it('rejects legacy params and filters instead of silently retaining them', () => {
+    const result = Endge.source.compile('query', `
+defineQuery({
+  kind: 'rest',
+  params: {},
+  filters: { mode: 'merge', items: [] },
+})
+`)
 
-    expect(result.ok).toBe(true)
-    expect(result.diagnostics).toEqual([])
-    expect(result.artifact?.filters).toEqual([
-      {
-        mode: 'reference',
-        filterId: 'flight-filter',
-        inlineJson: null,
-      },
-      {
-        mode: 'inline',
-        filterId: null,
-        inlineJson: '{"active":true}',
-      },
-    ])
+    expect(result.ok).toBe(false)
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'query-source-legacy-property', sourcePath: 'params' }),
+      expect.objectContaining({ code: 'query-source-legacy-property', sourcePath: 'filters' }),
+    ]))
   })
 
   it('returns diagnostics for unsupported query source kind', () => {
@@ -166,12 +177,6 @@ defineQuery({
       },
     })
 
-    const query = new RQuery()
-    query.auth = { mode: 'profile', authProfileIdentity: 'keycloak-dev' }
-
-    const generated = Endge.source.generate('query', query)
-    expect(generated.source).toContain("profile: 'keycloak-dev'")
-    expect(generated.source).not.toContain('authProfileIdentity')
   })
 
   it('returns diagnostics for legacy response block', () => {
@@ -197,7 +202,7 @@ defineQuery({
     ]))
   })
 
-  it('tracks unsupported query field diagnostics on the invalid field expression', () => {
+  it('marks legacy params as unsupported Query v2 configuration', () => {
     const source = `
 defineQuery({
   params: {
@@ -206,15 +211,12 @@ defineQuery({
 })
 `
     const result = Endge.source.compile('query', source)
-    const diagnostics = result.diagnostics as Array<{ code: string, severity: string, sourcePath?: string, start?: number, end?: number }>
-    const diagnostic = diagnostics.find(item => item.code === 'query-source-field-unsupported')
-    const start = source.indexOf('DateTime')
+    const diagnostics = result.diagnostics as Array<{ code: string, severity: string, sourcePath?: string }>
+    const diagnostic = diagnostics.find(item => item.code === 'query-source-legacy-property')
 
     expect(diagnostic).toEqual(expect.objectContaining({
       severity: 'error',
-      sourcePath: 'params.flightDate',
-      start,
-      end: start + 'DateTime'.length,
+      sourcePath: 'params',
     }))
   })
 
@@ -303,18 +305,6 @@ defineQuery({
     headers: { Accept: 'application/json' },
     auth: { mode: 'token' },
     timeoutMs: 10000,
-  },
-
-  params: {
-    flightDate: field('DateTime').optional(),
-  },
-
-  filters: {
-    mode: 'merge',
-    items: [
-      filter('flight-filter'),
-      filter.inline({ active: true }),
-    ],
   },
 
   outputs: {

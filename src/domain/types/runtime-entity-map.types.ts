@@ -6,6 +6,8 @@ import type { RProject } from '@/domain/entities/reflect/RProject'
 import type { RQuery } from '@/domain/entities/reflect/RQuery'
 import type { RView } from '@/domain/entities/reflect/RView'
 import type { RComponent } from '@/domain/types/component.types'
+import type { RFilter } from '@/domain/entities/reflect/RFilter'
+import type { RComposition } from '@/domain/entities/reflect/RComposition'
 
 /**
  * Канонический перечень сущностей, для которых может существовать runtime-host.
@@ -23,6 +25,10 @@ export interface RuntimeEntityModelMap {
   'component-sfc': RComponentSFC
   /** Доменная модель запроса. */
   query: RQuery
+  /** Source-first Filter runtime. */
+  filter: RFilter
+  /** Runtime orchestration graph. */
+  composition: RComposition
   /** Доменная модель action. */
   action: RAction
   /** Доменная модель табличного компонента. */

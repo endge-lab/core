@@ -35,30 +35,15 @@ export class EndgeExtract extends EndgeModule {
    * @param data Исходные данные, полученные в ответе
    * @param domain Схема домена, содержащая типы и поля
    * @param shape Описание выборки (DataShape) – что именно извлекать
-   * @param query Описание запроса, из которого берётся корневое поле (returnField)
-   * @returns Извлечённые данные или undefined, если данные некорректны
+   * @param query Source-only Query document
+   * @returns Всегда undefined: legacy returnField больше не существует.
    */
   shapeFromQuery<T>(
-    data: T,
-    domain: EndgeDomain,
-    query: RQuery,
+    _data: T,
+    _domain: EndgeDomain,
+    _query: RQuery,
   ): Partial<T> | undefined {
-    // Проверяем корректность входных данных
-    if (!data || typeof data !== 'object' || !query || !domain || !shape) {
-      return undefined
-    }
-
-    // Получаем корневое поле для выборки из запроса
-    const returnField = query.returnField
-    if (!returnField) {
-      console.warn(
-        `[extractData] У запроса "${query.name}" отсутствует returnField`,
-      )
-      return undefined
-    }
-
-    // Запускаем рекурсивное извлечение данных
-    return this.shape(data, domain, shape, returnField)
+    return undefined
   }
 
   /**

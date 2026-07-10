@@ -39,6 +39,7 @@ import { EndgeVocabs } from '@/model/endge/endge-vocabs'
 import { EndgeWorkspace } from '@/model/endge/endge-workspace'
 import { EndgeUIRegistry } from '@/model/endge/endge-ui-registry'
 import { ENDGE_CORE_MODULES } from '@/model/config/endge-modules'
+import type { EndgeComposition } from '@/model/endge/endge-composition'
 
 /**
  * Единая статическая федерация Endge.
@@ -237,6 +238,11 @@ export class Endge extends EndgeFederation {
    */
   static get dataView(): EndgeDataView {
     return this.getModule<EndgeDataView>('dataView')
+  }
+
+  /** Доступ к mount facade Composition runtime. */
+  static get composition(): EndgeComposition {
+    return this.getModule<EndgeComposition>('composition')
   }
 
   /**

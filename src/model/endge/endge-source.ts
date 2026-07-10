@@ -18,6 +18,10 @@ import { SourceLanguageRegistry } from '@/domain/services/source-engine/SourceLa
 import { SourcePatchRegistry } from '@/domain/services/source-engine/SourcePatchRegistry'
 import { DataViewSourceEngineStrategy } from '@/domain/services/source-engine/strategies/DataViewSourceEngineStrategy'
 import { DataViewSourceLanguageStrategy } from '@/domain/services/source-engine/strategies/DataViewSourceLanguageStrategy'
+import { FilterSourceEngineStrategy } from '@/domain/services/source-engine/strategies/FilterSourceEngineStrategy'
+import { FilterSourceLanguageStrategy } from '@/domain/services/source-engine/strategies/FilterSourceLanguageStrategy'
+import { CompositionSourceEngineStrategy } from '@/domain/services/source-engine/strategies/CompositionSourceEngineStrategy'
+import { CompositionSourceLanguageStrategy } from '@/domain/services/source-engine/strategies/CompositionSourceLanguageStrategy'
 import { QuerySourceEngineStrategy } from '@/domain/services/source-engine/strategies/QuerySourceEngineStrategy'
 import { QuerySourceLanguageStrategy } from '@/domain/services/source-engine/strategies/QuerySourceLanguageStrategy'
 import { QuerySourcePatchStrategy } from '@/domain/services/source-engine/strategies/QuerySourcePatchStrategy'
@@ -140,8 +144,12 @@ export class EndgeSource extends EndgeModule {
   private _registerDefaultStrategies(): void {
     this._strategies.register(new QuerySourceEngineStrategy())
     this._strategies.register(new DataViewSourceEngineStrategy())
+    this._strategies.register(new FilterSourceEngineStrategy())
+    this._strategies.register(new CompositionSourceEngineStrategy())
     this._languageStrategies.register(new QuerySourceLanguageStrategy())
     this._languageStrategies.register(new DataViewSourceLanguageStrategy())
+    this._languageStrategies.register(new FilterSourceLanguageStrategy())
+    this._languageStrategies.register(new CompositionSourceLanguageStrategy())
     this._patchStrategies.register(new QuerySourcePatchStrategy())
   }
 

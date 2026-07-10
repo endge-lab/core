@@ -88,6 +88,16 @@ export interface QueryRuntimeHostContext extends RuntimeHostContextBase {
   lastFilterChangeAt: string | null
 }
 
+export interface FilterRuntimeHostContext extends RuntimeHostContextBase {
+  instance: string
+  lastStateChangeAt: string | null
+}
+
+export interface CompositionRuntimeHostContext extends RuntimeHostContextBase {
+  mountedChildren: number
+  lastReactionAt: string | null
+}
+
 export interface TableRuntimeHostContext extends RuntimeHostContextBase {
   lastDataSyncAt: string | null
 }
@@ -125,6 +135,8 @@ export interface ProjectRuntimeHostContext extends RuntimeHostContextBase {
 export interface RuntimeHostContextMap {
   action: ActionRuntimeHostContext
   query: QueryRuntimeHostContext
+  filter: FilterRuntimeHostContext
+  composition: CompositionRuntimeHostContext
   table: TableRuntimeHostContext
   component: ComponentRuntimeHostContext
   'component-sfc': ComponentSFCRuntimeHostContext
@@ -223,6 +235,8 @@ export interface RuntimeHostRaphInputBinding {
 export interface RuntimeHostRaphInputSource {
   kind: 'raph'
   bindings: Record<string, RuntimeHostRaphInputBinding>
+  /** Literal props, которые объединяются с Raph bindings. */
+  props?: Record<string, unknown>
 }
 
 /** Унифицированный источник входных данных runtime-host-а. */

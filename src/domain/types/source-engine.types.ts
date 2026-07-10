@@ -1,5 +1,5 @@
 /** Канонический тип source-документа, для которого выбирается source strategy. */
-export type SourceKind = 'query' | 'data-view'
+export type SourceKind = 'query' | 'data-view' | 'filter' | 'composition'
 
 /** Тип нейтральной source completion без привязки к Monaco или другому editor API. */
 export type SourceLanguageCompletionKind
@@ -87,7 +87,7 @@ export interface SourceEngineCompileResult extends SourceEngineResult {
   document?: unknown
 
   /** Runtime/program-ready artifact payload. */
-  artifact?: unknown
+  artifact?: any
 
   /** Diagnostics, найденные source compiler-ом. */
   diagnostics?: unknown[]
@@ -153,6 +153,27 @@ export interface SourceEngineStrategy {
   compile?: (source: string) => SourceEngineCompileResult
 }
 
+/** Нейтральный token pattern source-языка, не завязанный на Monaco API. */
+export interface SourceLanguageTokenPattern {
+  pattern: RegExp
+  token: string
+  next?: string
+}
+
+/** Editor-facing синтаксис, которым владеет SourceLanguageStrategy. */
+export interface SourceLanguageSyntaxDefinition {
+  aliases: string[]
+  extensions: string[]
+  comments: {
+    lineComment: string
+    blockComment: [string, string]
+  }
+  brackets: Array<[string, string]>
+  autoClosingPairs: Array<{ open: string, close: string }>
+  triggerCharacters: string[]
+  tokenizer: Record<string, SourceLanguageTokenPattern[]>
+}
+
 /** Strategy source language для editor-facing операций одного source-kind. */
 export interface SourceLanguageStrategy {
   /** Стабильный id стратегии для debug/плагинов. */
@@ -163,6 +184,9 @@ export interface SourceLanguageStrategy {
 
   /** Проверяет, может ли стратегия обслужить переданный source-kind. */
   supports: (sourceKind: SourceKind | string) => boolean
+
+  /** Описывает подсветку, brackets и editor triggers в adapter-neutral формате. */
+  syntax: SourceLanguageSyntaxDefinition
 
   /** Возвращает базовый source для новой сущности. */
   createDefaultSource: () => string

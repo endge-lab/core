@@ -31,6 +31,8 @@ export interface RFilterSchema {
   identity: string
   displayName: string
   fields?: FilterFieldItemSchema[]
+  source?: string
+  sourceVersion?: number
   folder?: string | null
   /** Id папки в Payload (для relationship при сохранении). */
   folderId?: number | string | null

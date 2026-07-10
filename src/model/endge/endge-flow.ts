@@ -709,12 +709,8 @@ export class EndgeFlow extends EndgeModule {
   }
 
   private _getQueryArtifactParamNames(payload: QueryProgramPayload | null): string[] {
-    const params = payload?.params
-    if (!params || typeof params !== 'object' || Array.isArray(params))
-      return []
-
-    return Object.keys(params)
-      .map(name => String(name ?? '').trim())
+    return (payload?.props ?? [])
+      .map(prop => String(prop.key ?? '').trim())
       .filter(Boolean)
   }
 

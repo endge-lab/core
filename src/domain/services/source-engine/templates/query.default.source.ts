@@ -1,28 +1,32 @@
-/** Базовый source для новой RQuery v1. */
+/** Базовый canonical source для новой RQuery v2. */
 export const QUERY_DEFAULT_SOURCE = `defineQuery({
   kind: 'rest',
 
+  props: defineProps({
+    filterPayload: field('Object').optional(),
+    rowsStoreKey: field('String').default('queries.query.rows'),
+  }),
+
   request: {
     endpoint: '',
-    path: '',
-    method: 'GET',
+    path: '/search',
+    method: 'POST',
     headers: {},
     auth: {
       mode: 'inherit',
     },
-  },
-
-  params: {},
-
-  filters: {
-    mode: 'merge',
-    items: [],
+    body: body(({ prop }) =>
+      merge(
+        { limit: 100 },
+        prop('filterPayload'),
+      ),
+    ),
   },
 
   outputs: {
     raw: output()
       .from(response('items'))
-      .toStore(),
+      .toStore(prop('rowsStoreKey')),
   },
 
   mock: {
