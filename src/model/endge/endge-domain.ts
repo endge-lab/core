@@ -27,8 +27,6 @@ import { RParameter } from '@/domain/entities/reflect/RParameter'
 import { RPolicy } from '@/domain/entities/reflect/RPolicy'
 import { RProject } from '@/domain/entities/reflect/RProject'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
-import { RScenario } from '@/domain/entities/reflect/RScenario'
-import { RSettings } from '@/domain/entities/reflect/RSettings'
 import { RStyle } from '@/domain/entities/reflect/RStyle'
 import { RTenant } from '@/domain/entities/reflect/RTenant'
 import { RBehaviorBinding } from '@/domain/entities/reflect/RBehaviorBinding'
@@ -146,9 +144,7 @@ export interface EndgeDomainParsed {
   navigations: RNavigation[]
   components: RComponent[]
   componentSFCs: RComponentSFC[]
-  scenarios: RScenario[]
   folders: RFolder[]
-  settings: RSettings[]
 }
 
 export class EndgeDomain extends EndgeModule {
@@ -170,9 +166,6 @@ export class EndgeDomain extends EndgeModule {
   private _componentSFCsById: Map<string | number, RComponentSFC> = new Map()
   private _componentSFCsByIdentity: Map<string, RComponentSFC> = new Map()
 
-  private _scenariosById: Map<string | number, RScenario> = new Map()
-  private _scenariosByIdentity: Map<string, RScenario> = new Map()
-
   private _actionsById: Map<string | number, RAction> = new Map()
   private _actionsByIdentity: Map<string, RAction> = new Map()
 
@@ -187,9 +180,6 @@ export class EndgeDomain extends EndgeModule {
 
   private _foldersById: Map<string | number, RFolder> = new Map()
   private _foldersByIdentity: Map<string, RFolder> = new Map()
-
-  private _settingsById: Map<string | number, RSettings> = new Map()
-  private _settingsByIdentity: Map<string, RSettings> = new Map()
 
   private _parametersById: Map<string | number, RParameter> = new Map()
   private _parametersByIdentity: Map<string, RParameter> = new Map()
@@ -285,8 +275,6 @@ export class EndgeDomain extends EndgeModule {
     this._componentsByIdentity.clear()
     this._componentSFCsById.clear()
     this._componentSFCsByIdentity.clear()
-    this._scenariosById.clear()
-    this._scenariosByIdentity.clear()
     this._actionsById.clear()
     this._actionsByIdentity.clear()
     this._convertersById.clear()
@@ -297,8 +285,6 @@ export class EndgeDomain extends EndgeModule {
     this._viewsByIdentity.clear()
     this._foldersById.clear()
     this._foldersByIdentity.clear()
-    this._settingsById.clear()
-    this._settingsByIdentity.clear()
     this._parametersById.clear()
     this._parametersByIdentity.clear()
     this._filtersById.clear()
@@ -363,7 +349,6 @@ export class EndgeDomain extends EndgeModule {
     const dataViewsRaw = Array.isArray((payload as any)?.dataViews) ? (payload as any).dataViews : []
     const dataViewsPlain = dataViewsRaw.map((row: any) => dataViewPayloadDocToPlain(row))
     const projectsRaw = Array.isArray(payload?.projects) ? payload.projects : []
-    const settingsRaw = Array.isArray(payload?.settings) ? payload.settings : []
     const parametersRaw = Array.isArray(payload?.parameters) ? payload.parameters : []
     const filtersRaw = Array.isArray(payload?.filters) ? payload.filters : []
     const convertersRaw = Array.isArray(payload?.converters) ? payload.converters : []
@@ -392,7 +377,6 @@ export class EndgeDomain extends EndgeModule {
       : Array.isArray((payload as any)?.componentSfcs)
         ? (payload as any).componentSfcs
         : []
-    const scenariosRaw = Array.isArray(payload?.scenarios) ? payload.scenarios : []
     const typesRaw = stripSchemaArray(Array.isArray(payload?.types) ? payload.types : [])
 
     const normalized = {
@@ -401,7 +385,6 @@ export class EndgeDomain extends EndgeModule {
       dataViews: dataViewsPlain,
       components: componentsRaw,
       componentSFCs: componentSFCsRaw,
-      scenarios: scenariosRaw,
       folders: Array.isArray(payload?.folders) ? payload.folders : [],
       parameters: parametersRaw,
       filters: filtersRaw,
@@ -422,7 +405,6 @@ export class EndgeDomain extends EndgeModule {
       navigations: navigationsRaw,
       actions: actionsRaw,
       projects: projectsRaw,
-      settings: settingsRaw,
     }
 
     this.merge(normalized)
@@ -992,99 +974,6 @@ export class EndgeDomain extends EndgeModule {
    */
   hasComponentSFC(identity: string): boolean {
     return this.hasComponentSFCByIdentity(identity)
-  }
-
-  /**
-   * Методы для работы со сценариями
-   */
-  getScenarios(): RScenario[] {
-    return Array.from(this._scenariosByIdentity.values())
-  }
-
-  /**
-   * Возвращает Scenario по id.
-   */
-  getScenarioById(id: string | number): RScenario | null {
-    return this._scenariosById.get(id) ?? null
-  }
-
-  /**
-   * Возвращает Scenario по identity.
-   */
-  getScenarioByIdentity(identity: string): RScenario | null {
-    return this._scenariosByIdentity.get(identity) || null
-  }
-
-  /**
-   * Возвращает Scenario по id или identity.
-   */
-  getScenario(idOrIdentity: string | number): RScenario | null {
-    return this.getScenarioById(idOrIdentity as number) || this.getScenarioById(Number(idOrIdentity)) || this.getScenarioByIdentity(idOrIdentity as string)
-  }
-
-  /**
-   * Добавляет Scenario в домен и обновляет индексы.
-   */
-  addScenario(scenario: RScenario): void {
-    const identity = scenario.identity ?? scenario.id
-    if (this._scenariosByIdentity.has(identity) || this._scenariosById.has(scenario.id)) {
-      return
-    }
-    this._scenariosById.set(scenario.id, scenario)
-    this._scenariosByIdentity.set(identity, scenario)
-    this.notify()
-  }
-
-  /**
-   * Удаляет Scenario из домена по id.
-   */
-  removeScenarioById(id: string | number): void {
-    const scenario = this._scenariosById.get(id)
-    if (!scenario)
-      return
-    this._scenariosById.delete(scenario.id)
-    this._scenariosByIdentity.delete(scenario.identity ?? scenario.id)
-    this.notify()
-  }
-
-  /**
-   * Удаляет Scenario из домена по identity.
-   */
-  removeScenarioByIdentity(identity: string): void {
-    const scenario = this._scenariosByIdentity.get(identity)
-    if (!scenario)
-      return
-    this._scenariosById.delete(scenario.id)
-    this._scenariosByIdentity.delete(scenario.identity ?? scenario.id)
-    this.notify()
-  }
-
-  /**
-   * Удаляет Scenario из домена.
-   */
-  removeScenario(identity: string): void {
-    this.removeScenarioByIdentity(identity)
-  }
-
-  /**
-   * Проверяет наличие Scenario по id.
-   */
-  hasScenarioById(id: string | number): boolean {
-    return this._scenariosById.has(id)
-  }
-
-  /**
-   * Проверяет наличие Scenario по identity.
-   */
-  hasScenarioByIdentity(identity: string): boolean {
-    return this._scenariosByIdentity.has(identity)
-  }
-
-  /**
-   * Проверяет наличие Scenario по id или identity.
-   */
-  hasScenario(identity: string): boolean {
-    return this.hasScenarioByIdentity(identity)
   }
 
   /**
@@ -2627,97 +2516,6 @@ export class EndgeDomain extends EndgeModule {
     return this.hasFolderByIdentity(identity)
   }
 
-  /**
-   * Методы для работы с настройками
-   */
-  getSettings(): RSettings[] {
-    return Array.from(this._settingsById.values())
-  }
-
-  /**
-   * Возвращает Setting по id.
-   */
-  getSettingById(id: string | number): RSettings | null {
-    return this._settingsById.get(id) ?? null
-  }
-
-  /**
-   * Возвращает Setting по identity.
-   */
-  getSettingByIdentity(identity: string): RSettings | null {
-    return this._settingsByIdentity.get(identity) || null
-  }
-
-  /**
-   * Возвращает Setting по id или identity.
-   */
-  getSetting(idOrIdentity: string | number): RSettings | null {
-    return this.getSettingById(idOrIdentity as number) || this.getSettingById(Number(idOrIdentity)) || this.getSettingByIdentity(idOrIdentity as string)
-  }
-
-  /**
-   * Добавляет Setting в домен.
-   */
-  addSettings(settings: RSettings): void {
-    if (this._settingsByIdentity.has(settings.identity) || this._settingsById.has(settings.id)) {
-      return
-    }
-    this._settingsById.set(settings.id, settings)
-    this._settingsByIdentity.set(settings.identity, settings)
-    this.notify()
-  }
-
-  /**
-   * Удаляет Settings из домена по id.
-   */
-  removeSettingsById(id: string | number): void {
-    const settings = this._settingsById.get(id)
-    if (!settings)
-      return
-    this._settingsById.delete(settings.id)
-    this._settingsByIdentity.delete(settings.identity)
-    this.notify()
-  }
-
-  /**
-   * Удаляет Settings из домена по identity.
-   */
-  removeSettingsByIdentity(identity: string): void {
-    const settings = this._settingsByIdentity.get(identity)
-    if (!settings)
-      return
-    this._settingsById.delete(settings.id)
-    this._settingsByIdentity.delete(settings.identity)
-    this.notify()
-  }
-
-  /**
-   * Удаляет Setting из домена.
-   */
-  removeSettings(identity: string): void {
-    this.removeSettingsByIdentity(identity)
-  }
-
-  /**
-   * Проверяет наличие Setting по id.
-   */
-  hasSettingById(id: string | number): boolean {
-    return this._settingsById.has(id)
-  }
-
-  /**
-   * Проверяет наличие Setting по identity.
-   */
-  hasSettingByIdentity(identity: string): boolean {
-    return this._settingsByIdentity.has(identity)
-  }
-
-  /**
-   * Проверяет наличие Setting по id или identity.
-   */
-  hasSetting(identity: string): boolean {
-    return this.hasSettingByIdentity(identity)
-  }
 
   /**
    * Методы для работы с параметрами
@@ -3051,13 +2849,11 @@ export class EndgeDomain extends EndgeModule {
       dataViews: this.getDataViews().map(x => Serialize.toPlain(x)),
       components: this.getComponents().map(x => ReflectComponentToPlain(x)),
       componentSFCs: this.getComponentSFCs().map(x => x.toPlain()),
-      scenarios: this.getScenarios().map(x => Serialize.toPlain(x)),
       actions: this.getActions().map(x => Serialize.toPlain(x)),
       converters: this.getConverters().map(x => Serialize.toPlain(x)),
       integrations: this.getIntegrations().map(x => Serialize.toPlain(x)),
       views: this.getViews().map(x => Serialize.toPlain(x)),
       folders: this.getFolders().map(x => Serialize.toPlain(x)),
-      settings: this.getSettings().map(x => Serialize.toPlain(x)),
       parameters: this.getParameters().map(x => x.toPlain()),
       filters: this.getFilters().map(x => x.toPlain()),
       environments: this.getEnvironments().map(x => Serialize.toPlain(x)),
@@ -3161,9 +2957,7 @@ export class EndgeDomain extends EndgeModule {
       navigations: [],
       components: [],
       componentSFCs: [],
-      scenarios: [],
       folders: [],
-      settings: [],
     }
 
     if (json.parameters && Array.isArray(json.parameters)) {
@@ -3252,16 +3046,9 @@ export class EndgeDomain extends EndgeModule {
     if (json.componentSFCs && Array.isArray(json.componentSFCs)) {
       json.componentSFCs.forEach((componentJson: any) => out.componentSFCs.push(RComponentSFC.fromPlain(componentJson)))
     }
-    if (json.scenarios && Array.isArray(json.scenarios)) {
-      json.scenarios.forEach((scenarioJson: any) => out.scenarios.push(Serialize.fromJSON(RScenario, scenarioJson)))
-    }
     if (json.folders && Array.isArray(json.folders)) {
       json.folders.forEach((folderJson: any) => out.folders.push(Serialize.fromJSON(RFolder, folderJson)))
     }
-    for (const setting of json.settings ?? []) {
-      out.settings.push(Serialize.fromJSON(RSettings, setting))
-    }
-
     return out
   }
 
@@ -3293,9 +3080,7 @@ export class EndgeDomain extends EndgeModule {
     parsed.navigations.forEach(n => this.addNavigation(n))
     parsed.components.forEach(c => this.addComponent(c))
     parsed.componentSFCs.forEach(c => this.addComponentSFC(c))
-    parsed.scenarios.forEach(s => this.addScenario(s))
     parsed.folders.forEach(f => this.addFolder(f))
-    parsed.settings.forEach(s => this.addSettings(s))
   }
 
   /**
@@ -3425,18 +3210,9 @@ export class EndgeDomain extends EndgeModule {
       json.componentSFCs.forEach((componentJson: any) => domain.addComponentSFC(RComponentSFC.fromPlain(componentJson)))
     }
 
-    // Парсим сценарии
-    if (json.scenarios && Array.isArray(json.scenarios)) {
-      json.scenarios.forEach((scenarioJson: any) => domain.addScenario(Serialize.fromJSON(RScenario, scenarioJson)))
-    }
-
     // Парсим папки
     if (json.folders && Array.isArray(json.folders)) {
       json.folders.forEach((folderJson: any) => domain.addFolder(Serialize.fromJSON(RFolder, folderJson)))
-    }
-
-    for (const setting of json.settings ?? []) {
-      domain.addSettings(Serialize.fromJSON(RSettings, setting))
     }
 
     return domain

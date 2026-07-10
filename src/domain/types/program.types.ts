@@ -16,15 +16,13 @@ import type { DependencyGraph } from '@/domain/entities/data/DependencyGraph'
 
 /** Тип доменной сущности, для которой compiler может построить program artifact. */
 export type ProgramEntityType
-  = 'settings'
-    | 'type'
+  = 'type'
     | 'component'
     | 'table'
     | 'component-sfc'
     | 'action'
     | 'query'
     | 'data-view'
-    | 'scenario'
 
 /** Итоговый статус artifact после компиляции и валидации. */
 export type ProgramArtifactStatus = 'valid' | 'warning' | 'error'
@@ -304,27 +302,6 @@ export interface ComponentSFCPreviewRunTarget {
 export interface ComponentSFCPreviewOptions {
   seed?: Record<string, ComponentSFCPreviewLiteral>
   run?: ComponentSFCPreviewRunTarget[]
-}
-
-/** Payload artifact для settings. */
-export interface SettingsProgramPayload {
-  /** Runtime variables или normalized vars config. */
-  vars?: unknown
-
-  /** Auth config, подготовленный для runtime. */
-  auth?: unknown
-
-  /** Vocab config, подготовленный для runtime. */
-  vocabs?: unknown
-
-  /** Update/SSE config, подготовленный для runtime. */
-  updates?: unknown
-}
-
-/** Payload artifact для scenario. */
-export interface ScenarioProgramPayload {
-  /** Preview query или runtime metadata, используемые для предпросмотра scenario. */
-  previewQuery: unknown
 }
 
 /** Контекст одного запуска compiler pipeline. */

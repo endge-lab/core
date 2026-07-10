@@ -33,7 +33,6 @@ function normalizeRelationIds(value: unknown): number[] {
  *  - identity: string
  *  - name: string
  *  - displayName: string
- *  - extendSettings: boolean
  *
  * Storage-мета (через REntity.applyStorageMeta):
  *  - createdAt, updatedAt, deletedAt, author, active
@@ -42,10 +41,6 @@ export class RProject extends REntity {
   /** Отображаемое имя проекта */
   @Expose()
   displayName!: string
-
-  /** Наследоваться ли от базовых настроек */
-  @Expose()
-  extendSettings: boolean = true
 
   /** Описание проекта */
   @Expose()
@@ -58,10 +53,6 @@ export class RProject extends REntity {
   /** Порядок сортировки в списке */
   @Expose()
   order?: number | null = null
-
-  /** Id профиля настроек (relationship → settings) */
-  @Expose()
-  settingsId?: number | null = null
 
   /** Id навигации (relationship → navigations) */
   @Expose()
@@ -78,7 +69,6 @@ export class RProject extends REntity {
    *   id: number,
    *   identity: string,
    *   displayName: string,
-   *   "extend-settings": boolean,
    *   deletedAt?: string | null,
    *   author?: string,
    *   createdAt?: string,
@@ -97,14 +87,9 @@ export class RProject extends REntity {
     // Проект не лежит в папке
     p.folderId = null
 
-    p.extendSettings =
-      json['extend-settings'] !== undefined
-        ? Boolean(json['extend-settings'])
-        : true
     p.description = json.description ?? null
     p.slug = json.slug ?? null
     p.order = json.order != null ? Number(json.order) : null
-    p.settingsId = normalizeRelationId(json.settings ?? json.settingsId ?? null)
     p.navigationId = normalizeRelationId(json.navigation ?? json.navigationId ?? null)
     p.allowedEnvironmentIds = normalizeRelationIds(json.allowedEnvironments ?? json.allowedEnvironmentIds ?? [])
 
@@ -124,7 +109,6 @@ export class RProject extends REntity {
    *   name?: string
    *   displayName?: string
    *   folder?: string | null
-   *   extendSettings?: boolean
    * }
    */
   static fromPlain(json: any): RProject {
@@ -135,12 +119,9 @@ export class RProject extends REntity {
     p.name = json.name ?? json.displayName ?? p.identity
     p.displayName = json.displayName ?? p.name
     p.folderId = json.folderId ?? json.folder ?? null
-    p.extendSettings =
-      json.extendSettings !== undefined ? Boolean(json.extendSettings) : true
     p.description = json.description ?? null
     p.slug = json.slug ?? null
     p.order = json.order != null ? Number(json.order) : null
-    p.settingsId = normalizeRelationId(json.settingsId ?? json.settings ?? null)
     p.navigationId = normalizeRelationId(json.navigationId ?? json.navigation ?? null)
     p.allowedEnvironmentIds = normalizeRelationIds(json.allowedEnvironmentIds ?? json.allowedEnvironments ?? [])
 
@@ -158,11 +139,9 @@ export class RProject extends REntity {
       name: this.name,
       displayName: this.displayName,
       folderId: this.folderId ?? null,
-      extendSettings: this.extendSettings,
       description: this.description ?? null,
       slug: this.slug ?? null,
       order: this.order ?? null,
-      settingsId: this.settingsId ?? null,
       navigationId: this.navigationId ?? null,
       allowedEnvironmentIds: [...(this.allowedEnvironmentIds ?? [])],
     }

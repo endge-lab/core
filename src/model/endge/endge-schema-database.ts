@@ -18,7 +18,7 @@ import { ReflectComponentToPayloadData, ReflectComponentToPlain } from '@/domain
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { normalizeEndgeWorkspaceDefinition } from '@/domain/entities/reflect/RWorkspace'
 import { RVersion } from '@/domain/entities/reflect/RVersion'
-import { ComponentType, FilterType, ParameterType, QueryType, ScriptType } from '@/domain/types/document.types'
+import { ComponentType, FilterType, ParameterType, QueryType } from '@/domain/types/document.types'
 import { Endge } from '@/model/endge/endge'
 import { dataViewPayloadDocToPlain, queryPayloadDocToPlain } from '@/model/endge/endge-domain'
 import { DEFAULT_ENDGE_WORKSPACE } from '@/model/config/endge-workspace'
@@ -41,8 +41,6 @@ import { Policies_Repository } from '@/model/db/repositories/Policies_Repository
 import { PresentationBindings_Repository } from '@/model/db/repositories/PresentationBindings_Repository'
 import { Projects_Repository } from '@/model/db/repositories/Projects_Repository'
 import { Queries_Repository } from '@/model/db/repositories/Queries_Repository'
-import { Scenarios_Repository } from '@/model/db/repositories/Scenarios_Repository'
-import { Settings_Repository } from '@/model/db/repositories/Settings_Repository'
 import { Styles_Repository } from '@/model/db/repositories/Styles_Repository'
 import { Tenants_Repository } from '@/model/db/repositories/Tenants_Repository'
 import { Types_Repository } from '@/model/db/repositories/Types_Repository'
@@ -73,8 +71,6 @@ const WORKSPACE_SCOPED_PAYLOAD_COLLECTIONS = new Set([
   'presentation-bindings',
   'projects',
   'queries',
-  'scenarios',
-  'settings',
   'styles',
   'tenants',
   'types',
@@ -333,7 +329,6 @@ const ROOT_FOLDER_ENTITY_TYPE_BY_IDENTITY: Record<string, string> = {
   'root-queries': 'queries',
   'root-data-views': 'data-views',
   'root-components': 'components',
-  'root-scenarios': 'scenarios',
   'root-actions': 'actions',
   'root-parameters': 'parameters',
   'root-filters': 'filters',
@@ -350,7 +345,6 @@ const ROOT_FOLDER_ENTITY_TYPE_BY_IDENTITY: Record<string, string> = {
   'root-vocabs': 'vocabs',
   'root-i18n-bundles': 'i18n-bundles',
   'root-auth-profiles': 'auth-profiles',
-  'root-settings': 'settings',
   'root-behavior-bindings': 'behavior-bindings',
   'root-presentation-bindings': 'presentation-bindings',
 }
@@ -413,11 +407,9 @@ export class EndgeSchemaStorage extends EndgeModule {
   public collectionsToCheck: string[] = [
     'projects',
     'folders',
-    'settings',
     'types',
     'components',
     'component-sfcs',
-    'scenarios',
     'actions',
     'queries',
     'data-views',
@@ -677,9 +669,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         folders: new Folders_Repository(this.api),
         components: new Components_Repository(this.api),
         componentSFCs: new ComponentSFCs_Repository(this.api),
-        scenarios: new Scenarios_Repository(this.api),
         actions: new Actions_Repository(this.api),
-        settings: new Settings_Repository(this.api),
         parameters: new Parameters_Repository(this.api),
         filters: new Filters_Repository(this.api),
         converters: new Converters_Repository(this.api),
@@ -780,12 +770,10 @@ export class EndgeSchemaStorage extends EndgeModule {
       dataViews: [],
       components: [],
       componentSFCs: [],
-      scenarios: [],
       actions: [],
       converters: [],
       integrations: [],
       views: [],
-      settings: [],
       vocabs: [],
       i18nBundles: [],
       authProfiles: [],
@@ -1266,35 +1254,11 @@ export class EndgeSchemaStorage extends EndgeModule {
         identity: raw.identity,
         name: raw.displayName,
         displayName: raw.displayName,
-        extendSettings: raw['extend-settings'] !== undefined ? Boolean(raw['extend-settings']) : true,
         description: raw.description ?? null,
         slug: raw.slug ?? null,
         order: raw.order != null ? Number(raw.order) : null,
-        settingsId: relationToId(raw.settings) ?? null,
         navigationId: relationToId(raw.navigation) ?? null,
         allowedEnvironmentIds: relationToNumericIds(raw.allowedEnvironments ?? raw.allowedEnvironmentIds ?? []),
-      }
-    }
-
-    const normalizeSettings = (raw: any) => {
-      return {
-        id: raw.id,
-        identity: raw.identity,
-        name: raw.displayName,
-        displayName: raw.displayName,
-
-        // привязка к проекту (identity или null)
-        project: relationToId(raw.project) ?? null,
-
-        deletedAt: raw.deletedAt ?? null,
-
-        // все содержимое настроек просто пробрасываем как есть, с дефолтами
-        vars: raw.vars ?? [],
-        auth: raw.auth ?? null,
-        vocabs: raw.vocabs ?? [],
-        updates: raw.updates ?? [],
-        sse: raw.sse ?? {},
-        customSections: raw.customSections ?? [],
       }
     }
 
@@ -1531,19 +1495,9 @@ export class EndgeSchemaStorage extends EndgeModule {
         return rows.map(normalizeComponentSFC)
       }),
 
-      load('scenarios', async () => {
-        const rows = await this.repositories!.scenarios.findAll()
-        return rows.map(normalizeSchemaEntity)
-      }),
-
       load('actions', async () => {
         const rows = await this.repositories!.actions.findAll()
         return rows.map(normalizeAction)
-      }),
-
-      load('settings', async () => {
-        const rows = await this.repositories!.settings.findAll()
-        return rows.map(normalizeSettings)
       }),
 
       load('vocabs', async () => {
@@ -1666,8 +1620,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       return domain.getQuery(documentIdOrIdentity)
     if (documentType === 'data-view')
       return domain.getDataView(documentIdOrIdentity)
-    if (documentType === ScriptType.ScenarioSetup)
-      return domain.getScenario(documentIdOrIdentity)
     if (documentType === ParameterType.DefaultParameter)
       return domain.getParameter(documentIdOrIdentity)
     if (documentType === FilterType.DefaultFilter)
@@ -1700,8 +1652,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       return domain.getPage(documentIdOrIdentity)
     if (documentType === 'navigation')
       return domain.getNavigation(documentIdOrIdentity)
-    if (documentType === 'settings')
-      return domain.getSetting(documentIdOrIdentity)
     if (documentType === 'vocabs')
       return domain.getVocab(documentIdOrIdentity)
     if (documentType === 'auth-profile')
@@ -1780,8 +1730,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       return repos.queries.findByIdentity(identity)
     if (documentType === 'data-view')
       return repos.dataViews.findByIdentity(identity)
-    if (documentType === ScriptType.ScenarioSetup)
-      return repos.scenarios.findByIdentity(identity)
     if (documentType === ParameterType.DefaultParameter)
       return repos.parameters.findByIdentity(identity)
     if (documentType === FilterType.DefaultFilter)
@@ -1877,8 +1825,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       return repos.queries.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === 'data-view')
       return repos.dataViews.patchFolder(documentPayloadId, folderPayloadId)
-    if (documentType === ScriptType.ScenarioSetup)
-      return repos.scenarios.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === ParameterType.DefaultParameter)
       return repos.parameters.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === FilterType.DefaultFilter)
@@ -1994,10 +1940,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       await repos.dataViews.softDelete(resolvedIdentity, folderId)
       return
     }
-    if (documentType === ScriptType.ScenarioSetup) {
-      await repos.scenarios.softDelete(resolvedIdentity, folderId)
-      return
-    }
     if (documentType === ParameterType.DefaultParameter) {
       await repos.parameters.softDelete(resolvedIdentity, folderId)
       return
@@ -2054,10 +1996,6 @@ export class EndgeSchemaStorage extends EndgeModule {
     }
     if (documentType === 'data-view') {
       await repos.dataViews.hardDelete(resolvedIdentity)
-      return
-    }
-    if (documentType === ScriptType.ScenarioSetup) {
-      await repos.scenarios.hardDelete(resolvedIdentity)
       return
     }
     if (documentType === ParameterType.DefaultParameter) {
@@ -2156,10 +2094,6 @@ export class EndgeSchemaStorage extends EndgeModule {
     }
     if (documentType === 'data-view') {
       await repos.dataViews.restore(resolvedIdentity)
-      return
-    }
-    if (documentType === ScriptType.ScenarioSetup) {
-      await repos.scenarios.restore(resolvedIdentity)
       return
     }
     if (documentType === ParameterType.DefaultParameter) {
@@ -2635,11 +2569,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       data.meta = (data.meta && typeof data.meta === 'object' && !Array.isArray(data.meta)) ? data.meta : {}
       saved = await repos.dataViews.upsert(data as any)
     }
-    else if (documentType === ScriptType.ScenarioSetup) {
-      if (data.schema == null)
-        data.schema = {}
-      saved = await repos.scenarios.upsert(data as any)
-    }
     else if (documentType === 'action') {
       saved = await repos.actions.upsert(data as any)
     }
@@ -2748,26 +2677,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       })
       Endge.workspace.apply(saved)
       AppBus.emit('domainChanged')
-      return
-    }
-
-    if (documentType === 'settings') {
-      const settings = ((opts?.model as any) ?? domain.getSetting(documentId)) as any
-      if (!settings)
-        throw new Error(`Настройки не найдены: ${documentId}`)
-      const plain = settings.toPlain()
-      const saved = await repos.settings.upsert({
-        identity: plain.identity,
-        displayName: plain.displayName ?? plain.identity,
-        project: plain.project ?? undefined,
-        vars: plain.vars,
-        auth: plain.auth,
-        vocabs: plain.vocabs,
-        updates: plain.updates,
-        sse: plain.sse,
-        customSections: plain.customSections,
-      })
-      this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
 
@@ -2900,22 +2809,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         active: dataView.active ?? true,
         author: dataView.author ?? undefined,
         inherited: dataView.inherited === true,
-      })
-      this._applyPayloadDocToDomain(documentType, saved, documentId, true)
-      return
-    }
-
-    if (documentType === ScriptType.ScenarioSetup) {
-      const scenario = ((opts?.model as any) ?? domain.getScenario(documentId)) as any
-      if (!scenario)
-        throw new Error(`Сценарий не найден: ${documentId}`)
-      const schema = Serialize.toPlain(scenario)
-      const scenarioIdentity = String((scenario as any).identity ?? scenario.id ?? '')
-      const saved = await repos.scenarios.upsert({
-        identity: scenarioIdentity,
-        displayName: scenario.name ?? scenario.id,
-        schema,
-        meta: (scenario.meta && typeof scenario.meta === 'object' && !Array.isArray(scenario.meta)) ? scenario.meta : {},
       })
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
@@ -3570,7 +3463,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         view: 'views',
         query: 'queries',
         type: 'types',
-        scenario: 'scenarios',
         action: 'actions',
         converter: 'converters',
         integration: 'integrations',
@@ -3578,7 +3470,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         environment: 'environments',
         policy: 'policies',
         style: 'styles',
-        settings: 'settings',
       }
 
       const areasForPayload: Array<{ slotId: string, blocks: Array<{ key: string, entity: { relationTo: string, value: number }, titleOverride?: string | null, visibleWhen?: string | null, props?: Record<string, unknown> | null }> }> = []
@@ -3674,11 +3565,9 @@ export class EndgeSchemaStorage extends EndgeModule {
       const saved = await repos.projects.upsert({
         'identity': plain.identity,
         'displayName': plain.displayName ?? plain.name ?? plain.identity,
-        'extend-settings': plain.extendSettings,
         'description': plain.description ?? undefined,
         'slug': plain.slug ?? undefined,
         'order': plain.order ?? undefined,
-        'settings': plain.settingsId ?? null,
         'navigation': plain.navigationId ?? null,
         'allowedEnvironments': allowedEnvironments,
         'folder': plain.folderId ?? plain.folder ?? null,
@@ -3835,13 +3724,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       removeBy(
         x => Endge.domain.removeDataViewById(x),
         x => Endge.domain.removeDataView(x),
-      )
-      return
-    }
-    if (documentType === ScriptType.ScenarioSetup) {
-      removeBy(
-        x => Endge.domain.removeScenarioById(x),
-        x => Endge.domain.removeScenario(x),
       )
       return
     }
@@ -4014,8 +3896,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       return 'queries'
     if (documentType === 'data-view')
       return 'dataViews'
-    if (documentType === ScriptType.ScenarioSetup)
-      return 'scenarios'
     if (documentType === ParameterType.DefaultParameter)
       return 'parameters'
     if (documentType === FilterType.DefaultFilter)
@@ -4110,17 +3990,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         isPrimitive: schema.isPrimitive === true || raw.isPrimitive === true,
         isSystem: raw.isSystem === true,
         meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : (schema.meta ?? {}),
-      }
-    }
-    if (documentType === ScriptType.ScenarioSetup) {
-      const schema = raw.schema ?? {}
-      const id = schema.id ?? (raw.id != null ? String(raw.id) : undefined)
-      return {
-        ...schema,
-        id,
-        identity: schema.identity ?? raw.identity,
-        name: schema.name ?? raw.displayName,
-        folderId: relationToId(raw.folder) ?? schema.folderId ?? schema.folder ?? null,
       }
     }
     if (documentType === 'action') {
@@ -4308,11 +4177,9 @@ export class EndgeSchemaStorage extends EndgeModule {
         displayName: raw.displayName,
         folderId: relationToId(raw.folder) ?? null,
         deletedAt: raw.deletedAt ?? null,
-        extendSettings: raw['extend-settings'] !== undefined ? Boolean(raw['extend-settings']) : true,
         description: raw.description ?? null,
         slug: raw.slug ?? null,
         order: raw.order != null ? Number(raw.order) : null,
-        settingsId: relationToId(raw.settings) ?? null,
         navigationId: relationToId(raw.navigation) ?? null,
         allowedEnvironmentIds: relationToNumericIds(raw.allowedEnvironments ?? raw.allowedEnvironmentIds ?? []),
       }

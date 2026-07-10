@@ -3,7 +3,6 @@ import type {
   GetAccessTokenOpts,
   StoredAuthToken,
 } from '@/domain/types/auth.types'
-import type { SettingsAuthSchema } from '@/domain/types/settings.types'
 import type { AxiosInstance } from 'axios'
 
 import axios from 'axios'
@@ -18,15 +17,27 @@ import { Endge } from '@/model/endge/endge'
 
 type StringRecord = Record<string, string>
 type KeycloakProvider = 'keycloak_manual' | 'keycloak_form'
+type EndgeAuthProfileConfig = {
+  provider: KeycloakProvider
+  KeycloakBaseUrl: string
+  storageKey: string
+  clientId: string
+  scope: string
+  refreshSkewMs: number
+  tokenPath?: string
+  logoutPath?: string
+  login?: string
+  password?: string
+}
 
 function isKeycloakProvider(
-  p: SettingsAuthSchema['provider'],
+  p: string | undefined,
 ): p is KeycloakProvider {
   return p === 'keycloak_manual' || p === 'keycloak_form'
 }
 
 export class EndgeAuth extends EndgeModule {
-  private auth: SettingsAuthSchema | null = null
+  private auth: EndgeAuthProfileConfig | null = null
   private service: KeycloakAuthService | null = null
 
   /** Единственный axios инстанс для всего модуля */
@@ -102,7 +113,7 @@ export class EndgeAuth extends EndgeModule {
   // ---------------------------------------------------------------------------
 
   /**
-   * Инициализирует auth-конфигурацию из settings и восстанавливает токены из storage.
+   * Инициализирует auth-конфигурацию из профиля авторизации и восстанавливает токены из storage.
    */
   public async init(): Promise<void> {
     await this.ensureInit()
@@ -137,10 +148,9 @@ export class EndgeAuth extends EndgeModule {
    * Внутренний helper модуля: init Once.
    */
   private async initOnce(): Promise<void> {
-    const settings: any = Endge.domain.getSetting('general')
-    const auth: SettingsAuthSchema | undefined = settings?.auth ?? this.getAuthFromProfile()
+    const auth: EndgeAuthProfileConfig | undefined = this.getAuthFromProfile()
 
-    if (!auth) { throw new Error('Settings.general.auth отсутствует') }
+    if (!auth) { throw new Error('Профиль авторизации Keycloak не задан') }
 
     if (!isKeycloakProvider(auth.provider)) { throw new Error(`Неподдерживаемый provider: ${String(auth.provider)}`) }
 
@@ -156,13 +166,16 @@ export class EndgeAuth extends EndgeModule {
     this.startBackgroundRefresh()
   }
 
-  private getAuthFromProfile(): SettingsAuthSchema | undefined {
+  private getAuthFromProfile(): EndgeAuthProfileConfig | undefined {
     const profile = Endge.domain.getAuthProfiles()
       .find(item => item.active !== false && (item.adapterId === 'keycloak_manual' || item.adapterId === 'keycloak_form'))
     if (!profile)
       return undefined
     const config = profile.config ?? {}
-    const provider = profile.adapterId
+    const provider = String(profile.adapterId)
+    if (!isKeycloakProvider(provider))
+      return undefined
+
     return {
       provider,
       KeycloakBaseUrl: String(config.KeycloakBaseUrl ?? ''),
@@ -174,7 +187,7 @@ export class EndgeAuth extends EndgeModule {
       logoutPath: config.logoutPath == null ? undefined : String(config.logoutPath),
       login: config.login == null ? undefined : String(config.login),
       password: config.password == null ? undefined : String(config.password),
-    } as SettingsAuthSchema
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -182,12 +195,12 @@ export class EndgeAuth extends EndgeModule {
   // ---------------------------------------------------------------------------
 
   /**
-   * Manual login: логин/пароль берём из settings
+   * Manual login: логин/пароль берём из профиля авторизации.
    */
   public async login(): Promise<StoredAuthToken> {
     await this.ensureInit()
 
-    const auth: SettingsAuthSchema = this.requireAuth()
+    const auth: EndgeAuthProfileConfig = this.requireAuth()
     if (auth.provider !== 'keycloak_manual') { throw new Error('login() доступен только для провайдера keycloak_manual') }
 
     const username: string | undefined = auth.login
@@ -195,7 +208,7 @@ export class EndgeAuth extends EndgeModule {
 
     if (!username || !password) {
       throw new Error(
-        'keycloak_manual требует заполненных auth.login и auth.password в Settings',
+        'keycloak_manual требует заполненных login и password в профиле авторизации',
       )
     }
 
@@ -211,7 +224,7 @@ export class EndgeAuth extends EndgeModule {
   ): Promise<StoredAuthToken> {
     await this.ensureInit()
 
-    const auth: SettingsAuthSchema = this.requireAuth()
+    const auth: EndgeAuthProfileConfig = this.requireAuth()
     if (auth.provider !== 'keycloak_form') {
       throw new Error(
         'loginForm() доступен только для провайдера keycloak_form',
@@ -231,7 +244,7 @@ export class EndgeAuth extends EndgeModule {
   public async refresh(): Promise<boolean> {
     await this.ensureInit()
 
-    const auth: SettingsAuthSchema = this.requireAuth()
+    const auth: EndgeAuthProfileConfig = this.requireAuth()
     const service: KeycloakAuthService = this.requireService()
 
     if (!this.refreshToken) { return false }
@@ -259,7 +272,7 @@ export class EndgeAuth extends EndgeModule {
   public async checkAccessToken(): Promise<void> {
     await this.ensureInit()
 
-    const auth: SettingsAuthSchema = this.requireAuth()
+    const auth: EndgeAuthProfileConfig = this.requireAuth()
     if (!this.accessExpiresAt) { return }
 
     const now: Date = new Date()
@@ -279,7 +292,7 @@ export class EndgeAuth extends EndgeModule {
   public async logout(): Promise<void> {
     await this.ensureInit()
 
-    const auth: SettingsAuthSchema = this.requireAuth()
+    const auth: EndgeAuthProfileConfig = this.requireAuth()
     const service: KeycloakAuthService = this.requireService()
 
     try {
@@ -323,7 +336,7 @@ export class EndgeAuth extends EndgeModule {
   /**
    * Внутренний helper модуля: require Auth.
    */
-  private requireAuth(): SettingsAuthSchema {
+  private requireAuth(): EndgeAuthProfileConfig {
     if (!this.auth) { throw new Error('EndgeAuth не инициализирован: auth отсутствует') }
     return this.auth
   }
@@ -343,7 +356,7 @@ export class EndgeAuth extends EndgeModule {
     username: string,
     password: string,
   ): Promise<StoredAuthToken> {
-    const auth: SettingsAuthSchema = this.requireAuth()
+    const auth: EndgeAuthProfileConfig = this.requireAuth()
     const service: KeycloakAuthService = this.requireService()
 
     const payload: StringRecord = {
@@ -376,7 +389,7 @@ export class EndgeAuth extends EndgeModule {
    * Внутренний helper модуля: save To Storage.
    */
   private saveToStorage(data: StoredAuthToken): void {
-    const auth: SettingsAuthSchema = this.requireAuth()
+    const auth: EndgeAuthProfileConfig = this.requireAuth()
     localStorage.setItem(auth.storageKey, JSON.stringify(data))
   }
 
@@ -384,7 +397,7 @@ export class EndgeAuth extends EndgeModule {
    * Внутренний helper модуля: load From Storage.
    */
   private async loadFromStorage(): Promise<void> {
-    const auth: SettingsAuthSchema = this.requireAuth()
+    const auth: EndgeAuthProfileConfig = this.requireAuth()
 
     this.accessToken = ''
     this.refreshToken = ''
@@ -499,7 +512,7 @@ export class EndgeAuth extends EndgeModule {
     }
 
     // 2) если provider manual - логинимся сами (single-flight)
-    const auth: SettingsAuthSchema = this.requireAuth()
+    const auth: EndgeAuthProfileConfig = this.requireAuth()
     if (auth.provider === 'keycloak_manual') {
       if (!this.loginPromise) {
         this.loginPromise = this.login().finally(() => {

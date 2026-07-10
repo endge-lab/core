@@ -1,21 +1,20 @@
-import type { EndgeScenarioTestingOptions } from '@/domain/types/types'
+import type { EndgeTestingOptions } from '@/domain/types/types'
 import type { RaphUpdateRunner } from '@/tools/updates-generator'
 import { startRaphUpdates } from '@/tools/updates-generator'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 
 /**
- * Модуль управления тестовыми сценариями и генераторами updates.
+ * Модуль управления тестовыми генераторами updates.
  */
 export class EndgeTesting extends EndgeModule {
-  private _testingOptions: EndgeScenarioTestingOptions | null = null
+  private _testingOptions: EndgeTestingOptions | null = null
   private _updatesRunner: RaphUpdateRunner | null = null
 
   /**
-   * Если настройки тестирования установлены,
-   * то запуск сценария будет происходить с этими настройками.
+   * Устанавливает настройки тестирования.
    */
   setupTestingOptions(
-    options: EndgeScenarioTestingOptions | null,
+    options: EndgeTestingOptions | null,
     opts?: { mode: 'append' | 'replace' },
   ): void {
     opts = opts || { mode: 'replace' }
@@ -57,9 +56,9 @@ export class EndgeTesting extends EndgeModule {
   //
 
   /**
-   * Возвращает текущие настройки тестового сценария.
+   * Возвращает текущие настройки тестирования.
    */
-  get testingOptions(): EndgeScenarioTestingOptions | null {
+  get testingOptions(): EndgeTestingOptions | null {
     return this._testingOptions
   }
 }

@@ -1,9 +1,16 @@
-import type { RSettings } from '@/domain/entities/reflect/RSettings'
-
 import { Raph } from '@endge/raph'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { Endge } from '@/model/endge/endge'
+
+type VocabRuntimeConfig = {
+  idKey: string
+  identity: string
+  baseApiUrl: string
+  slug: string
+  authMode: 'inherit' | 'profile' | 'manual' | 'none'
+  authProfileIdentity?: string | null
+}
 
 /**
  * Модуль загрузки и чтения external vocabs в Raph cache.
@@ -19,110 +26,59 @@ export class EndgeVocabs extends EndgeModule {
   loading: boolean = false
 
   /**
-   * Строит индекс slug -> namespace из settings.general.vocabs.
+   * Строит индекс collectionSlug -> vocab identity из доменных документов vocabs.
    */
   init(): void {
-    const settings = Endge.domain.getSetting('general') as RSettings | undefined
-    if (!settings) {
-      console.log('settings.general не найден - vocabs init пропускаем')
-      this.index = {}
-      return
-    }
-
-    const spaces = Array.isArray(settings.vocabs) ? settings.vocabs : []
     const nextIndex: Record<string, string> = {}
 
-    for (const space of spaces) {
-      const ns: string = String(space?.identity ?? '').trim()
-      if (!ns)
+    for (const vocab of Endge.domain.getVocabs()) {
+      if (vocab.active === false || vocab.mode !== 'external_payload')
         continue
 
-      const collections: { name: string }[] = Array.isArray(space.collections)
-        ? space.collections
-        : []
+      const identity = String(vocab.identity ?? '').trim()
+      const slug = String(vocab.collectionSlug ?? '').trim()
+      if (!identity || !slug)
+        continue
 
-      for (const col of collections) {
-        const slug: string = String(col?.name ?? '').trim()
-        if (!slug)
-          continue
-
-        if (typeof nextIndex[slug] === 'undefined')
-          nextIndex[slug] = ns
-      }
+      if (typeof nextIndex[slug] === 'undefined')
+        nextIndex[slug] = identity
     }
 
     this.index = nextIndex
   }
 
   /**
-   * Загружает все collections конкретного vocab namespace в Raph.
+   * Загружает словарь по identity или collectionSlug.
+   * Namespace резолвится через доменный документ справочника.
    */
   async loadNamespace(namespace: string): Promise<void> {
     const ns: string = String(namespace ?? '').trim()
     if (!ns)
       return
 
-    const settings = Endge.domain.getSetting('general') as RSettings | undefined
-    if (!settings) {
-      console.log('settings.general не найден - vocabs пропускаем')
+    const cfg = this.resolveVocabConfigByIdentityOrSlug(ns, ns)
+    if (!cfg) {
+      console.log(`Vocab с identity или collectionSlug="${ns}" не найден`)
       return
     }
 
-    const vocabs = Array.isArray(settings.vocabs) ? settings.vocabs : []
-    if (!vocabs.length) {
-      console.log('В settings.general.vocabs нет записей - vocabs пропускаем')
+    const base = this.resolveBaseUrl(cfg.baseApiUrl)
+    if (!base)
       return
+
+    const headers = await this.resolveAuthHeaders(cfg)
+
+    try {
+      const res = await fetch(`${base}/${cfg.slug}?limit=10000`, { headers })
+      const json = await res.json()
+      const docs = this.extractDocs(json)
+
+      this.setByIdentityCache(cfg.identity, docs)
+      Raph.set(`vocabs.${cfg.slug}`, docs)
     }
-
-    const space = vocabs.find(v => v.identity === ns)
-    if (!space) {
-      console.log(`Vocab с identity="${ns}" не найден`)
-      return
-    }
-
-    const baseApiUrl: string | undefined = space.baseApiUrl
-    const collections: { name: string }[] = Array.isArray(space.collections)
-      ? space.collections
-      : []
-
-    if (!baseApiUrl) {
-      console.log(`У vocabs["${ns}"] не задан baseApiUrl`)
-      return
-    }
-
-    if (!collections.length) {
-      console.log(`У vocabs["${ns}"] нет collections - нечего загружать`)
-      return
-    }
-
-    const base = baseApiUrl.replace(/\/+$/, '')
-
-    const headers = await this.resolveAuthHeaders({ authMode: 'inherit' })
-
-    for (const col of collections) {
-      const slug = col?.name
-      if (!slug)
-        continue
-
-      const url = `${base}/${slug}`
-
-      try {
-        const res = await fetch(`${url}?limit=10000`, { headers })
-        const json = await res.json()
-
-        let docs: any[] = []
-        if (Array.isArray(json?.docs))
-          docs = json.docs
-        else if (Array.isArray(json))
-          docs = json
-
-        // храним БЕЗ namespace
-        Raph.set(`vocabs.${slug}`, docs)
-      }
-      catch (e: any) {
-        const msg = e?.message ?? String(e)
-        console.warn(`Ошибка при загрузке "${ns}/${slug}": ${msg}`)
-      }
+    catch (e: any) {
+      const msg = e?.message ?? String(e)
+      console.warn(`Ошибка при загрузке "${cfg.identity}/${cfg.slug}": ${msg}`)
     }
   }
 
@@ -138,27 +94,11 @@ export class EndgeVocabs extends EndgeModule {
       return this.getVocabsValues(ns, vocabs)
     }
 
-    const settings = Endge.domain.getSetting('general') as RSettings | undefined
-    if (!settings)
+    const cfg = this.resolveVocabConfigByIdentityOrSlug(ns, ns)
+    if (!cfg)
       return []
 
-    const space = settings.vocabs.find(v => v.identity === ns)
-    if (!Array.isArray(space?.collections))
-      return []
-
-    const result: any[] = []
-
-    for (const col of space.collections) {
-      const slug = col?.name
-      if (!slug)
-        continue
-
-      const values = this.getVocabsValues(ns, slug)
-      if (values.length)
-        result.push(...values)
-    }
-
-    return result
+    return this.getVocabsValues(ns, cfg.slug)
   }
 
   /**
@@ -166,6 +106,7 @@ export class EndgeVocabs extends EndgeModule {
    * потому что в Raph ключ теперь без namespace.
    */
   getVocabsValues(namespace: string, vocabs: string): Array<any> {
+    void namespace
     const vb: string = String(vocabs ?? '').trim()
     if (!vb)
       return []
@@ -192,7 +133,8 @@ export class EndgeVocabs extends EndgeModule {
   /**
    * Загружает до limit сущностей словаря по API (для инспектора и превью).
    * Если данные уже в Raph - не дергает сеть.
-   * @param vocabIdentity identity набора в settings.general.vocabs
+   * @param vocabIdentity identity документа vocabs. Для legacy вызовов допускается старый namespace,
+   * тогда словарь ищется по collectionSlug.
    * @param collectionSlug имя коллекции (name)
    * @param limit максимум документов (по умолчанию 1)
    */
@@ -207,31 +149,25 @@ export class EndgeVocabs extends EndgeModule {
       return cached.slice(0, limit)
     }
 
-    const settings = Endge.domain.getSetting('general') as RSettings | undefined
-    if (!settings)
+    const cfg = this.resolveVocabConfigByIdentityOrSlug(ns, slug)
+    if (!cfg)
       return []
 
-    const vocabs = Array.isArray(settings.vocabs) ? settings.vocabs : []
-    const space = vocabs.find((v: any) => v.identity === ns)
-    if (!space?.baseApiUrl)
+    const base = this.resolveBaseUrl(cfg.baseApiUrl)
+    if (!base)
       return []
 
-    const base = String(space.baseApiUrl).replace(/\/+$/, '')
-    const headers = await this.resolveAuthHeaders({ authMode: 'inherit' })
+    const headers = await this.resolveAuthHeaders(cfg)
 
     try {
-      const url = `${base}/${slug}?limit=${Math.max(1, limit)}`
+      const url = `${base}/${cfg.slug}?limit=${Math.max(1, limit)}`
       const res = await fetch(url, { headers })
       const json = await res.json()
-      let docs: any[] = []
-      if (Array.isArray(json?.docs))
-        docs = json.docs
-      else if (Array.isArray(json))
-        docs = json
+      const docs = this.extractDocs(json)
       return docs.slice(0, limit)
     }
     catch (e: any) {
-      console.warn(`[EndgeVocabs.getSample] ${ns}/${slug}:`, e?.message ?? e)
+      console.warn(`[EndgeVocabs.getSample] ${cfg.identity}/${cfg.slug}:`, e?.message ?? e)
       return []
     }
   }
@@ -436,7 +372,7 @@ export class EndgeVocabs extends EndgeModule {
   /**
    * Разрешает Vocab Config By Id.
    */
-  private resolveVocabConfigById(vocabId: string | number): { idKey: string; identity: string; baseApiUrl: string; slug: string; authMode: 'inherit' | 'profile' | 'manual' | 'none'; authProfileIdentity?: string | null } | null {
+  private resolveVocabConfigById(vocabId: string | number): VocabRuntimeConfig | null {
     const vocab = Endge.domain.getVocabById(vocabId) ?? Endge.domain.getVocabById(Number(vocabId))
     if (!vocab)
       return null
@@ -454,7 +390,7 @@ export class EndgeVocabs extends EndgeModule {
   /**
    * Разрешает Vocab Config By Id Or Identity.
    */
-  private resolveVocabConfigByIdOrIdentity(idOrIdentity: string | number): { idKey: string; identity: string; baseApiUrl: string; slug: string; authMode: 'inherit' | 'profile' | 'manual' | 'none'; authProfileIdentity?: string | null } | null {
+  private resolveVocabConfigByIdOrIdentity(idOrIdentity: string | number): VocabRuntimeConfig | null {
     const vocab = Endge.domain.getVocab(idOrIdentity)
     if (!vocab)
       return null
@@ -467,6 +403,25 @@ export class EndgeVocabs extends EndgeModule {
       return null
 
     return { idKey, identity, baseApiUrl, slug, authMode: vocab.authMode ?? 'inherit', authProfileIdentity: vocab.authProfileIdentity ?? null }
+  }
+
+  private resolveVocabConfigByIdentityOrSlug(identity: string, collectionSlug: string): VocabRuntimeConfig | null {
+    const normalizedIdentity = String(identity ?? '').trim()
+    const normalizedSlug = String(collectionSlug ?? '').trim()
+
+    const direct = normalizedIdentity ? Endge.domain.getVocabByIdentity(normalizedIdentity) : null
+    const indexedIdentity = normalizedSlug ? this.index[normalizedSlug] : undefined
+    const indexed = indexedIdentity ? Endge.domain.getVocabByIdentity(indexedIdentity) : null
+    const fallback = direct ?? indexed ?? Endge.domain.getVocabs().find((vocab) => {
+      if (vocab.active === false || vocab.mode !== 'external_payload')
+        return false
+      return String(vocab.collectionSlug ?? '').trim() === normalizedSlug
+    }) ?? null
+
+    if (!fallback)
+      return null
+
+    return this.resolveVocabConfigByIdOrIdentity(fallback.identity || fallback.id)
   }
 
   private async resolveAuthHeaders(cfg: { authMode?: 'inherit' | 'profile' | 'manual' | 'none'; authProfileIdentity?: string | null }): Promise<Record<string, string>> {

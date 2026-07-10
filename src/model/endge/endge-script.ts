@@ -10,7 +10,6 @@ import { apiExpose } from '@/domain/script-api/expose'
 import { formatDatetimeTZ } from '@endge/utils'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 // import * as monaco from 'monaco-editor'
-// import declareScenario from '@/domain/declare/scenario?raw'
 
 /**
  * Логика работы со скриптами и JSX.
@@ -21,25 +20,6 @@ export class EndgeScript extends EndgeModule {
   // Пока не нашел кейсов, когда нужно несколько окружений.
   // Для модульности окружение сегментируется на scopes.
   env: RuntimeEnvironment = new RuntimeEnvironment()
-
-  /**
-   * Настроить глобальный контекст редактора для живых подсказок (Контекст сценария)
-   */
-  declareScenario(): void {
-    // monaco.languages.typescript.typescriptDefaults.setExtraLibs([])
-    // monaco.languages.typescript.typescriptDefaults.addExtraLib(
-    //   declareScenario,
-    //   'ts:endge-runtime.d.ts',
-    // )
-    //
-    // monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
-    //   target: monaco.languages.typescript.ScriptTarget.ES2020,
-    //   module: monaco.languages.typescript.ModuleKind.ESNext,
-    //   allowNonTsExtensions: true,
-    //   noLib: true,
-    //   lib: [],
-    // })
-  }
 
   /**
    * Настроить глобальный контекст редактора для живых подсказок (Контекст DSL рендера)
@@ -164,7 +144,6 @@ export class EndgeScript extends EndgeModule {
 // import type { RuntimeScope } from '@/domain/entities/runtime/RuntimeScope'
 // import { apiExpose } from '@/domain/script-api/expose'
 // import * as monaco from 'monaco-editor'
-// import declareScenario from '@/domain/declare/scenario?raw'
 // import { formatDatetimeTZ } from '@endge/utils'
 //
 // /**
@@ -176,25 +155,6 @@ export class EndgeScript extends EndgeModule {
 //   // Пока не нашел кейсов, когда нужно несколько окружений.
 //   // Для модульности окружение сегментируется на scopes.
 //   env: RuntimeEnvironment = new RuntimeEnvironment()
-//
-//   /**
-//    * Настроить глобальный контекст редактора для живых подсказок (Контекст сценария)
-//    */
-//   declareScenario(): void {
-//     monaco.languages.typescript.typescriptDefaults.setExtraLibs([])
-//     monaco.languages.typescript.typescriptDefaults.addExtraLib(
-//       declareScenario,
-//       'ts:endge-runtime.d.ts',
-//     )
-//
-//     monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
-//       target: monaco.languages.typescript.ScriptTarget.ES2020,
-//       module: monaco.languages.typescript.ModuleKind.ESNext,
-//       allowNonTsExtensions: true,
-//       noLib: true,
-//       lib: [],
-//     })
-//   }
 //
 //   /**
 //    * Настроить глобальный контекст редактора для живых подсказок (Контекст DSL рендера)

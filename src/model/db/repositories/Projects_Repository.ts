@@ -4,11 +4,9 @@ import type { AxiosInstance } from 'axios'
 export type ProjectPayloadData = {
   identity: string
   displayName: string
-  'extend-settings'?: boolean
   description?: string | null
   slug?: string | null
   order?: number | null
-  settings?: number | null
   navigation?: number | null
   allowedEnvironments?: Array<number | string>
   folder?: number | string | null
@@ -44,11 +42,9 @@ export class Projects_Repository {
       identity: data.identity,
       displayName: data.displayName,
     }
-    if (data['extend-settings'] !== undefined) payload['extend-settings'] = data['extend-settings']
     if (data.description != null) payload.description = data.description
     if (data.slug != null) payload.slug = data.slug
     if (data.order != null) payload.order = data.order
-    if (data.settings != null) payload.settings = data.settings
     if (data.navigation != null) payload.navigation = data.navigation
     if (data.allowedEnvironments !== undefined) payload.allowedEnvironments = data.allowedEnvironments
     if (data.folder !== undefined) payload.folder = data.folder

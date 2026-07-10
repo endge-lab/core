@@ -5,9 +5,7 @@ import type { DataViews_Repository } from '@/model/db/repositories/DataViews_Rep
 import type { Folders_Repository } from '@/model/db/repositories/Folders_Repository'
 import type { Components_Repository } from '@/model/db/repositories/Components_Repository'
 import type { ComponentSFCs_Repository } from '@/model/db/repositories/ComponentSFCs_Repository'
-import type { Scenarios_Repository } from '@/model/db/repositories/Scenarios_Repository'
 import type { Actions_Repository } from '@/model/db/repositories/Actions_Repository'
-import type { Settings_Repository } from '@/model/db/repositories/Settings_Repository'
 import type { Vocabs_Repository } from '@/model/db/repositories/Vocabs_Repository'
 import type { I18nBundles_Repository } from '@/model/db/repositories/I18nBundles_Repository'
 import type { AuthProfiles_Repository } from '@/model/db/repositories/AuthProfiles_Repository'
@@ -38,12 +36,10 @@ export interface EndgeSchemaDump {
   folders: any[]
   components: any[]
   componentSFCs: any[]
-  scenarios: any[]
   actions: any[]
   converters: any[]
   integrations: any[]
   views: any[]
-  settings: any[]
   vocabs: any[]
   i18nBundles: any[]
   authProfiles: any[]
@@ -83,9 +79,7 @@ export type RepositoriesBag = {
   folders: Folders_Repository
   components: Components_Repository
   componentSFCs: ComponentSFCs_Repository
-  scenarios: Scenarios_Repository
   actions: Actions_Repository
-  settings: Settings_Repository
   vocabs: Vocabs_Repository
   i18nBundles: I18nBundles_Repository
   authProfiles: AuthProfiles_Repository

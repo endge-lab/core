@@ -18,14 +18,13 @@ import { RBehaviorBinding } from '@/domain/entities/reflect/RBehaviorBinding'
 import { RPresentationBinding } from '@/domain/entities/reflect/RPresentationBinding'
 import { RVocabs } from '@/domain/entities/reflect/RVocabs'
 import { RI18nBundle } from '@/domain/entities/reflect/RI18nBundle'
-import { RScenario } from '@/domain/entities/reflect/RScenario'
 import { RView } from '@/domain/entities/reflect/RView'
 import { RPageTemplate } from '@/domain/entities/reflect/RPageTemplate'
 import { RPage } from '@/domain/entities/reflect/RPage'
 import { RNavigation } from '@/domain/entities/reflect/RNavigation'
 import { RAction } from '@/domain/entities/reflect/RAction'
 import { RAuthProfile } from '@/domain/entities/reflect/RAuthProfile'
-import { ComponentType, QueryType, ScriptType } from '@/domain/types/document.types'
+import { ComponentType, QueryType } from '@/domain/types/document.types'
 
 export interface DocumentFactoryOptions {
   id?: string
@@ -124,18 +123,6 @@ export class DocumentFactory {
         return item
       }
 
-      case ScriptType.ScenarioSetup: {
-        const item = new RScenario()
-        item.id = entityId
-        item.identity = id
-        item.name = title
-        item.type = ScriptType.ScenarioSetup
-        if (folderId != null) item.folderId = folderId
-        if (registerInDomain)
-          Endge.domain.addScenario(item)
-        return item
-      }
-
       case 'action': {
         const item = new RAction()
         item.id = entityId
@@ -218,7 +205,6 @@ export class DocumentFactory {
         item.identity = id
         item.name = title
         item.displayName = title
-        item.scriptRef = 'scenario-setup'
         if (folderId != null)
           item.folderId = folderId
         if (registerInDomain)
@@ -349,8 +335,6 @@ export class DocumentFactory {
         return 'Новый запрос'
       case 'data-view':
         return 'Новый Data View'
-      case ScriptType.ScenarioSetup:
-        return 'Новый Сценарий'
       case 'action':
         return 'Новое действие'
       case 'integration':

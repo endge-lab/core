@@ -95,9 +95,9 @@ export interface GQLQueryNode {
 }
 
 /**
- * Параметры для запуска сценария с настройками из панели тестирования.
+ * Параметры панели тестирования.
  */
-export interface EndgeScenarioTestingOptions {
+export interface EndgeTestingOptions {
   // Количество элементов для генерации в ответе запроса
   // (Только, если у запроса установлен генератор)
   generatorCount?: number

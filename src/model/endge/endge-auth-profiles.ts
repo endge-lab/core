@@ -1,7 +1,6 @@
 import type { RAuthProfile } from '@/domain/entities/reflect/RAuthProfile'
 import type {
   AuthProfileAdapter,
-  AuthProfileAdapterId,
   AuthProfileSchema,
   AuthSession,
 } from '@/domain/types/auth-profile.types'
@@ -14,8 +13,6 @@ import {
   mapTokenResponseToStored,
 } from '@/domain/services/auth'
 import { Endge } from '@/model/endge/endge'
-
-export const LEGACY_SETTINGS_AUTH_PROFILE_IDENTITY = '_legacy_settings_auth'
 
 export class EndgeAuthProfiles extends EndgeModule {
   private adapters = new Map<string, AuthProfileAdapter>()
@@ -44,9 +41,7 @@ export class EndgeAuthProfiles extends EndgeModule {
     const defaultIdentity = String(Endge.workspace.defaultAuthProfileIdentity ?? '').trim()
     if (defaultIdentity)
       return profiles.find(profile => profile.identity === defaultIdentity) ?? null
-    if (profiles.length > 0)
-      return null
-    return this.createLegacySettingsProfile()
+    return null
   }
 
   public async resolve(profileIdentity?: string | null, opts: { manualToken?: string | null } = {}): Promise<AuthSession> {
@@ -125,8 +120,6 @@ export class EndgeAuthProfiles extends EndgeModule {
       const persisted = Endge.domain.getAuthProfile(identity)
       if (persisted)
         return persisted
-      if (identity === LEGACY_SETTINGS_AUTH_PROFILE_IDENTITY)
-        return this.createLegacySettingsProfile()
       return null
     }
     return this.getDefaultProfile()
@@ -140,30 +133,6 @@ export class EndgeAuthProfiles extends EndgeModule {
       profile: this.profileToSchema(profile),
       manualToken: opts.manualToken ?? undefined,
     })
-  }
-
-  private createLegacySettingsProfile(): AuthProfileSchema | null {
-    const settings = Endge.domain.getSetting('general') as any
-    const auth = settings?.auth
-    if (!auth?.provider)
-      return null
-    const adapterId = auth.provider === 'keycloak_manual' || auth.provider === 'keycloak_form'
-      ? auth.provider as AuthProfileAdapterId
-      : null
-    if (!adapterId)
-      return null
-    return {
-      id: LEGACY_SETTINGS_AUTH_PROFILE_IDENTITY,
-      identity: LEGACY_SETTINGS_AUTH_PROFILE_IDENTITY,
-      name: 'Legacy settings auth',
-      displayName: 'Legacy settings auth',
-      adapterId,
-      config: { ...auth },
-      credentialRefs: {},
-      persist: 'localStorage',
-      active: true,
-      meta: { legacy: true },
-    }
   }
 
   private createManualTokenProfile(): AuthProfileSchema {

@@ -9,8 +9,6 @@ import type { RPage } from '@/domain/entities/reflect/RPage'
 import type { RNavigation } from '@/domain/entities/reflect/RNavigation'
 import type { RQuery } from '@/domain/entities/reflect/RQuery'
 import type { RDataView } from '@/domain/entities/reflect/RDataView'
-import type { RScenario } from '@/domain/entities/reflect/RScenario'
-import type { RSettings } from '@/domain/entities/reflect/RSettings'
 import type { RPolicy } from '@/domain/entities/reflect/RPolicy'
 import type { RStyle } from '@/domain/entities/reflect/RStyle'
 import type { RTenant } from '@/domain/entities/reflect/RTenant'
@@ -61,7 +59,6 @@ export enum DomainSectionType {
   Component = 'component',
   Query = 'query',
   DataView = 'data-view',
-  Scenario = 'scenario',
   Action = 'action',
   Converter = 'converter',
   Integration = 'integration',
@@ -78,15 +75,7 @@ export enum DomainSectionType {
   Vocabs = 'vocabs',
   I18nBundles = 'i18n-bundles',
   AuthProfile = 'auth-profile',
-  Settings = 'settings',
   Project = 'project',
-}
-
-/**
- * Описывает типы скриптов
- */
-export enum ScriptType {
-  ScenarioSetup = 'scenario-setup',
 }
 
 /**
@@ -112,12 +101,10 @@ export type DomainDocumentType
     | 'i18n-bundles'
     | 'auth-profile'
     | 'tenant'
-    | 'settings'
     | 'project'
     | 'workspace'
     | Exclude<ComponentType, ComponentType.Component>
     | QueryType
-    | ScriptType
     | ParameterType
     | FilterType
 
@@ -138,4 +125,4 @@ export interface Document {
 /**
  * Описывает любой документ рефлекцию
  */
-export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RScenario | RAction | RConverter | RIntegration | RView | RParameter | RFilter | RSettings | RPolicy | RStyle | RVocabs | RI18nBundle | RAuthProfile | RWorkspace | RTenant | RBehaviorBinding | RPresentationBinding | RPageTemplate | RPage | RNavigation
+export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RAction | RConverter | RIntegration | RView | RParameter | RFilter | RPolicy | RStyle | RVocabs | RI18nBundle | RAuthProfile | RWorkspace | RTenant | RBehaviorBinding | RPresentationBinding | RPageTemplate | RPage | RNavigation

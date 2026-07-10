@@ -14,14 +14,12 @@ type EnvRecord = Record<string, unknown>
  *
  * Источник списка переменных:
  *  - workspace.vars
- *  - legacy fallback: settings.general.vars
  *
  * Источники значений и приоритеты:
  *  1) ENVY/runtime vars (если задано) - самый высокий приоритет
  *  2) Vite env: import.meta.env.VITE_<NAME> (напрямую, без сканирования)
  *     - имя переменной внутри системы: без префикса (ENDPOINT_AUTH -> VITE_ENDPOINT_AUTH)
  *  3) workspace.vars
- *  4) legacy settings.general.vars
  *
  * Особенности:
  *  - сам класс НЕ хранит данные, только читает их из домена
@@ -103,28 +101,10 @@ export class EndgeVars extends EndgeModule {
         })
       }
 
-      const settings = Endge.domain.getSetting('general') as
-        | { vars?: EndgeGlobalVar[] }
-        | undefined
-
-      const src: EndgeGlobalVar[] = settings?.vars ?? []
-      const res = src.map((item: EndgeGlobalVar) => {
-
-        let val = item.defaultValue
-
-        val = this.getExternalValue(item.name) ?? val
-
-        return {
-          name: String(item.name ?? '').trim(),
-          defaultValue: String(val ?? ''),
-          currentValue: String(val),
-        }
-      })
-
-      return res
+      return []
     }
     catch (e) {
-      console.warn('[EndgeVars] Failed to read vars from domain settings', e)
+      console.warn('[EndgeVars] Failed to read workspace vars', e)
       return []
     }
   }

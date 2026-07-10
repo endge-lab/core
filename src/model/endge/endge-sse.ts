@@ -1,6 +1,3 @@
-import type {
-  SettingsSSEAuthMode,
-} from '@/domain/types/settings.types'
 import type { Nullable } from '@endge/utils'
 
 import {
@@ -14,7 +11,7 @@ import { Endge } from '@/model/endge/endge'
 
 type EndgeSSEConfig = {
   url: string
-  authMode?: SettingsSSEAuthMode
+  authMode?: 'inherit' | 'profile' | 'none' | 'manual'
   authProfileIdentity?: string | null
   manualToken?: string | null
 }
@@ -68,8 +65,7 @@ export class EndgeSSE extends EndgeModule {
   public async startSSE(): Promise<void> {
     // console.group('[EndgeSSE] startSSE')
 
-    const settings = Endge.domain.getSetting('general')
-    const cfg: EndgeSSEConfig | undefined = Endge.workspace.sse ?? settings?.sse
+    const cfg: EndgeSSEConfig | undefined = Endge.workspace.sse
     if (!cfg?.url) {
       console.warn('[EndgeSSE] sse url is empty')
       // console.groupEnd()
@@ -189,7 +185,7 @@ export class EndgeSSE extends EndgeModule {
    * Внутренний helper модуля: refresh Token Cached.
    */
   private async refreshTokenCached(cfg: EndgeSSEConfig): Promise<void> {
-    const mode: SettingsSSEAuthMode = cfg.authMode ?? 'inherit'
+    const mode = cfg.authMode ?? 'inherit'
 
     // console.group('[EndgeSSE] refreshTokenCached')
     // console.log('authMode:', mode)
@@ -203,7 +199,7 @@ export class EndgeSSE extends EndgeModule {
           : mode === 'manual'
             ? (await Endge.authProfiles.resolveRequestAuth({ mode: 'manual', manualToken: cfg.manualToken ?? '' })).accessToken
             : mode === 'profile'
-              ? (await Endge.authProfiles.resolveRequestAuth({ mode: 'profile', authProfileIdentity: cfg.authProfileIdentity })).accessToken
+              ? (await Endge.authProfiles.resolveRequestAuth({ mode: 'profile', authProfileIdentity: cfg.authProfileIdentity ?? undefined })).accessToken
               : (await Endge.authProfiles.resolveRequestAuth({ mode: 'inherit' })).accessToken
 
       this._tokenCached = token
