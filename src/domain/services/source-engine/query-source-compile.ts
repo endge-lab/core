@@ -495,11 +495,28 @@ function parseFilterItem(
   sourcePath: string,
 ): QuerySourceFilterItem | null {
   const call = unwrapExpression(node)
-  if (!t.isCallExpression(call) || !t.isMemberExpression(call.callee)) {
+  if (!t.isCallExpression(call)) {
     diagnostics.push(createDiagnostic(
       'error',
       'query-source-filter-call',
-      'Фильтр должен быть filter.reference(...) или filter.inline(...).',
+      'Фильтр должен быть filter(...), filter.reference(...) или filter.inline(...).',
+      sourcePath,
+    ))
+    return null
+  }
+
+  if (t.isIdentifier(call.callee, { name: 'filter' })) {
+    const filterId = expressionToUnknown(call.arguments[0], diagnostics, sourcePath)
+    return typeof filterId === 'string'
+      ? { mode: 'reference', filterId }
+      : null
+  }
+
+  if (!t.isMemberExpression(call.callee)) {
+    diagnostics.push(createDiagnostic(
+      'error',
+      'query-source-filter-call',
+      'Фильтр должен быть filter(...), filter.reference(...) или filter.inline(...).',
       sourcePath,
     ))
     return null
@@ -509,7 +526,7 @@ function parseFilterItem(
     diagnostics.push(createDiagnostic(
       'error',
       'query-source-filter-call',
-      'Фильтр должен быть filter.reference(...) или filter.inline(...).',
+      'Фильтр должен быть filter(...), filter.reference(...) или filter.inline(...).',
       sourcePath,
     ))
     return null
@@ -724,12 +741,13 @@ function readAuthProperty(
     return { mode: 'inherit' }
 
   const auth = raw as Partial<RQueryAuth>
+  const profile = auth.profile ?? auth.authProfileIdentity
   if (auth.mode === 'none')
     return { ...auth, mode: 'none' }
   if (auth.mode === 'manual')
     return { ...auth, mode: 'manual' }
   if (auth.mode === 'profile')
-    return { ...auth, mode: 'profile' }
+    return { ...auth, mode: 'profile', profile, authProfileIdentity: profile }
   return { ...auth, mode: 'inherit' }
 }
 

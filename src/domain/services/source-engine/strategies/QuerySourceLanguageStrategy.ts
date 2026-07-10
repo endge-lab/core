@@ -146,9 +146,9 @@ const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
     detail: 'Inline filter object',
   },
   {
-    label: 'filter.reference',
+    label: 'filter',
     kind: 'function',
-    insertText: `filter.reference('filter-identity')`,
+    insertText: `filter('filter-identity')`,
     detail: 'Ссылка на доменный фильтр',
   },
   {
@@ -158,12 +158,13 @@ const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
     detail: 'Ссылка на environment variable',
   },
   {
-    label: 'auth.token',
+    label: 'auth.profile',
     kind: 'value',
     insertText: `auth: {
-  mode: 'inherit',
+  mode: 'profile',
+  profile: 'auth-profile-identity',
 },`,
-    detail: 'Token auth config',
+    detail: 'Auth profile config',
   },
   {
     label: 'method.GET',

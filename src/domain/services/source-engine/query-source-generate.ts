@@ -1,5 +1,6 @@
 import type { RQuery } from '@/domain/entities/reflect/RQuery'
 import type { RField } from '@/domain/entities/reflect/RField'
+import type { RQueryAuth } from '@/domain/types/query.types'
 import type {
   QuerySourceDocument,
   QuerySourceField,
@@ -35,7 +36,7 @@ export function createQuerySourceDocument(query: RQuery): QuerySourceDocument {
       path: String(query.query ?? ''),
       method: String(legacy.method ?? 'POST'),
       headers: normalizeHeaders(legacy.headers),
-      auth: query.auth ?? { mode: 'inherit' },
+      auth: toSourceAuth(query.auth),
       timeoutMs: typeof legacy.timeoutMs === 'number' ? legacy.timeoutMs : undefined,
       formUrlencoded: legacy.sendAsFormUrlencoded ? true : undefined,
     },
@@ -71,6 +72,21 @@ export function createQuerySourceDocument(query: RQuery): QuerySourceDocument {
       enabled: Boolean(query.mockDataEnabled),
       data: parseMockData(query.mockData),
     },
+  }
+}
+
+function toSourceAuth(auth: RQueryAuth | undefined): RQueryAuth {
+  if (!auth)
+    return { mode: 'inherit' }
+
+  if (auth.mode !== 'profile')
+    return { ...auth, profile: undefined, authProfileIdentity: undefined }
+
+  const profile = auth.profile ?? auth.authProfileIdentity
+  return {
+    ...auth,
+    profile,
+    authProfileIdentity: undefined,
   }
 }
 
@@ -223,7 +239,7 @@ function printFilterItems(items: QuerySourceFilterItem[], depth: number): string
   const childIndent = '  '.repeat(depth + 1)
   const lines = items.map(item => {
     if (item.mode === 'reference')
-      return `${childIndent}filter.reference(${printValue(item.filterId)}),`
+      return `${childIndent}filter(${printValue(item.filterId)}),`
 
     return `${childIndent}filter.inline(${printValue(item.value, depth + 1)}),`
   })

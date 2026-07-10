@@ -65,7 +65,7 @@ export class EndgeAuthProfiles extends EndgeModule {
     if (mode === 'manual')
       return this.resolveWithAdapter(this.createManualTokenProfile(), { manualToken: auth?.manualToken })
     if (mode === 'profile')
-      return this.resolve(auth?.authProfileIdentity)
+      return this.resolve(auth?.profile ?? auth?.authProfileIdentity)
     return this.resolve()
   }
 

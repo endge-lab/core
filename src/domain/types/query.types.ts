@@ -4,6 +4,9 @@ export type RQueryAuthMode = 'none' | 'token' | 'inherit' | 'profile' | 'manual'
 
 export interface RQueryAuth {
   mode: RQueryAuthMode
+  /** Identity auth-profile для source DSL. */
+  profile?: string
+  /** @deprecated use profile. Kept for persisted/legacy compatibility. */
   authProfileIdentity?: string
 
   /**

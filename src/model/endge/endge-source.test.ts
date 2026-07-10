@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { ENDGE_CORE_MODULES } from '@/model/config/endge-modules'
 import { Endge } from '@/model/endge/endge'
 import { EndgeSource } from '@/model/endge/endge-source'
@@ -48,6 +49,7 @@ describe('EndgeSource', () => {
     expect(completions).toEqual(expect.arrayContaining([
       expect.objectContaining({ label: 'defineQuery' }),
       expect.objectContaining({ label: 'field' }),
+      expect.objectContaining({ label: 'filter' }),
       expect.objectContaining({ label: 'filter.inline' }),
       expect.objectContaining({ label: 'env' }),
     ]))
@@ -80,6 +82,28 @@ describe('EndgeSource', () => {
         },
       ],
     })
+  })
+
+  it('keeps legacy filter.reference source compatible', () => {
+    const result = Endge.source.compile('query', createQuerySource().replace(
+      "filter('flight-filter')",
+      "filter.reference('flight-filter')",
+    ))
+
+    expect(result.ok).toBe(true)
+    expect(result.diagnostics).toEqual([])
+    expect(result.artifact?.filters).toEqual([
+      {
+        mode: 'reference',
+        filterId: 'flight-filter',
+        inlineJson: null,
+      },
+      {
+        mode: 'inline',
+        filterId: null,
+        inlineJson: '{"active":true}',
+      },
+    ])
   })
 
   it('returns diagnostics for unsupported query source kind', () => {
@@ -118,6 +142,36 @@ defineQuery({
 
     expect(envResult.artifact).toMatchObject({ endpoint: '{ENDPOINT_AODB}' })
     expect(legacyResult.artifact).toMatchObject({ endpoint: '{ENDPOINT_AODB}' })
+  })
+
+  it('uses profile as canonical query auth profile syntax', () => {
+    const result = Endge.source.compile('query', `
+defineQuery({
+  request: {
+    endpoint: env('ENDPOINT_AODB'),
+    path: '/select',
+    auth: {
+      mode: 'profile',
+      profile: 'keycloak-dev',
+    },
+  },
+})
+`)
+
+    expect(result.artifact).toMatchObject({
+      auth: {
+        mode: 'profile',
+        profile: 'keycloak-dev',
+        authProfileIdentity: 'keycloak-dev',
+      },
+    })
+
+    const query = new RQuery()
+    query.auth = { mode: 'profile', authProfileIdentity: 'keycloak-dev' }
+
+    const generated = Endge.source.generate('query', query)
+    expect(generated.source).toContain("profile: 'keycloak-dev'")
+    expect(generated.source).not.toContain('authProfileIdentity')
   })
 
   it('returns diagnostics for legacy response block', () => {
@@ -258,7 +312,7 @@ defineQuery({
   filters: {
     mode: 'merge',
     items: [
-      filter.reference('flight-filter'),
+      filter('flight-filter'),
       filter.inline({ active: true }),
     ],
   },
