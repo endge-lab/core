@@ -116,6 +116,7 @@ export * from '@/domain/entities/runtime/RuntimeBindingScope'
 export * from '@/domain/entities/runtime/RuntimeEnvironment'
 export * from '@/domain/entities/runtime/RuntimeContext'
 export * from '@/domain/entities/runtime/RuntimeCommandRegistry'
+export * from '@/domain/entities/runtime/hosts/FilterFieldsRuntimeHost'
 
 export * from '@/domain/entities/data/DependencyNode'
 export * from '@/domain/entities/data/DataSource'

@@ -124,18 +124,19 @@ function readRuntimes(node: t.ObjectExpression, diagnostics: DiagnosticDraft[]):
 function readRuntime(name: string, raw: t.Expression, diagnostics: DiagnosticDraft[]): CompositionRuntimeDescriptor | null {
   const chain = memberChain(raw)
   if (!chain || !t.isIdentifier(chain.base.callee)) {
-    diagnostics.push(diagnostic('error', 'composition-runtime-shape', `Runtime "${name}" должен начинаться с filter/query/component(identity).`, `runtimes.${name}`, raw))
+    diagnostics.push(diagnostic('error', 'composition-runtime-shape', `Runtime "${name}" должен начинаться с filter/query/component/filterFields(identity).`, `runtimes.${name}`, raw))
     return null
   }
 
-  const kind = chain.base.callee.name as CompositionRuntimeKind
-  if (kind !== 'filter' && kind !== 'query' && kind !== 'component') {
-    diagnostics.push(diagnostic('error', 'composition-runtime-kind', `Runtime kind "${kind}" не поддерживается.`, `runtimes.${name}`, chain.base))
+  const rawKind = chain.base.callee.name
+  const kind = (rawKind === 'filterFields' ? 'filter-fields' : rawKind) as CompositionRuntimeKind
+  if (kind !== 'filter' && kind !== 'query' && kind !== 'component' && kind !== 'filter-fields') {
+    diagnostics.push(diagnostic('error', 'composition-runtime-kind', `Runtime kind "${rawKind}" не поддерживается.`, `runtimes.${name}`, chain.base))
     return null
   }
   const identity = readStringArgument(chain.base, 0)
   if (!identity) {
-    diagnostics.push(diagnostic('error', 'composition-runtime-identity', `Runtime "${name}" требует identity.`, `runtimes.${name}`, chain.base))
+    diagnostics.push(diagnostic('error', 'composition-runtime-identity', `Runtime "${name}" требует identity/source runtime.`, `runtimes.${name}`, chain.base))
     return null
   }
 
@@ -148,7 +149,23 @@ function readRuntime(name: string, raw: t.Expression, diagnostics: DiagnosticDra
   }
 
   for (const modifier of chain.modifiers) {
+    if (modifier.name === 'fields') {
+      if (kind !== 'filter-fields') {
+        diagnostics.push(diagnostic('error', 'composition-fields-runtime-kind', '.fields(...) в v1 поддерживается только filterFields(...).', `runtimes.${name}.fields`, modifier.call))
+        continue
+      }
+      const fields = readStringArrayArgument(modifier.call, 0)
+      if (!fields?.length)
+        diagnostics.push(diagnostic('error', 'composition-filter-fields-empty', '.fields([...]) требует непустой массив field keys.', `runtimes.${name}.fields`, modifier.call))
+      else
+        descriptor.fields = [...new Set(fields)]
+      continue
+    }
     if (modifier.name === 'instance') {
+      if (kind === 'filter-fields') {
+        diagnostics.push(diagnostic('error', 'composition-filter-fields-instance-unsupported', 'filterFields runtime не поддерживает .instance(...).', `runtimes.${name}.instance`, modifier.call))
+        continue
+      }
       descriptor.instance = readStringArgument(modifier.call, 0) ?? 'default'
       continue
     }
@@ -166,7 +183,7 @@ function readRuntime(name: string, raw: t.Expression, diagnostics: DiagnosticDra
       continue
     }
     if (modifier.name === 'withProps') {
-      if (kind === 'filter') {
+      if (kind === 'filter' || kind === 'filter-fields') {
         diagnostics.push(diagnostic('error', 'composition-filter-props-unsupported', 'Filter runtime v1 не принимает .withProps(...).', `runtimes.${name}.withProps`, modifier.call))
         continue
       }
@@ -181,6 +198,8 @@ function readRuntime(name: string, raw: t.Expression, diagnostics: DiagnosticDra
 
     diagnostics.push(diagnostic('error', 'composition-runtime-method', `.${modifier.name}(...) не поддерживается runtime descriptor.`, `runtimes.${name}`, modifier.call))
   }
+  if (kind === 'filter-fields' && !descriptor.fields?.length)
+    diagnostics.push(diagnostic('error', 'composition-filter-fields-missing', `Runtime "${name}" требует .fields([...]).`, `runtimes.${name}`, raw))
   return descriptor
 }
 
@@ -348,6 +367,25 @@ function validatePersistKeys(runtimes: CompositionRuntimeDescriptor[], diagnosti
 function validateBindingReferences(runtimes: CompositionRuntimeDescriptor[], diagnostics: DiagnosticDraft[]): void {
   const runtimeByName = new Map(runtimes.map(runtime => [runtime.name, runtime]))
   for (const runtime of runtimes) {
+    if (runtime.kind === 'filter-fields') {
+      const source = runtimeByName.get(runtime.identity)
+      if (!source) {
+        diagnostics.push(diagnostic(
+          'error',
+          'composition-filter-fields-source-missing',
+          `filterFields source runtime "${runtime.identity}" не найден.`,
+          `runtimes.${runtime.name}`,
+        ))
+      }
+      else if (source.kind !== 'filter') {
+        diagnostics.push(diagnostic(
+          'error',
+          'composition-filter-fields-source-kind',
+          `filterFields source "${runtime.identity}" должен быть Filter runtime.`,
+          `runtimes.${runtime.name}`,
+        ))
+      }
+    }
     for (const [prop, binding] of Object.entries(runtime.props)) {
       if ((binding.kind === 'output' || binding.kind === 'filter-fields') && !runtimeByName.has(binding.runtime)) {
         diagnostics.push(diagnostic(
@@ -376,9 +414,12 @@ function validateRuntimeCycles(
 ): void {
   const edges = new Map<string, string[]>()
   for (const runtime of runtimes) {
-    edges.set(runtime.name, Object.values(runtime.props)
+    const propEdges = Object.values(runtime.props)
       .filter((binding): binding is Extract<CompositionBindingValue, { kind: 'output' | 'filter-fields' }> => binding.kind === 'output' || binding.kind === 'filter-fields')
-      .map(binding => binding.runtime))
+      .map(binding => binding.runtime)
+    edges.set(runtime.name, runtime.kind === 'filter-fields'
+      ? [runtime.identity, ...propEdges]
+      : propEdges)
   }
   for (const reaction of reactions) {
     if (reaction.kind === 'change')

@@ -17,7 +17,7 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
     alias: 'Endge Composition Source',
     extension: '.endge-composition.ts',
     keywords: [
-      'component', 'defineComposition', 'filter', 'fromFilter', 'fromOutput', 'fromStore', 'onChange',
+      'component', 'defineComposition', 'filter', 'filterFields', 'fromFilter', 'fromOutput', 'fromStore', 'onChange',
       'onMount', 'output', 'query',
     ],
     functions: [
@@ -48,6 +48,7 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
 const COMPOSITION_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'defineComposition', kind: 'snippet', insertText: COMPOSITION_DEFAULT_SOURCE.trimEnd(), detail: 'Создать Composition source' },
   { label: 'filter', kind: 'function', insertText: `filter('identity').instance('default')`, detail: 'Filter runtime' },
+  { label: 'filterFields', kind: 'function', insertText: `filterFields('filter').fields([])`, detail: 'Renderable Filter fields runtime slice' },
   { label: 'query', kind: 'function', insertText: `query('identity').withProps({})`, detail: 'Query runtime' },
   { label: 'component', kind: 'function', insertText: `component('identity').withProps({})`, detail: 'Component runtime' },
   { label: 'fromOutput', kind: 'function', insertText: `fromOutput('runtime', 'output')`, detail: 'Runtime output binding' },

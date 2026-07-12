@@ -2,7 +2,7 @@ import type { ProgramDiagnostic } from '@/domain/types/program.types'
 import type { RuntimeHost } from '@/domain/types/runtime-host.types'
 import type { SourceFieldDefinition } from '@/domain/types/source-expression.types'
 
-export type CompositionRuntimeKind = 'filter' | 'query' | 'component'
+export type CompositionRuntimeKind = 'filter' | 'query' | 'component' | 'filter-fields'
 
 export type CompositionBindingValue
   = | { kind: 'literal', value: unknown }
@@ -24,8 +24,15 @@ export interface CompositionRuntimeDescriptor {
   kind: CompositionRuntimeKind
   identity: string
   instance: string
+  fields?: string[]
   persistKey?: string
   props: Record<string, CompositionBindingValue>
+}
+
+export interface CompositionRuntimeChildHandle {
+  name: string
+  descriptor: CompositionRuntimeDescriptor
+  runtime: RuntimeHost<any, any>
 }
 
 export type CompositionReaction

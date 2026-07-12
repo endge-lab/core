@@ -32,6 +32,15 @@ describe('Composition runtime session', () => {
     const query = session.host.getChild('query') as QueryRuntimeHost
 
     expect(session.id).toBe('composition-session')
+    expect(session.host.getChildren().map(child => child.name)).toEqual(['filter', 'dateFilter', 'query'])
+    expect(session.host.getChild('dateFilter')?.runtimeType).toBe('filter-fields-runtime-host')
+    expect(session.host.getFilterFieldsSlice('filter', ['search'])).toMatchObject({
+      kind: 'filter-fields',
+      runtimeId: 'composition-session:filter:main',
+      runtimeName: 'filter',
+      fieldKeys: ['search'],
+      values: { search: '' },
+    })
     expect(run).toHaveBeenCalledTimes(1)
     expect(query.getProps()).toMatchObject({
       filterPayload: { where: { search: '' } },
@@ -108,6 +117,7 @@ defineFilter({
     type: 'composition', sourceVersion: 1,
     runtimes: [
       { name: 'filter', kind: 'filter', identity: 'schedule-filter', instance: 'main', props: {} },
+      { name: 'dateFilter', kind: 'filter-fields', identity: 'filter', instance: 'default', fields: ['search'], props: {} },
       {
         name: 'query', kind: 'query', identity: 'schedule-query', instance: 'default',
         props: {

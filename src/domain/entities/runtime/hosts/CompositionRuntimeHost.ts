@@ -1,11 +1,13 @@
 import type { RComposition } from '@/domain/entities/reflect/RComposition'
 import type { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentSFCRuntimeHost'
+import type { FilterFieldsRuntimeHost } from '@/domain/entities/runtime/hosts/FilterFieldsRuntimeHost'
 import type { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
 import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
 import type {
   CompositionBindingValue,
   CompositionFilterFieldsSlice,
   CompositionProgramPayload,
+  CompositionRuntimeChildHandle,
   CompositionRuntimeOutputHandle,
 } from '@/domain/types/composition-source.types'
 import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext, RuntimeHostInputSource } from '@/domain/types/runtime-host.types'
@@ -13,6 +15,7 @@ import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext, RuntimeHos
 import { Raph, RaphNode } from '@endge/raph'
 
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
+import { FilterFieldsRuntimeHost as EndgeFilterFieldsRuntimeHost } from '@/domain/entities/runtime/hosts/FilterFieldsRuntimeHost'
 import { Endge } from '@/model/endge/endge'
 
 function defaultContext(): RuntimeHostContext<'composition'> {
@@ -28,6 +31,7 @@ function defaultContext(): RuntimeHostContext<'composition'> {
 /** Runtime orchestration host: children, bindings, reactions и public handles. */
 export class CompositionRuntimeHost extends RuntimeHostBase<'composition', RuntimeHostContext<'composition'>, CompositionProgramPayload> {
   private _children = new Map<string, RuntimeHost<any, any>>()
+  private _childDescriptors = new Map<string, CompositionProgramPayload['runtimes'][number]>()
   private _outputs: Record<string, CompositionRuntimeOutputHandle> = {}
   private _disposers: Array<() => void> = []
   private _timers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -121,6 +125,23 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     return this._children.get(String(name ?? '').trim()) ?? null
   }
 
+  public getChildren(): CompositionRuntimeChildHandle[] {
+    return Array.from(this._children.entries()).map(([name, runtime]) => {
+      const descriptor = this._childDescriptors.get(name)
+      if (!descriptor)
+        throw new Error(`[CompositionRuntimeHost] descriptor "${name}" is missing.`)
+      return { name, descriptor, runtime }
+    })
+  }
+
+  public getFilterFieldsSlice(runtimeName: string, fieldKeys: string[]): CompositionFilterFieldsSlice | null {
+    return this._readFilterFieldsBinding({
+      kind: 'filter-fields',
+      runtime: runtimeName,
+      fields: fieldKeys,
+    })
+  }
+
   public getOutputs(): Readonly<Record<string, CompositionRuntimeOutputHandle>> {
     return { ...this._outputs }
   }
@@ -135,15 +156,43 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     for (const path of this._bridgePaths)
       Raph.delete(path)
     this._bridgePaths.clear()
-    for (const child of this._children.values())
-      Endge.runtime.destroyRuntimeTree(child.id)
+    for (const child of this._children.values()) {
+      if (Endge.runtime.getRuntimeById(child.id))
+        Endge.runtime.destroyRuntimeTree(child.id)
+      else
+        child.destroy()
+    }
     this._children.clear()
+    this._childDescriptors.clear()
     this._outputs = {}
     this._mounted = false
     super.destroy()
   }
 
   private _createChild(descriptor: CompositionProgramPayload['runtimes'][number]): void {
+    if (descriptor.kind === 'filter-fields') {
+      const source = this._children.get(descriptor.identity) as FilterRuntimeHost | undefined
+      if (!source || source.entityType !== 'filter' || source.runtimeType !== 'filter-runtime-host')
+        throw new Error(`[CompositionRuntimeHost] filterFields source runtime "${descriptor.identity}" is missing.`)
+      const child = new EndgeFilterFieldsRuntimeHost({
+        id: `${this.id}:${descriptor.name}:${descriptor.instance}`,
+        name: descriptor.name,
+        model: source.model as any,
+        sourceRuntimeName: descriptor.identity,
+        sourceRuntime: source,
+        fieldKeys: descriptor.fields ?? [],
+        parent: this,
+        meta: {
+          instance: descriptor.instance,
+          sourceRuntime: descriptor.identity,
+        },
+      })
+      child.create()
+      this._children.set(descriptor.name, child)
+      this._childDescriptors.set(descriptor.name, descriptor)
+      return
+    }
+
     let model: any = null
     if (descriptor.kind === 'filter')
       model = Endge.domain.getFilter(descriptor.identity)
@@ -178,6 +227,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     if (!child)
       throw new Error(`[CompositionRuntimeHost] runtime "${descriptor.name}" cannot be created.`)
     this._children.set(descriptor.name, child)
+    this._childDescriptors.set(descriptor.name, descriptor)
   }
 
   private _bindChild(descriptor: CompositionProgramPayload['runtimes'][number]): void {
@@ -347,6 +397,10 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }
   }
 
+  public isFilterFieldsRuntime(runtime: RuntimeHost<any, any>): runtime is FilterFieldsRuntimeHost {
+    return runtime.runtimeType === 'filter-fields-runtime-host'
+  }
+
   /** Возвращает topological runtime order по fromOutput dependencies. */
   private _dependencyOrder(
     runtimes: CompositionProgramPayload['runtimes'],
@@ -365,6 +419,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       if (!runtime)
         throw new Error(`[CompositionRuntimeHost] runtime dependency "${name}" is missing.`)
       visiting.add(name)
+      if (runtime.kind === 'filter-fields')
+        visit(runtime.identity)
       for (const binding of Object.values(runtime.props)) {
         if (binding.kind === 'output' || binding.kind === 'filter-fields')
           visit(binding.runtime)

@@ -119,6 +119,7 @@ defineQuery({
 	defineComposition({
 	  runtimes: {
 	    filter: filter('schedule').instance('main').persist({ key: 'schedule' }),
+	    dateFilter: filterFields('filter').fields(['from']),
 	    query: query('search').withProps({
 	      payload: fromOutput('filter', 'request'),
 	      filterModel: fromFilter('filter').fields(['from', 'direction']),
@@ -135,6 +136,11 @@ defineQuery({
 	`)
 	    expect(valid.diagnostics).toEqual([])
 	    expect(valid.artifact?.reactions).toHaveLength(2)
+	    expect(valid.artifact?.runtimes.find(runtime => runtime.name === 'dateFilter')).toMatchObject({
+	      kind: 'filter-fields',
+	      identity: 'filter',
+	      fields: ['from'],
+	    })
 	    expect(valid.artifact?.runtimes.find(runtime => runtime.name === 'query')?.props.filterModel).toEqual({
 	      kind: 'filter-fields',
 	      runtime: 'filter',

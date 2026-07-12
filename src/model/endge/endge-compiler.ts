@@ -570,24 +570,53 @@ export class EndgeCompiler extends EndgeModule {
     const dependencies: ProgramArtifact['dependencies'] = []
 
     for (const runtime of payload.runtimes) {
+      const dependencySource = runtime.kind === 'filter-fields'
+        ? payload.runtimes.find(item => item.name === runtime.identity)
+        : runtime
       dependencies.push({
-        entityType: runtime.kind,
-        id: runtime.identity,
-        identity: runtime.identity,
+        entityType: runtime.kind === 'filter-fields' ? 'filter' : runtime.kind,
+        id: dependencySource?.identity ?? runtime.identity,
+        identity: dependencySource?.identity ?? runtime.identity,
         role: 'composition-runtime',
       })
 
+      if (runtime.kind === 'filter-fields') {
+        const source = payload.runtimes.find(item => item.name === runtime.identity)
+        if (!source || source.kind !== 'filter') {
+          diagnostics.push({ severity: 'error', code: 'composition-filter-fields-source-kind', message: `filterFields source "${runtime.identity}" должен быть Filter runtime.`, sourcePath: `runtimes.${runtime.name}` })
+          continue
+        }
+        const artifact = Endge.program.getFilterArtifact(source.identity)
+        if (artifact) {
+          const keys = new Set(artifact.payload.fields.map(field => field.key))
+          for (const key of runtime.fields ?? []) {
+            if (!keys.has(key)) {
+              diagnostics.push({ severity: 'error', code: 'composition-filter-fields-field-missing', message: `Filter "${source.identity}" не содержит field "${key}".`, sourcePath: `runtimes.${runtime.name}.fields` })
+            }
+          }
+        }
+        continue
+      }
+
       if (runtime.kind === 'filter') {
+        const model = Endge.domain.getFilter(runtime.identity)
         const artifact = Endge.program.getFilterArtifact(runtime.identity)
-        if (!artifact)
+        if (!model)
           diagnostics.push({ severity: 'error', code: 'composition-filter-missing', message: `Filter "${runtime.identity}" не найден.`, sourcePath: `runtimes.${runtime.name}` })
+        else if (!artifact)
+          diagnostics.push({ severity: 'error', code: 'composition-filter-artifact-missing', message: `Filter "${runtime.identity}" найден в домене, но не собран в compiled program. Проверьте source фильтра или предыдущие ошибки build.`, sourcePath: `runtimes.${runtime.name}` })
         else if (artifact.status === 'error')
           diagnostics.push({ severity: 'error', code: 'composition-filter-invalid', message: `Filter "${runtime.identity}" содержит compile errors.`, sourcePath: `runtimes.${runtime.name}` })
       }
       else if (runtime.kind === 'query') {
+        const model = Endge.domain.getQuery(runtime.identity)
         const artifact = Endge.program.getQueryArtifact(runtime.identity)
-        if (!artifact) {
+        if (!model) {
           diagnostics.push({ severity: 'error', code: 'composition-query-missing', message: `Query "${runtime.identity}" не найден.`, sourcePath: `runtimes.${runtime.name}` })
+          continue
+        }
+        if (!artifact) {
+          diagnostics.push({ severity: 'error', code: 'composition-query-artifact-missing', message: `Query "${runtime.identity}" найден в домене, но не собран в compiled program. Проверьте source запроса или предыдущие ошибки build.`, sourcePath: `runtimes.${runtime.name}` })
           continue
         }
         if (artifact.status === 'error') {
