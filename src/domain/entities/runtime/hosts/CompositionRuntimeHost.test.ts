@@ -126,7 +126,7 @@ defineFilter({
         },
       },
     ],
-    reactions: [
+    hooks: [
       { kind: 'mount', target: 'query' },
       { kind: 'change', runtime: 'filter', output: 'request', target: 'query', debounceMs: 20 },
     ],

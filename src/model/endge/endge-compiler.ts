@@ -750,21 +750,21 @@ export class EndgeCompiler extends EndgeModule {
       }
     }
 
-    for (const reaction of payload.reactions) {
-      if (reaction.kind !== 'change')
+    for (const hook of payload.hooks) {
+      if (hook.kind !== 'change')
         continue
-      const source = payload.runtimes.find(item => item.name === reaction.runtime)
+      const source = payload.runtimes.find(item => item.name === hook.runtime)
       const outputExists = source?.kind === 'filter'
-        ? Endge.program.getFilterArtifact(source.identity)?.payload.outputs.some(item => item.key === reaction.output)
+        ? Endge.program.getFilterArtifact(source.identity)?.payload.outputs.some(item => item.key === hook.output)
         : source?.kind === 'query'
-          ? Endge.program.getQueryArtifact(source.identity)?.payload.outputs.some(item => item.key === reaction.output)
+          ? Endge.program.getQueryArtifact(source.identity)?.payload.outputs.some(item => item.key === hook.output)
           : false
       if (!outputExists) {
         diagnostics.push({
           severity: 'error',
-          code: 'composition-reaction-output-missing',
-          message: `Reaction source "${reaction.runtime}.${reaction.output}" не существует.`,
-          sourcePath: `reactions.${reaction.runtime}.${reaction.output}`,
+          code: 'composition-hook-output-missing',
+          message: `Hook source "${hook.runtime}.${hook.output}" не существует.`,
+          sourcePath: `hooks.${hook.runtime}.${hook.output}`,
         })
       }
     }
@@ -1047,7 +1047,7 @@ export class EndgeCompiler extends EndgeModule {
       type: 'composition',
       sourceVersion,
       runtimes: [],
-      reactions: [],
+      hooks: [],
       outputs: [],
     }
   }

@@ -23,7 +23,7 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
     functions: [
       'debounce', 'fields', 'fromRuntime', 'instance', 'persist', 'run', 'select', 'withProps',
     ],
-    properties: ['key', 'outputs', 'reactions', 'runtimes'],
+    properties: ['hooks', 'key', 'outputs', 'runtimes'],
   })
 
   public supports(sourceKind: SourceKind | string): boolean {
@@ -54,5 +54,5 @@ const COMPOSITION_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'fromOutput', kind: 'function', insertText: `fromOutput('runtime', 'output')`, detail: 'Runtime output binding' },
   { label: 'fromFilter', kind: 'function', insertText: `fromFilter('filter').fields([])`, detail: 'Filter fields runtime slice binding' },
   { label: 'fromStore', kind: 'function', insertText: `fromStore('path')`, detail: 'Raph store binding' },
-  { label: 'onChange', kind: 'function', insertText: `onChange('runtime.output').debounce(200).run('query')`, detail: 'Debounced reaction' },
+  { label: 'onChange', kind: 'function', insertText: `onChange('runtime.output').debounce(200).run('query')`, detail: 'Debounced hook' },
 ]

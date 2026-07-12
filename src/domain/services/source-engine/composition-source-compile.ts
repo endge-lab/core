@@ -1,7 +1,7 @@
 import type {
   CompositionBindingValue,
   CompositionOutputDescriptor,
-  CompositionReaction,
+  CompositionHook,
   CompositionRuntimeDescriptor,
   CompositionRuntimeKind,
   CompositionSourceCompileResult,
@@ -44,11 +44,11 @@ export function compileCompositionSource(source: string, sourceVersion = 1): Com
 
     validateRootProperties(definition, diagnostics)
     const runtimesNode = objectProperty(definition, 'runtimes')
-    const reactionsNode = arrayProperty(definition, 'reactions')
+    const hooksNode = arrayProperty(definition, 'hooks')
     const outputsNode = objectProperty(definition, 'outputs')
     const runtimes = runtimesNode ? readRuntimes(runtimesNode, diagnostics) : []
     const runtimeNames = new Set(runtimes.map(item => item.name))
-    const reactions = reactionsNode ? readReactions(reactionsNode, runtimeNames, runtimes, diagnostics) : []
+    const hooks = hooksNode ? readHooks(hooksNode, runtimeNames, runtimes, diagnostics) : []
     const outputs = outputsNode ? readOutputs(outputsNode, runtimeNames, diagnostics) : []
 
     if (!runtimesNode)
@@ -58,9 +58,9 @@ export function compileCompositionSource(source: string, sourceVersion = 1): Com
 
     validatePersistKeys(runtimes, diagnostics)
     validateBindingReferences(runtimes, diagnostics)
-    validateRuntimeCycles(runtimes, reactions, diagnostics)
+    validateRuntimeCycles(runtimes, hooks, diagnostics)
 
-    const document: CompositionSourceDocument = { runtimes, reactions, outputs }
+    const document: CompositionSourceDocument = { runtimes, hooks, outputs }
     const hasErrors = diagnostics.some(item => item.severity === 'error')
     return {
       ast,
@@ -93,7 +93,7 @@ function validateRootProperties(node: t.ObjectExpression, diagnostics: Diagnosti
       continue
     }
     const name = propertyName(property.key)
-    if (name !== 'runtimes' && name !== 'reactions' && name !== 'outputs')
+    if (name !== 'runtimes' && name !== 'hooks' && name !== 'outputs')
       diagnostics.push(diagnostic('error', 'composition-source-property-unsupported', `Свойство "${name ?? ''}" не поддерживается Composition v1.`, name ?? 'defineComposition', property))
   }
 }
@@ -250,24 +250,24 @@ function readBindings(
   return bindings
 }
 
-function readReactions(
+function readHooks(
   node: t.ArrayExpression,
   runtimeNames: Set<string>,
   runtimes: CompositionRuntimeDescriptor[],
   diagnostics: DiagnosticDraft[],
-): CompositionReaction[] {
-  const reactions: CompositionReaction[] = []
+): CompositionHook[] {
+  const hooks: CompositionHook[] = []
   node.elements.forEach((element, index) => {
     if (!element || !t.isExpression(element))
       return
     const chain = memberChain(element)
     if (!chain || !t.isIdentifier(chain.base.callee)) {
-      diagnostics.push(diagnostic('error', 'composition-reaction-shape', 'Reaction должна начинаться с onMount() или onChange(path).', `reactions.${index}`, element))
+      diagnostics.push(diagnostic('error', 'composition-hook-shape', 'Hook должен начинаться с onMount() или onChange(path).', `hooks.${index}`, element))
       return
     }
     const root = chain.base.callee.name
     if (root !== 'onMount' && root !== 'onChange') {
-      diagnostics.push(diagnostic('error', 'composition-reaction-kind', `Reaction "${root}" не поддерживается.`, `reactions.${index}`, chain.base))
+      diagnostics.push(diagnostic('error', 'composition-hook-kind', `Hook "${root}" не поддерживается.`, `hooks.${index}`, chain.base))
       return
     }
     let target = ''
@@ -280,22 +280,22 @@ function readReactions(
         debounceMs = value && t.isNumericLiteral(value) ? value.value : Number.NaN
       }
       else
-        diagnostics.push(diagnostic('error', 'composition-reaction-method', `Reaction method ".${modifier.name}" не поддерживается.`, `reactions.${index}`, modifier.call))
+        diagnostics.push(diagnostic('error', 'composition-hook-method', `Hook method ".${modifier.name}" не поддерживается.`, `hooks.${index}`, modifier.call))
     }
     if (!target || !runtimeNames.has(target)) {
-      diagnostics.push(diagnostic('error', 'composition-reaction-target', `Reaction target "${target}" не найден.`, `reactions.${index}`, element))
+      diagnostics.push(diagnostic('error', 'composition-hook-target', `Hook target "${target}" не найден.`, `hooks.${index}`, element))
       return
     }
     if (runtimes.find(item => item.name === target)?.kind !== 'query') {
-      diagnostics.push(diagnostic('error', 'composition-reaction-target-kind', 'Reaction v1 может запускать только Query runtime.', `reactions.${index}`, element))
+      diagnostics.push(diagnostic('error', 'composition-hook-target-kind', 'Hook v1 может запускать только Query runtime.', `hooks.${index}`, element))
       return
     }
     if (root === 'onMount') {
-      reactions.push({ kind: 'mount', target })
+      hooks.push({ kind: 'mount', target })
       return
     }
     if (!Number.isInteger(debounceMs) || debounceMs < 0 || debounceMs > 60000) {
-      diagnostics.push(diagnostic('error', 'composition-reaction-debounce', 'debounce должен быть целым числом от 0 до 60000.', `reactions.${index}`, element))
+      diagnostics.push(diagnostic('error', 'composition-hook-debounce', 'debounce должен быть целым числом от 0 до 60000.', `hooks.${index}`, element))
       return
     }
     const path = readStringArgument(chain.base, 0) ?? ''
@@ -303,12 +303,12 @@ function readReactions(
     const runtime = dot > 0 ? path.slice(0, dot) : ''
     const output = dot > 0 ? path.slice(dot + 1) : ''
     if (!runtimeNames.has(runtime) || !output) {
-      diagnostics.push(diagnostic('error', 'composition-reaction-path', `onChange path "${path}" должен иметь вид runtime.output.`, `reactions.${index}`, chain.base))
+      diagnostics.push(diagnostic('error', 'composition-hook-path', `onChange path "${path}" должен иметь вид runtime.output.`, `hooks.${index}`, chain.base))
       return
     }
-    reactions.push({ kind: 'change', runtime, output, target, debounceMs })
+    hooks.push({ kind: 'change', runtime, output, target, debounceMs })
   })
-  return reactions
+  return hooks
 }
 
 function readOutputs(
@@ -409,7 +409,7 @@ function validateBindingReferences(runtimes: CompositionRuntimeDescriptor[], dia
 
 function validateRuntimeCycles(
   runtimes: CompositionRuntimeDescriptor[],
-  reactions: CompositionReaction[],
+  hooks: CompositionHook[],
   diagnostics: DiagnosticDraft[],
 ): void {
   const edges = new Map<string, string[]>()
@@ -421,9 +421,9 @@ function validateRuntimeCycles(
       ? [runtime.identity, ...propEdges]
       : propEdges)
   }
-  for (const reaction of reactions) {
-    if (reaction.kind === 'change')
-      edges.set(reaction.target, [...(edges.get(reaction.target) ?? []), reaction.runtime])
+  for (const hook of hooks) {
+    if (hook.kind === 'change')
+      edges.set(hook.target, [...(edges.get(hook.target) ?? []), hook.runtime])
   }
   const visiting = new Set<string>()
   const visited = new Set<string>()
@@ -440,7 +440,7 @@ function validateRuntimeCycles(
   }
   for (const runtime of runtimes) {
     if (visit(runtime.name)) {
-      diagnostics.push(diagnostic('error', 'composition-binding-cycle', `Runtime bindings/reactions содержат цикл около "${runtime.name}".`, `runtimes.${runtime.name}`))
+      diagnostics.push(diagnostic('error', 'composition-binding-cycle', `Runtime bindings/hooks содержат цикл около "${runtime.name}".`, `runtimes.${runtime.name}`))
       return
     }
   }

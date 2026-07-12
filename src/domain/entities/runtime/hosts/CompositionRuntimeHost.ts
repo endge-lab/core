@@ -24,11 +24,11 @@ function defaultContext(): RuntimeHostContext<'composition'> {
     startedAt: null,
     updatedAt: null,
     mountedChildren: 0,
-    lastReactionAt: null,
+    lastHookAt: null,
   }
 }
 
-/** Runtime orchestration host: children, bindings, reactions и public handles. */
+/** Runtime orchestration host: children, bindings, hooks и public handles. */
 export class CompositionRuntimeHost extends RuntimeHostBase<'composition', RuntimeHostContext<'composition'>, CompositionProgramPayload> {
   private _children = new Map<string, RuntimeHost<any, any>>()
   private _childDescriptors = new Map<string, CompositionProgramPayload['runtimes'][number]>()
@@ -90,7 +90,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     return host
   }
 
-  /** Создает children, bindings и reactions. Повторный mount является no-op. */
+  /** Создает children, bindings и hooks. Повторный mount является no-op. */
   public async mountGraph(): Promise<void> {
     if (this._mounted)
       return
@@ -105,14 +105,14 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       for (const descriptor of orderedRuntimes)
         this._bindChild(descriptor)
       this._makeOutputs(payload)
-      this._bindReactions(payload)
+      this._bindHooks(payload)
       this._mounted = true
       const now = new Date().toISOString()
       this.setContext({ status: 'success', startedAt: now, updatedAt: now, mountedChildren: this._children.size })
 
-      for (const reaction of payload.reactions) {
-        if (reaction.kind === 'mount')
-          await this._runQuery(reaction.target)
+      for (const hook of payload.hooks) {
+        if (hook.kind === 'mount')
+          await this._runQuery(hook.target)
       }
     }
     catch (error) {
@@ -289,24 +289,24 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }))
   }
 
-  private _bindReactions(payload: CompositionProgramPayload): void {
-    payload.reactions.forEach((reaction, index) => {
-      if (reaction.kind !== 'change')
+  private _bindHooks(payload: CompositionProgramPayload): void {
+    payload.hooks.forEach((hook, index) => {
+      if (hook.kind !== 'change')
         return
-      const runtime = this._children.get(reaction.runtime)
+      const runtime = this._children.get(hook.runtime)
       if (!runtime)
         return
       const handler = (event: any) => {
-        if (event?.key !== reaction.output)
+        if (event?.key !== hook.output)
           return
-        const timerKey = `${index}:${reaction.runtime}.${reaction.output}`
+        const timerKey = `${index}:${hook.runtime}.${hook.output}`
         const previous = this._timers.get(timerKey)
         if (previous)
           clearTimeout(previous)
         const timer = setTimeout(() => {
           this._timers.delete(timerKey)
-          void this._runQuery(reaction.target)
-        }, reaction.debounceMs)
+          void this._runQuery(hook.target)
+        }, hook.debounceMs)
         this._timers.set(timerKey, timer)
       }
       runtime.on('output:change', handler)
@@ -320,7 +320,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       throw new Error(`[CompositionRuntimeHost] Query runtime "${name}" is missing.`)
     await query.run()
     const now = new Date().toISOString()
-    this.setContext({ updatedAt: now, lastReactionAt: now })
+    this.setContext({ updatedAt: now, lastHookAt: now })
   }
 
   private _readBinding(binding: CompositionBindingValue): unknown {

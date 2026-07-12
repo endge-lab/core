@@ -35,7 +35,7 @@ export interface CompositionRuntimeChildHandle {
   runtime: RuntimeHost<any, any>
 }
 
-export type CompositionReaction
+export type CompositionHook
   = | { kind: 'mount', target: string }
     | { kind: 'change', runtime: string, output: string, target: string, debounceMs: number }
 
@@ -47,7 +47,7 @@ export interface CompositionOutputDescriptor {
 
 export interface CompositionSourceDocument {
   runtimes: CompositionRuntimeDescriptor[]
-  reactions: CompositionReaction[]
+  hooks: CompositionHook[]
   outputs: CompositionOutputDescriptor[]
 }
 

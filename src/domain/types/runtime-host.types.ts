@@ -95,7 +95,7 @@ export interface FilterRuntimeHostContext extends RuntimeHostContextBase {
 
 export interface CompositionRuntimeHostContext extends RuntimeHostContextBase {
   mountedChildren: number
-  lastReactionAt: string | null
+  lastHookAt: string | null
 }
 
 export interface TableRuntimeHostContext extends RuntimeHostContextBase {

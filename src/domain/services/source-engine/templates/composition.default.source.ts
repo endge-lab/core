@@ -4,7 +4,7 @@ export const COMPOSITION_DEFAULT_SOURCE = `defineComposition({
       .withProps({}),
   },
 
-  reactions: [
+  hooks: [
     onMount().run('query'),
   ],
 

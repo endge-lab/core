@@ -125,7 +125,7 @@ defineQuery({
 	      filterModel: fromFilter('filter').fields(['from', 'direction']),
 	    }),
 	  },
-  reactions: [
+  hooks: [
     onMount().run('query'),
     onChange('filter.request').debounce(200).run('query'),
   ],
@@ -135,7 +135,7 @@ defineQuery({
 	})
 	`)
 	    expect(valid.diagnostics).toEqual([])
-	    expect(valid.artifact?.reactions).toHaveLength(2)
+	    expect(valid.artifact?.hooks).toHaveLength(2)
 	    expect(valid.artifact?.runtimes.find(runtime => runtime.name === 'dateFilter')).toMatchObject({
 	      kind: 'filter-fields',
 	      identity: 'filter',
