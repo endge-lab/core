@@ -17,13 +17,13 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
     alias: 'Endge Composition Source',
     extension: '.endge-composition.ts',
     keywords: [
-      'component', 'defineComposition', 'filter', 'filterFields', 'fromFilter', 'fromOutput', 'fromStore', 'onChange',
+      'component', 'data', 'defineComposition', 'filter', 'filterFields', 'fromData', 'fromFilter', 'fromOutput', 'fromStore', 'onChange',
       'onMount', 'output', 'query',
     ],
     functions: [
-      'debounce', 'fields', 'fromRuntime', 'instance', 'persist', 'run', 'select', 'withProps',
+      'debounce', 'fields', 'fromRuntime', 'persist', 'run', 'select', 'store', 'storeTo', 'vocab', 'withProps',
     ],
-    properties: ['hooks', 'key', 'outputs', 'runtimes'],
+    properties: ['data', 'hooks', 'key', 'outputs', 'runtimes'],
   })
 
   public supports(sourceKind: SourceKind | string): boolean {
@@ -47,7 +47,12 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
 
 const COMPOSITION_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'defineComposition', kind: 'snippet', insertText: COMPOSITION_DEFAULT_SOURCE.trimEnd(), detail: 'Создать Composition source' },
-  { label: 'filter', kind: 'function', insertText: `filter('identity').instance('default')`, detail: 'Filter runtime' },
+  { label: 'filter', kind: 'function', insertText: `filter('identity')`, detail: 'Filter runtime' },
+  { label: 'store', kind: 'function', insertText: `store('identity')`, detail: 'Store data dependency' },
+  { label: 'fromData', kind: 'function', insertText: `fromData('store.field')`, detail: 'Composition data binding' },
+  { label: 'storeTo', kind: 'function', insertText: `.storeTo(data('store'), {
+  raw: output('raw'),
+})`, detail: 'Atomic Query output publication to Store data' },
   { label: 'filterFields', kind: 'function', insertText: `filterFields('filter').fields([])`, detail: 'Renderable Filter fields runtime slice' },
   { label: 'query', kind: 'function', insertText: `query('identity').withProps({})`, detail: 'Query runtime' },
   { label: 'component', kind: 'function', insertText: `component('identity').withProps({})`, detail: 'Component runtime' },

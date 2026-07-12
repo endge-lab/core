@@ -10,9 +10,9 @@ export class StoreSourceLanguageStrategy implements SourceLanguageStrategy {
   public readonly syntax = createTypeScriptLikeSourceSyntax({
     alias: 'Endge Store Source',
     extension: '.endge-store.ts',
-    keywords: ['defineStore'],
-    functions: [],
-    properties: ['initial'],
+    keywords: ['dataView', 'defineDataView', 'defineStore', 'derived', 'value'],
+    functions: ['dataView', 'derived', 'from', 'value'],
+    properties: ['data'],
   })
 
   public supports(sourceKind: SourceKind | string): boolean {

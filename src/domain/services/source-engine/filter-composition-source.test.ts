@@ -115,8 +115,9 @@ defineQuery({
   it('compiles Composition graph and rejects cycles, duplicate persist keys and render config', () => {
     const valid = compileCompositionSource(`
 	defineComposition({
+	  data: {},
 	  runtimes: {
-	    filter: filter('schedule').instance('main').persist({ key: 'schedule' }),
+	    filter: filter('schedule').persist({ key: 'schedule' }),
 	    dateFilter: filterFields('filter').fields(['from']),
 	    query: query('search').withProps({
 	      payload: fromOutput('filter', 'request'),
@@ -163,5 +164,44 @@ defineComposition({
       expect.objectContaining({ code: 'composition-persist-key-duplicate' }),
       expect.objectContaining({ code: 'composition-source-property-unsupported' }),
     ]))
+  })
+
+  it('compiles data, storeTo and fromData with optional outputs', () => {
+    const result = compileCompositionSource(`
+defineComposition({
+  data: {
+    schedule: store('schedule'),
+  },
+  runtimes: {
+    query: query('schedule-query')
+      .storeTo(data('schedule'), {
+        raw: output('raw'),
+      }),
+    table: component('schedule-table')
+      .withProps({
+        rows: fromData('schedule.table'),
+      }),
+  },
+  hooks: [
+    onMount().run('query'),
+  ],
+})
+`)
+
+    expect(result.diagnostics).toEqual([])
+    expect(result.artifact).toMatchObject({
+      data: [{ name: 'schedule', kind: 'store', identity: 'schedule' }],
+      runtimes: [
+        {
+          name: 'query',
+          storeTo: [{ data: 'schedule', fields: { raw: 'raw' } }],
+        },
+        {
+          name: 'table',
+          props: { rows: { kind: 'data', data: 'schedule', path: 'table' } },
+        },
+      ],
+      outputs: [],
+    })
   })
 })

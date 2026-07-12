@@ -1,4 +1,6 @@
 export const COMPOSITION_DEFAULT_SOURCE = `defineComposition({
+  data: {},
+
   runtimes: {
     query: query('query-identity')
       .withProps({}),
@@ -8,8 +10,6 @@ export const COMPOSITION_DEFAULT_SOURCE = `defineComposition({
     onMount().run('query'),
   ],
 
-  outputs: {
-    query: output().fromRuntime('query'),
-  },
+  outputs: {},
 })
 `

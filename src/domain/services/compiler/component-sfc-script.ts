@@ -6,6 +6,7 @@ import type {
   ComponentSFCPreviewLiteral,
   ComponentSFCPreviewOptions,
   ComponentSFCPreviewProps,
+  ComponentSFCPreviewRunTarget,
 } from '@/domain/types/program.types'
 import type {
   RComponentSFC_AST_Script,
@@ -169,7 +170,7 @@ function parsePreviewPropsSource(
     diagnostics: [{
       severity: 'warning',
       code: 'sfc-preview-props-unsupported',
-      message: 'definePreviewProps поддерживает object literal с literal-значениями или fromStore("path").',
+      message: 'definePreviewProps поддерживает literal, fromStore("path") или fromData("store.path").',
       sourcePath: 'script',
     }],
   }
@@ -202,7 +203,7 @@ function parsePreviewOptionsSource(
   diagnostics.push({
     severity: 'warning',
     code: 'sfc-preview-options-unsupported',
-    message: 'definePreviewProps options поддерживает seed object и run: [query("identity")].',
+    message: 'definePreviewProps options поддерживает seed и run: [query("identity").storeTo(store("identity"), mapping)].',
     sourcePath: 'script',
   })
   return null
@@ -234,6 +235,9 @@ function readPreviewPropValue(node: any): { ok: true, value: ComponentSFCPreview
   const storeRef = readFromStoreExpression(expression)
   if (storeRef)
     return { ok: true, value: storeRef }
+  const dataRef = readFromDataExpression(expression)
+  if (dataRef)
+    return { ok: true, value: dataRef }
 
   return readPreviewLiteral(expression)
 }
@@ -302,18 +306,93 @@ function readFromStoreExpression(node: any): { type: 'store', path: string } | n
     : null
 }
 
-function readQueryExpression(node: any): { type: 'query', identity: string } | null {
+function readFromDataExpression(node: any): { type: 'data', store: string, path: string } | null {
   if (
     node?.type !== 'CallExpression'
     || node.callee?.type !== 'Identifier'
-    || node.callee.name !== 'query'
+    || node.callee.name !== 'fromData'
   ) {
     return null
   }
 
   const argument = readPreviewLiteral(node.arguments?.[0])
-  return argument.ok && typeof argument.value === 'string'
-    ? { type: 'query', identity: argument.value }
+  if (!argument.ok || typeof argument.value !== 'string')
+    return null
+  const dot = argument.value.indexOf('.')
+  return dot > 0 && dot < argument.value.length - 1
+    ? { type: 'data', store: argument.value.slice(0, dot), path: argument.value.slice(dot + 1) }
+    : null
+}
+
+function readQueryExpression(node: any): ComponentSFCPreviewRunTarget | null {
+  node = unwrapPreviewExpression(node)
+  if (node?.type === 'CallExpression' && node.callee?.type === 'Identifier' && node.callee.name === 'query') {
+    const argument = readPreviewLiteral(node.arguments?.[0])
+    return argument.ok && typeof argument.value === 'string'
+      ? { type: 'query', identity: argument.value }
+      : null
+  }
+
+  if (
+    node?.type !== 'CallExpression'
+    || node.callee?.type !== 'MemberExpression'
+    || node.callee.computed
+    || node.callee.property?.type !== 'Identifier'
+    || node.callee.property.name !== 'storeTo'
+  ) {
+    return null
+  }
+
+  const queryRef = readQueryExpression(node.callee.object)
+  const store = readStoreExpression(node.arguments?.[0])
+  const fields = readPreviewStoreMapping(node.arguments?.[1])
+  if (!queryRef || queryRef.storeTo || !store || !fields)
+    return null
+
+  return {
+    ...queryRef,
+    storeTo: { store, fields },
+  }
+}
+
+function readStoreExpression(node: any): string | null {
+  node = unwrapPreviewExpression(node)
+  if (node?.type !== 'CallExpression' || node.callee?.type !== 'Identifier' || node.callee.name !== 'store')
+    return null
+  const argument = readPreviewLiteral(node.arguments?.[0])
+  return argument.ok && typeof argument.value === 'string' && argument.value.trim()
+    ? argument.value
+    : null
+}
+
+function readPreviewStoreMapping(node: any): Record<string, string> | null {
+  node = unwrapPreviewExpression(node)
+  const shorthand = readPreviewLiteral(node)
+  if (shorthand.ok && typeof shorthand.value === 'string' && shorthand.value.trim())
+    return { [shorthand.value]: shorthand.value }
+  if (node?.type !== 'ObjectExpression')
+    return null
+
+  const fields: Record<string, string> = {}
+  for (const property of node.properties ?? []) {
+    if (property.type !== 'ObjectProperty' || property.computed)
+      return null
+    const target = readObjectKey(property.key)
+    const output = readOutputExpression(property.value)
+    if (!target || !output)
+      return null
+    fields[target] = output
+  }
+  return Object.keys(fields).length ? fields : null
+}
+
+function readOutputExpression(node: any): string | null {
+  node = unwrapPreviewExpression(node)
+  if (node?.type !== 'CallExpression' || node.callee?.type !== 'Identifier' || node.callee.name !== 'output')
+    return null
+  const argument = readPreviewLiteral(node.arguments?.[0])
+  return argument.ok && typeof argument.value === 'string' && argument.value.trim()
+    ? argument.value
     : null
 }
 

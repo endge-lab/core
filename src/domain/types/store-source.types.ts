@@ -1,10 +1,26 @@
 import type { ProgramDiagnostic } from '@/domain/types/program.types'
+import type { DataViewRef } from '@/domain/types/data-view-source.types'
 
-export interface StoreSourceDocument {
+export type StoreDataDescriptor = StoreValueDescriptor | StoreDerivedDescriptor
+
+export interface StoreValueDescriptor {
+  key: string
+  kind: 'value'
   initial: unknown
 }
 
-/** Persisted Store artifact v1. Runtime-семантика появится отдельным этапом. */
+export interface StoreDerivedDescriptor {
+  key: string
+  kind: 'derived'
+  source: string
+  dataViews: DataViewRef[]
+}
+
+export interface StoreSourceDocument {
+  data: StoreDataDescriptor[]
+}
+
+/** Runtime-ready Store source artifact v1. */
 export interface StoreSourceArtifact extends StoreSourceDocument {
   type: 'store'
   sourceVersion: number

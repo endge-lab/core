@@ -97,4 +97,45 @@ definePreviewProps(
       ],
     })
   })
+
+  it('parses Store-backed data props and routed Query preview runs', () => {
+    const result = compileComponentSFC(`<script setup lang="ts">
+defineProps<{ rows: unknown[] }>()
+
+definePreviewProps(
+  {
+    rows: fromData('schedule.table'),
+  },
+  {
+    run: [
+      query('schedule').storeTo(store('schedule'), {
+        raw: output('raw'),
+      }),
+      query('metadata').storeTo(store('schedule'), 'meta'),
+    ],
+  },
+)
+</script>
+
+<template><Table :rows="rows" /></template>`)
+
+    expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
+    expect(result.previewProps).toEqual({
+      rows: { type: 'data', store: 'schedule', path: 'table' },
+    })
+    expect(result.previewOptions).toEqual({
+      run: [
+        {
+          type: 'query',
+          identity: 'schedule',
+          storeTo: { store: 'schedule', fields: { raw: 'raw' } },
+        },
+        {
+          type: 'query',
+          identity: 'metadata',
+          storeTo: { store: 'schedule', fields: { meta: 'meta' } },
+        },
+      ],
+    })
+  })
 })

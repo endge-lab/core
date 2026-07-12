@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
+import { RStore } from '@/domain/entities/reflect/RStore'
 import { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
 import { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
 import { compileFilterSource } from '@/domain/services/source-engine/filter-source-compile'
@@ -36,7 +37,7 @@ describe('Composition runtime session', () => {
     expect(session.host.getChild('dateFilter')?.runtimeType).toBe('filter-fields-runtime-host')
     expect(session.host.getFilterFieldsSlice('filter', ['search'])).toMatchObject({
       kind: 'filter-fields',
-      runtimeId: 'composition-session:filter:main',
+      runtimeId: 'composition-session:filter',
       runtimeName: 'filter',
       fieldKeys: ['search'],
       values: { search: '' },
@@ -46,7 +47,7 @@ describe('Composition runtime session', () => {
       filterPayload: { where: { search: '' } },
       filterModel: {
         kind: 'filter-fields',
-        runtimeId: 'composition-session:filter:main',
+        runtimeId: 'composition-session:filter',
         runtimeName: 'filter',
         fieldKeys: ['search'],
         values: { search: '' },
@@ -59,7 +60,7 @@ describe('Composition runtime session', () => {
       filterPayload: { where: { search: 'SU' } },
       filterModel: {
         kind: 'filter-fields',
-        runtimeId: 'composition-session:filter:main',
+        runtimeId: 'composition-session:filter',
         runtimeName: 'filter',
         fieldKeys: ['search'],
         values: { search: 'SU' },
@@ -75,6 +76,71 @@ describe('Composition runtime session', () => {
     expect(run).toHaveBeenCalledTimes(2)
     expect(Endge.runtime.getRuntimeHosts()).toEqual([])
     session.unmount()
+  })
+
+  it('publishes Query outputs atomically into Store data and recomputes derived fields', async () => {
+    const rows = [{ id: 1, flight: 'SU100' }]
+    vi.spyOn(QueryRuntimeHost.prototype, 'run').mockResolvedValue({ raw: rows })
+
+    const store = new RStore()
+    store.id = 10
+    store.identity = 'schedule'
+    store.name = 'Schedule'
+    store.source = `defineStore({
+      data: {
+        raw: value([]),
+        table: derived()
+          .from('raw')
+          .dataView(defineDataView({
+            mode: 'pipeline',
+            steps: [
+              from('').as('row'),
+              map({ ...spread('row') }),
+            ],
+          })),
+      },
+    })`
+    const query = new RQuery()
+    query.id = 11
+    query.identity = 'schedule-query'
+    query.name = 'Schedule query'
+    const composition = new RComposition()
+    composition.id = 12
+    composition.identity = 'schedule-store-page'
+    composition.name = 'Schedule Store page'
+    Endge.domain.addStore(store)
+    Endge.domain.addQuery(query)
+    Endge.domain.addComposition(composition)
+
+    const queryPayload: QueryProgramPayload = {
+      type: 'query-rest', sourceVersion: 2, endpoint: '', query: '',
+      props: [], requestBody: null,
+      outputs: [{ key: 'raw', source: { type: 'response', path: null }, dataViews: [], materialization: { kind: 'source' } }],
+    }
+    const compositionPayload: CompositionProgramPayload = {
+      type: 'composition', sourceVersion: 1,
+      data: [{ name: 'schedule', kind: 'store', identity: 'schedule' }],
+      runtimes: [{
+        name: 'query', kind: 'query', identity: 'schedule-query', props: {},
+        storeTo: [{ data: 'schedule', fields: { raw: 'raw' } }],
+      }],
+      hooks: [{ kind: 'mount', target: 'query' }],
+      outputs: [],
+    }
+    Endge.program.beginCompile('test')
+    Endge.program.addArtifact(artifact('query', 11, 'schedule-query', queryPayload))
+    Endge.program.addArtifact(artifact('composition', 12, 'schedule-store-page', compositionPayload))
+
+    const session = await Endge.composition.mount('schedule-store-page', { id: 'composition-store' })
+    const base = '__endge.compositionRuntime.composition-store.data.schedule'
+    expect(Raph.get(`${base}.raw`)).toEqual(rows)
+    expect(Raph.get(`${base}.table`)).toEqual(rows)
+    expect(session.host.getDataSnapshot()).toEqual({
+      schedule: { raw: rows, table: rows },
+    })
+
+    session.unmount()
+    expect(Raph.get(base)).toBeUndefined()
   })
 })
 
@@ -115,11 +181,12 @@ defineFilter({
   }
   const compositionPayload: CompositionProgramPayload = {
     type: 'composition', sourceVersion: 1,
+    data: [],
     runtimes: [
-      { name: 'filter', kind: 'filter', identity: 'schedule-filter', instance: 'main', props: {} },
-      { name: 'dateFilter', kind: 'filter-fields', identity: 'filter', instance: 'default', fields: ['search'], props: {} },
+      { name: 'filter', kind: 'filter', identity: 'schedule-filter', props: {}, storeTo: [] },
+      { name: 'dateFilter', kind: 'filter-fields', identity: 'filter', fields: ['search'], props: {}, storeTo: [] },
       {
-        name: 'query', kind: 'query', identity: 'schedule-query', instance: 'default',
+        name: 'query', kind: 'query', identity: 'schedule-query', storeTo: [],
         props: {
           filterPayload: { kind: 'output', runtime: 'filter', output: 'request' },
           filterModel: { kind: 'filter-fields', runtime: 'filter', fields: ['search'] },

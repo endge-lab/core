@@ -2,6 +2,7 @@ import type { EndgeBootContext } from '@/domain/types/bootstrap.types'
 import type { DataViewMaterializationStrategy, DataViewRef, DataViewPipelineStep } from '@/domain/types/data-view-source.types'
 import type { FilterProgramPayload } from '@/domain/types/filter-source.types'
 import type { CompositionProgramPayload } from '@/domain/types/composition-source.types'
+import type { StoreSourceArtifact } from '@/domain/types/store-source.types'
 import type {
   ComponentSFCProgramPayload,
   DataViewProgramPayload,
@@ -621,6 +622,30 @@ export class EndgeCompiler extends EndgeModule {
   } {
     const diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[] = []
     const dependencies: ProgramArtifact['dependencies'] = []
+    const storeArtifacts = new Map<string, StoreSourceArtifact>()
+
+    for (const data of payload.data) {
+      if (data.kind === 'store') {
+        const store = Endge.domain.getStore(data.identity)
+        if (!store) {
+          diagnostics.push({ severity: 'error', code: 'composition-store-missing', message: `Store "${data.identity}" не найден.`, sourcePath: `data.${data.name}` })
+          continue
+        }
+        const compiled = Endge.source.compile('store', store.source)
+        if (!compiled.ok || !compiled.artifact)
+          diagnostics.push({ severity: 'error', code: 'composition-store-invalid', message: `Store "${data.identity}" содержит compile errors.`, sourcePath: `data.${data.name}` })
+        else
+          storeArtifacts.set(data.name, compiled.artifact as StoreSourceArtifact)
+        dependencies.push({ entityType: 'store', id: store.id, identity: store.identity, role: 'composition-data' })
+      }
+      else {
+        const vocab = Endge.domain.getVocab(data.identity)
+        if (!vocab)
+          diagnostics.push({ severity: 'error', code: 'composition-vocab-missing', message: `Vocab "${data.identity}" не найден.`, sourcePath: `data.${data.name}` })
+        else
+          dependencies.push({ entityType: 'vocabs', id: vocab.id, identity: vocab.identity, role: 'composition-data' })
+      }
+    }
 
     for (const runtime of payload.runtimes) {
       const dependencySource = runtime.kind === 'filter-fields'
@@ -685,6 +710,34 @@ export class EndgeCompiler extends EndgeModule {
               message: `Query "${runtime.identity}" не объявляет prop "${propName}".`,
               sourcePath: `runtimes.${runtime.name}.withProps.${propName}`,
             })
+          }
+        }
+        const outputNames = new Set(artifact.payload.outputs.map(output => output.key))
+        for (const publication of runtime.storeTo) {
+          const storeArtifact = storeArtifacts.get(publication.data)
+          const writableFields = new Set(
+            storeArtifact?.data.filter(field => field.kind === 'value').map(field => field.key) ?? [],
+          )
+          for (const target of Object.keys(publication.fields)) {
+            const root = target.split('.')[0] ?? ''
+            if (storeArtifact && !writableFields.has(root)) {
+              diagnostics.push({
+                severity: 'error',
+                code: 'composition-store-to-target-readonly',
+                message: `Store target "${publication.data}.${target}" отсутствует или является derived.`,
+                sourcePath: `runtimes.${runtime.name}.storeTo`,
+              })
+            }
+          }
+          for (const output of Object.values(publication.fields)) {
+            if (!outputNames.has(output)) {
+              diagnostics.push({
+                severity: 'error',
+                code: 'composition-store-to-output-missing',
+                message: `Query "${runtime.identity}" не содержит output "${output}".`,
+                sourcePath: `runtimes.${runtime.name}.storeTo`,
+              })
+            }
           }
         }
       }
@@ -1037,6 +1090,7 @@ export class EndgeCompiler extends EndgeModule {
     return {
       type: 'composition',
       sourceVersion,
+      data: [],
       runtimes: [],
       hooks: [],
       outputs: [],

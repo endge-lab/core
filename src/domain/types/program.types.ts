@@ -278,15 +278,26 @@ export interface ComponentSFCPreviewStoreProp {
   path: string
 }
 
+export interface ComponentSFCPreviewDataProp {
+  type: 'data'
+  store: string
+  path: string
+}
+
 export type ComponentSFCPreviewPropValue
   = | ComponentSFCPreviewLiteral
     | ComponentSFCPreviewStoreProp
+    | ComponentSFCPreviewDataProp
 
 export type ComponentSFCPreviewProps = Record<string, ComponentSFCPreviewPropValue>
 
 export interface ComponentSFCPreviewRunTarget {
   type: 'query'
   identity: string
+  storeTo?: {
+    store: string
+    fields: Record<string, string>
+  }
 }
 
 export interface ComponentSFCPreviewOptions {

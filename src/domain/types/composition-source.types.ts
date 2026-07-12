@@ -8,7 +8,19 @@ export type CompositionBindingValue
   = | { kind: 'literal', value: unknown }
     | { kind: 'output', runtime: string, output: string }
     | { kind: 'store', key: string }
+    | { kind: 'data', data: string, path: string }
     | { kind: 'filter-fields', runtime: string, fields: string[] }
+
+export interface CompositionDataDescriptor {
+  name: string
+  kind: 'store' | 'vocab'
+  identity: string
+}
+
+export interface CompositionStorePublication {
+  data: string
+  fields: Record<string, string>
+}
 
 export interface CompositionFilterFieldsSlice {
   kind: 'filter-fields'
@@ -23,10 +35,10 @@ export interface CompositionRuntimeDescriptor {
   name: string
   kind: CompositionRuntimeKind
   identity: string
-  instance: string
   fields?: string[]
   persistKey?: string
   props: Record<string, CompositionBindingValue>
+  storeTo: CompositionStorePublication[]
 }
 
 export interface CompositionRuntimeChildHandle {
@@ -46,6 +58,7 @@ export interface CompositionOutputDescriptor {
 }
 
 export interface CompositionSourceDocument {
+  data: CompositionDataDescriptor[]
   runtimes: CompositionRuntimeDescriptor[]
   hooks: CompositionHook[]
   outputs: CompositionOutputDescriptor[]
