@@ -48,10 +48,11 @@ describe('QueryRuntimeHost', () => {
     expect(host.getOutputs()).toEqual({ raw: 'new' })
   })
 
-  it('locks stable props after mount', () => {
-    const host = createHost({ rowsStoreKey: 'queries.rows' })
-    expect(host.getProps()).toEqual({ rowsStoreKey: 'queries.rows' })
-    expect(() => host.setProps({ rowsStoreKey: 'queries.other' })).toThrow('requires remount')
+  it('updates declared props without store-key remount restrictions', () => {
+    const host = createHost({ filterPayload: { active: true } })
+    expect(host.getProps()).toEqual({ filterPayload: { active: true } })
+    host.setProps({ filterPayload: { active: false } })
+    expect(host.getProps()).toEqual({ filterPayload: { active: false } })
   })
 
   it('mounts a local default Filter only without an explicit prop and owns its lifecycle', () => {
@@ -77,7 +78,7 @@ defineFilter({
           output: 'request',
         },
       }],
-      requestBody: null, stableProps: [], outputs: [],
+      requestBody: null, outputs: [],
     }
     const queryArtifact: ProgramArtifact<QueryProgramPayload> = {
       ...artifactBase('query', 20, payload),
@@ -114,9 +115,8 @@ function createHost(props: Record<string, unknown> = {}): QueryRuntimeHost {
     sourceVersion: 2,
     endpoint: 'https://example.test',
     query: '/search',
-    props: [{ key: 'rowsStoreKey', type: 'String', optional: false, array: false }],
+    props: [{ key: 'filterPayload', type: 'Object', optional: true, array: false }],
     requestBody: null,
-    stableProps: ['rowsStoreKey'],
     outputs: [],
   }
   const artifact: ProgramArtifact<QueryProgramPayload> = {

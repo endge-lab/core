@@ -52,17 +52,10 @@ export type QueryOutputSource
     key: string
   }
 
-export interface QueryOutputStoreTarget {
-  mode: 'default' | 'custom' | 'prop'
-  key?: string
-  prop?: string
-}
-
 export interface QuerySourceOutput {
   key: string
   source: QueryOutputSource
   dataViews: DataViewRef[]
-  store: QueryOutputStoreTarget | null
 }
 
 export type QuerySourceOutputs = QuerySourceOutput[]
@@ -78,7 +71,7 @@ export interface QuerySourceDocument {
   /** Единственный runtime input contract Query. */
   props: QueryProgramProp[]
 
-  /** Ordered output graph: response/output sources, transforms and store targets. */
+  /** Ordered output graph: response/output sources and transformations. */
   outputs: QuerySourceOutputs
 
   /** Mock config. */

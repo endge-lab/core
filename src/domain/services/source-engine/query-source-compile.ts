@@ -1,6 +1,5 @@
 import type {
   QueryOutputSource,
-  QueryOutputStoreTarget,
   QuerySourceCompileResult,
   QuerySourceDocument,
   QuerySourceOutput,
@@ -132,7 +131,7 @@ function parseDocument(
     diagnostics.push(createDiagnostic(
       'error',
       'query-source-response-unsupported',
-      'Блок response удален из query source v2. Используйте outputs: { raw: output().from(response(...)).toStore() }.',
+      'Блок response удален из query source v2. Используйте outputs: { raw: output().from(response(...)) }.',
       'response',
     ))
   }
@@ -165,7 +164,7 @@ function parseDocument(
       body: requestBody,
     },
     props,
-    outputs: outputsNode ? readOutputs(outputsNode, source, diagnostics, propKeys) : [],
+    outputs: outputsNode ? readOutputs(outputsNode, source, diagnostics) : [],
     mock: {
       enabled: mockNode ? readBooleanProperty(mockNode, 'enabled') ?? false : false,
       data: mockNode ? readUnknownProperty(mockNode, 'data', diagnostics) ?? null : null,
@@ -186,17 +185,12 @@ function createQueryArtifact(document: QuerySourceDocument): QueryProgramPayload
     sendAsFormUrlencoded: document.request.formUrlencoded,
     props: document.props,
     requestBody: document.request.body ?? null,
-    stableProps: document.outputs
-      .filter(output => output.store?.mode === 'prop' && output.store.prop)
-      .map(output => output.store!.prop!)
-      .filter((value, index, values) => values.indexOf(value) === index),
     mockDataEnabled: document.mock.enabled,
     mockData: document.mock.data,
     outputs: document.outputs.map(output => ({
       key: output.key,
       source: output.source,
       dataViews: output.dataViews,
-      store: output.store,
       materialization: output.source.type === 'response' && output.dataViews.length === 0
         ? { kind: 'source' as const }
         : { kind: 'derived' as const, strategy: { kind: 'full' as const } },
@@ -258,7 +252,6 @@ function readOutputs(
   node: t.ObjectExpression,
   source: string,
   diagnostics: DiagnosticDraft[],
-  propKeys: Set<string> = new Set(),
 ): QuerySourceOutput[] {
   const outputs: QuerySourceOutput[] = []
   const declared = new Set<string>()
@@ -290,15 +283,6 @@ function readOutputs(
 
     const output = readOutput(key, unwrapExpression(property.value), source, diagnostics)
     if (output) {
-      if (output.store?.mode === 'prop' && output.store.prop && !propKeys.has(output.store.prop)) {
-        diagnostics.push(createDiagnostic(
-          'error',
-          'query-source-store-prop-missing',
-          `Store prop "${output.store.prop}" не объявлен в defineProps.`,
-          `outputs.${key}.toStore`,
-          property,
-        ))
-      }
       if (output.source.type === 'output' && !declared.has(output.source.key)) {
         diagnostics.push(createDiagnostic(
           'error',
@@ -357,7 +341,6 @@ function readOutput(
 
   let outputSource: QueryOutputSource | null = null
   const dataViews: DataViewRef[] = []
-  let store: QueryOutputStoreTarget | null = null
 
   for (const call of calls.modifiers) {
     if (call.name === 'from') {
@@ -369,11 +352,6 @@ function readOutput(
       const dataViewRef = readDataViewRef(call.arguments[0], source, diagnostics, `outputs.${key}.dataView`)
       if (dataViewRef)
         dataViews.push(dataViewRef)
-      continue
-    }
-
-    if (call.name === 'toStore') {
-      store = readStoreTarget(call.arguments[0], diagnostics, `outputs.${key}.toStore`)
       continue
     }
 
@@ -396,7 +374,7 @@ function readOutput(
     return null
   }
 
-  return { key, source: outputSource, dataViews, store }
+  return { key, source: outputSource, dataViews }
 }
 
 function unsupportedOutput(
@@ -465,54 +443,6 @@ function readOutputSource(
     expression,
   ))
   return null
-}
-
-function readStoreTarget(
-  node: t.CallExpression['arguments'][number] | undefined,
-  diagnostics: DiagnosticDraft[],
-  sourcePath: string,
-): QueryOutputStoreTarget {
-  if (!node)
-    return { mode: 'default' }
-  if (!t.isExpression(node))
-    return { mode: 'default' }
-
-  const expression = unwrapExpression(node)
-  if (t.isStringLiteral(expression))
-    return { mode: 'custom', key: expression.value }
-
-  if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'prop' })) {
-    const prop = expression.arguments[0]
-    if (t.isStringLiteral(prop))
-      return { mode: 'prop', prop: prop.value }
-  }
-
-  if (t.isObjectExpression(expression)) {
-    const unsupported = expression.properties.some(property =>
-      !t.isObjectProperty(property) || property.computed || getPropertyName(property.key) !== 'key',
-    )
-    if (unsupported) {
-      diagnostics.push(createDiagnostic(
-        'error',
-        'query-source-output-store-unsupported',
-        '.toStore({ ... }) в v1 поддерживает только поле key.',
-        sourcePath,
-        expression,
-      ))
-    }
-
-    const key = readStringProperty(expression, 'key')
-    return key ? { mode: 'custom', key } : { mode: 'default' }
-  }
-
-  diagnostics.push(createDiagnostic(
-    'error',
-    'query-source-output-store-target',
-    '.toStore(...) принимает строковый key, prop(name), объект { key } или вызывается без аргументов.',
-    sourcePath,
-    expression,
-  ))
-  return { mode: 'default' }
 }
 
 function readDataViewRef(

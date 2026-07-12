@@ -51,6 +51,8 @@ describe('Query Raph derived integration', () => {
       persistence: 'disabled',
       props: { filterPayload: { where: { active: true } } },
     }) as QueryRuntimeHost
+    const rawPath = queryOutputPath(host.id, 'raw')
+    const tablePath = queryOutputPath(host.id, 'table')
     const changed: string[] = []
     host.on('output:change', (event: any) => changed.push(event.key))
 
@@ -60,8 +62,8 @@ describe('Query Raph derived integration', () => {
     expect((outputs.table as any[])[0]).toMatchObject({ id: 1, flightCarrier: 'SU', flightNumber: '100' })
     expect((outputs.table as any[])[0].arrivalTime).toBeInstanceOf(Date)
     expect((outputs.table as any[])[0].daysOfWeek).toEqual([true, true, true, true, true, false, false])
-    expect(Raph.get('queries.schedule.raw')).toEqual(firstRows)
-    expect(Raph.get('queries.schedule.table')).toEqual(outputs.table)
+    expect(Raph.get(rawPath)).toEqual(firstRows)
+    expect(Raph.get(tablePath)).toEqual(outputs.table)
 
     const node = host.node?.children.find(child => child instanceof RaphDerivedNode) as RaphDerivedNode
     expect(node).toBeInstanceOf(RaphDerivedNode)
@@ -69,26 +71,26 @@ describe('Query Raph derived integration', () => {
     expect(changed).toEqual(['raw', 'table'])
 
     changed.length = 0
-    Raph.set('queries.schedule.raw[id=1].flightNumber', '101')
+    Raph.set(`${rawPath}[id=1].flightNumber`, '101')
     expect((host.getOutput('table') as any[])[0].flightNumber).toBe('101')
     expect(node.snapshot().incrementalComputeCount).toBe(1)
     await waitForRuntimeTick()
     expect(changed).toContain('table')
 
     Raph.transaction(() => {
-      Raph.merge('queries.schedule.raw[id=2]', { departureGate: 'B2' })
-      Raph.set('queries.schedule.raw[id=3]', scheduleRow(3, 'DP', '300'))
+      Raph.merge(`${rawPath}[id=2]`, { departureGate: 'B2' })
+      Raph.set(`${rawPath}[id=3]`, scheduleRow(3, 'DP', '300'))
     })
-    expect(Raph.get('queries.schedule.table[id=2]')).toMatchObject({ id: 2 })
-    expect(Raph.get('queries.schedule.table[id=3]')).toMatchObject({ id: 3, flightNumber: '300' })
+    expect(Raph.get(`${tablePath}[id=2]`)).toMatchObject({ id: 2 })
+    expect(Raph.get(`${tablePath}[id=3]`)).toMatchObject({ id: 3, flightNumber: '300' })
     expect(node.snapshot().incrementalComputeCount).toBe(2)
 
-    Raph.delete('queries.schedule.raw[id=1]')
-    expect(Raph.get('queries.schedule.table[id=1]')).toBeUndefined()
-    expect(() => Raph.set('queries.schedule.table', [])).toThrow(RaphDerivedTargetWriteError)
+    Raph.delete(`${rawPath}[id=1]`)
+    expect(Raph.get(`${tablePath}[id=1]`)).toBeUndefined()
+    expect(() => Raph.set(tablePath, [])).toThrow(RaphDerivedTargetWriteError)
 
     const reordered = [scheduleRow(3, 'DP', '301'), scheduleRow(2, 'FV', '201')]
-    Raph.set('queries.schedule.raw', reordered)
+    Raph.set(rawPath, reordered)
     expect((host.getOutput('table') as any[]).map(row => row.id)).toEqual([3, 2])
     expect(node.snapshot().fullComputeCount).toBe(2)
 
@@ -96,16 +98,18 @@ describe('Query Raph derived integration', () => {
     await host.run()
     expect(node.snapshot().fullComputeCount).toBe(3)
 
-    expect(() => Endge.runtime.execute(query, {
+    const secondHost = Endge.runtime.execute(query, {
       id: 'schedule-runtime-conflict',
       persistence: 'disabled',
       props: { filterPayload: {} },
-    })).toThrow('Cannot materialize output "table"')
+    }) as QueryRuntimeHost
+    expect(secondHost).toBeTruthy()
+    Endge.runtime.destroyRuntimeTree(secondHost.id)
 
     Endge.runtime.destroyRuntimeTree(host.id)
     expect(Raph.getDerivedSnapshot().registrations).toBe(0)
-    expect(Raph.get('queries.schedule.raw')).toEqual([scheduleRow(4, 'SU', '400')])
-    expect(Raph.get('queries.schedule.table')).toHaveLength(1)
+    expect(Raph.get(rawPath)).toBeUndefined()
+    expect(Raph.get(tablePath)).toBeUndefined()
   })
 
   it('keeps latest materialized response and ignores a stale transport result', async () => {
@@ -119,6 +123,8 @@ describe('Query Raph derived integration', () => {
     const host = Endge.runtime.execute(query, {
       id: 'schedule-latest-runtime', persistence: 'disabled', props: { filterPayload: {} },
     }) as QueryRuntimeHost
+    const rawPath = queryOutputPath(host.id, 'raw')
+    const tablePath = queryOutputPath(host.id, 'table')
 
     const firstRun = host.run()
     const secondRun = host.run()
@@ -127,8 +133,8 @@ describe('Query Raph derived integration', () => {
     first.resolve([scheduleRow(1, 'SU', 'old')])
     await firstRun
 
-    expect((Raph.get('queries.schedule.raw') as any[])[0].flightNumber).toBe('new')
-    expect((Raph.get('queries.schedule.table') as any[])[0].flightNumber).toBe('new')
+    expect((Raph.get(rawPath) as any[])[0].flightNumber).toBe('new')
+    expect((Raph.get(tablePath) as any[])[0].flightNumber).toBe('new')
     const node = host.node?.children.find(child => child instanceof RaphDerivedNode) as RaphDerivedNode
     expect(node.snapshot().fullComputeCount).toBe(1)
   })
@@ -140,8 +146,10 @@ describe('Query Raph derived integration', () => {
     const host = Endge.runtime.execute(query, {
       id: 'schedule-error-runtime', persistence: 'disabled', props: { filterPayload: {} },
     }) as QueryRuntimeHost
+    const rawPath = queryOutputPath(host.id, 'raw')
+    const tablePath = queryOutputPath(host.id, 'table')
     await host.run()
-    const lastGood = (Raph.get('queries.schedule.table[id=1]') as any).arrivalTime
+    const lastGood = (Raph.get(`${tablePath}[id=1]`) as any).arrivalTime
     const converter = Endge.domain.getConverter('time-string-to-date')!
     converter.setCustom((value) => {
       if (value === 'boom') throw new Error('converter failed')
@@ -150,19 +158,23 @@ describe('Query Raph derived integration', () => {
     const errors: Error[] = []
     host.on('run:error', error => errors.push(error))
 
-    expect(() => Raph.set('queries.schedule.raw[id=1].arrivalTime', 'boom')).toThrow('converter failed')
+    expect(() => Raph.set(`${rawPath}[id=1].arrivalTime`, 'boom')).toThrow('converter failed')
     await waitForRuntimeTick()
-    expect(Raph.get('queries.schedule.raw[id=1].arrivalTime')).toBe('boom')
-    expect((Raph.get('queries.schedule.table[id=1]') as any).arrivalTime).toBe(lastGood)
+    expect(Raph.get(`${rawPath}[id=1].arrivalTime`)).toBe('boom')
+    expect((Raph.get(`${tablePath}[id=1]`) as any).arrivalTime).toBe(lastGood)
     expect(host.context.status).toBe('error')
     expect(errors).toHaveLength(1)
 
-    Raph.set('queries.schedule.raw[id=1].arrivalTime', '09:00')
+    Raph.set(`${rawPath}[id=1].arrivalTime`, '09:00')
     await waitForRuntimeTick()
     expect(host.context.status).toBe('success')
-    expect((Raph.get('queries.schedule.table[id=1]') as any).arrivalTime).toBeInstanceOf(Date)
+    expect((Raph.get(`${tablePath}[id=1]`) as any).arrivalTime).toBeInstanceOf(Date)
   })
 })
+
+function queryOutputPath(runtimeId: string, output: string): string {
+  return `__endge.queryRuntime.${runtimeId}.outputs.${output}`
+}
 
 function registerConverter(id: number, identity: string, handler: (value: any) => any): void {
   const converter = new RConverter()
@@ -200,8 +212,6 @@ defineQuery({
   kind: 'rest',
   props: defineProps({
     filterPayload: field('Object').optional().from(filter('schedule').output('request')),
-    storeRaw: field('String').default('queries.schedule.raw'),
-    storeTable: field('String').default('queries.schedule.table'),
   }),
   request: {
     endpoint: env('ENDPOINT_AODB'),
@@ -215,7 +225,7 @@ defineQuery({
     body: body(({ prop }) => merge({}, prop('filterPayload'))),
   },
   outputs: {
-    raw: output().from(response()).toStore(prop('storeRaw')),
+    raw: output().from(response()),
     table: output()
       .from('raw')
       .dataView(defineDataView({
@@ -244,8 +254,7 @@ defineQuery({
             aircraftConfiguration: path('row.aircraftConfiguration'),
           }),
         ],
-      }))
-      .toStore(prop('storeTable')),
+      })),
   },
   mock: { enabled: false, data: '' },
 })

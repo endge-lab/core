@@ -32,7 +32,6 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
   private _props: Record<string, unknown> = {}
   private _outputs: Record<string, unknown> = {}
   private _outputHashes = new Map<string, string>()
-  private _stableProps = new Set<string>()
   private _runSequence = 0
   private _abortController: AbortController | null = null
   private _filterDisposers: Array<() => void> = []
@@ -100,7 +99,6 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     Raph.app.addNode(node)
     host.addRaphNode(node)
     host.addResource({ id: `node:${node.id}`, kind: 'raph-node', title: node.id })
-    host._stableProps = new Set(artifact.payload.stableProps)
     host._props = host._literalDefaults(artifact.payload)
     host._applyProps(input.meta?.props ?? {}, true)
     try {
@@ -295,7 +293,7 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
           to,
           strategy,
           immediate: false,
-          disposeTarget: output.store ? 'keep' : 'delete',
+          disposeTarget: 'delete',
           compute: (source) => {
             let value = source
             for (const ref of output.dataViews)
@@ -324,20 +322,6 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
   }
 
   private _resolveOutputPath(output: QueryProgramPayload['outputs'][number]): string {
-    if (output.store?.mode === 'prop' && output.store.prop) {
-      const key = String(this._props[output.store.prop] ?? '').trim()
-      if (!key)
-        throw new Error(`[QueryRuntimeHost] Output "${output.key}" store prop "${output.store.prop}" is empty.`)
-      return key
-    }
-    if (output.store?.mode === 'custom' && output.store.key)
-      return output.store.key
-    if (output.store?.mode === 'default') {
-      const identity = String(this.model.identity ?? this.model.id ?? '').trim()
-      if (!identity)
-        throw new Error(`[QueryRuntimeHost] Output "${output.key}" cannot use default store without query identity.`)
-      return `queries.${identity}.${output.key}`
-    }
     return `${this._internalBase}.outputs.${encodePathPart(output.key)}`
   }
 
@@ -386,14 +370,12 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     return defaults
   }
 
-  private _applyProps(patch: Record<string, unknown>, initial: boolean): void {
+  private _applyProps(patch: Record<string, unknown>, _initial: boolean): void {
     const payload = this.getArtifactPayload()
     const definitions = new Map((payload?.props ?? []).map(prop => [prop.key, prop]))
     for (const [key, value] of Object.entries(patch)) {
       if (!definitions.has(key))
         throw new Error(`[QueryRuntimeHost] unknown prop: ${key}`)
-      if (!initial && this._stableProps.has(key) && Object.prototype.hasOwnProperty.call(this._props, key) && this._props[key] !== value)
-        throw new Error(`[QueryRuntimeHost] stable prop "${key}" requires remount.`)
       this._props[key] = value
     }
   }

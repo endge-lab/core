@@ -8,6 +8,7 @@ import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RComponentTable } from '@/domain/entities/reflect/RComponentTable'
 import { RDataView } from '@/domain/entities/reflect/RDataView'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
+import { RStore } from '@/domain/entities/reflect/RStore'
 import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { REnvironment } from '@/domain/entities/reflect/REnvironment'
@@ -137,6 +138,21 @@ export class DocumentFactory {
           item.folderId = folderId
         if (registerInDomain)
           Endge.domain.addComposition(item)
+        return item
+      }
+
+      case 'store': {
+        const item = new RStore()
+        item.id = entityId
+        item.identity = id
+        item.name = title
+        item.displayName = title
+        item.source = Endge.source.createDefault('store')
+        item.sourceVersion = 1
+        if (folderId != null)
+          item.folderId = folderId
+        if (registerInDomain)
+          Endge.domain.addStore(item)
         return item
       }
 

@@ -677,20 +677,12 @@ export class EndgeCompiler extends EndgeModule {
           continue
         }
         const propNames = new Set(artifact.payload.props.map(prop => prop.key))
-        for (const [propName, binding] of Object.entries(runtime.props)) {
+        for (const propName of Object.keys(runtime.props)) {
           if (artifact.payload.requestBody && !propNames.has(propName)) {
             diagnostics.push({
               severity: 'error',
               code: 'composition-query-prop-missing',
               message: `Query "${runtime.identity}" не объявляет prop "${propName}".`,
-              sourcePath: `runtimes.${runtime.name}.withProps.${propName}`,
-            })
-          }
-          if (artifact.payload.stableProps.includes(propName) && binding.kind !== 'literal') {
-            diagnostics.push({
-              severity: 'error',
-              code: 'composition-query-stable-prop-dynamic',
-              message: `Query prop "${propName}" участвует в store key и должен быть literal/default.`,
               sourcePath: `runtimes.${runtime.name}.withProps.${propName}`,
             })
           }
@@ -1025,7 +1017,6 @@ export class EndgeCompiler extends EndgeModule {
       query: '',
       props: [],
       requestBody: null,
-      stableProps: [],
       outputs: [],
     }
   }

@@ -111,7 +111,7 @@ defineFilter({
       { key: 'filterPayload', type: 'Object', optional: true, array: false },
       { key: 'filterModel', type: 'Object', optional: true, array: false },
     ],
-    requestBody: null, stableProps: [], outputs: [],
+    requestBody: null, outputs: [],
   }
   const compositionPayload: CompositionProgramPayload = {
     type: 'composition', sourceVersion: 1,

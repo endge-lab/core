@@ -33,7 +33,7 @@ defineQuery({
     ]))
   })
 
-  it('parses response output, store target and local/external DataView refs', () => {
+  it('parses response output and local/external DataView refs', () => {
     const result = Endge.source.compile('query', createQuerySource('query_output_parse'))
 
     expect(result.ok).toBe(true)
@@ -43,7 +43,6 @@ defineQuery({
       {
         key: 'raw',
         source: { type: 'response', path: 'items' },
-        store: { mode: 'default' },
       },
       {
         key: 'rows',
@@ -52,7 +51,6 @@ defineQuery({
           { kind: 'inline' },
           { kind: 'external', identity: 'formatRows' },
         ],
-        store: { mode: 'custom', key: 'custom.rows' },
       },
     ])
     expect(result.artifact).toMatchObject({
@@ -71,8 +69,8 @@ defineQuery({
     path: '/flights',
   },
   outputs: {
-    rows: output().from('raw').toStore(),
-    raw: output().from(response('items')).toStore(),
+    rows: output().from('raw'),
+    raw: output().from(response('items')),
   },
 })
 `)
@@ -81,6 +79,25 @@ defineQuery({
     expect(result.diagnostics).toEqual(expect.arrayContaining([
       expect.objectContaining({
         code: 'query-source-output-forward-reference',
+        severity: 'error',
+      }),
+    ]))
+  })
+
+  it('rejects removed toStore output modifier', () => {
+    const result = Endge.source.compile('query', `
+defineQuery({
+  request: { endpoint: '/api', path: '/flights' },
+  outputs: {
+    raw: output().from(response()).toStore(),
+  },
+})
+`)
+
+    expect(result.ok).toBe(false)
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'query-source-output-method-unsupported',
         severity: 'error',
       }),
     ]))
@@ -128,8 +145,7 @@ defineQuery({
         transform(input) {
           return input
         },
-      }))
-      .toStore(),
+      })),
   },
 })
 `)
@@ -151,7 +167,7 @@ describe('query output runtime', () => {
     Endge.program.clear()
   })
 
-  it('computes outputs in order and stores only outputs with toStore', async () => {
+  it('computes every declared output in order without publishing to a store', async () => {
     const queryIdentity = 'query_output_runtime'
     const query = createQuery(queryIdentity, `
 defineQuery({
@@ -170,8 +186,7 @@ defineQuery({
   },
   outputs: {
     raw: output()
-      .from(response('items'))
-      .toStore(),
+      .from(response('items')),
     prepared: output()
       .from('raw'),
     rows: output()
@@ -185,8 +200,7 @@ defineQuery({
             flightNumber: path('row.flight'),
           }),
         ],
-      }))
-      .toStore(),
+      })),
   },
 })
 `)
@@ -211,9 +225,8 @@ defineQuery({
         { id: '2', flightNumber: 'FV101' },
       ],
     })
-    expect(Raph.get(`queries.${queryIdentity}.raw`)).toEqual(result.raw)
-    expect(Raph.get(`queries.${queryIdentity}.rows`)).toEqual(result.rows)
-    expect(Raph.get(`queries.${queryIdentity}.prepared`)).toBeUndefined()
+    expect(Raph.get(`queries.${queryIdentity}.raw`)).toBeUndefined()
+    expect(Raph.get(`queries.${queryIdentity}.rows`)).toBeUndefined()
     Endge.runtime.destroyRuntimeTree(host.id)
   })
 })
@@ -232,15 +245,12 @@ describe('source-only Query request body', () => {
         method: 'POST',
         props: [
           { key: 'filterPayload', type: 'Object', optional: true, array: false },
-          { key: 'storeRaw', type: 'String', optional: false, array: false },
         ],
         requestBody: null,
-        stableProps: ['storeRaw'],
         outputs: [],
       },
       vars: {
         filterPayload: { from: '2026-07-03' },
-        storeRaw: 'queries.schedule.raw',
       },
     })
 
@@ -374,8 +384,7 @@ defineQuery({
   },
   outputs: {
     raw: output()
-      .from(response('items'))
-      .toStore(),
+      .from(response('items')),
     rows: output()
       .from('raw')
       .dataView(defineDataView({
@@ -388,8 +397,7 @@ defineQuery({
           }),
         ],
       }))
-      .dataView(dataView('formatRows'))
-      .toStore('custom.rows'),
+      .dataView(dataView('formatRows')),
   },
   mock: {
     enabled: false,

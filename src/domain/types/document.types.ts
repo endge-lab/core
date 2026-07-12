@@ -21,6 +21,7 @@ import type { RAuthProfile } from '@/domain/entities/reflect/RAuthProfile'
 import type { RWorkspace } from '@/domain/entities/reflect/RWorkspace'
 import type { RComponent } from '@/domain/types/component.types'
 import type { RComposition } from '@/domain/entities/reflect/RComposition'
+import type { RStore } from '@/domain/entities/reflect/RStore'
 
 /**
  * Разновидности типов компонентов
@@ -61,6 +62,7 @@ export enum DomainSectionType {
   Query = 'query',
   DataView = 'data-view',
   Composition = 'composition',
+  Store = 'store',
   Action = 'action',
   Converter = 'converter',
   Integration = 'integration',
@@ -90,6 +92,7 @@ export type DomainDocumentType
     | 'converter'
     | 'data-view'
     | 'composition'
+    | 'store'
     | 'integration'
     | 'view'
     | 'page-template'
@@ -128,4 +131,4 @@ export interface Document {
 /**
  * Описывает любой документ рефлекцию
  */
-export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RComposition | RAction | RConverter | RIntegration | RView | RParameter | RFilter | RPolicy | RStyle | RVocabs | RI18nBundle | RAuthProfile | RWorkspace | RTenant | RBehaviorBinding | RPresentationBinding | RPageTemplate | RPage | RNavigation
+export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RComposition | RStore | RAction | RConverter | RIntegration | RView | RParameter | RFilter | RPolicy | RStyle | RVocabs | RI18nBundle | RAuthProfile | RWorkspace | RTenant | RBehaviorBinding | RPresentationBinding | RPageTemplate | RPage | RNavigation

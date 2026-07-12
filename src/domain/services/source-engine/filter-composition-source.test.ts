@@ -87,13 +87,12 @@ defineFilter({
     ]))
   })
 
-  it('compiles Query props/body and marks dynamic store props stable', () => {
+  it('compiles Query props/body and output graph', () => {
     const result = compileQuerySource(`
 defineQuery({
   kind: 'rest',
   props: defineProps({
     filterPayload: field('Object').optional(),
-    rowsStoreKey: field('String').default('queries.rows'),
   }),
   request: {
     method: 'POST',
@@ -102,15 +101,14 @@ defineQuery({
     body: body(({ prop }) => merge({ limit: 500 }, prop('filterPayload'))),
   },
   outputs: {
-    rows: output().from(response('items')).toStore(prop('rowsStoreKey')),
+    rows: output().from(response('items')),
   },
 })
 `)
     expect(result.diagnostics).toEqual([])
     expect(result.artifact).toMatchObject({
-      props: [{ key: 'filterPayload' }, { key: 'rowsStoreKey' }],
+      props: [{ key: 'filterPayload' }],
       requestBody: { type: 'operation', operation: 'merge' },
-      stableProps: ['rowsStoreKey'],
     })
   })
 

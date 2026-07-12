@@ -17,6 +17,7 @@ import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RConverter } from '@/domain/entities/reflect/RConverter'
 import { RDataView } from '@/domain/entities/reflect/RDataView'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
+import { RStore } from '@/domain/entities/reflect/RStore'
 import { REnvironment } from '@/domain/entities/reflect/REnvironment'
 import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { RFolder } from '@/domain/entities/reflect/RFolder'
@@ -117,6 +118,26 @@ export function compositionPayloadDocToPlain(doc: any): any {
   }
 }
 
+/** Собирает plain-объект Store из документа Payload. */
+export function storePayloadDocToPlain(doc: any): any {
+  return {
+    id: doc?.id,
+    identity: doc?.identity,
+    name: doc?.displayName ?? doc?.name,
+    displayName: doc?.displayName ?? doc?.name,
+    description: doc?.description ?? null,
+    source: doc?.source ?? '',
+    sourceVersion: doc?.sourceVersion ?? 1,
+    folderId: relationToId(doc?.folder ?? doc?.folderId),
+    project: relationToId(doc?.project) ?? null,
+    meta: (doc?.meta && typeof doc.meta === 'object' && !Array.isArray(doc.meta)) ? doc.meta : {},
+    active: doc?.active !== false,
+    author: doc?.author,
+    inherited: doc?.inherited === true,
+    deletedAt: doc?.deletedAt ?? null,
+  }
+}
+
 /**
  * EndgeDomain – менеджер доменных данных.
  * Он заменяет ReflectDomain и объединяет управление типами, запросами и компонентами.
@@ -133,6 +154,7 @@ export interface EndgeDomainParsed {
   queries: RQuery[]
   dataViews: RDataView[]
   compositions: RComposition[]
+  stores: RStore[]
   actions: RAction[]
   converters: RConverter[]
   integrations: RIntegration[]
@@ -169,6 +191,9 @@ export class EndgeDomain extends EndgeModule {
 
   private _compositionsById: Map<string | number, RComposition> = new Map()
   private _compositionsByIdentity: Map<string, RComposition> = new Map()
+
+  private _storesById: Map<string | number, RStore> = new Map()
+  private _storesByIdentity: Map<string, RStore> = new Map()
 
   private _componentsById: Map<string | number, RComponent> = new Map()
   private _componentsByIdentity: Map<string, RComponent> = new Map()
@@ -283,6 +308,8 @@ export class EndgeDomain extends EndgeModule {
     this._dataViewsByIdentity.clear()
     this._compositionsById.clear()
     this._compositionsByIdentity.clear()
+    this._storesById.clear()
+    this._storesByIdentity.clear()
     this._componentsById.clear()
     this._componentsByIdentity.clear()
     this._componentSFCsById.clear()
@@ -362,6 +389,8 @@ export class EndgeDomain extends EndgeModule {
     const dataViewsPlain = dataViewsRaw.map((row: any) => dataViewPayloadDocToPlain(row))
     const compositionsRaw = Array.isArray((payload as any)?.compositions) ? (payload as any).compositions : []
     const compositionsPlain = compositionsRaw.map((row: any) => compositionPayloadDocToPlain(row))
+    const storesRaw = Array.isArray((payload as any)?.stores) ? (payload as any).stores : []
+    const storesPlain = storesRaw.map((row: any) => storePayloadDocToPlain(row))
     const projectsRaw = Array.isArray(payload?.projects) ? payload.projects : []
     const parametersRaw = Array.isArray(payload?.parameters) ? payload.parameters : []
     const filtersRaw = Array.isArray(payload?.filters) ? payload.filters : []
@@ -398,6 +427,7 @@ export class EndgeDomain extends EndgeModule {
       queries: queriesPlain,
       dataViews: dataViewsPlain,
       compositions: compositionsPlain,
+      stores: storesPlain,
       components: componentsRaw,
       componentSFCs: componentSFCsRaw,
       folders: Array.isArray(payload?.folders) ? payload.folders : [],
@@ -858,6 +888,57 @@ export class EndgeDomain extends EndgeModule {
     const composition = this.getComposition(idOrIdentity)
     if (composition)
       this.removeCompositionById(composition.id)
+  }
+
+  /** Возвращает все Store-документы. */
+  getStores(): RStore[] {
+    return Array.from(this._storesByIdentity.values())
+  }
+
+  getStoreById(id: string | number): RStore | null {
+    return this._storesById.get(id) ?? null
+  }
+
+  getStoreByIdentity(identity: string): RStore | null {
+    return this._storesByIdentity.get(identity) ?? null
+  }
+
+  getStore(idOrIdentity: string | number): RStore | null {
+    return this.getStoreById(idOrIdentity)
+      ?? this.getStoreById(Number(idOrIdentity))
+      ?? this.getStoreByIdentity(String(idOrIdentity))
+  }
+
+  addStore(store: RStore): void {
+    if (this._storesByIdentity.has(store.identity) || this._storesById.has(store.id))
+      return
+    this._storesById.set(store.id, store)
+    this._storesByIdentity.set(store.identity, store)
+    this.notify()
+  }
+
+  removeStoreById(id: string | number): void {
+    const store = this.getStoreById(id)
+    if (!store)
+      return
+    this._storesById.delete(store.id)
+    this._storesByIdentity.delete(store.identity)
+    this.notify()
+  }
+
+  removeStoreByIdentity(identity: string): void {
+    const store = this.getStoreByIdentity(identity)
+    if (!store)
+      return
+    this._storesById.delete(store.id)
+    this._storesByIdentity.delete(store.identity)
+    this.notify()
+  }
+
+  removeStore(idOrIdentity: string | number): void {
+    const store = this.getStore(idOrIdentity)
+    if (store)
+      this.removeStoreById(store.id)
   }
 
   /**
@@ -2921,6 +3002,7 @@ export class EndgeDomain extends EndgeModule {
         .map(x => Serialize.toPlain(x)),
       dataViews: this.getDataViews().map(x => Serialize.toPlain(x)),
       compositions: this.getCompositions().map(x => Serialize.toPlain(x)),
+      stores: this.getStores().map(x => Serialize.toPlain(x)),
       components: this.getComponents().map(x => ReflectComponentToPlain(x)),
       componentSFCs: this.getComponentSFCs().map(x => x.toPlain()),
       actions: this.getActions().map(x => Serialize.toPlain(x)),
@@ -3014,6 +3096,7 @@ export class EndgeDomain extends EndgeModule {
       queries: [],
       dataViews: [],
       compositions: [],
+      stores: [],
       actions: [],
       converters: [],
       integrations: [],
@@ -3063,6 +3146,11 @@ export class EndgeDomain extends EndgeModule {
     if (json.compositions && Array.isArray(json.compositions)) {
       json.compositions.forEach((compositionJson: any) => {
         out.compositions.push(Serialize.fromJSON(RComposition, compositionJson))
+      })
+    }
+    if (json.stores && Array.isArray(json.stores)) {
+      json.stores.forEach((storeJson: any) => {
+        out.stores.push(Serialize.fromJSON(RStore, storeJson))
       })
     }
     if (json.actions && Array.isArray(json.actions)) {
@@ -3143,6 +3231,7 @@ export class EndgeDomain extends EndgeModule {
     parsed.queries.forEach(q => this.addQuery(q))
     parsed.dataViews.forEach(dv => this.addDataView(dv))
     parsed.compositions.forEach(composition => this.addComposition(composition))
+    parsed.stores.forEach(store => this.addStore(store))
     parsed.actions.forEach(a => this.addAction(a))
     parsed.converters.forEach(c => this.addConverter(c))
     parsed.integrations.forEach(i => this.addIntegration(i))
@@ -3208,6 +3297,11 @@ export class EndgeDomain extends EndgeModule {
     if (json.compositions && Array.isArray(json.compositions)) {
       json.compositions.forEach((compositionJson: any) => {
         domain.addComposition(Serialize.fromJSON(RComposition, compositionJson))
+      })
+    }
+    if (json.stores && Array.isArray(json.stores)) {
+      json.stores.forEach((storeJson: any) => {
+        domain.addStore(Serialize.fromJSON(RStore, storeJson))
       })
     }
 

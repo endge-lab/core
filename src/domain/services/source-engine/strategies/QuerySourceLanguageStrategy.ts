@@ -24,7 +24,7 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
     ],
     functions: [
       'array', 'as', 'auto', 'by', 'collectionByKey', 'dataView', 'default', 'from', 'full', 'map', 'optional',
-      'options', 'toStore', 'vocab',
+      'options', 'vocab',
     ],
     properties: [
       'auth', 'body', 'data', 'enabled', 'endpoint', 'formUrlencoded',
@@ -110,8 +110,7 @@ const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
     kind: 'property',
     insertText: `outputs: {
   raw: output()
-    .from(response('items'))
-    .toStore(),
+    .from(response('items')),
 },`,
     detail: 'Query output graph',
   },
@@ -127,7 +126,7 @@ const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
   {
     label: 'output',
     kind: 'function',
-    insertText: `output().from(response('items')).toStore()`,
+    insertText: `output().from(response('items'))`,
     detail: 'Описывает output из response или предыдущего output',
   },
   {

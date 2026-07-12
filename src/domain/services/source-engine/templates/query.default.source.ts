@@ -4,7 +4,6 @@ export const QUERY_DEFAULT_SOURCE = `defineQuery({
 
   props: defineProps({
     filterPayload: field('Object').optional(),
-    rowsStoreKey: field('String').default('queries.query.rows'),
   }),
 
   request: {
@@ -25,8 +24,7 @@ export const QUERY_DEFAULT_SOURCE = `defineQuery({
 
   outputs: {
     raw: output()
-      .from(response('items'))
-      .toStore(prop('rowsStoreKey')),
+      .from(response('items')),
   },
 
   mock: {

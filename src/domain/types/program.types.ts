@@ -136,17 +136,10 @@ export type QueryProgramOutputSource
     key: string
   }
 
-export interface QueryProgramOutputStoreTarget {
-  mode: 'default' | 'custom' | 'prop'
-  key?: string
-  prop?: string
-}
-
 export interface QueryProgramOutput {
   key: string
   source: QueryProgramOutputSource
   dataViews: DataViewRef[]
-  store: QueryProgramOutputStoreTarget | null
   materialization:
     | { kind: 'source' }
     | { kind: 'derived', strategy: import('@/domain/types/data-view-source.types').DataViewMaterializationStrategy }
@@ -192,9 +185,6 @@ export interface QueryProgramPayload {
 
   /** Безопасный request.body IR. При null отправляется пустой object payload. */
   requestBody: SourceExpressionIR | null
-
-  /** Props, которые участвуют в вычислении store key и фиксируются при mount. */
-  stableProps: string[]
 
   /** Включены ли mock data для query. */
   mockDataEnabled?: boolean

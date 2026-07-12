@@ -95,7 +95,6 @@ describe('EndgeSource', () => {
         {
           key: 'raw',
           source: { type: 'response', path: 'items' },
-          store: { mode: 'default' },
         },
       ],
     })
@@ -259,12 +258,12 @@ defineQuery({
     const result = Endge.source.patch('query', source, {
       path: 'outputs',
       expression: `{
-  raw: output().from(response('items')).toStore(),
+  raw: output().from(response('items')),
 }`,
     })
 
     expect(result.ok).toBe(true)
-    expect(result.source).toContain("raw: output().from(response('items')).toStore()")
+    expect(result.source).toContain("raw: output().from(response('items'))")
     expect(result.document).toMatchObject({
       outputs: [
         {
@@ -309,8 +308,7 @@ defineQuery({
 
   outputs: {
     raw: output()
-      .from(response('items'))
-      .toStore(),
+      .from(response('items')),
   },
 
   mock: {
