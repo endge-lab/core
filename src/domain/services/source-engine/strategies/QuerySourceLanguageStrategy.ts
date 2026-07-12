@@ -18,17 +18,17 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
     alias: 'Endge Query Source',
     extension: '.endge-query.ts',
     keywords: [
-      'body', 'compact', 'dataView', 'defineDataView', 'defineFilter', 'defineProps',
+      'auto', 'body', 'collectionByKey', 'compact', 'dataView', 'defineDataView', 'defineFilter', 'defineProps',
       'defineQuery', 'endgeVar', 'env', 'field', 'filter', 'merge', 'output', 'prop',
-      'response',
+      'full', 'incremental', 'response',
     ],
     functions: [
-      'array', 'as', 'by', 'dataView', 'default', 'from', 'map', 'optional',
+      'array', 'as', 'auto', 'by', 'collectionByKey', 'dataView', 'default', 'from', 'full', 'map', 'optional',
       'options', 'toStore', 'vocab',
     ],
     properties: [
       'auth', 'body', 'data', 'enabled', 'endpoint', 'formUrlencoded',
-      'headers', 'items', 'kind', 'method', 'mock', 'mode', 'outputs', 'path',
+      'headers', 'incremental', 'items', 'kind', 'method', 'mock', 'mode', 'outputs', 'path',
       'props', 'request', 'timeoutMs',
     ],
   })

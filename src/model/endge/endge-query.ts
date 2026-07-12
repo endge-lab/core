@@ -6,7 +6,7 @@ import axios from 'axios'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { Endge } from '@/model/endge/endge'
 import { QueryExecutor_Service } from '@/model/services/QueryExecutor_Service'
-import type { ProgramArtifact, QueryProgramPayload } from '@/domain/types/program.types'
+import type { QueryProgramPayload } from '@/domain/types/program.types'
 import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
 
 /**
@@ -57,29 +57,22 @@ export class EndgeQuery extends EndgeModule {
 
   /** Выполняет artifact для QueryRuntimeHost без преждевременной записи stores. */
   public executeArtifact(input: {
-    query: RQuery
     payload: QueryProgramPayload
-    children: ProgramArtifact[]
     props: Record<string, unknown>
     signal?: AbortSignal
   }): Promise<any> {
     return this.executor.execute({
-      query: input.query,
       payload: input.payload,
-      children: input.children,
       vars: input.props,
       signal: input.signal,
-      writeStores: false,
     })
   }
 
-  /** Записывает outputs только после latest-wins проверки host-а. */
-  public writeOutputStores(
-    payload: QueryProgramPayload,
-    query: RQuery,
-    props: Record<string, unknown>,
-    outputs: Record<string, unknown>,
-  ): void {
-    this.executor.writeOutputStores(payload, query, props, outputs)
+  /** Извлекает response-backed output для атомарного commit в QueryRuntimeHost. */
+  public readResponseOutput(
+    output: QueryProgramPayload['outputs'][number],
+    response: unknown,
+  ): unknown {
+    return this.executor.readResponseOutput(output, response)
   }
 }

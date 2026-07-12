@@ -1,29 +1,18 @@
-import type { RQuery } from '@/domain/entities/reflect/RQuery'
-import type { ProgramArtifact, QueryProgramOutput, QueryProgramPayload } from '@/domain/types/program.types'
+import type { QueryProgramOutput, QueryProgramPayload } from '@/domain/types/program.types'
 import type { RQueryAuth } from '@/domain/types/query.types'
 import type { AxiosInstance } from 'axios'
 
-import { Raph } from '@endge/raph'
 import axios from 'axios'
 
 import { Endge } from '@/model/endge/endge'
 import { evaluateSourceExpression } from '@/domain/services/source-engine/source-expression-evaluate'
 
 export interface QueryExecutionContext {
-  /** Доменный query, которому принадлежит artifact. */
-  query: RQuery
-
   /** Runtime-ready query payload из Endge.program. */
   payload: QueryProgramPayload
 
-  /** Локальные artifacts, принадлежащие query artifact. */
-  children?: ProgramArtifact[]
-
   /** Входные параметры одноразового или реактивного запуска. */
   vars?: Record<string, unknown>
-
-  /** Отложить запись stores до проверки latest-wins в QueryRuntimeHost. */
-  writeStores?: boolean
 
   /** AbortSignal текущего runtime run. */
   signal?: AbortSignal
@@ -37,81 +26,21 @@ export class QueryExecutor_Service {
     }),
   ) {}
 
-  /** Выполняет query artifact и вычисляет output graph. */
+  /** Выполняет только transport/mock слой; output graph материализует QueryRuntimeHost через Raph. */
   public async execute(context: QueryExecutionContext): Promise<any> {
-    const result = context.payload.mockDataEnabled
+    return context.payload.mockDataEnabled
       ? this._readMockData(context.payload.mockData)
       : await this._executeByProtocol(context.payload, context.vars ?? {}, context.signal)
-
-    if (!context.payload.outputs.length)
-      return result
-
-    return this._resolveOutputs(result, context)
   }
 
-  /** Вычисляет output graph строго в порядке source document. */
-  private _resolveOutputs(
-    response: unknown,
-    context: QueryExecutionContext,
-  ): Record<string, unknown> {
-    const values: Record<string, unknown> = {}
-
-    for (const output of context.payload.outputs) {
-      let value = this._readOutputSource(output, response, values)
-      for (const dataViewRef of output.dataViews)
-        value = Endge.dataView.runRef(dataViewRef, value, undefined, { children: context.children ?? [] })
-
-      values[output.key] = value
-      if (output.store && context.writeStores !== false)
-        Raph.set(this._resolveStoreKey(output, context.query, context.vars ?? {}), value)
-    }
-
-    return values
-  }
-
-  /** Читает source output из backend response или предыдущего output. */
-  private _readOutputSource(
+  /** Извлекает response-backed source output без запуска DataView. */
+  public readResponseOutput(
     output: QueryProgramOutput,
     response: unknown,
-    values: Record<string, unknown>,
   ): unknown {
-    if (output.source.type === 'response')
-      return output.source.path == null ? response : this._path(response, output.source.path)
-
-    if (!(output.source.key in values))
-      throw new Error(`Query output "${output.key}" references missing output "${output.source.key}".`)
-
-    return values[output.source.key]
-  }
-
-  /** Возвращает default/custom store key для output. */
-  public writeOutputStores(
-    payload: QueryProgramPayload,
-    query: RQuery,
-    props: Record<string, unknown>,
-    values: Record<string, unknown>,
-  ): void {
-    for (const output of payload.outputs) {
-      if (output.store)
-        Raph.set(this._resolveStoreKey(output, query, props), values[output.key])
-    }
-  }
-
-  private _resolveStoreKey(output: QueryProgramOutput, query: RQuery, props: Record<string, unknown> = {}): string {
-    if (output.store?.mode === 'prop' && output.store.prop) {
-      const key = String(props[output.store.prop] ?? '').trim()
-      if (!key)
-        throw new Error(`Query output "${output.key}" store prop "${output.store.prop}" is empty.`)
-      return key
-    }
-    if (output.store?.mode === 'custom' && output.store.key)
-      return output.store.key
-
-    const queryIdentity = String(query.identity ?? query.id ?? '').trim()
-    if (!queryIdentity)
-      throw new Error(`Query output "${output.key}" cannot be stored without query identity.`)
-
-    return `queries.${queryIdentity}.${output.key}`
+    if (output.source.type !== 'response')
+      throw new Error(`Query output "${output.key}" is not response-backed.`)
+    return output.source.path == null ? response : this._path(response, output.source.path)
   }
 
   /** Выбирает protocol executor по compiled artifact type. */

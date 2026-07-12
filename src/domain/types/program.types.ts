@@ -147,6 +147,9 @@ export interface QueryProgramOutput {
   source: QueryProgramOutputSource
   dataViews: DataViewRef[]
   store: QueryProgramOutputStoreTarget | null
+  materialization:
+    | { kind: 'source' }
+    | { kind: 'derived', strategy: import('@/domain/types/data-view-source.types').DataViewMaterializationStrategy }
 }
 
 /** Payload artifact для query-сущности. */
@@ -210,6 +213,9 @@ export interface DataViewProgramPayload {
 
   /** Режим выполнения source: manual transform или декларативный pipeline. */
   mode: 'manual' | 'pipeline'
+
+  /** Runtime-ready strategy; auto всегда разрешен compiler-ом заранее. */
+  materializationStrategy: import('@/domain/types/data-view-source.types').DataViewMaterializationStrategy
 
   /** Canonical source document для debug/preview UI. */
   sourceDocument: DataViewSourceDocument | null

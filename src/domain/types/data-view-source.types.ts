@@ -2,8 +2,18 @@ import type { ProgramDiagnostic } from '@/domain/types/program.types'
 
 export type DataViewSourceMode = 'manual' | 'pipeline'
 
+export type DataViewIncrementalRequest
+  = | { mode: 'auto' }
+    | { mode: 'full' }
+    | { mode: 'collection-by-key', key: string }
+
+export type DataViewMaterializationStrategy
+  = | { kind: 'full' }
+    | { kind: 'collection-by-key', key: string }
+
 export interface DataViewSourceDocument {
   mode: DataViewSourceMode
+  incremental: DataViewIncrementalRequest
   transform?: DataViewManualTransform
   steps?: DataViewPipelineStep[]
 }

@@ -266,6 +266,16 @@ export class EndgeDataView extends EndgeModule {
 
   /** Минимальные built-in converters для preview v1. */
   private _convert(identity: string, value: unknown, options?: Record<string, unknown>): unknown {
+    // Не инициируем federation configuration из standalone DataView во время
+    // циклической загрузки Endge modules; в полноценном runtime она уже собрана.
+    const converter = Endge.isConfigured ? Endge.domain.getConverter(identity) : null
+    if (converter?.customHandler) {
+      const converted = converter.convert(value)
+      if (converted && (typeof converted === 'object' || typeof converted === 'function') && typeof (converted as any).then === 'function')
+        throw new Error(`[DataView] Async converter "${identity}" is not supported.`)
+      return converted
+    }
+
     if (identity === 'date.iso_to_time') {
       const date = new Date(String(value ?? ''))
       if (Number.isNaN(date.getTime()))

@@ -27,7 +27,7 @@ import type {
   RuntimeHostUpdateContext,
 } from '@/domain/types/runtime-host.types'
 
-import { Raph, RaphNode } from '@endge/raph'
+import { DataPath, Raph, RaphNode } from '@endge/raph'
 
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component-sfc.types'
@@ -418,6 +418,10 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
           phase: RUNTIME_BOUNDARY_UPDATE_PHASE_NAME,
           wildcardDynamic: binding.wildcardDynamic ?? true,
         }))
+        this._raphInputDisposers.push(Raph.app.observeData(tableNode, `${sourcePath}[*]`, {
+          phase: RUNTIME_BOUNDARY_UPDATE_PHASE_NAME,
+          wildcardDynamic: binding.wildcardDynamic ?? true,
+        }))
       }
 
       for (const column of boundary.columns) {
@@ -471,8 +475,48 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   private _makeBoundaryPatch(ctx: RuntimeHostUpdateContext): RuntimeBoundaryPatch | null {
     if (ctx.node.meta?.boundaryType === 'table-column')
       return this._makeTableColumnPatch(ctx)
+    if (ctx.node.meta?.boundaryType === 'table')
+      return this._makeTableRowPatch(ctx)
 
     return null
+  }
+
+  private _makeTableRowPatch(ctx: RuntimeHostUpdateContext): RuntimeBoundaryPatch | null {
+    const meta = ctx.node.meta ?? {}
+    const sourcePath = this._resolveBoundarySourcePath(meta)
+    if (!sourcePath)
+      return null
+
+    const itemIndex = this._extractCollectionItemIndex(sourcePath, ctx.events)
+    if (itemIndex == null)
+      return null
+
+    const itemPath = `${sourcePath}[${itemIndex}]`
+    const rowKey = typeof meta.rowKey === 'string' ? meta.rowKey : null
+    const boundaryId = String(meta.boundaryId ?? '')
+    const boundary = this.getRuntimeDependencies().boundaries.find(item => item.id === boundaryId)
+    if (!boundary)
+      return null
+
+    return {
+      kind: 'collection-projection-update',
+      boundaryId,
+      boundaryType: 'table',
+      sourcePath,
+      itemIndex,
+      itemKey: rowKey ? Raph.get(`${itemPath}.${rowKey}`) : null,
+      itemSnapshot: Raph.get(itemPath),
+      changedPaths: ctx.events
+        .map(event => this._extractChangedPath(sourcePath, event.canonical))
+        .filter((path): path is string[] => Array.isArray(path)),
+      affectedProjections: boundary.columns.map(column => ({
+        boundaryId: column.id,
+        key: column.key,
+        index: column.index,
+      })),
+      events: ctx.events,
+      node: ctx.node,
+    }
   }
 
   private _makeTableColumnPatch(ctx: RuntimeHostUpdateContext): RuntimeBoundaryPatch | null {
@@ -525,27 +569,43 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   }
 
   private _extractCollectionItemIndex(sourcePath: string, events: RuntimeHostUpdateContext['events']): number | null {
-    const escaped = sourcePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const pattern = new RegExp(`^${escaped}\\[(\\d+)\\](?:\\.|$)`)
+    const sourceSegmentCount = DataPath.from(sourcePath).segments().length
+    const collection = Raph.get(sourcePath)
 
     for (const event of events) {
-      const match = event.canonical.match(pattern)
-      if (match)
-        return Number(match[1])
+      const selector = DataPath.from(event.canonical).segments()[sourceSegmentCount]
+      if (Number.isInteger(selector?.index))
+        return selector?.index ?? null
+
+      if (!Array.isArray(collection) || !selector?.pkey || selector.pval == null)
+        continue
+
+      const index = collection.findIndex((item) => {
+        return isRecord(item) && Object.is(item[selector.pkey!], selector.pval)
+      })
+      if (index >= 0)
+        return index
     }
 
     return null
   }
 
   private _extractChangedPath(sourcePath: string, canonical: string): string[] | null {
-    const escaped = sourcePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const match = canonical.match(new RegExp(`^${escaped}\\[\\d+\\]\\.?(.+)?$`))
-    if (!match)
+    const sourceSegmentCount = DataPath.from(sourcePath).segments().length
+    const segments = DataPath.from(canonical).segments()
+    const selector = segments[sourceSegmentCount]
+    if (selector?.index == null && !selector?.pkey)
       return null
 
-    return String(match[1] ?? '')
-      .split('.')
-      .map(part => part.trim())
+    return segments
+      .slice(sourceSegmentCount + 1)
+      .map((segment) => {
+        if (segment.key != null)
+          return segment.key
+        if (segment.index != null)
+          return String(segment.index)
+        return ''
+      })
       .filter(Boolean)
   }
 

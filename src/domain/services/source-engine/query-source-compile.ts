@@ -197,6 +197,9 @@ function createQueryArtifact(document: QuerySourceDocument): QueryProgramPayload
       source: output.source,
       dataViews: output.dataViews,
       store: output.store,
+      materialization: output.source.type === 'response' && output.dataViews.length === 0
+        ? { kind: 'source' as const }
+        : { kind: 'derived' as const, strategy: { kind: 'full' as const } },
     })),
   }
 }

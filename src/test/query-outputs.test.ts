@@ -3,6 +3,7 @@ import { Raph } from '@endge/raph'
 
 import { RDataView } from '@/domain/entities/reflect/RDataView'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
+import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
 import { EndgeDataView } from '@/model/endge/endge-data-view'
 import { Endge } from '@/model/endge/endge'
 import { QueryExecutor_Service } from '@/model/services/QueryExecutor_Service'
@@ -189,12 +190,12 @@ defineQuery({
   },
 })
 `)
-    const artifact = Endge.compiler.buildQuery(query)
-    const result = await new QueryExecutor_Service().execute({
-      query,
-      payload: artifact.payload,
-      children: artifact.children,
-    })
+    Endge.compiler.buildQuery(query)
+    const host = Endge.runtime.execute(query, {
+      id: 'query-output-runtime',
+      persistence: 'disabled',
+    }) as QueryRuntimeHost
+    const result = await host.run()
 
     expect(result).toEqual({
       raw: [
@@ -213,6 +214,7 @@ defineQuery({
     expect(Raph.get(`queries.${queryIdentity}.raw`)).toEqual(result.raw)
     expect(Raph.get(`queries.${queryIdentity}.rows`)).toEqual(result.rows)
     expect(Raph.get(`queries.${queryIdentity}.prepared`)).toBeUndefined()
+    Endge.runtime.destroyRuntimeTree(host.id)
   })
 })
 
@@ -220,10 +222,8 @@ describe('source-only Query request body', () => {
   it('sends an empty payload when request.body is absent', async () => {
     const request = vi.fn().mockResolvedValue({ data: { items: [] } })
     const executor = new QueryExecutor_Service({ request } as any)
-    const query = createQuery('empty-body', '')
 
     await executor.execute({
-      query,
       payload: {
         type: 'query-rest',
         sourceVersion: 2,

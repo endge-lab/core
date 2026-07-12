@@ -1,5 +1,7 @@
 import type {
   DataViewExpression,
+  DataViewIncrementalRequest,
+  DataViewMaterializationStrategy,
   DataViewRef,
   DataViewManualTransform,
   DataViewPathOperation,
@@ -87,6 +89,7 @@ function parseDocument(
   diagnostics: DiagnosticDraft[],
 ): DataViewSourceDocument {
   const declaredMode = readStringProperty(definition, 'mode')
+  const incremental = readIncrementalRequest(definition, diagnostics)
   const transformNode = readObjectProperty(definition, 'transform')
   const stepsNode = readArrayProperty(definition, 'steps')
   const hasTransform = transformNode != null
@@ -121,7 +124,15 @@ function parseDocument(
         'transform',
       ))
     }
-    return { mode, transform: transform ?? undefined }
+    if (incremental.mode === 'collection-by-key') {
+      diagnostics.push(createDiagnostic(
+        'error',
+        'data-view-source-incremental-manual',
+        'Manual DataView не может использовать collectionByKey; выберите full().',
+        'incremental',
+      ))
+    }
+    return { mode, incremental, transform: transform ?? undefined }
   }
 
   const steps = stepsNode ? readPipelineSteps(stepsNode, source, diagnostics) : []
@@ -134,7 +145,43 @@ function parseDocument(
     ))
   }
 
-  return { mode, steps }
+  if (incremental.mode === 'collection-by-key' && !isRowLocalPipeline(steps, incremental.key)) {
+    diagnostics.push(createDiagnostic(
+      'error',
+      'data-view-source-incremental-not-row-local',
+      `DataView не доказывает row-local семантику для collectionByKey("${incremental.key}").`,
+      'incremental',
+    ))
+  }
+
+  return { mode, incremental, steps }
+}
+
+function readIncrementalRequest(
+  definition: t.ObjectExpression,
+  diagnostics: DiagnosticDraft[],
+): DataViewIncrementalRequest {
+  const node = readPropertyValue(definition, 'incremental')
+  if (!node)
+    return { mode: 'auto' }
+  const expression = unwrapExpression(node)
+  if (!t.isCallExpression(expression) || !t.isIdentifier(expression.callee)) {
+    diagnostics.push(createDiagnostic('error', 'data-view-source-incremental-shape', 'incremental должен быть auto(), full() или collectionByKey(key).', 'incremental'))
+    return { mode: 'auto' }
+  }
+  if (expression.callee.name === 'auto' && expression.arguments.length === 0)
+    return { mode: 'auto' }
+  if (expression.callee.name === 'full' && expression.arguments.length === 0)
+    return { mode: 'full' }
+  if (expression.callee.name === 'collectionByKey') {
+    const key = expression.arguments[0]
+    if (t.isStringLiteral(key) && key.value.trim())
+      return { mode: 'collection-by-key', key: key.value.trim() }
+    diagnostics.push(createDiagnostic('error', 'data-view-source-incremental-key', 'collectionByKey требует непустой строковый key.', 'incremental'))
+    return { mode: 'auto' }
+  }
+  diagnostics.push(createDiagnostic('error', 'data-view-source-incremental-unsupported', 'incremental поддерживает только auto(), full() и collectionByKey(key).', 'incremental'))
+  return { mode: 'auto' }
 }
 
 function readManualTransform(
@@ -436,10 +483,48 @@ function createDataViewArtifact(document: DataViewSourceDocument): DataViewProgr
   return {
     type: 'data-view',
     mode: document.mode,
+    materializationStrategy: resolveMaterializationStrategy(document),
     sourceDocument: document,
     transform: document.transform ?? null,
     steps: document.steps ?? [],
   }
+}
+
+function resolveMaterializationStrategy(document: DataViewSourceDocument): DataViewMaterializationStrategy {
+  if (document.incremental.mode === 'full' || document.mode === 'manual')
+    return { kind: 'full' }
+  if (document.incremental.mode === 'collection-by-key')
+    return { kind: 'collection-by-key', key: document.incremental.key }
+  return isRowLocalPipeline(document.steps ?? [], 'id')
+    ? { kind: 'collection-by-key', key: 'id' }
+    : { kind: 'full' }
+}
+
+function isRowLocalPipeline(steps: DataViewPipelineStep[], key: string): boolean {
+  if (steps.length !== 2 || steps[0]?.type !== 'from' || steps[1]?.type !== 'map')
+    return false
+  const from = steps[0]
+  const map = steps[1]
+  if (from.source !== '' || from.dataViews?.length)
+    return false
+  const keyExpression = map.fields[key]
+  if (!keyExpression || keyExpression.type !== 'path' || keyExpression.path !== `${from.as}.${key}` || keyExpression.operations.length)
+    return false
+  if (map.spreads.some(spread => spread.source !== from.as))
+    return false
+  return Object.values(map.fields).every(expression => isRowLocalExpression(expression, from.as))
+}
+
+function isRowLocalExpression(expression: DataViewExpression, alias: string): boolean {
+  if (expression.type === 'literal')
+    return true
+  if (expression.type === 'path')
+    return expression.path === alias || expression.path.startsWith(`${alias}.`)
+  const placeholders = [...expression.template.matchAll(/\{([^{}]+)\}/g)]
+  return placeholders.every(match => {
+    const path = String(match[1] ?? '').trim()
+    return path === alias || path.startsWith(`${alias}.`)
+  })
 }
 
 function readObjectProperty(node: t.ObjectExpression, name: string): t.ObjectMethod | t.ObjectProperty | null {

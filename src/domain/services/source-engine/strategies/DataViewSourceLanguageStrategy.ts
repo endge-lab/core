@@ -18,11 +18,12 @@ export class DataViewSourceLanguageStrategy implements SourceLanguageStrategy {
     alias: 'Endge DataView Source',
     extension: '.endge-data-view.ts',
     keywords: [
-      'convert', 'dataView', 'defineDataView', 'field', 'from', 'join', 'map', 'path',
-      'pick', 'spread', 'template', 'transform',
+      'auto', 'collectionByKey', 'convert', 'dataView', 'defineDataView', 'field',
+      'from', 'full', 'incremental', 'join', 'map', 'path', 'pick', 'spread',
+      'template', 'transform',
     ],
-    functions: ['as', 'by', 'convert', 'dataView', 'find', 'from', 'join', 'map', 'pick'],
-    properties: ['input', 'left', 'manual', 'mode', 'pipeline', 'right', 'steps', 'tools'],
+    functions: ['as', 'auto', 'by', 'collectionByKey', 'convert', 'dataView', 'find', 'from', 'full', 'join', 'map', 'pick'],
+    properties: ['incremental', 'input', 'left', 'manual', 'mode', 'pipeline', 'right', 'steps', 'tools'],
   })
 
   /** Проверяет, что strategy обслуживает DataView source. */
@@ -89,6 +90,9 @@ const DATA_VIEW_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
   },
   { label: 'transform', kind: 'function', insertText: `transform(input, tools) {\n  return input\n}`, detail: 'Manual transform' },
   { label: 'steps', kind: 'property', insertText: `steps: [\n  from('items').as('item'),\n  map({})\n],`, detail: 'Pipeline steps' },
+  { label: 'incremental.auto', kind: 'property', insertText: 'incremental: auto(),', detail: 'Автоматический выбор full/byKey (default)' },
+  { label: 'incremental.full', kind: 'property', insertText: 'incremental: full(),', detail: 'Всегда полный пересчет' },
+  { label: 'incremental.collectionByKey', kind: 'property', insertText: `incremental: collectionByKey('id'),`, detail: 'Явный row-local incremental contract' },
   { label: 'from', kind: 'function', insertText: `from('items').as('item')`, detail: 'Берет input array' },
   { label: 'from.dataView', kind: 'function', insertText: `from('items').dataView(dataView('normalize')).as('item')`, detail: 'Применяет DataView перед map' },
   { label: 'dataView', kind: 'function', insertText: `dataView('data-view-identity')`, detail: 'Ссылка на доменный DataView' },

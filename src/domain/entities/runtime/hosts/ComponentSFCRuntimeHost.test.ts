@@ -100,6 +100,54 @@ defineProps<{
         counter: 1,
       }),
     })
+
+    patches.length = 0
+    Raph.set('test.sfc.flights[id="flight-1"].number', 'SSE-1')
+
+    expect(propsUpdates).toHaveLength(0)
+    expect(patches).toHaveLength(1)
+    expect(patches[0]).toMatchObject({
+      kind: 'collection-projection-update',
+      sourcePath: 'test.sfc.flights',
+      itemIndex: 0,
+      itemKey: 'flight-1',
+      changedPaths: [['number']],
+      affectedProjections: [
+        expect.objectContaining({
+          key: 'number',
+          index: 0,
+        }),
+      ],
+      itemSnapshot: expect.objectContaining({
+        number: 'SSE-1',
+      }),
+    })
+
+    patches.length = 0
+    Raph.set('test.sfc.flights[id="flight-1"]', {
+      id: 'flight-1',
+      number: 'SSE-2',
+      counter: 1,
+    })
+
+    expect(propsUpdates).toHaveLength(0)
+    expect(patches).toHaveLength(1)
+    expect(patches[0]).toMatchObject({
+      kind: 'collection-projection-update',
+      sourcePath: 'test.sfc.flights',
+      itemIndex: 0,
+      itemKey: 'flight-1',
+      changedPaths: [[]],
+      affectedProjections: [
+        expect.objectContaining({
+          key: 'number',
+          index: 0,
+        }),
+      ],
+      itemSnapshot: expect.objectContaining({
+        number: 'SSE-2',
+      }),
+    })
   })
 })
 

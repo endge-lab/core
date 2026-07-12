@@ -1,5 +1,5 @@
 import type { EndgeBootContext } from '@/domain/types/bootstrap.types'
-import type { DataViewRef, DataViewPipelineStep } from '@/domain/types/data-view-source.types'
+import type { DataViewMaterializationStrategy, DataViewRef, DataViewPipelineStep } from '@/domain/types/data-view-source.types'
 import type { FilterProgramPayload } from '@/domain/types/filter-source.types'
 import type { CompositionProgramPayload } from '@/domain/types/composition-source.types'
 import type {
@@ -13,6 +13,7 @@ import type {
   ProgramDiagnostic,
   ProgramEntityType,
   QueryProgramPayload,
+  QueryProgramOutput,
 } from '@/domain/types/program.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
@@ -364,9 +365,10 @@ export class EndgeCompiler extends EndgeModule {
     const diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[] = []
     const dependencies: ProgramArtifact['dependencies'] = []
 
-    const outputs = payload.outputs.map(output => ({
-      ...output,
-      dataViews: this._materializeDataViewRefs(
+    const strategies = new Map<string, DataViewMaterializationStrategy>()
+    const outputs: QueryProgramOutput[] = []
+    for (const output of payload.outputs) {
+      const dataViews = this._materializeDataViewRefs(
         output.dataViews,
         ownerRef.identity,
         `outputs.${output.key}.dataView`,
@@ -374,8 +376,22 @@ export class EndgeCompiler extends EndgeModule {
         children,
         diagnostics,
         dependencies,
-      ),
-    }))
+      )
+      let materialization: QueryProgramOutput['materialization']
+      if (output.source.type === 'response' && dataViews.length === 0) {
+        materialization = { kind: 'source' }
+      }
+      else {
+        const strategy: DataViewMaterializationStrategy = dataViews.length
+          ? this._resolveDataViewChainStrategy(dataViews, children)
+          : output.source.type === 'output'
+            ? strategies.get(output.source.key) ?? { kind: 'full' }
+            : { kind: 'full' }
+        materialization = { kind: 'derived', strategy }
+        strategies.set(output.key, strategy)
+      }
+      outputs.push({ ...output, dataViews, materialization })
+    }
 
     return {
       payload: { ...payload, outputs },
@@ -383,6 +399,43 @@ export class EndgeCompiler extends EndgeModule {
       diagnostics,
       dependencies,
     }
+  }
+
+  /** Сворачивает цепочку DataView: byKey допустим только при одинаковом доказанном ключе. */
+  private _resolveDataViewChainStrategy(
+    refs: DataViewRef[],
+    localChildren: ProgramArtifact[],
+  ): DataViewMaterializationStrategy {
+    let key: string | null = null
+    for (const ref of refs) {
+      let artifact: ProgramArtifact<DataViewProgramPayload> | null = null
+      if (ref.kind === 'local')
+        artifact = this._findDataViewChild(localChildren, ref.ref.id, ref.ref.identity)
+      else if (ref.kind === 'external')
+        artifact = Endge.program.getDataViewArtifact(ref.identity)
+      if (!artifact || artifact.status === 'error' || artifact.payload.materializationStrategy.kind !== 'collection-by-key')
+        return { kind: 'full' }
+      const currentKey = artifact.payload.materializationStrategy.key
+      if (key != null && key !== currentKey)
+        return { kind: 'full' }
+      key = currentKey
+    }
+    return key == null ? { kind: 'full' } : { kind: 'collection-by-key', key }
+  }
+
+  private _findDataViewChild(
+    children: ProgramArtifact[],
+    id: string | number,
+    identity: string,
+  ): ProgramArtifact<DataViewProgramPayload> | null {
+    for (const child of children) {
+      if (child.ref.entityType === 'data-view' && (child.ref.id === id || child.ref.identity === identity))
+        return child as ProgramArtifact<DataViewProgramPayload>
+      const nested = this._findDataViewChild(child.children ?? [], id, identity)
+      if (nested)
+        return nested
+    }
+    return null
   }
 
   /** Материализует локальные Filter defaults query props в child artifacts. */
@@ -1004,6 +1057,7 @@ export class EndgeCompiler extends EndgeModule {
     return {
       type: 'data-view',
       mode: 'manual',
+      materializationStrategy: { kind: 'full' },
       sourceDocument: null,
       transform: null,
       steps: [],

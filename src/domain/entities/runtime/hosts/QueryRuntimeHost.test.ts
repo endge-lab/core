@@ -31,7 +31,6 @@ describe('QueryRuntimeHost', () => {
         signals.push(input.signal!)
         return second.promise
       })
-    const writeStores = vi.spyOn(Endge.query, 'writeOutputStores').mockImplementation(() => {})
     const host = createHost()
 
     const firstRun = host.run()
@@ -46,8 +45,7 @@ describe('QueryRuntimeHost', () => {
 
     expect(host.getOutput('raw')).toBe('new')
     expect(host.context.status).toBe('success')
-    expect(writeStores).toHaveBeenCalledTimes(1)
-    expect(writeStores.mock.calls[0]?.[3]).toEqual({ raw: 'new' })
+    expect(host.getOutputs()).toEqual({ raw: 'new' })
   })
 
   it('locks stable props after mount', () => {
