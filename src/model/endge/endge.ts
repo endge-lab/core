@@ -1,5 +1,6 @@
 import { EndgeFederation } from '@/domain/entities/endge/EndgeFederation'
 import type { EndgeBootContext } from '@/domain/types/bootstrap.types'
+import type { EndgeDomainBundle } from '@/domain/types/domain-export.type'
 import type { EndgeAuth } from '@/model/endge/endge-auth'
 import type { EndgeAuthProfiles } from '@/model/endge/endge-auth-profiles'
 import { EndgeBindingsBehavior } from '@/model/endge/endge-bindings-behavior'
@@ -40,6 +41,8 @@ import { EndgeWorkspace } from '@/model/endge/endge-workspace'
 import { EndgeUIRegistry } from '@/model/endge/endge-ui-registry'
 import { ENDGE_CORE_MODULES } from '@/model/config/endge-modules'
 import type { EndgeComposition } from '@/model/endge/endge-composition'
+
+const ENDGE_DOMAIN_BUNDLE_VERSION = '1.1.0'
 
 /**
  * Единая статическая федерация Endge.
@@ -84,13 +87,29 @@ export class Endge extends EndgeFederation {
   }
 
   /**
-   * Скачивает текущий домен как JSON-файл через браузерный download.
+   * Собирает переносимый snapshot workspace и текущего домена.
+   */
+  static exportDomainBundle(): EndgeDomainBundle {
+    const workspace = Endge.workspace.serialize()
+    const sse = workspace.sse ? { ...workspace.sse } : undefined
+    if (sse)
+      delete sse.manualToken
+
+    return {
+      domain: Endge.domain.toPlain(),
+      version: ENDGE_DOMAIN_BUNDLE_VERSION,
+      workspace: {
+        ...workspace,
+        ...(sse ? { sse } : {}),
+      },
+    }
+  }
+
+  /**
+   * Скачивает текущий workspace и домен как JSON-файл через браузерный download.
    */
   static async download(): Promise<void> {
-    const bundle = {
-      domain: Endge.domain.toPlain(),
-      version: '1.0.0',
-    }
+    const bundle = this.exportDomainBundle()
     const jsonString = JSON.stringify(bundle)
 
     const now = new Date()

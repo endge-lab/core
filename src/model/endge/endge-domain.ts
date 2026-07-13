@@ -1,6 +1,7 @@
 import type { RVersion } from '@/domain/entities/reflect/RVersion'
 import type { RComponent } from '@/domain/types/component.types'
 import type { EndgeBootContext } from '@/domain/types/bootstrap.types'
+import type { EndgeDomainPlain } from '@/domain/types/domain-export.type'
 import type { FilterFieldSchema } from '@/domain/types/query.types'
 import type { EndgeSchemaDump } from '@/domain/types/schema.types'
 
@@ -2993,37 +2994,38 @@ export class EndgeDomain extends EndgeModule {
   /**
    * Преобразует EndgeDomain в JSON-объект.
    */
-  public toPlain(): any {
+  public toPlain(): EndgeDomainPlain {
+    const persisted = <T extends { isTemporary?: boolean }>(items: T[]): T[] =>
+      items.filter(item => item.isTemporary !== true)
+
     return {
-      projects: this.getProjects().map(x => Serialize.toPlain(x)),
-      types: this.getTypes().map(x => Serialize.toPlain(x)),
-      queries: this.getQueries()
-        .filter(x => x.type !== 'query-custom')
-        .map(x => Serialize.toPlain(x)),
-      dataViews: this.getDataViews().map(x => Serialize.toPlain(x)),
-      compositions: this.getCompositions().map(x => Serialize.toPlain(x)),
-      stores: this.getStores().map(x => Serialize.toPlain(x)),
-      components: this.getComponents().map(x => ReflectComponentToPlain(x)),
-      componentSFCs: this.getComponentSFCs().map(x => x.toPlain()),
-      actions: this.getActions().map(x => Serialize.toPlain(x)),
-      converters: this.getConverters().map(x => Serialize.toPlain(x)),
-      integrations: this.getIntegrations().map(x => Serialize.toPlain(x)),
-      views: this.getViews().map(x => Serialize.toPlain(x)),
-      folders: this.getFolders().map(x => Serialize.toPlain(x)),
-      parameters: this.getParameters().map(x => x.toPlain()),
-      filters: this.getFilters().map(x => x.toPlain()),
-      environments: this.getEnvironments().map(x => Serialize.toPlain(x)),
-      tenants: this.getTenants().map(x => x.toPlain()),
-      behaviorBindings: this.getBehaviorBindings().map(x => x.toPlain()),
-      presentationBindings: this.getPresentationBindings().map(x => x.toPlain()),
-      policies: this.getPolicies().map(x => Serialize.toPlain(x)),
-      styles: this.getStyles().map(x => x.toPlain()),
-      vocabs: this.getVocabs().map(x => x.toPlain()),
-      authProfiles: this.getAuthProfiles().map(x => x.toPlain()),
-      i18nBundles: this.getI18nBundles().map(x => x.toPlain()),
-      pageTemplates: this.getPageTemplates().map(x => x.toPlain()),
-      pages: this.getPages().map(x => x.toPlain()),
-      navigations: this.getNavigations().map(x => x.toPlain()),
+      projects: persisted(this.getProjects()).map(x => Serialize.toPlain(x)),
+      types: persisted(this.getTypes()).map(x => Serialize.toPlain(x)),
+      queries: persisted(this.getQueries()).map(x => Serialize.toPlain(x)),
+      dataViews: persisted(this.getDataViews()).map(x => Serialize.toPlain(x)),
+      compositions: persisted(this.getCompositions()).map(x => Serialize.toPlain(x)),
+      stores: persisted(this.getStores()).map(x => Serialize.toPlain(x)),
+      components: persisted(this.getComponents()).map(x => ReflectComponentToPlain(x)),
+      componentSFCs: persisted(this.getComponentSFCs()).map(x => x.toPlain()),
+      actions: persisted(this.getActions()).map(x => Serialize.toPlain(x)),
+      converters: persisted(this.getConverters()).map(x => Serialize.toPlain(x)),
+      integrations: persisted(this.getIntegrations()).map(x => Serialize.toPlain(x)),
+      views: persisted(this.getViews()).map(x => Serialize.toPlain(x)),
+      folders: persisted(this.getFolders()).map(x => Serialize.toPlain(x)),
+      parameters: persisted(this.getParameters()).map(x => x.toPlain()),
+      filters: persisted(this.getFilters()).map(x => x.toPlain()),
+      environments: persisted(this.getEnvironments()).map(x => Serialize.toPlain(x)),
+      tenants: persisted(this.getTenants()).map(x => x.toPlain()),
+      behaviorBindings: persisted(this.getBehaviorBindings()).map(x => x.toPlain()),
+      presentationBindings: persisted(this.getPresentationBindings()).map(x => x.toPlain()),
+      policies: persisted(this.getPolicies()).map(x => Serialize.toPlain(x)),
+      styles: persisted(this.getStyles()).map(x => x.toPlain()),
+      vocabs: persisted(this.getVocabs()).map(x => x.toPlain()),
+      authProfiles: persisted(this.getAuthProfiles()).map(x => x.toPlain()),
+      i18nBundles: persisted(this.getI18nBundles()).map(x => x.toPlain()),
+      pageTemplates: persisted(this.getPageTemplates()).map(x => x.toPlain()),
+      pages: persisted(this.getPages()).map(x => x.toPlain()),
+      navigations: persisted(this.getNavigations()).map(x => x.toPlain()),
     }
   }
 
@@ -3088,6 +3090,9 @@ export class EndgeDomain extends EndgeModule {
    * Парсит JSON в объект всех сущностей без добавления в домен.
    */
   static parsePlain(json: any): EndgeDomainParsed {
+    if (json?.domain && typeof json.domain === 'object' && !Array.isArray(json.domain))
+      json = json.domain
+
     const out: EndgeDomainParsed = {
       parameters: [],
       filters: [],
@@ -3258,143 +3263,7 @@ export class EndgeDomain extends EndgeModule {
    */
   static fromPlain(json: any): EndgeDomain {
     const domain = new EndgeDomain()
-
-    // Параметры (коллекция parameters)
-    if (json.parameters && Array.isArray(json.parameters)) {
-      json.parameters.forEach((p: any) => domain.addParameter(RParameter.fromPlain(p)))
-    }
-
-    // Фильтры (коллекция filters)
-    if (json.filters && Array.isArray(json.filters)) {
-      json.filters.forEach((f: any) => domain.addFilter(RFilter.fromPlain(f)))
-    }
-
-    // ---- ПРОЕКТЫ ----
-    const projectsRaw = json.projects ?? json._projectsByIdentity
-    if (Array.isArray(projectsRaw)) {
-      projectsRaw.forEach((projectJson: any) => domain.addProject(Serialize.fromJSON(RProject, projectJson)))
-    }
-
-    // Парсим типы
-    if (json.types && Array.isArray(json.types)) {
-      json.types.forEach((typeJson: any) => domain.addType(Serialize.fromJSON(RType, typeJson)))
-    }
-
-    // Парсим запросы
-    if (json.queries && Array.isArray(json.queries)) {
-      json.queries.forEach((queryJson: any) => {
-        const query = Serialize.fromJSON(RQuery, queryJson)
-        domain.addQuery(query)
-      })
-    }
-
-    // Парсим DataView.
-    if (json.dataViews && Array.isArray(json.dataViews)) {
-      json.dataViews.forEach((dataViewJson: any) => {
-        domain.addDataView(Serialize.fromJSON(RDataView, dataViewJson))
-      })
-    }
-    if (json.compositions && Array.isArray(json.compositions)) {
-      json.compositions.forEach((compositionJson: any) => {
-        domain.addComposition(Serialize.fromJSON(RComposition, compositionJson))
-      })
-    }
-    if (json.stores && Array.isArray(json.stores)) {
-      json.stores.forEach((storeJson: any) => {
-        domain.addStore(Serialize.fromJSON(RStore, storeJson))
-      })
-    }
-
-    // Парсим действия
-    if (json.actions && Array.isArray(json.actions)) {
-      json.actions.forEach((actionJson: any) => domain.addAction(Serialize.fromJSON(RAction, actionJson)))
-    }
-
-    // Парсим конвертеры
-    if (json.converters && Array.isArray(json.converters)) {
-      json.converters.forEach((converterJson: any) => domain.addConverter(Serialize.fromJSON(RConverter, converterJson)))
-    }
-
-    // Парсим интеграции
-    if (json.integrations && Array.isArray(json.integrations)) {
-      json.integrations.forEach((integrationJson: any) => domain.addIntegration(Serialize.fromJSON(RIntegration, integrationJson)))
-    }
-
-    // Окружения
-    if (json.environments && Array.isArray(json.environments)) {
-      json.environments.forEach((envJson: any) => domain.addEnvironment(Serialize.fromJSON(REnvironment, envJson)))
-    }
-    if (json.tenants && Array.isArray(json.tenants)) {
-      json.tenants.forEach((tenantJson: any) => domain.addTenant(Serialize.fromJSON(RTenant, tenantJson)))
-    }
-    if (json.behaviorBindings && Array.isArray(json.behaviorBindings)) {
-      json.behaviorBindings.forEach((bindingJson: any) => domain.addBehaviorBinding(Serialize.fromJSON(RBehaviorBinding, bindingJson)))
-    }
-    if (json.presentationBindings && Array.isArray(json.presentationBindings)) {
-      json.presentationBindings.forEach((bindingJson: any) => domain.addPresentationBinding(Serialize.fromJSON(RPresentationBinding, bindingJson)))
-    }
-
-    // Политики
-    if (json.policies && Array.isArray(json.policies)) {
-      json.policies.forEach((policyJson: any) => domain.addPolicy(Serialize.fromJSON(RPolicy, policyJson)))
-    }
-
-    // Стили
-    if (json.styles && Array.isArray(json.styles)) {
-      json.styles.forEach((styleJson: any) => domain.addStyle(Serialize.fromJSON(RStyle, styleJson)))
-    }
-    if (json.vocabs && Array.isArray(json.vocabs)) {
-      json.vocabs.forEach((vocabJson: any) => domain.addVocabs(Serialize.fromJSON(RVocabs, vocabJson)))
-    }
-    if (json.authProfiles && Array.isArray(json.authProfiles)) {
-      json.authProfiles.forEach((profileJson: any) => domain.addAuthProfile(RAuthProfile.fromPlain(profileJson)))
-    }
-    if (json.i18nBundles && Array.isArray(json.i18nBundles)) {
-      json.i18nBundles.forEach((bundleJson: any) => domain.addI18nBundles(Serialize.fromJSON(RI18nBundle, bundleJson)))
-    }
-
-    // Парсим виды
-    if (json.views && Array.isArray(json.views)) {
-      json.views.forEach((viewJson: any) => domain.addView(Serialize.fromJSON(RView, viewJson)))
-    }
-
-    // Шаблоны страниц
-    if (json.pageTemplates && Array.isArray(json.pageTemplates)) {
-      json.pageTemplates.forEach((tplJson: any) => domain.addPageTemplate(Serialize.fromJSON(RPageTemplate, tplJson)))
-    }
-
-    // Страницы (нормализуем блоки областей: API отдаёт entity: { relationTo, value }, нужны entityType и entityIdentity)
-    if (json.pages && Array.isArray(json.pages)) {
-      json.pages.forEach((pageJson: any) => {
-        const normalized = EndgeDomain.normalizePageBlocksFromPayload(pageJson)
-        domain.addPage(Serialize.fromJSON(RPage, normalized))
-      })
-    }
-
-    // Навигации
-    if (json.navigations && Array.isArray(json.navigations)) {
-      json.navigations.forEach((navJson: any) => domain.addNavigation(Serialize.fromJSON(RNavigation, navJson)))
-    }
-
-    // Парсим компоненты с использованием fromPlain()
-    if (json.components && Array.isArray(json.components)) {
-      json.components.forEach((componentJson: any) => {
-        const component = ReflectComponentFromPlain(componentJson)
-        if (component)
-          domain.addComponent(component)
-      })
-    }
-
-    // Парсим SFC-компоненты нового API отдельно от legacy components.
-    if (json.componentSFCs && Array.isArray(json.componentSFCs)) {
-      json.componentSFCs.forEach((componentJson: any) => domain.addComponentSFC(RComponentSFC.fromPlain(componentJson)))
-    }
-
-    // Парсим папки
-    if (json.folders && Array.isArray(json.folders)) {
-      json.folders.forEach((folderJson: any) => domain.addFolder(Serialize.fromJSON(RFolder, folderJson)))
-    }
-
+    domain.importFromSchema(EndgeDomain.parsePlain(json))
     return domain
   }
 

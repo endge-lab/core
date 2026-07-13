@@ -663,6 +663,41 @@ export class EndgeCompiler extends EndgeModule {
       }
     }
 
+    /** Проверяет публикацию публичных runtime outputs в writable Store fields. */
+    const validateStoreTo = (
+      runtime: CompositionProgramPayload['runtimes'][number],
+      outputNames: Set<string>,
+      runtimeTitle: string,
+    ): void => {
+      for (const publication of runtime.storeTo) {
+        const storeArtifact = storeArtifacts.get(publication.data)
+        const writableFields = new Set(
+          storeArtifact?.data.filter(field => field.kind === 'value').map(field => field.key) ?? [],
+        )
+        for (const target of Object.keys(publication.fields)) {
+          const root = target.split('.')[0] ?? ''
+          if (storeArtifact && !writableFields.has(root)) {
+            diagnostics.push({
+              severity: 'error',
+              code: 'composition-store-to-target-readonly',
+              message: `Store target "${publication.data}.${target}" отсутствует или является derived.`,
+              sourcePath: `runtimes.${runtime.name}.storeTo`,
+            })
+          }
+        }
+        for (const output of Object.values(publication.fields)) {
+          if (!outputNames.has(output)) {
+            diagnostics.push({
+              severity: 'error',
+              code: 'composition-store-to-output-missing',
+              message: `${runtimeTitle} "${runtime.identity}" не содержит output "${output}".`,
+              sourcePath: `runtimes.${runtime.name}.storeTo`,
+            })
+          }
+        }
+      }
+    }
+
     for (const runtime of payload.runtimes) {
       const dependencySource = runtime.kind === 'filter-view'
         ? payload.runtimes.find(item => item.name === runtime.identity)
@@ -750,33 +785,7 @@ export class EndgeCompiler extends EndgeModule {
           }
         }
         const outputNames = new Set(artifact.payload.outputs.map(output => output.key))
-        for (const publication of runtime.storeTo) {
-          const storeArtifact = storeArtifacts.get(publication.data)
-          const writableFields = new Set(
-            storeArtifact?.data.filter(field => field.kind === 'value').map(field => field.key) ?? [],
-          )
-          for (const target of Object.keys(publication.fields)) {
-            const root = target.split('.')[0] ?? ''
-            if (storeArtifact && !writableFields.has(root)) {
-              diagnostics.push({
-                severity: 'error',
-                code: 'composition-store-to-target-readonly',
-                message: `Store target "${publication.data}.${target}" отсутствует или является derived.`,
-                sourcePath: `runtimes.${runtime.name}.storeTo`,
-              })
-            }
-          }
-          for (const output of Object.values(publication.fields)) {
-            if (!outputNames.has(output)) {
-              diagnostics.push({
-                severity: 'error',
-                code: 'composition-store-to-output-missing',
-                message: `Query "${runtime.identity}" не содержит output "${output}".`,
-                sourcePath: `runtimes.${runtime.name}.storeTo`,
-              })
-            }
-          }
-        }
+        validateStoreTo(runtime, outputNames, 'Query')
       }
       else if (runtime.kind === 'composition') {
         const model = Endge.domain.getComposition(runtime.identity)
@@ -799,7 +808,10 @@ export class EndgeCompiler extends EndgeModule {
         }
         if (artifact.status === 'error') {
           diagnostics.push({ severity: 'error', code: 'composition-composition-invalid', message: `Composition "${runtime.identity}" содержит compile errors.`, sourcePath: `runtimes.${runtime.name}` })
+          continue
         }
+        const outputNames = new Set(artifact.payload.outputs.map(output => output.key))
+        validateStoreTo(runtime, outputNames, 'Composition')
       }
       else {
         const componentSFC = Endge.domain.getComponentSFC(runtime.identity)

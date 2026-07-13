@@ -183,10 +183,20 @@ describe('Composition runtime session', () => {
     outer.id = 23
     outer.identity = 'groundhandling-page'
     outer.name = 'Ground handling page'
+    const store = new RStore()
+    store.id = 24
+    store.identity = 'groundhandling-db'
+    store.name = 'Ground handling DB'
+    store.source = `defineStore({
+      data: {
+        raw: value({ rows: [] }),
+      },
+    })`
     Endge.domain.addQuery(sourceQuery)
     Endge.domain.addQuery(consumerQuery)
     Endge.domain.addComposition(inner)
     Endge.domain.addComposition(outer)
+    Endge.domain.addStore(store)
 
     const sourcePayload: QueryProgramPayload = {
       type: 'query-rest', sourceVersion: 2, endpoint: '', query: '',
@@ -205,9 +215,12 @@ describe('Composition runtime session', () => {
       outputs: [{ key: 'rows', runtime: 'query', output: 'raw' }],
     })
     const outerPayload = makeCompositionPayload({
-      data: [],
+      data: [{ name: 'db', kind: 'store', identity: 'groundhandling-db' }],
       runtimes: [
-        { name: 'requests', kind: 'composition', identity: 'groundhandling-default', props: {}, storeTo: [] },
+        {
+          name: 'requests', kind: 'composition', identity: 'groundhandling-default', props: {},
+          storeTo: [{ data: 'db', fields: { 'raw.rows': 'rows' } }],
+        },
         {
           name: 'consumer', kind: 'query', identity: 'table-consumer', storeTo: [],
           props: { rows: { kind: 'output', runtime: 'requests', output: 'rows' } },
@@ -229,12 +242,14 @@ describe('Composition runtime session', () => {
     expect(nested.parent).toBe(session.host)
     expect(consumer.getProps().rows).toEqual(initialRows)
     expect(session.host.getOutput('rows')).toEqual(initialRows)
+    expect(session.host.getDataSnapshot()).toEqual({ db: { raw: { rows: initialRows } } })
 
     const updatedRows = [{ id: 2, flight: 'SU200' }]
     const nestedQuery = nested.getChild('query') as QueryRuntimeHost
     Raph.set(nestedQuery.outputPath('raw'), updatedRows)
     expect(consumer.getProps().rows).toEqual(updatedRows)
     expect(session.host.getOutput('rows')).toEqual(updatedRows)
+    expect(session.host.getDataSnapshot()).toEqual({ db: { raw: { rows: updatedRows } } })
 
     session.unmount()
     expect(Endge.runtime.getRuntimeHosts()).toEqual([])

@@ -312,8 +312,8 @@ function readRuntime(name: string, raw: t.Expression, dataNames: Set<string>, di
       continue
     }
     if (modifier.name === 'storeTo') {
-      if (kind !== 'query') {
-        diagnostics.push(diagnostic('error', 'composition-store-to-runtime-kind', '.storeTo(...) поддерживается только Query runtime.', `runtimes.${name}.storeTo`, modifier.call))
+      if (kind !== 'query' && kind !== 'composition') {
+        diagnostics.push(diagnostic('error', 'composition-store-to-runtime-kind', '.storeTo(...) поддерживается только Query и Composition runtime.', `runtimes.${name}.storeTo`, modifier.call))
         continue
       }
       const target = modifier.call.arguments[0]
@@ -334,7 +334,7 @@ function readRuntime(name: string, raw: t.Expression, dataNames: Set<string>, di
         const field = propertyName(property.key)
         const output = readOutputReference(property.value)
         if (!field || !output) {
-          diagnostics.push(diagnostic('error', 'composition-store-to-field', 'storeTo mapping имеет вид { storeField: output(queryOutput) }.', `runtimes.${name}.storeTo`, property))
+          diagnostics.push(diagnostic('error', 'composition-store-to-field', 'storeTo mapping имеет вид { storeField: output(runtimeOutput) }.', `runtimes.${name}.storeTo`, property))
           continue
         }
         fields[field] = output

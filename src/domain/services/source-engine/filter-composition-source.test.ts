@@ -246,8 +246,15 @@ defineComposition({
   it('compiles nested Composition runtimes and keeps their inputs explicit', () => {
     const valid = compileCompositionSource(`
 defineComposition({
+  data: {
+    db: store('groundhandling-db'),
+  },
   runtimes: {
-    requests: composition('groundhandling-default'),
+    requests: composition('groundhandling-default')
+      .storeTo(data('db'), {
+        'raw.pairsArrival': output('arrivalPairs'),
+        'raw.pairsDeparture': output('departurePairs'),
+      }),
     table: component('groundhandling-table').withProps({
       rows: fromOutput('requests', 'arrivalPairs')
         .concat(fromOutput('requests', 'departurePairs'))
@@ -265,7 +272,15 @@ defineComposition({
       name: 'requests',
       kind: 'composition',
       identity: 'groundhandling-default',
+      storeTo: [{
+        data: 'db',
+        fields: {
+          'raw.pairsArrival': 'arrivalPairs',
+          'raw.pairsDeparture': 'departurePairs',
+        },
+      }],
     })
+    expect(valid.artifact?.graph.publications).toHaveLength(2)
 
     const invalid = compileCompositionSource(`
 defineComposition({

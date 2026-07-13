@@ -260,7 +260,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }
   }
 
-  /** Атомарно публикует накопленный batch Query outputs в writable Store data. */
+  /** Атомарно публикует накопленный batch runtime outputs в writable Store data. */
   private _publishUpdates(publications: CompositionRuntimePublicationConnection[]): void {
     const writes: Array<{ path: string, value: unknown }> = []
     for (const publication of publications) {
@@ -508,6 +508,13 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         policy: { distinct: 'structural' },
       }))
     }
+
+    const initialPublications = payload.graph.publications.filter(publication => {
+      const source = this._children.get(publication.sourceRuntime)
+      return source && Raph.get(source.outputPath(publication.sourceOutput)) !== undefined
+    })
+    if (initialPublications.length)
+      this._publishUpdates(initialPublications)
   }
 
   private async _runQuery(name: string): Promise<void> {

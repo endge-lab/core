@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
+import { RStore } from '@/domain/entities/reflect/RStore'
 import { Endge } from '@/model/endge/endge'
 
 describe('EndgeCompiler composition validation', () => {
@@ -96,10 +97,16 @@ defineComposition({
 `
     Endge.domain.addQuery(query)
     Endge.domain.addComposition(child)
+    const store = new RStore()
+    store.id = 12
+    store.identity = 'groundhandling-db'
+    store.name = 'Ground handling DB'
+    store.source = `defineStore({ data: { raw: value({ rows: [] }) } })`
+    Endge.domain.addStore(store)
     Endge.compiler.buildQuery(query)
     Endge.compiler.buildComposition(child)
 
-    const parent = createNestedCompositionWithOutput('groundhandling-default', 'rows')
+    const parent = createNestedCompositionWithOutput('groundhandling-default', 'rows', true)
     const artifact = Endge.compiler.buildComposition(parent)
     expect(artifact.diagnostics).not.toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'composition-output-selection-missing' }),
@@ -182,12 +189,18 @@ defineComposition({
   return composition
 }
 
-function createNestedCompositionWithOutput(identity: string, output: string): RComposition {
+function createNestedCompositionWithOutput(identity: string, output: string, storeTo = false): RComposition {
   const composition = createNestedComposition(identity)
   composition.source = `
 defineComposition({
+  ${storeTo ? `data: {
+    db: store('groundhandling-db'),
+  },` : ''}
   runtimes: {
-    requests: composition('${identity}'),
+    requests: composition('${identity}')${storeTo ? `
+      .storeTo(data('db'), {
+        'raw.rows': output('${output}'),
+      })` : ''},
   },
   outputs: {
     rows: output().fromRuntime('requests').select('${output}'),
