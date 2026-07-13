@@ -11,6 +11,7 @@ import { RStore } from '@/domain/entities/reflect/RStore'
 import { FilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
 import { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
 import { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
+import { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
 import { compileFilterSource } from '@/domain/services/source-engine/filter-source-compile'
 import { buildRuntimeGraph } from '@/domain/services/source-engine/composition-source-compile'
 import { Endge } from '@/model/endge/endge'
@@ -156,6 +157,87 @@ describe('Composition runtime session', () => {
 
     session.unmount()
     expect(Raph.get(base)).toBeUndefined()
+  })
+
+  it('mounts a nested Composition and exposes its outputs reactively', async () => {
+    const initialRows = [{ id: 1, flight: 'SU100' }]
+    vi.spyOn(QueryRuntimeHost.prototype, 'run').mockImplementation(async function (this: QueryRuntimeHost) {
+      if (this.entityIdentity === 'groundhandling-query')
+        Raph.set(this.outputPath('raw'), initialRows)
+      return this.getOutputs() as Record<string, unknown>
+    })
+
+    const sourceQuery = new RQuery()
+    sourceQuery.id = 20
+    sourceQuery.identity = 'groundhandling-query'
+    sourceQuery.name = 'Ground handling query'
+    const consumerQuery = new RQuery()
+    consumerQuery.id = 21
+    consumerQuery.identity = 'table-consumer'
+    consumerQuery.name = 'Table consumer'
+    const inner = new RComposition()
+    inner.id = 22
+    inner.identity = 'groundhandling-default'
+    inner.name = 'Ground handling requests'
+    const outer = new RComposition()
+    outer.id = 23
+    outer.identity = 'groundhandling-page'
+    outer.name = 'Ground handling page'
+    Endge.domain.addQuery(sourceQuery)
+    Endge.domain.addQuery(consumerQuery)
+    Endge.domain.addComposition(inner)
+    Endge.domain.addComposition(outer)
+
+    const sourcePayload: QueryProgramPayload = {
+      type: 'query-rest', sourceVersion: 2, endpoint: '', query: '',
+      props: [], requestBody: null,
+      outputs: [{ key: 'raw', source: { type: 'response', path: null }, dataViews: [], materialization: { kind: 'source' } }],
+    }
+    const consumerPayload: QueryProgramPayload = {
+      type: 'query-rest', sourceVersion: 2, endpoint: '', query: '',
+      props: [{ key: 'rows', type: 'Object', optional: true, array: true }],
+      requestBody: null, outputs: [],
+    }
+    const innerPayload = makeCompositionPayload({
+      data: [],
+      runtimes: [{ name: 'query', kind: 'query', identity: 'groundhandling-query', props: {}, storeTo: [] }],
+      hooks: [{ kind: 'mount', target: 'query' }],
+      outputs: [{ key: 'rows', runtime: 'query', output: 'raw' }],
+    })
+    const outerPayload = makeCompositionPayload({
+      data: [],
+      runtimes: [
+        { name: 'requests', kind: 'composition', identity: 'groundhandling-default', props: {}, storeTo: [] },
+        {
+          name: 'consumer', kind: 'query', identity: 'table-consumer', storeTo: [],
+          props: { rows: { kind: 'output', runtime: 'requests', output: 'rows' } },
+        },
+      ],
+      hooks: [],
+      outputs: [{ key: 'rows', runtime: 'requests', output: 'rows' }],
+    })
+    Endge.program.beginCompile('test')
+    Endge.program.addArtifact(artifact('query', 20, 'groundhandling-query', sourcePayload))
+    Endge.program.addArtifact(artifact('query', 21, 'table-consumer', consumerPayload))
+    Endge.program.addArtifact(artifact('composition', 22, 'groundhandling-default', innerPayload))
+    Endge.program.addArtifact(artifact('composition', 23, 'groundhandling-page', outerPayload))
+
+    const session = await Endge.composition.mount('groundhandling-page', { id: 'groundhandling-page-session' })
+    const nested = session.host.getChild('requests') as CompositionRuntimeHost
+    const consumer = session.host.getChild('consumer') as QueryRuntimeHost
+    expect(nested).toBeInstanceOf(CompositionRuntimeHost)
+    expect(nested.parent).toBe(session.host)
+    expect(consumer.getProps().rows).toEqual(initialRows)
+    expect(session.host.getOutput('rows')).toEqual(initialRows)
+
+    const updatedRows = [{ id: 2, flight: 'SU200' }]
+    const nestedQuery = nested.getChild('query') as QueryRuntimeHost
+    Raph.set(nestedQuery.outputPath('raw'), updatedRows)
+    expect(consumer.getProps().rows).toEqual(updatedRows)
+    expect(session.host.getOutput('rows')).toEqual(updatedRows)
+
+    session.unmount()
+    expect(Endge.runtime.getRuntimeHosts()).toEqual([])
   })
 })
 

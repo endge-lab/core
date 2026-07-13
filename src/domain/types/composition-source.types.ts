@@ -4,7 +4,7 @@ import type { RuntimeHost } from '@/domain/types/runtime-host.types'
 import type { SourceExpressionIR, SourceFieldDefinition } from '@/domain/types/source-expression.types'
 import type { FilterViewControlDefinition } from '@/domain/types/filter-view.type'
 
-export type CompositionRuntimeKind = 'filter' | 'query' | 'component' | 'filter-view'
+export type CompositionRuntimeKind = 'filter' | 'query' | 'component' | 'composition' | 'filter-view'
 
 export type CompositionBindingValue
   = | { kind: 'literal', value: unknown }

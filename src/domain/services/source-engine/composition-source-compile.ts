@@ -215,13 +215,13 @@ function readRuntimes(node: t.ObjectExpression, dataNames: Set<string>, diagnost
 function readRuntime(name: string, raw: t.Expression, dataNames: Set<string>, diagnostics: DiagnosticDraft[]): CompositionRuntimeDescriptor | null {
   const chain = memberChain(raw)
   if (!chain || !t.isIdentifier(chain.base.callee)) {
-    diagnostics.push(diagnostic('error', 'composition-runtime-shape', `Runtime "${name}" должен начинаться с filter/query/component/filterView(identity).`, `runtimes.${name}`, raw))
+    diagnostics.push(diagnostic('error', 'composition-runtime-shape', `Runtime "${name}" должен начинаться с filter/query/component/composition/filterView(identity).`, `runtimes.${name}`, raw))
     return null
   }
 
   const rawKind = chain.base.callee.name
   const kind = (rawKind === 'filterView' ? 'filter-view' : rawKind) as CompositionRuntimeKind
-  if (kind !== 'filter' && kind !== 'query' && kind !== 'component' && kind !== 'filter-view') {
+  if (kind !== 'filter' && kind !== 'query' && kind !== 'component' && kind !== 'composition' && kind !== 'filter-view') {
     diagnostics.push(diagnostic('error', 'composition-runtime-kind', `Runtime kind "${rawKind}" не поддерживается.`, `runtimes.${name}`, chain.base))
     return null
   }
@@ -291,8 +291,16 @@ function readRuntime(name: string, raw: t.Expression, dataNames: Set<string>, di
       continue
     }
     if (modifier.name === 'withProps') {
-      if (kind === 'filter') {
-        diagnostics.push(diagnostic('error', 'composition-filter-props-unsupported', 'Filter runtime v1 не принимает .withProps(...).', `runtimes.${name}.withProps`, modifier.call))
+      if (kind === 'filter' || kind === 'composition') {
+        diagnostics.push(diagnostic(
+          'error',
+          kind === 'filter' ? 'composition-filter-props-unsupported' : 'composition-composition-props-unsupported',
+          kind === 'filter'
+            ? 'Filter runtime v1 не принимает .withProps(...).'
+            : 'Composition runtime v1 не принимает .withProps(...): публичный input contract для Composition пока не определен.',
+          `runtimes.${name}.withProps`,
+          modifier.call,
+        ))
         continue
       }
       const config = modifier.call.arguments[0]

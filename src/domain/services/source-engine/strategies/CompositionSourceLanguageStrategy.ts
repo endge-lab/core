@@ -18,7 +18,7 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
     alias: 'Endge Composition Source',
     extension: '.endge-composition.ts',
     keywords: [
-      'component', 'control', 'data', 'defineComposition', 'filter', 'filterView', 'fromData', 'fromFilter', 'fromOutput', 'fromStore', 'onChange',
+      'component', 'composition', 'control', 'data', 'defineComposition', 'filter', 'filterView', 'fromData', 'fromFilter', 'fromOutput', 'fromStore', 'onChange',
       'onMount', 'output', 'query', 'metadata', ...VALUE_EXPRESSION_FUNCTION_NAMES,
     ],
     functions: [
@@ -58,6 +58,7 @@ const COMPOSITION_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'filterView', kind: 'function', insertText: `filterView('filter')`, detail: 'Renderable Filter view runtime' },
   { label: 'query', kind: 'function', insertText: `query('identity').withProps({})`, detail: 'Query runtime' },
   { label: 'component', kind: 'function', insertText: `component('identity').withProps({})`, detail: 'Component runtime' },
+  { label: 'composition', kind: 'function', insertText: `composition('identity')`, detail: 'Nested Composition runtime' },
   { label: 'fromOutput', kind: 'function', insertText: `fromOutput('runtime', 'output')`, detail: 'Runtime output binding' },
   { label: 'fromFilter', kind: 'function', insertText: `fromFilter('filter').fields([])`, detail: 'Filter fields runtime slice binding' },
   { label: 'fromStore', kind: 'function', insertText: `fromStore('path')`, detail: 'Raph store binding' },

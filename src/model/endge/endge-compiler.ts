@@ -74,7 +74,13 @@ export class EndgeCompiler extends EndgeModule {
     if (!this.compilePhase('query', ENDGE_LOG_LANES.QUERIES, 'query source', Endge.domain.getQueries(), context))
       return
 
-    if (!this.compilePhase('composition', ENDGE_LOG_LANES.COMPONENTS, 'compositions', Endge.domain.getCompositions(), context))
+    if (!this.compilePhase(
+      'composition',
+      ENDGE_LOG_LANES.COMPONENTS,
+      'compositions',
+      this._orderCompositionsForCompile(Endge.domain.getCompositions()),
+      context,
+    ))
       return
 
     dbg.info('Проект успешно скомпилирован', { icon: 'ti ti-check text-xl' })
@@ -302,7 +308,7 @@ export class EndgeCompiler extends EndgeModule {
         const payload = compiledPayload
           ? { ...compiledPayload, sourceVersion: Number(entity.sourceVersion ?? 1) || 1 }
           : undefined
-        const validation = payload ? this._validateComposition(payload) : { diagnostics: [], dependencies: [] }
+        const validation = payload ? this._validateComposition(payload, entity) : { diagnostics: [], dependencies: [] }
         return this._makeArtifact(entity, 'composition', context, {
           capabilities: ['compilable', 'executable', 'configuration'],
           metadata: { self: result.metadata ?? {}, nodes: [] },
@@ -626,7 +632,7 @@ export class EndgeCompiler extends EndgeModule {
   }
 
   /** Проверяет domain/program references и stable-prop bindings Composition. */
-  private _validateComposition(payload: CompositionProgramPayload): {
+  private _validateComposition(payload: CompositionProgramPayload, owner: RComposition): {
     diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
     dependencies: ProgramArtifact['dependencies']
   } {
@@ -772,6 +778,29 @@ export class EndgeCompiler extends EndgeModule {
           }
         }
       }
+      else if (runtime.kind === 'composition') {
+        const model = Endge.domain.getComposition(runtime.identity)
+        const artifact = Endge.program.getCompositionArtifact(runtime.identity)
+        if (runtime.identity === owner.identity) {
+          diagnostics.push({ severity: 'error', code: 'composition-self-reference', message: `Composition "${owner.identity}" не может запускать саму себя.`, sourcePath: `runtimes.${runtime.name}` })
+          continue
+        }
+        if (this._compositionDependsOn(runtime.identity, owner.identity)) {
+          diagnostics.push({ severity: 'error', code: 'composition-reference-cycle', message: `Composition dependency cycle: "${owner.identity}" → "${runtime.identity}" → "${owner.identity}".`, sourcePath: `runtimes.${runtime.name}` })
+          continue
+        }
+        if (!model) {
+          diagnostics.push({ severity: 'error', code: 'composition-composition-missing', message: `Composition "${runtime.identity}" не найдена.`, sourcePath: `runtimes.${runtime.name}` })
+          continue
+        }
+        if (!artifact) {
+          diagnostics.push({ severity: 'error', code: 'composition-composition-artifact-missing', message: `Composition "${runtime.identity}" найдена в домене, но не собрана в compiled program. Проверьте source композиции или предыдущие ошибки build.`, sourcePath: `runtimes.${runtime.name}` })
+          continue
+        }
+        if (artifact.status === 'error') {
+          diagnostics.push({ severity: 'error', code: 'composition-composition-invalid', message: `Composition "${runtime.identity}" содержит compile errors.`, sourcePath: `runtimes.${runtime.name}` })
+        }
+      }
       else {
         const componentSFC = Endge.domain.getComponentSFC(runtime.identity)
         const component = Endge.domain.getComponent(runtime.identity)
@@ -784,15 +813,21 @@ export class EndgeCompiler extends EndgeModule {
       }
     }
 
+    const runtimeHasOutput = (runtime: CompositionProgramPayload['runtimes'][number] | undefined, output: string): boolean => {
+      if (runtime?.kind === 'filter')
+        return Endge.program.getFilterArtifact(runtime.identity)?.payload.outputs.some(item => item.key === output) ?? false
+      if (runtime?.kind === 'query')
+        return Endge.program.getQueryArtifact(runtime.identity)?.payload.outputs.some(item => item.key === output) ?? false
+      if (runtime?.kind === 'composition')
+        return Endge.program.getCompositionArtifact(runtime.identity)?.payload.outputs.some(item => item.key === output) ?? false
+      return false
+    }
+
     for (const output of payload.outputs) {
       if (!output.output)
         continue
       const runtime = payload.runtimes.find(item => item.name === output.runtime)
-      const outputExists = runtime?.kind === 'filter'
-        ? Endge.program.getFilterArtifact(runtime.identity)?.payload.outputs.some(item => item.key === output.output)
-        : runtime?.kind === 'query'
-          ? Endge.program.getQueryArtifact(runtime.identity)?.payload.outputs.some(item => item.key === output.output)
-          : false
+      const outputExists = runtimeHasOutput(runtime, output.output)
       if (!outputExists) {
         diagnostics.push({
           severity: 'error',
@@ -810,11 +845,7 @@ export class EndgeCompiler extends EndgeModule {
         const source = payload.runtimes.find(item => item.name === binding.runtime)
         if (!source)
           continue
-        const outputExists = source.kind === 'filter'
-          ? Endge.program.getFilterArtifact(source.identity)?.payload.outputs.some(item => item.key === binding.output)
-          : source.kind === 'query'
-            ? Endge.program.getQueryArtifact(source.identity)?.payload.outputs.some(item => item.key === binding.output)
-            : false
+        const outputExists = runtimeHasOutput(source, binding.output)
         if (!outputExists) {
           diagnostics.push({
             severity: 'error',
@@ -830,11 +861,7 @@ export class EndgeCompiler extends EndgeModule {
       if (hook.kind !== 'change')
         continue
       const source = payload.runtimes.find(item => item.name === hook.runtime)
-      const outputExists = source?.kind === 'filter'
-        ? Endge.program.getFilterArtifact(source.identity)?.payload.outputs.some(item => item.key === hook.output)
-        : source?.kind === 'query'
-          ? Endge.program.getQueryArtifact(source.identity)?.payload.outputs.some(item => item.key === hook.output)
-          : false
+      const outputExists = runtimeHasOutput(source, hook.output)
       if (!outputExists) {
         diagnostics.push({
           severity: 'error',
@@ -846,6 +873,60 @@ export class EndgeCompiler extends EndgeModule {
     }
 
     return { diagnostics, dependencies }
+  }
+
+  /** Сортирует Composition так, чтобы compiled artifact зависимости появился раньше consumer. */
+  private _orderCompositionsForCompile(compositions: RComposition[]): RComposition[] {
+    const byIdentity = new Map(compositions.map(composition => [composition.identity, composition]))
+    const ordered: RComposition[] = []
+    const visiting = new Set<string>()
+    const visited = new Set<string>()
+
+    const visit = (composition: RComposition): void => {
+      const identity = String(composition.identity ?? composition.id)
+      if (visited.has(identity))
+        return
+      if (visiting.has(identity))
+        return
+      visiting.add(identity)
+      for (const dependency of this._compositionDependencies(composition)) {
+        const child = byIdentity.get(dependency)
+        if (child)
+          visit(child)
+      }
+      visiting.delete(identity)
+      visited.add(identity)
+      ordered.push(composition)
+    }
+
+    for (const composition of compositions)
+      visit(composition)
+    return ordered
+  }
+
+  /** Проверяет достижимость Composition dependency для compile-time cycle diagnostics. */
+  private _compositionDependsOn(fromIdentity: string, targetIdentity: string, visited = new Set<string>()): boolean {
+    if (fromIdentity === targetIdentity)
+      return true
+    if (visited.has(fromIdentity))
+      return false
+    visited.add(fromIdentity)
+    const model = Endge.domain.getComposition(fromIdentity)
+    if (!model)
+      return false
+    return this._compositionDependencies(model)
+      .some(identity => this._compositionDependsOn(identity, targetIdentity, visited))
+  }
+
+  /** Читает только прямые Composition dependencies из source без создания Program artifact. */
+  private _compositionDependencies(composition: RComposition): string[] {
+    const result = Endge.source.compile('composition', this._resolveCompositionSource(composition))
+    const payload = result.artifact as CompositionProgramPayload | undefined
+    return [...new Set(
+      (payload?.runtimes ?? [])
+        .filter(runtime => runtime.kind === 'composition')
+        .map(runtime => runtime.identity),
+    )]
   }
 
   /** Материализует локальные DataView внутри DataView pipeline steps в child artifacts. */

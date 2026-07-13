@@ -107,7 +107,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       this._mountData(payload)
       const orderedRuntimes = this._dependencyOrder(payload.runtimes)
       for (const descriptor of orderedRuntimes)
-        this._createChild(descriptor)
+        await this._createChild(descriptor)
       for (const descriptor of orderedRuntimes)
         this._bindChild(descriptor)
       this._makeOutputs(payload)
@@ -148,6 +148,15 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
 
   public getOutputs(): Readonly<Record<string, CompositionRuntimeOutputHandle>> {
     return { ...this._outputs }
+  }
+
+  /** Возвращает текущее значение публичного Composition output. */
+  public getOutput(name: string): unknown {
+    const key = String(name ?? '').trim()
+    const handle = this._outputs[key]
+    if (!handle)
+      return undefined
+    return handle.output ? Raph.get(this.outputPath(key)) : handle.runtime
   }
 
   /** Текущие значения data-блока для preview и runtime debugger. */
@@ -294,7 +303,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     return path ? `${basePath}.${path.split('.').map(encodePathPart).join('.')}` : basePath
   }
 
-  private _createChild(descriptor: CompositionProgramPayload['runtimes'][number]): void {
+  private async _createChild(descriptor: CompositionProgramPayload['runtimes'][number]): Promise<void> {
     if (descriptor.kind === 'filter-view') {
       const source = this._children.get(descriptor.identity) as FilterRuntimeHost | undefined
       if (!source || source.entityType !== 'filter' || source.runtimeType !== 'filter-runtime-host')
@@ -340,10 +349,15 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       model = Endge.domain.getFilter(descriptor.identity)
     else if (descriptor.kind === 'query')
       model = Endge.domain.getQuery(descriptor.identity)
+    else if (descriptor.kind === 'composition')
+      model = Endge.domain.getComposition(descriptor.identity)
     else
       model = Endge.domain.getComponentSFC(descriptor.identity) ?? Endge.domain.getComponent(descriptor.identity)
     if (!model)
       throw new Error(`[CompositionRuntimeHost] model "${descriptor.identity}" is missing.`)
+
+    if (descriptor.kind === 'composition')
+      this._assertCompositionCycle(descriptor.identity)
 
     const initialProps = Object.fromEntries(
       Object.entries(this._compiledInputs(descriptor.name))
@@ -370,6 +384,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       throw new Error(`[CompositionRuntimeHost] runtime "${descriptor.name}" cannot be created.`)
     this._children.set(descriptor.name, child)
     this._childDescriptors.set(descriptor.name, descriptor)
+    if (descriptor.kind === 'composition')
+      await (child as unknown as CompositionRuntimeHost).mountGraph()
   }
 
   private _bindChild(descriptor: CompositionProgramPayload['runtimes'][number]): void {
@@ -445,8 +461,26 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       const runtime = this._children.get(output.runtime)
       if (!runtime)
         throw new Error(`[CompositionRuntimeHost] output runtime "${output.runtime}" is missing.`)
+      if (output.output) {
+        const sourcePath = runtime.outputPath(output.output)
+        const targetPath = this.outputPath(output.key)
+        const sync = () => Raph.set(targetPath, Raph.get(sourcePath))
+        sync()
+        this._disposers.push(Raph.watch([sourcePath, `${sourcePath}.*`], sync))
+      }
       return [output.key, { runtime, output: output.output }]
     }))
+  }
+
+  /** Не допускает прямые и транзитивные циклы Composition runtime tree. */
+  private _assertCompositionCycle(identity: string): void {
+    let current: RuntimeHost<any, any> | null = this
+    while (current) {
+      if (current.entityType === 'composition' && current.entityIdentity === identity) {
+        throw new Error(`[CompositionRuntimeHost] composition cycle detected for "${identity}".`)
+      }
+      current = current.parent
+    }
   }
 
   private _bindHooks(payload: CompositionProgramPayload): void {

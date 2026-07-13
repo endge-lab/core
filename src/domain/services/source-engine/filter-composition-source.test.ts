@@ -243,6 +243,43 @@ defineComposition({
     })
   })
 
+  it('compiles nested Composition runtimes and keeps their inputs explicit', () => {
+    const valid = compileCompositionSource(`
+defineComposition({
+  runtimes: {
+    requests: composition('groundhandling-default'),
+    table: component('groundhandling-table').withProps({
+      rows: fromOutput('requests', 'arrivalPairs')
+        .concat(fromOutput('requests', 'departurePairs'))
+        .uniqBy(get('id')),
+    }),
+  },
+  outputs: {
+    rows: output().fromRuntime('requests').select('arrivalPairs'),
+  },
+})
+`)
+
+    expect(valid.diagnostics).toEqual([])
+    expect(valid.artifact?.runtimes[0]).toMatchObject({
+      name: 'requests',
+      kind: 'composition',
+      identity: 'groundhandling-default',
+    })
+
+    const invalid = compileCompositionSource(`
+defineComposition({
+  runtimes: {
+    requests: composition('groundhandling-default').withProps({ value: 1 }),
+  },
+})
+`)
+    expect(invalid.artifact).toBeNull()
+    expect(invalid.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'composition-composition-props-unsupported' }),
+    ]))
+  })
+
   it('compiles data, storeTo and fromData with optional outputs', () => {
     const result = compileCompositionSource(`
 defineComposition({
