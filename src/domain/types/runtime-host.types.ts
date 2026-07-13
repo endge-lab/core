@@ -13,6 +13,9 @@ export type RuntimeHostStatus
     | 'destroyed'
     | 'error'
 
+/** Возможность, которую runtime-host предоставляет внешним consumers. */
+export type RuntimeHostCapability = 'renderable'
+
 export type RuntimeHostResourceKind
   = 'raph-node'
     | 'behavior-binding'
@@ -160,6 +163,9 @@ export interface RuntimeHostSnapshot {
 
   /** Технический тип runtime-host реализации. */
   runtimeType: string
+
+  /** Возможности runtime-host, доступные внешним consumers. */
+  capabilities: RuntimeHostCapability[]
 
   /** Тип доменной сущности, к которой привязан host. */
   entityType: RuntimeEntityType
@@ -328,6 +334,9 @@ export interface RuntimeHost<
    * Имя конкретной runtime-реализации host.
    */
   readonly runtimeType: string
+
+  /** Возможности runtime-host, доступные внешним consumers. */
+  readonly capabilities: readonly RuntimeHostCapability[]
   /** Тип привязанной доменной сущности. */
   readonly entityType: TType
 
@@ -375,6 +384,9 @@ export interface RuntimeHost<
 
   /** Изменить статус host и обновить updatedAt. */
   setStatus: (status: RuntimeHostStatus) => void
+
+  /** Проверить наличие runtime capability. */
+  hasCapability: (capability: RuntimeHostCapability) => boolean
 
   /** Добавить/обновить runtime-ресурс host. */
   addResource: (resource: RuntimeHostResource) => void

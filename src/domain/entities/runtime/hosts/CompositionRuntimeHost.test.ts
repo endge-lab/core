@@ -8,6 +8,7 @@ import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RStore } from '@/domain/entities/reflect/RStore'
+import { FilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
 import { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
 import { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
 import { compileFilterSource } from '@/domain/services/source-engine/filter-source-compile'
@@ -30,11 +31,18 @@ describe('Composition runtime session', () => {
 
     const session = await Endge.composition.mount('schedule-page', { id: 'composition-session' })
     const filter = session.outputs.filter?.runtime as FilterRuntimeHost
+    const filterView = session.host.getChild('dateFilter') as FilterViewRuntimeHost
     const query = session.host.getChild('query') as QueryRuntimeHost
 
     expect(session.id).toBe('composition-session')
     expect(session.host.getChildren().map(child => child.name)).toEqual(['filter', 'dateFilter', 'query'])
-    expect(session.host.getChild('dateFilter')?.runtimeType).toBe('filter-fields-runtime-host')
+    expect(session.host.getChild('dateFilter')?.runtimeType).toBe('filter-view-runtime-host')
+    expect(session.host.getChild('dateFilter')?.hasCapability('renderable')).toBe(true)
+    expect(filterView.getProps()).toMatchObject({
+      showLabels: true,
+      labels: { search: 'Поиск рейса' },
+      requestPreview: { where: { search: '' } },
+    })
     expect(session.host.getFilterFieldsSlice('filter', ['search'])).toMatchObject({
       kind: 'filter-fields',
       runtimeId: 'composition-session:filter',
@@ -53,9 +61,9 @@ describe('Composition runtime session', () => {
         values: { search: '' },
       },
     })
-
     await filter.command('set').run({ key: 'search', value: 'S' })
     await filter.command('set').run({ key: 'search', value: 'SU' })
+    expect(filterView.getProps().requestPreview).toEqual({ where: { search: 'SU' } })
     expect(query.getProps()).toMatchObject({
       filterPayload: { where: { search: 'SU' } },
       filterModel: {
@@ -184,7 +192,14 @@ defineFilter({
     data: [],
     runtimes: [
       { name: 'filter', kind: 'filter', identity: 'schedule-filter', props: {}, storeTo: [] },
-      { name: 'dateFilter', kind: 'filter-fields', identity: 'filter', fields: ['search'], props: {}, storeTo: [] },
+      {
+        name: 'dateFilter', kind: 'filter-view', identity: 'filter', fields: ['search'], storeTo: [],
+        props: {
+          showLabels: { kind: 'literal', value: true },
+          labels: { kind: 'literal', value: { search: 'Поиск рейса' } },
+          requestPreview: { kind: 'output', runtime: 'filter', output: 'request' },
+        },
+      },
       {
         name: 'query', kind: 'query', identity: 'schedule-query', storeTo: [],
         props: {

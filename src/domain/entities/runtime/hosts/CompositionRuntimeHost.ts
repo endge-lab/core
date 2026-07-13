@@ -1,6 +1,6 @@
 import type { RComposition } from '@/domain/entities/reflect/RComposition'
 import type { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentSFCRuntimeHost'
-import type { FilterFieldsRuntimeHost } from '@/domain/entities/runtime/hosts/FilterFieldsRuntimeHost'
+import type { FilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
 import type { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
 import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
 import type {
@@ -16,7 +16,7 @@ import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext, RuntimeHos
 import { Raph, RaphNode, full, type RaphDerivedHandle } from '@endge/raph'
 
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
-import { FilterFieldsRuntimeHost as EndgeFilterFieldsRuntimeHost } from '@/domain/entities/runtime/hosts/FilterFieldsRuntimeHost'
+import { FilterViewRuntimeHost as EndgeFilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
 import { Endge } from '@/model/endge/endge'
 
 function defaultContext(): RuntimeHostContext<'composition'> {
@@ -295,17 +295,24 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   }
 
   private _createChild(descriptor: CompositionProgramPayload['runtimes'][number]): void {
-    if (descriptor.kind === 'filter-fields') {
+    if (descriptor.kind === 'filter-view') {
       const source = this._children.get(descriptor.identity) as FilterRuntimeHost | undefined
       if (!source || source.entityType !== 'filter' || source.runtimeType !== 'filter-runtime-host')
-        throw new Error(`[CompositionRuntimeHost] filterFields source runtime "${descriptor.identity}" is missing.`)
-      const child = new EndgeFilterFieldsRuntimeHost({
+        throw new Error(`[CompositionRuntimeHost] filterView source runtime "${descriptor.identity}" is missing.`)
+      const initialProps = Object.fromEntries(
+        Object.entries(descriptor.props)
+          .map(([key, binding]) => [key, this._readBinding(binding)]),
+      )
+      const child = new EndgeFilterViewRuntimeHost({
         id: `${this.id}:${descriptor.name}`,
         name: descriptor.name,
         model: source.model as any,
         sourceRuntimeName: descriptor.identity,
         sourceRuntime: source,
-        fieldKeys: descriptor.fields ?? [],
+        fieldKeys: descriptor.fields,
+        controls: descriptor.controls,
+        componentIdentity: descriptor.componentIdentity,
+        props: initialProps,
         parent: this,
         meta: {
           instance: descriptor.name,
@@ -359,6 +366,18 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     const child = this._children.get(descriptor.name)
     if (!child)
       return
+
+    if (descriptor.kind === 'filter-view') {
+      const filterView = child as unknown as FilterViewRuntimeHost
+      for (const [prop, binding] of Object.entries(descriptor.props)) {
+        if (binding.kind === 'literal')
+          continue
+        const sync = () => filterView.setProps({ [prop]: this._readBinding(binding) })
+        sync()
+        this._subscribeBinding(binding, sync)
+      }
+      return
+    }
 
     if (descriptor.kind === 'query') {
       const query = child as unknown as QueryRuntimeHost
@@ -532,8 +551,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }
   }
 
-  public isFilterFieldsRuntime(runtime: RuntimeHost<any, any>): runtime is FilterFieldsRuntimeHost {
-    return runtime.runtimeType === 'filter-fields-runtime-host'
+  public isFilterViewRuntime(runtime: RuntimeHost<any, any>): runtime is FilterViewRuntimeHost {
+    return runtime.runtimeType === 'filter-view-runtime-host'
   }
 
   /** Возвращает topological runtime order по fromOutput dependencies. */
@@ -554,7 +573,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       if (!runtime)
         throw new Error(`[CompositionRuntimeHost] runtime dependency "${name}" is missing.`)
       visiting.add(name)
-      if (runtime.kind === 'filter-fields')
+      if (runtime.kind === 'filter-view')
         visit(runtime.identity)
       for (const binding of Object.values(runtime.props)) {
         if (binding.kind === 'output' || binding.kind === 'filter-fields')

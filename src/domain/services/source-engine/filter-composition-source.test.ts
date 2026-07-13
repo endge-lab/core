@@ -152,7 +152,15 @@ defineQuery({
 	  data: {},
 	  runtimes: {
 	    filter: filter('schedule').persist({ key: 'schedule' }),
-	    dateFilter: filterFields('filter').fields(['from']),
+	    dateFilter: filterView('filter')
+        .fields(['from'])
+	      .controls({ from: control('Input') })
+	      .withProps({
+	        showLabels: true,
+	        labels: { from: 'Дата вылета' },
+	        requestPreview: fromOutput('filter', 'request'),
+	      }),
+	    allFilters: filterView('filter'),
 	    query: query('search').withProps({
 	      payload: fromOutput('filter', 'request'),
 	      filterModel: fromFilter('filter').fields(['from', 'direction']),
@@ -170,9 +178,19 @@ defineQuery({
 	    expect(valid.diagnostics).toEqual([])
 	    expect(valid.artifact?.hooks).toHaveLength(2)
 	    expect(valid.artifact?.runtimes.find(runtime => runtime.name === 'dateFilter')).toMatchObject({
-	      kind: 'filter-fields',
+	      kind: 'filter-view',
 	      identity: 'filter',
 	      fields: ['from'],
+	      controls: { from: { type: 'Input' } },
+	      props: {
+	        showLabels: { kind: 'literal', value: true },
+	        labels: { kind: 'literal', value: { from: 'Дата вылета' } },
+	        requestPreview: { kind: 'output', runtime: 'filter', output: 'request' },
+	      },
+	    })
+	    expect(valid.artifact?.runtimes.find(runtime => runtime.name === 'allFilters')).toMatchObject({
+	      kind: 'filter-view',
+	      identity: 'filter',
 	    })
 	    expect(valid.artifact?.runtimes.find(runtime => runtime.name === 'query')?.props.filterModel).toEqual({
 	      kind: 'filter-fields',
@@ -198,6 +216,27 @@ defineComposition({
       expect.objectContaining({ code: 'composition-persist-key-duplicate' }),
       expect.objectContaining({ code: 'composition-source-property-unsupported' }),
     ]))
+  })
+
+  it('compiles optional custom component construction for Filter view', () => {
+    const result = compileCompositionSource(`
+defineComposition({
+  runtimes: {
+    filter: filter('schedule'),
+    filters: filterView('filter')
+      .fields(['search'])
+      .component('schedule-filter-sfc'),
+  },
+})
+`)
+
+    expect(result.diagnostics).toEqual([])
+    expect(result.artifact?.runtimes[1]).toMatchObject({
+      kind: 'filter-view',
+      identity: 'filter',
+      fields: ['search'],
+      componentIdentity: 'schedule-filter-sfc',
+    })
   })
 
   it('compiles data, storeTo and fromData with optional outputs', () => {

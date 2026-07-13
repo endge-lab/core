@@ -17,11 +17,11 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
     alias: 'Endge Composition Source',
     extension: '.endge-composition.ts',
     keywords: [
-      'component', 'data', 'defineComposition', 'filter', 'filterFields', 'fromData', 'fromFilter', 'fromOutput', 'fromStore', 'onChange',
+      'component', 'control', 'data', 'defineComposition', 'filter', 'filterView', 'fromData', 'fromFilter', 'fromOutput', 'fromStore', 'onChange',
       'onMount', 'output', 'query',
     ],
     functions: [
-      'debounce', 'fields', 'fromRuntime', 'persist', 'run', 'select', 'store', 'storeTo', 'vocab', 'withProps',
+      'component', 'controls', 'debounce', 'fields', 'fromRuntime', 'persist', 'run', 'select', 'store', 'storeTo', 'vocab', 'withProps',
     ],
     properties: ['data', 'hooks', 'key', 'outputs', 'runtimes'],
   })
@@ -53,7 +53,7 @@ const COMPOSITION_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'storeTo', kind: 'function', insertText: `.storeTo(data('store'), {
   raw: output('raw'),
 })`, detail: 'Atomic Query output publication to Store data' },
-  { label: 'filterFields', kind: 'function', insertText: `filterFields('filter').fields([])`, detail: 'Renderable Filter fields runtime slice' },
+  { label: 'filterView', kind: 'function', insertText: `filterView('filter')`, detail: 'Renderable Filter view runtime' },
   { label: 'query', kind: 'function', insertText: `query('identity').withProps({})`, detail: 'Query runtime' },
   { label: 'component', kind: 'function', insertText: `component('identity').withProps({})`, detail: 'Component runtime' },
   { label: 'fromOutput', kind: 'function', insertText: `fromOutput('runtime', 'output')`, detail: 'Runtime output binding' },

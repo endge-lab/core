@@ -27,6 +27,7 @@ export class ComponentRuntimeHost extends RuntimeHostBase<'component'> {
       ...input,
       kind: 'runtime',
       runtimeType: 'component-runtime-host',
+      capabilities: ['renderable'],
       entityType: 'component',
       context: createDefaultComponentContext(),
     })

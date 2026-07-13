@@ -73,6 +73,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
       ...input,
       kind: 'runtime',
       runtimeType: 'component-sfc-runtime-host',
+      capabilities: ['renderable'],
       entityType: 'component-sfc',
       context: createDefaultSFCContext(target),
       artifactReader: input.artifactReader,

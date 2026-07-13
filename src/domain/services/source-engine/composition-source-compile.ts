@@ -8,6 +8,10 @@ import type {
   CompositionSourceCompileResult,
   CompositionSourceDocument,
 } from '@/domain/types/composition-source.types'
+import type {
+  FilterViewControlDefinition,
+  FilterViewControlType,
+} from '@/domain/types/filter-view.type'
 import type { ProgramDiagnostic } from '@/domain/types/program.types'
 
 import { parse as parseTS } from '@babel/parser'
@@ -169,13 +173,13 @@ function readRuntimes(node: t.ObjectExpression, dataNames: Set<string>, diagnost
 function readRuntime(name: string, raw: t.Expression, dataNames: Set<string>, diagnostics: DiagnosticDraft[]): CompositionRuntimeDescriptor | null {
   const chain = memberChain(raw)
   if (!chain || !t.isIdentifier(chain.base.callee)) {
-    diagnostics.push(diagnostic('error', 'composition-runtime-shape', `Runtime "${name}" должен начинаться с filter/query/component/filterFields(identity).`, `runtimes.${name}`, raw))
+    diagnostics.push(diagnostic('error', 'composition-runtime-shape', `Runtime "${name}" должен начинаться с filter/query/component/filterView(identity).`, `runtimes.${name}`, raw))
     return null
   }
 
   const rawKind = chain.base.callee.name
-  const kind = (rawKind === 'filterFields' ? 'filter-fields' : rawKind) as CompositionRuntimeKind
-  if (kind !== 'filter' && kind !== 'query' && kind !== 'component' && kind !== 'filter-fields') {
+  const kind = (rawKind === 'filterView' ? 'filter-view' : rawKind) as CompositionRuntimeKind
+  if (kind !== 'filter' && kind !== 'query' && kind !== 'component' && kind !== 'filter-view') {
     diagnostics.push(diagnostic('error', 'composition-runtime-kind', `Runtime kind "${rawKind}" не поддерживается.`, `runtimes.${name}`, chain.base))
     return null
   }
@@ -195,8 +199,8 @@ function readRuntime(name: string, raw: t.Expression, dataNames: Set<string>, di
 
   for (const modifier of chain.modifiers) {
     if (modifier.name === 'fields') {
-      if (kind !== 'filter-fields') {
-        diagnostics.push(diagnostic('error', 'composition-fields-runtime-kind', '.fields(...) в v1 поддерживается только filterFields(...).', `runtimes.${name}.fields`, modifier.call))
+      if (kind !== 'filter-view') {
+        diagnostics.push(diagnostic('error', 'composition-fields-runtime-kind', '.fields(...) в v1 поддерживается только filterView(...).', `runtimes.${name}.fields`, modifier.call))
         continue
       }
       const fields = readStringArrayArgument(modifier.call, 0)
@@ -204,6 +208,31 @@ function readRuntime(name: string, raw: t.Expression, dataNames: Set<string>, di
         diagnostics.push(diagnostic('error', 'composition-filter-fields-empty', '.fields([...]) требует непустой массив field keys.', `runtimes.${name}.fields`, modifier.call))
       else
         descriptor.fields = [...new Set(fields)]
+      continue
+    }
+    if (modifier.name === 'controls') {
+      if (kind !== 'filter-view') {
+        diagnostics.push(diagnostic('error', 'composition-controls-runtime-kind', '.controls(...) поддерживается только filterView(...).', `runtimes.${name}.controls`, modifier.call))
+        continue
+      }
+      const config = modifier.call.arguments[0]
+      if (!config || !t.isObjectExpression(config)) {
+        diagnostics.push(diagnostic('error', 'composition-filter-view-controls-object', '.controls(...) принимает object literal.', `runtimes.${name}.controls`, modifier.call))
+        continue
+      }
+      descriptor.controls = readFilterViewControls(config, diagnostics, `runtimes.${name}.controls`)
+      continue
+    }
+    if (modifier.name === 'component') {
+      if (kind !== 'filter-view') {
+        diagnostics.push(diagnostic('error', 'composition-component-runtime-kind', '.component(...) поддерживается только filterView(...).', `runtimes.${name}.component`, modifier.call))
+        continue
+      }
+      const identity = readStringArgument(modifier.call, 0)
+      if (!identity)
+        diagnostics.push(diagnostic('error', 'composition-filter-view-component-identity', '.component(identity) требует identity.', `runtimes.${name}.component`, modifier.call))
+      else
+        descriptor.componentIdentity = identity
       continue
     }
     if (modifier.name === 'persist') {
@@ -220,7 +249,7 @@ function readRuntime(name: string, raw: t.Expression, dataNames: Set<string>, di
       continue
     }
     if (modifier.name === 'withProps') {
-      if (kind === 'filter' || kind === 'filter-fields') {
+      if (kind === 'filter') {
         diagnostics.push(diagnostic('error', 'composition-filter-props-unsupported', 'Filter runtime v1 не принимает .withProps(...).', `runtimes.${name}.withProps`, modifier.call))
         continue
       }
@@ -270,9 +299,46 @@ function readRuntime(name: string, raw: t.Expression, dataNames: Set<string>, di
 
     diagnostics.push(diagnostic('error', 'composition-runtime-method', `.${modifier.name}(...) не поддерживается runtime descriptor.`, `runtimes.${name}`, modifier.call))
   }
-  if (kind === 'filter-fields' && !descriptor.fields?.length)
-    diagnostics.push(diagnostic('error', 'composition-filter-fields-missing', `Runtime "${name}" требует .fields([...]).`, `runtimes.${name}`, raw))
+  if (kind === 'filter-view' && descriptor.componentIdentity && Object.keys(descriptor.controls ?? {}).length) {
+    diagnostics.push(diagnostic(
+      'error',
+      'composition-filter-view-controls-component-conflict',
+      'Явные .controls(...) относятся только ко встроенному генератору и не используются вместе с .component(...).',
+      `runtimes.${name}`,
+      raw,
+    ))
+  }
   return descriptor
+}
+
+function readFilterViewControls(
+  node: t.ObjectExpression,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+): Record<string, FilterViewControlDefinition> {
+  const controls: Record<string, FilterViewControlDefinition> = {}
+  const supported = new Set<FilterViewControlType>(['Input', 'Textarea', 'Checkbox', 'Select'])
+
+  for (const property of node.properties) {
+    if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
+      diagnostics.push(diagnostic('error', 'composition-filter-view-control-property', 'controls допускает обычные properties.', sourcePath, property))
+      continue
+    }
+    const key = propertyName(property.key)
+    const expression = unwrapExpression(property.value)
+    if (!key || !t.isCallExpression(expression) || !t.isIdentifier(expression.callee, { name: 'control' })) {
+      diagnostics.push(diagnostic('error', 'composition-filter-view-control-shape', 'Control должен иметь вид control(type).', `${sourcePath}.${key ?? ''}`, property))
+      continue
+    }
+    const type = readStringArgument(expression, 0) as FilterViewControlType | null
+    if (!type || !supported.has(type)) {
+      diagnostics.push(diagnostic('error', 'composition-filter-view-control-type', `Control type "${type ?? ''}" не поддерживается.`, `${sourcePath}.${key}`, expression))
+      continue
+    }
+    controls[key] = { type }
+  }
+
+  return controls
 }
 
 function readBindings(
@@ -451,13 +517,13 @@ function validateBindingReferences(data: CompositionDataDescriptor[], runtimes: 
   const dataByName = new Map(data.map(item => [item.name, item]))
   const runtimeByName = new Map(runtimes.map(runtime => [runtime.name, runtime]))
   for (const runtime of runtimes) {
-    if (runtime.kind === 'filter-fields') {
+    if (runtime.kind === 'filter-view') {
       const source = runtimeByName.get(runtime.identity)
       if (!source) {
         diagnostics.push(diagnostic(
           'error',
           'composition-filter-fields-source-missing',
-          `filterFields source runtime "${runtime.identity}" не найден.`,
+          `filterView source runtime "${runtime.identity}" не найден.`,
           `runtimes.${runtime.name}`,
         ))
       }
@@ -465,7 +531,7 @@ function validateBindingReferences(data: CompositionDataDescriptor[], runtimes: 
         diagnostics.push(diagnostic(
           'error',
           'composition-filter-fields-source-kind',
-          `filterFields source "${runtime.identity}" должен быть Filter runtime.`,
+          `filterView source "${runtime.identity}" должен быть Filter runtime.`,
           `runtimes.${runtime.name}`,
         ))
       }
@@ -519,7 +585,7 @@ function validateRuntimeCycles(
     const propEdges = Object.values(runtime.props)
       .filter((binding): binding is Extract<CompositionBindingValue, { kind: 'output' | 'filter-fields' }> => binding.kind === 'output' || binding.kind === 'filter-fields')
       .map(binding => binding.runtime)
-    edges.set(runtime.name, runtime.kind === 'filter-fields'
+    edges.set(runtime.name, runtime.kind === 'filter-view'
       ? [runtime.identity, ...propEdges]
       : propEdges)
   }

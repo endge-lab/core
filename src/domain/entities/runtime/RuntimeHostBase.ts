@@ -4,6 +4,7 @@ import type {
   RuntimeArtifactReader,
   RuntimeHost,
   RuntimeHostArtifactRef,
+  RuntimeHostCapability,
   RuntimeHostChannel,
   RuntimeHostContext,
   RuntimeHostResource,
@@ -36,6 +37,9 @@ export abstract class RuntimeHostBase<
 
   /** Техническое имя реализации host. */
   public readonly runtimeType: string
+
+  /** Возможности runtime-host, доступные внешним consumers. */
+  public readonly capabilities: readonly RuntimeHostCapability[]
 
   /** Тип доменной сущности, к которой привязан host. */
   public readonly entityType: TType
@@ -99,6 +103,9 @@ export abstract class RuntimeHostBase<
     /** Техническое имя реализации host. */
     runtimeType: string
 
+    /** Возможности runtime-host, доступные внешним consumers. */
+    capabilities?: RuntimeHostCapability[]
+
     /** Тип доменной сущности. */
     entityType: TType
 
@@ -131,6 +138,7 @@ export abstract class RuntimeHostBase<
     this.parent = input.parent ?? null
     this.kind = input.kind
     this.runtimeType = input.runtimeType
+    this.capabilities = [...new Set(input.capabilities ?? [])]
     this.entityType = input.entityType
     this.model = input.model
     this.entityIdentity = String(input.entityIdentity)
@@ -182,6 +190,11 @@ export abstract class RuntimeHostBase<
   public setStatus(status: RuntimeHostStatus): void {
     this.status = status
     this.touch()
+  }
+
+  /** Проверяет наличие runtime capability. */
+  public hasCapability(capability: RuntimeHostCapability): boolean {
+    return this.capabilities.includes(capability)
   }
 
   /**
@@ -272,6 +285,7 @@ export abstract class RuntimeHostBase<
       parentId: this.parent?.id ?? null,
       removedAt: null,
       runtimeType: this.runtimeType,
+      capabilities: [...this.capabilities],
       entityType: this.entityType,
       entityIdentity: this.entityIdentity,
       title: this.title,

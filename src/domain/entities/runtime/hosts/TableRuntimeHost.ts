@@ -37,6 +37,7 @@ export class TableRuntimeHost extends RuntimeHostBase<'table'> {
       ...input,
       kind: 'table',
       runtimeType: 'table-runtime-host',
+      capabilities: ['renderable'],
       entityType: 'table',
       context: createDefaultTableContext(),
     })

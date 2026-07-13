@@ -1,12 +1,15 @@
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
 
 import { Serialize } from '@endge/utils'
-import { Expose } from 'class-transformer'
+import { Exclude, Expose } from 'class-transformer'
 
 import { REntity } from '@/domain/entities/reflect/REntity'
 
 /** Persisted source-first описание runtime-графа без layout/rendering. */
 export class RComposition extends REntity {
+  @Exclude()
+  readonly type = 'composition' as const
+
   @Expose()
   description: string | null = null
 

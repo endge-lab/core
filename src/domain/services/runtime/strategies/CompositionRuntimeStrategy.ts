@@ -8,6 +8,7 @@ export class CompositionRuntimeStrategy implements RuntimeStrategy<RComposition,
 
   public supports(model: unknown): model is RComposition {
     return model instanceof RComposition
+      || (model as any)?.type === 'composition'
   }
 
   public create(ctx: Parameters<RuntimeStrategy<RComposition, CompositionRuntimeHost>['create']>[0]) {

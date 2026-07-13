@@ -1,8 +1,9 @@
 import type { ProgramDiagnostic } from '@/domain/types/program.types'
 import type { RuntimeHost } from '@/domain/types/runtime-host.types'
 import type { SourceFieldDefinition } from '@/domain/types/source-expression.types'
+import type { FilterViewControlDefinition } from '@/domain/types/filter-view.type'
 
-export type CompositionRuntimeKind = 'filter' | 'query' | 'component' | 'filter-fields'
+export type CompositionRuntimeKind = 'filter' | 'query' | 'component' | 'filter-view'
 
 export type CompositionBindingValue
   = | { kind: 'literal', value: unknown }
@@ -36,6 +37,8 @@ export interface CompositionRuntimeDescriptor {
   kind: CompositionRuntimeKind
   identity: string
   fields?: string[]
+  controls?: Record<string, FilterViewControlDefinition>
+  componentIdentity?: string
   persistKey?: string
   props: Record<string, CompositionBindingValue>
   storeTo: CompositionStorePublication[]

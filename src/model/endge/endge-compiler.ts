@@ -648,20 +648,20 @@ export class EndgeCompiler extends EndgeModule {
     }
 
     for (const runtime of payload.runtimes) {
-      const dependencySource = runtime.kind === 'filter-fields'
+      const dependencySource = runtime.kind === 'filter-view'
         ? payload.runtimes.find(item => item.name === runtime.identity)
         : runtime
       dependencies.push({
-        entityType: runtime.kind === 'filter-fields' ? 'filter' : runtime.kind,
+        entityType: runtime.kind === 'filter-view' ? 'filter' : runtime.kind,
         id: dependencySource?.identity ?? runtime.identity,
         identity: dependencySource?.identity ?? runtime.identity,
         role: 'composition-runtime',
       })
 
-      if (runtime.kind === 'filter-fields') {
+      if (runtime.kind === 'filter-view') {
         const source = payload.runtimes.find(item => item.name === runtime.identity)
         if (!source || source.kind !== 'filter') {
-          diagnostics.push({ severity: 'error', code: 'composition-filter-fields-source-kind', message: `filterFields source "${runtime.identity}" должен быть Filter runtime.`, sourcePath: `runtimes.${runtime.name}` })
+          diagnostics.push({ severity: 'error', code: 'composition-filter-view-source-kind', message: `filterView source "${runtime.identity}" должен быть Filter runtime.`, sourcePath: `runtimes.${runtime.name}` })
           continue
         }
         const artifact = Endge.program.getFilterArtifact(source.identity)
@@ -669,8 +669,29 @@ export class EndgeCompiler extends EndgeModule {
           const keys = new Set(artifact.payload.fields.map(field => field.key))
           for (const key of runtime.fields ?? []) {
             if (!keys.has(key)) {
-              diagnostics.push({ severity: 'error', code: 'composition-filter-fields-field-missing', message: `Filter "${source.identity}" не содержит field "${key}".`, sourcePath: `runtimes.${runtime.name}.fields` })
+              diagnostics.push({ severity: 'error', code: 'composition-filter-view-field-missing', message: `Filter "${source.identity}" не содержит field "${key}".`, sourcePath: `runtimes.${runtime.name}.fields` })
             }
+          }
+          for (const key of Object.keys(runtime.controls ?? {})) {
+            if (!keys.has(key)) {
+              diagnostics.push({ severity: 'error', code: 'composition-filter-view-control-field-missing', message: `Filter "${source.identity}" не содержит field "${key}" из controls.`, sourcePath: `runtimes.${runtime.name}.controls.${key}` })
+            }
+          }
+        }
+        if (runtime.componentIdentity) {
+          const componentSFC = Endge.domain.getComponentSFC(runtime.componentIdentity)
+          const component = Endge.domain.getComponent(runtime.componentIdentity)
+          if (!componentSFC && !component) {
+            diagnostics.push({ severity: 'error', code: 'composition-filter-view-component-missing', message: `Component "${runtime.componentIdentity}" не найден.`, sourcePath: `runtimes.${runtime.name}.component` })
+          }
+          else {
+            const model = componentSFC ?? component!
+            dependencies.push({
+              entityType: componentSFC ? 'component-sfc' : 'component',
+              id: model.id,
+              identity: model.identity,
+              role: 'filter-view-component',
+            })
           }
         }
         continue
