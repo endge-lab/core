@@ -127,6 +127,7 @@ function createHost(props: Record<string, unknown> = {}): QueryRuntimeHost {
     diagnostics: [],
     dependencies: [],
     capabilities: ['compilable', 'runnable', 'data-provider'],
+    metadata: { self: {}, nodes: [] },
     payload,
   }
   const model = new RQuery()
@@ -167,6 +168,7 @@ function artifactBase<T>(
     diagnostics: [],
     dependencies: [],
     capabilities: ['compilable'],
+    metadata: { self: {}, nodes: [] },
     payload,
   }
 }

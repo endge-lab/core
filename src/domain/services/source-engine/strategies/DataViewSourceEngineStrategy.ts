@@ -36,6 +36,7 @@ export class DataViewSourceEngineStrategy implements SourceEngineStrategy {
       ast: result.ast,
       document: result.document ?? undefined,
       artifact: result.artifact ?? undefined,
+      metadata: result.metadata,
       diagnostics: result.diagnostics,
       message: ok ? undefined : 'DataView source contains compilation errors.',
     }

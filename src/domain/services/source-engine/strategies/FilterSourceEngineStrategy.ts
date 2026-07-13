@@ -23,6 +23,7 @@ export class FilterSourceEngineStrategy implements SourceEngineStrategy {
       ast: result.ast ?? undefined,
       document: result.document ?? undefined,
       artifact: result.artifact ?? undefined,
+      metadata: result.metadata,
       diagnostics: result.diagnostics,
       message: ok ? undefined : 'Filter source contains compilation errors.',
     }

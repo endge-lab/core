@@ -12,6 +12,12 @@ defineProps<{
   flight: FlightLeg
   compact?: boolean
 }>()
+
+defineMetadata({
+  'hub.tgo': {
+    entity: 'flight',
+  },
+})
 </script>
 
 <template>
@@ -33,6 +39,25 @@ defineProps<{
 <style lang="endgecss" scoped>
 </style>
 ```
+
+## Metadata
+
+`defineMetadata({...})` объявляет metadata всего SFC-компонента. Для отдельного template-узла используется `:metadata`:
+
+```vue
+<Column
+  key="bestOn"
+  :metadata="{
+    'hub.tgo': {
+      attributes: ['BestOn'],
+    },
+  }"
+/>
+```
+
+Обе формы принимают только статический JSON-compatible object literal. Ссылки на props, локальные переменные, вызовы функций, spread и computed keys запрещены. Metadata извлекается compiler-ом в `ProgramArtifact.metadata`, а `:metadata` не попадает в props runtime IR и не передаётся renderer-у.
+
+Ключ верхнего уровня должен быть namespace consumer-а или интеграции (`hub.tgo`, `analytics`, `export`). Это предотвращает конфликт несвязанных расширений.
 
 ## Общие правила template
 

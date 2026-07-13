@@ -245,6 +245,7 @@ function artifact<T>(
   return {
     ref: { entityType, id, identity },
     sourceHash: 'test', compilerVersion: 'test', status: 'valid',
-    diagnostics: [], dependencies: [], capabilities: ['compilable', 'executable'], payload,
+    diagnostics: [], dependencies: [], capabilities: ['compilable', 'executable'],
+    metadata: { self: {}, nodes: [] }, payload,
   }
 }

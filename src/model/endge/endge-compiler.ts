@@ -27,6 +27,8 @@ import { compileComponentSFC } from '@/domain/services/compiler/component-sfc-co
 import { ENDGE_COMPILER_VERSION } from '@/model/config/compiler'
 import { ENDGE_LOG_LANES } from '@/model/config/debug'
 import { Endge } from '@/model/endge/endge'
+import { createEmptyProgramMetadata } from '@/domain/types/program-metadata.types'
+import type { ProgramMetadata } from '@/domain/types/program-metadata.types'
 
 /**
  * Компилятор persisted domain model в compiled program artifacts.
@@ -178,6 +180,7 @@ export class EndgeCompiler extends EndgeModule {
         const result = compileComponentSFC(entity.source)
         return this._makeArtifact(entity, 'component-sfc', context, {
           capabilities: ['compilable', 'runnable', 'renderable'],
+          metadata: result.metadata,
           payload: {
             sourceParts: result.sourceParts,
             contract: result.contract,
@@ -208,6 +211,7 @@ export class EndgeCompiler extends EndgeModule {
 
         return this._makeArtifact(entity, 'query', context, {
           capabilities: ['compilable', 'runnable', 'data-provider'],
+          metadata: { self: result.metadata ?? {}, nodes: [] },
           payload: {
             ...this._makeEmptyQueryPayload(),
             ...(local.payload ?? artifact ?? {}),
@@ -237,6 +241,7 @@ export class EndgeCompiler extends EndgeModule {
 
         return this._makeArtifact(entity, 'data-view', context, {
           capabilities: ['compilable', 'runnable', 'data-provider'],
+          metadata: { self: result.metadata ?? {}, nodes: [] },
           payload: {
             ...this._makeEmptyDataViewPayload(),
             ...(local.payload ?? artifact ?? {}),
@@ -281,6 +286,7 @@ export class EndgeCompiler extends EndgeModule {
         }
         return this._makeArtifact(entity, 'filter', context, {
           capabilities: ['compilable', 'executable', 'data-provider', 'configuration'],
+          metadata: { self: result.metadata ?? {}, nodes: [] },
           payload: payload ?? this._makeEmptyFilterPayload(entity.sourceVersion),
           dependencies,
           diagnostics: (result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[],
@@ -299,6 +305,7 @@ export class EndgeCompiler extends EndgeModule {
         const validation = payload ? this._validateComposition(payload) : { diagnostics: [], dependencies: [] }
         return this._makeArtifact(entity, 'composition', context, {
           capabilities: ['compilable', 'executable', 'configuration'],
+          metadata: { self: result.metadata ?? {}, nodes: [] },
           payload: payload ?? this._makeEmptyCompositionPayload(entity.sourceVersion),
           dependencies: validation.dependencies,
           diagnostics: [
@@ -323,6 +330,7 @@ export class EndgeCompiler extends EndgeModule {
     options: {
       payload: TPayload
       capabilities: ProgramCapability[]
+      metadata?: ProgramMetadata
       dependencies?: ProgramArtifact<TPayload>['dependencies']
       diagnostics?: Omit<ProgramDiagnostic, 'entityRef'>[]
       children?: ProgramArtifact[]
@@ -345,6 +353,7 @@ export class EndgeCompiler extends EndgeModule {
       diagnostics,
       dependencies: options.dependencies ?? [],
       capabilities: options.capabilities,
+      metadata: options.metadata ?? createEmptyProgramMetadata(),
       payload: options.payload,
       children: options.children?.length ? options.children : undefined,
     }
@@ -602,6 +611,7 @@ export class EndgeCompiler extends EndgeModule {
     }
     return this._makeArtifact(entity, 'filter', context, {
       capabilities: ['compilable', 'executable', 'data-provider', 'configuration'],
+      metadata: { self: result.metadata ?? {}, nodes: [] },
       payload: payload ?? this._makeEmptyFilterPayload(1),
       diagnostics,
       dependencies: (payload?.fields ?? [])
@@ -989,6 +999,7 @@ export class EndgeCompiler extends EndgeModule {
 
     return this._makeArtifact(entity, 'data-view', context, {
       capabilities: ['compilable', 'runnable', 'data-provider'],
+      metadata: { self: result.metadata ?? {}, nodes: [] },
       payload,
       diagnostics,
       dependencies,

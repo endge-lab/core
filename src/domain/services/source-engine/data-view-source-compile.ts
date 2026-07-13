@@ -13,6 +13,7 @@ import type { DataViewProgramPayload, ProgramDiagnostic } from '@/domain/types/p
 
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
+import { compileProgramMetadataProperty } from '@/domain/services/source-engine/source-metadata-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
@@ -33,7 +34,7 @@ export function compileDataViewSource(source: string): DataViewSourceCompileResu
         'data-view-source-define-missing',
         'DataView source должен содержать вызов defineDataView({...}).',
       ))
-      return { ast, document: null, artifact: null, diagnostics }
+      return { ast, document: null, artifact: null, metadata: {}, diagnostics }
     }
 
     const definitionArg = defineCall.arguments[0]
@@ -46,9 +47,10 @@ export function compileDataViewSource(source: string): DataViewSourceCompileResu
         'data-view-source-define-argument',
         'defineDataView принимает только объектный литерал.',
       ))
-      return { ast, document: null, artifact: null, diagnostics }
+      return { ast, document: null, artifact: null, metadata: {}, diagnostics }
     }
 
+    const metadata = compileProgramMetadataProperty(definition, diagnostics)
     const document = parseDocument(definition, source, diagnostics)
     const hasErrors = diagnostics.some(diagnostic => diagnostic.severity === 'error')
 
@@ -56,6 +58,7 @@ export function compileDataViewSource(source: string): DataViewSourceCompileResu
       ast,
       document: hasErrors ? null : document,
       artifact: hasErrors ? null : createDataViewArtifact(document),
+      metadata,
       diagnostics,
     }
   }
@@ -66,7 +69,7 @@ export function compileDataViewSource(source: string): DataViewSourceCompileResu
       `Не удалось распарсить DataView source: ${error?.message ?? error}`,
     ))
 
-    return { ast: null, document: null, artifact: null, diagnostics }
+    return { ast: null, document: null, artifact: null, metadata: {}, diagnostics }
   }
 }
 

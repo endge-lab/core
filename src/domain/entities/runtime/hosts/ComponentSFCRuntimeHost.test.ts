@@ -166,6 +166,7 @@ function createSFCArtifact(
     diagnostics: [],
     dependencies: [],
     capabilities: ['compilable', 'executable', 'renderable'],
+    metadata: { self: {}, nodes: [] },
     payload,
   }
 }

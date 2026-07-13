@@ -15,10 +15,12 @@ import type {
   RComponentSFC_IR_Template,
   RComponentSFC_IR_Value,
 } from '@/domain/types/component-sfc.types'
+import type { ProgramNodeMetadata } from '@/domain/types/program-metadata.types'
 import { compileComponentSFCExpression } from '@/domain/services/compiler/component-sfc-expression'
 import { normalizeComponentSFCTableColumnMenu } from '@/domain/services/compiler/component-sfc-table-menu'
 import { normalizeComponentSFCTableColumnPin } from '@/domain/services/compiler/component-sfc-table-pin'
 import { normalizeComponentSFCTableSort } from '@/domain/services/compiler/component-sfc-table-sort'
+import { compileProgramMetadataSource } from '@/domain/services/source-engine/source-metadata-compile'
 
 /** Контекст компиляции template в IR. */
 export interface ComponentSFCTemplateCompileContext {
@@ -39,6 +41,9 @@ export interface ComponentSFCTemplateCompileResult {
 
   /** Diagnostics template pass. */
   diagnostics: RComponentDiagnostic[]
+
+  /** Публичная metadata внутренних template-узлов. */
+  metadata: ProgramNodeMetadata[]
 }
 
 const ALLOWED_TAGS = new Set<RComponentSFC_IR_Tag>([
@@ -71,6 +76,7 @@ export function compileComponentSFCTemplate(
 ): ComponentSFCTemplateCompileResult {
   const diagnostics: RComponentDiagnostic[] = []
   const dependencies = createEmptyComponentDependencies()
+  const metadata: ProgramNodeMetadata[] = []
 
   if (!template) {
     diagnostics.push({
@@ -83,6 +89,7 @@ export function compileComponentSFCTemplate(
     return {
       template: null,
       dependencies,
+      metadata,
       diagnostics,
     }
   }
@@ -90,10 +97,11 @@ export function compileComponentSFCTemplate(
   return {
     template: {
       roots: template.roots
-        .map((node, index) => compileTemplateNode(node, `root-${index}`, context, dependencies, diagnostics))
+        .map((node, index) => compileTemplateNode(node, `root-${index}`, context, dependencies, metadata, diagnostics))
         .filter((node): node is RComponentSFC_IR_Node => node != null),
     },
     dependencies,
+    metadata,
     diagnostics,
   }
 }
@@ -103,6 +111,7 @@ function compileTemplateNode(
   id: string,
   context: ComponentSFCTemplateCompileContext,
   dependencies: RComponentDependencies,
+  metadata: ProgramNodeMetadata[],
   diagnostics: RComponentDiagnostic[],
 ): RComponentSFC_IR_Node | null {
   if (node.kind === 'text')
@@ -111,7 +120,7 @@ function compileTemplateNode(
   if (node.kind === 'interpolation')
     return compileInterpolationNode(node, id, context, diagnostics)
 
-  return compileElementNode(node, id, context, dependencies, diagnostics)
+  return compileElementNode(node, id, context, dependencies, metadata, diagnostics)
 }
 
 function compileTextNode(node: RComponentSFC_AST_TextNode, id: string): RComponentSFC_IR_Node | null {
@@ -152,6 +161,7 @@ function compileElementNode(
   id: string,
   context: ComponentSFCTemplateCompileContext,
   dependencies: RComponentDependencies,
+  metadata: ProgramNodeMetadata[],
   diagnostics: RComponentDiagnostic[],
 ): RComponentSFC_IR_ElementNode | null {
   if (!ALLOWED_TAGS.has(node.tag as RComponentSFC_IR_Tag)) {
@@ -166,7 +176,12 @@ function compileElementNode(
     return null
   }
 
-  const props = compileAttributes(node.attributes, context, diagnostics)
+  const nodeMetadata = compileNodeMetadata(node.attributes, diagnostics, `template.${id}.metadata`)
+  const props = compileAttributes(
+    node.attributes.filter(attribute => attribute.name !== 'metadata'),
+    context,
+    diagnostics,
+  )
   const directives = compileDirectives(node.directives, context, diagnostics)
 
   if (node.tag === 'Component')
@@ -179,9 +194,20 @@ function compileElementNode(
     props,
     directives,
     children: node.children
-      .map((child, index) => compileTemplateNode(child, `${id}-${index}`, context, dependencies, diagnostics))
+      .map((child, index) => compileTemplateNode(child, `${id}-${index}`, context, dependencies, metadata, diagnostics))
       .filter((child): child is RComponentSFC_IR_Node => child != null),
     sourceRange: node.range,
+  }
+
+  if (Object.keys(nodeMetadata).length > 0) {
+    const staticKey = node.directives.find(directive => directive.name === 'key' && !directive.argument)
+    const key = staticKey?.expression?.trim() || undefined
+    metadata.push({
+      nodeId: id,
+      nodeKind: element.tag,
+      key,
+      values: nodeMetadata,
+    })
   }
 
   if (element.tag === 'Table') {
@@ -191,6 +217,42 @@ function compileElementNode(
   }
 
   return element
+}
+
+function compileNodeMetadata(
+  attributes: RComponentSFC_AST_Attribute[],
+  diagnostics: RComponentDiagnostic[],
+  sourcePath: string,
+) {
+  const declarations = attributes.filter(attribute => attribute.name === 'metadata')
+  if (declarations.length === 0)
+    return {}
+
+  if (declarations.length > 1) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-template-metadata-duplicate',
+      message: 'Template-узел допускает только один атрибут metadata.',
+      sourcePath,
+      start: declarations[1].range.start,
+      end: declarations[1].range.end,
+    })
+  }
+
+  const declaration = declarations[0]
+  if (!declaration.dynamic || !declaration.value) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-template-metadata-shape',
+      message: 'Metadata template-узла должна быть статическим object literal в :metadata.',
+      sourcePath,
+      start: declaration.range.start,
+      end: declaration.range.end,
+    })
+    return {}
+  }
+
+  return compileProgramMetadataSource(declaration.value, diagnostics, sourcePath)
 }
 
 function compileAttributes(

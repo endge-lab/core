@@ -64,6 +64,7 @@ function makeArtifact(
         }],
     dependencies: [],
     capabilities: ['compilable'],
+    metadata: { self: {}, nodes: [] },
     payload: {},
   }
 }

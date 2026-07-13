@@ -24,6 +24,7 @@ import {
   readStringArgument,
   unwrapExpression,
 } from '@/domain/services/source-engine/source-expression-compile'
+import { compileProgramMetadataProperty } from '@/domain/services/source-engine/source-metadata-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
@@ -32,7 +33,7 @@ export function compileCompositionSource(source: string, sourceVersion = 1): Com
   const diagnostics: DiagnosticDraft[] = []
   if (!String(source ?? '').trim()) {
     diagnostics.push(diagnostic('error', 'composition-source-empty', 'Composition source пуст.'))
-    return { ast: null, document: null, artifact: null, diagnostics }
+    return { ast: null, document: null, artifact: null, metadata: {}, diagnostics }
   }
 
   try {
@@ -41,14 +42,15 @@ export function compileCompositionSource(source: string, sourceVersion = 1): Com
     const definition = call?.arguments[0]
     if (!call) {
       diagnostics.push(diagnostic('error', 'composition-source-define-missing', 'Composition source должен содержать defineComposition({...}).'))
-      return { ast, document: null, artifact: null, diagnostics }
+      return { ast, document: null, artifact: null, metadata: {}, diagnostics }
     }
     if (!definition || !t.isObjectExpression(definition)) {
       diagnostics.push(diagnostic('error', 'composition-source-definition', 'defineComposition принимает объектный литерал.', 'defineComposition', call))
-      return { ast, document: null, artifact: null, diagnostics }
+      return { ast, document: null, artifact: null, metadata: {}, diagnostics }
     }
 
     validateRootProperties(definition, diagnostics)
+    const metadata = compileProgramMetadataProperty(definition, diagnostics)
     const dataValue = propertyValue(definition, 'data')
     const runtimesValue = propertyValue(definition, 'runtimes')
     const hooksValue = propertyValue(definition, 'hooks')
@@ -89,12 +91,13 @@ export function compileCompositionSource(source: string, sourceVersion = 1): Com
         ...document,
         graph: buildRuntimeGraph(document),
       },
+      metadata,
       diagnostics,
     }
   }
   catch (error: any) {
     diagnostics.push(diagnostic('error', 'composition-source-parse-error', `Не удалось распарсить Composition source: ${error?.message ?? error}`))
-    return { ast: null, document: null, artifact: null, diagnostics }
+    return { ast: null, document: null, artifact: null, metadata: {}, diagnostics }
   }
 }
 
@@ -148,7 +151,7 @@ function validateRootProperties(node: t.ObjectExpression, diagnostics: Diagnosti
       continue
     }
     const name = propertyName(property.key)
-    if (name !== 'data' && name !== 'runtimes' && name !== 'hooks' && name !== 'outputs')
+    if (name !== 'metadata' && name !== 'data' && name !== 'runtimes' && name !== 'hooks' && name !== 'outputs')
       diagnostics.push(diagnostic('error', 'composition-source-property-unsupported', `Свойство "${name ?? ''}" не поддерживается Composition v1.`, name ?? 'defineComposition', property))
   }
 }

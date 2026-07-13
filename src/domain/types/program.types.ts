@@ -14,6 +14,7 @@ import type {
 } from '@/domain/types/component-sfc.types'
 import type { DependencyGraph } from '@/domain/entities/data/DependencyGraph'
 import type { QueryProgramProp, SourceExpressionIR } from '@/domain/types/source-expression.types'
+import type { ProgramMetadata } from '@/domain/types/program-metadata.types'
 
 /** Тип доменной сущности, для которой compiler может построить program artifact. */
 export type ProgramEntityType
@@ -112,6 +113,9 @@ export interface ProgramArtifact<TPayload = unknown> {
 
   /** Возможности artifact для runtime/render/query слоев. */
   capabilities: ProgramCapability[]
+
+  /** Публичная compiler-derived metadata сущности и её внутренних узлов. */
+  metadata: ProgramMetadata
 
   /** Typed payload конкретного artifact: SFC IR, compiled flow, query plan и т.п. */
   payload: TPayload

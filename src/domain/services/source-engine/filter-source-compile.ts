@@ -17,6 +17,7 @@ import {
   unwrapExpression,
 } from '@/domain/services/source-engine/source-expression-compile'
 import { compileSourceField } from '@/domain/services/source-engine/source-field-compile'
+import { compileProgramMetadataProperty } from '@/domain/services/source-engine/source-metadata-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
@@ -25,7 +26,7 @@ export function compileFilterSource(source: string, sourceVersion = 1): FilterSo
   const diagnostics: DiagnosticDraft[] = []
   if (!String(source ?? '').trim()) {
     diagnostics.push(diagnostic('error', 'filter-source-empty', 'Filter source пуст. Legacy fields не используются новым runtime.'))
-    return { ast: null, document: null, artifact: null, diagnostics }
+    return { ast: null, document: null, artifact: null, metadata: {}, diagnostics }
   }
 
   try {
@@ -34,22 +35,23 @@ export function compileFilterSource(source: string, sourceVersion = 1): FilterSo
     const definition = call?.arguments[0]
     if (!call) {
       diagnostics.push(diagnostic('error', 'filter-source-define-missing', 'Filter source должен содержать defineFilter({...}).'))
-      return { ast, document: null, artifact: null, diagnostics }
+      return { ast, document: null, artifact: null, metadata: {}, diagnostics }
     }
     if (!definition || !t.isObjectExpression(definition)) {
       diagnostics.push(diagnostic('error', 'filter-source-definition', 'defineFilter принимает объектный литерал.', 'defineFilter', call))
-      return { ast, document: null, artifact: null, diagnostics }
+      return { ast, document: null, artifact: null, metadata: {}, diagnostics }
     }
 
     const unsupported = definition.properties.filter(property => {
       if (!t.isObjectProperty(property) || property.computed)
         return true
       const name = propertyName(property.key)
-      return name !== 'fields' && name !== 'outputs'
+      return name !== 'metadata' && name !== 'fields' && name !== 'outputs'
     })
     for (const property of unsupported)
-      diagnostics.push(diagnostic('error', 'filter-source-property-unsupported', 'defineFilter v1 поддерживает только fields и outputs.', 'defineFilter', property))
+      diagnostics.push(diagnostic('error', 'filter-source-property-unsupported', 'defineFilter v1 поддерживает только metadata, fields и outputs.', 'defineFilter', property))
 
+    const metadata = compileProgramMetadataProperty(definition, diagnostics)
     const fieldsNode = objectProperty(definition, 'fields')
     const outputsNode = objectProperty(definition, 'outputs')
     const fields = fieldsNode ? readFields(fieldsNode, source, diagnostics) : []
@@ -72,12 +74,13 @@ export function compileFilterSource(source: string, sourceVersion = 1): FilterSo
       ast,
       document: hasErrors ? null : document,
       artifact: hasErrors ? null : artifact,
+      metadata,
       diagnostics,
     }
   }
   catch (error: any) {
     diagnostics.push(diagnostic('error', 'filter-source-parse-error', `Не удалось распарсить Filter source: ${error?.message ?? error}`))
-    return { ast: null, document: null, artifact: null, diagnostics }
+    return { ast: null, document: null, artifact: null, metadata: {}, diagnostics }
   }
 }
 

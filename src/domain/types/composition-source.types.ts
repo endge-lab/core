@@ -1,4 +1,5 @@
 import type { ProgramDiagnostic } from '@/domain/types/program.types'
+import type { ProgramMetadataMap } from '@/domain/types/program-metadata.types'
 import type { RuntimeHost } from '@/domain/types/runtime-host.types'
 import type { SourceFieldDefinition } from '@/domain/types/source-expression.types'
 import type { FilterViewControlDefinition } from '@/domain/types/filter-view.type'
@@ -118,6 +119,7 @@ export interface CompositionSourceCompileResult {
   ast: unknown | null
   document: CompositionSourceDocument | null
   artifact: CompositionProgramPayload | null
+  metadata: ProgramMetadataMap
   diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
 }
 

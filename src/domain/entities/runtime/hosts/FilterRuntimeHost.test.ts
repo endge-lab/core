@@ -123,6 +123,7 @@ defineFilter({
     diagnostics: [],
     dependencies: [],
     capabilities: ['compilable', 'executable', 'data-provider', 'configuration'],
+    metadata: { self: {}, nodes: [] },
     payload,
   }
   const model = new RFilter()

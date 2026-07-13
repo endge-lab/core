@@ -1,4 +1,5 @@
 import type { ProgramDiagnostic } from '@/domain/types/program.types'
+import type { ProgramMetadataMap } from '@/domain/types/program-metadata.types'
 
 export type DataViewSourceMode = 'manual' | 'pipeline'
 
@@ -107,6 +108,7 @@ export interface DataViewSourceCompileResult {
   ast: unknown
   document: DataViewSourceDocument | null
   artifact: unknown | null
+  metadata: ProgramMetadataMap
   diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
 }
 

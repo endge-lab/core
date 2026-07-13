@@ -17,12 +17,14 @@ import type {
   RComponentSFC_IR,
   RComponentSFC_RuntimeDependencies,
 } from '@/domain/types/component-sfc.types'
+import type { ProgramMetadata } from '@/domain/types/program-metadata.types'
 import { parseComponentSFC } from '@/domain/services/compiler/component-sfc-parse'
 import { analyzeComponentSFCScript } from '@/domain/services/compiler/component-sfc-script'
 import { analyzeComponentSFCRuntimeDependencies } from '@/domain/services/compiler/component-sfc-dependencies'
 import { compileComponentSFCStyle } from '@/domain/services/compiler/component-sfc-style'
 import { compileComponentSFCTemplate } from '@/domain/services/compiler/component-sfc-template'
 import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component-sfc.types'
+import { createEmptyProgramMetadata } from '@/domain/types/program-metadata.types'
 
 /** Результат полного SFC compiler pipeline в core. */
 export interface ComponentSFCCompileResult {
@@ -52,6 +54,9 @@ export interface ComponentSFCCompileResult {
 
   /** Все diagnostics pipeline. */
   diagnostics: RComponentDiagnostic[]
+
+  /** Публичная metadata компонента и его template-узлов. */
+  metadata: ProgramMetadata
 }
 
 /** Компилирует Endge SFC source до target-neutral artifact для Endge.program. */
@@ -69,6 +74,7 @@ export function compileComponentSFC(source: string): ComponentSFCCompileResult {
       runtimeDependencies: createEmptyComponentSFCRuntimeDependencies(),
       previewProps: null,
       previewOptions: null,
+      metadata: createEmptyProgramMetadata(),
       diagnostics,
     }
   }
@@ -112,6 +118,10 @@ export function compileComponentSFC(source: string): ComponentSFCCompileResult {
     runtimeDependencies: analyzeComponentSFCRuntimeDependencies(ir),
     previewProps: scriptResult.previewProps,
     previewOptions: scriptResult.previewOptions,
+    metadata: {
+      self: scriptResult.metadata,
+      nodes: templateResult.metadata,
+    },
     diagnostics,
   }
 }

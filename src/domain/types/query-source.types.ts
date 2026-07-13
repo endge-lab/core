@@ -1,6 +1,7 @@
 import type { RQueryAuth } from '@/domain/types/query.types'
 import type { ProgramDiagnostic, QueryProgramPayload } from '@/domain/types/program.types'
 import type { DataViewRef } from '@/domain/types/data-view-source.types'
+import type { ProgramMetadataMap } from '@/domain/types/program-metadata.types'
 import type { QueryProgramProp, SourceExpressionIR } from '@/domain/types/source-expression.types'
 
 /** Поддерживаемые kind query source v1. */
@@ -119,6 +120,9 @@ export interface QuerySourceCompileResult {
 
   /** Query artifact payload для Endge.program. */
   artifact: QueryProgramPayload | null
+
+  /** Публичная metadata, извлечённая из canonical source. */
+  metadata: ProgramMetadataMap
 
   /** Diagnostics source compiler-а. */
   diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]

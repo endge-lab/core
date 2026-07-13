@@ -121,6 +121,65 @@ defineProps<{
     })
   })
 
+  it('extracts entity and node metadata without leaking compiler attributes into IR props', () => {
+    const result = compileComponentSFC(`<script setup lang="ts">
+defineProps<{
+  flights: FlightLeg[]
+}>()
+
+defineMetadata({
+  'hub.tgo': {
+    entity: 'flight',
+  },
+})
+</script>
+
+<template>
+  <Table :rows="flights">
+    <Column
+      key="bestOn"
+      :metadata="{ 'hub.tgo': { attributes: ['BestOn'], order: 1 } }"
+    />
+  </Table>
+</template>
+`)
+
+    expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
+    expect(result.metadata).toEqual({
+      self: {
+        'hub.tgo': { entity: 'flight' },
+      },
+      nodes: [{
+        nodeId: 'root-0-0',
+        nodeKind: 'Column',
+        key: 'bestOn',
+        values: {
+          'hub.tgo': { attributes: ['BestOn'], order: 1 },
+        },
+      }],
+    })
+
+    const table = result.ir?.template.roots[0]
+    const column = table?.kind === 'element' ? table.children[0] : null
+    expect(column?.kind === 'element' ? column.props.metadata : undefined).toBeUndefined()
+  })
+
+  it('rejects runtime-dependent node metadata', () => {
+    const result = compileComponentSFC(`<script setup lang="ts">
+const columnMetadata = { 'hub.tgo': { attributes: ['BestOn'] } }
+</script>
+
+<template>
+  <Column key="bestOn" :metadata="columnMetadata" />
+</template>
+`)
+
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'program-metadata-shape', severity: 'error' }),
+    ]))
+    expect(result.metadata.nodes).toEqual([])
+  })
+
   it('accepts display-only input primitives and preserves their props in IR', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 defineProps<{

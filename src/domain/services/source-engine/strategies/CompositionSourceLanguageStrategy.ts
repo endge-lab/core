@@ -23,7 +23,7 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
     functions: [
       'component', 'controls', 'debounce', 'fields', 'fromRuntime', 'persist', 'run', 'select', 'store', 'storeTo', 'vocab', 'withProps',
     ],
-    properties: ['data', 'hooks', 'key', 'outputs', 'runtimes'],
+    properties: ['data', 'hooks', 'key', 'metadata', 'outputs', 'runtimes'],
   })
 
   public supports(sourceKind: SourceKind | string): boolean {
@@ -47,6 +47,7 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
 
 const COMPOSITION_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'defineComposition', kind: 'snippet', insertText: COMPOSITION_DEFAULT_SOURCE.trimEnd(), detail: 'Создать Composition source' },
+  { label: 'metadata', kind: 'property', insertText: `metadata: {\n  'namespace.feature': {},\n},`, detail: 'Статическая metadata Composition' },
   { label: 'filter', kind: 'function', insertText: `filter('identity')`, detail: 'Filter runtime' },
   { label: 'store', kind: 'function', insertText: `store('identity')`, detail: 'Store data dependency' },
   { label: 'fromData', kind: 'function', insertText: `fromData('store.field')`, detail: 'Composition data binding' },

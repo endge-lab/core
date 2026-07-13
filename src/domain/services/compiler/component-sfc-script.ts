@@ -13,6 +13,8 @@ import type {
   RComponentSFC_IR_LocalBinding,
   RComponentSFC_IR_Prop,
 } from '@/domain/types/component-sfc.types'
+import type { ProgramMetadataMap } from '@/domain/types/program-metadata.types'
+import { compileProgramMetadataSource } from '@/domain/services/source-engine/source-metadata-compile'
 
 /** Результат анализа script-секции SFC. */
 export interface ComponentSFCScriptAnalysisResult {
@@ -30,6 +32,9 @@ export interface ComponentSFCScriptAnalysisResult {
 
   /** Preview-only runtime options для запуска песочницы компонента. */
   previewOptions: ComponentSFCPreviewOptions | null
+
+  /** Публичная metadata компонента из defineMetadata. */
+  metadata: ProgramMetadataMap
 
   /** Diagnostics script pass. */
   diagnostics: RComponentDiagnostic[]
@@ -54,6 +59,7 @@ export function analyzeComponentSFCScript(script: RComponentSFC_AST_Script | nul
       locals: [],
       previewProps: null,
       previewOptions: null,
+      metadata: {},
       diagnostics,
     }
   }
@@ -76,6 +82,20 @@ export function analyzeComponentSFCScript(script: RComponentSFC_AST_Script | nul
 
   diagnostics.push(...previewPropsResult.diagnostics)
 
+  if (script.metadata.length > 1) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-metadata-duplicate',
+      message: 'SFC-компонент допускает только один вызов defineMetadata.',
+      sourcePath: 'script.defineMetadata',
+      start: script.metadata[1].range.start,
+      end: script.metadata[1].range.end,
+    })
+  }
+  const metadata = script.metadata[0]
+    ? compileProgramMetadataSource(script.metadata[0].source, diagnostics, 'script.defineMetadata')
+    : {}
+
   contract.inputs = props.map(prop => ({
     name: prop.name,
     type: prop.type,
@@ -94,6 +114,7 @@ export function analyzeComponentSFCScript(script: RComponentSFC_AST_Script | nul
       })),
     previewProps: previewPropsResult.props,
     previewOptions: previewPropsResult.options,
+    metadata,
     diagnostics,
   }
 }

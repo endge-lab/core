@@ -36,6 +36,7 @@ export class QuerySourceEngineStrategy implements SourceEngineStrategy {
       ast: result.ast,
       document: result.document ?? undefined,
       artifact: result.artifact ?? undefined,
+      metadata: result.metadata,
       diagnostics: result.diagnostics,
       message: ok ? undefined : 'Query source contains compilation errors.',
     }

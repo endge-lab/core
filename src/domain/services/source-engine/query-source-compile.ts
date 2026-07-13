@@ -15,6 +15,7 @@ import * as t from '@babel/types'
 import { QueryType } from '@/domain/types/document.types'
 import { compileSourceCallback } from '@/domain/services/source-engine/source-expression-compile'
 import { compileSourceField } from '@/domain/services/source-engine/source-field-compile'
+import { compileProgramMetadataProperty } from '@/domain/services/source-engine/source-metadata-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
@@ -35,7 +36,7 @@ export function compileQuerySource(source: string): QuerySourceCompileResult {
         'query-source-define-query-missing',
         'Query source должен содержать вызов defineQuery({...}).',
       ))
-      return { ast, document: null, artifact: null, diagnostics }
+      return { ast, document: null, artifact: null, metadata: {}, diagnostics }
     }
 
     const definitionArg = defineCall.arguments[0]
@@ -48,9 +49,10 @@ export function compileQuerySource(source: string): QuerySourceCompileResult {
         'query-source-define-query-argument',
         'defineQuery принимает только объектный литерал.',
       ))
-      return { ast, document: null, artifact: null, diagnostics }
+      return { ast, document: null, artifact: null, metadata: {}, diagnostics }
     }
 
+    const metadata = compileProgramMetadataProperty(definition, diagnostics)
     const document = parseDocument(definition, source, diagnostics)
     const hasErrors = diagnostics.some(diagnostic => diagnostic.severity === 'error')
 
@@ -58,6 +60,7 @@ export function compileQuerySource(source: string): QuerySourceCompileResult {
       ast,
       document: hasErrors ? null : document,
       artifact: hasErrors ? null : createQueryArtifact(document),
+      metadata,
       diagnostics,
     }
   }
@@ -72,6 +75,7 @@ export function compileQuerySource(source: string): QuerySourceCompileResult {
       ast: null,
       document: null,
       artifact: null,
+      metadata: {},
       diagnostics,
     }
   }

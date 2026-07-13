@@ -18,6 +18,7 @@ export class CompositionSourceEngineStrategy implements SourceEngineStrategy {
       ast: result.ast ?? undefined,
       document: result.document ?? undefined,
       artifact: result.artifact ?? undefined,
+      metadata: result.metadata,
       diagnostics: result.diagnostics,
       message: ok ? undefined : 'Composition source contains compilation errors.',
     }

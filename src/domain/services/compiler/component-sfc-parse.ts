@@ -20,6 +20,7 @@ import type {
   RComponentSFC_AST_Directive,
   RComponentSFC_AST_ElementNode,
   RComponentSFC_AST_InterpolationNode,
+  RComponentSFC_AST_MetadataDeclaration,
   RComponentSFC_AST_PreviewPropsDeclaration,
   RComponentSFC_AST_PropsDeclaration,
   RComponentSFC_AST_Script,
@@ -152,6 +153,7 @@ function parseScriptBlock(block: { content: string, attrs: Record<string, any>, 
     content,
     props: extractPropsDeclaration(content, range.start),
     previewProps: extractPreviewPropsDeclaration(content, range.start),
+    metadata: extractMetadataDeclarations(content, range.start),
     bindings: extractScriptBindings(content, range.start),
     range,
   }
@@ -346,6 +348,48 @@ function extractPreviewPropsDeclaration(content: string, baseOffset: number): RC
   }
 
   return null
+}
+
+function extractMetadataDeclarations(content: string, baseOffset: number): RComponentSFC_AST_MetadataDeclaration[] {
+  const declarations: RComponentSFC_AST_MetadataDeclaration[] = []
+
+  try {
+    const ast = parseTS(content, {
+      sourceType: 'module',
+      plugins: ['typescript'],
+    }) as any
+
+    for (const statement of ast.program.body as any[]) {
+      const expression = statement.type === 'ExpressionStatement'
+        ? statement.expression
+        : null
+
+      if (
+        expression?.type !== 'CallExpression'
+        || expression.callee?.type !== 'Identifier'
+        || expression.callee.name !== 'defineMetadata'
+      ) {
+        continue
+      }
+
+      const argument = expression.arguments?.[0]
+      if (!argument || argument.start == null || argument.end == null)
+        continue
+
+      declarations.push({
+        source: content.slice(argument.start, argument.end).trim(),
+        range: {
+          start: baseOffset + Number(statement.start ?? argument.start),
+          end: baseOffset + Number(statement.end ?? argument.end),
+        },
+      })
+    }
+  }
+  catch {
+    return declarations
+  }
+
+  return declarations
 }
 
 function extractScriptBindings(content: string, baseOffset: number): RComponentSFC_AST_ScriptBinding[] {

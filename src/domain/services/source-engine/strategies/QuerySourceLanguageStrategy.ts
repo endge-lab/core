@@ -29,7 +29,7 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
     properties: [
       'auth', 'body', 'data', 'enabled', 'endpoint', 'formUrlencoded',
       'headers', 'incremental', 'items', 'kind', 'method', 'mock', 'mode', 'outputs', 'path',
-      'props', 'request', 'timeoutMs',
+      'metadata', 'props', 'request', 'timeoutMs',
     ],
   })
 
@@ -68,6 +68,14 @@ const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
     insertText: QUERY_DEFAULT_SOURCE.trimEnd(),
     detail: 'Создать REST query source',
     documentation: 'Минимальный валидный source для RQuery v2.',
+  },
+  {
+    label: 'metadata',
+    kind: 'property',
+    insertText: `metadata: {
+  'namespace.feature': {},
+},`,
+    detail: 'Статическая metadata Query',
   },
   {
     label: 'defineProps',

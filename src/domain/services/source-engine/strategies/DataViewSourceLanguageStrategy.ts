@@ -23,7 +23,7 @@ export class DataViewSourceLanguageStrategy implements SourceLanguageStrategy {
       'template', 'transform',
     ],
     functions: ['as', 'auto', 'by', 'collectionByKey', 'convert', 'dataView', 'find', 'from', 'full', 'join', 'map', 'pick'],
-    properties: ['incremental', 'input', 'left', 'manual', 'mode', 'pipeline', 'right', 'steps', 'tools'],
+    properties: ['incremental', 'input', 'left', 'manual', 'metadata', 'mode', 'pipeline', 'right', 'steps', 'tools'],
   })
 
   /** Проверяет, что strategy обслуживает DataView source. */
@@ -60,6 +60,14 @@ const DATA_VIEW_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
     kind: 'snippet',
     insertText: DATA_VIEW_DEFAULT_SOURCE.trimEnd(),
     detail: 'Создать DataView source',
+  },
+  {
+    label: 'metadata',
+    kind: 'property',
+    insertText: `metadata: {
+  'namespace.feature': {},
+},`,
+    detail: 'Статическая metadata DataView',
   },
   {
     label: 'manual.transform',

@@ -89,6 +89,9 @@ export interface SourceEngineCompileResult extends SourceEngineResult {
   /** Runtime/program-ready artifact payload. */
   artifact?: any
 
+  /** Публичная metadata, извлечённая из source. */
+  metadata?: import('@/domain/types/program-metadata.types').ProgramMetadataMap
+
   /** Diagnostics, найденные source compiler-ом. */
   diagnostics?: unknown[]
 }

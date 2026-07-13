@@ -23,7 +23,7 @@ export class FilterSourceLanguageStrategy implements SourceLanguageStrategy {
     functions: [
       'array', 'default', 'json', 'optional', 'options', 'predicate', 'vocab',
     ],
-    properties: ['fields', 'label', 'labelPath', 'outputs', 'value', 'valuePath'],
+    properties: ['fields', 'label', 'labelPath', 'metadata', 'outputs', 'value', 'valuePath'],
   })
 
   public supports(sourceKind: SourceKind | string): boolean {
@@ -47,6 +47,7 @@ export class FilterSourceLanguageStrategy implements SourceLanguageStrategy {
 
 const FILTER_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'defineFilter', kind: 'snippet', insertText: FILTER_DEFAULT_SOURCE.trimEnd(), detail: 'Создать Filter source' },
+  { label: 'metadata', kind: 'property', insertText: `metadata: {\n  'namespace.feature': {},\n},`, detail: 'Статическая metadata Filter' },
   { label: 'field', kind: 'function', insertText: `field('String').optional().default('')`, detail: 'Описание Filter field' },
   { label: 'options', kind: 'function', insertText: `.options([{ value: '', label: '' }])`, detail: 'Статические варианты поля' },
   { label: 'vocab', kind: 'function', insertText: `.vocab('', { valuePath: 'code', labelPath: 'name' })`, detail: 'Внешний vocab поля' },

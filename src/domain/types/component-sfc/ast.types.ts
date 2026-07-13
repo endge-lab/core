@@ -32,6 +32,9 @@ export interface RComponentSFC_AST_Script {
   /** Preview-only значения props для песочницы, если найден definePreviewProps. */
   previewProps: RComponentSFC_AST_PreviewPropsDeclaration | null
 
+  /** Статические объявления публичной metadata компонента. */
+  metadata: RComponentSFC_AST_MetadataDeclaration[]
+
   /** Верхнеуровневые bindings, найденные в script. */
   bindings: RComponentSFC_AST_ScriptBinding[]
 
@@ -60,6 +63,15 @@ export interface RComponentSFC_AST_PreviewPropsDeclaration {
   optionsSource?: string | null
 
   /** Позиция объявления definePreviewProps в полном source. */
+  range: RComponentSFC_SourceRange
+}
+
+/** AST объявления `defineMetadata({...})` внутри script setup. */
+export interface RComponentSFC_AST_MetadataDeclaration {
+  /** Исходный текст object literal, переданного в defineMetadata. */
+  source: string
+
+  /** Позиция полного вызова defineMetadata в SFC source. */
   range: RComponentSFC_SourceRange
 }
 

@@ -1,4 +1,5 @@
 import type { ProgramDiagnostic } from '@/domain/types/program.types'
+import type { ProgramMetadataMap } from '@/domain/types/program-metadata.types'
 import type { SourceExpressionIR, SourceFieldDefinition } from '@/domain/types/source-expression.types'
 
 /** Source-описание Filter v1. */
@@ -39,6 +40,7 @@ export interface FilterSourceCompileResult {
   ast: unknown | null
   document: FilterSourceDocument | null
   artifact: FilterProgramPayload | null
+  metadata: ProgramMetadataMap
   diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
 }
 
