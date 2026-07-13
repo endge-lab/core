@@ -826,6 +826,8 @@ export class EndgeSchemaStorage extends EndgeModule {
         defaultLocale: raw.defaultLocale ?? raw.default_locale,
         fallbackLocale: raw.fallbackLocale ?? raw.fallback_locale,
         defaultAuthProfileIdentity: raw.defaultAuthProfileIdentity ?? raw.default_auth_profile_identity ?? null,
+        sfcAdapterIds: raw.sfcAdapterIds ?? raw.sfc_adapter_ids ?? [],
+        defaultSfcAdapterId: raw.defaultSfcAdapterId ?? raw.default_sfc_adapter_id,
       }
     }
 
@@ -2712,6 +2714,8 @@ export class EndgeSchemaStorage extends EndgeModule {
         defaultLocale: workspace.defaultLocale,
         fallbackLocale: workspace.fallbackLocale,
         defaultAuthProfileIdentity: workspace.defaultAuthProfileIdentity,
+        sfcAdapterIds: [...workspace.sfcAdapterIds],
+        defaultSfcAdapterId: workspace.defaultSfcAdapterId,
       })
       Endge.workspace.apply(saved)
       ;(AppBus.emit as (event: string, payload?: unknown) => void)('domainChanged', undefined)

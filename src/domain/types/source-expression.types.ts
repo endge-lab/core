@@ -1,5 +1,5 @@
 /** Поддерживаемые scalar-типы полей source DSL. */
-export type SourceFieldType = 'String' | 'Number' | 'Boolean' | 'Date' | 'DateTime' | 'Object'
+export type SourceFieldType = 'String' | 'Number' | 'Boolean' | 'Date' | 'Time' | 'DateTime' | 'Object'
 
 /** Источник безопасного чтения значения внутри source expression. */
 export type SourceExpressionReadKind = 'prop' | 'value' | 'row' | 'response' | 'store'

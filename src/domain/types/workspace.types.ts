@@ -28,6 +28,8 @@ export interface EndgeWorkspaceDefinition {
   defaultLocale: string
   fallbackLocale: string
   defaultAuthProfileIdentity: string | null
+  sfcAdapterIds: string[]
+  defaultSfcAdapterId: string
 }
 
 export type EndgeWorkspaceDefinitionInput = Partial<EndgeWorkspaceDefinition> & Record<string, unknown>

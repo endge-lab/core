@@ -33,6 +33,12 @@ export class RWorkspace extends REntity implements EndgeWorkspaceDefinition {
   @Expose()
   defaultAuthProfileIdentity: string | null = DEFAULT_ENDGE_WORKSPACE.defaultAuthProfileIdentity
 
+  @Expose()
+  sfcAdapterIds: string[] = [...DEFAULT_ENDGE_WORKSPACE.sfcAdapterIds]
+
+  @Expose()
+  defaultSfcAdapterId: string = DEFAULT_ENDGE_WORKSPACE.defaultSfcAdapterId
+
   static fromPlain(input: unknown): RWorkspace {
     return createWorkspace(input)
   }
@@ -51,6 +57,8 @@ export class RWorkspace extends REntity implements EndgeWorkspaceDefinition {
       defaultLocale: this.defaultLocale,
       fallbackLocale: this.fallbackLocale,
       defaultAuthProfileIdentity: this.defaultAuthProfileIdentity,
+      sfcAdapterIds: [...this.sfcAdapterIds],
+      defaultSfcAdapterId: this.defaultSfcAdapterId,
     }
   }
 }
@@ -79,8 +87,35 @@ function createWorkspace(input: unknown): RWorkspace {
   workspace.defaultAuthProfileIdentity = normalizeNullableText(
     source.defaultAuthProfileIdentity ?? source.default_auth_profile_identity,
   )
+  workspace.sfcAdapterIds = normalizeSfcAdapterIds(source.sfcAdapterIds ?? source.sfc_adapter_ids)
+  workspace.defaultSfcAdapterId = selectWorkspaceSfcAdapter(
+    source.defaultSfcAdapterId ?? source.default_sfc_adapter_id,
+    workspace.sfcAdapterIds,
+  )
 
   return workspace
+}
+
+function normalizeSfcAdapterIds(value: unknown): string[] {
+  const source = Array.isArray(value) ? value : []
+  const result = Array.from(new Set(
+    source
+      .map(item => String(item ?? '').trim())
+      .filter(Boolean),
+  ))
+
+  return result.length ? result : [...DEFAULT_ENDGE_WORKSPACE.sfcAdapterIds]
+}
+
+function selectWorkspaceSfcAdapter(value: unknown, adapterIds: string[]): string {
+  const adapterId = String(value ?? '').trim()
+  if (adapterIds.includes(adapterId))
+    return adapterId
+
+  if (adapterIds.includes(DEFAULT_ENDGE_WORKSPACE.defaultSfcAdapterId))
+    return DEFAULT_ENDGE_WORKSPACE.defaultSfcAdapterId
+
+  return adapterIds[0] ?? DEFAULT_ENDGE_WORKSPACE.defaultSfcAdapterId
 }
 
 function normalizeVars(value: unknown): EndgeWorkspaceVar[] {

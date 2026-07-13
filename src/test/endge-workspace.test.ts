@@ -40,7 +40,29 @@ describe('EndgeWorkspace', () => {
       defaultLocale: 'kk',
       fallbackLocale: 'en',
       defaultAuthProfileIdentity: null,
+      sfcAdapterIds: ['shadcn-vue'],
+      defaultSfcAdapterId: 'shadcn-vue',
     })
+  })
+
+  it('normalizes workspace SFC adapter identifiers', () => {
+    const workspace = normalizeEndgeWorkspaceDefinition({
+      sfcAdapterIds: [' shadcn-vue ', 'customer:aodb', 'customer:aodb', ''],
+      defaultSfcAdapterId: 'customer:aodb',
+    })
+
+    expect(workspace.sfcAdapterIds).toEqual(['shadcn-vue', 'customer:aodb'])
+    expect(workspace.defaultSfcAdapterId).toBe('customer:aodb')
+  })
+
+  it('uses the first available SFC adapter when the selected identifier is unavailable', () => {
+    const workspace = normalizeEndgeWorkspaceDefinition({
+      sfcAdapterIds: ['customer:aodb'],
+      defaultSfcAdapterId: 'missing',
+    })
+
+    expect(workspace.sfcAdapterIds).toEqual(['customer:aodb'])
+    expect(workspace.defaultSfcAdapterId).toBe('customer:aodb')
   })
 
   it('supports object locale map and updates shared locale helpers', () => {

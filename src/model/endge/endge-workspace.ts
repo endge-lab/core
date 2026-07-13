@@ -71,6 +71,14 @@ export class EndgeWorkspace extends EndgeModule {
     return this._current.defaultAuthProfileIdentity
   }
 
+  get sfcAdapterIds(): string[] {
+    return this._current.sfcAdapterIds
+  }
+
+  get defaultSfcAdapterId(): string {
+    return this._current.defaultSfcAdapterId
+  }
+
   supportsLocale(locale: string | null | undefined): boolean {
     return supportsWorkspaceLocale(locale)
   }

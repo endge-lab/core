@@ -87,6 +87,20 @@ defineFilter({
     await expect(host.command('patch').run({ unknown: true })).rejects.toThrow('unknown field')
     await expect(host.command('set').run({ key: 'search', value: 42 })).rejects.toThrow('invalid value')
   })
+
+  it('accepts string values for Time fields and rejects non-string values', async () => {
+    const host = createHost(`
+defineFilter({
+  fields: { departureTime: field('Time').default('06:30') },
+  outputs: { request: output().json(({ value }) => ({ departureTime: value('departureTime') })) },
+})
+`)
+
+    expect(host.getState()).toEqual({ departureTime: '06:30' })
+    await host.command('set').run({ key: 'departureTime', value: '12:45' })
+    expect(host.getState()).toEqual({ departureTime: '12:45' })
+    await expect(host.command('set').run({ key: 'departureTime', value: 1245 })).rejects.toThrow('invalid value')
+  })
 })
 
 function createHost(source = `

@@ -116,6 +116,33 @@ defineProps<{
     ])
   })
 
+  it('collects prop reads from display-only input primitives', () => {
+    const ir = compileComponentSFC(`<script setup lang="ts">
+defineProps<{
+  search: string
+  cancelled: boolean
+  status: string
+  statusOptions: Array<{ value: string, label?: string }>
+}>()
+</script>
+
+<template>
+  <Input :value="search" />
+  <Textarea :value="search" />
+  <Checkbox :checked="cancelled" />
+  <Select :value="status" :options="statusOptions" />
+</template>`).ir
+
+    const deps = analyzeComponentSFCRuntimeDependencies(ir)
+
+    expect(deps.props.map(dep => `${dep.prop}.${dep.path.join('.')}`)).toEqual([
+      'search.',
+      'cancelled.',
+      'status.',
+      'statusOptions.',
+    ])
+  })
+
   it('ignores unsupported or global identifiers', () => {
     const ir = compileComponentSFC(`<script setup lang="ts">
 defineProps<{

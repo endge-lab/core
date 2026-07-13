@@ -63,6 +63,40 @@ defineFilter({
     })
   })
 
+  it('compiles Time fields with string defaults and rejects non-string defaults', () => {
+    const valid = compileFilterSource(`
+defineFilter({
+  fields: {
+    from: field('Time').default('06:30'),
+  },
+  outputs: {
+    request: output().json(({ value }) => ({ from: value('from') })),
+  },
+})
+`)
+
+    expect(valid.diagnostics).toEqual([])
+    expect(valid.artifact).toMatchObject({
+      fields: [
+        { key: 'from', type: 'Time', defaultValue: { type: 'literal', value: '06:30' } },
+      ],
+    })
+
+    const invalid = compileFilterSource(`
+defineFilter({
+  fields: {
+    from: field('Time').default(630),
+  },
+  outputs: {},
+})
+`)
+
+    expect(invalid.artifact).toBeNull()
+    expect(invalid.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'source-field-default-type' }),
+    ]))
+  })
+
   it('rejects legacy fallback, arbitrary JavaScript and incompatible field config', () => {
     expect(compileFilterSource('').diagnostics).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'filter-source-empty' }),

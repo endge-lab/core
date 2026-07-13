@@ -120,4 +120,62 @@ defineProps<{
       tag: 'Table',
     })
   })
+
+  it('accepts display-only input primitives and preserves their props in IR', () => {
+    const result = compileComponentSFC(`<script setup lang="ts">
+defineProps<{
+  search: string
+  cancelled: boolean
+  status: string
+  airlines: string[]
+  statusOptions: Array<{ value: string, label?: string }>
+}>()
+</script>
+
+<template>
+  <Input type="String" :value="search" placeholder="Поиск" />
+  <Textarea :value="search" rows="4" />
+  <Checkbox :checked="cancelled" label="Отменённые" />
+  <Select multiple :value="airlines" :options="statusOptions" />
+</template>
+`)
+
+    expect(result.diagnostics.filter(item => item.code === 'sfc-template-tag-unsupported')).toEqual([])
+    expect(result.ir?.template.roots).toMatchObject([
+      {
+        kind: 'element',
+        tag: 'Input',
+        props: {
+          type: { kind: 'literal', value: 'String' },
+          value: { kind: 'expression', source: 'search' },
+          placeholder: { kind: 'literal', value: 'Поиск' },
+        },
+      },
+      {
+        kind: 'element',
+        tag: 'Textarea',
+        props: {
+          value: { kind: 'expression', source: 'search' },
+          rows: { kind: 'literal', value: '4' },
+        },
+      },
+      {
+        kind: 'element',
+        tag: 'Checkbox',
+        props: {
+          checked: { kind: 'expression', source: 'cancelled' },
+          label: { kind: 'literal', value: 'Отменённые' },
+        },
+      },
+      {
+        kind: 'element',
+        tag: 'Select',
+        props: {
+          multiple: { kind: 'literal', value: true },
+          value: { kind: 'expression', source: 'airlines' },
+          options: { kind: 'expression', source: 'statusOptions' },
+        },
+      },
+    ])
+  })
 })

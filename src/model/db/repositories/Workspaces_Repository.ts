@@ -9,6 +9,8 @@ export type WorkspacePayloadData = {
   defaultLocale?: string | null
   fallbackLocale?: string | null
   defaultAuthProfileIdentity?: string | null
+  sfcAdapterIds?: string[]
+  defaultSfcAdapterId?: string | null
 }
 
 export class Workspaces_Repository {

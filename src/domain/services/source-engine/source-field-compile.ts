@@ -23,7 +23,7 @@ export interface SourceFieldParseResult {
   defaultSource?: SourceFieldDefaultSource
 }
 
-const FIELD_TYPES = new Set<SourceFieldType>(['String', 'Number', 'Boolean', 'Date', 'DateTime', 'Object'])
+const FIELD_TYPES = new Set<SourceFieldType>(['String', 'Number', 'Boolean', 'Date', 'Time', 'DateTime', 'Object'])
 
 /** Компилирует chain field(...).optional().array()... в общий field contract. */
 export function compileSourceField(
@@ -216,7 +216,7 @@ function validateLiteralDefault(
     return
   const valid = field.array
     ? Array.isArray(value) && value.every(item => isScalarValue(field.type, item))
-    : field.type === 'String' || field.type === 'Date' || field.type === 'DateTime'
+    : field.type === 'String' || field.type === 'Date' || field.type === 'Time' || field.type === 'DateTime'
       ? typeof value === 'string'
       : field.type === 'Number'
         ? typeof value === 'number'
@@ -251,7 +251,7 @@ function staticExpressionValue(expression: import('@/domain/types/source-express
 function isScalarValue(type: SourceFieldType, value: unknown): boolean {
   if (value == null)
     return false
-  if (type === 'String' || type === 'Date' || type === 'DateTime')
+  if (type === 'String' || type === 'Date' || type === 'Time' || type === 'DateTime')
     return typeof value === 'string'
   if (type === 'Number')
     return typeof value === 'number'
