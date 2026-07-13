@@ -1115,6 +1115,7 @@ export class EndgeCompiler extends EndgeModule {
       runtimes: [],
       hooks: [],
       outputs: [],
+      graph: { inputs: [], updates: [], publications: [], mounts: [] },
     }
   }
 

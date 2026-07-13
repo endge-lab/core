@@ -26,7 +26,6 @@ function defaultContext(instance: string): RuntimeHostContext<'filter'> {
 
 /** Runtime-владелец Filter state, outputs и команд. */
 export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostContext<'filter'>, FilterProgramPayload> {
-  private _state: Record<string, unknown> = {}
   private _outputs = new Map<string, FilterRuntimeOutput>()
   private _outputHashes = new Map<string, string>()
 
@@ -103,14 +102,13 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
     const restored = this.runtimeState.get<Record<string, unknown>>(
       `filter:${this.entityIdentity}`,
       'state',
-      this._state,
+      this.getState(),
     )
-    this._state = this._normalizePatch(restored, false)
-    this._recomputeOutputs(false)
+    this._replaceState(this._normalizePatch(restored, false), false)
   }
 
   public getState(): Readonly<Record<string, unknown>> {
-    return { ...this._state }
+    return { ...((Raph.get(this.statePath()) as Record<string, unknown> | undefined) ?? {}) }
   }
 
   public get instanceName(): string {
@@ -158,7 +156,7 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
   private _patch(payload: unknown): void {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload))
       throw new Error('[FilterRuntimeHost] patch payload must be an object.')
-    this._replaceState({ ...this._state, ...this._normalizePatch(payload as Record<string, unknown>, true) }, true)
+    this._replaceState({ ...this.getState(), ...this._normalizePatch(payload as Record<string, unknown>, true) }, true)
   }
 
   private _set(payload: unknown): void {
@@ -180,10 +178,13 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
   }
 
   private _replaceState(state: Record<string, unknown>, emit: boolean): void {
-    this._state = state
-    const changedOutputs = this._recomputeOutputs(emit)
+    let changedOutputs: Array<{ key: string, output: FilterRuntimeOutput }> = []
+    Raph.transaction(() => {
+      Raph.set(this.statePath(), state)
+      changedOutputs = this._recomputeOutputs(emit)
+    })
     if (this.runtimeState)
-      this.runtimeState.set(`filter:${this.entityIdentity}`, 'state', this._state)
+      this.runtimeState.set(`filter:${this.entityIdentity}`, 'state', this.getState())
 
     const now = new Date().toISOString()
     this.setContext({ status: 'success', updatedAt: now, lastStateChangeAt: now })
@@ -203,14 +204,14 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
         next.set(output.key, {
           key: output.key,
           kind: 'json',
-          value: evaluateSourceExpression(output.expression, { values: this._state }),
+          value: evaluateSourceExpression(output.expression, { values: this.getState() }),
         })
       }
       else {
         next.set(output.key, {
           key: output.key,
           kind: 'predicate',
-          test: row => Boolean(evaluateSourceExpression(output.expression, { row, values: this._state })),
+          test: row => Boolean(evaluateSourceExpression(output.expression, { row, values: this.getState() })),
         })
       }
     }
@@ -220,6 +221,7 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
       if (emit && this._outputHashes.get(key) !== hash)
         changed.push({ key, output })
       this._outputHashes.set(key, hash)
+      Raph.set(this.outputPath(key), output.kind === 'json' ? output.value : output.test)
     }
     this._outputs = next
     return changed
@@ -267,7 +269,7 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
 
   private _outputHash(output: FilterRuntimeOutput): string {
     if (output.kind === 'predicate')
-      return JSON.stringify(this._state)
+      return JSON.stringify(this.getState())
     return JSON.stringify(output.value)
   }
 }

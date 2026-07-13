@@ -51,8 +51,8 @@ describe('Query Raph derived integration', () => {
       persistence: 'disabled',
       props: { filterPayload: { where: { active: true } } },
     }) as QueryRuntimeHost
-    const rawPath = queryOutputPath(host.id, 'raw')
-    const tablePath = queryOutputPath(host.id, 'table')
+    const rawPath = host.outputPath('raw')
+    const tablePath = host.outputPath('table')
     const changed: string[] = []
     host.on('output:change', (event: any) => changed.push(event.key))
 
@@ -123,8 +123,8 @@ describe('Query Raph derived integration', () => {
     const host = Endge.runtime.execute(query, {
       id: 'schedule-latest-runtime', persistence: 'disabled', props: { filterPayload: {} },
     }) as QueryRuntimeHost
-    const rawPath = queryOutputPath(host.id, 'raw')
-    const tablePath = queryOutputPath(host.id, 'table')
+    const rawPath = host.outputPath('raw')
+    const tablePath = host.outputPath('table')
 
     const firstRun = host.run()
     const secondRun = host.run()
@@ -146,8 +146,8 @@ describe('Query Raph derived integration', () => {
     const host = Endge.runtime.execute(query, {
       id: 'schedule-error-runtime', persistence: 'disabled', props: { filterPayload: {} },
     }) as QueryRuntimeHost
-    const rawPath = queryOutputPath(host.id, 'raw')
-    const tablePath = queryOutputPath(host.id, 'table')
+    const rawPath = host.outputPath('raw')
+    const tablePath = host.outputPath('table')
     await host.run()
     const lastGood = (Raph.get(`${tablePath}[id=1]`) as any).arrivalTime
     const converter = Endge.domain.getConverter('time-string-to-date')!
@@ -172,9 +172,6 @@ describe('Query Raph derived integration', () => {
   })
 })
 
-function queryOutputPath(runtimeId: string, output: string): string {
-  return `__endge.queryRuntime.${runtimeId}.outputs.${output}`
-}
 
 function registerConverter(id: number, identity: string, handler: (value: any) => any): void {
   const converter = new RConverter()

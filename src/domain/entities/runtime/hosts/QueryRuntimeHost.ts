@@ -2,7 +2,7 @@ import type { RQuery } from '@/domain/entities/reflect/RQuery'
 import type { RFilter } from '@/domain/entities/reflect/RFilter'
 import type { FilterProgramPayload } from '@/domain/types/filter-source.types'
 import type { ProgramArtifact, QueryProgramPayload } from '@/domain/types/program.types'
-import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime-host.types'
+import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext, RuntimeHostUpdateContext } from '@/domain/types/runtime-host.types'
 
 import {
   Raph,
@@ -34,7 +34,6 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
   private _outputHashes = new Map<string, string>()
   private _runSequence = 0
   private _abortController: AbortController | null = null
-  private _filterDisposers: Array<() => void> = []
   private _filterChildIds = new Set<string>()
   private _derivedHandles: RaphDerivedHandle[] = []
   private _outputWatchers: Array<() => void> = []
@@ -66,7 +65,7 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
       artifactReader: input.artifactReader ?? Endge.program,
       artifactRef: { entityType: 'query', id: input.model.id, identity: input.model.identity },
     })
-    this._internalBase = `__endge.queryRuntime.${encodePathPart(input.id)}`
+    this._internalBase = this.basePath
   }
 
   public static createRuntime(input: {
@@ -100,6 +99,7 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     host.addRaphNode(node)
     host.addResource({ id: `node:${node.id}`, kind: 'raph-node', title: node.id })
     host._props = host._literalDefaults(artifact.payload)
+    host._applyProps(host._props, true)
     host._applyProps(input.meta?.props ?? {}, true)
     try {
       host._mountOutputGraph(artifact)
@@ -152,20 +152,13 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
       if (!child)
         continue
 
-      const sync = () => {
-        const output = child.getOutput(source.output)
-        if (output?.kind === 'json')
-          this._applyProps({ [prop.key]: output.value }, false)
-      }
-      sync()
-      child.on('output:change', sync)
-      this._filterDisposers.push(() => child.off('output:change', sync))
+      this.bindInput(prop.key, { kind: 'raph', path: child.outputPath(source.output) })
       this._filterChildIds.add(child.id)
     }
   }
 
   public getProps(): Readonly<Record<string, unknown>> {
-    return { ...this._props }
+    return this.readInputs()
   }
 
   public setProps(patch: Record<string, unknown>): void {
@@ -202,7 +195,7 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     try {
       const response = await Endge.query.executeArtifact({
         payload,
-        props: this._props,
+        props: this.readInputs(),
         signal: this._abortController.signal,
       })
       if (sequence !== this._runSequence)
@@ -259,13 +252,17 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     this._derivedErrorActive = false
     if (Raph.get(this._internalBase) !== undefined)
       Raph.delete(this._internalBase)
-    for (const dispose of this._filterDisposers)
-      dispose()
-    this._filterDisposers = []
     for (const runtimeId of this._filterChildIds)
       Endge.runtime.destroyRuntimeTree(runtimeId)
     this._filterChildIds.clear()
     super.destroy()
+  }
+
+  protected override onUpdate(ctx: RuntimeHostUpdateContext): void {
+    const shouldRun = ctx.updates?.some(update => update.kind === 'run') ?? false
+    if (shouldRun)
+      void this.run().catch(() => undefined)
+    this.emit('update', ctx)
   }
 
   /** Монтирует compiled output graph как runtime-scoped Raph materialized dependencies. */
@@ -377,6 +374,7 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
       if (!definitions.has(key))
         throw new Error(`[QueryRuntimeHost] unknown prop: ${key}`)
       this._props[key] = value
+      this.bindInput(key, { kind: 'literal', value })
     }
   }
 }

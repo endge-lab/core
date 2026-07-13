@@ -1,4 +1,4 @@
-import type { CompositionProgramPayload } from '@/domain/types/composition-source.types'
+import type { CompositionProgramPayload, CompositionSourceDocument } from '@/domain/types/composition-source.types'
 import type { ProgramArtifact, QueryProgramPayload } from '@/domain/types/program.types'
 
 import { Raph } from '@endge/raph'
@@ -12,6 +12,7 @@ import { FilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterVie
 import { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
 import { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
 import { compileFilterSource } from '@/domain/services/source-engine/filter-source-compile'
+import { buildRuntimeGraph } from '@/domain/services/source-engine/composition-source-compile'
 import { Endge } from '@/model/endge/endge'
 
 describe('Composition runtime session', () => {
@@ -36,6 +37,10 @@ describe('Composition runtime session', () => {
 
     expect(session.id).toBe('composition-session')
     expect(session.host.getChildren().map(child => child.name)).toEqual(['filter', 'dateFilter', 'query'])
+    expect(filter.node?.parent).toBe(session.host.node)
+    expect(filterView.node?.parent).toBe(session.host.node)
+    expect(query.node?.parent).toBe(session.host.node)
+    expect(session.host.node?.parent?.id).toBe('__endge.runtime.app')
     expect(session.host.getChild('dateFilter')?.runtimeType).toBe('filter-view-runtime-host')
     expect(session.host.getChild('dateFilter')?.hasCapability('renderable')).toBe(true)
     expect(filterView.getProps()).toMatchObject({
@@ -88,7 +93,10 @@ describe('Composition runtime session', () => {
 
   it('publishes Query outputs atomically into Store data and recomputes derived fields', async () => {
     const rows = [{ id: 1, flight: 'SU100' }]
-    vi.spyOn(QueryRuntimeHost.prototype, 'run').mockResolvedValue({ raw: rows })
+    vi.spyOn(QueryRuntimeHost.prototype, 'run').mockImplementation(async function (this: QueryRuntimeHost) {
+      Raph.set(this.outputPath('raw'), rows)
+      return { raw: rows }
+    })
 
     const store = new RStore()
     store.id = 10
@@ -125,8 +133,7 @@ describe('Composition runtime session', () => {
       props: [], requestBody: null,
       outputs: [{ key: 'raw', source: { type: 'response', path: null }, dataViews: [], materialization: { kind: 'source' } }],
     }
-    const compositionPayload: CompositionProgramPayload = {
-      type: 'composition', sourceVersion: 1,
+    const compositionPayload = makeCompositionPayload({
       data: [{ name: 'schedule', kind: 'store', identity: 'schedule' }],
       runtimes: [{
         name: 'query', kind: 'query', identity: 'schedule-query', props: {},
@@ -134,7 +141,7 @@ describe('Composition runtime session', () => {
       }],
       hooks: [{ kind: 'mount', target: 'query' }],
       outputs: [],
-    }
+    })
     Endge.program.beginCompile('test')
     Endge.program.addArtifact(artifact('query', 11, 'schedule-query', queryPayload))
     Endge.program.addArtifact(artifact('composition', 12, 'schedule-store-page', compositionPayload))
@@ -187,8 +194,7 @@ defineFilter({
     ],
     requestBody: null, outputs: [],
   }
-  const compositionPayload: CompositionProgramPayload = {
-    type: 'composition', sourceVersion: 1,
+  const compositionPayload = makeCompositionPayload({
     data: [],
     runtimes: [
       { name: 'filter', kind: 'filter', identity: 'schedule-filter', props: {}, storeTo: [] },
@@ -213,12 +219,21 @@ defineFilter({
       { kind: 'change', runtime: 'filter', output: 'request', target: 'query', debounceMs: 20 },
     ],
     outputs: [{ key: 'filter', runtime: 'filter' }],
-  }
+  })
 
   Endge.program.beginCompile('test')
   Endge.program.addArtifact(artifact('filter', 1, 'schedule-filter', filterPayload))
   Endge.program.addArtifact(artifact('query', 2, 'schedule-query', queryPayload))
   Endge.program.addArtifact(artifact('composition', 3, 'schedule-page', compositionPayload))
+}
+
+function makeCompositionPayload(document: CompositionSourceDocument): CompositionProgramPayload {
+  return {
+    type: 'composition',
+    sourceVersion: 1,
+    ...document,
+    graph: buildRuntimeGraph(document),
+  }
 }
 
 function artifact<T>(

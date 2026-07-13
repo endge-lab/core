@@ -1,7 +1,7 @@
 import type { RuntimeEntityType } from '@/domain/types/runtime-entity-map.types'
 import type { AnyRuntimeStrategy, EndgeRuntimeSnapshot, RuntimeExecutableModel } from '@/domain/types/runtime.types'
 
-import { Raph } from '@endge/raph'
+import { Raph, RaphNode } from '@endge/raph'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { RuntimeHostRegistry } from '@/domain/entities/runtime/RuntimeHostRegistry'
@@ -19,12 +19,14 @@ import { FilterRuntimeStrategy } from '@/domain/services/runtime/strategies/Filt
 import { CompositionRuntimeStrategy } from '@/domain/services/runtime/strategies/CompositionRuntimeStrategy'
 import { Endge } from '@/model/endge/endge'
 import { RuntimeBoundaryUpdatePhase } from '@/model/helpers/raph-phases/runtime-boundary-update-phase'
+import { RuntimeNodeUpdatePhase } from '@/model/helpers/raph-phases/runtime-node-update-phase'
 
 export class EndgeRuntime extends EndgeModule {
   private _hosts = new RuntimeHostRegistry()
   private _strategies = new RuntimeStrategyRegistry()
   private _nextRuntimeId = 0
   private _inited = false
+  private _appNode: RaphNode | null = null
 
   public constructor() {
     super()
@@ -47,6 +49,12 @@ export class EndgeRuntime extends EndgeModule {
     }
     this._inited = true
 
+    this._appNode = new RaphNode(Raph.app, {
+      id: '__endge.runtime.app',
+      meta: { type: 'runtime-scope', kind: 'app' },
+    })
+    Raph.app.addNode(this._appNode)
+    Raph.addPhase(RuntimeNodeUpdatePhase.make())
     Raph.addPhase(RuntimeBoundaryUpdatePhase.make())
   }
 
@@ -89,6 +97,15 @@ export class EndgeRuntime extends EndgeModule {
    */
   public getRuntimeHosts(): AnyRuntimeHost[] {
     return this._hosts.getAll()
+  }
+
+  /** Регистрирует host, созданный владельцем составной runtime-сущности. */
+  public registerRuntimeHost(host: AnyRuntimeHost): boolean {
+    this.start()
+    const registered = this.registerCreatedHost(host, host.parent)
+    if (registered)
+      this.notify()
+    return registered
   }
 
   /**
@@ -159,39 +176,11 @@ export class EndgeRuntime extends EndgeModule {
       return
     }
 
-    const hosts = this._hosts.getAll()
-    if (!hosts.some(host => host.id === rootId)) {
+    if (!this._hosts.getById(rootId)) {
       return
     }
 
-    const childrenByParentId = new Map<string, string[]>()
-    for (const host of hosts) {
-      const parentId = String(host.parent?.id ?? '').trim()
-      if (!parentId) {
-        continue
-      }
-      childrenByParentId.set(parentId, [
-        ...(childrenByParentId.get(parentId) ?? []),
-        host.id,
-      ])
-    }
-
-    const orderedIds: string[] = []
-    const visited = new Set<string>()
-    const visit = (id: string) => {
-      if (!id || visited.has(id)) {
-        return
-      }
-      visited.add(id)
-      for (const childId of childrenByParentId.get(id) ?? []) {
-        visit(childId)
-      }
-      orderedIds.push(id)
-    }
-
-    visit(rootId)
-
-    for (const id of orderedIds) {
+    for (const id of this._hosts.getTreePostOrder(rootId)) {
       this.destroyRuntimeInternal(id, false)
     }
 
@@ -208,6 +197,9 @@ export class EndgeRuntime extends EndgeModule {
     }
 
     Raph.clearPhases()
+    if (this._appNode)
+      Raph.app.removeNode(this._appNode)
+    this._appNode = null
     this._inited = false
 
     // Единый notify после batch-reset.
@@ -261,6 +253,7 @@ export class EndgeRuntime extends EndgeModule {
     model: RuntimeExecutableModel,
     meta: Record<string, any>,
   ): AnyRuntimeHost | null {
+    this.start()
     const parent = this.resolveParentHost(meta?.parent)
     const hostMeta = { ...(meta ?? {}) }
     delete hostMeta.parent
@@ -282,20 +275,10 @@ export class EndgeRuntime extends EndgeModule {
       return null
     }
 
-    try {
-      this._hosts.register(host)
-    }
-    catch (error) {
-      console.error('[EndgeRuntime] Failed to register runtime host', error)
+    if (!this.registerCreatedHost(host, parent)) {
       host.destroy()
       return null
     }
-
-    host.attachRuntimeState(Endge.context.createRuntimeStateController({
-      runtimeId: host.id,
-      storageId: typeof host.meta.persistenceKey === 'string' ? host.meta.persistenceKey : host.id,
-      persistence: host.meta.persistence as any,
-    }))
 
     strategy.attach?.({
       id: runtimeId,
@@ -307,6 +290,39 @@ export class EndgeRuntime extends EndgeModule {
     })
     this.notify()
     return host
+  }
+
+  private registerCreatedHost(host: AnyRuntimeHost, parent: AnyRuntimeHost | null): boolean {
+    if (this._hosts.getById(host.id)) {
+      console.error(`[EndgeRuntime] Runtime host "${host.id}" is already active.`)
+      return false
+    }
+    if (host.node) {
+      host.node.options({
+        meta: {
+          type: 'runtime-node',
+          kind: 'root',
+          runtimeId: host.id,
+          entityType: host.entityType,
+          entityIdentity: host.entityIdentity,
+          parentRuntimeId: parent?.id ?? null,
+        },
+      })
+      ;(parent?.node ?? this._appNode)?.addChild(host.node, { invalidate: false })
+    }
+    try {
+      this._hosts.register(host)
+    }
+    catch (error) {
+      console.error('[EndgeRuntime] Failed to register runtime host', error)
+      return false
+    }
+    host.attachRuntimeState(Endge.context.createRuntimeStateController({
+      runtimeId: host.id,
+      storageId: typeof host.meta.persistenceKey === 'string' ? host.meta.persistenceKey : host.id,
+      persistence: host.meta.persistence as any,
+    }))
+    return true
   }
 
   /**

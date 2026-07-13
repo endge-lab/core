@@ -8,6 +8,7 @@ import type {
 export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
   private _hosts = new Map<string, RuntimeHost<any, any>>()
   private _indexByEntity = new Map<string, Set<string>>()
+  private _childrenByParent = new Map<string, Set<string>>()
   private _deletedSnapshots = new Map<string, RuntimeHostSnapshot>()
 
   /**
@@ -27,6 +28,12 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
     set.add(runtimeId)
     this._indexByEntity.set(key, set)
     this._hosts.set(runtimeId, host)
+    const parentId = String(host.parent?.id ?? '').trim()
+    if (parentId) {
+      const children = this._childrenByParent.get(parentId) ?? new Set<string>()
+      children.add(runtimeId)
+      this._childrenByParent.set(parentId, children)
+    }
     return host
   }
 
@@ -45,6 +52,22 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
    */
   public getAll(): RuntimeHost<any, any>[] {
     return Array.from(this._hosts.values())
+  }
+
+  /** Возвращает runtime subtree в безопасном для destroy порядке: children first. */
+  public getTreePostOrder(rootId: string): string[] {
+    const ordered: string[] = []
+    const visited = new Set<string>()
+    const visit = (id: string) => {
+      if (!id || visited.has(id))
+        return
+      visited.add(id)
+      for (const childId of this._childrenByParent.get(id) ?? [])
+        visit(childId)
+      ordered.push(id)
+    }
+    visit(String(rootId ?? '').trim())
+    return ordered
   }
 
   /**
@@ -84,6 +107,12 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
       this._indexByEntity.delete(entityKey)
 
     this._hosts.delete(key)
+    const parentId = String(host.parent?.id ?? '').trim()
+    const siblings = parentId ? this._childrenByParent.get(parentId) : null
+    siblings?.delete(key)
+    if (parentId && siblings?.size === 0)
+      this._childrenByParent.delete(parentId)
+    this._childrenByParent.delete(key)
     return host
   }
 
@@ -95,6 +124,7 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
       host.destroy()
     this._hosts.clear()
     this._indexByEntity.clear()
+    this._childrenByParent.clear()
   }
 
   /**

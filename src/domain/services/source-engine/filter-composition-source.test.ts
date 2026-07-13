@@ -177,6 +177,10 @@ defineQuery({
 	`)
 	    expect(valid.diagnostics).toEqual([])
 	    expect(valid.artifact?.hooks).toHaveLength(2)
+	    expect(valid.artifact?.graph).toMatchObject({
+	      updates: [{ sourceRuntime: 'filter', sourceOutput: 'request', targetRuntime: 'query', updateKind: 'run', debounceMs: 200 }],
+	      mounts: [{ targetRuntime: 'query', updateKind: 'run' }],
+	    })
 	    expect(valid.artifact?.runtimes.find(runtime => runtime.name === 'dateFilter')).toMatchObject({
 	      kind: 'filter-view',
 	      identity: 'filter',
@@ -275,6 +279,9 @@ defineComposition({
         },
       ],
       outputs: [],
+	      graph: {
+	        publications: [{ sourceRuntime: 'query', sourceOutput: 'raw', targetData: 'schedule', targetPath: 'raw' }],
+	      },
     })
   })
 })

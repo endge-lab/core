@@ -67,10 +67,51 @@ export interface CompositionSourceDocument {
   outputs: CompositionOutputDescriptor[]
 }
 
+/** Нормализованная связь input runtime-ноды. */
+export interface CompositionRuntimeInputConnection {
+  targetRuntime: string
+  targetProp: string
+  source: CompositionBindingValue
+}
+
+/** Нормализованный trigger логического update runtime-ноды. */
+export interface CompositionRuntimeUpdateConnection {
+  id: string
+  sourceRuntime: string
+  sourceOutput: string
+  targetRuntime: string
+  updateKind: 'run'
+  debounceMs: number
+}
+
+/** Публикация output runtime-ноды в Composition data. */
+export interface CompositionRuntimePublicationConnection {
+  id: string
+  sourceRuntime: string
+  sourceOutput: string
+  targetData: string
+  targetPath: string
+}
+
+/** Действие, выполняемое после mount всего графа. */
+export interface CompositionRuntimeMountConnection {
+  targetRuntime: string
+  updateKind: 'run'
+}
+
+/** Исполняемый граф Composition, построенный компилятором из source document. */
+export interface CompositionRuntimeGraph {
+  inputs: CompositionRuntimeInputConnection[]
+  updates: CompositionRuntimeUpdateConnection[]
+  publications: CompositionRuntimePublicationConnection[]
+  mounts: CompositionRuntimeMountConnection[]
+}
+
 /** Payload Composition artifact без runtime state. */
 export interface CompositionProgramPayload extends CompositionSourceDocument {
   type: 'composition'
   sourceVersion: number
+  graph: CompositionRuntimeGraph
 }
 
 export interface CompositionSourceCompileResult {

@@ -205,7 +205,7 @@ export interface RuntimeHostLifecycle {
   /** Корректно остановить host и освободить ресурсы. */
   destroy: () => Promise<void> | void
 
-  /** Обработать runtime update, пришедший из Raph boundary phase. */
+  /** Обработать runtime update, пришедший из логической либо boundary Raph-фазы. */
   update: (ctx: RuntimeHostUpdateContext) => Promise<void> | void
 }
 
@@ -224,6 +224,36 @@ export interface RuntimeHostArtifactRef {
 
 /** Каноническое имя Raph-фазы, которая агрегирует dirty runtime-ноды к root host. */
 export const RUNTIME_BOUNDARY_UPDATE_PHASE_NAME = 'runtime-boundary-update' as PhaseName
+
+/** Фаза логического обновления root-ноды runtime-host. */
+export const RUNTIME_NODE_UPDATE_PHASE_NAME = 'runtime-node-update' as PhaseName
+
+/** Значение входа runtime-host: literal либо прямая ссылка на Raph data path. */
+export type RuntimeHostInputBinding
+  = | { kind: 'literal', value: unknown }
+    | { kind: 'raph', path: string }
+
+/** Декларативная команда, которую host должен обработать при изменении sourcePath. */
+export interface RuntimeHostUpdateBinding {
+  id: string
+  sourcePath: string
+  update: {
+    kind: string
+    payload?: unknown
+  }
+  policy?: {
+    debounceMs?: number
+    distinct?: 'none' | 'structural'
+  }
+}
+
+/** Конкретное логическое обновление, разрешённое из Raph events. */
+export interface RuntimeHostResolvedUpdate {
+  bindingId: string
+  sourcePath: string
+  kind: string
+  payload?: unknown
+}
 
 /** Локальный input source runtime-host-а без привязки к Raph. */
 export interface RuntimeHostLocalInputSource {
@@ -263,6 +293,8 @@ export interface RuntimeHostUpdateContext {
   events: PhaseEvent[]
   boundaries: RuntimeDirtyBoundary[]
   frame: RaphFrameContext
+  /** Логические обновления root runtime-ноды. Boundary-фаза это поле не заполняет. */
+  updates?: RuntimeHostResolvedUpdate[]
 }
 
 /** Проекция patchable collection boundary, которую можно обновить точечно. */
@@ -376,6 +408,27 @@ export interface RuntimeHost<
   /** Корневая raph-нода host (если есть). */
   readonly node: RaphNode | null
 
+  /** Runtime-scoped базовый путь host в Raph data storage. */
+  readonly basePath: string
+
+  /** Возвращает путь runtime state. */
+  statePath: (path?: string) => string
+
+  /** Возвращает путь output runtime-host. */
+  outputPath: (name: string) => string
+
+  /** Привязывает локальное имя входа к literal либо Raph path. */
+  bindInput: (name: string, binding: RuntimeHostInputBinding) => void
+
+  /** Читает разрешённое значение входа. */
+  readInput: (name: string) => unknown
+
+  /** Читает все входы одним snapshot. */
+  readInputs: () => Readonly<Record<string, unknown>>
+
+  /** Подписывает root runtime-ноду на data path и тип логического обновления. */
+  bindUpdate: (binding: RuntimeHostUpdateBinding) => () => void
+
   /** Возвращает compiled artifact, связанный с host, если он доступен. */
   getArtifact: () => ProgramArtifact<TArtifactPayload> | null
 
@@ -412,7 +465,7 @@ export interface RuntimeHost<
   /** Привязать runtime-scoped persistence controller. */
   attachRuntimeState: (runtimeState: RuntimeStateControllerLike | null) => void
 
-  /** Обработать runtime update, пришедший из Raph boundary phase. */
+  /** Обработать runtime update, пришедший из логической либо boundary Raph-фазы. */
   update: (ctx: RuntimeHostUpdateContext) => Promise<void> | void
 
   /** Сериализовать host в снимок для UI/диагностики. */

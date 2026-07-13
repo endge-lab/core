@@ -10,6 +10,8 @@ import type {
 import type { RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime-host.types'
 import type { SourceFieldDefinition } from '@/domain/types/source-expression.types'
 
+import { Raph } from '@endge/raph'
+
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 
 function defaultContext(instance: string): RuntimeHostContext<'filter'> {
@@ -30,6 +32,7 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
   private readonly _controls: Record<string, FilterViewControlDefinition>
   private readonly _implementation: FilterViewImplementation
   private readonly _onSourceChange: () => void
+  private readonly _disposeSourceWatch: () => void
   private _props: Record<string, unknown>
 
   public constructor(input: {
@@ -83,7 +86,10 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
       this.setContext({ updatedAt: now, lastStateChangeAt: now })
       this.emit('render:change', this.getRenderModel())
     }
-    this._sourceRuntime.on('state:change', this._onSourceChange)
+    this._disposeSourceWatch = Raph.watch([
+      this._sourceRuntime.statePath(),
+      `${this._sourceRuntime.statePath()}.*`,
+    ], this._onSourceChange)
   }
 
   /** Возвращает renderer-neutral модель встроенного или пользовательского Filter view. */
@@ -141,7 +147,7 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
   }
 
   public override destroy(): void {
-    this._sourceRuntime.off('state:change', this._onSourceChange)
+    this._disposeSourceWatch()
     super.destroy()
   }
 

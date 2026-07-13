@@ -4,6 +4,7 @@ import type {
   CompositionOutputDescriptor,
   CompositionHook,
   CompositionRuntimeDescriptor,
+  CompositionRuntimeGraph,
   CompositionRuntimeKind,
   CompositionSourceCompileResult,
   CompositionSourceDocument,
@@ -82,7 +83,12 @@ export function compileCompositionSource(source: string, sourceVersion = 1): Com
     return {
       ast,
       document: hasErrors ? null : document,
-      artifact: hasErrors ? null : { type: 'composition', sourceVersion, ...document },
+      artifact: hasErrors ? null : {
+        type: 'composition',
+        sourceVersion,
+        ...document,
+        graph: buildRuntimeGraph(document),
+      },
       diagnostics,
     }
   }
@@ -90,6 +96,38 @@ export function compileCompositionSource(source: string, sourceVersion = 1): Com
     diagnostics.push(diagnostic('error', 'composition-source-parse-error', `Не удалось распарсить Composition source: ${error?.message ?? error}`))
     return { ast: null, document: null, artifact: null, diagnostics }
   }
+}
+
+/** Строит normalized graph отдельно от source AST, чтобы runtime не интерпретировал DSL. */
+export function buildRuntimeGraph(document: CompositionSourceDocument): CompositionRuntimeGraph {
+  const inputs = document.runtimes.flatMap(runtime => Object.entries(runtime.props).map(([targetProp, source]) => ({
+    targetRuntime: runtime.name,
+    targetProp,
+    source,
+  })))
+  const updates = document.hooks.flatMap((hook, index) => hook.kind === 'change'
+    ? [{
+        id: `hook:${index}:${hook.runtime}.${hook.output}->${hook.target}`,
+        sourceRuntime: hook.runtime,
+        sourceOutput: hook.output,
+        targetRuntime: hook.target,
+        updateKind: 'run' as const,
+        debounceMs: hook.debounceMs,
+      }]
+    : [])
+  const mounts = document.hooks.flatMap(hook => hook.kind === 'mount'
+    ? [{ targetRuntime: hook.target, updateKind: 'run' as const }]
+    : [])
+  const publications = document.runtimes.flatMap(runtime => runtime.storeTo.flatMap((publication, publicationIndex) => (
+    Object.entries(publication.fields).map(([targetPath, sourceOutput]) => ({
+      id: `store:${runtime.name}:${publicationIndex}:${sourceOutput}->${publication.data}.${targetPath}`,
+      sourceRuntime: runtime.name,
+      sourceOutput,
+      targetData: publication.data,
+      targetPath,
+    }))
+  )))
+  return { inputs, updates, publications, mounts }
 }
 
 function findDefineComposition(ast: t.File): t.CallExpression | null {
