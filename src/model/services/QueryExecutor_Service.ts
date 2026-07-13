@@ -40,6 +40,8 @@ export class QueryExecutor_Service {
   ): unknown {
     if (output.source.type !== 'response')
       throw new Error(`Query output "${output.key}" is not response-backed.`)
+    if (output.source.expression)
+      return evaluateSourceExpression(output.source.expression, { response })
     return output.source.path == null ? response : this._path(response, output.source.path)
   }
 

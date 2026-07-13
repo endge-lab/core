@@ -9,6 +9,7 @@ import type {
 import { compileQuerySource } from '@/domain/services/source-engine/query-source-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/domain/services/source-engine/source-language-syntax'
 import { QUERY_DEFAULT_SOURCE } from '@/domain/services/source-engine/templates/query.default.source'
+import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/domain/services/source-engine/value-expression-language'
 
 /** Source language strategy для editor-facing операций RQuery source. */
 export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
@@ -20,11 +21,11 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
     keywords: [
       'auto', 'body', 'collectionByKey', 'compact', 'dataView', 'defineDataView', 'defineFilter', 'defineProps',
       'defineQuery', 'endgeVar', 'env', 'field', 'filter', 'merge', 'output', 'prop',
-      'full', 'incremental', 'response',
+      'full', 'incremental', 'response', ...VALUE_EXPRESSION_FUNCTION_NAMES,
     ],
     functions: [
       'array', 'as', 'auto', 'by', 'collectionByKey', 'dataView', 'default', 'from', 'full', 'map', 'optional',
-      'options', 'vocab',
+      'options', 'vocab', ...VALUE_EXPRESSION_METHOD_NAMES,
     ],
     properties: [
       'auth', 'body', 'data', 'enabled', 'endpoint', 'formUrlencoded',
@@ -57,7 +58,7 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
 
   /** Возвращает подсказки source-only Query v2 API. */
   public completions(_context: SourceLanguageContext): SourceLanguageCompletion[] {
-    return QUERY_SOURCE_COMPLETIONS
+    return [...QUERY_SOURCE_COMPLETIONS, ...VALUE_EXPRESSION_COMPLETIONS]
   }
 }
 

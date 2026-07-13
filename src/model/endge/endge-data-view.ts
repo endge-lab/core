@@ -10,6 +10,7 @@ import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { RDataView } from '@/domain/entities/reflect/RDataView'
 import { compileDataViewSource } from '@/domain/services/source-engine/data-view-source-compile'
 import { Endge } from '@/model/endge/endge'
+import { evaluateSourceExpression } from '@/domain/services/source-engine/source-expression-evaluate'
 
 /** Runtime executor для compiled RDataView artifacts. */
 export class EndgeDataView extends EndgeModule {
@@ -218,6 +219,9 @@ export class EndgeDataView extends EndgeModule {
       return expression.value
     if (expression.type === 'template')
       return tools.template(expression.template, scope)
+
+    if (expression.type !== 'path')
+      return evaluateSourceExpression(expression, { scope })
 
     let value = tools.path(scope, expression.path)
     for (const operation of expression.operations)

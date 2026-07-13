@@ -1,5 +1,6 @@
 import type { ProgramDiagnostic } from '@/domain/types/program.types'
 import type { ProgramMetadataMap } from '@/domain/types/program-metadata.types'
+import type { SourceExpressionIR } from '@/domain/types/source-expression.types'
 
 export type DataViewSourceMode = 'manual' | 'pipeline'
 
@@ -82,6 +83,7 @@ export type DataViewExpression
   = | DataViewPathExpression
     | DataViewTemplateExpression
     | DataViewLiteralExpression
+    | SourceExpressionIR
 
 export interface DataViewPathExpression {
   type: 'path'

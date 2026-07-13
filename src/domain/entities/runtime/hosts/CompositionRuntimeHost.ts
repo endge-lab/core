@@ -19,6 +19,7 @@ import { Raph, RaphNode, full, type RaphDerivedHandle } from '@endge/raph'
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 import { FilterViewRuntimeHost as EndgeFilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
 import { Endge } from '@/model/endge/endge'
+import { evaluateSourceExpression } from '@/domain/services/source-engine/source-expression-evaluate'
 
 function defaultContext(): RuntimeHostContext<'composition'> {
   return {
@@ -493,6 +494,11 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       return Raph.get(this._requireDataPath(binding.data, binding.path))
     if (binding.kind === 'filter-fields')
       return this._readFilterFieldsBinding(binding)
+    if (binding.kind === 'expression') {
+      return evaluateSourceExpression(binding.expression, {
+        read: expression => this._readExpressionSource(expression),
+      })
+    }
     const runtime = this._children.get(binding.runtime) as any
     const output = runtime?.getOutput?.(binding.output)
     return output?.kind === 'json' ? output.value : output
@@ -532,6 +538,17 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       ], sync))
       return
     }
+    if (binding.kind === 'expression') {
+      const seen = new Set<string>()
+      for (const read of this._collectExpressionReads(binding.expression)) {
+        const key = `${read.source}:${read.path}:${JSON.stringify(read.parameters ?? [])}`
+        if (seen.has(key))
+          continue
+        seen.add(key)
+        this._subscribeExpressionRead(read, sync)
+      }
+      return
+    }
     const runtime = this._children.get(binding.runtime)
     if (!runtime)
       return
@@ -562,7 +579,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   private _materializeBinding(
     runtimeName: string,
     prop: string,
-    binding: Extract<CompositionBindingValue, { kind: 'output' | 'filter-fields' | 'data' }>,
+    binding: Extract<CompositionBindingValue, { kind: 'output' | 'filter-fields' | 'data' | 'expression' }>,
   ): string {
     const path = `compositions.${this.id}.bindings.${runtimeName}.${prop}`
     const sync = () => Raph.set(path, this._readBinding(binding))
@@ -570,6 +587,81 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     this._subscribeBinding(binding, sync)
     this._bridgePaths.add(path)
     return path
+  }
+
+  private _readExpressionSource(
+    read: Extract<import('@/domain/types/source-expression.types').SourceExpressionIR, { type: 'read' }>,
+  ): unknown {
+    const parameters = read.parameters ?? []
+    if (read.source === 'composition-output') {
+      const runtime = this._children.get(parameters[0]) as any
+      const output = runtime?.getOutput?.(parameters[1])
+      return output?.kind === 'json' ? output.value : output
+    }
+    if (read.source === 'composition-store')
+      return Raph.get(parameters[0])
+    if (read.source === 'composition-data') {
+      const ref = parameters[0] ?? ''
+      const dot = ref.indexOf('.')
+      return Raph.get(this._requireDataPath(dot > 0 ? ref.slice(0, dot) : ref, dot > 0 ? ref.slice(dot + 1) : ''))
+    }
+    if (read.source === 'composition-filter-fields') {
+      return this._readFilterFieldsBinding({
+        kind: 'filter-fields',
+        runtime: parameters[0],
+        fields: parameters.slice(1),
+      })
+    }
+    if (read.source === 'metadata')
+      return Endge.program.getArtifact(parameters[0] as any, parameters[1])?.metadata
+    if (read.source === 'store')
+      return Raph.get(read.path)
+    return undefined
+  }
+
+  private _collectExpressionReads(
+    expression: import('@/domain/types/source-expression.types').SourceExpressionIR,
+  ): Array<Extract<import('@/domain/types/source-expression.types').SourceExpressionIR, { type: 'read' }>> {
+    if (expression.type === 'read')
+      return [expression]
+    if (expression.type === 'operation')
+      return expression.arguments.flatMap(argument => this._collectExpressionReads(argument))
+    if (expression.type === 'array')
+      return expression.items.flatMap(argument => this._collectExpressionReads(argument))
+    if (expression.type === 'object')
+      return Object.values(expression.properties).flatMap(argument => this._collectExpressionReads(argument))
+    return []
+  }
+
+  private _subscribeExpressionRead(
+    read: Extract<import('@/domain/types/source-expression.types').SourceExpressionIR, { type: 'read' }>,
+    sync: () => void,
+  ): void {
+    const parameters = read.parameters ?? []
+    if (read.source === 'metadata' || read.source === 'current')
+      return
+    if (read.source === 'composition-output') {
+      const runtime = this._children.get(parameters[0])
+      if (runtime)
+        this._disposers.push(Raph.watch([runtime.outputPath(parameters[1]), `${runtime.outputPath(parameters[1])}.*`], sync))
+      return
+    }
+    if (read.source === 'composition-filter-fields') {
+      const runtime = this._children.get(parameters[0])
+      if (runtime)
+        this._disposers.push(Raph.watch([runtime.statePath(), `${runtime.statePath()}.*`], sync))
+      return
+    }
+    if (read.source === 'composition-store' || read.source === 'store') {
+      this._disposers.push(Raph.watch(read.source === 'store' ? read.path : parameters[0], sync))
+      return
+    }
+    if (read.source === 'composition-data') {
+      const ref = parameters[0] ?? ''
+      const dot = ref.indexOf('.')
+      const path = this._requireDataPath(dot > 0 ? ref.slice(0, dot) : ref, dot > 0 ? ref.slice(dot + 1) : '')
+      this._disposers.push(Raph.watch(`${path}.*`, sync))
+    }
   }
 
   private _readFilterFieldsBinding(binding: Extract<CompositionBindingValue, { kind: 'filter-fields' }>): CompositionFilterFieldsSlice | null {
@@ -617,6 +709,12 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       for (const binding of Object.values(this._compiledInputs(runtime.name))) {
         if (binding.kind === 'output' || binding.kind === 'filter-fields')
           visit(binding.runtime)
+        else if (binding.kind === 'expression') {
+          for (const read of this._collectExpressionReads(binding.expression)) {
+            if (read.source === 'composition-output' || read.source === 'composition-filter-fields')
+              visit(read.parameters?.[0] ?? '')
+          }
+        }
       }
       visiting.delete(name)
       visited.add(name)

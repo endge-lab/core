@@ -1,7 +1,7 @@
 import type { ProgramDiagnostic } from '@/domain/types/program.types'
 import type { ProgramMetadataMap } from '@/domain/types/program-metadata.types'
 import type { RuntimeHost } from '@/domain/types/runtime-host.types'
-import type { SourceFieldDefinition } from '@/domain/types/source-expression.types'
+import type { SourceExpressionIR, SourceFieldDefinition } from '@/domain/types/source-expression.types'
 import type { FilterViewControlDefinition } from '@/domain/types/filter-view.type'
 
 export type CompositionRuntimeKind = 'filter' | 'query' | 'component' | 'filter-view'
@@ -12,6 +12,7 @@ export type CompositionBindingValue
     | { kind: 'store', key: string }
     | { kind: 'data', data: string, path: string }
     | { kind: 'filter-fields', runtime: string, fields: string[] }
+    | { kind: 'expression', expression: SourceExpressionIR }
 
 export interface CompositionDataDescriptor {
   name: string

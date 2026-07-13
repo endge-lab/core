@@ -9,6 +9,7 @@ import type {
 import { compileCompositionSource } from '@/domain/services/source-engine/composition-source-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/domain/services/source-engine/source-language-syntax'
 import { COMPOSITION_DEFAULT_SOURCE } from '@/domain/services/source-engine/templates/composition.default.source'
+import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/domain/services/source-engine/value-expression-language'
 
 export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy {
   public readonly id = 'source-language:composition'
@@ -18,10 +19,10 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
     extension: '.endge-composition.ts',
     keywords: [
       'component', 'control', 'data', 'defineComposition', 'filter', 'filterView', 'fromData', 'fromFilter', 'fromOutput', 'fromStore', 'onChange',
-      'onMount', 'output', 'query',
+      'onMount', 'output', 'query', 'metadata', ...VALUE_EXPRESSION_FUNCTION_NAMES,
     ],
     functions: [
-      'component', 'controls', 'debounce', 'fields', 'fromRuntime', 'persist', 'run', 'select', 'store', 'storeTo', 'vocab', 'withProps',
+      'component', 'controls', 'debounce', 'fields', 'fromRuntime', 'persist', 'run', 'select', 'store', 'storeTo', 'vocab', 'withProps', ...VALUE_EXPRESSION_METHOD_NAMES,
     ],
     properties: ['data', 'hooks', 'key', 'metadata', 'outputs', 'runtimes'],
   })
@@ -41,7 +42,7 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
   }
 
   public completions(_context: SourceLanguageContext): SourceLanguageCompletion[] {
-    return COMPOSITION_COMPLETIONS
+    return [...COMPOSITION_COMPLETIONS, ...VALUE_EXPRESSION_COMPLETIONS]
   }
 }
 

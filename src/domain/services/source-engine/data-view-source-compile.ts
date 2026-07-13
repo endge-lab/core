@@ -14,6 +14,7 @@ import type { DataViewProgramPayload, ProgramDiagnostic } from '@/domain/types/p
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
 import { compileProgramMetadataProperty } from '@/domain/services/source-engine/source-metadata-compile'
+import { compileSourceExpression } from '@/domain/services/source-engine/source-expression-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
@@ -399,7 +400,7 @@ function readMapStep(node: t.Expression, diagnostics: DiagnosticDraft[]) {
     const key = getPropertyName(property.key)
     if (!key || !t.isExpression(property.value))
       continue
-    fields[key] = readExpression(unwrapExpression(property.value))
+    fields[key] = readExpression(unwrapExpression(property.value), diagnostics, `steps.map.${key}`)
   }
 
   return { type: 'map' as const, spreads, fields }
@@ -422,7 +423,7 @@ function readMapSpread(node: t.Expression, diagnostics: DiagnosticDraft[]): { so
   return null
 }
 
-function readExpression(node: t.Expression): DataViewExpression {
+function readExpression(node: t.Expression, diagnostics: DiagnosticDraft[], sourcePath: string): DataViewExpression {
   const expression = unwrapExpression(node)
   if (t.isStringLiteral(expression) || t.isNumericLiteral(expression) || t.isBooleanLiteral(expression) || t.isNullLiteral(expression))
     return { type: 'literal', value: literalValue(expression) }
@@ -433,6 +434,10 @@ function readExpression(node: t.Expression): DataViewExpression {
 
   if (t.isCallExpression(expression) && isIdentifierCallee(expression, 'template'))
     return { type: 'template', template: readStringArgument(expression, 0) ?? '' }
+
+  const compiled = compileSourceExpression(expression, diagnostics, sourcePath)
+  if (compiled)
+    return compiled
 
   return { type: 'literal', value: null }
 }
@@ -523,11 +528,22 @@ function isRowLocalExpression(expression: DataViewExpression, alias: string): bo
     return true
   if (expression.type === 'path')
     return expression.path === alias || expression.path.startsWith(`${alias}.`)
-  const placeholders = [...expression.template.matchAll(/\{([^{}]+)\}/g)]
-  return placeholders.every(match => {
-    const path = String(match[1] ?? '').trim()
-    return path === alias || path.startsWith(`${alias}.`)
-  })
+  if (expression.type === 'template') {
+    const placeholders = [...expression.template.matchAll(/\{([^{}]+)\}/g)]
+    return placeholders.every(match => {
+      const path = String(match[1] ?? '').trim()
+      return path === alias || path.startsWith(`${alias}.`)
+    })
+  }
+  if (expression.type === 'read')
+    return expression.source === 'scope' && (expression.path === alias || expression.path.startsWith(`${alias}.`))
+  if (expression.type === 'operation')
+    return expression.arguments.every(argument => isRowLocalExpression(argument, alias))
+  if (expression.type === 'array')
+    return expression.items.every(argument => isRowLocalExpression(argument, alias))
+  if (expression.type === 'object')
+    return Object.values(expression.properties).every(argument => isRowLocalExpression(argument, alias))
+  return false
 }
 
 function readObjectProperty(node: t.ObjectExpression, name: string): t.ObjectMethod | t.ObjectProperty | null {

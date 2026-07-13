@@ -13,7 +13,7 @@ import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
 
 import { QueryType } from '@/domain/types/document.types'
-import { compileSourceCallback } from '@/domain/services/source-engine/source-expression-compile'
+import { compileSourceCallback, compileSourceExpression } from '@/domain/services/source-engine/source-expression-compile'
 import { compileSourceField } from '@/domain/services/source-engine/source-field-compile'
 import { compileProgramMetadataProperty } from '@/domain/services/source-engine/source-metadata-compile'
 
@@ -313,6 +313,9 @@ function validateBodyPropReferences(
     return
   const visit = (node: import('@/domain/types/source-expression.types').SourceExpressionIR) => {
     if (node.type === 'read') {
+      if (node.source === 'current') {
+        return
+      }
       if (node.source !== 'prop') {
         diagnostics.push(createDiagnostic('error', 'query-source-body-read', `request.body не поддерживает read source "${node.source}".`, 'request.body'))
       }
@@ -439,14 +442,35 @@ function readOutputSource(
       return { type: 'response', path: path.value }
   }
 
+  const compiled = compileSourceExpression(expression, diagnostics, sourcePath)
+  if (compiled && containsOnlyReads(compiled, new Set(['response', 'current'])))
+    return { type: 'response', path: null, expression: compiled }
+  if (compiled)
+    diagnostics.push(createDiagnostic('error', 'query-source-output-read', 'Query output expression может читать только response(...).', sourcePath, expression))
+
   diagnostics.push(createDiagnostic(
     'error',
     'query-source-output-source-unsupported',
-    '.from(...) поддерживает только response(path?) или ключ предыдущего output.',
+    '.from(...) поддерживает response(path?) с value-цепочкой или ключ предыдущего output.',
     sourcePath,
     expression,
   ))
   return null
+}
+
+function containsOnlyReads(
+  expression: import('@/domain/types/source-expression.types').SourceExpressionIR,
+  allowed: Set<import('@/domain/types/source-expression.types').SourceExpressionReadKind>,
+): boolean {
+  if (expression.type === 'read')
+    return allowed.has(expression.source)
+  if (expression.type === 'operation')
+    return expression.arguments.every(argument => containsOnlyReads(argument, allowed))
+  if (expression.type === 'array')
+    return expression.items.every(argument => containsOnlyReads(argument, allowed))
+  if (expression.type === 'object')
+    return Object.values(expression.properties).every(argument => containsOnlyReads(argument, allowed))
+  return true
 }
 
 function readDataViewRef(

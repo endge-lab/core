@@ -20,6 +20,7 @@ import * as t from '@babel/types'
 
 import {
   diagnostic,
+  compileSourceExpression,
   propertyName,
   readStringArgument,
   unwrapExpression,
@@ -432,10 +433,13 @@ function readBindings(
     }
 
     const value = staticValue(expression)
-    if (!value.ok)
-      diagnostics.push(diagnostic('error', 'composition-binding-literal', 'Literal binding допускает только JSON-compatible значения.', `${sourcePath}.${key}`, expression))
-    else
+    if (value.ok)
       bindings[key] = { kind: 'literal', value: value.value }
+    else {
+      const compiled = compileSourceExpression(expression, diagnostics, `${sourcePath}.${key}`)
+      if (compiled)
+        bindings[key] = { kind: 'expression', expression: compiled }
+    }
   }
   return bindings
 }
@@ -578,6 +582,22 @@ function validateBindingReferences(data: CompositionDataDescriptor[], runtimes: 
       }
     }
     for (const [prop, binding] of Object.entries(runtime.props)) {
+      if (binding.kind === 'expression') {
+        for (const read of collectExpressionReads(binding.expression)) {
+          const runtimeRef = read.source === 'composition-output' || read.source === 'composition-filter-fields'
+            ? read.parameters?.[0]
+            : undefined
+          const dataRef = read.source === 'composition-data'
+            ? String(read.parameters?.[0] ?? '').split('.')[0]
+            : undefined
+          if (runtimeRef && !runtimeByName.has(runtimeRef))
+            diagnostics.push(diagnostic('error', 'composition-binding-runtime-missing', `Expression ссылается на отсутствующий runtime "${runtimeRef}".`, `runtimes.${runtime.name}.withProps.${prop}`))
+          if (read.source === 'composition-filter-fields' && runtimeRef && runtimeByName.get(runtimeRef)?.kind !== 'filter')
+            diagnostics.push(diagnostic('error', 'composition-binding-filter-runtime-kind', `fromFilter(...) должен ссылаться на Filter runtime, получен "${runtimeByName.get(runtimeRef)?.kind ?? ''}".`, `runtimes.${runtime.name}.withProps.${prop}`))
+          if (dataRef && !dataByName.has(dataRef))
+            diagnostics.push(diagnostic('error', 'composition-binding-data-missing', `Expression ссылается на отсутствующий data alias "${dataRef}".`, `runtimes.${runtime.name}.withProps.${prop}`))
+        }
+      }
       if ((binding.kind === 'output' || binding.kind === 'filter-fields') && !runtimeByName.has(binding.runtime)) {
         diagnostics.push(diagnostic(
           'error',
@@ -624,8 +644,16 @@ function validateRuntimeCycles(
   const edges = new Map<string, string[]>()
   for (const runtime of runtimes) {
     const propEdges = Object.values(runtime.props)
-      .filter((binding): binding is Extract<CompositionBindingValue, { kind: 'output' | 'filter-fields' }> => binding.kind === 'output' || binding.kind === 'filter-fields')
-      .map(binding => binding.runtime)
+      .flatMap((binding) => {
+        if (binding.kind === 'output' || binding.kind === 'filter-fields')
+          return [binding.runtime]
+        if (binding.kind === 'expression')
+          return collectExpressionReads(binding.expression)
+            .filter(read => read.source === 'composition-output' || read.source === 'composition-filter-fields')
+            .map(read => read.parameters?.[0])
+            .filter((value): value is string => Boolean(value))
+        return []
+      })
     edges.set(runtime.name, runtime.kind === 'filter-view'
       ? [runtime.identity, ...propEdges]
       : propEdges)
@@ -653,6 +681,18 @@ function validateRuntimeCycles(
       return
     }
   }
+}
+
+function collectExpressionReads(expression: import('@/domain/types/source-expression.types').SourceExpressionIR): Array<Extract<import('@/domain/types/source-expression.types').SourceExpressionIR, { type: 'read' }>> {
+  if (expression.type === 'read')
+    return [expression]
+  if (expression.type === 'operation')
+    return expression.arguments.flatMap(collectExpressionReads)
+  if (expression.type === 'array')
+    return expression.items.flatMap(collectExpressionReads)
+  if (expression.type === 'object')
+    return Object.values(expression.properties).flatMap(collectExpressionReads)
+  return []
 }
 
 function memberChain(raw: t.Expression): {

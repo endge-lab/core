@@ -2,12 +2,74 @@
 export type SourceFieldType = 'String' | 'Number' | 'Boolean' | 'Date' | 'Time' | 'DateTime' | 'Object'
 
 /** Источник безопасного чтения значения внутри source expression. */
-export type SourceExpressionReadKind = 'prop' | 'value' | 'row' | 'response' | 'store'
+export type SourceExpressionReadKind
+  = | 'prop'
+    | 'value'
+    | 'row'
+    | 'response'
+    | 'store'
+    | 'current'
+    | 'scope'
+    | 'composition-output'
+    | 'composition-data'
+    | 'composition-store'
+    | 'composition-filter-fields'
+    | 'metadata'
 
 /** Whitelist операций статического expression IR. */
 export type SourceExpressionOperation
   = | 'merge'
     | 'compact'
+    | 'get'
+    | 'get-or'
+    | 'has'
+    | 'default-to'
+    | 'pick'
+    | 'omit'
+    | 'defaults'
+    | 'keys'
+    | 'values'
+    | 'entries'
+    | 'map'
+    | 'where'
+    | 'reject'
+    | 'find'
+    | 'some'
+    | 'every'
+    | 'flat-map'
+    | 'flatten'
+    | 'uniq'
+    | 'uniq-by'
+    | 'concat'
+    | 'take'
+    | 'drop'
+    | 'sort-by'
+    | 'group-by'
+    | 'key-by'
+    | 'size'
+    | 'sum'
+    | 'sum-by'
+    | 'min'
+    | 'max'
+    | 'min-by'
+    | 'max-by'
+    | 'trim'
+    | 'lower-case'
+    | 'upper-case'
+    | 'split'
+    | 'join'
+    | 'match'
+    | 'eq'
+    | 'ne'
+    | 'gt'
+    | 'gte'
+    | 'lt'
+    | 'lte'
+    | 'includes'
+    | 'or'
+    | 'not'
+    | 'is-nil'
+    | 'is-empty'
     | 'and'
     | 'between'
     | 'in-list'
@@ -24,7 +86,7 @@ export type SourceExpressionIR
   = | { type: 'literal', value: unknown }
     | { type: 'object', properties: Record<string, SourceExpressionIR> }
     | { type: 'array', items: SourceExpressionIR[] }
-    | { type: 'read', source: SourceExpressionReadKind, path: string }
+    | { type: 'read', source: SourceExpressionReadKind, path: string, parameters?: string[] }
     | {
       type: 'operation'
       operation: SourceExpressionOperation
@@ -77,4 +139,11 @@ export interface SourceExpressionContext {
   row?: unknown
   response?: unknown
   stores?: Record<string, unknown>
+  current?: unknown
+  scope?: unknown
+  read?: (expression: Extract<SourceExpressionIR, { type: 'read' }>) => unknown
 }
+
+/** Публичное имя общего декларативного value DSL. */
+export type ValueExpressionIR = SourceExpressionIR
+export type ValueExpressionContext = SourceExpressionContext

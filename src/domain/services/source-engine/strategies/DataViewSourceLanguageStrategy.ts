@@ -9,6 +9,7 @@ import type {
 import { compileDataViewSource } from '@/domain/services/source-engine/data-view-source-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/domain/services/source-engine/source-language-syntax'
 import { DATA_VIEW_DEFAULT_SOURCE } from '@/domain/services/source-engine/templates/data-view.default.source'
+import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/domain/services/source-engine/value-expression-language'
 
 /** Source language strategy для editor-facing операций RDataView source. */
 export class DataViewSourceLanguageStrategy implements SourceLanguageStrategy {
@@ -20,9 +21,9 @@ export class DataViewSourceLanguageStrategy implements SourceLanguageStrategy {
     keywords: [
       'auto', 'collectionByKey', 'convert', 'dataView', 'defineDataView', 'field',
       'from', 'full', 'incremental', 'join', 'map', 'path', 'pick', 'spread',
-      'template', 'transform',
+      'template', 'transform', ...VALUE_EXPRESSION_FUNCTION_NAMES,
     ],
-    functions: ['as', 'auto', 'by', 'collectionByKey', 'convert', 'dataView', 'find', 'from', 'full', 'join', 'map', 'pick'],
+    functions: ['as', 'auto', 'by', 'collectionByKey', 'convert', 'dataView', 'find', 'from', 'full', 'join', 'map', 'pick', ...VALUE_EXPRESSION_METHOD_NAMES],
     properties: ['incremental', 'input', 'left', 'manual', 'metadata', 'mode', 'pipeline', 'right', 'steps', 'tools'],
   })
 
@@ -50,7 +51,7 @@ export class DataViewSourceLanguageStrategy implements SourceLanguageStrategy {
 
   /** Возвращает подсказки v1 для разрешенного DataView source API. */
   public completions(_context: SourceLanguageContext): SourceLanguageCompletion[] {
-    return DATA_VIEW_SOURCE_COMPLETIONS
+    return [...DATA_VIEW_SOURCE_COMPLETIONS, ...VALUE_EXPRESSION_COMPLETIONS]
   }
 }
 

@@ -134,6 +134,7 @@ export type QueryProgramOutputSource
   = | {
     type: 'response'
     path: string | null
+    expression?: import('@/domain/types/source-expression.types').SourceExpressionIR
   }
   | {
     type: 'output'

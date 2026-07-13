@@ -47,6 +47,7 @@ export type QueryOutputSource
   = | {
     type: 'response'
     path: string | null
+    expression?: SourceExpressionIR
   }
   | {
     type: 'output'
