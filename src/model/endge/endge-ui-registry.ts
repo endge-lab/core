@@ -30,6 +30,7 @@ import {
   ENDGE_UI_DEFAULT_PRESET_COMPONENTS,
   UI_COMPONENT_HOST_DEFINITION_ID,
 } from '@/model/config/ui-composition-defaults'
+import { UIAdapterRegistry } from '@/model/endge/ui-registry/UIAdapterRegistry'
 
 function clonePlainValue<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
@@ -61,6 +62,8 @@ function legacyRendererIndexKeys(input: {
 }
 
 export class EndgeUIRegistry extends EndgeModule {
+  public readonly adapters = new UIAdapterRegistry(() => this.notify())
+
   private _definitions = new Map<string, UIComponentDefinition>()
   private _configDefinitions = new Map<string, UIComponentConfigDefinition>()
   private _presetComponents = new Map<string, UIComponentPresetDocument>()
@@ -90,6 +93,7 @@ export class EndgeUIRegistry extends EndgeModule {
     this._legacyRendererRefsByIndex.clear()
     this._renderersByRef.clear()
     this._rendererRefsByIndex.clear()
+    this.adapters.reset()
 
     this.registerDefinitions(ENDGE_UI_DEFAULT_DEFINITIONS)
     this.registerConfigDefinitions(ENDGE_UI_DEFAULT_CONFIG_DEFINITIONS)
@@ -108,6 +112,8 @@ export class EndgeUIRegistry extends EndgeModule {
       jsxComponents: [...this._jsxComponents.keys()],
       legacyRenderers: [...this._legacyRenderersByRef.keys()],
       renderers: [...this._renderersByRef.keys()],
+      adapters: this.adapters.list(),
+      activeAdapterId: this.adapters.active?.id ?? null,
     }
   }
 

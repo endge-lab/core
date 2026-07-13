@@ -9,8 +9,8 @@ describe('EndgeWorkspace', () => {
     expect(workspace.locales.map(locale => locale.code)).toEqual(['en', 'ru'])
     expect(workspace.defaultLocale).toBe('ru')
     expect(workspace.fallbackLocale).toBe('ru')
-    expect(workspace.sfcAdapterIds).toEqual(['shadcn-vue'])
-    expect(workspace.defaultSfcAdapterId).toBe('shadcn-vue')
+    expect(workspace.sfcAdapterIds).toEqual(['native-vue'])
+    expect(workspace.defaultSfcAdapterId).toBe('native-vue')
   })
 
   it('normalizes unsupported locales to default locale', () => {

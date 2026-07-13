@@ -12,8 +12,8 @@ export const DEFAULT_ENDGE_WORKSPACE = {
   defaultLocale: 'ru',
   fallbackLocale: 'ru',
   defaultAuthProfileIdentity: null,
-  sfcAdapterIds: ['shadcn-vue'],
-  defaultSfcAdapterId: 'shadcn-vue',
+  sfcAdapterIds: ['native-vue'],
+  defaultSfcAdapterId: 'native-vue',
 } satisfies EndgeWorkspaceDefinition
 
 export type EndgeWorkspaceLocaleLabelMode = keyof Pick<EndgeWorkspaceLocale, 'displayName' | 'shortLabel'>

@@ -1,3 +1,5 @@
+import type { UIRenderAdapterDescriptor } from '@/domain/types/ui-render-adapter.type'
+
 export type UIPrimitiveKind
   = | 'page'
     | 'flex'
@@ -224,6 +226,8 @@ export interface UIRegistrySnapshot {
   jsxComponents: string[]
   legacyRenderers: string[]
   renderers: string[]
+  adapters: UIRenderAdapterDescriptor[]
+  activeAdapterId: string | null
 }
 
 export interface UIRegistryNodeDraft {

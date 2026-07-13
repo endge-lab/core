@@ -40,8 +40,8 @@ describe('EndgeWorkspace', () => {
       defaultLocale: 'kk',
       fallbackLocale: 'en',
       defaultAuthProfileIdentity: null,
-      sfcAdapterIds: ['shadcn-vue'],
-      defaultSfcAdapterId: 'shadcn-vue',
+      sfcAdapterIds: ['native-vue'],
+      defaultSfcAdapterId: 'native-vue',
     })
   })
 
