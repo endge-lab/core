@@ -72,7 +72,7 @@ export class EndgeSSE extends EndgeModule {
       return
     }
 
-    const url: string = String(Endge.vars.resolve(cfg.url) ?? cfg.url).trim()
+    const url: string = String(Endge.workspace.variables.resolve(cfg.url) ?? cfg.url).trim()
     if (!url) {
       console.warn('[EndgeSSE] resolved sse url is empty')
       // console.groupEnd()
@@ -197,10 +197,10 @@ export class EndgeSSE extends EndgeModule {
         = mode === 'none'
           ? undefined
           : mode === 'manual'
-            ? (await Endge.authProfiles.resolveRequestAuth({ mode: 'manual', manualToken: cfg.manualToken ?? '' })).accessToken
+            ? (await Endge.auth.profiles.resolveRequestAuth({ mode: 'manual', manualToken: cfg.manualToken ?? '' })).accessToken
             : mode === 'profile'
-              ? (await Endge.authProfiles.resolveRequestAuth({ mode: 'profile', authProfileIdentity: cfg.authProfileIdentity ?? undefined })).accessToken
-              : (await Endge.authProfiles.resolveRequestAuth({ mode: 'inherit' })).accessToken
+              ? (await Endge.auth.profiles.resolveRequestAuth({ mode: 'profile', authProfileIdentity: cfg.authProfileIdentity ?? undefined })).accessToken
+              : (await Endge.auth.profiles.resolveRequestAuth({ mode: 'inherit' })).accessToken
 
       this._tokenCached = token
 

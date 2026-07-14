@@ -7,7 +7,11 @@ import type {
 } from '@/domain/types/runtime/context-persistence.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
-import { Endge } from '@/model/endge/kernel/endge'
+import {
+  getActiveEndgeWorkspace,
+  hasActiveEndgeWorkspace,
+  normalizeWorkspaceLocale,
+} from '@/model/config/endge-workspace'
 import {
   EndgeStorageAdapterRegistry,
   normalizePersistence,
@@ -113,8 +117,14 @@ export class EndgeContext extends EndgeModule {
     this._currentEnvironment = normalizeScopePart(payload?.environment, DEFAULT_SCOPE.environmentId)
     this._currentUser = normalizeScopePart(payload?.user, DEFAULT_SCOPE.userId)
     const rawLocale = normalizeOptionalText(payload?.locale)
-    this._currentLocale = rawLocale ?? ''
-    this._pendingLocale = rawLocale
+    if (hasActiveEndgeWorkspace()) {
+      this._currentLocale = normalizeWorkspaceLocale(rawLocale)
+      this._pendingLocale = null
+    }
+    else {
+      this._currentLocale = rawLocale ?? ''
+      this._pendingLocale = rawLocale
+    }
   }
 
   /** Сохраняет текущий context snapshot через выбранный adapter. */
@@ -178,11 +188,14 @@ export class EndgeContext extends EndgeModule {
       return existing
     }
 
+    const persistence = normalizePersistence(input.persistence ?? { driver: 'local' })
     const controller = new RuntimeStateController({
       runtimeId,
       storageId: input.storageId,
-      scope: this.getPersistenceScope(),
-      adapter: this.resolveAdapter(input.persistence ?? { driver: 'local' }),
+      scope: persistence.driver === 'disabled'
+        ? this.getDisabledPersistenceScope()
+        : this.getPersistenceScope(),
+      adapter: this.resolveAdapter(persistence),
     })
     this._runtimeControllers.set(runtimeId, controller)
     return controller
@@ -256,12 +269,12 @@ export class EndgeContext extends EndgeModule {
 
   /** Возвращает текущую locale или locale активного workspace. */
   get currentLocale(): string {
-    return this._currentLocale || Endge.workspace.defaultLocale
+    return this._currentLocale || getActiveEndgeWorkspace().defaultLocale
   }
 
   /** Нормализует, сохраняет и публикует новую locale. */
   set currentLocale(value: string) {
-    const next = Endge.workspace.normalizeLocale(value)
+    const next = normalizeWorkspaceLocale(value)
     if (next === this._currentLocale) {
       return
     }
@@ -273,13 +286,13 @@ export class EndgeContext extends EndgeModule {
 
   /** Устанавливает текущую locale через публичный method API. */
   public setCurrentLocale(locale: string | null): void {
-    this.currentLocale = Endge.workspace.normalizeLocale(locale)
+    this.currentLocale = normalizeWorkspaceLocale(locale)
   }
 
   /** Согласует текущую locale с активной workspace-конфигурацией. */
   public reconcileCurrentLocaleWithWorkspace(): void {
     const pending = this._pendingLocale
-    const next = Endge.workspace.normalizeLocale(pending ?? this._currentLocale)
+    const next = normalizeWorkspaceLocale(pending ?? this._currentLocale)
     this._pendingLocale = null
     if (next === this._currentLocale)
       return
@@ -299,6 +312,19 @@ export class EndgeContext extends EndgeModule {
     if (!this._currentWorkspace)
       throw new Error('[EndgeContext] Active workspace has not been loaded from Payload')
     return this._currentWorkspace
+  }
+
+  /** Builds a harmless scope for a controller that never reads or writes state. */
+  private getDisabledPersistenceScope(): EndgePersistenceScope {
+    const session = this.resolveSessionIdentity()
+
+    return {
+      workspaceId: this._currentWorkspace ?? 'detached',
+      tenantId: session.tenantId,
+      projectId: this._currentProject,
+      environmentId: this._currentEnvironment,
+      userId: session.userId,
+    }
   }
 
   /** Вычисляет tenant и user identity текущей сессии. */

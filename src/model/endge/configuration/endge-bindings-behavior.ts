@@ -6,7 +6,6 @@ import type {
   ResolvedBehaviorBinding,
 } from '@/domain/types/configuration/faceted-cascade'
 
-import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { Endge } from '@/model/endge/kernel/endge'
 import { EndgeResolveEngine } from '@/model/helpers/endge-resolve-engine'
 
@@ -15,7 +14,7 @@ import { EndgeResolveEngine } from '@/model/helpers/endge-resolve-engine'
  * Преобразует сырые записи биндингов в итоговый список обработчиков для события
  * и при необходимости запускает связанные action-flow.
  */
-export class EndgeBindingsBehavior extends EndgeModule {
+export class EndgeBindingsBehavior {
   private readonly _engine = new EndgeResolveEngine<RBehaviorBinding, ResolvedBehaviorBinding>({
     getSource: () => Endge.domain.getBehaviorBindings(),
     getSelector: raw => raw.eventName,
@@ -72,7 +71,7 @@ export class EndgeBindingsBehavior extends EndgeModule {
       bindings,
       found: bindings.length > 0,
       count: bindings.length,
-      facet: 'behavior',
+      facet: 'behavior' as const,
     }
     if (typeof console !== 'undefined') {
       const msg = `[EndgeBehaviorBindings] resolveForEvent: событие "${eventName}", owner=${opts.ownerType}:${opts.ownerId}, найдено контрактов=${result.count}`
@@ -158,7 +157,7 @@ export class EndgeBindingsBehavior extends EndgeModule {
       if (typeof console !== 'undefined') {
         console.log('[EndgeBehaviorBindings] запуск контракта', binding.identity ?? actionId, '→ action', actionId, `(событие "${eventName}")`)
       }
-      Endge.flow.run(runtime)
+      Endge.runtime.flow.run(runtime)
     }
     return result
   }

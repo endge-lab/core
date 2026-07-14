@@ -164,7 +164,7 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
         immediate: true,
         disposeTarget: 'delete',
         compute: input => field.dataViews.reduce(
-          (value, ref) => Endge.dataView.runRef(ref, value),
+          (value, ref) => Endge.runtime.dataView.runRef(ref, value),
           input,
         ),
       })

@@ -33,7 +33,7 @@ describe('Composition runtime session', () => {
     const run = vi.spyOn(QueryRuntimeHost.prototype, 'run').mockResolvedValue({})
     installDomainAndProgram()
 
-    const session = await Endge.composition.mount('schedule-page', { id: 'composition-session' })
+    const session = await Endge.runtime.composition.mount('schedule-page', { id: 'composition-session' })
     const filter = session.outputs.filter?.runtime as FilterRuntimeHost
     const filterView = session.host.getChild('dateFilter') as FilterViewRuntimeHost
     const query = session.host.getChild('query') as QueryRuntimeHost
@@ -155,7 +155,7 @@ describe('Composition runtime session', () => {
     ))
     Endge.program.addArtifact(artifact('composition', 12, 'schedule-store-page', compositionPayload))
 
-    const session = await Endge.composition.mount('schedule-store-page', { id: 'composition-store' })
+    const session = await Endge.runtime.composition.mount('schedule-store-page', { id: 'composition-store' })
     const storeRuntime = Endge.runtime
       .getRuntimeHostsByEntity('store', 'schedule', 'app')
       .find(runtime => runtime.parent?.id === session.id) as StoreRuntimeHost
@@ -197,7 +197,7 @@ describe('Composition runtime session', () => {
     Endge.program.addArtifact(artifact('composition', 31, 'shared-page', compositionPayload))
 
     const sharedRuntime = Endge.runtime.execute(store, { id: 'store:shared-db-preview' }) as StoreRuntimeHost
-    const session = await Endge.composition.mount('shared-page', {
+    const session = await Endge.runtime.composition.mount('shared-page', {
       id: 'composition:shared-page-preview',
       dataRuntimes: { db: sharedRuntime.id },
     })
@@ -291,7 +291,7 @@ describe('Composition runtime session', () => {
     Endge.program.addArtifact(artifact('composition', 22, 'groundhandling-default', innerPayload))
     Endge.program.addArtifact(artifact('composition', 23, 'groundhandling-page', outerPayload))
 
-    const session = await Endge.composition.mount('groundhandling-page', { id: 'groundhandling-page-session' })
+    const session = await Endge.runtime.composition.mount('groundhandling-page', { id: 'groundhandling-page-session' })
     const nested = session.host.getChild('requests') as CompositionRuntimeHost
     const consumer = session.host.getChild('consumer') as QueryRuntimeHost
     expect(nested).toBeInstanceOf(CompositionRuntimeHost)

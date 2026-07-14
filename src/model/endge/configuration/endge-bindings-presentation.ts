@@ -5,7 +5,6 @@ import type {
   ResolvedPresentationBinding,
 } from '@/domain/types/configuration/faceted-cascade'
 
-import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { Endge } from '@/model/endge/kernel/endge'
 import { EndgeResolveEngine } from '@/model/helpers/endge-resolve-engine'
 
@@ -14,7 +13,7 @@ import { EndgeResolveEngine } from '@/model/helpers/endge-resolve-engine'
  * Находит итоговые renderer-привязки для роли с учётом наследования,
  * окружения и режимов объединения override-правил.
  */
-export class EndgeBindingsPresentation extends EndgeModule {
+export class EndgeBindingsPresentation {
   private readonly _engine = new EndgeResolveEngine<RPresentationBinding, ResolvedPresentationBinding>({
     getSource: () => Endge.domain.getPresentationBindings(),
     getSelector: raw => raw.role,

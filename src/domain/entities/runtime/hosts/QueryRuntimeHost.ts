@@ -193,7 +193,7 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     this.setContext({ status: 'running', startedAt, updatedAt: startedAt })
 
     try {
-      const response = await Endge.query.executeArtifact({
+      const response = await Endge.runtime.query.executeArtifact({
         payload,
         props: this.readInputs(),
         signal: this._abortController.signal,
@@ -215,7 +215,7 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
               const path = output.materialization.kind === 'source'
                 ? this._requireOutputPath(output.key)
                 : this._requireResponseInputPath(output.key)
-              Raph.set(path, Endge.query.readResponseOutput(output, response))
+              Raph.set(path, Endge.runtime.query.readResponseOutput(output, response))
             }
           })
         }
@@ -294,7 +294,7 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
           compute: (source) => {
             let value = source
             for (const ref of output.dataViews)
-              value = Endge.dataView.runRef(ref, value, undefined, { children: artifact.children ?? [] })
+              value = Endge.runtime.dataView.runRef(ref, value, undefined, { children: artifact.children ?? [] })
             return value
           },
         })

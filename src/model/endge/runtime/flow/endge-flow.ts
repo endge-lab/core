@@ -7,14 +7,18 @@ import type { EndgeFlowNodeDefinition } from '@/domain/types/flow/endge-flow.typ
 import type { QueryProgramPayload } from '@/domain/types/program/program.types'
 import type { RuntimeHost } from '@/domain/types/runtime/runtime-host.types'
 
-import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { createActionContext } from '@/domain/entities/runtime/hosts/ActionRuntimeHost'
 import { Endge } from '@/model/endge/kernel/endge'
+import { EndgeFlowRegistry } from '@/model/endge/runtime/flow/endge-flow-registry'
 
 /**
  * Модуль исполнения compiled flow для action runtime-host.
  */
-export class EndgeFlow extends EndgeModule {
+export class EndgeFlow {
+  public constructor(
+    public readonly conditions = new EndgeFlowRegistry(),
+  ) {}
+
   /*
    * Публичные операции
    */
@@ -550,7 +554,7 @@ export class EndgeFlow extends EndgeModule {
         const conditionId = branch?.conditionId
         const portId = branch?.portId
         if (!conditionId || !portId) continue
-        const ok = await Endge.flowRegistry.evaluateCondition(
+        const ok = await this.conditions.evaluateCondition(
           conditionId,
           flowContext,
           branch.params ?? {},

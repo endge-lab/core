@@ -1,16 +1,10 @@
 import type { EndgeGlobalVar } from '@/domain/types/types'
-import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
-
-import { Raph } from '@endge/raph'
-
-import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
-import Config from '@/model/config'
-import { Endge } from '@/model/endge/kernel/endge'
+import type { EndgeWorkspaceVar } from '@/domain/types/document/workspace.types'
 
 type EnvRecord = Record<string, unknown>
 
 /**
- * EndgeVars - контроллер глобальных переменных.
+ * WorkspaceVariables resolves effective values of workspace variable definitions.
  *
  * Источник списка переменных:
  *  - workspace.vars
@@ -21,62 +15,32 @@ type EnvRecord = Record<string, unknown>
  *     - имя переменной внутри системы: без префикса (ENDPOINT_AUTH -> VITE_ENDPOINT_AUTH)
  *  3) workspace.vars
  *
- * Особенности:
- *  - сам класс НЕ хранит данные, только читает их из домена
- *  - кладёт итоговые значения в Raph.app под `${Config.STORAGE_VARS_KEY}.*`
- *  - умеет резолвить строки вида "{VAR}" (через getValue)
+ * Runtime projections are owned by EndgeRuntime, not by this service.
  */
-export class EndgeVars extends EndgeModule {
+export class WorkspaceVariables {
 
   // Переопределение переменных среды
   private _envyRecord: EnvRecord = {}
 
-  /**
-   * Принимает runtime/env overrides из boot context.
-   */
-  public override setup(ctx: EndgeBootContext): void {
-    this.setEnvyRecord(ctx.vars)
-  }
-
-  /**
-   * Синхронизирует итоговые значения переменных и runtime-фильтров в Raph.
-   */
-  public override start(): void {
-    this.syncAllToRaph()
-    this.hydrateRuntimeFilters()
-  }
+  public constructor(
+    private readonly getDefinitions: () => EndgeWorkspaceVar[],
+  ) {}
 
   /**
    * Устанавливает внешние overrides переменных и сразу пересинхронизирует Raph.
    */
-  setEnvyRecord(envyRecord: EnvRecord): void {
+  setEnvironment(envyRecord: EnvRecord): void {
     this._envyRecord = envyRecord ?? {}
-    this.syncAllToRaph()
   }
 
-  /**
-   * Внутренний helper модуля: hydrate Runtime Filters.
-   */
-  private hydrateRuntimeFilters(): void {
-    try {
-      const raw = localStorage.getItem('endge:parameters')
-      if (!raw) { return }
+  /** Compatibility name for callers that still provide runtime overrides directly. */
+  setEnvyRecord(envyRecord: EnvRecord): void {
+    this.setEnvironment(envyRecord)
+  }
 
-      const store = JSON.parse(raw) as Record<string, unknown>
-      if (!store || typeof store !== 'object') { return }
-
-      for (const [identity, payload] of Object.entries(store)) {
-        if (!identity) { continue }
-
-        Raph.set(
-          identity.startsWith('parameters.') ? identity : `parameters.${identity}`,
-          payload,
-        )
-      }
-    }
-    catch (error) {
-      console.error(error)
-    }
+  /** Workspace-owned persisted variable definitions. */
+  get definitions(): EndgeWorkspaceVar[] {
+    return [...this.getDefinitions()]
   }
 
   // ========================================================================
@@ -88,7 +52,7 @@ export class EndgeVars extends EndgeModule {
    */
   private getDomainVars(): EndgeGlobalVar[] {
     try {
-      const workspaceVars = Endge.workspace.vars
+      const workspaceVars = this.getDefinitions()
       if (workspaceVars.length > 0) {
         return workspaceVars.map((item) => {
           const name = String(item.name ?? '').trim()
@@ -104,7 +68,7 @@ export class EndgeVars extends EndgeModule {
       return []
     }
     catch (e) {
-      console.warn('[EndgeVars] Failed to read workspace vars', e)
+      console.warn('[WorkspaceVariables] Failed to read workspace vars', e)
       return []
     }
   }
@@ -194,7 +158,7 @@ export class EndgeVars extends EndgeModule {
     }
 
     const trimmed: string = raw.trim()
-    const parsed = EndgeVars.parseVarToken(trimmed)
+    const parsed = WorkspaceVariables.parseVarToken(trimmed)
 
     if (parsed.ok) {
       const val: string | undefined = this.getValue(parsed.name)
@@ -210,7 +174,7 @@ export class EndgeVars extends EndgeModule {
         return coerce(trimmed)
       case 'throw':
         throw new Error(
-          `[EndgeVars.resolve] invalid variable token "${trimmed}": ${parsed.reason}`,
+          `[WorkspaceVariables.resolve] invalid variable token "${trimmed}": ${parsed.reason}`,
         )
       case 'fallback':
       default:
@@ -281,30 +245,6 @@ export class EndgeVars extends EndgeModule {
     return { ok: true, name: inner }
   }
 
-  // ========================================================================
-  // Синхронизация с Raph
-  // ========================================================================
-
-  /**
-   * Внутренний helper модуля: sync All To Raph.
-   */
-  private syncAllToRaph(): void {
-    const vars: EndgeGlobalVar[] = this.getAll()
-    for (const v of vars) {
-      if (!v.name)
-        continue
-
-      this.syncOneToRaph(v.name, this.getValue(v.name))
-    }
-  }
-
-  /**
-   * Внутренний helper модуля: sync One To Raph.
-   */
-  private syncOneToRaph(name: string, value: string | undefined): void {
-    Raph.app.set(`${Config.STORAGE_VARS_KEY}.${name}`, value)
-  }
-
   /** Читает variable из внешнего environment без изменения module state. */
   private getExternalValue(name: string): unknown {
     const key = String(name ?? '').trim()
@@ -325,3 +265,6 @@ export class EndgeVars extends EndgeModule {
     return undefined
   }
 }
+
+/** @deprecated Use WorkspaceVariables through Endge.workspace.variables. */
+export { WorkspaceVariables as EndgeVars }

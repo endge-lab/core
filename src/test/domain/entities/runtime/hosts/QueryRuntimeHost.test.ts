@@ -22,7 +22,7 @@ describe('QueryRuntimeHost', () => {
     const first = deferred<Record<string, unknown>>()
     const second = deferred<Record<string, unknown>>()
     const signals: AbortSignal[] = []
-    vi.spyOn(Endge.query, 'executeArtifact')
+    vi.spyOn(Endge.runtime.query, 'executeArtifact')
       .mockImplementationOnce((input) => {
         signals.push(input.signal!)
         return first.promise

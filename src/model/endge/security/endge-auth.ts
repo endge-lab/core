@@ -9,6 +9,7 @@ import axios from 'axios'
 import { isAfter, subMilliseconds } from 'date-fns'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
+import { EndgeAuthProfiles } from '@/model/endge/security/endge-auth-profiles'
 import {
   KeycloakAuthClient,
   mapTokenResponseToStored,
@@ -38,6 +39,9 @@ function isKeycloakProvider(
 
 /** Модуль legacy Keycloak-аутентификации и управления token lifecycle. */
 export class EndgeAuth extends EndgeModule {
+  /** Profile/adapters service, owned by the auth module. */
+  public readonly profiles = new EndgeAuthProfiles()
+
   private auth: EndgeAuthProfileConfig | null = null
   private client: KeycloakAuthClient | null = null
 
@@ -160,7 +164,7 @@ export class EndgeAuth extends EndgeModule {
     const tokenPath: string = auth.tokenPath ?? '/token'
     const logoutPath: string = auth.logoutPath ?? '/logout'
     const endpoint
-      = Endge.vars.resolve(auth.KeycloakBaseUrl) || auth.KeycloakBaseUrl
+      = Endge.workspace.variables.resolve(auth.KeycloakBaseUrl) || auth.KeycloakBaseUrl
     this.client = new KeycloakAuthClient(endpoint, tokenPath, logoutPath)
 
     await this.loadFromStorage()
@@ -495,6 +499,8 @@ export class EndgeAuth extends EndgeModule {
     // NEW: reset single-flight
     this.loginPromise = null
 
+    this.profiles.reset()
+
     // уведомление подписчиков
     this.notify()
   }
@@ -540,7 +546,7 @@ export class EndgeAuth extends EndgeModule {
 
     if (mode === 'manual') {
       const raw: string = String(opts.manualToken ?? '').trim()
-      const resolved: string = (Endge.vars.resolve(raw) ?? raw).trim()
+      const resolved: string = (Endge.workspace.variables.resolve(raw) ?? raw).trim()
       return resolved || undefined
     }
 

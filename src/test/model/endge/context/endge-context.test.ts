@@ -58,6 +58,7 @@ describe('EndgeContext locale', () => {
   })
 
   it('reconciles stored locale after workspace locales are loaded', () => {
+    Endge.workspace.reset()
     const context = new EndgeContext()
     context.deserialize({ project: null, environment: 'dev', locale: 'kk' })
 

@@ -1,11 +1,24 @@
-import { describe, expect, it } from 'vitest'
+import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 
-import { EndgeWorkspace } from '@/model/endge/context/endge-workspace'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import { Endge } from '@/model/endge/kernel/endge'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
 describe('EndgeWorkspace', () => {
+  const payloadContext: EndgeBootContext = {
+    dataProvider: 'payload',
+    scope: {},
+    vars: {},
+    payload: { baseAPI: 'https://payload.test/api', secret: 'test-secret' },
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('exposes the applied Payload workspace', () => {
-    const workspace = new EndgeWorkspace()
+    const workspace = Endge.workspace
     workspace.apply(TEST_ENDGE_WORKSPACE)
 
     expect(workspace.locales.map(locale => locale.code)).toEqual(['en', 'ru'])
@@ -16,7 +29,7 @@ describe('EndgeWorkspace', () => {
   })
 
   it('normalizes unsupported locales to default locale', () => {
-    const workspace = new EndgeWorkspace()
+    const workspace = Endge.workspace
     workspace.apply(TEST_ENDGE_WORKSPACE)
 
     expect(workspace.normalizeLocale('ru')).toBe('ru')
@@ -26,7 +39,7 @@ describe('EndgeWorkspace', () => {
   })
 
   it('returns locale labels by mode', () => {
-    const workspace = new EndgeWorkspace()
+    const workspace = Endge.workspace
     workspace.apply(TEST_ENDGE_WORKSPACE)
 
     expect(workspace.getLocaleLabel('ru', 'displayName')).toBe('Русский')
@@ -35,8 +48,49 @@ describe('EndgeWorkspace', () => {
   })
 
   it('fails before a Payload workspace is applied', () => {
-    const workspace = new EndgeWorkspace()
+    const workspace = Endge.workspace
+    workspace.reset()
 
     expect(() => workspace.current).toThrow('Workspace has not been loaded from Payload')
+  })
+
+  it('selects the only workspace returned by Payload', () => {
+    Endge.context.setCurrentWorkspace(null)
+    vi.spyOn(Endge.schema, 'getLoadedSource').mockReturnValue({
+      workspaces: [TEST_ENDGE_WORKSPACE],
+    } as never)
+
+    Endge.workspace.build(payloadContext)
+
+    expect(Endge.workspace.current.identity).toBe(TEST_ENDGE_WORKSPACE.identity)
+  })
+
+  it('requires an explicit identity when Payload returns multiple workspaces', () => {
+    Endge.context.setCurrentWorkspace(null)
+    vi.spyOn(Endge.schema, 'getLoadedSource').mockReturnValue({
+      workspaces: [
+        TEST_ENDGE_WORKSPACE,
+        { ...TEST_ENDGE_WORKSPACE, identity: 'workspace-b' },
+      ],
+    } as never)
+
+    expect(() => Endge.workspace.build(payloadContext)).toThrow('explicit workspace identity')
+  })
+
+  it('selects the workspace requested by boot scope', () => {
+    Endge.context.setCurrentWorkspace(null)
+    vi.spyOn(Endge.schema, 'getLoadedSource').mockReturnValue({
+      workspaces: [
+        TEST_ENDGE_WORKSPACE,
+        { ...TEST_ENDGE_WORKSPACE, identity: 'workspace-b' },
+      ],
+    } as never)
+
+    Endge.workspace.build({
+      ...payloadContext,
+      scope: { workspaceIdentity: 'workspace-b' },
+    })
+
+    expect(Endge.workspace.current.identity).toBe('workspace-b')
   })
 })

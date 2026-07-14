@@ -3,7 +3,6 @@ import type { AxiosInstance } from 'axios'
 
 import axios from 'axios'
 
-import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { Endge } from '@/model/endge/kernel/endge'
 import { QueryExecutor } from '@/model/services/query/QueryExecutor'
 import type { QueryProgramPayload } from '@/domain/types/program/program.types'
@@ -12,7 +11,7 @@ import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRunt
 /**
  * Модуль выполнения доменных query: custom executor, mock data и REST.
  */
-export class EndgeQuery extends EndgeModule {
+export class EndgeQuery {
   private readonly executor: QueryExecutor
 
   /**
@@ -23,7 +22,6 @@ export class EndgeQuery extends EndgeModule {
       headers: { Accept: 'application/json' },
     }),
   ) {
-    super()
     this.executor = new QueryExecutor(this.http)
   }
 

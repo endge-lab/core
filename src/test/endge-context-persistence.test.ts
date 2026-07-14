@@ -1,39 +1,42 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { setActiveEndgeWorkspace } from '@/model/config/endge-workspace'
 import { EndgeContext } from '@/model/endge/context/endge-context'
 import { buildRuntimeStateStorageKey, RuntimeStateController } from '@/model/endge/context/persistence/RuntimeStateController'
 import { DisabledContextAdapter } from '@/model/endge/context/persistence/adapters/DisabledContextAdapter'
 import { LocalStorageContextAdapter } from '@/model/endge/context/persistence/adapters/LocalStorageContextAdapter'
+import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
 describe('EndgeContext persistence', () => {
   beforeEach(() => {
     installLocalStorageMock()
+    setActiveEndgeWorkspace(TEST_ENDGE_WORKSPACE)
   })
 
-  it('builds default persistence scope', () => {
+  afterEach(() => {
+    setActiveEndgeWorkspace(null)
+  })
+
+  it('keeps workspace unresolved until Payload selects it', () => {
     const context = new EndgeContext()
     context.deserialize(undefined)
 
-    expect(context.getPersistenceScope()).toEqual({
-      workspaceId: 'default',
-      tenantId: 'default',
-      projectId: 'default',
-      environmentId: 'dev',
-      userId: 'anonymous',
-    })
+    expect(context.getCurrentWorkspace()).toBeNull()
+    expect(context.serialize().workspace).toBeNull()
+    expect(() => context.getPersistenceScope()).toThrow('Active workspace has not been loaded from Payload')
   })
 
-  it('normalizes empty scope values to defaults', () => {
+  it('normalizes empty non-workspace scope values to defaults', () => {
     const context = new EndgeContext()
 
-    context.setCurrentWorkspace('')
+    context.setCurrentWorkspace('workspace-a')
     context.setCurrentTenant('')
     context.setCurrentProject('')
     context.setCurrentEnvironment('')
     context.setCurrentUser('')
 
     expect(context.getPersistenceScope()).toEqual({
-      workspaceId: 'default',
+      workspaceId: 'workspace-a',
       tenantId: 'default',
       projectId: 'default',
       environmentId: 'dev',
@@ -69,7 +72,7 @@ describe('EndgeContext persistence', () => {
     })
 
     expect(context.serialize()).toEqual({
-      workspace: 'default',
+      workspace: null,
       tenant: 'default',
       project: 'legacy-project',
       environment: 'prod',

@@ -2,15 +2,18 @@ import type { FlowConditionSpec } from '@/domain/types/flow/flow-condition.types
 import type { FlowHandlerContext } from '@/domain/types/flow/action.types'
 
 import { DomainSectionType } from '@/domain/types/document/document.types'
-import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { Endge } from '@/model/endge/kernel/endge'
 
 /**
  * Реестр конструкций flow: условия и в будущем другие сущности.
- * Регистрируется в федерации как flowRegistry.
+ * Принадлежит runtime flow executor и не участвует в federation lifecycle.
  */
-export class EndgeFlowRegistry extends EndgeModule {
+export class EndgeFlowRegistry {
   private _conditions = new Map<string, FlowConditionSpec>()
+
+  public constructor() {
+    this.reset()
+  }
 
   /**
    * Регистрирует условие flow.
@@ -52,7 +55,8 @@ export class EndgeFlowRegistry extends EndgeModule {
   /**
    * Регистрирует стандартные flow-условия на стадии start.
    */
-  override start(): void {
+  reset(): void {
+    this._conditions.clear()
     this._registerDefaultConditions()
   }
 

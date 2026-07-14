@@ -7,21 +7,20 @@ import type {
 import type { RQueryAuth } from '@/domain/types/document/query.types'
 import type { StoredAuthToken } from '@/domain/types/auth/auth.types'
 
-import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import {
   KeycloakAuthClient,
   mapTokenResponseToStored,
 } from '@/model/services/auth/KeycloakAuthClient'
 import { Endge } from '@/model/endge/kernel/endge'
 
-/** Модуль auth profiles, adapters и хранения полученных tokens. */
-export class EndgeAuthProfiles extends EndgeModule {
+/** Service auth profiles, adapters и хранения полученных tokens. */
+export class EndgeAuthProfiles {
   private adapters = new Map<string, AuthProfileAdapter>()
   private memoryTokens = new Map<string, StoredAuthToken>()
 
-  /** Регистрирует встроенные auth adapters. */
-  public override setup(): void {
-    this.registerBuiltInAdapters()
+  /** Создаёт service с зарегистрированными built-in adapters. */
+  public constructor() {
+    this.reset()
   }
 
   /** Регистрирует auth adapter с необязательной заменой существующего. */
@@ -43,7 +42,9 @@ export class EndgeAuthProfiles extends EndgeModule {
   public getDefaultProfile(): RAuthProfile | AuthProfileSchema | null {
     const profiles = Endge.domain.getAuthProfiles()
       .filter(profile => profile.active !== false && !profile.deletedAt)
-    const defaultIdentity = String(Endge.workspace.defaultAuthProfileIdentity ?? '').trim()
+    const defaultIdentity = Endge.workspace.isLoaded
+      ? String(Endge.workspace.defaultAuthProfileIdentity ?? '').trim()
+      : ''
     if (defaultIdentity)
       return profiles.find(profile => profile.identity === defaultIdentity) ?? null
     return null
@@ -97,7 +98,7 @@ export class EndgeAuthProfiles extends EndgeModule {
   }
 
   /** Очищает runtime tokens и восстанавливает встроенные adapters. */
-  public override reset(): void {
+  public reset(): void {
     this.adapters.clear()
     this.memoryTokens.clear()
     this.registerBuiltInAdapters()
@@ -168,7 +169,7 @@ export class EndgeAuthProfiles extends EndgeModule {
   /** Разрешает ручной token и формирует Authorization header. */
   private async resolveManualToken(raw: string | null | undefined): Promise<AuthSession> {
     const value = String(raw ?? '').trim()
-    const token = String(Endge.vars.resolve(value) ?? '').trim()
+    const token = String(Endge.workspace.variables.resolve(value) ?? '').trim()
     if (!token) {
       throw new Error(
         'manual_token требует заполненного config.manualToken. Можно указать прямой токен или переменную, например {API_TOKEN}.',
@@ -287,7 +288,7 @@ export class EndgeAuthProfiles extends EndgeModule {
     const value = String(raw ?? '').trim()
     if (!value)
       return ''
-    return String(Endge.vars.resolve(value) ?? '').trim()
+    return String(Endge.workspace.variables.resolve(value) ?? '').trim()
   }
 
   /** Проверяет обязательное resolved config value. */

@@ -354,6 +354,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
           runtimePath: filterViewAddress.runtimePath,
           scopeRoot: false,
           sourceRuntime: descriptor.identity,
+          persistence: this.meta.persistence ?? 'disabled',
         },
       })
       const node = new RaphNode(Raph.app, {

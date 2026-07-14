@@ -1,6 +1,5 @@
 import type { CompositionMountOptions, CompositionRuntimeOutputHandle } from '@/domain/types/source/composition-source.types'
 
-import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import type { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
 import { Endge } from '@/model/endge/kernel/endge'
 
@@ -12,7 +11,7 @@ export interface CompositionSession {
 }
 
 /** Публичный facade монтирования Composition runtime sessions. */
-export class EndgeComposition extends EndgeModule {
+export class EndgeComposition {
   /** Монтирует Composition runtime и возвращает управляемую session. */
   public async mount(identity: string, options: CompositionMountOptions = {}): Promise<CompositionSession> {
     const normalizedIdentity = String(identity ?? '').trim()

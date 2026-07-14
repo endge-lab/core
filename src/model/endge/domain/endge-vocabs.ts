@@ -443,7 +443,7 @@ export class EndgeVocabs extends EndgeModule {
     const mode = cfg.authMode ?? 'inherit'
     if (mode === 'none')
       return {}
-    const session = await Endge.authProfiles.resolveRequestAuth({
+    const session = await Endge.auth.profiles.resolveRequestAuth({
       mode,
       authProfileIdentity: cfg.authProfileIdentity ?? undefined,
     })
@@ -458,7 +458,7 @@ export class EndgeVocabs extends EndgeModule {
     if (!raw)
       return ''
 
-    const directlyResolved = Endge.vars.resolve<string>(raw, {
+    const directlyResolved = Endge.workspace.variables.resolve<string>(raw, {
       fallback: raw,
       onInvalid: 'as-is',
     }) ?? raw
@@ -468,7 +468,7 @@ export class EndgeVocabs extends EndgeModule {
         const name = String(token ?? '').trim()
         if (!name)
           return ''
-        const value = Endge.vars.resolve<string>(`{${name}}`, {
+        const value = Endge.workspace.variables.resolve<string>(`{${name}}`, {
           fallback: '',
           onInvalid: 'as-is',
         })

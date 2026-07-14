@@ -6,14 +6,13 @@ import type {
 } from '@/domain/types/source/data-view-source.types'
 import type { DataViewProgramPayload, ProgramArtifact } from '@/domain/types/program/program.types'
 
-import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { RDataView } from '@/domain/entities/reflect/RDataView'
 import { compileDataViewSource } from '@/model/services/source-engine/compilers/data-view-source-compile'
 import { Endge } from '@/model/endge/kernel/endge'
 import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
 
 /** Модуль выполнения скомпилированных RDataView artifacts. */
-export class EndgeDataView extends EndgeModule {
+export class EndgeDataView {
   /** Выполняет DataView по id/identity/model над переданным input object. */
   public run(
     dataViewOrId: RDataView | string | number,

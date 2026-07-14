@@ -1,4 +1,4 @@
-import type { ActionCompiledFlow, ActionDefinition, ActionStepHandler, FlowHandlerContext, FlowHandlerResult, FlowValidationIssue } from '@/domain/types/flow/action.types'
+import type { ActionCompiledFlow, ActionDefinition, ActionStepHandler, FlowValidationIssue } from '@/domain/types/flow/action.types'
 import type { ActionFlowDefinition } from '@/domain/types/flow/endge-flow.types'
 
 import { Serialize } from '@endge/utils'
@@ -285,7 +285,7 @@ export class RAction extends REntity {
   run(): void {
     const runtime = Endge.runtime.execute(this, {})
     if (!runtime || runtime.kind !== 'action') { return }
-    Endge.flow.run(runtime)
+    Endge.runtime.flow.run(runtime)
   }
 
   toPlain(): Record<string, unknown> {

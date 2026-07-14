@@ -21,9 +21,23 @@ import { StoreRuntimeStrategy } from '@/model/services/runtime/strategies/StoreR
 import { Endge } from '@/model/endge/kernel/endge'
 import { RuntimeBoundaryUpdatePhase } from '@/model/helpers/raph-phases/runtime-boundary-update-phase'
 import { RuntimeNodeUpdatePhase } from '@/model/helpers/raph-phases/runtime-node-update-phase'
+import Config from '@/model/config'
+import { EndgeCommands } from '@/model/endge/runtime/core/endge-commands'
+import { EndgeComposition } from '@/model/endge/runtime/execution/endge-composition'
+import { EndgeDataView } from '@/model/endge/runtime/execution/endge-data-view'
+import { EndgeQuery } from '@/model/endge/runtime/execution/endge-query'
+import { EndgeFlow } from '@/model/endge/runtime/flow/endge-flow'
+import { EndgeFlowRegistry } from '@/model/endge/runtime/flow/endge-flow-registry'
 
 /** Модуль создания, регистрации и уничтожения runtime hosts и app scopes. */
 export class EndgeRuntime extends EndgeModule {
+  public readonly query = new EndgeQuery()
+  public readonly dataView = new EndgeDataView()
+  public readonly composition = new EndgeComposition()
+  public readonly flowRegistry = new EndgeFlowRegistry()
+  public readonly flow = new EndgeFlow(this.flowRegistry)
+  public readonly commands = new EndgeCommands()
+
   private _hosts = new RuntimeHostRegistry()
   private _strategies = new RuntimeStrategyRegistry()
   private _inited = false
@@ -31,6 +45,7 @@ export class EndgeRuntime extends EndgeModule {
   private _scopeNodes = new Map<string, RaphNode>()
   private _appScopes = new Map<string, RuntimeAppScope>()
   private _defaultAppScope: RuntimeAppScope
+  private _unsubscribeWorkspace: (() => void) | null = null
 
   /** Создаёт default app scope и регистрирует runtime strategies. */
   public constructor() {
@@ -67,6 +82,11 @@ export class EndgeRuntime extends EndgeModule {
     Raph.app.addNode(this._appNode)
     Raph.addPhase(RuntimeNodeUpdatePhase.make())
     Raph.addPhase(RuntimeBoundaryUpdatePhase.make())
+    this.syncWorkspaceVariablesToRaph()
+    this.hydrateRuntimeFilters()
+    this._unsubscribeWorkspace = Endge.workspace.subscribe(() => {
+      this.syncWorkspaceVariablesToRaph()
+    })
   }
 
   /**
@@ -242,9 +262,54 @@ export class EndgeRuntime extends EndgeModule {
       scope.reset()
     this._appNode = null
     this._inited = false
+    this._unsubscribeWorkspace?.()
+    this._unsubscribeWorkspace = null
+    this.flowRegistry.reset()
+    this.commands.reset()
 
     // Единый notify после batch-reset.
     this.notify()
+  }
+
+  /** Projects effective workspace variables into the runtime Raph namespace. */
+  private syncWorkspaceVariablesToRaph(): void {
+    if (!Endge.workspace.isLoaded)
+      return
+
+    for (const variable of Endge.workspace.variables.getAll()) {
+      const name = String(variable.name ?? '').trim()
+      if (!name)
+        continue
+      Raph.app.set(`${Config.STORAGE_VARS_KEY}.${name}`, Endge.workspace.variables.getValue(name))
+    }
+  }
+
+  /** Restores persisted runtime filter values independently of workspace variables. */
+  private hydrateRuntimeFilters(): void {
+    if (typeof localStorage === 'undefined')
+      return
+
+    try {
+      const raw = localStorage.getItem('endge:parameters')
+      if (!raw)
+        return
+
+      const store = JSON.parse(raw) as Record<string, unknown>
+      if (!store || typeof store !== 'object')
+        return
+
+      for (const [identity, payload] of Object.entries(store)) {
+        if (!identity)
+          continue
+        Raph.set(
+          identity.startsWith('parameters.') ? identity : `parameters.${identity}`,
+          payload,
+        )
+      }
+    }
+    catch (error) {
+      console.error('[EndgeRuntime] Failed to hydrate runtime filters', error)
+    }
   }
 
   /**
@@ -295,6 +360,7 @@ export class EndgeRuntime extends EndgeModule {
     meta: Record<string, any>,
   ): AnyRuntimeHost | null {
     this.start()
+
     const parent = this.resolveParentHost(meta?.parent)
     const hostMeta = { ...(meta ?? {}) }
     delete hostMeta.parent

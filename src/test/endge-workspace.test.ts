@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { normalizeEndgeWorkspaceDefinition } from '@/domain/entities/reflect/RWorkspace'
-import { EndgeWorkspace } from '@/model/endge/context/endge-workspace'
+import { Endge } from '@/model/endge/kernel/endge'
 
 describe('EndgeWorkspace', () => {
   it('normalizes payload workspace locales', () => {
@@ -77,7 +77,7 @@ describe('EndgeWorkspace', () => {
       sfcAdapterIds: ['native-vue'],
       defaultSfcAdapterId: 'native-vue',
     })
-    const workspace = new EndgeWorkspace()
+    const workspace = Endge.workspace
 
     workspace.apply(definition)
 

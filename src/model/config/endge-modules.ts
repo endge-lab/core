@@ -1,75 +1,51 @@
 import type { EndgeModuleDefinition } from '@/domain/types/kernel/endge-modules.types'
 
 import { EndgeAuth } from '@/model/endge/security/endge-auth'
-import { EndgeAuthProfiles } from '@/model/endge/security/endge-auth-profiles'
-import { EndgeBindingsBehavior } from '@/model/endge/configuration/endge-bindings-behavior'
-import { EndgeBindingsPresentation } from '@/model/endge/configuration/endge-bindings-presentation'
 import { EndgeBind } from '@/model/endge/runtime/core/endge-bind'
-import { EndgeCommands } from '@/model/endge/runtime/core/endge-commands'
 import { EndgeCompiler } from '@/model/endge/program/endge-compiler'
 import { EndgeConsole } from '@/model/endge/diagnostics/endge-console'
 import { EndgeContext } from '@/model/endge/context/endge-context'
-import { EndgeContracts } from '@/model/endge/configuration/endge-contracts'
-import { EndgeDataView } from '@/model/endge/runtime/execution/endge-data-view'
+import { EndgeConfiguration } from '@/model/endge/configuration/endge-configuration'
 import { EndgeDebug } from '@/model/endge/diagnostics/endge-debug'
 import { EndgeDiagnostics } from '@/model/endge/diagnostics/endge-diagnostics'
 import { EndgeDomain } from '@/model/endge/domain/endge-domain'
 import { EndgeEvents } from '@/model/endge/kernel/endge-events'
-import { EndgeExtract } from '@/model/endge/domain/endge-extract'
-import { EndgeFlow } from '@/model/endge/runtime/flow/endge-flow'
-import { EndgeFlowRegistry } from '@/model/endge/runtime/flow/endge-flow-registry'
 import { EndgeI18n } from '@/model/endge/context/endge-i18n'
 import { EndgeProgram } from '@/model/endge/program/endge-program'
-import { EndgeQuery } from '@/model/endge/runtime/execution/endge-query'
 import { EndgeRuntime } from '@/model/endge/runtime/core/endge-runtime'
 import { EndgeRuntimeDebugger } from '@/model/endge/diagnostics/endge-runtime-debugger'
 import { EndgeSchemaStorage } from '@/model/endge/schema/endge-schema-database'
 import { EndgeSource } from '@/model/endge/program/endge-source'
 import { EndgeSSE } from '@/model/endge/runtime/input/endge-sse'
-import { EndgeStore } from '@/model/endge/runtime/core/endge-store'
 import { EndgeStyles } from '@/model/endge/ui/endge-styles'
 import { EndgeUI } from '@/model/endge/ui/endge-ui'
 import { EndgeUIRegistry } from '@/model/endge/ui/endge-ui-registry'
 import { EndgeUpdates } from '@/model/endge/runtime/core/endge-updates'
-import { EndgeVars } from '@/model/endge/context/endge-vars'
 import { EndgeVocabs } from '@/model/endge/domain/endge-vocabs'
 import { EndgeWorkspace } from '@/model/endge/context/endge-workspace'
-import { EndgeComposition } from '@/model/endge/runtime/execution/endge-composition'
 
 export const ENDGE_CORE_MODULES: EndgeModuleDefinition[] = [
-  { key: 'workspace', module: EndgeWorkspace },
   { key: 'context', module: EndgeContext },
   { key: 'diagnostics', module: EndgeDiagnostics },
-  { key: 'debug', module: EndgeDebug },
-  { key: 'schema', module: EndgeSchemaStorage },
-  { key: 'domain', module: EndgeDomain },
-  { key: 'program', module: EndgeProgram },
-  { key: 'compiler', module: EndgeCompiler },
-  { key: 'source', module: EndgeSource },
-  { key: 'authProfiles', module: EndgeAuthProfiles },
-  { key: 'vocabs', module: EndgeVocabs },
-  { key: 'i18n', module: EndgeI18n },
-  { key: 'extract', module: EndgeExtract },
-  { key: 'flowRegistry', module: EndgeFlowRegistry },
-  { key: 'flow', module: EndgeFlow },
-  { key: 'store', module: EndgeStore },
-  { key: 'runtime', module: EndgeRuntime },
-  { key: 'vars', module: EndgeVars },
-  { key: 'query', module: EndgeQuery },
-  { key: 'dataView', module: EndgeDataView },
-  { key: 'composition', module: EndgeComposition },
-  { key: 'auth', module: EndgeAuth },
-  { key: 'updates', module: EndgeUpdates },
-  { key: 'events', module: EndgeEvents },
-  { key: 'sse', module: EndgeSSE },
-  { key: 'ui', module: EndgeUI },
-  { key: 'uiRegistry', module: EndgeUIRegistry },
-  { key: 'bind', module: EndgeBind },
-  { key: 'commands', module: EndgeCommands },
-  { key: 'console', module: EndgeConsole },
-  { key: 'runtimeDebugger', module: EndgeRuntimeDebugger },
-  { key: 'styles', module: EndgeStyles },
-  { key: 'contracts', module: EndgeContracts },
-  { key: 'behaviorBindings', module: EndgeBindingsBehavior },
-  { key: 'presentationBindings', module: EndgeBindingsPresentation },
+  { key: 'debug', module: EndgeDebug, after: 'diagnostics' },
+  { key: 'schema', module: EndgeSchemaStorage, after: 'context' },
+  { key: 'workspace', module: EndgeWorkspace, after: ['context', 'schema'] },
+  { key: 'domain', module: EndgeDomain, after: 'schema' },
+  { key: 'source', module: EndgeSource, after: 'domain' },
+  { key: 'program', module: EndgeProgram, after: 'domain' },
+  { key: 'compiler', module: EndgeCompiler, after: ['domain', 'source', 'program'] },
+  { key: 'auth', module: EndgeAuth, after: ['workspace', 'domain'] },
+  { key: 'vocabs', module: EndgeVocabs, after: ['domain', 'auth'] },
+  { key: 'i18n', module: EndgeI18n, after: ['domain', 'workspace'] },
+  { key: 'events', module: EndgeEvents, after: 'context' },
+  { key: 'runtime', module: EndgeRuntime, after: ['compiler', 'workspace', 'context'] },
+  { key: 'updates', module: EndgeUpdates, after: 'runtime' },
+  { key: 'sse', module: EndgeSSE, after: ['workspace', 'auth', 'events'] },
+  { key: 'ui', module: EndgeUI, after: ['workspace', 'context'] },
+  { key: 'uiRegistry', module: EndgeUIRegistry, after: 'ui' },
+  { key: 'bind', module: EndgeBind, after: ['compiler', 'runtime'] },
+  { key: 'configuration', module: EndgeConfiguration, after: ['domain', 'runtime'] },
+  { key: 'console', module: EndgeConsole, after: ['domain', 'runtime'] },
+  { key: 'runtimeDebugger', module: EndgeRuntimeDebugger, after: ['diagnostics', 'runtime'] },
+  { key: 'styles', module: EndgeStyles, after: ['ui', 'domain'] },
 ]

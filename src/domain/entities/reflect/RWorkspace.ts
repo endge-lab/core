@@ -12,7 +12,7 @@ import { REntity } from '@/domain/entities/reflect/REntity'
 
 export class RWorkspace extends REntity implements EndgeWorkspaceDefinition {
   @Expose()
-  displayName!: string
+  displayName = ''
 
   @Expose()
   vars: EndgeWorkspaceVar[] = []

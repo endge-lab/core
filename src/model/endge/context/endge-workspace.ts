@@ -9,16 +9,24 @@ import type {
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { normalizeEndgeWorkspaceDefinition } from '@/domain/entities/reflect/RWorkspace'
+import { setActiveEndgeWorkspace } from '@/model/config/endge-workspace'
 import { Endge } from '@/model/endge/kernel/endge'
+import { WorkspaceVariables } from '@/model/endge/context/endge-vars'
 
 /**
  * Модуль workspace-профиля frontend-приложения.
- * Владеет workspace, загруженным из Payload schema dump.
+ * Владеет workspace, загруженным из DB.
  */
 export class EndgeWorkspace extends EndgeModule {
   private _current: EndgeWorkspaceDefinition | null = null
+  public readonly variables = new WorkspaceVariables(() => this._current?.vars ?? [])
 
-  /** Строит workspace из загруженного Payload source. */
+  /** Captures environment overrides before the workspace definition is loaded. */
+  public override setup(ctx: EndgeBootContext): void {
+    this.variables.setEnvironment(ctx.vars)
+  }
+
+  /** Строит workspace из загруженного source. */
   public override build(ctx: EndgeBootContext): void {
     if (ctx.dataProvider !== 'payload') {
       throw new Error('[EndgeWorkspace] Workspace can only be loaded from Payload')
@@ -26,15 +34,61 @@ export class EndgeWorkspace extends EndgeModule {
 
     this.apply(selectPayloadWorkspace(
       Endge.schema.getLoadedSource(),
-      Endge.context.getCurrentWorkspace(),
+      normalizeOptionalIdentity(ctx.scope.workspaceIdentity)
+      ?? Endge.context.getCurrentWorkspace(),
     ))
   }
 
   /** Очищает загруженный workspace. */
   public override reset(): void {
     this._current = null
+    this.variables.setEnvironment({})
+    setActiveEndgeWorkspace(null)
     this.notify()
   }
+
+  /** Проверяет, поддерживает ли workspace указанную locale. */
+  supportsLocale(locale: string | null | undefined): boolean {
+    const code = String(locale ?? '').trim()
+    return this.locales.some(item => item.code === code)
+  }
+
+  /** Нормализует locale по правилам активного workspace. */
+  normalizeLocale(locale: string | null | undefined): string {
+    const code = String(locale ?? '').trim()
+    return this.supportsLocale(code) ? code : this.defaultLocale
+  }
+
+  /** Возвращает label locale в указанном режиме. */
+  getLocaleLabel(locale: string, mode: EndgeWorkspaceLocaleLabelMode = 'displayName'): string {
+    return this.locales.find(item => item.code === locale)?.[mode] ?? locale
+  }
+
+  /** Применяет и публикует новую workspace-конфигурацию. */
+  public apply(input: unknown): void {
+    const next = normalizeEndgeWorkspaceDefinition(input)
+    this._current = next
+    setActiveEndgeWorkspace(next)
+    Endge.context.setCurrentWorkspace(next.identity)
+    Endge.context.reconcileCurrentLocaleWithWorkspace()
+    this.notify()
+  }
+
+  /** Сериализует текущую workspace-конфигурацию. */
+  public override serialize(): EndgeWorkspaceDefinition {
+    return this.current
+  }
+
+  /** Возвращает workspace или сообщает о нарушении boot lifecycle. */
+  private _requireCurrent(): EndgeWorkspaceDefinition {
+    if (!this._current)
+      throw new Error('[EndgeWorkspace] Workspace has not been loaded from Payload')
+    return this._current
+  }
+
+  /**
+   * ACCESS
+   */
 
   /** Показывает, загружен ли workspace из Payload. */
   get isLoaded(): boolean {
@@ -54,6 +108,11 @@ export class EndgeWorkspace extends EndgeModule {
   /** Возвращает определения workspace variables. */
   get vars(): EndgeWorkspaceVar[] {
     return this._requireCurrent().vars
+  }
+
+  /** Explicit name for the persisted variable definitions. */
+  get variableDefinitions(): EndgeWorkspaceVar[] {
+    return this.vars
   }
 
   /** Возвращает workspace SSE config. */
@@ -85,49 +144,6 @@ export class EndgeWorkspace extends EndgeModule {
   get defaultSfcAdapterId(): string {
     return this._requireCurrent().defaultSfcAdapterId
   }
-
-  /** Проверяет, поддерживает ли workspace указанную locale. */
-  supportsLocale(locale: string | null | undefined): boolean {
-    const code = String(locale ?? '').trim()
-    return this.locales.some(item => item.code === code)
-  }
-
-  /** Нормализует locale по правилам активного workspace. */
-  normalizeLocale(locale: string | null | undefined): string {
-    const code = String(locale ?? '').trim()
-    return this.supportsLocale(code) ? code : this.defaultLocale
-  }
-
-  /** Возвращает label locale в указанном режиме. */
-  getLocaleLabel(locale: string, mode: EndgeWorkspaceLocaleLabelMode = 'displayName'): string {
-    return this.locales.find(item => item.code === locale)?.[mode] ?? locale
-  }
-
-  /** Применяет и публикует новую workspace-конфигурацию. */
-  public apply(input: unknown): void {
-    const next = normalizeEndgeWorkspaceDefinition(input)
-    this._current = next
-    Endge.context.setCurrentWorkspace(next.identity)
-    Endge.context.reconcileCurrentLocaleWithWorkspace()
-    this.notify()
-  }
-
-  /** Сериализует текущую workspace-конфигурацию. */
-  public override serialize(): EndgeWorkspaceDefinition {
-    return this.current
-  }
-
-  /** Восстанавливает workspace-конфигурацию из payload. */
-  public override deserialize(payload: unknown): void {
-    this.apply(payload)
-  }
-
-  /** Возвращает workspace или сообщает о нарушении boot lifecycle. */
-  private _requireCurrent(): EndgeWorkspaceDefinition {
-    if (!this._current)
-      throw new Error('[EndgeWorkspace] Workspace has not been loaded from Payload')
-    return this._current
-  }
 }
 
 function selectPayloadWorkspace(source: unknown, requestedIdentity: string | null): unknown {
@@ -155,4 +171,9 @@ function selectPayloadWorkspace(source: unknown, requestedIdentity: string | nul
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function normalizeOptionalIdentity(value: unknown): string | null {
+  const identity = String(value ?? '').trim()
+  return identity || null
 }

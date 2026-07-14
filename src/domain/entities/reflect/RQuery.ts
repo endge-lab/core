@@ -25,6 +25,6 @@ export class RQuery extends REntity {
 
   /** Выполняет скомпилированный source Query через one-shot runtime session. */
   async run(props: Record<string, unknown> = {}): Promise<any> {
-    return Endge.query.run(this, props)
+    return Endge.runtime.query.run(this, props)
   }
 }

@@ -6,12 +6,12 @@ import type {
   RuntimeCommandRegistrySnapshot,
 } from '@/domain/types/runtime/command.types'
 
-import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
+import { Subscribable } from '@endge/utils'
 import { RuntimeCommandRegistry } from '@/domain/entities/runtime/RuntimeCommandRegistry'
 import { createTableRuntimeCommands } from '@/model/services/runtime/table-commands'
 
 /** Модуль регистрации и выполнения runtime-команд. */
-export class EndgeCommands extends EndgeModule {
+export class EndgeCommands extends Subscribable {
   private readonly _registry = new RuntimeCommandRegistry()
 
   /** Создаёт registry и регистрирует встроенные команды. */
@@ -21,7 +21,7 @@ export class EndgeCommands extends EndgeModule {
   }
 
   /** Сбрасывает registry к набору встроенных команд. */
-  public override reset(): void {
+  public reset(): void {
     this._registry.clear()
     this._registry.registerMany(createTableRuntimeCommands())
     this.notify()
@@ -87,7 +87,7 @@ export class EndgeCommands extends EndgeModule {
   }
 
   /** Сериализует публичный snapshot registry. */
-  public override serialize(): RuntimeCommandRegistrySnapshot {
+  public serialize(): RuntimeCommandRegistrySnapshot {
     return this._registry.snapshot()
   }
 }

@@ -4,6 +4,7 @@ import type { EndgeDomainBundle } from '@/domain/types/document/domain-export.ty
 import type { EndgeAuth } from '@/model/endge/security/endge-auth'
 import type { EndgeAuthProfiles } from '@/model/endge/security/endge-auth-profiles'
 import { EndgeBindingsBehavior } from '@/model/endge/configuration/endge-bindings-behavior'
+import { EndgeConfiguration } from '@/model/endge/configuration/endge-configuration'
 import { EndgeBind } from '@/model/endge/runtime/core/endge-bind'
 import { EndgeCommands } from '@/model/endge/runtime/core/endge-commands'
 import { EndgeConsole } from '@/model/endge/diagnostics/endge-console'
@@ -15,7 +16,6 @@ import { EndgeDebug } from '@/model/endge/diagnostics/endge-debug'
 import { EndgeDiagnostics } from '@/model/endge/diagnostics/endge-diagnostics'
 import { EndgeDomain } from '@/model/endge/domain/endge-domain'
 import { EndgeEvents } from '@/model/endge/kernel/endge-events'
-import { EndgeExtract } from '@/model/endge/domain/endge-extract'
 import { EndgeFlow } from '@/model/endge/runtime/flow/endge-flow'
 import { EndgeFlowRegistry } from '@/model/endge/runtime/flow/endge-flow-registry'
 import { EndgeBindingsPresentation } from '@/model/endge/configuration/endge-bindings-presentation'
@@ -27,11 +27,10 @@ import { EndgeRuntimeDebugger } from '@/model/endge/diagnostics/endge-runtime-de
 import { EndgeSchemaStorage } from '@/model/endge/schema/endge-schema-database'
 import { EndgeSource } from '@/model/endge/program/endge-source'
 import { EndgeSSE } from '@/model/endge/runtime/input/endge-sse'
-import { EndgeStore } from '@/model/endge/runtime/core/endge-store'
 import { EndgeStyles } from '@/model/endge/ui/endge-styles'
 import { EndgeUI } from '@/model/endge/ui/endge-ui'
 import { EndgeUpdates } from '@/model/endge/runtime/core/endge-updates'
-import { EndgeVars } from '@/model/endge/context/endge-vars'
+import type { WorkspaceVariables } from '@/model/endge/context/endge-vars'
 import { EndgeVocabs } from '@/model/endge/domain/endge-vocabs'
 import { EndgeWorkspace } from '@/model/endge/context/endge-workspace'
 import { EndgeUIRegistry } from '@/model/endge/ui/endge-ui-registry'
@@ -179,31 +178,17 @@ export class Endge extends EndgeFederation {
   }
 
   /**
-   * Доступ к модулю извлечения значений из доменных и runtime-структур.
-   */
-  static get extract(): EndgeExtract {
-    return this.getModule<EndgeExtract>('extract')
-  }
-
-  /**
-   * Доступ к registry flow handlers.
+   * @deprecated Используйте Endge.runtime.flowRegistry.
    */
   static get flowRegistry(): EndgeFlowRegistry {
-    return this.getModule<EndgeFlowRegistry>('flowRegistry')
+    return this.runtime.flowRegistry
   }
 
   /**
-   * Доступ к модулю выполнения flow/action сценариев.
+   * @deprecated Используйте Endge.runtime.flow.
    */
   static get flow(): EndgeFlow {
-    return this.getModule<EndgeFlow>('flow')
-  }
-
-  /**
-   * Доступ к runtime store.
-   */
-  static get store(): EndgeStore {
-    return this.getModule<EndgeStore>('store')
+    return this.runtime.flow
   }
 
   /**
@@ -214,29 +199,29 @@ export class Endge extends EndgeFederation {
   }
 
   /**
-   * Доступ к модулю runtime/env variables.
+   * @deprecated Используйте Endge.workspace.variables.
    */
-  static get vars(): EndgeVars {
-    return this.getModule<EndgeVars>('vars')
+  static get vars(): WorkspaceVariables {
+    return this.workspace.variables
   }
 
   /**
-   * Доступ к модулю выполнения query.
+   * @deprecated Используйте Endge.runtime.query.
    */
   static get query(): EndgeQuery {
-    return this.getModule<EndgeQuery>('query')
+    return this.runtime.query
   }
 
   /**
-   * Доступ к модулю выполнения DataView transformations.
+   * @deprecated Используйте Endge.runtime.dataView.
    */
   static get dataView(): EndgeDataView {
-    return this.getModule<EndgeDataView>('dataView')
+    return this.runtime.dataView
   }
 
-  /** Доступ к mount facade Composition runtime. */
+  /** @deprecated Используйте Endge.runtime.composition. */
   static get composition(): EndgeComposition {
-    return this.getModule<EndgeComposition>('composition')
+    return this.runtime.composition
   }
 
   /**
@@ -247,10 +232,10 @@ export class Endge extends EndgeFederation {
   }
 
   /**
-   * Доступ к профилям авторизации и adapter registry.
+   * @deprecated Используйте Endge.auth.profiles.
    */
   static get authProfiles(): EndgeAuthProfiles {
-    return this.getModule<EndgeAuthProfiles>('authProfiles')
+    return this.auth.profiles
   }
 
   /**
@@ -268,10 +253,10 @@ export class Endge extends EndgeFederation {
   }
 
   /**
-   * Доступ к contracts registry.
+   * @deprecated Используйте Endge.configuration.contracts.
    */
   static get contracts(): EndgeContracts {
-    return this.getModule<EndgeContracts>('contracts')
+    return this.configuration.contracts
   }
 
   /**
@@ -283,17 +268,22 @@ export class Endge extends EndgeFederation {
   }
 
   /**
-   * Доступ к resolver поведения по behavior bindings.
+   * @deprecated Используйте Endge.configuration.behaviorBindings.
    */
   static get behaviorBindings(): EndgeBindingsBehavior {
-    return this.getModule<EndgeBindingsBehavior>('behaviorBindings')
+    return this.configuration.behaviorBindings
   }
 
   /**
-   * Доступ к resolver презентации по presentation bindings.
+   * @deprecated Используйте Endge.configuration.presentationBindings.
    */
   static get presentationBindings(): EndgeBindingsPresentation {
-    return this.getModule<EndgeBindingsPresentation>('presentationBindings')
+    return this.configuration.presentationBindings
+  }
+
+  /** Configuration contracts and binding resolvers. */
+  static get configuration(): EndgeConfiguration {
+    return this.getModule<EndgeConfiguration>('configuration')
   }
 
   /**
@@ -332,10 +322,10 @@ export class Endge extends EndgeFederation {
   }
 
   /**
-   * Доступ к runtime command registry.
+   * @deprecated Используйте Endge.runtime.commands.
    */
   static get commands(): EndgeCommands {
-    return this.getModule<EndgeCommands>('commands')
+    return this.runtime.commands
   }
 
   /**

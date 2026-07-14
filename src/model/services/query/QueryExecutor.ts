@@ -53,8 +53,8 @@ export class QueryExecutor {
     vars: Record<string, unknown>,
     signal?: AbortSignal,
   ): Promise<any> {
-    const endpoint = Endge.vars.resolve(payload.endpoint) || payload.endpoint
-    const queryPath = Endge.vars.resolve(payload.query) || payload.query
+    const endpoint = Endge.workspace.variables.resolve(payload.endpoint) || payload.endpoint
+    const queryPath = Endge.workspace.variables.resolve(payload.query) || payload.query
     const url = this._buildUrl(endpoint, queryPath)
     const method = String(payload.method ?? 'POST').toUpperCase() as
       | 'GET'
@@ -182,7 +182,7 @@ export class QueryExecutor {
       return
     }
 
-    const session = await Endge.authProfiles.resolveRequestAuth(current)
+    const session = await Endge.auth.profiles.resolveRequestAuth(current)
     const token = session.accessToken
 
     if (!token)

@@ -45,7 +45,7 @@ describe('Query Raph derived integration', () => {
     expect(artifact.children?.filter(child => child.ref.entityType === 'data-view')).toHaveLength(1)
 
     const firstRows = [scheduleRow(1, 'SU', '100'), scheduleRow(2, 'FV', '200')]
-    vi.spyOn(Endge.query, 'executeArtifact').mockResolvedValue(firstRows)
+    vi.spyOn(Endge.runtime.query, 'executeArtifact').mockResolvedValue(firstRows)
     const host = Endge.runtime.execute(query, {
       id: 'schedule-runtime',
       persistence: 'disabled',
@@ -94,7 +94,7 @@ describe('Query Raph derived integration', () => {
     expect((host.getOutput('table') as any[]).map(row => row.id)).toEqual([3, 2])
     expect(node.snapshot().fullComputeCount).toBe(2)
 
-    vi.mocked(Endge.query.executeArtifact).mockResolvedValue([scheduleRow(4, 'SU', '400')])
+    vi.mocked(Endge.runtime.query.executeArtifact).mockResolvedValue([scheduleRow(4, 'SU', '400')])
     await host.run()
     expect(node.snapshot().fullComputeCount).toBe(3)
 
@@ -117,7 +117,7 @@ describe('Query Raph derived integration', () => {
     Endge.compiler.buildQuery(query)
     const first = deferred<any[]>()
     const second = deferred<any[]>()
-    vi.spyOn(Endge.query, 'executeArtifact')
+    vi.spyOn(Endge.runtime.query, 'executeArtifact')
       .mockImplementationOnce(() => first.promise)
       .mockImplementationOnce(() => second.promise)
     const host = Endge.runtime.execute(query, {
@@ -142,7 +142,7 @@ describe('Query Raph derived integration', () => {
   it('keeps last-good table and exposes external derived errors on the host', async () => {
     const query = createScheduleQuery('schedule-error')
     Endge.compiler.buildQuery(query)
-    vi.spyOn(Endge.query, 'executeArtifact').mockResolvedValue([scheduleRow(1, 'SU', '100')])
+    vi.spyOn(Endge.runtime.query, 'executeArtifact').mockResolvedValue([scheduleRow(1, 'SU', '100')])
     const host = Endge.runtime.execute(query, {
       id: 'schedule-error-runtime', persistence: 'disabled', props: { filterPayload: {} },
     }) as QueryRuntimeHost

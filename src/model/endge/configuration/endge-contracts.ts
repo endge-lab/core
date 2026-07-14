@@ -7,7 +7,7 @@ import type {
 } from '@/domain/types/configuration/faceted-cascade'
 import type { ConfigurationContract } from '@/domain/types/configuration/configuration-contract.types'
 
-import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
+import { Subscribable } from '@endge/utils'
 import { EndgeFacetType as FacetType } from '@/domain/types/configuration/faceted-cascade'
 import { ENDGE_CORE_DEFAULT_CONTRACTS } from '@/model/config/contracts'
 
@@ -16,7 +16,7 @@ import { ENDGE_CORE_DEFAULT_CONTRACTS } from '@/model/config/contracts'
  * Публично остаётся единым фасадом, но внутри хранит три независимые семьи:
  * behavior, presentation и configuration.
  */
-export class EndgeContracts extends EndgeModule {
+export class EndgeContracts extends Subscribable {
   private _behaviorContracts: BehaviorContract[] = []
   private _behaviorContractsByEntity = new Map<string, BehaviorContract[]>()
   private _behaviorContractsByKey = new Map<string, BehaviorContract>()
@@ -32,14 +32,14 @@ export class EndgeContracts extends EndgeModule {
   /**
    * На старте модуля регистрирует канонический набор core-контрактов всех трёх фасетов.
    */
-  public override start(): void {
+  public start(): void {
     this.registerContracts(ENDGE_CORE_DEFAULT_CONTRACTS)
   }
 
   /**
    * Очищает registry контрактов при reset federation.
    */
-  public override reset(): void {
+  public reset(): void {
     this.clear()
   }
 

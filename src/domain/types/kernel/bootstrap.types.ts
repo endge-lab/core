@@ -11,10 +11,12 @@ export type EndgeDataProvider =
 
 /**
  * Конфигурация загрузки движка
- * Сейчас пустой, потому что configurator грузит полный snapshot.
+ * Определяет workspace, данные которого должны быть активированы из Payload.
  * Позже сюда добавятся tenantId/projectId/environmentId/entrypoint.
  */
-export interface EndgeLoadScope {}
+export interface EndgeLoadScope {
+  workspaceIdentity?: string
+}
 
 export interface EndgePayloadProviderOptions {
   baseAPI: string
