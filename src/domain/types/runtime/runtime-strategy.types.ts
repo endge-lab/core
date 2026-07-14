@@ -22,15 +22,6 @@ export interface RuntimeCreateContext<TModel = unknown> {
   artifacts: RuntimeArtifactReader
 }
 
-/** Контекст подключения runtime-host после регистрации в общем registry. */
-export interface RuntimeAttachContext<
-  TModel = unknown,
-  THost extends AnyRuntimeHost = AnyRuntimeHost,
-> extends RuntimeCreateContext<TModel> {
-  /** Созданный и зарегистрированный host. */
-  host: THost
-}
-
 /** Контекст разрушения runtime-host, если стратегии нужна своя очистка. */
 export interface RuntimeDestroyContext<THost extends AnyRuntimeHost = AnyRuntimeHost> {
   /** Разрушаемый runtime-host. */
@@ -53,9 +44,6 @@ export interface RuntimeStrategy<
 
   /** Создает runtime-host. Регистрация в EndgeRuntime здесь не выполняется. */
   create: (ctx: RuntimeCreateContext<TModel>) => THost | null
-
-  /** Подключает внешние ресурсы после регистрации host-а. */
-  attach?: (ctx: RuntimeAttachContext<TModel, THost>) => void
 
   /** Выполняет strategy-specific cleanup перед общим host.destroy(). */
   destroy?: (ctx: RuntimeDestroyContext<THost>) => void

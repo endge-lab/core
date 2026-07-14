@@ -67,6 +67,17 @@ describe('RuntimeAppScope', () => {
     expect(child.meta.scopeRoot).toBe(false)
   })
 
+  it('derives scope root only from the parent relation', () => {
+    const store = installStore()
+    const app = Endge.runtime.getDefaultAppScope()
+    const parent = app.execute(store) as StoreRuntimeHost
+    const child = app.execute(store, { parent }) as StoreRuntimeHost
+
+    expect(parent.meta.scopeRoot).toBe(true)
+    expect(child.parent).toBe(parent)
+    expect(child.meta.scopeRoot).toBe(false)
+  })
+
   it('rejects an explicit parent that is not registered', () => {
     const store = installStore()
 

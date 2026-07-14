@@ -1,6 +1,6 @@
 import type { RStore } from '@/domain/entities/reflect/RStore'
 import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime/runtime-host.types'
-import type { StoreDataDescriptor, StoreSourceArtifact } from '@/domain/types/source/store-source.types'
+import type { StoreDataDescriptor, StoreSourceArtifact, StoreValueDescriptor } from '@/domain/types/source/store-source.types'
 
 import { Raph, RaphNode, full, type RaphDerivedHandle } from '@endge/raph'
 
@@ -82,8 +82,13 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
     Raph.app.addNode(node)
     host.addRaphNode(node)
     host.addResource({ id: `node:${node.id}`, kind: 'raph-node', title: node.id })
-    host._mount(programArtifact.payload)
-    host.create()
+    try {
+      host._mount(programArtifact.payload)
+    }
+    catch (error) {
+      host.destroy()
+      throw error
+    }
     return host
   }
 
@@ -132,10 +137,16 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
 
   /** Инициализирует writable fields и затем immediate derived graph. */
   private _mount(artifact: StoreSourceArtifact): void {
+    const initialValues = new Map<string, unknown>()
+    for (const field of artifact.data) {
+      if (field.kind === 'value')
+        initialValues.set(field.key, resolveStoreInitialValue(field))
+    }
+
     Raph.transaction(() => {
       for (const field of artifact.data) {
         if (field.kind === 'value')
-          Raph.set(this.getDataPath(field.key), cloneRuntimeValue(field.initial))
+          Raph.set(this.getDataPath(field.key), cloneRuntimeValue(initialValues.get(field.key)))
       }
     })
 
@@ -150,7 +161,10 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
           kind: field.kind,
           ...(field.kind === 'derived'
             ? { source: field.source, dataViews: field.dataViews.length }
-            : {}),
+            : {
+                initializer: field.initial.kind,
+                ...(field.initial.kind === 'mock' ? { mockIdentity: field.initial.identity } : {}),
+              }),
         },
       })
       if (field.kind !== 'derived')
@@ -189,6 +203,12 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
     const now = new Date().toISOString()
     this.setContext({ status: 'success', startedAt: now, updatedAt: now, lastStateChangeAt: now })
   }
+}
+
+function resolveStoreInitialValue(field: StoreValueDescriptor): unknown {
+  return field.initial.kind === 'mock'
+    ? Endge.mock.get(field.initial.identity)
+    : field.initial.value
 }
 
 function appendStorePath(base: string, path: string): string {

@@ -170,8 +170,6 @@ export class ActionRuntimeHost extends RuntimeHostBase<'action'> {
         wildcardDynamic: meta.wildcardDynamic === true,
       })
     }
-
-    host.create()
     return host
   }
 }

@@ -158,7 +158,6 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
       direction: 'both',
       subtitle: 'Публикация и подписка runtime-событий',
     })
-    host.create()
     return host
   }
 

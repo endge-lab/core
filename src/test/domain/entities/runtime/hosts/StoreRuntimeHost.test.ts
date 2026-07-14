@@ -13,6 +13,7 @@ describe('StoreRuntimeHost', () => {
     Endge.runtime.reset()
     Endge.program.clear()
     Endge.domain.reset()
+    Endge.mock.reset()
     Raph.app.reset()
   })
 
@@ -69,5 +70,69 @@ describe('StoreRuntimeHost', () => {
     const statePath = runtime.getDataPath()
     Endge.runtime.destroyRuntimeTree(runtime.id)
     expect(Raph.get(statePath)).toBeUndefined()
+  })
+
+  it('resolves a registered mock before immediate derived materialization', () => {
+    const store = new RStore()
+    store.id = 102
+    store.identity = 'groundhandling-db'
+    store.name = 'Ground Handling DB'
+    store.source = `defineStore({
+      data: {
+        raw: value(mock('groundhandling')),
+        table: derived()
+          .from('raw')
+          .dataView(defineDataView({
+            mode: 'pipeline',
+            steps: [
+              from('pairsArrival').as('pair'),
+              map({ ...spread('pair') }),
+            ],
+          })),
+      },
+    })`
+    Endge.domain.addStore(store)
+
+    const payload = Endge.source.compile('store', store.source).artifact as StoreSourceArtifact
+    const artifact: ProgramArtifact<StoreSourceArtifact> = {
+      ref: { entityType: 'store', id: store.id, identity: store.identity },
+      sourceHash: 'test-mock',
+      compilerVersion: 'test',
+      status: 'valid',
+      diagnostics: [],
+      dependencies: [{
+        entityType: 'mock-data',
+        id: 'groundhandling',
+        identity: 'groundhandling',
+        role: 'store-initial:raw',
+      }],
+      capabilities: ['compilable', 'executable', 'data-provider'],
+      metadata: { self: {}, nodes: [] },
+      payload,
+    }
+    Endge.program.beginCompile('test')
+    Endge.program.addArtifact(artifact)
+
+    const runtime = Endge.runtime.execute(store, { id: 'store:groundhandling-db-preview' }) as StoreRuntimeHost
+    const snapshot = runtime.getDataSnapshot() as any
+
+    expect(snapshot.raw.pairsArrival).toHaveLength(2)
+    expect(snapshot.raw.pairsDeparture).toHaveLength(1)
+    expect(snapshot.table.map((row: any) => row.id)).toEqual([
+      'SU1679_140726_ASF_1_null',
+      'SU205_140726_PKX_1_null',
+    ])
+    expect(runtime.resources).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'data:raw',
+        payload: expect.objectContaining({
+          initializer: 'mock',
+          mockIdentity: 'groundhandling',
+        }),
+      }),
+    ]))
+
+    snapshot.raw.pairsArrival.splice(0)
+    expect(Endge.mock.get<any>('groundhandling').pairsArrival).toHaveLength(2)
   })
 })

@@ -91,12 +91,19 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
     host.addRaphNode(node)
     host.addResource({ id: `node:${node.id}`, kind: 'raph-node', title: node.id })
     host._resetState(false)
-    host.create()
     return host
   }
 
+  /** Активирует зарегистрированный Filter host с восстановленным state. */
+  public override create(): void {
+    if (this.status === 'active')
+      return
+    this._hydratePersistence()
+    super.create()
+  }
+
   /** Восстанавливает persisted state после подключения runtime controller. */
-  public hydratePersistence(): void {
+  private _hydratePersistence(): void {
     if (!this.runtimeState)
       return
     const restored = this.runtimeState.get<Record<string, unknown>>(

@@ -282,6 +282,22 @@ export class EndgeCompiler extends EndgeModule {
         const payload = result.artifact as StoreSourceArtifact | undefined
         const dependencies: ProgramArtifact['dependencies'] = []
         for (const field of payload?.data ?? []) {
+          if (field.kind === 'value' && field.initial.kind === 'mock') {
+            dependencies.push({
+              entityType: 'mock-data',
+              id: field.initial.identity,
+              identity: field.initial.identity,
+              role: `store-initial:${field.key}`,
+            })
+            if (!Endge.mock.has(field.initial.identity)) {
+              ;(result.diagnostics ??= []).push({
+                severity: 'error',
+                code: 'store-mock-missing',
+                message: `Mock "${field.initial.identity}" для Store field "${field.key}" не зарегистрирован.`,
+                sourcePath: `data.${field.key}`,
+              })
+            }
+          }
           if (field.kind !== 'derived')
             continue
           for (const ref of field.dataViews) {

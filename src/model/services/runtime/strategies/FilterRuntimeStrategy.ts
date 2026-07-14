@@ -19,8 +19,4 @@ export class FilterRuntimeStrategy implements RuntimeStrategy<RFilter, FilterRun
       artifacts: ctx.artifacts,
     })
   }
-
-  public attach(ctx: Parameters<NonNullable<RuntimeStrategy<RFilter, FilterRuntimeHost>['attach']>>[0]): void {
-    ctx.host.hydratePersistence()
-  }
 }

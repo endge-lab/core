@@ -19,8 +19,4 @@ export class QueryRuntimeStrategy implements RuntimeStrategy<RQuery, QueryRuntim
       artifacts: ctx.artifacts,
     })
   }
-
-  public attach(ctx: Parameters<NonNullable<RuntimeStrategy<RQuery, QueryRuntimeHost>['attach']>>[0]): void {
-    ctx.host.initializeDefaultSources()
-  }
 }

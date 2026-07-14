@@ -56,7 +56,7 @@ export class RuntimeAppScope {
     this.persistence = options.persistence ?? 'disabled'
   }
 
-  /** Запускает root entity в этом AppScope. */
+  /** Запускает entity в этом AppScope; root определяется отсутствием parent. */
   public execute(
     model: RuntimeExecutableModel,
     options: RuntimeAppScopeExecuteOptions = {},
@@ -64,7 +64,6 @@ export class RuntimeAppScope {
     return this._owner.execute(model, {
       ...options,
       appScope: this,
-      scopeRoot: true,
     })
   }
 

@@ -1,4 +1,5 @@
 import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
+import type { EndgeMockReference } from '@/domain/types/mock'
 import type { DataViewRef } from '@/domain/types/source/data-view-source.types'
 
 export type StoreDataDescriptor = StoreValueDescriptor | StoreDerivedDescriptor
@@ -6,8 +7,12 @@ export type StoreDataDescriptor = StoreValueDescriptor | StoreDerivedDescriptor
 export interface StoreValueDescriptor {
   key: string
   kind: 'value'
-  initial: unknown
+  initial: StoreValueInitializer
 }
+
+export type StoreValueInitializer
+  = | { kind: 'literal', value: unknown }
+    | EndgeMockReference
 
 export interface StoreDerivedDescriptor {
   key: string

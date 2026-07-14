@@ -10,8 +10,8 @@ export class StoreSourceLanguageStrategy implements SourceLanguageStrategy {
   public readonly syntax = createTypeScriptLikeSourceSyntax({
     alias: 'Endge Store Source',
     extension: '.endge-store.ts',
-    keywords: ['dataView', 'defineDataView', 'defineStore', 'derived', 'value'],
-    functions: ['dataView', 'derived', 'from', 'value'],
+    keywords: ['dataView', 'defineDataView', 'defineStore', 'derived', 'mock', 'value'],
+    functions: ['dataView', 'derived', 'from', 'mock', 'value'],
     properties: ['data'],
   })
 
@@ -30,6 +30,14 @@ export class StoreSourceLanguageStrategy implements SourceLanguageStrategy {
   }
 
   public completions(_context: SourceLanguageContext): SourceLanguageCompletion[] {
-    return [{ label: 'defineStore', kind: 'snippet', insertText: STORE_DEFAULT_SOURCE.trimEnd(), detail: 'Создать Store source' }]
+    return [
+      { label: 'defineStore', kind: 'snippet', insertText: STORE_DEFAULT_SOURCE.trimEnd(), detail: 'Создать Store source' },
+      {
+        label: 'mock',
+        kind: 'function',
+        insertText: "mock('identity')",
+        detail: 'Получить initial value из Endge.mock registry',
+      },
+    ]
   }
 }

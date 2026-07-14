@@ -20,6 +20,7 @@ import { EndgeFlow } from '@/model/endge/runtime/flow/endge-flow'
 import { EndgeFlowRegistry } from '@/model/endge/runtime/flow/endge-flow-registry'
 import { EndgeBindingsPresentation } from '@/model/endge/configuration/endge-bindings-presentation'
 import { EndgeI18n } from '@/model/endge/context/endge-i18n'
+import type { EndgeMock } from '@/model/endge/mock/EndgeMock'
 import { EndgeProgram } from '@/model/endge/program/endge-program'
 import { EndgeQuery } from '@/model/endge/runtime/execution/endge-query'
 import { EndgeRuntime } from '@/model/endge/runtime/core/endge-runtime'
@@ -161,6 +162,13 @@ export class Endge extends EndgeFederation {
    */
   static get source(): EndgeSource {
     return this.getModule<EndgeSource>('source')
+  }
+
+  /**
+   * Доступ к registry mock payload.
+   */
+  static get mock(): EndgeMock {
+    return this.getModule<EndgeMock>('mock')
   }
 
   /**

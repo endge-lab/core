@@ -20,9 +20,6 @@ export interface RuntimeExecuteOptions {
   /** App scope или id зарегистрированного app scope. */
   appScope?: RuntimeAppScope | string
 
-  /** Помечает host корнем runtime tree внутри app scope. */
-  scopeRoot?: boolean
-
   /** Read-only источник compiled artifacts. */
   artifactReader?: RuntimeArtifactReader
 
@@ -36,5 +33,5 @@ export interface RuntimeExecuteOptions {
   meta?: Record<string, unknown>
 }
 
-/** Параметры запуска root host через конкретный app scope. */
-export type RuntimeAppScopeExecuteOptions = Omit<RuntimeExecuteOptions, 'appScope' | 'scopeRoot'>
+/** Параметры запуска host через конкретный app scope. */
+export type RuntimeAppScopeExecuteOptions = Omit<RuntimeExecuteOptions, 'appScope'>

@@ -20,6 +20,7 @@ describe('Endge runtime persistence integration', () => {
 
     expect(host?.id).toBe('test-runtime')
     expect(host?.runtimeState?.runtimeId).toBe('test-runtime')
+    expect(host?.status).toBe('active')
   })
 
   it('rejects duplicate active runtime ids and allows reuse after destroy', () => {

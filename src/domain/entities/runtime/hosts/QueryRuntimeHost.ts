@@ -103,7 +103,6 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     host._applyProps(input.meta?.props ?? {}, true)
     try {
       host._mountOutputGraph(artifact)
-      host.create()
     }
     catch (error) {
       host.destroy()
@@ -112,8 +111,16 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     return host
   }
 
+  /** Активирует зарегистрированный Query host и создаёт его child filters. */
+  public override create(): void {
+    if (this.status === 'active')
+      return
+    this._initializeDefaultSources()
+    super.create()
+  }
+
   /** Создает unresolved Filter defaults после регистрации Query host. */
-  public initializeDefaultSources(): void {
+  private _initializeDefaultSources(): void {
     const payload = this.getArtifactPayload()
     const artifact = this.getArtifact()
     if (!payload || !artifact)

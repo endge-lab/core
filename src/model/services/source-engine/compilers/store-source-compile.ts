@@ -1,6 +1,6 @@
 import type { DataViewRef } from '@/domain/types/source/data-view-source.types'
 import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
-import type { StoreDataDescriptor, StoreSourceCompileResult } from '@/domain/types/source/store-source.types'
+import type { StoreDataDescriptor, StoreSourceCompileResult, StoreValueInitializer } from '@/domain/types/source/store-source.types'
 
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
@@ -88,12 +88,12 @@ function readData(node: t.ObjectExpression, source: string, diagnostics: Diagnos
         diagnostics.push(diagnostic('error', 'store-value-initial', `value(...) для "${key}" требует initial value.`, `data.${key}`, expression))
         continue
       }
-      const initial = readStaticValue(initialNode)
+      const initial = readValueInitializer(initialNode)
       if (!initial.ok) {
-        diagnostics.push(diagnostic('error', 'store-value-static', `value(...) для "${key}" принимает JSON-compatible значение.`, `data.${key}`, initialNode))
+        diagnostics.push(diagnostic('error', 'store-value-static', `value(...) для "${key}" принимает JSON-compatible значение или mock(identity).`, `data.${key}`, initialNode))
         continue
       }
-      descriptors.push({ key, kind: 'value', initial: initial.value })
+      descriptors.push({ key, kind: 'value', initial: initial.initial })
       declared.add(key)
       continue
     }
@@ -134,6 +134,23 @@ function readData(node: t.ObjectExpression, source: string, diagnostics: Diagnos
     declared.add(key)
   }
   return descriptors
+}
+
+function readValueInitializer(node: t.Expression): { ok: true, initial: StoreValueInitializer } | { ok: false } {
+  const value = unwrapExpression(node)
+  if (t.isCallExpression(value) && t.isIdentifier(value.callee, { name: 'mock' })) {
+    if (value.arguments.length !== 1)
+      return { ok: false }
+    const identity = readStringArgument(value, 0)?.trim()
+    return identity
+      ? { ok: true, initial: { kind: 'mock', identity } }
+      : { ok: false }
+  }
+
+  const literal = readStaticValue(value)
+  return literal.ok
+    ? { ok: true, initial: { kind: 'literal', value: literal.value } }
+    : literal
 }
 
 function readDataViewRef(

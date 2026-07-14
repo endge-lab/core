@@ -84,7 +84,6 @@ export class ViewRuntimeHost extends RuntimeHostBase<'view'> {
       direction: 'both',
       subtitle: 'Публикация и подписка runtime-событий',
     })
-    host.create()
     return host
   }
 }

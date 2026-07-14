@@ -84,7 +84,6 @@ export class ProjectRuntimeHost extends RuntimeHostBase<'project'> {
       direction: 'both',
       subtitle: 'Публикация и подписка runtime-событий',
     })
-    host.create()
     return host
   }
 }

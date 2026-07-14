@@ -91,7 +91,6 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     Raph.app.addNode(node)
     host.addRaphNode(node)
     host.addResource({ id: `node:${node.id}`, kind: 'raph-node', title: node.id })
-    host.create()
     return host
   }
 
@@ -363,7 +362,6 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       })
       Raph.app.addNode(node)
       child.addRaphNode(node)
-      child.create()
       if (!Endge.runtime.registerRuntimeHost(child)) {
         child.destroy()
         throw new Error(`[CompositionRuntimeHost] filterView runtime "${descriptor.name}" cannot be registered.`)

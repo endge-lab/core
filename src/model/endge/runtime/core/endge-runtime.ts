@@ -111,7 +111,6 @@ export class EndgeRuntime extends EndgeModule {
       instanceId: requestedLocalId,
       parent: parentRef,
       appScope: appScopeRef,
-      scopeRoot: requestedScopeRoot,
       artifactReader: artifactReaderRef,
       persistence,
       persistenceKey,
@@ -122,7 +121,7 @@ export class EndgeRuntime extends EndgeModule {
     const artifactReader = this._resolveArtifactReader(artifactReaderRef)
     const hostMeta: Record<string, any> = { ...(meta ?? {}) }
 
-    const scopeRoot = requestedScopeRoot === true || !parent
+    const scopeRoot = !parent
     const identity = String((model as any)?.identity ?? (model as any)?.id ?? strategy.entityType)
     const address = appScope.allocate({
       entityType: strategy.entityType,
@@ -163,19 +162,11 @@ export class EndgeRuntime extends EndgeModule {
       return null
     }
 
-    if (!this.registerCreatedHost(host, parent)) {
+    if (!this.registerAndActivateHost(host, parent)) {
       host.destroy()
       return null
     }
 
-    strategy.attach?.({
-      id: runtimeId,
-      model,
-      meta: hostMeta,
-      parent,
-      artifacts: artifactReader,
-      host,
-    })
     this.notify()
     return host
   }
@@ -231,7 +222,7 @@ export class EndgeRuntime extends EndgeModule {
   /** Регистрирует host, созданный владельцем составной runtime-сущности. */
   public registerRuntimeHost(host: AnyRuntimeHost): boolean {
     this.start()
-    const registered = this.registerCreatedHost(host, host.parent)
+    const registered = this.registerAndActivateHost(host, host.parent)
     if (registered)
       this.notify()
     return registered
@@ -427,8 +418,8 @@ export class EndgeRuntime extends EndgeModule {
     }
   }
 
-  /** Регистрирует созданный host и связывает его Raph node с runtime tree. */
-  private registerCreatedHost(host: AnyRuntimeHost, parent: AnyRuntimeHost | null): boolean {
+  /** Регистрирует host, подключает infrastructure и только затем активирует его. */
+  private registerAndActivateHost(host: AnyRuntimeHost, parent: AnyRuntimeHost | null): boolean {
     if (this._hosts.getById(host.id)) {
       console.error(`[EndgeRuntime] Runtime host "${host.id}" is already active.`)
       return false
@@ -453,11 +444,18 @@ export class EndgeRuntime extends EndgeModule {
       console.error('[EndgeRuntime] Failed to register runtime host', error)
       return false
     }
-    host.attachRuntimeState(Endge.context.createRuntimeStateController({
-      runtimeId: host.id,
-      storageId: typeof host.meta.persistenceKey === 'string' ? host.meta.persistenceKey : host.id,
-      persistence: host.meta.persistence as any,
-    }))
+    try {
+      host.attachRuntimeState(Endge.context.createRuntimeStateController({
+        runtimeId: host.id,
+        storageId: typeof host.meta.persistenceKey === 'string' ? host.meta.persistenceKey : host.id,
+        persistence: host.meta.persistence as any,
+      }))
+      host.create()
+    }
+    catch (error) {
+      this.destroyRuntimeTree(host.id)
+      throw error
+    }
     return true
   }
 

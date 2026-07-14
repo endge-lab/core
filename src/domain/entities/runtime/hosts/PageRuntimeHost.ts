@@ -84,7 +84,6 @@ export class PageRuntimeHost extends RuntimeHostBase<'page'> {
       direction: 'both',
       subtitle: 'Публикация и подписка runtime-событий',
     })
-    host.create()
     return host
   }
 }
