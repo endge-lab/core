@@ -13,8 +13,8 @@ import type { DataViewProgramPayload, ProgramDiagnostic } from '@/domain/types/p
 
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
-import { compileProgramMetadataProperty } from '@/model/services/source-engine/source-metadata-compile'
-import { compileSourceExpression } from '@/model/services/source-engine/source-expression-compile'
+import { compileProgramMetadataProperty } from '@/model/services/source-engine/compilers/source-metadata-compile'
+import { compileSourceExpression } from '@/model/services/source-engine/compilers/source-expression-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 

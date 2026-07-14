@@ -2,10 +2,11 @@ import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 
 /**
  * Модуль применения внешних update-сообщений к runtime state.
- * Legacy update-профили из документа настроек удалены; новый SSE pipeline
+ * Устаревшие update-профили из документа настроек удалены; новый SSE pipeline
  * должен описываться отдельной доменной моделью.
  */
 export class EndgeUpdates extends EndgeModule {
+  /** Обрабатывает legacy update profile; текущая реализация оставлена как no-op boundary. */
   public applyUpdateForProfile(
     profileIdentity: string,
     message: unknown,

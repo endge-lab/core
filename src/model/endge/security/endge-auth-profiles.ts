@@ -9,19 +9,22 @@ import type { StoredAuthToken } from '@/domain/types/auth/auth.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import {
-  KeycloakAuthService,
+  KeycloakAuthClient,
   mapTokenResponseToStored,
-} from '@/model/services/auth'
+} from '@/model/services/auth/KeycloakAuthClient'
 import { Endge } from '@/model/endge/kernel/endge'
 
+/** Модуль auth profiles, adapters и хранения полученных tokens. */
 export class EndgeAuthProfiles extends EndgeModule {
   private adapters = new Map<string, AuthProfileAdapter>()
   private memoryTokens = new Map<string, StoredAuthToken>()
 
+  /** Регистрирует встроенные auth adapters. */
   public override setup(): void {
     this.registerBuiltInAdapters()
   }
 
+  /** Регистрирует auth adapter с необязательной заменой существующего. */
   public registerAdapter(adapter: AuthProfileAdapter, opts: { replace?: boolean } = {}): void {
     const id = String(adapter.id ?? '').trim()
     if (!id)
@@ -31,10 +34,12 @@ export class EndgeAuthProfiles extends EndgeModule {
     this.adapters.set(id, adapter)
   }
 
+  /** Возвращает auth adapter по id. */
   public getAdapter(id: string): AuthProfileAdapter | null {
     return this.adapters.get(id) ?? null
   }
 
+  /** Возвращает активный auth profile workspace по умолчанию. */
   public getDefaultProfile(): RAuthProfile | AuthProfileSchema | null {
     const profiles = Endge.domain.getAuthProfiles()
       .filter(profile => profile.active !== false && !profile.deletedAt)
@@ -44,6 +49,7 @@ export class EndgeAuthProfiles extends EndgeModule {
     return null
   }
 
+  /** Разрешает auth session для указанного или default profile. */
   public async resolve(profileIdentity?: string | null, opts: { manualToken?: string | null } = {}): Promise<AuthSession> {
     const profile = this.resolveProfile(profileIdentity)
     if (!profile)
@@ -51,6 +57,7 @@ export class EndgeAuthProfiles extends EndgeModule {
     return this.resolveWithAdapter(profile, opts)
   }
 
+  /** Проверяет profile и требует непустой access token. */
   public async test(profile: RAuthProfile | AuthProfileSchema): Promise<AuthSession> {
     const session = await this.resolveWithAdapter(profile)
     if (!session.accessToken)
@@ -58,6 +65,7 @@ export class EndgeAuthProfiles extends EndgeModule {
     return session
   }
 
+  /** Разрешает auth session по Query request policy. */
   public async resolveRequestAuth(auth: Partial<RQueryAuth> | undefined): Promise<AuthSession> {
     const mode = normalizeAuthMode(auth?.mode)
     if (mode === 'none')
@@ -69,11 +77,13 @@ export class EndgeAuthProfiles extends EndgeModule {
     return this.resolve()
   }
 
+  /** Возвращает access token указанного profile. */
   public async getAccessToken(profileIdentity?: string | null): Promise<string | undefined> {
     const session = await this.resolve(profileIdentity)
     return session.accessToken
   }
 
+  /** Завершает session указанного profile через его adapter. */
   public async logout(profileIdentity?: string | null): Promise<void> {
     const profile = this.resolveProfile(profileIdentity)
     if (!profile)
@@ -86,12 +96,14 @@ export class EndgeAuthProfiles extends EndgeModule {
     })
   }
 
+  /** Очищает runtime tokens и восстанавливает встроенные adapters. */
   public override reset(): void {
     this.adapters.clear()
     this.memoryTokens.clear()
     this.registerBuiltInAdapters()
   }
 
+  /** Регистрирует встроенные manual и Keycloak adapters. */
   private registerBuiltInAdapters(): void {
     if (this.adapters.size > 0)
       return
@@ -114,6 +126,7 @@ export class EndgeAuthProfiles extends EndgeModule {
     })
   }
 
+  /** Находит auth profile по identity или выбирает default profile. */
   private resolveProfile(profileIdentity?: string | null): RAuthProfile | AuthProfileSchema | null {
     const identity = String(profileIdentity ?? '').trim()
     if (identity) {
@@ -125,6 +138,7 @@ export class EndgeAuthProfiles extends EndgeModule {
     return this.getDefaultProfile()
   }
 
+  /** Разрешает session через adapter конкретного profile. */
   private async resolveWithAdapter(profile: RAuthProfile | AuthProfileSchema, opts: { manualToken?: string | null } = {}): Promise<AuthSession> {
     const adapter = this.getAdapter(profile.adapterId)
     if (!adapter)
@@ -135,6 +149,7 @@ export class EndgeAuthProfiles extends EndgeModule {
     })
   }
 
+  /** Создаёт virtual profile для ручного request token. */
   private createManualTokenProfile(): AuthProfileSchema {
     return {
       id: '_manual_token_request_auth',
@@ -150,6 +165,7 @@ export class EndgeAuthProfiles extends EndgeModule {
     }
   }
 
+  /** Разрешает ручной token и формирует Authorization header. */
   private async resolveManualToken(raw: string | null | undefined): Promise<AuthSession> {
     const value = String(raw ?? '').trim()
     const token = String(Endge.vars.resolve(value) ?? '').trim()
@@ -166,6 +182,7 @@ export class EndgeAuthProfiles extends EndgeModule {
     }
   }
 
+  /** Выполняет Keycloak login или восстанавливает сохранённую session. */
   private async resolveKeycloakProfile(profile: AuthProfileSchema): Promise<AuthSession> {
     const auth = this.getKeycloakConfig(profile)
 
@@ -175,8 +192,8 @@ export class EndgeAuthProfiles extends EndgeModule {
       this.requireResolvedValue(auth.login, 'Login', 'config.login', '{KEYCLOAK_LOGIN}')
       this.requireResolvedValue(auth.password, 'Password', 'config.password', '{KEYCLOAK_PASSWORD}')
 
-      const service = new KeycloakAuthService(auth.baseUrl, auth.tokenPath, auth.logoutPath)
-      const data = await service.passwordGrant({
+      const client = new KeycloakAuthClient(auth.baseUrl, auth.tokenPath, auth.logoutPath)
+      const data = await client.passwordGrant({
         username: auth.login,
         password: auth.password,
         client_id: auth.clientId,
@@ -197,13 +214,14 @@ export class EndgeAuthProfiles extends EndgeModule {
     return this.sessionFromStoredToken(stored)
   }
 
+  /** Завершает Keycloak session и очищает локальный token. */
   private async logoutKeycloakProfile(profile: AuthProfileSchema): Promise<void> {
     const auth = this.getKeycloakConfig(profile)
     const stored = this.loadStoredToken(profile)
     if (stored?.refresh_token && auth.baseUrl && auth.clientId) {
       try {
-        const service = new KeycloakAuthService(auth.baseUrl, auth.tokenPath, auth.logoutPath)
-        await service.logout({
+        const client = new KeycloakAuthClient(auth.baseUrl, auth.tokenPath, auth.logoutPath)
+        await client.logout({
           client_id: auth.clientId,
           refresh_token: stored.refresh_token,
         })
@@ -216,6 +234,7 @@ export class EndgeAuthProfiles extends EndgeModule {
     this.removeStoredToken(profile)
   }
 
+  /** Преобразует сохранённый token в публичную auth session. */
   private sessionFromStoredToken(stored: StoredAuthToken): AuthSession {
     const token = String(stored.access_token ?? '').trim()
     if (!token)
@@ -230,12 +249,14 @@ export class EndgeAuthProfiles extends EndgeModule {
     }
   }
 
+  /** Приводит domain profile к transport-neutral schema. */
   private profileToSchema(profile: RAuthProfile | AuthProfileSchema): AuthProfileSchema {
     if ('toPlain' in profile && typeof profile.toPlain === 'function')
       return profile.toPlain() as unknown as AuthProfileSchema
     return profile as AuthProfileSchema
   }
 
+  /** Собирает нормализованный Keycloak config из profile. */
   private getKeycloakConfig(profile: AuthProfileSchema): {
     baseUrl: string
     storageKey: string
@@ -261,6 +282,7 @@ export class EndgeAuthProfiles extends EndgeModule {
     }
   }
 
+  /** Разрешает строковое config value через Endge variables. */
   private resolveConfigString(raw: unknown): string {
     const value = String(raw ?? '').trim()
     if (!value)
@@ -268,6 +290,7 @@ export class EndgeAuthProfiles extends EndgeModule {
     return String(Endge.vars.resolve(value) ?? '').trim()
   }
 
+  /** Проверяет обязательное resolved config value. */
   private requireResolvedValue(
     value: string,
     label: string,
@@ -279,11 +302,13 @@ export class EndgeAuthProfiles extends EndgeModule {
     throw new Error(`${label} не задан. Заполните ${path} напрямую или через переменную, например ${example}.`)
   }
 
+  /** Возвращает storage key auth profile. */
   private getStorageKey(profile: AuthProfileSchema): string {
     const key = this.resolveConfigString(profile.config?.storageKey)
     return key || `endge.auth.${profile.identity}`
   }
 
+  /** Загружает token из выбранного profile storage. */
   private loadStoredToken(profile: AuthProfileSchema): StoredAuthToken | null {
     if (profile.persist === 'memory')
       return this.memoryTokens.get(profile.identity) ?? null
@@ -302,6 +327,7 @@ export class EndgeAuthProfiles extends EndgeModule {
     }
   }
 
+  /** Сохраняет token согласно persistence policy profile. */
   private saveStoredToken(profile: AuthProfileSchema, token: StoredAuthToken): void {
     if (profile.persist === 'memory') {
       this.memoryTokens.set(profile.identity, token)
@@ -312,12 +338,14 @@ export class EndgeAuthProfiles extends EndgeModule {
     storage.setItem(this.getStorageKey(profile), JSON.stringify(token))
   }
 
+  /** Удаляет token profile из всех поддерживаемых storages. */
   private removeStoredToken(profile: AuthProfileSchema): void {
     this.memoryTokens.delete(profile.identity)
     localStorage.removeItem(this.getStorageKey(profile))
     sessionStorage.removeItem(this.getStorageKey(profile))
   }
 
+  /** Проверяет минимальную структуру сохранённого auth token. */
   private isStoredAuthToken(value: unknown): value is StoredAuthToken {
     if (!value || typeof value !== 'object' || Array.isArray(value))
       return false
@@ -326,11 +354,13 @@ export class EndgeAuthProfiles extends EndgeModule {
       && typeof token.access_expires === 'string'
   }
 
+  /** Проверяет истечение сохранённого access token. */
   private isStoredTokenExpired(token: StoredAuthToken): boolean {
     const expiresAt = new Date(token.access_expires).getTime()
     return Number.isFinite(expiresAt) && expiresAt <= Date.now()
   }
 
+  /** Формирует диагностическое сообщение для пустой auth session. */
   private getEmptySessionMessage(profile: AuthProfileSchema): string {
     if (profile.adapterId === 'keycloak_form') {
       const storageKey = this.getStorageKey(profile)

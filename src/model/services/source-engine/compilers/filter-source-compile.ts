@@ -15,9 +15,9 @@ import {
   diagnostic,
   propertyName,
   unwrapExpression,
-} from '@/model/services/source-engine/source-expression-compile'
-import { compileSourceField } from '@/model/services/source-engine/source-field-compile'
-import { compileProgramMetadataProperty } from '@/model/services/source-engine/source-metadata-compile'
+} from '@/model/services/source-engine/compilers/source-expression-compile'
+import { compileSourceField } from '@/model/services/source-engine/compilers/source-field-compile'
+import { compileProgramMetadataProperty } from '@/model/services/source-engine/compilers/source-metadata-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 

@@ -177,6 +177,7 @@ export interface EndgeDomainParsed {
   folders: RFolder[]
 }
 
+/** Модуль хранения, индексации и изменения документов домена. */
 export class EndgeDomain extends EndgeModule {
   private _projectsById: Map<number, RProject> = new Map()
   private _projectsByIdentity: Map<string, RProject> = new Map()
@@ -896,20 +897,24 @@ export class EndgeDomain extends EndgeModule {
     return Array.from(this._storesByIdentity.values())
   }
 
+  /** Возвращает Store по id. */
   getStoreById(id: string | number): RStore | null {
     return this._storesById.get(id) ?? null
   }
 
+  /** Возвращает Store по identity. */
   getStoreByIdentity(identity: string): RStore | null {
     return this._storesByIdentity.get(identity) ?? null
   }
 
+  /** Возвращает Store по id или identity. */
   getStore(idOrIdentity: string | number): RStore | null {
     return this.getStoreById(idOrIdentity)
       ?? this.getStoreById(Number(idOrIdentity))
       ?? this.getStoreByIdentity(String(idOrIdentity))
   }
 
+  /** Добавляет Store в доменные indexes. */
   addStore(store: RStore): void {
     if (this._storesByIdentity.has(store.identity) || this._storesById.has(store.id))
       return
@@ -918,6 +923,7 @@ export class EndgeDomain extends EndgeModule {
     this.notify()
   }
 
+  /** Удаляет Store по id. */
   removeStoreById(id: string | number): void {
     const store = this.getStoreById(id)
     if (!store)
@@ -927,6 +933,7 @@ export class EndgeDomain extends EndgeModule {
     this.notify()
   }
 
+  /** Удаляет Store по identity. */
   removeStoreByIdentity(identity: string): void {
     const store = this.getStoreByIdentity(identity)
     if (!store)
@@ -936,6 +943,7 @@ export class EndgeDomain extends EndgeModule {
     this.notify()
   }
 
+  /** Удаляет Store по id или identity. */
   removeStore(idOrIdentity: string | number): void {
     const store = this.getStore(idOrIdentity)
     if (store)
@@ -2059,27 +2067,29 @@ export class EndgeDomain extends EndgeModule {
     return this._vocabsByIdentity.has(identity)
   }
 
-  /**
-   * Методы для работы с профилями авторизации.
-   */
+  /** Возвращает все auth profiles. */
   getAuthProfiles(): RAuthProfile[] {
     return Array.from(this._authProfilesById.values())
   }
 
+  /** Возвращает auth profile по id. */
   getAuthProfileById(id: string | number): RAuthProfile | null {
     return this._authProfilesById.get(id) ?? null
   }
 
+  /** Возвращает auth profile по identity. */
   getAuthProfileByIdentity(identity: string): RAuthProfile | null {
     return this._authProfilesByIdentity.get(identity) ?? null
   }
 
+  /** Возвращает auth profile по id или identity. */
   getAuthProfile(idOrIdentity: string | number): RAuthProfile | null {
     return this.getAuthProfileById(idOrIdentity)
       || this.getAuthProfileById(Number(idOrIdentity))
       || this.getAuthProfileByIdentity(String(idOrIdentity))
   }
 
+  /** Добавляет auth profile в доменные indexes. */
   addAuthProfile(profile: RAuthProfile): void {
     if (this._authProfilesByIdentity.has(profile.identity) || this._authProfilesById.has(profile.id))
       return
@@ -2088,6 +2098,7 @@ export class EndgeDomain extends EndgeModule {
     this.notify()
   }
 
+  /** Удаляет auth profile по id. */
   removeAuthProfileById(id: string | number): void {
     const profile = this._authProfilesById.get(id)
     if (!profile)
@@ -2097,6 +2108,7 @@ export class EndgeDomain extends EndgeModule {
     this.notify()
   }
 
+  /** Удаляет auth profile по identity. */
   removeAuthProfileByIdentity(identity: string): void {
     const profile = this._authProfilesByIdentity.get(identity)
     if (!profile)
@@ -2106,6 +2118,7 @@ export class EndgeDomain extends EndgeModule {
     this.notify()
   }
 
+  /** Удаляет auth profile по identity через публичный alias. */
   removeAuthProfile(identity: string): void {
     this.removeAuthProfileByIdentity(identity)
   }
@@ -3268,7 +3281,7 @@ export class EndgeDomain extends EndgeModule {
   }
 
   //
-  // TOOLS
+  // Инструменты
   //
 
   /**

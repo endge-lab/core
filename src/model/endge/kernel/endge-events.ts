@@ -50,7 +50,7 @@ export class EndgeEvents extends EndgeModule {
     // пересоздаём, сохраняя хвост (самые свежие)
     const nextCache = new RingBuffer<CachedEvent>(n)
     if (prev) {
-      const old: CachedEvent[] = prev.toArray() // oldest -> newest
+      const old: CachedEvent[] = prev.toArray() // От старых событий к новым.
       const tail: CachedEvent[] = old.slice(Math.max(0, old.length - n))
       for (const item of tail) nextCache.push(item)
     }

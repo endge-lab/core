@@ -1,6 +1,6 @@
 import { RStore } from '@/domain/entities/reflect/RStore'
 import { StoreRuntimeHost } from '@/domain/entities/runtime/hosts/StoreRuntimeHost'
-import type { RuntimeStrategy } from '@/model/services/runtime/RuntimeStrategy'
+import type { RuntimeStrategy } from '@/domain/types/runtime/runtime-strategy.types'
 
 export class StoreRuntimeStrategy implements RuntimeStrategy<RStore, StoreRuntimeHost> {
   public readonly id = 'runtime:store'

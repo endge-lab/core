@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { compileStoreSource } from '@/model/services/source-engine/store-source-compile'
+import { compileStoreSource } from '@/model/services/source-engine/compilers/store-source-compile'
 
 describe('compileStoreSource', () => {
   it('compiles writable and derived data fields', () => {

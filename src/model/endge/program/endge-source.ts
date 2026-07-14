@@ -34,6 +34,7 @@ export class EndgeSource extends EndgeModule {
   private readonly _languageStrategies = new SourceLanguageRegistry()
   private readonly _patchStrategies = new SourcePatchRegistry()
 
+  /** Создаёт source-модуль и регистрирует встроенные strategies. */
   public constructor() {
     super()
     this._registerDefaultStrategies()

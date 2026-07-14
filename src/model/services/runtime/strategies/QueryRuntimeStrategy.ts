@@ -1,6 +1,6 @@
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
-import type { RuntimeStrategy } from '@/model/services/runtime/RuntimeStrategy'
+import type { RuntimeStrategy } from '@/domain/types/runtime/runtime-strategy.types'
 
 export class QueryRuntimeStrategy implements RuntimeStrategy<RQuery, QueryRuntimeHost> {
   public readonly id = 'runtime:query'

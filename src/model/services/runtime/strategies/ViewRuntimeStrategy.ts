@@ -1,6 +1,6 @@
 import { RView } from '@/domain/entities/reflect/RView'
 import { ViewRuntimeHost } from '@/domain/entities/runtime/hosts/ViewRuntimeHost'
-import type { RuntimeStrategy } from '@/model/services/runtime/RuntimeStrategy'
+import type { RuntimeStrategy } from '@/domain/types/runtime/runtime-strategy.types'
 
 export class ViewRuntimeStrategy implements RuntimeStrategy<RView> {
   public readonly id = 'runtime:view'

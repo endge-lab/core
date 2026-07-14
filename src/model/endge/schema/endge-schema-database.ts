@@ -21,7 +21,6 @@ import { RVersion } from '@/domain/entities/reflect/RVersion'
 import { ComponentType, FilterType, ParameterType, QueryType } from '@/domain/types/document/document.types'
 import { Endge } from '@/model/endge/kernel/endge'
 import { compositionPayloadDocToPlain, dataViewPayloadDocToPlain, queryPayloadDocToPlain, storePayloadDocToPlain } from '@/model/endge/domain/endge-domain'
-import { DEFAULT_ENDGE_WORKSPACE } from '@/model/config/endge-workspace'
 import { Actions_Repository } from '@/model/db/repositories/Actions_Repository'
 import { AuthProfiles_Repository } from '@/model/db/repositories/AuthProfiles_Repository'
 import { BehaviorBindings_Repository } from '@/model/db/repositories/BehaviorBindings_Repository'
@@ -534,6 +533,7 @@ export class EndgeSchemaStorage extends EndgeModule {
     this._loadedSource = null
   }
 
+  /** Устанавливает interceptor для lock override и workspace relation. */
   private installWorkspaceRequestInterceptor(): void {
     this.api.interceptors.request.use(async (config) => {
       if (shouldOverridePayloadDocumentLock(config.method)) {
@@ -551,16 +551,19 @@ export class EndgeSchemaStorage extends EndgeModule {
     })
   }
 
+  /** Возвращает identity активного workspace. */
   private getCurrentWorkspaceIdentity(): string {
     const fromContext = Endge.context.getCurrentWorkspace?.()
-    const fromWorkspace = Endge.workspace.current?.identity
-    const identity = String(
-      fromContext || fromWorkspace || DEFAULT_ENDGE_WORKSPACE.identity,
-    ).trim()
+    const fromWorkspace = Endge.workspace.isLoaded ? Endge.workspace.current.identity : null
+    const identity = String(fromContext || fromWorkspace || '').trim()
 
-    return identity || DEFAULT_ENDGE_WORKSPACE.identity
+    if (!identity)
+      throw new Error('[EndgeSchemaStorage] Active workspace has not been loaded from Payload')
+
+    return identity
   }
 
+  /** Разрешает и кеширует Payload id активного workspace. */
   private async resolvePayloadWorkspaceId(): Promise<string | number> {
     const identity = this.getCurrentWorkspaceIdentity()
     if (this._payloadWorkspaceIdCache?.identity === identity)
@@ -578,6 +581,7 @@ export class EndgeSchemaStorage extends EndgeModule {
     return id
   }
 
+  /** Загружает Payload id workspace по identity. */
   private async fetchPayloadWorkspaceId(identity: string): Promise<string | number> {
     const doc = await this.repositories?.workspaces?.findByIdentity(identity)
       ?? await this.fetchPayloadWorkspaceByIdentity(identity)
@@ -591,6 +595,7 @@ export class EndgeSchemaStorage extends EndgeModule {
     return doc.id
   }
 
+  /** Ищет workspace через совместимые Payload collection endpoints. */
   private async fetchPayloadWorkspaceByIdentity(identity: string): Promise<any | null> {
     const params = {
       limit: 1,
@@ -607,6 +612,7 @@ export class EndgeSchemaStorage extends EndgeModule {
     }
   }
 
+  /** Возвращает или создаёт корневую Payload folder. */
   private async ensurePayloadRootFolder(params: {
     identity: string
     displayName: string

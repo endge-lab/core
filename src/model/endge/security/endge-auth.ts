@@ -10,9 +10,9 @@ import { isAfter, subMilliseconds } from 'date-fns'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import {
-  KeycloakAuthService,
+  KeycloakAuthClient,
   mapTokenResponseToStored,
-} from '@/model/services/auth'
+} from '@/model/services/auth/KeycloakAuthClient'
 import { Endge } from '@/model/endge/kernel/endge'
 
 type StringRecord = Record<string, string>
@@ -36,9 +36,10 @@ function isKeycloakProvider(
   return p === 'keycloak_manual' || p === 'keycloak_form'
 }
 
+/** Модуль legacy Keycloak-аутентификации и управления token lifecycle. */
 export class EndgeAuth extends EndgeModule {
   private auth: EndgeAuthProfileConfig | null = null
-  private service: KeycloakAuthService | null = null
+  private client: KeycloakAuthClient | null = null
 
   /** Единственный axios инстанс для всего модуля */
   private readonly http: AxiosInstance = axios.create({
@@ -55,12 +56,12 @@ export class EndgeAuth extends EndgeModule {
   private isInitialized: boolean = false
 
   // ---------------------------------------------------------------------------
-  // NEW: single-flight auto-login (чтобы не спамить логином при параллельных вызовах)
+  // Single-flight auto-login для защиты от параллельных запросов.
   // ---------------------------------------------------------------------------
   private loginPromise: Promise<StoredAuthToken> | null = null
 
   // ---------------------------------------------------------------------------
-  // USER INFO
+  // Данные пользователя
   // ---------------------------------------------------------------------------
   private _userInfo: any = null
 
@@ -109,7 +110,7 @@ export class EndgeAuth extends EndgeModule {
   }
 
   // ---------------------------------------------------------------------------
-  // INIT
+  // Инициализация
   // ---------------------------------------------------------------------------
 
   /**
@@ -160,12 +161,13 @@ export class EndgeAuth extends EndgeModule {
     const logoutPath: string = auth.logoutPath ?? '/logout'
     const endpoint
       = Endge.vars.resolve(auth.KeycloakBaseUrl) || auth.KeycloakBaseUrl
-    this.service = new KeycloakAuthService(endpoint, tokenPath, logoutPath)
+    this.client = new KeycloakAuthClient(endpoint, tokenPath, logoutPath)
 
     await this.loadFromStorage()
     this.startBackgroundRefresh()
   }
 
+  /** Собирает auth config из первого активного Keycloak profile. */
   private getAuthFromProfile(): EndgeAuthProfileConfig | undefined {
     const profile = Endge.domain.getAuthProfiles()
       .find(item => item.active !== false && (item.adapterId === 'keycloak_manual' || item.adapterId === 'keycloak_form'))
@@ -191,11 +193,11 @@ export class EndgeAuth extends EndgeModule {
   }
 
   // ---------------------------------------------------------------------------
-  // PUBLIC API
+  // Публичный API
   // ---------------------------------------------------------------------------
 
   /**
-   * Manual login: логин/пароль берём из профиля авторизации.
+   * Выполняет ручной login с credentials из auth profile.
    */
   public async login(): Promise<StoredAuthToken> {
     await this.ensureInit()
@@ -216,7 +218,7 @@ export class EndgeAuth extends EndgeModule {
   }
 
   /**
-   * Form login: логин/пароль приходят из UI
+   * Выполняет form login с credentials из UI.
    */
   public async loginForm(
     username: string,
@@ -245,7 +247,7 @@ export class EndgeAuth extends EndgeModule {
     await this.ensureInit()
 
     const auth: EndgeAuthProfileConfig = this.requireAuth()
-    const service: KeycloakAuthService = this.requireService()
+    const client: KeycloakAuthClient = this.requireClient()
 
     if (!this.refreshToken) { return false }
     if (!this.refreshExpiresAt) { return false }
@@ -257,7 +259,7 @@ export class EndgeAuth extends EndgeModule {
       refresh_token: this.refreshToken,
     }
 
-    const data = await service.refreshGrant(payload)
+    const data = await client.refreshGrant(payload)
     const stored: StoredAuthToken = mapTokenResponseToStored(data)
 
     this.saveToStorage(stored)
@@ -293,7 +295,7 @@ export class EndgeAuth extends EndgeModule {
     await this.ensureInit()
 
     const auth: EndgeAuthProfileConfig = this.requireAuth()
-    const service: KeycloakAuthService = this.requireService()
+    const client: KeycloakAuthClient = this.requireClient()
 
     try {
       if (this.refreshToken) {
@@ -301,7 +303,7 @@ export class EndgeAuth extends EndgeModule {
           client_id: auth.clientId,
           refresh_token: this.refreshToken,
         }
-        await service.logout(payload)
+        await client.logout(payload)
       }
     }
     catch {
@@ -330,7 +332,7 @@ export class EndgeAuth extends EndgeModule {
   }
 
   // ---------------------------------------------------------------------------
-  // INTERNAL
+  // Внутренние операции
   // ---------------------------------------------------------------------------
 
   /**
@@ -344,9 +346,9 @@ export class EndgeAuth extends EndgeModule {
   /**
    * Внутренний helper модуля: require Service.
    */
-  private requireService(): KeycloakAuthService {
-    if (!this.service) { throw new Error('EndgeAuth не инициализирован: service отсутствует') }
-    return this.service
+  private requireClient(): KeycloakAuthClient {
+    if (!this.client) { throw new Error('EndgeAuth не инициализирован: auth client отсутствует') }
+    return this.client
   }
 
   /**
@@ -357,7 +359,7 @@ export class EndgeAuth extends EndgeModule {
     password: string,
   ): Promise<StoredAuthToken> {
     const auth: EndgeAuthProfileConfig = this.requireAuth()
-    const service: KeycloakAuthService = this.requireService()
+    const client: KeycloakAuthClient = this.requireClient()
 
     const payload: StringRecord = {
       username,
@@ -367,7 +369,7 @@ export class EndgeAuth extends EndgeModule {
       scope: auth.scope,
     }
 
-    const data = await service.passwordGrant(payload)
+    const data = await client.passwordGrant(payload)
     const stored: StoredAuthToken = mapTokenResponseToStored(data)
 
     this.saveToStorage(stored)
@@ -484,7 +486,7 @@ export class EndgeAuth extends EndgeModule {
 
     // сброс зависимостей
     this.auth = null
-    this.service = null
+    this.client = null
 
     // сброс init-состояния
     this.isInitialized = false
@@ -557,9 +559,9 @@ export class EndgeAuth extends EndgeModule {
   public async loadUserInfo(): Promise<void> {
     await this.ensureInit()
 
-    const service: KeycloakAuthService = this.requireService()
+    const client: KeycloakAuthClient = this.requireClient()
     try {
-      const data = await service.getUserInfo(this.http)
+      const data = await client.getUserInfo(this.http)
       this._userInfo = data
       this.notify()
     }

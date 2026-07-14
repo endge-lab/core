@@ -14,6 +14,7 @@ import { MemoryStore } from '@/domain/entities/debug/MemoryStore'
 import { rndHex } from '@/domain/entities/debug/tools/base'
 import { buildLogTree } from '@/domain/entities/debug/tools/tree'
 
+/** Модуль in-memory debug-записей, trace и span API. */
 export class EndgeDebug extends EndgeModule {
   private _enabled = false
   private store = new MemoryStore(50_000, 'drop-oldest')
@@ -42,7 +43,7 @@ export class EndgeDebug extends EndgeModule {
     this._enabled = value
   }
 
-  /** ===== CORE ===== */
+  /** Основные операции debug-store. */
 
   /**
    * Возвращает все накопленные debug-записи.
@@ -71,7 +72,7 @@ export class EndgeDebug extends EndgeModule {
     this.notify()
   }
 
-  /** ===== TRACE / SPAN API ===== */
+  /** Операции trace и span. */
 
   /**
    * Открывает trace или возвращает уже активный trace.
@@ -176,7 +177,7 @@ export class EndgeDebug extends EndgeModule {
     this.spanStartTime = null
   }
 
-  /** ===== EVENT API ===== */
+  /** Операции записи событий. */
 
   /**
    * Записывает debug event, автоматически создавая trace/span при необходимости.
@@ -307,7 +308,7 @@ export class EndgeDebug extends EndgeModule {
     return out
   }
 
-  /** ===== SYNTACTIC SUGAR ===== */
+  /** Сокращённые методы уровней логирования. */
 
   /**
    * Записывает event уровня trace.

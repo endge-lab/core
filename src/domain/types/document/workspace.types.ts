@@ -5,6 +5,8 @@ export interface EndgeWorkspaceLocale {
   direction?: 'ltr' | 'rtl'
 }
 
+export type EndgeWorkspaceLocaleLabelMode = keyof Pick<EndgeWorkspaceLocale, 'displayName' | 'shortLabel'>
+
 export type EndgeWorkspaceSSEAuthMode = 'inherit' | 'profile' | 'manual' | 'none'
 
 export interface EndgeWorkspaceVar {

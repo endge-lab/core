@@ -6,7 +6,7 @@ import type {
   SourceKind,
 } from '@/domain/types/source/source-engine.types'
 
-import { compileQuerySource } from '@/model/services/source-engine/query-source-compile'
+import { compileQuerySource } from '@/model/services/source-engine/compilers/query-source-compile'
 
 /** Source strategy для RQuery/source-kind=query. */
 export class QuerySourceEngineStrategy implements SourceEngineStrategy {

@@ -14,8 +14,8 @@ import { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntime
 import { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
 import { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
 import { StoreRuntimeHost } from '@/domain/entities/runtime/hosts/StoreRuntimeHost'
-import { compileFilterSource } from '@/model/services/source-engine/filter-source-compile'
-import { buildRuntimeGraph } from '@/model/services/source-engine/composition-source-compile'
+import { compileFilterSource } from '@/model/services/source-engine/compilers/filter-source-compile'
+import { buildRuntimeGraph } from '@/model/services/source-engine/compilers/composition-source-compile'
 import { Endge } from '@/model/endge/kernel/endge'
 
 describe('Composition runtime session', () => {

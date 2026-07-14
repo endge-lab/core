@@ -1,6 +1,6 @@
 import type { SourceEngineCompileResult, SourceEngineStrategy, SourceKind } from '@/domain/types/source/source-engine.types'
 
-import { compileCompositionSource } from '@/model/services/source-engine/composition-source-compile'
+import { compileCompositionSource } from '@/model/services/source-engine/compilers/composition-source-compile'
 
 export class CompositionSourceEngineStrategy implements SourceEngineStrategy {
   public readonly id = 'source:composition'

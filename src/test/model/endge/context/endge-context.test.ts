@@ -1,11 +1,12 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { Endge } from '@/model/endge/kernel/endge'
 import { EndgeContext } from '@/model/endge/context/endge-context'
-import { DEFAULT_ENDGE_WORKSPACE, setActiveEndgeWorkspace } from '@/model/config/endge-workspace'
+import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
 describe('EndgeContext locale', () => {
-  afterEach(() => {
-    setActiveEndgeWorkspace(DEFAULT_ENDGE_WORKSPACE)
+  beforeEach(() => {
+    Endge.workspace.apply(TEST_ENDGE_WORKSPACE)
   })
 
   it('uses ru as the default locale', () => {
@@ -60,10 +61,10 @@ describe('EndgeContext locale', () => {
     const context = new EndgeContext()
     context.deserialize({ project: null, environment: 'dev', locale: 'kk' })
 
-    setActiveEndgeWorkspace({
-      ...DEFAULT_ENDGE_WORKSPACE,
+    Endge.workspace.apply({
+      ...TEST_ENDGE_WORKSPACE,
       locales: [
-        ...DEFAULT_ENDGE_WORKSPACE.locales,
+        ...TEST_ENDGE_WORKSPACE.locales,
         { code: 'kk', displayName: 'Қазақша', shortLabel: 'KK' },
       ],
       defaultLocale: 'kk',

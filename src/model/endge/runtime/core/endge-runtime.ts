@@ -1,12 +1,13 @@
 import type { RuntimeEntityType } from '@/domain/types/runtime/runtime-entity-map.types'
-import type { AnyRuntimeStrategy, EndgeRuntimeSnapshot, RuntimeExecutableModel } from '@/domain/types/runtime/runtime.types'
+import type { AnyRuntimeStrategy } from '@/domain/types/runtime/runtime-strategy.types'
+import type { EndgeRuntimeSnapshot, RuntimeExecutableModel } from '@/domain/types/runtime/runtime.types'
 
 import { Raph, RaphNode } from '@endge/raph'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { RuntimeAppScope, type RuntimeAppScopeOptions } from '@/domain/entities/runtime/RuntimeAppScope'
 import { RuntimeHostRegistry } from '@/domain/entities/runtime/RuntimeHostRegistry'
-import type { AnyRuntimeHost } from '@/model/services/runtime/RuntimeStrategy'
+import type { AnyRuntimeHost } from '@/domain/types/runtime/runtime-strategy.types'
 import { RuntimeStrategyRegistry } from '@/model/services/runtime/RuntimeStrategyRegistry'
 import { ActionRuntimeStrategy } from '@/model/services/runtime/strategies/ActionRuntimeStrategy'
 import { ComponentSFCRuntimeStrategy } from '@/model/services/runtime/strategies/ComponentSFCRuntimeStrategy'
@@ -21,6 +22,7 @@ import { Endge } from '@/model/endge/kernel/endge'
 import { RuntimeBoundaryUpdatePhase } from '@/model/helpers/raph-phases/runtime-boundary-update-phase'
 import { RuntimeNodeUpdatePhase } from '@/model/helpers/raph-phases/runtime-node-update-phase'
 
+/** Модуль создания, регистрации и уничтожения runtime hosts и app scopes. */
 export class EndgeRuntime extends EndgeModule {
   private _hosts = new RuntimeHostRegistry()
   private _strategies = new RuntimeStrategyRegistry()
@@ -30,6 +32,7 @@ export class EndgeRuntime extends EndgeModule {
   private _appScopes = new Map<string, RuntimeAppScope>()
   private _defaultAppScope: RuntimeAppScope
 
+  /** Создаёт default app scope и регистрирует runtime strategies. */
   public constructor() {
     super()
     this._defaultAppScope = this.createAppScope({
@@ -100,7 +103,7 @@ export class EndgeRuntime extends EndgeModule {
     return scope
   }
 
-  /** Root scope обычного запуска приложения. */
+  /** Возвращает корневой scope обычного запуска приложения. */
   public getDefaultAppScope(): RuntimeAppScope {
     return this._defaultAppScope
   }
@@ -357,6 +360,7 @@ export class EndgeRuntime extends EndgeModule {
     return host
   }
 
+  /** Регистрирует созданный host и связывает его Raph node с runtime tree. */
   private registerCreatedHost(host: AnyRuntimeHost, parent: AnyRuntimeHost | null): boolean {
     if (this._hosts.getById(host.id)) {
       console.error(`[EndgeRuntime] Runtime host "${host.id}" is already active.`)

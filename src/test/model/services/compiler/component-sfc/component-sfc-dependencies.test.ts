@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { analyzeComponentSFCRuntimeDependencies } from '@/model/services/compiler/component-sfc-dependencies'
-import { compileComponentSFC } from '@/model/services/compiler/component-sfc-compile'
+import { analyzeComponentSFCRuntimeDependencies } from '@/model/services/compiler/component-sfc/component-sfc-dependencies'
+import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 
 describe('analyzeComponentSFCRuntimeDependencies', () => {
   it('finds prop reads from interpolation, dynamic attrs and if directives', () => {

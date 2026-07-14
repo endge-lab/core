@@ -4,7 +4,7 @@ import type {
   SourceKind,
 } from '@/domain/types/source/source-engine.types'
 
-import { compileFilterSource } from '@/model/services/source-engine/filter-source-compile'
+import { compileFilterSource } from '@/model/services/source-engine/compilers/filter-source-compile'
 
 /** Source strategy для RFilter/source-kind=filter. */
 export class FilterSourceEngineStrategy implements SourceEngineStrategy {

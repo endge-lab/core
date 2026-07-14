@@ -418,6 +418,7 @@ export class EndgeVocabs extends EndgeModule {
     return { idKey, identity, baseApiUrl, slug, authMode: vocab.authMode ?? 'inherit', authProfileIdentity: vocab.authProfileIdentity ?? null }
   }
 
+  /** Находит runtime config справочника по identity или collection slug. */
   private resolveVocabConfigByIdentityOrSlug(identity: string, collectionSlug: string): VocabRuntimeConfig | null {
     const normalizedIdentity = String(identity ?? '').trim()
     const normalizedSlug = String(collectionSlug ?? '').trim()
@@ -437,6 +438,7 @@ export class EndgeVocabs extends EndgeModule {
     return this.resolveVocabConfigByIdOrIdentity(fallback.identity || fallback.id)
   }
 
+  /** Собирает auth headers для обращения к внешнему справочнику. */
   private async resolveAuthHeaders(cfg: { authMode?: 'inherit' | 'profile' | 'manual' | 'none'; authProfileIdentity?: string | null }): Promise<Record<string, string>> {
     const mode = cfg.authMode ?? 'inherit'
     if (mode === 'none')

@@ -92,9 +92,7 @@ export class EndgeRuntimeDebugger extends EndgeModule {
     Endge.console.register('debugTab', () => Endge.runtimeDebugger.activate(), 'Подключить текущую вкладку к Runtime Debug')
   }
 
-  /**
-   * ACCESS
-   */
+  /** Доступ к текущему состоянию runtime debugger. */
 
   /**
    * Возвращает список вкладок, известных runtime debugger.

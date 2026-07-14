@@ -80,7 +80,7 @@ export class EndgeVars extends EndgeModule {
   }
 
   // ========================================================================
-  // DOMAIN
+  // Домен
   // ========================================================================
 
   /**
@@ -110,7 +110,7 @@ export class EndgeVars extends EndgeModule {
   }
 
   // ========================================================================
-  // PUBLIC API
+  // Публичный API
   // ========================================================================
 
   /**
@@ -282,7 +282,7 @@ export class EndgeVars extends EndgeModule {
   }
 
   // ========================================================================
-  // Raph sync
+  // Синхронизация с Raph
   // ========================================================================
 
   /**
@@ -305,6 +305,7 @@ export class EndgeVars extends EndgeModule {
     Raph.app.set(`${Config.STORAGE_VARS_KEY}.${name}`, value)
   }
 
+  /** Читает variable из внешнего environment без изменения module state. */
   private getExternalValue(name: string): unknown {
     const key = String(name ?? '').trim()
     if (!key)

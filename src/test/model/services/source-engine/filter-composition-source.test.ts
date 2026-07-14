@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { compileCompositionSource } from '@/model/services/source-engine/composition-source-compile'
-import { compileFilterSource } from '@/model/services/source-engine/filter-source-compile'
-import { compileQuerySource } from '@/model/services/source-engine/query-source-compile'
+import { compileCompositionSource } from '@/model/services/source-engine/compilers/composition-source-compile'
+import { compileFilterSource } from '@/model/services/source-engine/compilers/filter-source-compile'
+import { compileQuerySource } from '@/model/services/source-engine/compilers/query-source-compile'
 
 describe('Filter, Query v2 and Composition source compiler', () => {
   it('compiles Filter fields, options, vocab, defaults and outputs into static IR', () => {

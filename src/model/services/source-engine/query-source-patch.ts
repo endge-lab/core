@@ -8,7 +8,7 @@ import type { SourcePatchResult } from '@/domain/types/source/source-engine.type
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
 
-import { compileQuerySource } from '@/model/services/source-engine/query-source-compile'
+import { compileQuerySource } from '@/model/services/source-engine/compilers/query-source-compile'
 
 interface QueryDefinitionParseResult {
   ast: t.File | null

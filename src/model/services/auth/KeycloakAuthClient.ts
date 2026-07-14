@@ -1,4 +1,4 @@
-import type {KeycloakTokenResponse, StoredAuthToken} from '@/domain/types/auth/auth.types'
+import type { KeycloakTokenResponse, StoredAuthToken } from '@/domain/types/auth/auth.types'
 import type { AxiosInstance } from 'axios'
 
 import axios from 'axios'
@@ -24,7 +24,7 @@ export function mapTokenResponseToStored(
   }
 }
 
-export class KeycloakAuthService {
+export class KeycloakAuthClient {
   private readonly http: AxiosInstance
   private readonly tokenPath: string
   private readonly logoutPath: string

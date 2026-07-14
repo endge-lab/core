@@ -31,7 +31,7 @@ import type {
   RComponentSFC_AST_TextNode,
   RComponentSFC_SourceRange,
 } from '@/domain/types/component/sfc'
-import { parseSFCSourceParts } from '@/model/services/compiler/component-sfc-source-parts'
+import { parseSFCSourceParts } from '@/model/services/compiler/component-sfc/component-sfc-source-parts'
 
 /** Результат parser pass для SFC-компонента. */
 export interface ComponentSFCParseResult {

@@ -3,13 +3,13 @@ import type * as t from '@babel/types'
 import { parseExpression } from '@babel/parser'
 import { describe, expect, it } from 'vitest'
 
-import { compileValueExpression } from '@/model/services/source-engine/source-expression-compile'
+import { compileValueExpression } from '@/model/services/source-engine/compilers/source-expression-compile'
 import { evaluateValueExpression } from '@/model/services/source-engine/source-expression-evaluate'
-import { compileQuerySource } from '@/model/services/source-engine/query-source-compile'
-import { compileCompositionSource } from '@/model/services/source-engine/composition-source-compile'
-import { compileDataViewSource } from '@/model/services/source-engine/data-view-source-compile'
+import { compileQuerySource } from '@/model/services/source-engine/compilers/query-source-compile'
+import { compileCompositionSource } from '@/model/services/source-engine/compilers/composition-source-compile'
+import { compileDataViewSource } from '@/model/services/source-engine/compilers/data-view-source-compile'
 import { EndgeDataView } from '@/model/endge/runtime/execution/endge-data-view'
-import { QueryExecutor_Service } from '@/model/services/QueryExecutor_Service'
+import { QueryExecutor } from '@/model/services/query/QueryExecutor'
 
 function compile(source: string) {
   const diagnostics: any[] = []
@@ -105,7 +105,7 @@ defineQuery({
       type: 'response',
       expression: { type: 'operation', operation: 'sort-by' },
     })
-    expect(new QueryExecutor_Service().readResponseOutput(result.artifact!.outputs[0], {
+    expect(new QueryExecutor().readResponseOutput(result.artifact!.outputs[0], {
       items: [
         { id: 2, active: true, std: '12:00' },
         { id: 3, active: false, std: '09:00' },

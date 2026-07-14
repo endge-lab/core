@@ -6,7 +6,7 @@ import type {
   SourceLanguageValidationResult,
 } from '@/domain/types/source/source-engine.types'
 
-import { compileCompositionSource } from '@/model/services/source-engine/composition-source-compile'
+import { compileCompositionSource } from '@/model/services/source-engine/compilers/composition-source-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
 import { COMPOSITION_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/composition.default.source'
 import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/model/services/source-engine/value-expression-language'

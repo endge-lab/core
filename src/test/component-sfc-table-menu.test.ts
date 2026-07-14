@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import type { RComponentSFC_IR_ElementNode } from '@/domain/types/component/sfc'
-import { compileComponentSFC } from '@/model/services/compiler/component-sfc-compile'
-import { normalizeComponentSFCTableColumnMenu } from '@/model/services/compiler/component-sfc-table-menu'
+import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
+import { normalizeComponentSFCTableColumnMenu } from '@/model/services/compiler/component-sfc/component-sfc-table-menu'
 
 describe('Component SFC table column menu', () => {
   it('compiles Table > ColumnMenu into a context menu descriptor', () => {

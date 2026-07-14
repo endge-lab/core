@@ -29,6 +29,7 @@ export class EndgeStore extends EndgeModule {
    */
   public subscribe(listener: () => void): () => void
   public subscribe(storeKey: string, listener: () => void): () => void
+  /** Реализует global или key-specific подписку в зависимости от arguments. */
   public subscribe(
     storeKeyOrListener: string | (() => void),
     listener?: () => void,
@@ -94,6 +95,7 @@ export class EndgeStore extends EndgeModule {
    */
   public notify(): void
   public notify(storeKey: string): void
+  /** Уведомляет подписчиков указанного store bucket и всего модуля. */
   public notify(storeKey: string = EndgeStore.Default): void {
     const keyedListeners = this.keyedSubscribers.get(storeKey)
     if (keyedListeners) {

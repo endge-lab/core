@@ -1,6 +1,6 @@
 import type { RuntimeEntityType } from '@/domain/types/runtime/runtime-entity-map.types'
 import type { RuntimeExecutableModel } from '@/domain/types/runtime/runtime.types'
-import type { AnyRuntimeHost } from '@/model/services/runtime/RuntimeStrategy'
+import type { AnyRuntimeHost } from '@/domain/types/runtime/runtime-strategy.types'
 
 export type RuntimeAppScopeCollisionPolicy = 'multi' | 'reject' | 'replace'
 

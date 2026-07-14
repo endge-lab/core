@@ -6,7 +6,7 @@ import type {
   SourceLanguageValidationResult,
 } from '@/domain/types/source/source-engine.types'
 
-import { compileFilterSource } from '@/model/services/source-engine/filter-source-compile'
+import { compileFilterSource } from '@/model/services/source-engine/compilers/filter-source-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
 import { FILTER_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/filter.default.source'
 

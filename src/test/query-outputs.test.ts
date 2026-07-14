@@ -6,7 +6,7 @@ import { RQuery } from '@/domain/entities/reflect/RQuery'
 import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
 import { EndgeDataView } from '@/model/endge/runtime/execution/endge-data-view'
 import { Endge } from '@/model/endge/kernel/endge'
-import { QueryExecutor_Service } from '@/model/services/QueryExecutor_Service'
+import { QueryExecutor } from '@/model/services/query/QueryExecutor'
 import type { QuerySourceDocument } from '@/domain/types/source/query-source.types'
 
 describe('query output source compiler', () => {
@@ -234,7 +234,7 @@ defineQuery({
 describe('source-only Query request body', () => {
   it('sends an empty payload when request.body is absent', async () => {
     const request = vi.fn().mockResolvedValue({ data: { items: [] } })
-    const executor = new QueryExecutor_Service({ request } as any)
+    const executor = new QueryExecutor({ request } as any)
 
     await executor.execute({
       payload: {

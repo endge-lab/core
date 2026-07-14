@@ -13,9 +13,9 @@ import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
 
 import { QueryType } from '@/domain/types/document/document.types'
-import { compileSourceCallback, compileSourceExpression } from '@/model/services/source-engine/source-expression-compile'
-import { compileSourceField } from '@/model/services/source-engine/source-field-compile'
-import { compileProgramMetadataProperty } from '@/model/services/source-engine/source-metadata-compile'
+import { compileSourceCallback, compileSourceExpression } from '@/model/services/source-engine/compilers/source-expression-compile'
+import { compileSourceField } from '@/model/services/source-engine/compilers/source-field-compile'
+import { compileProgramMetadataProperty } from '@/model/services/source-engine/compilers/source-metadata-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 

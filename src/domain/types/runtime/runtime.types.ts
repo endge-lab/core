@@ -7,7 +7,6 @@ import type { RPage } from '@/domain/entities/reflect/RPage'
 import type { RProject } from '@/domain/entities/reflect/RProject'
 import type { RQuery } from '@/domain/entities/reflect/RQuery'
 import type { RView } from '@/domain/entities/reflect/RView'
-import type { RuntimeStrategy } from '@/model/services/runtime/RuntimeStrategy'
 import type { RuntimeHostRegistrySnapshot } from '@/domain/types/runtime/runtime-registry.types'
 
 /**
@@ -25,8 +24,6 @@ export type RuntimeExecutableModel
     | RFilter
     | RComposition
     | RStore
-
-export type AnyRuntimeStrategy = RuntimeStrategy<any, any>
 
 export interface EndgeRuntimeSnapshot extends RuntimeHostRegistrySnapshot {
   generatedAt: number

@@ -11,8 +11,9 @@ export interface CompositionSession {
   unmount: () => void
 }
 
-/** Public mount facade для Composition runtime sessions. */
+/** Публичный facade монтирования Composition runtime sessions. */
 export class EndgeComposition extends EndgeModule {
+  /** Монтирует Composition runtime и возвращает управляемую session. */
   public async mount(identity: string, options: CompositionMountOptions = {}): Promise<CompositionSession> {
     const normalizedIdentity = String(identity ?? '').trim()
     const model = Endge.domain.getComposition(normalizedIdentity)

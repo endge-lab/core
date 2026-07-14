@@ -1,6 +1,6 @@
 import type { SourceEngineCompileResult, SourceEngineStrategy, SourceKind } from '@/domain/types/source/source-engine.types'
 
-import { compileStoreSource } from '@/model/services/source-engine/store-source-compile'
+import { compileStoreSource } from '@/model/services/source-engine/compilers/store-source-compile'
 
 export class StoreSourceEngineStrategy implements SourceEngineStrategy {
   public readonly id = 'source:store'

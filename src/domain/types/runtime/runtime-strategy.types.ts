@@ -1,5 +1,5 @@
-import type { RuntimeArtifactReader, RuntimeHost } from '@/domain/types/runtime/runtime-host.types'
-import type { RuntimeEntityType } from '@/domain/types/runtime/runtime-entity-map.types'
+import type { RuntimeEntityType } from './runtime-entity-map.types'
+import type { RuntimeArtifactReader, RuntimeHost } from './runtime-host.types'
 
 export type RuntimeStrategyMeta = Record<string, any>
 export type AnyRuntimeHost = RuntimeHost<any, any>
@@ -23,7 +23,10 @@ export interface RuntimeCreateContext<TModel = unknown> {
 }
 
 /** Контекст подключения runtime-host после регистрации в общем registry. */
-export interface RuntimeAttachContext<TModel = unknown, THost extends AnyRuntimeHost = AnyRuntimeHost> extends RuntimeCreateContext<TModel> {
+export interface RuntimeAttachContext<
+  TModel = unknown,
+  THost extends AnyRuntimeHost = AnyRuntimeHost,
+> extends RuntimeCreateContext<TModel> {
   /** Созданный и зарегистрированный host. */
   host: THost
 }
@@ -35,7 +38,10 @@ export interface RuntimeDestroyContext<THost extends AnyRuntimeHost = AnyRuntime
 }
 
 /** Strategy запуска runtime-сущности одного типа. */
-export interface RuntimeStrategy<TModel = unknown, THost extends AnyRuntimeHost = AnyRuntimeHost> {
+export interface RuntimeStrategy<
+  TModel = unknown,
+  THost extends AnyRuntimeHost = AnyRuntimeHost,
+> {
   /** Стабильный id стратегии для debug/плагинов. */
   id: string
 
@@ -54,3 +60,5 @@ export interface RuntimeStrategy<TModel = unknown, THost extends AnyRuntimeHost 
   /** Выполняет strategy-specific cleanup перед общим host.destroy(). */
   destroy?: (ctx: RuntimeDestroyContext<THost>) => void
 }
+
+export type AnyRuntimeStrategy = RuntimeStrategy<any, any>

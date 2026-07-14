@@ -1,6 +1,6 @@
 import { RProject } from '@/domain/entities/reflect/RProject'
 import { ProjectRuntimeHost } from '@/domain/entities/runtime/hosts/ProjectRuntimeHost'
-import type { RuntimeStrategy } from '@/model/services/runtime/RuntimeStrategy'
+import type { RuntimeStrategy } from '@/domain/types/runtime/runtime-strategy.types'
 
 export class ProjectRuntimeStrategy implements RuntimeStrategy<RProject> {
   public readonly id = 'runtime:project'

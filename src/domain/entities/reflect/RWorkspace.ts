@@ -9,11 +9,10 @@ import type {
 
 import { Expose } from 'class-transformer'
 import { REntity } from '@/domain/entities/reflect/REntity'
-import { DEFAULT_ENDGE_WORKSPACE } from '@/model/config/endge-workspace'
 
 export class RWorkspace extends REntity implements EndgeWorkspaceDefinition {
   @Expose()
-  displayName: string = DEFAULT_ENDGE_WORKSPACE.displayName
+  displayName!: string
 
   @Expose()
   vars: EndgeWorkspaceVar[] = []
@@ -22,22 +21,22 @@ export class RWorkspace extends REntity implements EndgeWorkspaceDefinition {
   sse?: EndgeWorkspaceSSEConfig
 
   @Expose()
-  locales: EndgeWorkspaceLocale[] = [...DEFAULT_ENDGE_WORKSPACE.locales]
+  locales: EndgeWorkspaceLocale[] = []
 
   @Expose()
-  defaultLocale: string = DEFAULT_ENDGE_WORKSPACE.defaultLocale
+  defaultLocale!: string
 
   @Expose()
-  fallbackLocale: string = DEFAULT_ENDGE_WORKSPACE.fallbackLocale
+  fallbackLocale!: string
 
   @Expose()
-  defaultAuthProfileIdentity: string | null = DEFAULT_ENDGE_WORKSPACE.defaultAuthProfileIdentity
+  defaultAuthProfileIdentity: string | null = null
 
   @Expose()
-  sfcAdapterIds: string[] = [...DEFAULT_ENDGE_WORKSPACE.sfcAdapterIds]
+  sfcAdapterIds: string[] = []
 
   @Expose()
-  defaultSfcAdapterId: string = DEFAULT_ENDGE_WORKSPACE.defaultSfcAdapterId
+  defaultSfcAdapterId!: string
 
   static fromPlain(input: unknown): RWorkspace {
     return createWorkspace(input)
@@ -68,22 +67,26 @@ export function normalizeEndgeWorkspaceDefinition(input: unknown): EndgeWorkspac
 }
 
 function createWorkspace(input: unknown): RWorkspace {
-  const source = isRecord(input) ? input as EndgeWorkspaceDefinitionInput : {}
+  if (!isRecord(input))
+    throw new Error('[RWorkspace] Payload workspace must be an object')
+
+  const source = input as EndgeWorkspaceDefinitionInput
   const workspace = new RWorkspace()
-  const identity = normalizeText(source.identity ?? source.id, DEFAULT_ENDGE_WORKSPACE.identity)
+  const identity = requireText(source.identity, 'identity')
+  const displayName = requireText(source.displayName ?? source.name, 'displayName')
 
   workspace.id = normalizeNumericId(source.id)
   workspace.identity = identity
-  workspace.name = normalizeText(source.name ?? source.displayName, DEFAULT_ENDGE_WORKSPACE.displayName)
-  workspace.displayName = normalizeText(source.displayName ?? source.name, workspace.name)
+  workspace.name = displayName
+  workspace.displayName = displayName
   workspace.vars = normalizeVars(source.vars)
   workspace.sse = normalizeSSE(source.sse ?? source.sse_endpoint ?? source.sseEndpoint)
   workspace.locales = normalizeLocales(source.locales)
 
   const defaultLocale = normalizeText(source.defaultLocale ?? source.default_locale, '')
   const fallbackLocale = normalizeText(source.fallbackLocale ?? source.fallback_locale, '')
-  workspace.defaultLocale = selectSupportedLocale(defaultLocale, workspace.locales, DEFAULT_ENDGE_WORKSPACE.defaultLocale)
-  workspace.fallbackLocale = selectSupportedLocale(fallbackLocale, workspace.locales, workspace.defaultLocale)
+  workspace.defaultLocale = requireSupportedLocale(defaultLocale, workspace.locales, 'defaultLocale')
+  workspace.fallbackLocale = requireSupportedLocale(fallbackLocale, workspace.locales, 'fallbackLocale')
   workspace.defaultAuthProfileIdentity = normalizeNullableText(
     source.defaultAuthProfileIdentity ?? source.default_auth_profile_identity,
   )
@@ -104,7 +107,10 @@ function normalizeSfcAdapterIds(value: unknown): string[] {
       .filter(Boolean),
   ))
 
-  return result.length ? result : [...DEFAULT_ENDGE_WORKSPACE.sfcAdapterIds]
+  if (!result.length)
+    throw new Error('[RWorkspace] Payload field "sfcAdapterIds" must contain at least one adapter id')
+
+  return result
 }
 
 function selectWorkspaceSfcAdapter(value: unknown, adapterIds: string[]): string {
@@ -112,10 +118,7 @@ function selectWorkspaceSfcAdapter(value: unknown, adapterIds: string[]): string
   if (adapterIds.includes(adapterId))
     return adapterId
 
-  if (adapterIds.includes(DEFAULT_ENDGE_WORKSPACE.defaultSfcAdapterId))
-    return DEFAULT_ENDGE_WORKSPACE.defaultSfcAdapterId
-
-  return adapterIds[0] ?? DEFAULT_ENDGE_WORKSPACE.defaultSfcAdapterId
+  throw new Error('[RWorkspace] Payload field "defaultSfcAdapterId" must reference an item from "sfcAdapterIds"')
 }
 
 function normalizeVars(value: unknown): EndgeWorkspaceVar[] {
@@ -175,7 +178,7 @@ function normalizeLocales(value: unknown): EndgeWorkspaceLocale[] {
     ? value
     : isRecord(value)
       ? Object.entries(value).map(([code, locale]) => isRecord(locale) ? { code, ...locale } : { code, displayName: locale })
-      : DEFAULT_ENDGE_WORKSPACE.locales
+      : []
 
   const result: EndgeWorkspaceLocale[] = []
   const used = new Set<string>()
@@ -189,7 +192,10 @@ function normalizeLocales(value: unknown): EndgeWorkspaceLocale[] {
     result.push(locale)
   }
 
-  return result.length ? result : DEFAULT_ENDGE_WORKSPACE.locales.map(locale => ({ ...locale }))
+  if (!result.length)
+    throw new Error('[RWorkspace] Payload field "locales" must contain at least one locale')
+
+  return result
 }
 
 function normalizeLocale(input: unknown): EndgeWorkspaceLocale | null {
@@ -220,18 +226,22 @@ function normalizeLocale(input: unknown): EndgeWorkspaceLocale | null {
   }
 }
 
-function selectSupportedLocale(
+function requireSupportedLocale(
   value: string,
   locales: EndgeWorkspaceLocale[],
-  fallback: string,
+  field: string,
 ): string {
   if (value && locales.some(locale => locale.code === value))
     return value
 
-  if (fallback && locales.some(locale => locale.code === fallback))
-    return fallback
+  throw new Error(`[RWorkspace] Payload field "${field}" must reference an item from "locales"`)
+}
 
-  return locales[0]?.code ?? DEFAULT_ENDGE_WORKSPACE.defaultLocale
+function requireText(value: unknown, field: string): string {
+  const text = String(value ?? '').trim()
+  if (!text)
+    throw new Error(`[RWorkspace] Payload field "${field}" is required`)
+  return text
 }
 
 function normalizeText(value: unknown, fallback: string): string {

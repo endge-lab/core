@@ -1,5 +1,6 @@
 import type { QueryProgramOutput, QueryProgramPayload } from '@/domain/types/program/program.types'
 import type { RQueryAuth } from '@/domain/types/document/query.types'
+import type { QueryExecutionContext } from '@/domain/types/runtime/query-execution.types'
 import type { AxiosInstance } from 'axios'
 
 import axios from 'axios'
@@ -7,19 +8,8 @@ import axios from 'axios'
 import { Endge } from '@/model/endge/kernel/endge'
 import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
 
-export interface QueryExecutionContext {
-  /** Runtime-ready query payload из Endge.program. */
-  payload: QueryProgramPayload
-
-  /** Входные параметры одноразового или реактивного запуска. */
-  vars?: Record<string, unknown>
-
-  /** AbortSignal текущего runtime run. */
-  signal?: AbortSignal
-}
-
 /** Выполняет source-only compiled query artifact. */
-export class QueryExecutor_Service {
+export class QueryExecutor {
   public constructor(
     private readonly http: AxiosInstance = axios.create({
       headers: { Accept: 'application/json' },

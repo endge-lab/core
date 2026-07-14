@@ -16,11 +16,11 @@ import type {
   RComponentSFC_IR_Value,
 } from '@/domain/types/component/sfc'
 import type { ProgramNodeMetadata } from '@/domain/types/program/program-metadata.types'
-import { compileComponentSFCExpression } from '@/model/services/compiler/component-sfc-expression'
-import { normalizeComponentSFCTableColumnMenu } from '@/model/services/compiler/component-sfc-table-menu'
-import { normalizeComponentSFCTableColumnPin } from '@/model/services/compiler/component-sfc-table-pin'
-import { normalizeComponentSFCTableSort } from '@/model/services/compiler/component-sfc-table-sort'
-import { compileProgramMetadataSource } from '@/model/services/source-engine/source-metadata-compile'
+import { compileComponentSFCExpression } from '@/model/services/compiler/component-sfc/component-sfc-expression'
+import { normalizeComponentSFCTableColumnMenu } from '@/model/services/compiler/component-sfc/component-sfc-table-menu'
+import { normalizeComponentSFCTableColumnPin } from '@/model/services/compiler/component-sfc/component-sfc-table-pin'
+import { normalizeComponentSFCTableSort } from '@/model/services/compiler/component-sfc/component-sfc-table-sort'
+import { compileProgramMetadataSource } from '@/model/services/source-engine/compilers/source-metadata-compile'
 
 /** Контекст компиляции template в IR. */
 export interface ComponentSFCTemplateCompileContext {

@@ -15,7 +15,7 @@ import {
  */
 export class EndgeUI extends EndgeModule {
   //
-  // ZOOM CONFIG
+  // Настройки zoom
   private readonly MIN_ZOOM: number = 50
   private readonly MAX_ZOOM: number = 150
   private readonly STEP_ZOOM: number = 25
@@ -23,13 +23,13 @@ export class EndgeUI extends EndgeModule {
   private readonly LS_KEY_ZOOM: string = 'zoom'
 
   //
-  // TIME CONFIG
-  // true => LT
-  // false => UTC
+  // Настройки времени
+  // true означает локальное время (LT)
+  // false означает UTC
   private readonly DEFAULT_IS_LOCAL_TIME: boolean = true
   private readonly LS_KEY_IS_LOCAL_TIME: string = 'endge:isLocalTime'
 
-  // STATE
+  // Состояние
   private _zoom: number
   private _theme: string
   private _isLocalTime: boolean
@@ -49,7 +49,7 @@ export class EndgeUI extends EndgeModule {
   }
 
   //
-  // SNAPSHOT
+  // Снимок состояния
   //
   /**
    * Возвращает полный snapshot UI-настроек.
@@ -67,7 +67,7 @@ export class EndgeUI extends EndgeModule {
   }
 
   //
-  // ZOOM
+  // Масштаб
   //
   /**
    * Возвращает текущий процент zoom.
@@ -150,7 +150,7 @@ export class EndgeUI extends EndgeModule {
   }
 
   //
-  // THEME
+  // Тема
   //
   /**
    * Возвращает текущую тему.
@@ -223,7 +223,7 @@ export class EndgeUI extends EndgeModule {
   }
 
   //
-  // TIME
+  // Время
   //
   /**
    * Показывает, используется ли локальное время вместо UTC.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { compileDataViewSource } from '@/model/services/source-engine/data-view-source-compile'
+import { compileDataViewSource } from '@/model/services/source-engine/compilers/data-view-source-compile'
 import type { DataViewProgramPayload } from '@/domain/types/program/program.types'
 
 describe('DataView incremental compiler', () => {

@@ -16,7 +16,7 @@ import { Endge } from '@/model/endge/kernel/endge'
  */
 export class EndgeFlow extends EndgeModule {
   /*
-   * PUBLIC
+   * Публичные операции
    */
 
   /**
@@ -458,7 +458,7 @@ export class EndgeFlow extends EndgeModule {
   }
 
   /*
-   * PRIVATE
+   * Внутренние операции
    */
 
   /** Создаёт пустой flow-state для случаев, когда состояние ещё не инициализировано. */
@@ -537,7 +537,7 @@ export class EndgeFlow extends EndgeModule {
     const elsePortId = 'else'
 
     if (mode === 'script') {
-      // Arbitrary script conditions are no longer executed.
+      // Произвольные script conditions больше не выполняются.
       return elsePortId
     }
 
@@ -695,6 +695,7 @@ export class EndgeFlow extends EndgeModule {
     return input
   }
 
+  /** Возвращает имена props, объявленных в Query artifact. */
   private _getQueryArtifactParamNames(payload: QueryProgramPayload | null): string[] {
     return (payload?.props ?? [])
       .map(prop => String(prop.key ?? '').trim())

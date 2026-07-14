@@ -14,7 +14,7 @@ import type {
   RComponentSFC_IR_Prop,
 } from '@/domain/types/component/sfc'
 import type { ProgramMetadataMap } from '@/domain/types/program/program-metadata.types'
-import { compileProgramMetadataSource } from '@/model/services/source-engine/source-metadata-compile'
+import { compileProgramMetadataSource } from '@/model/services/source-engine/compilers/source-metadata-compile'
 
 /** Результат анализа script-секции SFC. */
 export interface ComponentSFCScriptAnalysisResult {

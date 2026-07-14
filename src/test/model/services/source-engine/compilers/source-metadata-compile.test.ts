@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { compileCompositionSource } from '@/model/services/source-engine/composition-source-compile'
-import { compileDataViewSource } from '@/model/services/source-engine/data-view-source-compile'
-import { compileFilterSource } from '@/model/services/source-engine/filter-source-compile'
-import { compileQuerySource } from '@/model/services/source-engine/query-source-compile'
+import { compileCompositionSource } from '@/model/services/source-engine/compilers/composition-source-compile'
+import { compileDataViewSource } from '@/model/services/source-engine/compilers/data-view-source-compile'
+import { compileFilterSource } from '@/model/services/source-engine/compilers/filter-source-compile'
+import { compileQuerySource } from '@/model/services/source-engine/compilers/query-source-compile'
 
 const EXPECTED_METADATA = {
   'hub.tgo': {

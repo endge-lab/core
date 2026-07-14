@@ -1,6 +1,6 @@
 import type { SourceKind, SourceLanguageCompletion, SourceLanguageContext, SourceLanguageStrategy, SourceLanguageValidationResult } from '@/domain/types/source/source-engine.types'
 
-import { compileStoreSource } from '@/model/services/source-engine/store-source-compile'
+import { compileStoreSource } from '@/model/services/source-engine/compilers/store-source-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
 import { STORE_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/store.default.source'
 

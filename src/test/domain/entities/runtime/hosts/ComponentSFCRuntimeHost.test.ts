@@ -3,7 +3,7 @@ import { Raph } from '@endge/raph'
 
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentSFCRuntimeHost'
-import { compileComponentSFC } from '@/model/services/compiler/component-sfc-compile'
+import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import type { ComponentSFCProgramPayload, ProgramArtifact } from '@/domain/types/program/program.types'
 import type {
   RuntimeBoundaryPatch,

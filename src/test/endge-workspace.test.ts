@@ -1,19 +1,9 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import { normalizeEndgeWorkspaceDefinition } from '@/domain/entities/reflect/RWorkspace'
-import {
-  DEFAULT_ENDGE_WORKSPACE,
-  getWorkspaceLocaleLabel,
-  normalizeWorkspaceLocale,
-  setActiveEndgeWorkspace,
-  supportsWorkspaceLocale,
-} from '@/model/config/endge-workspace'
+import { EndgeWorkspace } from '@/model/endge/context/endge-workspace'
 
 describe('EndgeWorkspace', () => {
-  afterEach(() => {
-    setActiveEndgeWorkspace(DEFAULT_ENDGE_WORKSPACE)
-  })
-
   it('normalizes payload workspace locales', () => {
     const workspace = normalizeEndgeWorkspaceDefinition({
       identity: 'workspace-a',
@@ -26,6 +16,8 @@ describe('EndgeWorkspace', () => {
       ],
       defaultLocale: 'kk',
       fallbackLocale: 'en',
+      sfcAdapterIds: ['native-vue'],
+      defaultSfcAdapterId: 'native-vue',
     })
 
     expect(workspace).toEqual({
@@ -47,6 +39,11 @@ describe('EndgeWorkspace', () => {
 
   it('normalizes workspace SFC adapter identifiers', () => {
     const workspace = normalizeEndgeWorkspaceDefinition({
+      identity: 'workspace-a',
+      displayName: 'Workspace A',
+      locales: [{ code: 'en', displayName: 'English', shortLabel: 'EN' }],
+      defaultLocale: 'en',
+      fallbackLocale: 'en',
       sfcAdapterIds: [' shadcn-vue ', 'customer:aodb', 'customer:aodb', ''],
       defaultSfcAdapterId: 'customer:aodb',
     })
@@ -55,29 +52,44 @@ describe('EndgeWorkspace', () => {
     expect(workspace.defaultSfcAdapterId).toBe('customer:aodb')
   })
 
-  it('uses the first available SFC adapter when the selected identifier is unavailable', () => {
-    const workspace = normalizeEndgeWorkspaceDefinition({
+  it('rejects an unavailable selected SFC adapter', () => {
+    expect(() => normalizeEndgeWorkspaceDefinition({
+      identity: 'workspace-a',
+      displayName: 'Workspace A',
+      locales: [{ code: 'en', displayName: 'English', shortLabel: 'EN' }],
+      defaultLocale: 'en',
+      fallbackLocale: 'en',
       sfcAdapterIds: ['customer:aodb'],
       defaultSfcAdapterId: 'missing',
-    })
-
-    expect(workspace.sfcAdapterIds).toEqual(['customer:aodb'])
-    expect(workspace.defaultSfcAdapterId).toBe('customer:aodb')
+    })).toThrow('defaultSfcAdapterId')
   })
 
-  it('supports object locale map and updates shared locale helpers', () => {
-    const workspace = normalizeEndgeWorkspaceDefinition({
+  it('supports object locale map through the workspace module', () => {
+    const definition = normalizeEndgeWorkspaceDefinition({
+      identity: 'workspace-a',
+      displayName: 'Workspace A',
       locales: {
         en: { nativeLabel: 'English' },
         kk: { label: 'Kazakh', nativeLabel: 'Қазақша' },
       },
       defaultLocale: 'kk',
+      fallbackLocale: 'en',
+      sfcAdapterIds: ['native-vue'],
+      defaultSfcAdapterId: 'native-vue',
     })
+    const workspace = new EndgeWorkspace()
 
-    setActiveEndgeWorkspace(workspace)
+    workspace.apply(definition)
 
-    expect(supportsWorkspaceLocale('kk')).toBe(true)
-    expect(normalizeWorkspaceLocale('missing')).toBe('kk')
-    expect(getWorkspaceLocaleLabel('kk', 'displayName')).toBe('Қазақша')
+    expect(workspace.supportsLocale('kk')).toBe(true)
+    expect(workspace.normalizeLocale('missing')).toBe('kk')
+    expect(workspace.getLocaleLabel('kk', 'displayName')).toBe('Қазақша')
+  })
+
+  it('rejects incomplete Payload workspace data', () => {
+    expect(() => normalizeEndgeWorkspaceDefinition({
+      identity: 'workspace-a',
+      displayName: 'Workspace A',
+    })).toThrow('locales')
   })
 })

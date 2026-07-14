@@ -8,11 +8,11 @@ import type { DataViewProgramPayload, ProgramArtifact } from '@/domain/types/pro
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { RDataView } from '@/domain/entities/reflect/RDataView'
-import { compileDataViewSource } from '@/model/services/source-engine/data-view-source-compile'
+import { compileDataViewSource } from '@/model/services/source-engine/compilers/data-view-source-compile'
 import { Endge } from '@/model/endge/kernel/endge'
 import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
 
-/** Runtime executor для compiled RDataView artifacts. */
+/** Модуль выполнения скомпилированных RDataView artifacts. */
 export class EndgeDataView extends EndgeModule {
   /** Выполняет DataView по id/identity/model над переданным input object. */
   public run(

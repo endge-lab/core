@@ -5,7 +5,7 @@ import type { StoreDataDescriptor, StoreSourceCompileResult } from '@/domain/typ
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
 
-import { diagnostic, propertyName, readStringArgument, unwrapExpression } from '@/model/services/source-engine/source-expression-compile'
+import { diagnostic, propertyName, readStringArgument, unwrapExpression } from '@/model/services/source-engine/compilers/source-expression-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 

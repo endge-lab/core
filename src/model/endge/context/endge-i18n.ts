@@ -2,14 +2,13 @@ import type { RI18nBundle } from '@/domain/entities/reflect/RI18nBundle'
 import type { I18nLocaleMessages, I18nMessagesOptions, I18nTranslateOptions } from '@/domain/types/i18n.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
-import { DEFAULT_ENDGE_WORKSPACE } from '@/model/config/endge-workspace'
 import { Endge } from '@/model/endge/kernel/endge'
 
 /**
  * Runtime-доступ к доменным словарям переводов.
  */
 export class EndgeI18n extends EndgeModule {
-  private _fallbackLocale = DEFAULT_ENDGE_WORKSPACE.fallbackLocale
+  private _fallbackLocale = ''
   private _offContext: (() => void) | null = null
   private _offDomain: (() => void) | null = null
   private readonly _messagesByLocale = new Map<string, Map<string, string>>()
@@ -21,7 +20,6 @@ export class EndgeI18n extends EndgeModule {
   public override setup(): void {
     this._offContext?.()
     this._offDomain?.()
-    this._fallbackLocale = Endge.workspace.fallbackLocale
     this._offContext = Endge.context.subscribe(() => this.notify())
     this._offDomain = Endge.domain.subscribe(() => this.rebuildIndexes())
   }
@@ -42,7 +40,7 @@ export class EndgeI18n extends EndgeModule {
     this._offDomain?.()
     this._offContext = null
     this._offDomain = null
-    this._fallbackLocale = DEFAULT_ENDGE_WORKSPACE.fallbackLocale
+    this._fallbackLocale = ''
     this._messagesByLocale.clear()
     this._messagesByBundle.clear()
   }
@@ -162,10 +160,12 @@ export class EndgeI18n extends EndgeModule {
     return out
   }
 
+  /** Нормализует сокращённые и полные options перевода. */
   private _normalizeOptions(options: I18nTranslateOptions | string): I18nTranslateOptions {
     return typeof options === 'string' ? { locale: options } : options
   }
 
+  /** Разбирает ключ формата `bundle:key`. */
   private _parseKey(key: string, bundle?: string): { bundle?: string, key: string } {
     const rawKey = String(key ?? '').trim()
     const separatorIndex = rawKey.indexOf(':')
@@ -183,6 +183,7 @@ export class EndgeI18n extends EndgeModule {
     }
   }
 
+  /** Ищет перевод в общем или bundle-specific index. */
   private _resolveFromIndex(key: string, locale: string, bundleIdentity?: string): string | undefined {
     if (!key || !locale)
       return undefined
@@ -193,16 +194,19 @@ export class EndgeI18n extends EndgeModule {
     return this._messagesByLocale.get(locale)?.get(key)
   }
 
+  /** Возвращает доступные translation bundles. */
   private _getBundles(includeInactive: boolean): RI18nBundle[] {
     return Endge.domain.getI18nBundles().filter(bundle => includeInactive || bundle.active !== false)
   }
 
+  /** Читает сообщения locale из одного bundle. */
   private _readLocaleMessages(bundle: RI18nBundle, locale: string): I18nLocaleMessages {
     const locales = bundle.locales ?? {}
     const messages = locales[locale]
     return messages && typeof messages === 'object' && !Array.isArray(messages) ? messages : {}
   }
 
+  /** Подставляет параметры в placeholders строки перевода. */
   private _interpolate(text: string, params?: Record<string, unknown>): string {
     if (!params)
       return text
@@ -213,6 +217,7 @@ export class EndgeI18n extends EndgeModule {
     })
   }
 
+  /** Рекурсивно объединяет деревья сообщений. */
   private _mergeMessages(target: I18nLocaleMessages, source: I18nLocaleMessages): void {
     for (const [key, value] of Object.entries(source)) {
       const prev = target[key]
@@ -232,6 +237,7 @@ export class EndgeI18n extends EndgeModule {
     }
   }
 
+  /** Возвращает или создаёт общий index для locale. */
   private _getLocaleIndex(locale: string): Map<string, string> {
     const key = String(locale ?? '').trim()
     let index = this._messagesByLocale.get(key)
@@ -242,6 +248,7 @@ export class EndgeI18n extends EndgeModule {
     return index
   }
 
+  /** Возвращает или создаёт index locale для конкретного bundle. */
   private _getBundleLocaleIndex(bundleIdentity: string, locale: string): Map<string, string> {
     let bundleIndex = this._messagesByBundle.get(bundleIdentity)
     if (!bundleIndex) {
@@ -259,6 +266,7 @@ export class EndgeI18n extends EndgeModule {
     return localeIndex
   }
 
+  /** Записывает вложенные сообщения в плоский dot-path index. */
   private _writeMessagesIndex(
     target: Map<string, string>,
     source: I18nLocaleMessages,
@@ -279,6 +287,7 @@ export class EndgeI18n extends EndgeModule {
     }
   }
 
+  /** Проверяет, является ли значение обычным object. */
   private _isPlainObject(value: unknown): value is Record<string, unknown> {
     return !!value && typeof value === 'object' && !Array.isArray(value)
   }

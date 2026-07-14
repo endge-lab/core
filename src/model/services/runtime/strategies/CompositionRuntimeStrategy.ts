@@ -1,6 +1,6 @@
 import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
-import type { RuntimeStrategy } from '@/model/services/runtime/RuntimeStrategy'
+import type { RuntimeStrategy } from '@/domain/types/runtime/runtime-strategy.types'
 
 export class CompositionRuntimeStrategy implements RuntimeStrategy<RComposition, CompositionRuntimeHost> {
   public readonly id = 'runtime:composition'

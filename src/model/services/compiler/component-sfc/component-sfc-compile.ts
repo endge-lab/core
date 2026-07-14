@@ -18,11 +18,11 @@ import type {
   RComponentSFC_RuntimeDependencies,
 } from '@/domain/types/component/sfc'
 import type { ProgramMetadata } from '@/domain/types/program/program-metadata.types'
-import { parseComponentSFC } from '@/model/services/compiler/component-sfc-parse'
-import { analyzeComponentSFCScript } from '@/model/services/compiler/component-sfc-script'
-import { analyzeComponentSFCRuntimeDependencies } from '@/model/services/compiler/component-sfc-dependencies'
-import { compileComponentSFCStyle } from '@/model/services/compiler/component-sfc-style'
-import { compileComponentSFCTemplate } from '@/model/services/compiler/component-sfc-template'
+import { parseComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-parse'
+import { analyzeComponentSFCScript } from '@/model/services/compiler/component-sfc/component-sfc-script'
+import { analyzeComponentSFCRuntimeDependencies } from '@/model/services/compiler/component-sfc/component-sfc-dependencies'
+import { compileComponentSFCStyle } from '@/model/services/compiler/component-sfc/component-sfc-style'
+import { compileComponentSFCTemplate } from '@/model/services/compiler/component-sfc/component-sfc-template'
 import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component/sfc'
 import { createEmptyProgramMetadata } from '@/domain/types/program/program-metadata.types'
 

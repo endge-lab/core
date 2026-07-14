@@ -14,7 +14,7 @@ import {
   propertyName,
   readStringArgument,
   unwrapExpression,
-} from '@/model/services/source-engine/source-expression-compile'
+} from '@/model/services/source-engine/compilers/source-expression-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 

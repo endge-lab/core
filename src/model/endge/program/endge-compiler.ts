@@ -24,7 +24,7 @@ import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { RStore } from '@/domain/entities/reflect/RStore'
-import { compileComponentSFC } from '@/model/services/compiler/component-sfc-compile'
+import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import { ENDGE_COMPILER_VERSION } from '@/model/config/compiler'
 import { ENDGE_LOG_LANES } from '@/model/config/debug'
 import { Endge } from '@/model/endge/kernel/endge'
@@ -109,11 +109,13 @@ export class EndgeCompiler extends EndgeModule {
     return this.compileEntity('store', entity, context) as ProgramArtifact<StoreSourceArtifact>
   }
 
+  /** Компилирует один Filter source в Endge.program. */
   public buildFilter(entity: RFilter): ProgramArtifact<FilterProgramPayload> {
     const context: ProgramCompileContext = { compilerVersion: ENDGE_COMPILER_VERSION }
     return this.compileEntity('filter', entity, context) as ProgramArtifact<FilterProgramPayload>
   }
 
+  /** Компилирует один Composition source в Endge.program. */
   public buildComposition(entity: RComposition): ProgramArtifact<CompositionProgramPayload> {
     const context: ProgramCompileContext = { compilerVersion: ENDGE_COMPILER_VERSION }
     return this.compileEntity('composition', entity, context) as ProgramArtifact<CompositionProgramPayload>
@@ -488,6 +490,7 @@ export class EndgeCompiler extends EndgeModule {
     return key == null ? { kind: 'full' } : { kind: 'collection-by-key', key }
   }
 
+  /** Рекурсивно ищет локальный DataView artifact среди дочерних artifacts. */
   private _findDataViewChild(
     children: ProgramArtifact[],
     id: string | number,
@@ -1146,7 +1149,7 @@ export class EndgeCompiler extends EndgeModule {
   /**
    * Строит стабильную ссылку artifact на исходную доменную сущность.
    *
-   * Ref используется diagnostics, indexes и read-model lookups.
+   * Ссылка используется для diagnostics, indexes и поиска в read-model.
    */
   private _makeRef(entity: any, entityType: ProgramEntityType): ProgramArtifactRef {
     const id = entity?.id ?? entity?.identity ?? entity?.name ?? ''
@@ -1281,7 +1284,7 @@ export class EndgeCompiler extends EndgeModule {
   /**
    * Возвращает короткий deterministic hash для source snapshot artifact.
    *
-   * Hash не является криптографическим; он нужен только как дешевый marker
+   * Хеш не является криптографическим; он нужен только как дешёвый marker
    * изменения входных данных компиляции.
    */
   private _hashString(value: string): string {

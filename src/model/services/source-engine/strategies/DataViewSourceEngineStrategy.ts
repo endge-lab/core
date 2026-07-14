@@ -6,7 +6,7 @@ import type {
   SourceKind,
 } from '@/domain/types/source/source-engine.types'
 
-import { compileDataViewSource } from '@/model/services/source-engine/data-view-source-compile'
+import { compileDataViewSource } from '@/model/services/source-engine/compilers/data-view-source-compile'
 
 /** Source strategy для RDataView/source-kind=data-view. */
 export class DataViewSourceEngineStrategy implements SourceEngineStrategy {

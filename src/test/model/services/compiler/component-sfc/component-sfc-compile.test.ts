@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { compileComponentSFC } from '@/model/services/compiler/component-sfc-compile'
+import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 
 describe('compileComponentSFC', () => {
   it('extracts preview props without changing the component contract', () => {

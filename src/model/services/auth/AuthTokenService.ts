@@ -2,10 +2,10 @@ import { EndgeApi, makeForm } from '@/domain/entities/endge/EndgeApi'
 import type { KeycloakTokenResponse } from '@/domain/types/auth/auth.types'
 
 /**
- * Лёгкий клиент Keycloak-совместимого токен-эндпоинта.
+ * Service токен-операций для Keycloak-совместимого endpoint.
  * Работает поверх EndgeApi (form-urlencoded).
  */
-export class AuthService {
+export class AuthTokenService {
   constructor(
     private readonly api: EndgeApi,
     private readonly clientId: string,
@@ -23,7 +23,7 @@ export class AuthService {
       Accept: 'application/json',
       ...(opts.headers ?? {}),
     })
-    return new AuthService(
+    return new AuthTokenService(
       api,
       opts.clientId,
       opts.scope ?? 'openid profile email',
@@ -77,3 +77,6 @@ export class AuthService {
     )
   }
 }
+
+/** @deprecated Use AuthTokenService. */
+export { AuthTokenService as AuthService }

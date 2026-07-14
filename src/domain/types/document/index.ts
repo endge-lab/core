@@ -1,5 +1,6 @@
 export * from './codegen.types'
 export * from './document.types'
+export * from './document-draft.type'
 export * from './domain-export.type'
 export * from './filter.types'
 export * from './navigation.types'

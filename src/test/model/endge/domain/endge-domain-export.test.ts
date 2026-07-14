@@ -8,7 +8,7 @@ import type { REntity } from '@/domain/entities/reflect/REntity'
 import { QueryType } from '@/domain/types/document/document.types'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RStore } from '@/domain/entities/reflect/RStore'
-import { DEFAULT_ENDGE_WORKSPACE } from '@/model/config/endge-workspace'
+import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 import { Endge } from '@/model/endge/kernel/endge'
 import { EndgeDomain } from '@/model/endge/domain/endge-domain'
 
@@ -94,7 +94,7 @@ describe('Endge domain export', () => {
 
   it('builds a workspace-aware bundle that can restore the domain', () => {
     const workspace = {
-      ...DEFAULT_ENDGE_WORKSPACE,
+      ...TEST_ENDGE_WORKSPACE,
       identity: 'workspace-export-test',
       displayName: 'Workspace export test',
       vars: [{ name: 'apiBaseUrl', defaultValue: '/api/test' }],

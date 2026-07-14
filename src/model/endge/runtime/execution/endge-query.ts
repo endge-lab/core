@@ -5,7 +5,7 @@ import axios from 'axios'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { Endge } from '@/model/endge/kernel/endge'
-import { QueryExecutor_Service } from '@/model/services/QueryExecutor_Service'
+import { QueryExecutor } from '@/model/services/query/QueryExecutor'
 import type { QueryProgramPayload } from '@/domain/types/program/program.types'
 import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
 
@@ -13,7 +13,7 @@ import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRunt
  * Модуль выполнения доменных query: custom executor, mock data и REST.
  */
 export class EndgeQuery extends EndgeModule {
-  private readonly executor: QueryExecutor_Service
+  private readonly executor: QueryExecutor
 
   /**
    * Создает query runner с переданным или дефолтным axios instance.
@@ -24,7 +24,7 @@ export class EndgeQuery extends EndgeModule {
     }),
   ) {
     super()
-    this.executor = new QueryExecutor_Service(this.http)
+    this.executor = new QueryExecutor(this.http)
   }
 
   /**
