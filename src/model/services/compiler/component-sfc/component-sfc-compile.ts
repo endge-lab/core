@@ -59,8 +59,20 @@ export interface ComponentSFCCompileResult {
   metadata: ProgramMetadata
 }
 
+/** Внешний registry-контекст, который связывает чистый SFC compiler с domain build. */
+export interface ComponentSFCCompileOptions {
+  /** Разрешает прямой пользовательский tag в identity компонента. */
+  resolveComponentTag?: (tag: string) => string | null
+
+  /** Проверяет существование статической identity из Component is. */
+  hasComponentIdentity?: (identity: string) => boolean
+}
+
 /** Компилирует Endge SFC source до target-neutral artifact для Endge.program. */
-export function compileComponentSFC(source: string): ComponentSFCCompileResult {
+export function compileComponentSFC(
+  source: string,
+  options: ComponentSFCCompileOptions = {},
+): ComponentSFCCompileResult {
   const parseResult = parseComponentSFC(source)
   const diagnostics = [...parseResult.diagnostics]
 
@@ -83,6 +95,8 @@ export function compileComponentSFC(source: string): ComponentSFCCompileResult {
   const templateResult = compileComponentSFCTemplate(parseResult.ast.template, {
     props: scriptResult.props.map(prop => prop.name),
     locals: scriptResult.locals.map(local => local.name),
+    resolveComponentTag: options.resolveComponentTag,
+    hasComponentIdentity: options.hasComponentIdentity,
   })
   const styleResult = compileComponentSFCStyle(parseResult.ast.style)
 

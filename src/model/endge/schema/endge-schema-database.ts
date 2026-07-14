@@ -244,6 +244,12 @@ function normalizeComponentSFCTargets(raw: unknown): Array<'dom' | 'canvas'> {
   return targets.length ? Array.from(new Set(targets)) : ['dom', 'canvas']
 }
 
+/** Нормализует пустое значение в отсутствие опционального SFC tag. */
+function normalizeOptionalComponentSFCTag(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null
+  return raw.trim() || null
+}
+
 /** Возвращает root-папку раздела "Компоненты" для SFC-документов. */
 async function resolveDefaultComponentFolder(repos: RepositoriesBag): Promise<number | string | null> {
   const rootFolder = await repos.folders.findByIdentity('root-components')
@@ -2611,6 +2617,7 @@ export class EndgeSchemaStorage extends EndgeModule {
       saved = await repos.components.upsert(data as any)
     }
     else if (documentType === ComponentType.SFC) {
+      data.tag = normalizeOptionalComponentSFCTag(data.tag)
       data.source = typeof data.source === 'string' ? data.source : ''
       data.supportedTargets = normalizeComponentSFCTargets(data.supportedTargets)
       data.modelVersion = Number(data.modelVersion ?? 1)
@@ -2830,6 +2837,7 @@ export class EndgeSchemaStorage extends EndgeModule {
       const folder = component.folderId ?? relationToId(fallbackFolder) ?? null
       const saved = await repos.componentSFCs.upsert({
         identity: component.identity,
+        tag: normalizeOptionalComponentSFCTag(component.tag),
         displayName: component.displayName ?? component.name ?? component.identity,
         folder,
         project: component.project ?? null,
@@ -4412,6 +4420,7 @@ export class EndgeSchemaStorage extends EndgeModule {
       kind: 'component-sfc',
       type: ComponentType.SFC,
       sourceKind: 'component-sfc',
+      tag: normalizeOptionalComponentSFCTag(raw.tag),
       source: typeof raw.source === 'string' ? raw.source : '',
       supportedTargets: normalizeComponentSFCTargets(raw.supportedTargets),
       modelVersion: Number(raw.modelVersion ?? 1),

@@ -26,6 +26,10 @@ export class RComponentSFC extends RComponentCore {
   @Expose()
   source: string = ''
 
+  /** Опциональный пользовательский tag для прямого вызова компонента из SFC template. */
+  @Expose()
+  tag: string | null = null
+
   constructor() {
     super()
     this.sourceKind = 'component-sfc'
@@ -57,6 +61,7 @@ export class RComponentSFC extends RComponentCore {
     copy.displayName = options.name ?? this.displayName
     copy.folderId = null
     copy.source = this.source
+    copy.tag = null
     return copy
   }
 
@@ -79,6 +84,7 @@ export class RComponentSFC extends RComponentCore {
       modelVersion: this.modelVersion,
       supportedTargets: [...this.supportedTargets],
       source: this.source,
+      tag: this.tag,
     }
   }
 
@@ -99,6 +105,7 @@ export class RComponentSFC extends RComponentCore {
     component.meta = normalizeMeta(raw?.meta)
     component.modelVersion = Number(raw?.modelVersion ?? 1)
     component.supportedTargets = normalizeTargets(raw?.supportedTargets)
+    component.tag = normalizeTag(raw?.tag)
     component.source = typeof raw?.source === 'string'
       ? raw.source
       : sourceParts
@@ -108,6 +115,12 @@ export class RComponentSFC extends RComponentCore {
 
     return component
   }
+}
+
+/** Нормализует опциональный пользовательский tag без навязывания namespace. */
+function normalizeTag(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null
+  return raw.trim() || null
 }
 
 /** Нормализует ссылку на проект из Payload relation или plain-значения. */

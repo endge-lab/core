@@ -9,6 +9,7 @@ import type {
   ProgramArtifact,
   ProgramArtifactRef,
   ProgramArtifactStatus,
+  ComponentSFCTagRegistryEntry,
   ProgramDiagnostic,
   ProgramEntityType,
   QueryProgramPayload,
@@ -22,6 +23,7 @@ type ProgramArtifactKey = string
 export class EndgeProgram extends EndgeModule {
   private _artifacts = new Map<ProgramArtifactKey, ProgramArtifact>()
   private _indexByIdentity = new Map<ProgramArtifactKey, ProgramArtifactKey>()
+  private _componentIdentityByTag = new Map<string, string>()
   private _status: ProgramArtifactStatus = 'valid'
   private _compilerVersion = '0'
 
@@ -64,6 +66,24 @@ export class EndgeProgram extends EndgeModule {
     this.setStatus(artifact.status)
     this.notify()
     return artifact
+  }
+
+  /** Заменяет build-derived registry пользовательских SFC tags. */
+  public setComponentTags(entries: readonly ComponentSFCTagRegistryEntry[]): void {
+    this._componentIdentityByTag.clear()
+    for (const entry of entries)
+      this._componentIdentityByTag.set(entry.tag, entry.identity)
+    this.notify()
+  }
+
+  /** Разрешает пользовательский SFC tag в persisted identity компонента. */
+  public resolveComponentTag(tag: string): string | null {
+    return this._componentIdentityByTag.get(tag) ?? null
+  }
+
+  /** Возвращает snapshot build-derived registry без выдачи mutable Map наружу. */
+  public getComponentTags(): ComponentSFCTagRegistryEntry[] {
+    return Array.from(this._componentIdentityByTag, ([tag, identity]) => ({ tag, identity }))
   }
 
   /**
@@ -152,6 +172,7 @@ export class EndgeProgram extends EndgeModule {
   public clear(): void {
     this._artifacts.clear()
     this._indexByIdentity.clear()
+    this._componentIdentityByTag.clear()
     this._status = 'valid'
     this.notify()
   }

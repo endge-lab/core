@@ -237,4 +237,83 @@ defineProps<{
       },
     ])
   })
+
+  it('normalizes direct user tags and Component is into one component-call IR', () => {
+    const identities = new Set(['aircraft-tail', 'aircraft-type'])
+    const result = compileComponentSFC(`<script setup lang="ts">
+defineProps<{
+  aircraft: Aircraft
+  visible: boolean
+  items: Aircraft[]
+}>()
+</script>
+
+<template>
+  <Tail if="visible" :aircraft="aircraft" />
+  <Module.SomeTag else :aircraft="aircraft" />
+  <Component is="aircraft-tail" for="item in items" :aircraft="item" />
+</template>
+`, {
+      resolveComponentTag: tag => ({
+        Tail: 'aircraft-tail',
+        'Module.SomeTag': 'aircraft-type',
+      })[tag] ?? null,
+      hasComponentIdentity: identity => identities.has(identity),
+    })
+
+    expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
+    expect(result.ir?.template.roots).toMatchObject([
+      {
+        kind: 'element',
+        tag: 'Component',
+        props: {
+          is: { kind: 'literal', value: 'aircraft-tail' },
+          aircraft: { kind: 'expression', source: 'aircraft' },
+        },
+        directives: { if: { kind: 'expression', source: 'visible' } },
+      },
+      {
+        kind: 'element',
+        tag: 'Component',
+        props: {
+          is: { kind: 'literal', value: 'aircraft-type' },
+        },
+        directives: { else: true },
+      },
+      {
+        kind: 'element',
+        tag: 'Component',
+        props: {
+          is: { kind: 'literal', value: 'aircraft-tail' },
+          aircraft: { kind: 'expression', source: 'item' },
+        },
+        directives: {
+          for: {
+            item: 'item',
+            source: { kind: 'expression', source: 'items' },
+          },
+        },
+      },
+    ])
+    expect(result.dependencies.components).toEqual([
+      { source: 'component-sfc', id: 'aircraft-tail' },
+      { source: 'component-sfc', id: 'aircraft-type' },
+      { source: 'component-sfc', id: 'aircraft-tail' },
+    ])
+  })
+
+  it('reports unknown direct tags and missing static Component identities', () => {
+    const result = compileComponentSFC(`<template>
+  <Unknown.Tag />
+  <Component is="missing-component" />
+</template>`, {
+      resolveComponentTag: () => null,
+      hasComponentIdentity: () => false,
+    })
+
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'sfc-template-component-tag-unknown' }),
+      expect.objectContaining({ code: 'sfc-template-component-missing' }),
+    ]))
+  })
 })

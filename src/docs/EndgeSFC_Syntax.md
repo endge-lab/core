@@ -2,7 +2,7 @@
 
 Документ фиксирует начальный набор тегов, атрибутов и стилей для нового Endge SFC-синтаксиса.
 
-Статус: проектный v1-контракт для будущего compiler/runtime pipeline. Синтаксис ориентирован на компоненты внутри ячеек таблиц и должен компилироваться в общий Endge SFC IR, который DOM и Nova renderer-слои смогут использовать каждый своим способом.
+Статус: действующий v1-контракт compiler/runtime pipeline. Синтаксис ориентирован на компоненты внутри ячеек таблиц и компилируется в общий Endge SFC IR, который DOM и Canvas renderer-слои могут использовать каждый своим способом.
 
 ## Базовая структура
 
@@ -492,11 +492,12 @@ DOM renderer сопоставляет типы так: `String → text`, `Numbe
 
 ## `Component`
 
-Встраивает другой доменный компонент по стабильной identity. Используется для переиспользования table-cell компонентов и постепенной миграции legacy DSL/SFC.
+Встраивает другой SFC-компонент по стабильной identity. Все props и Endge control-flow directives компилируются так же, как у visual primitives.
 
 ```vue
 <Component is="flight-status-badge" :flight="flight" />
 <Component is="best-time-horizontal-departure" :flight="flight" :compact="compact" />
+<Component is="flight-status-badge" for="flight in flights" :flight="flight" />
 ```
 
 Атрибуты:
@@ -507,7 +508,21 @@ DOM renderer сопоставляет типы так: `String → text`, `Numbe
 | `:is` | expression | Динамическая ссылка на identity. Использовать осторожно: сложнее валидировать dependencies. |
 | `:propName` | expression | Передача входа во вложенный компонент. |
 | `propName` | string | Статическое значение входа. |
-| `fallback` | string | Текст или renderer fallback, если компонент не найден. |
+
+Статическая `is` проверяется во время build. Динамическая `:is` разрешается runtime-ом и поэтому не может дать полную compile-time dependency validation.
+
+### Прямой пользовательский tag
+
+У SFC-компонента можно сохранить опциональное поле `tag`. Оно не обязано иметь namespace: валидны и `Tail`, и dotted form `Module.SomeTag`.
+
+```vue
+<Tail :aircraft="flight.aircraft" />
+<Module.SomeTag if="flight.aircraft" :value="flight.aircraft.type" />
+```
+
+Build сначала строит registry `tag -> component identity`, затем компилирует templates. Прямой tag нормализуется в тот же IR-узел `Component` с `is=<identity>`, поэтому props, `if`, `else-if`, `else`, `for` и `:key` не требуют отдельной реализации.
+
+Поле `tag` опционально. Tags сравниваются с учетом регистра. Повторяющийся tag и конфликт с built-in primitive (`Text`, `Flex`, `Component`, `Table` и другими) являются build errors. Такие документы можно сохранить, чтобы конфликт можно было исправить в редакторе.
 
 `id` не используется для ссылки на доменный компонент, чтобы не смешивать DOM id, Payload id и stable identity.
 

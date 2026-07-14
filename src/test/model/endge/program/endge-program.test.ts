@@ -42,6 +42,24 @@ describe('EndgeProgram', () => {
     expect(snapshot.byEntityType.action).toBe(1)
     expect(snapshot.diagnostics).toHaveLength(1)
   })
+
+  it('stores component tag registry only for the active compile cycle', () => {
+    const program = new EndgeProgram()
+    program.beginCompile('test')
+    program.setComponentTags([
+      { tag: 'Tail', identity: 'aircraft-tail' },
+      { tag: 'Module.SomeTag', identity: 'aircraft-type' },
+    ])
+
+    expect(program.resolveComponentTag('Tail')).toBe('aircraft-tail')
+    expect(program.getComponentTags()).toEqual([
+      { tag: 'Tail', identity: 'aircraft-tail' },
+      { tag: 'Module.SomeTag', identity: 'aircraft-type' },
+    ])
+
+    program.clear()
+    expect(program.resolveComponentTag('Tail')).toBeNull()
+  })
 })
 
 function makeArtifact(

@@ -253,6 +253,15 @@ export interface ComponentSFCProgramPayload {
   ir: RComponentSFC_IR | null
 }
 
+/** Одна запись build-derived registry пользовательских SFC tags. */
+export interface ComponentSFCTagRegistryEntry {
+  /** Пользовательский tag, доступный в template. */
+  tag: string
+
+  /** Identity persisted SFC-компонента, на который разрешается tag. */
+  identity: string
+}
+
 export type ComponentSFCPreviewLiteral
   = | null
     | string

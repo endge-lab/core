@@ -2,6 +2,7 @@ import type { AxiosInstance } from 'axios'
 
 export interface ComponentSFCRepositoryPayload {
   identity: string
+  tag?: string | null
   displayName: string
   folder?: string | number | null
   project?: string | number | null

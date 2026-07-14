@@ -5,6 +5,7 @@ import type { CompositionProgramPayload } from '@/domain/types/source/compositio
 import type { StoreSourceArtifact } from '@/domain/types/source/store-source.types'
 import type {
   ComponentSFCProgramPayload,
+  ComponentSFCTagRegistryEntry,
   DataViewProgramPayload,
   EntityCompilerHandler,
   ProgramArtifact,
@@ -25,6 +26,7 @@ import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { RStore } from '@/domain/entities/reflect/RStore'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
+import { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sfc/component-sfc-template'
 import { ENDGE_COMPILER_VERSION } from '@/model/config/compiler'
 import { ENDGE_LOG_LANES } from '@/model/config/debug'
 import { Endge } from '@/model/endge/kernel/endge'
@@ -38,6 +40,7 @@ export class EndgeCompiler extends EndgeModule {
   private readonly handlers = new Map<ProgramEntityType, EntityCompilerHandler<any, any>>()
   private _localDataViewCounter = 0
   private _localFilterCounter = 0
+  private _componentTagDiagnosticsByIdentity = new Map<string, Omit<ProgramDiagnostic, 'entityRef'>[]>()
 
   /**
    * Создает singleton-bound compiler module и регистрирует стандартные handlers.
@@ -59,11 +62,13 @@ export class EndgeCompiler extends EndgeModule {
   public override build(_ctx: EndgeBootContext): void {
     const dbg = Endge.debug
     const context: ProgramCompileContext = { compilerVersion: ENDGE_COMPILER_VERSION }
+    const componentSFCs = Endge.domain.getComponentSFCs()
 
     Endge.program.beginCompile(ENDGE_COMPILER_VERSION)
+    this._prepareComponentTagRegistry(componentSFCs)
     dbg.startTrace('compile', 'info')
 
-    if (!this.compilePhase('component-sfc', ENDGE_LOG_LANES.COMPONENTS, 'SFC-компонентов', Endge.domain.getComponentSFCs(), context))
+    if (!this.compilePhase('component-sfc', ENDGE_LOG_LANES.COMPONENTS, 'SFC-компонентов', componentSFCs, context))
       return
 
     if (!this.compilePhase('data-view', ENDGE_LOG_LANES.QUERIES, 'data views', Endge.domain.getDataViews(), context))
@@ -195,7 +200,10 @@ export class EndgeCompiler extends EndgeModule {
     this.registerHandler<RComponentSFC, ComponentSFCProgramPayload>({
       entityType: 'component-sfc',
       compile: (entity, context) => {
-        const result = compileComponentSFC(entity.source)
+        const result = compileComponentSFC(entity.source, {
+          resolveComponentTag: tag => Endge.program.resolveComponentTag(tag),
+          hasComponentIdentity: identity => Endge.domain.getComponentSFC(identity) != null,
+        })
         return this._makeArtifact(entity, 'component-sfc', context, {
           capabilities: ['compilable', 'runnable', 'renderable'],
           metadata: result.metadata,
@@ -209,7 +217,10 @@ export class EndgeCompiler extends EndgeModule {
             ast: result.ast,
             ir: result.ir,
           },
-          diagnostics: result.diagnostics,
+          diagnostics: [
+            ...(this._componentTagDiagnosticsByIdentity.get(entity.identity) ?? []),
+            ...result.diagnostics,
+          ],
         })
       },
     })
@@ -394,6 +405,67 @@ export class EndgeCompiler extends EndgeModule {
         })
       },
     })
+  }
+
+  /**
+   * Строит registry пользовательских SFC tags до компиляции templates.
+   *
+   * В registry попадают только однозначные tags. Конфликты остаются persisted,
+   * но превращают artifacts всех владельцев tag в error на build-фазе.
+   */
+  private _prepareComponentTagRegistry(components: RComponentSFC[]): void {
+    this._componentTagDiagnosticsByIdentity.clear()
+    const componentsByTag = new Map<string, RComponentSFC[]>()
+
+    for (const component of components) {
+      const tag = typeof component.tag === 'string' ? component.tag.trim() : ''
+      if (!tag) continue
+      const owners = componentsByTag.get(tag) ?? []
+      owners.push(component)
+      componentsByTag.set(tag, owners)
+    }
+
+    const entries: ComponentSFCTagRegistryEntry[] = []
+    for (const [tag, owners] of componentsByTag) {
+      if (isComponentSFCBuiltInTag(tag)) {
+        for (const owner of owners) {
+          this._addComponentTagDiagnostic(owner.identity, {
+            severity: 'error',
+            code: 'component-sfc-tag-reserved',
+            message: `SFC tag "${tag}" совпадает со встроенным primitive и не может быть зарегистрирован.`,
+            sourcePath: 'tag',
+          })
+        }
+        continue
+      }
+
+      if (owners.length > 1) {
+        const identities = owners.map(owner => owner.identity).join(', ')
+        for (const owner of owners) {
+          this._addComponentTagDiagnostic(owner.identity, {
+            severity: 'error',
+            code: 'component-sfc-tag-duplicate',
+            message: `SFC tag "${tag}" повторяется у компонентов: ${identities}.`,
+            sourcePath: 'tag',
+          })
+        }
+        continue
+      }
+
+      entries.push({ tag, identity: owners[0].identity })
+    }
+
+    Endge.program.setComponentTags(entries)
+  }
+
+  /** Добавляет build diagnostic владельцу persisted SFC tag. */
+  private _addComponentTagDiagnostic(
+    identity: string,
+    diagnostic: Omit<ProgramDiagnostic, 'entityRef'>,
+  ): void {
+    const diagnostics = this._componentTagDiagnosticsByIdentity.get(identity) ?? []
+    diagnostics.push(diagnostic)
+    this._componentTagDiagnosticsByIdentity.set(identity, diagnostics)
   }
 
   /**
@@ -1219,6 +1291,7 @@ export class EndgeCompiler extends EndgeModule {
       name: entity?.name ?? null,
       type: entity?.type ?? null,
       kind: entity?.kind ?? null,
+      tag: entity?.tag ?? null,
       source: entity?.source ?? null,
       sourceVersion: entity?.sourceVersion ?? null,
       definition: entity?.definition ?? null,

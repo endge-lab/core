@@ -29,6 +29,12 @@ export interface ComponentSFCTemplateCompileContext {
 
   /** Имена locals для классификации expression reads. */
   locals: string[]
+
+  /** Разрешает зарегистрированный пользовательский tag в identity компонента. */
+  resolveComponentTag?: (tag: string) => string | null
+
+  /** Проверяет статическую identity из Component is. */
+  hasComponentIdentity?: (identity: string) => boolean
 }
 
 /** Результат компиляции template в IR. */
@@ -46,7 +52,7 @@ export interface ComponentSFCTemplateCompileResult {
   metadata: ProgramNodeMetadata[]
 }
 
-const ALLOWED_TAGS = new Set<RComponentSFC_IR_Tag>([
+const ENDGE_SFC_BUILT_IN_TAGS = new Set<RComponentSFC_IR_Tag>([
   'Text',
   'DateTime',
   'Number',
@@ -68,6 +74,11 @@ const ALLOWED_TAGS = new Set<RComponentSFC_IR_Tag>([
   'MenuItem',
   'MenuSeparator',
 ])
+
+/** Проверяет, является ли tag встроенным renderer-neutral SFC primitive. */
+export function isComponentSFCBuiltInTag(tag: string): tag is RComponentSFC_IR_Tag {
+  return ENDGE_SFC_BUILT_IN_TAGS.has(tag as RComponentSFC_IR_Tag)
+}
 
 /** Компилирует AST template в renderer-neutral Endge SFC IR. */
 export function compileComponentSFCTemplate(
@@ -164,11 +175,16 @@ function compileElementNode(
   metadata: ProgramNodeMetadata[],
   diagnostics: RComponentDiagnostic[],
 ): RComponentSFC_IR_ElementNode | null {
-  if (!ALLOWED_TAGS.has(node.tag as RComponentSFC_IR_Tag)) {
+  const isBuiltIn = isComponentSFCBuiltInTag(node.tag)
+  const directComponentIdentity = isBuiltIn
+    ? null
+    : context.resolveComponentTag?.(node.tag) ?? null
+
+  if (!isBuiltIn && !directComponentIdentity) {
     diagnostics.push({
       severity: 'error',
-      code: 'sfc-template-tag-unsupported',
-      message: `SFC template tag "${node.tag}" не поддерживается в v1.`,
+      code: 'sfc-template-component-tag-unknown',
+      message: `Пользовательский SFC tag "${node.tag}" не зарегистрирован.`,
       sourcePath: 'template',
       start: node.range.start,
       end: node.range.end,
@@ -183,14 +199,29 @@ function compileElementNode(
     diagnostics,
   )
   const directives = compileDirectives(node.directives, context, diagnostics)
+  const tag: RComponentSFC_IR_Tag = directComponentIdentity ? 'Component' : node.tag as RComponentSFC_IR_Tag
 
-  if (node.tag === 'Component')
-    collectComponentDependency(props.is, dependencies)
+  if (directComponentIdentity) {
+    if (props.is) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'sfc-template-direct-component-is-reserved',
+        message: `Атрибут is зарезервирован для <Component>; у прямого tag <${node.tag}> identity определяется registry.`,
+        sourcePath: 'template',
+        start: node.range.start,
+        end: node.range.end,
+      })
+    }
+    props.is = { kind: 'literal', value: directComponentIdentity }
+  }
+
+  if (tag === 'Component')
+    validateComponentCall(props.is, context, dependencies, diagnostics, node)
 
   const element: RComponentSFC_IR_ElementNode = {
     id,
     kind: 'element',
-    tag: node.tag as RComponentSFC_IR_Tag,
+    tag,
     props,
     directives,
     children: node.children
@@ -217,6 +248,53 @@ function compileElementNode(
   }
 
   return element
+}
+
+function validateComponentCall(
+  value: RComponentSFC_IR_Value | undefined,
+  context: ComponentSFCTemplateCompileContext,
+  dependencies: RComponentDependencies,
+  diagnostics: RComponentDiagnostic[],
+  node: RComponentSFC_AST_ElementNode,
+): void {
+  if (!value) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-template-component-is-required',
+      message: 'Component должен содержать is с identity компонента.',
+      sourcePath: 'template',
+      start: node.range.start,
+      end: node.range.end,
+    })
+    return
+  }
+
+  if (value.kind !== 'literal') return
+  const identity = typeof value.value === 'string' ? value.value.trim() : ''
+  if (!identity) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-template-component-is-invalid',
+      message: 'Статический Component is должен содержать непустую identity.',
+      sourcePath: 'template',
+      start: node.range.start,
+      end: node.range.end,
+    })
+    return
+  }
+
+  if (context.hasComponentIdentity && !context.hasComponentIdentity(identity)) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-template-component-missing',
+      message: `SFC-компонент с identity "${identity}" не найден.`,
+      sourcePath: 'template',
+      start: node.range.start,
+      end: node.range.end,
+    })
+  }
+
+  collectComponentDependency({ kind: 'literal', value: identity }, dependencies)
 }
 
 function compileNodeMetadata(
