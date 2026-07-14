@@ -9,6 +9,7 @@ import { QueryType } from '@/domain/types/document/document.types'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RStore } from '@/domain/entities/reflect/RStore'
 import { RMock } from '@/domain/entities/reflect/RMock'
+import { RComputation } from '@/domain/entities/reflect/RComputation'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 import { Endge } from '@/model/endge/kernel/endge'
 import { EndgeDomain } from '@/model/endge/domain/endge-domain'
@@ -50,6 +51,7 @@ describe('Endge domain export', () => {
     domain.addComposition(initializeEntity(new RComposition(), 4, 'composition'))
     domain.addStore(initializeEntity(new RStore(), 5, 'store'))
     domain.addMock(initializeEntity(new RMock(), 8, 'mock'))
+    domain.addComputation(initializeEntity(new RComputation(), 9, 'computation'))
     domain.addComponentSFC(initializeEntity(new RComponentSFC(), 6, 'component-sfc'))
     domain.addAuthProfile(initializeEntity(new RAuthProfile(), 7, 'auth-profile'))
 
@@ -62,6 +64,7 @@ describe('Endge domain export', () => {
       'componentSFCs',
       'components',
       'compositions',
+      'computations',
       'converters',
       'dataViews',
       'environments',
@@ -92,6 +95,7 @@ describe('Endge domain export', () => {
     expect(plain.compositions).toEqual([expect.objectContaining({ identity: 'composition' })])
     expect(plain.stores).toEqual([expect.objectContaining({ identity: 'store' })])
     expect(plain.mocks).toEqual([expect.objectContaining({ identity: 'mock' })])
+    expect(plain.computations).toEqual([expect.objectContaining({ identity: 'computation' })])
     expect(plain.componentSFCs).toEqual([expect.objectContaining({ identity: 'component-sfc' })])
     expect(plain.authProfiles).toEqual([expect.objectContaining({ identity: 'auth-profile' })])
   })

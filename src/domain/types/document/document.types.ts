@@ -23,6 +23,7 @@ import type { RComponent } from '@/domain/types/component/component.types'
 import type { RComposition } from '@/domain/entities/reflect/RComposition'
 import type { RStore } from '@/domain/entities/reflect/RStore'
 import type { RMock } from '@/domain/entities/reflect/RMock'
+import type { RComputation } from '@/domain/entities/reflect/RComputation'
 
 /**
  * Разновидности типов компонентов
@@ -69,6 +70,7 @@ export enum DomainSectionType {
   Mock = 'mock',
   Action = 'action',
   Converter = 'converter',
+  Computation = 'computation',
   Integration = 'integration',
   View = 'view',
   Parameters = 'parameters',
@@ -94,6 +96,7 @@ export type DomainDocumentType
     | 'type'
     | 'action'
     | 'converter'
+    | 'computation'
     | 'data-view'
     | 'composition'
     | 'store'
@@ -136,4 +139,4 @@ export interface Document {
 /**
  * Описывает любой документ рефлекцию
  */
-export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RComposition | RStore | RMock | RAction | RConverter | RIntegration | RView | RParameter | RFilter | RPolicy | RStyle | RVocabs | RI18nBundle | RAuthProfile | RWorkspace | RTenant | RBehaviorBinding | RPresentationBinding | RPageTemplate | RPage | RNavigation
+export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RComposition | RStore | RMock | RAction | RConverter | RComputation | RIntegration | RView | RParameter | RFilter | RPolicy | RStyle | RVocabs | RI18nBundle | RAuthProfile | RWorkspace | RTenant | RBehaviorBinding | RPresentationBinding | RPageTemplate | RPage | RNavigation

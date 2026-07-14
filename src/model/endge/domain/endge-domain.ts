@@ -20,6 +20,7 @@ import { RDataView } from '@/domain/entities/reflect/RDataView'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { RStore } from '@/domain/entities/reflect/RStore'
 import { RMock } from '@/domain/entities/reflect/RMock'
+import { RComputation } from '@/domain/entities/reflect/RComputation'
 import { REnvironment } from '@/domain/entities/reflect/REnvironment'
 import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { RFolder } from '@/domain/entities/reflect/RFolder'
@@ -162,6 +163,32 @@ export function mockPayloadDocToPlain(doc: any): any {
   }
 }
 
+/** Собирает plain-объект Computation из документа Payload. */
+export function computationPayloadDocToPlain(doc: any): any {
+  return {
+    id: doc?.id,
+    identity: doc?.identity,
+    name: doc?.displayName ?? doc?.name,
+    displayName: doc?.displayName ?? doc?.name,
+    description: doc?.description ?? null,
+    implementationKind: doc?.implementationKind === 'provider' ? 'provider' : 'source',
+    sourceLanguage: doc?.sourceLanguage === 'endge' ? 'endge' : 'typescript',
+    source: typeof doc?.source === 'string' ? doc.source : '',
+    providerRef: String(doc?.providerRef ?? '').trim() || null,
+    sourceVersion: Math.max(1, Number(doc?.sourceVersion ?? 1) || 1),
+    contractVersion: Math.max(1, Number(doc?.contractVersion ?? 1) || 1),
+    input: doc?.input ?? null,
+    output: doc?.output ?? null,
+    folderId: relationToId(doc?.folder ?? doc?.folderId),
+    project: relationToId(doc?.project) ?? null,
+    meta: (doc?.meta && typeof doc.meta === 'object' && !Array.isArray(doc.meta)) ? doc.meta : {},
+    active: doc?.active !== false,
+    author: doc?.author,
+    inherited: doc?.inherited === true,
+    deletedAt: doc?.deletedAt ?? null,
+  }
+}
+
 /**
  * EndgeDomain – менеджер доменных данных.
  * Он заменяет ReflectDomain и объединяет управление типами, запросами и компонентами.
@@ -180,6 +207,7 @@ export interface EndgeDomainParsed {
   compositions: RComposition[]
   stores: RStore[]
   mocks: RMock[]
+  computations: RComputation[]
   actions: RAction[]
   converters: RConverter[]
   integrations: RIntegration[]
@@ -223,6 +251,9 @@ export class EndgeDomain extends EndgeModule {
 
   private _mocksById: Map<string | number, RMock> = new Map()
   private _mocksByIdentity: Map<string, RMock> = new Map()
+
+  private _computationsById: Map<string | number, RComputation> = new Map()
+  private _computationsByIdentity: Map<string, RComputation> = new Map()
 
   private _componentsById: Map<string | number, RComponent> = new Map()
   private _componentsByIdentity: Map<string, RComponent> = new Map()
@@ -341,6 +372,8 @@ export class EndgeDomain extends EndgeModule {
     this._storesByIdentity.clear()
     this._mocksById.clear()
     this._mocksByIdentity.clear()
+    this._computationsById.clear()
+    this._computationsByIdentity.clear()
     this._componentsById.clear()
     this._componentsByIdentity.clear()
     this._componentSFCsById.clear()
@@ -424,6 +457,8 @@ export class EndgeDomain extends EndgeModule {
     const storesPlain = storesRaw.map((row: any) => storePayloadDocToPlain(row))
     const mocksRaw = Array.isArray((payload as any)?.mocks) ? (payload as any).mocks : []
     const mocksPlain = mocksRaw.map((row: any) => mockPayloadDocToPlain(row))
+    const computationsRaw = Array.isArray((payload as any)?.computations) ? (payload as any).computations : []
+    const computationsPlain = computationsRaw.map((row: any) => computationPayloadDocToPlain(row))
     const projectsRaw = Array.isArray(payload?.projects) ? payload.projects : []
     const parametersRaw = Array.isArray(payload?.parameters) ? payload.parameters : []
     const filtersRaw = Array.isArray(payload?.filters) ? payload.filters : []
@@ -462,6 +497,7 @@ export class EndgeDomain extends EndgeModule {
       compositions: compositionsPlain,
       stores: storesPlain,
       mocks: mocksPlain,
+      computations: computationsPlain,
       components: componentsRaw,
       componentSFCs: componentSFCsRaw,
       folders: Array.isArray(payload?.folders) ? payload.folders : [],
@@ -1038,6 +1074,57 @@ export class EndgeDomain extends EndgeModule {
     const mock = this.getMock(idOrIdentity)
     if (mock)
       this.removeMockById(mock.id)
+  }
+
+  /** Возвращает все Computation-документы. */
+  getComputations(): RComputation[] {
+    return Array.from(this._computationsByIdentity.values())
+  }
+
+  getComputationById(id: string | number): RComputation | null {
+    return this._computationsById.get(id) ?? null
+  }
+
+  getComputationByIdentity(identity: string): RComputation | null {
+    return this._computationsByIdentity.get(identity) ?? null
+  }
+
+  getComputation(idOrIdentity: string | number): RComputation | null {
+    return this.getComputationById(idOrIdentity)
+      ?? this.getComputationById(Number(idOrIdentity))
+      ?? this.getComputationByIdentity(String(idOrIdentity))
+  }
+
+  addComputation(computation: RComputation): void {
+    if (this._computationsByIdentity.has(computation.identity) || this._computationsById.has(computation.id))
+      return
+    this._computationsById.set(computation.id, computation)
+    this._computationsByIdentity.set(computation.identity, computation)
+    this.notify()
+  }
+
+  removeComputationById(id: string | number): void {
+    const computation = this.getComputationById(id)
+    if (!computation)
+      return
+    this._computationsById.delete(computation.id)
+    this._computationsByIdentity.delete(computation.identity)
+    this.notify()
+  }
+
+  removeComputationByIdentity(identity: string): void {
+    const computation = this.getComputationByIdentity(identity)
+    if (!computation)
+      return
+    this._computationsById.delete(computation.id)
+    this._computationsByIdentity.delete(computation.identity)
+    this.notify()
+  }
+
+  removeComputation(idOrIdentity: string | number): void {
+    const computation = this.getComputation(idOrIdentity)
+    if (computation)
+      this.removeComputationById(computation.id)
   }
 
   /**
@@ -3109,6 +3196,7 @@ export class EndgeDomain extends EndgeModule {
       compositions: persisted(this.getCompositions()).map(x => Serialize.toPlain(x)),
       stores: persisted(this.getStores()).map(x => Serialize.toPlain(x)),
       mocks: persisted(this.getMocks()).map(x => x.toPlain()),
+      computations: persisted(this.getComputations()).map(x => x.toPlain()),
       components: persisted(this.getComponents()).map(x => ReflectComponentToPlain(x)),
       componentSFCs: persisted(this.getComponentSFCs()).map(x => x.toPlain()),
       actions: persisted(this.getActions()).map(x => Serialize.toPlain(x)),
@@ -3207,6 +3295,7 @@ export class EndgeDomain extends EndgeModule {
       compositions: [],
       stores: [],
       mocks: [],
+      computations: [],
       actions: [],
       converters: [],
       integrations: [],
@@ -3265,6 +3354,9 @@ export class EndgeDomain extends EndgeModule {
     }
     if (json.mocks && Array.isArray(json.mocks)) {
       json.mocks.forEach((mockJson: any) => out.mocks.push(RMock.fromPlain(mockJson)))
+    }
+    if (json.computations && Array.isArray(json.computations)) {
+      json.computations.forEach((computationJson: any) => out.computations.push(RComputation.fromPlain(computationJson)))
     }
     if (json.actions && Array.isArray(json.actions)) {
       json.actions.forEach((actionJson: any) => out.actions.push(Serialize.fromJSON(RAction, actionJson)))
@@ -3346,6 +3438,7 @@ export class EndgeDomain extends EndgeModule {
     parsed.compositions.forEach(composition => this.addComposition(composition))
     parsed.stores.forEach(store => this.addStore(store))
     parsed.mocks.forEach(mock => this.addMock(mock))
+    parsed.computations.forEach(computation => this.addComputation(computation))
     parsed.actions.forEach(a => this.addAction(a))
     parsed.converters.forEach(c => this.addConverter(c))
     parsed.integrations.forEach(i => this.addIntegration(i))

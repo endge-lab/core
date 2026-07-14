@@ -18,6 +18,7 @@ export interface EndgeDomainPlain {
   componentSFCs: unknown[]
   actions: unknown[]
   converters: unknown[]
+  computations: unknown[]
   integrations: unknown[]
   views: unknown[]
   folders: unknown[]

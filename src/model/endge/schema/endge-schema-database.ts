@@ -20,7 +20,7 @@ import { normalizeEndgeWorkspaceDefinition } from '@/domain/entities/reflect/RWo
 import { RVersion } from '@/domain/entities/reflect/RVersion'
 import { ComponentType, FilterType, ParameterType, QueryType } from '@/domain/types/document/document.types'
 import { Endge } from '@/model/endge/kernel/endge'
-import { compositionPayloadDocToPlain, dataViewPayloadDocToPlain, mockPayloadDocToPlain, queryPayloadDocToPlain, storePayloadDocToPlain } from '@/model/endge/domain/endge-domain'
+import { compositionPayloadDocToPlain, computationPayloadDocToPlain, dataViewPayloadDocToPlain, mockPayloadDocToPlain, queryPayloadDocToPlain, storePayloadDocToPlain } from '@/model/endge/domain/endge-domain'
 import { Actions_Repository } from '@/model/db/repositories/Actions_Repository'
 import { AuthProfiles_Repository } from '@/model/db/repositories/AuthProfiles_Repository'
 import { BehaviorBindings_Repository } from '@/model/db/repositories/BehaviorBindings_Repository'
@@ -29,6 +29,7 @@ import { ComponentSFCs_Repository } from '@/model/db/repositories/ComponentSFCs_
 import { Compositions_Repository } from '@/model/db/repositories/Compositions_Repository'
 import { Stores_Repository } from '@/model/db/repositories/Stores_Repository'
 import { Mocks_Repository } from '@/model/db/repositories/Mocks_Repository'
+import { Computations_Repository } from '@/model/db/repositories/Computations_Repository'
 import { Converters_Repository } from '@/model/db/repositories/Converters_Repository'
 import { DataViews_Repository } from '@/model/db/repositories/DataViews_Repository'
 import { Environments_Repository } from '@/model/db/repositories/Environments_Repository'
@@ -62,6 +63,7 @@ const WORKSPACE_SCOPED_PAYLOAD_COLLECTIONS = new Set([
   'stores',
   'mocks',
   'converters',
+  'computations',
   'data-views',
   'environments',
   'filters',
@@ -325,6 +327,7 @@ const ROOT_FOLDER_ENTITY_TYPE_BY_IDENTITY: Record<string, string> = {
   'root-parameters': 'parameters',
   'root-filters': 'filters',
   'root-converters': 'converters',
+  'root-computations': 'computations',
   'root-integrations': 'integrations',
   'root-views': 'views',
   'root-environments': 'environments',
@@ -411,6 +414,7 @@ export class EndgeSchemaStorage extends EndgeModule {
     'parameters',
     'filters',
     'converters',
+    'computations',
     'integrations',
     'views',
     'page-templates',
@@ -678,6 +682,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         parameters: new Parameters_Repository(this.api),
         filters: new Filters_Repository(this.api),
         converters: new Converters_Repository(this.api),
+        computations: new Computations_Repository(this.api),
         integrations: new Integrations_Repository(this.api),
         views: new Views_Repository(this.api),
         versions: new Versions_Repository(this.api),
@@ -780,6 +785,7 @@ export class EndgeSchemaStorage extends EndgeModule {
       componentSFCs: [],
       actions: [],
       converters: [],
+      computations: [],
       integrations: [],
       views: [],
       vocabs: [],
@@ -1230,6 +1236,7 @@ export class EndgeSchemaStorage extends EndgeModule {
     const normalizeComposition = (raw: any) => compositionPayloadDocToPlain(raw)
     const normalizeStore = (raw: any) => storePayloadDocToPlain(raw)
     const normalizeMock = (raw: any) => mockPayloadDocToPlain(raw)
+    const normalizeComputation = (raw: any) => computationPayloadDocToPlain(raw)
 
     const normalizeFolder = (raw: any) => {
       return {
@@ -1544,6 +1551,11 @@ export class EndgeSchemaStorage extends EndgeModule {
         return rows.map(normalizeConverter)
       }),
 
+      load('computations', async () => {
+        const rows = await this.repositories!.computations.findAll()
+        return rows.map(normalizeComputation)
+      }),
+
       load('integrations', async () => {
         const rows = await this.repositories!.integrations.findAll()
         return rows.map(normalizeIntegration)
@@ -1650,6 +1662,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       return domain.getAction(documentIdOrIdentity)
     if (documentType === 'converter')
       return domain.getConverter(documentIdOrIdentity)
+    if (documentType === 'computation')
+      return domain.getComputation(documentIdOrIdentity)
     if (documentType === 'integration')
       return domain.getIntegration(documentIdOrIdentity)
     if (documentType === 'view')
@@ -1766,6 +1780,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       return repos.actions.findByIdentity(identity)
     if (documentType === 'converter')
       return repos.converters.findByIdentity(identity)
+    if (documentType === 'computation')
+      return repos.computations.findByIdentity(identity)
     if (documentType === 'integration')
       return repos.integrations.findByIdentity(identity)
     if (documentType === 'view')
@@ -1867,6 +1883,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       return repos.actions.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === 'converter')
       return repos.converters.patchFolder(documentPayloadId, folderPayloadId)
+    if (documentType === 'computation')
+      return repos.computations.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === 'integration')
       return repos.integrations.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === 'view')
@@ -1984,6 +2002,10 @@ export class EndgeSchemaStorage extends EndgeModule {
       await repos.mocks.softDelete(resolvedIdentity, folderId)
       return
     }
+    if (documentType === 'computation') {
+      await repos.computations.softDelete(resolvedIdentity, folderId)
+      return
+    }
     if (documentType === ParameterType.DefaultParameter) {
       await repos.parameters.softDelete(resolvedIdentity, folderId)
       return
@@ -2052,6 +2074,10 @@ export class EndgeSchemaStorage extends EndgeModule {
     }
     if (documentType === 'mock') {
       await repos.mocks.hardDelete(resolvedIdentity)
+      return
+    }
+    if (documentType === 'computation') {
+      await repos.computations.hardDelete(resolvedIdentity)
       return
     }
     if (documentType === ParameterType.DefaultParameter) {
@@ -2162,6 +2188,10 @@ export class EndgeSchemaStorage extends EndgeModule {
     }
     if (documentType === 'mock') {
       await repos.mocks.restore(resolvedIdentity)
+      return
+    }
+    if (documentType === 'computation') {
+      await repos.computations.restore(resolvedIdentity)
       return
     }
     if (documentType === ParameterType.DefaultParameter) {
@@ -2659,6 +2689,16 @@ export class EndgeSchemaStorage extends EndgeModule {
       data.meta = (data.meta && typeof data.meta === 'object' && !Array.isArray(data.meta)) ? data.meta : {}
       saved = await repos.mocks.upsert(data as any)
     }
+    else if (documentType === 'computation') {
+      data.implementationKind = data.implementationKind === 'provider' ? 'provider' : 'source'
+      data.sourceLanguage = data.sourceLanguage === 'endge' ? 'endge' : 'typescript'
+      data.source = typeof data.source === 'string' ? data.source : ''
+      data.providerRef = String(data.providerRef ?? '').trim() || null
+      data.sourceVersion = Math.max(1, Number(data.sourceVersion ?? 1) || 1)
+      data.contractVersion = Math.max(1, Number(data.contractVersion ?? 1) || 1)
+      data.meta = (data.meta && typeof data.meta === 'object' && !Array.isArray(data.meta)) ? data.meta : {}
+      saved = await repos.computations.upsert(data as any)
+    }
     else if (documentType === 'action') {
       saved = await repos.actions.upsert(data as any)
     }
@@ -2985,6 +3025,42 @@ export class EndgeSchemaStorage extends EndgeModule {
       const saved = !this.isMalformedPayloadDocumentId(storageId)
         ? await repos.mocks.update(storageId, payload)
         : await repos.mocks.upsert(payload)
+      this._applyPayloadDocToDomain(documentType, saved, documentId, true)
+      return
+    }
+
+    if (documentType === 'computation') {
+      const computation = ((opts?.model as any) ?? domain.getComputation(documentId)) as any
+      if (!computation)
+        throw new Error(`Вычисление не найдено: ${documentId}`)
+
+      const existing = await repos.computations.findByIdentity(computation.identity)
+      const fallbackFolder = existing?.folder ?? await resolveDefaultFolderByIdentity(repos, 'root-computations')
+      const folder = computation.folderId ?? relationToId(fallbackFolder) ?? null
+      const plain = typeof computation.toPlain === 'function' ? computation.toPlain() : computation
+      const payload = {
+        identity: String(computation.identity ?? documentId),
+        displayName: computation.displayName ?? computation.name ?? String(computation.identity ?? documentId),
+        description: computation.description ?? null,
+        folder,
+        project: computation.project ?? null,
+        implementationKind: computation.implementationKind === 'provider' ? 'provider' as const : 'source' as const,
+        sourceLanguage: computation.sourceLanguage === 'endge' ? 'endge' as const : 'typescript' as const,
+        source: typeof computation.source === 'string' ? computation.source : '',
+        providerRef: String(computation.providerRef ?? '').trim() || null,
+        sourceVersion: Math.max(1, Number(computation.sourceVersion ?? 1) || 1),
+        contractVersion: Math.max(1, Number(computation.contractVersion ?? 1) || 1),
+        input: plain.input ?? null,
+        output: plain.output ?? null,
+        meta: (computation.meta && typeof computation.meta === 'object' && !Array.isArray(computation.meta)) ? computation.meta : {},
+        active: computation.active ?? true,
+        author: computation.author ?? undefined,
+        inherited: computation.inherited === true,
+      }
+      const storageId = computation.id
+      const saved = !this.isMalformedPayloadDocumentId(storageId)
+        ? await repos.computations.update(storageId, payload)
+        : await repos.computations.upsert(payload)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -3925,6 +4001,13 @@ export class EndgeSchemaStorage extends EndgeModule {
       )
       return
     }
+    if (documentType === 'computation') {
+      removeBy(
+        x => Endge.domain.removeComputationById(x),
+        x => Endge.domain.removeComputation(x),
+      )
+      return
+    }
     if (documentType === ParameterType.DefaultParameter) {
       removeBy(
         x => Endge.domain.removeParameterById(x),
@@ -4100,6 +4183,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       return 'stores'
     if (documentType === 'mock')
       return 'mocks'
+    if (documentType === 'computation')
+      return 'computations'
     if (documentType === ParameterType.DefaultParameter)
       return 'parameters'
     if (documentType === FilterType.DefaultFilter)
@@ -4155,6 +4240,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       return storePayloadDocToPlain(raw)
     if (documentType === 'mock')
       return mockPayloadDocToPlain(raw)
+    if (documentType === 'computation')
+      return computationPayloadDocToPlain(raw)
     if (documentType === ParameterType.DefaultParameter) {
       return {
         id: raw.id,

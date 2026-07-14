@@ -21,6 +21,7 @@ import { RPresentationBinding } from '@/domain/entities/reflect/RPresentationBin
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RStore } from '@/domain/entities/reflect/RStore'
 import { RMock } from '@/domain/entities/reflect/RMock'
+import { RComputation } from '@/domain/entities/reflect/RComputation'
 import { RStyle } from '@/domain/entities/reflect/RStyle'
 import { RTenant } from '@/domain/entities/reflect/RTenant'
 import { RView } from '@/domain/entities/reflect/RView'
@@ -137,6 +138,21 @@ export class DocumentDraftFactory {
         item.contentSource = 'document'
         item.contentType = 'application/json'
         item.source = '{}'
+        if (folderId != null)
+          item.folderId = folderId
+        return item
+      }
+
+      case 'computation': {
+        const item = new RComputation()
+        item.identity = identity
+        item.name = title
+        item.displayName = title
+        item.implementationKind = 'source'
+        item.sourceLanguage = 'typescript'
+        item.source = `export default function compute(input: unknown, context: unknown): unknown {\n  return input\n}\n`
+        item.sourceVersion = 1
+        item.contractVersion = 1
         if (folderId != null)
           item.folderId = folderId
         return item

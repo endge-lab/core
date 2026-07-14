@@ -28,6 +28,7 @@ import type { Workspaces_Repository } from '@/model/db/repositories/Workspaces_R
 import type { Compositions_Repository } from '@/model/db/repositories/Compositions_Repository'
 import type { Stores_Repository } from '@/model/db/repositories/Stores_Repository'
 import type { Mocks_Repository } from '@/model/db/repositories/Mocks_Repository'
+import type { Computations_Repository } from '@/model/db/repositories/Computations_Repository'
 
 export interface EndgeSchemaDump {
   workspaces?: any[]
@@ -44,6 +45,7 @@ export interface EndgeSchemaDump {
   componentSFCs: any[]
   actions: any[]
   converters: any[]
+  computations: any[]
   integrations: any[]
   views: any[]
   vocabs: any[]
@@ -95,6 +97,7 @@ export type RepositoriesBag = {
   parameters: Parameters_Repository
   filters: Filters_Repository
   converters: Converters_Repository
+  computations: Computations_Repository
   integrations: Integrations_Repository
   views: Views_Repository
   versions: Versions_Repository

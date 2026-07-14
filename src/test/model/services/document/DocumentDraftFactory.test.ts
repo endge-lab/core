@@ -4,6 +4,7 @@ import { RAction } from '@/domain/entities/reflect/RAction'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RMock } from '@/domain/entities/reflect/RMock'
+import { RComputation } from '@/domain/entities/reflect/RComputation'
 import { ComponentType, QueryType } from '@/domain/types/document/document.types'
 import { DocumentDraftFactory } from '@/model/services/document/DocumentDraftFactory'
 
@@ -69,6 +70,26 @@ describe('DocumentDraftFactory', () => {
       source: '{}',
       folderId: 'root-mocks',
     })
+  })
+
+  it('creates a TypeScript computation draft', () => {
+    const draft = DocumentDraftFactory.create('computation', {
+      identity: 'ground-handling-cell-state',
+      name: 'Ground handling cell state',
+      folderId: 'root-computations',
+    })
+
+    expect(draft).toBeInstanceOf(RComputation)
+    expect(draft).toMatchObject({
+      identity: 'ground-handling-cell-state',
+      displayName: 'Ground handling cell state',
+      implementationKind: 'source',
+      sourceLanguage: 'typescript',
+      sourceVersion: 1,
+      contractVersion: 1,
+      folderId: 'root-computations',
+    })
+    expect((draft as RComputation).source).toContain('function compute')
   })
 
   it('rejects an empty identity', () => {
