@@ -1,6 +1,6 @@
 import { Expose } from 'class-transformer'
 
-import type { EndgeBindingMode } from '@/domain/types/resolve.types'
+import type { EndgeBindingMode } from '@/domain/types/configuration/resolve.types'
 
 import { REntity } from '@/domain/entities/reflect/REntity'
 

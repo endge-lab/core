@@ -1,4 +1,4 @@
-import type { RComponentSFCSource_Parts } from '@/domain/types/component-sfc.types'
+import type { RComponentSFCSource_Parts } from '@/domain/types/component/sfc'
 
 /** Создает пустые sourceParts для нового компонента. */
 export function createEmptySFCSourceParts(): RComponentSFCSource_Parts {

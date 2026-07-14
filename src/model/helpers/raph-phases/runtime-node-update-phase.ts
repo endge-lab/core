@@ -1,10 +1,10 @@
 import type { PhaseName, RaphPhase } from '@endge/raph'
-import type { RuntimeHost } from '@/domain/types/runtime-host.types'
+import type { RuntimeHost } from '@/domain/types/runtime/runtime-host.types'
 
 import { RaphNode } from '@endge/raph'
 
-import { RUNTIME_NODE_UPDATE_PHASE_NAME } from '@/domain/types/runtime-host.types'
-import { Endge } from '@/model/endge/endge'
+import { RUNTIME_NODE_UPDATE_PHASE_NAME } from '@/domain/types/runtime/runtime-host.types'
+import { Endge } from '@/model/endge/kernel/endge'
 
 export interface RuntimeNodeUpdatePhaseOptions {
   name?: PhaseName

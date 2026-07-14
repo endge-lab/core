@@ -4,7 +4,7 @@ import { REntity, type DuplicateOptions } from '@/domain/entities/reflect/REntit
 import type {
   RComponentRenderTarget,
   RComponentSourceKind,
-} from '@/domain/types/component-core.types'
+} from '@/domain/types/component/component-core.types'
 
 /**
  * Чистая базовая модель компонента нового поколения.

@@ -1,10 +1,10 @@
-import type { ConfigurationContract } from '@/domain/types/configuration-contract.types'
+import type { ConfigurationContract } from '@/domain/types/configuration/configuration-contract.types'
 
 import {
   ConfigurationValueType,
-} from '@/domain/types/configuration-contract.types'
-import { DomainSectionType } from '@/domain/types/document.types'
-import { EndgeFacetType, FacetedCascadeScope } from '@/domain/types/faceted-cascade'
+} from '@/domain/types/configuration/configuration-contract.types'
+import { DomainSectionType } from '@/domain/types/document/document.types'
+import { EndgeFacetType, FacetedCascadeScope } from '@/domain/types/configuration/faceted-cascade'
 
 export const NAVIGATION_CONFIGURATION_CONTRACTS: ConfigurationContract<DomainSectionType>[] = [
   {

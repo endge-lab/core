@@ -2,7 +2,7 @@ import type {
   SourceEngineCompileResult,
   SourceEngineStrategy,
   SourceKind,
-} from '@/domain/types/source-engine.types'
+} from '@/domain/types/source/source-engine.types'
 
 import { compileFilterSource } from '@/model/services/source-engine/filter-source-compile'
 

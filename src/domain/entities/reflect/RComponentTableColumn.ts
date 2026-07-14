@@ -1,15 +1,12 @@
-import type { RComponentHtml } from '@/domain/entities/reflect/RComponentHtml'
-import type { RField } from '@/domain/entities/reflect/RField'
-import type { EndgeEventBinding } from '@/domain/types/events.types'
-import type { ColumnSortConfig } from '@/domain/types/table.types'
+import type { EndgeEventBinding } from '@/domain/types/kernel/events.types'
+import type { ColumnSortConfig } from '@/domain/types/runtime/table.types'
 import type { Constructor } from '@endge/utils'
 
 import { randomString } from '@endge/utils'
 
-import { Endge } from '@/model/endge/endge'
 import { normalizeSortConfig } from '@/tools/table'
-import {ComponentType} from "@/domain/types/document.types";
-import {ColumnComponentType} from "@/domain/types/component.types";
+import { ComponentType } from '@/domain/types/document/document.types'
+import { ColumnComponentType } from '@/domain/types/component/component.types'
 
 function normalizeRelationId(value: unknown): number | null {
   if (value == null)
@@ -241,7 +238,6 @@ export class ReflectComponentTableColumnBase {
 
 export class ReflectComponentTableColumnHtml extends ReflectComponentTableColumnBase {
   template: string | null = null
-  htmlComponent: RComponentHtml | null = null
 
   toPlain(): Record<string, any> {
     return {
@@ -259,20 +255,6 @@ export class ReflectComponentTableColumnHtml extends ReflectComponentTableColumn
 export class ReflectComponentTableColumnComponent extends ReflectComponentTableColumnBase {
   // Идентификатор компонента
   componentId: number | null = null
-
-  //
-  // Возвращает входные поля связного компонента
-  getInputs(): Record<string, RField> {
-    if (!this.componentId) {
-      return {}
-    }
-    const com = Endge.domain.getComponent(this.componentId)
-    if (!com) {
-      return {}
-    }
-
-    return com.inputFields
-  }
 
   override toPlain(): Record<string, any> {
     return {

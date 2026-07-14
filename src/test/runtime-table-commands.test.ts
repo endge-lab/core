@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import type { TableColumnCommandContext } from '@/domain/types/command.types'
+import type { TableColumnCommandContext } from '@/domain/types/runtime/command.types'
 import { RuntimeCommandRegistry } from '@/domain/entities/runtime/RuntimeCommandRegistry'
 import { createTableRuntimeCommands } from '@/model/services/runtime/table-commands'
-import { TABLE_RUNTIME_COMMAND_IDS } from '@/domain/types/command.types'
+import { TABLE_RUNTIME_COMMAND_IDS } from '@/domain/types/runtime/command.types'
 
 describe('Runtime table commands', () => {
   it('runs column sort commands against the table runtime target', async () => {

@@ -1,4 +1,4 @@
-import type { RuntimeHost } from '@/domain/types/runtime-host.types'
+import type { RuntimeHost } from '@/domain/types/runtime/runtime-host.types'
 
 /**
  * Минимальная binding-scope модель runtime.

@@ -4,10 +4,10 @@ import { Raph } from '@endge/raph'
 import { RDataView } from '@/domain/entities/reflect/RDataView'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
-import { EndgeDataView } from '@/model/endge/endge-data-view'
-import { Endge } from '@/model/endge/endge'
+import { EndgeDataView } from '@/model/endge/runtime/execution/endge-data-view'
+import { Endge } from '@/model/endge/kernel/endge'
 import { QueryExecutor_Service } from '@/model/services/QueryExecutor_Service'
-import type { QuerySourceDocument } from '@/domain/types/query-source.types'
+import type { QuerySourceDocument } from '@/domain/types/source/query-source.types'
 
 describe('query output source compiler', () => {
   it('rejects legacy response block', () => {

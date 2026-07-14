@@ -1,4 +1,4 @@
-import type { EndgeWorkspaceDefinition, EndgeWorkspaceLocale } from '@/domain/types/workspace.types'
+import type { EndgeWorkspaceDefinition, EndgeWorkspaceLocale } from '@/domain/types/document/workspace.types'
 
 export const DEFAULT_ENDGE_WORKSPACE = {
   identity: 'default',

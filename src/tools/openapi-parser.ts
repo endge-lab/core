@@ -1,7 +1,7 @@
 import { parse as parseYaml } from 'yaml'
 import { RType } from '@/domain/entities/reflect/RType'
 import { RField } from '@/domain/entities/reflect/RField'
-import { Endge } from '@/model/endge/endge'
+import { Endge } from '@/model/endge/kernel/endge'
 
 /**
  * Импорт типов из OpenAPI YAML схемы

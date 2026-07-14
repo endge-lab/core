@@ -3,9 +3,9 @@ import type {
   FilterProgramPayload,
   FilterSourceCompileResult,
   FilterSourceDocument,
-} from '@/domain/types/filter-source.types'
-import type { ProgramDiagnostic } from '@/domain/types/program.types'
-import type { SourceExpressionIR, SourceFieldDefinition } from '@/domain/types/source-expression.types'
+} from '@/domain/types/source/filter-source.types'
+import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
+import type { SourceExpressionIR, SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'

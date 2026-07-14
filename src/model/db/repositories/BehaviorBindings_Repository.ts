@@ -2,7 +2,7 @@ import type { AxiosInstance } from 'axios'
 import type {
   BehaviorBindingDoc,
   BehaviorBindingWriteData,
-} from '@/domain/types/faceted-cascade'
+} from '@/domain/types/configuration/faceted-cascade'
 
 export class BehaviorBindings_Repository {
   constructor(private readonly _api: AxiosInstance) {}

@@ -1,4 +1,4 @@
-import type { SourceLanguageCompletion } from '@/domain/types/source-engine.types'
+import type { SourceLanguageCompletion } from '@/domain/types/source/source-engine.types'
 
 /** Общий vocabulary ValueExpression, подключаемый всеми domain source languages. */
 export const VALUE_EXPRESSION_FUNCTION_NAMES = [

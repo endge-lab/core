@@ -2,8 +2,8 @@ import type {
   QuerySourceDocument,
   QuerySourcePatch,
   QuerySourcePatchOperation,
-} from '@/domain/types/query-source.types'
-import type { SourcePatchResult } from '@/domain/types/source-engine.types'
+} from '@/domain/types/source/query-source.types'
+import type { SourcePatchResult } from '@/domain/types/source/source-engine.types'
 
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'

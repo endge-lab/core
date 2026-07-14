@@ -1,8 +1,8 @@
 import {
   ENDGE_SFC_RENDER_ADAPTER_PROTOCOL,
   ENDGE_SFC_RENDER_ADAPTER_PROTOCOL_VERSION,
-} from '@/domain/types/ui-render-adapter.type'
-import { UIAdapterRegistry } from '@/model/endge/ui-registry/UIAdapterRegistry'
+} from '@/domain/types/ui/ui-render-adapter.type'
+import { UIAdapterRegistry } from '@/model/endge/ui/registry/UIAdapterRegistry'
 import { describe, expect, it, vi } from 'vitest'
 
 describe('UIAdapterRegistry', () => {

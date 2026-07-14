@@ -5,7 +5,7 @@ import type {
   EndgeWorkspaceSSEAuthMode,
   EndgeWorkspaceSSEConfig,
   EndgeWorkspaceVar,
-} from '@/domain/types/workspace.types'
+} from '@/domain/types/document/workspace.types'
 
 import { Expose } from 'class-transformer'
 import { REntity } from '@/domain/entities/reflect/REntity'

@@ -1,8 +1,8 @@
-import { QueryType } from '@/domain/types/document.types'
+import { QueryType } from '@/domain/types/document/document.types'
 
 import { Expose } from 'class-transformer'
 
-import { Endge } from '@/model/endge/endge'
+import { Endge } from '@/model/endge/kernel/endge'
 import { REntity } from '@/domain/entities/reflect/REntity'
 
 /**

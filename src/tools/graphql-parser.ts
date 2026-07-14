@@ -1,6 +1,6 @@
 import type { DocumentNode, ObjectTypeDefinitionNode } from 'graphql'
 import { parse, visit } from 'graphql'
-import { Endge } from '@/model/endge/endge'
+import { Endge } from '@/model/endge/kernel/endge'
 import { RType } from '@/domain/entities/reflect/RType'
 import { RField } from '@/domain/entities/reflect/RField'
 

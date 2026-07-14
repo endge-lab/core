@@ -5,9 +5,9 @@ import type {
   EndgeResolveOptions,
   EndgeResolveSelectionMode,
   EndgeResolveSourceCommon,
-} from '@/domain/types/resolve.types'
+} from '@/domain/types/configuration/resolve.types'
 
-import { Endge } from '@/model/endge/endge'
+import { Endge } from '@/model/endge/kernel/endge'
 
 interface OwnerNode {
   ownerType: string

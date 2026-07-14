@@ -8,12 +8,12 @@ import type {
   CompositionRuntimeKind,
   CompositionSourceCompileResult,
   CompositionSourceDocument,
-} from '@/domain/types/composition-source.types'
+} from '@/domain/types/source/composition-source.types'
 import type {
   FilterViewControlDefinition,
   FilterViewControlType,
-} from '@/domain/types/filter-view.type'
-import type { ProgramDiagnostic } from '@/domain/types/program.types'
+} from '@/domain/types/ui/filter-view.type'
+import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
 
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
@@ -691,7 +691,7 @@ function validateRuntimeCycles(
   }
 }
 
-function collectExpressionReads(expression: import('@/domain/types/source-expression.types').SourceExpressionIR): Array<Extract<import('@/domain/types/source-expression.types').SourceExpressionIR, { type: 'read' }>> {
+function collectExpressionReads(expression: import('@/domain/types/source/source-expression.types').SourceExpressionIR): Array<Extract<import('@/domain/types/source/source-expression.types').SourceExpressionIR, { type: 'read' }>> {
   if (expression.type === 'read')
     return [expression]
   if (expression.type === 'operation')

@@ -1,4 +1,4 @@
-import type { AnyRuntimeStrategy } from '@/domain/types/runtime.types'
+import type { AnyRuntimeStrategy } from '@/domain/types/runtime/runtime.types'
 
 /** Реестр runtime strategy, которые EndgeRuntime использует вместо switch/if factory. */
 export class RuntimeStrategyRegistry {

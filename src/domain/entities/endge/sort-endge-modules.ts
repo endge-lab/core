@@ -1,4 +1,4 @@
-import type { EndgeModuleDescriptor } from '@/domain/types/endge-modules.types'
+import type { EndgeModuleDescriptor } from '@/domain/types/kernel/endge-modules.types'
 
 function toArray(value: string | string[] | undefined): string[] {
   if (!value)

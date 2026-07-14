@@ -1,9 +1,9 @@
-import type { RComponentDiagnostic } from '@/domain/types/component-core.types'
+import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
 import type {
   RComponentSFC_IR_ElementNode,
   RComponentSFC_IR_Value,
-} from '@/domain/types/component-sfc.types'
-import type { TableColumnPinSide } from '@/domain/types/command.types'
+} from '@/domain/types/component/sfc'
+import type { TableColumnPinSide } from '@/domain/types/runtime/command.types'
 
 export const SFC_TABLE_COLUMN_PIN_MODES = ['enabled', 'disabled'] as const
 export const SFC_TABLE_COLUMN_PIN_SIDES = ['left', 'right'] as const

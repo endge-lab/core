@@ -3,7 +3,7 @@ import { Expose } from 'class-transformer'
 
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
 import { REntity } from '@/domain/entities/reflect/REntity'
-import type { DomainDocumentType } from '@/domain/types/document.types'
+import type { DomainDocumentType } from '@/domain/types/document/document.types'
 
 export interface RPageAreaBlockSchema {
   key: string

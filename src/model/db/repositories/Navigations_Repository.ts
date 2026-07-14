@@ -1,5 +1,5 @@
 import type { AxiosInstance } from 'axios'
-import type { NavigationDoc, NavigationTreeNodeDoc } from '@/domain/types/navigation.types'
+import type { NavigationDoc, NavigationTreeNodeDoc } from '@/domain/types/document/navigation.types'
 
 export class Navigations_Repository {
   constructor(private readonly api: AxiosInstance) {}

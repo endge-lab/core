@@ -1,5 +1,5 @@
 import type { RAction } from '@/domain/entities/reflect/RAction'
-import type { ActionRuntimeHostContext, RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime-host.types'
+import type { ActionRuntimeHostContext, RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime/runtime-host.types'
 
 import { Raph, RaphNode } from '@endge/raph'
 

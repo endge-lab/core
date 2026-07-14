@@ -1,4 +1,4 @@
-import type { LogRecord } from '@/domain/types/debug/base.types'
+import type { LogRecord } from '@/domain/types/diagnostics/debug/base.types'
 
 /**
  * Простое in-memory хранилище логов с ограничением по количеству

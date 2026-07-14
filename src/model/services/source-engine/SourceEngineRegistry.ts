@@ -1,4 +1,4 @@
-import type { SourceEngineStrategy, SourceKind } from '@/domain/types/source-engine.types'
+import type { SourceEngineStrategy, SourceKind } from '@/domain/types/source/source-engine.types'
 
 /** Реестр source engine strategies, выбирающий обработчик по source-kind. */
 export class SourceEngineRegistry {

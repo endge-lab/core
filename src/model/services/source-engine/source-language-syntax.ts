@@ -1,4 +1,4 @@
-import type { SourceLanguageSyntaxDefinition } from '@/domain/types/source-engine.types'
+import type { SourceLanguageSyntaxDefinition } from '@/domain/types/source/source-engine.types'
 
 interface TypeScriptLikeSourceSyntaxOptions {
   alias: string

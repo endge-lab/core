@@ -1,5 +1,5 @@
 import { EndgeApi, makeForm } from '@/domain/entities/endge/EndgeApi'
-import type { KeycloakTokenResponse } from '@/domain/types/auth.types'
+import type { KeycloakTokenResponse } from '@/domain/types/auth/auth.types'
 
 /**
  * Лёгкий клиент Keycloak-совместимого токен-эндпоинта.

@@ -1,5 +1,5 @@
-import type { ActionCompiledFlow, ActionDefinition, ActionStepHandler, FlowHandlerContext, FlowHandlerResult, FlowValidationIssue } from '@/domain/types/action.types'
-import type { ActionFlowDefinition } from '@/domain/types/endge-flow.types'
+import type { ActionCompiledFlow, ActionDefinition, ActionStepHandler, FlowHandlerContext, FlowHandlerResult, FlowValidationIssue } from '@/domain/types/flow/action.types'
+import type { ActionFlowDefinition } from '@/domain/types/flow/endge-flow.types'
 
 import { Serialize } from '@endge/utils'
 import { Exclude, Expose, Type } from 'class-transformer'
@@ -7,7 +7,7 @@ import { Exclude, Expose, Type } from 'class-transformer'
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
 import { REntity } from '@/domain/entities/reflect/REntity'
 import { RField } from '@/domain/entities/reflect/RField'
-import { Endge } from '@/model/endge/endge'
+import { Endge } from '@/model/endge/kernel/endge'
 
 /**
  * Действие хранится как flow-описание.

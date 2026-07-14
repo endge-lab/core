@@ -1,5 +1,5 @@
-import type { RuntimeEntityModelMap, RuntimeEntityType } from '@/domain/types/runtime-entity-map.types'
-import type { RuntimeStateControllerLike } from '@/domain/types/context-persistence.types'
+import type { RuntimeEntityModelMap, RuntimeEntityType } from '@/domain/types/runtime/runtime-entity-map.types'
+import type { RuntimeStateControllerLike } from '@/domain/types/runtime/context-persistence.types'
 import type {
   RuntimeArtifactReader,
   RuntimeHost,
@@ -14,15 +14,15 @@ import type {
   RuntimeHostStatus,
   RuntimeHostUpdateBinding,
   RuntimeHostUpdateContext,
-} from '@/domain/types/runtime-host.types'
-import type { ProgramArtifact } from '@/domain/types/program.types'
-import type { RuntimeKind } from '@/domain/types/runtime.types'
+} from '@/domain/types/runtime/runtime-host.types'
+import type { ProgramArtifact } from '@/domain/types/program/program.types'
+import type { RuntimeKind } from '@/domain/types/runtime/runtime.types'
 import type { RaphNode } from '@endge/raph'
 
 import { Raph } from '@endge/raph'
 import { EventBus } from '@endge/utils'
 
-import { RUNTIME_NODE_UPDATE_PHASE_NAME } from '@/domain/types/runtime-host.types'
+import { RUNTIME_NODE_UPDATE_PHASE_NAME } from '@/domain/types/runtime/runtime-host.types'
 
 export abstract class RuntimeHostBase<
   TType extends RuntimeEntityType,
@@ -414,6 +414,7 @@ export abstract class RuntimeHostBase<
   public snapshot(): RuntimeHostSnapshot {
     return {
       id: this.id,
+      basePath: this.basePath,
       parentId: this.parent?.id ?? null,
       removedAt: null,
       runtimeType: this.runtimeType,

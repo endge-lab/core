@@ -1,4 +1,4 @@
-import type { PresentationContract } from '@/domain/types/faceted-cascade'
+import type { PresentationContract } from '@/domain/types/configuration/faceted-cascade'
 
 import { COMPONENT_PRESENTATION_CONTRACTS } from '@/model/config/contracts/presentation/component'
 import { PAGE_PRESENTATION_CONTRACTS } from '@/model/config/contracts/presentation/page'

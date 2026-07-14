@@ -1,4 +1,4 @@
-import type {KeycloakTokenResponse, StoredAuthToken} from '@/domain/types/auth.types'
+import type {KeycloakTokenResponse, StoredAuthToken} from '@/domain/types/auth/auth.types'
 import type { AxiosInstance } from 'axios'
 
 import axios from 'axios'

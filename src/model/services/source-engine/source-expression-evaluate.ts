@@ -1,4 +1,4 @@
-import type { SourceExpressionContext, SourceExpressionIR } from '@/domain/types/source-expression.types'
+import type { SourceExpressionContext, SourceExpressionIR } from '@/domain/types/source/source-expression.types'
 
 import { readPath, VALUE_EXPRESSION_OPERATIONS } from './value-expression-operations'
 

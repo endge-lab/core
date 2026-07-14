@@ -1,6 +1,6 @@
-import type { DataViewRef } from '@/domain/types/data-view-source.types'
-import type { ProgramDiagnostic } from '@/domain/types/program.types'
-import type { StoreDataDescriptor, StoreSourceCompileResult } from '@/domain/types/store-source.types'
+import type { DataViewRef } from '@/domain/types/source/data-view-source.types'
+import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
+import type { StoreDataDescriptor, StoreSourceCompileResult } from '@/domain/types/source/store-source.types'
 
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'

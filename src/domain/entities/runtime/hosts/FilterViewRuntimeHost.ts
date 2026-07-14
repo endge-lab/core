@@ -1,14 +1,14 @@
 import type { RFilter } from '@/domain/entities/reflect/RFilter'
 import type { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
-import type { CompositionFilterFieldsSlice } from '@/domain/types/composition-source.types'
-import type { FilterProgramPayload } from '@/domain/types/filter-source.types'
+import type { CompositionFilterFieldsSlice } from '@/domain/types/source/composition-source.types'
+import type { FilterProgramPayload } from '@/domain/types/source/filter-source.types'
 import type {
   FilterViewControlDefinition,
   FilterViewImplementation,
   FilterViewRenderModel,
-} from '@/domain/types/filter-view.type'
-import type { RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime-host.types'
-import type { SourceFieldDefinition } from '@/domain/types/source-expression.types'
+} from '@/domain/types/ui/filter-view.type'
+import type { RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime/runtime-host.types'
+import type { SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 
 import { Raph } from '@endge/raph'
 

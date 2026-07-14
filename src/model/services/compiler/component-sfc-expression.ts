@@ -1,10 +1,10 @@
 import { parseExpression } from '@babel/parser'
 
-import type { RComponentDiagnostic } from '@/domain/types/component-core.types'
+import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
 import type {
   RComponentSFC_IR_Read,
   RComponentSFC_IR_Value,
-} from '@/domain/types/component-sfc.types'
+} from '@/domain/types/component/sfc'
 
 /** Контекст анализа выражения SFC template/script. */
 export interface ComponentSFCExpressionContext {

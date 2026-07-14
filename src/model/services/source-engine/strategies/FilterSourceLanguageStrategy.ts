@@ -4,7 +4,7 @@ import type {
   SourceLanguageContext,
   SourceLanguageStrategy,
   SourceLanguageValidationResult,
-} from '@/domain/types/source-engine.types'
+} from '@/domain/types/source/source-engine.types'
 
 import { compileFilterSource } from '@/model/services/source-engine/filter-source-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'

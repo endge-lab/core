@@ -1,14 +1,12 @@
-import type { RuntimeEntityModelMap, RuntimeEntityType } from '@/domain/types/runtime-entity-map.types'
-import type { RuntimeHost } from '@/domain/types/runtime-host.types'
+import type { RuntimeEntityModelMap, RuntimeEntityType } from '@/domain/types/runtime/runtime-entity-map.types'
+import type { RuntimeHost } from '@/domain/types/runtime/runtime-host.types'
 
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 import { ActionRuntimeHost } from '@/domain/entities/runtime/hosts/ActionRuntimeHost'
-import { ComponentRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentRuntimeHost'
 import { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentSFCRuntimeHost'
 import { PageRuntimeHost } from '@/domain/entities/runtime/hosts/PageRuntimeHost'
 import { ProjectRuntimeHost } from '@/domain/entities/runtime/hosts/ProjectRuntimeHost'
 import { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
-import { TableRuntimeHost } from '@/domain/entities/runtime/hosts/TableRuntimeHost'
 import { ViewRuntimeHost } from '@/domain/entities/runtime/hosts/ViewRuntimeHost'
 
 export interface RuntimeHostFactoryInput<TType extends RuntimeEntityType> {
@@ -55,14 +53,6 @@ export function createRuntimeHost(
         title,
         meta,
       })
-    case 'component':
-      return new ComponentRuntimeHost({
-        id,
-        model: model as RuntimeEntityModelMap['component'],
-        entityIdentity,
-        title,
-        meta,
-      })
     case 'component-sfc':
       return new ComponentSFCRuntimeHost({
         id,
@@ -83,14 +73,6 @@ export function createRuntimeHost(
       return new ActionRuntimeHost({
         id,
         model: model as RuntimeEntityModelMap['action'],
-        entityIdentity,
-        title,
-        meta,
-      })
-    case 'table':
-      return new TableRuntimeHost({
-        id,
-        model: model as RuntimeEntityModelMap['table'],
         entityIdentity,
         title,
         meta,

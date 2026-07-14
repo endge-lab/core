@@ -1,5 +1,5 @@
 import type { AxiosInstance } from 'axios'
-import type { ActionFlowDefinition } from '@/domain/types/endge-flow.types'
+import type { ActionFlowDefinition } from '@/domain/types/flow/endge-flow.types'
 
 export interface ActionRepositoryFieldContract {
   type: number | string | null

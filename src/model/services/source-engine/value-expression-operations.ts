@@ -1,4 +1,4 @@
-import type { SourceExpressionIR, SourceExpressionOperation } from '@/domain/types/source-expression.types'
+import type { SourceExpressionIR, SourceExpressionOperation } from '@/domain/types/source/source-expression.types'
 
 export interface ValueOperationRuntime {
   evaluate: (expression: SourceExpressionIR, current?: unknown) => unknown

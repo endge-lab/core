@@ -7,7 +7,7 @@ import type {
   DiagnosticsScopeOptions,
   DiagnosticsScopeWriter,
   DiagnosticsSnapshotOptions,
-} from '@/domain/types/diagnostics.types'
+} from '@/domain/types/diagnostics/diagnostics.types'
 
 export abstract class DiagnosticsScopeHandle {
   protected _closed = false

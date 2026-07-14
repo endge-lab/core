@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { EndgeContext } from '@/model/endge/endge-context'
-import { buildRuntimeStateStorageKey, RuntimeStateController } from '@/model/endge/context/RuntimeStateController'
-import { DisabledContextAdapter } from '@/model/endge/context/adapters/DisabledContextAdapter'
-import { LocalStorageContextAdapter } from '@/model/endge/context/adapters/LocalStorageContextAdapter'
+import { EndgeContext } from '@/model/endge/context/endge-context'
+import { buildRuntimeStateStorageKey, RuntimeStateController } from '@/model/endge/context/persistence/RuntimeStateController'
+import { DisabledContextAdapter } from '@/model/endge/context/persistence/adapters/DisabledContextAdapter'
+import { LocalStorageContextAdapter } from '@/model/endge/context/persistence/adapters/LocalStorageContextAdapter'
 
 describe('EndgeContext persistence', () => {
   beforeEach(() => {

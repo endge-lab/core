@@ -1,5 +1,5 @@
 import type { RComponentTableColumn } from '@/domain/entities/reflect/RComponentTableColumn'
-import type { RComponent } from '@/domain/types/component.types'
+import type { RComponent } from '@/domain/types/component/component.types'
 
 import { Serialize } from '@endge/utils'
 
@@ -8,7 +8,7 @@ import { RComponentBase } from '@/domain/entities/reflect/RComponentBase'
 import { RComponentDSL } from '@/domain/entities/reflect/RComponentDSL'
 import { RComponentTable } from '@/domain/entities/reflect/RComponentTable'
 import { RComponentTableColumn_TypeCtor } from '@/domain/entities/reflect/RComponentTableColumn'
-import { ComponentType } from '@/domain/types/document.types'
+import { ComponentType } from '@/domain/types/document/document.types'
 
 /**
  * Создает экземпляр ComponentModel из JSON-объекта.
@@ -36,13 +36,19 @@ export function ReflectComponentFromPlain(
     table.id = base.id
     table.identity = base.identity
     table.name = base.name
+    table.displayName = base.displayName
+    table.description = base.description
+    table.kind = base.kind
     table.type = base.type
     table.folderId = base.folderId ?? null
+    table.project = base.project ?? null
+    table.isSystem = base.isSystem
     ;(table as any).group = (base as any).group ?? base.folderId
     table.inputFields = base.inputFields
+    table.setupScript = base.setupScript
     table.sourceIndex = json.sourceIndex
     table.rowSize = json.rowSize
-    table.runtimeFilters = json.runtimeFilters
+    table.runtimeFilters = base.runtimeFilters
     table.meta = (json.meta && typeof json.meta === 'object' && !Array.isArray(json.meta)) ? { ...json.meta } : (base.meta ?? {})
     table.inherited = json.inherited === true || base?.inherited === true
 
@@ -78,7 +84,7 @@ export function ReflectComponentFromPlain(
 
 export function ReflectComponentToPlain(
   component: RComponent,
-): Record<string, any> {
+): Record<string, any> | null {
   if (component.type === ComponentType.DSL) {
     return Serialize.toPlain(component)
   }
@@ -156,7 +162,7 @@ export function ReflectComponentToPayloadData(
     inherited: Boolean((component as any).inherited),
     inputFields: Object.values(component.inputFields || {}).map((f: any) => {
       const params = f.params instanceof Map
-        ? Array.from(f.params.entries()).map(([n, p]: [string, any]) => ({ name: n, type: p?.type ?? '' }))
+        ? Array.from(f.params.entries() as IterableIterator<[string, any]>).map(([n, p]) => ({ name: n, type: p?.type ?? '' }))
         : (Array.isArray(f.params) ? f.params : [])
       return {
         name: f.name,

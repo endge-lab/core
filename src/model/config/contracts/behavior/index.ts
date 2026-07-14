@@ -1,4 +1,4 @@
-import type { BehaviorContract } from '@/domain/types/faceted-cascade'
+import type { BehaviorContract } from '@/domain/types/configuration/faceted-cascade'
 
 import { COMPONENT_BEHAVIOR_CONTRACTS } from '@/model/config/contracts/behavior/component'
 import { PAGE_BEHAVIOR_CONTRACTS } from '@/model/config/contracts/behavior/page'

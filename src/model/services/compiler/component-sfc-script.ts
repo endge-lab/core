@@ -1,19 +1,19 @@
 import { parse as parseTS } from '@babel/parser'
 
-import type { RComponentContract, RComponentDiagnostic } from '@/domain/types/component-core.types'
-import { createEmptyComponentContract } from '@/domain/types/component-core.types'
+import type { RComponentContract, RComponentDiagnostic } from '@/domain/types/component/component-core.types'
+import { createEmptyComponentContract } from '@/domain/types/component/component-core.types'
 import type {
   ComponentSFCPreviewLiteral,
   ComponentSFCPreviewOptions,
   ComponentSFCPreviewProps,
   ComponentSFCPreviewRunTarget,
-} from '@/domain/types/program.types'
+} from '@/domain/types/program/program.types'
 import type {
   RComponentSFC_AST_Script,
   RComponentSFC_IR_LocalBinding,
   RComponentSFC_IR_Prop,
-} from '@/domain/types/component-sfc.types'
-import type { ProgramMetadataMap } from '@/domain/types/program-metadata.types'
+} from '@/domain/types/component/sfc'
+import type { ProgramMetadataMap } from '@/domain/types/program/program-metadata.types'
 import { compileProgramMetadataSource } from '@/model/services/source-engine/source-metadata-compile'
 
 /** Результат анализа script-секции SFC. */

@@ -1,10 +1,10 @@
-import type { QueryProgramOutput, QueryProgramPayload } from '@/domain/types/program.types'
-import type { RQueryAuth } from '@/domain/types/query.types'
+import type { QueryProgramOutput, QueryProgramPayload } from '@/domain/types/program/program.types'
+import type { RQueryAuth } from '@/domain/types/document/query.types'
 import type { AxiosInstance } from 'axios'
 
 import axios from 'axios'
 
-import { Endge } from '@/model/endge/endge'
+import { Endge } from '@/model/endge/kernel/endge'
 import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
 
 export interface QueryExecutionContext {

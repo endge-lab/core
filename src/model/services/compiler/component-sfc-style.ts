@@ -1,8 +1,8 @@
-import type { RComponentDiagnostic } from '@/domain/types/component-core.types'
+import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
 import type {
   RComponentSFC_AST_Style,
   RComponentSFC_IR_Style,
-} from '@/domain/types/component-sfc.types'
+} from '@/domain/types/component/sfc'
 
 /** Результат компиляции style-секции. */
 export interface ComponentSFCStyleCompileResult {

@@ -1,11 +1,11 @@
 import type { RStore } from '@/domain/entities/reflect/RStore'
-import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime-host.types'
-import type { StoreDataDescriptor, StoreSourceArtifact } from '@/domain/types/store-source.types'
+import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime/runtime-host.types'
+import type { StoreDataDescriptor, StoreSourceArtifact } from '@/domain/types/source/store-source.types'
 
 import { Raph, RaphNode, full, type RaphDerivedHandle } from '@endge/raph'
 
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
-import { Endge } from '@/model/endge/endge'
+import { Endge } from '@/model/endge/kernel/endge'
 
 function defaultContext(artifact: StoreSourceArtifact): RuntimeHostContext<'store'> {
   return {

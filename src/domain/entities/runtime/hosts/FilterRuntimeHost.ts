@@ -5,9 +5,9 @@ import type {
   FilterRuntimeCommandId,
   FilterRuntimeOutput,
   FilterRuntimeSetPayload,
-} from '@/domain/types/filter-source.types'
-import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime-host.types'
-import type { SourceFieldDefinition } from '@/domain/types/source-expression.types'
+} from '@/domain/types/source/filter-source.types'
+import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime/runtime-host.types'
+import type { SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 
 import { Raph, RaphNode } from '@endge/raph'
 
@@ -60,10 +60,10 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
     parent?: RuntimeHost<any, any> | null
     artifacts: RuntimeArtifactReader
   }): FilterRuntimeHost | null {
-    const explicitArtifact = input.meta?.artifact as import('@/domain/types/program.types').ProgramArtifact<FilterProgramPayload> | undefined
+    const explicitArtifact = input.meta?.artifact as import('@/domain/types/program/program.types').ProgramArtifact<FilterProgramPayload> | undefined
     const artifactReader: RuntimeArtifactReader = explicitArtifact
       ? {
-          getArtifact: <TPayload>() => explicitArtifact as unknown as import('@/domain/types/program.types').ProgramArtifact<TPayload>,
+          getArtifact: <TPayload>() => explicitArtifact as unknown as import('@/domain/types/program/program.types').ProgramArtifact<TPayload>,
         }
       : input.artifacts
     const artifact = explicitArtifact

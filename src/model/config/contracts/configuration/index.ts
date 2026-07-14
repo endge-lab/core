@@ -1,4 +1,4 @@
-import type { ConfigurationContract } from '@/domain/types/configuration-contract.types'
+import type { ConfigurationContract } from '@/domain/types/configuration/configuration-contract.types'
 
 import { NAVIGATION_CONFIGURATION_CONTRACTS } from '@/model/config/contracts/configuration/navigation'
 

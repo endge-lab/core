@@ -1,5 +1,5 @@
-import type { RuntimeEntityType } from '@/domain/types/runtime-entity-map.types'
-import type { RuntimeExecutableModel } from '@/domain/types/runtime.types'
+import type { RuntimeEntityType } from '@/domain/types/runtime/runtime-entity-map.types'
+import type { RuntimeExecutableModel } from '@/domain/types/runtime/runtime.types'
 import type { AnyRuntimeHost } from '@/model/services/runtime/RuntimeStrategy'
 
 export type RuntimeAppScopeCollisionPolicy = 'multi' | 'reject' | 'replace'
@@ -134,7 +134,6 @@ export class RuntimeAppScope {
 function runtimeEntityCollection(entityType: RuntimeEntityType): string {
   const collections: Record<RuntimeEntityType, string> = {
     action: 'actions',
-    component: 'components',
     'component-sfc': 'component-sfcs',
     composition: 'compositions',
     filter: 'filters',
@@ -142,7 +141,6 @@ function runtimeEntityCollection(entityType: RuntimeEntityType): string {
     project: 'projects',
     query: 'queries',
     store: 'stores',
-    table: 'tables',
     view: 'views',
   }
   return collections[entityType]

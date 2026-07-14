@@ -4,7 +4,7 @@ import type {
   RuntimeCommandContext,
   RuntimeCommandId,
   RuntimeCommandRegistrySnapshot,
-} from '@/domain/types/command.types'
+} from '@/domain/types/runtime/command.types'
 
 export class RuntimeCommandRegistry {
   private readonly _commands = new Map<RuntimeCommandId, AnyRuntimeCommand>()

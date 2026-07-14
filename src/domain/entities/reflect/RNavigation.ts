@@ -3,8 +3,8 @@ import { Expose } from 'class-transformer'
 
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
 import { REntity } from '@/domain/entities/reflect/REntity'
-import type { DomainDocumentType } from '@/domain/types/document.types'
-import type { NavigationTreeNodeDoc } from '@/domain/types/navigation.types'
+import type { DomainDocumentType } from '@/domain/types/document/document.types'
+import type { NavigationTreeNodeDoc } from '@/domain/types/document/navigation.types'
 
 export interface RNavigationSchema {
   id: string

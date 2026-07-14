@@ -12,7 +12,7 @@ import {
 } from '@vue/compiler-dom'
 import { parse as parseTS } from '@babel/parser'
 
-import type { RComponentDiagnostic } from '@/domain/types/component-core.types'
+import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
 import type {
   RComponentSFCSource_Parts,
   RComponentSFC_AST,
@@ -30,7 +30,7 @@ import type {
   RComponentSFC_AST_TemplateNode,
   RComponentSFC_AST_TextNode,
   RComponentSFC_SourceRange,
-} from '@/domain/types/component-sfc.types'
+} from '@/domain/types/component/sfc'
 import { parseSFCSourceParts } from '@/model/services/compiler/component-sfc-source-parts'
 
 /** Результат parser pass для SFC-компонента. */

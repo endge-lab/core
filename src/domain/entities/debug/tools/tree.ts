@@ -3,12 +3,12 @@ import type {
   LogRecord,
   SpanEnd,
   SpanStart,
-} from '@/domain/types/debug/base.types'
+} from '@/domain/types/diagnostics/debug/base.types'
 import type {
   EventNode,
   LogNode,
   SpanNode,
-} from '@/domain/types/debug/tree.types'
+} from '@/domain/types/diagnostics/debug/tree.types'
 
 /**
  * Строит дерево:

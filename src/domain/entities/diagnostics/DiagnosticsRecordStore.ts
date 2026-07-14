@@ -1,7 +1,7 @@
 import type {
   DiagnosticsRecord,
   DiagnosticsRecordKind,
-} from '@/domain/types/diagnostics.types'
+} from '@/domain/types/diagnostics/diagnostics.types'
 
 export class DiagnosticsRecordStore {
   private _capacity: number

@@ -1,8 +1,8 @@
 import type { RQuery } from '@/domain/entities/reflect/RQuery'
 import type { RFilter } from '@/domain/entities/reflect/RFilter'
-import type { FilterProgramPayload } from '@/domain/types/filter-source.types'
-import type { ProgramArtifact, QueryProgramPayload } from '@/domain/types/program.types'
-import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext, RuntimeHostUpdateContext } from '@/domain/types/runtime-host.types'
+import type { FilterProgramPayload } from '@/domain/types/source/filter-source.types'
+import type { ProgramArtifact, QueryProgramPayload } from '@/domain/types/program/program.types'
+import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext, RuntimeHostUpdateContext } from '@/domain/types/runtime/runtime-host.types'
 
 import {
   Raph,
@@ -15,7 +15,7 @@ import {
 import { RFilter as FilterModel } from '@/domain/entities/reflect/RFilter'
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
-import { Endge } from '@/model/endge/endge'
+import { Endge } from '@/model/endge/kernel/endge'
 import type { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
 
 function defaultContext(): RuntimeHostContext<'query'> {
@@ -144,8 +144,8 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
         continue
 
       const child = Endge.runtime.execute(model, {
-        id: `${this.id}:default-filter:${prop.key}`,
         parent: this,
+        instance: `default-filter:${prop.key}`,
         persistence: 'disabled',
         artifact: childArtifact ?? undefined,
       }) as FilterRuntimeHost | null

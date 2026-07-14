@@ -2,29 +2,29 @@ import type {
   RComponentContract,
   RComponentDependencies,
   RComponentDiagnostic,
-} from '@/domain/types/component-core.types'
+} from '@/domain/types/component/component-core.types'
 import {
   createEmptyComponentContract,
   createEmptyComponentDependencies,
-} from '@/domain/types/component-core.types'
+} from '@/domain/types/component/component-core.types'
 import type {
   ComponentSFCPreviewOptions,
   ComponentSFCPreviewProps,
-} from '@/domain/types/program.types'
+} from '@/domain/types/program/program.types'
 import type {
   RComponentSFCSource_Parts,
   RComponentSFC_AST,
   RComponentSFC_IR,
   RComponentSFC_RuntimeDependencies,
-} from '@/domain/types/component-sfc.types'
-import type { ProgramMetadata } from '@/domain/types/program-metadata.types'
+} from '@/domain/types/component/sfc'
+import type { ProgramMetadata } from '@/domain/types/program/program-metadata.types'
 import { parseComponentSFC } from '@/model/services/compiler/component-sfc-parse'
 import { analyzeComponentSFCScript } from '@/model/services/compiler/component-sfc-script'
 import { analyzeComponentSFCRuntimeDependencies } from '@/model/services/compiler/component-sfc-dependencies'
 import { compileComponentSFCStyle } from '@/model/services/compiler/component-sfc-style'
 import { compileComponentSFCTemplate } from '@/model/services/compiler/component-sfc-template'
-import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component-sfc.types'
-import { createEmptyProgramMetadata } from '@/domain/types/program-metadata.types'
+import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component/sfc'
+import { createEmptyProgramMetadata } from '@/domain/types/program/program-metadata.types'
 
 /** Результат полного SFC compiler pipeline в core. */
 export interface ComponentSFCCompileResult {

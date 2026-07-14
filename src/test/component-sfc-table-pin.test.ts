@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { RComponentSFC_IR_ElementNode } from '@/domain/types/component-sfc.types'
+import type { RComponentSFC_IR_ElementNode } from '@/domain/types/component/sfc'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc-compile'
 import { normalizeComponentSFCTableColumnPin } from '@/model/services/compiler/component-sfc-table-pin'
 

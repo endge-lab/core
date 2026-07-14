@@ -1,13 +1,13 @@
 import type {
   QuerySourceDocument,
   QuerySourcePatch,
-} from '@/domain/types/query-source.types'
+} from '@/domain/types/source/query-source.types'
 import type {
   SourceKind,
   SourceParseResult,
   SourcePatchResult,
   SourcePatchStrategy,
-} from '@/domain/types/source-engine.types'
+} from '@/domain/types/source/source-engine.types'
 
 import {
   parseQuerySource,

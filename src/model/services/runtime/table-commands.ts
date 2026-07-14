@@ -4,8 +4,8 @@ import type {
   TableColumnPinSide,
   TableRuntimeCommandTarget,
   TableSortDirection,
-} from '@/domain/types/command.types'
-import { TABLE_RUNTIME_COMMAND_IDS } from '@/domain/types/command.types'
+} from '@/domain/types/runtime/command.types'
+import { TABLE_RUNTIME_COMMAND_IDS } from '@/domain/types/runtime/command.types'
 
 type TableTargetMethodName = keyof TableRuntimeCommandTarget
 

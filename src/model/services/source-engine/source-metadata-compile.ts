@@ -1,4 +1,4 @@
-import type { ProgramMetadataMap, ProgramMetadataValue } from '@/domain/types/program-metadata.types'
+import type { ProgramMetadataMap, ProgramMetadataValue } from '@/domain/types/program/program-metadata.types'
 
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'

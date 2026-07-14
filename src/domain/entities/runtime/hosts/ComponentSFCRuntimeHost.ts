@@ -3,7 +3,7 @@ import type {
   RComponentContract,
   RComponentDependencies,
   RComponentRenderTarget,
-} from '@/domain/types/component-core.types'
+} from '@/domain/types/component/component-core.types'
 import type {
   RComponentSFC_AST,
   RComponentSFC_IR,
@@ -11,12 +11,12 @@ import type {
   RComponentSFC_RuntimeDependencies,
   RComponentSFC_RuntimeTableColumnDependency,
   RComponentSFCSource_Parts,
-} from '@/domain/types/component-sfc.types'
+} from '@/domain/types/component/sfc'
 import type {
   ComponentSFCPreviewOptions,
   ComponentSFCProgramPayload,
   ProgramDiagnostic,
-} from '@/domain/types/program.types'
+} from '@/domain/types/program/program.types'
 import type {
   RuntimeArtifactReader,
   RuntimeBoundaryPatch,
@@ -25,13 +25,13 @@ import type {
   RuntimeHostContext,
   RuntimeHostInputSource,
   RuntimeHostUpdateContext,
-} from '@/domain/types/runtime-host.types'
+} from '@/domain/types/runtime/runtime-host.types'
 
 import { DataPath, Raph, RaphNode } from '@endge/raph'
 
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
-import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component-sfc.types'
-import { RUNTIME_BOUNDARY_UPDATE_PHASE_NAME } from '@/domain/types/runtime-host.types'
+import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component/sfc'
+import { RUNTIME_BOUNDARY_UPDATE_PHASE_NAME } from '@/domain/types/runtime/runtime-host.types'
 
 function createDefaultSFCContext(target: RComponentRenderTarget | null): RuntimeHostContext<'component-sfc'> {
   return {

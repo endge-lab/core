@@ -1,4 +1,4 @@
-import type { EndgeBootContext } from '@/domain/types/bootstrap.types'
+import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 
 import { Subscribable } from '@endge/utils'
 

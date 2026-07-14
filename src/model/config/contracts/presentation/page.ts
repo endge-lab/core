@@ -1,11 +1,11 @@
-import type { PresentationContract } from '@/domain/types/faceted-cascade'
+import type { PresentationContract } from '@/domain/types/configuration/faceted-cascade'
 
 import {
   EndgeFacetType,
   FacetedCascadeEntityType,
   FacetedCascadeScope,
   PresentationContractKind,
-} from '@/domain/types/faceted-cascade'
+} from '@/domain/types/configuration/faceted-cascade'
 
 export const PAGE_PRESENTATION_CONTRACTS: PresentationContract<FacetedCascadeEntityType>[] = [
   {

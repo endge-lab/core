@@ -1,7 +1,7 @@
 import type {
   EndgeFlowDefinition,
   EndgeFlowNodeDefinition,
-} from '@/domain/types/endge-flow.types'
+} from '@/domain/types/flow/endge-flow.types'
 
 import { Expose, Type } from 'class-transformer'
 

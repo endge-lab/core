@@ -9,8 +9,8 @@ import type {
   RComponentSFC_RuntimeDependencies,
   RComponentSFC_RuntimeDependency,
   RComponentSFC_RuntimeTableColumnDependency,
-} from '@/domain/types/component-sfc.types'
-import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component-sfc.types'
+} from '@/domain/types/component/sfc'
+import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component/sfc'
 
 /** Анализирует SFC IR и собирает runtime-зависимости от входных props. */
 export function analyzeComponentSFCRuntimeDependencies(

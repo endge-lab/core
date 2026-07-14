@@ -3,16 +3,16 @@ import type {
   QuerySourceCompileResult,
   QuerySourceDocument,
   QuerySourceOutput,
-} from '@/domain/types/query-source.types'
-import type { ProgramDiagnostic, QueryProgramPayload } from '@/domain/types/program.types'
-import type { RQueryAuth } from '@/domain/types/query.types'
-import type { DataViewRef } from '@/domain/types/data-view-source.types'
-import type { QueryProgramProp } from '@/domain/types/source-expression.types'
+} from '@/domain/types/source/query-source.types'
+import type { ProgramDiagnostic, QueryProgramPayload } from '@/domain/types/program/program.types'
+import type { RQueryAuth } from '@/domain/types/document/query.types'
+import type { DataViewRef } from '@/domain/types/source/data-view-source.types'
+import type { QueryProgramProp } from '@/domain/types/source/source-expression.types'
 
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
 
-import { QueryType } from '@/domain/types/document.types'
+import { QueryType } from '@/domain/types/document/document.types'
 import { compileSourceCallback, compileSourceExpression } from '@/model/services/source-engine/source-expression-compile'
 import { compileSourceField } from '@/model/services/source-engine/source-field-compile'
 import { compileProgramMetadataProperty } from '@/model/services/source-engine/source-metadata-compile'
@@ -305,13 +305,13 @@ function readOutputs(
 }
 
 function validateBodyPropReferences(
-  expression: import('@/domain/types/source-expression.types').SourceExpressionIR | null,
+  expression: import('@/domain/types/source/source-expression.types').SourceExpressionIR | null,
   propKeys: Set<string>,
   diagnostics: DiagnosticDraft[],
 ): void {
   if (!expression)
     return
-  const visit = (node: import('@/domain/types/source-expression.types').SourceExpressionIR) => {
+  const visit = (node: import('@/domain/types/source/source-expression.types').SourceExpressionIR) => {
     if (node.type === 'read') {
       if (node.source === 'current') {
         return
@@ -459,8 +459,8 @@ function readOutputSource(
 }
 
 function containsOnlyReads(
-  expression: import('@/domain/types/source-expression.types').SourceExpressionIR,
-  allowed: Set<import('@/domain/types/source-expression.types').SourceExpressionReadKind>,
+  expression: import('@/domain/types/source/source-expression.types').SourceExpressionIR,
+  allowed: Set<import('@/domain/types/source/source-expression.types').SourceExpressionReadKind>,
 ): boolean {
   if (expression.type === 'read')
     return allowed.has(expression.source)

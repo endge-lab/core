@@ -5,12 +5,12 @@ import type {
   PhaseName,
   RaphPhase,
 } from '@endge/raph'
-import type { RuntimeDirtyBoundary, RuntimeHost } from '@/domain/types/runtime-host.types'
+import type { RuntimeDirtyBoundary, RuntimeHost } from '@/domain/types/runtime/runtime-host.types'
 
 import { Raph, RaphNode } from '@endge/raph'
 
-import { RUNTIME_BOUNDARY_UPDATE_PHASE_NAME } from '@/domain/types/runtime-host.types'
-import { Endge } from '@/model/endge/endge'
+import { RUNTIME_BOUNDARY_UPDATE_PHASE_NAME } from '@/domain/types/runtime/runtime-host.types'
+import { Endge } from '@/model/endge/kernel/endge'
 
 export interface RuntimeBoundaryAggregatedUpdate {
   node: RaphNode

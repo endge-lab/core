@@ -1,6 +1,6 @@
-import type { EndgeBootContext } from '@/domain/types/bootstrap.types'
-import type { EndgeModuleDescriptor, EndgePlugin } from '@/domain/types/endge-modules.types'
-import type { EndgeFederationHost } from '@/domain/types/federation.types'
+import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
+import type { EndgeModuleDescriptor, EndgePlugin } from '@/domain/types/kernel/endge-modules.types'
+import type { EndgeFederationHost } from '@/domain/types/kernel/federation.types'
 
 import type { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { sortEndgeModuleDescriptors } from '@/domain/entities/endge/sort-endge-modules'

@@ -2,7 +2,7 @@ import type { DataSource } from '@/domain/entities/data/DataSource'
 import { DataSourceGQL } from '@/domain/data-source-graphql'
 import { DataSourceRest } from '@/domain/data-source-rest'
 
-import {QueryType} from "@/domain/types/document.types";
+import {QueryType} from "@/domain/types/document/document.types";
 
 /**
  * Фабрика для создания и кэширования источников данных по типу запроса.

@@ -2,7 +2,7 @@ import type { AxiosInstance } from 'axios'
 import type {
   PresentationBindingDoc,
   PresentationBindingWriteData,
-} from '@/domain/types/faceted-cascade'
+} from '@/domain/types/configuration/faceted-cascade'
 
 export class PresentationBindings_Repository {
   constructor(private readonly _api: AxiosInstance) {}

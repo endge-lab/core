@@ -2,14 +2,14 @@ import type {
   FilterFieldSchema,
   RParameterSchema,
   RuntimeFilterLinkEntity,
-} from '@/domain/types/query.types'
-import type { DomainDocumentType } from '@/domain/types/document.types'
+} from '@/domain/types/document/query.types'
+import type { DomainDocumentType } from '@/domain/types/document/document.types'
 
 import { TypeMap } from '@endge/utils'
 import { Expose } from 'class-transformer'
 
 import { REntity } from '@/domain/entities/reflect/REntity'
-import { ParameterType } from '@/domain/types/document.types'
+import { ParameterType } from '@/domain/types/document/document.types'
 
 export class RParameter extends REntity {
   @Expose()

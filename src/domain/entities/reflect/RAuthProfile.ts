@@ -3,7 +3,7 @@ import type {
   AuthProfileConfig,
   AuthProfileCredentialRefs,
   AuthProfilePersist,
-} from '@/domain/types/auth-profile.types'
+} from '@/domain/types/auth/auth-profile.types'
 
 import { Serialize } from '@endge/utils'
 import { Expose } from 'class-transformer'

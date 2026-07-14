@@ -1,10 +1,10 @@
-import type { ProgramDiagnostic } from '@/domain/types/program.types'
+import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
 import type {
   SourceFieldDefinition,
   SourceFieldDefaultSource,
   SourceFieldOption,
   SourceFieldType,
-} from '@/domain/types/source-expression.types'
+} from '@/domain/types/source/source-expression.types'
 
 import * as t from '@babel/types'
 
@@ -228,7 +228,7 @@ function validateLiteralDefault(
     diagnostics.push(diagnostic('error', 'source-field-default-type', `Default поля "${field.key}" не соответствует типу ${field.type}${field.array ? '[]' : ''}.`, `${sourcePath}.default`, node))
 }
 
-function isStaticExpression(expression: import('@/domain/types/source-expression.types').SourceExpressionIR): boolean {
+function isStaticExpression(expression: import('@/domain/types/source/source-expression.types').SourceExpressionIR): boolean {
   if (expression.type === 'literal')
     return true
   if (expression.type === 'array')
@@ -238,7 +238,7 @@ function isStaticExpression(expression: import('@/domain/types/source-expression
   return false
 }
 
-function staticExpressionValue(expression: import('@/domain/types/source-expression.types').SourceExpressionIR): unknown {
+function staticExpressionValue(expression: import('@/domain/types/source/source-expression.types').SourceExpressionIR): unknown {
   if (expression.type === 'literal')
     return expression.value
   if (expression.type === 'array')

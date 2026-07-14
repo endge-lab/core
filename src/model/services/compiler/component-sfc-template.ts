@@ -1,5 +1,5 @@
-import type { RComponentDependencies, RComponentDiagnostic } from '@/domain/types/component-core.types'
-import { createEmptyComponentDependencies } from '@/domain/types/component-core.types'
+import type { RComponentDependencies, RComponentDiagnostic } from '@/domain/types/component/component-core.types'
+import { createEmptyComponentDependencies } from '@/domain/types/component/component-core.types'
 import type {
   RComponentSFC_AST_Attribute,
   RComponentSFC_AST_Directive,
@@ -14,8 +14,8 @@ import type {
   RComponentSFC_IR_Tag,
   RComponentSFC_IR_Template,
   RComponentSFC_IR_Value,
-} from '@/domain/types/component-sfc.types'
-import type { ProgramNodeMetadata } from '@/domain/types/program-metadata.types'
+} from '@/domain/types/component/sfc'
+import type { ProgramNodeMetadata } from '@/domain/types/program/program-metadata.types'
 import { compileComponentSFCExpression } from '@/model/services/compiler/component-sfc-expression'
 import { normalizeComponentSFCTableColumnMenu } from '@/model/services/compiler/component-sfc-table-menu'
 import { normalizeComponentSFCTableColumnPin } from '@/model/services/compiler/component-sfc-table-pin'

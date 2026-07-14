@@ -1,4 +1,4 @@
-import type { ColumnSortConfig } from '@/domain/types/table.types'
+import type { ColumnSortConfig } from '@/domain/types/runtime/table.types'
 
 export function normalizeSortType(v: unknown): string {
   const s: string = String(v ?? '').trim()

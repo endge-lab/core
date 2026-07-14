@@ -1,8 +1,8 @@
-import type { DomainDocumentType, RDocument } from '@/domain/types/document.types'
+import type { DomainDocumentType, RDocument } from '@/domain/types/document/document.types'
 
 import { randomString } from '@endge/utils'
 
-import { Endge } from '@/model/endge/endge'
+import { Endge } from '@/model/endge/kernel/endge'
 import { RComponentDSL } from '@/domain/entities/reflect/RComponentDSL'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RComponentTable } from '@/domain/entities/reflect/RComponentTable'
@@ -26,7 +26,7 @@ import { RPage } from '@/domain/entities/reflect/RPage'
 import { RNavigation } from '@/domain/entities/reflect/RNavigation'
 import { RAction } from '@/domain/entities/reflect/RAction'
 import { RAuthProfile } from '@/domain/entities/reflect/RAuthProfile'
-import { ComponentType, FilterType, QueryType } from '@/domain/types/document.types'
+import { ComponentType, FilterType, QueryType } from '@/domain/types/document/document.types'
 
 export interface DocumentFactoryOptions {
   id?: string

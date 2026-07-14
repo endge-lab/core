@@ -4,7 +4,7 @@ import type {
   SourceLanguageContext,
   SourceLanguageStrategy,
   SourceLanguageValidationResult,
-} from '@/domain/types/source-engine.types'
+} from '@/domain/types/source/source-engine.types'
 
 import { compileDataViewSource } from '@/model/services/source-engine/data-view-source-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'

@@ -1,9 +1,9 @@
-import type { ProgramDiagnostic } from '@/domain/types/program.types'
+import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
 import type {
   SourceExpressionIR,
   SourceExpressionOperation,
   SourceExpressionReadKind,
-} from '@/domain/types/source-expression.types'
+} from '@/domain/types/source/source-expression.types'
 
 import * as t from '@babel/types'
 

@@ -1,5 +1,5 @@
 import type { RProject } from '@/domain/entities/reflect/RProject'
-import type { RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime-host.types'
+import type { RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime/runtime-host.types'
 
 import { Raph, RaphNode } from '@endge/raph'
 

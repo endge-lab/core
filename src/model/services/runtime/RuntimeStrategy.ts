@@ -1,5 +1,5 @@
-import type { RuntimeArtifactReader, RuntimeHost } from '@/domain/types/runtime-host.types'
-import type { RuntimeEntityType } from '@/domain/types/runtime-entity-map.types'
+import type { RuntimeArtifactReader, RuntimeHost } from '@/domain/types/runtime/runtime-host.types'
+import type { RuntimeEntityType } from '@/domain/types/runtime/runtime-entity-map.types'
 
 export type RuntimeStrategyMeta = Record<string, any>
 export type AnyRuntimeHost = RuntimeHost<any, any>

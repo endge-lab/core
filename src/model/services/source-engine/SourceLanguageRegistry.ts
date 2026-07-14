@@ -1,4 +1,4 @@
-import type { SourceKind, SourceLanguageStrategy } from '@/domain/types/source-engine.types'
+import type { SourceKind, SourceLanguageStrategy } from '@/domain/types/source/source-engine.types'
 
 /** Реестр source language strategies для editor-facing операций. */
 export class SourceLanguageRegistry {

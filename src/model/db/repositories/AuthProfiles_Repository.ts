@@ -1,4 +1,4 @@
-import type { AuthProfileAdapterId, AuthProfilePersist } from '@/domain/types/auth-profile.types'
+import type { AuthProfileAdapterId, AuthProfilePersist } from '@/domain/types/auth/auth-profile.types'
 import type { AxiosInstance } from 'axios'
 
 export interface AuthProfileDoc {

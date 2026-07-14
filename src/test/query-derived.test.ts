@@ -9,7 +9,7 @@ import { RConverter } from '@/domain/entities/reflect/RConverter'
 import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
-import { Endge } from '@/model/endge/endge'
+import { Endge } from '@/model/endge/kernel/endge'
 import { timeStringToDate } from '@/model/seed/converters/date/time-string-to-date'
 import { weekdaysRange } from '@/model/seed/converters/date/weekdays-range'
 

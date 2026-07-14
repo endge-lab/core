@@ -3,7 +3,7 @@ import { Raph } from '@endge/raph'
 
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentSFCRuntimeHost'
-import { Endge } from '@/model/endge/endge'
+import { Endge } from '@/model/endge/kernel/endge'
 
 describe('Endge runtime persistence integration', () => {
   afterEach(() => {

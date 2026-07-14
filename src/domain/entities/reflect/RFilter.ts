@@ -1,10 +1,10 @@
-import type { FilterFieldItemSchema, RFilterSchema } from '@/domain/types/filter.types'
-import type { DomainDocumentType } from '@/domain/types/document.types'
+import type { FilterFieldItemSchema, RFilterSchema } from '@/domain/types/document/filter.types'
+import type { DomainDocumentType } from '@/domain/types/document/document.types'
 
 import { Expose } from 'class-transformer'
 
 import { REntity } from '@/domain/entities/reflect/REntity'
-import { FilterType } from '@/domain/types/document.types'
+import { FilterType } from '@/domain/types/document/document.types'
 
 export class RFilter extends REntity {
   @Expose()

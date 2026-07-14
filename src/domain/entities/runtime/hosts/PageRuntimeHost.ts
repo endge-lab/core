@@ -1,5 +1,5 @@
 import type { RPage } from '@/domain/entities/reflect/RPage'
-import type { RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime-host.types'
+import type { RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime/runtime-host.types'
 
 import { Raph, RaphNode } from '@endge/raph'
 

@@ -1,6 +1,6 @@
-import type { ActionRuntimeHostContext } from '@/domain/types/runtime-host.types'
+import type { ActionRuntimeHostContext } from '@/domain/types/runtime/runtime-host.types'
 
-import { Endge } from '@/model/endge/endge'
+import { Endge } from '@/model/endge/kernel/endge'
 
 /** Берёт вход из context.input (массив id справочников), при необходимости — из context.input.input. */
 export function loadVocabs(context: ActionRuntimeHostContext): Promise<void> {

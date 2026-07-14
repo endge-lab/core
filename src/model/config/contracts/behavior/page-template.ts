@@ -1,11 +1,11 @@
-import type { BehaviorContract } from '@/domain/types/faceted-cascade'
+import type { BehaviorContract } from '@/domain/types/configuration/faceted-cascade'
 
 import {
   BehaviorContractKind,
   EndgeFacetType,
   FacetedCascadeEntityType,
   FacetedCascadeScope,
-} from '@/domain/types/faceted-cascade'
+} from '@/domain/types/configuration/faceted-cascade'
 
 export const PAGE_TEMPLATE_BEHAVIOR_CONTRACTS: BehaviorContract<FacetedCascadeEntityType>[] = [
   {

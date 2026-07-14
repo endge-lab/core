@@ -1,4 +1,4 @@
-import type { SourceKind, SourcePatchStrategy } from '@/domain/types/source-engine.types'
+import type { SourceKind, SourcePatchStrategy } from '@/domain/types/source/source-engine.types'
 
 /** Реестр source patch strategies для editor-facing AST-патчинга. */
 export class SourcePatchRegistry {

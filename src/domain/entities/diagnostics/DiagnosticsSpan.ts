@@ -5,7 +5,7 @@ import type {
   DiagnosticsLevel,
   DiagnosticsScopeOptions,
   DiagnosticsSpanOwner,
-} from '@/domain/types/diagnostics.types'
+} from '@/domain/types/diagnostics/diagnostics.types'
 
 export class DiagnosticsSpan extends DiagnosticsScopeHandle {
   private readonly _name: string

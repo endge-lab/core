@@ -8,8 +8,8 @@ import type {
   DataViewPipelineStep,
   DataViewSourceCompileResult,
   DataViewSourceDocument,
-} from '@/domain/types/data-view-source.types'
-import type { DataViewProgramPayload, ProgramDiagnostic } from '@/domain/types/program.types'
+} from '@/domain/types/source/data-view-source.types'
+import type { DataViewProgramPayload, ProgramDiagnostic } from '@/domain/types/program/program.types'
 
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'

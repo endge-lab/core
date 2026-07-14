@@ -1,9 +1,9 @@
-import type { RuntimeEntityType } from '@/domain/types/runtime-entity-map.types'
-import type { RuntimeHost, RuntimeHostSnapshot } from '@/domain/types/runtime-host.types'
+import type { RuntimeEntityType } from '@/domain/types/runtime/runtime-entity-map.types'
+import type { RuntimeHost, RuntimeHostSnapshot } from '@/domain/types/runtime/runtime-host.types'
 import type {
   RuntimeHostRegistryLike,
   RuntimeHostRegistrySnapshot,
-} from '@/domain/types/runtime-registry.types'
+} from '@/domain/types/runtime/runtime-registry.types'
 
 export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
   private _hosts = new Map<string, RuntimeHost<any, any>>()

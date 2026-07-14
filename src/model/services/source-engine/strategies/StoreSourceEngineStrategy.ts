@@ -1,4 +1,4 @@
-import type { SourceEngineCompileResult, SourceEngineStrategy, SourceKind } from '@/domain/types/source-engine.types'
+import type { SourceEngineCompileResult, SourceEngineStrategy, SourceKind } from '@/domain/types/source/source-engine.types'
 
 import { compileStoreSource } from '@/model/services/source-engine/store-source-compile'
 

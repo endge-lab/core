@@ -1,14 +1,14 @@
-import type { RComponentDiagnostic } from '@/domain/types/component-core.types'
+import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
 import type {
   RComponentSFC_IR_ElementNode,
   RComponentSFC_IR_Value,
-} from '@/domain/types/component-sfc.types'
+} from '@/domain/types/component/sfc'
 import type {
   ContextMenuDescriptor,
   ContextMenuItemDescriptor,
   ContextMenuNodeDescriptor,
   ContextMenuSeparatorDescriptor,
-} from '@/domain/types/context-menu.types'
+} from '@/domain/types/ui/context-menu.types'
 
 export const SFC_TABLE_COLUMN_MENU_MODES = ['default', 'disabled'] as const
 

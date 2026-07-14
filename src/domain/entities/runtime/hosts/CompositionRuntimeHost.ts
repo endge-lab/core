@@ -11,14 +11,14 @@ import type {
   CompositionRuntimeChildHandle,
   CompositionRuntimeOutputHandle,
   CompositionRuntimePublicationConnection,
-} from '@/domain/types/composition-source.types'
-import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext, RuntimeHostInputSource, RuntimeHostUpdateContext } from '@/domain/types/runtime-host.types'
+} from '@/domain/types/source/composition-source.types'
+import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext, RuntimeHostInputSource, RuntimeHostUpdateContext } from '@/domain/types/runtime/runtime-host.types'
 
 import { Raph, RaphNode } from '@endge/raph'
 
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 import { FilterViewRuntimeHost as EndgeFilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
-import { Endge } from '@/model/endge/endge'
+import { Endge } from '@/model/endge/kernel/endge'
 import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
 
 function defaultContext(): RuntimeHostContext<'composition'> {
@@ -207,7 +207,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     ) as Record<string, unknown>
 
     for (const descriptor of payload.data) {
-      const basePath = `__endge.compositionRuntime.${encodePathPart(this.id)}.data.${encodePathPart(descriptor.name)}`
+      const basePath = `${this.basePath}.data.${encodePathPart(descriptor.name)}`
 
       if (descriptor.kind === 'vocab') {
         const vocab = Endge.domain.getVocab(descriptor.identity)
@@ -242,7 +242,6 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       }
       else {
         storeRuntime = Endge.runtime.execute(store, {
-          id: `${this.id}:data:${descriptor.name}`,
           parent: this,
           instance: descriptor.name,
           persistence: 'disabled',
@@ -329,8 +328,15 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         Object.entries(this._compiledInputs(descriptor.name))
           .map(([key, binding]) => [key, this._readBinding(binding)]),
       )
+      const appScope = Endge.runtime.getAppScope(String(this.meta.appScopeId ?? ''))
+        ?? Endge.runtime.getDefaultAppScope()
+      const filterViewAddress = appScope.allocate({
+        entityType: 'filter',
+        identity: source.entityIdentity,
+        scopeRoot: false,
+      })
       const child = new EndgeFilterViewRuntimeHost({
-        id: `${this.id}:${descriptor.name}`,
+        id: filterViewAddress.runtimeId,
         name: descriptor.name,
         model: source.model as any,
         sourceRuntimeName: descriptor.identity,
@@ -341,7 +347,12 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         props: initialProps,
         parent: this,
         meta: {
+          appScopeId: appScope.id,
+          appScopeRootPath: appScope.rootPath,
           instance: descriptor.name,
+          runtimeLocalId: filterViewAddress.localId,
+          runtimePath: filterViewAddress.runtimePath,
+          scopeRoot: false,
           sourceRuntime: descriptor.identity,
         },
       })
@@ -380,9 +391,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       Object.entries(this._compiledInputs(descriptor.name))
         .map(([key, binding]) => [key, this._readBinding(binding)]),
     )
-    const basePath = `compositions.${this.id}.children.${descriptor.name}.props`
+    const basePath = `${this.basePath}.children.${encodePathPart(descriptor.name)}.props`
     const meta: Record<string, unknown> = {
-      id: `${this.id}:${descriptor.name}`,
       parent: this,
       instance: descriptor.name,
       props: initialProps,
@@ -639,7 +649,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     prop: string,
     binding: Extract<CompositionBindingValue, { kind: 'output' | 'filter-fields' | 'data' | 'expression' }>,
   ): string {
-    const path = `compositions.${this.id}.bindings.${runtimeName}.${prop}`
+    const path = `${this.basePath}.bindings.${encodePathPart(runtimeName)}.${encodePathPart(prop)}`
     const sync = () => Raph.set(path, this._readBinding(binding))
     sync()
     this._subscribeBinding(binding, sync)
@@ -648,7 +658,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   }
 
   private _readExpressionSource(
-    read: Extract<import('@/domain/types/source-expression.types').SourceExpressionIR, { type: 'read' }>,
+    read: Extract<import('@/domain/types/source/source-expression.types').SourceExpressionIR, { type: 'read' }>,
   ): unknown {
     const parameters = read.parameters ?? []
     if (read.source === 'composition-output') {
@@ -678,8 +688,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   }
 
   private _collectExpressionReads(
-    expression: import('@/domain/types/source-expression.types').SourceExpressionIR,
-  ): Array<Extract<import('@/domain/types/source-expression.types').SourceExpressionIR, { type: 'read' }>> {
+    expression: import('@/domain/types/source/source-expression.types').SourceExpressionIR,
+  ): Array<Extract<import('@/domain/types/source/source-expression.types').SourceExpressionIR, { type: 'read' }>> {
     if (expression.type === 'read')
       return [expression]
     if (expression.type === 'operation')
@@ -692,7 +702,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   }
 
   private _subscribeExpressionRead(
-    read: Extract<import('@/domain/types/source-expression.types').SourceExpressionIR, { type: 'read' }>,
+    read: Extract<import('@/domain/types/source/source-expression.types').SourceExpressionIR, { type: 'read' }>,
     sync: () => void,
   ): void {
     const parameters = read.parameters ?? []

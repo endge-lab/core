@@ -1,5 +1,5 @@
-import type { EndgeContract } from '@/domain/types/faceted-cascade'
-import type { ConfigurationContract } from '@/domain/types/configuration-contract.types'
+import type { EndgeContract } from '@/domain/types/configuration/faceted-cascade'
+import type { ConfigurationContract } from '@/domain/types/configuration/configuration-contract.types'
 
 import { ENDGE_CORE_DEFAULT_BEHAVIOR_CONTRACTS } from '@/model/config/contracts/behavior'
 import { ENDGE_CORE_DEFAULT_CONFIGURATION_CONTRACTS as ENDGE_CORE_CONFIGURATION_CONTRACTS } from '@/model/config/contracts/configuration'
