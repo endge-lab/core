@@ -2,9 +2,6 @@ import { RField } from '@/domain/entities/reflect/RField'
 import { ComponentKind } from '@/domain/types/types'
 import { REntity } from '@/domain/entities/reflect/REntity'
 import { Exclude, Expose } from 'class-transformer'
-import * as t from '@babel/types'
-import { parse } from '@babel/parser'
-import traverse from '@babel/traverse'
 import { TypeRecord } from '@endge/utils'
 import { DependencyGraph } from '@/domain/entities/data/DependencyGraph'
 import { RaphNode } from '@endge/raph'
@@ -43,14 +40,6 @@ export class RComponentBase extends REntity {
   @TypeRecord(RField)
   inputFields: Record<string, RField> = {}
 
-  // Скрипт запуска
-  @Expose()
-  setupScript: string = ''
-
-  // Имена, которые экспортирует скрипт неявно (глобальным определением)
-  @Exclude()
-  exportedNames: Set<string> = new Set()
-
   @Exclude()
   depGraph: DependencyGraph | null = null
 
@@ -70,8 +59,6 @@ export class RComponentBase extends REntity {
 
     this.generateDependencyGraph()
     this.producerComponentPath = [this.id]
-    if (!this.setupScript?.length) return
-    this.extractDeclaredFns()
   }
 
   // Вторая фаза сборки, когда компонент порождает Runtime узлы (RaphNode)
@@ -93,36 +80,6 @@ export class RComponentBase extends REntity {
   // Возвращает массив идентификаторов зависимых компонентов.
   getDependencyComponentIds(): Array<string | number> {
     return []
-  }
-
-  extractDeclaredFns(): void {
-    if (!this.setupScript) return
-    try {
-      const ast = parse(this.setupScript, {
-        sourceType: 'module',
-        plugins: ['typescript', 'jsx'],
-      })
-
-      traverse(
-        ast,
-        {
-          FunctionDeclaration(path) {
-            if (path.node.id?.name) {
-              this.exportedNames.add(path.node.id.name)
-            }
-          },
-          VariableDeclarator(path) {
-            if (t.isIdentifier(path.node.id)) {
-              this.exportedNames.add(path.node.id.name)
-            }
-          },
-        },
-        undefined,
-        this,
-      )
-    } catch (e) {
-      console.warn('[DSL compile]: Failed to parse setupScript', e)
-    }
   }
 
   /**

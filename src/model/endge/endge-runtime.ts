@@ -4,6 +4,7 @@ import type { AnyRuntimeStrategy, EndgeRuntimeSnapshot, RuntimeExecutableModel }
 import { Raph, RaphNode } from '@endge/raph'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
+import { RuntimeAppScope, type RuntimeAppScopeOptions } from '@/domain/entities/runtime/RuntimeAppScope'
 import { RuntimeHostRegistry } from '@/domain/entities/runtime/RuntimeHostRegistry'
 import type { AnyRuntimeHost } from '@/model/services/runtime/RuntimeStrategy'
 import { RuntimeStrategyRegistry } from '@/model/services/runtime/RuntimeStrategyRegistry'
@@ -25,12 +26,20 @@ import { RuntimeNodeUpdatePhase } from '@/model/helpers/raph-phases/runtime-node
 export class EndgeRuntime extends EndgeModule {
   private _hosts = new RuntimeHostRegistry()
   private _strategies = new RuntimeStrategyRegistry()
-  private _nextRuntimeId = 0
   private _inited = false
   private _appNode: RaphNode | null = null
+  private _scopeNodes = new Map<string, RaphNode>()
+  private _appScopes = new Map<string, RuntimeAppScope>()
+  private _defaultAppScope: RuntimeAppScope
 
   public constructor() {
     super()
+    this._defaultAppScope = this.createAppScope({
+      id: 'app',
+      rootPath: 'runtime',
+      collisionPolicy: 'multi',
+      persistence: 'disabled',
+    })
     this.registerDefaultStrategies()
   }
 
@@ -79,6 +88,28 @@ export class EndgeRuntime extends EndgeModule {
    */
   public registerStrategy(strategy: AnyRuntimeStrategy): void {
     this._strategies.register(strategy)
+  }
+
+  /** Создаёт или возвращает именованный root runtime scope приложения. */
+  public createAppScope(options: RuntimeAppScopeOptions): RuntimeAppScope {
+    const scopeId = String(options.id ?? '').trim()
+    const existing = this._appScopes.get(scopeId)
+    if (existing) {
+      return existing
+    }
+    const scope = new RuntimeAppScope(this, options)
+    this._appScopes.set(scope.id, scope)
+    return scope
+  }
+
+  /** Root scope обычного запуска приложения. */
+  public getDefaultAppScope(): RuntimeAppScope {
+    return this._defaultAppScope
+  }
+
+  /** Возвращает зарегистрированный AppScope. */
+  public getAppScope(id: string): RuntimeAppScope | null {
+    return this._appScopes.get(String(id ?? '').trim()) ?? null
   }
 
   /**
@@ -147,8 +178,13 @@ export class EndgeRuntime extends EndgeModule {
   public getRuntimeHostsByEntity(
     entityType: RuntimeEntityType,
     entityIdentity: string,
+    appScopeId?: string,
   ): AnyRuntimeHost[] {
-    return this._hosts.getByEntity(entityType, entityIdentity)
+    const hosts = this._hosts.getByEntity(entityType, entityIdentity)
+    const normalizedScopeId = String(appScopeId ?? '').trim()
+    return normalizedScopeId
+      ? hosts.filter(host => host.meta.appScopeId === normalizedScopeId)
+      : hosts
   }
 
   /**
@@ -200,6 +236,9 @@ export class EndgeRuntime extends EndgeModule {
     Raph.clearPhases()
     if (this._appNode)
       Raph.app.removeNode(this._appNode)
+    this._scopeNodes.clear()
+    for (const scope of this._appScopes.values())
+      scope.reset()
     this._appNode = null
     this._inited = false
 
@@ -258,16 +297,39 @@ export class EndgeRuntime extends EndgeModule {
     const parent = this.resolveParentHost(meta?.parent)
     const hostMeta = { ...(meta ?? {}) }
     delete hostMeta.parent
+    const appScope = this.resolveAppScope(hostMeta.appScope, parent)
+    delete hostMeta.appScope
     const artifactReader = isRuntimeArtifactReader(hostMeta.artifactReader)
       ? hostMeta.artifactReader
       : Endge.program
     delete hostMeta.artifactReader
 
-    const runtimeId = this.resolveRuntimeId(hostMeta.id)
-    if (this._hosts.getById(runtimeId)) {
-      console.error(`[EndgeRuntime] Runtime host "${runtimeId}" is already active.`)
-      return null
+    const scopeRoot = hostMeta.scopeRoot === true || !parent
+    const identity = String((model as any)?.identity ?? (model as any)?.id ?? strategy.entityType)
+    const address = appScope.allocate({
+      entityType: strategy.entityType,
+      identity,
+      explicitRuntimeId: hostMeta.id,
+      requestedLocalId: hostMeta.instanceId,
+      scopeRoot,
+    })
+    const runtimeId = address.runtimeId
+    const existing = this._hosts.getById(runtimeId)
+    if (existing) {
+      if (scopeRoot && appScope.collisionPolicy === 'replace') {
+        this.destroyRuntimeTree(runtimeId)
+      }
+      else {
+        console.error(`[EndgeRuntime] Runtime host "${runtimeId}" is already active.`)
+        return null
+      }
     }
+    hostMeta.appScopeId = appScope.id
+    hostMeta.appScopeRootPath = appScope.rootPath
+    hostMeta.runtimeLocalId = address.localId
+    hostMeta.runtimePath = address.runtimePath
+    hostMeta.scopeRoot = scopeRoot
+    hostMeta.persistence ??= appScope.persistence
 
     const host = strategy.create({
       id: runtimeId,
@@ -313,7 +375,7 @@ export class EndgeRuntime extends EndgeModule {
           parentRuntimeId: parent?.id ?? null,
         },
       })
-      ;(parent?.node ?? this._appNode)?.addChild(host.node, { invalidate: false })
+      ;(parent?.node ?? this.ensureScopeNode(String(host.meta.appScopeId ?? 'app')))?.addChild(host.node, { invalidate: false })
     }
     try {
       this._hosts.register(host)
@@ -347,16 +409,46 @@ export class EndgeRuntime extends EndgeModule {
     this.registerStrategy(new ComponentRuntimeStrategy())
   }
 
-  /**
-   * Генерирует следующий runtime-id.
-   */
-  private createRuntimeId(): string {
-    return `runtime-${this._nextRuntimeId++}`
+  /** Разрешает scope запуска: explicit -> parent -> default app. */
+  private resolveAppScope(rawScope: unknown, parent: AnyRuntimeHost | null): RuntimeAppScope {
+    if (rawScope instanceof RuntimeAppScope) {
+      return rawScope
+    }
+    const explicitId = typeof rawScope === 'string' ? rawScope.trim() : ''
+    if (explicitId) {
+      const explicit = this.getAppScope(explicitId)
+      if (!explicit) {
+        throw new Error(`[EndgeRuntime] AppScope "${explicitId}" is not registered.`)
+      }
+      return explicit
+    }
+    const parentScopeId = String(parent?.meta.appScopeId ?? '').trim()
+    return this.getAppScope(parentScopeId) ?? this._defaultAppScope
   }
 
-  private resolveRuntimeId(value: unknown): string {
-    const explicit = String(value ?? '').trim()
-    return explicit || this.createRuntimeId()
+  /** Создаёт Raph graph node для AppScope независимо от data namespace. */
+  private ensureScopeNode(scopeId: string): RaphNode | null {
+    const scope = this.getAppScope(scopeId) ?? this._defaultAppScope
+    const existing = this._scopeNodes.get(scope.id)
+    if (existing) {
+      return existing
+    }
+    if (!this._appNode) {
+      return null
+    }
+    const node = new RaphNode(Raph.app, {
+      id: `__endge.runtime.scope.${scope.id}`,
+      meta: {
+        type: 'runtime-scope',
+        kind: 'app-scope',
+        appScopeId: scope.id,
+        rootPath: scope.rootPath,
+      },
+    })
+    Raph.app.addNode(node)
+    this._appNode.addChild(node, { invalidate: false })
+    this._scopeNodes.set(scope.id, node)
+    return node
   }
 
   /**

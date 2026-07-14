@@ -40,7 +40,6 @@ export function ReflectComponentFromPlain(
     table.folderId = base.folderId ?? null
     ;(table as any).group = (base as any).group ?? base.folderId
     table.inputFields = base.inputFields
-    table.setupScript = base.setupScript
     table.sourceIndex = json.sourceIndex
     table.rowSize = json.rowSize
     table.runtimeFilters = json.runtimeFilters

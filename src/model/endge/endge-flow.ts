@@ -3,7 +3,7 @@ import type { RQuery } from '@/domain/entities/reflect/RQuery'
 import type { ActionCompiledFlow, FlowHandlerContext, FlowValidationIssue } from '@/domain/types/action.types'
 import type { FlowExecutionResult, FlowExecutionState } from '@/domain/types/endge-flow-runtime.types'
 import type { FlowSwitchParams } from '@/domain/types/flow-condition.types'
-import type { EndgeFlowEdgeDefinition, EndgeFlowNodeDefinition } from '@/domain/types/endge-flow.types'
+import type { EndgeFlowNodeDefinition } from '@/domain/types/endge-flow.types'
 import type { QueryProgramPayload } from '@/domain/types/program.types'
 import type { RuntimeHost } from '@/domain/types/runtime-host.types'
 
@@ -94,7 +94,7 @@ export class EndgeFlow extends EndgeModule {
       const nextNode = compiled.nodesById.get(nodeId)
       const outgoing = compiled.outgoingByNodeId.get(nodeId) ?? []
       if (nextNode?.blockId === 'core.switch' && outgoing.length > 0) {
-        const selectedPortId = await this._getSwitchSelectedPortId(host, compiled, nextNode, state)
+        const selectedPortId = await this._getSwitchSelectedPortId(host, nextNode, state)
         const nextEdge = outgoing.find(e => String(e.sourcePortId) === selectedPortId)
           ?? outgoing.find(e => String(e.sourcePortId) === 'else')
           ?? outgoing[0]
@@ -529,28 +529,15 @@ export class EndgeFlow extends EndgeModule {
    */
   private async _getSwitchSelectedPortId(
     host: RuntimeHost<'action'>,
-    compiled: ActionCompiledFlow,
     node: EndgeFlowNodeDefinition,
     state: FlowExecutionState,
   ): Promise<string> {
     const params = (this._toPlainParams(node.params) ?? {}) as FlowSwitchParams
     const mode = params.conditionMode ?? 'script'
-    const outgoing = compiled.outgoingByNodeId.get(node.id) ?? []
     const elsePortId = 'else'
-    const firstCasePortId = outgoing.find((e: EndgeFlowEdgeDefinition) => String(e.sourcePortId) !== elsePortId)?.sourcePortId ?? elsePortId
 
     if (mode === 'script') {
-      const expr = params.scriptExpression
-      if (expr != null && String(expr).trim()) {
-        try {
-          const scope = Endge.script.getScope('flow-switch', undefined)
-          const result = Endge.script.evaluate(String(expr).trim(), scope, { ctx: state })
-          return result ? String(firstCasePortId) : elsePortId
-        }
-        catch {
-          return elsePortId
-        }
-      }
+      // Arbitrary script conditions are no longer executed.
       return elsePortId
     }
 

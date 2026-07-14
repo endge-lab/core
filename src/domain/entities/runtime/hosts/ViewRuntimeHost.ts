@@ -63,7 +63,7 @@ export class ViewRuntimeHost extends RuntimeHostBase<'view'> {
       entityIdentity: model.identity ?? String(model.id),
       parent,
       title: model.name ?? model.identity ?? `View ${model.id}`,
-      meta: { runtimeKind: 'runtime', parentRuntimeId: parent?.id ?? null },
+      meta: { ...meta, runtimeKind: 'runtime', parentRuntimeId: parent?.id ?? null },
     })
 
     Raph.app.addNode(node)

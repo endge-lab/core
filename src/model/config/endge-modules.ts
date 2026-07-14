@@ -26,7 +26,6 @@ import { EndgeReports } from '@/model/endge/endge-reports'
 import { EndgeRuntime } from '@/model/endge/endge-runtime'
 import { EndgeRuntimeDebugger } from '@/model/endge/endge-runtime-debugger'
 import { EndgeSchemaStorage } from '@/model/endge/endge-schema-database'
-import { EndgeScript } from '@/model/endge/endge-script'
 import { EndgeSource } from '@/model/endge/endge-source'
 import { EndgeSSE } from '@/model/endge/endge-sse'
 import { EndgeStore } from '@/model/endge/endge-store'
@@ -59,7 +58,6 @@ export const ENDGE_CORE_MODULES: EndgeModuleDefinition[] = [
   { key: 'flow', module: EndgeFlow },
   { key: 'render', module: EndgeRender },
   { key: 'store', module: EndgeStore },
-  { key: 'script', module: EndgeScript },
   { key: 'runtime', module: EndgeRuntime },
   { key: 'vars', module: EndgeVars },
   { key: 'query', module: EndgeQuery },

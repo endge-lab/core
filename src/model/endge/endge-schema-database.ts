@@ -1045,7 +1045,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         name,
         type,
         inputs,
-        setupScript: raw.setupScript ?? '',
         runtimeFilters,
         folderId: relationToId(raw.folder) ?? null,
         project: relationToId(raw.project) ?? null,
@@ -4365,7 +4364,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       name,
       type,
       inputs,
-      setupScript: raw.setupScript ?? '',
       runtimeFilters: Array.isArray(raw.runtimeFilters) ? raw.runtimeFilters.map((x: any) => (typeof x === 'object' && x?.value != null ? x.value : String(x))) : [],
       folderId: relationToId(raw.folder) ?? null,
     }

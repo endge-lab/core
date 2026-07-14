@@ -63,7 +63,7 @@ export class ProjectRuntimeHost extends RuntimeHostBase<'project'> {
       entityIdentity: model.identity ?? String(model.id),
       parent,
       title: model.displayName ?? model.name ?? model.identity ?? `Project ${model.id}`,
-      meta: { runtimeKind: 'runtime', parentRuntimeId: parent?.id ?? null },
+      meta: { ...meta, runtimeKind: 'runtime', parentRuntimeId: parent?.id ?? null },
     })
 
     Raph.app.addNode(node)

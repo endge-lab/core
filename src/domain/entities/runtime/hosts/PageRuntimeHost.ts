@@ -63,7 +63,7 @@ export class PageRuntimeHost extends RuntimeHostBase<'page'> {
       entityIdentity: model.identity ?? String(model.id),
       parent,
       title: model.name ?? model.identity ?? `Page ${model.id}`,
-      meta: { runtimeKind: 'runtime', parentRuntimeId: parent?.id ?? null },
+      meta: { ...meta, runtimeKind: 'runtime', parentRuntimeId: parent?.id ?? null },
     })
 
     Raph.app.addNode(node)

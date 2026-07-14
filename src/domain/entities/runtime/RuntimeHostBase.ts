@@ -149,7 +149,8 @@ export abstract class RuntimeHostBase<
   }) {
     super([])
     this.id = String(input.id)
-    this.basePath = `__endge.runtime.${encodePathPart(this.id)}`
+    this.basePath = String(input.meta?.runtimePath ?? '').trim()
+      || `__endge.runtime.${encodePathPart(this.id)}`
     this.parent = input.parent ?? null
     this.kind = input.kind
     this.runtimeType = input.runtimeType

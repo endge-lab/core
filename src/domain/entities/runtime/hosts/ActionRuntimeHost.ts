@@ -125,6 +125,7 @@ export class ActionRuntimeHost extends RuntimeHostBase<'action'> {
       parent,
       title: model.name ?? model.identity ?? `Action ${model.id}`,
       meta: {
+        ...meta,
         runtimeKind: 'action',
         parentRuntimeId: parent?.id ?? null,
         watchPaths,

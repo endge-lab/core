@@ -47,7 +47,7 @@ export class RComponentDSL extends RComponentBase {
     // Создаем AST и парсим
     dbg.info('Создаём AST и парсим JSX-скрипт')
     const ast = new AbstractSyntaxTree_JSX(this.jsxScript, this.id)
-    ast.parseAndBuildGraph(this.inputFields, this.exportedNames)
+    ast.parseAndBuildGraph(this.inputFields)
     this.depGraph = ast.getDependencyGraph()
     dbg.success('AST успешно создан')
 
@@ -64,12 +64,11 @@ export class RComponentDSL extends RComponentBase {
       decodeEntities: decode,
     })
 
-    this.ast.children.forEach((node) => walkAndNormalize(node, this))
+    this.ast.children.forEach(node => walkAndNormalize(node))
 
     this.generateVarPaths()
 
     // console.log(this.ast)
-    // console.log('Exported Names', this.exportedNames)
     // console.log('Required Fns', this.requiredFns)
     // console.log('Required Vars', this.requiredVars)
     // console.log('Vars', this.varsPaths)
@@ -213,20 +212,14 @@ function collectVars(code: string, dsl: RComponentDSL): void {
   }
 }
 
-function walkAndNormalize(
-  node: TemplateChildNode,
-  component?: RComponentDSL,
-): void {
+function walkAndNormalize(node: TemplateChildNode): void {
   if (node.type === NodeTypes.ELEMENT) {
-    normalizeDirectives(node, component)
-    node.children.forEach((child) => walkAndNormalize(child, component))
+    normalizeDirectives(node)
+    node.children.forEach(child => walkAndNormalize(child))
   }
 }
 
-function normalizeDirectives(
-  node: ElementNode,
-  component?: RComponentDSL,
-): void {
+function normalizeDirectives(node: ElementNode): void {
   const newProps = node.props.map((prop) => {
     if (prop.type === NodeTypes.ATTRIBUTE) {
       if (prop.name === 'if' && prop.value?.content) {
@@ -323,19 +316,6 @@ function normalizeDirectives(
   })
 
   node.props = newProps
-
-  for (const prop of node.props) {
-    if (
-      prop.type === NodeTypes.DIRECTIVE &&
-      prop.name === 'on' &&
-      prop.exp?.type === NodeTypes.SIMPLE_EXPRESSION
-    ) {
-      const handlerName = prop.exp.content.trim()
-      if (handlerName && component) {
-        component.exportedNames.add(handlerName)
-      }
-    }
-  }
 }
 
 function normalizeInterpolations(raw: string): string {

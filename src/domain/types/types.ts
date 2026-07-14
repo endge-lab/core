@@ -36,7 +36,7 @@ export enum Prefix {
 export interface ComponentType_Props<T extends RComponentBase> {
   model: T
   comData: Record<string, any> // данные, которые требует компонент
-  scope: RuntimeScope
+  scope?: RuntimeScope
   context?: Record<string, any> // дополнительный контекст, который может быть передан в компонент
 }
 
@@ -52,7 +52,7 @@ export interface JSXComponentProps {
   node: ElementNode
   children: (VNode | string | null)[]
 
-  scope: RuntimeScope
+  scope?: RuntimeScope
   handlers?: Record<string, CallableFunction>
 
   comData: Record<string, any> // данные только для компонента (извлеченные)

@@ -94,13 +94,13 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
 
   /** Возвращает абсолютный Raph path Store state или вложенного поля. */
   public getDataPath(path = ''): string {
-    return this.statePath(path)
+    return appendStorePath(this.basePath, path)
   }
 
   /** Возвращает текущий снимок raw и derived Store fields. */
   public getDataSnapshot(): Readonly<Record<string, unknown>> {
     return cloneRuntimeValue(
-      (Raph.get(this.statePath()) as Record<string, unknown> | undefined) ?? {},
+      (Raph.get(this.getDataPath()) as Record<string, unknown> | undefined) ?? {},
     )
   }
 
@@ -184,11 +184,22 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
       kind: 'raph',
       name: 'Store state',
       direction: 'both',
-      subtitle: this.statePath(),
+      subtitle: this.getDataPath(),
     })
     const now = new Date().toISOString()
     this.setContext({ status: 'success', startedAt: now, updatedAt: now, lastStateChangeAt: now })
   }
+}
+
+function appendStorePath(base: string, path: string): string {
+  const suffix = String(path ?? '').trim()
+  if (!suffix)
+    return base
+  return `${base}.${suffix.split('.').map(encodePathPart).join('.')}`
+}
+
+function encodePathPart(value: string): string {
+  return encodeURIComponent(String(value)).replace(/\./g, '%2E')
 }
 
 function cloneRuntimeValue<T>(value: T): T {

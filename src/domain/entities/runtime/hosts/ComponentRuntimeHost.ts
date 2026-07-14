@@ -68,7 +68,7 @@ export class ComponentRuntimeHost extends RuntimeHostBase<'component'> {
       entityIdentity: model.identity ?? String(model.id),
       parent,
       title: model.name ?? model.identity ?? `Component ${model.id}`,
-      meta: { runtimeKind: 'runtime', parentRuntimeId: parent?.id ?? null, basePath },
+      meta: { ...meta, runtimeKind: 'runtime', parentRuntimeId: parent?.id ?? null, basePath },
     })
 
     Raph.app.addNode(node)
