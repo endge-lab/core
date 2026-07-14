@@ -19,7 +19,7 @@ import { Raph, RaphNode } from '@endge/raph'
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 import { FilterViewRuntimeHost as EndgeFilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
 import { Endge } from '@/model/endge/endge'
-import { evaluateSourceExpression } from '@/domain/services/source-engine/source-expression-evaluate'
+import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
 
 function defaultContext(): RuntimeHostContext<'composition'> {
   return {

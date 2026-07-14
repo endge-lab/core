@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
 import { FilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
-import { compileFilterSource } from '@/domain/services/source-engine/filter-source-compile'
+import { compileFilterSource } from '@/model/services/source-engine/filter-source-compile'
 
 describe('FilterViewRuntimeHost', () => {
   afterEach(() => Raph.app.reset())

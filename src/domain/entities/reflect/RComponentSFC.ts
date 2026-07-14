@@ -2,7 +2,7 @@ import { Expose } from 'class-transformer'
 
 import { type DuplicateOptions } from '@/domain/entities/reflect/REntity'
 import { RComponentCore } from '@/domain/entities/reflect/RComponentCore'
-import { serializeSFCSourceParts } from '@/domain/services/compiler/component-sfc-source-parts'
+import { serializeSFCSourceParts } from '@/model/services/compiler/component-sfc-source-parts'
 import type { RComponentRenderTarget } from '@/domain/types/component-core.types'
 import type { RComponentSFCSource_Parts } from '@/domain/types/component-sfc.types'
 import { ComponentType } from '@/domain/types/document.types'

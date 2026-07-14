@@ -11,7 +11,7 @@ import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import {
   KeycloakAuthService,
   mapTokenResponseToStored,
-} from '@/domain/services/auth'
+} from '@/model/services/auth'
 import { Endge } from '@/model/endge/endge'
 
 export class EndgeAuthProfiles extends EndgeModule {

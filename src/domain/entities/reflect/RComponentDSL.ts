@@ -8,7 +8,7 @@ import type {
 import { baseParse, NodeTypes } from '@vue/compiler-dom'
 import { decode } from 'he'
 import { DataPath } from '@endge/raph'
-import { AbstractSyntaxTree_JSX } from '@/domain/services/AbstractSyntaxTree_JSX'
+import { AbstractSyntaxTree_JSX } from '@/model/services/AbstractSyntaxTree_JSX'
 import { Endge } from '@/model/endge/endge'
 import { ENDGE_LOG_LANES } from '@/model/config/debug'
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { DATA_VIEW_DEFAULT_SOURCE } from '@/domain/services/source-engine/templates/data-view.default.source'
+import { DATA_VIEW_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/data-view.default.source'
 import { EndgeDataView } from '@/model/endge/endge-data-view'
 
 const dataView = new EndgeDataView()

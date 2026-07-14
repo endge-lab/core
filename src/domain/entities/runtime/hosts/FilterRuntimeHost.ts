@@ -12,7 +12,7 @@ import type { SourceFieldDefinition } from '@/domain/types/source-expression.typ
 import { Raph, RaphNode } from '@endge/raph'
 
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
-import { evaluateSourceExpression } from '@/domain/services/source-engine/source-expression-evaluate'
+import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
 
 function defaultContext(instance: string): RuntimeHostContext<'filter'> {
   return {

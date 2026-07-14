@@ -5,7 +5,7 @@ import type { AxiosInstance } from 'axios'
 import axios from 'axios'
 
 import { Endge } from '@/model/endge/endge'
-import { evaluateSourceExpression } from '@/domain/services/source-engine/source-expression-evaluate'
+import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
 
 export interface QueryExecutionContext {
   /** Runtime-ready query payload из Endge.program. */

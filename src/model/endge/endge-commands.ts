@@ -8,7 +8,7 @@ import type {
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { RuntimeCommandRegistry } from '@/domain/entities/runtime/RuntimeCommandRegistry'
-import { createTableRuntimeCommands } from '@/domain/services/runtime/table-commands'
+import { createTableRuntimeCommands } from '@/model/services/runtime/table-commands'
 
 export class EndgeCommands extends EndgeModule {
   private readonly _registry = new RuntimeCommandRegistry()
