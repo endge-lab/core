@@ -1,76 +1,134 @@
 import type {
+  EndgeMockBindingStatus,
   EndgeMockDescriptor,
+  EndgeMockProvider,
   EndgeMockRegistration,
   EndgeMockSnapshot,
 } from '@/domain/types/mock'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
-import { ENDGE_BUILTIN_MOCKS } from '@/model/config/endge-mocks'
+import { Endge } from '@/model/endge/kernel/endge'
 
-/** Registry и runtime reader mock payload по стабильному identity. */
+/** Runtime resolver persisted mock-документов и подключенных code providers. */
 export class EndgeMock extends EndgeModule {
-  private readonly _items = new Map<string, EndgeMockRegistration>()
+  private readonly _providers = new Map<string, EndgeMockProvider>()
 
-  /** Создает registry и регистрирует встроенные mock payload. */
+  /** Создает пустой registry для application providers. */
   public constructor() {
     super()
     this.reset()
   }
 
-  /** Регистрирует mock payload и запрещает неявную замену существующего identity. */
-  public register(registration: EndgeMockRegistration): void {
-    const normalized = normalizeRegistration(registration)
-    if (this._items.has(normalized.identity))
-      throw new Error(`[EndgeMock] Mock "${normalized.identity}" is already registered.`)
+  /** Регистрирует provider по namespaced ref и запрещает неявную замену. */
+  public registerProvider(provider: EndgeMockProvider): void {
+    const normalized = normalizeProvider(provider)
+    if (this._providers.has(normalized.ref))
+      throw new Error(`[EndgeMock] Provider "${normalized.ref}" is already registered.`)
 
-    this._items.set(normalized.identity, normalized)
+    this._providers.set(normalized.ref, normalized)
     this.notify()
   }
 
-  /** Проверяет наличие mock payload по identity. */
-  public has(identity: string): boolean {
-    return this._items.has(normalizeIdentity(identity))
+  /**
+   * Compatibility adapter старого data registration.
+   * Он регистрирует только provider и не создает RMock в домене.
+   */
+  public register(registration: EndgeMockRegistration): void {
+    const ref = normalizeRef(registration?.identity)
+    const data = cloneMockValue(registration?.data)
+    this.registerProvider({
+      ref,
+      description: registration?.description,
+      provide: () => data,
+    })
   }
 
-  /** Возвращает независимую копию mock payload или бросает явную ошибку. */
+  /** Возвращает состояние binding persisted mock и code provider. */
+  public getBindingStatus(identity: string): EndgeMockBindingStatus {
+    const mock = Endge.domain.getMock(normalizeIdentity(identity))
+    if (!mock)
+      return 'missing-document'
+    if (mock.contentSource === 'code-provider')
+      return mock.codeRef && this._providers.has(mock.codeRef) ? 'connected' : 'missing-provider'
+    if (mock.contentType === 'application/json') {
+      try {
+        JSON.parse(mock.source)
+      }
+      catch {
+        return 'invalid-content'
+      }
+    }
+    return 'document'
+  }
+
+  /** Проверяет, может ли persisted mock быть разрешен прямо сейчас. */
+  public has(identity: string): boolean {
+    const status = this.getBindingStatus(identity)
+    return status === 'document' || status === 'connected'
+  }
+
+  /** Разрешает данные из persisted document или его code provider. */
   public get<T = unknown>(identity: string): T {
     const normalizedIdentity = normalizeIdentity(identity)
-    const registration = this._items.get(normalizedIdentity)
-    if (!registration)
-      throw new Error(`[EndgeMock] Mock "${normalizedIdentity}" is not registered.`)
+    const mock = Endge.domain.getMock(normalizedIdentity)
+    if (!mock)
+      throw new Error(`[EndgeMock] Persisted mock document "${normalizedIdentity}" is not loaded.`)
 
-    return cloneMockValue(registration.data) as T
+    if (mock.contentSource === 'code-provider') {
+      const ref = normalizeRef(mock.codeRef)
+      const provider = this._providers.get(ref)
+      if (!provider)
+        throw new Error(`[EndgeMock] Provider "${ref}" for mock "${normalizedIdentity}" is not registered.`)
+      const value = provider.provide({ mock })
+      if (value && typeof (value as { then?: unknown }).then === 'function')
+        throw new Error(`[EndgeMock] Provider "${ref}" must be synchronous.`)
+      return cloneMockValue(value) as T
+    }
+
+    if (mock.contentType === 'text/plain')
+      return mock.source as T
+
+    try {
+      return cloneMockValue(JSON.parse(mock.source)) as T
+    }
+    catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      throw new Error(`[EndgeMock] Mock "${normalizedIdentity}" contains invalid JSON: ${message}`)
+    }
   }
 
-  /** Возвращает описания зарегистрированных mock payload без тяжелых данных. */
-  public list(): EndgeMockDescriptor[] {
-    return [...this._items.values()].map(item => ({
-      identity: item.identity,
+  /** Возвращает descriptions зарегистрированных code providers. */
+  public listProviders(): EndgeMockDescriptor[] {
+    return [...this._providers.values()].map(item => ({
+      ref: item.ref,
       ...(item.description ? { description: item.description } : {}),
     }))
   }
 
-  /** Очищает runtime registration и восстанавливает встроенный manifest. */
+  /** @deprecated Используйте listProviders(). */
+  public list(): EndgeMockDescriptor[] {
+    return this.listProviders()
+  }
+
+  /** Очищает runtime providers. */
   public override reset(): void {
-    this._items.clear()
-    for (const registration of ENDGE_BUILTIN_MOCKS)
-      this._items.set(registration.identity, normalizeRegistration(registration))
+    this._providers.clear()
     this.notify()
   }
 
-  /** Возвращает легкий snapshot registry для diagnostics и configurator UI. */
+  /** Возвращает легкий snapshot provider registry. */
   public override serialize(): EndgeMockSnapshot {
-    return { mocks: this.list() }
+    return { providers: this.listProviders() }
   }
 }
 
-function normalizeRegistration(registration: EndgeMockRegistration): EndgeMockRegistration {
+function normalizeProvider(provider: EndgeMockProvider): EndgeMockProvider {
+  if (typeof provider?.provide !== 'function')
+    throw new Error('[EndgeMock] Provider.provide must be a function.')
   return {
-    identity: normalizeIdentity(registration?.identity),
-    data: cloneMockValue(registration?.data),
-    ...(registration?.description
-      ? { description: String(registration.description).trim() }
-      : {}),
+    ref: normalizeRef(provider.ref),
+    provide: provider.provide,
+    ...(provider.description ? { description: String(provider.description).trim() } : {}),
   }
 }
 
@@ -81,11 +139,18 @@ function normalizeIdentity(identity: unknown): string {
   return normalized
 }
 
+function normalizeRef(ref: unknown): string {
+  const normalized = String(ref ?? '').trim()
+  if (!normalized)
+    throw new Error('[EndgeMock] Provider ref is required.')
+  return normalized
+}
+
 function cloneMockValue<T>(value: T): T {
   try {
     const json = JSON.stringify(value)
     if (json === undefined)
-      throw new Error('[EndgeMock] Mock data must be JSON-compatible.')
+      throw new Error('not JSON-compatible')
     return JSON.parse(json) as T
   }
   catch {

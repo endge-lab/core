@@ -55,6 +55,8 @@ export class EndgeDataView {
       return this._runManual(artifact, input, runTools)
     if (artifact.mode === 'projection')
       return this._runProjection(artifact, input)
+    if (artifact.mode === 'expression')
+      return this._runExpression(artifact, input)
 
     return this._runPipeline(artifact, input, runTools, context)
   }
@@ -72,6 +74,18 @@ export class EndgeDataView {
         }),
       ]),
     )
+  }
+
+  /** Вычисляет root ValueExpression без object projection wrapper. */
+  private _runExpression(artifact: DataViewProgramPayload, input: unknown): unknown {
+    if (!artifact.expression)
+      return undefined
+    return evaluateSourceExpression(artifact.expression, {
+      scope: input,
+      onWarning: Endge.isConfigured
+        ? warning => Endge.debug.warn(`[DataView] ${warning.message}`, warning.data)
+        : undefined,
+    })
   }
 
   /** Выполняет DataView-ссылку из query/DataView artifact. */

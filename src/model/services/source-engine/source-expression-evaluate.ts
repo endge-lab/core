@@ -7,6 +7,8 @@ export function evaluateSourceExpression(
   expression: SourceExpressionIR,
   context: SourceExpressionContext = {},
 ): unknown {
+  const evaluationCache = new WeakMap<object, Map<string, unknown>>()
+
   const evaluate = (node: SourceExpressionIR, current: unknown = context.current): unknown => {
     if (node.type === 'literal')
       return cloneValue(node.value)
@@ -41,6 +43,16 @@ export function evaluateSourceExpression(
     const operation = VALUE_EXPRESSION_OPERATIONS[node.operation]
     return operation(node.arguments, {
       evaluate: (argument, nestedCurrent = current) => evaluate(argument, nestedCurrent),
+      memoize: (owner, key, create) => {
+        let ownerCache = evaluationCache.get(owner)
+        if (!ownerCache) {
+          ownerCache = new Map()
+          evaluationCache.set(owner, ownerCache)
+        }
+        if (!ownerCache.has(key))
+          ownerCache.set(key, create())
+        return ownerCache.get(key) as ReturnType<typeof create>
+      },
       warn: warning => context.onWarning?.(warning),
     })
   }

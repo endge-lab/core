@@ -19,6 +19,7 @@ import { RConverter } from '@/domain/entities/reflect/RConverter'
 import { RDataView } from '@/domain/entities/reflect/RDataView'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { RStore } from '@/domain/entities/reflect/RStore'
+import { RMock } from '@/domain/entities/reflect/RMock'
 import { REnvironment } from '@/domain/entities/reflect/REnvironment'
 import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { RFolder } from '@/domain/entities/reflect/RFolder'
@@ -139,6 +140,28 @@ export function storePayloadDocToPlain(doc: any): any {
   }
 }
 
+/** Собирает plain-объект Mock из документа Payload. */
+export function mockPayloadDocToPlain(doc: any): any {
+  return {
+    id: doc?.id,
+    identity: doc?.identity,
+    name: doc?.displayName ?? doc?.name,
+    displayName: doc?.displayName ?? doc?.name,
+    description: doc?.description ?? null,
+    contentSource: doc?.contentSource === 'code-provider' ? 'code-provider' : 'document',
+    contentType: doc?.contentType === 'text/plain' ? 'text/plain' : 'application/json',
+    source: typeof doc?.source === 'string' ? doc.source : '{}',
+    codeRef: String(doc?.codeRef ?? '').trim() || null,
+    folderId: relationToId(doc?.folder ?? doc?.folderId),
+    project: relationToId(doc?.project) ?? null,
+    meta: (doc?.meta && typeof doc.meta === 'object' && !Array.isArray(doc.meta)) ? doc.meta : {},
+    active: doc?.active !== false,
+    author: doc?.author,
+    inherited: doc?.inherited === true,
+    deletedAt: doc?.deletedAt ?? null,
+  }
+}
+
 /**
  * EndgeDomain – менеджер доменных данных.
  * Он заменяет ReflectDomain и объединяет управление типами, запросами и компонентами.
@@ -156,6 +179,7 @@ export interface EndgeDomainParsed {
   dataViews: RDataView[]
   compositions: RComposition[]
   stores: RStore[]
+  mocks: RMock[]
   actions: RAction[]
   converters: RConverter[]
   integrations: RIntegration[]
@@ -196,6 +220,9 @@ export class EndgeDomain extends EndgeModule {
 
   private _storesById: Map<string | number, RStore> = new Map()
   private _storesByIdentity: Map<string, RStore> = new Map()
+
+  private _mocksById: Map<string | number, RMock> = new Map()
+  private _mocksByIdentity: Map<string, RMock> = new Map()
 
   private _componentsById: Map<string | number, RComponent> = new Map()
   private _componentsByIdentity: Map<string, RComponent> = new Map()
@@ -312,6 +339,8 @@ export class EndgeDomain extends EndgeModule {
     this._compositionsByIdentity.clear()
     this._storesById.clear()
     this._storesByIdentity.clear()
+    this._mocksById.clear()
+    this._mocksByIdentity.clear()
     this._componentsById.clear()
     this._componentsByIdentity.clear()
     this._componentSFCsById.clear()
@@ -393,6 +422,8 @@ export class EndgeDomain extends EndgeModule {
     const compositionsPlain = compositionsRaw.map((row: any) => compositionPayloadDocToPlain(row))
     const storesRaw = Array.isArray((payload as any)?.stores) ? (payload as any).stores : []
     const storesPlain = storesRaw.map((row: any) => storePayloadDocToPlain(row))
+    const mocksRaw = Array.isArray((payload as any)?.mocks) ? (payload as any).mocks : []
+    const mocksPlain = mocksRaw.map((row: any) => mockPayloadDocToPlain(row))
     const projectsRaw = Array.isArray(payload?.projects) ? payload.projects : []
     const parametersRaw = Array.isArray(payload?.parameters) ? payload.parameters : []
     const filtersRaw = Array.isArray(payload?.filters) ? payload.filters : []
@@ -430,6 +461,7 @@ export class EndgeDomain extends EndgeModule {
       dataViews: dataViewsPlain,
       compositions: compositionsPlain,
       stores: storesPlain,
+      mocks: mocksPlain,
       components: componentsRaw,
       componentSFCs: componentSFCsRaw,
       folders: Array.isArray(payload?.folders) ? payload.folders : [],
@@ -948,6 +980,64 @@ export class EndgeDomain extends EndgeModule {
     const store = this.getStore(idOrIdentity)
     if (store)
       this.removeStoreById(store.id)
+  }
+
+  /** Возвращает все Mock-документы. */
+  getMocks(): RMock[] {
+    return Array.from(this._mocksByIdentity.values())
+  }
+
+  /** Возвращает Mock по Payload id. */
+  getMockById(id: string | number): RMock | null {
+    return this._mocksById.get(id) ?? null
+  }
+
+  /** Возвращает Mock по identity. */
+  getMockByIdentity(identity: string): RMock | null {
+    return this._mocksByIdentity.get(identity) ?? null
+  }
+
+  /** Возвращает Mock по id или identity. */
+  getMock(idOrIdentity: string | number): RMock | null {
+    return this.getMockById(idOrIdentity)
+      ?? this.getMockById(Number(idOrIdentity))
+      ?? this.getMockByIdentity(String(idOrIdentity))
+  }
+
+  /** Добавляет Mock в доменные indexes. */
+  addMock(mock: RMock): void {
+    if (this._mocksByIdentity.has(mock.identity) || this._mocksById.has(mock.id))
+      return
+    this._mocksById.set(mock.id, mock)
+    this._mocksByIdentity.set(mock.identity, mock)
+    this.notify()
+  }
+
+  /** Удаляет Mock по id. */
+  removeMockById(id: string | number): void {
+    const mock = this.getMockById(id)
+    if (!mock)
+      return
+    this._mocksById.delete(mock.id)
+    this._mocksByIdentity.delete(mock.identity)
+    this.notify()
+  }
+
+  /** Удаляет Mock по identity. */
+  removeMockByIdentity(identity: string): void {
+    const mock = this.getMockByIdentity(identity)
+    if (!mock)
+      return
+    this._mocksById.delete(mock.id)
+    this._mocksByIdentity.delete(mock.identity)
+    this.notify()
+  }
+
+  /** Удаляет Mock по id или identity. */
+  removeMock(idOrIdentity: string | number): void {
+    const mock = this.getMock(idOrIdentity)
+    if (mock)
+      this.removeMockById(mock.id)
   }
 
   /**
@@ -3018,6 +3108,7 @@ export class EndgeDomain extends EndgeModule {
       dataViews: persisted(this.getDataViews()).map(x => Serialize.toPlain(x)),
       compositions: persisted(this.getCompositions()).map(x => Serialize.toPlain(x)),
       stores: persisted(this.getStores()).map(x => Serialize.toPlain(x)),
+      mocks: persisted(this.getMocks()).map(x => x.toPlain()),
       components: persisted(this.getComponents()).map(x => ReflectComponentToPlain(x)),
       componentSFCs: persisted(this.getComponentSFCs()).map(x => x.toPlain()),
       actions: persisted(this.getActions()).map(x => Serialize.toPlain(x)),
@@ -3115,6 +3206,7 @@ export class EndgeDomain extends EndgeModule {
       dataViews: [],
       compositions: [],
       stores: [],
+      mocks: [],
       actions: [],
       converters: [],
       integrations: [],
@@ -3170,6 +3262,9 @@ export class EndgeDomain extends EndgeModule {
       json.stores.forEach((storeJson: any) => {
         out.stores.push(Serialize.fromJSON(RStore, storeJson))
       })
+    }
+    if (json.mocks && Array.isArray(json.mocks)) {
+      json.mocks.forEach((mockJson: any) => out.mocks.push(RMock.fromPlain(mockJson)))
     }
     if (json.actions && Array.isArray(json.actions)) {
       json.actions.forEach((actionJson: any) => out.actions.push(Serialize.fromJSON(RAction, actionJson)))
@@ -3250,6 +3345,7 @@ export class EndgeDomain extends EndgeModule {
     parsed.dataViews.forEach(dv => this.addDataView(dv))
     parsed.compositions.forEach(composition => this.addComposition(composition))
     parsed.stores.forEach(store => this.addStore(store))
+    parsed.mocks.forEach(mock => this.addMock(mock))
     parsed.actions.forEach(a => this.addAction(a))
     parsed.converters.forEach(c => this.addConverter(c))
     parsed.integrations.forEach(i => this.addIntegration(i))

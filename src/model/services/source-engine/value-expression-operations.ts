@@ -2,6 +2,7 @@ import type { SourceExpressionIR, SourceExpressionOperation, SourceExpressionWar
 
 export interface ValueOperationRuntime {
   evaluate: (expression: SourceExpressionIR, current?: unknown) => unknown
+  memoize: <T>(owner: object, key: string, create: () => T) => T
   warn: (warning: SourceExpressionWarning) => void
 }
 
@@ -22,6 +23,22 @@ interface JoinKey {
 interface JoinRow {
   left: unknown | null
   right: unknown | null
+}
+
+interface LookupBuilder {
+  kind: 'value-expression-lookup'
+  cardinality: 'one' | 'many'
+  source: unknown[]
+}
+
+interface LookupKey {
+  source: string
+  target: string
+}
+
+interface LookupIndex {
+  rowsByKey: Map<string, unknown[]>
+  warnedKeys: Set<string>
 }
 
 export type ValueOperation = (
@@ -96,6 +113,9 @@ export const VALUE_EXPRESSION_OPERATIONS: Record<SourceExpressionOperation, Valu
   'join-by': joinBy('all'),
   'join-by-any': joinBy('any'),
   'join-coalesce': joinCoalesce,
+  'lookup-one': lookupBuilder('one'),
+  'lookup-many': lookupBuilder('many'),
+  enrich,
 }
 
 function eager(operation: (args: unknown[]) => unknown): ValueOperation {
@@ -116,10 +136,21 @@ function joinBuilder(type: JoinType): ValueOperation {
   }) satisfies JoinBuilder
 }
 
+/** Создаёт отложенный lookup, который будет проиндексирован после .by(...). */
+function lookupBuilder(cardinality: LookupBuilder['cardinality']): ValueOperation {
+  return (args, runtime) => ({
+    kind: 'value-expression-lookup',
+    cardinality,
+    source: resolveCollectionSource(args[0], runtime),
+  }) satisfies LookupBuilder
+}
+
 /** Выполняет join по одному composite key или набору альтернативных keys. */
 function joinBy(mode: 'all' | 'any'): ValueOperation {
   return (args, runtime) => {
     const builder = runtime.evaluate(args[0])
+    if (isLookupBuilder(builder))
+      return executeLookup(builder, args[1], runtime)
     if (!isJoinBuilder(builder))
       return []
 
@@ -131,6 +162,77 @@ function joinBy(mode: 'all' | 'any'): ValueOperation {
 
     return executeJoin(builder, keys, mode, runtime)
   }
+}
+
+/** Дополняет вложенную object-ветку вычисленными полями, не меняя source rows. */
+function enrich(args: SourceExpressionIR[], runtime: ValueOperationRuntime): unknown {
+  const rows = runtime.evaluate(args[0])
+  const branchPath = String(runtime.evaluate(args[1]) ?? '').trim()
+  if (!Array.isArray(rows) || !branchPath)
+    return []
+
+  return rows.map((row) => {
+    if (!isRecord(row))
+      return cloneValue(row)
+
+    const branch = readPath(row, branchPath)
+    if (!isRecord(branch))
+      return cloneValue(row)
+
+    const fields = runtime.evaluate(args[2], branch)
+    if (!isRecord(fields))
+      return cloneValue(row)
+
+    return setPath(cloneValue(row), branchPath, deepMerge(branch, fields))
+  })
+}
+
+function executeLookup(
+  builder: LookupBuilder,
+  keyExpression: SourceExpressionIR | undefined,
+  runtime: ValueOperationRuntime,
+): unknown {
+  if (!keyExpression)
+    return builder.cardinality === 'many' ? [] : undefined
+
+  const key = normalizeLookupKey(runtime.evaluate(keyExpression))
+  if (!key)
+    return builder.cardinality === 'many' ? [] : undefined
+
+  const targetValue = runtime.evaluate({ type: 'read', source: 'current', path: key.target })
+  if (targetValue == null)
+    return builder.cardinality === 'many' ? [] : undefined
+
+  const index = runtime.memoize(builder.source, `lookup:${key.source}`, () => buildLookupIndex(builder.source, key.source))
+  const encodedTarget = structuralKey(targetValue)
+  const matches = index.rowsByKey.get(encodedTarget) ?? []
+
+  if (builder.cardinality === 'many')
+    return matches
+
+  if (matches.length > 1 && !index.warnedKeys.has(encodedTarget)) {
+    index.warnedKeys.add(encodedTarget)
+    runtime.warn({
+      code: 'value-expression-lookup-ambiguous',
+      message: `lookupOne matched ${matches.length} records for the same key.`,
+      data: { key, targetValue, matches: matches.length },
+    })
+  }
+  return matches[0]
+}
+
+function buildLookupIndex(source: unknown[], sourcePath: string): LookupIndex {
+  const rowsByKey = new Map<string, unknown[]>()
+  for (const row of source) {
+    const value = readPath(row, sourcePath)
+    if (value == null)
+      continue
+    const key = structuralKey(value)
+    const rows = rowsByKey.get(key) ?? []
+    rows.push(row)
+    rowsByKey.set(key, rows)
+  }
+  return { rowsByKey, warnedKeys: new Set() }
 }
 
 /** Объединяет left/right records, заполняя отсутствующие поля по приоритету. */
@@ -155,7 +257,7 @@ function joinCoalesce(args: SourceExpressionIR[], runtime: ValueOperationRuntime
   })
 }
 
-function resolveJoinSource(expression: SourceExpressionIR, runtime: ValueOperationRuntime): unknown[] {
+function resolveCollectionSource(expression: SourceExpressionIR, runtime: ValueOperationRuntime): unknown[] {
   const value = runtime.evaluate(expression)
   if (Array.isArray(value))
     return value
@@ -166,6 +268,8 @@ function resolveJoinSource(expression: SourceExpressionIR, runtime: ValueOperati
   return Array.isArray(resolved) ? resolved : []
 }
 
+const resolveJoinSource = resolveCollectionSource
+
 function normalizeJoinKey(value: unknown): JoinKey | null {
   if (typeof value === 'string' && value.trim())
     return { left: value.trim(), right: value.trim() }
@@ -174,6 +278,16 @@ function normalizeJoinKey(value: unknown): JoinKey | null {
   const left = typeof value.left === 'string' ? value.left.trim() : ''
   const right = typeof value.right === 'string' ? value.right.trim() : ''
   return left && right ? { left, right } : null
+}
+
+function normalizeLookupKey(value: unknown): LookupKey | null {
+  if (typeof value === 'string' && value.trim())
+    return { source: value.trim(), target: 'id' }
+  if (!isRecord(value))
+    return null
+  const source = typeof value.source === 'string' ? value.source.trim() : ''
+  const target = typeof value.target === 'string' ? value.target.trim() : ''
+  return source && target ? { source, target } : null
 }
 
 function executeJoin(
@@ -238,6 +352,13 @@ function isJoinBuilder(value: unknown): value is JoinBuilder {
     && Array.isArray(value.right)
 }
 
+function isLookupBuilder(value: unknown): value is LookupBuilder {
+  return isRecord(value)
+    && value.kind === 'value-expression-lookup'
+    && (value.cardinality === 'one' || value.cardinality === 'many')
+    && Array.isArray(value.source)
+}
+
 export function readPath(source: unknown, path: string): unknown {
   if (!path)
     return source
@@ -248,6 +369,22 @@ export function readPath(source: unknown, path: string): unknown {
     current = current[part]
   }
   return current
+}
+
+function setPath(source: Record<string, unknown>, path: string, value: unknown): Record<string, unknown> {
+  const parts = path.split('.').filter(Boolean)
+  if (!parts.length)
+    return source
+
+  let current = source
+  for (let index = 0; index < parts.length - 1; index++) {
+    const part = parts[index]!
+    const next = current[part]
+    current[part] = isRecord(next) ? next : {}
+    current = current[part] as Record<string, unknown>
+  }
+  current[parts.at(-1)!] = cloneValue(value)
+  return source
 }
 
 function hasPath(source: unknown, path: string): boolean {

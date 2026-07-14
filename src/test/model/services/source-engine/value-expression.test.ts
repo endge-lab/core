@@ -71,7 +71,12 @@ defineComposition({
       pairs: fullJoin(
         fromOutput('filter', 'arrivalPairs'),
         fromOutput('filter', 'departurePairs'),
-      ).byAny('arrivalLeg.id', 'departureLeg.id').coalesce(),
+      )
+        .byAny('arrivalLeg.id', 'departureLeg.id')
+        .coalesce()
+        .enrich('arrivalLeg', {
+          attributes: lookupOne(fromOutput('filter', 'attributes')).by('legId').getOr('items', []),
+        }),
     }),
   },
   hooks: [],
@@ -83,7 +88,7 @@ defineComposition({
     expect(result.artifact?.runtimes.find(runtime => runtime.name === 'query')?.props).toMatchObject({
       ids: { kind: 'expression', expression: { type: 'operation', operation: 'map' } },
       columns: { kind: 'expression', expression: { type: 'operation', operation: 'where' } },
-      pairs: { kind: 'expression', expression: { type: 'operation', operation: 'join-coalesce' } },
+      pairs: { kind: 'expression', expression: { type: 'operation', operation: 'enrich' } },
     })
   })
 
@@ -104,7 +109,12 @@ defineQuery({
       fullJoin(
         response('pairsArrival'),
         response('pairsDeparture'),
-      ).byAny('arrivalLeg.id', 'departureLeg.id').coalesce()
+      )
+        .byAny('arrivalLeg.id', 'departureLeg.id')
+        .coalesce()
+        .enrich('arrivalLeg', {
+          attributes: lookupOne(response('attributes')).by('legId').getOr('items', []),
+        })
     ),
   },
 })
@@ -130,8 +140,13 @@ defineQuery({
     expect(new QueryExecutor().readResponseOutput(result.artifact!.outputs[1], {
       pairsArrival: [{ id: 'A-null', arrivalLeg: { id: 'A' } }],
       pairsDeparture: [{ id: 'A-D', arrivalLeg: { id: 'A' }, departureLeg: { id: 'D' } }],
+      attributes: [{ legId: 'A', items: [{ name: 'BestOn' }] }],
     })).toEqual([
-      { id: 'A-null', arrivalLeg: { id: 'A' }, departureLeg: { id: 'D' } },
+      {
+        id: 'A-null',
+        arrivalLeg: { id: 'A', attributes: [{ name: 'BestOn' }] },
+        departureLeg: { id: 'D' },
+      },
     ])
   })
 
@@ -243,6 +258,101 @@ fullJoin(prop('arrival'), prop('departure'))
     ])
     expect(warnings).toEqual([
       expect.objectContaining({ code: 'value-expression-join-ambiguous' }),
+    ])
+  })
+
+  it('enriches existing branches through indexed one-to-one and one-to-many lookups', () => {
+    const expression = compile(`
+fullJoin('pairsArrival', 'pairsDeparture')
+  .byAny('arrivalLeg.id', 'departureLeg.id')
+  .coalesce()
+  .enrich('arrivalLeg', {
+    attributes: lookupOne('attributes').by('legId').getOr('items', []),
+    activities: lookupMany('activities').by({ source: 'legId', target: 'id' }),
+  })
+  .enrich('departureLeg', {
+    attributes: lookupOne('attributes').by('legId').getOr('items', []),
+  })
+`)
+    const scope = {
+      pairsArrival: [
+        { id: 'A-null', arrivalLeg: { id: 'A', carrier: 'SU' } },
+        { id: 'B-null', arrivalLeg: { id: 'B', carrier: 'SU' } },
+      ],
+      pairsDeparture: [
+        { id: 'A-D', arrivalLeg: { id: 'A' }, departureLeg: { id: 'D', carrier: 'SU' } },
+        { id: 'X-Y', arrivalLeg: { id: 'X' }, departureLeg: { id: 'Y' } },
+      ],
+      attributes: [
+        { legId: 'A', items: [{ code: 'stand', value: '101' }] },
+        { legId: 'D', items: [{ code: 'gate', value: '12' }] },
+      ],
+      activities: [
+        { id: 1, legId: 'A', code: 'tow' },
+        { id: 2, legId: 'A', code: 'pushback' },
+      ],
+    }
+
+    expect(evaluateValueExpression(expression, { scope })).toEqual([
+      {
+        id: 'A-null',
+        arrivalLeg: {
+          id: 'A',
+          carrier: 'SU',
+          attributes: [{ code: 'stand', value: '101' }],
+          activities: [
+            { id: 1, legId: 'A', code: 'tow' },
+            { id: 2, legId: 'A', code: 'pushback' },
+          ],
+        },
+        departureLeg: {
+          id: 'D',
+          carrier: 'SU',
+          attributes: [{ code: 'gate', value: '12' }],
+        },
+      },
+      {
+        id: 'B-null',
+        arrivalLeg: { id: 'B', carrier: 'SU', attributes: [], activities: [] },
+      },
+      {
+        id: 'X-Y',
+        arrivalLeg: { id: 'X', attributes: [], activities: [] },
+        departureLeg: { id: 'Y', attributes: [] },
+      },
+    ])
+
+    expect(scope.pairsArrival[0]).toEqual({ id: 'A-null', arrivalLeg: { id: 'A', carrier: 'SU' } })
+    expect(scope.pairsDeparture[0]).toEqual({
+      id: 'A-D',
+      arrivalLeg: { id: 'A' },
+      departureLeg: { id: 'D', carrier: 'SU' },
+    })
+  })
+
+  it('warns once when lookupOne finds duplicate records for one key', () => {
+    const warnings: any[] = []
+    const expression = compile(`
+prop('rows').enrich('leg', {
+  attributes: lookupOne(prop('attributes')).by('legId').getOr('items', []),
+})
+`)
+
+    expect(evaluateValueExpression(expression, {
+      props: {
+        rows: [{ leg: { id: 'A' } }, { leg: { id: 'A' } }],
+        attributes: [
+          { legId: 'A', items: [1] },
+          { legId: 'A', items: [2] },
+        ],
+      },
+      onWarning: warning => warnings.push(warning),
+    })).toEqual([
+      { leg: { id: 'A', attributes: [1] } },
+      { leg: { id: 'A', attributes: [1] } },
+    ])
+    expect(warnings).toEqual([
+      expect.objectContaining({ code: 'value-expression-lookup-ambiguous' }),
     ])
   })
 })

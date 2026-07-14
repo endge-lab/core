@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { RAction } from '@/domain/entities/reflect/RAction'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
+import { RMock } from '@/domain/entities/reflect/RMock'
 import { ComponentType, QueryType } from '@/domain/types/document/document.types'
 import { DocumentDraftFactory } from '@/model/services/document/DocumentDraftFactory'
 
@@ -49,6 +50,24 @@ describe('DocumentDraftFactory', () => {
       entrypoint: 'flow-entry',
       nodes: [],
       edges: [],
+    })
+  })
+
+  it('creates a persisted JSON mock draft', () => {
+    const draft = DocumentDraftFactory.create('mock', {
+      identity: 'orders-response',
+      name: 'Orders response',
+      folderId: 'root-mocks',
+    })
+
+    expect(draft).toBeInstanceOf(RMock)
+    expect(draft).toMatchObject({
+      identity: 'orders-response',
+      displayName: 'Orders response',
+      contentSource: 'document',
+      contentType: 'application/json',
+      source: '{}',
+      folderId: 'root-mocks',
     })
   })
 

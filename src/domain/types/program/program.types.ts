@@ -204,8 +204,8 @@ export interface DataViewProgramPayload {
   /** Тип artifact для diagnostics/debug UI. */
   type: 'data-view'
 
-  /** Режим выполнения source: manual transform, pipeline или object projection. */
-  mode: 'manual' | 'pipeline' | 'projection'
+  /** Режим выполнения source: manual transform, pipeline, object projection или root expression. */
+  mode: 'manual' | 'pipeline' | 'projection' | 'expression'
 
   /** Runtime-ready strategy; auto всегда разрешен compiler-ом заранее. */
   materializationStrategy: import('@/domain/types/source/data-view-source.types').DataViewMaterializationStrategy
@@ -221,6 +221,9 @@ export interface DataViewProgramPayload {
 
   /** Compiled object fields. Используется только в mode=projection. */
   output: Record<string, SourceExpressionIR>
+
+  /** Compiled root expression. Используется только в mode=expression. */
+  expression?: SourceExpressionIR | null
 }
 
 /** Payload artifact для нового source-first SFC компонента. */

@@ -63,6 +63,26 @@ const INPUT = {
 }
 
 describe('EndgeDataView pipeline transform', () => {
+  it('returns a root expression result without an object projection wrapper', () => {
+    const output = dataView.runSource(`
+defineDataView({
+  output: fullJoin(
+    path('pairsArrival'),
+    path('pairsDeparture'),
+  )
+    .byAny('arrivalLeg.id', 'departureLeg.id')
+    .coalesce(),
+})
+`, {
+      pairsArrival: [{ id: 'A-null', arrivalLeg: { id: 'A' } }],
+      pairsDeparture: [{ id: 'A-D', arrivalLeg: { id: 'A' }, departureLeg: { id: 'D' } }],
+    })
+
+    expect(output).toEqual([
+      { id: 'A-null', arrivalLeg: { id: 'A' }, departureLeg: { id: 'D' } },
+    ])
+  })
+
   it('evaluates projection output over the whole input object', () => {
     const output = dataView.runSource(`
 defineDataView({
@@ -72,16 +92,28 @@ defineDataView({
       path('pairsDeparture'),
     )
       .byAny('arrivalLeg.id', 'departureLeg.id')
-      .coalesce(),
+      .coalesce()
+      .enrich('arrivalLeg', {
+        attributes: lookupOne(path('attributes')).by('legId').getOr('items', []),
+      })
+      .enrich('departureLeg', {
+        activities: lookupMany(path('activities')).by('legId'),
+      }),
   },
 })
 `, {
       pairsArrival: [{ id: 'A-null', arrivalLeg: { id: 'A' } }],
       pairsDeparture: [{ id: 'A-D', arrivalLeg: { id: 'A' }, departureLeg: { id: 'D' } }],
+      attributes: [{ legId: 'A', items: [{ name: 'BestOn' }] }],
+      activities: [{ legId: 'D', code: 'pushback' }],
     })
 
     expect(output).toEqual({
-      pairs: [{ id: 'A-null', arrivalLeg: { id: 'A' }, departureLeg: { id: 'D' } }],
+      pairs: [{
+        id: 'A-null',
+        arrivalLeg: { id: 'A', attributes: [{ name: 'BestOn' }] },
+        departureLeg: { id: 'D', activities: [{ legId: 'D', code: 'pushback' }] },
+      }],
     })
   })
 

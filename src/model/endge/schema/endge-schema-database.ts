@@ -20,7 +20,7 @@ import { normalizeEndgeWorkspaceDefinition } from '@/domain/entities/reflect/RWo
 import { RVersion } from '@/domain/entities/reflect/RVersion'
 import { ComponentType, FilterType, ParameterType, QueryType } from '@/domain/types/document/document.types'
 import { Endge } from '@/model/endge/kernel/endge'
-import { compositionPayloadDocToPlain, dataViewPayloadDocToPlain, queryPayloadDocToPlain, storePayloadDocToPlain } from '@/model/endge/domain/endge-domain'
+import { compositionPayloadDocToPlain, dataViewPayloadDocToPlain, mockPayloadDocToPlain, queryPayloadDocToPlain, storePayloadDocToPlain } from '@/model/endge/domain/endge-domain'
 import { Actions_Repository } from '@/model/db/repositories/Actions_Repository'
 import { AuthProfiles_Repository } from '@/model/db/repositories/AuthProfiles_Repository'
 import { BehaviorBindings_Repository } from '@/model/db/repositories/BehaviorBindings_Repository'
@@ -28,6 +28,7 @@ import { Components_Repository } from '@/model/db/repositories/Components_Reposi
 import { ComponentSFCs_Repository } from '@/model/db/repositories/ComponentSFCs_Repository'
 import { Compositions_Repository } from '@/model/db/repositories/Compositions_Repository'
 import { Stores_Repository } from '@/model/db/repositories/Stores_Repository'
+import { Mocks_Repository } from '@/model/db/repositories/Mocks_Repository'
 import { Converters_Repository } from '@/model/db/repositories/Converters_Repository'
 import { DataViews_Repository } from '@/model/db/repositories/DataViews_Repository'
 import { Environments_Repository } from '@/model/db/repositories/Environments_Repository'
@@ -59,6 +60,7 @@ const WORKSPACE_SCOPED_PAYLOAD_COLLECTIONS = new Set([
   'component-sfcs',
   'compositions',
   'stores',
+  'mocks',
   'converters',
   'data-views',
   'environments',
@@ -311,6 +313,7 @@ const ROOT_FOLDER_ENTITY_TYPE_BY_IDENTITY: Record<string, string> = {
   'root-data-views': 'data-views',
   'root-compositions': 'compositions',
   'root-stores': 'stores',
+  'root-mocks': 'mocks',
   'root-components': 'components',
   'root-actions': 'actions',
   'root-parameters': 'parameters',
@@ -398,6 +401,7 @@ export class EndgeSchemaStorage extends EndgeModule {
     'data-views',
     'compositions',
     'stores',
+    'mocks',
     'parameters',
     'filters',
     'converters',
@@ -660,6 +664,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         dataViews: new DataViews_Repository(this.api),
         compositions: new Compositions_Repository(this.api),
         stores: new Stores_Repository(this.api),
+        mocks: new Mocks_Repository(this.api),
         folders: new Folders_Repository(this.api),
         components: new Components_Repository(this.api),
         componentSFCs: new ComponentSFCs_Repository(this.api),
@@ -764,6 +769,7 @@ export class EndgeSchemaStorage extends EndgeModule {
       dataViews: [],
       compositions: [],
       stores: [],
+      mocks: [],
       components: [],
       componentSFCs: [],
       actions: [],
@@ -1217,6 +1223,7 @@ export class EndgeSchemaStorage extends EndgeModule {
     const normalizeDataView = (raw: any) => dataViewPayloadDocToPlain(raw)
     const normalizeComposition = (raw: any) => compositionPayloadDocToPlain(raw)
     const normalizeStore = (raw: any) => storePayloadDocToPlain(raw)
+    const normalizeMock = (raw: any) => mockPayloadDocToPlain(raw)
 
     const normalizeFolder = (raw: any) => {
       return {
@@ -1481,6 +1488,11 @@ export class EndgeSchemaStorage extends EndgeModule {
         return rows.map(normalizeStore)
       }),
 
+      load('mocks', async () => {
+        const rows = await this.repositories!.mocks.findAll()
+        return rows.map(normalizeMock)
+      }),
+
       load('components', async () => {
         const rows = await this.repositories!.components.findAll()
         return rows.map(normalizeComponentFromPayload)
@@ -1620,6 +1632,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       return domain.getComposition(documentIdOrIdentity)
     if (documentType === 'store')
       return domain.getStore(documentIdOrIdentity)
+    if (documentType === 'mock')
+      return domain.getMock(documentIdOrIdentity)
     if (documentType === ParameterType.DefaultParameter)
       return domain.getParameter(documentIdOrIdentity)
     if (documentType === FilterType.DefaultFilter)
@@ -1734,6 +1748,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       return repos.compositions.findByIdentity(identity)
     if (documentType === 'store')
       return repos.stores.findByIdentity(identity)
+    if (documentType === 'mock')
+      return repos.mocks.findByIdentity(identity)
     if (documentType === ParameterType.DefaultParameter)
       return repos.parameters.findByIdentity(identity)
     if (documentType === FilterType.DefaultFilter)
@@ -1833,6 +1849,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       return repos.compositions.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === 'store')
       return repos.stores.patchFolder(documentPayloadId, folderPayloadId)
+    if (documentType === 'mock')
+      return repos.mocks.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === ParameterType.DefaultParameter)
       return repos.parameters.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === FilterType.DefaultFilter)
@@ -1956,6 +1974,10 @@ export class EndgeSchemaStorage extends EndgeModule {
       await repos.stores.softDelete(resolvedIdentity, folderId)
       return
     }
+    if (documentType === 'mock') {
+      await repos.mocks.softDelete(resolvedIdentity, folderId)
+      return
+    }
     if (documentType === ParameterType.DefaultParameter) {
       await repos.parameters.softDelete(resolvedIdentity, folderId)
       return
@@ -2020,6 +2042,10 @@ export class EndgeSchemaStorage extends EndgeModule {
     }
     if (documentType === 'store') {
       await repos.stores.hardDelete(resolvedIdentity)
+      return
+    }
+    if (documentType === 'mock') {
+      await repos.mocks.hardDelete(resolvedIdentity)
       return
     }
     if (documentType === ParameterType.DefaultParameter) {
@@ -2126,6 +2152,10 @@ export class EndgeSchemaStorage extends EndgeModule {
     }
     if (documentType === 'store') {
       await repos.stores.restore(resolvedIdentity)
+      return
+    }
+    if (documentType === 'mock') {
+      await repos.mocks.restore(resolvedIdentity)
       return
     }
     if (documentType === ParameterType.DefaultParameter) {
@@ -2614,6 +2644,14 @@ export class EndgeSchemaStorage extends EndgeModule {
       data.meta = (data.meta && typeof data.meta === 'object' && !Array.isArray(data.meta)) ? data.meta : {}
       saved = await repos.stores.upsert(data as any)
     }
+    else if (documentType === 'mock') {
+      data.contentSource = data.contentSource === 'code-provider' ? 'code-provider' : 'document'
+      data.contentType = data.contentType === 'text/plain' ? 'text/plain' : 'application/json'
+      data.source = typeof data.source === 'string' ? data.source : '{}'
+      data.codeRef = String(data.codeRef ?? '').trim() || null
+      data.meta = (data.meta && typeof data.meta === 'object' && !Array.isArray(data.meta)) ? data.meta : {}
+      saved = await repos.mocks.upsert(data as any)
+    }
     else if (documentType === 'action') {
       saved = await repos.actions.upsert(data as any)
     }
@@ -2908,6 +2946,37 @@ export class EndgeSchemaStorage extends EndgeModule {
       const saved = !this.isMalformedPayloadDocumentId(storageId)
         ? await repos.stores.update(storageId, payload)
         : await repos.stores.upsert(payload)
+      this._applyPayloadDocToDomain(documentType, saved, documentId, true)
+      return
+    }
+
+    if (documentType === 'mock') {
+      const mock = ((opts?.model as any) ?? domain.getMock(documentId)) as any
+      if (!mock)
+        throw new Error(`Mock не найден: ${documentId}`)
+
+      const existing = await repos.mocks.findByIdentity(mock.identity)
+      const fallbackFolder = existing?.folder ?? await resolveDefaultFolderByIdentity(repos, 'root-mocks')
+      const folder = mock.folderId ?? relationToId(fallbackFolder) ?? null
+      const payload = {
+        identity: String(mock.identity ?? documentId),
+        displayName: mock.displayName ?? mock.name ?? String(mock.identity ?? documentId),
+        description: mock.description ?? null,
+        folder,
+        project: mock.project ?? null,
+        contentSource: mock.contentSource === 'code-provider' ? 'code-provider' as const : 'document' as const,
+        contentType: mock.contentType === 'text/plain' ? 'text/plain' as const : 'application/json' as const,
+        source: typeof mock.source === 'string' ? mock.source : '{}',
+        codeRef: String(mock.codeRef ?? '').trim() || null,
+        meta: (mock.meta && typeof mock.meta === 'object' && !Array.isArray(mock.meta)) ? mock.meta : {},
+        active: mock.active ?? true,
+        author: mock.author ?? undefined,
+        inherited: mock.inherited === true,
+      }
+      const storageId = mock.id
+      const saved = !this.isMalformedPayloadDocumentId(storageId)
+        ? await repos.mocks.update(storageId, payload)
+        : await repos.mocks.upsert(payload)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -3841,6 +3910,13 @@ export class EndgeSchemaStorage extends EndgeModule {
       )
       return
     }
+    if (documentType === 'mock') {
+      removeBy(
+        x => Endge.domain.removeMockById(x),
+        x => Endge.domain.removeMock(x),
+      )
+      return
+    }
     if (documentType === ParameterType.DefaultParameter) {
       removeBy(
         x => Endge.domain.removeParameterById(x),
@@ -4014,6 +4090,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       return 'compositions'
     if (documentType === 'store')
       return 'stores'
+    if (documentType === 'mock')
+      return 'mocks'
     if (documentType === ParameterType.DefaultParameter)
       return 'parameters'
     if (documentType === FilterType.DefaultFilter)
@@ -4067,6 +4145,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       return compositionPayloadDocToPlain(raw)
     if (documentType === 'store')
       return storePayloadDocToPlain(raw)
+    if (documentType === 'mock')
+      return mockPayloadDocToPlain(raw)
     if (documentType === ParameterType.DefaultParameter) {
       return {
         id: raw.id,

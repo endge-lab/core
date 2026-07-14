@@ -13,6 +13,7 @@ export interface EndgeDomainPlain {
   dataViews: unknown[]
   compositions: unknown[]
   stores: unknown[]
+  mocks: unknown[]
   components: unknown[]
   componentSFCs: unknown[]
   actions: unknown[]

@@ -56,7 +56,17 @@ describe('compileStoreSource', () => {
           .select({
             pairs: fullJoin('pairsArrival', 'pairsDeparture')
               .byAny('arrivalLeg.id', 'departureLeg.id')
-              .coalesce(),
+              .coalesce()
+              .enrich('arrivalLeg', {
+                attributes: lookupOne('attributes').by('legId').getOr('items', []),
+                groundHandling: lookupOne('groundHandlingArrival').by('legId').getOr('items', []),
+                steeringActivities: lookupMany('steeringActivitiesArrival').by('arrivalLegId'),
+              })
+              .enrich('departureLeg', {
+                attributes: lookupOne('attributes').by('legId').getOr('items', []),
+                groundHandling: lookupOne('groundHandlingDeparture').by('legId').getOr('items', []),
+                steeringActivities: lookupMany('steeringActivitiesDeparture').by('departureLegId'),
+              }),
           }),
       },
     })`)
@@ -69,6 +79,25 @@ describe('compileStoreSource', () => {
       dataViews: [{ kind: 'inline' }],
     })
     expect((result.artifact?.data[1] as any).dataViews[0].source).toContain('defineDataView({ output:')
+  })
+
+  it('compiles a root select expression without an object wrapper', () => {
+    const result = compileStoreSource(`defineStore({
+      data: {
+        raw: value({ pairsArrival: [], pairsDeparture: [] }),
+        table: derived()
+          .from('raw')
+          .select(
+            fullJoin('pairsArrival', 'pairsDeparture')
+              .byAny('arrivalLeg.id', 'departureLeg.id')
+              .coalesce(),
+          ),
+      },
+    })`)
+
+    expect(result.diagnostics).toEqual([])
+    const source = (result.artifact?.data[1] as any).dataViews[0].source
+    expect(source).toContain('defineDataView({ output: fullJoin(')
   })
 
   it('rejects invalid mock references', () => {

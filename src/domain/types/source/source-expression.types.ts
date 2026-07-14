@@ -81,6 +81,9 @@ export type SourceExpressionOperation
     | 'join-by'
     | 'join-by-any'
     | 'join-coalesce'
+    | 'lookup-one'
+    | 'lookup-many'
+    | 'enrich'
 
 /**
  * Безопасное runtime-выражение, полученное из source callback.

@@ -27,6 +27,7 @@ import type { PresentationBindings_Repository } from '@/model/db/repositories/Pr
 import type { Workspaces_Repository } from '@/model/db/repositories/Workspaces_Repository'
 import type { Compositions_Repository } from '@/model/db/repositories/Compositions_Repository'
 import type { Stores_Repository } from '@/model/db/repositories/Stores_Repository'
+import type { Mocks_Repository } from '@/model/db/repositories/Mocks_Repository'
 
 export interface EndgeSchemaDump {
   workspaces?: any[]
@@ -37,6 +38,7 @@ export interface EndgeSchemaDump {
   dataViews: any[]
   compositions: any[]
   stores: any[]
+  mocks: any[]
   folders: any[]
   components: any[]
   componentSFCs: any[]
@@ -82,6 +84,7 @@ export type RepositoriesBag = {
   dataViews: DataViews_Repository
   compositions: Compositions_Repository
   stores: Stores_Repository
+  mocks: Mocks_Repository
   folders: Folders_Repository
   components: Components_Repository
   componentSFCs: ComponentSFCs_Repository

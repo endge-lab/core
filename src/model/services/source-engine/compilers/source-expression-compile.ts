@@ -82,6 +82,9 @@ const OPERATION_FUNCTIONS: Record<string, SourceExpressionOperation> = {
   by: 'join-by',
   byAny: 'join-by-any',
   coalesce: 'join-coalesce',
+  lookupOne: 'lookup-one',
+  lookupMany: 'lookup-many',
+  enrich: 'enrich',
 }
 
 const IMPLICIT_CURRENT_OPERATIONS = new Set<SourceExpressionOperation>([
@@ -154,6 +157,9 @@ const OPERATION_ARITY: Record<SourceExpressionOperation, { min: number, max?: nu
   'join-by': { min: 2 },
   'join-by-any': { min: 2 },
   'join-coalesce': { min: 1, max: 2 },
+  'lookup-one': { min: 1, max: 1 },
+  'lookup-many': { min: 1, max: 1 },
+  enrich: { min: 3, max: 3 },
 }
 
 /** Компилирует разрешенное source-expression в безопасный IR. */

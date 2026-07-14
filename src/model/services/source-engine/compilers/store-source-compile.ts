@@ -149,12 +149,12 @@ function readSelectDataViewRef(
   sourcePath: string,
 ): DataViewRef | null {
   if (!raw || !t.isExpression(raw)) {
-    diagnostics.push(diagnostic('error', 'store-select-missing', '.select(...) требует object projection.', sourcePath))
+    diagnostics.push(diagnostic('error', 'store-select-missing', '.select(...) требует expression.', sourcePath))
     return null
   }
   const expression = unwrapExpression(raw)
-  if (!t.isObjectExpression(expression) || expression.start == null || expression.end == null) {
-    diagnostics.push(diagnostic('error', 'store-select-shape', '.select(...) принимает object literal.', sourcePath, expression))
+  if (expression.start == null || expression.end == null) {
+    diagnostics.push(diagnostic('error', 'store-select-shape', '.select(...) принимает object projection или ValueExpression.', sourcePath, expression))
     return null
   }
 

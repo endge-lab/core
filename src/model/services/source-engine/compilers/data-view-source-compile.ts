@@ -8,6 +8,7 @@ import type {
   DataViewPipelineStep,
   DataViewSourceCompileResult,
   DataViewSourceDocument,
+  DataViewSourceMode,
 } from '@/domain/types/source/data-view-source.types'
 import type { SourceExpressionIR } from '@/domain/types/source/source-expression.types'
 import type { DataViewProgramPayload, ProgramDiagnostic } from '@/domain/types/program/program.types'
@@ -103,15 +104,6 @@ function parseDocument(
   const hasSteps = stepsNode != null
   const hasOutput = outputValue != null
 
-  if (hasOutput && !outputNode) {
-    diagnostics.push(createDiagnostic(
-      'error',
-      'data-view-source-output-shape',
-      'DataView output должен быть object literal.',
-      'output',
-    ))
-  }
-
   if ([hasTransform, hasSteps, hasOutput].filter(Boolean).length > 1) {
     diagnostics.push(createDiagnostic(
       'error',
@@ -121,8 +113,12 @@ function parseDocument(
     ))
   }
 
-  const mode = hasOutput || declaredMode === 'projection'
-    ? 'projection'
+  const mode: DataViewSourceMode = hasOutput
+    ? outputNode ? 'projection' : 'expression'
+    : declaredMode === 'projection'
+      ? 'projection'
+      : declaredMode === 'expression'
+        ? 'expression'
     : declaredMode === 'pipeline' || hasSteps
       ? 'pipeline'
       : 'manual'
@@ -154,6 +150,29 @@ function parseDocument(
       ))
     }
     return { mode, incremental, output }
+  }
+
+  if (mode === 'expression') {
+    const expression = outputValue && t.isExpression(outputValue)
+      ? compileSourceExpression(outputValue, diagnostics, 'output')
+      : null
+    if (!expression) {
+      diagnostics.push(createDiagnostic(
+        'error',
+        'data-view-source-expression-missing',
+        'Expression DataView должен содержать output expression.',
+        'output',
+      ))
+    }
+    if (incremental.mode === 'collection-by-key') {
+      diagnostics.push(createDiagnostic(
+        'error',
+        'data-view-source-incremental-expression',
+        'Expression DataView не может использовать collectionByKey; выберите full().',
+        'incremental',
+      ))
+    }
+    return { mode, incremental, expression: expression ?? undefined }
   }
 
   if (mode === 'manual') {
@@ -563,11 +582,12 @@ function createDataViewArtifact(document: DataViewSourceDocument): DataViewProgr
     transform: document.transform ?? null,
     steps: document.steps ?? [],
     output: document.output ?? {},
+    expression: document.expression ?? null,
   }
 }
 
 function resolveMaterializationStrategy(document: DataViewSourceDocument): DataViewMaterializationStrategy {
-  if (document.incremental.mode === 'full' || document.mode === 'manual' || document.mode === 'projection')
+  if (document.incremental.mode === 'full' || document.mode === 'manual' || document.mode === 'projection' || document.mode === 'expression')
     return { kind: 'full' }
   if (document.incremental.mode === 'collection-by-key')
     return { kind: 'collection-by-key', key: document.incremental.key }

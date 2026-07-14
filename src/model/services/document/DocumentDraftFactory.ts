@@ -20,6 +20,7 @@ import { RPolicy } from '@/domain/entities/reflect/RPolicy'
 import { RPresentationBinding } from '@/domain/entities/reflect/RPresentationBinding'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RStore } from '@/domain/entities/reflect/RStore'
+import { RMock } from '@/domain/entities/reflect/RMock'
 import { RStyle } from '@/domain/entities/reflect/RStyle'
 import { RTenant } from '@/domain/entities/reflect/RTenant'
 import { RView } from '@/domain/entities/reflect/RView'
@@ -123,6 +124,19 @@ export class DocumentDraftFactory {
         item.displayName = title
         item.source = Endge.source.createDefault('store')
         item.sourceVersion = 1
+        if (folderId != null)
+          item.folderId = folderId
+        return item
+      }
+
+      case 'mock': {
+        const item = new RMock()
+        item.identity = identity
+        item.name = title
+        item.displayName = title
+        item.contentSource = 'document'
+        item.contentType = 'application/json'
+        item.source = '{}'
         if (folderId != null)
           item.folderId = folderId
         return item
