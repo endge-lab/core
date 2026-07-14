@@ -3,6 +3,7 @@ import type { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/Co
 import type { FilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
 import type { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
 import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
+import type { StoreRuntimeHost } from '@/domain/entities/runtime/hosts/StoreRuntimeHost'
 import type {
   CompositionBindingValue,
   CompositionFilterFieldsSlice,
@@ -11,10 +12,9 @@ import type {
   CompositionRuntimeOutputHandle,
   CompositionRuntimePublicationConnection,
 } from '@/domain/types/composition-source.types'
-import type { StoreSourceArtifact } from '@/domain/types/store-source.types'
 import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext, RuntimeHostInputSource, RuntimeHostUpdateContext } from '@/domain/types/runtime-host.types'
 
-import { Raph, RaphNode, full, type RaphDerivedHandle } from '@endge/raph'
+import { Raph, RaphNode } from '@endge/raph'
 
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 import { FilterViewRuntimeHost as EndgeFilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
@@ -39,8 +39,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   private _disposers: Array<() => void> = []
   private _bridgePaths = new Set<string>()
   private _dataPaths = new Map<string, string>()
-  private _storeArtifacts = new Map<string, StoreSourceArtifact>()
-  private _dataDerivedHandles: RaphDerivedHandle[] = []
+  private _storeRuntimeIds = new Map<string, string>()
+  private _ownedStoreRuntimeIds = new Set<string>()
   private _mounted = false
 
   public constructor(input: {
@@ -175,12 +175,14 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     for (const dispose of this._disposers)
       dispose()
     this._disposers = []
-    for (const handle of [...this._dataDerivedHandles].reverse())
-      handle.dispose()
-    this._dataDerivedHandles = []
     for (const path of this._bridgePaths)
       Raph.delete(path)
     this._bridgePaths.clear()
+    for (const runtimeId of this._ownedStoreRuntimeIds) {
+      if (Endge.runtime.getRuntimeById(runtimeId))
+        Endge.runtime.destroyRuntimeTree(runtimeId)
+    }
+    this._ownedStoreRuntimeIds.clear()
     for (const child of this._children.values()) {
       if (Endge.runtime.getRuntimeById(child.id))
         Endge.runtime.destroyRuntimeTree(child.id)
@@ -191,98 +193,113 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     this._childDescriptors.clear()
     this._outputs = {}
     this._dataPaths.clear()
-    this._storeArtifacts.clear()
+    this._storeRuntimeIds.clear()
     this._mounted = false
     super.destroy()
   }
 
-  /** Монтирует объявленные data-зависимости в локальное пространство Composition runtime. */
+  /** Монтирует vocab data и связывает Store aliases с owned/borrowed runtime instances. */
   private _mountData(payload: CompositionProgramPayload): void {
+    const explicitStoreRuntimes = (
+      this.meta.dataRuntimes && typeof this.meta.dataRuntimes === 'object'
+        ? this.meta.dataRuntimes
+        : {}
+    ) as Record<string, unknown>
+
     for (const descriptor of payload.data) {
       const basePath = `__endge.compositionRuntime.${encodePathPart(this.id)}.data.${encodePathPart(descriptor.name)}`
-      this._dataPaths.set(descriptor.name, basePath)
-      this._bridgePaths.add(basePath)
-      this.addResource({
-        id: `data:${descriptor.name}`,
-        kind: 'raph-node',
-        title: `Data ${descriptor.name}`,
-        subtitle: descriptor.identity,
-        payload: { path: basePath, kind: descriptor.kind, identity: descriptor.identity },
-      })
 
       if (descriptor.kind === 'vocab') {
         const vocab = Endge.domain.getVocab(descriptor.identity)
         if (!vocab)
           throw new Error(`[CompositionRuntimeHost] Vocab data "${descriptor.identity}" is missing.`)
+        this._dataPaths.set(descriptor.name, basePath)
+        this._bridgePaths.add(basePath)
         Raph.set(basePath, vocab)
+        this.addResource({
+          id: `data:${descriptor.name}`,
+          kind: 'raph-node',
+          title: `Data ${descriptor.name}`,
+          subtitle: descriptor.identity,
+          payload: { path: basePath, kind: descriptor.kind, identity: descriptor.identity, ownership: 'owned' },
+        })
         continue
       }
 
       const store = Endge.domain.getStore(descriptor.identity)
       if (!store)
         throw new Error(`[CompositionRuntimeHost] Store data "${descriptor.identity}" is missing.`)
-      const compiled = Endge.source.compile('store', store.source)
-      if (!compiled.ok || !compiled.artifact)
-        throw new Error(`[CompositionRuntimeHost] Store "${descriptor.identity}" contains compile errors.`)
-      const artifact = compiled.artifact as StoreSourceArtifact
-      this._storeArtifacts.set(descriptor.name, artifact)
+      const explicitRuntimeId = String(explicitStoreRuntimes[descriptor.name] ?? '').trim()
+      let storeRuntime: StoreRuntimeHost | null = null
+      let ownership: 'owned' | 'borrowed' = 'owned'
+      if (explicitRuntimeId) {
+        storeRuntime = Endge.runtime.getRuntimeById<StoreRuntimeHost>(explicitRuntimeId)
+        ownership = 'borrowed'
+        if (!storeRuntime || storeRuntime.entityType !== 'store')
+          throw new Error(`[CompositionRuntimeHost] Store runtime "${explicitRuntimeId}" for data alias "${descriptor.name}" is missing.`)
+        if (storeRuntime.entityIdentity !== descriptor.identity)
+          throw new Error(`[CompositionRuntimeHost] Store runtime "${explicitRuntimeId}" has identity "${storeRuntime.entityIdentity}" instead of "${descriptor.identity}".`)
+      }
+      else {
+        storeRuntime = Endge.runtime.execute(store, {
+          id: `${this.id}:data:${descriptor.name}`,
+          parent: this,
+          instance: descriptor.name,
+          persistence: 'disabled',
+        }) as StoreRuntimeHost | null
+        if (!storeRuntime)
+          throw new Error(`[CompositionRuntimeHost] Store runtime for "${descriptor.identity}" cannot be created.`)
+        this._ownedStoreRuntimeIds.add(storeRuntime.id)
+      }
 
-      for (const field of artifact.data) {
-        if (field.kind === 'value')
-          Raph.set(`${basePath}.${encodePathPart(field.key)}`, cloneRuntimeValue(field.initial))
-      }
-      for (const field of artifact.data) {
-        if (field.kind !== 'derived')
-          continue
-        const from = `${basePath}.${encodePathPart(field.source)}`
-        const to = `${basePath}.${encodePathPart(field.key)}`
-        const handle = Raph.derive({
-          id: `${this.id}:data:${descriptor.name}:${field.key}`,
-          from,
-          to,
-          strategy: full(),
-          immediate: true,
-          disposeTarget: 'delete',
-          compute: (input) => field.dataViews.reduce(
-            (value, ref) => Endge.dataView.runRef(ref, value),
-            input,
-          ),
-        })
-        this.node?.addChild(handle.node, { invalidate: false })
-        this._dataDerivedHandles.push(handle)
-        this.addResource({
-          id: `data-derived:${descriptor.name}:${field.key}`,
-          kind: 'raph-node',
-          title: `Data ${descriptor.name}.${field.key}`,
-          subtitle: `${field.source} → ${field.key}`,
-        })
-      }
+      const storePath = storeRuntime.getDataPath()
+      this._dataPaths.set(descriptor.name, storePath)
+      this._storeRuntimeIds.set(descriptor.name, storeRuntime.id)
+      this.addResource({
+        id: `data:${descriptor.name}`,
+        kind: 'meta',
+        title: `Store ${descriptor.name}`,
+        subtitle: descriptor.identity,
+        payload: {
+          path: storePath,
+          kind: descriptor.kind,
+          identity: descriptor.identity,
+          runtimeId: storeRuntime.id,
+          ownership,
+        },
+      })
     }
   }
 
   /** Атомарно публикует накопленный batch runtime outputs в writable Store data. */
   private _publishUpdates(publications: CompositionRuntimePublicationConnection[]): void {
-    const writes: Array<{ path: string, value: unknown }> = []
+    const writes: Array<{ runtimeId: string, path: string, value: unknown }> = []
     for (const publication of publications) {
-      const artifact = this._storeArtifacts.get(publication.targetData)
-      if (!artifact)
+      const runtimeId = this._storeRuntimeIds.get(publication.targetData)
+      const storeRuntime = runtimeId
+        ? Endge.runtime.getRuntimeById<StoreRuntimeHost>(runtimeId)
+        : null
+      if (!storeRuntime || storeRuntime.entityType !== 'store')
         throw new Error(`[CompositionRuntimeHost] Store data "${publication.targetData}" is not mounted.`)
-      const writable = new Set(artifact.data.filter(field => field.kind === 'value').map(field => field.key))
-      const root = publication.targetPath.split('.')[0] ?? ''
-      if (!writable.has(root))
+      if (!storeRuntime.isWritable(publication.targetPath))
         throw new Error(`[CompositionRuntimeHost] Store target "${publication.targetData}.${publication.targetPath}" is derived or missing.`)
       const source = this._children.get(publication.sourceRuntime)
       if (!source)
         throw new Error(`[CompositionRuntimeHost] Runtime "${publication.sourceRuntime}" is missing.`)
       writes.push({
-        path: this._requireDataPath(publication.targetData, publication.targetPath),
+        runtimeId: storeRuntime.id,
+        path: publication.targetPath,
         value: Raph.get(source.outputPath(publication.sourceOutput)),
       })
     }
 
     Raph.transaction(() => {
-      for (const write of writes)
-        Raph.set(write.path, write.value)
+      for (const write of writes) {
+        const storeRuntime = Endge.runtime.getRuntimeById<StoreRuntimeHost>(write.runtimeId)
+        if (!storeRuntime)
+          throw new Error(`[CompositionRuntimeHost] Store runtime "${write.runtimeId}" was replaced or removed.`)
+        storeRuntime.set(write.path, write.value)
+      }
     })
     this.emit('data:change', this.getDataSnapshot())
   }
@@ -770,13 +787,4 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
 
 function encodePathPart(value: string): string {
   return encodeURIComponent(String(value)).replace(/\./g, '%2E')
-}
-
-function cloneRuntimeValue<T>(value: T): T {
-  try {
-    return structuredClone(value)
-  }
-  catch {
-    return JSON.parse(JSON.stringify(value)) as T
-  }
 }

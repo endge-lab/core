@@ -17,6 +17,7 @@ import { TableRuntimeStrategy } from '@/domain/services/runtime/strategies/Table
 import { ViewRuntimeStrategy } from '@/domain/services/runtime/strategies/ViewRuntimeStrategy'
 import { FilterRuntimeStrategy } from '@/domain/services/runtime/strategies/FilterRuntimeStrategy'
 import { CompositionRuntimeStrategy } from '@/domain/services/runtime/strategies/CompositionRuntimeStrategy'
+import { StoreRuntimeStrategy } from '@/domain/services/runtime/strategies/StoreRuntimeStrategy'
 import { Endge } from '@/model/endge/endge'
 import { RuntimeBoundaryUpdatePhase } from '@/model/helpers/raph-phases/runtime-boundary-update-phase'
 import { RuntimeNodeUpdatePhase } from '@/model/helpers/raph-phases/runtime-node-update-phase'
@@ -257,6 +258,10 @@ export class EndgeRuntime extends EndgeModule {
     const parent = this.resolveParentHost(meta?.parent)
     const hostMeta = { ...(meta ?? {}) }
     delete hostMeta.parent
+    const artifactReader = isRuntimeArtifactReader(hostMeta.artifactReader)
+      ? hostMeta.artifactReader
+      : Endge.program
+    delete hostMeta.artifactReader
 
     const runtimeId = this.resolveRuntimeId(hostMeta.id)
     if (this._hosts.getById(runtimeId)) {
@@ -269,7 +274,7 @@ export class EndgeRuntime extends EndgeModule {
       model,
       meta: hostMeta,
       parent,
-      artifacts: Endge.program,
+      artifacts: artifactReader,
     })
     if (!host) {
       return null
@@ -285,7 +290,7 @@ export class EndgeRuntime extends EndgeModule {
       model,
       meta: hostMeta,
       parent,
-      artifacts: Endge.program,
+      artifacts: artifactReader,
       host,
     })
     this.notify()
@@ -330,6 +335,7 @@ export class EndgeRuntime extends EndgeModule {
    */
   private registerDefaultStrategies(): void {
     this.registerStrategy(new CompositionRuntimeStrategy())
+    this.registerStrategy(new StoreRuntimeStrategy())
     this.registerStrategy(new FilterRuntimeStrategy())
     this.registerStrategy(new QueryRuntimeStrategy())
     this.registerStrategy(new TableRuntimeStrategy())
@@ -376,4 +382,12 @@ export class EndgeRuntime extends EndgeModule {
 
     return null
   }
+}
+
+function isRuntimeArtifactReader(value: unknown): value is import('@/domain/types/runtime-host.types').RuntimeArtifactReader {
+  return Boolean(
+    value
+    && typeof value === 'object'
+    && typeof (value as { getArtifact?: unknown }).getArtifact === 'function',
+  )
 }

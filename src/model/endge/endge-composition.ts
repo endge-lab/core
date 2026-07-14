@@ -27,6 +27,7 @@ export class EndgeComposition extends EndgeModule {
 
     const host = Endge.runtime.execute(model, {
       ...(options.id ? { id: options.id } : {}),
+      ...(options.dataRuntimes ? { dataRuntimes: options.dataRuntimes } : {}),
       persistence: 'disabled',
     }) as CompositionRuntimeHost | null
     if (!host)

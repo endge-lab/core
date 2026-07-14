@@ -23,6 +23,7 @@ import { RDataView } from '@/domain/entities/reflect/RDataView'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
+import { RStore } from '@/domain/entities/reflect/RStore'
 import { compileComponentSFC } from '@/domain/services/compiler/component-sfc-compile'
 import { ENDGE_COMPILER_VERSION } from '@/model/config/compiler'
 import { ENDGE_LOG_LANES } from '@/model/config/debug'
@@ -68,6 +69,9 @@ export class EndgeCompiler extends EndgeModule {
     if (!this.compilePhase('data-view', ENDGE_LOG_LANES.QUERIES, 'data views', Endge.domain.getDataViews(), context))
       return
 
+    if (!this.compilePhase('store', ENDGE_LOG_LANES.QUERIES, 'stores', Endge.domain.getStores(), context))
+      return
+
     if (!this.compilePhase('filter', ENDGE_LOG_LANES.QUERIES, 'filter source', Endge.domain.getFilters(), context))
       return
 
@@ -97,6 +101,12 @@ export class EndgeCompiler extends EndgeModule {
   public buildDataView(entity: RDataView): ProgramArtifact<DataViewProgramPayload> {
     const context: ProgramCompileContext = { compilerVersion: ENDGE_COMPILER_VERSION }
     return this.compileEntity('data-view', entity, context) as ProgramArtifact<DataViewProgramPayload>
+  }
+
+  /** Компилирует один Store source в Endge.program. */
+  public buildStore(entity: RStore): ProgramArtifact<StoreSourceArtifact> {
+    const context: ProgramCompileContext = { compilerVersion: ENDGE_COMPILER_VERSION }
+    return this.compileEntity('store', entity, context) as ProgramArtifact<StoreSourceArtifact>
   }
 
   public buildFilter(entity: RFilter): ProgramArtifact<FilterProgramPayload> {
@@ -259,6 +269,45 @@ export class EndgeCompiler extends EndgeModule {
             ...local.diagnostics,
           ],
           children: local.children,
+        })
+      },
+    })
+
+    this.registerHandler<RStore, StoreSourceArtifact>({
+      entityType: 'store',
+      compile: (entity, context) => {
+        const result = Endge.source.compile('store', entity.source)
+        const payload = result.artifact as StoreSourceArtifact | undefined
+        const dependencies: ProgramArtifact['dependencies'] = []
+        for (const field of payload?.data ?? []) {
+          if (field.kind !== 'derived')
+            continue
+          for (const ref of field.dataViews) {
+            if (ref.kind !== 'external')
+              continue
+            dependencies.push({
+              entityType: 'data-view',
+              id: ref.identity,
+              identity: ref.identity,
+              role: `store-derived:${field.key}`,
+            })
+            const dataViewArtifact = Endge.program.getDataViewArtifact(ref.identity)
+            if (!dataViewArtifact || dataViewArtifact.status === 'error') {
+              ;(result.diagnostics ??= []).push({
+                severity: 'error',
+                code: 'store-data-view-invalid',
+                message: `DataView "${ref.identity}" для Store field "${field.key}" отсутствует или содержит compile errors.`,
+                sourcePath: `data.${field.key}`,
+              })
+            }
+          }
+        }
+        return this._makeArtifact(entity, 'store', context, {
+          capabilities: ['compilable', 'executable', 'data-provider'],
+          metadata: createEmptyProgramMetadata(),
+          payload: payload ?? { type: 'store', sourceVersion: Number(entity.sourceVersion ?? 1) || 1, data: [] },
+          dependencies,
+          diagnostics: (result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[],
         })
       },
     })
@@ -647,11 +696,11 @@ export class EndgeCompiler extends EndgeModule {
           diagnostics.push({ severity: 'error', code: 'composition-store-missing', message: `Store "${data.identity}" не найден.`, sourcePath: `data.${data.name}` })
           continue
         }
-        const compiled = Endge.source.compile('store', store.source)
-        if (!compiled.ok || !compiled.artifact)
+        const compiled = Endge.program.getStoreArtifact(store.id ?? store.identity)
+        if (!compiled || compiled.status === 'error')
           diagnostics.push({ severity: 'error', code: 'composition-store-invalid', message: `Store "${data.identity}" содержит compile errors.`, sourcePath: `data.${data.name}` })
         else
-          storeArtifacts.set(data.name, compiled.artifact as StoreSourceArtifact)
+          storeArtifacts.set(data.name, compiled.payload)
         dependencies.push({ entityType: 'store', id: store.id, identity: store.identity, role: 'composition-data' })
       }
       else {

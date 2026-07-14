@@ -131,4 +131,6 @@ export interface CompositionRuntimeOutputHandle {
 
 export interface CompositionMountOptions {
   id?: string
+  /** Явные runtime-id Store instances для data aliases. */
+  dataRuntimes?: Record<string, string>
 }

@@ -124,6 +124,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
       parent,
       title: model.name ?? model.identity ?? `SFC ${model.id}`,
       meta: {
+        ...meta,
         runtimeKind: 'runtime',
         parentRuntimeId: parent?.id ?? null,
         target,

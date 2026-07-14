@@ -104,6 +104,7 @@ defineComposition({
     store.source = `defineStore({ data: { raw: value({ rows: [] }) } })`
     Endge.domain.addStore(store)
     Endge.compiler.buildQuery(query)
+    Endge.compiler.buildStore(store)
     Endge.compiler.buildComposition(child)
 
     const parent = createNestedCompositionWithOutput('groundhandling-default', 'rows', true)

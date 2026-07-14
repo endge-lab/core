@@ -1,5 +1,6 @@
 import type { CompositionProgramPayload, CompositionSourceDocument } from '@/domain/types/composition-source.types'
 import type { ProgramArtifact, QueryProgramPayload } from '@/domain/types/program.types'
+import type { StoreSourceArtifact } from '@/domain/types/store-source.types'
 
 import { Raph } from '@endge/raph'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -12,6 +13,7 @@ import { FilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterVie
 import { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
 import { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
 import { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
+import { StoreRuntimeHost } from '@/domain/entities/runtime/hosts/StoreRuntimeHost'
 import { compileFilterSource } from '@/domain/services/source-engine/filter-source-compile'
 import { buildRuntimeGraph } from '@/domain/services/source-engine/composition-source-compile'
 import { Endge } from '@/model/endge/endge'
@@ -145,10 +147,17 @@ describe('Composition runtime session', () => {
     })
     Endge.program.beginCompile('test')
     Endge.program.addArtifact(artifact('query', 11, 'schedule-query', queryPayload))
+    Endge.program.addArtifact(artifact(
+      'store',
+      10,
+      'schedule',
+      Endge.source.compile('store', store.source).artifact as StoreSourceArtifact,
+    ))
     Endge.program.addArtifact(artifact('composition', 12, 'schedule-store-page', compositionPayload))
 
     const session = await Endge.composition.mount('schedule-store-page', { id: 'composition-store' })
-    const base = '__endge.compositionRuntime.composition-store.data.schedule'
+    const storeRuntime = Endge.runtime.getRuntimeById<StoreRuntimeHost>('composition-store:data:schedule')!
+    const base = storeRuntime.getDataPath()
     expect(Raph.get(`${base}.raw`)).toEqual(rows)
     expect(Raph.get(`${base}.table`)).toEqual(rows)
     expect(session.host.getDataSnapshot()).toEqual({
@@ -157,6 +166,43 @@ describe('Composition runtime session', () => {
 
     session.unmount()
     expect(Raph.get(base)).toBeUndefined()
+  })
+
+  it('borrows an explicit Store runtime without destroying it on Composition unmount', async () => {
+    const store = new RStore()
+    store.id = 30
+    store.identity = 'shared-db'
+    store.name = 'Shared DB'
+    store.source = 'defineStore({ data: { raw: value([1]) } })'
+    const composition = new RComposition()
+    composition.id = 31
+    composition.identity = 'shared-page'
+    composition.name = 'Shared page'
+    Endge.domain.addStore(store)
+    Endge.domain.addComposition(composition)
+
+    const storePayload = Endge.source.compile('store', store.source).artifact as StoreSourceArtifact
+    const compositionPayload = makeCompositionPayload({
+      data: [{ name: 'db', kind: 'store', identity: 'shared-db' }],
+      runtimes: [],
+      hooks: [],
+      outputs: [],
+    })
+    Endge.program.beginCompile('test')
+    Endge.program.addArtifact(artifact('store', 30, 'shared-db', storePayload))
+    Endge.program.addArtifact(artifact('composition', 31, 'shared-page', compositionPayload))
+
+    const sharedRuntime = Endge.runtime.execute(store, { id: 'store:shared-db-preview' }) as StoreRuntimeHost
+    const session = await Endge.composition.mount('shared-page', {
+      id: 'composition:shared-page-preview',
+      dataRuntimes: { db: sharedRuntime.id },
+    })
+    expect(session.host.getDataPath('db')).toBe(sharedRuntime.getDataPath())
+    expect(session.host.getDataSnapshot()).toEqual({ db: { raw: [1] } })
+
+    session.unmount()
+    expect(Endge.runtime.getRuntimeById(sharedRuntime.id)).toBe(sharedRuntime)
+    expect(sharedRuntime.getDataSnapshot()).toEqual({ raw: [1] })
   })
 
   it('mounts a nested Composition and exposes its outputs reactively', async () => {
@@ -232,6 +278,12 @@ describe('Composition runtime session', () => {
     Endge.program.beginCompile('test')
     Endge.program.addArtifact(artifact('query', 20, 'groundhandling-query', sourcePayload))
     Endge.program.addArtifact(artifact('query', 21, 'table-consumer', consumerPayload))
+    Endge.program.addArtifact(artifact(
+      'store',
+      24,
+      'groundhandling-db',
+      Endge.source.compile('store', store.source).artifact as StoreSourceArtifact,
+    ))
     Endge.program.addArtifact(artifact('composition', 22, 'groundhandling-default', innerPayload))
     Endge.program.addArtifact(artifact('composition', 23, 'groundhandling-page', outerPayload))
 
@@ -334,7 +386,7 @@ function makeCompositionPayload(document: CompositionSourceDocument): Compositio
 }
 
 function artifact<T>(
-  entityType: 'filter' | 'query' | 'composition',
+  entityType: 'filter' | 'query' | 'composition' | 'store',
   id: number,
   identity: string,
   payload: T,

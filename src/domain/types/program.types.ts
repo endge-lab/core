@@ -25,6 +25,7 @@ export type ProgramEntityType
     | 'action'
     | 'query'
     | 'data-view'
+    | 'store'
     | 'filter'
     | 'composition'
 

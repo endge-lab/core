@@ -3,6 +3,7 @@ import type { PhaseExecutorContext } from '@endge/raph'
 import type { RComponent } from '@/domain/types/component.types'
 import type { RFilter } from '@/domain/entities/reflect/RFilter'
 import type { RComposition } from '@/domain/entities/reflect/RComposition'
+import type { RStore } from '@/domain/entities/reflect/RStore'
 import type { RAction } from '@/domain/entities/reflect/RAction'
 import type { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import type { RComponentTable } from '@/domain/entities/reflect/RComponentTable'
@@ -16,7 +17,7 @@ import type { RuntimeHostRegistrySnapshot } from '@/domain/types/runtime-registr
 /**
  * Runtime kinds
  */
-export type RuntimeKind = 'query' | 'filter' | 'composition' | 'table' | 'table-column' | 'action' | 'runtime'
+export type RuntimeKind = 'query' | 'filter' | 'composition' | 'store' | 'table' | 'table-column' | 'action' | 'runtime'
 
 /** Параметры legacy execute() для Raph-backed компонентов. */
 export interface ExecuteOptions {
@@ -35,6 +36,7 @@ export type RuntimeExecutableModel
     | RComponentSFC
     | RFilter
     | RComposition
+    | RStore
 
 export type AnyRuntimeStrategy = RuntimeStrategy<any, any>
 

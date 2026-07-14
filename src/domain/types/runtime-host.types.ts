@@ -101,6 +101,12 @@ export interface CompositionRuntimeHostContext extends RuntimeHostContextBase {
   lastHookAt: string | null
 }
 
+export interface StoreRuntimeHostContext extends RuntimeHostContextBase {
+  lastStateChangeAt: string | null
+  writableFields: string[]
+  derivedFields: string[]
+}
+
 export interface TableRuntimeHostContext extends RuntimeHostContextBase {
   lastDataSyncAt: string | null
 }
@@ -140,6 +146,7 @@ export interface RuntimeHostContextMap {
   query: QueryRuntimeHostContext
   filter: FilterRuntimeHostContext
   composition: CompositionRuntimeHostContext
+  store: StoreRuntimeHostContext
   table: TableRuntimeHostContext
   component: ComponentRuntimeHostContext
   'component-sfc': ComponentSFCRuntimeHostContext
