@@ -63,6 +63,28 @@ const INPUT = {
 }
 
 describe('EndgeDataView pipeline transform', () => {
+  it('evaluates projection output over the whole input object', () => {
+    const output = dataView.runSource(`
+defineDataView({
+  output: {
+    pairs: fullJoin(
+      path('pairsArrival'),
+      path('pairsDeparture'),
+    )
+      .byAny('arrivalLeg.id', 'departureLeg.id')
+      .coalesce(),
+  },
+})
+`, {
+      pairsArrival: [{ id: 'A-null', arrivalLeg: { id: 'A' } }],
+      pairsDeparture: [{ id: 'A-D', arrivalLeg: { id: 'A' }, departureLeg: { id: 'D' } }],
+    })
+
+    expect(output).toEqual({
+      pairs: [{ id: 'A-null', arrivalLeg: { id: 'A' }, departureLeg: { id: 'D' } }],
+    })
+  })
+
   it('runs default source as legs enriched with related attrs', () => {
     const output = dataView.runSource(DATA_VIEW_DEFAULT_SOURCE, {
       legs: [

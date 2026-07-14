@@ -9,6 +9,7 @@ import type {
   DataViewSourceCompileResult,
   DataViewSourceDocument,
 } from '@/domain/types/source/data-view-source.types'
+import type { SourceExpressionIR } from '@/domain/types/source/source-expression.types'
 import type { DataViewProgramPayload, ProgramDiagnostic } from '@/domain/types/program/program.types'
 
 import { parse as parseTS } from '@babel/parser'
@@ -96,19 +97,35 @@ function parseDocument(
   const incremental = readIncrementalRequest(definition, diagnostics)
   const transformNode = readObjectProperty(definition, 'transform')
   const stepsNode = readArrayProperty(definition, 'steps')
+  const outputValue = readPropertyValue(definition, 'output')
+  const outputNode = outputValue && t.isObjectExpression(outputValue) ? outputValue : null
   const hasTransform = transformNode != null
   const hasSteps = stepsNode != null
+  const hasOutput = outputValue != null
 
-  if (hasTransform && hasSteps) {
+  if (hasOutput && !outputNode) {
+    diagnostics.push(createDiagnostic(
+      'error',
+      'data-view-source-output-shape',
+      'DataView output должен быть object literal.',
+      'output',
+    ))
+  }
+
+  if ([hasTransform, hasSteps, hasOutput].filter(Boolean).length > 1) {
     diagnostics.push(createDiagnostic(
       'error',
       'data-view-source-mode-conflict',
-      'DataView source не может одновременно содержать transform и steps.',
+      'DataView source должен содержать только один из contracts: transform, steps или output.',
       'mode',
     ))
   }
 
-  const mode = declaredMode === 'pipeline' || hasSteps ? 'pipeline' : 'manual'
+  const mode = hasOutput || declaredMode === 'projection'
+    ? 'projection'
+    : declaredMode === 'pipeline' || hasSteps
+      ? 'pipeline'
+      : 'manual'
   if (declaredMode && declaredMode !== mode) {
     diagnostics.push(createDiagnostic(
       'warning',
@@ -116,6 +133,27 @@ function parseDocument(
       `DataView mode "${declaredMode}" не совпадает с содержимым source, используется "${mode}".`,
       'mode',
     ))
+  }
+
+  if (mode === 'projection') {
+    const output = outputNode ? readProjectionOutput(outputNode, diagnostics) : {}
+    if (!Object.keys(output).length) {
+      diagnostics.push(createDiagnostic(
+        'error',
+        'data-view-source-output-missing',
+        'Projection DataView должен содержать непустой output object.',
+        'output',
+      ))
+    }
+    if (incremental.mode === 'collection-by-key') {
+      diagnostics.push(createDiagnostic(
+        'error',
+        'data-view-source-incremental-projection',
+        'Projection DataView не может использовать collectionByKey; выберите full().',
+        'incremental',
+      ))
+    }
+    return { mode, incremental, output }
   }
 
   if (mode === 'manual') {
@@ -159,6 +197,35 @@ function parseDocument(
   }
 
   return { mode, incremental, steps }
+}
+
+function readProjectionOutput(
+  node: t.ObjectExpression,
+  diagnostics: DiagnosticDraft[],
+): Record<string, SourceExpressionIR> {
+  const output: Record<string, SourceExpressionIR> = {}
+  for (const property of node.properties) {
+    if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
+      diagnostics.push(createDiagnostic(
+        'error',
+        'data-view-source-output-property',
+        'DataView output допускает только обычные expression properties.',
+        'output',
+      ))
+      continue
+    }
+    const key = getPropertyName(property.key)
+    if (!key)
+      continue
+    const expression = compileSourceExpression(
+      unwrapExpression(property.value),
+      diagnostics,
+      `output.${key}`,
+    )
+    if (expression)
+      output[key] = expression
+  }
+  return output
 }
 
 function readIncrementalRequest(
@@ -495,11 +562,12 @@ function createDataViewArtifact(document: DataViewSourceDocument): DataViewProgr
     sourceDocument: document,
     transform: document.transform ?? null,
     steps: document.steps ?? [],
+    output: document.output ?? {},
   }
 }
 
 function resolveMaterializationStrategy(document: DataViewSourceDocument): DataViewMaterializationStrategy {
-  if (document.incremental.mode === 'full' || document.mode === 'manual')
+  if (document.incremental.mode === 'full' || document.mode === 'manual' || document.mode === 'projection')
     return { kind: 'full' }
   if (document.incremental.mode === 'collection-by-key')
     return { kind: 'collection-by-key', key: document.incremental.key }

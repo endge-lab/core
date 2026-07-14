@@ -2,7 +2,7 @@ import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
 import type { ProgramMetadataMap } from '@/domain/types/program/program-metadata.types'
 import type { SourceExpressionIR } from '@/domain/types/source/source-expression.types'
 
-export type DataViewSourceMode = 'manual' | 'pipeline'
+export type DataViewSourceMode = 'manual' | 'pipeline' | 'projection'
 
 export type DataViewIncrementalRequest
   = | { mode: 'auto' }
@@ -18,6 +18,7 @@ export interface DataViewSourceDocument {
   incremental: DataViewIncrementalRequest
   transform?: DataViewManualTransform
   steps?: DataViewPipelineStep[]
+  output?: Record<string, SourceExpressionIR>
 }
 
 export interface DataViewManualTransform {

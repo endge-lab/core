@@ -82,13 +82,11 @@ describe('StoreRuntimeHost', () => {
         raw: value(mock('groundhandling')),
         table: derived()
           .from('raw')
-          .dataView(defineDataView({
-            mode: 'pipeline',
-            steps: [
-              from('pairsArrival').as('pair'),
-              map({ ...spread('pair') }),
-            ],
-          })),
+          .select({
+            pairs: fullJoin('pairsArrival', 'pairsDeparture')
+              .byAny('arrivalLeg.id', 'departureLeg.id')
+              .coalesce(),
+          }),
       },
     })`
     Endge.domain.addStore(store)
@@ -118,9 +116,10 @@ describe('StoreRuntimeHost', () => {
 
     expect(snapshot.raw.pairsArrival).toHaveLength(2)
     expect(snapshot.raw.pairsDeparture).toHaveLength(1)
-    expect(snapshot.table.map((row: any) => row.id)).toEqual([
+    expect(snapshot.table.pairs.map((row: any) => row.id)).toEqual([
       'SU1679_140726_ASF_1_null',
       'SU205_140726_PKX_1_null',
+      'SU213_130726_HKG_1_SU296_140726_SVO_1',
     ])
     expect(runtime.resources).toEqual(expect.arrayContaining([
       expect.objectContaining({

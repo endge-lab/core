@@ -76,6 +76,11 @@ export type SourceExpressionOperation
     | 'in-array'
     | 'relative-date'
     | 'relative-date-time'
+    | 'left-join'
+    | 'full-join'
+    | 'join-by'
+    | 'join-by-any'
+    | 'join-coalesce'
 
 /**
  * Безопасное runtime-выражение, полученное из source callback.
@@ -142,8 +147,16 @@ export interface SourceExpressionContext {
   current?: unknown
   scope?: unknown
   read?: (expression: Extract<SourceExpressionIR, { type: 'read' }>) => unknown
+  onWarning?: (warning: SourceExpressionWarning) => void
 }
 
 /** Публичное имя общего декларативного value DSL. */
 export type ValueExpressionIR = SourceExpressionIR
 export type ValueExpressionContext = SourceExpressionContext
+
+/** Runtime warning безопасного expression evaluator. */
+export interface SourceExpressionWarning {
+  code: string
+  message: string
+  data?: unknown
+}

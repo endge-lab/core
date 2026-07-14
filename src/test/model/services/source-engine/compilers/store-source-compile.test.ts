@@ -47,6 +47,30 @@ describe('compileStoreSource', () => {
     ])
   })
 
+  it('compiles select as an inline projection DataView', () => {
+    const result = compileStoreSource(`defineStore({
+      data: {
+        raw: value({ pairsArrival: [], pairsDeparture: [] }),
+        table: derived()
+          .from('raw')
+          .select({
+            pairs: fullJoin('pairsArrival', 'pairsDeparture')
+              .byAny('arrivalLeg.id', 'departureLeg.id')
+              .coalesce(),
+          }),
+      },
+    })`)
+
+    expect(result.diagnostics).toEqual([])
+    expect(result.artifact?.data[1]).toMatchObject({
+      key: 'table',
+      kind: 'derived',
+      source: 'raw',
+      dataViews: [{ kind: 'inline' }],
+    })
+    expect((result.artifact?.data[1] as any).dataViews[0].source).toContain('defineDataView({ output:')
+  })
+
   it('rejects invalid mock references', () => {
     for (const expression of ['mock()', "mock('')", 'mock(identity)', "mock('one', 'two')"]) {
       const result = compileStoreSource(`defineStore({ data: { raw: value(${expression}) } })`)

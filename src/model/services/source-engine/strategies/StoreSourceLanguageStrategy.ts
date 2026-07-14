@@ -3,6 +3,7 @@ import type { SourceKind, SourceLanguageCompletion, SourceLanguageContext, Sourc
 import { compileStoreSource } from '@/model/services/source-engine/compilers/store-source-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
 import { STORE_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/store.default.source'
+import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/model/services/source-engine/value-expression-language'
 
 export class StoreSourceLanguageStrategy implements SourceLanguageStrategy {
   public readonly id = 'source-language:store'
@@ -10,8 +11,8 @@ export class StoreSourceLanguageStrategy implements SourceLanguageStrategy {
   public readonly syntax = createTypeScriptLikeSourceSyntax({
     alias: 'Endge Store Source',
     extension: '.endge-store.ts',
-    keywords: ['dataView', 'defineDataView', 'defineStore', 'derived', 'mock', 'value'],
-    functions: ['dataView', 'derived', 'from', 'mock', 'value'],
+    keywords: ['dataView', 'defineDataView', 'defineStore', 'derived', 'mock', 'select', 'value', ...VALUE_EXPRESSION_FUNCTION_NAMES],
+    functions: ['dataView', 'derived', 'from', 'mock', 'select', 'value', ...VALUE_EXPRESSION_METHOD_NAMES],
     properties: ['data'],
   })
 
@@ -38,6 +39,13 @@ export class StoreSourceLanguageStrategy implements SourceLanguageStrategy {
         insertText: "mock('identity')",
         detail: 'Получить initial value из Endge.mock registry',
       },
+      {
+        label: 'select',
+        kind: 'function',
+        insertText: `.select({\n  rows: path('items'),\n})`,
+        detail: 'Inline DataView object projection',
+      },
+      ...VALUE_EXPRESSION_COMPLETIONS,
     ]
   }
 }

@@ -53,8 +53,25 @@ export class EndgeDataView {
 
     if (artifact.mode === 'manual')
       return this._runManual(artifact, input, runTools)
+    if (artifact.mode === 'projection')
+      return this._runProjection(artifact, input)
 
     return this._runPipeline(artifact, input, runTools, context)
+  }
+
+  /** Вычисляет object projection один раз над целым DataView input. */
+  private _runProjection(artifact: DataViewProgramPayload, input: unknown): Record<string, unknown> {
+    return Object.fromEntries(
+      Object.entries(artifact.output ?? {}).map(([key, expression]) => [
+        key,
+        evaluateSourceExpression(expression, {
+          scope: input,
+          onWarning: Endge.isConfigured
+            ? warning => Endge.debug.warn(`[DataView] ${warning.message}`, warning.data)
+            : undefined,
+        }),
+      ]),
+    )
   }
 
   /** Выполняет DataView-ссылку из query/DataView artifact. */

@@ -68,6 +68,10 @@ defineComposition({
     query: query('search').withProps({
       ids: fromOutput('filter', 'request').get('rows').where(match({ active: true })).map(get('id')),
       columns: metadata('component-sfc', 'flight-table').getOr('columns', []).where(match({ request: true })),
+      pairs: fullJoin(
+        fromOutput('filter', 'arrivalPairs'),
+        fromOutput('filter', 'departurePairs'),
+      ).byAny('arrivalLeg.id', 'departureLeg.id').coalesce(),
     }),
   },
   hooks: [],
@@ -79,6 +83,7 @@ defineComposition({
     expect(result.artifact?.runtimes.find(runtime => runtime.name === 'query')?.props).toMatchObject({
       ids: { kind: 'expression', expression: { type: 'operation', operation: 'map' } },
       columns: { kind: 'expression', expression: { type: 'operation', operation: 'where' } },
+      pairs: { kind: 'expression', expression: { type: 'operation', operation: 'join-coalesce' } },
     })
   })
 
@@ -95,6 +100,12 @@ defineQuery({
   },
   outputs: {
     active: output().from(response('items').where(match({ active: true })).sortBy(get('std'))),
+    pairs: output().from(
+      fullJoin(
+        response('pairsArrival'),
+        response('pairsDeparture'),
+      ).byAny('arrivalLeg.id', 'departureLeg.id').coalesce()
+    ),
   },
 })
 `)
@@ -114,6 +125,13 @@ defineQuery({
     })).toEqual([
       { id: 1, active: true, std: '10:00' },
       { id: 2, active: true, std: '12:00' },
+    ])
+
+    expect(new QueryExecutor().readResponseOutput(result.artifact!.outputs[1], {
+      pairsArrival: [{ id: 'A-null', arrivalLeg: { id: 'A' } }],
+      pairsDeparture: [{ id: 'A-D', arrivalLeg: { id: 'A' }, departureLeg: { id: 'D' } }],
+    })).toEqual([
+      { id: 'A-null', arrivalLeg: { id: 'A' }, departureLeg: { id: 'D' } },
     ])
   })
 
@@ -172,5 +190,59 @@ prop('rows')
     expect(evaluateValueExpression(compile(`prop('row').pick(['id'])`), {
       props: { row: { id: 1, name: 'Flight' } },
     })).toEqual({ id: 1 })
+  })
+
+  it('supports relational joins with alternative keys and record coalescing', () => {
+    const expression = compile(`
+fullJoin(prop('arrival'), prop('departure'))
+  .byAny('arrivalLeg.id', 'departureLeg.id')
+  .coalesce({ prefer: 'right' })
+`)
+
+    expect(evaluateValueExpression(expression, {
+      props: {
+        arrival: [
+          { id: 'A-null', arrivalLeg: { id: 'A' } },
+          { id: 'B-null', arrivalLeg: { id: 'B' } },
+        ],
+        departure: [
+          { id: 'A-D', arrivalLeg: { id: 'A' }, departureLeg: { id: 'D' } },
+          { id: 'X-Y', arrivalLeg: { id: 'X' }, departureLeg: { id: 'Y' } },
+        ],
+      },
+    })).toEqual([
+      { id: 'A-D', arrivalLeg: { id: 'A' }, departureLeg: { id: 'D' } },
+      { id: 'B-null', arrivalLeg: { id: 'B' } },
+      { id: 'X-Y', arrivalLeg: { id: 'X' }, departureLeg: { id: 'Y' } },
+    ])
+
+    const mappedKey = compile(`leftJoin(prop('rows'), prop('attrs')).by({ left: 'id', right: 'legId' })`)
+    expect(evaluateValueExpression(mappedKey, {
+      props: {
+        rows: [{ id: 'A' }, { id: 'B' }],
+        attrs: [{ legId: 'A', value: 1 }],
+      },
+    })).toEqual([
+      { left: { id: 'A' }, right: { legId: 'A', value: 1 } },
+      { left: { id: 'B' }, right: null },
+    ])
+
+    const warnings: any[] = []
+    const ambiguous = compile(`fullJoin(prop('left'), prop('right')).byAny('id')`)
+    expect(evaluateValueExpression(ambiguous, {
+      props: {
+        left: [{ id: 'A' }, {}],
+        right: [{ id: 'A' }, { id: 'A' }, {}],
+      },
+      onWarning: warning => warnings.push(warning),
+    })).toEqual([
+      { left: { id: 'A' }, right: { id: 'A' } },
+      { left: { id: 'A' }, right: { id: 'A' } },
+      { left: {}, right: null },
+      { left: null, right: {} },
+    ])
+    expect(warnings).toEqual([
+      expect.objectContaining({ code: 'value-expression-join-ambiguous' }),
+    ])
   })
 })

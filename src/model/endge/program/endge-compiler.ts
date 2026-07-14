@@ -1294,6 +1294,7 @@ export class EndgeCompiler extends EndgeModule {
       sourceDocument: null,
       transform: null,
       steps: [],
+      output: {},
     }
   }
 

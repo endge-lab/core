@@ -77,6 +77,11 @@ const OPERATION_FUNCTIONS: Record<string, SourceExpressionOperation> = {
   inArray: 'in-array',
   relativeDate: 'relative-date',
   relativeDateTime: 'relative-date-time',
+  leftJoin: 'left-join',
+  fullJoin: 'full-join',
+  by: 'join-by',
+  byAny: 'join-by-any',
+  coalesce: 'join-coalesce',
 }
 
 const IMPLICIT_CURRENT_OPERATIONS = new Set<SourceExpressionOperation>([
@@ -144,6 +149,11 @@ const OPERATION_ARITY: Record<SourceExpressionOperation, { min: number, max?: nu
   'in-array': { min: 2, max: 2 },
   'relative-date': { min: 1, max: 1 },
   'relative-date-time': { min: 1, max: 2 },
+  'left-join': { min: 2, max: 2 },
+  'full-join': { min: 2, max: 2 },
+  'join-by': { min: 2 },
+  'join-by-any': { min: 2 },
+  'join-coalesce': { min: 1, max: 2 },
 }
 
 /** Компилирует разрешенное source-expression в безопасный IR. */

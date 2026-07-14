@@ -566,6 +566,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     if (binding.kind === 'expression') {
       return evaluateSourceExpression(binding.expression, {
         read: expression => this._readExpressionSource(expression),
+        onWarning: warning => Endge.debug.warn(`[Composition] ${warning.message}`, warning.data),
       })
     }
     const runtime = this._children.get(binding.runtime) as any

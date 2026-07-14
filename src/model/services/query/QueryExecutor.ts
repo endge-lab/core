@@ -31,7 +31,10 @@ export class QueryExecutor {
     if (output.source.type !== 'response')
       throw new Error(`Query output "${output.key}" is not response-backed.`)
     if (output.source.expression)
-      return evaluateSourceExpression(output.source.expression, { response })
+      return evaluateSourceExpression(output.source.expression, {
+        response,
+        onWarning: warning => this._writeExpressionWarning(warning.message, warning.data),
+      })
     return output.source.path == null ? response : this._path(response, output.source.path)
   }
 
@@ -65,7 +68,10 @@ export class QueryExecutor {
     const headers = { ...(payload.headers ?? {}) }
 
     const sourceBody = payload.requestBody
-      ? evaluateSourceExpression(payload.requestBody, { props: vars ?? {} })
+      ? evaluateSourceExpression(payload.requestBody, {
+          props: vars ?? {},
+          onWarning: warning => this._writeExpressionWarning(warning.message, warning.data),
+        })
       : {}
 
     let data: any
@@ -121,6 +127,12 @@ export class QueryExecutor {
 
       throw new Error(`${message}\n${details}`)
     }
+  }
+
+  /** Публикует runtime warning безопасного expression evaluator. */
+  private _writeExpressionWarning(message: string, data?: unknown): void {
+    if (Endge.isConfigured)
+      Endge.debug.warn(`[Query] ${message}`, data)
   }
 
   private _asRecord(value: unknown): Record<string, any> {

@@ -116,6 +116,12 @@ function readData(node: t.ObjectExpression, source: string, diagnostics: Diagnos
           dataViews.push(ref)
         continue
       }
+      if (modifier.name === 'select') {
+        const ref = readSelectDataViewRef(modifier.call.arguments[0], source, diagnostics, `data.${key}.select`)
+        if (ref)
+          dataViews.push(ref)
+        continue
+      }
       diagnostics.push(diagnostic('error', 'store-derived-method', `derived().${modifier.name}(...) не поддерживается.`, `data.${key}`, modifier.call))
     }
     if (!sourceKey) {
@@ -127,13 +133,35 @@ function readData(node: t.ObjectExpression, source: string, diagnostics: Diagnos
       continue
     }
     if (!dataViews.length) {
-      diagnostics.push(diagnostic('error', 'store-derived-transform', `Derived field "${key}" требует хотя бы один .dataView(...).`, `data.${key}`, expression))
+      diagnostics.push(diagnostic('error', 'store-derived-transform', `Derived field "${key}" требует .dataView(...) или .select(...).`, `data.${key}`, expression))
       continue
     }
     descriptors.push({ key, kind: 'derived', source: sourceKey, dataViews })
     declared.add(key)
   }
   return descriptors
+}
+
+function readSelectDataViewRef(
+  raw: t.CallExpression['arguments'][number] | undefined,
+  source: string,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+): DataViewRef | null {
+  if (!raw || !t.isExpression(raw)) {
+    diagnostics.push(diagnostic('error', 'store-select-missing', '.select(...) требует object projection.', sourcePath))
+    return null
+  }
+  const expression = unwrapExpression(raw)
+  if (!t.isObjectExpression(expression) || expression.start == null || expression.end == null) {
+    diagnostics.push(diagnostic('error', 'store-select-shape', '.select(...) принимает object literal.', sourcePath, expression))
+    return null
+  }
+
+  return {
+    kind: 'inline',
+    source: `defineDataView({ output: ${source.slice(expression.start, expression.end)} })`,
+  }
 }
 
 function readValueInitializer(node: t.Expression): { ok: true, initial: StoreValueInitializer } | { ok: false } {

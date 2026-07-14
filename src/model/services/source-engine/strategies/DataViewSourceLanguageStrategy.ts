@@ -20,11 +20,11 @@ export class DataViewSourceLanguageStrategy implements SourceLanguageStrategy {
     extension: '.endge-data-view.ts',
     keywords: [
       'auto', 'collectionByKey', 'convert', 'dataView', 'defineDataView', 'field',
-      'from', 'full', 'incremental', 'join', 'map', 'path', 'pick', 'spread',
+      'from', 'full', 'incremental', 'join', 'map', 'output', 'path', 'pick', 'spread',
       'template', 'transform', ...VALUE_EXPRESSION_FUNCTION_NAMES,
     ],
     functions: ['as', 'auto', 'by', 'collectionByKey', 'convert', 'dataView', 'find', 'from', 'full', 'join', 'map', 'pick', ...VALUE_EXPRESSION_METHOD_NAMES],
-    properties: ['incremental', 'input', 'left', 'manual', 'metadata', 'mode', 'pipeline', 'right', 'steps', 'tools'],
+    properties: ['incremental', 'input', 'left', 'manual', 'metadata', 'mode', 'output', 'pipeline', 'right', 'steps', 'tools'],
   })
 
   /** Проверяет, что strategy обслуживает DataView source. */
@@ -99,6 +99,7 @@ const DATA_VIEW_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
   },
   { label: 'transform', kind: 'function', insertText: `transform(input, tools) {\n  return input\n}`, detail: 'Manual transform' },
   { label: 'steps', kind: 'property', insertText: `steps: [\n  from('items').as('item'),\n  map({})\n],`, detail: 'Pipeline steps' },
+  { label: 'output', kind: 'property', insertText: `output: {\n  rows: path('items'),\n},`, detail: 'Object projection над целым input' },
   { label: 'incremental.auto', kind: 'property', insertText: 'incremental: auto(),', detail: 'Автоматический выбор full/byKey (default)' },
   { label: 'incremental.full', kind: 'property', insertText: 'incremental: full(),', detail: 'Всегда полный пересчет' },
   { label: 'incremental.collectionByKey', kind: 'property', insertText: `incremental: collectionByKey('id'),`, detail: 'Явный row-local incremental contract' },

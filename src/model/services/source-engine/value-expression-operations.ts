@@ -1,7 +1,27 @@
-import type { SourceExpressionIR, SourceExpressionOperation } from '@/domain/types/source/source-expression.types'
+import type { SourceExpressionIR, SourceExpressionOperation, SourceExpressionWarning } from '@/domain/types/source/source-expression.types'
 
 export interface ValueOperationRuntime {
   evaluate: (expression: SourceExpressionIR, current?: unknown) => unknown
+  warn: (warning: SourceExpressionWarning) => void
+}
+
+type JoinType = 'left' | 'full'
+
+interface JoinBuilder {
+  kind: 'value-expression-join'
+  type: JoinType
+  left: unknown[]
+  right: unknown[]
+}
+
+interface JoinKey {
+  left: string
+  right: string
+}
+
+interface JoinRow {
+  left: unknown | null
+  right: unknown | null
 }
 
 export type ValueOperation = (
@@ -71,6 +91,11 @@ export const VALUE_EXPRESSION_OPERATIONS: Record<SourceExpressionOperation, Valu
   'in-array': eager(args => !Array.isArray(args[1]) || args[1].length === 0 || args[1].includes(args[0])),
   'relative-date': eager(args => relativeDate(args[0])),
   'relative-date-time': eager(args => relativeDateTime(args[0], args[1])),
+  'left-join': joinBuilder('left'),
+  'full-join': joinBuilder('full'),
+  'join-by': joinBy('all'),
+  'join-by-any': joinBy('any'),
+  'join-coalesce': joinCoalesce,
 }
 
 function eager(operation: (args: unknown[]) => unknown): ValueOperation {
@@ -79,6 +104,138 @@ function eager(operation: (args: unknown[]) => unknown): ValueOperation {
 
 function collection(operation: (items: unknown[], expression: SourceExpressionIR, runtime: ValueOperationRuntime) => unknown): ValueOperation {
   return (args, runtime) => operation(asArray(runtime.evaluate(args[0])), args[1], runtime)
+}
+
+/** Создаёт отложенное описание join до объявления matching keys. */
+function joinBuilder(type: JoinType): ValueOperation {
+  return (args, runtime) => ({
+    kind: 'value-expression-join',
+    type,
+    left: resolveJoinSource(args[0], runtime),
+    right: resolveJoinSource(args[1], runtime),
+  }) satisfies JoinBuilder
+}
+
+/** Выполняет join по одному composite key или набору альтернативных keys. */
+function joinBy(mode: 'all' | 'any'): ValueOperation {
+  return (args, runtime) => {
+    const builder = runtime.evaluate(args[0])
+    if (!isJoinBuilder(builder))
+      return []
+
+    const keys = args.slice(1)
+      .map(argument => normalizeJoinKey(runtime.evaluate(argument)))
+      .filter((key): key is JoinKey => key != null)
+    if (!keys.length)
+      return []
+
+    return executeJoin(builder, keys, mode, runtime)
+  }
+}
+
+/** Объединяет left/right records, заполняя отсутствующие поля по приоритету. */
+function joinCoalesce(args: SourceExpressionIR[], runtime: ValueOperationRuntime): unknown {
+  const rows = runtime.evaluate(args[0])
+  if (!Array.isArray(rows))
+    return []
+
+  const options = args[1] ? runtime.evaluate(args[1]) : undefined
+  const prefer = isRecord(options) && options.prefer === 'right' ? 'right' : 'left'
+
+  return rows.map((value) => {
+    const row = isRecord(value) ? value as unknown as JoinRow : { left: null, right: null }
+    const primary = prefer === 'right' ? row.right : row.left
+    const fallback = prefer === 'right' ? row.left : row.right
+
+    if (!isRecord(primary))
+      return cloneValue(fallback)
+    if (!isRecord(fallback))
+      return cloneValue(primary)
+    return deepDefaults(primary, fallback)
+  })
+}
+
+function resolveJoinSource(expression: SourceExpressionIR, runtime: ValueOperationRuntime): unknown[] {
+  const value = runtime.evaluate(expression)
+  if (Array.isArray(value))
+    return value
+  if (typeof value !== 'string')
+    return []
+
+  const resolved = runtime.evaluate({ type: 'read', source: 'scope', path: value })
+  return Array.isArray(resolved) ? resolved : []
+}
+
+function normalizeJoinKey(value: unknown): JoinKey | null {
+  if (typeof value === 'string' && value.trim())
+    return { left: value.trim(), right: value.trim() }
+  if (!isRecord(value))
+    return null
+  const left = typeof value.left === 'string' ? value.left.trim() : ''
+  const right = typeof value.right === 'string' ? value.right.trim() : ''
+  return left && right ? { left, right } : null
+}
+
+function executeJoin(
+  builder: JoinBuilder,
+  keys: JoinKey[],
+  mode: 'all' | 'any',
+  runtime: ValueOperationRuntime,
+): JoinRow[] {
+  const rows: JoinRow[] = []
+  const matchedRight = new Set<number>()
+
+  for (const left of builder.left) {
+    const matches: number[] = []
+    for (let index = 0; index < builder.right.length; index++) {
+      if (joinRecordsMatch(left, builder.right[index], keys, mode))
+        matches.push(index)
+    }
+
+    if (matches.length > 1) {
+      runtime.warn({
+        code: 'value-expression-join-ambiguous',
+        message: `Join record matched ${matches.length} records from the right collection.`,
+        data: { left, matchIndexes: matches, keys },
+      })
+    }
+
+    if (!matches.length) {
+      rows.push({ left, right: null })
+      continue
+    }
+
+    for (const index of matches) {
+      matchedRight.add(index)
+      rows.push({ left, right: builder.right[index] ?? null })
+    }
+  }
+
+  if (builder.type === 'full') {
+    for (let index = 0; index < builder.right.length; index++) {
+      if (!matchedRight.has(index))
+        rows.push({ left: null, right: builder.right[index] ?? null })
+    }
+  }
+
+  return rows
+}
+
+function joinRecordsMatch(left: unknown, right: unknown, keys: JoinKey[], mode: 'all' | 'any'): boolean {
+  const matches = keys.map((key) => {
+    const leftValue = readPath(left, key.left)
+    const rightValue = readPath(right, key.right)
+    return leftValue != null && rightValue != null && equal(leftValue, rightValue)
+  })
+  return mode === 'any' ? matches.some(Boolean) : matches.every(Boolean)
+}
+
+function isJoinBuilder(value: unknown): value is JoinBuilder {
+  return isRecord(value)
+    && value.kind === 'value-expression-join'
+    && (value.type === 'left' || value.type === 'full')
+    && Array.isArray(value.left)
+    && Array.isArray(value.right)
 }
 
 export function readPath(source: unknown, path: string): unknown {

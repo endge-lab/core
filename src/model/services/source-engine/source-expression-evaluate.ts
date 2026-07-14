@@ -41,6 +41,7 @@ export function evaluateSourceExpression(
     const operation = VALUE_EXPRESSION_OPERATIONS[node.operation]
     return operation(node.arguments, {
       evaluate: (argument, nestedCurrent = current) => evaluate(argument, nestedCurrent),
+      warn: warning => context.onWarning?.(warning),
     })
   }
 

@@ -4,6 +4,7 @@ import type { SourceLanguageCompletion } from '@/domain/types/source/source-engi
 export const VALUE_EXPRESSION_FUNCTION_NAMES = [
   'get', 'getOr', 'pick', 'omit', 'match', 'eq', 'ne', 'gt', 'gte', 'lt', 'lte',
   'inList', 'includes', 'and', 'or', 'not', 'isNil', 'isEmpty', 'has',
+  'leftJoin', 'fullJoin',
 ]
 
 export const VALUE_EXPRESSION_METHOD_NAMES = [
@@ -13,6 +14,7 @@ export const VALUE_EXPRESSION_METHOD_NAMES = [
   'sortBy', 'groupBy', 'keyBy',
   'size', 'sum', 'sumBy', 'min', 'max', 'minBy', 'maxBy',
   'trim', 'lowerCase', 'upperCase', 'split', 'join',
+  'by', 'byAny', 'coalesce',
 ]
 
 export const VALUE_EXPRESSION_COMPLETIONS: SourceLanguageCompletion[] = [
@@ -21,6 +23,8 @@ export const VALUE_EXPRESSION_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'eq', kind: 'function', insertText: 'eq(get(\'path\'), value)', detail: 'Predicate: строгое равенство' },
   { label: 'and', kind: 'function', insertText: 'and()', detail: 'Predicate: логическое И' },
   { label: 'or', kind: 'function', insertText: 'or()', detail: 'Predicate: логическое ИЛИ' },
+  { label: 'leftJoin', kind: 'function', insertText: `leftJoin(left, right).by('id')`, detail: 'Left join двух коллекций' },
+  { label: 'fullJoin', kind: 'function', insertText: `fullJoin(left, right).byAny('id')`, detail: 'Full join двух коллекций' },
   ...VALUE_EXPRESSION_METHOD_NAMES.map(name => ({
     label: `.${name}`,
     kind: 'function' as const,
