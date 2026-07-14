@@ -1,6 +1,7 @@
 import type { RuntimeEntityType } from '@/domain/types/runtime/runtime-entity-map.types'
 import type { RuntimeExecutableModel } from '@/domain/types/runtime/runtime.types'
 import type { AnyRuntimeHost } from '@/domain/types/runtime/runtime-strategy.types'
+import type { RuntimeAppScopeExecuteOptions, RuntimeExecuteOptions } from '@/domain/types/runtime/runtime-execute.type'
 
 export type RuntimeAppScopeCollisionPolicy = 'multi' | 'reject' | 'replace'
 
@@ -22,7 +23,7 @@ export interface RuntimeAppScopeAddress {
 }
 
 interface RuntimeAppScopeOwner {
-  execute: (model: RuntimeExecutableModel, meta?: Record<string, any>) => AnyRuntimeHost | null
+  execute: (model: RuntimeExecutableModel, options?: RuntimeExecuteOptions) => AnyRuntimeHost | null
   getRuntimeHostsByEntity: (
     entityType: RuntimeEntityType,
     entityIdentity: string,
@@ -58,10 +59,10 @@ export class RuntimeAppScope {
   /** Запускает root entity в этом AppScope. */
   public execute(
     model: RuntimeExecutableModel,
-    meta: Record<string, any> = {},
+    options: RuntimeAppScopeExecuteOptions = {},
   ): AnyRuntimeHost | null {
     return this._owner.execute(model, {
-      ...meta,
+      ...options,
       appScope: this,
       scopeRoot: true,
     })

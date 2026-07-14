@@ -27,8 +27,8 @@ export class EndgeComposition {
 
     const host = Endge.runtime.execute(model, {
       ...(options.id ? { id: options.id } : {}),
-      ...(options.dataRuntimes ? { dataRuntimes: options.dataRuntimes } : {}),
       persistence: 'disabled',
+      meta: options.dataRuntimes ? { dataRuntimes: options.dataRuntimes } : undefined,
     }) as CompositionRuntimeHost | null
     if (!host)
       throw new Error(`[EndgeComposition] Runtime host cannot be created for "${normalizedIdentity}".`)

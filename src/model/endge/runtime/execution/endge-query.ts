@@ -39,8 +39,8 @@ export class EndgeQuery {
       throw new Error(`Query artifact has compile errors for "${query.identity ?? query.name ?? query.id}".`)
 
     const host = Endge.runtime.execute(query, {
-      props: params,
       persistence: 'disabled',
+      meta: { props: params },
     }) as QueryRuntimeHost | null
     if (!host)
       throw new Error(`Query runtime cannot be created for "${query.identity}".`)

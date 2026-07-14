@@ -105,7 +105,7 @@ defineFilter({
     const explicit = Endge.runtime.execute(query, {
       id: 'query-with-explicit-prop',
       persistence: 'disabled',
-      props: { filterPayload: { explicit: true } },
+      meta: { props: { filterPayload: { explicit: true } } },
     }) as QueryRuntimeHost
     expect(explicit.getProps()).toEqual({ filterPayload: { explicit: true } })
     expect(Endge.runtime.getRuntimeHosts()).toHaveLength(1)

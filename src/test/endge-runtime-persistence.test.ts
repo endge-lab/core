@@ -15,7 +15,7 @@ describe('Endge runtime persistence integration', () => {
     const host = Endge.runtime.execute(createSFCModel(), {
       id: 'test-runtime',
       persistence: 'disabled',
-      target: 'dom',
+      meta: { target: 'dom' },
     }) as ComponentSFCRuntimeHost | null
 
     expect(host?.id).toBe('test-runtime')
@@ -26,12 +26,12 @@ describe('Endge runtime persistence integration', () => {
     const first = Endge.runtime.execute(createSFCModel('first'), {
       id: 'duplicate-runtime',
       persistence: 'disabled',
-      target: 'dom',
+      meta: { target: 'dom' },
     })
     const second = Endge.runtime.execute(createSFCModel('second'), {
       id: 'duplicate-runtime',
       persistence: 'disabled',
-      target: 'dom',
+      meta: { target: 'dom' },
     })
 
     expect(first).not.toBeNull()
@@ -42,7 +42,7 @@ describe('Endge runtime persistence integration', () => {
     const third = Endge.runtime.execute(createSFCModel('third'), {
       id: 'duplicate-runtime',
       persistence: 'disabled',
-      target: 'dom',
+      meta: { target: 'dom' },
     })
 
     expect(third?.id).toBe('duplicate-runtime')

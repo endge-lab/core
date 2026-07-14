@@ -243,8 +243,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       else {
         storeRuntime = Endge.runtime.execute(store, {
           parent: this,
-          instance: descriptor.name,
           persistence: 'disabled',
+          meta: { instance: descriptor.name },
         }) as StoreRuntimeHost | null
         if (!storeRuntime)
           throw new Error(`[CompositionRuntimeHost] Store runtime for "${descriptor.identity}" cannot be created.`)
@@ -394,11 +394,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     )
     const basePath = `${this.basePath}.children.${encodePathPart(descriptor.name)}.props`
     const meta: Record<string, unknown> = {
-      parent: this,
       instance: descriptor.name,
       props: initialProps,
-      persistence: descriptor.persistKey ? 'local' : 'disabled',
-      persistenceKey: descriptor.persistKey,
       basePath,
       input: { kind: 'local', props: initialProps },
     }
@@ -407,7 +404,12 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       this._bridgePaths.add(basePath)
     }
 
-    const child = Endge.runtime.execute(model, meta)
+    const child = Endge.runtime.execute(model, {
+      parent: this,
+      persistence: descriptor.persistKey ? 'local' : 'disabled',
+      persistenceKey: descriptor.persistKey,
+      meta,
+    })
     if (!child)
       throw new Error(`[CompositionRuntimeHost] runtime "${descriptor.name}" cannot be created.`)
     this._children.set(descriptor.name, child)

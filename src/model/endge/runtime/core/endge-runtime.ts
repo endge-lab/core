@@ -1,5 +1,7 @@
 import type { RuntimeEntityType } from '@/domain/types/runtime/runtime-entity-map.types'
 import type { AnyRuntimeStrategy } from '@/domain/types/runtime/runtime-strategy.types'
+import type { RuntimeExecuteOptions } from '@/domain/types/runtime/runtime-execute.type'
+import type { RuntimeArtifactReader } from '@/domain/types/runtime/runtime-host.types'
 import type { EndgeRuntimeSnapshot, RuntimeExecutableModel } from '@/domain/types/runtime/runtime.types'
 
 import { Raph, RaphNode } from '@endge/raph'
@@ -94,14 +96,88 @@ export class EndgeRuntime extends EndgeModule {
    */
   public execute(
     model: RuntimeExecutableModel,
-    meta: Record<string, any> = {},
+    options: RuntimeExecuteOptions = {},
   ): AnyRuntimeHost | null {
     const strategy = this._strategies.resolve(model)
     if (!strategy) {
       console.error('[EndgeRuntime] Unsupported runtime model', model)
       return null
     }
-    return this.createHost(strategy, model, meta)
+
+    this.start()
+
+    const {
+      id: explicitRuntimeId,
+      instanceId: requestedLocalId,
+      parent: parentRef,
+      appScope: appScopeRef,
+      scopeRoot: requestedScopeRoot,
+      artifactReader: artifactReaderRef,
+      persistence,
+      persistenceKey,
+      meta,
+    } = options
+    const parent = this.resolveParentHost(parentRef)
+    const appScope = this.resolveAppScope(appScopeRef, parent)
+    const artifactReader = this._resolveArtifactReader(artifactReaderRef)
+    const hostMeta: Record<string, any> = { ...(meta ?? {}) }
+
+    const scopeRoot = requestedScopeRoot === true || !parent
+    const identity = String((model as any)?.identity ?? (model as any)?.id ?? strategy.entityType)
+    const address = appScope.allocate({
+      entityType: strategy.entityType,
+      identity,
+      explicitRuntimeId,
+      requestedLocalId,
+      scopeRoot,
+    })
+    const runtimeId = address.runtimeId
+    const existing = this._hosts.getById(runtimeId)
+    if (existing) {
+      if (scopeRoot && appScope.collisionPolicy === 'replace') {
+        this.destroyRuntimeTree(runtimeId)
+      }
+      else {
+        console.error(`[EndgeRuntime] Runtime host "${runtimeId}" is already active.`)
+        return null
+      }
+    }
+    hostMeta.appScopeId = appScope.id
+    hostMeta.appScopeRootPath = appScope.rootPath
+    hostMeta.runtimeLocalId = address.localId
+    hostMeta.runtimePath = address.runtimePath
+    hostMeta.scopeRoot = scopeRoot
+    hostMeta.persistence = persistence ?? appScope.persistence
+    if (persistenceKey !== undefined) {
+      hostMeta.persistenceKey = persistenceKey
+    }
+
+    const host = strategy.create({
+      id: runtimeId,
+      model,
+      meta: hostMeta,
+      parent,
+      artifacts: artifactReader,
+    })
+    if (!host) {
+      return null
+    }
+
+    if (!this.registerCreatedHost(host, parent)) {
+      host.destroy()
+      return null
+    }
+
+    strategy.attach?.({
+      id: runtimeId,
+      model,
+      meta: hostMeta,
+      parent,
+      artifacts: artifactReader,
+      host,
+    })
+    this.notify()
+    return host
   }
 
   /**
@@ -351,81 +427,6 @@ export class EndgeRuntime extends EndgeModule {
     }
   }
 
-  /**
-   * Создаёт host через runtime strategy и регистрирует его в runtime-registry.
-   */
-  private createHost(
-    strategy: AnyRuntimeStrategy,
-    model: RuntimeExecutableModel,
-    meta: Record<string, any>,
-  ): AnyRuntimeHost | null {
-    this.start()
-
-    const parent = this.resolveParentHost(meta?.parent)
-    const hostMeta = { ...(meta ?? {}) }
-    delete hostMeta.parent
-    const appScope = this.resolveAppScope(hostMeta.appScope, parent)
-    delete hostMeta.appScope
-    const artifactReader = isRuntimeArtifactReader(hostMeta.artifactReader)
-      ? hostMeta.artifactReader
-      : Endge.program
-    delete hostMeta.artifactReader
-
-    const scopeRoot = hostMeta.scopeRoot === true || !parent
-    const identity = String((model as any)?.identity ?? (model as any)?.id ?? strategy.entityType)
-    const address = appScope.allocate({
-      entityType: strategy.entityType,
-      identity,
-      explicitRuntimeId: hostMeta.id,
-      requestedLocalId: hostMeta.instanceId,
-      scopeRoot,
-    })
-    const runtimeId = address.runtimeId
-    const existing = this._hosts.getById(runtimeId)
-    if (existing) {
-      if (scopeRoot && appScope.collisionPolicy === 'replace') {
-        this.destroyRuntimeTree(runtimeId)
-      }
-      else {
-        console.error(`[EndgeRuntime] Runtime host "${runtimeId}" is already active.`)
-        return null
-      }
-    }
-    hostMeta.appScopeId = appScope.id
-    hostMeta.appScopeRootPath = appScope.rootPath
-    hostMeta.runtimeLocalId = address.localId
-    hostMeta.runtimePath = address.runtimePath
-    hostMeta.scopeRoot = scopeRoot
-    hostMeta.persistence ??= appScope.persistence
-
-    const host = strategy.create({
-      id: runtimeId,
-      model,
-      meta: hostMeta,
-      parent,
-      artifacts: artifactReader,
-    })
-    if (!host) {
-      return null
-    }
-
-    if (!this.registerCreatedHost(host, parent)) {
-      host.destroy()
-      return null
-    }
-
-    strategy.attach?.({
-      id: runtimeId,
-      model,
-      meta: hostMeta,
-      parent,
-      artifacts: artifactReader,
-      host,
-    })
-    this.notify()
-    return host
-  }
-
   /** Регистрирует созданный host и связывает его Raph node с runtime tree. */
   private registerCreatedHost(host: AnyRuntimeHost, parent: AnyRuntimeHost | null): boolean {
     if (this._hosts.getById(host.id)) {
@@ -517,32 +518,48 @@ export class EndgeRuntime extends EndgeModule {
     return node
   }
 
-  /**
-   * Разрешает Parent Host.
-   */
+  /** Разрешает и проверяет явно переданный parent host. */
   private resolveParentHost(rawParent: unknown): AnyRuntimeHost | null {
-    if (!rawParent) {
+    if (rawParent === undefined || rawParent === null) {
       return null
     }
 
+    let id = ''
     if (typeof rawParent === 'string') {
-      return this.getRuntimeById(rawParent)
+      id = rawParent.trim()
     }
-
-    if (
+    else if (
       typeof rawParent === 'object'
       && rawParent !== null
       && 'id' in rawParent
     ) {
-      const id = String((rawParent as { id?: unknown }).id ?? '').trim()
-      return id ? this.getRuntimeById(id) : null
+      id = String((rawParent as { id?: unknown }).id ?? '').trim()
     }
 
-    return null
+    if (!id) {
+      throw new Error('[EndgeRuntime] Explicit parent runtime host must have a non-empty id.')
+    }
+
+    const parent = this.getRuntimeById(id)
+    if (!parent) {
+      throw new Error(`[EndgeRuntime] Parent runtime host "${id}" is not registered.`)
+    }
+    return parent
+  }
+
+  /** Разрешает artifact reader и запрещает невалидную явную зависимость. */
+  private _resolveArtifactReader(rawReader: unknown): RuntimeArtifactReader {
+    if (rawReader === undefined) {
+      return Endge.program
+    }
+    if (!isRuntimeArtifactReader(rawReader)) {
+      throw new Error('[EndgeRuntime] Explicit artifactReader must implement getArtifact().')
+    }
+    return rawReader
   }
 }
 
-function isRuntimeArtifactReader(value: unknown): value is import('@/domain/types/runtime/runtime-host.types').RuntimeArtifactReader {
+function isRuntimeArtifactReader(value: unknown): value is RuntimeArtifactReader {
   return Boolean(
     value
     && typeof value === 'object'

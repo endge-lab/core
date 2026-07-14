@@ -52,6 +52,34 @@ describe('RuntimeAppScope', () => {
     expect(first.id).toBe('app:store:groundhandling-db-0')
     expect(second.id).toBe('app:store:groundhandling-db-1')
   })
+
+  it('keeps the typed parent relation outside host metadata', () => {
+    const store = installStore()
+    const parent = Endge.runtime.execute(store, { id: 'runtime-parent' }) as StoreRuntimeHost
+    const child = Endge.runtime.execute(store, {
+      parent,
+      meta: { role: 'child' },
+    }) as StoreRuntimeHost
+
+    expect(child.parent).toBe(parent)
+    expect(child.meta.role).toBe('child')
+    expect(child.meta.parent).toBeUndefined()
+    expect(child.meta.scopeRoot).toBe(false)
+  })
+
+  it('rejects an explicit parent that is not registered', () => {
+    const store = installStore()
+
+    expect(() => Endge.runtime.execute(store, { parent: 'missing-runtime' }))
+      .toThrow('[EndgeRuntime] Parent runtime host "missing-runtime" is not registered.')
+  })
+
+  it('rejects an explicit invalid artifact reader', () => {
+    const store = installStore()
+
+    expect(() => Endge.runtime.execute(store, { artifactReader: {} as any }))
+      .toThrow('[EndgeRuntime] Explicit artifactReader must implement getArtifact().')
+  })
 })
 
 function installStore(): RStore {

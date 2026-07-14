@@ -49,7 +49,7 @@ describe('Query Raph derived integration', () => {
     const host = Endge.runtime.execute(query, {
       id: 'schedule-runtime',
       persistence: 'disabled',
-      props: { filterPayload: { where: { active: true } } },
+      meta: { props: { filterPayload: { where: { active: true } } } },
     }) as QueryRuntimeHost
     const rawPath = host.outputPath('raw')
     const tablePath = host.outputPath('table')
@@ -101,7 +101,7 @@ describe('Query Raph derived integration', () => {
     const secondHost = Endge.runtime.execute(query, {
       id: 'schedule-runtime-conflict',
       persistence: 'disabled',
-      props: { filterPayload: {} },
+      meta: { props: { filterPayload: {} } },
     }) as QueryRuntimeHost
     expect(secondHost).toBeTruthy()
     Endge.runtime.destroyRuntimeTree(secondHost.id)
@@ -121,7 +121,7 @@ describe('Query Raph derived integration', () => {
       .mockImplementationOnce(() => first.promise)
       .mockImplementationOnce(() => second.promise)
     const host = Endge.runtime.execute(query, {
-      id: 'schedule-latest-runtime', persistence: 'disabled', props: { filterPayload: {} },
+      id: 'schedule-latest-runtime', persistence: 'disabled', meta: { props: { filterPayload: {} } },
     }) as QueryRuntimeHost
     const rawPath = host.outputPath('raw')
     const tablePath = host.outputPath('table')
@@ -144,7 +144,7 @@ describe('Query Raph derived integration', () => {
     Endge.compiler.buildQuery(query)
     vi.spyOn(Endge.runtime.query, 'executeArtifact').mockResolvedValue([scheduleRow(1, 'SU', '100')])
     const host = Endge.runtime.execute(query, {
-      id: 'schedule-error-runtime', persistence: 'disabled', props: { filterPayload: {} },
+      id: 'schedule-error-runtime', persistence: 'disabled', meta: { props: { filterPayload: {} } },
     }) as QueryRuntimeHost
     const rawPath = host.outputPath('raw')
     const tablePath = host.outputPath('table')

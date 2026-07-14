@@ -145,9 +145,11 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
 
       const child = Endge.runtime.execute(model, {
         parent: this,
-        instance: `default-filter:${prop.key}`,
         persistence: 'disabled',
-        artifact: childArtifact ?? undefined,
+        meta: {
+          instance: `default-filter:${prop.key}`,
+          artifact: childArtifact ?? undefined,
+        },
       }) as FilterRuntimeHost | null
       if (!child)
         continue
