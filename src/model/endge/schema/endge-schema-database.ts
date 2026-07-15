@@ -250,6 +250,31 @@ function normalizeOptionalComponentSFCTag(raw: unknown): string | null {
   return raw.trim() || null
 }
 
+/** Приводит Payload document SFC-компонента к единой plain-модели домена. */
+export function componentSFCPayloadDocToPlain(raw: any): any {
+  return {
+    id: raw.id,
+    identity: raw.identity ?? '',
+    name: raw.displayName ?? raw.identity ?? '',
+    displayName: raw.displayName ?? raw.identity ?? '',
+    description: raw.description ?? null,
+    folderId: relationToId(raw.folder) ?? null,
+    project: relationToId(raw.project) ?? null,
+    kind: 'component-sfc',
+    type: ComponentType.SFC,
+    sourceKind: 'component-sfc',
+    tag: normalizeOptionalComponentSFCTag(raw.tag),
+    source: typeof raw.source === 'string' ? raw.source : '',
+    supportedTargets: normalizeComponentSFCTargets(raw.supportedTargets),
+    modelVersion: Number(raw.modelVersion ?? 1),
+    meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
+    active: raw.active ?? true,
+    deletedAt: raw.deletedAt ?? null,
+    author: raw.author ?? null,
+    inherited: raw.inherited === true,
+  }
+}
+
 /** Возвращает root-папку раздела "Компоненты" для SFC-документов. */
 async function resolveDefaultComponentFolder(repos: RepositoriesBag): Promise<number | string | null> {
   const rootFolder = await repos.folders.findByIdentity('root-components')
@@ -1180,29 +1205,6 @@ export class EndgeSchemaStorage extends EndgeModule {
     }
 
     /** SFC-компонент из отдельной flat-коллекции payload. */
-    const normalizeComponentSFC = (raw: any) => {
-      return {
-        id: raw.id,
-        identity: raw.identity ?? '',
-        name: raw.displayName ?? raw.identity ?? '',
-        displayName: raw.displayName ?? raw.identity ?? '',
-        description: raw.description ?? null,
-        folderId: relationToId(raw.folder) ?? null,
-        project: relationToId(raw.project) ?? null,
-        kind: 'component-sfc',
-        type: ComponentType.SFC,
-        sourceKind: 'component-sfc',
-        source: typeof raw.source === 'string' ? raw.source : '',
-        supportedTargets: normalizeComponentSFCTargets(raw.supportedTargets),
-        modelVersion: Number(raw.modelVersion ?? 1),
-        meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
-        active: raw.active ?? true,
-        deletedAt: raw.deletedAt ?? null,
-        author: raw.author ?? null,
-        inherited: raw.inherited === true,
-      }
-    }
-
     const normalizeQuery = (raw: any) => {
       const folderId = relationToId(raw.folder)
       return {
@@ -1480,7 +1482,7 @@ export class EndgeSchemaStorage extends EndgeModule {
 
       load('componentSFCs', async () => {
         const rows = await this.repositories!.componentSFCs.findAll()
-        return rows.map(normalizeComponentSFC)
+        return rows.map(componentSFCPayloadDocToPlain)
       }),
 
       load('actions', async () => {
@@ -4371,27 +4373,7 @@ export class EndgeSchemaStorage extends EndgeModule {
    * Нормализует Component SFCPayload Doc.
    */
   private _normalizeComponentSFCPayloadDoc(raw: any): any {
-    return {
-      id: raw.id,
-      identity: raw.identity ?? '',
-      name: raw.displayName ?? raw.identity ?? '',
-      displayName: raw.displayName ?? raw.identity ?? '',
-      description: raw.description ?? null,
-      folderId: relationToId(raw.folder) ?? null,
-      project: relationToId(raw.project) ?? null,
-      kind: 'component-sfc',
-      type: ComponentType.SFC,
-      sourceKind: 'component-sfc',
-      tag: normalizeOptionalComponentSFCTag(raw.tag),
-      source: typeof raw.source === 'string' ? raw.source : '',
-      supportedTargets: normalizeComponentSFCTargets(raw.supportedTargets),
-      modelVersion: Number(raw.modelVersion ?? 1),
-      meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
-      active: raw.active ?? true,
-      deletedAt: raw.deletedAt ?? null,
-      author: raw.author ?? null,
-      inherited: raw.inherited === true,
-    }
+    return componentSFCPayloadDocToPlain(raw)
   }
 
   /**
