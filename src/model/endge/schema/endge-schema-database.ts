@@ -2650,6 +2650,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       data.providerRef = String(data.providerRef ?? '').trim() || null
       data.sourceVersion = Math.max(1, Number(data.sourceVersion ?? 1) || 1)
       data.contractVersion = Math.max(1, Number(data.contractVersion ?? 1) || 1)
+      data.input = data.input != null && typeof data.input === 'object' && !Array.isArray(data.input) ? data.input : {}
+      data.output = data.output != null && typeof data.output === 'object' && !Array.isArray(data.output) ? data.output : {}
       data.meta = (data.meta && typeof data.meta === 'object' && !Array.isArray(data.meta)) ? data.meta : {}
       saved = await repos.computations.upsert(data as any)
     }
@@ -2986,8 +2988,16 @@ export class EndgeSchemaStorage extends EndgeModule {
         throw new Error(`Вычисление не найдено: ${documentId}`)
 
       const existing = await repos.computations.findByIdentity(computation.identity)
-      const fallbackFolder = existing?.folder ?? await resolveDefaultFolderByIdentity(repos, 'root-computations')
-      const folder = computation.folderId ?? relationToId(fallbackFolder) ?? null
+      const requestedFolder = computation.folderId ?? relationToId(existing?.folder) ?? null
+      const folder = requestedFolder != null
+        ? await this.resolveFolderPayloadId(requestedFolder)
+        : await this.ensurePayloadRootFolder({
+            identity: 'root-computations',
+            displayName: 'Вычисления',
+            entityType: 'computations',
+          })
+      if (folder == null)
+        throw new Error('Не удалось определить папку для вычисления')
       const plain = typeof computation.toPlain === 'function' ? computation.toPlain() : computation
       const payload = {
         identity: String(computation.identity ?? documentId),
@@ -3001,8 +3011,8 @@ export class EndgeSchemaStorage extends EndgeModule {
         providerRef: String(computation.providerRef ?? '').trim() || null,
         sourceVersion: Math.max(1, Number(computation.sourceVersion ?? 1) || 1),
         contractVersion: Math.max(1, Number(computation.contractVersion ?? 1) || 1),
-        input: plain.input ?? null,
-        output: plain.output ?? null,
+        input: plain.input != null && typeof plain.input === 'object' && !Array.isArray(plain.input) ? plain.input : {},
+        output: plain.output != null && typeof plain.output === 'object' && !Array.isArray(plain.output) ? plain.output : {},
         meta: (computation.meta && typeof computation.meta === 'object' && !Array.isArray(computation.meta)) ? computation.meta : {},
         active: computation.active ?? true,
         author: computation.author ?? undefined,
