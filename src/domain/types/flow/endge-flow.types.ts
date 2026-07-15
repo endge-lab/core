@@ -2,7 +2,7 @@
  * Канонический тип шага внутри action-flow.
  * Описывает поведение шага на уровне UX/runtime, а не форму graph-node.
  */
-export type ActionFlowStepKind = 'builtin' | 'behavior-binding' | 'runtime' | 'flow-ref'
+export type ActionFlowStepKind = 'builtin' | 'action' | 'runtime' | 'flow-ref'
 
 /**
  * Тип graph-node внутри action-flow.

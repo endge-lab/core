@@ -23,7 +23,6 @@ import { Endge } from '@/model/endge/kernel/endge'
 import { compositionPayloadDocToPlain, computationPayloadDocToPlain, dataViewPayloadDocToPlain, mockPayloadDocToPlain, queryPayloadDocToPlain, storePayloadDocToPlain } from '@/model/endge/domain/endge-domain'
 import { Actions_Repository } from '@/model/db/repositories/Actions_Repository'
 import { AuthProfiles_Repository } from '@/model/db/repositories/AuthProfiles_Repository'
-import { BehaviorBindings_Repository } from '@/model/db/repositories/BehaviorBindings_Repository'
 import { Components_Repository } from '@/model/db/repositories/Components_Repository'
 import { ComponentSFCs_Repository } from '@/model/db/repositories/ComponentSFCs_Repository'
 import { Compositions_Repository } from '@/model/db/repositories/Compositions_Repository'
@@ -41,7 +40,6 @@ import { Pages_Repository } from '@/model/db/repositories/Pages_Repository'
 import { PageTemplates_Repository } from '@/model/db/repositories/PageTemplates_Repository'
 import { Parameters_Repository } from '@/model/db/repositories/Parameters_Repository'
 import { Policies_Repository } from '@/model/db/repositories/Policies_Repository'
-import { PresentationBindings_Repository } from '@/model/db/repositories/PresentationBindings_Repository'
 import { Projects_Repository } from '@/model/db/repositories/Projects_Repository'
 import { Queries_Repository } from '@/model/db/repositories/Queries_Repository'
 import { Styles_Repository } from '@/model/db/repositories/Styles_Repository'
@@ -55,7 +53,6 @@ import { Workspaces_Repository } from '@/model/db/repositories/Workspaces_Reposi
 const WORKSPACE_SCOPED_PAYLOAD_COLLECTIONS = new Set([
   'actions',
   'auth-profiles',
-  'behavior-bindings',
   'components',
   'component-sfcs',
   'compositions',
@@ -74,7 +71,6 @@ const WORKSPACE_SCOPED_PAYLOAD_COLLECTIONS = new Set([
   'pages',
   'parameters',
   'policies',
-  'presentation-bindings',
   'projects',
   'queries',
   'styles',
@@ -362,8 +358,6 @@ const ROOT_FOLDER_ENTITY_TYPE_BY_IDENTITY: Record<string, string> = {
   'root-vocabs': 'vocabs',
   'root-i18n-bundles': 'i18n-bundles',
   'root-auth-profiles': 'auth-profiles',
-  'root-behavior-bindings': 'behavior-bindings',
-  'root-presentation-bindings': 'presentation-bindings',
 }
 
 /**
@@ -444,8 +438,6 @@ export class EndgeSchemaStorage extends EndgeModule {
     'versions',
     'environments',
     'tenants',
-    'behavior-bindings',
-    'presentation-bindings',
     'policies',
     'styles',
     'vocabs',
@@ -708,8 +700,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         versions: new Versions_Repository(this.api),
         environments: new Environments_Repository(this.api),
         tenants: new Tenants_Repository(this.api),
-        behaviorBindings: new BehaviorBindings_Repository(this.api),
-        presentationBindings: new PresentationBindings_Repository(this.api),
         policies: new Policies_Repository(this.api),
         styles: new Styles_Repository(this.api),
         vocabs: new Vocabs_Repository(this.api),
@@ -815,8 +805,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       versions: [],
       environments: [],
       tenants: [],
-      behaviorBindings: [],
-      presentationBindings: [],
       policies: [],
       styles: [],
       pageTemplates: [],
@@ -871,57 +859,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         defaultAuthProfileIdentity: raw.defaultAuthProfileIdentity ?? raw.default_auth_profile_identity ?? null,
         sfcAdapterIds: raw.sfcAdapterIds ?? raw.sfc_adapter_ids ?? [],
         defaultSfcAdapterId: raw.defaultSfcAdapterId ?? raw.default_sfc_adapter_id,
-      }
-    }
-
-    const normalizeBehaviorBinding = (raw: any) => {
-      const modeText = String(raw.mode ?? 'replace').trim().toLowerCase()
-      const mode = modeText === 'append' || modeText === 'prepend' || modeText === 'disable' ? modeText : 'replace'
-      return {
-        id: raw.id,
-        identity: raw.identity,
-        name: raw.displayName,
-        displayName: raw.displayName,
-        projectId: relationToNumericId(raw.projectId) ?? null,
-        ownerType: String(raw.ownerType ?? '').trim(),
-        ownerId: relationToNumericId(raw.ownerId) ?? null,
-        targetType: String(raw.targetType ?? '').trim(),
-        targetId: relationToNumericId(raw.targetId) ?? null,
-        eventName: String(raw.eventName ?? '').trim(),
-        scriptRef: String(raw.scriptRef ?? '').trim(),
-        mode,
-        priority: Number.isFinite(Number(raw.priority)) ? Number(raw.priority) : 0,
-        isEnabled: raw.isEnabled !== false,
-        environmentId: relationToNumericId(raw.environmentId) ?? null,
-        isInherited: raw.isInherited === true,
-        originBindingId: relationToNumericId(raw.originBindingId) ?? null,
-        folderId: relationToId(raw.folder) ?? null,
-      }
-    }
-
-    const normalizePresentationBinding = (raw: any) => {
-      const modeText = String(raw.mode ?? 'replace').trim().toLowerCase()
-      const mode = modeText === 'append' || modeText === 'prepend' || modeText === 'disable' ? modeText : 'replace'
-      return {
-        id: raw.id,
-        identity: raw.identity,
-        name: raw.displayName,
-        displayName: raw.displayName,
-        projectId: relationToNumericId(raw.projectId) ?? null,
-        ownerType: String(raw.ownerType ?? '').trim(),
-        ownerId: relationToNumericId(raw.ownerId) ?? null,
-        targetType: String(raw.targetType ?? '').trim(),
-        targetId: relationToNumericId(raw.targetId) ?? null,
-        role: String(raw.role ?? '').trim(),
-        rendererRef: String(raw.rendererRef ?? '').trim(),
-        when: raw.when == null ? null : String(raw.when).trim(),
-        mode,
-        priority: Number.isFinite(Number(raw.priority)) ? Number(raw.priority) : 0,
-        isEnabled: raw.isEnabled !== false,
-        environmentId: relationToNumericId(raw.environmentId) ?? null,
-        isInherited: raw.isInherited === true,
-        originBindingId: relationToNumericId(raw.originBindingId) ?? null,
-        folderId: relationToId(raw.folder) ?? null,
       }
     }
 
@@ -1545,16 +1482,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         return rows.map(normalizeTenant)
       }),
 
-      load('behaviorBindings', async () => {
-        const rows = await this.repositories!.behaviorBindings.findAll()
-        return rows.map(normalizeBehaviorBinding)
-      }),
-
-      load('presentationBindings', async () => {
-        const rows = await this.repositories!.presentationBindings.findAll()
-        return rows.map(normalizePresentationBinding)
-      }),
-
       load('policies', async () => {
         const rows = await this.repositories!.policies.findAll()
         return rows.map(normalizePolicy)
@@ -1634,10 +1561,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       return domain.getEnvironment(documentIdOrIdentity)
     if (documentType === 'tenant')
       return domain.getTenant(documentIdOrIdentity)
-    if (documentType === 'behavior-binding')
-      return domain.getBehaviorBinding(documentIdOrIdentity)
-    if (documentType === 'presentation-binding')
-      return domain.getPresentationBinding(documentIdOrIdentity)
     if (documentType === 'policy')
       return domain.getPolicy(documentIdOrIdentity)
     if (documentType === 'style')
@@ -1750,10 +1673,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       return repos.environments.findByIdentity(identity)
     if (documentType === 'tenant')
       return repos.tenants.findByIdentity(identity)
-    if (documentType === 'behavior-binding')
-      return repos.behaviorBindings.findByIdentity(identity)
-    if (documentType === 'presentation-binding')
-      return repos.presentationBindings.findByIdentity(identity)
     if (documentType === 'policy')
       return repos.policies.findByIdentity(identity)
     if (documentType === 'style')
@@ -1851,10 +1770,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       return repos.environments.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === 'tenant')
       return repos.tenants.patchFolder(documentPayloadId, folderPayloadId)
-    if (documentType === 'behavior-binding')
-      return repos.behaviorBindings.patchFolder(documentPayloadId, relationToNumericId(folderPayloadId))
-    if (documentType === 'presentation-binding')
-      return repos.presentationBindings.patchFolder(documentPayloadId, relationToNumericId(folderPayloadId))
     if (documentType === 'policy')
       return repos.policies.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === 'style')
@@ -2056,14 +1971,6 @@ export class EndgeSchemaStorage extends EndgeModule {
     }
     if (documentType === 'tenant') {
       await repos.tenants.hardDelete(resolvedIdentity)
-      return
-    }
-    if (documentType === 'behavior-binding') {
-      await repos.behaviorBindings.hardDelete(resolvedIdentity)
-      return
-    }
-    if (documentType === 'presentation-binding') {
-      await repos.presentationBindings.hardDelete(resolvedIdentity)
       return
     }
     if (documentType === 'policy') {
@@ -2296,271 +2203,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       )
     }
     await repos.folders.deleteByIdentity(folderIdentity)
-  }
-
-  /**
-   * Синхронизирует behavior bindings указанного owner с Payload и локальным доменом.
-   */
-  public async syncOwnerBehaviorBindings(opts: {
-    ownerType: string
-    ownerId: number
-    targetType?: string | null
-    targetId?: number | null
-    projectId?: number | null
-    items: Array<{
-      id?: number | null
-      identity?: string | null
-      displayName?: string | null
-      projectId?: number | null
-      targetType?: string | null
-      targetId?: number | null
-      eventName?: string | null
-      scriptRef?: string | null
-      mode?: string | null
-      priority?: number | null
-      isEnabled?: boolean | null
-      environmentId?: number | null
-      isInherited?: boolean | null
-      originBindingId?: number | null
-    }>
-  }): Promise<void> {
-    const repos = this.repositories
-    if (!repos) {
-      throw new Error(
-        '[EndgeSchemaStorage.syncOwnerBehaviorBindings] Репозитории не инициализированы. Вызови init().',
-      )
-    }
-
-    const normalizeKey = (value: unknown): string => String(value ?? '').trim()
-    const normalizeId = (value: unknown): number | null => {
-      if (value == null)
-        return null
-      if (typeof value === 'number')
-        return Number.isFinite(value) ? value : null
-      const text = normalizeKey(value)
-      if (!text)
-        return null
-      const parsed = Number(text)
-      return Number.isFinite(parsed) ? parsed : null
-    }
-    const ownerType = normalizeKey(opts.ownerType).toLowerCase()
-    const ownerId = normalizeId(opts.ownerId)
-    if (!ownerType || ownerId == null)
-      return
-
-    const fallbackTargetType = normalizeKey(opts.targetType).toLowerCase() || ownerType
-    const fallbackTargetId = normalizeId(opts.targetId) ?? ownerId
-
-    const [allBindings, rootBindingsFolder] = await Promise.all([
-      repos.behaviorBindings.findAll(),
-      repos.folders.findByIdentity('root-behavior-bindings'),
-    ])
-
-    const existingOwned = allBindings.filter((doc) => {
-      const docOwnerType = normalizeKey((doc as any).ownerType).toLowerCase()
-      const docOwnerId = normalizeId((doc as any).ownerId)
-      return docOwnerType === ownerType && docOwnerId != null && docOwnerId === ownerId
-    })
-
-    const existingByIdentity = new Map<string, any>()
-    for (const doc of existingOwned) {
-      const identity = normalizeKey((doc as any).identity)
-      if (identity)
-        existingByIdentity.set(identity, doc)
-    }
-
-    const keptIdentities = new Set<string>()
-    const now = Date.now()
-    let index = 0
-
-    for (const rawItem of opts.items ?? []) {
-      index += 1
-      if (rawItem?.isInherited === true)
-        continue
-
-      const eventName = normalizeKey(rawItem?.eventName)
-      const scriptRef = normalizeKey(rawItem?.scriptRef)
-      if (!eventName || !scriptRef)
-        continue
-
-      const explicitIdentity = normalizeKey(rawItem?.identity)
-      const identity = explicitIdentity || `binding-${ownerType}-${ownerId}-${index}-${now}`
-      const modeText = normalizeKey(rawItem?.mode).toLowerCase()
-      const mode = modeText === 'append' || modeText === 'prepend' || modeText === 'disable'
-        ? modeText
-        : 'replace'
-
-      const targetType = normalizeKey(rawItem?.targetType).toLowerCase() || fallbackTargetType
-      const targetId = normalizeId(rawItem?.targetId) ?? fallbackTargetId
-
-      const existing = existingByIdentity.get(identity)
-      const folderId
-        = relationToNumericId((existing as any)?.folderId ?? (existing as any)?.folder ?? rootBindingsFolder?.id ?? null)
-      const projectId = normalizeId(rawItem?.projectId ?? opts.projectId)
-      const environmentId = normalizeId(rawItem?.environmentId)
-      const originBindingId = normalizeId(rawItem?.originBindingId)
-
-      const saved = await repos.behaviorBindings.upsert({
-        identity,
-        displayName: normalizeKey(rawItem?.displayName) || `${eventName} -> ${scriptRef}`,
-        projectId,
-        ownerType,
-        ownerId,
-        targetType,
-        targetId,
-        eventName,
-        scriptRef,
-        mode: mode as 'replace' | 'append' | 'prepend' | 'disable',
-        priority: Number.isFinite(Number(rawItem?.priority)) ? Number(rawItem?.priority) : 0,
-        isEnabled: rawItem?.isEnabled !== false,
-        environmentId,
-        isInherited: false,
-        originBindingId,
-        folder: folderId,
-      })
-
-      keptIdentities.add(identity)
-      this._applyPayloadDocToDomain('behavior-binding', saved, (saved as any)?.id ?? identity, true)
-    }
-
-    for (const existing of existingOwned) {
-      const identity = normalizeKey((existing as any).identity)
-      if (!identity || keptIdentities.has(identity))
-        continue
-      await repos.behaviorBindings.hardDelete(identity)
-      this._removeDomainDocumentByType('behavior-binding', (existing as any).id ?? identity)
-    }
-  }
-
-  /**
-   * Синхронизирует presentation bindings указанного owner с Payload и локальным доменом.
-   */
-  public async syncOwnerPresentationBindings(opts: {
-    ownerType: string
-    ownerId: number
-    targetType?: string | null
-    targetId?: number | null
-    projectId?: number | null
-    items: Array<{
-      id?: number | null
-      identity?: string | null
-      displayName?: string | null
-      projectId?: number | null
-      targetType?: string | null
-      targetId?: number | null
-      role?: string | null
-      rendererRef?: string | null
-      when?: string | null
-      mode?: string | null
-      priority?: number | null
-      isEnabled?: boolean | null
-      environmentId?: number | null
-      isInherited?: boolean | null
-      originBindingId?: number | null
-    }>
-  }): Promise<void> {
-    const repos = this.repositories
-    if (!repos) {
-      throw new Error(
-        '[EndgeSchemaStorage.syncOwnerPresentationBindings] Репозитории не инициализированы. Вызови init().',
-      )
-    }
-
-    const normalizeKey = (value: unknown): string => String(value ?? '').trim()
-    const normalizeId = (value: unknown): number | null => {
-      if (value == null)
-        return null
-      if (typeof value === 'number')
-        return Number.isFinite(value) ? value : null
-      const text = normalizeKey(value)
-      if (!text)
-        return null
-      const parsed = Number(text)
-      return Number.isFinite(parsed) ? parsed : null
-    }
-    const ownerType = normalizeKey(opts.ownerType).toLowerCase()
-    const ownerId = normalizeId(opts.ownerId)
-    if (!ownerType || ownerId == null)
-      return
-
-    const fallbackTargetType = normalizeKey(opts.targetType).toLowerCase() || ownerType
-    const fallbackTargetId = normalizeId(opts.targetId) ?? ownerId
-
-    const [allBindings, rootFolder] = await Promise.all([
-      repos.presentationBindings.findAll(),
-      repos.folders.findByIdentity('root-presentation-bindings'),
-    ])
-
-    const existingOwned = allBindings.filter((doc) => {
-      const docOwnerType = normalizeKey((doc as any).ownerType).toLowerCase()
-      const docOwnerId = normalizeId((doc as any).ownerId)
-      return docOwnerType === ownerType && docOwnerId != null && docOwnerId === ownerId
-    })
-
-    const existingByIdentity = new Map<string, any>()
-    for (const doc of existingOwned) {
-      const identity = normalizeKey((doc as any).identity)
-      if (identity)
-        existingByIdentity.set(identity, doc)
-    }
-
-    const keptIdentities = new Set<string>()
-    const now = Date.now()
-    let index = 0
-
-    for (const rawItem of opts.items ?? []) {
-      index += 1
-      if (rawItem?.isInherited === true)
-        continue
-
-      const role = normalizeKey(rawItem?.role)
-      const rendererRef = normalizeKey(rawItem?.rendererRef)
-      if (!role || !rendererRef)
-        continue
-
-      const explicitIdentity = normalizeKey(rawItem?.identity)
-      const identity = explicitIdentity || `presentation-binding-${ownerType}-${ownerId}-${index}-${now}`
-      const modeText = normalizeKey(rawItem?.mode).toLowerCase()
-      const mode = modeText === 'append' || modeText === 'prepend' || modeText === 'disable'
-        ? modeText
-        : 'replace'
-
-      const targetType = normalizeKey(rawItem?.targetType).toLowerCase() || fallbackTargetType
-      const targetId = normalizeId(rawItem?.targetId) ?? fallbackTargetId
-      const existing = existingByIdentity.get(identity)
-      const folderId = relationToNumericId((existing as any)?.folderId ?? (existing as any)?.folder ?? rootFolder?.id ?? null)
-
-      const saved = await repos.presentationBindings.upsert({
-        identity,
-        displayName: normalizeKey(rawItem?.displayName) || `${role} -> ${rendererRef}`,
-        projectId: normalizeId(rawItem?.projectId ?? opts.projectId),
-        ownerType,
-        ownerId,
-        targetType,
-        targetId,
-        role,
-        rendererRef,
-        when: normalizeKey(rawItem?.when) || null,
-        mode: mode as 'replace' | 'append' | 'prepend' | 'disable',
-        priority: Number.isFinite(Number(rawItem?.priority)) ? Number(rawItem?.priority) : 0,
-        isEnabled: rawItem?.isEnabled !== false,
-        environmentId: normalizeId(rawItem?.environmentId),
-        isInherited: false,
-        originBindingId: normalizeId(rawItem?.originBindingId),
-        folder: folderId,
-      })
-
-      keptIdentities.add(identity)
-      this._applyPayloadDocToDomain('presentation-binding', saved, (saved as any)?.id ?? identity, true)
-    }
-
-    for (const existing of existingOwned) {
-      const identity = normalizeKey((existing as any).identity)
-      if (!identity || keptIdentities.has(identity))
-        continue
-      await repos.presentationBindings.hardDelete(identity)
-      this._removeDomainDocumentByType('presentation-binding', (existing as any).id ?? identity)
-    }
   }
 
   /**
@@ -3234,127 +2876,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       return
     }
 
-    if (documentType === 'behavior-binding') {
-      const binding = ((opts?.model as any) ?? domain.getBehaviorBinding(documentId)) as any
-      if (!binding)
-        throw new Error(`Биндинг не найден: ${documentId}`)
-      const plain = binding.toPlain() as {
-        id: number
-        name: string
-        displayName?: string
-        projectId?: number | null
-        ownerType?: string
-        ownerId?: number | null
-        targetType?: string
-        targetId?: number | null
-        eventName?: string
-        scriptRef?: string
-        mode?: string
-        priority?: number
-        isEnabled?: boolean
-        environmentId?: number | null
-        isInherited?: boolean
-        originBindingId?: number | null
-      }
-      const bindingIdentity = String((binding as any).identity ?? plain.id ?? binding.id ?? '')
-      let folderId: number | null | undefined
-      const existing = await repos.behaviorBindings.findByIdentity(bindingIdentity)
-      if (existing && ((existing as any).folderId ?? (existing as any).folder) != null) {
-        folderId = relationToNumericId((existing as any).folderId ?? (existing as any).folder)
-      }
-      else {
-        const folderDoc = await repos.folders.findByIdentity('root-behavior-bindings')
-        folderId = relationToNumericId(folderDoc?.id)
-      }
-      const modeText = String(plain.mode ?? 'replace').trim().toLowerCase()
-      const mode = modeText === 'append' || modeText === 'prepend' || modeText === 'disable' ? modeText : 'replace'
-      const ownerId = relationToNumericId(plain.ownerId)
-      const targetId = relationToNumericId(plain.targetId)
-      if (ownerId == null || targetId == null)
-        throw new Error(`Некорректные ownerId/targetId биндинга: ${bindingIdentity}`)
-      const saved = await repos.behaviorBindings.upsert({
-        identity: bindingIdentity,
-        displayName: plain.displayName ?? plain.name ?? bindingIdentity,
-        projectId: relationToNumericId(plain.projectId) ?? null,
-        ownerType: String(plain.ownerType ?? 'project').trim() || 'project',
-        ownerId,
-        targetType: String(plain.targetType ?? 'component').trim() || 'component',
-        targetId,
-        eventName: String(plain.eventName ?? '').trim(),
-        scriptRef: String(plain.scriptRef ?? '').trim(),
-        mode: mode as 'replace' | 'append' | 'prepend' | 'disable',
-        priority: Number.isFinite(Number(plain.priority)) ? Number(plain.priority) : 0,
-        isEnabled: plain.isEnabled !== false,
-        environmentId: relationToNumericId(plain.environmentId) ?? null,
-        isInherited: plain.isInherited === true,
-        originBindingId: relationToNumericId(plain.originBindingId) ?? null,
-        folder: folderId,
-      })
-      this._applyPayloadDocToDomain(documentType, saved, documentId, true)
-      return
-    }
-
-    if (documentType === 'presentation-binding') {
-      const binding = ((opts?.model as any) ?? domain.getPresentationBinding(documentId)) as any
-      if (!binding)
-        throw new Error(`Presentation binding не найден: ${documentId}`)
-      const plain = binding.toPlain() as {
-        id: number
-        name: string
-        displayName?: string
-        projectId?: number | null
-        ownerType?: string
-        ownerId?: number | null
-        targetType?: string
-        targetId?: number | null
-        role?: string
-        rendererRef?: string
-        when?: string | null
-        mode?: string
-        priority?: number
-        isEnabled?: boolean
-        environmentId?: number | null
-        isInherited?: boolean
-        originBindingId?: number | null
-      }
-      const bindingIdentity = String((binding as any).identity ?? plain.id ?? binding.id ?? '')
-      let folderId: number | null | undefined
-      const existing = await repos.presentationBindings.findByIdentity(bindingIdentity)
-      if (existing && ((existing as any).folderId ?? (existing as any).folder) != null) {
-        folderId = relationToNumericId((existing as any).folderId ?? (existing as any).folder)
-      }
-      else {
-        const folderDoc = await repos.folders.findByIdentity('root-presentation-bindings')
-        folderId = relationToNumericId(folderDoc?.id)
-      }
-      const modeText = String(plain.mode ?? 'replace').trim().toLowerCase()
-      const mode = modeText === 'append' || modeText === 'prepend' || modeText === 'disable' ? modeText : 'replace'
-      const ownerId = relationToNumericId(plain.ownerId)
-      if (ownerId == null)
-        throw new Error(`Некорректный ownerId presentation биндинга: ${bindingIdentity}`)
-      const saved = await repos.presentationBindings.upsert({
-        identity: bindingIdentity,
-        displayName: plain.displayName ?? plain.name ?? bindingIdentity,
-        projectId: relationToNumericId(plain.projectId) ?? null,
-        ownerType: String(plain.ownerType ?? 'project').trim() || 'project',
-        ownerId,
-        targetType: String(plain.targetType ?? 'component').trim() || 'component',
-        targetId: relationToNumericId(plain.targetId) ?? null,
-        role: String(plain.role ?? '').trim(),
-        rendererRef: String(plain.rendererRef ?? '').trim(),
-        when: plain.when ?? null,
-        mode: mode as 'replace' | 'append' | 'prepend' | 'disable',
-        priority: Number.isFinite(Number(plain.priority)) ? Number(plain.priority) : 0,
-        isEnabled: plain.isEnabled !== false,
-        environmentId: relationToNumericId(plain.environmentId) ?? null,
-        isInherited: plain.isInherited === true,
-        originBindingId: relationToNumericId(plain.originBindingId) ?? null,
-        folder: folderId,
-      })
-      this._applyPayloadDocToDomain(documentType, saved, documentId, true)
-      return
-    }
-
     if (documentType === 'policy') {
       const policy = ((opts?.model as any) ?? domain.getPolicy(documentId)) as any
       if (!policy)
@@ -3960,20 +3481,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       )
       return
     }
-    if (documentType === 'behavior-binding') {
-      removeBy(
-        x => Endge.domain.removeBehaviorBindingById(x),
-        x => Endge.domain.removeBehaviorBinding(x),
-      )
-      return
-    }
-    if (documentType === 'presentation-binding') {
-      removeBy(
-        x => Endge.domain.removePresentationBindingById(x),
-        x => Endge.domain.removePresentationBinding(x),
-      )
-      return
-    }
     if (documentType === 'policy') {
       removeBy(
         x => Endge.domain.removePolicyById(x),
@@ -4090,10 +3597,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       return 'environments'
     if (documentType === 'tenant')
       return 'tenants'
-    if (documentType === 'behavior-binding')
-      return 'behaviorBindings'
-    if (documentType === 'presentation-binding')
-      return 'presentationBindings'
     if (documentType === 'policy')
       return 'policies'
     if (documentType === 'style')
@@ -4220,55 +3723,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         displayName: raw.displayName,
         code: raw.code ?? raw.identity ?? '',
         description: raw.description ?? null,
-        folderId: relationToId(raw.folder) ?? null,
-      }
-    }
-    if (documentType === 'behavior-binding') {
-      const modeText = String(raw.mode ?? 'replace').trim().toLowerCase()
-      const mode = modeText === 'append' || modeText === 'prepend' || modeText === 'disable' ? modeText : 'replace'
-      return {
-        id: raw.id,
-        identity: raw.identity,
-        name: raw.displayName,
-        displayName: raw.displayName,
-        projectId: relationToNumericId(raw.projectId) ?? null,
-        ownerType: String(raw.ownerType ?? '').trim(),
-        ownerId: relationToNumericId(raw.ownerId) ?? null,
-        targetType: String(raw.targetType ?? '').trim(),
-        targetId: relationToNumericId(raw.targetId) ?? null,
-        eventName: String(raw.eventName ?? '').trim(),
-        scriptRef: String(raw.scriptRef ?? '').trim(),
-        mode,
-        priority: Number.isFinite(Number(raw.priority)) ? Number(raw.priority) : 0,
-        isEnabled: raw.isEnabled !== false,
-        environmentId: relationToNumericId(raw.environmentId) ?? null,
-        isInherited: raw.isInherited === true,
-        originBindingId: relationToNumericId(raw.originBindingId) ?? null,
-        folderId: relationToId(raw.folder) ?? null,
-      }
-    }
-    if (documentType === 'presentation-binding') {
-      const modeText = String(raw.mode ?? 'replace').trim().toLowerCase()
-      const mode = modeText === 'append' || modeText === 'prepend' || modeText === 'disable' ? modeText : 'replace'
-      return {
-        id: raw.id,
-        identity: raw.identity,
-        name: raw.displayName,
-        displayName: raw.displayName,
-        projectId: relationToNumericId(raw.projectId) ?? null,
-        ownerType: String(raw.ownerType ?? '').trim(),
-        ownerId: relationToNumericId(raw.ownerId) ?? null,
-        targetType: String(raw.targetType ?? '').trim(),
-        targetId: relationToNumericId(raw.targetId) ?? null,
-        role: String(raw.role ?? '').trim(),
-        rendererRef: String(raw.rendererRef ?? '').trim(),
-        when: raw.when == null ? null : String(raw.when).trim(),
-        mode,
-        priority: Number.isFinite(Number(raw.priority)) ? Number(raw.priority) : 0,
-        isEnabled: raw.isEnabled !== false,
-        environmentId: relationToNumericId(raw.environmentId) ?? null,
-        isInherited: raw.isInherited === true,
-        originBindingId: relationToNumericId(raw.originBindingId) ?? null,
         folderId: relationToId(raw.folder) ?? null,
       }
     }

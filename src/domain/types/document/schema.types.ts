@@ -21,8 +21,6 @@ import type { Environments_Repository } from '@/model/db/repositories/Environmen
 import type { Policies_Repository } from '@/model/db/repositories/Policies_Repository'
 import type { Styles_Repository } from '@/model/db/repositories/Styles_Repository'
 import type { Tenants_Repository } from '@/model/db/repositories/Tenants_Repository'
-import type { BehaviorBindings_Repository } from '@/model/db/repositories/BehaviorBindings_Repository'
-import type { PresentationBindings_Repository } from '@/model/db/repositories/PresentationBindings_Repository'
 import type { Workspaces_Repository } from '@/model/db/repositories/Workspaces_Repository'
 import type { Compositions_Repository } from '@/model/db/repositories/Compositions_Repository'
 import type { Stores_Repository } from '@/model/db/repositories/Stores_Repository'
@@ -54,8 +52,6 @@ export interface EndgeSchemaDump {
   versions: any[]
   environments: any[]
   tenants: any[]
-  behaviorBindings: any[]
-  presentationBindings: any[]
   policies: any[]
   styles: any[]
   pageTemplates: any[]
@@ -100,8 +96,6 @@ export type RepositoriesBag = {
   versions: Versions_Repository
   environments: Environments_Repository
   tenants: Tenants_Repository
-  behaviorBindings: BehaviorBindings_Repository
-  presentationBindings: PresentationBindings_Repository
   policies: Policies_Repository
   styles: Styles_Repository
   pageTemplates: PageTemplates_Repository

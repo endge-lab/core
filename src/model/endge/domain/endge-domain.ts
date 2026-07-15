@@ -34,8 +34,6 @@ import { RProject } from '@/domain/entities/reflect/RProject'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RStyle } from '@/domain/entities/reflect/RStyle'
 import { RTenant } from '@/domain/entities/reflect/RTenant'
-import { RBehaviorBinding } from '@/domain/entities/reflect/RBehaviorBinding'
-import { RPresentationBinding } from '@/domain/entities/reflect/RPresentationBinding'
 import { RType } from '@/domain/entities/reflect/RType'
 import { RVocabs } from '@/domain/entities/reflect/RVocabs'
 import { RI18nBundle } from '@/domain/entities/reflect/RI18nBundle'
@@ -212,8 +210,6 @@ export interface EndgeDomainParsed {
   integrations: RIntegration[]
   environments: REnvironment[]
   tenants: RTenant[]
-  behaviorBindings: RBehaviorBinding[]
-  presentationBindings: RPresentationBinding[]
   policies: RPolicy[]
   styles: RStyle[]
   vocabs: RVocabs[]
@@ -285,12 +281,6 @@ export class EndgeDomain extends EndgeModule {
 
   private _tenantsById: Map<string | number, RTenant> = new Map()
   private _tenantsByIdentity: Map<string, RTenant> = new Map()
-
-  private _behaviorBindingsById: Map<string | number, RBehaviorBinding> = new Map()
-  private _behaviorBindingsByIdentity: Map<string, RBehaviorBinding> = new Map()
-
-  private _presentationBindingsById: Map<string | number, RPresentationBinding> = new Map()
-  private _presentationBindingsByIdentity: Map<string, RPresentationBinding> = new Map()
 
   private _policiesById: Map<string | number, RPolicy> = new Map()
   private _policiesByIdentity: Map<string, RPolicy> = new Map()
@@ -391,10 +381,6 @@ export class EndgeDomain extends EndgeModule {
     this._environmentsByIdentity.clear()
     this._tenantsById.clear()
     this._tenantsByIdentity.clear()
-    this._behaviorBindingsById.clear()
-    this._behaviorBindingsByIdentity.clear()
-    this._presentationBindingsById.clear()
-    this._presentationBindingsByIdentity.clear()
     this._policiesById.clear()
     this._policiesByIdentity.clear()
     this._stylesById.clear()
@@ -460,12 +446,6 @@ export class EndgeDomain extends EndgeModule {
     const actionsRaw = Array.isArray(payload?.actions) ? payload.actions : []
     const environmentsRaw = Array.isArray(payload?.environments) ? payload.environments : []
     const tenantsRaw = Array.isArray(payload?.tenants) ? payload.tenants : []
-    const behaviorBindingsRaw = Array.isArray((payload as any)?.behaviorBindings)
-      ? (payload as any).behaviorBindings
-      : []
-    const presentationBindingsRaw = Array.isArray((payload as any)?.presentationBindings)
-      ? (payload as any).presentationBindings
-      : []
     const policiesRaw = Array.isArray(payload?.policies) ? payload.policies : []
     const stylesRaw = Array.isArray(payload?.styles) ? payload.styles : []
     const vocabsRaw = Array.isArray(payload?.vocabs) ? payload.vocabs : []
@@ -499,8 +479,6 @@ export class EndgeDomain extends EndgeModule {
       integrations: integrationsRaw,
       environments: environmentsRaw,
       tenants: tenantsRaw,
-      behaviorBindings: behaviorBindingsRaw,
-      presentationBindings: presentationBindingsRaw,
       policies: policiesRaw,
       styles: stylesRaw,
       vocabs: vocabsRaw,
@@ -1771,188 +1749,6 @@ export class EndgeDomain extends EndgeModule {
   }
 
   /**
-   * Методы для работы с биндингами поведения
-   */
-  getBehaviorBindings(): RBehaviorBinding[] {
-    return Array.from(this._behaviorBindingsById.values())
-  }
-
-  /**
-   * Возвращает Behavior Binding по id.
-   */
-  getBehaviorBindingById(id: string | number): RBehaviorBinding | null {
-    return this._behaviorBindingsById.get(id) ?? null
-  }
-
-  /**
-   * Возвращает Behavior Binding по identity.
-   */
-  getBehaviorBindingByIdentity(identity: string): RBehaviorBinding | null {
-    return this._behaviorBindingsByIdentity.get(identity) || null
-  }
-
-  /**
-   * Возвращает Behavior Binding по id или identity.
-   */
-  getBehaviorBinding(idOrIdentity: string | number): RBehaviorBinding | null {
-    return this.getBehaviorBindingById(idOrIdentity as number) || this.getBehaviorBindingById(Number(idOrIdentity)) || this.getBehaviorBindingByIdentity(idOrIdentity as string)
-  }
-
-  /**
-   * Добавляет Behavior Binding в домен и обновляет индексы.
-   */
-  addBehaviorBinding(binding: RBehaviorBinding): void {
-    if (this._behaviorBindingsByIdentity.has(binding.identity) || this._behaviorBindingsById.has(binding.id))
-      return
-    this._behaviorBindingsById.set(binding.id, binding)
-    this._behaviorBindingsByIdentity.set(binding.identity, binding)
-    this.notify()
-  }
-
-  /**
-   * Удаляет Behavior Binding из домена по id.
-   */
-  removeBehaviorBindingById(id: string | number): void {
-    const binding = this._behaviorBindingsById.get(id)
-    if (!binding)
-      return
-    this._behaviorBindingsById.delete(binding.id)
-    this._behaviorBindingsByIdentity.delete(binding.identity)
-    this.notify()
-  }
-
-  /**
-   * Удаляет Behavior Binding из домена по identity.
-   */
-  removeBehaviorBindingByIdentity(identity: string): void {
-    const binding = this._behaviorBindingsByIdentity.get(identity)
-    if (!binding)
-      return
-    this._behaviorBindingsById.delete(binding.id)
-    this._behaviorBindingsByIdentity.delete(binding.identity)
-    this.notify()
-  }
-
-  /**
-   * Удаляет Behavior Binding из домена.
-   */
-  removeBehaviorBinding(identity: string): void {
-    this.removeBehaviorBindingByIdentity(identity)
-  }
-
-  /**
-   * Проверяет наличие Behavior Binding по id.
-   */
-  hasBehaviorBindingById(id: string | number): boolean {
-    return this._behaviorBindingsById.has(id)
-  }
-
-  /**
-   * Проверяет наличие Behavior Binding по identity.
-   */
-  hasBehaviorBindingByIdentity(identity: string): boolean {
-    return this._behaviorBindingsByIdentity.has(identity)
-  }
-
-  /**
-   * Проверяет наличие Behavior Binding по id или identity.
-   */
-  hasBehaviorBinding(identity: string): boolean {
-    return this.hasBehaviorBindingByIdentity(identity)
-  }
-
-  /**
-   * Методы для работы с биндингами presentation
-   */
-  getPresentationBindings(): RPresentationBinding[] {
-    return Array.from(this._presentationBindingsById.values())
-  }
-
-  /**
-   * Возвращает Presentation Binding по id.
-   */
-  getPresentationBindingById(id: string | number): RPresentationBinding | null {
-    return this._presentationBindingsById.get(id) ?? null
-  }
-
-  /**
-   * Возвращает Presentation Binding по identity.
-   */
-  getPresentationBindingByIdentity(identity: string): RPresentationBinding | null {
-    return this._presentationBindingsByIdentity.get(identity) || null
-  }
-
-  /**
-   * Возвращает Presentation Binding по id или identity.
-   */
-  getPresentationBinding(idOrIdentity: string | number): RPresentationBinding | null {
-    return this.getPresentationBindingById(idOrIdentity as number) || this.getPresentationBindingById(Number(idOrIdentity)) || this.getPresentationBindingByIdentity(idOrIdentity as string)
-  }
-
-  /**
-   * Добавляет Presentation Binding в домен и обновляет индексы.
-   */
-  addPresentationBinding(binding: RPresentationBinding): void {
-    if (this._presentationBindingsByIdentity.has(binding.identity) || this._presentationBindingsById.has(binding.id))
-      return
-    this._presentationBindingsById.set(binding.id, binding)
-    this._presentationBindingsByIdentity.set(binding.identity, binding)
-    this.notify()
-  }
-
-  /**
-   * Удаляет Presentation Binding из домена по id.
-   */
-  removePresentationBindingById(id: string | number): void {
-    const binding = this._presentationBindingsById.get(id)
-    if (!binding)
-      return
-    this._presentationBindingsById.delete(binding.id)
-    this._presentationBindingsByIdentity.delete(binding.identity)
-    this.notify()
-  }
-
-  /**
-   * Удаляет Presentation Binding из домена по identity.
-   */
-  removePresentationBindingByIdentity(identity: string): void {
-    const binding = this._presentationBindingsByIdentity.get(identity)
-    if (!binding)
-      return
-    this._presentationBindingsById.delete(binding.id)
-    this._presentationBindingsByIdentity.delete(binding.identity)
-    this.notify()
-  }
-
-  /**
-   * Удаляет Presentation Binding из домена.
-   */
-  removePresentationBinding(identity: string): void {
-    this.removePresentationBindingByIdentity(identity)
-  }
-
-  /**
-   * Проверяет наличие Presentation Binding по id.
-   */
-  hasPresentationBindingById(id: string | number): boolean {
-    return this._presentationBindingsById.has(id)
-  }
-
-  /**
-   * Проверяет наличие Presentation Binding по identity.
-   */
-  hasPresentationBindingByIdentity(identity: string): boolean {
-    return this._presentationBindingsByIdentity.has(identity)
-  }
-
-  /**
-   * Проверяет наличие Presentation Binding по id или identity.
-   */
-  hasPresentationBinding(identity: string): boolean {
-    return this.hasPresentationBindingByIdentity(identity)
-  }
-
-  /**
    * Методы для работы с политиками
    */
   getPolicies(): RPolicy[] {
@@ -3105,8 +2901,6 @@ export class EndgeDomain extends EndgeModule {
       filters: persisted(this.getFilters()).map(x => x.toPlain()),
       environments: persisted(this.getEnvironments()).map(x => Serialize.toPlain(x)),
       tenants: persisted(this.getTenants()).map(x => x.toPlain()),
-      behaviorBindings: persisted(this.getBehaviorBindings()).map(x => x.toPlain()),
-      presentationBindings: persisted(this.getPresentationBindings()).map(x => x.toPlain()),
       policies: persisted(this.getPolicies()).map(x => Serialize.toPlain(x)),
       styles: persisted(this.getStyles()).map(x => x.toPlain()),
       vocabs: persisted(this.getVocabs()).map(x => x.toPlain()),
@@ -3188,8 +2982,6 @@ export class EndgeDomain extends EndgeModule {
       integrations: [],
       environments: [],
       tenants: [],
-      behaviorBindings: [],
-      presentationBindings: [],
       policies: [],
       styles: [],
       vocabs: [],
@@ -3259,12 +3051,6 @@ export class EndgeDomain extends EndgeModule {
     if (json.tenants && Array.isArray(json.tenants)) {
       json.tenants.forEach((tenantJson: any) => out.tenants.push(Serialize.fromJSON(RTenant, tenantJson)))
     }
-    if (json.behaviorBindings && Array.isArray(json.behaviorBindings)) {
-      json.behaviorBindings.forEach((bindingJson: any) => out.behaviorBindings.push(Serialize.fromJSON(RBehaviorBinding, bindingJson)))
-    }
-    if (json.presentationBindings && Array.isArray(json.presentationBindings)) {
-      json.presentationBindings.forEach((bindingJson: any) => out.presentationBindings.push(Serialize.fromJSON(RPresentationBinding, bindingJson)))
-    }
     if (json.policies && Array.isArray(json.policies)) {
       json.policies.forEach((policyJson: any) => out.policies.push(Serialize.fromJSON(RPolicy, policyJson)))
     }
@@ -3327,8 +3113,6 @@ export class EndgeDomain extends EndgeModule {
     parsed.integrations.forEach(i => this.addIntegration(i))
     parsed.environments.forEach(e => this.addEnvironment(e))
     parsed.tenants.forEach(t => this.addTenant(t))
-    parsed.behaviorBindings.forEach(b => this.addBehaviorBinding(b))
-    parsed.presentationBindings.forEach(b => this.addPresentationBinding(b))
     parsed.policies.forEach(p => this.addPolicy(p))
     parsed.styles.forEach(s => this.addStyle(s))
     parsed.vocabs.forEach(v => this.addVocabs(v))

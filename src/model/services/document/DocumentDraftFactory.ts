@@ -3,7 +3,6 @@ import type { DomainDocumentType, RDocument } from '@/domain/types/document/docu
 
 import { RAction } from '@/domain/entities/reflect/RAction'
 import { RAuthProfile } from '@/domain/entities/reflect/RAuthProfile'
-import { RBehaviorBinding } from '@/domain/entities/reflect/RBehaviorBinding'
 import { RComponentDSL } from '@/domain/entities/reflect/RComponentDSL'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RComponentTable } from '@/domain/entities/reflect/RComponentTable'
@@ -17,7 +16,6 @@ import { RNavigation } from '@/domain/entities/reflect/RNavigation'
 import { RPage } from '@/domain/entities/reflect/RPage'
 import { RPageTemplate } from '@/domain/entities/reflect/RPageTemplate'
 import { RPolicy } from '@/domain/entities/reflect/RPolicy'
-import { RPresentationBinding } from '@/domain/entities/reflect/RPresentationBinding'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RStore } from '@/domain/entities/reflect/RStore'
 import { RMock } from '@/domain/entities/reflect/RMock'
@@ -218,26 +216,6 @@ export class DocumentDraftFactory {
         item.name = title
         item.displayName = title
         item.code = identity
-        if (folderId != null)
-          item.folderId = folderId
-        return item
-      }
-
-      case 'behavior-binding': {
-        const item = new RBehaviorBinding()
-        item.identity = identity
-        item.name = title
-        item.displayName = title
-        if (folderId != null)
-          item.folderId = folderId
-        return item
-      }
-
-      case 'presentation-binding': {
-        const item = new RPresentationBinding()
-        item.identity = identity
-        item.name = title
-        item.displayName = title
         if (folderId != null)
           item.folderId = folderId
         return item

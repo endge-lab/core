@@ -5,7 +5,6 @@ import { EndgeBind } from '@/model/endge/runtime/core/endge-bind'
 import { EndgeCompiler } from '@/model/endge/program/endge-compiler'
 import { EndgeConsole } from '@/model/endge/diagnostics/endge-console'
 import { EndgeContext } from '@/model/endge/context/endge-context'
-import { EndgeConfiguration } from '@/model/endge/configuration/endge-configuration'
 import { EndgeDebug } from '@/model/endge/diagnostics/endge-debug'
 import { EndgeDiagnostics } from '@/model/endge/diagnostics/endge-diagnostics'
 import { EndgeDomain } from '@/model/endge/domain/endge-domain'
@@ -46,7 +45,6 @@ export const ENDGE_CORE_MODULES: EndgeModuleDefinition[] = [
   { key: 'ui', module: EndgeUI, after: ['workspace', 'context'] },
   { key: 'uiRegistry', module: EndgeUIRegistry, after: 'ui' },
   { key: 'bind', module: EndgeBind, after: ['compiler', 'runtime'] },
-  { key: 'configuration', module: EndgeConfiguration, after: ['domain', 'runtime'] },
   { key: 'console', module: EndgeConsole, after: ['domain', 'runtime'] },
   { key: 'runtimeDebugger', module: EndgeRuntimeDebugger, after: ['diagnostics', 'runtime'] },
   { key: 'styles', module: EndgeStyles, after: ['ui', 'domain'] },

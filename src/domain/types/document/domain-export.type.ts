@@ -25,8 +25,6 @@ export interface EndgeDomainPlain {
   filters: unknown[]
   environments: unknown[]
   tenants: unknown[]
-  behaviorBindings: unknown[]
-  presentationBindings: unknown[]
   policies: unknown[]
   styles: unknown[]
   vocabs: unknown[]

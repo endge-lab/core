@@ -14,15 +14,6 @@ describe('Endge module ownership', () => {
     expect(Endge.authProfiles).toBe(Endge.auth.profiles)
   })
 
-  it('owns configuration services through EndgeConfiguration', () => {
-    expect(Endge.hasModule('contracts')).toBe(false)
-    expect(Endge.hasModule('behaviorBindings')).toBe(false)
-    expect(Endge.hasModule('presentationBindings')).toBe(false)
-    expect(Endge.contracts).toBe(Endge.configuration.contracts)
-    expect(Endge.behaviorBindings).toBe(Endge.configuration.behaviorBindings)
-    expect(Endge.presentationBindings).toBe(Endge.configuration.presentationBindings)
-  })
-
   it('owns execution services through EndgeRuntime', () => {
     for (const key of ['query', 'dataView', 'composition', 'flowRegistry', 'flow', 'commands']) {
       expect(Endge.hasModule(key)).toBe(false)

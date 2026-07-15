@@ -60,7 +60,6 @@ describe('Endge domain export', () => {
     expect(Object.keys(plain).sort()).toEqual([
       'actions',
       'authProfiles',
-      'behaviorBindings',
       'componentSFCs',
       'components',
       'compositions',
@@ -78,7 +77,6 @@ describe('Endge domain export', () => {
       'pages',
       'parameters',
       'policies',
-      'presentationBindings',
       'projects',
       'queries',
       'stores',

@@ -3,13 +3,10 @@ import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 import type { EndgeDomainBundle } from '@/domain/types/document/domain-export.type'
 import type { EndgeAuth } from '@/model/endge/security/endge-auth'
 import type { EndgeAuthProfiles } from '@/model/endge/security/endge-auth-profiles'
-import { EndgeBindingsBehavior } from '@/model/endge/configuration/endge-bindings-behavior'
-import { EndgeConfiguration } from '@/model/endge/configuration/endge-configuration'
 import { EndgeBind } from '@/model/endge/runtime/core/endge-bind'
 import { EndgeCommands } from '@/model/endge/runtime/core/endge-commands'
 import { EndgeConsole } from '@/model/endge/diagnostics/endge-console'
 import { EndgeContext } from '@/model/endge/context/endge-context'
-import { EndgeContracts } from '@/model/endge/configuration/endge-contracts'
 import { EndgeDataView } from '@/model/endge/runtime/execution/endge-data-view'
 import { EndgeCompiler } from '@/model/endge/program/endge-compiler'
 import { EndgeDebug } from '@/model/endge/diagnostics/endge-debug'
@@ -18,7 +15,6 @@ import { EndgeDomain } from '@/model/endge/domain/endge-domain'
 import { EndgeEvents } from '@/model/endge/kernel/endge-events'
 import { EndgeFlow } from '@/model/endge/runtime/flow/endge-flow'
 import { EndgeFlowRegistry } from '@/model/endge/runtime/flow/endge-flow-registry'
-import { EndgeBindingsPresentation } from '@/model/endge/configuration/endge-bindings-presentation'
 import { EndgeI18n } from '@/model/endge/context/endge-i18n'
 import type { EndgeMock } from '@/model/endge/mock/EndgeMock'
 import { EndgeProgram } from '@/model/endge/program/endge-program'
@@ -258,40 +254,6 @@ export class Endge extends EndgeFederation {
    */
   static get updates(): EndgeUpdates {
     return this.getModule<EndgeUpdates>('updates')
-  }
-
-  /**
-   * @deprecated Используйте Endge.configuration.contracts.
-   */
-  static get contracts(): EndgeContracts {
-    return this.configuration.contracts
-  }
-
-  /**
-   * Доступ к contracts registry через старое имя.
-   * @deprecated Используйте Endge.contracts.
-   */
-  static get eventContracts(): EndgeContracts {
-    return this.contracts
-  }
-
-  /**
-   * @deprecated Используйте Endge.configuration.behaviorBindings.
-   */
-  static get behaviorBindings(): EndgeBindingsBehavior {
-    return this.configuration.behaviorBindings
-  }
-
-  /**
-   * @deprecated Используйте Endge.configuration.presentationBindings.
-   */
-  static get presentationBindings(): EndgeBindingsPresentation {
-    return this.configuration.presentationBindings
-  }
-
-  /** Configuration contracts and binding resolvers. */
-  static get configuration(): EndgeConfiguration {
-    return this.getModule<EndgeConfiguration>('configuration')
   }
 
   /**

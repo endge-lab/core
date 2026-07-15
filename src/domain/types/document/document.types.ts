@@ -11,8 +11,6 @@ import type { RDataView } from '@/domain/entities/reflect/RDataView'
 import type { RPolicy } from '@/domain/entities/reflect/RPolicy'
 import type { RStyle } from '@/domain/entities/reflect/RStyle'
 import type { RTenant } from '@/domain/entities/reflect/RTenant'
-import type { RBehaviorBinding } from '@/domain/entities/reflect/RBehaviorBinding'
-import type { RPresentationBinding } from '@/domain/entities/reflect/RPresentationBinding'
 import type { RVocabs } from '@/domain/entities/reflect/RVocabs'
 import type { RI18nBundle } from '@/domain/entities/reflect/RI18nBundle'
 import type { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
@@ -106,8 +104,6 @@ export type DomainDocumentType
     | 'environment'
     | 'policy'
     | 'style'
-    | 'behavior-binding'
-    | 'presentation-binding'
     | 'vocabs'
     | 'i18n-bundles'
     | 'auth-profile'
@@ -136,4 +132,4 @@ export interface Document {
 /**
  * Описывает любой документ рефлекцию
  */
-export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RComposition | RStore | RMock | RAction | RConverter | RComputation | RIntegration | RParameter | RFilter | RPolicy | RStyle | RVocabs | RI18nBundle | RAuthProfile | RWorkspace | RTenant | RBehaviorBinding | RPresentationBinding | RPageTemplate | RPage | RNavigation
+export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RComposition | RStore | RMock | RAction | RConverter | RComputation | RIntegration | RParameter | RFilter | RPolicy | RStyle | RVocabs | RI18nBundle | RAuthProfile | RWorkspace | RTenant | RPageTemplate | RPage | RNavigation

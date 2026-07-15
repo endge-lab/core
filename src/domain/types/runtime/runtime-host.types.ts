@@ -18,8 +18,6 @@ export type RuntimeHostCapability = 'renderable'
 
 export type RuntimeHostResourceKind
   = 'raph-node'
-    | 'behavior-binding'
-    | 'contract'
     | 'event-subscription'
     | 'scope'
     | 'meta'
@@ -39,8 +37,6 @@ export interface RuntimeHostResource {
 
 export type RuntimeHostChannelKind
   = 'raph'
-    | 'event-contract'
-    | 'behavior-bindings'
     | 'event-bus'
     | 'external'
 

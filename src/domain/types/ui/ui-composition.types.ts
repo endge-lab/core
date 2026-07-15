@@ -55,18 +55,6 @@ export interface UIPresentationContract {
   roles: UIPresentationRoleContract[]
 }
 
-export interface UIPresentationBinding {
-  ownerType: string
-  ownerId: string | number
-  targetType: 'ui-definition' | 'ui-config' | 'ui-asset' | 'ui-ast-node'
-  targetId: string
-  role: string
-  surface: UIPresentationSurface
-  rendererRef: string
-  mode: 'replace' | 'append' | 'prepend' | 'disable'
-  priority: number
-}
-
 export interface UIComponentDefinition<
   TProps extends Record<string, unknown> = Record<string, unknown>,
 > {
