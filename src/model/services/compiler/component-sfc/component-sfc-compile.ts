@@ -16,6 +16,7 @@ import type {
   RComponentSFC_AST,
   RComponentSFC_IR,
   RComponentSFC_RuntimeDependencies,
+  ComponentSFCPortProviderDescriptor,
 } from '@/domain/types/component/sfc'
 import type { ProgramMetadata } from '@/domain/types/program/program-metadata.types'
 import { parseComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-parse'
@@ -25,6 +26,7 @@ import { compileComponentSFCStyle } from '@/model/services/compiler/component-sf
 import { compileComponentSFCTemplate } from '@/model/services/compiler/component-sfc/component-sfc-template'
 import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component/sfc'
 import { createEmptyProgramMetadata } from '@/domain/types/program/program-metadata.types'
+import { analyzeComponentSFCPorts } from '@/model/services/compiler/component-sfc/component-sfc-ports'
 
 /** Результат полного SFC compiler pipeline в core. */
 export interface ComponentSFCCompileResult {
@@ -66,6 +68,12 @@ export interface ComponentSFCCompileOptions {
 
   /** Проверяет существование статической identity из Component is. */
   hasComponentIdentity?: (identity: string) => boolean
+
+  /** Resolves and describes a default port provider for build-time validation. */
+  resolvePortProvider?: (
+    identity: string,
+    expectedKind: 'computation' | 'component',
+  ) => ComponentSFCPortProviderDescriptor | null
 }
 
 /** Компилирует Endge SFC source до target-neutral artifact для Endge.program. */
@@ -92,9 +100,17 @@ export function compileComponentSFC(
   }
 
   const scriptResult = analyzeComponentSFCScript(parseResult.ast.script)
+  const portResult = analyzeComponentSFCPorts(
+    parseResult.ast.script,
+    createEmptyComponentDependencies(),
+    { resolveProvider: options.resolvePortProvider },
+  )
+  const templateLocals = scriptResult.locals
+    .filter(local => local.name !== portResult.bindingName)
   const templateResult = compileComponentSFCTemplate(parseResult.ast.template, {
     props: scriptResult.props.map(prop => prop.name),
-    locals: scriptResult.locals.map(local => local.name),
+    locals: templateLocals.map(local => local.name),
+    componentPorts: portResult.manifest.components,
     resolveComponentTag: options.resolveComponentTag,
     hasComponentIdentity: options.hasComponentIdentity,
   })
@@ -102,12 +118,14 @@ export function compileComponentSFC(
 
   diagnostics.push(
     ...scriptResult.diagnostics,
+    ...portResult.diagnostics,
     ...templateResult.diagnostics,
     ...styleResult.diagnostics,
   )
 
   const dependencies = mergeDependencies(
     createEmptyComponentDependencies(),
+    portResult.dependencies,
     templateResult.dependencies,
   )
 
@@ -116,7 +134,9 @@ export function compileComponentSFC(
         version: 1,
         script: {
           props: scriptResult.props,
-          locals: scriptResult.locals,
+          locals: templateLocals,
+          ports: portResult.manifest,
+          portCalls: portResult.calls,
         },
         template: templateResult.template,
         style: styleResult.style,
@@ -146,6 +166,7 @@ function mergeDependencies(
 ): RComponentDependencies {
   for (const item of items) {
     base.components.push(...item.components)
+    base.computations.push(...item.computations)
     base.actions.push(...item.actions)
     base.dataSources.push(...item.dataSources)
     base.renderers.push(...item.renderers)

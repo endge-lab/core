@@ -14,6 +14,7 @@ import type {
   RComponentSFC_IR_Tag,
   RComponentSFC_IR_Template,
   RComponentSFC_IR_Value,
+  ComponentSFCComponentPort,
 } from '@/domain/types/component/sfc'
 import type { ProgramNodeMetadata } from '@/domain/types/program/program-metadata.types'
 import { compileComponentSFCExpression } from '@/model/services/compiler/component-sfc/component-sfc-expression'
@@ -29,6 +30,9 @@ export interface ComponentSFCTemplateCompileContext {
 
   /** Имена locals для классификации expression reads. */
   locals: string[]
+
+  /** Local component ports have priority over the global user tag registry. */
+  componentPorts?: ComponentSFCComponentPort[]
 
   /** Разрешает зарегистрированный пользовательский tag в identity компонента. */
   resolveComponentTag?: (tag: string) => string | null
@@ -176,9 +180,14 @@ function compileElementNode(
   diagnostics: RComponentDiagnostic[],
 ): RComponentSFC_IR_ElementNode | null {
   const isBuiltIn = isComponentSFCBuiltInTag(node.tag)
+  const localComponentPort = isBuiltIn
+    ? null
+    : context.componentPorts?.find(port => port.tag === node.tag) ?? null
   const directComponentIdentity = isBuiltIn
     ? null
-    : context.resolveComponentTag?.(node.tag) ?? null
+    : localComponentPort?.defaultIdentity
+      ?? context.resolveComponentTag?.(node.tag)
+      ?? null
 
   if (!isBuiltIn && !directComponentIdentity) {
     diagnostics.push({
@@ -215,7 +224,7 @@ function compileElementNode(
     props.is = { kind: 'literal', value: directComponentIdentity }
   }
 
-  if (tag === 'Component')
+  if (tag === 'Component' && !localComponentPort)
     validateComponentCall(props.is, context, dependencies, diagnostics, node)
 
   const element: RComponentSFC_IR_ElementNode = {
@@ -228,6 +237,13 @@ function compileElementNode(
       .map((child, index) => compileTemplateNode(child, `${id}-${index}`, context, dependencies, metadata, diagnostics))
       .filter((child): child is RComponentSFC_IR_Node => child != null),
     sourceRange: node.range,
+    port: localComponentPort
+      ? {
+          kind: 'component',
+          port: localComponentPort.name,
+          defaultIdentity: localComponentPort.defaultIdentity,
+        }
+      : undefined,
   }
 
   if (Object.keys(nodeMetadata).length > 0) {

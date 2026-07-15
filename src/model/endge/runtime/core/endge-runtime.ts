@@ -27,11 +27,13 @@ import { EndgeCommands } from '@/model/endge/runtime/core/endge-commands'
 import { EndgeComposition } from '@/model/endge/runtime/execution/endge-composition'
 import { EndgeDataView } from '@/model/endge/runtime/execution/endge-data-view'
 import { EndgeQuery } from '@/model/endge/runtime/execution/endge-query'
+import { EndgeComputation } from '@/model/endge/runtime/execution/endge-computation'
 import { EndgeFlow } from '@/model/endge/runtime/flow/endge-flow'
 import { EndgeFlowRegistry } from '@/model/endge/runtime/flow/endge-flow-registry'
 
 /** Модуль создания, регистрации и уничтожения runtime hosts и app scopes. */
 export class EndgeRuntime extends EndgeModule {
+  public readonly computation = new EndgeComputation()
   public readonly query = new EndgeQuery()
   public readonly dataView = new EndgeDataView()
   public readonly composition = new EndgeComposition()

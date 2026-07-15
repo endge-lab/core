@@ -68,6 +68,7 @@ const OPERATION_FUNCTIONS: Record<string, SourceExpressionOperation> = {
   lte: 'lte',
   includes: 'includes',
   or: 'or',
+  when: 'when',
   not: 'not',
   isNil: 'is-nil',
   isEmpty: 'is-empty',
@@ -143,6 +144,7 @@ const OPERATION_ARITY: Record<SourceExpressionOperation, { min: number, max?: nu
   lte: { min: 2, max: 2 },
   includes: { min: 2, max: 2 },
   or: { min: 1 },
+  when: { min: 3, max: 3 },
   not: { min: 1, max: 1 },
   'is-nil': { min: 1, max: 1 },
   'is-empty': { min: 1, max: 1 },
@@ -261,7 +263,8 @@ export function compileSourceExpression(
     const operation = OPERATION_FUNCTIONS[calleeName]
     if (operation) {
       const args = compileArguments(node, diagnostics, sourcePath, calleeName)
-      if (IMPLICIT_CURRENT_OPERATIONS.has(operation))
+      const arity = OPERATION_ARITY[operation]
+      if (IMPLICIT_CURRENT_OPERATIONS.has(operation) && args.length < arity.min)
         args.unshift({ type: 'read', source: 'current', path: '' })
       validateArity(operation, args.length, calleeName, diagnostics, sourcePath, node)
       return { type: 'operation', operation, arguments: args }

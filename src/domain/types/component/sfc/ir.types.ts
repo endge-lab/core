@@ -1,4 +1,9 @@
 import type { RComponentSFC_SourceRange } from './location.types'
+import type {
+  ComponentSFCPortManifest,
+  RComponentSFC_IR_ComponentPortMarker,
+  RComponentSFC_IR_PortCall,
+} from './ports.types'
 
 /** Семантическая модель компонента после compiler pipeline, независимая от DOM и Nova. */
 export interface RComponentSFC_IR {
@@ -22,6 +27,12 @@ export interface RComponentSFC_IR_Script {
 
   /** Локальные bindings, доступные template-выражениям. */
   locals: RComponentSFC_IR_LocalBinding[]
+
+  /** Port declarations resolved during compilation. */
+  ports: ComponentSFCPortManifest
+
+  /** Top-level computation port calls that initialize template locals. */
+  portCalls: RComponentSFC_IR_PortCall[]
 }
 
 /** IR prop компонента. */
@@ -108,6 +119,9 @@ export interface RComponentSFC_IR_ElementNode {
 
   /** Дочерние IR-узлы. */
   children: RComponentSFC_IR_Node[]
+
+  /** Local component port marker retained for future provider overrides. */
+  port?: RComponentSFC_IR_ComponentPortMarker
 
   /** Позиция исходного AST-узла. */
   sourceRange?: RComponentSFC_SourceRange

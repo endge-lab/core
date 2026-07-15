@@ -23,6 +23,9 @@ export function analyzeComponentSFCRuntimeDependencies(
   const props = new Set(ir.script.props.map(prop => prop.name))
   const seen = new Set<string>()
 
+  for (const call of ir.script.portCalls)
+    collectValueDependencies(call.input, props, result, seen)
+
   for (const node of ir.template.roots) {
     collectNodeDependencies(node, props, result, seen)
     collectBoundaryDependencies(node, props, result)

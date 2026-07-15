@@ -14,11 +14,13 @@ import type {
 } from '@/domain/types/component/sfc'
 import type { QueryProgramProp, SourceExpressionIR } from '@/domain/types/source/source-expression.types'
 import type { ProgramMetadata } from '@/domain/types/program/program-metadata.types'
+import type { ComputationProgramPayload } from '@/domain/types/computation'
 
 /** Тип доменной сущности, для которой compiler может построить program artifact. */
 export type ProgramEntityType
   = 'type'
     | 'component-sfc'
+    | 'computation'
     | 'action'
     | 'query'
     | 'data-view'
@@ -252,6 +254,8 @@ export interface ComponentSFCProgramPayload {
   /** Target-neutral semantic IR, который renderer-слои используют для DOM/Nova. */
   ir: RComponentSFC_IR | null
 }
+
+export type { ComputationProgramPayload }
 
 /** Одна запись build-derived registry пользовательских SFC tags. */
 export interface ComponentSFCTagRegistryEntry {

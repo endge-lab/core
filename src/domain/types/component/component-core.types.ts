@@ -14,6 +14,16 @@ export interface RComponentRef {
 
   /** Идентификатор компонента внутри выбранного хранилища. */
   id: string | number
+
+  /** Semantic dependency role in the compiled artifact. */
+  role?: 'child-component' | 'port-default-component'
+}
+
+/** Ссылка SFC-компонента на computation provider. */
+export interface RComputationRef {
+  source: 'computation'
+  id: string | number
+  role: 'port-default-computation'
 }
 
 /** Описание одного сообщения компилятора или валидатора. */
@@ -87,6 +97,9 @@ export interface RComponentDependencies {
   /** Дочерние компоненты, на которые ссылается template. */
   components: RComponentRef[]
 
+  /** Computation providers required by source ports. */
+  computations: RComputationRef[]
+
   /** Действия, которые вызываются из handlers или bindings. */
   actions: string[]
 
@@ -110,6 +123,7 @@ export function createEmptyComponentContract(): RComponentContract {
 export function createEmptyComponentDependencies(): RComponentDependencies {
   return {
     components: [],
+    computations: [],
     actions: [],
     dataSources: [],
     renderers: [],

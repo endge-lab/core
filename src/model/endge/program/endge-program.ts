@@ -10,6 +10,7 @@ import type {
   ProgramArtifactRef,
   ProgramArtifactStatus,
   ComponentSFCTagRegistryEntry,
+  ComputationProgramPayload,
   ProgramDiagnostic,
   ProgramEntityType,
   QueryProgramPayload,
@@ -123,6 +124,11 @@ export class EndgeProgram extends EndgeModule {
   /** Возвращает compiled query artifact по id или identity. */
   public getQueryArtifact(idOrIdentity: string | number): ProgramArtifact<QueryProgramPayload> | null {
     return this.getArtifact<QueryProgramPayload>('query', idOrIdentity)
+  }
+
+  /** Returns a compiled Computation artifact by id or identity. */
+  public getComputationArtifact(idOrIdentity: string | number): ProgramArtifact<ComputationProgramPayload> | null {
+    return this.getArtifact<ComputationProgramPayload>('computation', idOrIdentity)
   }
 
   /** Возвращает compiled DataView artifact по id или identity. */

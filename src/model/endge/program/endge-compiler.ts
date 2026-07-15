@@ -5,6 +5,7 @@ import type { CompositionProgramPayload } from '@/domain/types/source/compositio
 import type { StoreSourceArtifact } from '@/domain/types/source/store-source.types'
 import type {
   ComponentSFCProgramPayload,
+  ComputationProgramPayload,
   ComponentSFCTagRegistryEntry,
   DataViewProgramPayload,
   EntityCompilerHandler,
@@ -20,6 +21,7 @@ import type {
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
+import { RComputation } from '@/domain/entities/reflect/RComputation'
 import { RDataView } from '@/domain/entities/reflect/RDataView'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RFilter } from '@/domain/entities/reflect/RFilter'
@@ -32,6 +34,9 @@ import { ENDGE_LOG_LANES } from '@/model/config/debug'
 import { Endge } from '@/model/endge/kernel/endge'
 import { createEmptyProgramMetadata } from '@/domain/types/program/program-metadata.types'
 import type { ProgramMetadata } from '@/domain/types/program/program-metadata.types'
+import { compileComputation } from '@/model/services/compiler/computation/computation-compile'
+import { parseComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-parse'
+import { analyzeComponentSFCScript } from '@/model/services/compiler/component-sfc/component-sfc-script'
 
 /**
  * Компилятор persisted domain model в compiled program artifacts.
@@ -68,6 +73,9 @@ export class EndgeCompiler extends EndgeModule {
     this._prepareComponentTagRegistry(componentSFCs)
     dbg.startTrace('compile', 'info')
 
+    if (!this.compilePhase('computation', ENDGE_LOG_LANES.COMPONENTS, 'computations', Endge.domain.getComputations(), context))
+      return
+
     if (!this.compilePhase('component-sfc', ENDGE_LOG_LANES.COMPONENTS, 'SFC-компонентов', componentSFCs, context))
       return
 
@@ -100,6 +108,19 @@ export class EndgeCompiler extends EndgeModule {
   public buildQuery(entity: RQuery): ProgramArtifact<QueryProgramPayload> {
     const context: ProgramCompileContext = { compilerVersion: ENDGE_COMPILER_VERSION }
     return this.compileEntity('query', entity, context) as ProgramArtifact<QueryProgramPayload>
+  }
+
+  /** Компилирует одну Computation в безопасный runtime artifact. */
+  public buildComputation(entity: RComputation): ProgramArtifact<ComputationProgramPayload> {
+    const context: ProgramCompileContext = { compilerVersion: ENDGE_COMPILER_VERSION }
+    return this.compileEntity('computation', entity, context) as ProgramArtifact<ComputationProgramPayload>
+  }
+
+  /** Компилирует один ComponentSFC без запуска полного domain build. */
+  public buildComponentSFC(entity: RComponentSFC): ProgramArtifact<ComponentSFCProgramPayload> {
+    const context: ProgramCompileContext = { compilerVersion: ENDGE_COMPILER_VERSION }
+    this._prepareComponentTagRegistry(Endge.domain.getComponentSFCs())
+    return this.compileEntity('component-sfc', entity, context) as ProgramArtifact<ComponentSFCProgramPayload>
   }
 
   /** Компилирует один DataView source в Endge.program без запуска остальных compiler-фаз. */
@@ -197,12 +218,31 @@ export class EndgeCompiler extends EndgeModule {
    * source-first ветки `component-sfc`.
    */
   private registerDefaultHandlers(): void {
+    this.registerHandler<RComputation, ComputationProgramPayload>({
+      entityType: 'computation',
+      compile: (entity, context) => {
+        const result = compileComputation({
+          implementationKind: entity.implementationKind,
+          sourceLanguage: entity.sourceLanguage,
+          source: entity.source,
+          input: fieldContract(entity.input),
+          output: fieldContract(entity.output),
+        })
+        return this._makeArtifact(entity, 'computation', context, {
+          capabilities: ['compilable', 'runnable'],
+          payload: result.payload,
+          diagnostics: result.diagnostics,
+        })
+      },
+    })
+
     this.registerHandler<RComponentSFC, ComponentSFCProgramPayload>({
       entityType: 'component-sfc',
       compile: (entity, context) => {
         const result = compileComponentSFC(entity.source, {
           resolveComponentTag: tag => Endge.program.resolveComponentTag(tag),
           hasComponentIdentity: identity => Endge.domain.getComponentSFC(identity) != null,
+          resolvePortProvider: (identity, expectedKind) => this._resolvePortProvider(identity, expectedKind),
         })
         return this._makeArtifact(entity, 'component-sfc', context, {
           capabilities: ['compilable', 'runnable', 'renderable'],
@@ -220,6 +260,20 @@ export class EndgeCompiler extends EndgeModule {
           diagnostics: [
             ...(this._componentTagDiagnosticsByIdentity.get(entity.identity) ?? []),
             ...result.diagnostics,
+          ],
+          dependencies: [
+            ...result.dependencies.components.map(dependency => ({
+              entityType: 'component-sfc',
+              id: dependency.id,
+              identity: String(dependency.id),
+              role: dependency.role ?? 'child-component',
+            })),
+            ...result.dependencies.computations.map(dependency => ({
+              entityType: 'computation',
+              id: dependency.id,
+              identity: String(dependency.id),
+              role: dependency.role,
+            })),
           ],
         })
       },
@@ -405,6 +459,39 @@ export class EndgeCompiler extends EndgeModule {
         })
       },
     })
+  }
+
+  /** Resolves a domain provider descriptor without requiring compile order among SFCs. */
+  private _resolvePortProvider(
+    identity: string,
+    expectedKind: 'computation' | 'component',
+  ) {
+    const computation = Endge.domain.getComputation(identity)
+    const component = Endge.domain.getComponentSFC(identity)
+    const target = expectedKind === 'computation'
+      ? computation ?? component
+      : component ?? computation
+
+    if (target instanceof RComputation) {
+      return {
+        kind: 'computation' as const,
+        identity: target.identity,
+        active: target.active !== false && !target.deletedAt,
+        input: fieldContract(target.input),
+        output: fieldContract(target.output),
+      }
+    }
+    if (target instanceof RComponentSFC) {
+      const parsed = parseComponentSFC(target.source)
+      const contract = analyzeComponentSFCScript(parsed.ast?.script ?? null).contract
+      return {
+        kind: 'component' as const,
+        identity: target.identity,
+        active: target.active !== false && !target.deletedAt,
+        inputs: contract.inputs,
+      }
+    }
+    return null
   }
 
   /**
@@ -1389,5 +1476,14 @@ export class EndgeCompiler extends EndgeModule {
     for (let index = 0; index < value.length; index += 1)
       hash = ((hash << 5) - hash + value.charCodeAt(index)) | 0
     return Math.abs(hash).toString(36)
+  }
+}
+
+function fieldContract(field: { type: string, isArray?: boolean, optional?: boolean } | null | undefined) {
+  if (!field) return null
+  return {
+    type: field.type,
+    isArray: field.isArray === true,
+    optional: field.optional === true,
   }
 }

@@ -74,7 +74,7 @@ export function analyzeComponentSFCScript(script: RComponentSFC_AST_Script | nul
   }
 
   const props = script.props
-    ? parsePropsSource(script.props.source)
+    ? parseComponentSFCTypeFields(script.props.source, script.content)
     : []
   const previewPropsResult = script.previewProps
     ? parsePreviewPropsSource(script.previewProps.source, script.previewProps.optionsSource)
@@ -119,31 +119,81 @@ export function analyzeComponentSFCScript(script: RComponentSFC_AST_Script | nul
   }
 }
 
-function parsePropsSource(source: string): RComponentSFC_IR_Prop[] {
-  const props: RComponentSFC_IR_Prop[] = []
-  const body = source
-    .trim()
-    .replace(/^\{/, '')
-    .replace(/\}$/, '')
+/** Resolves inline or named TypeScript object contracts used by SFC macros. */
+export function parseComponentSFCTypeFields(
+  source: string,
+  scriptContent = '',
+): RComponentSFC_IR_Prop[] {
+  const named = /^[A-Za-z_$][\w$]*$/.test(source.trim())
+    ? findNamedTypeLiteral(source.trim(), scriptContent)
+    : null
+  if (named)
+    return readTypeMembers(named.members, named.content)
 
-  for (const chunk of body.split(/[;\n,]+/)) {
-    const line = chunk.trim()
-    if (!line)
-      continue
-
-    const match = line.match(/^([A-Za-z_$][\w$]*)(\?)?\s*:\s*(.+)$/)
-    if (!match)
-      continue
-
-    const type = match[3].trim()
-    props.push({
-      name: match[1],
-      type,
-      isArray: /\[\]$/.test(type) || /^Array<.+>$/.test(type),
-      optional: Boolean(match[2]),
-    })
+  const prefix = 'type __EndgeContract = '
+  const content = `${prefix}${source}`
+  try {
+    const ast = parseTS(content, {
+      sourceType: 'module',
+      plugins: ['typescript'],
+    }) as any
+    const annotation = ast.program.body[0]?.typeAnnotation
+    if (annotation?.type === 'TSTypeLiteral')
+      return readTypeMembers(annotation.members ?? [], content)
+  }
+  catch {
+    return []
   }
 
+  return []
+}
+
+function findNamedTypeLiteral(
+  name: string,
+  content: string,
+): { members: any[], content: string } | null {
+  try {
+    const ast = parseTS(content, {
+      sourceType: 'module',
+      plugins: ['typescript'],
+    }) as any
+    for (const statement of ast.program.body ?? []) {
+      if (statement.type === 'TSInterfaceDeclaration' && statement.id?.name === name)
+        return { members: statement.body?.body ?? [], content }
+      if (
+        statement.type === 'TSTypeAliasDeclaration'
+        && statement.id?.name === name
+        && statement.typeAnnotation?.type === 'TSTypeLiteral'
+      ) return { members: statement.typeAnnotation.members ?? [], content }
+    }
+  }
+  catch {
+    return null
+  }
+  return null
+}
+
+function readTypeMembers(members: any[], content: string): RComponentSFC_IR_Prop[] {
+  const props: RComponentSFC_IR_Prop[] = []
+  for (const member of members) {
+    if (member.type !== 'TSPropertySignature' || member.computed)
+      continue
+    const name = member.key?.type === 'Identifier'
+      ? member.key.name
+      : member.key?.type === 'StringLiteral'
+        ? member.key.value
+        : ''
+    const annotation = member.typeAnnotation?.typeAnnotation
+    if (!name || annotation?.start == null || annotation?.end == null)
+      continue
+    const type = content.slice(annotation.start, annotation.end).trim()
+    props.push({
+      name,
+      type,
+      isArray: /\[\]$/.test(type) || /^Array<.+>$/.test(type),
+      optional: member.optional === true,
+    })
+  }
   return props
 }
 

@@ -40,6 +40,87 @@ defineMetadata({
 </style>
 ```
 
+## Ports
+
+`definePorts` объявляет source-first dependencies компонента. В v1 доступны
+только `computation` и `component`, и каждый port обязан иметь `default`.
+Отдельный persisted document для ports не создаётся: compiler сохраняет typed
+manifest и port calls в ComponentSFC artifact.
+
+```vue
+<script setup lang="ts">
+interface Props {
+  process?: GroundHandlingOperation
+}
+
+interface ProcessStateInput {
+  process?: GroundHandlingOperation
+}
+
+interface ProcessState {
+  target?: GroundHandlingPointState
+}
+
+interface CellProps {
+  point?: GroundHandlingPointState
+}
+
+const props = defineProps<Props>()
+
+const ports = definePorts({
+  state: computation<ProcessStateInput, ProcessState>({
+    default: 'groundhandling-process-state',
+  }),
+  cell: component<CellProps>({
+    tag: 'GroundHandling.Cell',
+    default: 'groundhandling-process-cell',
+  }),
+})
+
+const state = ports.state({
+  process: props.process,
+})
+</script>
+
+<template>
+  <GroundHandling.Cell :point="state.target" />
+</template>
+```
+
+Rules for v1:
+
+- разрешён один top-level `const ports = definePorts({...})`;
+- computation вызывается только в top-level `const` и получает один input object;
+- component port задаёт local tag, включая dotted form;
+- local component tag имеет приоритет над global user tag;
+- built-in tags (`Text`, `Flex`, `Component` и другие) запрещены для component ports;
+- defaults проверяются на existence, active state и provider kind;
+- computation generic types сохраняются в manifest, но в v1 не сравниваются с
+  опциональными persisted `RComputation.input/output`; несовместимость проявляется
+  естественной runtime-ошибкой;
+- Composition overrides, actions, converters и async computations пока не поддерживаются.
+
+Source computation должна экспортировать одну синхронную function с одним
+return expression. JavaScript не исполняется напрямую: compiler превращает
+expression в safe ValueExpression IR.
+
+```ts
+export default function compute(
+  input: ProcessStateInput,
+): ProcessState {
+  return {
+    target: {
+      value: get(input, 'process.target.value'),
+      tone: when(
+        isNil(get(input, 'process.target.value')),
+        'muted',
+        'default',
+      ),
+    },
+  }
+}
+```
+
 ## Metadata
 
 `defineMetadata({...})` объявляет metadata всего SFC-компонента. Для отдельного template-узла используется `:metadata`:

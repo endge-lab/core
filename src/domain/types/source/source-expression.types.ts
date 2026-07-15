@@ -67,6 +67,7 @@ export type SourceExpressionOperation
     | 'lte'
     | 'includes'
     | 'or'
+    | 'when'
     | 'not'
     | 'is-nil'
     | 'is-empty'

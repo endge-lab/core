@@ -98,6 +98,9 @@ export const VALUE_EXPRESSION_OPERATIONS: Record<SourceExpressionOperation, Valu
   includes: eager(args => includes(args[0], args[1])),
   and: eager(args => args.every(Boolean)),
   or: eager(args => args.some(Boolean)),
+  when: (args, runtime) => Boolean(runtime.evaluate(args[0]))
+    ? runtime.evaluate(args[1])
+    : runtime.evaluate(args[2]),
   not: eager(args => !args[0]),
   'is-nil': eager(args => args[0] == null),
   'is-empty': eager(args => isEmpty(args[0])),
