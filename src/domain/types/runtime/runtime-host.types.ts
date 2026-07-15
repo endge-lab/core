@@ -121,10 +121,6 @@ export interface ComponentSFCRuntimeHostContext extends RuntimeHostContextBase {
   lastRenderAt: string | null
 }
 
-export interface ViewRuntimeHostContext extends RuntimeHostContextBase {
-  lastRenderAt: string | null
-}
-
 export interface PageRuntimeHostContext extends RuntimeHostContextBase {
   lastRenderAt: string | null
 }
@@ -140,7 +136,6 @@ export interface RuntimeHostContextMap {
   composition: CompositionRuntimeHostContext
   store: StoreRuntimeHostContext
   'component-sfc': ComponentSFCRuntimeHostContext
-  view: ViewRuntimeHostContext
   page: PageRuntimeHostContext
   project: ProjectRuntimeHostContext
 }

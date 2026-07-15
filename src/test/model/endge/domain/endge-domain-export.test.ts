@@ -85,7 +85,6 @@ describe('Endge domain export', () => {
       'styles',
       'tenants',
       'types',
-      'views',
       'vocabs',
     ])
     expect(plain.queries).toEqual([

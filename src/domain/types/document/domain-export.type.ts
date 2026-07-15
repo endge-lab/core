@@ -20,7 +20,6 @@ export interface EndgeDomainPlain {
   converters: unknown[]
   computations: unknown[]
   integrations: unknown[]
-  views: unknown[]
   folders: unknown[]
   parameters: unknown[]
   filters: unknown[]

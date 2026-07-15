@@ -48,7 +48,6 @@ import { Styles_Repository } from '@/model/db/repositories/Styles_Repository'
 import { Tenants_Repository } from '@/model/db/repositories/Tenants_Repository'
 import { Types_Repository } from '@/model/db/repositories/Types_Repository'
 import { Versions_Repository } from '@/model/db/repositories/Versions_Repository'
-import { Views_Repository } from '@/model/db/repositories/Views_Repository'
 import { Vocabs_Repository } from '@/model/db/repositories/Vocabs_Repository'
 import { I18nBundles_Repository } from '@/model/db/repositories/I18nBundles_Repository'
 import { Workspaces_Repository } from '@/model/db/repositories/Workspaces_Repository'
@@ -82,7 +81,6 @@ const WORKSPACE_SCOPED_PAYLOAD_COLLECTIONS = new Set([
   'tenants',
   'types',
   'versions',
-  'views',
   'vocabs',
 ])
 
@@ -329,7 +327,6 @@ const ROOT_FOLDER_ENTITY_TYPE_BY_IDENTITY: Record<string, string> = {
   'root-converters': 'converters',
   'root-computations': 'computations',
   'root-integrations': 'integrations',
-  'root-views': 'views',
   'root-environments': 'environments',
   'root-tenants': 'tenants',
   'root-policies': 'policies',
@@ -416,7 +413,6 @@ export class EndgeSchemaStorage extends EndgeModule {
     'converters',
     'computations',
     'integrations',
-    'views',
     'page-templates',
     'pages',
     'navigations',
@@ -684,7 +680,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         converters: new Converters_Repository(this.api),
         computations: new Computations_Repository(this.api),
         integrations: new Integrations_Repository(this.api),
-        views: new Views_Repository(this.api),
         versions: new Versions_Repository(this.api),
         environments: new Environments_Repository(this.api),
         tenants: new Tenants_Repository(this.api),
@@ -787,7 +782,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       converters: [],
       computations: [],
       integrations: [],
-      views: [],
       vocabs: [],
       i18nBundles: [],
       authProfiles: [],
@@ -953,12 +947,6 @@ export class EndgeSchemaStorage extends EndgeModule {
           ?? relationToNumericId(raw.templateId)
           ?? relationToNumericId(raw.templateIdentity)
           ?? null
-      const controllerId
-        = relationToNumericId(raw.controller)
-          ?? relationToNumericId(raw.controllerId)
-          ?? relationToNumericId(raw.controllerIdentity)
-          ?? null
-
       const areas = Array.isArray(raw.areas) ? raw.areas : []
 
       return {
@@ -972,7 +960,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         routeName: raw.routeName ?? null,
         routePath: raw.routePath ?? null,
         templateId,
-        controllerId,
         enabled: raw.enabled !== false,
         areas: areas.map((a: any) => ({
           slotId: a?.slotId ?? '',
@@ -1390,26 +1377,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       }
     }
 
-    const normalizeView = (raw: any) => {
-      const componentId = relationToNumericId(raw.component) ?? relationToNumericId(raw.componentId)
-      const filterId = relationToNumericId(raw.filter) ?? relationToNumericId(raw.filterId)
-      const queryId = relationToNumericId(raw.query) ?? relationToNumericId(raw.queryId)
-
-      return {
-        id: raw.id,
-        identity: raw.identity,
-        name: raw.displayName,
-        description: raw.description ?? null,
-        isSystem: raw.isSystem === true,
-        folderId: relationToId(raw.folder) ?? null,
-        project: relationToId(raw.project) ?? null,
-        componentId: componentId ?? null,
-        filterId: filterId ?? null,
-        queryId: queryId ?? null,
-        meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
-      }
-    }
-
     // ==== ОБЩИЙ ЛОАДЕР С ОБРАБОТКОЙ ОШИБОК ====
 
     const load = async (
@@ -1561,11 +1528,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         return rows.map(normalizeIntegration)
       }),
 
-      load('views', async () => {
-        const rows = await this.repositories!.views.findAll()
-        return rows.map(normalizeView)
-      }),
-
       load('versions', async () => {
         const rows = await this.repositories!.versions.findAll()
         return rows.map(normalizeVersion)
@@ -1666,8 +1628,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       return domain.getComputation(documentIdOrIdentity)
     if (documentType === 'integration')
       return domain.getIntegration(documentIdOrIdentity)
-    if (documentType === 'view')
-      return domain.getView(documentIdOrIdentity)
     if (documentType === 'environment')
       return domain.getEnvironment(documentIdOrIdentity)
     if (documentType === 'tenant')
@@ -1784,8 +1744,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       return repos.computations.findByIdentity(identity)
     if (documentType === 'integration')
       return repos.integrations.findByIdentity(identity)
-    if (documentType === 'view')
-      return repos.views.findByIdentity(identity)
     if (documentType === 'environment')
       return repos.environments.findByIdentity(identity)
     if (documentType === 'tenant')
@@ -1887,8 +1845,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       return repos.computations.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === 'integration')
       return repos.integrations.patchFolder(documentPayloadId, folderPayloadId)
-    if (documentType === 'view')
-      return repos.views.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === 'environment')
       return repos.environments.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === 'tenant')
@@ -2090,10 +2046,6 @@ export class EndgeSchemaStorage extends EndgeModule {
     }
     if (documentType === 'type' || documentType === 'primitive') {
       await repos.types.hardDelete(resolvedIdentity)
-      return
-    }
-    if (documentType === 'view') {
-      await repos.views.hardDelete(resolvedIdentity)
       return
     }
     if (documentType === 'environment') {
@@ -2705,9 +2657,6 @@ export class EndgeSchemaStorage extends EndgeModule {
     else if (documentType === 'integration') {
       saved = await repos.integrations.upsert(data as any)
     }
-    else if (documentType === 'view') {
-      saved = await repos.views.upsert(data as any)
-    }
     else if (documentType === 'environment') {
       saved = await repos.environments.upsert(data as any)
     }
@@ -3315,9 +3264,9 @@ export class EndgeSchemaStorage extends EndgeModule {
         identity: bindingIdentity,
         displayName: plain.displayName ?? plain.name ?? bindingIdentity,
         projectId: relationToNumericId(plain.projectId) ?? null,
-        ownerType: String(plain.ownerType ?? 'view').trim() || 'view',
+        ownerType: String(plain.ownerType ?? 'project').trim() || 'project',
         ownerId,
-        targetType: String(plain.targetType ?? 'view').trim() || 'view',
+        targetType: String(plain.targetType ?? 'component').trim() || 'component',
         targetId,
         eventName: String(plain.eventName ?? '').trim(),
         scriptRef: String(plain.scriptRef ?? '').trim(),
@@ -3580,41 +3529,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       return
     }
 
-    if (documentType === 'view') {
-      const view = ((opts?.model as any) ?? domain.getView(documentId)) as any
-      if (!view)
-        throw new Error(`Вид не найден: ${documentId}`)
-      const plain = view.toPlain()
-      let folderId: number | string | undefined
-      const existing = await repos.views.findByIdentity(plain.identity)
-      if (existing && (((existing as any).folderId ?? existing.folder) != null)) {
-        folderId = (existing as any).folderId ?? existing.folder
-      }
-      else {
-        const folderDoc = await repos.folders.findByIdentity('root-views')
-        folderId = folderDoc?.id
-      }
-      const comp = plain.componentId ? domain.getComponent(plain.componentId) : null
-      const compDoc = comp ? await repos.components.findByIdentity((comp as any).identity ?? String(comp.id)) : null
-      const filter = plain.filterId ? domain.getFilter(plain.filterId) : null
-      const query = plain.queryId ? domain.getQuery(plain.queryId) : null
-      const filterDoc = filter ? await repos.filters.findByIdentity((filter as any).identity ?? String(filter.id)) : null
-      const queryDoc = query ? await repos.queries.findByIdentity((query as any).identity ?? String(query.id)) : null
-      const saved = await repos.views.upsert({
-        identity: plain.identity,
-        displayName: plain.name,
-        description: plain.description ?? undefined,
-        isSystem: plain.isSystem,
-        folder: folderId,
-        component: compDoc?.id ?? comp?.id ?? null,
-        filter: filterDoc?.id ?? null,
-        query: queryDoc?.id ?? null,
-        meta: (view.meta && typeof view.meta === 'object' && !Array.isArray(view.meta)) ? view.meta : {},
-      })
-      this._applyPayloadDocToDomain(documentType, saved, documentId, true)
-      return
-    }
-
     if (documentType === 'page-template') {
       const tpl = ((opts?.model as any) ?? domain.getPageTemplate(documentId)) as any
       if (!tpl)
@@ -3685,35 +3599,10 @@ export class EndgeSchemaStorage extends EndgeModule {
       else {
         throw new Error('[EndgeSchemaStorage.saveDocument] Для страницы не задан templateId')
       }
-      let controllerPayloadId: number | string | null = null
-      const controllerRef = (plain as any).controllerId ?? (plain as any).controllerIdentity ?? null
-      if (controllerRef != null && String(controllerRef).trim() !== '') {
-        const viewById = domain.getViewById(controllerRef)
-        const viewByIdentity = !viewById ? domain.getView(String(controllerRef)) : null
-        const resolvedController = viewById ?? viewByIdentity
-
-        if (resolvedController?.id != null) {
-          controllerPayloadId = resolvedController.id
-        }
-        else if (typeof controllerRef === 'number' && Number.isFinite(controllerRef)) {
-          controllerPayloadId = controllerRef
-        }
-        else if (typeof controllerRef === 'string' && /^-?\d+$/.test(controllerRef)) {
-          controllerPayloadId = Number(controllerRef)
-        }
-        else {
-          const controllerDoc = await repos.views.findByIdentity(String(controllerRef))
-          if (!controllerDoc)
-            throw new Error(`Контроллер страницы (view) не найден в Payload: ${String(controllerRef)}`)
-          controllerPayloadId = controllerDoc.id
-        }
-      }
-
       /** Маппинг entityType домена -> relationTo коллекции Payload (полиморфная связь). */
       const entityTypeToRelation: Record<string, string> = {
         component: 'components',
         filter: 'filters',
-        view: 'views',
         query: 'queries',
         type: 'types',
         action: 'actions',
@@ -3739,10 +3628,6 @@ export class EndgeSchemaStorage extends EndgeModule {
             }
             else if (b.entityType === 'filter') {
               const doc = await repos.filters.findByIdentity(identity)
-              docId = (doc as any)?.id != null ? (doc as any).id : null
-            }
-            else if (relationTo === 'views') {
-              const doc = await repos.views.findByIdentity(identity)
               docId = (doc as any)?.id != null ? (doc as any).id : null
             }
             else if (relationTo === 'queries') {
@@ -3772,7 +3657,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         routeName: plain.routeName ?? null,
         routePath: plain.routePath ?? null,
         template: templatePayloadId,
-        controller: controllerPayloadId,
         enabled: plain.enabled ?? true,
         areas: areasForPayload,
         meta: plain.meta ?? {},
@@ -4050,13 +3934,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       )
       return
     }
-    if (documentType === 'view') {
-      removeBy(
-        x => Endge.domain.removeViewById(x),
-        x => Endge.domain.removeView(x),
-      )
-      return
-    }
     if (documentType === 'environment') {
       removeBy(
         x => Endge.domain.removeEnvironmentById(x),
@@ -4197,8 +4074,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       return 'converters'
     if (documentType === 'integration')
       return 'integrations'
-    if (documentType === 'view')
-      return 'views'
     if (documentType === 'environment')
       return 'environments'
     if (documentType === 'tenant')
@@ -4305,7 +4180,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         output: normalizeActionField(raw.output, 'output'),
       }
     }
-    if (documentType === 'converter' || documentType === 'integration' || documentType === 'view') {
+    if (documentType === 'converter' || documentType === 'integration') {
       return {
         id: raw.id,
         identity: raw.identity,

@@ -7,7 +7,6 @@ import { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/Compone
 import { PageRuntimeHost } from '@/domain/entities/runtime/hosts/PageRuntimeHost'
 import { ProjectRuntimeHost } from '@/domain/entities/runtime/hosts/ProjectRuntimeHost'
 import { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
-import { ViewRuntimeHost } from '@/domain/entities/runtime/hosts/ViewRuntimeHost'
 
 export interface RuntimeHostFactoryInput<TType extends RuntimeEntityType> {
   id: string
@@ -41,14 +40,6 @@ export function createRuntimeHost(
       return new PageRuntimeHost({
         id,
         model: model as RuntimeEntityModelMap['page'],
-        entityIdentity,
-        title,
-        meta,
-      })
-    case 'view':
-      return new ViewRuntimeHost({
-        id,
-        model: model as RuntimeEntityModelMap['view'],
         entityIdentity,
         title,
         meta,

@@ -8,7 +8,6 @@ export type EndgeComponentId = string
 export type EndgeActionId = string
 export type EndgeConverterId = string
 export type EndgeIntegrationId = string
-export type EndgeViewId = string
 export type EndgePageTemplateId = string
 export type EndgePageId = string
 export type EndgeNavigationId = string

@@ -37,7 +37,6 @@ import { RTenant } from '@/domain/entities/reflect/RTenant'
 import { RBehaviorBinding } from '@/domain/entities/reflect/RBehaviorBinding'
 import { RPresentationBinding } from '@/domain/entities/reflect/RPresentationBinding'
 import { RType } from '@/domain/entities/reflect/RType'
-import { RView } from '@/domain/entities/reflect/RView'
 import { RVocabs } from '@/domain/entities/reflect/RVocabs'
 import { RI18nBundle } from '@/domain/entities/reflect/RI18nBundle'
 import { QueryType } from '@/domain/types/document/document.types'
@@ -220,7 +219,6 @@ export interface EndgeDomainParsed {
   vocabs: RVocabs[]
   i18nBundles: RI18nBundle[]
   authProfiles: RAuthProfile[]
-  views: RView[]
   pageTemplates: RPageTemplate[]
   pages: RPage[]
   navigations: RNavigation[]
@@ -269,9 +267,6 @@ export class EndgeDomain extends EndgeModule {
 
   private _integrationsById: Map<string | number, RIntegration> = new Map()
   private _integrationsByIdentity: Map<string, RIntegration> = new Map()
-
-  private _viewsById: Map<string | number, RView> = new Map()
-  private _viewsByIdentity: Map<string, RView> = new Map()
 
   private _foldersById: Map<string | number, RFolder> = new Map()
   private _foldersByIdentity: Map<string, RFolder> = new Map()
@@ -384,8 +379,6 @@ export class EndgeDomain extends EndgeModule {
     this._convertersByIdentity.clear()
     this._integrationsById.clear()
     this._integrationsByIdentity.clear()
-    this._viewsById.clear()
-    this._viewsByIdentity.clear()
     this._foldersById.clear()
     this._foldersByIdentity.clear()
     this._parametersById.clear()
@@ -464,7 +457,6 @@ export class EndgeDomain extends EndgeModule {
     const filtersRaw = Array.isArray(payload?.filters) ? payload.filters : []
     const convertersRaw = Array.isArray(payload?.converters) ? payload.converters : []
     const integrationsRaw = Array.isArray(payload?.integrations) ? payload.integrations : []
-    const viewsRaw = Array.isArray(payload?.views) ? payload.views : []
     const actionsRaw = Array.isArray(payload?.actions) ? payload.actions : []
     const environmentsRaw = Array.isArray(payload?.environments) ? payload.environments : []
     const tenantsRaw = Array.isArray(payload?.tenants) ? payload.tenants : []
@@ -505,7 +497,6 @@ export class EndgeDomain extends EndgeModule {
       filters: filtersRaw,
       converters: convertersRaw,
       integrations: integrationsRaw,
-      views: viewsRaw,
       environments: environmentsRaw,
       tenants: tenantsRaw,
       behaviorBindings: behaviorBindingsRaw,
@@ -2400,99 +2391,6 @@ export class EndgeDomain extends EndgeModule {
   }
 
   /**
-   * Методы для работы с видами
-   */
-  getViews(): RView[] {
-    return Array.from(this._viewsById.values())
-  }
-
-  /**
-   * Возвращает View по id.
-   */
-  getViewById(id: string | number): RView | null {
-    return this._viewsById.get(id) ?? null
-  }
-
-  /**
-   * Возвращает View по identity.
-   */
-  getViewByIdentity(identity: string): RView | null {
-    return this._viewsByIdentity.get(identity) || null
-  }
-
-  /**
-   * Возвращает View по id или identity.
-   */
-  getView(idOrIdentity: string | number): RView | null {
-    return this.getViewById(idOrIdentity as number) || this.getViewById(Number(idOrIdentity)) || this.getViewByIdentity(idOrIdentity as string)
-  }
-
-  /**
-   * Добавляет View в домен и обновляет индексы.
-   */
-  addView(view: RView): void {
-    const identity = (view as any).identity ?? view.id
-    if (this._viewsByIdentity.has(identity) || this._viewsById.has(view.id)) {
-      return
-    }
-    this._viewsById.set(view.id, view)
-    this._viewsByIdentity.set(identity, view)
-    this.notify()
-  }
-
-  /**
-   * Удаляет View из домена по id.
-   */
-  removeViewById(id: string | number): void {
-    const view = this._viewsById.get(id)
-    if (!view)
-      return
-    this._viewsById.delete(view.id)
-    this._viewsByIdentity.delete((view as any).identity ?? view.id)
-    this.notify()
-  }
-
-  /**
-   * Удаляет View из домена по identity.
-   */
-  removeViewByIdentity(identity: string): void {
-    const view = this._viewsByIdentity.get(identity)
-    if (!view)
-      return
-    this._viewsById.delete(view.id)
-    this._viewsByIdentity.delete((view as any).identity ?? view.id)
-    this.notify()
-  }
-
-  /**
-   * Удаляет View из домена.
-   */
-  removeView(identity: string): void {
-    this.removeViewByIdentity(identity)
-  }
-
-  /**
-   * Проверяет наличие View по id.
-   */
-  hasViewById(id: string | number): boolean {
-    return this._viewsById.has(id)
-  }
-
-  /**
-   * Проверяет наличие View по identity.
-   */
-  hasViewByIdentity(identity: string): boolean {
-    return this._viewsByIdentity.has(identity)
-  }
-
-  /**
-   * Проверяет наличие View по id или identity.
-   */
-  hasView(identity: string): boolean {
-    return this.hasViewByIdentity(identity)
-  }
-
-  /**
    * Методы для работы с шаблонами страниц
    */
   getPageTemplates(): RPageTemplate[] {
@@ -3202,7 +3100,6 @@ export class EndgeDomain extends EndgeModule {
       actions: persisted(this.getActions()).map(x => Serialize.toPlain(x)),
       converters: persisted(this.getConverters()).map(x => Serialize.toPlain(x)),
       integrations: persisted(this.getIntegrations()).map(x => Serialize.toPlain(x)),
-      views: persisted(this.getViews()).map(x => Serialize.toPlain(x)),
       folders: persisted(this.getFolders()).map(x => Serialize.toPlain(x)),
       parameters: persisted(this.getParameters()).map(x => x.toPlain()),
       filters: persisted(this.getFilters()).map(x => x.toPlain()),
@@ -3235,15 +3132,6 @@ export class EndgeDomain extends EndgeModule {
         ?? pageJson?.template?.identity
         ?? (typeof pageJson?.template === 'object' && pageJson?.template != null ? pageJson.template.identity : null)
         ?? null
-    const controllerId
-      = pageJson?.controllerId
-        ?? pageJson?.controller?.id
-        ?? (typeof pageJson?.controller === 'object' && pageJson?.controller != null ? pageJson.controller.id : null)
-        ?? ((typeof pageJson?.controller === 'string' || typeof pageJson?.controller === 'number') ? pageJson.controller : null)
-        ?? pageJson?.controllerIdentity
-        ?? pageJson?.controller?.identity
-        ?? (typeof pageJson?.controller === 'object' && pageJson?.controller != null ? pageJson.controller.identity : null)
-        ?? null
     const areas = Array.isArray(pageJson?.areas) ? pageJson.areas : []
     const areasNormalized = areas.map((a: any) => {
       const blocks = Array.isArray(a?.blocks) ? a.blocks : []
@@ -3273,7 +3161,6 @@ export class EndgeDomain extends EndgeModule {
     return {
       ...pageJson,
       templateId,
-      controllerId,
       areas: areasNormalized,
     }
   }
@@ -3308,7 +3195,6 @@ export class EndgeDomain extends EndgeModule {
       vocabs: [],
       authProfiles: [],
       i18nBundles: [],
-      views: [],
       pageTemplates: [],
       pages: [],
       navigations: [],
@@ -3394,9 +3280,6 @@ export class EndgeDomain extends EndgeModule {
     if (json.i18nBundles && Array.isArray(json.i18nBundles)) {
       json.i18nBundles.forEach((bundleJson: any) => out.i18nBundles.push(Serialize.fromJSON(RI18nBundle, bundleJson)))
     }
-    if (json.views && Array.isArray(json.views)) {
-      json.views.forEach((viewJson: any) => out.views.push(Serialize.fromJSON(RView, viewJson)))
-    }
     if (json.pageTemplates && Array.isArray(json.pageTemplates)) {
       json.pageTemplates.forEach((tplJson: any) => out.pageTemplates.push(Serialize.fromJSON(RPageTemplate, tplJson)))
     }
@@ -3451,7 +3334,6 @@ export class EndgeDomain extends EndgeModule {
     parsed.vocabs.forEach(v => this.addVocabs(v))
     parsed.authProfiles.forEach(p => this.addAuthProfile(p))
     parsed.i18nBundles.forEach(b => this.addI18nBundles(b))
-    parsed.views.forEach(v => this.addView(v))
     parsed.pageTemplates.forEach(t => this.addPageTemplate(t))
     parsed.pages.forEach(p => this.addPage(p))
     parsed.navigations.forEach(n => this.addNavigation(n))

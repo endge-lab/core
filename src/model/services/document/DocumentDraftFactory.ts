@@ -24,7 +24,6 @@ import { RMock } from '@/domain/entities/reflect/RMock'
 import { RComputation } from '@/domain/entities/reflect/RComputation'
 import { RStyle } from '@/domain/entities/reflect/RStyle'
 import { RTenant } from '@/domain/entities/reflect/RTenant'
-import { RView } from '@/domain/entities/reflect/RView'
 import { RVocabs } from '@/domain/entities/reflect/RVocabs'
 import { ComponentType, FilterType, QueryType } from '@/domain/types/document/document.types'
 import { Endge } from '@/model/endge/kernel/endge'
@@ -188,15 +187,6 @@ export class DocumentDraftFactory {
 
       case 'integration': {
         const item = new RIntegration()
-        item.identity = identity
-        item.name = title
-        if (folderId != null)
-          item.folderId = folderId
-        return item
-      }
-
-      case 'view': {
-        const item = new RView()
         item.identity = identity
         item.name = title
         if (folderId != null)

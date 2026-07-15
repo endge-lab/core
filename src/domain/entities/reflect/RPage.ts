@@ -31,7 +31,6 @@ export interface RPageSchema {
   routeName?: string | null
   routePath?: string | null
   templateId?: number | null
-  controllerId?: number | null
   enabled?: boolean
   areas?: RPageAreaSchema[]
   meta?: Record<string, unknown>
@@ -50,9 +49,6 @@ export class RPage extends REntity {
 
   @Expose()
   templateId: number | null = null
-
-  @Expose()
-  controllerId: number | null = null
 
   @Expose()
   enabled: boolean = true
@@ -75,7 +71,6 @@ export class RPage extends REntity {
       routeName: this.routeName ?? null,
       routePath: this.routePath ?? null,
       templateId: this.templateId ?? null,
-      controllerId: this.controllerId ?? null,
       enabled: this.enabled,
       areas: this.areas?.length ? this.areas.map(a => ({
         slotId: a.slotId,

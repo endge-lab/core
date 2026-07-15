@@ -10,13 +10,13 @@ export class RBehaviorBinding extends REntity {
   projectId: number | null = null
 
   @Expose()
-  ownerType: string = 'view'
+  ownerType: string = 'project'
 
   @Expose()
   ownerId: number | null = null
 
   @Expose()
-  targetType: string = 'view'
+  targetType: string = 'component'
 
   @Expose()
   targetId: number | null = null

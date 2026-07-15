@@ -3,7 +3,6 @@ import type { RConverter } from '@/domain/entities/reflect/RConverter'
 import type { RFilter } from '@/domain/entities/reflect/RFilter'
 import type { RIntegration } from '@/domain/entities/reflect/RIntegration'
 import type { RParameter } from '@/domain/entities/reflect/RParameter'
-import type { RView } from '@/domain/entities/reflect/RView'
 import type { RPageTemplate } from '@/domain/entities/reflect/RPageTemplate'
 import type { RPage } from '@/domain/entities/reflect/RPage'
 import type { RNavigation } from '@/domain/entities/reflect/RNavigation'
@@ -72,7 +71,6 @@ export enum DomainSectionType {
   Converter = 'converter',
   Computation = 'computation',
   Integration = 'integration',
-  View = 'view',
   Parameters = 'parameters',
   Filters = 'filters',
   Environment = 'environment',
@@ -102,7 +100,6 @@ export type DomainDocumentType
     | 'store'
     | 'mock'
     | 'integration'
-    | 'view'
     | 'page-template'
     | 'page'
     | 'navigation'
@@ -139,4 +136,4 @@ export interface Document {
 /**
  * Описывает любой документ рефлекцию
  */
-export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RComposition | RStore | RMock | RAction | RConverter | RComputation | RIntegration | RView | RParameter | RFilter | RPolicy | RStyle | RVocabs | RI18nBundle | RAuthProfile | RWorkspace | RTenant | RBehaviorBinding | RPresentationBinding | RPageTemplate | RPage | RNavigation
+export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RComposition | RStore | RMock | RAction | RConverter | RComputation | RIntegration | RParameter | RFilter | RPolicy | RStyle | RVocabs | RI18nBundle | RAuthProfile | RWorkspace | RTenant | RBehaviorBinding | RPresentationBinding | RPageTemplate | RPage | RNavigation

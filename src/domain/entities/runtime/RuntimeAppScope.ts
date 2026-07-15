@@ -141,7 +141,6 @@ function runtimeEntityCollection(entityType: RuntimeEntityType): string {
     project: 'projects',
     query: 'queries',
     store: 'stores',
-    view: 'views',
   }
   return collections[entityType]
 }

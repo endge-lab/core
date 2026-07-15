@@ -6,7 +6,6 @@ import type { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import type { RPage } from '@/domain/entities/reflect/RPage'
 import type { RProject } from '@/domain/entities/reflect/RProject'
 import type { RQuery } from '@/domain/entities/reflect/RQuery'
-import type { RView } from '@/domain/entities/reflect/RView'
 import type { RuntimeHostRegistrySnapshot } from '@/domain/types/runtime/runtime-registry.types'
 
 /**
@@ -18,7 +17,6 @@ export type RuntimeExecutableModel
   = | RQuery
     | RAction
     | RProject
-    | RView
     | RPage
     | RComponentSFC
     | RFilter

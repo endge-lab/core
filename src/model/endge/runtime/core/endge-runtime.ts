@@ -16,7 +16,6 @@ import { ComponentSFCRuntimeStrategy } from '@/model/services/runtime/strategies
 import { PageRuntimeStrategy } from '@/model/services/runtime/strategies/PageRuntimeStrategy'
 import { ProjectRuntimeStrategy } from '@/model/services/runtime/strategies/ProjectRuntimeStrategy'
 import { QueryRuntimeStrategy } from '@/model/services/runtime/strategies/QueryRuntimeStrategy'
-import { ViewRuntimeStrategy } from '@/model/services/runtime/strategies/ViewRuntimeStrategy'
 import { FilterRuntimeStrategy } from '@/model/services/runtime/strategies/FilterRuntimeStrategy'
 import { CompositionRuntimeStrategy } from '@/model/services/runtime/strategies/CompositionRuntimeStrategy'
 import { StoreRuntimeStrategy } from '@/model/services/runtime/strategies/StoreRuntimeStrategy'
@@ -470,7 +469,6 @@ export class EndgeRuntime extends EndgeModule {
     this.registerStrategy(new ComponentSFCRuntimeStrategy())
     this.registerStrategy(new ActionRuntimeStrategy())
     this.registerStrategy(new ProjectRuntimeStrategy())
-    this.registerStrategy(new ViewRuntimeStrategy())
     this.registerStrategy(new PageRuntimeStrategy())
   }
 

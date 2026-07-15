@@ -14,7 +14,6 @@ import type { Filters_Repository } from '@/model/db/repositories/Filters_Reposit
 import type { Converters_Repository } from '@/model/db/repositories/Converters_Repository'
 import type { Integrations_Repository } from '@/model/db/repositories/Integrations_Repository'
 import type { Versions_Repository } from '@/model/db/repositories/Versions_Repository'
-import type { Views_Repository } from '@/model/db/repositories/Views_Repository'
 import type { PageTemplates_Repository } from '@/model/db/repositories/PageTemplates_Repository'
 import type { Pages_Repository } from '@/model/db/repositories/Pages_Repository'
 import type { Navigations_Repository } from '@/model/db/repositories/Navigations_Repository'
@@ -47,7 +46,6 @@ export interface EndgeSchemaDump {
   converters: any[]
   computations: any[]
   integrations: any[]
-  views: any[]
   vocabs: any[]
   i18nBundles: any[]
   authProfiles: any[]
@@ -99,7 +97,6 @@ export type RepositoriesBag = {
   converters: Converters_Repository
   computations: Computations_Repository
   integrations: Integrations_Repository
-  views: Views_Repository
   versions: Versions_Repository
   environments: Environments_Repository
   tenants: Tenants_Repository

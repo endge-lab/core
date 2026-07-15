@@ -18,7 +18,6 @@ export enum EndgeFacetType {
  */
 export enum FacetedCascadeEntityType {
   Project = 'project',
-  View = 'view',
   Component = 'component',
   Query = 'query',
   Page = 'page',

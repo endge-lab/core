@@ -288,7 +288,6 @@ export class EndgeResolveEngine<
   private _resolveOwnerEntity(ownerType: string, ownerId: unknown): any | null {
     if (ownerType === 'tenant') { return Endge.domain.getTenant(ownerId as any) }
     if (ownerType === 'project') { return Endge.domain.getProject(ownerId as any) }
-    if (ownerType === 'view') { return Endge.domain.getView(ownerId as any) }
     if (ownerType === 'page-template') { return Endge.domain.getPageTemplate(ownerId as any) }
     if (ownerType === 'page') { return Endge.domain.getPage(ownerId as any) }
     if (ownerType === 'component') { return Endge.domain.getComponent(ownerId as any) }
@@ -341,7 +340,7 @@ export class EndgeResolveEngine<
     const raw = this._normalizeKey(value).toLowerCase()
     if (!raw) { return '' }
 
-    if (raw === 'tenant' || raw === 'project' || raw === 'view' || raw === 'page-template' || raw === 'page' || raw === 'filter' || raw === 'table-cell') { return raw }
+    if (raw === 'tenant' || raw === 'project' || raw === 'page-template' || raw === 'page' || raw === 'filter' || raw === 'table-cell') { return raw }
     if (raw === 'component' || raw === 'component-table' || raw === 'component-dsl') { return 'component' }
     if (raw === 'query' || raw === 'query-rest' || raw === 'query-gql' || raw === 'query-custom') { return 'query' }
 
