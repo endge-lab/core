@@ -112,6 +112,7 @@ export * from '@/model/config/debug'
 export * from '@/model/config/storage_config'
 export * from '@/model/config/persistance_config'
 export * from '@/model/config/ui-composition-defaults'
+export * from '@/model/config/mock-providers'
 export { default as Config } from '@/model/config'
 
 export * from '@/model/endge/context/persistence/EndgeStorageAdapterRegistry'
