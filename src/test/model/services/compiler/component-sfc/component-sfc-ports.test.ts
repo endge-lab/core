@@ -173,8 +173,8 @@ const ports = definePorts({
             kind: 'computation',
             identity,
             active: true,
-            input: { type: 'OtherInput' },
-            output: { type: 'OtherOutput' },
+            input: null,
+            output: null,
           }
         }
         return {

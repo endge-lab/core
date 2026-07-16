@@ -26,10 +26,13 @@ import type {
   RuntimeHostInputSource,
   RuntimeHostUpdateContext,
 } from '@/domain/types/runtime/runtime-host.types'
+import type { ComputationResource } from '@/domain/types/computation'
 
 import { DataPath, Raph, RaphNode } from '@endge/raph'
 
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
+import { Endge } from '@/model/endge/kernel/endge'
+import { ComputationResourceRegistry } from '@/model/endge/runtime/execution/computation/ComputationResourceRegistry'
 import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component/sfc'
 import { RUNTIME_BOUNDARY_UPDATE_PHASE_NAME } from '@/domain/types/runtime/runtime-host.types'
 
@@ -58,6 +61,8 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
 > {
   private _inputSource: RuntimeHostInputSource | null = null
   private _raphInputDisposers: VoidFunction[] = []
+  private readonly _computationResources = new ComputationResourceRegistry()
+  private readonly _computationErrorSignatures = new Map<string, string>()
 
   constructor(input: {
     id: string
@@ -207,6 +212,27 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     return this.getArtifactPayload()?.previewOptions ?? null
   }
 
+  /** Returns one host-owned computation resource isolated by renderer consumer scope. */
+  public getComputationResource(
+    identity: string,
+    input: unknown,
+    consumerKey: string,
+    portName?: string,
+  ): ComputationResource {
+    let resource: ComputationResource | null = null
+    resource = this._computationResources.getOrCreate(
+      consumerKey,
+      input,
+      () => Endge.runtime.computation.createResource(identity, input, consumerKey),
+      () => {
+        if (resource) this._reportComputationError(resource, identity, consumerKey, portName)
+        this.emit('computation:dirty', { identity, consumerKey })
+      },
+    )
+    this._reportComputationError(resource, identity, consumerKey, portName)
+    return resource
+  }
+
   /** Обновляет input source и пересобирает Raph subscriptions host-а. */
   public setInputSource(input: RuntimeHostInputSource | null | undefined): void {
     this._clearRaphInputSubscriptions()
@@ -249,7 +275,32 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   /** Очищает Raph subscriptions перед общим destroy host-а. */
   public override destroy(): void {
     this._clearRaphInputSubscriptions()
+    this._computationResources.dispose()
+    this._computationErrorSignatures.clear()
     super.destroy()
+  }
+
+  private _reportComputationError(
+    resource: ComputationResource,
+    identity: string,
+    consumerKey: string,
+    portName?: string,
+  ): void {
+    if (!resource.error) {
+      this._computationErrorSignatures.delete(consumerKey)
+      return
+    }
+    const signature = `${resource.error.kind}:${resource.error.outputName ?? ''}:${resource.error.message}`
+    if (this._computationErrorSignatures.get(consumerKey) === signature)
+      return
+    this._computationErrorSignatures.set(consumerKey, signature)
+    console.error('[ComponentSFCRuntimeHost] Computation port failed.', {
+      componentIdentity: this.entityIdentity,
+      portName: portName ?? null,
+      computationIdentity: resource.error.computationIdentity || identity,
+      outputName: resource.error.outputName ?? null,
+      kind: resource.error.kind,
+    })
   }
 
   /** Синхронизирует runtime context с текущим compiled artifact. */

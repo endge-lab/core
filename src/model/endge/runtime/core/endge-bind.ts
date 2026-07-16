@@ -1,4 +1,5 @@
 import type { ActionStepHandler } from '@/domain/types/flow/action.types'
+import type { ComputationOverride } from '@/domain/types/computation'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { RAction } from '@/domain/entities/reflect/RAction'
@@ -30,12 +31,17 @@ import { stringTrim } from '@/model/seed/converters/strings/string-trim'
  * Не связана с declarative bindings и event contracts.
  */
 export class EndgeBind extends EndgeModule {
+  private readonly computationOverrides = new Map<string, ComputationOverride>()
   /**
    * Регистрирует built-in converters и runtime action handlers после загрузки домена.
    */
   public override start(): void {
     this.registerDefaultConverters()
     this.registerDefaultActions()
+    for (const identity of this.computationOverrides.keys()) {
+      if (!Endge.domain.getComputation(identity))
+        console.error(`[EndgeBind] Computation "${identity}" is not present in the active domain.`)
+    }
   }
 
   /**
@@ -121,6 +127,23 @@ export class EndgeBind extends EndgeModule {
     if (keys.length === 0) { return false }
     for (const key of keys) { action.setStepHandler(key, handler) }
     return true
+  }
+
+  /** Registers a local full replacement for a persisted computation graph. */
+  computation(identity: string, override: ComputationOverride): VoidFunction {
+    const key = String(identity ?? '').trim()
+    if (!key)
+      throw new Error('Computation override identity is required.')
+    this.computationOverrides.set(key, override)
+    return () => {
+      if (this.computationOverrides.get(key) === override)
+        this.computationOverrides.delete(key)
+    }
+  }
+
+  /** Runtime-only lookup used by EndgeComputation. */
+  getComputation(identity: string): ComputationOverride | null {
+    return this.computationOverrides.get(String(identity ?? '').trim()) ?? null
   }
 
 }

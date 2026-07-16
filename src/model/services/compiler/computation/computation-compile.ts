@@ -1,18 +1,28 @@
 import { parse } from '@babel/parser'
 import * as t from '@babel/types'
 
-import type { ComputationProgramPayload } from '@/domain/types/computation'
+import type {
+  ComputationContractField,
+  ComputationProgramNode,
+  ComputationProgramPayload,
+  ComputationSourceDocument,
+  ComputationSourceNode,
+} from '@/domain/types/computation'
 import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
-import { compileSourceExpression, unwrapExpression } from '@/model/services/source-engine/compilers/source-expression-compile'
+import type { SourceExpressionIR } from '@/domain/types/source/source-expression.types'
+import {
+  compileSourceExpression,
+  diagnostic,
+  propertyName,
+  unwrapExpression,
+} from '@/model/services/source-engine/compilers/source-expression-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
 export interface ComputationCompileInput {
-  implementationKind: 'source' | 'provider'
-  sourceLanguage: 'typescript' | 'endge'
   source: string
-  input: ComputationProgramPayload['input']
-  output: ComputationProgramPayload['output']
+  input: ComputationContractField | null
+  output: ComputationContractField | null
 }
 
 export interface ComputationCompileResult {
@@ -20,43 +30,26 @@ export interface ComputationCompileResult {
   diagnostics: DiagnosticDraft[]
 }
 
-/** Compiles one synchronous source computation into safe ValueExpression IR. */
+/** Compiles defineComputation source into a deterministic output graph. */
 export function compileComputation(input: ComputationCompileInput): ComputationCompileResult {
   const diagnostics: DiagnosticDraft[] = []
   const payload: ComputationProgramPayload = {
-    implementationKind: input.implementationKind,
-    sourceLanguage: input.sourceLanguage,
     input: input.input,
     output: input.output,
-    expression: null,
+    sourceDocument: null,
+    nodes: [],
+    result: null,
+    execution: 'sync',
   }
 
-  if (input.implementationKind === 'provider') {
-    diagnostics.push({
-      severity: 'error',
-      code: 'computation-provider-unsupported',
-      message: 'Computation implementationKind "provider" пока не поддерживается runtime-ом.',
-      sourcePath: 'implementationKind',
-    })
+  if (!input.source.trim()) {
+    diagnostics.push(diagnostic('error', 'computation-source-empty', 'Computation source пуст.', 'source'))
     return { payload, diagnostics }
   }
 
-  if (input.sourceLanguage !== 'typescript') {
-    diagnostics.push({
-      severity: 'error',
-      code: 'computation-source-language-unsupported',
-      message: `Computation sourceLanguage "${input.sourceLanguage}" пока не поддерживается.`,
-      sourcePath: 'sourceLanguage',
-    })
-    return { payload, diagnostics }
-  }
-
-  let program: t.Program
+  let file: t.File
   try {
-    program = parse(input.source, {
-      sourceType: 'module',
-      plugins: ['typescript'],
-    }).program
+    file = parse(input.source, { sourceType: 'module', plugins: ['typescript'] })
   }
   catch (error: any) {
     diagnostics.push({
@@ -69,191 +62,376 @@ export function compileComputation(input: ComputationCompileInput): ComputationC
     return { payload, diagnostics }
   }
 
-  for (const statement of program.body) {
+  const calls: t.CallExpression[] = []
+  for (const statement of file.program.body) {
     if (t.isImportDeclaration(statement)) {
+      diagnostics.push(diagnostic('error', 'computation-import-unsupported', 'Imports запрещены в computation source.', 'source', statement))
+      continue
+    }
+    if (t.isExportDefaultDeclaration(statement)) {
       diagnostics.push(diagnostic(
-        'computation-import-unsupported',
-        'Imports запрещены в source computation.',
+        'error',
+        'computation-legacy-source-unsupported',
+        'Legacy `export default function compute` больше не поддерживается. Используйте defineComputation({...}).',
+        'source',
         statement,
       ))
       continue
     }
-    if (
-      !t.isExportDefaultDeclaration(statement)
-      && !t.isTSInterfaceDeclaration(statement)
-      && !t.isTSTypeAliasDeclaration(statement)
-    ) diagnostics.push(diagnostic(
-      'computation-top-level-unsupported',
-      'Computation source допускает только type declarations и default function compute.',
-      statement,
-    ))
+    if (t.isTSInterfaceDeclaration(statement) || t.isTSTypeAliasDeclaration(statement))
+      continue
+    if (t.isExpressionStatement(statement)) {
+      const expression = unwrapExpression(statement.expression)
+      if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'defineComputation' })) {
+        calls.push(expression)
+        continue
+      }
+    }
+    if (!t.isEmptyStatement(statement))
+      diagnostics.push(diagnostic('error', 'computation-top-level-unsupported', 'Разрешены только type declarations и один defineComputation({...}).', 'source', statement))
   }
 
-  const exports = program.body.filter(t.isExportDefaultDeclaration)
-  if (exports.length !== 1) {
-    diagnostics.push({
-      severity: 'error',
-      code: 'computation-default-export-required',
-      message: 'Computation должна содержать ровно один `export default function compute(...)`.',
-      sourcePath: 'source',
-    })
-    return { payload, diagnostics }
-  }
-
-  const declaration = exports[0]!.declaration
-  if (!t.isFunctionDeclaration(declaration) && !t.isFunctionExpression(declaration)) {
+  if (calls.length !== 1) {
     diagnostics.push(diagnostic(
-      'computation-function-required',
-      'Default export computation должен быть function compute.',
-      declaration,
+      'error',
+      'computation-define-required',
+      'Computation source должен содержать ровно один top-level defineComputation({...}).',
+      'source',
+      calls[1] ?? calls[0],
     ))
     return { payload, diagnostics }
   }
 
-  if (declaration.async || declaration.generator) {
-    diagnostics.push(diagnostic(
-      'computation-async-unsupported',
-      'Computation должна быть синхронной function без generator.',
-      declaration,
-    ))
-  }
-  if (declaration.id?.name !== 'compute') {
-    diagnostics.push(diagnostic(
-      'computation-function-name',
-      'Default function должна называться compute.',
-      declaration.id,
-    ))
-  }
-  if (declaration.params.length !== 1 || !t.isIdentifier(declaration.params[0])) {
-    diagnostics.push(diagnostic(
-      'computation-input-parameter',
-      'Function compute должна принимать ровно один identifier input.',
-      declaration,
-    ))
+  const definition = calls[0]!.arguments[0]
+  if (!definition || !t.isObjectExpression(definition)) {
+    diagnostics.push(diagnostic('error', 'computation-definition-object', 'defineComputation принимает object literal.', 'source', calls[0]))
     return { payload, diagnostics }
   }
 
-  const executableStatements = declaration.body.body.filter(statement => !t.isEmptyStatement(statement))
-  const returnStatement = executableStatements[0]
-  if (executableStatements.length !== 1 || !t.isReturnStatement(returnStatement) || !returnStatement.argument) {
-    diagnostics.push(diagnostic(
-      'computation-single-return-required',
-      'Body computation должен содержать только один `return expression`.',
-      declaration.body,
-    ))
-    return { payload, diagnostics }
+  let outputsNode: t.ObjectExpression | null = null
+  let resultNode: t.Expression | null = null
+  for (const property of definition.properties) {
+    if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
+      diagnostics.push(diagnostic('error', 'computation-definition-property', 'defineComputation допускает только обычные properties.', 'source', property))
+      continue
+    }
+    const name = propertyName(property.key)
+    if (name === 'outputs') {
+      const value = unwrapExpression(property.value)
+      if (t.isObjectExpression(value)) outputsNode = value
+      else diagnostics.push(diagnostic('error', 'computation-outputs-object', 'outputs должен быть object literal.', 'outputs', value))
+    }
+    else if (name === 'result') resultNode = property.value
+    else diagnostics.push(diagnostic('error', 'computation-definition-property-unsupported', `Свойство "${name ?? ''}" не поддерживается.`, 'source', property))
   }
 
-  const rewritten = rewriteInputReads(returnStatement.argument, declaration.params[0].name, diagnostics)
-  if (rewritten)
-    payload.expression = compileSourceExpression(rewritten, diagnostics, 'source.return')
+  if (!outputsNode || outputsNode.properties.length === 0)
+    diagnostics.push(diagnostic('error', 'computation-outputs-required', 'defineComputation требует непустой outputs object.', 'outputs', outputsNode ?? definition))
+  if (!resultNode)
+    diagnostics.push(diagnostic('error', 'computation-result-required', 'defineComputation требует result expression.', 'result', definition))
+  if (!outputsNode || !resultNode)
+    return { payload, diagnostics }
 
+  const sourceNodes: ComputationSourceNode[] = []
+  const declaredNames = new Set<string>()
+  for (const property of outputsNode.properties) {
+    if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
+      diagnostics.push(diagnostic('error', 'computation-output-property', 'outputs допускает только обычные properties.', 'outputs', property))
+      continue
+    }
+    const name = propertyName(property.key)
+    if (!name)
+      continue
+    if (declaredNames.has(name)) {
+      diagnostics.push(diagnostic('error', 'computation-output-duplicate', `Output "${name}" объявлен повторно.`, `outputs.${name}`, property))
+      continue
+    }
+    declaredNames.add(name)
+    const value = unwrapExpression(property.value)
+    const sourceRange = range(property)
+    if (isTypescriptCall(value)) {
+      const node = compileTypescriptNode(name, value, input.source, diagnostics)
+      if (node) sourceNodes.push({ ...node, sourceRange })
+      continue
+    }
+    const expression = compileComputationExpression(value, diagnostics, `outputs.${name}`)
+    if (expression)
+      sourceNodes.push({ kind: 'expression', name, expression, sourceRange })
+  }
+
+  const result = compileComputationExpression(resultNode, diagnostics, 'result')
+  if (!result)
+    return { payload, diagnostics }
+
+  const known = new Set(sourceNodes.map(node => node.name))
+  const programNodes: ComputationProgramNode[] = sourceNodes.map((node) => {
+    const expressions = node.kind === 'expression' ? [node.expression] : Object.values(node.inputs)
+    const dependencies = unique(expressions.flatMap(collectOutputReferences))
+    for (const dependency of dependencies) {
+      if (!known.has(dependency)) {
+        diagnostics.push({
+          ...diagnostic('error', 'computation-output-unknown', `Output "${node.name}" ссылается на неизвестный output "${dependency}".`, `outputs.${node.name}`),
+          start: node.sourceRange?.start,
+          end: node.sourceRange?.end,
+        })
+      }
+    }
+    return node.kind === 'expression'
+      ? { kind: 'expression', name: node.name, dependencies, expression: node.expression }
+      : {
+        kind: 'typescript',
+        name: node.name,
+        dependencies,
+        inputs: node.inputs,
+        moduleKey: hash(`${node.name}:${node.source}`),
+        source: node.source,
+      }
+  })
+  for (const dependency of collectOutputReferences(result)) {
+    if (!known.has(dependency))
+      diagnostics.push(diagnostic('error', 'computation-result-output-unknown', `result ссылается на неизвестный output "${dependency}".`, 'result', resultNode))
+  }
+
+  const ordered = topologicalSort(programNodes, diagnostics, outputsNode)
+  const document: ComputationSourceDocument = { outputs: sourceNodes, result }
+  payload.sourceDocument = document
+  payload.nodes = ordered
+  payload.result = result
+  payload.execution = ordered.some(node => node.kind === 'typescript') ? 'async' : 'sync'
   return { payload, diagnostics }
 }
 
-function rewriteInputReads(
-  raw: t.Expression,
-  parameterName: string,
+function compileTypescriptNode(
+  name: string,
+  call: t.CallExpression,
+  source: string,
   diagnostics: DiagnosticDraft[],
-): t.Expression | null {
-  const node = unwrapExpression(raw)
-  const path = readInputPath(node, parameterName)
-  if (path != null)
-    return t.callExpression(t.identifier('path'), [t.stringLiteral(path)])
-
-  if (
-    t.isStringLiteral(node)
-    || t.isNumericLiteral(node)
-    || t.isBooleanLiteral(node)
-    || t.isNullLiteral(node)
-    || t.isTemplateLiteral(node)
-  ) return node
-
-  if (t.isIdentifier(node, { name: 'undefined' }))
-    return node
-
-  if (t.isArrayExpression(node)) {
-    return t.arrayExpression(node.elements.map((element) => {
-      if (!element || !t.isExpression(element)) return null
-      return rewriteInputReads(element, parameterName, diagnostics)
-    }))
+): Extract<ComputationSourceNode, { kind: 'typescript' }> | null {
+  const definition = call.arguments[0]
+  if (!definition || !t.isObjectExpression(definition)) {
+    diagnostics.push(diagnostic('error', 'computation-typescript-object', 'typescript(...) принимает object literal.', `outputs.${name}`, call))
+    return null
   }
-
-  if (t.isObjectExpression(node)) {
-    const properties: t.ObjectProperty[] = []
-    for (const property of node.properties) {
-      if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
-        diagnostics.push(diagnostic(
-          'computation-object-property-unsupported',
-          'Computation object поддерживает только обычные properties без spread/computed keys.',
-          property,
-        ))
-        continue
-      }
-      const value = rewriteInputReads(property.value, parameterName, diagnostics)
-      if (value)
-        properties.push(t.objectProperty(property.key, value, false, property.shorthand))
+  let inputsNode: t.ObjectExpression | null = null
+  let computeNode: t.ObjectMethod | t.FunctionExpression | t.ArrowFunctionExpression | null = null
+  for (const property of definition.properties) {
+    const propertyKey = (t.isObjectProperty(property) || t.isObjectMethod(property)) ? propertyName(property.key) : null
+    if (propertyKey === 'inputs' && t.isObjectProperty(property) && t.isExpression(property.value)) {
+      const value = unwrapExpression(property.value)
+      if (t.isObjectExpression(value)) inputsNode = value
+      else diagnostics.push(diagnostic('error', 'computation-typescript-inputs-object', 'typescript.inputs должен быть object literal.', `outputs.${name}.inputs`, value))
+      continue
     }
-    return t.objectExpression(properties)
-  }
-
-  if (t.isCallExpression(node) && t.isIdentifier(node.callee)) {
-    const args: Array<t.Expression | t.SpreadElement | t.ArgumentPlaceholder> = []
-    for (const argument of node.arguments) {
-      if (!t.isExpression(argument)) {
-        diagnostics.push(diagnostic(
-          'computation-call-argument-unsupported',
-          'Spread arguments запрещены в source computation.',
-          argument,
-        ))
-        continue
-      }
-      const value = rewriteInputReads(argument, parameterName, diagnostics)
-      if (value) args.push(value)
+    if (propertyKey === 'compute') {
+      if (t.isObjectMethod(property)) computeNode = property
+      else if (t.isObjectProperty(property) && (t.isFunctionExpression(property.value) || t.isArrowFunctionExpression(property.value))) computeNode = property.value
+      else diagnostics.push(diagnostic('error', 'computation-typescript-compute-function', 'typescript.compute должен быть function или method.', `outputs.${name}.compute`, property))
+      continue
     }
-    return t.callExpression(node.callee, args)
+    diagnostics.push(diagnostic('error', 'computation-typescript-property', `Свойство "${propertyKey ?? ''}" не поддерживается в typescript node.`, `outputs.${name}`, property))
+  }
+  if (!inputsNode)
+    diagnostics.push(diagnostic('error', 'computation-typescript-inputs-required', 'typescript node требует inputs object.', `outputs.${name}.inputs`, definition))
+  if (!computeNode)
+    diagnostics.push(diagnostic('error', 'computation-typescript-compute-required', 'typescript node требует compute(inputs, api).', `outputs.${name}.compute`, definition))
+  if (!inputsNode || !computeNode)
+    return null
+  if (computeNode.async || computeNode.generator)
+    diagnostics.push(diagnostic('error', 'computation-typescript-async', 'typescript.compute должен быть синхронным и не generator.', `outputs.${name}.compute`, computeNode))
+  if (computeNode.params.length < 1 || computeNode.params.length > 2)
+    diagnostics.push(diagnostic('error', 'computation-typescript-parameters', 'typescript.compute принимает inputs и optional api.', `outputs.${name}.compute`, computeNode))
+
+  validateSandboxBody(computeNode, diagnostics, `outputs.${name}.compute`)
+  const inputs: Record<string, SourceExpressionIR> = {}
+  const inputNames = new Set<string>()
+  for (const property of inputsNode.properties) {
+    if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
+      diagnostics.push(diagnostic('error', 'computation-typescript-input-property', 'typescript.inputs допускает только обычные properties.', `outputs.${name}.inputs`, property))
+      continue
+    }
+    const inputName = propertyName(property.key)
+    if (!inputName)
+      continue
+    if (inputNames.has(inputName)) {
+      diagnostics.push(diagnostic('error', 'computation-typescript-input-duplicate', `Input "${inputName}" объявлен повторно.`, `outputs.${name}.inputs.${inputName}`, property))
+      continue
+    }
+    inputNames.add(inputName)
+    const expression = compileComputationExpression(property.value, diagnostics, `outputs.${name}.inputs.${inputName}`)
+    if (expression) inputs[inputName] = expression
   }
 
-  diagnostics.push(diagnostic(
-    'computation-expression-unsupported',
-    'Return expression использует синтаксис вне безопасного computation DSL.',
-    node,
-  ))
-  return null
-}
-
-function readInputPath(node: t.Node, parameterName: string): string | null {
-  if (t.isIdentifier(node))
-    return node.name === parameterName ? '' : null
-
-  if (!t.isMemberExpression(node) && !t.isOptionalMemberExpression(node))
-    return null
-
-  const parent = readInputPath(node.object, parameterName)
-  if (parent == null)
-    return null
-
-  const property = !node.computed && t.isIdentifier(node.property)
-    ? node.property.name
-    : t.isStringLiteral(node.property) || t.isNumericLiteral(node.property)
-      ? String(node.property.value)
-      : null
-  if (property == null)
-    return null
-  return parent ? `${parent}.${property}` : property
-}
-
-function diagnostic(
-  code: string,
-  message: string,
-  node?: t.Node | null,
-): DiagnosticDraft {
   return {
-    severity: 'error',
-    code,
-    message,
-    sourcePath: 'source',
-    start: typeof node?.start === 'number' ? node.start : undefined,
-    end: typeof node?.end === 'number' ? node.end : undefined,
+    kind: 'typescript',
+    name,
+    inputs,
+    source: functionSource(computeNode, source),
   }
+}
+
+function compileComputationExpression(
+  raw: t.Expression,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+): SourceExpressionIR | null {
+  return compileSourceExpression(rewriteComputationReads(raw, diagnostics, sourcePath), diagnostics, sourcePath)
+}
+
+function rewriteComputationReads(raw: t.Expression, diagnostics: DiagnosticDraft[], sourcePath: string): t.Expression {
+  const node = t.cloneNode(raw, true)
+  walk(node, (current) => {
+    if (!t.isCallExpression(current) || !t.isIdentifier(current.callee))
+      return
+    if (current.callee.name !== 'input' && current.callee.name !== 'output')
+      return
+    if (current.arguments.length > 1 || (current.arguments[0] && !t.isStringLiteral(current.arguments[0]))) {
+      diagnostics.push(diagnostic('error', 'computation-read-path', `${current.callee.name}(...) принимает ${current.callee.name === 'input' ? 'optional ' : ''}строковый path.`, sourcePath, current))
+      return
+    }
+    if (current.callee.name === 'input') {
+      current.callee = t.identifier('path')
+      if (current.arguments.length === 0) current.arguments = [t.stringLiteral('')]
+    }
+    else {
+      current.callee = t.identifier('__computationOutput')
+    }
+  })
+  return node
+}
+
+function validateSandboxBody(node: t.Node, diagnostics: DiagnosticDraft[], sourcePath: string): void {
+  const forbidden = new Set([
+    'eval', 'Function', 'Promise', 'fetch', 'XMLHttpRequest', 'WebSocket',
+    'Worker', 'SharedWorker', 'setTimeout', 'setInterval', 'require', 'process',
+    'Deno', 'Bun', 'globalThis', 'self', 'window', 'document', 'navigator',
+  ])
+  const bindings = collectBindingNames(node)
+  walkWithParent(node, null, (current, parent) => {
+    if (t.isAwaitExpression(current))
+      diagnostics.push(diagnostic('error', 'computation-typescript-await', 'await запрещён в synchronous typescript.compute.', sourcePath, current))
+    if (t.isImport(current) || t.isImportDeclaration(current))
+      diagnostics.push(diagnostic('error', 'computation-typescript-import', 'Dynamic и static imports запрещены.', sourcePath, current))
+    if (t.isIdentifier(current)
+      && forbidden.has(current.name)
+      && !bindings.has(current.name)
+      && !isNonComputedPropertyName(current, parent))
+      diagnostics.push(diagnostic('error', 'computation-typescript-global', `Global "${current.name}" запрещён в sandbox.`, sourcePath, current))
+  })
+}
+
+function collectBindingNames(node: t.Node): Set<string> {
+  const names = new Set<string>()
+  walk(node, (current) => {
+    if (t.isVariableDeclarator(current)) addPatternNames(current.id, names)
+    else if (t.isFunction(current)) current.params.forEach(param => addPatternNames(param, names))
+    else if ((t.isFunctionDeclaration(current) || t.isClassDeclaration(current)) && current.id) names.add(current.id.name)
+    else if (t.isCatchClause(current) && current.param) addPatternNames(current.param, names)
+  })
+  return names
+}
+
+function addPatternNames(node: t.LVal | t.PatternLike, names: Set<string>): void {
+  if (t.isIdentifier(node)) names.add(node.name)
+  else if (t.isRestElement(node)) addPatternNames(node.argument, names)
+  else if (t.isAssignmentPattern(node)) addPatternNames(node.left, names)
+  else if (t.isArrayPattern(node)) node.elements.forEach(item => item && addPatternNames(item, names))
+  else if (t.isObjectPattern(node)) {
+    for (const property of node.properties) {
+      if (t.isRestElement(property)) addPatternNames(property.argument, names)
+      else addPatternNames(property.value as t.LVal | t.PatternLike, names)
+    }
+  }
+}
+
+function isNonComputedPropertyName(node: t.Identifier, parent: t.Node | null): boolean {
+  if (!parent)
+    return false
+  if ((t.isObjectProperty(parent) || t.isObjectMethod(parent) || t.isClassMethod(parent))
+    && parent.key === node
+    && !parent.computed)
+    return true
+  return t.isMemberExpression(parent) && parent.property === node && !parent.computed
+}
+
+function functionSource(node: t.ObjectMethod | t.FunctionExpression | t.ArrowFunctionExpression, source: string): string {
+  const params = node.params.map(param => source.slice(param.start ?? 0, param.end ?? 0)).join(', ')
+  if (t.isBlockStatement(node.body))
+    return `function(${params}) ${source.slice(node.body.start ?? 0, node.body.end ?? 0)}`
+  return `function(${params}) { return (${source.slice(node.body.start ?? 0, node.body.end ?? 0)}); }`
+}
+
+function isTypescriptCall(node: t.Expression): node is t.CallExpression {
+  return t.isCallExpression(node) && t.isIdentifier(node.callee, { name: 'typescript' })
+}
+
+function collectOutputReferences(expression: SourceExpressionIR): string[] {
+  if (expression.type === 'read')
+    return expression.source === 'computation-output' ? [expression.path] : []
+  if (expression.type === 'array')
+    return expression.items.flatMap(collectOutputReferences)
+  if (expression.type === 'object')
+    return Object.values(expression.properties).flatMap(collectOutputReferences)
+  if (expression.type === 'operation')
+    return expression.arguments.flatMap(collectOutputReferences)
+  return []
+}
+
+function topologicalSort(nodes: ComputationProgramNode[], diagnostics: DiagnosticDraft[], sourceNode: t.Node): ComputationProgramNode[] {
+  const byName = new Map(nodes.map(node => [node.name, node]))
+  const pending = new Map(nodes.map(node => [node.name, new Set(node.dependencies.filter(dep => byName.has(dep)))]))
+  const ordered: ComputationProgramNode[] = []
+  while (pending.size) {
+    const ready = nodes.filter(node => pending.has(node.name) && pending.get(node.name)!.size === 0)
+    if (!ready.length) {
+      diagnostics.push(diagnostic('error', 'computation-output-cycle', `Обнаружен cycle между outputs: ${[...pending.keys()].join(', ')}.`, 'outputs', sourceNode))
+      return nodes
+    }
+    for (const node of ready) {
+      ordered.push(node)
+      pending.delete(node.name)
+      for (const dependencies of pending.values()) dependencies.delete(node.name)
+    }
+  }
+  return ordered
+}
+
+function walk(node: t.Node, visit: (node: t.Node) => void): void {
+  visit(node)
+  const keys = (t.VISITOR_KEYS as Record<string, string[]>)[node.type] ?? []
+  for (const key of keys) {
+    const value = (node as any)[key]
+    if (Array.isArray(value)) {
+      for (const child of value) if (child && typeof child.type === 'string') walk(child, visit)
+    }
+    else if (value && typeof value.type === 'string') walk(value, visit)
+  }
+}
+
+function walkWithParent(node: t.Node, parent: t.Node | null, visit: (node: t.Node, parent: t.Node | null) => void): void {
+  visit(node, parent)
+  const keys = (t.VISITOR_KEYS as Record<string, string[]>)[node.type] ?? []
+  for (const key of keys) {
+    const value = (node as any)[key]
+    if (Array.isArray(value)) {
+      for (const child of value) if (child && typeof child.type === 'string') walkWithParent(child, node, visit)
+    }
+    else if (value && typeof value.type === 'string') walkWithParent(value, node, visit)
+  }
+}
+
+function unique<T>(values: T[]): T[] {
+  return [...new Set(values)]
+}
+
+function range(node: t.Node): { start: number, end: number } | undefined {
+  return node.start != null && node.end != null ? { start: node.start, end: node.end } : undefined
+}
+
+function hash(value: string): string {
+  let result = 2166136261
+  for (let index = 0; index < value.length; index++) {
+    result ^= value.charCodeAt(index)
+    result = Math.imul(result, 16777619)
+  }
+  return (result >>> 0).toString(16).padStart(8, '0')
 }

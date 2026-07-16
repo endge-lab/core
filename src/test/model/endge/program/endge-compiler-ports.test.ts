@@ -10,15 +10,18 @@ describe('EndgeCompiler ComponentSFC ports', () => {
     Endge.domain.reset()
   })
 
-  it('compiles computations before components and executes the default artifact', () => {
+  it('compiles computations before components and executes the default artifact', async () => {
     const computation = new RComputation()
     computation.id = 1
     computation.identity = 'process-state'
     computation.name = 'process-state'
     computation.displayName = 'Process state'
-    computation.source = `export default function compute(input: ProcessInput): ProcessOutput {
-  return { value: get(input, 'value'), tone: when(isNil(get(input, 'value')), 'muted', 'success') }
-}`
+    computation.source = `defineComputation({
+  outputs: {
+    state: { value: input('value'), tone: when(isNil(input('value')), 'muted', 'success') },
+  },
+  result: output('state'),
+})`
 
     const cell = component(2, 'process-cell', `<script setup lang="ts">
 interface CellProps { point?: ProcessOutput }
@@ -51,7 +54,7 @@ const state = ports.state({ value: props.value })
       expect.objectContaining({ entityType: 'computation', role: 'port-default-computation' }),
       expect.objectContaining({ entityType: 'component-sfc', role: 'port-default-component' }),
     ]))
-    expect(Endge.runtime.computation.run('process-state', { value: '07:15' })).toEqual({
+    await expect(Endge.runtime.computation.run('process-state', { value: '07:15' })).resolves.toEqual({
       value: '07:15',
       tone: 'success',
     })

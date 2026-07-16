@@ -145,9 +145,7 @@ export class DocumentDraftFactory {
         item.identity = identity
         item.name = title
         item.displayName = title
-        item.implementationKind = 'source'
-        item.sourceLanguage = 'typescript'
-        item.source = `export default function compute(input: unknown, context: unknown): unknown {\n  return input\n}\n`
+        item.source = Endge.source.createDefault('computation')
         item.sourceVersion = 1
         item.contractVersion = 1
         if (folderId != null)

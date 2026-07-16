@@ -9,7 +9,10 @@ describe('computation Payload persistence', () => {
     const computation = RComputation.fromPlain({
       identity: 'test-computation',
       displayName: 'Test computation',
-      source: 'export default function compute(input: unknown): unknown { return input }',
+      source: `defineComputation({
+  outputs: { value: input('value') },
+  result: output('value'),
+})`,
     })
     const upsert = vi.fn(async (payload: Record<string, unknown>) => payload)
     const createFolder = vi.fn(async () => ({ id: 42 }))
@@ -38,8 +41,12 @@ describe('computation Payload persistence', () => {
     expect(upsert).toHaveBeenCalledWith(expect.objectContaining({
       identity: computation.identity,
       folder: 42,
+      source: computation.source,
       input: {},
       output: {},
     }))
+    expect(upsert.mock.calls[0]?.[0]).not.toHaveProperty('implementationKind')
+    expect(upsert.mock.calls[0]?.[0]).not.toHaveProperty('sourceLanguage')
+    expect(upsert.mock.calls[0]?.[0]).not.toHaveProperty('providerRef')
   })
 })

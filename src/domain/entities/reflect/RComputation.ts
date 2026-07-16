@@ -2,7 +2,6 @@ import { Serialize } from '@endge/utils'
 import { Expose, Type } from 'class-transformer'
 
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
-import type { ComputationImplementationKind, ComputationSourceLanguage } from '@/domain/types/computation'
 import { REntity } from '@/domain/entities/reflect/REntity'
 import { RField } from '@/domain/entities/reflect/RField'
 
@@ -15,16 +14,7 @@ export class RComputation extends REntity {
   override description: string | null = null
 
   @Expose()
-  implementationKind: ComputationImplementationKind = 'source'
-
-  @Expose()
-  sourceLanguage: ComputationSourceLanguage = 'typescript'
-
-  @Expose()
   source: string = ''
-
-  @Expose()
-  providerRef: string | null = null
 
   @Expose()
   sourceVersion: number = 1
@@ -56,10 +46,7 @@ export class RComputation extends REntity {
     computation.name = String(json?.name ?? json?.displayName ?? computation.identity)
     computation.displayName = String(json?.displayName ?? computation.name)
     computation.description = json?.description ?? null
-    computation.implementationKind = json?.implementationKind === 'provider' ? 'provider' : 'source'
-    computation.sourceLanguage = json?.sourceLanguage === 'endge' ? 'endge' : 'typescript'
     computation.source = typeof json?.source === 'string' ? json.source : ''
-    computation.providerRef = String(json?.providerRef ?? '').trim() || null
     computation.sourceVersion = Math.max(1, Number(json?.sourceVersion ?? 1) || 1)
     computation.contractVersion = Math.max(1, Number(json?.contractVersion ?? 1) || 1)
     computation.input = fieldFromPlain(json?.input, 'input')
@@ -83,10 +70,7 @@ export class RComputation extends REntity {
       name: this.name,
       displayName: this.displayName,
       description: this.description,
-      implementationKind: this.implementationKind,
-      sourceLanguage: this.sourceLanguage,
       source: this.source,
-      providerRef: this.providerRef,
       sourceVersion: this.sourceVersion,
       contractVersion: this.contractVersion,
       input: fieldToPlain(this.input),
@@ -107,10 +91,8 @@ export class RComputation extends REntity {
       this.addValidationError('Computation.identity не задан')
     if (!this.displayName)
       this.addValidationError('Computation.displayName не задан')
-    if (this.implementationKind === 'provider' && !this.providerRef)
-      this.addValidationError('Computation.providerRef не задан для provider')
-    if (this.implementationKind === 'source' && !this.source.trim())
-      this.addValidationError('Computation.source не задан для source')
+    if (!this.source.trim())
+      this.addValidationError('Computation.source не задан')
   }
 
   override duplicate(options: DuplicateOptions): RComputation {

@@ -16,6 +16,7 @@ const READ_FUNCTIONS: Record<string, SourceExpressionReadKind> = {
   response: 'response',
   store: 'store',
   path: 'scope',
+  __computationOutput: 'computation-output',
 }
 
 const OPERATION_FUNCTIONS: Record<string, SourceExpressionOperation> = {

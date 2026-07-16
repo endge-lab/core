@@ -2286,10 +2286,7 @@ export class EndgeSchemaStorage extends EndgeModule {
       saved = await repos.mocks.upsert(data as any)
     }
     else if (documentType === 'computation') {
-      data.implementationKind = data.implementationKind === 'provider' ? 'provider' : 'source'
-      data.sourceLanguage = data.sourceLanguage === 'endge' ? 'endge' : 'typescript'
       data.source = typeof data.source === 'string' ? data.source : ''
-      data.providerRef = String(data.providerRef ?? '').trim() || null
       data.sourceVersion = Math.max(1, Number(data.sourceVersion ?? 1) || 1)
       data.contractVersion = Math.max(1, Number(data.contractVersion ?? 1) || 1)
       data.input = data.input != null && typeof data.input === 'object' && !Array.isArray(data.input) ? data.input : {}
@@ -2647,10 +2644,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         description: computation.description ?? null,
         folder,
         project: computation.project ?? null,
-        implementationKind: computation.implementationKind === 'provider' ? 'provider' as const : 'source' as const,
-        sourceLanguage: computation.sourceLanguage === 'endge' ? 'endge' as const : 'typescript' as const,
         source: typeof computation.source === 'string' ? computation.source : '',
-        providerRef: String(computation.providerRef ?? '').trim() || null,
         sourceVersion: Math.max(1, Number(computation.sourceVersion ?? 1) || 1),
         contractVersion: Math.max(1, Number(computation.contractVersion ?? 1) || 1),
         input: plain.input != null && typeof plain.input === 'object' && !Array.isArray(plain.input) ? plain.input : {},

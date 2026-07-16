@@ -222,8 +222,6 @@ export class EndgeCompiler extends EndgeModule {
       entityType: 'computation',
       compile: (entity, context) => {
         const result = compileComputation({
-          implementationKind: entity.implementationKind,
-          sourceLanguage: entity.sourceLanguage,
           source: entity.source,
           input: fieldContract(entity.input),
           output: fieldContract(entity.output),

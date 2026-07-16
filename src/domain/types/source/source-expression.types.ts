@@ -15,6 +15,7 @@ export type SourceExpressionReadKind
     | 'composition-store'
     | 'composition-filter-fields'
     | 'metadata'
+    | 'computation-output'
 
 /** Whitelist операций статического expression IR. */
 export type SourceExpressionOperation

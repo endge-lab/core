@@ -1,5 +1,5 @@
 /** Канонический тип source-документа, для которого выбирается source strategy. */
-export type SourceKind = 'query' | 'data-view' | 'filter' | 'composition' | 'store'
+export type SourceKind = 'query' | 'data-view' | 'filter' | 'composition' | 'store' | 'computation'
 
 /** Тип нейтральной source completion без привязки к Monaco или другому editor API. */
 export type SourceLanguageCompletionKind

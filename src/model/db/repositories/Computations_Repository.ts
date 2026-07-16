@@ -1,14 +1,10 @@
 import type { AxiosInstance } from 'axios'
-import type { ComputationImplementationKind, ComputationSourceLanguage } from '@/domain/types/computation'
 
 export interface ComputationsPayloadFields {
   identity: string
   displayName: string
   description?: string | null
-  implementationKind: ComputationImplementationKind
-  sourceLanguage: ComputationSourceLanguage
-  source?: string
-  providerRef?: string | null
+  source: string
   sourceVersion: number
   contractVersion: number
   input?: Record<string, unknown> | null

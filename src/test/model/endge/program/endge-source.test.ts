@@ -39,6 +39,16 @@ describe('EndgeSource', () => {
     expect(validation.diagnostics).toEqual([])
   })
 
+  it('registers and validates computation source strategies', () => {
+    const source = Endge.source.createDefault('computation')
+    const validation = Endge.source.validate('computation', source)
+
+    expect(Endge.source.resolveStrategy('computation')).toMatchObject({ id: 'source:computation' })
+    expect(Endge.source.resolveLanguageStrategy('computation')).toMatchObject({ id: 'source-language:computation' })
+    expect(source).toContain('defineComputation({')
+    expect(validation.ok).toBe(true)
+  })
+
   it('returns query source language completions', () => {
     const completions = Endge.source.completions('query', {
       source: '',
@@ -59,6 +69,7 @@ describe('EndgeSource', () => {
       ['data-view', 'defineDataView'],
       ['filter', 'defineFilter'],
       ['composition', 'defineComposition'],
+      ['computation', 'defineComputation'],
     ] as const
 
     for (const [sourceKind, keyword] of cases) {

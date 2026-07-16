@@ -72,7 +72,7 @@ describe('DocumentDraftFactory', () => {
     })
   })
 
-  it('creates a TypeScript computation draft', () => {
+  it('creates a source-first computation draft', () => {
     const draft = DocumentDraftFactory.create('computation', {
       identity: 'ground-handling-cell-state',
       name: 'Ground handling cell state',
@@ -83,13 +83,11 @@ describe('DocumentDraftFactory', () => {
     expect(draft).toMatchObject({
       identity: 'ground-handling-cell-state',
       displayName: 'Ground handling cell state',
-      implementationKind: 'source',
-      sourceLanguage: 'typescript',
       sourceVersion: 1,
       contractVersion: 1,
       folderId: 'root-computations',
     })
-    expect((draft as RComputation).source).toContain('function compute')
+    expect((draft as RComputation).source).toContain('defineComputation')
   })
 
   it('rejects an empty identity', () => {
