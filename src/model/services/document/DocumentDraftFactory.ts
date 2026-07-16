@@ -223,7 +223,8 @@ export class DocumentDraftFactory {
         const item = new RStyle()
         item.identity = identity
         item.name = title
-        item.styles = {}
+        item.displayName = title
+        item.sourceVersion = 1
         if (folderId != null)
           item.folderId = folderId
         return item

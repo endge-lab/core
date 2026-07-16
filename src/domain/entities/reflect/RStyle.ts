@@ -1,25 +1,74 @@
 import { Serialize } from '@endge/utils'
-import { Expose } from 'class-transformer'
+import { Exclude, Expose } from 'class-transformer'
 
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
 import { REntity } from '@/domain/entities/reflect/REntity'
 
-/** Сущность стиля (коллекция styles). identity, displayName, folder, project, styles, meta, inherited, isSystem. */
+/** Empty authored source used before the EndgeCSS grammar is defined. */
+export const ENDGE_STYLE_DEFAULT_SOURCE = ''
+
+/** Persisted source-first EndgeCSS document without compiled/runtime state. */
 export class RStyle extends REntity {
+  @Exclude()
+  readonly type = 'style' as const
+
   @Expose()
-  styles: Record<string, unknown> = {}
+  override description: string | null = null
+
+  @Expose()
+  source: string = ENDGE_STYLE_DEFAULT_SOURCE
+
+  @Expose()
+  sourceVersion: number = 1
+
+  static fromPayload(json: any): RStyle {
+    return RStyle.fromPlain({
+      ...json,
+      name: json?.displayName ?? json?.name,
+      folderId: relationToId(json?.folder ?? json?.folderId),
+      project: relationToId(json?.project) ?? null,
+    }, json)
+  }
+
+  static fromPlain(json: any, storageMeta?: any): RStyle {
+    const style = new RStyle()
+    style.id = json?.id
+    style.identity = String(json?.identity ?? '').trim()
+    style.name = String(json?.name ?? json?.displayName ?? style.identity)
+    style.displayName = String(json?.displayName ?? style.name)
+    style.description = json?.description ?? null
+    style.source = typeof json?.source === 'string' ? json.source : ENDGE_STYLE_DEFAULT_SOURCE
+    style.sourceVersion = Math.max(1, Number(json?.sourceVersion ?? 1) || 1)
+    style.folderId = json?.folderId ?? relationToId(json?.folder) ?? null
+    style.project = (relationToId(json?.project) ?? null) as any
+    style.meta = isPlainObject(json?.meta) ? { ...json.meta } : {}
+    style.isSystem = json?.isSystem === true
+    style.inherited = json?.inherited === true
+    style.active = json?.active ?? null
+    style.deletedAt = json?.deletedAt ?? null
+    style.author = json?.author ?? null
+    if (storageMeta)
+      style.applyStorageMeta(storageMeta)
+    return style
+  }
 
   toPlain(): Record<string, unknown> {
     return {
       id: this.id,
       identity: this.identity,
       name: this.name,
+      displayName: this.displayName || this.name,
+      description: this.description,
+      source: this.source,
+      sourceVersion: this.sourceVersion,
       folderId: this.folderId ?? null,
       project: this.project ?? null,
-      styles: this.styles && typeof this.styles === 'object' ? this.styles : {},
       meta: this.meta ?? {},
-      inherited: this.inherited,
-      isSystem: this.isSystem,
+      active: this.active !== false,
+      inherited: this.inherited === true,
+      isSystem: this.isSystem === true,
+      deletedAt: this.deletedAt ?? null,
+      author: this.author ?? null,
     }
   }
 
@@ -30,6 +79,18 @@ export class RStyle extends REntity {
     plain.name = name
     plain.displayName = name
     plain.folderId = null
-    return Serialize.fromJSON(RStyle, plain)
+    return RStyle.fromPlain(plain)
   }
+}
+
+function relationToId(value: any): string | number | null {
+  if (value == null)
+    return null
+  if (typeof value === 'object')
+    return relationToId(value.id ?? value.value)
+  return value
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === 'object' && !Array.isArray(value)
 }

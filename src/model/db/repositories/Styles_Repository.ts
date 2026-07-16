@@ -1,113 +1,96 @@
 import type { AxiosInstance } from 'axios'
 
-export interface StyleDoc {
-  id: number | string
+export interface StylesPayloadFields {
   identity: string
   displayName: string
-  styles: Record<string, unknown>
-  folder?: number | string
-  project?: number | string
-  isSystem?: boolean
-  inherited?: boolean
+  description?: string | null
+  source: string
+  sourceVersion: number
+  folder?: string | number | null
+  project?: string | number | null
   meta?: Record<string, unknown>
+  author?: string | null
+  active?: boolean
+  deletedAt?: string | null
+  inherited?: boolean
+  isSystem?: boolean
 }
 
-export class Styles_Repository {
-  constructor(private readonly api: AxiosInstance) {}
+export interface StyleDoc extends StylesPayloadFields {
+  id: number | string
+}
 
-  async findByIdentity(identity: string): Promise<StyleDoc | null> {
-    const r = await this.api.get('/styles', {
+/** Payload repository for source-first EndgeCSS documents. */
+export class Styles_Repository {
+  public constructor(private readonly api: AxiosInstance) {}
+
+  public async findByIdentity(identity: string): Promise<StyleDoc | null> {
+    const response = await this.api.get('/styles', {
       params: {
         limit: 1,
+        depth: 1,
         'where[identity][equals]': identity,
       },
     })
-    return r.data?.docs?.[0] ?? null
+    return response.data?.docs?.[0] ?? null
   }
 
-  async findAll(params: Record<string, unknown> = {}): Promise<StyleDoc[]> {
-    const r = await this.api.get('/styles', {
+  public async findAll(params: Record<string, unknown> = {}): Promise<StyleDoc[]> {
+    const response = await this.api.get('/styles', {
       params: {
         limit: 0,
         sort: 'identity',
+        depth: 1,
         ...params,
       },
     })
-    return r.data?.docs ?? []
+    return response.data?.docs ?? []
   }
 
-  async create(data: {
-    identity: string
-    displayName: string
-    styles?: Record<string, unknown>
-    folder?: number | string
-    project?: number | string
-    isSystem?: boolean
-    inherited?: boolean
-    meta?: Record<string, unknown>
-  }): Promise<StyleDoc> {
-    const r = await this.api.post('/styles', {
-      ...data,
-      styles: data.styles ?? {},
-    })
-    return r.data
+  public async create(data: StylesPayloadFields): Promise<StyleDoc> {
+    const response = await this.api.post('/styles', normalizePayload(data))
+    return response.data
   }
 
-  async update(
-    id: number | string,
-    data: Partial<{
-      identity: string
-      displayName: string
-      styles: Record<string, unknown>
-      folder: number | string
-      project: number | string
-      isSystem: boolean
-      inherited: boolean
-      meta: Record<string, unknown>
-    }>,
-  ): Promise<StyleDoc> {
-    const r = await this.api.patch(`/styles/${id}`, data)
-    return r.data
+  public async update(id: number | string, data: Partial<StylesPayloadFields>): Promise<StyleDoc> {
+    const response = await this.api.patch(`/styles/${id}`, normalizePayload(data))
+    return response.data
   }
 
-  async patchFolder(documentPayloadId: number | string, folderPayloadId: number | string | null): Promise<StyleDoc | null> {
-    const r = await this.api.patch(`/styles/${documentPayloadId}`, { folder: folderPayloadId })
-    return r.data
-  }
-
-  async changeFolder(identity: string, folderPayloadId: number | string | null): Promise<StyleDoc | null> {
-    const existing = await this.findByIdentity(identity)
-    if (!existing) return null
-    return this.patchFolder((existing as any).id, folderPayloadId)
-  }
-
-  async hardDelete(identity: string): Promise<void> {
-    const existing = await this.findByIdentity(identity)
-    if (!existing) return
-    await this.api.delete(`/styles/${(existing as any).id}`)
-  }
-
-  async upsert(data: {
-    identity: string
-    displayName: string
-    styles?: Record<string, unknown>
-    folder?: number | string
-    project?: number | string
-    isSystem?: boolean
-    inherited?: boolean
-    meta?: Record<string, unknown>
-  }): Promise<StyleDoc> {
+  public async upsert(data: StylesPayloadFields): Promise<StyleDoc> {
     const existing = await this.findByIdentity(data.identity)
-    if (!existing)
-      return this.create(data)
-    return this.update((existing as any).id, {
-      displayName: data.displayName,
-      styles: data.styles ?? {},
-      folder: data.folder,
-      project: data.project,
-      ...(data.isSystem !== undefined && { isSystem: data.isSystem }),
-      ...(data.inherited !== undefined && { inherited: data.inherited }),
-      ...(data.meta !== undefined && { meta: data.meta }),
-    })
+    return existing ? this.update(existing.id, data) : this.create(data)
   }
+
+  public async patchFolder(id: number | string, folder: number | string | null): Promise<StyleDoc> {
+    const response = await this.api.patch(`/styles/${id}`, { folder })
+    return response.data
+  }
+
+  public async changeFolder(identity: string, folder: number | string | null): Promise<StyleDoc | null> {
+    const existing = await this.findByIdentity(identity)
+    return existing ? this.patchFolder(existing.id, folder) : null
+  }
+
+  public async softDelete(identity: string, folder?: number | string): Promise<void> {
+    const existing = await this.findByIdentity(identity)
+    if (existing)
+      await this.api.patch(`/styles/${existing.id}`, { deletedAt: new Date().toISOString(), ...(folder != null && { folder }) })
+  }
+
+  public async hardDelete(identity: string): Promise<void> {
+    const existing = await this.findByIdentity(identity)
+    if (existing)
+      await this.api.delete(`/styles/${existing.id}`)
+  }
+
+  public async restore(identity: string): Promise<void> {
+    const existing = await this.findByIdentity(identity)
+    if (existing)
+      await this.api.patch(`/styles/${existing.id}`, { deletedAt: null, folder: null })
+  }
+}
+
+function normalizePayload<T extends Record<string, any>>(data: T): Partial<T> {
+  return Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined)) as Partial<T>
 }

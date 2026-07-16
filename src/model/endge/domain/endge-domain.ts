@@ -183,6 +183,27 @@ export function computationPayloadDocToPlain(doc: any): any {
   }
 }
 
+/** Собирает plain-объект Style из source-first документа Payload. */
+export function stylePayloadDocToPlain(doc: any): any {
+  return {
+    id: doc?.id,
+    identity: doc?.identity,
+    name: doc?.displayName ?? doc?.name,
+    displayName: doc?.displayName ?? doc?.name,
+    description: doc?.description ?? null,
+    source: typeof doc?.source === 'string' ? doc.source : '',
+    sourceVersion: Math.max(1, Number(doc?.sourceVersion ?? 1) || 1),
+    folderId: relationToId(doc?.folder ?? doc?.folderId),
+    project: relationToId(doc?.project) ?? null,
+    meta: (doc?.meta && typeof doc.meta === 'object' && !Array.isArray(doc.meta)) ? doc.meta : {},
+    active: doc?.active !== false,
+    author: doc?.author,
+    inherited: doc?.inherited === true,
+    isSystem: doc?.isSystem === true,
+    deletedAt: doc?.deletedAt ?? null,
+  }
+}
+
 /**
  * EndgeDomain – менеджер доменных данных.
  * Он заменяет ReflectDomain и объединяет управление типами, запросами и компонентами.
@@ -445,6 +466,7 @@ export class EndgeDomain extends EndgeModule {
     const tenantsRaw = Array.isArray(payload?.tenants) ? payload.tenants : []
     const policiesRaw = Array.isArray(payload?.policies) ? payload.policies : []
     const stylesRaw = Array.isArray(payload?.styles) ? payload.styles : []
+    const stylesPlain = stylesRaw.map((row: any) => stylePayloadDocToPlain(row))
     const vocabsRaw = Array.isArray(payload?.vocabs) ? payload.vocabs : []
     const authProfilesRaw = Array.isArray((payload as any)?.authProfiles) ? (payload as any).authProfiles : []
     const i18nBundlesRaw = Array.isArray((payload as any)?.i18nBundles) ? (payload as any).i18nBundles : []
@@ -477,7 +499,7 @@ export class EndgeDomain extends EndgeModule {
       environments: environmentsRaw,
       tenants: tenantsRaw,
       policies: policiesRaw,
-      styles: stylesRaw,
+      styles: stylesPlain,
       vocabs: vocabsRaw,
       authProfiles: authProfilesRaw,
       i18nBundles: i18nBundlesRaw,
@@ -3052,7 +3074,7 @@ export class EndgeDomain extends EndgeModule {
       json.policies.forEach((policyJson: any) => out.policies.push(Serialize.fromJSON(RPolicy, policyJson)))
     }
     if (json.styles && Array.isArray(json.styles)) {
-      json.styles.forEach((styleJson: any) => out.styles.push(Serialize.fromJSON(RStyle, styleJson)))
+      json.styles.forEach((styleJson: any) => out.styles.push(RStyle.fromPlain(styleJson)))
     }
     if (json.vocabs && Array.isArray(json.vocabs)) {
       json.vocabs.forEach((vocabJson: any) => out.vocabs.push(Serialize.fromJSON(RVocabs, vocabJson)))

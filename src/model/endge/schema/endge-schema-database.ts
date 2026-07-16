@@ -866,13 +866,19 @@ export class EndgeSchemaStorage extends EndgeModule {
       return {
         id: raw.id,
         identity: raw.identity,
-        name: raw.displayName,
+        name: raw.displayName ?? raw.name,
+        displayName: raw.displayName ?? raw.name,
+        description: raw.description ?? null,
         folderId: relationToId(raw.folder) ?? null,
         project: relationToId(raw.project) ?? null,
-        styles: (raw.styles && typeof raw.styles === 'object' && !Array.isArray(raw.styles)) ? raw.styles : {},
+        source: typeof raw.source === 'string' ? raw.source : '',
+        sourceVersion: Math.max(1, Number(raw.sourceVersion ?? 1) || 1),
         meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
+        active: raw.active !== false,
+        author: raw.author,
         inherited: raw.inherited === true,
         isSystem: raw.isSystem === true,
+        deletedAt: raw.deletedAt ?? null,
       }
     }
 
@@ -2310,6 +2316,9 @@ export class EndgeSchemaStorage extends EndgeModule {
       saved = await repos.policies.upsert(data as any)
     }
     else if (documentType === 'style') {
+      data.source = typeof data.source === 'string' ? data.source : ''
+      data.sourceVersion = Math.max(1, Number(data.sourceVersion ?? 1) || 1)
+      data.meta = (data.meta && typeof data.meta === 'object' && !Array.isArray(data.meta)) ? data.meta : {}
       saved = await repos.styles.upsert(data as any)
     }
     else if (documentType === 'page-template') {
@@ -2899,27 +2908,32 @@ export class EndgeSchemaStorage extends EndgeModule {
       const style = ((opts?.model as any) ?? domain.getStyle(documentId)) as any
       if (!style)
         throw new Error(`Стиль не найден: ${documentId}`)
-      const plain = style.toPlain() as { id: string, name: string, folder?: string | null, project?: string | null, styles: Record<string, unknown>, meta: Record<string, unknown>, inherited: boolean, isSystem: boolean }
-      const styleIdentity = String((style as any).identity ?? plain.id ?? style.id ?? '')
-      let folderId: number | string | undefined
-      const existing = await repos.styles.findByIdentity(styleIdentity)
-      if (existing && ((existing as any).folderId ?? (existing as any).folder) != null) {
-        folderId = (existing as any).folderId ?? (existing as any).folder
-      }
-      else {
-        const folderDoc = await repos.folders.findByIdentity('root-styles')
-        folderId = folderDoc?.id
-      }
-      const saved = await repos.styles.upsert({
-        identity: styleIdentity,
-        displayName: plain.name,
-        styles: plain.styles ?? {},
-        folder: folderId,
-        project: plain.project ?? undefined,
-        isSystem: plain.isSystem,
-        inherited: plain.inherited,
-        meta: plain.meta ?? {},
+
+      const existing = await repos.styles.findByIdentity(style.identity)
+      const fallbackFolder = existing?.folder ?? await this.ensurePayloadRootFolder({
+        identity: 'root-styles',
+        displayName: 'Стили',
+        entityType: 'styles',
       })
+      const folder = style.folderId ?? relationToId(fallbackFolder) ?? null
+      const payload = {
+        identity: String(style.identity ?? documentId),
+        displayName: style.displayName ?? style.name ?? String(style.identity ?? documentId),
+        description: style.description ?? null,
+        folder,
+        project: style.project ?? null,
+        source: typeof style.source === 'string' ? style.source : '',
+        sourceVersion: Math.max(1, Number(style.sourceVersion ?? 1) || 1),
+        meta: (style.meta && typeof style.meta === 'object' && !Array.isArray(style.meta)) ? style.meta : {},
+        active: style.active !== false,
+        author: style.author ?? undefined,
+        inherited: style.inherited === true,
+        isSystem: style.isSystem === true,
+      }
+      const storageId = style.id
+      const saved = !this.isMalformedPayloadDocumentId(storageId)
+        ? await repos.styles.update(storageId, payload)
+        : await repos.styles.upsert(payload)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -3733,13 +3747,19 @@ export class EndgeSchemaStorage extends EndgeModule {
       return {
         id: raw.id,
         identity: raw.identity,
-        name: raw.displayName,
+        name: raw.displayName ?? raw.name,
+        displayName: raw.displayName ?? raw.name,
+        description: raw.description ?? null,
         folderId: relationToId(raw.folder) ?? null,
         project: relationToId(raw.project) ?? null,
-        styles: (raw.styles && typeof raw.styles === 'object' && !Array.isArray(raw.styles)) ? raw.styles : {},
+        source: typeof raw.source === 'string' ? raw.source : '',
+        sourceVersion: Math.max(1, Number(raw.sourceVersion ?? 1) || 1),
         meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
+        active: raw.active !== false,
+        author: raw.author,
         inherited: raw.inherited === true,
         isSystem: raw.isSystem === true,
+        deletedAt: raw.deletedAt ?? null,
       }
     }
     if (documentType === 'navigation') {

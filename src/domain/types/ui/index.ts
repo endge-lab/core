@@ -1,7 +1,6 @@
 export * from './context-menu.types'
 export * from './filter-view.type'
 export * from './jsx.types'
-export * from './styles.types'
 export * from './ui-composition.types'
 export * from './ui-render-adapter.type'
 export * from './ui.types'

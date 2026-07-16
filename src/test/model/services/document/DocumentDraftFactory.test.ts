@@ -5,6 +5,7 @@ import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RMock } from '@/domain/entities/reflect/RMock'
 import { RComputation } from '@/domain/entities/reflect/RComputation'
+import { ENDGE_STYLE_DEFAULT_SOURCE, RStyle } from '@/domain/entities/reflect/RStyle'
 import { ComponentType, QueryType } from '@/domain/types/document/document.types'
 import { DocumentDraftFactory } from '@/model/services/document/DocumentDraftFactory'
 
@@ -88,6 +89,24 @@ describe('DocumentDraftFactory', () => {
       folderId: 'root-computations',
     })
     expect((draft as RComputation).source).toContain('defineComputation')
+  })
+
+  it('creates a source-first style draft without derived artifacts', () => {
+    const draft = DocumentDraftFactory.create('style', {
+      identity: 'flight-board',
+      name: 'Flight board',
+      folderId: 'root-styles',
+    })
+
+    expect(draft).toBeInstanceOf(RStyle)
+    expect(draft).toMatchObject({
+      identity: 'flight-board',
+      displayName: 'Flight board',
+      source: ENDGE_STYLE_DEFAULT_SOURCE,
+      sourceVersion: 1,
+      folderId: 'root-styles',
+    })
+    expect((draft as RStyle).toPlain()).not.toHaveProperty('styles')
   })
 
   it('rejects an empty identity', () => {
