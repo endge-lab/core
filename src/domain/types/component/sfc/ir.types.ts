@@ -4,6 +4,7 @@ import type {
   RComponentSFC_IR_ComponentPortMarker,
   RComponentSFC_IR_PortCall,
 } from './ports.types'
+import type { EndgeStyleSheetArtifact } from '@/domain/types/style'
 
 /** Семантическая модель компонента после compiler pipeline, независимая от DOM и Nova. */
 export interface RComponentSFC_IR {
@@ -110,6 +111,9 @@ export interface RComponentSFC_IR_ElementNode {
 
   /** Нормализованный Endge primitive tag. */
   tag: RComponentSFC_IR_Tag
+
+  /** Original public component tag before normalization to Component. */
+  componentTag?: string
 
   /** Нормализованные props элемента. */
   props: Record<string, RComponentSFC_IR_Value>
@@ -226,25 +230,4 @@ export interface RComponentSFC_IR_ForDirective {
 }
 
 /** IR style-секции после нормализации endgecss. */
-export interface RComponentSFC_IR_Style {
-  /** Флаг scoped-стилей. */
-  scoped: boolean
-
-  /** Нормализованные style rules. */
-  rules: RComponentSFC_IR_StyleRule[]
-
-  /** Исходный style-текст, пока endgecss compiler не нормализует все rules. */
-  content: string
-}
-
-/** Нормализованное style-правило. */
-export interface RComponentSFC_IR_StyleRule {
-  /** Selector правила в renderer-neutral форме. */
-  selector: string
-
-  /** CSS/endgecss declarations правила. */
-  declarations: Record<string, RComponentSFC_IR_Value>
-
-  /** Позиция исходного style-правила. */
-  sourceRange?: RComponentSFC_SourceRange
-}
+export type RComponentSFC_IR_Style = EndgeStyleSheetArtifact

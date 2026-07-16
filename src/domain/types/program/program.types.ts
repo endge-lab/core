@@ -15,6 +15,7 @@ import type {
 import type { QueryProgramProp, SourceExpressionIR } from '@/domain/types/source/source-expression.types'
 import type { ProgramMetadata } from '@/domain/types/program/program-metadata.types'
 import type { ComputationProgramPayload } from '@/domain/types/computation'
+import type { EndgeStyleSheetArtifact } from '@/domain/types/style'
 
 /** Тип доменной сущности, для которой compiler может построить program artifact. */
 export type ProgramEntityType
@@ -27,6 +28,7 @@ export type ProgramEntityType
     | 'store'
     | 'filter'
     | 'composition'
+    | 'style'
 
 /** Итоговый статус artifact после компиляции и валидации. */
 export type ProgramArtifactStatus = 'valid' | 'warning' | 'error'
@@ -230,6 +232,8 @@ export interface DataViewProgramPayload {
 
 /** Payload artifact для нового source-first SFC компонента. */
 export interface ComponentSFCProgramPayload {
+  /** Independent compiler status for each SFC section. */
+  sections?: Record<'script' | 'template' | 'style', ProgramArtifactStatus>
   /** Разложенный canonical source: script, template и style. */
   sourceParts: RComponentSFCSource_Parts
 
@@ -253,6 +257,18 @@ export interface ComponentSFCProgramPayload {
 
   /** Target-neutral semantic IR, который renderer-слои используют для DOM/Nova. */
   ir: RComponentSFC_IR | null
+}
+
+/** Runtime payload source-first style document. */
+export interface EndgeStyleProgramPayload {
+  /** Renderer-neutral compiled stylesheet. */
+  stylesheet: EndgeStyleSheetArtifact
+
+  /** Theme ids contributed by this document. */
+  themes: string[]
+
+  /** External dependencies discovered while compiling style conditions. */
+  dependencies: ProgramDependency[]
 }
 
 export type { ComputationProgramPayload }

@@ -47,5 +47,5 @@ export const ENDGE_CORE_MODULES: EndgeModuleDefinition[] = [
   { key: 'bind', module: EndgeBind, after: ['compiler', 'runtime'] },
   { key: 'console', module: EndgeConsole, after: ['domain', 'runtime'] },
   { key: 'runtimeDebugger', module: EndgeRuntimeDebugger, after: ['diagnostics', 'runtime'] },
-  { key: 'styles', module: EndgeStyles, after: ['ui', 'domain'] },
+  { key: 'styles', module: EndgeStyles, after: ['ui', 'domain', 'program', 'compiler'] },
 ]

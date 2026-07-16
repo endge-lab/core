@@ -17,7 +17,9 @@ import type {
   ProgramEntityType,
   QueryProgramPayload,
   QueryProgramOutput,
+  EndgeStyleProgramPayload,
 } from '@/domain/types/program/program.types'
+import type { EndgeStyleSheetArtifact } from '@/domain/types/style'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
@@ -27,6 +29,7 @@ import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { RStore } from '@/domain/entities/reflect/RStore'
+import { RStyle } from '@/domain/entities/reflect/RStyle'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sfc/component-sfc-template'
 import { ENDGE_COMPILER_VERSION } from '@/model/config/compiler'
@@ -37,6 +40,7 @@ import type { ProgramMetadata } from '@/domain/types/program/program-metadata.ty
 import { compileComputation } from '@/model/services/compiler/computation/computation-compile'
 import { parseComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-parse'
 import { analyzeComponentSFCScript } from '@/model/services/compiler/component-sfc/component-sfc-script'
+import { compileEndgeCSS } from '@/model/services/style'
 
 /**
  * Компилятор persisted domain model в compiled program artifacts.
@@ -77,6 +81,9 @@ export class EndgeCompiler extends EndgeModule {
       return
 
     if (!this.compilePhase('component-sfc', ENDGE_LOG_LANES.COMPONENTS, 'SFC-компонентов', componentSFCs, context))
+      return
+
+    if (!this.compilePhase('style', ENDGE_LOG_LANES.COMPONENTS, 'EndgeCSS styles', this._orderedStyles(), context))
       return
 
     if (!this.compilePhase('data-view', ENDGE_LOG_LANES.QUERIES, 'data views', Endge.domain.getDataViews(), context))
@@ -145,6 +152,12 @@ export class EndgeCompiler extends EndgeModule {
   public buildComposition(entity: RComposition): ProgramArtifact<CompositionProgramPayload> {
     const context: ProgramCompileContext = { compilerVersion: ENDGE_COMPILER_VERSION }
     return this.compileEntity('composition', entity, context) as ProgramArtifact<CompositionProgramPayload>
+  }
+
+  /** Compiles one global source-first EndgeCSS document. */
+  public buildStyle(entity: RStyle): ProgramArtifact<EndgeStyleProgramPayload> {
+    const context: ProgramCompileContext = { compilerVersion: ENDGE_COMPILER_VERSION }
+    return this.compileEntity('style', entity, context) as ProgramArtifact<EndgeStyleProgramPayload>
   }
 
   /**
@@ -238,15 +251,17 @@ export class EndgeCompiler extends EndgeModule {
       entityType: 'component-sfc',
       compile: (entity, context) => {
         const result = compileComponentSFC(entity.source, {
+          identity: entity.identity,
           resolveComponentTag: tag => Endge.program.resolveComponentTag(tag),
           hasComponentIdentity: identity => Endge.domain.getComponentSFC(identity) != null,
           resolvePortProvider: (identity, expectedKind) => this._resolvePortProvider(identity, expectedKind),
         })
         return this._makeArtifact(entity, 'component-sfc', context, {
-          capabilities: ['compilable', 'runnable', 'renderable'],
+          capabilities: result.ir ? ['compilable', 'runnable', 'renderable'] : ['compilable'],
           metadata: result.metadata,
           payload: {
             sourceParts: result.sourceParts,
+            sections: result.sections,
             contract: result.contract,
             dependencies: result.dependencies,
             runtimeDependencies: result.runtimeDependencies,
@@ -273,6 +288,40 @@ export class EndgeCompiler extends EndgeModule {
               role: dependency.role,
             })),
           ],
+          nonBlockingSourcePaths: ['style'],
+        })
+      },
+    })
+
+    this.registerHandler<RStyle, EndgeStyleProgramPayload>({
+      entityType: 'style',
+      compile: (entity, context) => {
+        const result = compileEndgeCSS(entity.source, { identity: entity.identity, scope: 'global' })
+        const stylesheet: EndgeStyleSheetArtifact = result.artifact ?? {
+          language: 'endgecss',
+          version: 1,
+          identity: entity.identity,
+          sourceHash: this._hashString(entity.source),
+          scope: 'global',
+          rules: [],
+          themes: [],
+          indexes: { universal: [], tags: {}, classes: {}, ids: {}, components: {}, identities: {}, states: {}, parts: {} },
+        }
+        return this._makeArtifact(entity, 'style', context, {
+          capabilities: ['compilable', 'configuration'],
+          payload: {
+            stylesheet,
+            themes: stylesheet.themes.map(theme => theme.id),
+            dependencies: [],
+          },
+          diagnostics: result.diagnostics.map(diagnostic => ({
+            severity: diagnostic.severity,
+            code: diagnostic.code,
+            message: diagnostic.message,
+            sourcePath: 'source',
+            start: diagnostic.range?.start,
+            end: diagnostic.range?.end,
+          })),
         })
       },
     })
@@ -459,6 +508,14 @@ export class EndgeCompiler extends EndgeModule {
     })
   }
 
+  /** Stable cascade order: system base, inherited, local/project, then identity. */
+  private _orderedStyles(): RStyle[] {
+    const rank = (style: RStyle) => style.isSystem ? 0 : style.inherited ? 1 : 2
+    return Endge.domain.getStyles()
+      .filter(style => style.active !== false && !style.deletedAt)
+      .sort((left, right) => rank(left) - rank(right) || left.identity.localeCompare(right.identity))
+  }
+
   /** Resolves a domain provider descriptor without requiring compile order among SFCs. */
   private _resolvePortProvider(
     identity: string,
@@ -570,6 +627,7 @@ export class EndgeCompiler extends EndgeModule {
       dependencies?: ProgramArtifact<TPayload>['dependencies']
       diagnostics?: Omit<ProgramDiagnostic, 'entityRef'>[]
       children?: ProgramArtifact[]
+      nonBlockingSourcePaths?: string[]
     },
   ): ProgramArtifact<TPayload> {
     const ref = this._makeRef(entity, entityType)
@@ -577,7 +635,8 @@ export class EndgeCompiler extends EndgeModule {
       ...this._collectValidationDiagnostics(entity),
       ...(options.diagnostics ?? []),
     ].map(diagnostic => ({ ...diagnostic, entityRef: ref }))
-    const status = diagnostics.some(diagnostic => diagnostic.severity === 'error')
+    const blockingDiagnostics = diagnostics.filter(diagnostic => !options.nonBlockingSourcePaths?.includes(diagnostic.sourcePath ?? ''))
+    const status = blockingDiagnostics.some(diagnostic => diagnostic.severity === 'error')
       ? 'error'
       : (diagnostics.length ? 'warning' : 'valid')
 

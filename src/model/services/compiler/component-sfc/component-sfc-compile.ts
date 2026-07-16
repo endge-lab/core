@@ -59,10 +59,15 @@ export interface ComponentSFCCompileResult {
 
   /** Публичная metadata компонента и его template-узлов. */
   metadata: ProgramMetadata
+
+  /** Per-section status; style errors do not invalidate template rendering. */
+  sections: Record<'script' | 'template' | 'style', 'valid' | 'warning' | 'error'>
 }
 
 /** Внешний registry-контекст, который связывает чистый SFC compiler с domain build. */
 export interface ComponentSFCCompileOptions {
+  /** Stable persisted identity used for the component style scope id. */
+  identity?: string
   /** Разрешает прямой пользовательский tag в identity компонента. */
   resolveComponentTag?: (tag: string) => string | null
 
@@ -96,6 +101,7 @@ export function compileComponentSFC(
       previewOptions: null,
       metadata: createEmptyProgramMetadata(),
       diagnostics,
+      sections: sectionStatuses(diagnostics),
     }
   }
 
@@ -114,7 +120,7 @@ export function compileComponentSFC(
     resolveComponentTag: options.resolveComponentTag,
     hasComponentIdentity: options.hasComponentIdentity,
   })
-  const styleResult = compileComponentSFCStyle(parseResult.ast.style)
+  const styleResult = compileComponentSFCStyle(parseResult.ast.style, { identity: options.identity })
 
   diagnostics.push(
     ...scriptResult.diagnostics,
@@ -157,7 +163,19 @@ export function compileComponentSFC(
       nodes: templateResult.metadata,
     },
     diagnostics,
+    sections: sectionStatuses(diagnostics),
   }
+}
+
+function sectionStatuses(diagnostics: RComponentDiagnostic[]): Record<'script' | 'template' | 'style', 'valid' | 'warning' | 'error'> {
+  const sections = { script: 'valid', template: 'valid', style: 'valid' } as Record<'script' | 'template' | 'style', 'valid' | 'warning' | 'error'>
+  for (const diagnostic of diagnostics) {
+    const section = diagnostic.sourcePath?.split('.')[0]
+    if (section !== 'script' && section !== 'template' && section !== 'style') continue
+    if (diagnostic.severity === 'error') sections[section] = 'error'
+    else if (diagnostic.severity === 'warning' && sections[section] === 'valid') sections[section] = 'warning'
+  }
+  return sections
 }
 
 function mergeDependencies(

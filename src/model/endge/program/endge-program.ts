@@ -14,6 +14,7 @@ import type {
   ProgramDiagnostic,
   ProgramEntityType,
   QueryProgramPayload,
+  EndgeStyleProgramPayload,
 } from '@/domain/types/program/program.types'
 
 type ProgramArtifactKey = string
@@ -149,6 +150,11 @@ export class EndgeProgram extends EndgeModule {
   /** Возвращает compiled Composition artifact по id или identity. */
   public getCompositionArtifact(idOrIdentity: string | number): ProgramArtifact<CompositionProgramPayload> | null {
     return this.getArtifact<CompositionProgramPayload>('composition', idOrIdentity)
+  }
+
+  /** Returns a compiled EndgeCSS document by persisted id or identity. */
+  public getStyleArtifact(idOrIdentity: string | number): ProgramArtifact<EndgeStyleProgramPayload> | null {
+    return this.getArtifact<EndgeStyleProgramPayload>('style', idOrIdentity)
   }
 
   /**

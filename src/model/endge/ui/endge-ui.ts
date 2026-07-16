@@ -14,6 +14,9 @@ import {
  * UI-состояние ядра: zoom, theme и режим отображения времени.
  */
 export class EndgeUI extends EndgeModule {
+  private readonly _themeIdsByOwner = new Map<string, Set<string>>([
+    ['endge:built-in', new Set(themeConfig.availableThemes)],
+  ])
   //
   // Настройки zoom
   private readonly MIN_ZOOM: number = 50
@@ -32,6 +35,7 @@ export class EndgeUI extends EndgeModule {
   // Состояние
   private _zoom: number
   private _theme: string
+  private _preferredTheme: string
   private _isLocalTime: boolean
 
   /**
@@ -41,7 +45,10 @@ export class EndgeUI extends EndgeModule {
     super()
 
     this._zoom = this.readZoomFromLS()
-    this._theme = this.readThemeFromLS()
+    this._preferredTheme = this.readThemePreferenceFromLS()
+    this._theme = themeConfig.availableThemes.includes(this._preferredTheme)
+      ? this._preferredTheme
+      : themeConfig.defaultTheme
     this._isLocalTime = this.readIsLocalTimeFromLS()
 
     // сразу применим (как immediate watch)
@@ -159,6 +166,28 @@ export class EndgeUI extends EndgeModule {
     return this._theme
   }
 
+  /** Returns built-in and runtime-contributed theme ids. */
+  public get availableThemes(): string[] {
+    return Array.from(new Set(Array.from(this._themeIdsByOwner.values()).flatMap(ids => [...ids])))
+  }
+
+  /** Replaces theme ids contributed by one artifact/module owner. */
+  public registerThemes(owner: string, ids: Iterable<string>): void {
+    const normalized = new Set(Array.from(ids, id => String(id).trim()).filter(Boolean))
+    if (normalized.size > 0) this._themeIdsByOwner.set(owner, normalized)
+    else this._themeIdsByOwner.delete(owner)
+    if (this.availableThemes.includes(this._preferredTheme) && this._theme !== this._preferredTheme)
+      this.applyTheme(this._preferredTheme, false)
+    else if (!this.availableThemes.includes(this._theme))
+      this.applyTheme(themeConfig.defaultTheme, false)
+    this.notify()
+  }
+
+  /** Removes all themes contributed by one owner. */
+  public unregisterThemes(owner: string): void {
+    this.registerThemes(owner, [])
+  }
+
   /**
    * Показывает, активна ли темная тема.
    */
@@ -170,31 +199,32 @@ export class EndgeUI extends EndgeModule {
    * Устанавливает тему, сохраняет ее и применяет CSS-классы к document.
    */
   public setTheme(next: string): void {
-    if (!themeConfig.availableThemes.includes(next))
+    this.applyTheme(next, true)
+  }
+
+  private applyTheme(next: string, remember: boolean): void {
+    if (!this.availableThemes.includes(next))
       return
-    if (next === this._theme)
+    if (next === this._theme) {
+      if (remember) {
+        this._preferredTheme = next
+        this.writeThemeToLS(next)
+      }
       return
+    }
 
     this._theme = next
-    this.writeThemeToLS(next)
+    if (remember) {
+      this._preferredTheme = next
+      this.writeThemeToLS(next)
+    }
     this.applyThemeToDocument(next)
     this.notify()
   }
 
-  /**
-   * Считывает Theme From LS.
-   */
-  private readThemeFromLS(): string {
-    if (typeof localStorage === 'undefined')
-      return themeConfig.defaultTheme
-
-    const raw: string | null = localStorage.getItem(themeConfig.storageKey)
-    const v: string = raw ?? themeConfig.defaultTheme
-
-    if (themeConfig.availableThemes.includes(v))
-      return v
-
-    return themeConfig.defaultTheme
+  private readThemePreferenceFromLS(): string {
+    if (typeof localStorage === 'undefined') return themeConfig.defaultTheme
+    return localStorage.getItem(themeConfig.storageKey)?.trim() || themeConfig.defaultTheme
   }
 
   /**
@@ -214,6 +244,7 @@ export class EndgeUI extends EndgeModule {
       return
 
     const root: HTMLElement = document.documentElement
+    root.dataset.endgeTheme = theme
     root.classList.remove(...ALL_THEME_CLASSES)
 
     // на всякий случай: если theme сломан, не кидаем

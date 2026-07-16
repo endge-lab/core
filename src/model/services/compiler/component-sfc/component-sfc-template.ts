@@ -202,6 +202,7 @@ function compileElementNode(
   }
 
   const nodeMetadata = compileNodeMetadata(node.attributes, diagnostics, `template.${id}.metadata`)
+  validateSemanticStyleAttributes(node.attributes, diagnostics, `template.${id}`)
   const props = compileAttributes(
     node.attributes.filter(attribute => attribute.name !== 'metadata'),
     context,
@@ -231,6 +232,7 @@ function compileElementNode(
     id,
     kind: 'element',
     tag,
+    componentTag: directComponentIdentity ? node.tag : undefined,
     props,
     directives,
     children: node.children
@@ -264,6 +266,29 @@ function compileElementNode(
   }
 
   return element
+}
+
+function validateSemanticStyleAttributes(
+  attributes: RComponentSFC_AST_Attribute[],
+  diagnostics: RComponentDiagnostic[],
+  sourcePath: string,
+): void {
+  const part = attributes.find(attribute => attribute.name === 'part')
+  if (!part) return
+  const valid = !part.dynamic
+    && typeof part.value === 'string'
+    && part.value.trim().length > 0
+    && part.value.trim().split(/\s+/).every(token => /^[a-zA-Z][\w-]*$/.test(token))
+  if (!valid) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-template-part-static',
+      message: 'part must be a static whitespace-separated token list.',
+      sourcePath: `${sourcePath}.part`,
+      start: part.range.start,
+      end: part.range.end,
+    })
+  }
 }
 
 function validateComponentCall(

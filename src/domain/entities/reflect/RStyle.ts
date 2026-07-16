@@ -4,8 +4,18 @@ import { Exclude, Expose } from 'class-transformer'
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
 import { REntity } from '@/domain/entities/reflect/REntity'
 
-/** Empty authored source used before the EndgeCSS grammar is defined. */
-export const ENDGE_STYLE_DEFAULT_SOURCE = ''
+/** Initial source-first EndgeCSS document. */
+export const ENDGE_STYLE_DEFAULT_SOURCE = `/* EndgeCSS is renderer-neutral. */
+* {
+  --surface: #ffffff;
+  --text: #111827;
+}
+
+@theme dark {
+  --surface: #111827;
+  --text: #f9fafb;
+}
+`
 
 /** Persisted source-first EndgeCSS document without compiled/runtime state. */
 export class RStyle extends REntity {
