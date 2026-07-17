@@ -202,16 +202,16 @@ export class Endge extends EndgeFederation {
    * Скачивает текущий workspace и домен как JSON-файл через браузерный download.
    */
   static async download(): Promise<void> {
-    const bundle = this.exportDomainBundle()
-    this.downloadBundle(bundle, 'endge-domain')
+    const bundle = Endge.exportDomainBundle()
+    Endge.downloadBundle(bundle, 'endge-domain')
   }
 
   /**
    * Скачивает выбранные документы в той же portable JSON-структуре, что и полный домен.
    */
   static async downloadSelected(selection: readonly EndgeDomainSelection[]): Promise<void> {
-    const bundle = this.exportSelectedDomainBundle(selection)
-    this.downloadBundle(bundle, 'endge-domain-selected')
+    const bundle = Endge.exportSelectedDomainBundle(selection)
+    Endge.downloadBundle(bundle, 'endge-domain-selected')
   }
 
   private static downloadBundle(bundle: EndgeDomainBundle, filenamePrefix: string): void {

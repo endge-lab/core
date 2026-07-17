@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { RAuthProfile } from '@/domain/entities/reflect/RAuthProfile'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
@@ -35,6 +35,7 @@ function initializeEntity<T extends REntity>(entity: T, id: number, identity: st
 
 describe('Endge domain export', () => {
   afterEach(() => {
+    vi.unstubAllGlobals()
     Endge.domain.reset()
     Endge.workspace.reset()
   })
@@ -125,6 +126,24 @@ describe('Endge domain export', () => {
     })
     expect(bundle.workspace.sse).not.toHaveProperty('manualToken')
     expect(restored.getQueryByIdentity('bundle-query')).not.toBeNull()
+  })
+
+  it('downloads the domain when used as an unbound event handler', async () => {
+    Endge.workspace.apply(TEST_ENDGE_WORKSPACE)
+    const click = vi.fn()
+    const createObjectURL = vi.fn(() => 'blob:endge-domain')
+    const revokeObjectURL = vi.fn()
+    vi.stubGlobal('document', {
+      createElement: vi.fn(() => ({ click })),
+    })
+    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL })
+
+    const eventHandler = Endge.download
+    await eventHandler()
+
+    expect(createObjectURL).toHaveBeenCalledOnce()
+    expect(click).toHaveBeenCalledOnce()
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:endge-domain')
   })
 
   it('exports only selected documents and scopes ids by domain collection', () => {
