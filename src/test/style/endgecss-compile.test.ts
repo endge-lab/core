@@ -62,8 +62,18 @@ describe('compileEndgeCSS', () => {
     const artifact = compileEndgeCSS('.list > Text:nth-child(even):state(selected) { color: red; }').artifact!
     const parent = node({ tag: 'Flex', classes: new Set(['list']) })
     const first = node({ tag: 'Text', parent, index: 1, siblingCount: 2 })
-    const second = node({ tag: 'Text', parent, index: 2, siblingCount: 2, previousSiblings: [first], states: new Set(['selected']) })
+    const second = node({ tag: 'Text', parent, index: 2, siblingCount: 2, previousSibling: first, states: new Set(['selected']) })
     expect(matchEndgeStyleSelector(artifact.rules[0].selectors[0], second)).toBe(true)
+  })
+
+  it('walks a linked sibling chain for adjacent and general sibling selectors', () => {
+    const artifact = compileEndgeCSS('Text + Badge { color: red; } Text ~ Icon { color: blue; }').artifact!
+    const first = node({ tag: 'Text', index: 1, siblingCount: 3 })
+    const second = node({ tag: 'Badge', index: 2, siblingCount: 3, previousSibling: first })
+    const third = node({ tag: 'Icon', index: 3, siblingCount: 3, previousSibling: second })
+
+    expect(matchEndgeStyleSelector(artifact.rules[0].selectors[0], second)).toBe(true)
+    expect(matchEndgeStyleSelector(artifact.rules[1].selectors[0], third)).toBe(true)
   })
 
   it('resolves important, specificity and stable source order', () => {

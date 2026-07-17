@@ -160,7 +160,11 @@ export interface EndgeStyleMatchNode {
   /** Runtime lifecycle ancestry; used by renderer-neutral placement isolation. */
   runtimeScopeIds?: ReadonlySet<string>
   parent?: EndgeStyleMatchNode
-  previousSiblings?: readonly EndgeStyleMatchNode[]
+  /**
+   * Immediate logical predecessor. A linked chain keeps sibling combinators
+   * renderer-neutral without retaining a copied prefix for every node.
+   */
+  previousSibling?: EndgeStyleMatchNode
   index: number
   siblingCount: number
 }

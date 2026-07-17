@@ -70,10 +70,6 @@ function compoundMatches(compound: EndgeStyleCompoundSelector, node: EndgeStyleM
   })
 }
 
-function previousSibling(node: EndgeStyleMatchNode): EndgeStyleMatchNode | undefined {
-  return node.previousSiblings?.at(-1)
-}
-
 function matchSegment(selector: EndgeStyleSelector, segmentIndex: number, node: EndgeStyleMatchNode | undefined): boolean {
   if (!node || !compoundMatches(selector.segments[segmentIndex].compound, node))
     return false
@@ -84,9 +80,16 @@ function matchSegment(selector: EndgeStyleSelector, segmentIndex: number, node: 
   if (combinator === 'child')
     return matchSegment(selector, segmentIndex - 1, node.parent)
   if (combinator === 'adjacent')
-    return matchSegment(selector, segmentIndex - 1, previousSibling(node))
-  if (combinator === 'sibling')
-    return (node.previousSiblings ?? []).some(sibling => matchSegment(selector, segmentIndex - 1, sibling))
+    return matchSegment(selector, segmentIndex - 1, node.previousSibling)
+  if (combinator === 'sibling') {
+    let sibling = node.previousSibling
+    while (sibling) {
+      if (matchSegment(selector, segmentIndex - 1, sibling))
+        return true
+      sibling = sibling.previousSibling
+    }
+    return false
+  }
 
   let ancestor = node.parent
   while (ancestor) {
