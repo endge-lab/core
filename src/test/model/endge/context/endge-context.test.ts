@@ -121,3 +121,60 @@ describe('EndgeContext locale and theme', () => {
     expect(context.currentTheme).toBe('contrast')
   })
 })
+
+describe('EndgeContext execution context resolution', () => {
+  const candidates = {
+    tenants: ['tenant-a', 'tenant-b'],
+    projects: [
+      { identity: 'project-a', allowedEnvironmentIds: [2] },
+      { identity: 'project-b', allowedEnvironmentIds: [] },
+    ],
+    environments: [
+      { id: 1, identity: 'development' },
+      { id: 2, identity: 'production' },
+    ],
+  } as const
+
+  it('falls back to the first available entities for stale stored coordinates', () => {
+    const context = new EndgeContext()
+    context.deserialize({ tenant: 'removed', project: 'removed', environment: 'removed' })
+
+    expect(context.resolveExecutionContext(candidates)).toEqual({
+      tenantIdentity: 'tenant-a',
+      projectIdentity: 'project-a',
+      environmentIdentity: 'production',
+    })
+  })
+
+  it('keeps valid stored coordinates', () => {
+    const context = new EndgeContext()
+    context.deserialize({ tenant: 'tenant-b', project: 'project-b', environment: 'development' })
+
+    expect(context.resolveExecutionContext(candidates)).toEqual({
+      tenantIdentity: 'tenant-b',
+      projectIdentity: 'project-b',
+      environmentIdentity: 'development',
+    })
+  })
+
+  it('rejects an explicitly requested coordinate that is not available', () => {
+    const context = new EndgeContext()
+
+    expect(() => context.resolveExecutionContext({
+      ...candidates,
+      explicit: { projectIdentity: 'missing-project' },
+    })).toThrow('[EndgeContext] Project "missing-project" was not found in loaded Domain')
+  })
+
+  it('rejects an explicitly requested environment outside the selected project', () => {
+    const context = new EndgeContext()
+
+    expect(() => context.resolveExecutionContext({
+      ...candidates,
+      explicit: {
+        projectIdentity: 'project-a',
+        environmentIdentity: 'development',
+      },
+    })).toThrow('[EndgeContext] Environment for Project "project-a" "development" was not found in loaded Domain')
+  })
+})

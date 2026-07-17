@@ -49,6 +49,23 @@ export interface EndgeContextPersistenceConfig {
   context?: EndgePersistenceDriver | EndgePersistenceOptions | null
 }
 
+export interface EndgeExecutionContextProjectCandidate {
+  identity: string
+  allowedEnvironmentIds: readonly number[]
+}
+
+export interface EndgeExecutionContextEnvironmentCandidate {
+  id: string | number
+  identity: string
+}
+
+export interface EndgeExecutionContextResolutionInput {
+  explicit?: Partial<EndgeExecutionContext>
+  tenants: readonly string[]
+  projects: readonly EndgeExecutionContextProjectCandidate[]
+  environments: readonly EndgeExecutionContextEnvironmentCandidate[]
+}
+
 /**
  * Контекст выполнения Endge: текущий workspace/project/environment/user scope
  * и координатор persistence-инфраструктуры приложения.
@@ -92,7 +109,6 @@ export class EndgeContext extends EndgeModule {
         this._currentEnvironment = normalizeScopePart(input.environmentIdentity, DEFAULT_SCOPE.environmentId)
     }
     this._executionContextLocked = true
-    this.saveToStorage()
   }
 
   /** Разрешает выбрать новый structural context только перед следующим boot. */
@@ -304,6 +320,59 @@ export class EndgeContext extends EndgeModule {
     }
   }
 
+  /**
+   * Разрешает structural context после загрузки Domain, но до configuration/build.
+   * Explicit и session coordinates обязательны; сохранённые preferences могут
+   * безопасно перейти на первую доступную сущность, если Domain изменился.
+   */
+  public resolveExecutionContext(input: EndgeExecutionContextResolutionInput): EndgeExecutionContext {
+    const tenants = normalizeIdentityList(input.tenants)
+    const projects = input.projects.filter(item => normalizeOptionalText(item.identity) != null)
+    const sessionTenant = normalizeOptionalText(this._sessionProvider?.getCurrentIdentity()?.tenantId)
+    const explicitTenant = normalizeOptionalText(input.explicit?.tenantIdentity)
+    const explicitProject = normalizeOptionalText(input.explicit?.projectIdentity)
+    const explicitEnvironment = normalizeOptionalText(input.explicit?.environmentIdentity)
+
+    const tenantIdentity = resolveAvailableIdentity({
+      label: 'Tenant',
+      requested: sessionTenant ?? explicitTenant ?? this._currentTenant,
+      required: sessionTenant != null || explicitTenant != null,
+      available: tenants,
+    })
+    const projectIdentity = resolveAvailableIdentity({
+      label: 'Project',
+      requested: explicitProject ?? this._currentProject,
+      required: explicitProject != null,
+      available: projects.map(item => item.identity),
+    })
+    const project = projects.find(item => item.identity === projectIdentity)!
+    const allowedEnvironmentIds = new Set(project.allowedEnvironmentIds.map(Number))
+    const environments = input.environments
+      .filter(item => normalizeOptionalText(item.identity) != null)
+      .filter(item => allowedEnvironmentIds.size === 0 || allowedEnvironmentIds.has(Number(item.id)))
+    const environmentIdentity = resolveAvailableIdentity({
+      label: `Environment for Project "${projectIdentity}"`,
+      requested: explicitEnvironment ?? this._currentEnvironment,
+      required: explicitEnvironment != null,
+      available: environments.map(item => item.identity),
+    })
+
+    const changed = tenantIdentity !== this._currentTenant
+      || projectIdentity !== this._currentProject
+      || environmentIdentity !== this._currentEnvironment
+
+    this._currentTenant = tenantIdentity
+    this._currentProject = projectIdentity
+    this._currentEnvironment = environmentIdentity
+    this.saveToStorage()
+
+    if (changed) {
+      this.notify()
+    }
+
+    return this.getExecutionContext()
+  }
+
   /** Устанавливает текущий environment и сохраняет контекст. */
   public setCurrentEnvironment(identity: string | null): void {
     this.assertStructuralContextMutable('_currentEnvironment', identity, DEFAULT_SCOPE.environmentId)
@@ -470,6 +539,39 @@ function normalizeRequiredScopePart(value: unknown, field: string): string {
   }
 
   return normalized
+}
+
+function normalizeIdentityList(values: readonly string[]): string[] {
+  const result: string[] = []
+  const seen = new Set<string>()
+  for (const value of values) {
+    const identity = normalizeOptionalText(value)
+    if (!identity || seen.has(identity))
+      continue
+    seen.add(identity)
+    result.push(identity)
+  }
+  return result
+}
+
+function resolveAvailableIdentity(input: {
+  label: string
+  requested: string | null | undefined
+  required: boolean
+  available: readonly string[]
+}): string {
+  const available = normalizeIdentityList(input.available)
+  const requested = normalizeOptionalText(input.requested)
+  if (requested && available.includes(requested))
+    return requested
+
+  if (requested && input.required)
+    throw new Error(`[EndgeContext] ${input.label} "${requested}" was not found in loaded Domain`)
+
+  const fallback = available[0]
+  if (!fallback)
+    throw new Error(`[EndgeContext] Cannot resolve ${input.label}: no available entities were loaded`)
+  return fallback
 }
 
 function readLegacyThemePreference(): string | null {

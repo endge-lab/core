@@ -24,10 +24,21 @@ export class EndgeConfigurationModule extends EndgeModule {
 
   /** Разрешает Workspace → Project → Environment → Tenant до compiler build. */
   public override build(ctx: EndgeBootContext): void {
-    const execution = Endge.context.getExecutionContext()
-    const project = this._resolveEntity('Project', execution.projectIdentity, ctx.context?.projectIdentity != null, identity => Endge.domain.getProject(identity))
-    const environment = this._resolveEntity('Environment', execution.environmentIdentity, ctx.context?.environmentIdentity != null, identity => Endge.domain.getEnvironment(identity))
-    const tenant = this._resolveEntity('Tenant', execution.tenantIdentity, ctx.context?.tenantIdentity != null, identity => Endge.domain.getTenant(identity))
+    const execution = Endge.context.resolveExecutionContext({
+      explicit: ctx.context,
+      tenants: Endge.domain.getTenants().map(item => item.identity),
+      projects: Endge.domain.getProjects().map(item => ({
+        identity: item.identity,
+        allowedEnvironmentIds: item.allowedEnvironmentIds,
+      })),
+      environments: Endge.domain.getEnvironments().map(item => ({
+        id: item.id,
+        identity: item.identity,
+      })),
+    })
+    const project = this._resolveEntity('Project', execution.projectIdentity, identity => Endge.domain.getProject(identity))
+    const environment = this._resolveEntity('Environment', execution.environmentIdentity, identity => Endge.domain.getEnvironment(identity))
+    const tenant = this._resolveEntity('Tenant', execution.tenantIdentity, identity => Endge.domain.getTenant(identity))
 
     if (project && environment && project.allowedEnvironmentIds.length > 0 && !project.allowedEnvironmentIds.includes(Number(environment.id))) {
       throw new Error(`[EndgeConfiguration] Environment "${environment.identity}" is not allowed for Project "${project.identity}"`)
@@ -120,11 +131,10 @@ export class EndgeConfigurationModule extends EndgeModule {
   private _resolveEntity<TEntity>(
     label: string,
     identity: string,
-    required: boolean,
     resolve: (identity: string) => TEntity | null,
-  ): TEntity | null {
+  ): TEntity {
     const entity = resolve(identity)
-    if (!entity && required)
+    if (!entity)
       throw new Error(`[EndgeConfiguration] ${label} "${identity}" was not found in loaded Domain`)
     return entity
   }
