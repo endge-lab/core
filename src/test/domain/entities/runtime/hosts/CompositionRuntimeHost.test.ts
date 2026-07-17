@@ -1,4 +1,4 @@
-import type { CompositionProgramPayload, CompositionSourceDocument } from '@/domain/types/source/composition-source.types'
+import type { CompositionProgramPayload, CompositionRuntimeOutputHandle } from '@/domain/types/source/composition-source.types'
 import type { ProgramArtifact, QueryProgramPayload } from '@/domain/types/program/program.types'
 import type { StoreSourceArtifact } from '@/domain/types/source/store-source.types'
 
@@ -34,7 +34,7 @@ describe('Composition runtime session', () => {
     installDomainAndProgram()
 
     const session = await Endge.runtime.composition.mount('schedule-page', { id: 'composition-session' })
-    const filter = session.outputs.filter?.runtime as FilterRuntimeHost
+    const filter = (session.outputs.filter as CompositionRuntimeOutputHandle)?.runtime as FilterRuntimeHost
     const filterView = session.host.getChild('dateFilter') as FilterViewRuntimeHost
     const query = session.host.getChild('query') as QueryRuntimeHost
 
@@ -87,11 +87,11 @@ describe('Composition runtime session', () => {
     expect(run).toHaveBeenCalledTimes(2)
 
     await filter.command('set').run({ key: 'search', value: 'S7' })
-    session.unmount()
+    await session.unmount()
     await vi.advanceTimersByTimeAsync(20)
     expect(run).toHaveBeenCalledTimes(2)
     expect(Endge.runtime.getRuntimeHosts()).toEqual([])
-    session.unmount()
+    await session.unmount()
   })
 
   it('publishes Query outputs atomically into Store data and recomputes derived fields', async () => {
@@ -168,7 +168,7 @@ describe('Composition runtime session', () => {
       schedule: { raw: rows, table: rows },
     })
 
-    session.unmount()
+    await session.unmount()
     expect(Raph.get(base)).toBeUndefined()
   })
 
@@ -204,7 +204,7 @@ describe('Composition runtime session', () => {
     expect(session.host.getDataPath('db')).toBe(sharedRuntime.getDataPath())
     expect(session.host.getDataSnapshot()).toEqual({ db: { raw: [1] } })
 
-    session.unmount()
+    await session.unmount()
     expect(Endge.runtime.getRuntimeById(sharedRuntime.id)).toBe(sharedRuntime)
     expect(sharedRuntime.getDataSnapshot()).toEqual({ raw: [1] })
   })
@@ -307,7 +307,7 @@ describe('Composition runtime session', () => {
     expect(session.host.getOutput('rows')).toEqual(updatedRows)
     expect(session.host.getDataSnapshot()).toEqual({ db: { raw: { rows: updatedRows } } })
 
-    session.unmount()
+    await session.unmount()
     expect(Endge.runtime.getRuntimeHosts()).toEqual([])
   })
 })
@@ -380,12 +380,38 @@ defineFilter({
   Endge.program.addArtifact(artifact('composition', 3, 'schedule-page', compositionPayload))
 }
 
-function makeCompositionPayload(document: CompositionSourceDocument): CompositionProgramPayload {
+function makeCompositionPayload(document: any): CompositionProgramPayload {
+  const runtimes = document.runtimes.map((runtime: any) => ({
+    path: runtime.name,
+    scopePath: 'scope_default',
+    activationOverride: null,
+    effectiveActivation: { mode: 'startup' as const },
+    ...runtime,
+  }))
+  const normalized = {
+    activation: { mode: 'startup' as const },
+    data: document.data,
+    resources: [],
+    scopes: [{
+      name: 'scope_default',
+      path: 'scope_default',
+      parentPath: null,
+      activationOverride: { mode: 'startup' as const },
+      effectiveActivation: { mode: 'startup' as const },
+      resources: [],
+      runtimes: runtimes.map((runtime: any) => runtime.path),
+      children: [],
+      sourceOrder: 0,
+    }],
+    runtimes,
+    hooks: document.hooks,
+    outputs: document.outputs.map((output: any) => ({ kind: 'runtime' as const, ...output })),
+  }
   return {
     type: 'composition',
     sourceVersion: 1,
-    ...document,
-    graph: buildRuntimeGraph(document),
+    ...normalized,
+    graph: buildRuntimeGraph(normalized),
   }
 }
 

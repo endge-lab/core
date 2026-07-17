@@ -25,6 +25,7 @@ export type RuntimeExecutableModel
 
 export interface EndgeRuntimeSnapshot extends RuntimeHostRegistrySnapshot {
   generatedAt: number
+  scopes: import('@/domain/types/runtime/runtime-scope.types').RuntimeScopeSnapshot[]
 }
 
 /**

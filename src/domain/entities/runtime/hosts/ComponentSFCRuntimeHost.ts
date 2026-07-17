@@ -27,6 +27,7 @@ import type {
   RuntimeHostUpdateContext,
 } from '@/domain/types/runtime/runtime-host.types'
 import type { ComputationResource } from '@/domain/types/computation'
+import type { EndgeStyleLease } from '@/domain/types/style'
 
 import { DataPath, Raph, RaphNode } from '@endge/raph'
 
@@ -63,6 +64,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   private _raphInputDisposers: VoidFunction[] = []
   private readonly _computationResources = new ComputationResourceRegistry()
   private readonly _computationErrorSignatures = new Map<string, string>()
+  private _styleLease: EndgeStyleLease | null = null
 
   constructor(input: {
     id: string
@@ -138,6 +140,16 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     })
 
     host.syncArtifactState(target)
+    const style = host.getIr()?.style
+    const runtimeScopeId = String(meta.runtimeScopeId ?? '').trim()
+    if (style && runtimeScopeId) {
+      host._styleLease = Endge.styles.acquireStyle({
+        artifact: style,
+        ownerScopeId: host.id,
+        boundaryId: runtimeScopeId,
+        orderKey: `sfc:${host.entityIdentity}`,
+      })
+    }
     Raph.app.addNode(node)
     host.addRaphNode(node)
     host.addResource({
@@ -272,11 +284,23 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     super.update(ctx)
   }
 
+  public override pause(): void {
+    super.pause()
+    this._styleLease?.suspend()
+  }
+
+  public override resume(): void {
+    this._styleLease?.resume()
+    super.resume()
+  }
+
   /** Очищает Raph subscriptions перед общим destroy host-а. */
   public override destroy(): void {
     this._clearRaphInputSubscriptions()
     this._computationResources.dispose()
     this._computationErrorSignatures.clear()
+    this._styleLease?.release()
+    this._styleLease = null
     super.destroy()
   }
 

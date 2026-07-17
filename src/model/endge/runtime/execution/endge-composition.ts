@@ -1,14 +1,7 @@
-import type { CompositionMountOptions, CompositionRuntimeOutputHandle } from '@/domain/types/source/composition-source.types'
+import type { CompositionMountOptions, CompositionSession } from '@/domain/types/source/composition-source.types'
 
 import type { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
 import { Endge } from '@/model/endge/kernel/endge'
-
-export interface CompositionSession {
-  id: string
-  host: CompositionRuntimeHost
-  outputs: Readonly<Record<string, CompositionRuntimeOutputHandle>>
-  unmount: () => void
-}
 
 /** Публичный facade монтирования Composition runtime sessions. */
 export class EndgeComposition {
@@ -46,10 +39,12 @@ export class EndgeComposition {
       id: host.id,
       host,
       outputs: host.getOutputs(),
-      unmount: () => {
+      output: <T = unknown>(name: string) => host.getOutput(name) as T | undefined,
+      unmount: async () => {
         if (!mounted)
           return
         mounted = false
+        await host.getScope('scope_default')?.dispose()
         Endge.runtime.destroyRuntimeTree(host.id)
       },
     }

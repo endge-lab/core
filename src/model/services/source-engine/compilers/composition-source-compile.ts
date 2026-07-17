@@ -1,11 +1,14 @@
 import type {
+  CompositionActivationDescriptor,
   CompositionBindingValue,
   CompositionDataDescriptor,
   CompositionOutputDescriptor,
   CompositionHook,
+  CompositionResourceDescriptor,
   CompositionRuntimeDescriptor,
   CompositionRuntimeGraph,
   CompositionRuntimeKind,
+  CompositionScopeDescriptor,
   CompositionSourceCompileResult,
   CompositionSourceDocument,
 } from '@/domain/types/source/composition-source.types'
@@ -52,16 +55,22 @@ export function compileCompositionSource(source: string, sourceVersion = 1): Com
 
     validateRootProperties(definition, diagnostics)
     const metadata = compileProgramMetadataProperty(definition, diagnostics)
+    const activationValue = propertyValue(definition, 'activateOn')
     const dataValue = propertyValue(definition, 'data')
+    const resourcesValue = propertyValue(definition, 'resources')
     const runtimesValue = propertyValue(definition, 'runtimes')
     const hooksValue = propertyValue(definition, 'hooks')
     const outputsValue = propertyValue(definition, 'outputs')
+    const activation = activationValue ? readActivation(activationValue, diagnostics, 'activateOn') : null
     const dataNode = dataValue && t.isObjectExpression(dataValue) ? dataValue : null
+    const resourcesNode = resourcesValue && t.isObjectExpression(resourcesValue) ? resourcesValue : null
     const runtimesNode = runtimesValue && t.isObjectExpression(runtimesValue) ? runtimesValue : null
     const hooksNode = hooksValue && t.isArrayExpression(hooksValue) ? hooksValue : null
     const outputsNode = outputsValue && t.isObjectExpression(outputsValue) ? outputsValue : null
     if (dataValue && !dataNode)
       diagnostics.push(diagnostic('error', 'composition-source-data-shape', 'data должен быть object literal.', 'data', dataValue))
+    if (resourcesValue && !resourcesNode)
+      diagnostics.push(diagnostic('error', 'composition-source-resources-shape', 'resources должен быть object literal.', 'resources', resourcesValue))
     if (runtimesValue && !runtimesNode)
       diagnostics.push(diagnostic('error', 'composition-source-runtimes-shape', 'runtimes должен быть object literal.', 'runtimes', runtimesValue))
     if (hooksValue && !hooksNode)
@@ -70,10 +79,43 @@ export function compileCompositionSource(source: string, sourceVersion = 1): Com
       diagnostics.push(diagnostic('error', 'composition-source-outputs-shape', 'outputs должен быть object literal.', 'outputs', outputsValue))
     const data = dataNode ? readData(dataNode, diagnostics) : []
     const dataNames = new Set(data.map(item => item.name))
-    const runtimes = runtimesNode ? readRuntimes(runtimesNode, dataNames, diagnostics) : []
+    const defaultActivation = activation ?? { mode: 'startup' as const }
+    const resources = resourcesNode
+      ? readResources(resourcesNode, 'scope_default', '', diagnostics, { value: 0 })
+      : []
+    const scopes: CompositionScopeDescriptor[] = [{
+      name: 'scope_default',
+      path: 'scope_default',
+      parentPath: null,
+      activationOverride: activation,
+      effectiveActivation: defaultActivation,
+      resources: resources.map(item => item.path),
+      runtimes: [],
+      children: [],
+      sourceOrder: 0,
+    }]
+    const runtimes: CompositionRuntimeDescriptor[] = []
+    const order = { value: resources.length + 1 }
+    if (runtimesNode) {
+      readRuntimes(
+        runtimesNode,
+        dataNames,
+        diagnostics,
+        runtimes,
+        scopes,
+        resources,
+        '',
+        'scope_default',
+        defaultActivation,
+        order,
+      )
+    }
+    scopes[0].runtimes = runtimes.filter(item => item.scopePath === 'scope_default').map(item => item.path)
+    scopes[0].children = scopes.filter(item => item.parentPath === 'scope_default').map(item => item.path)
     const runtimeNames = new Set(runtimes.map(item => item.name))
     const hooks = hooksNode ? readHooks(hooksNode, runtimeNames, runtimes, diagnostics) : []
-    const outputs = outputsNode ? readOutputs(outputsNode, runtimeNames, diagnostics) : []
+    const scopeNames = new Set(scopes.filter(item => item.path !== 'scope_default').map(item => item.path))
+    const outputs = outputsNode ? readOutputs(outputsNode, runtimeNames, scopeNames, diagnostics) : []
 
     if (!runtimesNode)
       diagnostics.push(diagnostic('error', 'composition-source-runtimes-missing', 'defineComposition требует runtimes.', 'runtimes', definition))
@@ -81,7 +123,7 @@ export function compileCompositionSource(source: string, sourceVersion = 1): Com
     validateBindingReferences(data, runtimes, diagnostics)
     validateRuntimeCycles(runtimes, hooks, diagnostics)
 
-    const document: CompositionSourceDocument = { data, runtimes, hooks, outputs }
+    const document: CompositionSourceDocument = { activation, data, resources, scopes, runtimes, hooks, outputs }
     const hasErrors = diagnostics.some(item => item.severity === 'error')
     return {
       ast,
@@ -152,9 +194,82 @@ function validateRootProperties(node: t.ObjectExpression, diagnostics: Diagnosti
       continue
     }
     const name = propertyName(property.key)
-    if (name !== 'metadata' && name !== 'data' && name !== 'runtimes' && name !== 'hooks' && name !== 'outputs')
+    if (name !== 'metadata' && name !== 'activateOn' && name !== 'data' && name !== 'resources' && name !== 'runtimes' && name !== 'hooks' && name !== 'outputs')
       diagnostics.push(diagnostic('error', 'composition-source-property-unsupported', `Свойство "${name ?? ''}" не поддерживается Composition v1.`, name ?? 'defineComposition', property))
   }
+}
+
+function readActivation(
+  raw: t.Node | null | undefined,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+): CompositionActivationDescriptor | null {
+  const expression = raw && t.isExpression(raw) ? unwrapExpression(raw) : null
+  if (!expression || !t.isCallExpression(expression) || !t.isIdentifier(expression.callee)) {
+    diagnostics.push(diagnostic('error', 'composition-activation-shape', 'Activation должен иметь вид startup() или manual().', sourcePath, raw ?? undefined))
+    return null
+  }
+  const mode = expression.callee.name
+  if ((mode !== 'startup' && mode !== 'manual') || expression.arguments.length) {
+    diagnostics.push(diagnostic('error', 'composition-activation-kind', 'Activation поддерживает только startup() или manual() без аргументов.', sourcePath, expression))
+    return null
+  }
+  return { mode }
+}
+
+function validateScopeProperties(node: t.ObjectExpression, diagnostics: DiagnosticDraft[], path: string): void {
+  for (const property of node.properties) {
+    if (!t.isObjectProperty(property) || property.computed) {
+      diagnostics.push(diagnostic('error', 'composition-scope-property', `Scope "${path}" допускает только обычные properties.`, `runtimes.${path}`, property))
+      continue
+    }
+    const name = propertyName(property.key)
+    if (name !== 'resources' && name !== 'runtimes')
+      diagnostics.push(diagnostic('error', 'composition-scope-property-unsupported', `Свойство "${name ?? ''}" не поддерживается внутри scope.`, `runtimes.${path}.${name ?? ''}`, property))
+  }
+}
+
+function readResources(
+  node: t.ObjectExpression,
+  scopePath: string,
+  publicPrefix: string,
+  diagnostics: DiagnosticDraft[],
+  order: { value: number },
+): CompositionResourceDescriptor[] {
+  const resources: CompositionResourceDescriptor[] = []
+  const declared = new Set<string>()
+  for (const property of node.properties) {
+    if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
+      diagnostics.push(diagnostic('error', 'composition-resource-property', 'resources допускает только обычные properties.', 'resources', property))
+      continue
+    }
+    const name = propertyName(property.key)
+    const expression = unwrapExpression(property.value)
+    const path = publicPrefix ? `${publicPrefix}.${name ?? ''}` : String(name ?? '')
+    if (!name || declared.has(name)) {
+      diagnostics.push(diagnostic('error', 'composition-resource-duplicate', `Resource "${name ?? ''}" объявлен повторно.`, `resources.${path}`, property))
+      continue
+    }
+    declared.add(name)
+    if (!t.isCallExpression(expression) || !t.isIdentifier(expression.callee, { name: 'style' })) {
+      diagnostics.push(diagnostic('error', 'composition-resource-kind', `Resource "${path}" должен иметь вид style(identity).`, `resources.${path}`, expression))
+      continue
+    }
+    const identity = readStringArgument(expression, 0)
+    if (!identity || expression.arguments.length !== 1) {
+      diagnostics.push(diagnostic('error', 'composition-resource-style-identity', `Style resource "${path}" требует один identity.`, `resources.${path}`, expression))
+      continue
+    }
+    resources.push({
+      name,
+      path,
+      scopePath,
+      kind: 'style',
+      identity,
+      sourceOrder: order.value++,
+    })
+  }
+  return resources
 }
 
 function readData(node: t.ObjectExpression, diagnostics: DiagnosticDraft[]): CompositionDataDescriptor[] {
@@ -189,8 +304,18 @@ function readData(node: t.ObjectExpression, diagnostics: DiagnosticDraft[]): Com
   return data
 }
 
-function readRuntimes(node: t.ObjectExpression, dataNames: Set<string>, diagnostics: DiagnosticDraft[]): CompositionRuntimeDescriptor[] {
-  const runtimes: CompositionRuntimeDescriptor[] = []
+function readRuntimes(
+  node: t.ObjectExpression,
+  dataNames: Set<string>,
+  diagnostics: DiagnosticDraft[],
+  runtimes: CompositionRuntimeDescriptor[],
+  scopes: CompositionScopeDescriptor[],
+  resources: CompositionResourceDescriptor[],
+  publicPrefix: string,
+  ownerScopePath: string,
+  ownerActivation: CompositionActivationDescriptor,
+  order: { value: number },
+): void {
   const declared = new Set<string>()
   for (const property of node.properties) {
     if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
@@ -201,18 +326,83 @@ function readRuntimes(node: t.ObjectExpression, dataNames: Set<string>, diagnost
     if (!name)
       continue
     if (declared.has(name)) {
-      diagnostics.push(diagnostic('error', 'composition-runtime-duplicate', `Runtime "${name}" объявлен повторно.`, `runtimes.${name}`, property))
+      diagnostics.push(diagnostic('error', 'composition-runtime-duplicate', `Runtime или scope "${name}" объявлен повторно.`, `runtimes.${name}`, property))
       continue
     }
     declared.add(name)
-    const runtime = readRuntime(name, property.value, dataNames, diagnostics)
+    const chain = memberChain(property.value)
+    if (chain && t.isIdentifier(chain.base.callee, { name: 'scope' })) {
+      const path = publicPrefix ? `${publicPrefix}.${name}` : name
+      const definition = chain.base.arguments[0]
+      if (!definition || !t.isObjectExpression(definition)) {
+        diagnostics.push(diagnostic('error', 'composition-scope-shape', `Scope "${path}" должен иметь вид scope({ resources, runtimes }).`, `runtimes.${path}`, property.value))
+        continue
+      }
+      let activationOverride: CompositionActivationDescriptor | null = null
+      for (const modifier of chain.modifiers) {
+        if (modifier.name !== 'activateOn') {
+          diagnostics.push(diagnostic('error', 'composition-scope-method', `Scope method ".${modifier.name}" не поддерживается.`, `runtimes.${path}`, modifier.call))
+          continue
+        }
+        activationOverride = readActivation(modifier.call.arguments[0], diagnostics, `runtimes.${path}.activateOn`)
+      }
+      validateScopeProperties(definition, diagnostics, path)
+      const effectiveActivation = activationOverride ?? ownerActivation
+      const scopeResourcesNode = propertyValue(definition, 'resources')
+      const scopeRuntimesNode = propertyValue(definition, 'runtimes')
+      if (scopeResourcesNode && !t.isObjectExpression(scopeResourcesNode))
+        diagnostics.push(diagnostic('error', 'composition-scope-resources-shape', `resources scope "${path}" должен быть object literal.`, `runtimes.${path}.resources`, scopeResourcesNode))
+      if (scopeRuntimesNode && !t.isObjectExpression(scopeRuntimesNode))
+        diagnostics.push(diagnostic('error', 'composition-scope-runtimes-shape', `runtimes scope "${path}" должен быть object literal.`, `runtimes.${path}.runtimes`, scopeRuntimesNode))
+      const ownedResources = t.isObjectExpression(scopeResourcesNode)
+        ? readResources(scopeResourcesNode, path, path, diagnostics, order)
+        : []
+      resources.push(...ownedResources)
+      const scope: CompositionScopeDescriptor = {
+        name,
+        path,
+        parentPath: ownerScopePath,
+        activationOverride,
+        effectiveActivation,
+        resources: ownedResources.map(item => item.path),
+        runtimes: [],
+        children: [],
+        sourceOrder: order.value++,
+      }
+      scopes.push(scope)
+      if (t.isObjectExpression(scopeRuntimesNode)) {
+        readRuntimes(
+          scopeRuntimesNode,
+          dataNames,
+          diagnostics,
+          runtimes,
+          scopes,
+          resources,
+          path,
+          path,
+          effectiveActivation,
+          order,
+        )
+      }
+      scope.runtimes = runtimes.filter(item => item.scopePath === path).map(item => item.path)
+      scope.children = scopes.filter(item => item.parentPath === path).map(item => item.path)
+      continue
+    }
+    const path = publicPrefix ? `${publicPrefix}.${name}` : name
+    const runtime = readRuntime(path, property.value, dataNames, diagnostics, ownerScopePath, ownerActivation)
     if (runtime)
       runtimes.push(runtime)
   }
-  return runtimes
 }
 
-function readRuntime(name: string, raw: t.Expression, dataNames: Set<string>, diagnostics: DiagnosticDraft[]): CompositionRuntimeDescriptor | null {
+function readRuntime(
+  name: string,
+  raw: t.Expression,
+  dataNames: Set<string>,
+  diagnostics: DiagnosticDraft[],
+  scopePath: string,
+  ownerActivation: CompositionActivationDescriptor,
+): CompositionRuntimeDescriptor | null {
   const chain = memberChain(raw)
   if (!chain || !t.isIdentifier(chain.base.callee)) {
     diagnostics.push(diagnostic('error', 'composition-runtime-shape', `Runtime "${name}" должен начинаться с filter/query/component/composition/filterView(identity).`, `runtimes.${name}`, raw))
@@ -233,13 +423,22 @@ function readRuntime(name: string, raw: t.Expression, dataNames: Set<string>, di
 
   const descriptor: CompositionRuntimeDescriptor = {
     name,
+    path: name,
+    scopePath,
     kind,
     identity,
+    activationOverride: null,
+    effectiveActivation: ownerActivation,
     props: {},
     storeTo: [],
   }
 
   for (const modifier of chain.modifiers) {
+    if (modifier.name === 'activateOn') {
+      descriptor.activationOverride = readActivation(modifier.call.arguments[0], diagnostics, `runtimes.${name}.activateOn`)
+      descriptor.effectiveActivation = descriptor.activationOverride ?? ownerActivation
+      continue
+    }
     if (modifier.name === 'fields') {
       if (kind !== 'filter-view') {
         diagnostics.push(diagnostic('error', 'composition-fields-runtime-kind', '.fields(...) в v1 поддерживается только filterView(...).', `runtimes.${name}.fields`, modifier.call))
@@ -493,6 +692,10 @@ function readHooks(
       return
     }
     if (root === 'onMount') {
+      if (runtimes.find(item => item.name === target)?.effectiveActivation.mode === 'manual') {
+        diagnostics.push(diagnostic('error', 'composition-hook-manual-target', `onMount не может запускать manual runtime "${target}". Добавьте .activateOn(startup()) или активируйте runtime через API.`, `hooks.${index}`, element))
+        return
+      }
       hooks.push({ kind: 'mount', target })
       return
     }
@@ -516,6 +719,7 @@ function readHooks(
 function readOutputs(
   node: t.ObjectExpression,
   runtimeNames: Set<string>,
+  scopeNames: Set<string>,
   diagnostics: DiagnosticDraft[],
 ): CompositionOutputDescriptor[] {
   const outputs: CompositionOutputDescriptor[] = []
@@ -537,20 +741,39 @@ function readOutputs(
       continue
     }
     let runtime = ''
+    let scope = ''
     let selected: string | undefined
     for (const modifier of chain.modifiers) {
       if (modifier.name === 'fromRuntime')
         runtime = readStringArgument(modifier.call, 0) ?? ''
+      else if (modifier.name === 'fromScope')
+        scope = readStringArgument(modifier.call, 0) ?? ''
       else if (modifier.name === 'select')
         selected = readStringArgument(modifier.call, 0) ?? undefined
       else
         diagnostics.push(diagnostic('error', 'composition-output-method', `Output method ".${modifier.name}" не поддерживается.`, `outputs.${key}`, modifier.call))
     }
+    if (runtime && scope) {
+      diagnostics.push(diagnostic('error', 'composition-output-target-conflict', `Output "${key}" не может одновременно ссылаться на runtime и scope.`, `outputs.${key}`, property.value))
+      continue
+    }
+    if (scope) {
+      if (selected) {
+        diagnostics.push(diagnostic('error', 'composition-output-scope-select', `Scope output "${key}" не поддерживает .select(...).`, `outputs.${key}`, property.value))
+        continue
+      }
+      if (!scopeNames.has(scope)) {
+        diagnostics.push(diagnostic('error', 'composition-output-scope', `Scope "${scope}" не найден.`, `outputs.${key}`, property.value))
+        continue
+      }
+      outputs.push({ key, kind: 'scope', scope })
+      continue
+    }
     if (!runtimeNames.has(runtime)) {
       diagnostics.push(diagnostic('error', 'composition-output-runtime', `Runtime "${runtime}" не найден.`, `outputs.${key}`, property.value))
       continue
     }
-    outputs.push({ key, runtime, output: selected })
+    outputs.push({ key, kind: 'runtime', runtime, output: selected })
   }
   return outputs
 }

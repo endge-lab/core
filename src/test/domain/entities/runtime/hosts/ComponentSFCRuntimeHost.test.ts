@@ -7,14 +7,49 @@ import { compileComponentSFC } from '@/model/services/compiler/component-sfc/com
 import type { ComponentSFCProgramPayload, ProgramArtifact } from '@/domain/types/program/program.types'
 import type {
   RuntimeBoundaryPatch,
+  RuntimeArtifactReader,
   RuntimeHostUpdateContext,
 } from '@/domain/types/runtime/runtime-host.types'
 import { RuntimeBoundaryUpdatePhase } from '@/model/helpers/raph-phases/runtime-boundary-update-phase'
+import { Endge } from '@/model/endge/kernel/endge'
 
 describe('ComponentSFCRuntimeHost', () => {
   afterEach(() => {
+    Endge.styles.reset()
     Raph.app.reset()
     Raph.clearPhases()
+  })
+
+  it('acquires scoped style on first instance and releases it after the last instance', () => {
+    const source = `<template><Text part="label">Hello</Text></template>
+<style lang="endgecss" scoped>
+::part(label) { color: red; }
+</style>`
+    const artifact = createSFCArtifact(compileComponentSFC(source))
+    const model = RComponentSFC.fromPlain({ id: 1, identity: 'test-sfc-table', name: 'Styled SFC', source })
+    const reader: RuntimeArtifactReader = {
+      getArtifact: <TPayload>() => artifact as unknown as ProgramArtifact<TPayload>,
+    }
+    const first = ComponentSFCRuntimeHost.createRuntime({
+      id: 'styled-1', model, meta: { runtimeScopeId: 'scope:test' }, artifactReader: reader,
+    })
+    const second = ComponentSFCRuntimeHost.createRuntime({
+      id: 'styled-2', model, meta: { runtimeScopeId: 'scope:test' }, artifactReader: reader,
+    })
+
+    expect(Endge.styles.getActivePlacements()).toHaveLength(1)
+    expect(Endge.styles.getActivePlacements()[0].referenceCount).toBe(2)
+    first.pause()
+    second.pause()
+    expect(Endge.styles.getActivePlacements()).toEqual([])
+    first.resume()
+    expect(Endge.styles.getActivePlacements()).toHaveLength(1)
+    first.destroy()
+    expect(Endge.styles.getActivePlacements()).toEqual([])
+    second.resume()
+    expect(Endge.styles.getActivePlacements()[0].referenceCount).toBe(1)
+    second.destroy()
+    expect(Endge.styles.getActivePlacements()).toEqual([])
   })
 
   it('emits table column boundary patch for Raph-backed row field update', () => {
@@ -41,8 +76,8 @@ defineProps<{
       name: 'Test SFC Table',
       source,
     })
-    const reader = {
-      getArtifact: () => artifact,
+    const reader: RuntimeArtifactReader = {
+      getArtifact: <TPayload>() => artifact as unknown as ProgramArtifact<TPayload>,
     }
     const patches: RuntimeBoundaryPatch[] = []
     const propsUpdates: RuntimeHostUpdateContext[] = []
@@ -51,7 +86,7 @@ defineProps<{
     Raph.app.reset()
     Raph.definePhases([
       RuntimeBoundaryUpdatePhase.make({
-        resolveHost: runtimeId => runtimeId === 'runtime-1' ? host : null,
+        resolveHost: runtimeId => runtimeId === 'runtime-1' ? host as any : null,
       }),
     ])
 

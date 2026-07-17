@@ -8,6 +8,8 @@ import { Raph, RaphNode } from '@endge/raph'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { RuntimeAppScope, type RuntimeAppScopeOptions } from '@/domain/entities/runtime/RuntimeAppScope'
+import { RuntimeScope } from '@/domain/entities/runtime/RuntimeScope'
+import { RuntimeScopeRegistry } from '@/domain/entities/runtime/RuntimeScopeRegistry'
 import { RuntimeHostRegistry } from '@/domain/entities/runtime/RuntimeHostRegistry'
 import type { AnyRuntimeHost } from '@/domain/types/runtime/runtime-strategy.types'
 import { RuntimeStrategyRegistry } from '@/model/services/runtime/RuntimeStrategyRegistry'
@@ -25,6 +27,7 @@ import { RuntimeNodeUpdatePhase } from '@/model/helpers/raph-phases/runtime-node
 import Config from '@/model/config'
 import { EndgeCommands } from '@/model/endge/runtime/core/endge-commands'
 import { EndgeComposition } from '@/model/endge/runtime/execution/endge-composition'
+import { EndgeProject } from '@/model/endge/runtime/execution/endge-project'
 import { EndgeDataView } from '@/model/endge/runtime/execution/endge-data-view'
 import { EndgeQuery } from '@/model/endge/runtime/execution/endge-query'
 import { EndgeComputation } from '@/model/endge/runtime/execution/endge-computation'
@@ -37,9 +40,11 @@ export class EndgeRuntime extends EndgeModule {
   public readonly query = new EndgeQuery()
   public readonly dataView = new EndgeDataView()
   public readonly composition = new EndgeComposition()
+  public readonly project = new EndgeProject()
   public readonly flowRegistry = new EndgeFlowRegistry()
   public readonly flow = new EndgeFlow(this.flowRegistry)
   public readonly commands = new EndgeCommands()
+  public readonly scopes = new RuntimeScopeRegistry()
 
   private _hosts = new RuntimeHostRegistry()
   private _strategies = new RuntimeStrategyRegistry()
@@ -119,6 +124,7 @@ export class EndgeRuntime extends EndgeModule {
     } = options
     const parent = this.resolveParentHost(parentRef)
     const appScope = this.resolveAppScope(appScopeRef, parent)
+    this.ensureLifecycleAppScope(appScope)
     const artifactReader = this._resolveArtifactReader(artifactReaderRef)
     const hostMeta: Record<string, any> = { ...(meta ?? {}) }
 
@@ -144,6 +150,7 @@ export class EndgeRuntime extends EndgeModule {
     }
     hostMeta.appScopeId = appScope.id
     hostMeta.appScopeRootPath = appScope.rootPath
+    hostMeta.runtimeScopeId = String(hostMeta.runtimeScopeId ?? parent?.meta.runtimeScopeId ?? `runtime-scope:${appScope.id}`)
     hostMeta.runtimeLocalId = address.localId
     hostMeta.runtimePath = address.runtimePath
     hostMeta.scopeRoot = scopeRoot
@@ -188,7 +195,13 @@ export class EndgeRuntime extends EndgeModule {
     }
     const scope = new RuntimeAppScope(this, options)
     this._appScopes.set(scope.id, scope)
+    this.ensureLifecycleAppScope(scope)
     return scope
+  }
+
+  /** Возвращает lifecycle scope, которому принадлежит RuntimeHost. */
+  public getRuntimeScopeByHost(runtimeId: string): RuntimeScope | null {
+    return this.scopes.getByRuntime(runtimeId)
   }
 
   /** Возвращает корневой scope обычного запуска приложения. */
@@ -283,6 +296,7 @@ export class EndgeRuntime extends EndgeModule {
     return {
       generatedAt: Date.now(),
       ...this._hosts.snapshot(),
+      scopes: this.scopes.snapshot(),
     }
   }
 
@@ -316,7 +330,7 @@ export class EndgeRuntime extends EndgeModule {
   /**
    * Корректно разрушает все зарегистрированные runtime-host.
    */
-  public override reset(): void {
+  public override async reset(): Promise<void> {
     const hostIds = this._hosts.getAll().map(host => host.id)
     for (const runtimeId of hostIds) {
       this.destroyRuntimeInternal(runtimeId, false)
@@ -328,6 +342,7 @@ export class EndgeRuntime extends EndgeModule {
     this._scopeNodes.clear()
     for (const scope of this._appScopes.values())
       scope.reset()
+    await this.scopes.reset()
     this._appNode = null
     this._inited = false
     this._unsubscribeWorkspace?.()
@@ -412,6 +427,7 @@ export class EndgeRuntime extends EndgeModule {
     }
 
     this._strategies.resolve(host.model)?.destroy?.({ host })
+    this.scopes.detachRuntime(id)
     Endge.context.destroyRuntimeStateController(id)
     host.destroy()
     if (shouldNotify) {
@@ -440,9 +456,12 @@ export class EndgeRuntime extends EndgeModule {
     }
     try {
       this._hosts.register(host)
+      this.scopes.attachRuntime(String(host.meta.runtimeScopeId ?? ''), host)
     }
     catch (error) {
       console.error('[EndgeRuntime] Failed to register runtime host', error)
+      this.scopes.detachRuntime(host.id)
+      this._hosts.removeById(host.id)
       return false
     }
     try {
@@ -458,6 +477,24 @@ export class EndgeRuntime extends EndgeModule {
       throw error
     }
     return true
+  }
+
+  /** Creates the lifecycle root lazily again after a full Endge.reset(). */
+  private ensureLifecycleAppScope(appScope: RuntimeAppScope): RuntimeScope {
+    const id = `runtime-scope:${appScope.id}`
+    const existing = this.scopes.get(id)
+    if (existing)
+      return existing
+    const scope = this.scopes.register(new RuntimeScope({
+      id,
+      path: appScope.id,
+      boundaryId: `app:${appScope.id}`,
+      hooks: {
+        destroyRuntime: runtimeId => this.destroyRuntimeTree(runtimeId),
+      },
+    }))
+    void scope.activate()
+    return scope
   }
 
   /**

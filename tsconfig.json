@@ -27,6 +27,7 @@
 
     // Локальные алиасы
     "paths": {
+      "@endge/raph": ["../@endge-raph/dist/main.d.ts"],
       "@/*": ["./src/*"]
     }
   },

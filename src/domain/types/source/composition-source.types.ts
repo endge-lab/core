@@ -1,10 +1,40 @@
 import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
 import type { ProgramMetadataMap } from '@/domain/types/program/program-metadata.types'
 import type { RuntimeHost } from '@/domain/types/runtime/runtime-host.types'
+import type { RuntimeScopeHandle } from '@/domain/types/runtime/runtime-scope.types'
+import type { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
 import type { SourceExpressionIR, SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 import type { FilterViewControlDefinition } from '@/domain/types/ui/filter-view.type'
 
 export type CompositionRuntimeKind = 'filter' | 'query' | 'component' | 'composition' | 'filter-view'
+
+export type CompositionActivationMode = 'startup' | 'manual'
+
+export interface CompositionActivationDescriptor {
+  mode: CompositionActivationMode
+}
+
+export interface CompositionResourceDescriptor {
+  name: string
+  path: string
+  scopePath: string
+  kind: 'style'
+  identity: string
+  sourceOrder: number
+}
+
+export interface CompositionScopeDescriptor {
+  name: string
+  /** Публичный path; implicit scope_default имеет path "scope_default". */
+  path: string
+  parentPath: string | null
+  activationOverride: CompositionActivationDescriptor | null
+  effectiveActivation: CompositionActivationDescriptor
+  resources: string[]
+  runtimes: string[]
+  children: string[]
+  sourceOrder: number
+}
 
 export type CompositionBindingValue
   = | { kind: 'literal', value: unknown }
@@ -36,8 +66,16 @@ export interface CompositionFilterFieldsSlice {
 
 export interface CompositionRuntimeDescriptor {
   name: string
+  /** Полный публичный path runtime внутри Composition. */
+  path: string
+  /** Internal path owning RuntimeScope. */
+  scopePath: string
   kind: CompositionRuntimeKind
   identity: string
+  /** Явный override в месте вызова runtime. */
+  activationOverride: CompositionActivationDescriptor | null
+  /** Compiler-linked activation, которую runtime применяет без интерпретации source. */
+  effectiveActivation: CompositionActivationDescriptor
   fields?: string[]
   controls?: Record<string, FilterViewControlDefinition>
   componentIdentity?: string
@@ -56,14 +94,28 @@ export type CompositionHook
   = | { kind: 'mount', target: string }
     | { kind: 'change', runtime: string, output: string, target: string, debounceMs: number }
 
-export interface CompositionOutputDescriptor {
+export interface CompositionRuntimeOutputDescriptor {
   key: string
+  kind: 'runtime'
   runtime: string
   output?: string
 }
 
+export interface CompositionScopeOutputDescriptor {
+  key: string
+  kind: 'scope'
+  scope: string
+}
+
+export type CompositionOutputDescriptor
+  = | CompositionRuntimeOutputDescriptor
+    | CompositionScopeOutputDescriptor
+
 export interface CompositionSourceDocument {
+  activation: CompositionActivationDescriptor | null
   data: CompositionDataDescriptor[]
+  resources: CompositionResourceDescriptor[]
+  scopes: CompositionScopeDescriptor[]
   runtimes: CompositionRuntimeDescriptor[]
   hooks: CompositionHook[]
   outputs: CompositionOutputDescriptor[]
@@ -125,12 +177,38 @@ export interface CompositionSourceCompileResult {
 }
 
 export interface CompositionRuntimeOutputHandle {
-  runtime: RuntimeHost<any, any>
+  kind: 'runtime'
+  runtime: RuntimeHost<any, any> | null
   output?: string
 }
+
+export interface CompositionRuntimeActivationHandle {
+  readonly path: string
+  readonly state: 'inactive' | 'active' | 'paused' | 'disposed'
+  readonly runtime: RuntimeHost<any, any> | null
+  activate: () => Promise<RuntimeHost<any, any>>
+  pause: () => Promise<void>
+  resume: () => Promise<void>
+  deactivate: () => Promise<void>
+  dispose: () => Promise<void>
+  getOutput: (name: string) => unknown
+}
+
+export type CompositionPublicOutputHandle
+  = | CompositionRuntimeOutputHandle
+    | CompositionRuntimeActivationHandle
+    | RuntimeScopeHandle
 
 export interface CompositionMountOptions {
   id?: string
   /** Явные runtime-id Store instances для data aliases. */
   dataRuntimes?: Record<string, string>
+}
+
+export interface CompositionSession {
+  id: string
+  host: CompositionRuntimeHost
+  outputs: Readonly<Record<string, CompositionPublicOutputHandle>>
+  output: <T = unknown>(name: string) => T | undefined
+  unmount: () => Promise<void>
 }

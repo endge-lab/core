@@ -33,7 +33,13 @@ export class RuntimeNodeUpdatePhase {
           return
         const resolveHost = options.resolveHost
           ?? ((id: string) => Endge.runtime.getRuntimeById(id))
-        resolveHost(runtimeId)?.update({
+        const host = resolveHost(runtimeId)
+        const scope = Endge.runtime.getRuntimeScopeByHost(runtimeId)
+        if (scope && !scope.acceptsUpdates()) {
+          scope.markStale()
+          return
+        }
+        host?.update({
           node: ctx.node,
           events: ctx.events ?? [],
           boundaries: [],

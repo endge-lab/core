@@ -157,6 +157,8 @@ export interface EndgeStyleMatchNode {
   component?: string
   identity?: string
   ownerScopeId?: string
+  /** Runtime lifecycle ancestry; used by renderer-neutral placement isolation. */
+  runtimeScopeIds?: ReadonlySet<string>
   parent?: EndgeStyleMatchNode
   previousSiblings?: readonly EndgeStyleMatchNode[]
   index: number
@@ -167,4 +169,38 @@ export interface EndgeStyleResolvedDeclaration extends EndgeStyleDeclaration {
   ruleId: string
   specificity: EndgeStyleSpecificity
   sourceOrder: number
+}
+
+export interface EndgeStylePlacement {
+  id: string
+  artifactIdentity: string
+  artifact: EndgeStyleSheetArtifact
+  ownerScopeIds: readonly string[]
+  boundaryId: string
+  orderKey: string
+  state: 'active' | 'suspended'
+  referenceCount: number
+}
+
+export interface AcquireEndgeStyleOptions {
+  artifactIdentity?: string
+  artifact?: EndgeStyleSheetArtifact
+  ownerScopeId: string
+  boundaryId: string
+  orderKey?: string
+}
+
+export interface EndgeStyleLease {
+  readonly id: string
+  readonly kind: 'style'
+  readonly artifactIdentity: string
+  readonly ownerScopeId: string
+  readonly boundaryId: string
+  readonly orderKey: string
+  readonly suspended: boolean
+  suspend: () => void
+  resume: () => void
+  release: () => void
+  pause: () => void
+  dispose: () => void
 }

@@ -248,6 +248,22 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     }
   }
 
+  public override pause(): void {
+    this._runSequence += 1
+    this._abortController?.abort()
+    super.pause()
+  }
+
+  public override stop(): void {
+    this._runSequence += 1
+    this._abortController?.abort()
+    super.stop()
+  }
+
+  public override async reconcile(): Promise<void> {
+    await this.run()
+  }
+
   public override destroy(): void {
     this._abortController?.abort()
     for (const dispose of this._outputWatchers)

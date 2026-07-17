@@ -1,5 +1,9 @@
 export const COMPOSITION_DEFAULT_SOURCE = `defineComposition({
+  activateOn: manual(),
+
   data: {},
+
+  resources: {},
 
   runtimes: {
     query: query('query-identity')

@@ -7,9 +7,14 @@ import type { PhaseEvent, PhaseName, RaphFrameContext, RaphNode } from '@endge/r
 
 export type RuntimeHostStatus
   = 'created'
+    | 'mounted'
+    | 'running'
     | 'active'
-    | 'idle'
+    | 'pausing'
+    | 'paused'
+    | 'stopping'
     | 'stopped'
+    | 'unmounted'
     | 'destroyed'
     | 'error'
 
@@ -190,8 +195,15 @@ export interface RuntimeHostSnapshot {
 }
 
 export interface RuntimeHostLifecycle {
-  /** Поднять host и перевести в рабочее состояние. */
+  /** Compatibility entrypoint: mount + start. */
   create: () => Promise<void> | void
+  mount: () => Promise<void> | void
+  start: () => Promise<void> | void
+  pause: () => Promise<void> | void
+  resume: () => Promise<void> | void
+  reconcile: () => Promise<void> | void
+  stop: () => Promise<void> | void
+  unmount: () => Promise<void> | void
 
   /** Корректно остановить host и освободить ресурсы. */
   destroy: () => Promise<void> | void

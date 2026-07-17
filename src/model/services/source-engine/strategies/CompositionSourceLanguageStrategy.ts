@@ -18,13 +18,13 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
     alias: 'Endge Composition Source',
     extension: '.endge-composition.ts',
     keywords: [
-      'component', 'composition', 'control', 'data', 'defineComposition', 'filter', 'filterView', 'fromData', 'fromFilter', 'fromOutput', 'fromStore', 'onChange',
-      'onMount', 'output', 'query', 'metadata', ...VALUE_EXPRESSION_FUNCTION_NAMES,
+      'component', 'composition', 'control', 'data', 'defineComposition', 'filter', 'filterView', 'fromData', 'fromFilter', 'fromOutput', 'fromStore', 'manual', 'onChange',
+      'onMount', 'output', 'query', 'metadata', 'resources', 'scope', 'startup', 'style', ...VALUE_EXPRESSION_FUNCTION_NAMES,
     ],
     functions: [
-      'component', 'controls', 'debounce', 'fields', 'fromRuntime', 'persist', 'run', 'select', 'store', 'storeTo', 'vocab', 'withProps', ...VALUE_EXPRESSION_METHOD_NAMES,
+      'activateOn', 'component', 'controls', 'debounce', 'fields', 'fromRuntime', 'fromScope', 'persist', 'run', 'select', 'store', 'storeTo', 'vocab', 'withProps', ...VALUE_EXPRESSION_METHOD_NAMES,
     ],
-    properties: ['data', 'hooks', 'key', 'metadata', 'outputs', 'runtimes'],
+    properties: ['activateOn', 'data', 'hooks', 'key', 'metadata', 'outputs', 'resources', 'runtimes'],
   })
 
   public supports(sourceKind: SourceKind | string): boolean {
@@ -59,6 +59,10 @@ const COMPOSITION_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'query', kind: 'function', insertText: `query('identity').withProps({})`, detail: 'Query runtime' },
   { label: 'component', kind: 'function', insertText: `component('identity').withProps({})`, detail: 'Component runtime' },
   { label: 'composition', kind: 'function', insertText: `composition('identity')`, detail: 'Nested Composition runtime' },
+  { label: 'scope', kind: 'function', insertText: `scope({\n  resources: {},\n  runtimes: {},\n}).activateOn(manual())`, detail: 'Runtime lifecycle scope' },
+  { label: 'style', kind: 'function', insertText: `style('style-identity')`, detail: 'Owned EndgeCSS resource' },
+  { label: 'activateOn', kind: 'function', insertText: `.activateOn(startup())`, detail: 'Instance activation override' },
+  { label: 'fromScope', kind: 'function', insertText: `output().fromScope('scope.path')`, detail: 'Public RuntimeScope handle' },
   { label: 'fromOutput', kind: 'function', insertText: `fromOutput('runtime', 'output')`, detail: 'Runtime output binding' },
   { label: 'fromFilter', kind: 'function', insertText: `fromFilter('filter').fields([])`, detail: 'Filter fields runtime slice binding' },
   { label: 'fromStore', kind: 'function', insertText: `fromStore('path')`, detail: 'Raph store binding' },

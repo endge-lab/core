@@ -1,12 +1,22 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 
 import { RStyle } from '@/domain/entities/reflect/RStyle'
 import { Endge } from '@/model/endge/kernel/endge'
 import { EndgeUI } from '@/model/endge/ui/endge-ui'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
+import { RProject } from '@/domain/entities/reflect/RProject'
+import { REnvironment } from '@/domain/entities/reflect/REnvironment'
+import { RTenant } from '@/domain/entities/reflect/RTenant'
 
 describe('EndgeCSS program lifecycle', () => {
+  afterEach(() => {
+    Endge.configuration.reset()
+    Endge.program.clear()
+    Endge.domain.reset()
+  })
+
   it('registers source strategies and provides a typed style artifact', () => {
+    prepareCompilerContext()
     const source = '@theme night { --surface: #111; }\nText { color: white; }'
     expect(Endge.source.resolveStrategy('style')?.id).toBe('source:style')
     expect(Endge.source.resolveLanguageStrategy('style')?.syntax.extensions).toContain('.endgecss')
@@ -33,3 +43,21 @@ describe('EndgeCSS program lifecycle', () => {
     ui.reset()
   })
 })
+
+function prepareCompilerContext(): void {
+  Endge.workspace.apply(TEST_ENDGE_WORKSPACE)
+  Endge.domain.addProject(RProject.fromPlain({ id: 1, identity: 'project', name: 'Project' }))
+  Endge.domain.addEnvironment(REnvironment.fromPlain({ id: 2, identity: 'environment', name: 'Environment' }))
+  const tenant = new RTenant()
+  tenant.id = 3
+  tenant.identity = 'tenant'
+  tenant.name = 'Tenant'
+  tenant.code = 'tenant'
+  Endge.domain.addTenant(tenant)
+  Endge.configuration.build({
+    dataProvider: 'plain',
+    scope: {},
+    vars: {},
+    context: { projectIdentity: 'project', environmentIdentity: 'environment', tenantIdentity: 'tenant' },
+  })
+}

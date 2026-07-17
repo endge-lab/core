@@ -41,6 +41,7 @@ import { compileComputation } from '@/model/services/compiler/computation/comput
 import { parseComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-parse'
 import { analyzeComponentSFCScript } from '@/model/services/compiler/component-sfc/component-sfc-script'
 import { compileEndgeCSS } from '@/model/services/style'
+import { resolveCompositionActivation } from '@/model/services/source-engine/composition-activation'
 
 /**
  * Компилятор persisted domain model в compiled program artifacts.
@@ -939,6 +940,29 @@ export class EndgeCompiler extends EndgeModule {
     const dependencies: ProgramArtifact['dependencies'] = []
     const storeArtifacts = new Map<string, StoreSourceArtifact>()
 
+    if (owner.kind === 'project' && !payload.activation) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'composition-project-activation-required',
+        message: 'Project Composition должна явно объявлять activateOn: startup() или manual().',
+        sourcePath: 'activateOn',
+      })
+    }
+
+    for (const resource of payload.resources) {
+      const style = Endge.domain.getStyle(resource.identity)
+      const artifact = Endge.program.getStyleArtifact(resource.identity)
+      if (!style) {
+        diagnostics.push({ severity: 'error', code: 'composition-style-missing', message: `Style "${resource.identity}" не найден.`, sourcePath: `resources.${resource.path}` })
+        continue
+      }
+      if (!artifact || artifact.status === 'error') {
+        diagnostics.push({ severity: 'error', code: 'composition-style-invalid', message: `Style "${resource.identity}" не собран или содержит compile errors.`, sourcePath: `resources.${resource.path}` })
+        continue
+      }
+      dependencies.push({ entityType: 'style', id: style.id, identity: style.identity, role: 'composition-resource' })
+    }
+
     for (const data of payload.data) {
       if (data.kind === 'store') {
         const store = Endge.domain.getStore(data.identity)
@@ -1107,6 +1131,11 @@ export class EndgeCompiler extends EndgeModule {
           diagnostics.push({ severity: 'error', code: 'composition-composition-invalid', message: `Composition "${runtime.identity}" содержит compile errors.`, sourcePath: `runtimes.${runtime.name}` })
           continue
         }
+        runtime.effectiveActivation = resolveCompositionActivation(
+          runtime.activationOverride,
+          artifact.payload.activation,
+          payload.scopes.find(scope => scope.path === runtime.scopePath)?.effectiveActivation,
+        )
         const outputNames = new Set(artifact.payload.outputs.map(output => output.key))
         validateStoreTo(runtime, outputNames, 'Composition')
       }
@@ -1129,7 +1158,7 @@ export class EndgeCompiler extends EndgeModule {
     }
 
     for (const output of payload.outputs) {
-      if (!output.output)
+      if (output.kind !== 'runtime' || !output.output)
         continue
       const runtime = payload.runtimes.find(item => item.name === output.runtime)
       const outputExists = runtimeHasOutput(runtime, output.output)
@@ -1509,7 +1538,20 @@ export class EndgeCompiler extends EndgeModule {
     return {
       type: 'composition',
       sourceVersion,
+      activation: null,
       data: [],
+      resources: [],
+      scopes: [{
+        name: 'scope_default',
+        path: 'scope_default',
+        parentPath: null,
+        activationOverride: null,
+        effectiveActivation: { mode: 'startup' },
+        resources: [],
+        runtimes: [],
+        children: [],
+        sourceOrder: 0,
+      }],
       runtimes: [],
       hooks: [],
       outputs: [],

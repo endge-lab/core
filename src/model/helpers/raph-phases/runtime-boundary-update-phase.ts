@@ -57,6 +57,11 @@ export class RuntimeBoundaryUpdatePhase {
             continue
 
           const host = resolveHost(runtimeId)
+          const scope = Endge.runtime.getRuntimeScopeByHost(runtimeId)
+          if (scope && !scope.acceptsUpdates()) {
+            scope.markStale()
+            continue
+          }
           host?.update({
             node: update.node,
             events: update.events,

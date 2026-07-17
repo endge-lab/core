@@ -174,7 +174,50 @@ export abstract class RuntimeHostBase<
    * LIFECYCLE
    */
   public create(): void {
-    this.setStatus('active')
+    this.mount()
+    this.start()
+  }
+
+  public mount(): void {
+    if (this.status === 'created' || this.status === 'unmounted' || this.status === 'stopped')
+      this.setStatus('mounted')
+  }
+
+  public start(): void {
+    if (this.status === 'mounted')
+      this.setStatus('active')
+  }
+
+  public pause(): void {
+    if (this.status !== 'active' && this.status !== 'running')
+      return
+    this.setStatus('pausing')
+    for (const timer of this._updateTimers.values())
+      clearTimeout(timer)
+    this._updateTimers.clear()
+    this.setStatus('paused')
+  }
+
+  public resume(): void {
+    if (this.status === 'paused')
+      this.setStatus('active')
+  }
+
+  public reconcile(): void {}
+
+  public stop(): void {
+    if (this.status === 'destroyed' || this.status === 'unmounted' || this.status === 'stopped')
+      return
+    this.setStatus('stopping')
+    for (const timer of this._updateTimers.values())
+      clearTimeout(timer)
+    this._updateTimers.clear()
+    this.setStatus('stopped')
+  }
+
+  public unmount(): void {
+    if (this.status !== 'destroyed')
+      this.setStatus('unmounted')
   }
 
   /**
@@ -210,6 +253,8 @@ export abstract class RuntimeHostBase<
    * решает, как обновлять свои данные, запросы или render-boundary.
    */
   public update(ctx: RuntimeHostUpdateContext): void {
+    if (this.status === 'paused' || this.status === 'stopping' || this.status === 'stopped' || this.status === 'unmounted' || this.status === 'destroyed')
+      return
     const immediate: RuntimeHostResolvedUpdate[] = []
     let matchedBinding = false
     for (const binding of this._updateBindings.values()) {
