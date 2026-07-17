@@ -16,6 +16,7 @@ import { QueryType } from '@/domain/types/document/document.types'
 import { compileSourceCallback, compileSourceExpression } from '@/model/services/source-engine/compilers/source-expression-compile'
 import { compileSourceField } from '@/model/services/source-engine/compilers/source-field-compile'
 import { compileProgramMetadataProperty } from '@/model/services/source-engine/compilers/source-metadata-compile'
+import { readSourceModelReference } from '@/model/services/source-engine/compilers/source-model-reference-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
@@ -484,34 +485,32 @@ function readDataViewRef(
     return null
   }
 
-  const expression = unwrapExpression(node)
-  if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'dataView' })) {
-    const identity = expression.arguments[0]
-    if (t.isStringLiteral(identity))
-      return { kind: 'external', identity: identity.value }
-  }
+  const reference = readSourceModelReference(node, source, {
+    referenceCall: 'dataView',
+    defineCall: 'defineDataView',
+  })
+  if (reference?.kind === 'external')
+    return reference
 
-  if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'defineDataView' })) {
-    if (isManualDataViewDefinition(expression.arguments[0])) {
+  if (reference?.kind === 'inline') {
+    if (isManualDataViewDefinition(reference.definition.arguments[0])) {
       diagnostics.push(createDiagnostic(
         'error',
         'query-source-local-dataview-manual-unsupported',
         'Локальные DataView внутри query в v1 поддерживают только mode: pipeline.',
         sourcePath,
-        expression,
+        reference.definition,
       ))
     }
-
-    if (typeof expression.start === 'number' && typeof expression.end === 'number')
-      return { kind: 'inline', source: source.slice(expression.start, expression.end) }
+    return { kind: 'inline', source: reference.source }
   }
 
   diagnostics.push(createDiagnostic(
     'error',
     'query-source-output-dataview-unsupported',
-    '.dataView(...) поддерживает dataView("identity") или defineDataView({...}).',
+    '.dataView(...) поддерживает "identity", dataView("identity") или defineDataView({...}).',
     sourcePath,
-    expression,
+    unwrapExpression(node),
   ))
   return null
 }

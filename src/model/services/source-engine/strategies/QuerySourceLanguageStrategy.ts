@@ -20,12 +20,12 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
     alias: 'Endge Query Source',
     extension: '.endge-query.ts',
     keywords: [
-      'auto', 'body', 'collectionByKey', 'compact', 'dataView', 'defineDataView', 'defineFilter', 'defineProps',
+      'auto', 'body', 'collectionByKey', 'compact', 'converter', 'dataView', 'defineDataView', 'defineFilter', 'defineProps',
       'defineQuery', 'endgeVar', 'env', 'field', 'filter', 'merge', 'output', 'prop',
       'full', 'incremental', 'response', ...VALUE_EXPRESSION_FUNCTION_NAMES,
     ],
     functions: [
-      'array', 'as', 'auto', 'by', 'collectionByKey', 'dataView', 'default', 'from', 'full', 'map', 'optional',
+      'array', 'as', 'auto', 'by', 'collectionByKey', 'converter', 'dataView', 'default', 'from', 'full', 'map', 'optional',
       'options', 'vocab', ...VALUE_EXPRESSION_METHOD_NAMES,
     ],
     properties: [
@@ -65,8 +65,13 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
   public resolveReference(context: SourceLanguageContext) {
     return resolveSourceDocumentReference(context, {
       functions: {
+        converter: 'converter',
         dataView: 'data-view',
         filter: 'filter',
+      },
+      methods: {
+        convert: 'converter',
+        dataView: 'data-view',
       },
       properties: [{ property: 'profile', parentProperty: 'auth', target: 'auth-profile' }],
     })
@@ -158,7 +163,7 @@ const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
   {
     label: 'dataView',
     kind: 'function',
-    insertText: `dataView('data-view-identity')`,
+    insertText: `.dataView('data-view-identity')`,
     detail: 'Ссылка на доменный DataView',
   },
   {

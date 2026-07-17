@@ -20,11 +20,11 @@ export class DataViewSourceLanguageStrategy implements SourceLanguageStrategy {
     alias: 'Endge DataView Source',
     extension: '.endge-data-view.ts',
     keywords: [
-      'auto', 'collectionByKey', 'convert', 'dataView', 'defineDataView', 'field',
+      'auto', 'collectionByKey', 'convert', 'converter', 'dataView', 'defineDataView', 'field',
       'from', 'full', 'incremental', 'join', 'map', 'output', 'path', 'pick', 'spread',
       'template', 'transform', ...VALUE_EXPRESSION_FUNCTION_NAMES,
     ],
-    functions: ['as', 'auto', 'by', 'collectionByKey', 'convert', 'dataView', 'find', 'from', 'full', 'join', 'map', 'pick', ...VALUE_EXPRESSION_METHOD_NAMES],
+    functions: ['as', 'auto', 'by', 'collectionByKey', 'convert', 'converter', 'dataView', 'find', 'from', 'full', 'join', 'map', 'pick', ...VALUE_EXPRESSION_METHOD_NAMES],
     properties: ['incremental', 'input', 'left', 'manual', 'metadata', 'mode', 'output', 'pipeline', 'right', 'steps', 'tools'],
   })
 
@@ -58,10 +58,12 @@ export class DataViewSourceLanguageStrategy implements SourceLanguageStrategy {
   public resolveReference(context: SourceLanguageContext) {
     return resolveSourceDocumentReference(context, {
       functions: {
+        converter: 'converter',
         dataView: 'data-view',
       },
       methods: {
         convert: 'converter',
+        dataView: 'data-view',
       },
     })
   }
@@ -116,7 +118,7 @@ const DATA_VIEW_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'incremental.full', kind: 'property', insertText: 'incremental: full(),', detail: 'Всегда полный пересчет' },
   { label: 'incremental.collectionByKey', kind: 'property', insertText: `incremental: collectionByKey('id'),`, detail: 'Явный row-local incremental contract' },
   { label: 'from', kind: 'function', insertText: `from('items').as('item')`, detail: 'Берет input array' },
-  { label: 'from.dataView', kind: 'function', insertText: `from('items').dataView(dataView('normalize')).as('item')`, detail: 'Применяет DataView перед map' },
+  { label: 'from.dataView', kind: 'function', insertText: `from('items').dataView('normalize').as('item')`, detail: 'Применяет DataView перед map' },
   { label: 'dataView', kind: 'function', insertText: `dataView('data-view-identity')`, detail: 'Ссылка на доменный DataView' },
   { label: 'join', kind: 'function', insertText: `join('attrs').by({ left: 'item.id', right: 'itemId', as: 'attrs' })`, detail: 'Связка по ключам' },
   { label: 'map', kind: 'function', insertText: `map({\n  id: path('item.id'),\n})`, detail: 'Формирует output row' },

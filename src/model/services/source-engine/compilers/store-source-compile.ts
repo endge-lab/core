@@ -6,6 +6,7 @@ import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
 
 import { diagnostic, propertyName, readStringArgument, unwrapExpression } from '@/model/services/source-engine/compilers/source-expression-compile'
+import { readSourceModelReference } from '@/model/services/source-engine/compilers/source-model-reference-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
@@ -191,16 +192,16 @@ function readDataViewRef(
     diagnostics.push(diagnostic('error', 'store-dataview-missing', '.dataView(...) требует DataView.', sourcePath))
     return null
   }
-  const expression = unwrapExpression(raw)
-  if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'dataView' })) {
-    const identity = readStringArgument(expression, 0)
-    if (identity)
-      return { kind: 'external', identity }
-  }
-  if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'defineDataView' }) && expression.start != null && expression.end != null)
-    return { kind: 'inline', source: source.slice(expression.start, expression.end) }
+  const reference = readSourceModelReference(raw, source, {
+    referenceCall: 'dataView',
+    defineCall: 'defineDataView',
+  })
+  if (reference?.kind === 'external')
+    return reference
+  if (reference?.kind === 'inline')
+    return { kind: 'inline', source: reference.source }
 
-  diagnostics.push(diagnostic('error', 'store-dataview-shape', '.dataView(...) поддерживает dataView(identity) или defineDataView({...}).', sourcePath, expression))
+  diagnostics.push(diagnostic('error', 'store-dataview-shape', '.dataView(...) поддерживает identity, dataView(identity) или defineDataView({...}).', sourcePath, unwrapExpression(raw)))
   return null
 }
 

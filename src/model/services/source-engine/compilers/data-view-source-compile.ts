@@ -17,6 +17,7 @@ import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
 import { compileProgramMetadataProperty } from '@/model/services/source-engine/compilers/source-metadata-compile'
 import { compileSourceExpression } from '@/model/services/source-engine/compilers/source-expression-compile'
+import { readSourceModelIdentity, readSourceModelReference } from '@/model/services/source-engine/compilers/source-model-reference-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
@@ -402,15 +403,15 @@ function readDataViewRef(
     return null
   }
 
-  const expression = unwrapExpression(node)
-  if (t.isCallExpression(expression) && isIdentifierCallee(expression, 'dataView')) {
-    const identity = expression.arguments[0]
-    if (identity && t.isStringLiteral(identity))
-      return { kind: 'external', identity: identity.value }
-  }
+  const reference = readSourceModelReference(node, source, {
+    referenceCall: 'dataView',
+    defineCall: 'defineDataView',
+  })
+  if (reference?.kind === 'external')
+    return reference
 
-  if (t.isCallExpression(expression) && isIdentifierCallee(expression, 'defineDataView')) {
-    if (isManualDataViewDefinition(expression.arguments[0])) {
+  if (reference?.kind === 'inline') {
+    if (isManualDataViewDefinition(reference.definition.arguments[0])) {
       diagnostics.push(createDiagnostic(
         'error',
         'data-view-source-local-dataview-manual-unsupported',
@@ -419,14 +420,13 @@ function readDataViewRef(
       ))
     }
 
-    if (typeof expression.start === 'number' && typeof expression.end === 'number')
-      return { kind: 'inline', source: source.slice(expression.start, expression.end) }
+    return { kind: 'inline', source: reference.source }
   }
 
   diagnostics.push(createDiagnostic(
     'error',
     'data-view-source-dataview-unsupported',
-    'from(...).dataView(...) поддерживает dataView("identity") или defineDataView({...}).',
+    'from(...).dataView(...) поддерживает "identity", dataView("identity") или defineDataView({...}).',
     'steps',
   ))
   return null
@@ -551,7 +551,7 @@ function readPathExpression(node: t.Expression): DataViewExpression | null {
     else if (opName === 'convert') {
       operations.unshift({
         type: 'convert',
-        converter: readStringArgument(current, 0) ?? '',
+        converter: readSourceModelIdentity(current.arguments[0], 'converter') ?? '',
         options: readObjectArgument(current, 1),
       })
     }

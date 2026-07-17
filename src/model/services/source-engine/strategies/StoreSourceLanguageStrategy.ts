@@ -12,8 +12,8 @@ export class StoreSourceLanguageStrategy implements SourceLanguageStrategy {
   public readonly syntax = createTypeScriptLikeSourceSyntax({
     alias: 'Endge Store Source',
     extension: '.endge-store.ts',
-    keywords: ['dataView', 'defineDataView', 'defineStore', 'derived', 'mock', 'select', 'value', ...VALUE_EXPRESSION_FUNCTION_NAMES],
-    functions: ['dataView', 'derived', 'from', 'mock', 'select', 'value', ...VALUE_EXPRESSION_METHOD_NAMES],
+    keywords: ['converter', 'dataView', 'defineDataView', 'defineStore', 'derived', 'mock', 'select', 'value', ...VALUE_EXPRESSION_FUNCTION_NAMES],
+    functions: ['converter', 'dataView', 'derived', 'from', 'mock', 'select', 'value', ...VALUE_EXPRESSION_METHOD_NAMES],
     properties: ['data'],
   })
 
@@ -53,8 +53,13 @@ export class StoreSourceLanguageStrategy implements SourceLanguageStrategy {
   public resolveReference(context: SourceLanguageContext) {
     return resolveSourceDocumentReference(context, {
       functions: {
+        converter: 'converter',
         dataView: 'data-view',
         mock: 'mock',
+      },
+      methods: {
+        convert: 'converter',
+        dataView: 'data-view',
       },
     })
   }
