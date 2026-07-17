@@ -16,6 +16,11 @@ describe('EndgeWorkspace', () => {
       ],
       defaultLocale: 'kk',
       fallbackLocale: 'en',
+      themes: [
+        { identity: 'light', displayName: 'Light' },
+        { identity: 'dark', displayName: 'Dark' },
+      ],
+      defaultTheme: 'light',
       sfcAdapterIds: ['native-vue'],
       defaultSfcAdapterId: 'native-vue',
     })
@@ -31,6 +36,11 @@ describe('EndgeWorkspace', () => {
       ],
       defaultLocale: 'kk',
       fallbackLocale: 'en',
+      themes: [
+        { identity: 'light', displayName: 'Light' },
+        { identity: 'dark', displayName: 'Dark' },
+      ],
+      defaultTheme: 'light',
       defaultAuthProfileIdentity: null,
       sfcAdapterIds: ['native-vue'],
       defaultSfcAdapterId: 'native-vue',
@@ -44,6 +54,8 @@ describe('EndgeWorkspace', () => {
       locales: [{ code: 'en', displayName: 'English', shortLabel: 'EN' }],
       defaultLocale: 'en',
       fallbackLocale: 'en',
+      themes: [{ identity: 'light', displayName: 'Light' }],
+      defaultTheme: 'light',
       sfcAdapterIds: [' shadcn-vue ', 'customer:aodb', 'customer:aodb', ''],
       defaultSfcAdapterId: 'customer:aodb',
     })
@@ -59,6 +71,8 @@ describe('EndgeWorkspace', () => {
       locales: [{ code: 'en', displayName: 'English', shortLabel: 'EN' }],
       defaultLocale: 'en',
       fallbackLocale: 'en',
+      themes: [{ identity: 'light', displayName: 'Light' }],
+      defaultTheme: 'light',
       sfcAdapterIds: ['customer:aodb'],
       defaultSfcAdapterId: 'missing',
     })).toThrow('defaultSfcAdapterId')
@@ -74,6 +88,11 @@ describe('EndgeWorkspace', () => {
       },
       defaultLocale: 'kk',
       fallbackLocale: 'en',
+      themes: {
+        light: { displayName: 'Light' },
+        dark: { displayName: 'Dark' },
+      },
+      defaultTheme: 'dark',
       sfcAdapterIds: ['native-vue'],
       defaultSfcAdapterId: 'native-vue',
     })
@@ -84,6 +103,22 @@ describe('EndgeWorkspace', () => {
     expect(workspace.supportsLocale('kk')).toBe(true)
     expect(workspace.normalizeLocale('missing')).toBe('kk')
     expect(workspace.getLocaleLabel('kk', 'displayName')).toBe('Қазақша')
+    expect(workspace.themes.map(theme => theme.identity)).toEqual(['light', 'dark'])
+    expect(workspace.normalizeTheme('missing')).toBe('dark')
+  })
+
+  it('rejects a default theme outside the workspace catalog', () => {
+    expect(() => normalizeEndgeWorkspaceDefinition({
+      identity: 'workspace-a',
+      displayName: 'Workspace A',
+      locales: [{ code: 'en', displayName: 'English', shortLabel: 'EN' }],
+      defaultLocale: 'en',
+      fallbackLocale: 'en',
+      themes: [{ identity: 'light', displayName: 'Light' }],
+      defaultTheme: 'dark',
+      sfcAdapterIds: ['native-vue'],
+      defaultSfcAdapterId: 'native-vue',
+    })).toThrow('defaultTheme')
   })
 
   it('rejects incomplete Payload workspace data', () => {

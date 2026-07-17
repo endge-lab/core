@@ -4,6 +4,7 @@ import type {
   EndgeWorkspaceLocale,
   EndgeWorkspaceLocaleLabelMode,
   EndgeWorkspaceSSEConfig,
+  EndgeWorkspaceTheme,
   EndgeWorkspaceVar,
 } from '@/domain/types/document/workspace.types'
 
@@ -64,6 +65,23 @@ export class EndgeWorkspace extends EndgeModule {
     return this.locales.find(item => item.code === locale)?.[mode] ?? locale
   }
 
+  /** Проверяет, поддерживает ли workspace указанную тему. */
+  supportsTheme(theme: string | null | undefined): boolean {
+    const identity = String(theme ?? '').trim()
+    return this.themes.some(item => item.identity === identity)
+  }
+
+  /** Нормализует тему по правилам активного workspace. */
+  normalizeTheme(theme: string | null | undefined): string {
+    const identity = String(theme ?? '').trim()
+    return this.supportsTheme(identity) ? identity : this.defaultTheme
+  }
+
+  /** Возвращает пользовательское имя темы. */
+  getThemeLabel(theme: string): string {
+    return this.themes.find(item => item.identity === theme)?.displayName ?? theme
+  }
+
   /** Применяет и публикует новую workspace-конфигурацию. */
   public apply(input: unknown): void {
     const next = normalizeEndgeWorkspaceDefinition(input)
@@ -71,6 +89,7 @@ export class EndgeWorkspace extends EndgeModule {
     setActiveEndgeWorkspace(next)
     Endge.context.setCurrentWorkspace(next.identity)
     Endge.context.reconcileCurrentLocaleWithWorkspace()
+    Endge.context.reconcileCurrentThemeWithWorkspace()
     this.notify()
   }
 
@@ -128,6 +147,16 @@ export class EndgeWorkspace extends EndgeModule {
   /** Возвращает fallback locale. */
   get fallbackLocale(): string {
     return this._requireCurrent().fallbackLocale
+  }
+
+  /** Возвращает доступные workspace themes. */
+  get themes(): EndgeWorkspaceTheme[] {
+    return this._requireCurrent().themes
+  }
+
+  /** Возвращает тему по умолчанию. */
+  get defaultTheme(): string {
+    return this._requireCurrent().defaultTheme
   }
 
   /** Возвращает identity auth profile по умолчанию. */

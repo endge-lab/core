@@ -24,6 +24,8 @@ describe('EndgeWorkspace', () => {
     expect(workspace.locales.map(locale => locale.code)).toEqual(['en', 'ru'])
     expect(workspace.defaultLocale).toBe('ru')
     expect(workspace.fallbackLocale).toBe('ru')
+    expect(workspace.themes.map(theme => theme.identity)).toEqual(['light', 'dark'])
+    expect(workspace.defaultTheme).toBe('light')
     expect(workspace.sfcAdapterIds).toEqual(['native-vue', 'shadcn-vue'])
     expect(workspace.defaultSfcAdapterId).toBe('shadcn-vue')
   })
@@ -45,6 +47,15 @@ describe('EndgeWorkspace', () => {
     expect(workspace.getLocaleLabel('ru', 'displayName')).toBe('Русский')
     expect(workspace.getLocaleLabel('en', 'shortLabel')).toBe('EN')
     expect(workspace.getLocaleLabel('kk', 'shortLabel')).toBe('kk')
+  })
+
+  it('normalizes themes and returns their labels', () => {
+    const workspace = Endge.workspace
+    workspace.apply(TEST_ENDGE_WORKSPACE)
+
+    expect(workspace.supportsTheme('dark')).toBe(true)
+    expect(workspace.normalizeTheme('missing')).toBe('light')
+    expect(workspace.getThemeLabel('dark')).toBe('Тёмная')
   })
 
   it('fails before a Payload workspace is applied', () => {

@@ -8,6 +8,8 @@ export type WorkspacePayloadData = {
   locales: unknown
   defaultLocale?: string | null
   fallbackLocale?: string | null
+  themes: unknown
+  defaultTheme?: string | null
   defaultAuthProfileIdentity?: string | null
   sfcAdapterIds?: string[]
   defaultSfcAdapterId?: string | null

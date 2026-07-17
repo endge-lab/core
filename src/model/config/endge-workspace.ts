@@ -21,3 +21,9 @@ export function normalizeWorkspaceLocale(locale: string | null | undefined): str
   const code = String(locale ?? '').trim()
   return workspace.locales.some(item => item.code === code) ? code : workspace.defaultLocale
 }
+
+export function normalizeWorkspaceTheme(theme: string | null | undefined): string {
+  const workspace = getActiveEndgeWorkspace()
+  const identity = String(theme ?? '').trim()
+  return workspace.themes.some(item => item.identity === identity) ? identity : workspace.defaultTheme
+}

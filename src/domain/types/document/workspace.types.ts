@@ -7,6 +7,11 @@ export interface EndgeWorkspaceLocale {
 
 export type EndgeWorkspaceLocaleLabelMode = keyof Pick<EndgeWorkspaceLocale, 'displayName' | 'shortLabel'>
 
+export interface EndgeWorkspaceTheme {
+  identity: string
+  displayName: string
+}
+
 export type EndgeWorkspaceSSEAuthMode = 'inherit' | 'profile' | 'manual' | 'none'
 
 export interface EndgeWorkspaceVar {
@@ -29,6 +34,8 @@ export interface EndgeWorkspaceDefinition {
   locales: EndgeWorkspaceLocale[]
   defaultLocale: string
   fallbackLocale: string
+  themes: EndgeWorkspaceTheme[]
+  defaultTheme: string
   defaultAuthProfileIdentity: string | null
   sfcAdapterIds: string[]
   defaultSfcAdapterId: string

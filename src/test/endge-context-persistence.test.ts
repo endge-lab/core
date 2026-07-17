@@ -78,6 +78,7 @@ describe('EndgeContext persistence', () => {
       environment: 'prod',
       user: 'anonymous',
       locale: 'en',
+      theme: 'light',
     })
   })
 
@@ -187,6 +188,18 @@ describe('EndgeContext persistence', () => {
 
     expect(context.currentLocale).toBe('en')
     expect(listener).toHaveBeenCalledTimes(1)
+  })
+
+  it('persists the current user theme inside the context snapshot', async () => {
+    const context = new EndgeContext()
+    context.deserialize(undefined)
+    await Promise.resolve()
+
+    context.setCurrentTheme('dark')
+
+    expect(context.currentTheme).toBe('dark')
+    expect(context.serialize().theme).toBe('dark')
+    expect(JSON.parse(localStorage.getItem('endge:context:v1') ?? '{}').theme).toBe('dark')
   })
 })
 

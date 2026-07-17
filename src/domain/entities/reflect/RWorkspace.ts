@@ -4,6 +4,7 @@ import type {
   EndgeWorkspaceLocale,
   EndgeWorkspaceSSEAuthMode,
   EndgeWorkspaceSSEConfig,
+  EndgeWorkspaceTheme,
   EndgeWorkspaceVar,
 } from '@/domain/types/document/workspace.types'
 
@@ -28,6 +29,12 @@ export class RWorkspace extends REntity implements EndgeWorkspaceDefinition {
 
   @Expose()
   fallbackLocale!: string
+
+  @Expose()
+  themes: EndgeWorkspaceTheme[] = []
+
+  @Expose()
+  defaultTheme!: string
 
   @Expose()
   defaultAuthProfileIdentity: string | null = null
@@ -55,6 +62,8 @@ export class RWorkspace extends REntity implements EndgeWorkspaceDefinition {
       locales: this.locales.map(locale => ({ ...locale })),
       defaultLocale: this.defaultLocale,
       fallbackLocale: this.fallbackLocale,
+      themes: this.themes.map(theme => ({ ...theme })),
+      defaultTheme: this.defaultTheme,
       defaultAuthProfileIdentity: this.defaultAuthProfileIdentity,
       sfcAdapterIds: [...this.sfcAdapterIds],
       defaultSfcAdapterId: this.defaultSfcAdapterId,
@@ -87,6 +96,12 @@ function createWorkspace(input: unknown): RWorkspace {
   const fallbackLocale = normalizeText(source.fallbackLocale ?? source.fallback_locale, '')
   workspace.defaultLocale = requireSupportedLocale(defaultLocale, workspace.locales, 'defaultLocale')
   workspace.fallbackLocale = requireSupportedLocale(fallbackLocale, workspace.locales, 'fallbackLocale')
+  workspace.themes = normalizeThemes(source.themes)
+  workspace.defaultTheme = requireSupportedTheme(
+    source.defaultTheme ?? source.default_theme,
+    workspace.themes,
+    'defaultTheme',
+  )
   workspace.defaultAuthProfileIdentity = normalizeNullableText(
     source.defaultAuthProfileIdentity ?? source.default_auth_profile_identity,
   )
@@ -97,6 +112,40 @@ function createWorkspace(input: unknown): RWorkspace {
   )
 
   return workspace
+}
+
+function normalizeThemes(value: unknown): EndgeWorkspaceTheme[] {
+  const rawItems = Array.isArray(value)
+    ? value
+    : isRecord(value)
+      ? Object.entries(value).map(([identity, theme]) => isRecord(theme)
+          ? { identity, ...theme }
+          : { identity, displayName: theme })
+      : []
+
+  const result: EndgeWorkspaceTheme[] = []
+  const used = new Set<string>()
+
+  for (const raw of rawItems) {
+    const source: Record<string, unknown> = isRecord(raw) ? raw : { identity: raw }
+    const identity = normalizeText(source.identity ?? source.value ?? source.theme, '')
+    if (!identity || used.has(identity))
+      continue
+
+    used.add(identity)
+    result.push({
+      identity,
+      displayName: normalizeText(
+        source.displayName ?? source.display_name ?? source.label ?? source.name,
+        identity,
+      ),
+    })
+  }
+
+  if (!result.length)
+    throw new Error('[RWorkspace] Payload field "themes" must contain at least one theme')
+
+  return result
 }
 
 function normalizeSfcAdapterIds(value: unknown): string[] {
@@ -235,6 +284,18 @@ function requireSupportedLocale(
     return value
 
   throw new Error(`[RWorkspace] Payload field "${field}" must reference an item from "locales"`)
+}
+
+function requireSupportedTheme(
+  value: unknown,
+  themes: EndgeWorkspaceTheme[],
+  field: string,
+): string {
+  const identity = String(value ?? '').trim()
+  if (identity && themes.some(theme => theme.identity === identity))
+    return identity
+
+  throw new Error(`[RWorkspace] Payload field "${field}" must reference an item from "themes"`)
 }
 
 function requireText(value: unknown, field: string): string {

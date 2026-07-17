@@ -18,13 +18,10 @@ export interface EndgeStyleResolver {
 /** Neutral style registry. Renderer materializers consume its artifacts/resolver. */
 export class EndgeStyles extends EndgeModule {
   private _unsubscribeProgram: (() => void) | null = null
-  private _themeOwners = new Set<string>()
 
   public override start(): void {
     if (this._unsubscribeProgram) return
-    this._refreshThemes()
     this._unsubscribeProgram = Endge.program.subscribe(() => {
-      this._refreshThemes()
       this.notify()
     })
   }
@@ -58,32 +55,5 @@ export class EndgeStyles extends EndgeModule {
   public override reset(): void {
     this._unsubscribeProgram?.()
     this._unsubscribeProgram = null
-    for (const owner of this._themeOwners)
-      Endge.ui.unregisterThemes(owner)
-    this._themeOwners.clear()
-  }
-
-  private _refreshThemes(): void {
-    const nextOwners = new Set<string>()
-    for (const artifact of Endge.program.getArtifacts()) {
-      if (artifact.status === 'error') continue
-      const stylePayload = artifact.ref.entityType === 'style'
-        ? artifact.payload as EndgeStyleProgramPayload
-        : null
-      const componentStyle = artifact.ref.entityType === 'component-sfc'
-        ? (artifact.payload as { ir?: { style?: EndgeStyleSheetArtifact | null } | null }).ir?.style
-        : null
-      const themes = stylePayload?.themes ?? componentStyle?.themes.map(theme => theme.id)
-      if (!themes) continue
-      const owner = artifact.ref.entityType === 'style'
-        ? `style:${artifact.ref.identity}`
-        : `component-style:${artifact.ref.identity}`
-      Endge.ui.registerThemes(owner, themes)
-      nextOwners.add(owner)
-    }
-    for (const owner of this._themeOwners) {
-      if (!nextOwners.has(owner)) Endge.ui.unregisterThemes(owner)
-    }
-    this._themeOwners = nextOwners
   }
 }

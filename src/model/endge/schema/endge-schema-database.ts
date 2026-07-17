@@ -107,6 +107,26 @@ function hasWorkspaceValue(data: Record<string, unknown>): boolean {
   return true
 }
 
+/** Нормализует Payload workspace без потери profile fields перед boot pipeline. */
+export function normalizePayloadWorkspace(raw: any): Record<string, unknown> {
+  return {
+    id: raw.id,
+    identity: raw.identity,
+    name: raw.name ?? raw.displayName,
+    displayName: raw.displayName ?? raw.name,
+    vars: raw.vars ?? [],
+    sse: raw.sse ?? undefined,
+    locales: raw.locales ?? raw.availableLocales ?? [],
+    defaultLocale: raw.defaultLocale ?? raw.default_locale,
+    fallbackLocale: raw.fallbackLocale ?? raw.fallback_locale,
+    themes: raw.themes ?? raw.availableThemes ?? [],
+    defaultTheme: raw.defaultTheme ?? raw.default_theme,
+    defaultAuthProfileIdentity: raw.defaultAuthProfileIdentity ?? raw.default_auth_profile_identity ?? null,
+    sfcAdapterIds: raw.sfcAdapterIds ?? raw.sfc_adapter_ids ?? [],
+    defaultSfcAdapterId: raw.defaultSfcAdapterId ?? raw.default_sfc_adapter_id,
+  }
+}
+
 function shouldInjectWorkspace(
   method: unknown,
   url: unknown,
@@ -845,23 +865,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       }
     }
 
-    const normalizeWorkspace = (raw: any) => {
-      return {
-        id: raw.id,
-        identity: raw.identity,
-        name: raw.name ?? raw.displayName,
-        displayName: raw.displayName ?? raw.name,
-        vars: raw.vars ?? [],
-        sse: raw.sse ?? undefined,
-        locales: raw.locales ?? raw.availableLocales ?? [],
-        defaultLocale: raw.defaultLocale ?? raw.default_locale,
-        fallbackLocale: raw.fallbackLocale ?? raw.fallback_locale,
-        defaultAuthProfileIdentity: raw.defaultAuthProfileIdentity ?? raw.default_auth_profile_identity ?? null,
-        sfcAdapterIds: raw.sfcAdapterIds ?? raw.sfc_adapter_ids ?? [],
-        defaultSfcAdapterId: raw.defaultSfcAdapterId ?? raw.default_sfc_adapter_id,
-      }
-    }
-
     const normalizeStyle = (raw: any) => {
       return {
         id: raw.id,
@@ -1385,7 +1388,7 @@ export class EndgeSchemaStorage extends EndgeModule {
 
       load('workspaces', async () => {
         const rows = await this.repositories!.workspaces!.findAll()
-        return rows.map(normalizeWorkspace)
+        return rows.map(normalizePayloadWorkspace)
       }),
 
       load('types', async () => {
@@ -2404,6 +2407,11 @@ export class EndgeSchemaStorage extends EndgeModule {
         })),
         defaultLocale: workspace.defaultLocale,
         fallbackLocale: workspace.fallbackLocale,
+        themes: workspace.themes.map(theme => ({
+          identity: theme.identity,
+          displayName: theme.displayName,
+        })),
+        defaultTheme: workspace.defaultTheme,
         defaultAuthProfileIdentity: workspace.defaultAuthProfileIdentity,
         sfcAdapterIds: [...workspace.sfcAdapterIds],
         defaultSfcAdapterId: workspace.defaultSfcAdapterId,

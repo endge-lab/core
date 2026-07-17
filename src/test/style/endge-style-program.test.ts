@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { RStyle } from '@/domain/entities/reflect/RStyle'
 import { Endge } from '@/model/endge/kernel/endge'
 import { EndgeUI } from '@/model/endge/ui/endge-ui'
+import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
 describe('EndgeCSS program lifecycle', () => {
   it('registers source strategies and provides a typed style artifact', () => {
@@ -19,13 +20,16 @@ describe('EndgeCSS program lifecycle', () => {
     expect(Endge.program.getStyleArtifact(71)?.payload.stylesheet.rules).toHaveLength(1)
   })
 
-  it('owns dynamic themes without changing the static compatibility classes contract', () => {
+  it('uses the workspace catalog instead of exposing every theme found in style source', () => {
+    Endge.workspace.apply(TEST_ENDGE_WORKSPACE)
+    Endge.context.setCurrentTheme('light')
     const ui = new EndgeUI()
-    ui.registerThemes('style:project', ['night', 'contrast'])
-    expect(ui.availableThemes).toEqual(expect.arrayContaining(['light', 'dark', 'night', 'contrast']))
+    ui.start()
+    expect(ui.availableThemes).toEqual(['light', 'dark'])
     ui.setTheme('night')
-    expect(ui.theme).toBe('night')
-    ui.unregisterThemes('style:project')
     expect(ui.theme).toBe('light')
+    ui.setTheme('dark')
+    expect(ui.theme).toBe('dark')
+    ui.reset()
   })
 })

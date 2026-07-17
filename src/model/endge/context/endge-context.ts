@@ -11,6 +11,7 @@ import {
   getActiveEndgeWorkspace,
   hasActiveEndgeWorkspace,
   normalizeWorkspaceLocale,
+  normalizeWorkspaceTheme,
 } from '@/model/config/endge-workspace'
 import {
   EndgeStorageAdapterRegistry,
@@ -23,6 +24,7 @@ import { LocalStorageContextAdapter } from '@/model/endge/context/persistence/ad
 
 const CONTEXT_STORAGE_KEY = 'endge:context:v1'
 const LEGACY_CONTEXT_STORAGE_KEY = 'endge-context'
+const LEGACY_THEME_STORAGE_KEY = 'endge:theme'
 
 const DEFAULT_SCOPE = {
   tenantId: 'default',
@@ -38,6 +40,7 @@ export interface EndgeContextSnapshot {
   environment: string | null
   user: string | null
   locale: string | null
+  theme: string | null
 }
 
 export interface EndgeContextPersistenceConfig {
@@ -60,6 +63,8 @@ export class EndgeContext extends EndgeModule {
   private _currentUser: string = DEFAULT_SCOPE.userId
   private _currentLocale = ''
   private _pendingLocale: string | null = null
+  private _currentTheme = ''
+  private _pendingTheme: string | null = null
   private _sessionProvider: EndgeSessionIdentityProvider | null = null
   private _isHydrating = false
 
@@ -106,6 +111,7 @@ export class EndgeContext extends EndgeModule {
       environment: this._currentEnvironment,
       user: this._currentUser,
       locale: this._currentLocale || null,
+      theme: this._currentTheme || null,
     }
   }
 
@@ -117,13 +123,18 @@ export class EndgeContext extends EndgeModule {
     this._currentEnvironment = normalizeScopePart(payload?.environment, DEFAULT_SCOPE.environmentId)
     this._currentUser = normalizeScopePart(payload?.user, DEFAULT_SCOPE.userId)
     const rawLocale = normalizeOptionalText(payload?.locale)
+    const rawTheme = normalizeOptionalText(payload?.theme) ?? readLegacyThemePreference()
     if (hasActiveEndgeWorkspace()) {
       this._currentLocale = normalizeWorkspaceLocale(rawLocale)
       this._pendingLocale = null
+      this._currentTheme = normalizeWorkspaceTheme(rawTheme)
+      this._pendingTheme = null
     }
     else {
       this._currentLocale = rawLocale ?? ''
       this._pendingLocale = rawLocale
+      this._currentTheme = rawTheme ?? ''
+      this._pendingTheme = rawTheme
     }
   }
 
@@ -302,6 +313,41 @@ export class EndgeContext extends EndgeModule {
     this.notify()
   }
 
+  /** Возвращает текущую тему или тему по умолчанию активного workspace. */
+  get currentTheme(): string {
+    return this._currentTheme || getActiveEndgeWorkspace().defaultTheme
+  }
+
+  /** Нормализует, сохраняет и публикует пользовательскую тему. */
+  set currentTheme(value: string) {
+    const next = normalizeWorkspaceTheme(value)
+    if (next === this._currentTheme)
+      return
+
+    this._currentTheme = next
+    this._pendingTheme = null
+    this.saveToStorage()
+    this.notify()
+  }
+
+  /** Устанавливает текущую пользовательскую тему. */
+  public setCurrentTheme(theme: string | null): void {
+    this.currentTheme = normalizeWorkspaceTheme(theme)
+  }
+
+  /** Согласует сохранённую тему с каталогом активного workspace. */
+  public reconcileCurrentThemeWithWorkspace(): void {
+    const pending = this._pendingTheme
+    const next = normalizeWorkspaceTheme(pending ?? this._currentTheme)
+    this._pendingTheme = null
+    if (next === this._currentTheme)
+      return
+
+    this._currentTheme = next
+    this.saveToStorage()
+    this.notify()
+  }
+
   /** Выбирает storage adapter для заданной persistence policy. */
   private resolveAdapter(persistence: EndgePersistenceInput): EndgeStorageAdapter {
     return this._adapters.resolve(persistence)
@@ -371,4 +417,16 @@ function normalizeRequiredScopePart(value: unknown, field: string): string {
   }
 
   return normalized
+}
+
+function readLegacyThemePreference(): string | null {
+  if (typeof localStorage === 'undefined')
+    return null
+
+  try {
+    return normalizeOptionalText(localStorage.getItem(LEGACY_THEME_STORAGE_KEY))
+  }
+  catch {
+    return null
+  }
 }

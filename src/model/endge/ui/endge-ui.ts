@@ -4,6 +4,8 @@ import type {
 } from '@/domain/types/ui/ui.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
+import { getActiveEndgeWorkspace, hasActiveEndgeWorkspace } from '@/model/config/endge-workspace'
+import { Endge } from '@/model/endge/kernel/endge'
 import {
   ALL_THEME_CLASSES,
   THEME_CLASS_BY_NAME,
@@ -14,9 +16,8 @@ import {
  * UI-состояние ядра: zoom, theme и режим отображения времени.
  */
 export class EndgeUI extends EndgeModule {
-  private readonly _themeIdsByOwner = new Map<string, Set<string>>([
-    ['endge:built-in', new Set(themeConfig.availableThemes)],
-  ])
+  private _offContext: (() => void) | null = null
+  private _offWorkspace: (() => void) | null = null
   //
   // Настройки zoom
   private readonly MIN_ZOOM: number = 50
@@ -35,7 +36,6 @@ export class EndgeUI extends EndgeModule {
   // Состояние
   private _zoom: number
   private _theme: string
-  private _preferredTheme: string
   private _isLocalTime: boolean
 
   /**
@@ -45,14 +45,31 @@ export class EndgeUI extends EndgeModule {
     super()
 
     this._zoom = this.readZoomFromLS()
-    this._preferredTheme = this.readThemePreferenceFromLS()
-    this._theme = themeConfig.availableThemes.includes(this._preferredTheme)
-      ? this._preferredTheme
-      : themeConfig.defaultTheme
+    this._theme = themeConfig.defaultTheme
     this._isLocalTime = this.readIsLocalTimeFromLS()
 
     // сразу применим (как immediate watch)
     this.applyThemeToDocument(this._theme)
+  }
+
+  /** Подключает UI projection к пользовательскому контексту после загрузки workspace. */
+  public override start(): void {
+    this._offContext?.()
+    this._offWorkspace?.()
+    this._offContext = Endge.context.subscribe(() => this.syncThemeFromContext())
+    this._offWorkspace = Endge.workspace.subscribe(() => {
+      if (!this.syncThemeFromContext())
+        this.notify()
+    })
+    this.syncThemeFromContext()
+  }
+
+  /** Отключает runtime subscription; пользовательское значение остаётся в EndgeContext. */
+  public override reset(): void {
+    this._offContext?.()
+    this._offWorkspace?.()
+    this._offContext = null
+    this._offWorkspace = null
   }
 
   //
@@ -166,26 +183,11 @@ export class EndgeUI extends EndgeModule {
     return this._theme
   }
 
-  /** Returns built-in and runtime-contributed theme ids. */
+  /** Возвращает workspace theme catalog; до boot используется безопасный bootstrap fallback. */
   public get availableThemes(): string[] {
-    return Array.from(new Set(Array.from(this._themeIdsByOwner.values()).flatMap(ids => [...ids])))
-  }
-
-  /** Replaces theme ids contributed by one artifact/module owner. */
-  public registerThemes(owner: string, ids: Iterable<string>): void {
-    const normalized = new Set(Array.from(ids, id => String(id).trim()).filter(Boolean))
-    if (normalized.size > 0) this._themeIdsByOwner.set(owner, normalized)
-    else this._themeIdsByOwner.delete(owner)
-    if (this.availableThemes.includes(this._preferredTheme) && this._theme !== this._preferredTheme)
-      this.applyTheme(this._preferredTheme, false)
-    else if (!this.availableThemes.includes(this._theme))
-      this.applyTheme(themeConfig.defaultTheme, false)
-    this.notify()
-  }
-
-  /** Removes all themes contributed by one owner. */
-  public unregisterThemes(owner: string): void {
-    this.registerThemes(owner, [])
+    if (!hasActiveEndgeWorkspace())
+      return [...themeConfig.availableThemes]
+    return getActiveEndgeWorkspace().themes.map(theme => theme.identity)
   }
 
   /**
@@ -199,41 +201,26 @@ export class EndgeUI extends EndgeModule {
    * Устанавливает тему, сохраняет ее и применяет CSS-классы к document.
    */
   public setTheme(next: string): void {
-    this.applyTheme(next, true)
+    const identity = String(next ?? '').trim()
+    if (!this.availableThemes.includes(identity))
+      return
+
+    Endge.context.setCurrentTheme(identity)
+    this.syncThemeFromContext()
   }
 
-  private applyTheme(next: string, remember: boolean): void {
-    if (!this.availableThemes.includes(next))
-      return
-    if (next === this._theme) {
-      if (remember) {
-        this._preferredTheme = next
-        this.writeThemeToLS(next)
-      }
-      return
-    }
+  private syncThemeFromContext(): boolean {
+    if (!hasActiveEndgeWorkspace())
+      return false
+
+    const next = Endge.context.currentTheme
+    if (next === this._theme)
+      return false
 
     this._theme = next
-    if (remember) {
-      this._preferredTheme = next
-      this.writeThemeToLS(next)
-    }
     this.applyThemeToDocument(next)
     this.notify()
-  }
-
-  private readThemePreferenceFromLS(): string {
-    if (typeof localStorage === 'undefined') return themeConfig.defaultTheme
-    return localStorage.getItem(themeConfig.storageKey)?.trim() || themeConfig.defaultTheme
-  }
-
-  /**
-   * Записывает Theme To LS.
-   */
-  private writeThemeToLS(value: string): void {
-    if (typeof localStorage === 'undefined')
-      return
-    localStorage.setItem(themeConfig.storageKey, value)
+    return true
   }
 
   /**
