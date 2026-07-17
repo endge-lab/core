@@ -9,7 +9,6 @@ export interface QueriesPayloadFields {
   author?: string
   active?: boolean
   meta?: Record<string, unknown>
-  inherited?: boolean
 }
 
 export class Queries_Repository {

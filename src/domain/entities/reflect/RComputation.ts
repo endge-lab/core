@@ -53,7 +53,6 @@ export class RComputation extends REntity {
     computation.folderId = json?.folderId ?? relationToId(json?.folder) ?? null
     computation.meta = isPlainObject(json?.meta) ? { ...json.meta } : {}
     computation.active = json?.active !== false
-    computation.inherited = json?.inherited === true
     computation.deletedAt = json?.deletedAt ?? null
     computation.author = json?.author ?? null
     if (storageMeta)
@@ -76,7 +75,6 @@ export class RComputation extends REntity {
       folderId: this.folderId ?? null,
       meta: this.meta ?? {},
       active: this.active !== false,
-      inherited: this.inherited === true,
       deletedAt: this.deletedAt ?? null,
       author: this.author ?? null,
     }

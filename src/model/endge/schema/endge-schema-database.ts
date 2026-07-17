@@ -277,7 +277,6 @@ export function componentSFCPayloadDocToPlain(raw: any): any {
     active: raw.active ?? true,
     deletedAt: raw.deletedAt ?? null,
     author: raw.author ?? null,
-    inherited: raw.inherited === true,
   }
 }
 
@@ -870,7 +869,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
         active: raw.active !== false,
         author: raw.author,
-        inherited: raw.inherited === true,
         isSystem: raw.isSystem === true,
         deletedAt: raw.deletedAt ?? null,
       }
@@ -1018,7 +1016,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         runtimeFilters,
         folderId: relationToId(raw.folder) ?? null,
         meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
-        inherited: raw.inherited === true,
       }
 
       if (type === 'component-dsl') {
@@ -1149,7 +1146,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         sourceVersion: Number(raw.sourceVersion ?? 2) || 2,
         folderId,
         meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
-        inherited: raw.inherited === true,
       }
     }
 
@@ -1282,7 +1278,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         source: String(raw.source ?? ''),
         sourceVersion: Number(raw.sourceVersion ?? 1) || 1,
         meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
-        inherited: raw.inherited === true,
       }
     }
 
@@ -2447,7 +2442,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         meta: (component.meta && typeof component.meta === 'object' && !Array.isArray(component.meta)) ? component.meta : {},
         active: component.active ?? true,
         author: component.author ?? undefined,
-        inherited: component.inherited === true,
       })
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
@@ -2470,7 +2464,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         source: plain.source,
         sourceVersion: plain.sourceVersion,
         meta: (query.meta && typeof query.meta === 'object' && !Array.isArray(query.meta)) ? query.meta : {},
-        inherited: Boolean((query as any).inherited),
       }
       const saved = existing
         ? await repos.queries.update((existing as any).id, payload)
@@ -2497,7 +2490,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         meta: (dataView.meta && typeof dataView.meta === 'object' && !Array.isArray(dataView.meta)) ? dataView.meta : {},
         active: dataView.active ?? true,
         author: dataView.author ?? undefined,
-        inherited: dataView.inherited === true,
       })
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
@@ -2515,13 +2507,14 @@ export class EndgeSchemaStorage extends EndgeModule {
         identity: String(composition.identity ?? documentId),
         displayName: composition.displayName ?? composition.name ?? String(composition.identity ?? documentId),
         description: composition.description ?? null,
+        kind: composition.kind ?? 'library',
+        kindIdentity: composition.kindIdentity ?? null,
         folder,
         source: composition.source ?? '',
         sourceVersion: Number(composition.sourceVersion ?? 1),
         meta: (composition.meta && typeof composition.meta === 'object' && !Array.isArray(composition.meta)) ? composition.meta : {},
         active: composition.active ?? true,
         author: composition.author ?? undefined,
-        inherited: composition.inherited === true,
       })
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
@@ -2545,7 +2538,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         meta: (store.meta && typeof store.meta === 'object' && !Array.isArray(store.meta)) ? store.meta : {},
         active: store.active ?? true,
         author: store.author ?? undefined,
-        inherited: store.inherited === true,
       }
       const storageId = store.id
       const saved = !this.isMalformedPayloadDocumentId(storageId)
@@ -2575,7 +2567,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         meta: (mock.meta && typeof mock.meta === 'object' && !Array.isArray(mock.meta)) ? mock.meta : {},
         active: mock.active ?? true,
         author: mock.author ?? undefined,
-        inherited: mock.inherited === true,
       }
       const storageId = mock.id
       const saved = !this.isMalformedPayloadDocumentId(storageId)
@@ -2615,7 +2606,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         meta: (computation.meta && typeof computation.meta === 'object' && !Array.isArray(computation.meta)) ? computation.meta : {},
         active: computation.active ?? true,
         author: computation.author ?? undefined,
-        inherited: computation.inherited === true,
       }
       const storageId = computation.id
       const saved = !this.isMalformedPayloadDocumentId(storageId)
@@ -2708,13 +2698,9 @@ export class EndgeSchemaStorage extends EndgeModule {
         active: f.active !== false,
         converterIdentities: (f.converterIdentities ?? []).map((id: string) => ({ identity: id })),
       }))
-      // Унаследованные фильтры могут иметь одинаковый displayName - делаем уникальным для Payload (unique на displayName)
-      const displayNameForPayload = plain.inherited
-        ? `${plain.displayName} (${plain.identity})`
-        : plain.displayName
       const saved = await repos.filters.upsert({
         identity: plain.identity,
-        displayName: displayNameForPayload,
+        displayName: plain.displayName,
         folder: folderId as number | string | undefined,
         ...(plain.author != null && plain.author !== '' && { author: plain.author }),
         active: plain.active,
@@ -2722,7 +2708,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         source: String(plain.source ?? ''),
         sourceVersion: Number(plain.sourceVersion ?? 1) || 1,
         meta: (plain.meta && typeof plain.meta === 'object' && !Array.isArray(plain.meta)) ? plain.meta : {},
-        inherited: Boolean(plain.inherited ?? filter.inherited),
       })
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
@@ -2880,7 +2865,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         meta: (style.meta && typeof style.meta === 'object' && !Array.isArray(style.meta)) ? style.meta : {},
         active: style.active !== false,
         author: style.author ?? undefined,
-        inherited: style.inherited === true,
         isSystem: style.isSystem === true,
       }
       const storageId = style.id
@@ -3711,7 +3695,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
         active: raw.active !== false,
         author: raw.author,
-        inherited: raw.inherited === true,
         isSystem: raw.isSystem === true,
         deletedAt: raw.deletedAt ?? null,
       }

@@ -11,7 +11,6 @@ export interface StylesPayloadFields {
   author?: string | null
   active?: boolean
   deletedAt?: string | null
-  inherited?: boolean
   isSystem?: boolean
 }
 

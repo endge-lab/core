@@ -17,7 +17,11 @@ import {
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RConverter } from '@/domain/entities/reflect/RConverter'
 import { RDataView } from '@/domain/entities/reflect/RDataView'
-import { RComposition } from '@/domain/entities/reflect/RComposition'
+import {
+  normalizeRCompositionKind,
+  normalizeRCompositionKindIdentity,
+  RComposition,
+} from '@/domain/entities/reflect/RComposition'
 import { RStore } from '@/domain/entities/reflect/RStore'
 import { RMock } from '@/domain/entities/reflect/RMock'
 import { RComputation } from '@/domain/entities/reflect/RComputation'
@@ -73,7 +77,6 @@ export function queryPayloadDocToPlain(doc: any): any {
     sourceVersion: Number(doc?.sourceVersion ?? 2) || 2,
     folderId,
     meta: (doc?.meta && typeof doc.meta === 'object' && !Array.isArray(doc.meta)) ? doc.meta : {},
-    inherited: doc?.inherited === true,
   }
 }
 
@@ -92,7 +95,6 @@ export function dataViewPayloadDocToPlain(doc: any): any {
     meta: (doc?.meta && typeof doc.meta === 'object' && !Array.isArray(doc.meta)) ? doc.meta : {},
     active: doc?.active !== false,
     author: doc?.author,
-    inherited: doc?.inherited === true,
     deletedAt: doc?.deletedAt ?? null,
   }
 }
@@ -105,13 +107,14 @@ export function compositionPayloadDocToPlain(doc: any): any {
     name: doc?.displayName ?? doc?.name,
     displayName: doc?.displayName ?? doc?.name,
     description: doc?.description ?? null,
+    kind: normalizeRCompositionKind(doc?.kind),
+    kindIdentity: normalizeRCompositionKindIdentity(doc?.kindIdentity),
     source: doc?.source ?? '',
     sourceVersion: doc?.sourceVersion ?? 1,
     folderId: relationToId(doc?.folder ?? doc?.folderId),
     meta: (doc?.meta && typeof doc.meta === 'object' && !Array.isArray(doc.meta)) ? doc.meta : {},
     active: doc?.active !== false,
     author: doc?.author,
-    inherited: doc?.inherited === true,
     deletedAt: doc?.deletedAt ?? null,
   }
 }
@@ -130,7 +133,6 @@ export function storePayloadDocToPlain(doc: any): any {
     meta: (doc?.meta && typeof doc.meta === 'object' && !Array.isArray(doc.meta)) ? doc.meta : {},
     active: doc?.active !== false,
     author: doc?.author,
-    inherited: doc?.inherited === true,
     deletedAt: doc?.deletedAt ?? null,
   }
 }
@@ -151,7 +153,6 @@ export function mockPayloadDocToPlain(doc: any): any {
     meta: (doc?.meta && typeof doc.meta === 'object' && !Array.isArray(doc.meta)) ? doc.meta : {},
     active: doc?.active !== false,
     author: doc?.author,
-    inherited: doc?.inherited === true,
     deletedAt: doc?.deletedAt ?? null,
   }
 }
@@ -173,7 +174,6 @@ export function computationPayloadDocToPlain(doc: any): any {
     meta: (doc?.meta && typeof doc.meta === 'object' && !Array.isArray(doc.meta)) ? doc.meta : {},
     active: doc?.active !== false,
     author: doc?.author,
-    inherited: doc?.inherited === true,
     deletedAt: doc?.deletedAt ?? null,
   }
 }
@@ -192,7 +192,6 @@ export function stylePayloadDocToPlain(doc: any): any {
     meta: (doc?.meta && typeof doc.meta === 'object' && !Array.isArray(doc.meta)) ? doc.meta : {},
     active: doc?.active !== false,
     author: doc?.author,
-    inherited: doc?.inherited === true,
     isSystem: doc?.isSystem === true,
     deletedAt: doc?.deletedAt ?? null,
   }
@@ -3035,7 +3034,7 @@ export class EndgeDomain extends EndgeModule {
     }
     if (json.compositions && Array.isArray(json.compositions)) {
       json.compositions.forEach((compositionJson: any) => {
-        out.compositions.push(Serialize.fromJSON(RComposition, compositionJson))
+        out.compositions.push(RComposition.fromPlain(compositionJson))
       })
     }
     if (json.stores && Array.isArray(json.stores)) {

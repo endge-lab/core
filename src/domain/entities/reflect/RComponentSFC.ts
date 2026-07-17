@@ -75,7 +75,6 @@ export class RComponentSFC extends RComponentCore {
       description: this.description,
       folderId: this.folderId ?? null,
       isSystem: this.isSystem,
-      inherited: this.inherited,
       meta: { ...this.meta },
       kind: this.kind,
       type: this.type,
@@ -99,7 +98,6 @@ export class RComponentSFC extends RComponentCore {
     component.description = raw?.description ?? null
     component.folderId = raw?.folderId ?? raw?.folder ?? null
     component.isSystem = Boolean(raw?.isSystem ?? false)
-    component.inherited = Boolean(raw?.inherited ?? false)
     component.meta = normalizeMeta(raw?.meta)
     component.modelVersion = Number(raw?.modelVersion ?? 1)
     component.supportedTargets = normalizeTargets(raw?.supportedTargets)

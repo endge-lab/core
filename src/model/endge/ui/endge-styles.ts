@@ -32,7 +32,7 @@ export class EndgeStyles extends EndgeModule {
       Endge.domain.getStyles()
         .filter(style => style.active !== false && !style.deletedAt)
         .sort((left, right) => {
-          const rank = (style: typeof left) => style.isSystem ? 0 : style.inherited ? 1 : 2
+          const rank = (style: typeof left) => style.isSystem ? 0 : 1
           return rank(left) - rank(right) || left.identity.localeCompare(right.identity)
         })
         .map((style, index) => [style.identity, index]),

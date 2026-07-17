@@ -11,7 +11,6 @@ export interface StoresPayloadFields {
   author?: string | null
   active?: boolean
   deletedAt?: string | null
-  inherited?: boolean
 }
 
 /** Репозиторий Payload-коллекции stores. */

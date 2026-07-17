@@ -108,6 +108,8 @@ export class DocumentDraftFactory {
         item.identity = identity
         item.name = title
         item.displayName = title
+        item.kind = 'library'
+        item.kindIdentity = null
         item.source = Endge.source.createDefault('composition')
         item.sourceVersion = 1
         if (folderId != null)

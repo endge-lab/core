@@ -5,6 +5,7 @@ import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RMock } from '@/domain/entities/reflect/RMock'
 import { RComputation } from '@/domain/entities/reflect/RComputation'
+import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { ENDGE_STYLE_DEFAULT_SOURCE, RStyle } from '@/domain/entities/reflect/RStyle'
 import { ComponentType, QueryType } from '@/domain/types/document/document.types'
 import { DocumentDraftFactory } from '@/model/services/document/DocumentDraftFactory'
@@ -89,6 +90,22 @@ describe('DocumentDraftFactory', () => {
       folderId: 'root-computations',
     })
     expect((draft as RComputation).source).toContain('defineComputation')
+  })
+
+  it('creates a library Composition by default', () => {
+    const draft = DocumentDraftFactory.create('composition', {
+      identity: 'project-startup',
+      name: 'Project startup',
+      folderId: 'root-compositions',
+    })
+
+    expect(draft).toBeInstanceOf(RComposition)
+    expect(draft).toMatchObject({
+      identity: 'project-startup',
+      kind: 'library',
+      kindIdentity: null,
+      folderId: 'root-compositions',
+    })
   })
 
   it('creates a source-first style draft without derived artifacts', () => {

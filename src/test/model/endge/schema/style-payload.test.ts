@@ -17,7 +17,6 @@ describe('style Payload persistence', () => {
       folder: { id: 21 },
       project: { id: 5 },
       active: true,
-      inherited: true,
       meta: { scope: 'workspace' },
     })
     const style = RStyle.fromPlain(plain)
@@ -31,12 +30,12 @@ describe('style Payload persistence', () => {
       sourceVersion: 2,
       folderId: 21,
       active: true,
-      inherited: true,
       meta: { scope: 'workspace' },
     })
     expect(style).not.toHaveProperty('project')
     expect(style.toPlain()).not.toHaveProperty('styles')
     expect(style.toPlain()).not.toHaveProperty('project')
+    expect(style.toPlain()).not.toHaveProperty('inherited')
   })
 
   it('creates the styles root and persists source without legacy JSON', async () => {
@@ -79,5 +78,6 @@ describe('style Payload persistence', () => {
     }))
     expect(upsert.mock.calls[0]?.[0]).not.toHaveProperty('styles')
     expect(upsert.mock.calls[0]?.[0]).not.toHaveProperty('project')
+    expect(upsert.mock.calls[0]?.[0]).not.toHaveProperty('inherited')
   })
 })

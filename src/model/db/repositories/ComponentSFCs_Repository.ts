@@ -12,7 +12,6 @@ export interface ComponentSFCRepositoryPayload {
   author?: string
   active?: boolean
   deletedAt?: string | null
-  inherited?: boolean
 }
 
 /** Репозиторий отдельной Payload-коллекции SFC-компонентов. */

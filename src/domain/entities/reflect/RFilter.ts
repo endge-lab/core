@@ -29,19 +29,12 @@ export class RFilter extends REntity {
     const f = new RFilter()
     f.id = raw.id
     f.identity = raw.identity ?? ''
-    let displayName = raw.displayName ?? raw.identity
-    // В Payload сохраняем с суффиксом (identity) для уникальности; в домене показываем короткое имя
-    if (raw.inherited === true && typeof displayName === 'string' && typeof f.identity === 'string') {
-      const suffix = ` (${f.identity})`
-      if (displayName.endsWith(suffix))
-        displayName = displayName.slice(0, -suffix.length)
-    }
+    const displayName = raw.displayName ?? raw.identity
     f.name = displayName
     f.displayName = displayName
     const folderId = raw.folder != null && typeof raw.folder === 'object' ? raw.folder.id : (typeof raw.folder === 'number' || typeof raw.folder === 'string' ? raw.folder : null)
     f.folderId = folderId ?? null
     f.active = raw.active ?? true
-    f.inherited = raw.inherited === true
     f.fields = Array.isArray(raw.fields) ? raw.fields.map((x: any) => ({ ...x, multiple: x.multiple !== false })) : []
     f.source = String(raw.source ?? '')
     f.sourceVersion = Number(raw.sourceVersion ?? 1) || 1
@@ -57,7 +50,6 @@ export class RFilter extends REntity {
     f.displayName = json.displayName
     f.folderId = json.folderId ?? json.folder ?? null
     f.active = json.active ?? true
-    f.inherited = json.inherited === true
     f.deletedAt = json.deletedAt ?? null
     f.fields = Array.isArray(json.fields) ? json.fields.map(x => ({ ...x, multiple: x.multiple !== false })) : []
     f.source = String(json.source ?? '')
@@ -78,7 +70,6 @@ export class RFilter extends REntity {
       source: this.source,
       sourceVersion: this.sourceVersion,
       meta: this.meta && Object.keys(this.meta).length > 0 ? { ...this.meta } : undefined,
-      inherited: this.inherited ?? false,
     }
   }
 }

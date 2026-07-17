@@ -15,7 +15,6 @@ export interface MocksPayloadFields {
   author?: string | null
   active?: boolean
   deletedAt?: string | null
-  inherited?: boolean
 }
 
 /** Репозиторий Payload-коллекции mocks. */

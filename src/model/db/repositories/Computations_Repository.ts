@@ -14,7 +14,6 @@ export interface ComputationsPayloadFields {
   author?: string | null
   active?: boolean
   deletedAt?: string | null
-  inherited?: boolean
 }
 
 /** Repository for the Payload computations collection. */

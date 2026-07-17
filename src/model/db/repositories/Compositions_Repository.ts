@@ -1,9 +1,12 @@
 import type { AxiosInstance } from 'axios'
+import type { RCompositionKind } from '@/domain/entities/reflect/RComposition'
 
 export interface CompositionsPayloadFields {
   identity: string
   displayName: string
   description?: string | null
+  kind?: RCompositionKind
+  kindIdentity?: string | null
   source: string
   sourceVersion: number
   folder?: string | number | null
@@ -11,7 +14,6 @@ export interface CompositionsPayloadFields {
   author?: string | null
   active?: boolean
   deletedAt?: string | null
-  inherited?: boolean
 }
 
 /** Репозиторий Payload-коллекции compositions. */

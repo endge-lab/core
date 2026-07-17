@@ -40,5 +40,4 @@ export interface RFilterSchema {
   active?: boolean
   deletedAt?: string | null
   meta?: Record<string, unknown>
-  inherited?: boolean
 }

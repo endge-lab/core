@@ -46,9 +46,6 @@ export class REntity {
   @Exclude()
   isTemporary: boolean = false
 
-  @Expose()
-  inherited: boolean = false
-
   /** Произвольные метаданные (из Payload meta, по умолчанию {}). */
   @Expose()
   meta: Record<string, unknown> = {}

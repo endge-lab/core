@@ -49,7 +49,6 @@ export function ReflectComponentFromPlain(
     table.rowSize = json.rowSize
     table.runtimeFilters = base.runtimeFilters
     table.meta = (json.meta && typeof json.meta === 'object' && !Array.isArray(json.meta)) ? { ...json.meta } : (base.meta ?? {})
-    table.inherited = json.inherited === true || base?.inherited === true
 
     const rawBindings = json.bindings
     table.bindings = { keys: {} }
@@ -158,7 +157,6 @@ export function ReflectComponentToPayloadData(
     displayName: component.name ?? component.identity ?? (component.id != null ? String(component.id) : ''),
     componentType: component.type,
     meta: (component.meta && typeof component.meta === 'object' && !Array.isArray(component.meta)) ? component.meta : {},
-    inherited: Boolean((component as any).inherited),
     inputFields: Object.values(component.inputFields || {}).map((f: any) => {
       const params = f.params instanceof Map
         ? Array.from(f.params.entries() as IterableIterator<[string, any]>).map(([n, p]) => ({ name: n, type: p?.type ?? '' }))

@@ -48,7 +48,6 @@ export class Filters_Repository {
     source?: string
     sourceVersion?: number
     meta?: Record<string, unknown>
-    inherited?: boolean
   }): Promise<FilterDoc> {
     const r = await this.api.post('/filters', { ...data, meta: data.meta ?? {} })
     return r.data
@@ -67,7 +66,6 @@ export class Filters_Repository {
       source: string
       sourceVersion: number
       meta: Record<string, unknown>
-      inherited: boolean
     }>,
   ): Promise<FilterDoc> {
     const r = await this.api.patch(`/filters/${id}`, data)
@@ -84,7 +82,6 @@ export class Filters_Repository {
     source?: string
     sourceVersion?: number
     meta?: Record<string, unknown>
-    inherited?: boolean
   }): Promise<FilterDoc> {
     const existing = await this.findByIdentity(data.identity)
     if (!existing) return this.create(data)

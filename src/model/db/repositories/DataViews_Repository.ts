@@ -11,7 +11,6 @@ export interface DataViewsPayloadFields {
   author?: string
   active?: boolean
   deletedAt?: string | null
-  inherited?: boolean
 }
 
 /** Репозиторий Payload-коллекции DataViews. */
