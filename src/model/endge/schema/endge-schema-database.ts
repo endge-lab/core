@@ -275,7 +275,6 @@ export function componentSFCPayloadDocToPlain(raw: any): any {
     displayName: raw.displayName ?? raw.identity ?? '',
     description: raw.description ?? null,
     folderId: relationToId(raw.folder) ?? null,
-    project: relationToId(raw.project) ?? null,
     kind: 'component-sfc',
     type: ComponentType.SFC,
     sourceKind: 'component-sfc',
@@ -873,7 +872,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         displayName: raw.displayName ?? raw.name,
         description: raw.description ?? null,
         folderId: relationToId(raw.folder) ?? null,
-        project: relationToId(raw.project) ?? null,
         source: typeof raw.source === 'string' ? raw.source : '',
         sourceVersion: Math.max(1, Number(raw.sourceVersion ?? 1) || 1),
         meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
@@ -899,7 +897,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         description: raw.description ?? null,
         isSystem: raw.isSystem === true,
         folderId: relationToId(raw.folder) ?? null,
-        project: relationToId(raw.project) ?? null,
         areas: Array.isArray(raw.areas)
           ? raw.areas.map((a: any) => ({
               identity: a?.identity ?? '',
@@ -927,7 +924,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         description: raw.description ?? null,
         isSystem: raw.isSystem === true,
         folderId: relationToId(raw.folder) ?? null,
-        project: relationToId(raw.project) ?? null,
         routeName: raw.routeName ?? null,
         routePath: raw.routePath ?? null,
         templateId,
@@ -987,7 +983,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         identity,
         name,
         folderId: relationToId(raw.folder) ?? schema.folderId ?? schema.folder ?? null,
-        project: relationToId(raw.project) ?? null,
         isPrimitive: schema.isPrimitive === true || raw.isPrimitive === true,
         isSystem: raw.isSystem === true,
         meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : (schema.meta ?? {}),
@@ -1029,7 +1024,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         inputs,
         runtimeFilters,
         folderId: relationToId(raw.folder) ?? null,
-        project: relationToId(raw.project) ?? null,
         meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
         inherited: raw.inherited === true,
       }
@@ -1161,7 +1155,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         source: typeof raw.source === 'string' ? raw.source : '',
         sourceVersion: Number(raw.sourceVersion ?? 2) || 2,
         folderId,
-        project: relationToId(raw.project) ?? null,
         meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
         inherited: raw.inherited === true,
       }
@@ -1182,7 +1175,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         entityType: typeof raw.entityType === 'string' && raw.entityType.trim() ? raw.entityType.trim() : null,
         parent: relationToId(raw.parent) ?? null,
         folderId: null,
-        project: relationToId(raw.project) ?? null,
         isSystem: raw.isSystem === true,
       }
     }
@@ -1259,7 +1251,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         name: raw.displayName,
         displayName: raw.displayName,
         folderId: relationToId(raw.folder) ?? null,
-        project: relationToId(raw.project) ?? null,
         author: raw.author ?? null,
         active: raw.active ?? true,
         deletedAt: raw.deletedAt ?? null,
@@ -1290,7 +1281,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         name: raw.displayName,
         displayName: raw.displayName,
         folderId: relationToId(raw.folder) ?? null,
-        project: relationToId(raw.project) ?? null,
         author: raw.author ?? null,
         active: raw.active ?? true,
         deletedAt: raw.deletedAt ?? null,
@@ -1310,7 +1300,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         description: raw.description ?? null,
         isSystem: raw.isSystem === true,
         folderId: relationToId(raw.folder) ?? null,
-        project: relationToId(raw.project) ?? null,
       }
     }
 
@@ -1321,7 +1310,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         name: raw.displayName,
         description: raw.description ?? null,
         isSystem: raw.isSystem === true,
-        project: relationToId(raw.project) ?? null,
       }
     }
 
@@ -1366,7 +1354,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         description: raw.description ?? null,
 
         folderId: relationToId(raw.folder) ?? null,
-        project: relationToId(raw.project) ?? null,
         definition: normalizeFlowDefinition(raw.definition),
         input: normalizeActionField(raw.input, 'input'),
         output: normalizeActionField(raw.output, 'output'),
@@ -1520,7 +1507,6 @@ export class EndgeSchemaStorage extends EndgeModule {
           description: raw.description ?? null,
           isSystem: raw.isSystem === true,
           folderId: relationToId(raw.folder) ?? null,
-          project: relationToId(raw.project) ?? null,
           tree: Array.isArray(raw.tree) ? raw.tree : [],
           meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
         }))
@@ -2489,7 +2475,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         tag: normalizeOptionalComponentSFCTag(component.tag),
         displayName: component.displayName ?? component.name ?? component.identity,
         folder,
-        project: component.project ?? null,
         source: component.source ?? '',
         supportedTargets: normalizeComponentSFCTargets(component.supportedTargets),
         modelVersion: Number(component.modelVersion ?? 1),
@@ -2541,7 +2526,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         displayName: dataView.displayName ?? dataView.name ?? String(dataView.identity ?? documentId),
         description: dataView.description ?? null,
         folder,
-        project: dataView.project ?? null,
         source: dataView.source ?? '',
         sourceVersion: Number(dataView.sourceVersion ?? 1),
         meta: (dataView.meta && typeof dataView.meta === 'object' && !Array.isArray(dataView.meta)) ? dataView.meta : {},
@@ -2566,7 +2550,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         displayName: composition.displayName ?? composition.name ?? String(composition.identity ?? documentId),
         description: composition.description ?? null,
         folder,
-        project: composition.project ?? null,
         source: composition.source ?? '',
         sourceVersion: Number(composition.sourceVersion ?? 1),
         meta: (composition.meta && typeof composition.meta === 'object' && !Array.isArray(composition.meta)) ? composition.meta : {},
@@ -2591,7 +2574,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         displayName: store.displayName ?? store.name ?? String(store.identity ?? documentId),
         description: store.description ?? null,
         folder,
-        project: store.project ?? null,
         source: store.source ?? '',
         sourceVersion: Number(store.sourceVersion ?? 1),
         meta: (store.meta && typeof store.meta === 'object' && !Array.isArray(store.meta)) ? store.meta : {},
@@ -2620,7 +2602,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         displayName: mock.displayName ?? mock.name ?? String(mock.identity ?? documentId),
         description: mock.description ?? null,
         folder,
-        project: mock.project ?? null,
         contentSource: mock.contentSource === 'code-provider' ? 'code-provider' as const : 'document' as const,
         contentType: mock.contentType === 'text/plain' ? 'text/plain' as const : 'application/json' as const,
         source: typeof mock.source === 'string' ? mock.source : '{}',
@@ -2660,7 +2641,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         displayName: computation.displayName ?? computation.name ?? String(computation.identity ?? documentId),
         description: computation.description ?? null,
         folder,
-        project: computation.project ?? null,
         source: typeof computation.source === 'string' ? computation.source : '',
         sourceVersion: Math.max(1, Number(computation.sourceVersion ?? 1) || 1),
         contractVersion: Math.max(1, Number(computation.contractVersion ?? 1) || 1),
@@ -2695,7 +2675,6 @@ export class EndgeSchemaStorage extends EndgeModule {
             identity: action.identity,
             displayName: action.displayName ?? action.name ?? action.identity,
             description: action.description ?? null,
-            project: action.project ?? null,
             folderId: action.folderId ?? null,
             definition: normalizeFlowDefinition(action.definition),
             input: action.input ?? null,
@@ -2724,7 +2703,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         definition: normalizeFlowDefinition(rawEditorFlowDefinition ?? plain.definition),
         input: toPayloadActionField(plain.input),
         output: toPayloadActionField(plain.output),
-        project: plain.project ?? null,
         folder: folderId,
         active: action.active !== false,
         ...(action.author != null && action.author !== '' && { author: action.author }),
@@ -2929,7 +2907,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         displayName: style.displayName ?? style.name ?? String(style.identity ?? documentId),
         description: style.description ?? null,
         folder,
-        project: style.project ?? null,
         source: typeof style.source === 'string' ? style.source : '',
         sourceVersion: Math.max(1, Number(style.sourceVersion ?? 1) || 1),
         meta: (style.meta && typeof style.meta === 'object' && !Array.isArray(style.meta)) ? style.meta : {},
@@ -3705,7 +3682,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         displayName: raw.displayName,
         description: raw.description ?? null,
         folderId: relationToId(raw.folder) ?? null,
-        project: relationToId(raw.project) ?? null,
         definition: normalizeFlowDefinition(raw.definition),
         input: normalizeActionField(raw.input, 'input'),
         output: normalizeActionField(raw.output, 'output'),
@@ -3759,7 +3735,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         displayName: raw.displayName ?? raw.name,
         description: raw.description ?? null,
         folderId: relationToId(raw.folder) ?? null,
-        project: relationToId(raw.project) ?? null,
         source: typeof raw.source === 'string' ? raw.source : '',
         sourceVersion: Math.max(1, Number(raw.sourceVersion ?? 1) || 1),
         meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
@@ -3778,7 +3753,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         description: raw.description ?? null,
         isSystem: raw.isSystem === true,
         folderId: relationToId(raw.folder) ?? null,
-        project: relationToId(raw.project) ?? null,
         tree: Array.isArray(raw.tree) ? raw.tree : [],
         meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
       }

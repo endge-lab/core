@@ -5,7 +5,6 @@ export interface ComponentSFCRepositoryPayload {
   tag?: string | null
   displayName: string
   folder?: string | number | null
-  project?: string | number | null
   source: string
   supportedTargets: string[]
   modelVersion: number

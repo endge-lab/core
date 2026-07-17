@@ -39,7 +39,6 @@ export interface NavigationDoc {
   displayName: string
   description?: string | null
   folder?: number | string
-  project?: number | string
   isSystem?: boolean
   tree?: NavigationTreeNodeDoc[]
   meta?: Record<string, unknown>

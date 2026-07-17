@@ -45,7 +45,6 @@ export abstract class RComponentCore extends REntity {
     target.name = this.name
     target.description = this.description
     target.folderId = this.folderId ?? null
-    target.project = this.project
     target.isSystem = this.isSystem
     target.inherited = this.inherited
     target.meta = { ...this.meta }

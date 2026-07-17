@@ -38,10 +38,6 @@ export class REntity {
   @Expose()
   folderId?: string | number | null = null
 
-  /** Проект (identity или null). Только для фильтра в виджете домена. */
-  @Expose()
-  project?: string | null = null
-
   /** Системный документ (нельзя редактировать/сохранять в редакторе) */
   @Expose()
   isSystem: boolean = false

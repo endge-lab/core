@@ -11,7 +11,6 @@ export interface MocksPayloadFields {
   source?: string
   codeRef?: string | null
   folder?: string | number | null
-  project?: string | number | null
   meta?: Record<string, unknown>
   author?: string | null
   active?: boolean

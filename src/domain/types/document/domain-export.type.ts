@@ -1,4 +1,5 @@
 import type { EndgeWorkspaceDefinition, EndgeWorkspaceSSEConfig } from '@/domain/types/document/workspace.types'
+import type { DomainDocumentType, DomainSectionType } from './document.types'
 
 /** Workspace-конфигурация без прямых credential-значений. */
 export type EndgeWorkspaceExport = Omit<EndgeWorkspaceDefinition, 'sse'> & {
@@ -40,4 +41,12 @@ export interface EndgeDomainBundle {
   version: string
   workspace: EndgeWorkspaceExport
   domain: EndgeDomainPlain
+}
+
+/** Ссылка на выбранный документ с типом коллекции, в которой локален его id. */
+export interface EndgeDomainSelection {
+  id: string | number
+  identity?: string
+  sectionType: DomainSectionType
+  docType: DomainDocumentType
 }

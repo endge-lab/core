@@ -36,7 +36,6 @@ export class RStyle extends REntity {
       ...json,
       name: json?.displayName ?? json?.name,
       folderId: relationToId(json?.folder ?? json?.folderId),
-      project: relationToId(json?.project) ?? null,
     }, json)
   }
 
@@ -50,7 +49,6 @@ export class RStyle extends REntity {
     style.source = typeof json?.source === 'string' ? json.source : ENDGE_STYLE_DEFAULT_SOURCE
     style.sourceVersion = Math.max(1, Number(json?.sourceVersion ?? 1) || 1)
     style.folderId = json?.folderId ?? relationToId(json?.folder) ?? null
-    style.project = (relationToId(json?.project) ?? null) as any
     style.meta = isPlainObject(json?.meta) ? { ...json.meta } : {}
     style.isSystem = json?.isSystem === true
     style.inherited = json?.inherited === true
@@ -72,7 +70,6 @@ export class RStyle extends REntity {
       source: this.source,
       sourceVersion: this.sourceVersion,
       folderId: this.folderId ?? null,
-      project: this.project ?? null,
       meta: this.meta ?? {},
       active: this.active !== false,
       inherited: this.inherited === true,

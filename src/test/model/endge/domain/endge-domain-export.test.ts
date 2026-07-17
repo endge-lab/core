@@ -5,7 +5,7 @@ import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { RDataView } from '@/domain/entities/reflect/RDataView'
 import type { REntity } from '@/domain/entities/reflect/REntity'
-import { QueryType } from '@/domain/types/document/document.types'
+import { DomainSectionType, QueryType } from '@/domain/types/document/document.types'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RStore } from '@/domain/entities/reflect/RStore'
 import { RMock } from '@/domain/entities/reflect/RMock'
@@ -125,5 +125,37 @@ describe('Endge domain export', () => {
     })
     expect(bundle.workspace.sse).not.toHaveProperty('manualToken')
     expect(restored.getQueryByIdentity('bundle-query')).not.toBeNull()
+  })
+
+  it('exports only selected documents and scopes ids by domain collection', () => {
+    Endge.workspace.apply(TEST_ENDGE_WORKSPACE)
+    const query = createQuery(1, 'selected-query', QueryType.REST)
+    const dataViewWithSameId = initializeEntity(new RDataView(), 1, 'not-selected-data-view')
+    const composition = initializeEntity(new RComposition(), 2, 'selected-composition')
+    Endge.domain.addQuery(query)
+    Endge.domain.addDataView(dataViewWithSameId)
+    Endge.domain.addComposition(composition)
+
+    const bundle = Endge.exportSelectedDomainBundle([
+      {
+        id: query.id,
+        identity: query.identity,
+        sectionType: DomainSectionType.Query,
+        docType: QueryType.REST,
+      },
+      {
+        id: composition.id,
+        identity: composition.identity,
+        sectionType: DomainSectionType.Composition,
+        docType: 'composition',
+      },
+    ])
+
+    expect(bundle.version).toBe('1.1.0')
+    expect(Object.keys(bundle.domain).sort()).toEqual(Object.keys(Endge.domain.toPlain()).sort())
+    expect(bundle.domain.queries).toEqual([expect.objectContaining({ identity: 'selected-query' })])
+    expect(bundle.domain.compositions).toEqual([expect.objectContaining({ identity: 'selected-composition' })])
+    expect(bundle.domain.dataViews).toEqual([])
+    expect(Object.values(bundle.domain).flat()).toHaveLength(2)
   })
 })

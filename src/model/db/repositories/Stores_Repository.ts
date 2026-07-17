@@ -7,7 +7,6 @@ export interface StoresPayloadFields {
   source: string
   sourceVersion: number
   folder?: string | number | null
-  project?: string | number | null
   meta?: Record<string, unknown>
   author?: string | null
   active?: boolean

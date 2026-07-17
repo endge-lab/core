@@ -14,7 +14,6 @@ export interface ActionRepositoryPayload {
   definition: ActionFlowDefinition
   input?: ActionRepositoryFieldContract | null
   output?: ActionRepositoryFieldContract | null
-  project?: number | string | null
   folder?: number | string | null
   author?: string
   active?: boolean

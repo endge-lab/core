@@ -30,12 +30,13 @@ describe('style Payload persistence', () => {
       source: 'opaque EndgeCSS source',
       sourceVersion: 2,
       folderId: 21,
-      project: 5,
       active: true,
       inherited: true,
       meta: { scope: 'workspace' },
     })
+    expect(style).not.toHaveProperty('project')
     expect(style.toPlain()).not.toHaveProperty('styles')
+    expect(style.toPlain()).not.toHaveProperty('project')
   })
 
   it('creates the styles root and persists source without legacy JSON', async () => {
@@ -77,5 +78,6 @@ describe('style Payload persistence', () => {
       sourceVersion: 1,
     }))
     expect(upsert.mock.calls[0]?.[0]).not.toHaveProperty('styles')
+    expect(upsert.mock.calls[0]?.[0]).not.toHaveProperty('project')
   })
 })

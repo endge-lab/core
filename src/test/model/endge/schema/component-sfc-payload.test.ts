@@ -11,6 +11,7 @@ describe('component SFC Payload hydration', () => {
       displayName: 'Tail',
       tag: '  Module.Tail  ',
       folder: { id: 10 },
+      project: { id: 7 },
       source: '<template><Text>Tail</Text></template>',
       supportedTargets: ['dom', 'canvas'],
     })
@@ -18,6 +19,8 @@ describe('component SFC Payload hydration', () => {
     const component = RComponentSFC.fromPlain(plain)
 
     expect(plain.tag).toBe('Module.Tail')
+    expect(plain).not.toHaveProperty('project')
     expect(component.tag).toBe('Module.Tail')
+    expect(component).not.toHaveProperty('project')
   })
 })

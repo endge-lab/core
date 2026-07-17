@@ -35,7 +35,6 @@ export class RComputation extends REntity {
       ...json,
       name: json?.displayName ?? json?.name,
       folderId: relationToId(json?.folder ?? json?.folderId),
-      project: relationToId(json?.project) ?? null,
     }, json)
   }
 
@@ -52,7 +51,6 @@ export class RComputation extends REntity {
     computation.input = fieldFromPlain(json?.input, 'input')
     computation.output = fieldFromPlain(json?.output, 'output')
     computation.folderId = json?.folderId ?? relationToId(json?.folder) ?? null
-    computation.project = (relationToId(json?.project) ?? null) as any
     computation.meta = isPlainObject(json?.meta) ? { ...json.meta } : {}
     computation.active = json?.active !== false
     computation.inherited = json?.inherited === true
@@ -76,7 +74,6 @@ export class RComputation extends REntity {
       input: fieldToPlain(this.input),
       output: fieldToPlain(this.output),
       folderId: this.folderId ?? null,
-      project: this.project ?? null,
       meta: this.meta ?? {},
       active: this.active !== false,
       inherited: this.inherited === true,

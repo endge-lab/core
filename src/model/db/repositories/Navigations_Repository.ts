@@ -33,7 +33,6 @@ export class Navigations_Repository {
       displayName: string
       description: string | null
       folder: number | string | null
-      project: number | string | null
       isSystem: boolean
       tree: NavigationTreeNodeDoc[]
       meta: Record<string, unknown>
@@ -48,7 +47,6 @@ export class Navigations_Repository {
     displayName: string
     description?: string | null
     folder?: number | string
-    project?: number | string
     isSystem?: boolean
     tree?: NavigationTreeNodeDoc[]
     meta?: Record<string, unknown>
@@ -60,7 +58,6 @@ export class Navigations_Repository {
       displayName: data.displayName,
       description: data.description ?? null,
       folder: data.folder ?? null,
-      project: data.project ?? null,
       ...(data.isSystem !== undefined && { isSystem: data.isSystem }),
       ...(data.tree !== undefined && { tree: data.tree }),
       ...(data.meta !== undefined && { meta: data.meta }),
@@ -72,7 +69,6 @@ export class Navigations_Repository {
     displayName: string
     description?: string | null
     folder?: number | string
-    project?: number | string
     isSystem?: boolean
     tree?: NavigationTreeNodeDoc[]
     meta?: Record<string, unknown>

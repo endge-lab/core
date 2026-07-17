@@ -74,7 +74,6 @@ export class RComponentSFC extends RComponentCore {
       displayName: this.displayName,
       description: this.description,
       folderId: this.folderId ?? null,
-      project: this.project ?? null,
       isSystem: this.isSystem,
       inherited: this.inherited,
       meta: { ...this.meta },
@@ -99,7 +98,6 @@ export class RComponentSFC extends RComponentCore {
     component.name = String(raw?.name ?? component.displayName)
     component.description = raw?.description ?? null
     component.folderId = raw?.folderId ?? raw?.folder ?? null
-    component.project = normalizeProject(raw?.project)
     component.isSystem = Boolean(raw?.isSystem ?? false)
     component.inherited = Boolean(raw?.inherited ?? false)
     component.meta = normalizeMeta(raw?.meta)
@@ -124,22 +122,6 @@ function normalizeTag(raw: unknown): string | null {
 }
 
 /** Нормализует ссылку на проект из Payload relation или plain-значения. */
-function normalizeProject(raw: unknown): string | null {
-  if (!raw) return null
-  if (typeof raw === 'string') return raw
-  if (typeof raw === 'number') return String(raw)
-  if (typeof raw === 'object') {
-    const project = raw as { identity?: unknown, id?: unknown }
-    return project.identity != null
-      ? String(project.identity)
-      : project.id != null
-        ? String(project.id)
-        : null
-  }
-
-  return null
-}
-
 /** Нормализует список поддерживаемых targets и оставляет только v1-значения. */
 function normalizeTargets(raw: unknown): RComponentRenderTarget[] {
   if (!Array.isArray(raw)) return ['dom', 'canvas']

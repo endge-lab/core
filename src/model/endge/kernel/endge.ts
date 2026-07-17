@@ -1,6 +1,7 @@
 import { EndgeFederation } from '@/domain/entities/endge/EndgeFederation'
 import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
-import type { EndgeDomainBundle } from '@/domain/types/document/domain-export.type'
+import type { EndgeDomainBundle, EndgeDomainPlain, EndgeDomainSelection } from '@/domain/types/document/domain-export.type'
+import { DomainSectionType } from '@/domain/types/document/document.types'
 import type { EndgeAuth } from '@/model/endge/security/endge-auth'
 import type { EndgeAuthProfiles } from '@/model/endge/security/endge-auth-profiles'
 import { EndgeBind } from '@/model/endge/runtime/core/endge-bind'
@@ -35,6 +36,64 @@ import { ENDGE_CORE_MODULES } from '@/model/config/endge-modules'
 import type { EndgeComposition } from '@/model/endge/runtime/execution/endge-composition'
 
 const ENDGE_DOMAIN_BUNDLE_VERSION = '1.1.0'
+
+type EndgeDomainCollection = keyof EndgeDomainPlain
+
+function resolveSelectionCollection(selection: EndgeDomainSelection): EndgeDomainCollection | null {
+  switch (selection.sectionType) {
+    case DomainSectionType.Primitive:
+    case DomainSectionType.Type:
+      return 'types'
+    case DomainSectionType.Component:
+      return selection.docType === 'component-sfc' ? 'componentSFCs' : 'components'
+    case DomainSectionType.Query:
+      return 'queries'
+    case DomainSectionType.DataView:
+      return 'dataViews'
+    case DomainSectionType.Composition:
+      return 'compositions'
+    case DomainSectionType.Store:
+      return 'stores'
+    case DomainSectionType.Mock:
+      return 'mocks'
+    case DomainSectionType.Action:
+      return 'actions'
+    case DomainSectionType.Converter:
+      return 'converters'
+    case DomainSectionType.Computation:
+      return 'computations'
+    case DomainSectionType.Integration:
+      return 'integrations'
+    case DomainSectionType.Parameters:
+      return 'parameters'
+    case DomainSectionType.Filters:
+      return 'filters'
+    case DomainSectionType.Environment:
+      return 'environments'
+    case DomainSectionType.Tenant:
+      return 'tenants'
+    case DomainSectionType.Policy:
+      return 'policies'
+    case DomainSectionType.Style:
+      return 'styles'
+    case DomainSectionType.PageTemplate:
+      return 'pageTemplates'
+    case DomainSectionType.Page:
+      return 'pages'
+    case DomainSectionType.Navigation:
+      return 'navigations'
+    case DomainSectionType.Vocabs:
+      return 'vocabs'
+    case DomainSectionType.I18nBundles:
+      return 'i18nBundles'
+    case DomainSectionType.AuthProfile:
+      return 'authProfiles'
+    case DomainSectionType.Project:
+      return 'projects'
+    default:
+      return null
+  }
+}
 
 /**
  * Единая статическая федерация Endge.
@@ -82,13 +141,55 @@ export class Endge extends EndgeFederation {
    * Собирает переносимый snapshot workspace и текущего домена.
    */
   static exportDomainBundle(): EndgeDomainBundle {
+    return this.createDomainBundle(Endge.domain.toPlain())
+  }
+
+  /**
+   * Собирает bundle только с перечисленными документами, сохраняя полную структуру domain.
+   * Тип секции обязателен, потому что id сущностей уникален только внутри своей коллекции.
+   */
+  static exportSelectedDomainBundle(selection: readonly EndgeDomainSelection[]): EndgeDomainBundle {
+    const selectedKeys = new Map<EndgeDomainCollection, Set<string>>()
+    for (const item of selection) {
+      const collection = resolveSelectionCollection(item)
+      if (!collection)
+        continue
+
+      const keys = selectedKeys.get(collection) ?? new Set<string>()
+      keys.add(String(item.id))
+      if (item.identity != null && item.identity !== '')
+        keys.add(String(item.identity))
+      selectedKeys.set(collection, keys)
+    }
+
+    const domain = Endge.domain.toPlain()
+    const selectedDomain = Object.fromEntries(
+      (Object.entries(domain) as Array<[EndgeDomainCollection, unknown[]]>).map(([collection, entities]) => {
+        const keys = selectedKeys.get(collection)
+        if (!keys)
+          return [collection, []]
+
+        return [collection, entities.filter((entity) => {
+          if (entity == null || typeof entity !== 'object')
+            return false
+          const candidate = entity as { id?: string | number, identity?: string | number }
+          return (candidate.id != null && keys.has(String(candidate.id)))
+            || (candidate.identity != null && keys.has(String(candidate.identity)))
+        })]
+      }),
+    ) as unknown as EndgeDomainPlain
+
+    return this.createDomainBundle(selectedDomain)
+  }
+
+  private static createDomainBundle(domain: EndgeDomainPlain): EndgeDomainBundle {
     const workspace = Endge.workspace.serialize()
     const sse = workspace.sse ? { ...workspace.sse } : undefined
     if (sse)
       delete sse.manualToken
 
     return {
-      domain: Endge.domain.toPlain(),
+      domain,
       version: ENDGE_DOMAIN_BUNDLE_VERSION,
       workspace: {
         ...workspace,
@@ -102,6 +203,18 @@ export class Endge extends EndgeFederation {
    */
   static async download(): Promise<void> {
     const bundle = this.exportDomainBundle()
+    this.downloadBundle(bundle, 'endge-domain')
+  }
+
+  /**
+   * Скачивает выбранные документы в той же portable JSON-структуре, что и полный домен.
+   */
+  static async downloadSelected(selection: readonly EndgeDomainSelection[]): Promise<void> {
+    const bundle = this.exportSelectedDomainBundle(selection)
+    this.downloadBundle(bundle, 'endge-domain-selected')
+  }
+
+  private static downloadBundle(bundle: EndgeDomainBundle, filenamePrefix: string): void {
     const jsonString = JSON.stringify(bundle)
 
     const now = new Date()
@@ -112,7 +225,7 @@ export class Endge extends EndgeFederation {
 
     const a = document.createElement('a')
     a.href = url
-    a.download = `endge-domain-${timestamp}.json`
+    a.download = `${filenamePrefix}-${timestamp}.json`
     a.click()
 
     URL.revokeObjectURL(url)

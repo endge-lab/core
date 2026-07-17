@@ -300,7 +300,6 @@ export class RAction extends REntity {
       displayName: this.displayName ?? this.name,
       description: this.description ?? null,
       folderId: this.folderId ?? null,
-      project: this.project ?? null,
       definition: rawDefinition,
       input: this._fieldToPlain(this.input),
       output: this._fieldToPlain(this.output),

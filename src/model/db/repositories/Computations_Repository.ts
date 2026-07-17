@@ -10,7 +10,6 @@ export interface ComputationsPayloadFields {
   input?: Record<string, unknown> | null
   output?: Record<string, unknown> | null
   folder?: string | number | null
-  project?: string | number | null
   meta?: Record<string, unknown>
   author?: string | null
   active?: boolean

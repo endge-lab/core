@@ -14,7 +14,6 @@ export interface RNavigationSchema {
   description?: string | null
   isSystem?: boolean
   folderId?: string | number | null
-  project?: string | number | null
   tree?: NavigationTreeNodeDoc[]
   meta?: Record<string, unknown>
 }
@@ -57,7 +56,6 @@ export class RNavigation extends REntity {
       description: this.description ?? null,
       isSystem: this.isSystem,
       folderId: this.folderId ?? null,
-      project: this.project ?? null,
       tree: this.tree?.length ? this.tree.map(cloneTreeNode) : undefined,
       meta: this.meta && Object.keys(this.meta).length > 0 ? { ...this.meta } : undefined,
     }
