@@ -1,4 +1,6 @@
 import type {
+  ComputationDependencyRunner,
+  ComputationExecutionScope,
   ComputationProgramNode,
   ComputationProgramPayload,
   ComputationSandboxAdapter,
@@ -33,23 +35,43 @@ export class ComputationRuntimeError extends Error {
 
 /** Executes compiler-ordered computation graphs without evaluating authored JS in core. */
 export class ComputationGraphExecutor {
-  constructor(private readonly sandbox: () => ComputationSandboxAdapter | null) {}
+  constructor(
+    private readonly sandbox: () => ComputationSandboxAdapter | null,
+    private readonly dependencies: ComputationDependencyRunner | null = null,
+  ) {}
 
-  runSync(payload: ComputationProgramPayload, input: unknown, identity: string): unknown {
+  runSync(
+    payload: ComputationProgramPayload,
+    input: unknown,
+    identity: string,
+    scope?: ComputationExecutionScope,
+  ): unknown {
     if (payload.execution !== 'sync')
       throw new ComputationRuntimeError(`Computation "${identity}" requires asynchronous sandbox execution.`, identity, 'async-artifact')
     const outputs = new Map<string, unknown>()
     for (const node of payload.nodes) {
-      if (node.kind !== 'expression')
+      if (node.kind === 'typescript')
         throw new ComputationRuntimeError(`Output "${node.name}" requires a sandbox.`, identity, 'async-output', node.name)
+      if (node.kind === 'computation') {
+        if (!this.dependencies || !scope)
+          throw new ComputationRuntimeError(`Output "${node.name}" requires a computation dependency runner.`, identity, 'dependency-runner-missing', node.name)
+        const nestedInput = this.evaluateNode(node.input, input, outputs, identity, node.name)
+        outputs.set(node.name, this.dependencies.runSync(node.identity, nestedInput, scope))
+        continue
+      }
       outputs.set(node.name, this.evaluateNode(node.expression, input, outputs, identity, node.name))
     }
     return this.evaluateResult(payload, input, outputs, identity)
   }
 
-  async run(payload: ComputationProgramPayload, input: unknown, identity: string): Promise<unknown> {
+  async run(
+    payload: ComputationProgramPayload,
+    input: unknown,
+    identity: string,
+    scope?: ComputationExecutionScope,
+  ): Promise<unknown> {
     if (payload.execution === 'sync')
-      return this.runSync(payload, input, identity)
+      return this.runSync(payload, input, identity, scope)
 
     const outputs = new Map<string, unknown>()
     const pending = new Map(payload.nodes.map(node => [node.name, node]))
@@ -57,7 +79,10 @@ export class ComputationGraphExecutor {
       const ready = payload.nodes.filter(node => pending.has(node.name) && node.dependencies.every(dependency => outputs.has(dependency)))
       if (!ready.length)
         throw new ComputationRuntimeError(`Computation "${identity}" graph cannot make progress.`, identity, 'graph-deadlock')
-      const values = await Promise.all(ready.map(async node => [node.name, await this.executeNode(node, input, outputs, identity)] as const))
+      const values = await Promise.all(ready.map(async node => [
+        node.name,
+        await this.executeNode(node, input, outputs, identity, scope),
+      ] as const))
       for (const [name, value] of values) {
         outputs.set(name, value)
         pending.delete(name)
@@ -71,9 +96,16 @@ export class ComputationGraphExecutor {
     input: unknown,
     outputs: Map<string, unknown>,
     identity: string,
+    scope?: ComputationExecutionScope,
   ): Promise<unknown> {
     if (node.kind === 'expression')
       return this.evaluateNode(node.expression, input, outputs, identity, node.name)
+    if (node.kind === 'computation') {
+      if (!this.dependencies || !scope)
+        throw new ComputationRuntimeError(`Output "${node.name}" requires a computation dependency runner.`, identity, 'dependency-runner-missing', node.name)
+      const nestedInput = this.evaluateNode(node.input, input, outputs, identity, node.name)
+      return this.dependencies.run(node.identity, nestedInput, scope)
+    }
     const sandbox = this.sandbox()
     if (!sandbox)
       throw new ComputationRuntimeError('Computation sandbox adapter is not installed.', identity, 'sandbox-missing', node.name)

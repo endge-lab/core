@@ -21,8 +21,8 @@ export class ComputationSourceLanguageStrategy implements SourceLanguageStrategy
   public readonly syntax = createTypeScriptLikeSourceSyntax({
     alias: 'Endge Computation Source',
     extension: '.endge-computation.ts',
-    keywords: ['defineComputation', 'input', 'output', 'typescript', ...VALUE_EXPRESSION_FUNCTION_NAMES],
-    functions: ['defineComputation', 'input', 'output', 'typescript', ...VALUE_EXPRESSION_METHOD_NAMES],
+    keywords: ['defineComputation', 'input', 'output', 'computation', 'typescript', ...VALUE_EXPRESSION_FUNCTION_NAMES],
+    functions: ['defineComputation', 'input', 'output', 'computation', 'typescript', ...VALUE_EXPRESSION_METHOD_NAMES],
     properties: ['outputs', 'result', 'inputs', 'compute'],
   })
 
@@ -44,6 +44,7 @@ export class ComputationSourceLanguageStrategy implements SourceLanguageStrategy
     return [
       { label: 'defineComputation', kind: 'snippet', insertText: COMPUTATION_DEFAULT_SOURCE.trimEnd(), detail: 'Создать computation graph' },
       { label: 'typescript', kind: 'snippet', insertText: "typescript({\n  inputs: {\n    value: input('value'),\n  },\n  compute({ value }, api) {\n    return value\n  },\n})", detail: 'Sandboxed TypeScript output node' },
+      { label: 'computation', kind: 'snippet', insertText: "computation('identity', {\n  value: input('value'),\n})", detail: 'Вызвать внешний computation' },
       { label: 'input', kind: 'function', insertText: "input('path')", detail: 'Прочитать внешний computation input' },
       { label: 'output', kind: 'function', insertText: "output('name')", detail: 'Прочитать named output' },
       ...VALUE_EXPRESSION_COMPLETIONS,

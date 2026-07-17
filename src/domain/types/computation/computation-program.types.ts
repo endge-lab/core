@@ -23,6 +23,13 @@ export type ComputationProgramNode
     moduleKey: string
     source: string
   }
+  | {
+    kind: 'computation'
+    name: string
+    dependencies: string[]
+    identity: string
+    input: SourceExpressionIR
+  }
 
 /** Runtime-ready graph compiled from one defineComputation source document. */
 export interface ComputationProgramPayload {

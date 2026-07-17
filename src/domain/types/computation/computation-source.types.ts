@@ -19,6 +19,13 @@ export type ComputationSourceNode
     source: string
     sourceRange?: ComputationSourceRange
   }
+  | {
+    kind: 'computation'
+    name: string
+    identity: string
+    input: SourceExpressionIR
+    sourceRange?: ComputationSourceRange
+  }
 
 /** Canonical compiler-derived representation of defineComputation source. */
 export interface ComputationSourceDocument {

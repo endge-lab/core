@@ -1,13 +1,21 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RComputation } from '@/domain/entities/reflect/RComputation'
+import { REnvironment } from '@/domain/entities/reflect/REnvironment'
+import { RProject } from '@/domain/entities/reflect/RProject'
+import { RTenant } from '@/domain/entities/reflect/RTenant'
 import { Endge } from '@/model/endge/kernel/endge'
+import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
 describe('EndgeCompiler ComponentSFC ports', () => {
+  beforeEach(() => prepareCompilerContext())
+
   afterEach(() => {
+    Endge.configuration.reset()
     Endge.program.clear()
     Endge.domain.reset()
+    Endge.workspace.reset()
   })
 
   it('compiles computations before components and executes the default artifact', async () => {
@@ -69,4 +77,22 @@ function component(id: number, identity: string, source: string): RComponentSFC 
   model.displayName = identity
   model.source = source
   return model
+}
+
+function prepareCompilerContext(): void {
+  Endge.workspace.apply(TEST_ENDGE_WORKSPACE)
+  Endge.domain.addProject(RProject.fromPlain({ id: 101, identity: 'project', name: 'Project' }))
+  Endge.domain.addEnvironment(REnvironment.fromPlain({ id: 102, identity: 'environment', name: 'Environment' }))
+  const tenant = new RTenant()
+  tenant.id = 103
+  tenant.identity = 'tenant'
+  tenant.name = 'Tenant'
+  tenant.code = 'tenant'
+  Endge.domain.addTenant(tenant)
+  Endge.configuration.build({
+    dataProvider: 'plain',
+    scope: {},
+    vars: {},
+    context: { projectIdentity: 'project', environmentIdentity: 'environment', tenantIdentity: 'tenant' },
+  })
 }

@@ -19,6 +19,12 @@ import {
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
+interface ExternalComputationCompileContext {
+  sourceNodes: ComputationSourceNode[]
+  reservedNames: Set<string>
+  nextCallId: number
+}
+
 export interface ComputationCompileInput {
   source: string
   input: ComputationContractField | null
@@ -133,6 +139,17 @@ export function compileComputation(input: ComputationCompileInput): ComputationC
     return { payload, diagnostics }
 
   const sourceNodes: ComputationSourceNode[] = []
+  const reservedNames = new Set(outputsNode.properties.flatMap((property) => {
+    if (!t.isObjectProperty(property) || property.computed)
+      return []
+    const name = propertyName(property.key)
+    return name ? [name] : []
+  }))
+  const externalContext: ExternalComputationCompileContext = {
+    sourceNodes,
+    reservedNames,
+    nextCallId: 0,
+  }
   const declaredNames = new Set<string>()
   for (const property of outputsNode.properties) {
     if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
@@ -150,22 +167,26 @@ export function compileComputation(input: ComputationCompileInput): ComputationC
     const value = unwrapExpression(property.value)
     const sourceRange = range(property)
     if (isTypescriptCall(value)) {
-      const node = compileTypescriptNode(name, value, input.source, diagnostics)
+      const node = compileTypescriptNode(name, value, input.source, diagnostics, externalContext)
       if (node) sourceNodes.push({ ...node, sourceRange })
       continue
     }
-    const expression = compileComputationExpression(value, diagnostics, `outputs.${name}`)
+    const expression = compileComputationExpression(value, diagnostics, `outputs.${name}`, externalContext)
     if (expression)
       sourceNodes.push({ kind: 'expression', name, expression, sourceRange })
   }
 
-  const result = compileComputationExpression(resultNode, diagnostics, 'result')
+  const result = compileComputationExpression(resultNode, diagnostics, 'result', externalContext)
   if (!result)
     return { payload, diagnostics }
 
   const known = new Set(sourceNodes.map(node => node.name))
   const programNodes: ComputationProgramNode[] = sourceNodes.map((node) => {
-    const expressions = node.kind === 'expression' ? [node.expression] : Object.values(node.inputs)
+    const expressions = node.kind === 'expression'
+      ? [node.expression]
+      : node.kind === 'typescript'
+        ? Object.values(node.inputs)
+        : [node.input]
     const dependencies = unique(expressions.flatMap(collectOutputReferences))
     for (const dependency of dependencies) {
       if (!known.has(dependency)) {
@@ -176,9 +197,10 @@ export function compileComputation(input: ComputationCompileInput): ComputationC
         })
       }
     }
-    return node.kind === 'expression'
-      ? { kind: 'expression', name: node.name, dependencies, expression: node.expression }
-      : {
+    if (node.kind === 'expression')
+      return { kind: 'expression', name: node.name, dependencies, expression: node.expression }
+    if (node.kind === 'typescript') {
+      return {
         kind: 'typescript',
         name: node.name,
         dependencies,
@@ -186,6 +208,14 @@ export function compileComputation(input: ComputationCompileInput): ComputationC
         moduleKey: hash(`${node.name}:${node.source}`),
         source: node.source,
       }
+    }
+    return {
+      kind: 'computation',
+      name: node.name,
+      dependencies,
+      identity: node.identity,
+      input: node.input,
+    }
   })
   for (const dependency of collectOutputReferences(result)) {
     if (!known.has(dependency))
@@ -197,7 +227,7 @@ export function compileComputation(input: ComputationCompileInput): ComputationC
   payload.sourceDocument = document
   payload.nodes = ordered
   payload.result = result
-  payload.execution = ordered.some(node => node.kind === 'typescript') ? 'async' : 'sync'
+  payload.execution = ordered.some(node => node.kind === 'typescript' || node.kind === 'computation') ? 'async' : 'sync'
   return { payload, diagnostics }
 }
 
@@ -206,6 +236,7 @@ function compileTypescriptNode(
   call: t.CallExpression,
   source: string,
   diagnostics: DiagnosticDraft[],
+  externalContext: ExternalComputationCompileContext,
 ): Extract<ComputationSourceNode, { kind: 'typescript' }> | null {
   const definition = call.arguments[0]
   if (!definition || !t.isObjectExpression(definition)) {
@@ -257,7 +288,12 @@ function compileTypescriptNode(
       continue
     }
     inputNames.add(inputName)
-    const expression = compileComputationExpression(property.value, diagnostics, `outputs.${name}.inputs.${inputName}`)
+    const expression = compileComputationExpression(
+      property.value,
+      diagnostics,
+      `outputs.${name}.inputs.${inputName}`,
+      externalContext,
+    )
     if (expression) inputs[inputName] = expression
   }
 
@@ -273,8 +309,11 @@ function compileComputationExpression(
   raw: t.Expression,
   diagnostics: DiagnosticDraft[],
   sourcePath: string,
+  externalContext: ExternalComputationCompileContext,
 ): SourceExpressionIR | null {
-  return compileSourceExpression(rewriteComputationReads(raw, diagnostics, sourcePath), diagnostics, sourcePath)
+  const rewritten = rewriteComputationReads(raw, diagnostics, sourcePath)
+  const lifted = liftExternalComputationCalls(rewritten, diagnostics, sourcePath, externalContext)
+  return compileSourceExpression(lifted, diagnostics, sourcePath)
 }
 
 function rewriteComputationReads(raw: t.Expression, diagnostics: DiagnosticDraft[], sourcePath: string): t.Expression {
@@ -299,6 +338,77 @@ function rewriteComputationReads(raw: t.Expression, diagnostics: DiagnosticDraft
   return node
 }
 
+/** Поднимает nested computation(...) calls в отдельные graph nodes. */
+function liftExternalComputationCalls(
+  root: t.Expression,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+  context: ExternalComputationCompileContext,
+): t.Expression {
+  const transform = (current: t.Node): t.Node => {
+    const keys = (t.VISITOR_KEYS as Record<string, string[]>)[current.type] ?? []
+    for (const key of keys) {
+      const value = (current as any)[key]
+      if (Array.isArray(value)) {
+        (current as any)[key] = value.map(child => child && typeof child.type === 'string' ? transform(child) : child)
+      }
+      else if (value && typeof value.type === 'string') {
+        (current as any)[key] = transform(value)
+      }
+    }
+
+    if (!t.isCallExpression(current) || !t.isIdentifier(current.callee, { name: 'computation' }))
+      return current
+
+    const identityNode = current.arguments[0]
+    const inputNode = current.arguments[1]
+    if (!t.isStringLiteral(identityNode) || !identityNode.value.trim()) {
+      diagnostics.push(diagnostic(
+        'error',
+        'computation-reference-identity',
+        'computation(identity, input) требует непустой static string identity.',
+        sourcePath,
+        current,
+      ))
+      return t.identifier('undefined')
+    }
+    if (current.arguments.length !== 2 || !inputNode || !t.isExpression(inputNode)) {
+      diagnostics.push(diagnostic(
+        'error',
+        'computation-reference-input',
+        'computation(identity, input) требует ровно два arguments и expression input.',
+        sourcePath,
+        current,
+      ))
+      return t.identifier('undefined')
+    }
+
+    const input = compileSourceExpression(inputNode, diagnostics, `${sourcePath}.input`)
+    if (!input)
+      return t.identifier('undefined')
+
+    const name = nextExternalNodeName(context)
+    context.sourceNodes.push({
+      kind: 'computation',
+      name,
+      identity: identityNode.value.trim(),
+      input,
+      sourceRange: range(current),
+    })
+    return t.callExpression(t.identifier('__computationOutput'), [t.stringLiteral(name)])
+  }
+
+  return transform(root) as t.Expression
+}
+
+function nextExternalNodeName(context: ExternalComputationCompileContext): string {
+  let name = ''
+  do name = `__computation_call_${context.nextCallId++}`
+  while (context.reservedNames.has(name))
+  context.reservedNames.add(name)
+  return name
+}
+
 function validateSandboxBody(node: t.Node, diagnostics: DiagnosticDraft[], sourcePath: string): void {
   const forbidden = new Set([
     'eval', 'Function', 'Promise', 'fetch', 'XMLHttpRequest', 'WebSocket',
@@ -311,6 +421,8 @@ function validateSandboxBody(node: t.Node, diagnostics: DiagnosticDraft[], sourc
       diagnostics.push(diagnostic('error', 'computation-typescript-await', 'await запрещён в synchronous typescript.compute.', sourcePath, current))
     if (t.isImport(current) || t.isImportDeclaration(current))
       diagnostics.push(diagnostic('error', 'computation-typescript-import', 'Dynamic и static imports запрещены.', sourcePath, current))
+    if (t.isCallExpression(current) && t.isIdentifier(current.callee, { name: 'computation' }))
+      diagnostics.push(diagnostic('error', 'computation-typescript-reference', 'External computation calls разрешены только в graph expressions и typescript.inputs.', sourcePath, current))
     if (t.isIdentifier(current)
       && forbidden.has(current.name)
       && !bindings.has(current.name)

@@ -85,6 +85,51 @@ describe('compileComputation graph', () => {
     await expect(execution).resolves.toBe(3)
   })
 
+  it('lifts external computations from value-expression chains into graph nodes', () => {
+    const result = compileComputation({
+      input: null,
+      output: null,
+      source: `defineComputation({
+        outputs: {
+          label: computation('shared.normalize', {
+            value: input('name'),
+          }).get('label').upperCase(),
+        },
+        result: output('label'),
+      })`,
+    })
+
+    expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
+    expect(result.payload.nodes).toEqual([
+      expect.objectContaining({
+        kind: 'computation',
+        identity: 'shared.normalize',
+        dependencies: [],
+      }),
+      expect.objectContaining({
+        kind: 'expression',
+        name: 'label',
+        dependencies: [expect.stringMatching(/^__computation_call_/)],
+      }),
+    ])
+    expect(result.payload.execution).toBe('async')
+  })
+
+  it('rejects dynamic external computation identities', () => {
+    const result = compileComputation({
+      input: null,
+      output: null,
+      source: `defineComputation({
+        outputs: { value: computation(input('identity'), input('value')) },
+        result: output('value'),
+      })`,
+    })
+
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'computation-reference-identity' }),
+    ]))
+  })
+
   it('reports unknown outputs, cycles, async blocks and the legacy syntax', () => {
     const invalid = compileComputation({
       input: null,
@@ -95,6 +140,7 @@ describe('compileComputation graph', () => {
     b: output('a'),
     c: output('missing'),
     d: typescript({ inputs: {}, async compute() { return 1 } }),
+    e: typescript({ inputs: {}, compute() { return computation('hidden', {}) } }),
   },
   result: output('c'),
 })`,
@@ -103,6 +149,7 @@ describe('compileComputation graph', () => {
       expect.objectContaining({ code: 'computation-output-unknown', start: expect.any(Number), end: expect.any(Number) }),
       expect.objectContaining({ code: 'computation-output-cycle', start: expect.any(Number), end: expect.any(Number) }),
       expect.objectContaining({ code: 'computation-typescript-async' }),
+      expect.objectContaining({ code: 'computation-typescript-reference' }),
     ]))
 
     expect(compileComputation({

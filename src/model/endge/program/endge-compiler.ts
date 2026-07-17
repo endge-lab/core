@@ -43,6 +43,14 @@ import { analyzeComponentSFCScript } from '@/model/services/compiler/component-s
 import { compileEndgeCSS } from '@/model/services/style'
 import { resolveCompositionActivation } from '@/model/services/source-engine/composition-activation'
 
+type ComputationArtifact = ProgramArtifact<ComputationProgramPayload>
+
+const COMPUTATION_LINK_DIAGNOSTICS = new Set([
+  'computation-reference-missing',
+  'computation-reference-invalid',
+  'computation-reference-cycle',
+])
+
 /**
  * Компилятор persisted domain model в compiled program artifacts.
  */
@@ -80,6 +88,7 @@ export class EndgeCompiler extends EndgeModule {
 
     if (!this.compilePhase('computation', ENDGE_LOG_LANES.COMPONENTS, 'computations', Endge.domain.getComputations(), context))
       return
+    this._linkComputations()
 
     if (!this.compilePhase('component-sfc', ENDGE_LOG_LANES.COMPONENTS, 'SFC-компонентов', componentSFCs, context))
       return
@@ -121,7 +130,9 @@ export class EndgeCompiler extends EndgeModule {
   /** Компилирует одну Computation в безопасный runtime artifact. */
   public buildComputation(entity: RComputation): ProgramArtifact<ComputationProgramPayload> {
     const context = this._createCompileContext()
-    return this.compileEntity('computation', entity, context) as ProgramArtifact<ComputationProgramPayload>
+    const artifact = this.compileEntity('computation', entity, context) as ProgramArtifact<ComputationProgramPayload>
+    this._linkComputations()
+    return artifact
   }
 
   /** Компилирует один ComponentSFC без запуска полного domain build. */
@@ -252,6 +263,7 @@ export class EndgeCompiler extends EndgeModule {
           capabilities: ['compilable', 'runnable'],
           payload: result.payload,
           diagnostics: result.diagnostics,
+          dependencies: this._computationDependencies(result.payload),
         })
       },
     })
@@ -523,6 +535,181 @@ export class EndgeCompiler extends EndgeModule {
     return Endge.domain.getStyles()
       .filter(style => style.active !== false && !style.deletedAt)
       .sort((left, right) => rank(left) - rank(right) || left.identity.localeCompare(right.identity))
+  }
+
+  /** Возвращает static artifact dependencies внешних computation calls. */
+  private _computationDependencies(payload: ComputationProgramPayload): ProgramArtifact['dependencies'] {
+    const identities = new Set<string>()
+    const dependencies: ProgramArtifact['dependencies'] = []
+    for (const node of payload.nodes) {
+      if (node.kind !== 'computation' || identities.has(node.identity))
+        continue
+      identities.add(node.identity)
+      const target = Endge.domain.getComputation(node.identity)
+      dependencies.push({
+        entityType: 'computation',
+        id: target?.id ?? node.identity,
+        identity: node.identity,
+        role: 'computation-call',
+      })
+    }
+    return dependencies
+  }
+
+  /** Связывает computation artifacts, запрещает missing/invalid/cyclic references и выводит effective execution mode. */
+  private _linkComputations(): void {
+    const artifacts = Endge.program.getArtifacts()
+      .filter((artifact): artifact is ComputationArtifact => artifact.ref.entityType === 'computation')
+    const byIdentity = new Map(artifacts.map(artifact => [artifact.ref.identity, artifact]))
+
+    for (const artifact of artifacts) {
+      artifact.diagnostics = artifact.diagnostics.filter(item => !COMPUTATION_LINK_DIAGNOSTICS.has(item.code))
+      artifact.status = statusFromDiagnostics(artifact.diagnostics)
+      artifact.dependencies = this._computationDependencies(artifact.payload)
+      artifact.payload.execution = artifact.payload.nodes.some(node => node.kind === 'typescript') ? 'async' : 'sync'
+    }
+
+    for (const artifact of artifacts) {
+      for (const node of artifact.payload.nodes) {
+        if (node.kind !== 'computation' || byIdentity.has(node.identity))
+          continue
+        this._addComputationLinkDiagnostic(artifact, {
+          severity: 'error',
+          code: 'computation-reference-missing',
+          message: `Computation "${artifact.ref.identity}" ссылается на отсутствующий computation "${node.identity}".`,
+          sourcePath: `outputs.${node.name}`,
+        })
+      }
+    }
+
+    const graph = new Map(artifacts.map(artifact => [
+      artifact.ref.identity,
+      uniqueComputationReferences(artifact.payload).filter(identity => byIdentity.has(identity)),
+    ]))
+    for (const component of this._findComputationCycles(graph)) {
+      const cycle = this._findCyclePath(component, graph)
+      const message = `Обнаружен cycle между computations: ${cycle.join(' -> ')}.`
+      for (const identity of component) {
+        const artifact = byIdentity.get(identity)!
+        this._addComputationLinkDiagnostic(artifact, {
+          severity: 'error',
+          code: 'computation-reference-cycle',
+          message,
+          sourcePath: 'source',
+        })
+      }
+    }
+
+    let changed = true
+    while (changed) {
+      changed = false
+      for (const artifact of artifacts) {
+        for (const identity of uniqueComputationReferences(artifact.payload)) {
+          const target = byIdentity.get(identity)
+          if (!target || target.status !== 'error' || artifact.status === 'error')
+            continue
+          this._addComputationLinkDiagnostic(artifact, {
+            severity: 'error',
+            code: 'computation-reference-invalid',
+            message: `Computation "${artifact.ref.identity}" зависит от invalid computation "${identity}".`,
+            sourcePath: 'source',
+          })
+          changed = true
+        }
+      }
+    }
+
+    changed = true
+    while (changed) {
+      changed = false
+      for (const artifact of artifacts) {
+        if (artifact.payload.execution === 'async')
+          continue
+        const hasAsyncDependency = uniqueComputationReferences(artifact.payload)
+          .some(identity => byIdentity.get(identity)?.payload.execution === 'async')
+        if (hasAsyncDependency) {
+          artifact.payload.execution = 'async'
+          changed = true
+        }
+      }
+    }
+
+    Endge.program.recalculateStatus()
+  }
+
+  /** Добавляет linker diagnostic без duplicate сообщений и обновляет artifact status. */
+  private _addComputationLinkDiagnostic(
+    artifact: ComputationArtifact,
+    value: Omit<ProgramDiagnostic, 'entityRef'>,
+  ): void {
+    if (artifact.diagnostics.some(item => item.code === value.code && item.message === value.message))
+      return
+    artifact.diagnostics.push({ ...value, entityRef: artifact.ref })
+    artifact.status = statusFromDiagnostics(artifact.diagnostics)
+  }
+
+  /** Находит strongly connected components, которые образуют реальные cycles. */
+  private _findComputationCycles(graph: Map<string, string[]>): string[][] {
+    let index = 0
+    const indexes = new Map<string, number>()
+    const lowLinks = new Map<string, number>()
+    const stack: string[] = []
+    const onStack = new Set<string>()
+    const cycles: string[][] = []
+
+    const visit = (identity: string) => {
+      indexes.set(identity, index)
+      lowLinks.set(identity, index++)
+      stack.push(identity)
+      onStack.add(identity)
+
+      for (const dependency of graph.get(identity) ?? []) {
+        if (!indexes.has(dependency)) {
+          visit(dependency)
+          lowLinks.set(identity, Math.min(lowLinks.get(identity)!, lowLinks.get(dependency)!))
+        }
+        else if (onStack.has(dependency)) {
+          lowLinks.set(identity, Math.min(lowLinks.get(identity)!, indexes.get(dependency)!))
+        }
+      }
+
+      if (lowLinks.get(identity) !== indexes.get(identity))
+        return
+      const component: string[] = []
+      let member = ''
+      do {
+        member = stack.pop()!
+        onStack.delete(member)
+        component.push(member)
+      } while (member !== identity)
+      if (component.length > 1 || (graph.get(identity) ?? []).includes(identity))
+        cycles.push(component)
+    }
+
+    for (const identity of graph.keys()) {
+      if (!indexes.has(identity))
+        visit(identity)
+    }
+    return cycles
+  }
+
+  /** Восстанавливает один точный cycle path внутри strongly connected component. */
+  private _findCyclePath(component: string[], graph: Map<string, string[]>): string[] {
+    const members = new Set(component)
+    const search = (current: string, path: string[]): string[] | null => {
+      for (const next of graph.get(current) ?? []) {
+        if (!members.has(next))
+          continue
+        const cycleStart = path.indexOf(next)
+        if (cycleStart >= 0)
+          return [...path.slice(cycleStart), next]
+        const found = search(next, [...path, next])
+        if (found)
+          return found
+      }
+      return null
+    }
+    return search(component[0]!, [component[0]!]) ?? [...component, component[0]!]
   }
 
   /** Resolves a domain provider descriptor without requiring compile order among SFCs. */
@@ -1594,4 +1781,16 @@ function fieldContract(field: { type: string, isArray?: boolean, optional?: bool
     isArray: field.isArray === true,
     optional: field.optional === true,
   }
+}
+
+function uniqueComputationReferences(payload: ComputationProgramPayload): string[] {
+  return [...new Set(payload.nodes
+    .filter(node => node.kind === 'computation')
+    .map(node => node.identity))]
+}
+
+function statusFromDiagnostics(diagnostics: ProgramDiagnostic[]): ProgramArtifact['status'] {
+  if (diagnostics.some(item => item.severity === 'error'))
+    return 'error'
+  return diagnostics.length ? 'warning' : 'valid'
 }

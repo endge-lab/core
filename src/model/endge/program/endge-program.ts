@@ -58,6 +58,14 @@ export class EndgeProgram extends EndgeModule {
     this._status = mergeStatus(this._status, status)
   }
 
+  /** Пересчитывает общий status после compiler linking pass. */
+  public recalculateStatus(): void {
+    this._status = 'valid'
+    for (const artifact of this._artifacts.values())
+      this._status = mergeStatus(this._status, artifact.status)
+    this.notify()
+  }
+
   /**
    * Добавляет compiled artifact и индексирует его по id и identity.
    */
