@@ -49,6 +49,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   private _bridgePaths = new Set<string>()
   private _dataPaths = new Map<string, string>()
   private _storeRuntimeIds = new Map<string, string>()
+  private _storeProviderRuntimeIds = new Map<string, Set<string>>()
   private _ownedStoreRuntimeIds = new Set<string>()
   private _mounted = false
 
@@ -413,17 +414,17 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     for (const path of this._bridgePaths)
       Raph.delete(path)
     this._bridgePaths.clear()
-    for (const runtimeId of this._ownedStoreRuntimeIds) {
-      if (Endge.runtime.getRuntimeById(runtimeId))
-        await Endge.runtime.destroyRuntimeTreeAsync(runtimeId)
-    }
-    this._ownedStoreRuntimeIds.clear()
     for (const child of this._children.values()) {
       if (Endge.runtime.getRuntimeById(child.id))
         await Endge.runtime.destroyRuntimeTreeAsync(child.id)
       else if (child.status !== 'destroyed')
         await child.destroy()
     }
+    for (const runtimeId of this._ownedStoreRuntimeIds) {
+      if (Endge.runtime.getRuntimeById(runtimeId))
+        await Endge.runtime.destroyRuntimeTreeAsync(runtimeId)
+    }
+    this._ownedStoreRuntimeIds.clear()
     this._children.clear()
     this._childDescriptors.clear()
     this._publicOutputs = {}
@@ -441,11 +442,12 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     this._publicationDisposers.clear()
     this._dataPaths.clear()
     this._storeRuntimeIds.clear()
+    this._storeProviderRuntimeIds.clear()
     this._mounted = false
     super.destroy()
   }
 
-  /** Монтирует vocab data и связывает Store aliases с owned/borrowed runtime instances. */
+  /** Монтирует vocab data и разрешает Store aliases через explicit, ancestor или local provider. */
   private _mountData(payload: CompositionProgramPayload): void {
     const explicitStoreRuntimes = (
       this.meta.dataRuntimes && typeof this.meta.dataRuntimes === 'object'
@@ -479,15 +481,27 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       const explicitRuntimeId = String(explicitStoreRuntimes[descriptor.name] ?? '').trim()
       let storeRuntime: StoreRuntimeHost | null = null
       let ownership: 'owned' | 'borrowed' = 'owned'
+      let provider: 'explicit' | 'ancestor' | 'local' = 'local'
       if (explicitRuntimeId) {
         storeRuntime = Endge.runtime.getRuntimeById<StoreRuntimeHost>(explicitRuntimeId)
         ownership = 'borrowed'
+        provider = 'explicit'
         if (!storeRuntime || storeRuntime.entityType !== 'store')
           throw new Error(`[CompositionRuntimeHost] Store runtime "${explicitRuntimeId}" for data alias "${descriptor.name}" is missing.`)
         if (storeRuntime.entityIdentity !== descriptor.identity)
           throw new Error(`[CompositionRuntimeHost] Store runtime "${explicitRuntimeId}" has identity "${storeRuntime.entityIdentity}" instead of "${descriptor.identity}".`)
       }
-      else {
+      else if (descriptor.resolution !== 'isolated') {
+        storeRuntime = this._findAncestorStoreProvider(descriptor.identity, descriptor.slot)
+        if (storeRuntime) {
+          ownership = 'borrowed'
+          provider = 'ancestor'
+        }
+        else if (descriptor.resolution === 'injected') {
+          throw new Error(`[CompositionRuntimeHost] Injected Store data "${descriptor.name}" requires provider "${descriptor.identity}"${descriptor.slot ? ` in slot "${descriptor.slot}"` : ''}.`)
+        }
+      }
+      if (!storeRuntime) {
         storeRuntime = Endge.runtime.execute(store, {
           parent: this,
           persistence: 'disabled',
@@ -501,6 +515,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       const storePath = storeRuntime.getDataPath()
       this._dataPaths.set(descriptor.name, storePath)
       this._storeRuntimeIds.set(descriptor.name, storeRuntime.id)
+      this._registerStoreProvider(descriptor.identity, descriptor.slot, storeRuntime.id)
       this.addResource({
         id: `data:${descriptor.name}`,
         kind: 'meta',
@@ -512,9 +527,42 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
           identity: descriptor.identity,
           runtimeId: storeRuntime.id,
           ownership,
+          provider,
+          resolution: descriptor.resolution ?? 'contextual',
+          slot: descriptor.slot ?? null,
         },
       })
     }
+  }
+
+  /** Находит ближайший Store provider только среди Composition ancestors. */
+  private _findAncestorStoreProvider(identity: string, slot: string | null | undefined): StoreRuntimeHost | null {
+    const key = storeProviderKey(identity, slot)
+    let current = this.parent
+    while (current) {
+      if (current instanceof CompositionRuntimeHost) {
+        const runtimeIds = current._storeProviderRuntimeIds.get(key)
+        if (runtimeIds?.size) {
+          if (runtimeIds.size > 1)
+            throw new Error(`[CompositionRuntimeHost] Store provider "${identity}"${slot ? ` in slot "${slot}"` : ''} is ambiguous in ancestor "${current.entityIdentity}".`)
+          const runtimeId = runtimeIds.values().next().value as string
+          const runtime = Endge.runtime.getRuntimeById<StoreRuntimeHost>(runtimeId)
+          if (!runtime || runtime.entityType !== 'store')
+            throw new Error(`[CompositionRuntimeHost] Store provider runtime "${runtimeId}" is missing.`)
+          return runtime
+        }
+      }
+      current = current.parent
+    }
+    return null
+  }
+
+  /** Публикует resolved Store instance для descendants этой Composition. */
+  private _registerStoreProvider(identity: string, slot: string | null | undefined, runtimeId: string): void {
+    const key = storeProviderKey(identity, slot)
+    const runtimeIds = this._storeProviderRuntimeIds.get(key) ?? new Set<string>()
+    runtimeIds.add(runtimeId)
+    this._storeProviderRuntimeIds.set(key, runtimeIds)
   }
 
   /** Атомарно публикует накопленный batch runtime outputs в writable Store data. */
@@ -647,6 +695,20 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       basePath,
       input: { kind: 'local', props: initialProps },
       runtimeScopeId: this._requireScope(descriptor.scopePath).id,
+    }
+    if (descriptor.kind === 'composition') {
+      const dataRuntimes = Object.fromEntries(
+        (this.getArtifactPayload()?.graph.dataInputs ?? [])
+          .filter(connection => connection.targetRuntime === descriptor.name)
+          .map((connection) => {
+            const runtimeId = this._storeRuntimeIds.get(connection.sourceData)
+            if (!runtimeId)
+              throw new Error(`[CompositionRuntimeHost] Store data "${connection.sourceData}" is not mounted for nested Composition "${descriptor.name}".`)
+            return [connection.targetData, runtimeId]
+          }),
+      )
+      if (Object.keys(dataRuntimes).length)
+        meta.dataRuntimes = dataRuntimes
     }
     if (descriptor.kind === 'component') {
       Raph.set(basePath, initialProps)
@@ -1051,6 +1113,10 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       visit(runtime.name)
     return ordered
   }
+}
+
+function storeProviderKey(identity: string, slot: string | null | undefined): string {
+  return `${String(identity).trim()}\u0000${String(slot ?? '').trim()}`
 }
 
 function encodePathPart(value: string): string {

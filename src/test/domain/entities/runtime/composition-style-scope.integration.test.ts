@@ -48,7 +48,7 @@ describe('Composition style scope integration', () => {
       runtimes: [],
       hooks: [],
       outputs: [{ key: 'page', kind: 'scope', scope: 'pages' }],
-      graph: { inputs: [], updates: [], publications: [], mounts: [] },
+      graph: { inputs: [], dataInputs: [], updates: [], publications: [], mounts: [] },
     }
     Endge.program.addArtifact(programArtifact('composition', 103, 'project-entry', payload))
 

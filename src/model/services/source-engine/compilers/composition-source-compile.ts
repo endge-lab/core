@@ -151,6 +151,11 @@ export function buildRuntimeGraph(document: CompositionSourceDocument): Composit
     targetProp,
     source,
   })))
+  const dataInputs = document.runtimes.flatMap(runtime => Object.entries(runtime.dataBindings ?? {}).map(([targetData, sourceData]) => ({
+    targetRuntime: runtime.name,
+    targetData,
+    sourceData,
+  })))
   const updates = document.hooks.flatMap((hook, index) => hook.kind === 'change'
     ? [{
         id: `hook:${index}:${hook.runtime}.${hook.output}->${hook.target}`,
@@ -173,7 +178,7 @@ export function buildRuntimeGraph(document: CompositionSourceDocument): Composit
       targetPath,
     }))
   )))
-  return { inputs, updates, publications, mounts }
+  return { inputs, dataInputs, updates, publications, mounts }
 }
 
 function findDefineComposition(ast: t.File): t.CallExpression | null {
@@ -279,8 +284,8 @@ function readData(node: t.ObjectExpression, diagnostics: DiagnosticDraft[]): Com
     if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value))
       continue
     const name = propertyName(property.key)
-    const expression = unwrapExpression(property.value)
-    if (!name || !t.isCallExpression(expression) || !t.isIdentifier(expression.callee)) {
+    const chain = memberChain(property.value)
+    if (!name || !chain || !t.isIdentifier(chain.base.callee)) {
       diagnostics.push(diagnostic('error', 'composition-data-shape', 'data entry должен быть store(identity) или vocab(identity).', `data.${name ?? ''}`, property))
       continue
     }
@@ -288,17 +293,57 @@ function readData(node: t.ObjectExpression, diagnostics: DiagnosticDraft[]): Com
       diagnostics.push(diagnostic('error', 'composition-data-duplicate', `Data alias "${name}" объявлен повторно.`, `data.${name}`, property))
       continue
     }
-    const kind = expression.callee.name
+    const kind = chain.base.callee.name
     if (kind !== 'store' && kind !== 'vocab') {
-      diagnostics.push(diagnostic('error', 'composition-data-kind', `Data kind "${kind}" не поддерживается.`, `data.${name}`, expression))
+      diagnostics.push(diagnostic('error', 'composition-data-kind', `Data kind "${kind}" не поддерживается.`, `data.${name}`, chain.base))
       continue
     }
-    const identity = readStringArgument(expression, 0)
+    const identity = readStringArgument(chain.base, 0)
     if (!identity) {
-      diagnostics.push(diagnostic('error', 'composition-data-identity', `Data "${name}" требует identity.`, `data.${name}`, expression))
+      diagnostics.push(diagnostic('error', 'composition-data-identity', `Data "${name}" требует identity.`, `data.${name}`, chain.base))
       continue
     }
-    data.push({ name, kind, identity })
+
+    let resolution: CompositionDataDescriptor['resolution'] = kind === 'store' ? 'contextual' : undefined
+    let slot: string | null = null
+    const resolutionModifiers = chain.modifiers.filter(item => ['contextual', 'isolated', 'injected'].includes(item.name))
+    if (resolutionModifiers.length > 1) {
+      diagnostics.push(diagnostic(
+        'error',
+        'composition-data-resolution-conflict',
+        `Store data "${name}" имеет несколько resolution modifiers.`,
+        `data.${name}`,
+        resolutionModifiers[1]?.call,
+      ))
+    }
+    for (const modifier of chain.modifiers) {
+      if (kind !== 'store') {
+        diagnostics.push(diagnostic('error', 'composition-data-modifier-kind', `.${modifier.name}(...) поддерживается только для store(...).`, `data.${name}`, modifier.call))
+        continue
+      }
+      if (modifier.name === 'contextual' || modifier.name === 'isolated' || modifier.name === 'injected') {
+        if (modifier.call.arguments.length) {
+          diagnostics.push(diagnostic('error', 'composition-data-resolution-arguments', `.${modifier.name}() не принимает аргументы.`, `data.${name}.${modifier.name}`, modifier.call))
+          continue
+        }
+        if (resolutionModifiers.length === 1)
+          resolution = modifier.name
+        continue
+      }
+      if (modifier.name === 'slot') {
+        const value = readStringArgument(modifier.call, 0)
+        if (!value || modifier.call.arguments.length !== 1)
+          diagnostics.push(diagnostic('error', 'composition-data-slot', '.slot(name) требует одну непустую строку.', `data.${name}.slot`, modifier.call))
+        else if (slot)
+          diagnostics.push(diagnostic('error', 'composition-data-slot-duplicate', '.slot(name) объявлен повторно.', `data.${name}.slot`, modifier.call))
+        else
+          slot = value
+        continue
+      }
+      diagnostics.push(diagnostic('error', 'composition-data-method', `.${modifier.name}(...) не поддерживается Store data descriptor.`, `data.${name}`, modifier.call))
+    }
+
+    data.push({ name, kind, identity, ...(resolution ? { resolution } : {}), ...(slot ? { slot } : {}) })
     declared.add(name)
   }
   return data
@@ -430,6 +475,7 @@ function readRuntime(
     activationOverride: null,
     effectiveActivation: ownerActivation,
     props: {},
+    dataBindings: {},
     storeTo: [],
   }
 
@@ -510,6 +556,19 @@ function readRuntime(
       descriptor.props = readBindings(config, diagnostics, `runtimes.${name}.withProps`)
       continue
     }
+    if (modifier.name === 'withData') {
+      if (kind !== 'composition') {
+        diagnostics.push(diagnostic('error', 'composition-with-data-runtime-kind', '.withData(...) поддерживается только для вложенной Composition.', `runtimes.${name}.withData`, modifier.call))
+        continue
+      }
+      const config = modifier.call.arguments[0]
+      if (!config || !t.isObjectExpression(config)) {
+        diagnostics.push(diagnostic('error', 'composition-with-data-object', '.withData(...) принимает object literal.', `runtimes.${name}.withData`, modifier.call))
+        continue
+      }
+      descriptor.dataBindings = readDataBindings(config, dataNames, diagnostics, `runtimes.${name}.withData`)
+      continue
+    }
     if (modifier.name === 'storeTo') {
       if (kind !== 'query' && kind !== 'composition') {
         diagnostics.push(diagnostic('error', 'composition-store-to-runtime-kind', '.storeTo(...) поддерживается только Query и Composition runtime.', `runtimes.${name}.storeTo`, modifier.call))
@@ -558,6 +617,33 @@ function readRuntime(
     ))
   }
   return descriptor
+}
+
+function readDataBindings(
+  node: t.ObjectExpression,
+  dataNames: Set<string>,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+): Record<string, string> {
+  const bindings: Record<string, string> = {}
+  for (const property of node.properties) {
+    if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
+      diagnostics.push(diagnostic('error', 'composition-with-data-property', 'withData допускает только обычные properties.', sourcePath, property))
+      continue
+    }
+    const targetData = propertyName(property.key)
+    const sourceData = readDataTarget(property.value)
+    if (!targetData || !sourceData) {
+      diagnostics.push(diagnostic('error', 'composition-with-data-binding', 'withData mapping имеет вид { childAlias: data(parentAlias) }.', `${sourcePath}.${targetData ?? ''}`, property))
+      continue
+    }
+    if (!dataNames.has(sourceData)) {
+      diagnostics.push(diagnostic('error', 'composition-with-data-source-missing', `withData ссылается на отсутствующий data alias "${sourceData}".`, `${sourcePath}.${targetData}`, property))
+      continue
+    }
+    bindings[targetData] = sourceData
+  }
+  return bindings
 }
 
 function readFilterViewControls(

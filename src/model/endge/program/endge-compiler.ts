@@ -1323,6 +1323,36 @@ export class EndgeCompiler extends EndgeModule {
           artifact.payload.activation,
           payload.scopes.find(scope => scope.path === runtime.scopePath)?.effectiveActivation,
         )
+        for (const [targetDataName, sourceDataName] of Object.entries(runtime.dataBindings ?? {})) {
+          const sourceData = payload.data.find(item => item.name === sourceDataName)
+          const targetData = artifact.payload.data.find(item => item.name === targetDataName)
+          if (!targetData) {
+            diagnostics.push({
+              severity: 'error',
+              code: 'composition-with-data-target-missing',
+              message: `Composition "${runtime.identity}" не объявляет data alias "${targetDataName}".`,
+              sourcePath: `runtimes.${runtime.name}.withData.${targetDataName}`,
+            })
+            continue
+          }
+          if (!sourceData || sourceData.kind !== 'store' || targetData.kind !== 'store') {
+            diagnostics.push({
+              severity: 'error',
+              code: 'composition-with-data-kind',
+              message: `withData binding "${sourceDataName}" → "${targetDataName}" должен связывать два Store data alias.`,
+              sourcePath: `runtimes.${runtime.name}.withData.${targetDataName}`,
+            })
+            continue
+          }
+          if (sourceData.identity !== targetData.identity) {
+            diagnostics.push({
+              severity: 'error',
+              code: 'composition-with-data-identity',
+              message: `Store identity "${sourceData.identity}" несовместима с ожидаемой "${targetData.identity}".`,
+              sourcePath: `runtimes.${runtime.name}.withData.${targetDataName}`,
+            })
+          }
+        }
         const outputNames = new Set(artifact.payload.outputs.map(output => output.key))
         validateStoreTo(runtime, outputNames, 'Composition')
       }
@@ -1742,7 +1772,7 @@ export class EndgeCompiler extends EndgeModule {
       runtimes: [],
       hooks: [],
       outputs: [],
-      graph: { inputs: [], updates: [], publications: [], mounts: [] },
+      graph: { inputs: [], dataInputs: [], updates: [], publications: [], mounts: [] },
     }
   }
 

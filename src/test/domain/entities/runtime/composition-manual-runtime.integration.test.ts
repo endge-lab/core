@@ -87,7 +87,7 @@ function compositionArtifact(model: RComposition): ProgramArtifact<CompositionPr
     }],
     graph: {
       inputs: [{ targetRuntime: 'consumer', targetProp: 'rows', source: { kind: 'output', runtime: 'source', output: 'rows' } }],
-      updates: [], publications: [], mounts: [],
+      dataInputs: [], updates: [], publications: [], mounts: [],
     },
   })
 }

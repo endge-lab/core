@@ -48,6 +48,10 @@ export interface CompositionDataDescriptor {
   name: string
   kind: 'store' | 'vocab'
   identity: string
+  /** Политика разрешения Store; для Vocab не используется. */
+  resolution?: 'contextual' | 'isolated' | 'injected'
+  /** Provider slot для нескольких Store instances с одной identity. */
+  slot?: string | null
 }
 
 export interface CompositionStorePublication {
@@ -81,6 +85,8 @@ export interface CompositionRuntimeDescriptor {
   componentIdentity?: string
   persistKey?: string
   props: Record<string, CompositionBindingValue>
+  /** Локальный data alias child -> data alias owner Composition. */
+  dataBindings?: Record<string, string>
   storeTo: CompositionStorePublication[]
 }
 
@@ -128,6 +134,13 @@ export interface CompositionRuntimeInputConnection {
   source: CompositionBindingValue
 }
 
+/** Явная передача Store data из owner Composition во вложенную Composition. */
+export interface CompositionRuntimeDataConnection {
+  targetRuntime: string
+  targetData: string
+  sourceData: string
+}
+
 /** Нормализованный trigger логического update runtime-ноды. */
 export interface CompositionRuntimeUpdateConnection {
   id: string
@@ -156,6 +169,7 @@ export interface CompositionRuntimeMountConnection {
 /** Исполняемый граф Composition, построенный компилятором из source document. */
 export interface CompositionRuntimeGraph {
   inputs: CompositionRuntimeInputConnection[]
+  dataInputs?: CompositionRuntimeDataConnection[]
   updates: CompositionRuntimeUpdateConnection[]
   publications: CompositionRuntimePublicationConnection[]
   mounts: CompositionRuntimeMountConnection[]

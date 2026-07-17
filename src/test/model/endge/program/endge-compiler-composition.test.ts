@@ -1,14 +1,22 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { RComposition } from '@/domain/entities/reflect/RComposition'
+import { REnvironment } from '@/domain/entities/reflect/REnvironment'
+import { RProject } from '@/domain/entities/reflect/RProject'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RStore } from '@/domain/entities/reflect/RStore'
+import { RTenant } from '@/domain/entities/reflect/RTenant'
 import { Endge } from '@/model/endge/kernel/endge'
+import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
 describe('EndgeCompiler composition validation', () => {
+  beforeEach(() => prepareCompilerContext())
+
   afterEach(() => {
+    Endge.configuration.reset()
     Endge.program.clear()
     Endge.domain.reset()
+    Endge.workspace.reset()
   })
 
   it('distinguishes missing query model from missing query artifact', () => {
@@ -135,6 +143,47 @@ defineComposition({
     ]))
   })
 
+  it('validates explicit Store data bindings against the nested Composition contract', () => {
+    const store = new RStore()
+    store.id = 20
+    store.identity = 'schedule-store'
+    store.name = 'Schedule Store'
+    store.source = 'defineStore({ data: { raw: value([]) } })'
+    const child = new RComposition()
+    child.id = 21
+    child.identity = 'schedule-child'
+    child.name = 'Schedule Child'
+    child.source = `
+defineComposition({
+  data: { schedule: store('schedule-store') },
+  runtimes: {},
+})
+`
+    Endge.domain.addStore(store)
+    Endge.domain.addComposition(child)
+    Endge.compiler.buildStore(store)
+    Endge.compiler.buildComposition(child)
+
+    const valid = new RComposition()
+    valid.id = 22
+    valid.identity = 'schedule-parent'
+    valid.name = 'Schedule Parent'
+    valid.source = `
+defineComposition({
+  data: { shared: store('schedule-store') },
+  runtimes: {
+    child: composition('schedule-child').withData({ schedule: data('shared') }),
+  },
+})
+`
+    expect(Endge.compiler.buildComposition(valid).status).toBe('valid')
+
+    valid.source = valid.source.replace('schedule: data(\'shared\')', 'missing: data(\'shared\')')
+    expect(Endge.compiler.buildComposition(valid).diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'composition-with-data-target-missing' }),
+    ]))
+  })
+
   it('reports transitive Composition dependency cycles during compilation', () => {
     const first = createNestedComposition('second')
     first.identity = 'first'
@@ -156,6 +205,24 @@ defineComposition({
     ]))
   })
 })
+
+function prepareCompilerContext(): void {
+  Endge.workspace.apply(TEST_ENDGE_WORKSPACE)
+  Endge.domain.addProject(RProject.fromPlain({ id: 101, identity: 'project', name: 'Project' }))
+  Endge.domain.addEnvironment(REnvironment.fromPlain({ id: 102, identity: 'environment', name: 'Environment' }))
+  const tenant = new RTenant()
+  tenant.id = 103
+  tenant.identity = 'tenant'
+  tenant.name = 'Tenant'
+  tenant.code = 'tenant'
+  Endge.domain.addTenant(tenant)
+  Endge.configuration.build({
+    dataProvider: 'plain',
+    scope: {},
+    vars: {},
+    context: { projectIdentity: 'project', environmentIdentity: 'environment', tenantIdentity: 'tenant' },
+  })
+}
 
 function createComposition(): RComposition {
   const composition = new RComposition()

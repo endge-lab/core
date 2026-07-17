@@ -209,6 +209,67 @@ describe('Composition runtime session', () => {
     expect(sharedRuntime.getDataSnapshot()).toEqual({ raw: [1] })
   })
 
+  it('reuses the nearest ancestor Store and creates a local fallback in standalone preview', async () => {
+    installContextualStoreCompositions({ resolution: 'contextual', parentHasStore: true })
+
+    const session = await Endge.runtime.composition.mount('context-parent')
+    const child = session.host.getChild('child') as CompositionRuntimeHost
+    const parentPath = session.host.getDataPath('shared')
+    const childPath = child.getDataPath('local')
+    const stores = Endge.runtime.getRuntimeHostsByEntity('store', 'context-store') as StoreRuntimeHost[]
+
+    expect(stores).toHaveLength(1)
+    expect(childPath).toBe(parentPath)
+    stores[0]?.set('raw', [2])
+    expect(session.host.getDataSnapshot()).toEqual({ shared: { raw: [2] } })
+    expect(child.getDataSnapshot()).toEqual({ local: { raw: [2] } })
+
+    await session.unmount()
+    const preview = await Endge.runtime.composition.mount('context-child')
+    const previewStore = Endge.runtime.getRuntimeHostsByEntity('store', 'context-store')[0] as StoreRuntimeHost
+    expect(previewStore.parent).toBe(preview.host)
+    expect(preview.host.getDataSnapshot()).toEqual({ local: { raw: [1] } })
+    await preview.unmount()
+  })
+
+  it('supports isolated Store instances and lets explicit withData override isolation', async () => {
+    installContextualStoreCompositions({ resolution: 'isolated', parentHasStore: true })
+    const isolatedSession = await Endge.runtime.composition.mount('context-parent')
+    const isolatedChild = isolatedSession.host.getChild('child') as CompositionRuntimeHost
+    expect(Endge.runtime.getRuntimeHostsByEntity('store', 'context-store')).toHaveLength(2)
+    expect(isolatedChild.getDataPath('local')).not.toBe(isolatedSession.host.getDataPath('shared'))
+    await isolatedSession.unmount()
+
+    await Endge.runtime.reset()
+    Endge.program.clear()
+    Endge.domain.reset()
+    Raph.app.reset()
+    installContextualStoreCompositions({ resolution: 'isolated', parentHasStore: true, explicitBinding: true })
+    const explicitSession = await Endge.runtime.composition.mount('context-parent')
+    const explicitChild = explicitSession.host.getChild('child') as CompositionRuntimeHost
+    expect(Endge.runtime.getRuntimeHostsByEntity('store', 'context-store')).toHaveLength(1)
+    expect(explicitChild.getDataPath('local')).toBe(explicitSession.host.getDataPath('shared'))
+    await explicitSession.unmount()
+  })
+
+  it('keeps sibling fallbacks separate and rejects a missing injected Store provider', async () => {
+    installContextualStoreCompositions({ resolution: 'contextual', parentHasStore: false, childNames: ['left', 'right'] })
+    const session = await Endge.runtime.composition.mount('context-parent')
+    const left = session.host.getChild('left') as CompositionRuntimeHost
+    const right = session.host.getChild('right') as CompositionRuntimeHost
+    expect(Endge.runtime.getRuntimeHostsByEntity('store', 'context-store')).toHaveLength(2)
+    expect(left.getDataPath('local')).not.toBe(right.getDataPath('local'))
+    await session.unmount()
+
+    await Endge.runtime.reset()
+    Endge.program.clear()
+    Endge.domain.reset()
+    Raph.app.reset()
+    installContextualStoreCompositions({ resolution: 'injected', parentHasStore: false })
+    await expect(Endge.runtime.composition.mount('context-child')).rejects.toThrow('requires provider "context-store"')
+    expect(Endge.runtime.getRuntimeHosts()).toEqual([])
+  })
+
   it('mounts a nested Composition and exposes its outputs reactively', async () => {
     const initialRows = [{ id: 1, flight: 'SU100' }]
     vi.spyOn(QueryRuntimeHost.prototype, 'run').mockImplementation(async function (this: QueryRuntimeHost) {
@@ -413,6 +474,66 @@ function makeCompositionPayload(document: any): CompositionProgramPayload {
     ...normalized,
     graph: buildRuntimeGraph(normalized),
   }
+}
+
+function installContextualStoreCompositions(input: {
+  resolution: 'contextual' | 'isolated' | 'injected'
+  parentHasStore: boolean
+  explicitBinding?: boolean
+  childNames?: string[]
+}): void {
+  const store = new RStore()
+  store.id = 40
+  store.identity = 'context-store'
+  store.name = 'Context Store'
+  store.source = 'defineStore({ data: { raw: value([1]) } })'
+
+  const child = new RComposition()
+  child.id = 41
+  child.identity = 'context-child'
+  child.name = 'Context Child'
+
+  const parent = new RComposition()
+  parent.id = 42
+  parent.identity = 'context-parent'
+  parent.name = 'Context Parent'
+
+  Endge.domain.addStore(store)
+  Endge.domain.addComposition(child)
+  Endge.domain.addComposition(parent)
+
+  const childPayload = makeCompositionPayload({
+    data: [{ name: 'local', kind: 'store', identity: 'context-store', resolution: input.resolution }],
+    runtimes: [],
+    hooks: [],
+    outputs: [],
+  })
+  const childNames = input.childNames ?? ['child']
+  const parentPayload = makeCompositionPayload({
+    data: input.parentHasStore
+      ? [{ name: 'shared', kind: 'store', identity: 'context-store', resolution: 'contextual' }]
+      : [],
+    runtimes: childNames.map(name => ({
+      name,
+      kind: 'composition',
+      identity: 'context-child',
+      props: {},
+      dataBindings: input.explicitBinding ? { local: 'shared' } : {},
+      storeTo: [],
+    })),
+    hooks: [],
+    outputs: [],
+  })
+
+  Endge.program.beginCompile('test')
+  Endge.program.addArtifact(artifact(
+    'store',
+    40,
+    'context-store',
+    Endge.source.compile('store', store.source).artifact as StoreSourceArtifact,
+  ))
+  Endge.program.addArtifact(artifact('composition', 41, 'context-child', childPayload))
+  Endge.program.addArtifact(artifact('composition', 42, 'context-parent', parentPayload))
 }
 
 function artifact<T>(

@@ -23,7 +23,7 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
       'onMount', 'output', 'query', 'metadata', 'resources', 'scope', 'startup', 'style', ...VALUE_EXPRESSION_FUNCTION_NAMES,
     ],
     functions: [
-      'activateOn', 'component', 'controls', 'debounce', 'fields', 'fromRuntime', 'fromScope', 'persist', 'run', 'select', 'store', 'storeTo', 'vocab', 'withProps', ...VALUE_EXPRESSION_METHOD_NAMES,
+      'activateOn', 'component', 'contextual', 'controls', 'debounce', 'fields', 'fromRuntime', 'fromScope', 'injected', 'isolated', 'persist', 'run', 'select', 'slot', 'store', 'storeTo', 'vocab', 'withData', 'withProps', ...VALUE_EXPRESSION_METHOD_NAMES,
     ],
     properties: ['activateOn', 'data', 'hooks', 'key', 'metadata', 'outputs', 'resources', 'runtimes'],
   })
@@ -69,7 +69,10 @@ const COMPOSITION_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'defineComposition', kind: 'snippet', insertText: COMPOSITION_DEFAULT_SOURCE.trimEnd(), detail: 'Создать Composition source' },
   { label: 'metadata', kind: 'property', insertText: `metadata: {\n  'namespace.feature': {},\n},`, detail: 'Статическая metadata Composition' },
   { label: 'filter', kind: 'function', insertText: `filter('identity')`, detail: 'Filter runtime' },
-  { label: 'store', kind: 'function', insertText: `store('identity')`, detail: 'Store data dependency' },
+  { label: 'store', kind: 'function', insertText: `store('identity')`, detail: 'Contextual Store data: nearest provider or local fallback' },
+  { label: 'isolated', kind: 'function', insertText: `.isolated()`, detail: 'Always create a local Store instance' },
+  { label: 'injected', kind: 'function', insertText: `.injected()`, detail: 'Require an ancestor or explicit Store provider' },
+  { label: 'slot', kind: 'function', insertText: `.slot('name')`, detail: 'Select a named Store provider slot' },
   { label: 'fromData', kind: 'function', insertText: `fromData('store.field')`, detail: 'Composition data binding' },
   { label: 'storeTo', kind: 'function', insertText: `.storeTo(data('store'), {
   raw: output('raw'),
@@ -78,6 +81,9 @@ const COMPOSITION_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'query', kind: 'function', insertText: `query('identity').withProps({})`, detail: 'Query runtime' },
   { label: 'component', kind: 'function', insertText: `component('identity').withProps({})`, detail: 'Component runtime' },
   { label: 'composition', kind: 'function', insertText: `composition('identity')`, detail: 'Nested Composition runtime' },
+  { label: 'withData', kind: 'function', insertText: `.withData({
+  childAlias: data('parentAlias'),
+})`, detail: 'Explicit Store data binding for nested Composition' },
   { label: 'scope', kind: 'function', insertText: `scope({\n  resources: {},\n  runtimes: {},\n}).activateOn(manual())`, detail: 'Runtime lifecycle scope' },
   { label: 'style', kind: 'function', insertText: `style('style-identity')`, detail: 'Owned EndgeCSS resource' },
   { label: 'activateOn', kind: 'function', insertText: `.activateOn(startup())`, detail: 'Instance activation override' },

@@ -124,7 +124,7 @@ function payload(mode: 'startup' | 'manual'): CompositionProgramPayload {
       activationOverride: { mode }, effectiveActivation: { mode },
       resources: [], runtimes: [], children: [], sourceOrder: 0,
     }],
-    graph: { inputs: [], updates: [], publications: [], mounts: [] },
+    graph: { inputs: [], dataInputs: [], updates: [], publications: [], mounts: [] },
   }
 }
 
@@ -152,7 +152,7 @@ function payloadWithPages(): CompositionProgramPayload {
       { key: 'pageA', kind: 'scope', scope: 'pageA' },
       { key: 'pageB', kind: 'scope', scope: 'pageB' },
     ],
-    graph: { inputs: [], updates: [], publications: [], mounts: [] },
+    graph: { inputs: [], dataInputs: [], updates: [], publications: [], mounts: [] },
   }
 }
 

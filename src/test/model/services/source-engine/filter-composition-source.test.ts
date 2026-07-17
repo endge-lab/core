@@ -377,6 +377,52 @@ defineComposition({
     ]))
   })
 
+  it('compiles contextual Store policies and explicit nested data bindings', () => {
+    const result = compileCompositionSource(`
+defineComposition({
+  data: {
+    shared: store('schedule').slot('primary'),
+    draft: store('schedule').isolated().slot('draft'),
+    session: store('session').injected(),
+  },
+  runtimes: {
+    board: composition('flight-board').withData({
+      schedule: data('shared'),
+    }),
+  },
+})
+`)
+
+    expect(result.diagnostics).toEqual([])
+    expect(result.artifact?.data).toEqual([
+      { name: 'shared', kind: 'store', identity: 'schedule', resolution: 'contextual', slot: 'primary' },
+      { name: 'draft', kind: 'store', identity: 'schedule', resolution: 'isolated', slot: 'draft' },
+      { name: 'session', kind: 'store', identity: 'session', resolution: 'injected' },
+    ])
+    expect(result.artifact?.runtimes[0]?.dataBindings).toEqual({ schedule: 'shared' })
+    expect(result.artifact?.graph.dataInputs).toEqual([
+      { targetRuntime: 'board', targetData: 'schedule', sourceData: 'shared' },
+    ])
+
+    const invalid = compileCompositionSource(`
+defineComposition({
+  data: {
+    schedule: store('schedule').isolated().injected(),
+  },
+  runtimes: {
+    board: composition('flight-board').withData({
+      schedule: data('missing'),
+    }),
+  },
+})
+`)
+    expect(invalid.artifact).toBeNull()
+    expect(invalid.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'composition-data-resolution-conflict' }),
+      expect.objectContaining({ code: 'composition-with-data-source-missing' }),
+    ]))
+  })
+
   it('compiles data, storeTo and fromData with optional outputs', () => {
     const result = compileCompositionSource(`
 defineComposition({
