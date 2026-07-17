@@ -1,3 +1,5 @@
+import type { EndgeExecutionContext } from '@/domain/types/configuration'
+
 /**
  * Источник получения доменных данных
  * default - работа с внешним сервисом backend
@@ -12,7 +14,7 @@ export type EndgeDataProvider =
 /**
  * Конфигурация загрузки движка
  * Определяет workspace, данные которого должны быть активированы из Payload.
- * Позже сюда добавятся tenantId/projectId/environmentId/entrypoint.
+ * Tenant, project и environment передаются отдельно через EndgeBootContext.context.
  */
 export interface EndgeLoadScope {
   workspaceIdentity?: string
@@ -33,6 +35,9 @@ export interface EndgeBootContext {
    * Граница загружаемых данных.
    */
   scope: EndgeLoadScope
+
+  /** Structural context immutable for one complete boot/build lifecycle. */
+  context?: Partial<EndgeExecutionContext>
 
   /**
    * Runtime/env vars, которые нужны ядру.

@@ -107,23 +107,14 @@ function hasWorkspaceValue(data: Record<string, unknown>): boolean {
   return true
 }
 
-/** Нормализует Payload workspace без потери profile fields перед boot pipeline. */
+/** Нормализует Payload Workspace с единой nested configuration. */
 export function normalizePayloadWorkspace(raw: any): Record<string, unknown> {
   return {
     id: raw.id,
     identity: raw.identity,
     name: raw.name ?? raw.displayName,
     displayName: raw.displayName ?? raw.name,
-    vars: raw.vars ?? [],
-    sse: raw.sse ?? undefined,
-    locales: raw.locales ?? raw.availableLocales ?? [],
-    defaultLocale: raw.defaultLocale ?? raw.default_locale,
-    fallbackLocale: raw.fallbackLocale ?? raw.fallback_locale,
-    themes: raw.themes ?? raw.availableThemes ?? [],
-    defaultTheme: raw.defaultTheme ?? raw.default_theme,
-    defaultAuthProfileIdentity: raw.defaultAuthProfileIdentity ?? raw.default_auth_profile_identity ?? null,
-    sfcAdapterIds: raw.sfcAdapterIds ?? raw.sfc_adapter_ids ?? [],
-    defaultSfcAdapterId: raw.defaultSfcAdapterId ?? raw.default_sfc_adapter_id,
+    configuration: raw.configuration,
   }
 }
 
@@ -849,6 +840,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         displayName: raw.displayName,
         isSystem: raw.isSystem === true,
         folderId: relationToId(raw.folder) ?? null,
+        configuration: raw.configuration,
       }
     }
 
@@ -861,6 +853,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         code: raw.code ?? raw.identity ?? '',
         description: raw.description ?? null,
         folderId: relationToId(raw.folder) ?? null,
+        configuration: raw.configuration,
       }
     }
 
@@ -1190,6 +1183,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         order: raw.order != null ? Number(raw.order) : null,
         navigationId: relationToId(raw.navigation) ?? null,
         allowedEnvironmentIds: relationToNumericIds(raw.allowedEnvironments ?? raw.allowedEnvironmentIds ?? []),
+        configuration: raw.configuration,
       }
     }
 
@@ -2372,35 +2366,7 @@ export class EndgeSchemaStorage extends EndgeModule {
       const saved = await repos.workspaces!.upsert({
         identity: workspace.identity,
         displayName: workspace.displayName,
-        vars: workspace.vars.map(item => ({
-          name: item.name,
-          defaultValue: item.defaultValue,
-        })),
-        sse: workspace.sse
-          ? {
-              url: workspace.sse.url,
-              authMode: workspace.sse.authMode ?? 'inherit',
-              authProfileIdentity: workspace.sse.authProfileIdentity ?? null,
-              manualToken: workspace.sse.manualToken ?? null,
-            }
-          : undefined,
-        locales: workspace.locales.map(locale => ({
-          identity: locale.code,
-          displayName: locale.displayName || locale.code,
-          code: locale.code,
-          shortLabel: locale.shortLabel,
-          direction: locale.direction ?? 'ltr',
-        })),
-        defaultLocale: workspace.defaultLocale,
-        fallbackLocale: workspace.fallbackLocale,
-        themes: workspace.themes.map(theme => ({
-          identity: theme.identity,
-          displayName: theme.displayName,
-        })),
-        defaultTheme: workspace.defaultTheme,
-        defaultAuthProfileIdentity: workspace.defaultAuthProfileIdentity,
-        sfcAdapterIds: [...workspace.sfcAdapterIds],
-        defaultSfcAdapterId: workspace.defaultSfcAdapterId,
+        configuration: workspace.configuration,
       })
       Endge.workspace.apply(saved)
       ;(AppBus.emit as (event: string, payload?: unknown) => void)('domainChanged', undefined)
@@ -2818,7 +2784,7 @@ export class EndgeSchemaStorage extends EndgeModule {
       const environment = ((opts?.model as any) ?? domain.getEnvironment(documentId)) as any
       if (!environment)
         throw new Error(`Окружение не найдено: ${documentId}`)
-      const plain = environment.toPlain() as { id: string, name: string, folder?: string | null, isSystem?: boolean }
+      const plain = environment.toPlain() as { id: string, name: string, folder?: string | null, isSystem?: boolean, configuration?: any }
       const environmentIdentity = String((environment as any).identity ?? plain.id ?? environment.id ?? '')
       let folderId: number | string | undefined
       const existing = await repos.environments.findByIdentity(environmentIdentity)
@@ -2834,6 +2800,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         displayName: plain.name,
         isSystem: plain.isSystem,
         folder: folderId,
+        configuration: plain.configuration,
       })
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
@@ -2843,7 +2810,7 @@ export class EndgeSchemaStorage extends EndgeModule {
       const tenant = ((opts?.model as any) ?? domain.getTenant(documentId)) as any
       if (!tenant)
         throw new Error(`Тенант не найден: ${documentId}`)
-      const plain = tenant.toPlain() as { id: string, name: string, displayName?: string, code?: string, description?: string | null }
+      const plain = tenant.toPlain() as { id: string, name: string, displayName?: string, code?: string, description?: string | null, configuration?: any }
       const tenantIdentity = String((tenant as any).identity ?? plain.id ?? tenant.id ?? '')
       let folderId: number | string | undefined
       const existing = await repos.tenants.findByIdentity(tenantIdentity)
@@ -2860,6 +2827,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         code: String(plain.code ?? tenantIdentity).trim() || tenantIdentity,
         description: plain.description ?? null,
         folder: folderId,
+        configuration: plain.configuration,
       })
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
@@ -3235,6 +3203,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         'allowedEnvironments': allowedEnvironments,
         'folder': plain.folderId ?? plain.folder ?? null,
         'deletedAt': plain.deletedAt ?? null,
+        'configuration': plain.configuration,
       })
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
@@ -3705,6 +3674,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         displayName: raw.displayName,
         isSystem: raw.isSystem === true,
         folderId: relationToId(raw.folder) ?? null,
+        configuration: raw.configuration,
       }
     }
     if (documentType === 'tenant') {
@@ -3716,6 +3686,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         code: raw.code ?? raw.identity ?? '',
         description: raw.description ?? null,
         folderId: relationToId(raw.folder) ?? null,
+        configuration: raw.configuration,
       }
     }
     if (documentType === 'policy') {
@@ -3818,6 +3789,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         order: raw.order != null ? Number(raw.order) : null,
         navigationId: relationToId(raw.navigation) ?? null,
         allowedEnvironmentIds: relationToNumericIds(raw.allowedEnvironments ?? raw.allowedEnvironmentIds ?? []),
+        configuration: raw.configuration,
       }
     }
     if (documentType === ComponentType.Table || documentType === ComponentType.DSL) {

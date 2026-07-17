@@ -1,4 +1,5 @@
 import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
+import type { EndgeConfiguration } from '@/domain/types/configuration'
 import type {
   EndgeWorkspaceDefinition,
   EndgeWorkspaceLocale,
@@ -20,7 +21,7 @@ import { WorkspaceVariables } from '@/model/endge/context/endge-vars'
  */
 export class EndgeWorkspace extends EndgeModule {
   private _current: EndgeWorkspaceDefinition | null = null
-  public readonly variables = new WorkspaceVariables(() => this._current?.vars ?? [])
+  public readonly variables = new WorkspaceVariables(() => this._configurationOrNull()?.vars ?? [])
 
   /** Captures environment overrides before the workspace definition is loaded. */
   public override setup(ctx: EndgeBootContext): void {
@@ -88,8 +89,6 @@ export class EndgeWorkspace extends EndgeModule {
     this._current = next
     setActiveEndgeWorkspace(next)
     Endge.context.setCurrentWorkspace(next.identity)
-    Endge.context.reconcileCurrentLocaleWithWorkspace()
-    Endge.context.reconcileCurrentThemeWithWorkspace()
     this.notify()
   }
 
@@ -103,6 +102,22 @@ export class EndgeWorkspace extends EndgeModule {
     if (!this._current)
       throw new Error('[EndgeWorkspace] Workspace has not been loaded from Payload')
     return this._current
+  }
+
+  /** Возвращает effective configuration после resolution и root configuration до него. */
+  private _configurationOrNull(): EndgeConfiguration | null {
+    try {
+      if (Endge.configuration.isResolved)
+        return Endge.configuration.current
+    }
+    catch {
+      // Configuration module ещё не доступен на ранней workspace build-фазе.
+    }
+    return this._current?.configuration ?? null
+  }
+
+  private _configuration(): EndgeConfiguration {
+    return this._configurationOrNull() ?? this._requireCurrent().configuration
   }
 
   /**
@@ -121,12 +136,12 @@ export class EndgeWorkspace extends EndgeModule {
 
   /** Возвращает доступные workspace locales. */
   get locales(): EndgeWorkspaceLocale[] {
-    return this._requireCurrent().locales
+    return this._configuration().locales
   }
 
   /** Возвращает определения workspace variables. */
   get vars(): EndgeWorkspaceVar[] {
-    return this._requireCurrent().vars
+    return this._configuration().vars
   }
 
   /** Explicit name for the persisted variable definitions. */
@@ -136,42 +151,42 @@ export class EndgeWorkspace extends EndgeModule {
 
   /** Возвращает workspace SSE config. */
   get sse(): EndgeWorkspaceSSEConfig | undefined {
-    return this._requireCurrent().sse
+    return this._configuration().sse
   }
 
   /** Возвращает locale по умолчанию. */
   get defaultLocale(): string {
-    return this._requireCurrent().defaultLocale
+    return this._configuration().defaultLocale
   }
 
   /** Возвращает fallback locale. */
   get fallbackLocale(): string {
-    return this._requireCurrent().fallbackLocale
+    return this._configuration().fallbackLocale
   }
 
   /** Возвращает доступные workspace themes. */
   get themes(): EndgeWorkspaceTheme[] {
-    return this._requireCurrent().themes
+    return this._configuration().themes
   }
 
   /** Возвращает тему по умолчанию. */
   get defaultTheme(): string {
-    return this._requireCurrent().defaultTheme
+    return this._configuration().defaultTheme
   }
 
   /** Возвращает identity auth profile по умолчанию. */
   get defaultAuthProfileIdentity(): string | null {
-    return this._requireCurrent().defaultAuthProfileIdentity
+    return this._configuration().defaultAuthProfileIdentity
   }
 
   /** Возвращает список разрешённых SFC adapter ids. */
   get sfcAdapterIds(): string[] {
-    return this._requireCurrent().sfcAdapterIds
+    return this._configuration().sfcAdapterIds
   }
 
   /** Возвращает SFC adapter id по умолчанию. */
   get defaultSfcAdapterId(): string {
-    return this._requireCurrent().defaultSfcAdapterId
+    return this._configuration().defaultSfcAdapterId
   }
 }
 

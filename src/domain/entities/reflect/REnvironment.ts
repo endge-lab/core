@@ -2,10 +2,21 @@ import { Serialize } from '@endge/utils'
 import { Expose } from 'class-transformer'
 
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
+import type { EndgeConfigurationContribution } from '@/domain/types/configuration'
 import { REntity } from '@/domain/entities/reflect/REntity'
+import { normalizeEndgeConfigurationContribution } from '@/model/services/configuration'
 
 /** Сущность окружения (коллекция environments). Без привязки к проекту. */
 export class REnvironment extends REntity {
+  @Expose()
+  configuration: EndgeConfigurationContribution = { mode: 'inherit', patch: {} }
+
+  static fromPlain(input: Record<string, unknown>): REnvironment {
+    const environment = Serialize.fromJSON(REnvironment, input)
+    environment.configuration = normalizeEndgeConfigurationContribution(input.configuration)
+    return environment
+  }
+
   toPlain(): Record<string, unknown> {
     return {
       id: this.id,
@@ -13,6 +24,7 @@ export class REnvironment extends REntity {
       name: this.name,
       folderId: this.folderId ?? null,
       isSystem: this.isSystem,
+      configuration: this.configuration,
     }
   }
 

@@ -4,7 +4,7 @@ import type {
 } from '@/domain/types/ui/ui.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
-import { getActiveEndgeWorkspace, hasActiveEndgeWorkspace } from '@/model/config/endge-workspace'
+import { getActiveEndgeConfiguration, hasActiveEndgeWorkspace } from '@/model/config/endge-workspace'
 import { Endge } from '@/model/endge/kernel/endge'
 import {
   ALL_THEME_CLASSES,
@@ -187,7 +187,7 @@ export class EndgeUI extends EndgeModule {
   public get availableThemes(): string[] {
     if (!hasActiveEndgeWorkspace())
       return [...themeConfig.availableThemes]
-    return getActiveEndgeWorkspace().themes.map(theme => theme.identity)
+    return getActiveEndgeConfiguration().themes.map(theme => theme.identity)
   }
 
   /**

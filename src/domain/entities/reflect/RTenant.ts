@@ -2,15 +2,19 @@ import { Serialize } from '@endge/utils'
 import { Expose } from 'class-transformer'
 
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
+import type { EndgeConfigurationContribution } from '@/domain/types/configuration'
 import { REntity } from '@/domain/entities/reflect/REntity'
 
 /** Сущность тенанта (коллекция tenants). */
 export class RTenant extends REntity {
   @Expose()
+  configuration: EndgeConfigurationContribution = { mode: 'inherit', patch: {} }
+
+  @Expose()
   code!: string
 
   @Expose()
-  description?: string | null = null
+  override description: string | null = null
 
   toPlain(): Record<string, unknown> {
     return {
@@ -21,6 +25,7 @@ export class RTenant extends REntity {
       code: this.code,
       description: this.description ?? null,
       folderId: this.folderId ?? null,
+      configuration: this.configuration,
     }
   }
 

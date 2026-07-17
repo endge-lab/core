@@ -5,6 +5,7 @@ import { EndgeBind } from '@/model/endge/runtime/core/endge-bind'
 import { EndgeCompiler } from '@/model/endge/program/endge-compiler'
 import { EndgeConsole } from '@/model/endge/diagnostics/endge-console'
 import { EndgeContext } from '@/model/endge/context/endge-context'
+import { EndgeConfigurationModule } from '@/model/endge/context/endge-configuration'
 import { EndgeDebug } from '@/model/endge/diagnostics/endge-debug'
 import { EndgeDiagnostics } from '@/model/endge/diagnostics/endge-diagnostics'
 import { EndgeDomain } from '@/model/endge/domain/endge-domain'
@@ -32,17 +33,18 @@ export const ENDGE_CORE_MODULES: EndgeModuleDefinition[] = [
   { key: 'schema', module: EndgeSchemaStorage, after: 'context' },
   { key: 'workspace', module: EndgeWorkspace, after: ['context', 'schema'] },
   { key: 'domain', module: EndgeDomain, after: 'schema' },
+  { key: 'configuration', module: EndgeConfigurationModule, after: ['workspace', 'domain', 'context'] },
   { key: 'source', module: EndgeSource, after: 'domain' },
   { key: 'program', module: EndgeProgram, after: 'domain' },
-  { key: 'compiler', module: EndgeCompiler, after: ['domain', 'source', 'program', 'mock'] },
-  { key: 'auth', module: EndgeAuth, after: ['workspace', 'domain'] },
+  { key: 'compiler', module: EndgeCompiler, after: ['domain', 'configuration', 'source', 'program', 'mock'] },
+  { key: 'auth', module: EndgeAuth, after: ['configuration', 'domain'] },
   { key: 'vocabs', module: EndgeVocabs, after: ['domain', 'auth'] },
-  { key: 'i18n', module: EndgeI18n, after: ['domain', 'workspace'] },
+  { key: 'i18n', module: EndgeI18n, after: ['domain', 'configuration'] },
   { key: 'events', module: EndgeEvents, after: 'context' },
   { key: 'runtime', module: EndgeRuntime, after: ['compiler', 'workspace', 'context'] },
   { key: 'updates', module: EndgeUpdates, after: 'runtime' },
-  { key: 'sse', module: EndgeSSE, after: ['workspace', 'auth', 'events'] },
-  { key: 'ui', module: EndgeUI, after: ['workspace', 'context'] },
+  { key: 'sse', module: EndgeSSE, after: ['configuration', 'auth', 'events'] },
+  { key: 'ui', module: EndgeUI, after: ['configuration', 'context'] },
   { key: 'uiRegistry', module: EndgeUIRegistry, after: 'ui' },
   { key: 'bind', module: EndgeBind, after: ['compiler', 'runtime'] },
   { key: 'console', module: EndgeConsole, after: ['domain', 'runtime'] },

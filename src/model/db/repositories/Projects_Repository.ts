@@ -11,6 +11,7 @@ export type ProjectPayloadData = {
   allowedEnvironments?: Array<number | string>
   folder?: number | string | null
   deletedAt?: string | null
+  configuration?: import('@/domain/types/configuration').EndgeConfigurationContribution
 }
 
 export class Projects_Repository {
@@ -49,6 +50,7 @@ export class Projects_Repository {
     if (data.allowedEnvironments !== undefined) payload.allowedEnvironments = data.allowedEnvironments
     if (data.folder !== undefined) payload.folder = data.folder
     if (data.deletedAt !== undefined) payload.deletedAt = data.deletedAt
+    if (data.configuration !== undefined) payload.configuration = data.configuration
     const r = await this.api.post('/projects', payload)
     return r.data
   }

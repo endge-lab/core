@@ -3,16 +3,7 @@ import type { AxiosInstance } from 'axios'
 export type WorkspacePayloadData = {
   identity: string
   displayName: string
-  vars?: unknown
-  sse?: unknown
-  locales: unknown
-  defaultLocale?: string | null
-  fallbackLocale?: string | null
-  themes: unknown
-  defaultTheme?: string | null
-  defaultAuthProfileIdentity?: string | null
-  sfcAdapterIds?: string[]
-  defaultSfcAdapterId?: string | null
+  configuration: import('@/domain/types/configuration').EndgeConfiguration
 }
 
 export class Workspaces_Repository {

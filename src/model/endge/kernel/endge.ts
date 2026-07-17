@@ -8,6 +8,7 @@ import { EndgeBind } from '@/model/endge/runtime/core/endge-bind'
 import { EndgeCommands } from '@/model/endge/runtime/core/endge-commands'
 import { EndgeConsole } from '@/model/endge/diagnostics/endge-console'
 import { EndgeContext } from '@/model/endge/context/endge-context'
+import { EndgeConfigurationModule } from '@/model/endge/context/endge-configuration'
 import { EndgeDataView } from '@/model/endge/runtime/execution/endge-data-view'
 import { EndgeCompiler } from '@/model/endge/program/endge-compiler'
 import { EndgeDebug } from '@/model/endge/diagnostics/endge-debug'
@@ -184,7 +185,7 @@ export class Endge extends EndgeFederation {
 
   private static createDomainBundle(domain: EndgeDomainPlain): EndgeDomainBundle {
     const workspace = Endge.workspace.serialize()
-    const sse = workspace.sse ? { ...workspace.sse } : undefined
+    const sse = workspace.configuration.sse ? { ...workspace.configuration.sse } : undefined
     if (sse)
       delete sse.manualToken
 
@@ -193,7 +194,10 @@ export class Endge extends EndgeFederation {
       version: ENDGE_DOMAIN_BUNDLE_VERSION,
       workspace: {
         ...workspace,
-        ...(sse ? { sse } : {}),
+        configuration: {
+          ...workspace.configuration,
+          ...(sse ? { sse } : {}),
+        },
       },
     }
   }
@@ -437,6 +441,11 @@ export class Endge extends EndgeFederation {
    */
   static get context(): EndgeContext {
     return this.getModule<EndgeContext>('context')
+  }
+
+  /** Доступ к effective configuration и immutable compiler build context. */
+  static get configuration(): EndgeConfigurationModule {
+    return this.getModule<EndgeConfigurationModule>('configuration')
   }
 
   /**

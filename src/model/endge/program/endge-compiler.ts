@@ -70,7 +70,7 @@ export class EndgeCompiler extends EndgeModule {
    */
   public override build(_ctx: EndgeBootContext): void {
     const dbg = Endge.debug
-    const context: ProgramCompileContext = { compilerVersion: ENDGE_COMPILER_VERSION }
+    const context = this._createCompileContext()
     const componentSFCs = Endge.domain.getComponentSFCs()
 
     Endge.program.beginCompile(ENDGE_COMPILER_VERSION)
@@ -113,50 +113,50 @@ export class EndgeCompiler extends EndgeModule {
 
   /** Компилирует один query source в Endge.program без запуска остальных compiler-фаз. */
   public buildQuery(entity: RQuery): ProgramArtifact<QueryProgramPayload> {
-    const context: ProgramCompileContext = { compilerVersion: ENDGE_COMPILER_VERSION }
+    const context = this._createCompileContext()
     return this.compileEntity('query', entity, context) as ProgramArtifact<QueryProgramPayload>
   }
 
   /** Компилирует одну Computation в безопасный runtime artifact. */
   public buildComputation(entity: RComputation): ProgramArtifact<ComputationProgramPayload> {
-    const context: ProgramCompileContext = { compilerVersion: ENDGE_COMPILER_VERSION }
+    const context = this._createCompileContext()
     return this.compileEntity('computation', entity, context) as ProgramArtifact<ComputationProgramPayload>
   }
 
   /** Компилирует один ComponentSFC без запуска полного domain build. */
   public buildComponentSFC(entity: RComponentSFC): ProgramArtifact<ComponentSFCProgramPayload> {
-    const context: ProgramCompileContext = { compilerVersion: ENDGE_COMPILER_VERSION }
+    const context = this._createCompileContext()
     this._prepareComponentTagRegistry(Endge.domain.getComponentSFCs())
     return this.compileEntity('component-sfc', entity, context) as ProgramArtifact<ComponentSFCProgramPayload>
   }
 
   /** Компилирует один DataView source в Endge.program без запуска остальных compiler-фаз. */
   public buildDataView(entity: RDataView): ProgramArtifact<DataViewProgramPayload> {
-    const context: ProgramCompileContext = { compilerVersion: ENDGE_COMPILER_VERSION }
+    const context = this._createCompileContext()
     return this.compileEntity('data-view', entity, context) as ProgramArtifact<DataViewProgramPayload>
   }
 
   /** Компилирует один Store source в Endge.program. */
   public buildStore(entity: RStore): ProgramArtifact<StoreSourceArtifact> {
-    const context: ProgramCompileContext = { compilerVersion: ENDGE_COMPILER_VERSION }
+    const context = this._createCompileContext()
     return this.compileEntity('store', entity, context) as ProgramArtifact<StoreSourceArtifact>
   }
 
   /** Компилирует один Filter source в Endge.program. */
   public buildFilter(entity: RFilter): ProgramArtifact<FilterProgramPayload> {
-    const context: ProgramCompileContext = { compilerVersion: ENDGE_COMPILER_VERSION }
+    const context = this._createCompileContext()
     return this.compileEntity('filter', entity, context) as ProgramArtifact<FilterProgramPayload>
   }
 
   /** Компилирует один Composition source в Endge.program. */
   public buildComposition(entity: RComposition): ProgramArtifact<CompositionProgramPayload> {
-    const context: ProgramCompileContext = { compilerVersion: ENDGE_COMPILER_VERSION }
+    const context = this._createCompileContext()
     return this.compileEntity('composition', entity, context) as ProgramArtifact<CompositionProgramPayload>
   }
 
   /** Compiles one global source-first EndgeCSS document. */
   public buildStyle(entity: RStyle): ProgramArtifact<EndgeStyleProgramPayload> {
-    const context: ProgramCompileContext = { compilerVersion: ENDGE_COMPILER_VERSION }
+    const context = this._createCompileContext()
     return this.compileEntity('style', entity, context) as ProgramArtifact<EndgeStyleProgramPayload>
   }
 
@@ -167,6 +167,14 @@ export class EndgeCompiler extends EndgeModule {
    */
   private registerHandler<TEntity, TPayload>(handler: EntityCompilerHandler<TEntity, TPayload>): void {
     this.handlers.set(handler.entityType, handler as EntityCompilerHandler<any, any>)
+  }
+
+  /** Создаёт единый immutable context для полного и точечного compiler entry points. */
+  private _createCompileContext(): ProgramCompileContext {
+    return {
+      compilerVersion: ENDGE_COMPILER_VERSION,
+      buildContext: Endge.configuration.buildContext,
+    }
   }
 
   /**
@@ -644,6 +652,7 @@ export class EndgeCompiler extends EndgeModule {
       ref,
       sourceHash: this._hashString(JSON.stringify(this._toStableSource(entity))),
       compilerVersion: context.compilerVersion,
+      contextHash: context.buildContext.contextHash,
       status,
       diagnostics,
       dependencies: options.dependencies ?? [],

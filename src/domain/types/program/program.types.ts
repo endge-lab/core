@@ -104,6 +104,9 @@ export interface ProgramArtifact<TPayload = unknown> {
   /** Версия compiler pipeline, построившая artifact. */
   compilerVersion: string
 
+  /** Hash structural context и effective configuration этой сборки. */
+  contextHash?: string
+
   /** Итоговый статус artifact с учетом diagnostics. */
   status: ProgramArtifactStatus
 
@@ -326,6 +329,9 @@ export interface ComponentSFCPreviewOptions {
 export interface ProgramCompileContext {
   /** Версия compiler pipeline, которая попадет во все artifacts текущей сборки. */
   compilerVersion: string
+
+  /** Immutable structural context and effective configuration of this build. */
+  buildContext: import('@/domain/types/configuration').EndgeBuildContext
 }
 
 /** Handler компиляции одного типа доменных сущностей. */

@@ -7,6 +7,7 @@ export interface TenantDoc {
   code: string
   description?: string | null
   folder?: number | string
+  configuration?: import('@/domain/types/configuration').EndgeConfigurationContribution
 }
 
 export class Tenants_Repository {
@@ -39,6 +40,7 @@ export class Tenants_Repository {
     code: string
     description?: string | null
     folder?: number | string
+    configuration?: import('@/domain/types/configuration').EndgeConfigurationContribution
   }): Promise<TenantDoc> {
     const r = await this.api.post('/tenants', data)
     return r.data
@@ -52,6 +54,7 @@ export class Tenants_Repository {
       code: string
       description: string | null
       folder: number | string
+      configuration: import('@/domain/types/configuration').EndgeConfigurationContribution
     }>,
   ): Promise<TenantDoc> {
     const r = await this.api.patch(`/tenants/${id}`, data)
@@ -82,6 +85,7 @@ export class Tenants_Repository {
     code: string
     description?: string | null
     folder?: number | string
+    configuration?: import('@/domain/types/configuration').EndgeConfigurationContribution
   }): Promise<TenantDoc> {
     const existing = await this.findByIdentity(data.identity)
     if (!existing)
@@ -91,6 +95,7 @@ export class Tenants_Repository {
       code: data.code,
       description: data.description ?? null,
       folder: data.folder,
+      configuration: data.configuration,
     })
   }
 }

@@ -1,6 +1,8 @@
 // RProject.ts
 import { Expose } from 'class-transformer'
+import type { EndgeConfigurationContribution } from '@/domain/types/configuration'
 import { REntity } from '@/domain/entities/reflect/REntity'
+import { normalizeEndgeConfigurationContribution } from '@/model/services/configuration'
 
 function normalizeRelationId(value: unknown): number | null {
   if (value == null)
@@ -38,13 +40,13 @@ function normalizeRelationIds(value: unknown): number[] {
  *  - createdAt, updatedAt, deletedAt, author, active
  */
 export class RProject extends REntity {
-  /** Отображаемое имя проекта */
+  /** Project-level contribution к effective configuration. */
   @Expose()
-  displayName!: string
+  configuration: EndgeConfigurationContribution = { mode: 'inherit', patch: {} }
 
   /** Описание проекта */
   @Expose()
-  description?: string | null = null
+  override description: string | null = null
 
   /** Slug (URL-имя) */
   @Expose()
@@ -92,6 +94,7 @@ export class RProject extends REntity {
     p.order = json.order != null ? Number(json.order) : null
     p.navigationId = normalizeRelationId(json.navigation ?? json.navigationId ?? null)
     p.allowedEnvironmentIds = normalizeRelationIds(json.allowedEnvironments ?? json.allowedEnvironmentIds ?? [])
+    p.configuration = normalizeEndgeConfigurationContribution(json.configuration)
 
     // STORAGE META
     p.applyStorageMeta(json)
@@ -124,6 +127,7 @@ export class RProject extends REntity {
     p.order = json.order != null ? Number(json.order) : null
     p.navigationId = normalizeRelationId(json.navigationId ?? json.navigation ?? null)
     p.allowedEnvironmentIds = normalizeRelationIds(json.allowedEnvironmentIds ?? json.allowedEnvironments ?? [])
+    p.configuration = normalizeEndgeConfigurationContribution(json.configuration)
 
     return p
   }
@@ -144,6 +148,7 @@ export class RProject extends REntity {
       order: this.order ?? null,
       navigationId: this.navigationId ?? null,
       allowedEnvironmentIds: [...(this.allowedEnvironmentIds ?? [])],
+      configuration: this.configuration,
     }
   }
 

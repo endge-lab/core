@@ -1,44 +1,25 @@
-export interface EndgeWorkspaceLocale {
-  code: string
-  displayName: string
-  shortLabel: string
-  direction?: 'ltr' | 'rtl'
-}
+import type {
+  EndgeConfiguration,
+  EndgeLocaleDefinition,
+  EndgeSSEAuthMode,
+  EndgeSSEConfiguration,
+  EndgeThemeDefinition,
+  EndgeVariableDefinition,
+} from '@/domain/types/configuration'
+
+export type EndgeWorkspaceLocale = EndgeLocaleDefinition
 
 export type EndgeWorkspaceLocaleLabelMode = keyof Pick<EndgeWorkspaceLocale, 'displayName' | 'shortLabel'>
 
-export interface EndgeWorkspaceTheme {
-  identity: string
-  displayName: string
-}
-
-export type EndgeWorkspaceSSEAuthMode = 'inherit' | 'profile' | 'manual' | 'none'
-
-export interface EndgeWorkspaceVar {
-  name: string
-  defaultValue: string
-}
-
-export interface EndgeWorkspaceSSEConfig {
-  url: string
-  authMode?: EndgeWorkspaceSSEAuthMode
-  authProfileIdentity?: string | null
-  manualToken?: string | null
-}
+export type EndgeWorkspaceTheme = EndgeThemeDefinition
+export type EndgeWorkspaceSSEAuthMode = EndgeSSEAuthMode
+export type EndgeWorkspaceVar = EndgeVariableDefinition
+export type EndgeWorkspaceSSEConfig = EndgeSSEConfiguration
 
 export interface EndgeWorkspaceDefinition {
   identity: string
   displayName: string
-  vars: EndgeWorkspaceVar[]
-  sse?: EndgeWorkspaceSSEConfig
-  locales: EndgeWorkspaceLocale[]
-  defaultLocale: string
-  fallbackLocale: string
-  themes: EndgeWorkspaceTheme[]
-  defaultTheme: string
-  defaultAuthProfileIdentity: string | null
-  sfcAdapterIds: string[]
-  defaultSfcAdapterId: string
+  configuration: EndgeConfiguration
 }
 
 export type EndgeWorkspaceDefinitionInput = Partial<EndgeWorkspaceDefinition> & Record<string, unknown>

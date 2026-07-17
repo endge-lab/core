@@ -5,10 +5,12 @@ import type {
   EndgeSessionIdentityProvider,
   EndgeStorageAdapter,
 } from '@/domain/types/runtime/context-persistence.types'
+import type { EndgeExecutionContext } from '@/domain/types/configuration'
+import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import {
-  getActiveEndgeWorkspace,
+  getActiveEndgeConfiguration,
   hasActiveEndgeWorkspace,
   normalizeWorkspaceLocale,
   normalizeWorkspaceTheme,
@@ -67,6 +69,7 @@ export class EndgeContext extends EndgeModule {
   private _pendingTheme: string | null = null
   private _sessionProvider: EndgeSessionIdentityProvider | null = null
   private _isHydrating = false
+  private _executionContextLocked = false
 
   /** Создаёт контекст, регистрирует storage adapters и восстанавливает snapshot. */
   public constructor() {
@@ -74,6 +77,28 @@ export class EndgeContext extends EndgeModule {
     this.registerStorageAdapter(new LocalStorageContextAdapter())
     this.registerStorageAdapter(new DisabledContextAdapter())
     this.loadFromStorage()
+  }
+
+  /** Применяет explicit structural context до load/build остальных модулей. */
+  public override setup(ctx: EndgeBootContext): void {
+    this._executionContextLocked = false
+    const input = ctx.context
+    if (input) {
+      if (input.tenantIdentity != null)
+        this._currentTenant = normalizeScopePart(input.tenantIdentity, DEFAULT_SCOPE.tenantId)
+      if (input.projectIdentity != null)
+        this._currentProject = normalizeScopePart(input.projectIdentity, DEFAULT_SCOPE.projectId)
+      if (input.environmentIdentity != null)
+        this._currentEnvironment = normalizeScopePart(input.environmentIdentity, DEFAULT_SCOPE.environmentId)
+    }
+    this._executionContextLocked = true
+    this.saveToStorage()
+  }
+
+  /** Разрешает выбрать новый structural context только перед следующим boot. */
+  public override reset(): void {
+    this._executionContextLocked = false
+    this.notify()
   }
 
   /** Показывает, выполняется ли восстановление контекста из storage. */
@@ -100,6 +125,11 @@ export class EndgeContext extends EndgeModule {
   public setSessionIdentityProvider(provider: EndgeSessionIdentityProvider | null): void {
     this._sessionProvider = provider
     this.notify()
+  }
+
+  /** Показывает, что Tenant принудительно задан authenticated session provider. */
+  get isTenantLockedBySession(): boolean {
+    return normalizeOptionalText(this._sessionProvider?.getCurrentIdentity()?.tenantId) != null
   }
 
   /** Сериализует текущий execution scope в snapshot. */
@@ -245,6 +275,7 @@ export class EndgeContext extends EndgeModule {
 
   /** Устанавливает fallback identity текущего tenant. */
   public setCurrentTenant(identity: string | null): void {
+    this.assertStructuralContextMutable('_currentTenant', identity, DEFAULT_SCOPE.tenantId)
     this.setScopeValue('_currentTenant', identity, DEFAULT_SCOPE.tenantId)
   }
 
@@ -255,6 +286,7 @@ export class EndgeContext extends EndgeModule {
 
   /** Устанавливает текущий project и сохраняет контекст. */
   public setCurrentProject(identity: string | null): void {
+    this.assertStructuralContextMutable('_currentProject', identity, DEFAULT_SCOPE.projectId)
     this.setScopeValue('_currentProject', identity, DEFAULT_SCOPE.projectId)
   }
 
@@ -263,8 +295,18 @@ export class EndgeContext extends EndgeModule {
     return this._currentEnvironment
   }
 
+  /** Возвращает immutable structural coordinates текущего boot lifecycle. */
+  public getExecutionContext(): EndgeExecutionContext {
+    return {
+      tenantIdentity: this.getCurrentTenant(),
+      projectIdentity: this.getCurrentProject(),
+      environmentIdentity: this.getCurrentEnvironment(),
+    }
+  }
+
   /** Устанавливает текущий environment и сохраняет контекст. */
   public setCurrentEnvironment(identity: string | null): void {
+    this.assertStructuralContextMutable('_currentEnvironment', identity, DEFAULT_SCOPE.environmentId)
     this.setScopeValue('_currentEnvironment', identity, DEFAULT_SCOPE.environmentId)
   }
 
@@ -280,7 +322,7 @@ export class EndgeContext extends EndgeModule {
 
   /** Возвращает текущую locale или locale активного workspace. */
   get currentLocale(): string {
-    return this._currentLocale || getActiveEndgeWorkspace().defaultLocale
+    return this._currentLocale || getActiveEndgeConfiguration().defaultLocale
   }
 
   /** Нормализует, сохраняет и публикует новую locale. */
@@ -315,7 +357,7 @@ export class EndgeContext extends EndgeModule {
 
   /** Возвращает текущую тему или тему по умолчанию активного workspace. */
   get currentTheme(): string {
-    return this._currentTheme || getActiveEndgeWorkspace().defaultTheme
+    return this._currentTheme || getActiveEndgeConfiguration().defaultTheme
   }
 
   /** Нормализует, сохраняет и публикует пользовательскую тему. */
@@ -397,6 +439,17 @@ export class EndgeContext extends EndgeModule {
     this[field] = next
     this.saveToStorage()
     this.notify()
+  }
+
+  private assertStructuralContextMutable(
+    field: '_currentTenant' | '_currentProject' | '_currentEnvironment',
+    identity: string | null,
+    fallback: string,
+  ): void {
+    const next = normalizeScopePart(identity, fallback)
+    if (!this._executionContextLocked || next === this[field])
+      return
+    throw new Error('[EndgeContext] Structural context is immutable during boot. Call Endge.reset() and boot with a new context.')
   }
 }
 

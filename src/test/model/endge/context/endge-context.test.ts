@@ -86,11 +86,14 @@ describe('EndgeContext locale and theme', () => {
 
     Endge.workspace.apply({
       ...TEST_ENDGE_WORKSPACE,
-      locales: [
-        ...TEST_ENDGE_WORKSPACE.locales,
-        { code: 'kk', displayName: 'Қазақша', shortLabel: 'KK' },
-      ],
-      defaultLocale: 'kk',
+      configuration: {
+        ...TEST_ENDGE_WORKSPACE.configuration,
+        locales: [
+          ...TEST_ENDGE_WORKSPACE.configuration.locales,
+          { code: 'kk', displayName: 'Қазақша', shortLabel: 'KK' },
+        ],
+        defaultLocale: 'kk',
+      },
     })
     context.reconcileCurrentLocaleWithWorkspace()
 
@@ -104,11 +107,14 @@ describe('EndgeContext locale and theme', () => {
 
     Endge.workspace.apply({
       ...TEST_ENDGE_WORKSPACE,
-      themes: [
-        ...TEST_ENDGE_WORKSPACE.themes,
-        { identity: 'contrast', displayName: 'Контрастная' },
-      ],
-      defaultTheme: 'contrast',
+      configuration: {
+        ...TEST_ENDGE_WORKSPACE.configuration,
+        themes: [
+          ...TEST_ENDGE_WORKSPACE.configuration.themes,
+          { identity: 'contrast', displayName: 'Контрастная' },
+        ],
+        defaultTheme: 'contrast',
+      },
     })
     context.reconcileCurrentThemeWithWorkspace()
 

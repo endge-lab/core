@@ -62,6 +62,23 @@ describe('EndgeContext persistence', () => {
     })
   })
 
+  it('keeps structural coordinates immutable until reset', () => {
+    const context = new EndgeContext()
+    context.setup({
+      dataProvider: 'plain',
+      scope: {},
+      vars: {},
+      context: { tenantIdentity: 'tenant-a', projectIdentity: 'project-a', environmentIdentity: 'dev' },
+    })
+
+    expect(() => context.setCurrentProject('project-b')).toThrow('Structural context is immutable')
+    expect(context.getCurrentProject()).toBe('project-a')
+
+    context.reset()
+    context.setCurrentProject('project-b')
+    expect(context.getCurrentProject()).toBe('project-b')
+  })
+
   it('serializes new context fields and reads legacy snapshots', () => {
     const context = new EndgeContext()
 

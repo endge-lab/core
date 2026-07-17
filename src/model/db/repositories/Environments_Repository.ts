@@ -6,6 +6,7 @@ export interface EnvironmentDoc {
   displayName: string
   folder?: number | string
   isSystem?: boolean
+  configuration?: import('@/domain/types/configuration').EndgeConfigurationContribution
 }
 
 export class Environments_Repository {
@@ -37,6 +38,7 @@ export class Environments_Repository {
     displayName: string
     folder?: number | string
     isSystem?: boolean
+    configuration?: import('@/domain/types/configuration').EndgeConfigurationContribution
   }): Promise<EnvironmentDoc> {
     const r = await this.api.post('/environments', data)
     return r.data
@@ -49,6 +51,7 @@ export class Environments_Repository {
       displayName: string
       folder: number | string
       isSystem: boolean
+      configuration: import('@/domain/types/configuration').EndgeConfigurationContribution
     }>,
   ): Promise<EnvironmentDoc> {
     const r = await this.api.patch(`/environments/${id}`, data)
@@ -77,6 +80,7 @@ export class Environments_Repository {
     displayName: string
     folder?: number | string
     isSystem?: boolean
+    configuration?: import('@/domain/types/configuration').EndgeConfigurationContribution
   }): Promise<EnvironmentDoc> {
     const existing = await this.findByIdentity(data.identity)
     if (!existing)
@@ -85,6 +89,7 @@ export class Environments_Repository {
       displayName: data.displayName,
       folder: data.folder,
       ...(data.isSystem !== undefined && { isSystem: data.isSystem }),
+      ...(data.configuration !== undefined && { configuration: data.configuration }),
     })
   }
 }
