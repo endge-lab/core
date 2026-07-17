@@ -65,12 +65,35 @@ export function parseComponentSFC(source: string): ComponentSFCParseResult {
     }
   }
 
-  const parsed = parseSFC(input, {
-    filename: 'component.endge',
-  })
+  let parsed: ReturnType<typeof parseSFC>
+  try {
+    parsed = parseSFC(input, {
+      filename: 'component.endge',
+    })
+  }
+  catch (error) {
+    diagnostics.push(toParserDiagnostic(error))
+
+    return {
+      sourceParts,
+      ast: null,
+      diagnostics,
+    }
+  }
 
   for (const error of parsed.errors)
     diagnostics.push(toParserDiagnostic(error))
+
+  // Во время редактирования source может быть временно незавершённым.
+  // Не строим stable AST из descriptor с parser errors: повторный template pass
+  // может бросить исключение вместо возврата diagnostics.
+  if (parsed.errors.length > 0) {
+    return {
+      sourceParts,
+      ast: null,
+      diagnostics,
+    }
+  }
 
   const descriptor = parsed.descriptor
   const script = descriptor.scriptSetup
