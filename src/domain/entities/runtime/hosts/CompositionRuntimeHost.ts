@@ -219,7 +219,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
               await this._children.get(runtimePath)?.reconcile?.()
           },
           deactivate: () => this._forgetScopeRuntimes(descriptor.path),
-          destroyRuntime: runtimeId => Endge.runtime.destroyRuntimeTree(runtimeId),
+          destroyRuntime: runtimeId => Endge.runtime.destroyRuntimeTreeAsync(runtimeId),
           resolveRuntime: path => this._children.get(path) ?? null,
           resolveOutput: name => this.getOutput(name),
         },
@@ -326,7 +326,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       deactivate: async () => {
         const runtime = owner._children.get(descriptor.path)
         if (!runtime) return
-        Endge.runtime.destroyRuntimeTree(runtime.id)
+        await Endge.runtime.destroyRuntimeTreeAsync(runtime.id)
         owner._forgetRuntime(descriptor.path)
       },
       dispose: async () => {
@@ -406,7 +406,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }
   }
 
-  public override destroy(): void {
+  public override async destroy(): Promise<void> {
     for (const dispose of this._disposers)
       dispose()
     this._disposers = []
@@ -415,20 +415,20 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     this._bridgePaths.clear()
     for (const runtimeId of this._ownedStoreRuntimeIds) {
       if (Endge.runtime.getRuntimeById(runtimeId))
-        Endge.runtime.destroyRuntimeTree(runtimeId)
+        await Endge.runtime.destroyRuntimeTreeAsync(runtimeId)
     }
     this._ownedStoreRuntimeIds.clear()
     for (const child of this._children.values()) {
       if (Endge.runtime.getRuntimeById(child.id))
-        Endge.runtime.destroyRuntimeTree(child.id)
+        await Endge.runtime.destroyRuntimeTreeAsync(child.id)
       else if (child.status !== 'destroyed')
-        child.destroy()
+        await child.destroy()
     }
     this._children.clear()
     this._childDescriptors.clear()
     this._publicOutputs = {}
     for (const scope of [...this._scopes.values()].reverse()) {
-      void Endge.runtime.scopes.remove(scope.id)
+      await Endge.runtime.scopes.remove(scope.id)
     }
     this._scopes.clear()
     this._runtimeHandles.clear()

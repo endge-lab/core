@@ -304,7 +304,7 @@ export class EndgeRuntime extends EndgeModule {
    * Корректно разрушает runtime-host по runtime-id.
    */
   public destroyRuntime(runtimeId: string): void {
-    this.destroyRuntimeInternal(runtimeId, true)
+    void this.destroyRuntimeInternal(runtimeId, true)
   }
 
   /**
@@ -321,7 +321,21 @@ export class EndgeRuntime extends EndgeModule {
     }
 
     for (const id of this._hosts.getTreePostOrder(rootId)) {
-      this.destroyRuntimeInternal(id, false)
+      void this.destroyRuntimeInternal(id, false)
+    }
+
+    this.notify()
+  }
+
+  /** Корректно разрушает runtime tree и ждёт завершения всего teardown. */
+  public async destroyRuntimeTreeAsync(runtimeId: string): Promise<void> {
+    const rootId = String(runtimeId ?? '').trim()
+    if (!rootId || !this._hosts.getById(rootId)) {
+      return
+    }
+
+    for (const id of this._hosts.getTreePostOrder(rootId)) {
+      await this.destroyRuntimeInternal(id, false)
     }
 
     this.notify()
@@ -333,7 +347,7 @@ export class EndgeRuntime extends EndgeModule {
   public override async reset(): Promise<void> {
     const hostIds = this._hosts.getAll().map(host => host.id)
     for (const runtimeId of hostIds) {
-      this.destroyRuntimeInternal(runtimeId, false)
+      await this.destroyRuntimeInternal(runtimeId, false)
     }
 
     Raph.clearPhases()
@@ -398,10 +412,10 @@ export class EndgeRuntime extends EndgeModule {
   /**
    * Внутренний destroy для host с контролем уведомления подписчиков.
    */
-  private destroyRuntimeInternal(
+  private async destroyRuntimeInternal(
     runtimeId: string,
     shouldNotify: boolean,
-  ): void {
+  ): Promise<void> {
     const id = String(runtimeId ?? '').trim()
     if (!id) {
       return
@@ -426,10 +440,14 @@ export class EndgeRuntime extends EndgeModule {
       })
     }
 
-    this._strategies.resolve(host.model)?.destroy?.({ host })
+    const strategyCleanup = this._strategies.resolve(host.model)?.destroy?.({ host })
+    if (strategyCleanup)
+      await strategyCleanup
     this.scopes.detachRuntime(id)
     Endge.context.destroyRuntimeStateController(id)
-    host.destroy()
+    const hostCleanup = host.destroy()
+    if (hostCleanup)
+      await hostCleanup
     if (shouldNotify) {
       this.notify()
     }
@@ -490,7 +508,7 @@ export class EndgeRuntime extends EndgeModule {
       path: appScope.id,
       boundaryId: `app:${appScope.id}`,
       hooks: {
-        destroyRuntime: runtimeId => this.destroyRuntimeTree(runtimeId),
+        destroyRuntime: runtimeId => this.destroyRuntimeTreeAsync(runtimeId),
       },
     }))
     void scope.activate()

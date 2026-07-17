@@ -30,6 +30,7 @@ interface RuntimeAppScopeOwner {
     appScopeId?: string,
   ) => AnyRuntimeHost[]
   destroyRuntimeTree: (runtimeId: string) => void
+  destroyRuntimeTreeAsync: (runtimeId: string) => Promise<void>
 }
 
 /**
@@ -81,6 +82,14 @@ export class RuntimeAppScope {
     const runtime = this.resolve(entityType, identity)
     if (runtime && typeof runtime === 'object' && 'id' in runtime) {
       this._owner.destroyRuntimeTree(String(runtime.id))
+    }
+  }
+
+  /** Удаляет runtime tree и ждёт полного освобождения lifecycle-ресурсов. */
+  public async destroyAsync(entityType: RuntimeEntityType, identity: string): Promise<void> {
+    const runtime = this.resolve(entityType, identity)
+    if (runtime && typeof runtime === 'object' && 'id' in runtime) {
+      await this._owner.destroyRuntimeTreeAsync(String(runtime.id))
     }
   }
 

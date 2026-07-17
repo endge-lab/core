@@ -43,6 +43,36 @@ describe('Endge project runtime session', () => {
     expect(Endge.runtime.scopes.getAll().filter(scope => scope.ownerRuntimeId === session.id)).toEqual([])
   })
 
+  it('supports debug mounting without auto activation and reusable pause/resume/restart handles', async () => {
+    const project = RProject.fromPlain({ id: 505, identity: 'debug-project', name: 'Debug project' })
+    const entry = composition(506, 'debug-entry', 'debug-project')
+    Endge.domain.addProject(project)
+    Endge.domain.addComposition(entry)
+    Endge.program.addArtifact(artifact(entry, payload('startup')))
+
+    const session = await Endge.runtime.project.mount('debug-project', { autoActivate: 'none' })
+    const handle = session.compositions.require('debug-entry')
+    expect(handle.state).toBe('inactive')
+    expect(handle.host).toBeNull()
+
+    const first = await handle.activate()
+    expect(handle.state).toBe('active')
+    await handle.pause()
+    expect(handle.state).toBe('paused')
+    await handle.resume()
+    expect(handle.state).toBe('active')
+
+    const restarted = await handle.restart()
+    expect(restarted.id).not.toBe(first.id)
+    expect(handle.state).toBe('active')
+
+    await handle.deactivate()
+    expect(handle.state).toBe('inactive')
+    expect(handle.host).toBeNull()
+    await session.unmount()
+    expect(Endge.runtime.getRuntimeHosts()).toEqual([])
+  })
+
   it('switches named scopes atomically and rejects handles from another project session', async () => {
     const project = RProject.fromPlain({ id: 510, identity: 'airport', name: 'Airport' })
     const entry = composition(511, 'project-entry', 'airport')

@@ -46,7 +46,7 @@ export interface RuntimeStrategy<
   create: (ctx: RuntimeCreateContext<TModel>) => THost | null
 
   /** Выполняет strategy-specific cleanup перед общим host.destroy(). */
-  destroy?: (ctx: RuntimeDestroyContext<THost>) => void
+  destroy?: (ctx: RuntimeDestroyContext<THost>) => Promise<void> | void
 }
 
 export type AnyRuntimeStrategy = RuntimeStrategy<any, any>

@@ -1,16 +1,19 @@
 import type { ProgramArtifact } from '@/domain/types/program/program.types'
+import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
 import type { StoreSourceArtifact } from '@/domain/types/source/store-source.types'
 
 import { Raph } from '@endge/raph'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { RStore } from '@/domain/entities/reflect/RStore'
+import { RComposition } from '@/domain/entities/reflect/RComposition'
+import { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
 import { StoreRuntimeHost } from '@/domain/entities/runtime/hosts/StoreRuntimeHost'
 import { Endge } from '@/model/endge/kernel/endge'
 
 describe('RuntimeAppScope', () => {
-  afterEach(() => {
-    Endge.runtime.reset()
+  afterEach(async () => {
+    await Endge.runtime.reset()
     Endge.program.clear()
     Endge.domain.reset()
     Raph.app.reset()
@@ -51,6 +54,30 @@ describe('RuntimeAppScope', () => {
     expect(second.getDataPath()).toBe('runtime.stores.groundhandling-db-1')
     expect(first.id).toBe('app:store:groundhandling-db-0')
     expect(second.id).toBe('app:store:groundhandling-db-1')
+  })
+
+  it('waits for owned composition scopes before starting the same preview again', async () => {
+    const composition = installComposition()
+    const preview = Endge.runtime.createAppScope({
+      id: 'preview',
+      rootPath: 'runtime-preview',
+      collisionPolicy: 'replace',
+      persistence: 'disabled',
+    })
+
+    const first = preview.execute(composition) as CompositionRuntimeHost
+    await first.mountGraph()
+    const scopeId = `${first.id}:scope:scope_default`
+    expect(Endge.runtime.scopes.get(scopeId)?.ownerRuntimeId).toBe(first.id)
+
+    await preview.destroyAsync('composition', composition.identity)
+    expect(Endge.runtime.scopes.get(scopeId)).toBeNull()
+
+    const second = preview.execute(composition) as CompositionRuntimeHost
+    await second.mountGraph()
+    expect(second).not.toBe(first)
+    expect(Endge.runtime.scopes.get(scopeId)?.ownerRuntimeId).toBe(second.id)
+    expect(Endge.runtime.getRuntimeHostsByEntity('composition', composition.identity, 'preview')).toEqual([second])
   })
 
   it('keeps the typed parent relation outside host metadata', () => {
@@ -121,4 +148,29 @@ function installStore(): RStore {
   Endge.program.beginCompile('test')
   Endge.program.addArtifact(artifact)
   return store
+}
+
+function installComposition(): RComposition {
+  const composition = new RComposition()
+  composition.id = 702
+  composition.identity = 'groundhandling-control-table-sfc-context'
+  composition.name = 'Ground handling control table'
+  composition.source = 'defineComposition({ runtimes: {}, outputs: {} })'
+  Endge.domain.addComposition(composition)
+
+  const payload = Endge.source.compile('composition', composition.source).artifact as CompositionProgramPayload
+  const artifact: ProgramArtifact<CompositionProgramPayload> = {
+    ref: { entityType: 'composition', id: composition.id, identity: composition.identity },
+    sourceHash: 'test',
+    compilerVersion: 'test',
+    status: 'valid',
+    diagnostics: [],
+    dependencies: [],
+    capabilities: ['compilable', 'executable'],
+    metadata: { self: {}, nodes: [] },
+    payload,
+  }
+  Endge.program.beginCompile('test')
+  Endge.program.addArtifact(artifact)
+  return composition
 }

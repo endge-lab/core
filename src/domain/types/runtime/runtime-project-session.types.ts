@@ -10,12 +10,20 @@ export interface ProjectCompositionRegistry {
 
 export interface ProjectCompositionHandle {
   readonly identity: string
-  readonly state: 'inactive' | 'active' | 'disposed'
+  readonly state: 'inactive' | 'active' | 'paused' | 'disposed'
   readonly host: CompositionRuntimeHost | null
   readonly outputs: Readonly<Record<string, CompositionPublicOutputHandle>>
   activate: () => Promise<CompositionSession>
+  pause: () => Promise<void>
+  resume: () => Promise<void>
+  restart: () => Promise<CompositionSession>
   deactivate: () => Promise<void>
   output: <T = unknown>(name: string) => T | undefined
+}
+
+export interface ProjectRuntimeMountOptions {
+  /** `declared` preserves root activateOn; `none` creates stable handles for an on-demand/debug session. */
+  autoActivate?: 'declared' | 'none'
 }
 
 export interface ProjectRuntimeSession {

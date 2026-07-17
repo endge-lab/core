@@ -2,6 +2,7 @@ import type { CompositionSession } from '@/domain/types/source/composition-sourc
 import type {
   ProjectCompositionHandle,
   ProjectCompositionRegistry,
+  ProjectRuntimeMountOptions,
   ProjectRuntimeSession,
 } from '@/domain/types/runtime/runtime-project-session.types'
 
@@ -23,8 +24,11 @@ class ProjectCompositionHandleImpl implements ProjectCompositionHandle {
     this.identity = identity
   }
 
-  public get state(): 'inactive' | 'active' | 'disposed' {
-    return this._disposed ? 'disposed' : this._host ? 'active' : 'inactive'
+  public get state(): 'inactive' | 'active' | 'paused' | 'disposed' {
+    if (this._disposed) return 'disposed'
+    const scope = this._host?.getScope('scope_default')
+    if (!scope) return 'inactive'
+    return scope.state === 'paused' ? 'paused' : 'active'
   }
 
   public get host(): CompositionRuntimeHost | null { return this._host }
@@ -53,6 +57,7 @@ class ProjectCompositionHandleImpl implements ProjectCompositionHandle {
       this._host = host
     }
     const host = this._host
+    await host.getScope('scope_default')?.activate()
     return {
       id: host.id,
       host,
@@ -60,6 +65,19 @@ class ProjectCompositionHandleImpl implements ProjectCompositionHandle {
       output: <T = unknown>(name: string) => host.getOutput(name) as T | undefined,
       unmount: () => this.deactivate(),
     }
+  }
+
+  public async pause(): Promise<void> {
+    await this._host?.getScope('scope_default')?.pause()
+  }
+
+  public async resume(): Promise<void> {
+    await this._host?.getScope('scope_default')?.activate()
+  }
+
+  public async restart(): Promise<CompositionSession> {
+    await this.deactivate()
+    return this.activate()
   }
 
   public async deactivate(): Promise<void> {
@@ -96,7 +114,7 @@ class ProjectCompositionRegistryImpl implements ProjectCompositionRegistry {
 
 /** Mounts one project into an isolated runtime session. */
 export class EndgeProject {
-  public async mount(identity: string): Promise<ProjectRuntimeSession> {
+  public async mount(identity: string, options: ProjectRuntimeMountOptions = {}): Promise<ProjectRuntimeSession> {
     const normalized = String(identity ?? '').trim()
     const model = Endge.domain.getProject(normalized)
     if (!model)
@@ -131,7 +149,7 @@ export class EndgeProject {
         const artifact = Endge.program.getCompositionArtifact(composition.identity)
         if (!artifact || artifact.status === 'error')
           throw new Error(`[EndgeProject] Project Composition "${composition.identity}" is invalid.`)
-        if (artifact.payload.activation?.mode === 'startup')
+        if (options.autoActivate !== 'none' && artifact.payload.activation?.mode === 'startup')
           await handles.get(composition.identity)?.activate()
       }
     }
