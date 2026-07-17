@@ -7,28 +7,31 @@ import type { QueryProgramProp, SourceExpressionIR } from '@/domain/types/source
 /** Поддерживаемые kind query source v1. */
 export type QuerySourceKind = 'rest'
 
+/** Static request value or a safe expression evaluated from Query props at runtime. */
+export type QuerySourceRequestValue<T> = T | SourceExpressionIR
+
 /** Source-описание HTTP request части REST-запроса. */
 export interface QuerySourceRequest {
   /** Endpoint или Endge var-token вида {API_URL}. */
-  endpoint: string
+  endpoint: QuerySourceRequestValue<string>
 
   /** REST path. В legacy RQuery это поле хранится как query. */
-  path: string
+  path: QuerySourceRequestValue<string>
 
   /** HTTP method. */
-  method: string
+  method: QuerySourceRequestValue<string>
 
   /** HTTP headers. */
-  headers: Record<string, string>
+  headers: QuerySourceRequestValue<Record<string, string>>
 
   /** Auth config. */
-  auth: RQueryAuth
+  auth: QuerySourceRequestValue<RQueryAuth>
 
   /** Request timeout. */
-  timeoutMs?: number
+  timeoutMs?: QuerySourceRequestValue<number>
 
   /** Отправлять body как application/x-www-form-urlencoded. */
-  formUrlencoded?: boolean
+  formUrlencoded?: QuerySourceRequestValue<boolean>
 
   /** Безопасный body expression для query source v2. */
   body?: SourceExpressionIR | null

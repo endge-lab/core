@@ -146,6 +146,88 @@ defineQuery({
     })
   })
 
+  it('compiles props in every runtime request field', () => {
+    const result = compileQuerySource(`
+defineQuery({
+  kind: 'rest',
+  props: defineProps({
+    endpoint: field('String'),
+    path: field('String'),
+    method: field('String'),
+    tenant: field('String'),
+    auth: field('Object'),
+    timeoutMs: field('Number'),
+    formUrlencoded: field('Boolean'),
+    payload: field('Object'),
+  }),
+  request: {
+    endpoint: prop('endpoint'),
+    path: prop('path'),
+    method: prop('method'),
+    headers: { Accept: 'application/json', 'X-Tenant': prop('tenant') },
+    auth: prop('auth'),
+    timeoutMs: prop('timeoutMs'),
+    formUrlencoded: prop('formUrlencoded'),
+    body: body(({ prop }) => prop('payload')),
+  },
+  outputs: { raw: output().from(response()) },
+})
+`)
+
+    expect(result.diagnostics).toEqual([])
+    expect(result.artifact).toMatchObject({
+      endpoint: { type: 'read', source: 'prop', path: 'endpoint' },
+      query: { type: 'read', source: 'prop', path: 'path' },
+      method: { type: 'read', source: 'prop', path: 'method' },
+      headers: {
+        type: 'object',
+        properties: {
+          Accept: { type: 'literal', value: 'application/json' },
+          'X-Tenant': { type: 'read', source: 'prop', path: 'tenant' },
+        },
+      },
+      auth: { type: 'read', source: 'prop', path: 'auth' },
+      timeoutMs: { type: 'read', source: 'prop', path: 'timeoutMs' },
+      sendAsFormUrlencoded: { type: 'read', source: 'prop', path: 'formUrlencoded' },
+      requestBody: { type: 'read', source: 'prop', path: 'payload' },
+    })
+  })
+
+  it('rejects an undeclared prop in any request field', () => {
+    const result = compileQuerySource(`
+defineQuery({
+  kind: 'rest',
+  props: defineProps({}),
+  request: { endpoint: prop('missing') },
+  outputs: {},
+})
+`)
+
+    expect(result.artifact).toBeNull()
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'query-source-request-prop-missing',
+        sourcePath: 'request.endpoint',
+      }),
+    ]))
+  })
+
+  it('compiles env bindings passed from Composition to Query props', () => {
+    const result = compileCompositionSource(`
+defineComposition({
+  runtimes: {
+    query: query('schedule').withProps({ endpoint: env('ENDPOINT_AODB') }),
+  },
+})
+`)
+
+    expect(result.diagnostics).toEqual([])
+    expect(result.artifact?.runtimes[0]?.props.endpoint).toEqual({
+      kind: 'expression',
+      expression: { type: 'read', source: 'env', path: 'ENDPOINT_AODB' },
+    })
+  })
+
   it('compiles Composition graph and rejects cycles, duplicate persist keys and render config', () => {
     const valid = compileCompositionSource(`
 	defineComposition({

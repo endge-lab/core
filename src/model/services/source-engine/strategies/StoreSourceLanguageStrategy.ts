@@ -41,6 +41,12 @@ export class StoreSourceLanguageStrategy implements SourceLanguageStrategy {
         detail: 'Получить initial value из Endge.mock registry',
       },
       {
+        label: 'dataView',
+        kind: 'function',
+        insertText: ".dataView('data-view-identity')",
+        detail: 'Применить внешний DataView',
+      },
+      {
         label: 'select',
         kind: 'function',
         insertText: `.select({\n  rows: path('items'),\n})`,

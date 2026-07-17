@@ -10,6 +10,8 @@ import * as t from '@babel/types'
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
 const READ_FUNCTIONS: Record<string, SourceExpressionReadKind> = {
+  env: 'env',
+  endgeVar: 'env',
   prop: 'prop',
   value: 'value',
   row: 'row',

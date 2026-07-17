@@ -3,7 +3,8 @@ export type SourceFieldType = 'String' | 'Number' | 'Boolean' | 'Date' | 'Time' 
 
 /** Источник безопасного чтения значения внутри source expression. */
 export type SourceExpressionReadKind
-  = | 'prop'
+  = | 'env'
+    | 'prop'
     | 'value'
     | 'row'
     | 'response'
@@ -144,6 +145,8 @@ export interface QueryProgramProp extends SourceFieldDefinition {
 
 /** Контекст вычисления безопасного source expression. */
 export interface SourceExpressionContext {
+  /** Resolves an env(name) read without exposing the workspace to the evaluator. */
+  environment?: (name: string) => unknown
   props?: Record<string, unknown>
   values?: Record<string, unknown>
   row?: unknown

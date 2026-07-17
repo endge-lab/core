@@ -1,6 +1,7 @@
 import type { QueryProgramOutput, QueryProgramPayload } from '@/domain/types/program/program.types'
 import type { RQueryAuth } from '@/domain/types/document/query.types'
 import type { QueryExecutionContext } from '@/domain/types/runtime/query-execution.types'
+import type { SourceExpressionIR } from '@/domain/types/source/source-expression.types'
 import type { AxiosInstance } from 'axios'
 
 import axios from 'axios'
@@ -56,23 +57,25 @@ export class QueryExecutor {
     vars: Record<string, unknown>,
     signal?: AbortSignal,
   ): Promise<any> {
-    const endpoint = Endge.workspace.variables.resolve(payload.endpoint) || payload.endpoint
-    const queryPath = Endge.workspace.variables.resolve(payload.query) || payload.query
+    const endpointSource = String(this._evaluateRequestValue(payload.endpoint, vars) ?? '')
+    const queryPathSource = String(this._evaluateRequestValue(payload.query, vars) ?? '')
+    const endpoint = Endge.workspace.variables.resolve(endpointSource) || endpointSource
+    const queryPath = Endge.workspace.variables.resolve(queryPathSource) || queryPathSource
     const url = this._buildUrl(endpoint, queryPath)
-    const method = String(payload.method ?? 'POST').toUpperCase() as
+    const method = String(this._evaluateRequestValue(payload.method, vars) ?? 'POST').toUpperCase() as
       | 'GET'
       | 'POST'
       | 'PUT'
       | 'PATCH'
       | 'DELETE'
-    const headers = { ...(payload.headers ?? {}) }
+    const headers = this._asHeaders(this._evaluateRequestValue(payload.headers, vars))
 
     const sourceBody = payload.requestBody
-      ? evaluateSourceExpression(payload.requestBody, {
-          props: vars ?? {},
-          onWarning: warning => this._writeExpressionWarning(warning.message, warning.data),
-        })
+      ? this._evaluateRequestValue(payload.requestBody, vars)
       : {}
+    const sendAsFormUrlencoded = Boolean(this._evaluateRequestValue(payload.sendAsFormUrlencoded, vars))
+    const timeoutMs = this._asOptionalNumber(this._evaluateRequestValue(payload.timeoutMs, vars))
+    const auth = this._evaluateRequestValue(payload.auth, vars) as RQueryAuth | undefined
 
     let data: any
     let params: Record<string, any> | undefined
@@ -83,7 +86,7 @@ export class QueryExecutor {
     else {
       const effectiveBody = this._asRecord(sourceBody)
 
-      if (payload.sendAsFormUrlencoded) {
+      if (sendAsFormUrlencoded) {
         const form = new URLSearchParams()
         for (const [key, value] of Object.entries(effectiveBody)) {
           if (value === null || value === undefined)
@@ -98,7 +101,7 @@ export class QueryExecutor {
       }
     }
 
-    await this._applyAuth(payload.auth as RQueryAuth | undefined, headers, (params ??= {}))
+    await this._applyAuth(auth, headers, (params ??= {}))
 
     try {
       const response = await this.http.request({
@@ -107,7 +110,7 @@ export class QueryExecutor {
         headers,
         params,
         data,
-        timeout: payload.timeoutMs,
+        timeout: timeoutMs,
         signal,
       })
       return response.data
@@ -139,6 +142,51 @@ export class QueryExecutor {
     return value && typeof value === 'object' && !Array.isArray(value)
       ? value as Record<string, any>
       : {}
+  }
+
+  /** Evaluates a compiled request expression while accepting legacy static payload fields. */
+  private _evaluateRequestValue(value: unknown, props: Record<string, unknown>): unknown {
+    if (!this._isSourceExpression(value))
+      return value
+    return evaluateSourceExpression(value, {
+      props,
+      environment: name => Endge.workspace.variables.resolve(`{${name}}`) || `{${name}}`,
+      onWarning: warning => this._writeExpressionWarning(warning.message, warning.data),
+    })
+  }
+
+  private _isSourceExpression(value: unknown): value is SourceExpressionIR {
+    if (!value || typeof value !== 'object' || Array.isArray(value))
+      return false
+    const candidate = value as Record<string, unknown>
+    if (candidate.type === 'literal')
+      return Object.prototype.hasOwnProperty.call(candidate, 'value')
+    if (candidate.type === 'object')
+      return Boolean(candidate.properties && typeof candidate.properties === 'object' && !Array.isArray(candidate.properties))
+    if (candidate.type === 'array')
+      return Array.isArray(candidate.items)
+    if (candidate.type === 'read')
+      return typeof candidate.source === 'string' && typeof candidate.path === 'string'
+    if (candidate.type === 'operation')
+      return typeof candidate.operation === 'string' && Array.isArray(candidate.arguments)
+    return false
+  }
+
+  private _asHeaders(value: unknown): Record<string, string> {
+    if (!value || typeof value !== 'object' || Array.isArray(value))
+      return {}
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, entry]) => entry !== null && entry !== undefined)
+        .map(([key, entry]) => [key, String(entry)]),
+    )
+  }
+
+  private _asOptionalNumber(value: unknown): number | undefined {
+    if (value === null || value === undefined || value === '')
+      return undefined
+    const number = typeof value === 'number' ? value : Number(value)
+    return Number.isFinite(number) ? number : undefined
   }
 
   /** Читает mock payload из artifact. */

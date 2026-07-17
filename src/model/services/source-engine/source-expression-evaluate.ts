@@ -20,6 +20,8 @@ export function evaluateSourceExpression(
       return Object.fromEntries(Object.entries(node.properties).map(([key, value]) => [key, evaluate(value, current)]))
 
     if (node.type === 'read') {
+      if (node.source === 'env')
+        return context.environment?.(node.path)
       if (node.source === 'current')
         return readPath(current, node.path)
       if (node.source === 'scope')

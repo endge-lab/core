@@ -828,6 +828,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       return this._readFilterFieldsBinding(binding)
     if (binding.kind === 'expression') {
       return evaluateSourceExpression(binding.expression, {
+        environment: name => Endge.workspace.variables.resolve(`{${name}}`) || `{${name}}`,
         read: expression => this._readExpressionSource(expression),
         onWarning: warning => Endge.debug.warn(`[Composition] ${warning.message}`, warning.data),
       })
@@ -961,7 +962,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     sync: () => void,
   ): void {
     const parameters = read.parameters ?? []
-    if (read.source === 'metadata' || read.source === 'current')
+    if (read.source === 'metadata' || read.source === 'current' || read.source === 'env')
       return
     if (read.source === 'composition-output') {
       const path = this._requireOutputBridge(parameters[0], parameters[1])

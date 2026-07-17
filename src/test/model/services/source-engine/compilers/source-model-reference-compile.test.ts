@@ -70,7 +70,9 @@ describe('typed source model references', () => {
     })`)
 
     expect(result.diagnostics).toEqual([])
-    const map = result.document?.steps?.find(step => step.type === 'map') as any
+    const map = result.document?.steps?.find(step => step.type === 'map') as unknown as {
+      fields: Record<string, { operations: Array<{ type: string, converter: string }> }>
+    }
     expect(map.fields.value.operations[0]).toMatchObject({
       type: 'convert',
       converter: 'date.iso_to_time',

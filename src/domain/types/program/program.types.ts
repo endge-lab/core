@@ -155,6 +155,9 @@ export interface QueryProgramOutput {
     | { kind: 'derived', strategy: import('@/domain/types/source/data-view-source.types').DataViewMaterializationStrategy }
 }
 
+/** Backward-compatible static value or compiled runtime request expression. */
+export type QueryProgramRequestValue<T> = T | SourceExpressionIR
+
 /** Payload artifact для query-сущности. */
 export interface QueryProgramPayload {
   /** Версия source syntax, определяющая runtime contract. */
@@ -170,25 +173,25 @@ export interface QueryProgramPayload {
   type: string
 
   /** HTTP method для REST query. */
-  method?: string
+  method?: QueryProgramRequestValue<string>
 
   /** Endpoint или базовая ссылка источника данных. */
-  endpoint: string
+  endpoint: QueryProgramRequestValue<string>
 
   /** Тело запроса, GraphQL document или custom query expression. */
-  query: string
+  query: QueryProgramRequestValue<string>
 
   /** Заголовки REST query. */
-  headers?: Record<string, string>
+  headers?: QueryProgramRequestValue<Record<string, string>>
 
   /** Auth config, подготовленный для runtime query layer. */
-  auth?: unknown
+  auth?: QueryProgramRequestValue<unknown>
 
   /** Request timeout для REST query. */
-  timeoutMs?: number
+  timeoutMs?: QueryProgramRequestValue<number>
 
   /** Отправлять body как application/x-www-form-urlencoded. */
-  sendAsFormUrlencoded?: boolean
+  sendAsFormUrlencoded?: QueryProgramRequestValue<boolean>
 
   /** Единственный runtime input contract Query. */
   props: QueryProgramProp[]

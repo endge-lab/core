@@ -3,11 +3,12 @@ import type {
   QuerySourceCompileResult,
   QuerySourceDocument,
   QuerySourceOutput,
+  QuerySourceRequestValue,
 } from '@/domain/types/source/query-source.types'
 import type { ProgramDiagnostic, QueryProgramPayload } from '@/domain/types/program/program.types'
 import type { RQueryAuth } from '@/domain/types/document/query.types'
 import type { DataViewRef } from '@/domain/types/source/data-view-source.types'
-import type { QueryProgramProp } from '@/domain/types/source/source-expression.types'
+import type { QueryProgramProp, SourceExpressionIR } from '@/domain/types/source/source-expression.types'
 
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
@@ -144,6 +145,13 @@ function parseDocument(
   const props = propsNode ? readProps(propsNode, source, diagnostics) : []
   const requestBodyNode = requestNode ? readPropertyValue(requestNode, 'body') : null
   const requestBody = requestBodyNode ? readRequestBody(requestBodyNode, diagnostics) : null
+  const endpoint = requestNode ? readRequestValue(requestNode, 'endpoint', '', diagnostics, readStringRequestValue) : ''
+  const path = requestNode ? readRequestValue(requestNode, 'path', '', diagnostics, readStringRequestValue) : ''
+  const method = requestNode ? readRequestValue(requestNode, 'method', 'POST', diagnostics, readStringRequestValue) : 'POST'
+  const headers = requestNode ? readRequestValue(requestNode, 'headers', {}, diagnostics, readHeadersRequestValue) : {}
+  const auth = requestNode ? readRequestValue(requestNode, 'auth', { mode: 'inherit' }, diagnostics, readAuthRequestValue) : { mode: 'inherit' as const }
+  const timeoutMs = requestNode ? readOptionalRequestValue(requestNode, 'timeoutMs', diagnostics, readNumberRequestValue) : undefined
+  const formUrlencoded = requestNode ? readOptionalRequestValue(requestNode, 'formUrlencoded', diagnostics, readBooleanRequestValue) : undefined
   const propKeys = new Set(props.map(prop => prop.key))
   if (propsNode && requestNode && (propsNode.start ?? 0) > (requestNode.start ?? 0)) {
     diagnostics.push(createDiagnostic(
@@ -154,18 +162,25 @@ function parseDocument(
       propsNode,
     ))
   }
-  validateBodyPropReferences(requestBody, propKeys, diagnostics)
+  validateRequestPropReferences(requestBody, propKeys, diagnostics, 'request.body')
+  validateRequestPropReferences(endpoint, propKeys, diagnostics, 'request.endpoint')
+  validateRequestPropReferences(path, propKeys, diagnostics, 'request.path')
+  validateRequestPropReferences(method, propKeys, diagnostics, 'request.method')
+  validateRequestPropReferences(headers, propKeys, diagnostics, 'request.headers')
+  validateRequestPropReferences(auth, propKeys, diagnostics, 'request.auth')
+  validateRequestPropReferences(timeoutMs, propKeys, diagnostics, 'request.timeoutMs')
+  validateRequestPropReferences(formUrlencoded, propKeys, diagnostics, 'request.formUrlencoded')
 
   return {
     kind: 'rest',
     request: {
-      endpoint: requestNode ? readStringLikeProperty(requestNode, 'endpoint', diagnostics) ?? '' : '',
-      path: requestNode ? readStringLikeProperty(requestNode, 'path', diagnostics) ?? '' : '',
-      method: requestNode ? readStringProperty(requestNode, 'method') ?? 'POST' : 'POST',
-      headers: requestNode ? readStringRecordProperty(requestNode, 'headers', diagnostics) : {},
-      auth: requestNode ? readAuthProperty(requestNode, diagnostics) : { mode: 'inherit' },
-      timeoutMs: requestNode ? readNumberProperty(requestNode, 'timeoutMs') : undefined,
-      formUrlencoded: requestNode ? readBooleanProperty(requestNode, 'formUrlencoded') || undefined : undefined,
+      endpoint,
+      path,
+      method,
+      headers,
+      auth,
+      timeoutMs,
+      formUrlencoded,
       body: requestBody,
     },
     props,
@@ -305,23 +320,24 @@ function readOutputs(
   return outputs
 }
 
-function validateBodyPropReferences(
-  expression: import('@/domain/types/source/source-expression.types').SourceExpressionIR | null,
+function validateRequestPropReferences(
+  expression: QuerySourceRequestValue<unknown> | null | undefined,
   propKeys: Set<string>,
   diagnostics: DiagnosticDraft[],
+  sourcePath: string,
 ): void {
-  if (!expression)
+  if (!isSourceExpression(expression))
     return
-  const visit = (node: import('@/domain/types/source/source-expression.types').SourceExpressionIR) => {
+  const visit = (node: SourceExpressionIR) => {
     if (node.type === 'read') {
-      if (node.source === 'current') {
+      if (node.source === 'current' || node.source === 'env') {
         return
       }
       if (node.source !== 'prop') {
-        diagnostics.push(createDiagnostic('error', 'query-source-body-read', `request.body не поддерживает read source "${node.source}".`, 'request.body'))
+        diagnostics.push(createDiagnostic('error', 'query-source-request-read', `${sourcePath} не поддерживает read source "${node.source}".`, sourcePath))
       }
       else if (!propKeys.has(node.path)) {
-        diagnostics.push(createDiagnostic('error', 'query-source-body-prop-missing', `Prop "${node.path}" не объявлен в defineProps.`, 'request.body'))
+        diagnostics.push(createDiagnostic('error', 'query-source-request-prop-missing', `Prop "${node.path}" не объявлен в defineProps.`, sourcePath))
       }
     }
     else if (node.type === 'operation') {
@@ -528,64 +544,73 @@ function isManualDataViewDefinition(node: t.Node | null | undefined): boolean {
   return mode === 'manual' || (hasTransform && !hasSteps)
 }
 
-function readStringLikeProperty(
+type StaticRequestValueReader<T> = (
+  value: unknown,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+) => T | undefined
+
+function readRequestValue<T>(
+  node: t.ObjectExpression,
+  key: string,
+  fallback: T,
+  diagnostics: DiagnosticDraft[],
+  readStatic: StaticRequestValueReader<T>,
+): QuerySourceRequestValue<T> {
+  return readOptionalRequestValue(node, key, diagnostics, readStatic) ?? fallback
+}
+
+function readOptionalRequestValue<T>(
   node: t.ObjectExpression,
   key: string,
   diagnostics: DiagnosticDraft[],
-): string | null {
+  readStatic: StaticRequestValueReader<T>,
+): QuerySourceRequestValue<T> | undefined {
   const value = readPropertyValue(node, key)
   if (!value)
-    return null
+    return undefined
 
-  const parsed = expressionToUnknown(value, diagnostics, key)
-  return typeof parsed === 'string' ? parsed : null
+  const sourcePath = `request.${key}`
+  if (!isStaticRequestExpression(value))
+    return compileSourceExpression(value, diagnostics, sourcePath) ?? undefined
+
+  const parsed = expressionToUnknown(value, diagnostics, sourcePath)
+  const normalized = readStatic(parsed, diagnostics, sourcePath)
+  if (normalized === undefined) {
+    diagnostics.push(createDiagnostic(
+      'error',
+      'query-source-request-value-type',
+      `${sourcePath} содержит значение недопустимого типа.`,
+      sourcePath,
+      value,
+    ))
+  }
+  return normalized
 }
 
-function readStringProperty(node: t.ObjectExpression, key: string): string | null {
-  const value = readPropertyValue(node, key)
-  const expression = value ? unwrapExpression(value) : null
-  return expression && t.isStringLiteral(expression) ? expression.value : null
+function readStringRequestValue(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined
 }
 
-function readNumberProperty(node: t.ObjectExpression, key: string): number | undefined {
-  const value = readPropertyValue(node, key)
-  const expression = value ? unwrapExpression(value) : null
-  return expression && t.isNumericLiteral(expression) ? expression.value : undefined
+function readNumberRequestValue(value: unknown): number | undefined {
+  return typeof value === 'number' ? value : undefined
 }
 
-function readBooleanProperty(node: t.ObjectExpression, key: string): boolean | undefined {
-  const value = readPropertyValue(node, key)
-  const expression = value ? unwrapExpression(value) : null
-  if (expression && t.isBooleanLiteral(expression))
-    return expression.value
-  return undefined
+function readBooleanRequestValue(value: unknown): boolean | undefined {
+  return typeof value === 'boolean' ? value : undefined
 }
 
-function readStringRecordProperty(
-  node: t.ObjectExpression,
-  key: string,
-  diagnostics: DiagnosticDraft[],
-): Record<string, string> {
-  const raw = readUnknownProperty(node, key, diagnostics)
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw))
-    return {}
-
-  const out: Record<string, string> = {}
-  for (const [name, value] of Object.entries(raw))
-    out[name] = String(value)
-
-  return out
+function readHeadersRequestValue(value: unknown): Record<string, string> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    return undefined
+  return Object.fromEntries(Object.entries(value).map(([name, entry]) => [name, String(entry)]))
 }
 
-function readAuthProperty(
-  node: t.ObjectExpression,
-  diagnostics: DiagnosticDraft[],
-): RQueryAuth {
-  const raw = readUnknownProperty(node, 'auth', diagnostics)
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw))
-    return { mode: 'inherit' }
+function readAuthRequestValue(value: unknown): RQueryAuth | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    return undefined
 
-  const auth = raw as Partial<RQueryAuth>
+  const auth = value as Partial<RQueryAuth>
   const profile = auth.profile ?? auth.authProfileIdentity
   if (auth.mode === 'none')
     return { ...auth, mode: 'none' }
@@ -594,6 +619,61 @@ function readAuthProperty(
   if (auth.mode === 'profile')
     return { ...auth, mode: 'profile', profile, authProfileIdentity: profile }
   return { ...auth, mode: 'inherit' }
+}
+
+function isStaticRequestExpression(node: t.Expression): boolean {
+  const expression = unwrapExpression(node)
+  if (
+    t.isStringLiteral(expression)
+    || t.isNumericLiteral(expression)
+    || t.isBooleanLiteral(expression)
+    || t.isNullLiteral(expression)
+    || t.isIdentifier(expression, { name: 'undefined' })
+    || (t.isTemplateLiteral(expression) && expression.expressions.length === 0)
+    || isVarCall(expression)
+  ) return true
+  if (t.isArrayExpression(expression))
+    return expression.elements.every(item => item != null && t.isExpression(item) && isStaticRequestExpression(item))
+  if (t.isObjectExpression(expression)) {
+    return expression.properties.every(property =>
+      t.isObjectProperty(property)
+      && !property.computed
+      && t.isExpression(property.value)
+      && isStaticRequestExpression(property.value),
+    )
+  }
+  return false
+}
+
+function isSourceExpression(value: unknown): value is SourceExpressionIR {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    return false
+  const candidate = value as Record<string, unknown>
+  if (candidate.type === 'literal')
+    return Object.prototype.hasOwnProperty.call(candidate, 'value')
+  if (candidate.type === 'object')
+    return Boolean(candidate.properties && typeof candidate.properties === 'object' && !Array.isArray(candidate.properties))
+  if (candidate.type === 'array')
+    return Array.isArray(candidate.items)
+  if (candidate.type === 'read')
+    return typeof candidate.source === 'string' && typeof candidate.path === 'string'
+  if (candidate.type === 'operation')
+    return typeof candidate.operation === 'string' && Array.isArray(candidate.arguments)
+  return false
+}
+
+function readStringProperty(node: t.ObjectExpression, key: string): string | null {
+  const value = readPropertyValue(node, key)
+  const expression = value ? unwrapExpression(value) : null
+  return expression && t.isStringLiteral(expression) ? expression.value : null
+}
+
+function readBooleanProperty(node: t.ObjectExpression, key: string): boolean | undefined {
+  const value = readPropertyValue(node, key)
+  const expression = value ? unwrapExpression(value) : null
+  if (expression && t.isBooleanLiteral(expression))
+    return expression.value
+  return undefined
 }
 
 function readUnknownProperty(
@@ -641,6 +721,10 @@ function expressionToUnknown(
     return expression.value
   if (t.isNullLiteral(expression))
     return null
+  if (t.isIdentifier(expression, { name: 'undefined' }))
+    return undefined
+  if (t.isTemplateLiteral(expression) && expression.expressions.length === 0)
+    return expression.quasis[0]?.value.cooked ?? ''
   if (t.isArrayExpression(expression))
     return expression.elements.map(item => expressionToUnknown(item as t.Expression, diagnostics, sourcePath))
   if (t.isObjectExpression(expression))
