@@ -45,6 +45,36 @@ export interface SourceLanguageCompletion {
   documentation?: string
 }
 
+/** Логический тип внешнего доменного документа, на который ссылается source. */
+export type SourceDocumentReferenceTarget
+  = | 'auth-profile'
+    | 'component'
+    | 'composition'
+    | 'computation'
+    | 'converter'
+    | 'data-view'
+    | 'filter'
+    | 'mock'
+    | 'query'
+    | 'store'
+    | 'style'
+    | 'vocabs'
+
+/** Семантическая ссылка из source на внешний доменный документ. */
+export interface SourceDocumentReference {
+  /** Логический тип цели; UI может уточнить concrete document type через domain. */
+  target: SourceDocumentReferenceTarget
+
+  /** Persisted identity целевого документа. */
+  identity: string
+
+  /** Полуоткрытый диапазон reference-expression в source offsets. */
+  range: {
+    start: number
+    end: number
+  }
+}
+
 /** Результат validation source language strategy. */
 export interface SourceLanguageValidationResult extends SourceEngineResult {
   /** Diagnostics, найденные language strategy. */
@@ -199,4 +229,7 @@ export interface SourceLanguageStrategy {
 
   /** Возвращает доступные подсказки языка в нейтральном формате. */
   completions: (context: SourceLanguageContext) => SourceLanguageCompletion[]
+
+  /** Возвращает внешнюю document reference под курсором, если язык её поддерживает. */
+  resolveReference?: (context: SourceLanguageContext) => SourceDocumentReference | null
 }

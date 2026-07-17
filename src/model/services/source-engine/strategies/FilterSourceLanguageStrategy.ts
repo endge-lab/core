@@ -8,6 +8,7 @@ import type {
 
 import { compileFilterSource } from '@/model/services/source-engine/compilers/filter-source-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
+import { resolveSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
 import { FILTER_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/filter.default.source'
 
 export class FilterSourceLanguageStrategy implements SourceLanguageStrategy {
@@ -42,6 +43,14 @@ export class FilterSourceLanguageStrategy implements SourceLanguageStrategy {
 
   public completions(_context: SourceLanguageContext): SourceLanguageCompletion[] {
     return FILTER_COMPLETIONS
+  }
+
+  public resolveReference(context: SourceLanguageContext) {
+    return resolveSourceDocumentReference(context, {
+      methods: {
+        vocab: 'vocabs',
+      },
+    })
   }
 }
 

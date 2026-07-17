@@ -8,6 +8,7 @@ import type {
 
 import { compileDataViewSource } from '@/model/services/source-engine/compilers/data-view-source-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
+import { resolveSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
 import { DATA_VIEW_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/data-view.default.source'
 import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/model/services/source-engine/value-expression-language'
 
@@ -52,6 +53,17 @@ export class DataViewSourceLanguageStrategy implements SourceLanguageStrategy {
   /** Возвращает подсказки v1 для разрешенного DataView source API. */
   public completions(_context: SourceLanguageContext): SourceLanguageCompletion[] {
     return [...DATA_VIEW_SOURCE_COMPLETIONS, ...VALUE_EXPRESSION_COMPLETIONS]
+  }
+
+  public resolveReference(context: SourceLanguageContext) {
+    return resolveSourceDocumentReference(context, {
+      functions: {
+        dataView: 'data-view',
+      },
+      methods: {
+        convert: 'converter',
+      },
+    })
   }
 }
 

@@ -8,6 +8,7 @@ import type {
 
 import { compileCompositionSource } from '@/model/services/source-engine/compilers/composition-source-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
+import { resolveSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
 import { COMPOSITION_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/composition.default.source'
 import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/model/services/source-engine/value-expression-language'
 
@@ -43,6 +44,24 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
 
   public completions(_context: SourceLanguageContext): SourceLanguageCompletion[] {
     return [...COMPOSITION_COMPLETIONS, ...VALUE_EXPRESSION_COMPLETIONS]
+  }
+
+  public resolveReference(context: SourceLanguageContext) {
+    return resolveSourceDocumentReference(context, {
+      functions: {
+        component: 'component',
+        composition: 'composition',
+        filter: 'filter',
+        filterView: 'filter',
+        query: 'query',
+        store: 'store',
+        style: 'style',
+        vocab: 'vocabs',
+      },
+      methods: {
+        component: 'component',
+      },
+    })
   }
 }
 

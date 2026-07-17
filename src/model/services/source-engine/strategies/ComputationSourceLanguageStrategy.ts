@@ -8,6 +8,7 @@ import type {
 
 import { compileComputation } from '@/model/services/compiler/computation/computation-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
+import { resolveSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
 import { COMPUTATION_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/computation.default.source'
 import {
   VALUE_EXPRESSION_COMPLETIONS,
@@ -49,5 +50,13 @@ export class ComputationSourceLanguageStrategy implements SourceLanguageStrategy
       { label: 'output', kind: 'function', insertText: "output('name')", detail: 'Прочитать named output' },
       ...VALUE_EXPRESSION_COMPLETIONS,
     ]
+  }
+
+  public resolveReference(context: SourceLanguageContext) {
+    return resolveSourceDocumentReference(context, {
+      functions: {
+        computation: 'computation',
+      },
+    })
   }
 }

@@ -8,6 +8,7 @@ import type {
 
 import { compileQuerySource } from '@/model/services/source-engine/compilers/query-source-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
+import { resolveSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
 import { QUERY_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/query.default.source'
 import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/model/services/source-engine/value-expression-language'
 
@@ -59,6 +60,16 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
   /** Возвращает подсказки source-only Query v2 API. */
   public completions(_context: SourceLanguageContext): SourceLanguageCompletion[] {
     return [...QUERY_SOURCE_COMPLETIONS, ...VALUE_EXPRESSION_COMPLETIONS]
+  }
+
+  public resolveReference(context: SourceLanguageContext) {
+    return resolveSourceDocumentReference(context, {
+      functions: {
+        dataView: 'data-view',
+        filter: 'filter',
+      },
+      properties: [{ property: 'profile', parentProperty: 'auth', target: 'auth-profile' }],
+    })
   }
 }
 

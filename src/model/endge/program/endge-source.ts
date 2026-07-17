@@ -4,6 +4,7 @@ import type {
   SourceEngineStrategy,
   SourceLanguageCompletion,
   SourceLanguageContext,
+  SourceDocumentReference,
   SourceLanguageStrategy,
   SourceLanguageValidationResult,
   SourceKind,
@@ -145,6 +146,11 @@ export class EndgeSource extends EndgeModule {
   /** Возвращает editor-facing completion items для указанного source-kind. */
   public completions(sourceKind: SourceKind | string, context: SourceLanguageContext): SourceLanguageCompletion[] {
     return this._resolveRequiredLanguageStrategy(sourceKind).completions(context)
+  }
+
+  /** Возвращает семантическую ссылку на внешний документ под курсором. */
+  public referenceAt(sourceKind: SourceKind | string, context: SourceLanguageContext): SourceDocumentReference | null {
+    return this._resolveRequiredLanguageStrategy(sourceKind).resolveReference?.(context) ?? null
   }
 
   /** Регистрирует встроенные strategies ядра. */

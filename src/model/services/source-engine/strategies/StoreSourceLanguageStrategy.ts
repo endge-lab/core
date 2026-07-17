@@ -2,6 +2,7 @@ import type { SourceKind, SourceLanguageCompletion, SourceLanguageContext, Sourc
 
 import { compileStoreSource } from '@/model/services/source-engine/compilers/store-source-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
+import { resolveSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
 import { STORE_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/store.default.source'
 import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/model/services/source-engine/value-expression-language'
 
@@ -47,5 +48,14 @@ export class StoreSourceLanguageStrategy implements SourceLanguageStrategy {
       },
       ...VALUE_EXPRESSION_COMPLETIONS,
     ]
+  }
+
+  public resolveReference(context: SourceLanguageContext) {
+    return resolveSourceDocumentReference(context, {
+      functions: {
+        dataView: 'data-view',
+        mock: 'mock',
+      },
+    })
   }
 }
