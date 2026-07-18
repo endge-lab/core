@@ -5,13 +5,56 @@ import type {
 
 /** Системная diagnostics configuration для workspace без явных настроек. */
 export const DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION: Readonly<EndgeDiagnosticsConfiguration> = Object.freeze({
-  collection: {
-    enabled: true,
-    signals: ['log', 'span'],
-    minSeverity: 9,
-    maxRecords: 2_000,
+  telemetry: {
+    collection: {
+      enabled: true,
+      signals: ['log', 'span'],
+      minSeverity: 9,
+      maxRecords: 2_000,
+    },
+    outputs: [
+      {
+        id: 'output-1',
+        name: 'Канал вывода 1',
+        enabled: true,
+        adapterType: 'console',
+        options: {
+          format: 'pretty',
+          groupByTrace: true,
+          includeTimestamp: true,
+          includeScope: true,
+          includeAttributes: true,
+        },
+      },
+    ],
+    routes: [
+      {
+        id: 'runtime-fatal-console',
+        name: 'Runtime fatal errors',
+        enabled: true,
+        match: {
+          signals: ['log'],
+          phases: ['runtime'],
+          minSeverity: 21,
+        },
+        outputId: 'output-1',
+      },
+    ],
   },
-  routes: [],
+  snapshots: {
+    content: {
+      telemetry: true,
+      problems: true,
+      configuration: false,
+    },
+    automatic: {
+      enabled: false,
+      errorCount: 10,
+      windowSeconds: 60,
+      cooldownSeconds: 300,
+      outputIds: ['output-1'],
+    },
+  },
 } satisfies EndgeDiagnosticsConfiguration)
 
 /** Текстовое представление базовых значений OpenTelemetry SeverityNumber. */

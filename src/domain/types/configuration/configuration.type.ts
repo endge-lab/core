@@ -1,6 +1,7 @@
 import type {
   DiagnosticsSeverityNumber,
   DiagnosticsSignal,
+  EndgeDiagnosticsOutputConfiguration,
   EndgeDiagnosticsConfiguration,
   EndgeDiagnosticsRoute,
 } from '@/domain/types/diagnostics'
@@ -43,7 +44,7 @@ export interface EndgeConfiguration {
   defaultAuthProfileIdentity: string | null
   sfcAdapterIds: string[]
   defaultSfcAdapterId: string
-  /** Настройки локального сбора и маршрутизации diagnostic records. */
+  /** Настройки telemetry, output adapters, routing и snapshots. */
   diagnostics: EndgeDiagnosticsConfiguration
 }
 
@@ -83,10 +84,39 @@ export interface EndgeDiagnosticsCollectionPatch {
   maxRecords?: EndgeValueOverride<number>
 }
 
-/** Patch diagnostics configuration с merge маршрутов по стабильному id. */
-export interface EndgeDiagnosticsConfigurationPatch {
+/** Patch telemetry configuration с merge outputs и routes по стабильному id. */
+export interface EndgeDiagnosticsTelemetryPatch {
   collection?: EndgeDiagnosticsCollectionPatch
+  outputs?: EndgeCollectionPatch<EndgeDiagnosticsOutputConfiguration>
   routes?: EndgeCollectionPatch<EndgeDiagnosticsRoute>
+}
+
+/** Patch состава диагностического snapshot. */
+export interface EndgeDiagnosticsSnapshotContentPatch {
+  telemetry?: EndgeValueOverride<boolean>
+  problems?: EndgeValueOverride<boolean>
+  configuration?: EndgeValueOverride<boolean>
+}
+
+/** Patch условий автоматического snapshot. */
+export interface EndgeDiagnosticsAutomaticSnapshotPatch {
+  enabled?: EndgeValueOverride<boolean>
+  errorCount?: EndgeValueOverride<number>
+  windowSeconds?: EndgeValueOverride<number>
+  cooldownSeconds?: EndgeValueOverride<number>
+  outputIds?: EndgeCollectionPatch<string>
+}
+
+/** Patch snapshots configuration текущего cascade layer. */
+export interface EndgeDiagnosticsSnapshotsPatch {
+  content?: EndgeDiagnosticsSnapshotContentPatch
+  automatic?: EndgeDiagnosticsAutomaticSnapshotPatch
+}
+
+/** Patch diagnostics configuration текущего cascade layer. */
+export interface EndgeDiagnosticsConfigurationPatch {
+  telemetry?: EndgeDiagnosticsTelemetryPatch
+  snapshots?: EndgeDiagnosticsSnapshotsPatch
 }
 
 export type EndgeConfigurationContribution =

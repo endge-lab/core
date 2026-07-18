@@ -138,6 +138,7 @@ export class QueryExecutor {
     if (Endge.isConfigured) {
       Endge.diagnostics.warn(`[Query] ${message}`, {
         scope: { name: 'endge.runtime.query' },
+        phase: 'runtime',
         eventName: 'endge.expression.warning',
       })
     }

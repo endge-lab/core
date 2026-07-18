@@ -10,17 +10,30 @@ import { describe, expect, it, vi } from 'vitest'
 
 /** Создаёт независимую configuration для одного тестового diagnostics module. */
 function configuration(
-  overrides: Partial<EndgeDiagnosticsConfiguration['collection']> = {},
+  overrides: Partial<EndgeDiagnosticsConfiguration['telemetry']['collection']> = {},
 ): EndgeDiagnosticsConfiguration {
   return {
-    collection: {
-      enabled: true,
-      signals: ['log', 'span'],
-      minSeverity: 1,
-      maxRecords: 100,
-      ...overrides,
+    telemetry: {
+      collection: {
+        enabled: true,
+        signals: ['log', 'span'],
+        minSeverity: 1,
+        maxRecords: 100,
+        ...overrides,
+      },
+      outputs: [],
+      routes: [],
     },
-    routes: [],
+    snapshots: {
+      content: { telemetry: true, problems: true, configuration: false },
+      automatic: {
+        enabled: false,
+        errorCount: 10,
+        windowSeconds: 60,
+        cooldownSeconds: 300,
+        outputIds: [],
+      },
+    },
   }
 }
 
@@ -167,15 +180,19 @@ describe('EndgeDiagnostics', () => {
     const diagnostics = new EndgeDiagnostics()
     const accept = vi.fn()
     const flush = vi.fn()
-    const adapter: DiagnosticsAdapter = { id: 'memory', accept, flush }
+    const adapter: DiagnosticsAdapter = { id: 'memory', acceptRecord: accept, flush }
     diagnostics.configure({
       ...configuration(),
-      routes: [{
-        id: 'errors',
-        enabled: true,
-        match: { signals: ['log'], minSeverity: 17 },
-        target: { adapterId: 'memory', integrationId: 'sentry-main' },
-      }],
+      telemetry: {
+        ...configuration().telemetry,
+        routes: [{
+          id: 'errors',
+          name: 'Errors',
+          enabled: true,
+          match: { signals: ['log'], minSeverity: 17 },
+          outputId: 'memory',
+        }],
+      },
     })
     diagnostics.registerAdapter(adapter)
 
@@ -185,7 +202,7 @@ describe('EndgeDiagnostics', () => {
 
     expect(accept).toHaveBeenCalledOnce()
     expect(accept.mock.calls[0]?.[0]).toMatchObject({ body: 'routed' })
-    expect(accept.mock.calls[0]?.[1]).toMatchObject({ routeId: 'errors', integrationId: 'sentry-main' })
+    expect(accept.mock.calls[0]?.[1]).toMatchObject({ routeIds: ['errors'] })
     expect(flush).toHaveBeenCalledOnce()
     expect(result).toEqual({ succeeded: ['memory'], failed: [] })
     expect(() => diagnostics.registerAdapter(adapter)).toThrow('Adapter "memory" is already registered')
@@ -195,16 +212,20 @@ describe('EndgeDiagnostics', () => {
     const diagnostics = new EndgeDiagnostics()
     diagnostics.configure({
       ...configuration(),
-      routes: [{
-        id: 'all',
-        enabled: true,
-        match: {},
-        target: { adapterId: 'broken' },
-      }],
+      telemetry: {
+        ...configuration().telemetry,
+        routes: [{
+          id: 'all',
+          name: 'All',
+          enabled: true,
+          match: {},
+          outputId: 'broken',
+        }],
+      },
     })
     diagnostics.registerAdapter({
       id: 'broken',
-      accept: async () => { throw new Error('delivery failed') },
+      acceptRecord: async () => { throw new Error('delivery failed') },
     })
 
     expect(() => diagnostics.info('still stored')).not.toThrow()
@@ -213,5 +234,58 @@ describe('EndgeDiagnostics', () => {
 
     expect(diagnostics.query()).toHaveLength(1)
     expect(diagnostics.getCounters().adapterFailures).toBe(1)
+  })
+
+  it('routes one record to an output once when several routes match', () => {
+    const diagnostics = new EndgeDiagnostics()
+    const acceptRecord = vi.fn()
+    const base = configuration()
+    diagnostics.configure({
+      ...base,
+      telemetry: {
+        ...base.telemetry,
+        routes: [
+          { id: 'runtime', name: 'Runtime', enabled: true, match: { phases: ['runtime'] }, outputId: 'memory' },
+          { id: 'errors', name: 'Errors', enabled: true, match: { minSeverity: 17 }, outputId: 'memory' },
+        ],
+      },
+    })
+    diagnostics.registerAdapter({ id: 'memory', acceptRecord })
+
+    diagnostics.error('failed', { phase: 'runtime' })
+
+    expect(acceptRecord).toHaveBeenCalledOnce()
+    expect(acceptRecord.mock.calls[0]?.[1]).toMatchObject({ routeIds: ['runtime', 'errors'] })
+  })
+
+  it('creates an automatic snapshot only when the sliding window threshold is reached', () => {
+    const diagnostics = new EndgeDiagnostics()
+    const acceptSnapshot = vi.fn()
+    const base = configuration()
+    diagnostics.configure({
+      ...base,
+      snapshots: {
+        ...base.snapshots,
+        automatic: {
+          enabled: true,
+          errorCount: 10,
+          windowSeconds: 60,
+          cooldownSeconds: 300,
+          outputIds: ['memory'],
+        },
+      },
+    })
+    diagnostics.registerAdapter({ id: 'memory', acceptRecord: vi.fn(), acceptSnapshot })
+
+    for (let index = 0; index < 9; index += 1)
+      diagnostics.error(`error-${index}`, { timestamp: 1_000 + index })
+    expect(acceptSnapshot).not.toHaveBeenCalled()
+
+    diagnostics.error('error-10', { timestamp: 1_010 })
+    expect(acceptSnapshot).toHaveBeenCalledOnce()
+    expect(acceptSnapshot.mock.calls[0]?.[0]).toMatchObject({ trigger: 'automatic' })
+
+    diagnostics.error('cooldown', { timestamp: 2_000 })
+    expect(acceptSnapshot).toHaveBeenCalledOnce()
   })
 })

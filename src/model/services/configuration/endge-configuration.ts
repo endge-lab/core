@@ -11,10 +11,13 @@ import type {
 } from '@/domain/types/configuration'
 import type {
   DiagnosticsAttributes,
+  DiagnosticsAdapterOptionValue,
   DiagnosticsFilter,
+  DiagnosticsPhase,
   DiagnosticsSeverityNumber,
   DiagnosticsSignal,
   EndgeDiagnosticsConfiguration,
+  EndgeDiagnosticsOutputConfiguration,
   EndgeDiagnosticsRoute,
 } from '@/domain/types/diagnostics'
 import { DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION } from '@/model/config/diagnostics'
@@ -147,30 +150,69 @@ function applyDiagnosticsPatch(
   patch: NonNullable<EndgeConfigurationPatch['diagnostics']>,
 ): EndgeDiagnosticsConfiguration {
   const next = structuredCloneSafe(upstream)
-  const collection = patch.collection
+  const legacyPatch = patch as typeof patch & {
+    collection?: NonNullable<typeof patch.telemetry>['collection']
+    routes?: NonNullable<typeof patch.telemetry>['routes']
+  }
+  const telemetry = patch.telemetry ?? {
+    collection: legacyPatch.collection,
+    routes: legacyPatch.routes,
+  }
+  const collection = telemetry.collection
 
   if (collection?.enabled?.op === 'set')
-    next.collection.enabled = collection.enabled.value
+    next.telemetry.collection.enabled = collection.enabled.value
   if (collection?.enabled?.op === 'remove')
-    throw new Error('[EndgeConfiguration] Required field "diagnostics.collection.enabled" cannot be removed')
+    throw new Error('[EndgeConfiguration] Required field "diagnostics.telemetry.collection.enabled" cannot be removed')
 
   if (collection?.signals)
-    next.collection.signals = applyCollectionPatch(next.collection.signals, collection.signals, item => item)
+    next.telemetry.collection.signals = applyCollectionPatch(next.telemetry.collection.signals, collection.signals, item => item)
 
   if (collection?.minSeverity?.op === 'set')
-    next.collection.minSeverity = collection.minSeverity.value
+    next.telemetry.collection.minSeverity = collection.minSeverity.value
   if (collection?.minSeverity?.op === 'remove')
-    throw new Error('[EndgeConfiguration] Required field "diagnostics.collection.minSeverity" cannot be removed')
+    throw new Error('[EndgeConfiguration] Required field "diagnostics.telemetry.collection.minSeverity" cannot be removed')
 
   if (collection?.maxRecords?.op === 'set')
-    next.collection.maxRecords = collection.maxRecords.value
+    next.telemetry.collection.maxRecords = collection.maxRecords.value
   if (collection?.maxRecords?.op === 'remove')
-    throw new Error('[EndgeConfiguration] Required field "diagnostics.collection.maxRecords" cannot be removed')
+    throw new Error('[EndgeConfiguration] Required field "diagnostics.telemetry.collection.maxRecords" cannot be removed')
 
-  if (patch.routes)
-    next.routes = applyCollectionPatch(next.routes, patch.routes, item => item.id)
+  if (telemetry.outputs)
+    next.telemetry.outputs = applyCollectionPatch(next.telemetry.outputs, telemetry.outputs, item => item.id)
+  if (telemetry.routes)
+    next.telemetry.routes = applyCollectionPatch(next.telemetry.routes, telemetry.routes, item => item.id)
+
+  const snapshots = patch.snapshots
+  applyDiagnosticsRequiredValue(next.snapshots.content, 'telemetry', snapshots?.content?.telemetry)
+  applyDiagnosticsRequiredValue(next.snapshots.content, 'problems', snapshots?.content?.problems)
+  applyDiagnosticsRequiredValue(next.snapshots.content, 'configuration', snapshots?.content?.configuration)
+  applyDiagnosticsRequiredValue(next.snapshots.automatic, 'enabled', snapshots?.automatic?.enabled)
+  applyDiagnosticsRequiredValue(next.snapshots.automatic, 'errorCount', snapshots?.automatic?.errorCount)
+  applyDiagnosticsRequiredValue(next.snapshots.automatic, 'windowSeconds', snapshots?.automatic?.windowSeconds)
+  applyDiagnosticsRequiredValue(next.snapshots.automatic, 'cooldownSeconds', snapshots?.automatic?.cooldownSeconds)
+  if (snapshots?.automatic?.outputIds) {
+    next.snapshots.automatic.outputIds = applyCollectionPatch(
+      next.snapshots.automatic.outputIds,
+      snapshots.automatic.outputIds,
+      item => item,
+    )
+  }
 
   return normalizeDiagnosticsConfiguration(next)
+}
+
+/** Применяет required diagnostics override и запрещает remove для scalar policy. */
+function applyDiagnosticsRequiredValue<TTarget extends object, TKey extends keyof TTarget>(
+  target: TTarget,
+  key: TKey,
+  override: { op: 'set', value: TTarget[TKey] } | { op: 'remove' } | undefined,
+): void {
+  if (!override)
+    return
+  if (override.op === 'remove')
+    throw new Error(`[EndgeConfiguration] Required field "diagnostics.${String(key)}" cannot be removed`)
+  target[key] = override.value
 }
 
 function applyCollectionPatch<T>(
@@ -318,25 +360,52 @@ function normalizeDiagnosticsConfiguration(input: unknown): EndgeDiagnosticsConf
   if (!isRecord(input))
     return defaults
 
-  const rawCollection = isRecord(input.collection) ? input.collection : {}
+  const rawTelemetry = isRecord(input.telemetry) ? input.telemetry : input
+  const rawCollection = isRecord(rawTelemetry.collection) ? rawTelemetry.collection : {}
   const signals = normalizeDiagnosticsSignals(rawCollection.signals)
-  const minSeverity = normalizeDiagnosticsSeverity(rawCollection.minSeverity, defaults.collection.minSeverity)
-  const maxRecords = Math.max(1, Math.floor(Number(rawCollection.maxRecords ?? defaults.collection.maxRecords) || defaults.collection.maxRecords))
+  const minSeverity = normalizeDiagnosticsSeverity(rawCollection.minSeverity, defaults.telemetry.collection.minSeverity)
+  const maxRecords = normalizePositiveInteger(rawCollection.maxRecords, defaults.telemetry.collection.maxRecords)
+  const rawSnapshots = isRecord(input.snapshots) ? input.snapshots : {}
+  const rawContent = isRecord(rawSnapshots.content) ? rawSnapshots.content : {}
+  const rawAutomatic = isRecord(rawSnapshots.automatic) ? rawSnapshots.automatic : {}
 
   return {
-    collection: {
-      enabled: typeof rawCollection.enabled === 'boolean' ? rawCollection.enabled : defaults.collection.enabled,
-      signals,
-      minSeverity,
-      maxRecords,
+    telemetry: {
+      collection: {
+        enabled: typeof rawCollection.enabled === 'boolean' ? rawCollection.enabled : defaults.telemetry.collection.enabled,
+        signals,
+        minSeverity,
+        maxRecords,
+      },
+      outputs: Array.isArray(rawTelemetry.outputs)
+        ? normalizeDiagnosticsOutputs(rawTelemetry.outputs)
+        : defaults.telemetry.outputs,
+      routes: Array.isArray(rawTelemetry.routes)
+        ? normalizeDiagnosticsRoutes(rawTelemetry.routes)
+        : defaults.telemetry.routes,
     },
-    routes: normalizeDiagnosticsRoutes(input.routes),
+    snapshots: {
+      content: {
+        telemetry: normalizeBoolean(rawContent.telemetry, defaults.snapshots.content.telemetry),
+        problems: normalizeBoolean(rawContent.problems, defaults.snapshots.content.problems),
+        configuration: normalizeBoolean(rawContent.configuration, defaults.snapshots.content.configuration),
+      },
+      automatic: {
+        enabled: normalizeBoolean(rawAutomatic.enabled, defaults.snapshots.automatic.enabled),
+        errorCount: normalizePositiveInteger(rawAutomatic.errorCount, defaults.snapshots.automatic.errorCount),
+        windowSeconds: normalizePositiveInteger(rawAutomatic.windowSeconds, defaults.snapshots.automatic.windowSeconds),
+        cooldownSeconds: normalizeNonNegativeInteger(rawAutomatic.cooldownSeconds, defaults.snapshots.automatic.cooldownSeconds),
+        outputIds: Array.isArray(rawAutomatic.outputIds)
+          ? [...new Set(rawAutomatic.outputIds.map(normalizeText).filter(Boolean))]
+          : defaults.snapshots.automatic.outputIds,
+      },
+    },
   }
 }
 
 /** Нормализует уникальный список поддерживаемых diagnostics signals. */
 function normalizeDiagnosticsSignals(input: unknown): DiagnosticsSignal[] {
-  const source = Array.isArray(input) ? input : DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION.collection.signals
+  const source = Array.isArray(input) ? input : DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION.telemetry.collection.signals
   return [...new Set(source.filter((item): item is DiagnosticsSignal => item === 'log' || item === 'span'))]
 }
 
@@ -348,30 +417,54 @@ function normalizeDiagnosticsSeverity(input: unknown, fallback: DiagnosticsSever
     : fallback
 }
 
-/** Нормализует routes и исключает записи без стабильного id или adapterId. */
+/** Нормализует outputs и сохраняет только JSON-safe adapter options. */
+function normalizeDiagnosticsOutputs(input: unknown): EndgeDiagnosticsOutputConfiguration[] {
+  const outputs: EndgeDiagnosticsOutputConfiguration[] = []
+  const used = new Set<string>()
+
+  for (const raw of Array.isArray(input) ? input : []) {
+    if (!isRecord(raw))
+      continue
+    const id = normalizeText(raw.id)
+    const adapterType = normalizeText(raw.adapterType)
+    if (!id || !adapterType || used.has(id))
+      continue
+
+    used.add(id)
+    outputs.push({
+      id,
+      name: normalizeText(raw.name) || id,
+      enabled: raw.enabled !== false,
+      adapterType,
+      options: normalizeDiagnosticsAdapterOptions(raw.options),
+    })
+  }
+
+  return outputs
+}
+
+/** Нормализует routes и поддерживает legacy target.adapterId при чтении. */
 function normalizeDiagnosticsRoutes(input: unknown): EndgeDiagnosticsRoute[] {
   const routes: EndgeDiagnosticsRoute[] = []
   const used = new Set<string>()
 
   for (const raw of Array.isArray(input) ? input : []) {
-    if (!isRecord(raw) || !isRecord(raw.target))
+    if (!isRecord(raw))
       continue
 
     const id = normalizeText(raw.id)
-    const adapterId = normalizeText(raw.target.adapterId)
-    if (!id || !adapterId || used.has(id))
+    const legacyTarget = isRecord(raw.target) ? raw.target : {}
+    const outputId = normalizeText(raw.outputId ?? legacyTarget.adapterId)
+    if (!id || !outputId || used.has(id))
       continue
 
     used.add(id)
-    const integrationId = normalizeText(raw.target.integrationId)
     routes.push({
       id,
+      name: normalizeText(raw.name) || id,
       enabled: raw.enabled !== false,
       match: normalizeDiagnosticsFilter(raw.match),
-      target: {
-        adapterId,
-        ...(integrationId ? { integrationId } : {}),
-      },
+      outputId,
     })
   }
 
@@ -384,6 +477,8 @@ function normalizeDiagnosticsFilter(input: unknown): DiagnosticsFilter {
     return {}
 
   const signals = Array.isArray(input.signals) ? normalizeDiagnosticsSignals(input.signals) : undefined
+  const phases = normalizeDiagnosticsPhases(input.phases)
+  const spanStatuses = normalizeDiagnosticsSpanStatuses(input.spanStatuses)
   const scopes = normalizeOptionalStringArray(input.scopes)
   const eventNames = normalizeOptionalStringArray(input.eventNames)
   const attributes = normalizeDiagnosticsAttributes(input.attributes)
@@ -391,13 +486,77 @@ function normalizeDiagnosticsFilter(input: unknown): DiagnosticsFilter {
 
   return {
     ...(signals ? { signals } : {}),
+    ...(phases ? { phases } : {}),
     ...(minSeverity ? { minSeverity } : {}),
+    ...(spanStatuses ? { spanStatuses } : {}),
+    ...(input.minDurationMs != null ? { minDurationMs: normalizeNonNegativeInteger(input.minDurationMs, 0) } : {}),
     ...(scopes ? { scopes } : {}),
     ...(eventNames ? { eventNames } : {}),
     ...(normalizeText(input.traceId) ? { traceId: normalizeText(input.traceId) } : {}),
     ...(normalizeText(input.spanId) ? { spanId: normalizeText(input.spanId) } : {}),
     ...(attributes ? { attributes } : {}),
   }
+}
+
+/** Нормализует optional список diagnostics phases. */
+function normalizeDiagnosticsPhases(input: unknown): DiagnosticsPhase[] | undefined {
+  if (!Array.isArray(input))
+    return undefined
+  const values = [...new Set(input.filter((item): item is DiagnosticsPhase => item === 'authoring' || item === 'build' || item === 'runtime'))]
+  return values.length ? values : undefined
+}
+
+/** Нормализует optional список статусов завершённых spans. */
+function normalizeDiagnosticsSpanStatuses(input: unknown): Array<'unset' | 'ok' | 'error'> | undefined {
+  if (!Array.isArray(input))
+    return undefined
+  const values = [...new Set(input.filter((item): item is 'unset' | 'ok' | 'error' => item === 'unset' || item === 'ok' || item === 'error'))]
+  return values.length ? values : undefined
+}
+
+/** Нормализует JSON-safe options без функций и undefined. */
+function normalizeDiagnosticsAdapterOptions(input: unknown): Record<string, DiagnosticsAdapterOptionValue> {
+  if (!isRecord(input))
+    return {}
+  const result: Record<string, DiagnosticsAdapterOptionValue> = {}
+  for (const [key, value] of Object.entries(input)) {
+    const normalized = normalizeDiagnosticsAdapterOptionValue(value)
+    if (normalized !== undefined)
+      result[key] = normalized
+  }
+  return result
+}
+
+/** Рекурсивно оставляет только JSON-safe adapter option value. */
+function normalizeDiagnosticsAdapterOptionValue(input: unknown): DiagnosticsAdapterOptionValue | undefined {
+  if (input === null || typeof input === 'string' || typeof input === 'boolean')
+    return input
+  if (typeof input === 'number')
+    return Number.isFinite(input) ? input : undefined
+  if (Array.isArray(input)) {
+    const values = input.map(normalizeDiagnosticsAdapterOptionValue).filter((value): value is DiagnosticsAdapterOptionValue => value !== undefined)
+    return values
+  }
+  if (isRecord(input))
+    return normalizeDiagnosticsAdapterOptions(input)
+  return undefined
+}
+
+/** Возвращает boolean или заданное default value. */
+function normalizeBoolean(input: unknown, fallback: boolean): boolean {
+  return typeof input === 'boolean' ? input : fallback
+}
+
+/** Нормализует обязательное положительное целое число. */
+function normalizePositiveInteger(input: unknown, fallback: number): number {
+  const value = Number(input)
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback
+}
+
+/** Нормализует целое число, допускающее нулевое значение. */
+function normalizeNonNegativeInteger(input: unknown, fallback: number): number {
+  const value = Number(input)
+  return Number.isFinite(value) && value >= 0 ? Math.floor(value) : fallback
 }
 
 /** Нормализует непустой список строк или возвращает undefined. */

@@ -98,6 +98,7 @@ export class EndgeCompiler extends EndgeModule {
     this._prepareComponentTagRegistry(componentSFCs)
     this._compileSpan = Endge.diagnostics.startSpan('domain.compile', {
       scope: { name: 'endge.compiler', version: ENDGE_COMPILER_VERSION },
+      phase: 'build',
     })
 
     try {
@@ -246,6 +247,7 @@ export class EndgeCompiler extends EndgeModule {
       },
     }) ?? Endge.diagnostics.startSpan(`compile.${entityType}`, {
       scope: { name: 'endge.compiler', version: ENDGE_COMPILER_VERSION },
+      phase: 'build',
     })
     span.log({
       body: `Начата компиляция ${title}`,

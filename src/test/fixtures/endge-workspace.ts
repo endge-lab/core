@@ -20,13 +20,26 @@ export const TEST_ENDGE_WORKSPACE: EndgeWorkspaceDefinition = {
     sfcAdapterIds: ['native-vue', 'shadcn-vue'],
     defaultSfcAdapterId: 'shadcn-vue',
     diagnostics: {
-      collection: {
-        enabled: true,
-        signals: ['log', 'span'],
-        minSeverity: 9,
-        maxRecords: 2_000,
+      telemetry: {
+        collection: {
+          enabled: true,
+          signals: ['log', 'span'],
+          minSeverity: 9,
+          maxRecords: 2_000,
+        },
+        outputs: [],
+        routes: [],
       },
-      routes: [],
+      snapshots: {
+        content: { telemetry: true, problems: true, configuration: false },
+        automatic: {
+          enabled: false,
+          errorCount: 10,
+          windowSeconds: 60,
+          cooldownSeconds: 300,
+          outputIds: [],
+        },
+      },
     },
   },
 }

@@ -2,6 +2,7 @@ import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import type {
   DiagnosticsAdapter,
+  DiagnosticsAdapterFactory,
   DiagnosticsContextProvider,
   DiagnosticsExceptionOptions,
   DiagnosticsFilter,
@@ -20,6 +21,10 @@ import type {
   DiagnosticsSubscribeOptions,
   EndgeDiagnosticsConfiguration,
 } from '@/domain/types/diagnostics'
+import {
+  CONSOLE_DIAGNOSTICS_ADAPTER_FACTORY,
+  DiagnosticsAdapterRegistry,
+} from '@/model/adapters/diagnostics'
 import { EndgeProblems } from '@/model/endge/diagnostics/endge-problems'
 import { EndgeTelemetry } from '@/model/endge/diagnostics/endge-telemetry'
 
@@ -28,17 +33,29 @@ import { EndgeTelemetry } from '@/model/endge/diagnostics/endge-telemetry'
  * Объединяет append-only telemetry history и replaceable registry актуальных problems.
  */
 export class EndgeDiagnostics extends EndgeModule {
+  /** Registry системных и внешних adapter factories. */
+  public readonly adapters: DiagnosticsAdapterRegistry
+
   /** Подмодуль logs, traces, adapters и external delivery. */
-  public readonly telemetry = new EndgeTelemetry()
+  public readonly telemetry: EndgeTelemetry
 
   /** Подмодуль актуальных authoring/build/runtime problems. */
-  public readonly problems = new EndgeProblems()
+  public readonly problems: EndgeProblems
+
+  private _automaticErrorTimestamps: number[] = []
+  private _automaticCooldownUntil = 0
+  private _unsubscribeAutomaticRecords: (() => void) | null = null
 
   /** Связывает независимые уведомления подмодулей с общим diagnostics facade. */
   public constructor() {
     super()
+    this.adapters = new DiagnosticsAdapterRegistry()
+    this.adapters.register(CONSOLE_DIAGNOSTICS_ADAPTER_FACTORY)
+    this.telemetry = new EndgeTelemetry(this.adapters)
+    this.problems = new EndgeProblems()
     this.telemetry.subscribe(() => this.notify())
     this.problems.subscribe(() => this.notify())
+    this._subscribeAutomaticSnapshots()
   }
 
   /** Возвращает идентификатор текущей telemetry session. */
@@ -65,10 +82,15 @@ export class EndgeDiagnostics extends EndgeModule {
   public override async reset(): Promise<void> {
     await this.telemetry.reset()
     this.problems.reset()
+    this._automaticErrorTimestamps = []
+    this._automaticCooldownUntil = 0
+    this._subscribeAutomaticSnapshots()
   }
 
-  /** Применяет collection/routes configuration к telemetry-подмодулю. */
+  /** Применяет telemetry, outputs, routes и snapshots configuration. */
   public configure(configuration: EndgeDiagnosticsConfiguration, resource: DiagnosticsResource = this.telemetry.resource): void {
+    this._automaticErrorTimestamps = []
+    this._automaticCooldownUntil = 0
     this.telemetry.configure(configuration, resource)
   }
 
@@ -146,9 +168,27 @@ export class EndgeDiagnostics extends EndgeModule {
     return this.telemetry.query(filter)
   }
 
-  /** Возвращает snapshot текущей telemetry session. */
+  /** Возвращает JSON-safe snapshot telemetry, problems и optional configuration. */
   public snapshot(options: DiagnosticsSnapshotOptions = {}): DiagnosticsSnapshot {
-    return this.telemetry.snapshot(options)
+    const content = this.configuration.snapshots.content
+    const includeTelemetry = options.includeTelemetry ?? content.telemetry
+    const includeProblems = options.includeProblems ?? content.problems
+    const includeConfiguration = options.includeConfiguration ?? content.configuration
+    return {
+      generatedAt: Date.now(),
+      trigger: options.trigger ?? 'manual',
+      ...(includeTelemetry ? { telemetry: this.telemetry.snapshot(options.filter) } : {}),
+      ...(includeProblems ? { problems: this.problems.snapshot() } : {}),
+      ...(includeConfiguration ? { configuration: this.configuration } : {}),
+    }
+  }
+
+  /** Создаёт snapshot и доставляет его в выбранные configured outputs. */
+  public sendSnapshot(outputIds?: readonly string[], options: DiagnosticsSnapshotOptions = {}): DiagnosticsSnapshot {
+    const snapshot = this.snapshot(options)
+    const targets = outputIds ?? this.configuration.snapshots.automatic.outputIds
+    this.telemetry.deliverSnapshot(snapshot, targets)
+    return snapshot
   }
 
   /** Возвращает telemetry counters текущей session. */
@@ -171,6 +211,16 @@ export class EndgeDiagnostics extends EndgeModule {
     return this.telemetry.registerAdapter(adapter)
   }
 
+  /** Регистрирует внешний тип adapter и возвращает функцию удаления factory. */
+  public registerAdapterFactory(factory: DiagnosticsAdapterFactory): () => void {
+    return this.adapters.register(factory)
+  }
+
+  /** Проверяет configured output через созданный runtime adapter. */
+  public testOutput(outputId: string): Promise<boolean> {
+    return this.telemetry.testOutput(outputId)
+  }
+
   /** Отключает telemetry adapter и освобождает его ресурсы. */
   public unregisterAdapter(adapterId: string): Promise<void> {
     return this.telemetry.unregisterAdapter(adapterId)
@@ -179,5 +229,37 @@ export class EndgeDiagnostics extends EndgeModule {
   /** Выполняет best-effort flush всех telemetry adapters. */
   public flush(): Promise<DiagnosticsFlushResult> {
     return this.telemetry.flush()
+  }
+
+  /** Восстанавливает внутреннюю подписку на ERROR/FATAL records после reset. */
+  private _subscribeAutomaticSnapshots(): void {
+    this._unsubscribeAutomaticRecords?.()
+    this._unsubscribeAutomaticRecords = this.telemetry.subscribe(
+      { signals: ['log'], minSeverity: 17 },
+      record => this._handleAutomaticSnapshotRecord(record),
+    )
+  }
+
+  /** Применяет sliding window и cooldown политики автоматического snapshot. */
+  private _handleAutomaticSnapshotRecord(record: DiagnosticsRecord): void {
+    if (record.signal !== 'log')
+      return
+    const policy = this.configuration.snapshots.automatic
+    if (!policy.enabled)
+      return
+
+    const now = record.timestamp
+    if (now < this._automaticCooldownUntil)
+      return
+
+    const windowStart = now - policy.windowSeconds * 1_000
+    this._automaticErrorTimestamps = this._automaticErrorTimestamps.filter(timestamp => timestamp >= windowStart)
+    this._automaticErrorTimestamps.push(now)
+    if (this._automaticErrorTimestamps.length < policy.errorCount)
+      return
+
+    this._automaticErrorTimestamps = []
+    this._automaticCooldownUntil = now + policy.cooldownSeconds * 1_000
+    this.sendSnapshot(policy.outputIds, { trigger: 'automatic' })
   }
 }

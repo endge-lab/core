@@ -1,6 +1,9 @@
 /** Сигналы, которые поддерживает первая версия модуля диагностики. */
 export type DiagnosticsSignal = 'log' | 'span'
 
+/** Фаза жизненного цикла, в которой создана диагностическая запись. */
+export type DiagnosticsPhase = 'authoring' | 'build' | 'runtime'
+
 /** Базовые значения OpenTelemetry SeverityNumber, используемые публичным API. */
 export type DiagnosticsSeverityNumber = 1 | 5 | 9 | 13 | 17 | 21
 
@@ -17,7 +20,7 @@ export type DiagnosticsAttributes = Record<string, DiagnosticsAttributeValue>
 export type DiagnosticsContextProvider = () => DiagnosticsAttributes
 
 /** Фаза, в которой обнаружена актуальная проблема системы. */
-export type DiagnosticsProblemPhase = 'authoring' | 'build' | 'runtime'
+export type DiagnosticsProblemPhase = DiagnosticsPhase
 
 /** Уровень актуальной проблемы, независимый от OTel SeverityNumber. */
 export type DiagnosticsProblemSeverity = 'info' | 'warning' | 'error' | 'fatal'
@@ -111,6 +114,7 @@ export interface DiagnosticsRecordBase {
   traceId?: string
   spanId?: string
   traceFlags?: number
+  phase?: DiagnosticsPhase
 }
 
 /** Структурированный log record в формате, близком к OpenTelemetry. */
@@ -148,10 +152,31 @@ export interface EndgeDiagnosticsCollectionConfiguration {
   maxRecords: number
 }
 
+/** JSON-safe значение persisted options конкретного adapter. */
+export type DiagnosticsAdapterOptionValue =
+  | string
+  | number
+  | boolean
+  | null
+  | DiagnosticsAdapterOptionValue[]
+  | { [key: string]: DiagnosticsAdapterOptionValue }
+
+/** Именованный канал вывода, создаваемый через adapter registry. */
+export interface EndgeDiagnosticsOutputConfiguration {
+  id: string
+  name: string
+  enabled: boolean
+  adapterType: string
+  options: Record<string, DiagnosticsAdapterOptionValue>
+}
+
 /** Условия выбора records для подписки или route. */
 export interface DiagnosticsFilter {
   signals?: DiagnosticsSignal[]
+  phases?: DiagnosticsPhase[]
   minSeverity?: DiagnosticsSeverityNumber
+  spanStatuses?: DiagnosticsSpanStatus['code'][]
+  minDurationMs?: number
   scopes?: string[]
   eventNames?: string[]
   traceId?: string
@@ -160,24 +185,48 @@ export interface DiagnosticsFilter {
   limit?: number
 }
 
-/** Назначение route без хранения credentials внутри diagnostics configuration. */
-export interface EndgeDiagnosticsRouteTarget {
-  adapterId: string
-  integrationId?: string
-}
-
 /** Декларативное правило доставки records в adapter. */
 export interface EndgeDiagnosticsRoute {
   id: string
+  name: string
   enabled: boolean
   match: DiagnosticsFilter
-  target: EndgeDiagnosticsRouteTarget
+  outputId: string
+}
+
+/** Effective configuration сбора и внешней доставки telemetry. */
+export interface EndgeDiagnosticsTelemetryConfiguration {
+  collection: EndgeDiagnosticsCollectionConfiguration
+  outputs: EndgeDiagnosticsOutputConfiguration[]
+  routes: EndgeDiagnosticsRoute[]
+}
+
+/** Состав JSON snapshot по умолчанию. */
+export interface EndgeDiagnosticsSnapshotContentConfiguration {
+  telemetry: boolean
+  problems: boolean
+  configuration: boolean
+}
+
+/** Условия автоматического snapshot по ERROR/FATAL records. */
+export interface EndgeDiagnosticsAutomaticSnapshotConfiguration {
+  enabled: boolean
+  errorCount: number
+  windowSeconds: number
+  cooldownSeconds: number
+  outputIds: string[]
+}
+
+/** Effective configuration ручных и автоматических snapshots. */
+export interface EndgeDiagnosticsSnapshotsConfiguration {
+  content: EndgeDiagnosticsSnapshotContentConfiguration
+  automatic: EndgeDiagnosticsAutomaticSnapshotConfiguration
 }
 
 /** Полная effective configuration модуля диагностики. */
 export interface EndgeDiagnosticsConfiguration {
-  collection: EndgeDiagnosticsCollectionConfiguration
-  routes: EndgeDiagnosticsRoute[]
+  telemetry: EndgeDiagnosticsTelemetryConfiguration
+  snapshots: EndgeDiagnosticsSnapshotsConfiguration
 }
 
 /** Параметры записи log без выбранного уровня severity. */
@@ -190,6 +239,7 @@ export interface DiagnosticsLogOptions {
   traceId?: string
   spanId?: string
   traceFlags?: number
+  phase?: DiagnosticsPhase
 }
 
 /** Полный input универсального метода log(). */
@@ -211,6 +261,7 @@ export interface DiagnosticsSpanOptions {
   parentSpanId?: string
   traceFlags?: number
   startTimestamp?: number
+  phase?: DiagnosticsPhase
 }
 
 /** Параметры завершения span. */
@@ -255,19 +306,30 @@ export interface DiagnosticsCounters {
   recordsByScope: Record<string, number>
 }
 
-/** Параметры создания read-only snapshot. */
+/** Параметры создания JSON-safe snapshot. */
 export interface DiagnosticsSnapshotOptions {
-  includeRecords?: boolean
+  trigger?: 'manual' | 'automatic'
+  includeTelemetry?: boolean
+  includeProblems?: boolean
+  includeConfiguration?: boolean
   filter?: DiagnosticsFilter
 }
 
-/** Read-only snapshot текущей diagnostics session. */
-export interface DiagnosticsSnapshot {
+/** Telemetry-часть диагностического snapshot. */
+export interface DiagnosticsTelemetrySnapshot {
   sessionId: string
-  configuration: EndgeDiagnosticsConfiguration
   resource: DiagnosticsResource
   counters: DiagnosticsCounters
-  records?: readonly DiagnosticsRecord[]
+  records: readonly DiagnosticsRecord[]
+}
+
+/** JSON-safe snapshot текущего состояния diagnostics facade. */
+export interface DiagnosticsSnapshot {
+  generatedAt: number
+  trigger: 'manual' | 'automatic'
+  telemetry?: DiagnosticsTelemetrySnapshot
+  problems?: DiagnosticsProblemsSnapshot
+  configuration?: EndgeDiagnosticsConfiguration
 }
 
 /** Обработчик одной принятой диагностической записи. */
@@ -276,31 +338,6 @@ export type DiagnosticsListener = (record: DiagnosticsRecord) => void
 /** Параметры подписки на diagnostics stream. */
 export interface DiagnosticsSubscribeOptions {
   replayStored?: boolean
-}
-
-/** Контекст вызова adapter после применения route. */
-export interface DiagnosticsAdapterContext {
-  sessionId: string
-  resource: DiagnosticsResource
-  routeId: string
-  integrationId?: string
-}
-
-/** Независимый adapter внешней доставки diagnostic records. */
-export interface DiagnosticsAdapter {
-  readonly id: string
-  /** Принимает record, который прошёл matching конкретного route. */
-  accept(record: DiagnosticsRecord, context: DiagnosticsAdapterContext): void | Promise<void>
-  /** Доставляет накопленный adapter buffer без завершения diagnostics session. */
-  flush?(): void | Promise<void>
-  /** Освобождает внешние ресурсы adapter при отключении или reset. */
-  dispose?(): void | Promise<void>
-}
-
-/** Результат best-effort flush всех зарегистрированных adapters. */
-export interface DiagnosticsFlushResult {
-  succeeded: string[]
-  failed: Array<{ adapterId: string, error: unknown }>
 }
 
 /** Внутренний port, через который span пишет records в модуль. */
@@ -317,6 +354,7 @@ export interface DiagnosticsSpanOwner {
     spanId: string
     parentSpanId?: string
     traceFlags?: number
+    phase?: DiagnosticsPhase
     name: string
     scope: DiagnosticsInstrumentationScope
     startTimestamp: number

@@ -21,7 +21,7 @@ import type {
   DiagnosticsSeverityNumber,
   DiagnosticsSignal,
   DiagnosticsSnapshot,
-  DiagnosticsSnapshotOptions,
+  DiagnosticsTelemetrySnapshot,
   DiagnosticsSpanEndOptions,
   DiagnosticsSpanHandle,
   DiagnosticsSpanOptions,
@@ -29,7 +29,9 @@ import type {
   DiagnosticsSpanRecord,
   DiagnosticsSubscribeOptions,
   EndgeDiagnosticsConfiguration,
+  EndgeDiagnosticsOutputConfiguration,
 } from '@/domain/types/diagnostics'
+import { DiagnosticsAdapterRegistry } from '@/model/adapters/diagnostics/DiagnosticsAdapterRegistry'
 import {
   DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION,
   DIAGNOSTICS_SEVERITY_TEXT,
@@ -52,8 +54,9 @@ interface DiagnosticsSubscription {
 export class EndgeTelemetry extends EndgeModule implements DiagnosticsSpanOwner {
   private _configuration = this._cloneConfiguration(DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION)
   private _resource: DiagnosticsResource = { attributes: { 'service.name': 'endge' } }
-  private _store = new DiagnosticsRecordStore(this._configuration.collection.maxRecords)
-  private readonly _adapters = new Map<string, DiagnosticsAdapter>()
+  private _store = new DiagnosticsRecordStore(this._configuration.telemetry.collection.maxRecords)
+  private readonly _configuredAdapters = new Map<string, DiagnosticsAdapter>()
+  private readonly _manualAdapters = new Map<string, DiagnosticsAdapter>()
   private readonly _contextProviders = new Map<string, DiagnosticsContextProvider>()
   private readonly _subscriptions = new Set<DiagnosticsSubscription>()
   private readonly _activeSpans = new Map<string, DiagnosticsSpan>()
@@ -65,6 +68,12 @@ export class EndgeTelemetry extends EndgeModule implements DiagnosticsSpanOwner 
   private _listenerFailures = 0
   private _contextProviderFailures = 0
   private _notifyScheduled = false
+
+  /** Создаёт telemetry module с внешним registry adapter factories. */
+  public constructor(private readonly _adapterRegistry: DiagnosticsAdapterRegistry) {
+    super()
+    this._adapterRegistry.subscribe(() => this._rebuildConfiguredAdapters())
+  }
 
   /** Возвращает идентификатор текущей diagnostics session. */
   public get sessionId(): string {
@@ -108,10 +117,11 @@ export class EndgeTelemetry extends EndgeModule implements DiagnosticsSpanOwner 
 
     await this.flush()
     await Promise.allSettled(
-      [...this._adapters.values()].map(adapter => Promise.resolve().then(() => adapter.dispose?.())),
+      [...this._allAdapters().values()].map(adapter => Promise.resolve().then(() => adapter.dispose?.())),
     )
 
-    this._adapters.clear()
+    this._configuredAdapters.clear()
+    this._manualAdapters.clear()
     this._contextProviders.clear()
     this._subscriptions.clear()
     this._activeSpans.clear()
@@ -126,24 +136,31 @@ export class EndgeTelemetry extends EndgeModule implements DiagnosticsSpanOwner 
     this._scheduleNotify()
   }
 
-  /** Применяет collection/routes configuration и resource без привязки к UI. */
+  /** Применяет telemetry, outputs и routes configuration без привязки к UI. */
   public configure(configuration: EndgeDiagnosticsConfiguration, resource: DiagnosticsResource = this._resource): void {
-    const signals = [...new Set(configuration.collection.signals.filter(signal => signal === 'log' || signal === 'span'))]
+    const signals = [...new Set(configuration.telemetry.collection.signals.filter(signal => signal === 'log' || signal === 'span'))]
     this._configuration = {
-      collection: {
-        enabled: configuration.collection.enabled !== false,
-        signals,
-        minSeverity: this._normalizeSeverity(configuration.collection.minSeverity),
-        maxRecords: Math.max(1, Math.floor(Number(configuration.collection.maxRecords) || 2_000)),
+      telemetry: {
+        collection: {
+          enabled: configuration.telemetry.collection.enabled !== false,
+          signals,
+          minSeverity: this._normalizeSeverity(configuration.telemetry.collection.minSeverity),
+          maxRecords: Math.max(1, Math.floor(Number(configuration.telemetry.collection.maxRecords) || 2_000)),
+        },
+        outputs: configuration.telemetry.outputs.map(output => ({
+          ...output,
+          options: this._cloneAdapterOptions(output.options),
+        })),
+        routes: configuration.telemetry.routes.map(route => ({
+          ...route,
+          match: this._cloneFilter(route.match),
+        })),
       },
-      routes: configuration.routes.map(route => ({
-        ...route,
-        match: this._cloneFilter(route.match),
-        target: { ...route.target },
-      })),
+      snapshots: this._cloneConfiguration(configuration).snapshots,
     }
     this._resource = { attributes: this._normalizeAttributes(resource.attributes) }
-    this._store.setCapacity(this._configuration.collection.maxRecords)
+    this._store.setCapacity(this._configuration.telemetry.collection.maxRecords)
+    this._rebuildConfiguredAdapters()
     this._scheduleNotify()
   }
 
@@ -153,6 +170,8 @@ export class EndgeTelemetry extends EndgeModule implements DiagnosticsSpanOwner 
     if (!this._canCollect('log', severityNumber))
       return null
 
+    const attributes = this._resolveRecordAttributes(input.attributes)
+    const phase = this._normalizePhase(input.phase ?? attributes['endge.phase'])
     const record: DiagnosticsLogRecord = {
       id: this._nextRecordId(),
       signal: 'log',
@@ -163,7 +182,8 @@ export class EndgeTelemetry extends EndgeModule implements DiagnosticsSpanOwner 
       body: String(input.body ?? ''),
       ...(this._normalizeText(input.eventName) ? { eventName: this._normalizeText(input.eventName) } : {}),
       scope: this._normalizeScope(input.scope),
-      attributes: this._resolveRecordAttributes(input.attributes),
+      attributes,
+      ...(phase ? { phase } : {}),
       ...this._normalizeCorrelation(input),
     }
 
@@ -223,6 +243,8 @@ export class EndgeTelemetry extends EndgeModule implements DiagnosticsSpanOwner 
     const traceId = this._normalizeTraceId(options.traceId) ?? this._randomHex(32)
     const spanId = this._randomHex(16)
     const parentSpanId = this._normalizeSpanId(options.parentSpanId)
+    const attributes = this._resolveRecordAttributes(options.attributes)
+    const phase = this._normalizePhase(options.phase ?? attributes['endge.phase'])
     const span = new DiagnosticsSpan(
       this,
       traceId,
@@ -232,7 +254,8 @@ export class EndgeTelemetry extends EndgeModule implements DiagnosticsSpanOwner 
       this._normalizeText(name) || 'span',
       this._normalizeScope(options.scope),
       this._normalizeTimestamp(options.startTimestamp),
-      this._resolveRecordAttributes(options.attributes),
+      attributes,
+      phase,
     )
 
     if (this._canCollect('span'))
@@ -247,6 +270,7 @@ export class EndgeTelemetry extends EndgeModule implements DiagnosticsSpanOwner 
     spanId: string
     parentSpanId?: string
     traceFlags?: number
+    phase?: 'authoring' | 'build' | 'runtime'
     name: string
     scope: DiagnosticsInstrumentationScope
     startTimestamp: number
@@ -265,6 +289,7 @@ export class EndgeTelemetry extends EndgeModule implements DiagnosticsSpanOwner 
       spanId: input.spanId,
       ...(input.parentSpanId ? { parentSpanId: input.parentSpanId } : {}),
       ...(input.traceFlags != null ? { traceFlags: input.traceFlags } : {}),
+      ...(input.phase ? { phase: input.phase } : {}),
       name: input.name,
       scope: input.scope,
       startTimestamp: input.startTimestamp,
@@ -318,14 +343,13 @@ export class EndgeTelemetry extends EndgeModule implements DiagnosticsSpanOwner 
     return filter.limit != null && filter.limit > 0 ? records.slice(-filter.limit) : records
   }
 
-  /** Возвращает snapshot configuration, resource, counters и optional records. */
-  public snapshot(options: DiagnosticsSnapshotOptions = {}): DiagnosticsSnapshot {
+  /** Возвращает telemetry-часть JSON-safe diagnostics snapshot. */
+  public snapshot(filter: DiagnosticsFilter = {}): DiagnosticsTelemetrySnapshot {
     return {
       sessionId: this._sessionId,
-      configuration: this.configuration,
       resource: this.resource,
       counters: this.getCounters(),
-      ...(options.includeRecords ? { records: this.query(options.filter) } : {}),
+      records: this.query(filter),
     }
   }
 
@@ -338,7 +362,7 @@ export class EndgeTelemetry extends EndgeModule implements DiagnosticsSpanOwner 
       adapterFailures: this._adapterFailures,
       listenerFailures: this._listenerFailures,
       contextProviderFailures: this._contextProviderFailures,
-      activeAdapters: this._adapters.size,
+      activeAdapters: this._allAdapters().size,
       activeContextProviders: this._contextProviders.size,
       activeSpans: this._activeSpans.size,
       recordsBySignal: this._store.getRecordsBySignal(),
@@ -373,15 +397,15 @@ export class EndgeTelemetry extends EndgeModule implements DiagnosticsSpanOwner 
     }
   }
 
-  /** Регистрирует adapter внешней доставки и возвращает функцию отключения. */
+  /** Регистрирует готовый adapter для программного output и возвращает функцию отключения. */
   public registerAdapter(adapter: DiagnosticsAdapter): () => void {
     const id = this._normalizeText(adapter.id)
     if (!id)
       throw new Error('[EndgeDiagnostics] Adapter id is required')
-    if (this._adapters.has(id))
+    if (this._manualAdapters.has(id))
       throw new Error(`[EndgeDiagnostics] Adapter "${id}" is already registered`)
 
-    this._adapters.set(id, adapter)
+    this._manualAdapters.set(id, adapter)
     this._scheduleNotify()
     return () => { void this.unregisterAdapter(id) }
   }
@@ -389,7 +413,7 @@ export class EndgeTelemetry extends EndgeModule implements DiagnosticsSpanOwner 
   /** Доставляет buffered data, освобождает adapter и удаляет его из registry. */
   public async unregisterAdapter(adapterId: string): Promise<void> {
     const id = this._normalizeText(adapterId)
-    const adapter = this._adapters.get(id)
+    const adapter = this._manualAdapters.get(id)
     if (!adapter)
       return
 
@@ -401,22 +425,60 @@ export class EndgeTelemetry extends EndgeModule implements DiagnosticsSpanOwner 
       this._adapterFailures += 1
     }
     finally {
-      this._adapters.delete(id)
+      this._manualAdapters.delete(id)
       this._scheduleNotify()
+    }
+  }
+
+  /** Проверяет один configured output через optional adapter test method. */
+  public async testOutput(outputId: string): Promise<boolean> {
+    const adapter = this._getAdapter(outputId)
+    if (!adapter?.test)
+      return false
+    try {
+      await adapter.test()
+      return true
+    }
+    catch {
+      this._adapterFailures += 1
+      return false
+    }
+  }
+
+  /** Доставляет snapshot в указанные outputs с поддержкой best-effort semantics. */
+  public deliverSnapshot(snapshot: DiagnosticsSnapshot, outputIds: readonly string[]): void {
+    for (const outputId of new Set(outputIds)) {
+      const adapter = this._getAdapter(outputId)
+      const output = this._resolveOutput(outputId)
+      if (!adapter?.acceptSnapshot || !output)
+        continue
+      try {
+        const pending = adapter.acceptSnapshot(snapshot, {
+          sessionId: this._sessionId,
+          resource: this.resource,
+          output,
+          trigger: snapshot.trigger,
+        })
+        if (pending)
+          void Promise.resolve(pending).catch(() => { this._adapterFailures += 1 })
+      }
+      catch {
+        this._adapterFailures += 1
+      }
     }
   }
 
   /** Выполняет best-effort flush всех adapters без reset модуля. */
   public async flush(): Promise<DiagnosticsFlushResult> {
     const result: DiagnosticsFlushResult = { succeeded: [], failed: [] }
-    for (const [adapterId, adapter] of this._adapters.entries()) {
+    for (const [outputId, adapter] of this._allAdapters().entries()) {
       try {
         await adapter.flush?.()
-        result.succeeded.push(adapterId)
+        result.succeeded.push(outputId)
       }
       catch (error) {
         this._adapterFailures += 1
-        result.failed.push({ adapterId, error })
+        result.failed.push({ outputId, error })
       }
     }
     return result
@@ -424,7 +486,7 @@ export class EndgeTelemetry extends EndgeModule implements DiagnosticsSpanOwner 
 
   /** Проверяет collection policy для signal и optional severity. */
   private _canCollect(signal: DiagnosticsSignal, severity?: DiagnosticsSeverityNumber): boolean {
-    const collection = this._configuration.collection
+    const collection = this._configuration.telemetry.collection
     const allowed = collection.enabled
       && collection.signals.includes(signal)
       && (signal !== 'log' || (severity ?? 1) >= collection.minSeverity)
@@ -445,19 +507,25 @@ export class EndgeTelemetry extends EndgeModule implements DiagnosticsSpanOwner 
         this._notifyListener(subscription.listener, immutableRecord)
     }
 
-    for (const route of this._configuration.routes) {
-      if (!route.enabled || !this._matchesFilter(immutableRecord, route.match))
+    const routesByOutput = new Map<string, string[]>()
+    for (const route of this._configuration.telemetry.routes) {
+      if (route.enabled && this._matchesFilter(immutableRecord, route.match)) {
+        const routeIds = routesByOutput.get(route.outputId) ?? []
+        routeIds.push(route.id)
+        routesByOutput.set(route.outputId, routeIds)
+      }
+    }
+    for (const [outputId, routeIds] of routesByOutput) {
+      const adapter = this._getAdapter(outputId)
+      const output = this._resolveOutput(outputId)
+      if (!adapter || !output)
         continue
-      const adapter = this._adapters.get(route.target.adapterId)
-      if (!adapter)
-        continue
-
       try {
-        const pending = adapter.accept(immutableRecord, {
+        const pending = adapter.acceptRecord(immutableRecord, {
           sessionId: this._sessionId,
           resource: this.resource,
-          routeId: route.id,
-          integrationId: route.target.integrationId,
+          routeIds,
+          output,
         })
         if (pending)
           void Promise.resolve(pending).catch(() => { this._adapterFailures += 1 })
@@ -484,7 +552,13 @@ export class EndgeTelemetry extends EndgeModule implements DiagnosticsSpanOwner 
   private _matchesFilter(record: DiagnosticsRecord, filter: DiagnosticsFilter): boolean {
     if (filter.signals?.length && !filter.signals.includes(record.signal))
       return false
+    if (filter.phases?.length && (!record.phase || !filter.phases.includes(record.phase)))
+      return false
     if (filter.minSeverity != null && record.signal === 'log' && record.severityNumber < filter.minSeverity)
+      return false
+    if (filter.spanStatuses?.length && (record.signal !== 'span' || !filter.spanStatuses.includes(record.status.code)))
+      return false
+    if (filter.minDurationMs != null && (record.signal !== 'span' || record.durationMs < filter.minDurationMs))
       return false
     if (filter.scopes?.length && !filter.scopes.includes(record.scope.name))
       return false
@@ -549,6 +623,8 @@ export class EndgeTelemetry extends EndgeModule implements DiagnosticsSpanOwner 
     return {
       ...filter,
       ...(filter.signals ? { signals: [...filter.signals] } : {}),
+      ...(filter.phases ? { phases: [...filter.phases] } : {}),
+      ...(filter.spanStatuses ? { spanStatuses: [...filter.spanStatuses] } : {}),
       ...(filter.scopes ? { scopes: [...filter.scopes] } : {}),
       ...(filter.eventNames ? { eventNames: [...filter.eventNames] } : {}),
       ...(filter.attributes ? { attributes: this._cloneAttributes(filter.attributes) } : {}),
@@ -579,6 +655,11 @@ export class EndgeTelemetry extends EndgeModule implements DiagnosticsSpanOwner 
     const name = this._normalizeText(scope?.name) || DEFAULT_SCOPE.name
     const version = this._normalizeText(scope?.version)
     return { name, ...(version ? { version } : {}) }
+  }
+
+  /** Нормализует diagnostics phase из explicit field или legacy endge.phase attribute. */
+  private _normalizePhase(value: unknown): 'authoring' | 'build' | 'runtime' | undefined {
+    return value === 'authoring' || value === 'build' || value === 'runtime' ? value : undefined
   }
 
   /** Нормализует correlation и отбрасывает невалидные W3C ids. */
@@ -663,6 +744,64 @@ export class EndgeTelemetry extends EndgeModule implements DiagnosticsSpanOwner 
   /** Клонирует configuration без передачи mutable ссылок наружу. */
   private _cloneConfiguration(configuration: Readonly<EndgeDiagnosticsConfiguration>): EndgeDiagnosticsConfiguration {
     return JSON.parse(JSON.stringify(configuration)) as EndgeDiagnosticsConfiguration
+  }
+
+  /** Клонирует JSON-safe adapter options. */
+  private _cloneAdapterOptions(
+    options: EndgeDiagnosticsOutputConfiguration['options'],
+  ): EndgeDiagnosticsOutputConfiguration['options'] {
+    return JSON.parse(JSON.stringify(options)) as EndgeDiagnosticsOutputConfiguration['options']
+  }
+
+  /** Пересоздаёт adapters enabled outputs после configuration или registry changes. */
+  private _rebuildConfiguredAdapters(): void {
+    for (const adapter of this._configuredAdapters.values())
+      void Promise.resolve().then(() => adapter.dispose?.()).catch(() => { this._adapterFailures += 1 })
+    this._configuredAdapters.clear()
+
+    for (const output of this._configuration.telemetry.outputs) {
+      if (!output.enabled || this._manualAdapters.has(output.id))
+        continue
+      try {
+        const adapter = this._adapterRegistry.create(output, {
+          sessionId: this._sessionId,
+          resource: this.resource,
+        })
+        if (adapter)
+          this._configuredAdapters.set(output.id, adapter)
+      }
+      catch {
+        this._adapterFailures += 1
+      }
+    }
+    this._scheduleNotify()
+  }
+
+  /** Возвращает configured или manual adapter для одного output id. */
+  private _getAdapter(outputId: string): DiagnosticsAdapter | undefined {
+    return this._manualAdapters.get(outputId) ?? this._configuredAdapters.get(outputId)
+  }
+
+  /** Возвращает configured output или synthetic descriptor программного adapter. */
+  private _resolveOutput(outputId: string): EndgeDiagnosticsOutputConfiguration | undefined {
+    const configured = this._configuration.telemetry.outputs.find(output => output.id === outputId && output.enabled)
+    if (configured)
+      return configured
+    if (this._manualAdapters.has(outputId)) {
+      return {
+        id: outputId,
+        name: outputId,
+        enabled: true,
+        adapterType: 'manual',
+        options: {},
+      }
+    }
+    return undefined
+  }
+
+  /** Объединяет adapters для counters и flush, отдавая приоритет manual registration. */
+  private _allAdapters(): Map<string, DiagnosticsAdapter> {
+    return new Map([...this._configuredAdapters, ...this._manualAdapters])
   }
 
   /** Нормализует optional text. */

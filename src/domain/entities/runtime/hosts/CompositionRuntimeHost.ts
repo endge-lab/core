@@ -894,6 +894,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         read: expression => this._readExpressionSource(expression),
         onWarning: warning => Endge.diagnostics.warn(`[Composition] ${warning.message}`, {
           scope: { name: 'endge.runtime.composition' },
+          phase: 'runtime',
           eventName: 'endge.expression.warning',
           attributes: { 'endge.runtime.id': this.id },
         }),

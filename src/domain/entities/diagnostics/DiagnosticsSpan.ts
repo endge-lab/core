@@ -27,6 +27,7 @@ export class DiagnosticsSpan implements DiagnosticsSpanHandle {
     private readonly _scope: DiagnosticsInstrumentationScope,
     private readonly _startTimestamp: number,
     attributes: DiagnosticsAttributes,
+    private readonly _phase: DiagnosticsSpanOptions['phase'],
   ) {
     this._attributes = { ...attributes }
   }
@@ -54,6 +55,7 @@ export class DiagnosticsSpan implements DiagnosticsSpanHandle {
       parentSpanId: this.spanId,
       traceFlags: options.traceFlags ?? this._traceFlags,
       scope: options.scope ?? this._scope,
+      phase: options.phase ?? this._phase,
     })
   }
 
@@ -65,6 +67,7 @@ export class DiagnosticsSpan implements DiagnosticsSpanHandle {
       spanId: this.spanId,
       traceFlags: input.traceFlags ?? this._traceFlags,
       scope: input.scope ?? this._scope,
+      phase: input.phase ?? this._phase,
     })
   }
 
@@ -76,6 +79,7 @@ export class DiagnosticsSpan implements DiagnosticsSpanHandle {
       spanId: this.spanId,
       traceFlags: options.traceFlags ?? this._traceFlags,
       scope: options.scope ?? this._scope,
+      phase: options.phase ?? this._phase,
     })
   }
 
@@ -94,6 +98,7 @@ export class DiagnosticsSpan implements DiagnosticsSpanHandle {
       scope: this._scope,
       startTimestamp: this._startTimestamp,
       attributes: this._attributes,
+      phase: this._phase,
       options,
     })
   }

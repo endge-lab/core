@@ -70,26 +70,64 @@ describe('Endge configuration cascade', () => {
       mode: 'inherit',
       patch: {
         diagnostics: {
-          collection: {
-            minSeverity: { op: 'set', value: 17 },
-            maxRecords: { op: 'set', value: 250 },
+          telemetry: {
+            collection: {
+              minSeverity: { op: 'set', value: 17 },
+              maxRecords: { op: 'set', value: 250 },
+            },
           },
         },
       },
     })
 
-    expect(defaults.diagnostics.collection).toEqual({
+    expect(defaults.diagnostics.telemetry.collection).toEqual({
       enabled: true,
       signals: ['log', 'span'],
       minSeverity: 9,
       maxRecords: 2_000,
     })
-    expect(result.diagnostics.collection).toEqual({
+    expect(result.diagnostics.telemetry.collection).toEqual({
       enabled: true,
       signals: ['log', 'span'],
       minSeverity: 17,
       maxRecords: 250,
     })
+  })
+
+  it('merges outputs, routes and automatic snapshot policy by cascade layer', () => {
+    const result = applyEndgeConfigurationContribution(createDefaultEndgeConfiguration(), {
+      mode: 'inherit',
+      patch: {
+        diagnostics: {
+          telemetry: {
+            outputs: {
+              entries: [{
+                key: 'output-2',
+                op: 'upsert',
+                value: { id: 'output-2', name: 'JSON', enabled: true, adapterType: 'console', options: { format: 'json' } },
+              }],
+            },
+            routes: {
+              entries: [{
+                key: 'build-errors',
+                op: 'upsert',
+                value: { id: 'build-errors', name: 'Build errors', enabled: true, match: { phases: ['build'], minSeverity: 17 }, outputId: 'output-2' },
+              }],
+            },
+          },
+          snapshots: {
+            automatic: {
+              enabled: { op: 'set', value: true },
+              outputIds: { entries: [{ key: 'output-2', op: 'upsert', value: 'output-2' }] },
+            },
+          },
+        },
+      },
+    })
+
+    expect(result.diagnostics.telemetry.outputs.map(output => output.id)).toEqual(['output-1', 'output-2'])
+    expect(result.diagnostics.telemetry.routes.some(route => route.id === 'build-errors')).toBe(true)
+    expect(result.diagnostics.snapshots.automatic).toMatchObject({ enabled: true, outputIds: ['output-1', 'output-2'] })
   })
 
   it('creates a deterministic context hash', () => {

@@ -71,6 +71,7 @@ export class EndgeDataView {
           onWarning: Endge.isConfigured
             ? warning => Endge.diagnostics.warn(`[DataView] ${warning.message}`, {
                 scope: { name: 'endge.runtime.data-view' },
+                phase: 'runtime',
                 eventName: 'endge.expression.warning',
               })
             : undefined,
@@ -88,6 +89,7 @@ export class EndgeDataView {
       onWarning: Endge.isConfigured
         ? warning => Endge.diagnostics.warn(`[DataView] ${warning.message}`, {
             scope: { name: 'endge.runtime.data-view' },
+            phase: 'runtime',
             eventName: 'endge.expression.warning',
           })
         : undefined,

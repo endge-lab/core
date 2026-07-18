@@ -104,6 +104,7 @@ export * from '@/tools/graphql-parser'
 export * from '@/tools/ScheduleUpdate-sse-generator'
 
 export * from '@/model/config/diagnostics'
+export * from '@/model/adapters/diagnostics'
 export * from '@/model/config/storage_config'
 export * from '@/model/config/persistance_config'
 export * from '@/model/config/ui-composition-defaults'
