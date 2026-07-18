@@ -31,8 +31,17 @@ export interface AuthSession {
   headers?: Record<string, string>
   expiresAt?: number | null
   subject?: string | null
+  sessionId?: string | null
   claims?: Record<string, unknown>
   raw?: unknown
+}
+
+/** Минимальный синхронный auth context без tokens и полного claims payload. */
+export interface EndgeAuthContext {
+  authenticated: boolean
+  subject?: string
+  sessionId?: string
+  profileIdentity?: string
 }
 
 export interface AuthProfileAdapterContext {

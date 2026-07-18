@@ -3,6 +3,8 @@ import type {
   GetAccessTokenOpts,
   StoredAuthToken,
 } from '@/domain/types/auth/auth.types'
+import type { EndgeAuthContext } from '@/domain/types/auth/auth-profile.types'
+import type { DiagnosticsAttributes } from '@/domain/types/diagnostics'
 import type { AxiosInstance } from 'axios'
 
 import axios from 'axios'
@@ -14,11 +16,13 @@ import {
   KeycloakAuthClient,
   mapTokenResponseToStored,
 } from '@/model/services/auth/KeycloakAuthClient'
+import { createEndgeAuthContext } from '@/model/services/auth/auth-context'
 import { Endge } from '@/model/endge/kernel/endge'
 
 type StringRecord = Record<string, string>
 type KeycloakProvider = 'keycloak_manual' | 'keycloak_form'
 type EndgeAuthProfileConfig = {
+  profileIdentity: string
   provider: KeycloakProvider
   KeycloakBaseUrl: string
   storageKey: string
@@ -52,6 +56,8 @@ export class EndgeAuth extends EndgeModule {
 
   private accessToken: string = ''
   private refreshToken: string = ''
+  private idToken: string = ''
+  private sessionState: string = ''
   private accessExpiresAt: Date | null = null
   private refreshExpiresAt: Date | null = null
   private backgroundInterval: ReturnType<typeof setInterval> | null = null
@@ -68,12 +74,22 @@ export class EndgeAuth extends EndgeModule {
   // Данные пользователя
   // ---------------------------------------------------------------------------
   private _userInfo: any = null
+  private _unregisterDiagnosticsContext: (() => void) | null = null
 
   /**
    * Создает auth-модуль с изолированным axios instance.
    */
   public constructor() {
     super()
+  }
+
+  /** Подключает безопасный auth context к общему diagnostics enrichment pipeline. */
+  public override setup(): void {
+    this._unregisterDiagnosticsContext?.()
+    this._unregisterDiagnosticsContext = Endge.diagnostics.registerContextProvider(
+      'auth',
+      () => this._getDiagnosticsAttributes(),
+    )
   }
 
   /**
@@ -111,6 +127,18 @@ export class EndgeAuth extends EndgeModule {
    */
   public get userInfo(): any {
     return this._userInfo
+  }
+
+  /** Возвращает минимальный синхронный actor/session snapshot без tokens и полного claims. */
+  public get context(): EndgeAuthContext {
+    return createEndgeAuthContext({
+      authenticated: this.isAuthenticated,
+      accessToken: this.accessToken,
+      idToken: this.idToken,
+      sessionState: this.sessionState,
+      profileIdentity: this.auth?.profileIdentity,
+      userInfo: this._userInfo,
+    })
   }
 
   // ---------------------------------------------------------------------------
@@ -183,6 +211,7 @@ export class EndgeAuth extends EndgeModule {
       return undefined
 
     return {
+      profileIdentity: profile.identity,
       provider,
       KeycloakBaseUrl: String(config.KeycloakBaseUrl ?? ''),
       storageKey: String(config.storageKey ?? `endge.auth.${profile.identity}`),
@@ -264,7 +293,11 @@ export class EndgeAuth extends EndgeModule {
     }
 
     const data = await client.refreshGrant(payload)
-    const stored: StoredAuthToken = mapTokenResponseToStored(data)
+    const stored: StoredAuthToken = {
+      ...mapTokenResponseToStored(data),
+      ...(data.id_token || this.idToken ? { id_token: data.id_token ?? this.idToken } : {}),
+      ...(data.session_state || this.sessionState ? { session_state: data.session_state ?? this.sessionState } : {}),
+    }
 
     this.saveToStorage(stored)
     await this.loadFromStorage()
@@ -318,6 +351,8 @@ export class EndgeAuth extends EndgeModule {
 
     this.accessToken = ''
     this.refreshToken = ''
+    this.idToken = ''
+    this.sessionState = ''
     this.accessExpiresAt = null
     this.refreshExpiresAt = null
     this._userInfo = null
@@ -407,6 +442,8 @@ export class EndgeAuth extends EndgeModule {
 
     this.accessToken = ''
     this.refreshToken = ''
+    this.idToken = ''
+    this.sessionState = ''
     this.accessExpiresAt = null
     this.refreshExpiresAt = null
     this._userInfo = null
@@ -425,6 +462,8 @@ export class EndgeAuth extends EndgeModule {
 
     this.accessToken = parsed.access_token
     this.refreshToken = parsed.refresh_token ?? ''
+    this.idToken = parsed.id_token ?? ''
+    this.sessionState = parsed.session_state ?? ''
     this.accessExpiresAt = new Date(parsed.access_expires)
     this.refreshExpiresAt = parsed.refresh_expires
       ? new Date(parsed.refresh_expires)
@@ -476,6 +515,8 @@ export class EndgeAuth extends EndgeModule {
     // очистка local state
     this.accessToken = ''
     this.refreshToken = ''
+    this.idToken = ''
+    this.sessionState = ''
     this.accessExpiresAt = null
     this.refreshExpiresAt = null
     this._userInfo = null
@@ -575,6 +616,19 @@ export class EndgeAuth extends EndgeModule {
       console.error('Failed to load user info:', error)
       this._userInfo = null
       throw error
+    }
+  }
+
+  /** Преобразует auth context в OTel-aligned attributes для каждого нового diagnostics record. */
+  private _getDiagnosticsAttributes(): DiagnosticsAttributes {
+    const context = this.context
+    if (!context.authenticated)
+      return {}
+
+    return {
+      ...(context.subject ? { 'user.id': context.subject } : {}),
+      ...(context.sessionId ? { 'session.id': context.sessionId } : {}),
+      ...(context.profileIdentity ? { 'endge.auth.profile.id': context.profileIdentity } : {}),
     }
   }
 }

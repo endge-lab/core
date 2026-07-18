@@ -42,9 +42,9 @@ export type AuthConfig = NoneAuthConfig | KeycloakBasicConfig
 /** Ответ Keycloak при выдаче/рефреше токена (строго типизированный). */
 export interface KeycloakTokenResponse {
   access_token: string
-  expires_in: number
-  refresh_expires_in: number
-  refresh_token: string
+  expires_in?: number
+  refresh_expires_in?: number
+  refresh_token?: string
   token_type: 'Bearer'
   id_token?: string
   'not-before-policy'?: number
@@ -75,15 +75,10 @@ export interface AuthSnapshot {
 export interface StoredAuthToken {
   access_token: string
   refresh_token?: string
+  id_token?: string
+  session_state?: string
   access_expires: string
   refresh_expires?: string
-}
-
-export interface KeycloakTokenResponse {
-  access_token: string
-  refresh_token?: string
-  expires_in?: number
-  refresh_expires_in?: number
 }
 
 export type EndgeTokenMode = 'inherit' | 'manual' | 'none'

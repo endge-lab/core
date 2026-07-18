@@ -11,6 +11,7 @@ import {
   KeycloakAuthClient,
   mapTokenResponseToStored,
 } from '@/model/services/auth/KeycloakAuthClient'
+import { createEndgeAuthContext } from '@/model/services/auth/auth-context'
 import { Endge } from '@/model/endge/kernel/endge'
 
 /** Service auth profiles, adapters и хранения полученных tokens. */
@@ -240,12 +241,20 @@ export class EndgeAuthProfiles {
     const token = String(stored.access_token ?? '').trim()
     if (!token)
       return {}
+    const context = createEndgeAuthContext({
+      authenticated: true,
+      accessToken: token,
+      idToken: stored.id_token,
+      sessionState: stored.session_state,
+    })
     return {
       accessToken: token,
       headers: {
         Authorization: `Bearer ${token}`,
       },
       expiresAt: stored.access_expires ? new Date(stored.access_expires).getTime() : null,
+      ...(context.subject ? { subject: context.subject } : {}),
+      ...(context.sessionId ? { sessionId: context.sessionId } : {}),
       raw: stored,
     }
   }

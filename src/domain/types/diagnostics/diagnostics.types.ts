@@ -13,6 +13,78 @@ export type DiagnosticsAttributeValue = DiagnosticsAttributeScalar | Diagnostics
 /** Плоские структурированные атрибуты записи. */
 export type DiagnosticsAttributes = Record<string, DiagnosticsAttributeValue>
 
+/** Синхронный provider общих attributes, актуальных в момент создания record. */
+export type DiagnosticsContextProvider = () => DiagnosticsAttributes
+
+/** Фаза, в которой обнаружена актуальная проблема системы. */
+export type DiagnosticsProblemPhase = 'authoring' | 'build' | 'runtime'
+
+/** Уровень актуальной проблемы, независимый от OTel SeverityNumber. */
+export type DiagnosticsProblemSeverity = 'info' | 'warning' | 'error' | 'fatal'
+
+/** Стабильная ссылка на доменную сущность без ограничения compiled ProgramEntityType. */
+export interface DiagnosticsEntityRef {
+  entityType: string
+  id: string | number
+  identity: string
+}
+
+/** Владелец replaceable-набора проблем. */
+export interface DiagnosticsProblemOwner {
+  /** Уникальный ключ владельца внутри problem registry. */
+  key: string
+  /** Фаза жизненного цикла, к которой относится набор. */
+  phase: DiagnosticsProblemPhase
+  /** Доменная сущность, если проблема связана с persisted document. */
+  entityRef?: DiagnosticsEntityRef
+  /** Runtime instance, если проблема относится к живому host. */
+  runtimeId?: string
+}
+
+/** Вход одной проблемы до добавления owner и временных метаданных registry. */
+export interface DiagnosticsProblemInput {
+  /** Стабильный ключ проблемы внутри одного owner; при отсутствии выводится из содержимого. */
+  key?: string
+  severity: DiagnosticsProblemSeverity
+  code: string
+  message: string
+  sourcePath?: string
+  start?: number
+  end?: number
+  attributes?: DiagnosticsAttributes
+  traceId?: string
+  recordId?: number
+}
+
+/** Актуальная проблема, нормализованная problem registry. */
+export interface DiagnosticsProblem extends Omit<DiagnosticsProblemInput, 'key'> {
+  /** Стабильный id в формате `<owner.key>:<problem.key>`. */
+  id: string
+  /** Ключ проблемы внутри owner. */
+  key: string
+  owner: DiagnosticsProblemOwner
+  updatedAt: number
+}
+
+/** Условия выбора актуальных проблем. */
+export interface DiagnosticsProblemFilter {
+  ownerKeys?: string[]
+  phases?: DiagnosticsProblemPhase[]
+  severities?: DiagnosticsProblemSeverity[]
+  entityTypes?: string[]
+  entityId?: string | number
+  entityIdentity?: string
+  runtimeId?: string
+  codes?: string[]
+}
+
+/** Snapshot replaceable problem registry. */
+export interface DiagnosticsProblemsSnapshot {
+  revision: number
+  total: number
+  problems: readonly DiagnosticsProblem[]
+}
+
 /** Модуль или библиотека, создавшая запись. */
 export interface DiagnosticsInstrumentationScope {
   name: string
@@ -175,7 +247,9 @@ export interface DiagnosticsCounters {
   droppedByCapacity: number
   adapterFailures: number
   listenerFailures: number
+  contextProviderFailures: number
   activeAdapters: number
+  activeContextProviders: number
   activeSpans: number
   recordsBySignal: Partial<Record<DiagnosticsSignal, number>>
   recordsByScope: Record<string, number>

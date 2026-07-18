@@ -124,6 +124,45 @@ describe('EndgeDiagnostics', () => {
     expect(diagnostics.getCounters().listenerFailures).toBe(1)
   })
 
+  it('enriches logs and spans with context captured at record start', () => {
+    const diagnostics = new EndgeDiagnostics()
+    diagnostics.configure(configuration())
+    let actor = { 'user.id': 'user-1', 'session.id': 'session-1' }
+    const unregister = diagnostics.registerContextProvider('auth', () => actor)
+
+    const log = diagnostics.info('authorized action', {
+      attributes: { 'user.id': 'spoofed', operation: 'save' },
+    })
+    const span = diagnostics.startSpan('query.execute', { startTimestamp: 100 })
+    actor = { 'user.id': 'user-2', 'session.id': 'session-2' }
+    const spanRecord = span.end({ endTimestamp: 130 })
+
+    expect(log?.attributes).toEqual({
+      'user.id': 'user-1',
+      'session.id': 'session-1',
+      operation: 'save',
+    })
+    expect(spanRecord?.attributes).toMatchObject({
+      'user.id': 'user-1',
+      'session.id': 'session-1',
+    })
+    expect(diagnostics.getCounters().activeContextProviders).toBe(1)
+
+    unregister()
+    expect(diagnostics.info('anonymous')?.attributes).toEqual({})
+    expect(diagnostics.getCounters().activeContextProviders).toBe(0)
+  })
+
+  it('isolates context provider errors from record producers', () => {
+    const diagnostics = new EndgeDiagnostics()
+    diagnostics.configure(configuration())
+    diagnostics.registerContextProvider('broken', () => { throw new Error('context failed') })
+
+    expect(() => diagnostics.info('still stored')).not.toThrow()
+    expect(diagnostics.query()).toHaveLength(1)
+    expect(diagnostics.getCounters().contextProviderFailures).toBe(1)
+  })
+
   it('routes matching records to adapters and flushes them best-effort', async () => {
     const diagnostics = new EndgeDiagnostics()
     const accept = vi.fn()
