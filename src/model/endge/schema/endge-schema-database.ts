@@ -1,4 +1,5 @@
 import type { DomainDocumentType } from '@/domain/types/document/document.types'
+import type { EndgeWorkspaceDefinition } from '@/domain/types/document/workspace.types'
 import type {
   EndgeSchemaDump,
   EndgeSchemaError,
@@ -116,6 +117,33 @@ export function normalizePayloadWorkspace(raw: any): Record<string, unknown> {
     displayName: raw.displayName ?? raw.name,
     configuration: raw.configuration,
   }
+}
+
+/**
+ * Нормализует ответ Payload после сохранения Workspace.
+ *
+ * Payload может вернуть документ внутри `doc` либо только изменённые поля.
+ * В последнем случае обязательные поля берутся из уже проверенной модели,
+ * отправленной на сохранение.
+ */
+export function normalizeSavedPayloadWorkspace(
+  response: unknown,
+  fallback: EndgeWorkspaceDefinition,
+): EndgeWorkspaceDefinition {
+  const responseBody = isPlainPayloadBody(response) && isPlainPayloadBody(response.doc)
+    ? response.doc
+    : response
+  const saved = isPlainPayloadBody(responseBody) ? responseBody : {}
+
+  return normalizeEndgeWorkspaceDefinition({
+    identity: saved.identity === undefined ? fallback.identity : saved.identity,
+    displayName: saved.displayName === undefined && saved.name === undefined
+      ? fallback.displayName
+      : saved.displayName ?? saved.name,
+    configuration: saved.configuration === undefined
+      ? fallback.configuration
+      : saved.configuration,
+  })
 }
 
 function shouldInjectWorkspace(
@@ -2363,7 +2391,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         displayName: workspace.displayName,
         configuration: workspace.configuration,
       })
-      Endge.workspace.apply(saved)
+      Endge.workspace.apply(normalizeSavedPayloadWorkspace(saved, workspace))
       ;(AppBus.emit as (event: string, payload?: unknown) => void)('domainChanged', undefined)
       return
     }
