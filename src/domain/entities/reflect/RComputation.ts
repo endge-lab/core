@@ -2,6 +2,7 @@ import { Serialize } from '@endge/utils'
 import { Expose, Type } from 'class-transformer'
 
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
+import type { DiagnosticsProblemInput } from '@/domain/types/diagnostics'
 import { REntity } from '@/domain/entities/reflect/REntity'
 import { RField } from '@/domain/entities/reflect/RField'
 
@@ -80,14 +81,16 @@ export class RComputation extends REntity {
     }
   }
 
-  override compile(): void {
-    this.clearValidationErrors()
+  /** Возвращает validation problems computation без mutable entity state. */
+  override getDiagnosticProblems(): DiagnosticsProblemInput[] {
+    const problems: DiagnosticsProblemInput[] = []
     if (!this.identity)
-      this.addValidationError('Computation.identity не задан')
+      problems.push({ severity: 'warning', code: 'computation.identity.required', message: 'Computation.identity не задан' })
     if (!this.displayName)
-      this.addValidationError('Computation.displayName не задан')
+      problems.push({ severity: 'warning', code: 'computation.display-name.required', message: 'Computation.displayName не задан' })
     if (!this.source.trim())
-      this.addValidationError('Computation.source не задан')
+      problems.push({ severity: 'warning', code: 'computation.source.required', message: 'Computation.source не задан', sourcePath: 'source' })
+    return problems
   }
 
   override duplicate(options: DuplicateOptions): RComputation {

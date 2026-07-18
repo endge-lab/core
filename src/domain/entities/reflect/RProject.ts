@@ -1,6 +1,7 @@
 // RProject.ts
 import { Expose } from 'class-transformer'
 import type { EndgeConfigurationContribution } from '@/domain/types/configuration'
+import type { DiagnosticsProblemInput } from '@/domain/types/diagnostics'
 import { REntity } from '@/domain/entities/reflect/REntity'
 import { normalizeEndgeConfigurationContribution } from '@/model/services/configuration'
 
@@ -152,18 +153,15 @@ export class RProject extends REntity {
     }
   }
 
-  compile(): void {
-    this.clearValidationErrors()
-
-    if (!this.id) {
-      this.addValidationError('Project.id не задан')
-    }
-    if (!this.identity) {
-      this.addValidationError('Project.identity не задан')
-    }
-    if (!this.name) {
-      this.addValidationError('Project.name не задан')
-    }
-    // Пока без жёстких ошибок, просто собираем validationErrors
+  /** Возвращает validation problems проекта без сохранения их внутри entity. */
+  override getDiagnosticProblems(): DiagnosticsProblemInput[] {
+    const problems: DiagnosticsProblemInput[] = []
+    if (!this.id)
+      problems.push({ severity: 'warning', code: 'project.id.required', message: 'Project.id не задан' })
+    if (!this.identity)
+      problems.push({ severity: 'warning', code: 'project.identity.required', message: 'Project.identity не задан' })
+    if (!this.name)
+      problems.push({ severity: 'warning', code: 'project.name.required', message: 'Project.name не задан' })
+    return problems
   }
 }

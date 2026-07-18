@@ -8,10 +8,10 @@ describe('Component SFC table column menu', () => {
   it('compiles Table > ColumnMenu into a context menu descriptor', () => {
     const result = compileComponentSFC(createTableSource(`
       <ColumnMenu>
-        <MenuItem command="table.sort.setColumnAsc" label="Сортировать по возрастанию" />
-        <MenuItem command="table.sort.setColumnDesc" label="Сортировать по убыванию" />
+        <MenuItem action="table.sort.setColumnAsc" label="Сортировать по возрастанию" />
+        <MenuItem action="table.sort.setColumnDesc" label="Сортировать по убыванию" />
         <MenuSeparator />
-        <MenuItem command="table.sort.clearAll" label="Сбросить все сортировки" />
+        <MenuItem action="table.sort.clearAll" label="Сбросить все сортировки" />
       </ColumnMenu>
       <Column key="number" title="Flight" sortable />
     `))
@@ -25,13 +25,13 @@ describe('Component SFC table column menu', () => {
         {
           kind: 'item',
           id: 'table.sort.setColumnAsc',
-          command: 'table.sort.setColumnAsc',
+          action: 'table.sort.setColumnAsc',
           label: 'Сортировать по возрастанию',
         },
         {
           kind: 'item',
           id: 'table.sort.setColumnDesc',
-          command: 'table.sort.setColumnDesc',
+          action: 'table.sort.setColumnDesc',
           label: 'Сортировать по убыванию',
         },
         {
@@ -41,17 +41,17 @@ describe('Component SFC table column menu', () => {
         {
           kind: 'item',
           id: 'table.sort.clearAll',
-          command: 'table.sort.clearAll',
+          action: 'table.sort.clearAll',
           label: 'Сбросить все сортировки',
         },
       ],
     })
   })
 
-  it('reports MenuItem without command or label', () => {
+  it('reports MenuItem without action or label', () => {
     const result = compileComponentSFC(createTableSource(`
       <ColumnMenu>
-        <MenuItem command="table.sort.clearAll" />
+        <MenuItem action="table.sort.clearAll" />
         <MenuItem label="Сбросить все сортировки" />
       </ColumnMenu>
       <Column key="number" title="Flight" sortable />
@@ -64,8 +64,30 @@ describe('Component SFC table column menu', () => {
       }),
       expect.objectContaining({
         severity: 'error',
-        code: 'sfc-table-column-menu-item-command-missing',
+        code: 'sfc-table-column-menu-item-action-missing',
       }),
+    ]))
+  })
+
+  it('rejects removed command syntax and undeclared Actions', () => {
+    const legacy = compileComponentSFC(createTableSource(`
+      <ColumnMenu>
+        <MenuItem command="table.sort.clearAll" label="Сбросить" />
+      </ColumnMenu>
+      <Column key="number" title="Flight" sortable />
+    `))
+    const undeclared = compileComponentSFC(createTableSource(`
+      <ColumnMenu>
+        <MenuItem action="table.column.pinLeft" label="Закрепить" />
+      </ColumnMenu>
+      <Column key="number" title="Flight" pinnable />
+    `))
+
+    expect(legacy.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'sfc-table-column-menu-item-command-removed' }),
+    ]))
+    expect(undeclared.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'sfc-table-column-menu-item-action-not-provided' }),
     ]))
   })
 
@@ -73,7 +95,7 @@ describe('Component SFC table column menu', () => {
     const result = compileComponentSFC(createTableSource(`
       <Column key="number" title="Flight" sortable>
         <ColumnMenu>
-          <MenuItem command="table.sort.clearAll" label="Сбросить все сортировки" />
+          <MenuItem action="table.sort.clearAll" label="Сбросить все сортировки" />
         </ColumnMenu>
       </Column>
     `))
@@ -105,6 +127,14 @@ function createTableSource(children: string, options: { tableAttrs?: string } = 
 defineProps<{
   rows: unknown[]
 }>()
+
+const ports = definePorts({
+  provides: {
+    'table.sort.setColumnAsc': action<unknown, void>(),
+    'table.sort.setColumnDesc': action<unknown, void>(),
+    'table.sort.clearAll': action<unknown, void>(),
+  },
+})
 </script>
 
 <template>

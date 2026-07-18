@@ -3,7 +3,7 @@ import type {
   RComponentSFC_IR_ElementNode,
   RComponentSFC_IR_Value,
 } from '@/domain/types/component/sfc'
-import type { TableColumnPinSide } from '@/domain/types/runtime/command.types'
+import type { TableColumnPinSide } from '@/domain/types/runtime/action.types'
 
 export const SFC_TABLE_COLUMN_PIN_MODES = ['enabled', 'disabled'] as const
 export const SFC_TABLE_COLUMN_PIN_SIDES = ['left', 'right'] as const

@@ -77,7 +77,7 @@ export interface ComponentSFCCompileOptions {
   /** Resolves and describes a default port provider for build-time validation. */
   resolvePortProvider?: (
     identity: string,
-    expectedKind: 'computation' | 'component',
+    expectedKind: 'computation' | 'component' | 'action',
   ) => ComponentSFCPortProviderDescriptor | null
 }
 
@@ -116,7 +116,8 @@ export function compileComponentSFC(
   const templateResult = compileComponentSFCTemplate(parseResult.ast.template, {
     props: scriptResult.props.map(prop => prop.name),
     locals: templateLocals.map(local => local.name),
-    componentPorts: portResult.manifest.components,
+    componentPorts: portResult.manifest.request.components,
+    providedActions: portResult.manifest.provides.actions,
     resolveComponentTag: options.resolveComponentTag,
     hasComponentIdentity: options.hasComponentIdentity,
   })
@@ -153,7 +154,16 @@ export function compileComponentSFC(
     sourceParts: parseResult.sourceParts,
     ast: parseResult.ast,
     ir,
-    contract: scriptResult.contract,
+    contract: {
+      ...scriptResult.contract,
+      events: [
+        ...scriptResult.contract.events,
+        ...portResult.manifest.emits.events.map(event => ({
+          name: event.name,
+          payloadType: event.payloadType === 'void' ? undefined : event.payloadType,
+        })),
+      ],
+    },
     dependencies,
     runtimeDependencies: analyzeComponentSFCRuntimeDependencies(ir),
     previewProps: scriptResult.previewProps,

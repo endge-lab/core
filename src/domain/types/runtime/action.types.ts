@@ -1,39 +1,41 @@
-export type RuntimeCommandId = string
-export type RuntimeCommandSurface = string
+export type RuntimeActionId = string
+export type RuntimeActionSurface = string
 
-export interface RuntimeCommandContext {
-  surface: RuntimeCommandSurface
+/** Renderer-neutral context passed to a runtime Action provider. */
+export interface RuntimeActionContext {
+  surface: RuntimeActionSurface
   runtimeId?: string
   target?: unknown
 }
 
-export interface RuntimeCommand<TContext extends RuntimeCommandContext = RuntimeCommandContext, TPayload = unknown> {
-  id: RuntimeCommandId
+/** Callable runtime behavior. Unlike Event, Action has one provider and may return a result. */
+export interface RuntimeAction<TContext extends RuntimeActionContext = RuntimeActionContext, TPayload = unknown, TResult = void> {
+  id: RuntimeActionId
   label?: string
   description?: string
-  surface?: RuntimeCommandSurface
+  surface?: RuntimeActionSurface
   canExecute?: (context: TContext, payload?: TPayload) => boolean
-  execute: (context: TContext, payload?: TPayload) => void | Promise<void>
+  execute: (context: TContext, payload?: TPayload) => TResult | Promise<TResult>
 }
 
-export type AnyRuntimeCommand = RuntimeCommand<any, any>
+export type AnyRuntimeAction = RuntimeAction<any, any, any>
 
-export interface RuntimeCommandSnapshotItem {
-  id: RuntimeCommandId
+export interface RuntimeActionSnapshotItem {
+  id: RuntimeActionId
   label?: string
   description?: string
-  surface?: RuntimeCommandSurface
+  surface?: RuntimeActionSurface
 }
 
-export interface RuntimeCommandRegistrySnapshot {
-  commands: RuntimeCommandSnapshotItem[]
+export interface RuntimeActionRegistrySnapshot {
+  actions: RuntimeActionSnapshotItem[]
 }
 
 export type TableColumnPinSide = 'left' | 'right' | 'none'
 export type TableSortDirection = 'asc' | 'desc'
 export type TableSortMode = 'multiple' | 'single' | 'fixed' | 'disabled'
 
-export const TABLE_RUNTIME_COMMAND_IDS = {
+export const TABLE_RUNTIME_ACTION_IDS = {
   columnPinLeft: 'table.column.pinLeft',
   columnPinRight: 'table.column.pinRight',
   columnUnpin: 'table.column.unpin',
@@ -45,7 +47,7 @@ export const TABLE_RUNTIME_COMMAND_IDS = {
   sortClearAll: 'table.sort.clearAll',
 } as const
 
-export type TableRuntimeCommandId = typeof TABLE_RUNTIME_COMMAND_IDS[keyof typeof TABLE_RUNTIME_COMMAND_IDS]
+export type TableRuntimeActionId = typeof TABLE_RUNTIME_ACTION_IDS[keyof typeof TABLE_RUNTIME_ACTION_IDS]
 
 export interface TableColumnSortState {
   active: boolean
@@ -53,7 +55,8 @@ export interface TableColumnSortState {
   index?: number
 }
 
-export interface TableRuntimeCommandTarget {
+/** Operations implemented by one mounted Table instance. */
+export interface TableRuntimeActionTarget {
   setColumnPin?: (columnKey: string, side: TableColumnPinSide) => void | Promise<void>
   resetColumnPin?: (columnKey: string) => void | Promise<void>
   resetAllPins?: () => void | Promise<void>
@@ -62,11 +65,11 @@ export interface TableRuntimeCommandTarget {
   clearAllSort?: () => void | Promise<void>
 }
 
-export interface TableColumnCommandContext extends RuntimeCommandContext {
+export interface TableColumnActionContext extends RuntimeActionContext {
   surface: 'table-column-header'
   tableRuntimeId: string
   tableId: string
-  target: TableRuntimeCommandTarget
+  target: TableRuntimeActionTarget
   columnKey: string
   columnIndex: number
   pinnable: boolean

@@ -1,5 +1,6 @@
 import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
 import type {
+  ComponentSFCActionPort,
   RComponentSFC_IR_ElementNode,
   RComponentSFC_IR_Value,
 } from '@/domain/types/component/sfc'
@@ -25,6 +26,7 @@ const COLUMN_MENU_MODE_SET = new Set<string>(SFC_TABLE_COLUMN_MENU_MODES)
 /** Нормализует declarative column context menu для SFC Table без renderer-specific деталей. */
 export function normalizeComponentSFCTableColumnMenu(
   tableNode: RComponentSFC_IR_ElementNode,
+  providedActions?: ComponentSFCActionPort[],
 ): ComponentSFCTableColumnMenuDescriptor {
   const diagnostics: RComponentDiagnostic[] = []
   const mode = normalizeColumnMenuMode(
@@ -69,7 +71,7 @@ export function normalizeComponentSFCTableColumnMenu(
     mode: 'inline',
     menu: {
       kind: 'context-menu',
-      items: collectMenuItems(menuNodes[0], diagnostics),
+      items: collectMenuItems(menuNodes[0], diagnostics, providedActions),
     },
     diagnostics,
   }
@@ -78,6 +80,7 @@ export function normalizeComponentSFCTableColumnMenu(
 function collectMenuItems(
   menuNode: RComponentSFC_IR_ElementNode,
   diagnostics: RComponentDiagnostic[],
+  providedActions?: ComponentSFCActionPort[],
 ): ContextMenuNodeDescriptor[] {
   const items: ContextMenuNodeDescriptor[] = []
   let index = 0
@@ -93,7 +96,7 @@ function collectMenuItems(
     }
 
     if (child.tag === 'MenuItem') {
-      const item = createItemDescriptor(child, index, diagnostics)
+      const item = createItemDescriptor(child, index, diagnostics, providedActions)
       if (item) {
         items.push(item)
         index++
@@ -118,18 +121,42 @@ function createItemDescriptor(
   node: RComponentSFC_IR_ElementNode,
   index: number,
   diagnostics: RComponentDiagnostic[],
+  providedActions?: ComponentSFCActionPort[],
 ): ContextMenuItemDescriptor | null {
-  const command = readLiteralStringProp(node, 'command')
+  const action = readLiteralStringProp(node, 'action')
+  const legacyCommand = readLiteralStringProp(node, 'command')
   const label = readLiteralStringProp(node, 'label')
-  const id = readLiteralStringProp(node, 'id') || command || `item-${index}`
+  const id = readLiteralStringProp(node, 'id') || action || `item-${index}`
   const icon = readLiteralStringProp(node, 'icon') || undefined
 
-  if (!command) {
+  if (legacyCommand) {
     diagnostics.push({
       severity: 'error',
-      code: 'sfc-table-column-menu-item-command-missing',
-      message: 'MenuItem должен содержать literal command.',
+      code: 'sfc-table-column-menu-item-command-removed',
+      message: 'Атрибут command удалён. Объявите Action в definePorts.provides и используйте MenuItem action.',
       sourcePath: 'template.Table.ColumnMenu.MenuItem.command',
+      start: node.sourceRange?.start,
+      end: node.sourceRange?.end,
+    })
+  }
+
+  if (!action) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-table-column-menu-item-action-missing',
+      message: 'MenuItem должен содержать literal action.',
+      sourcePath: 'template.Table.ColumnMenu.MenuItem.action',
+      start: node.sourceRange?.start,
+      end: node.sourceRange?.end,
+    })
+  }
+
+  if (action && providedActions && !providedActions.some(port => port.name === action)) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-table-column-menu-item-action-not-provided',
+      message: `Action "${action}" не объявлен в definePorts.provides.`,
+      sourcePath: 'template.Table.ColumnMenu.MenuItem.action',
       start: node.sourceRange?.start,
       end: node.sourceRange?.end,
     })
@@ -146,14 +173,14 @@ function createItemDescriptor(
     })
   }
 
-  if (!command || !label)
+  if (!action || !label || legacyCommand)
     return null
 
   return {
     kind: 'item',
     id,
     label,
-    command,
+    action,
     ...(icon ? { icon } : {}),
   }
 }

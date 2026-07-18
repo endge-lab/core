@@ -1,4 +1,4 @@
-export * from './command.types'
+export * from './action.types'
 export * from './context-persistence.types'
 export * from './query-execution.types'
 export * from './runtime-entity-map.types'

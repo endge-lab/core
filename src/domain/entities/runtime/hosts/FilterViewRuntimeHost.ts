@@ -130,7 +130,7 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
     if (!this._fieldKeys.includes(key))
       throw new Error(`[FilterViewRuntimeHost] field "${key}" is outside this view.`)
 
-    await this._sourceRuntime.command('set').run({ key, value })
+    await this._sourceRuntime.action('set').run({ key, value })
   }
 
   /** Возвращает read-only slice для существующих fromFilter bindings. */

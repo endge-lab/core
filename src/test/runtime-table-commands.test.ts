@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import type { TableColumnCommandContext } from '@/domain/types/runtime/command.types'
-import { RuntimeCommandRegistry } from '@/domain/entities/runtime/RuntimeCommandRegistry'
-import { createTableRuntimeCommands } from '@/model/services/runtime/table-commands'
-import { TABLE_RUNTIME_COMMAND_IDS } from '@/domain/types/runtime/command.types'
+import type { TableColumnActionContext } from '@/domain/types/runtime/action.types'
+import { RuntimeActionRegistry } from '@/domain/entities/runtime/RuntimeActionRegistry'
+import { createTableRuntimeActions } from '@/model/services/runtime/table-actions'
+import { TABLE_RUNTIME_ACTION_IDS } from '@/domain/types/runtime/action.types'
 
-describe('Runtime table commands', () => {
-  it('runs column sort commands against the table runtime target', async () => {
+describe('Runtime table actions', () => {
+  it('runs column sort actions against the table runtime target', async () => {
     const registry = createRegistry()
     const setColumnSort = vi.fn()
     const context = createContext({
@@ -15,9 +15,9 @@ describe('Runtime table commands', () => {
       },
     })
 
-    expect(registry.canExecute(TABLE_RUNTIME_COMMAND_IDS.sortSetColumnAsc, context)).toBe(true)
+    expect(registry.canExecute(TABLE_RUNTIME_ACTION_IDS.sortSetColumnAsc, context)).toBe(true)
 
-    await registry.execute(TABLE_RUNTIME_COMMAND_IDS.sortSetColumnAsc, context)
+    await registry.execute(TABLE_RUNTIME_ACTION_IDS.sortSetColumnAsc, context)
 
     expect(setColumnSort).toHaveBeenCalledWith('number', 'asc')
   })
@@ -37,9 +37,9 @@ describe('Runtime table commands', () => {
       },
     })
 
-    expect(registry.canExecute(TABLE_RUNTIME_COMMAND_IDS.sortClearColumn, context)).toBe(true)
+    expect(registry.canExecute(TABLE_RUNTIME_ACTION_IDS.sortClearColumn, context)).toBe(true)
 
-    await registry.execute(TABLE_RUNTIME_COMMAND_IDS.sortClearColumn, context)
+    await registry.execute(TABLE_RUNTIME_ACTION_IDS.sortClearColumn, context)
 
     expect(clearColumnSort).toHaveBeenCalledWith('number')
   })
@@ -60,15 +60,15 @@ describe('Runtime table commands', () => {
       },
     })
 
-    expect(registry.canExecute(TABLE_RUNTIME_COMMAND_IDS.sortClearAll, inactiveContext)).toBe(false)
-    expect(registry.canExecute(TABLE_RUNTIME_COMMAND_IDS.sortClearAll, activeContext)).toBe(true)
+    expect(registry.canExecute(TABLE_RUNTIME_ACTION_IDS.sortClearAll, inactiveContext)).toBe(false)
+    expect(registry.canExecute(TABLE_RUNTIME_ACTION_IDS.sortClearAll, activeContext)).toBe(true)
 
-    await registry.execute(TABLE_RUNTIME_COMMAND_IDS.sortClearAll, activeContext)
+    await registry.execute(TABLE_RUNTIME_ACTION_IDS.sortClearAll, activeContext)
 
     expect(clearAllSort).toHaveBeenCalledTimes(1)
   })
 
-  it('disables mutable sort commands for disabled and fixed sort modes', () => {
+  it('disables mutable sort actions for disabled and fixed sort modes', () => {
     const registry = createRegistry()
     const target = {
       setColumnSort: vi.fn(),
@@ -88,14 +88,14 @@ describe('Runtime table commands', () => {
         target,
       })
 
-      expect(registry.canExecute(TABLE_RUNTIME_COMMAND_IDS.sortSetColumnAsc, context)).toBe(false)
-      expect(registry.canExecute(TABLE_RUNTIME_COMMAND_IDS.sortSetColumnDesc, context)).toBe(false)
-      expect(registry.canExecute(TABLE_RUNTIME_COMMAND_IDS.sortClearColumn, context)).toBe(false)
-      expect(registry.canExecute(TABLE_RUNTIME_COMMAND_IDS.sortClearAll, context)).toBe(false)
+      expect(registry.canExecute(TABLE_RUNTIME_ACTION_IDS.sortSetColumnAsc, context)).toBe(false)
+      expect(registry.canExecute(TABLE_RUNTIME_ACTION_IDS.sortSetColumnDesc, context)).toBe(false)
+      expect(registry.canExecute(TABLE_RUNTIME_ACTION_IDS.sortClearColumn, context)).toBe(false)
+      expect(registry.canExecute(TABLE_RUNTIME_ACTION_IDS.sortClearAll, context)).toBe(false)
     }
   })
 
-  it('does not allow column sort commands for non-sortable columns', () => {
+  it('does not allow column sort actions for non-sortable columns', () => {
     const registry = createRegistry()
     const context = createContext({
       sortable: false,
@@ -104,11 +104,11 @@ describe('Runtime table commands', () => {
       },
     })
 
-    expect(registry.canExecute(TABLE_RUNTIME_COMMAND_IDS.sortSetColumnAsc, context)).toBe(false)
-    expect(registry.canExecute(TABLE_RUNTIME_COMMAND_IDS.sortSetColumnDesc, context)).toBe(false)
+    expect(registry.canExecute(TABLE_RUNTIME_ACTION_IDS.sortSetColumnAsc, context)).toBe(false)
+    expect(registry.canExecute(TABLE_RUNTIME_ACTION_IDS.sortSetColumnDesc, context)).toBe(false)
   })
 
-  it('runs column pin commands against the table runtime target', async () => {
+  it('runs column pin actions against the table runtime target', async () => {
     const registry = createRegistry()
     const setColumnPin = vi.fn()
     const context = createContext({
@@ -117,9 +117,9 @@ describe('Runtime table commands', () => {
       },
     })
 
-    expect(registry.canExecute(TABLE_RUNTIME_COMMAND_IDS.columnPinLeft, context)).toBe(true)
+    expect(registry.canExecute(TABLE_RUNTIME_ACTION_IDS.columnPinLeft, context)).toBe(true)
 
-    await registry.execute(TABLE_RUNTIME_COMMAND_IDS.columnPinLeft, context)
+    await registry.execute(TABLE_RUNTIME_ACTION_IDS.columnPinLeft, context)
 
     expect(setColumnPin).toHaveBeenCalledWith('number', 'left')
   })
@@ -138,17 +138,17 @@ describe('Runtime table commands', () => {
       },
     })
 
-    expect(registry.canExecute(TABLE_RUNTIME_COMMAND_IDS.columnResetPin, context)).toBe(true)
-    expect(registry.canExecute(TABLE_RUNTIME_COMMAND_IDS.columnResetAllPins, context)).toBe(true)
+    expect(registry.canExecute(TABLE_RUNTIME_ACTION_IDS.columnResetPin, context)).toBe(true)
+    expect(registry.canExecute(TABLE_RUNTIME_ACTION_IDS.columnResetAllPins, context)).toBe(true)
 
-    await registry.execute(TABLE_RUNTIME_COMMAND_IDS.columnResetPin, context)
-    await registry.execute(TABLE_RUNTIME_COMMAND_IDS.columnResetAllPins, context)
+    await registry.execute(TABLE_RUNTIME_ACTION_IDS.columnResetPin, context)
+    await registry.execute(TABLE_RUNTIME_ACTION_IDS.columnResetAllPins, context)
 
     expect(resetColumnPin).toHaveBeenCalledWith('number')
     expect(resetAllPins).toHaveBeenCalledTimes(1)
   })
 
-  it('disables pin commands when column pinning is disabled or column is not pinnable', () => {
+  it('disables pin actions when column pinning is disabled or column is not pinnable', () => {
     const registry = createRegistry()
     const target = {
       setColumnPin: vi.fn(),
@@ -166,22 +166,22 @@ describe('Runtime table commands', () => {
       target,
     })
 
-    expect(registry.canExecute(TABLE_RUNTIME_COMMAND_IDS.columnPinLeft, disabledContext)).toBe(false)
-    expect(registry.canExecute(TABLE_RUNTIME_COMMAND_IDS.columnResetAllPins, disabledContext)).toBe(false)
-    expect(registry.canExecute(TABLE_RUNTIME_COMMAND_IDS.columnPinRight, nonPinnableContext)).toBe(false)
-    expect(registry.canExecute(TABLE_RUNTIME_COMMAND_IDS.columnResetPin, nonPinnableContext)).toBe(false)
+    expect(registry.canExecute(TABLE_RUNTIME_ACTION_IDS.columnPinLeft, disabledContext)).toBe(false)
+    expect(registry.canExecute(TABLE_RUNTIME_ACTION_IDS.columnResetAllPins, disabledContext)).toBe(false)
+    expect(registry.canExecute(TABLE_RUNTIME_ACTION_IDS.columnPinRight, nonPinnableContext)).toBe(false)
+    expect(registry.canExecute(TABLE_RUNTIME_ACTION_IDS.columnResetPin, nonPinnableContext)).toBe(false)
   })
 })
 
-function createRegistry(): RuntimeCommandRegistry {
-  const registry = new RuntimeCommandRegistry()
-  registry.registerMany(createTableRuntimeCommands())
+function createRegistry(): RuntimeActionRegistry {
+  const registry = new RuntimeActionRegistry()
+  registry.registerMany(createTableRuntimeActions())
   return registry
 }
 
 function createContext(
-  overrides: Partial<TableColumnCommandContext> = {},
-): TableColumnCommandContext {
+  overrides: Partial<TableColumnActionContext> = {},
+): TableColumnActionContext {
   return {
     surface: 'table-column-header',
     runtimeId: 'table-runtime',

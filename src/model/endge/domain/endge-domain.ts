@@ -44,6 +44,7 @@ import { RI18nBundle } from '@/domain/entities/reflect/RI18nBundle'
 import { QueryType } from '@/domain/types/document/document.types'
 import Config from '@/model/config'
 import { Endge } from '@/model/endge/kernel/endge'
+import { createDiagnosticsEntityOwner } from '@/model/endge/diagnostics/endge-problems'
 import { importGqlSchemaToDomain } from '@/tools/graphql-parser'
 import { importOpenApiSchemaToDomain } from '@/tools/openapi-parser'
 
@@ -347,7 +348,32 @@ export class EndgeDomain extends EndgeModule {
    * Завершает domain-level сборку после загрузки данных.
    */
   public override build(): void {
+    this._publishEntityValidationProblems()
     this.notify()
+  }
+
+  /** Публикует pure validation results сущностей, не имеющих compiled program artifact. */
+  private _publishEntityValidationProblems(): void {
+    const groups = [
+      { entityType: 'project', entities: this.getProjects() },
+      { entityType: 'mock', entities: this.getMocks() },
+      { entityType: 'vocabs', entities: this.getVocabs() },
+      { entityType: 'i18n-bundles', entities: this.getI18nBundles() },
+    ]
+    Endge.diagnostics.problems.clear({
+      phases: ['build'],
+      entityTypes: groups.map(group => group.entityType),
+    })
+    for (const group of groups) {
+      for (const entity of group.entities) {
+        const id = entity.id ?? entity.identity ?? entity.name
+        const identity = String(entity.identity ?? entity.name ?? id)
+        Endge.diagnostics.problems.replace(
+          createDiagnosticsEntityOwner({ entityType: group.entityType, id, identity }, 'build'),
+          entity.getDiagnosticProblems(),
+        )
+      }
+    }
   }
 
   /**

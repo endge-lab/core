@@ -1,4 +1,4 @@
-import type { RuntimeCommandId } from '@/domain/types/runtime/command.types'
+import type { RuntimeActionId } from '@/domain/types/runtime/action.types'
 
 export type ContextMenuItemKind = 'item' | 'separator'
 
@@ -15,7 +15,7 @@ export interface ContextMenuItemDescriptor {
   kind: 'item'
   id: string
   label: string
-  command: RuntimeCommandId
+  action: RuntimeActionId
   icon?: string
 }
 

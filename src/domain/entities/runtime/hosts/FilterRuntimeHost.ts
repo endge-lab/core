@@ -1,8 +1,8 @@
 import type { RFilter } from '@/domain/entities/reflect/RFilter'
 import type {
   FilterProgramPayload,
-  FilterRuntimeCommandHandle,
-  FilterRuntimeCommandId,
+  FilterRuntimeActionHandle,
+  FilterRuntimeActionId,
   FilterRuntimeOutput,
   FilterRuntimeSetPayload,
 } from '@/domain/types/source/filter-source.types'
@@ -24,7 +24,7 @@ function defaultContext(instance: string): RuntimeHostContext<'filter'> {
   }
 }
 
-/** Runtime-владелец Filter state, outputs и команд. */
+/** Runtime-владелец Filter state, outputs и Actions. */
 export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostContext<'filter'>, FilterProgramPayload> {
   private _outputs = new Map<string, FilterRuntimeOutput>()
   private _outputHashes = new Map<string, string>()
@@ -143,9 +143,10 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
     return [...this._outputs.values()]
   }
 
-  public command(id: FilterRuntimeCommandId): FilterRuntimeCommandHandle {
+  /** Возвращает вызываемый Action изменения Filter state. */
+  public action(id: FilterRuntimeActionId): FilterRuntimeActionHandle {
     if (!['patch', 'set', 'reset', 'clear'].includes(id))
-      throw new Error(`[FilterRuntimeHost] unsupported command: ${id}`)
+      throw new Error(`[FilterRuntimeHost] unsupported action: ${id}`)
     return {
       run: async (payload?: unknown) => {
         if (id === 'patch')

@@ -2,6 +2,7 @@ import { Serialize } from '@endge/utils'
 import { Expose } from 'class-transformer'
 
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
+import type { DiagnosticsProblemInput } from '@/domain/types/diagnostics'
 import { REntity } from '@/domain/entities/reflect/REntity'
 
 export type RVocabMode = 'external_payload' | 'internal'
@@ -86,20 +87,21 @@ export class RVocabs extends REntity {
     }
   }
 
-  override compile(): void {
-    this.clearValidationErrors()
-
+  /** Возвращает validation problems vocab без mutable entity state. */
+  override getDiagnosticProblems(): DiagnosticsProblemInput[] {
+    const problems: DiagnosticsProblemInput[] = []
     if (!String(this.identity ?? '').trim())
-      this.addValidationError('Vocabs.identity не задан')
+      problems.push({ severity: 'warning', code: 'vocab.identity.required', message: 'Vocabs.identity не задан' })
     if (!String(this.displayName ?? '').trim())
-      this.addValidationError('Vocabs.displayName не задан')
+      problems.push({ severity: 'warning', code: 'vocab.display-name.required', message: 'Vocabs.displayName не задан' })
 
     if (this.mode === 'external_payload') {
       if (!String(this.baseApiUrl ?? '').trim())
-        this.addValidationError('Vocabs.baseApiUrl не задан для mode=external_payload')
+        problems.push({ severity: 'warning', code: 'vocab.base-api-url.required', message: 'Vocabs.baseApiUrl не задан для mode=external_payload' })
       if (!String(this.collectionSlug ?? '').trim())
-        this.addValidationError('Vocabs.collectionSlug не задан для mode=external_payload')
+        problems.push({ severity: 'warning', code: 'vocab.collection-slug.required', message: 'Vocabs.collectionSlug не задан для mode=external_payload' })
     }
+    return problems
   }
 
   override duplicate(options: DuplicateOptions): RVocabs {

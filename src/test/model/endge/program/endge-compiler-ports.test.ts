@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
+import { RAction } from '@/domain/entities/reflect/RAction'
 import { RComputation } from '@/domain/entities/reflect/RComputation'
 import { REnvironment } from '@/domain/entities/reflect/REnvironment'
 import { RProject } from '@/domain/entities/reflect/RProject'
@@ -43,10 +44,12 @@ interface ProcessOutput { value?: string, tone?: string }
 interface CellProps { point?: ProcessOutput }
 const props = defineProps<Props>()
 const ports = definePorts({
-  state: computation<ProcessInput, ProcessOutput>({ default: 'process-state' }),
-  cell: component<CellProps>({ tag: 'Process.Cell', default: 'process-cell' }),
+  request: {
+    state: computation<ProcessInput, ProcessOutput>({ default: 'process-state' }),
+    cell: component<CellProps>({ tag: 'Process.Cell', default: 'process-cell' }),
+  },
 })
-const state = ports.state({ value: props.value })
+const state = ports.request.state({ value: props.value })
 </script>
 <template><Process.Cell :point="state" /></template>`)
 
@@ -67,6 +70,31 @@ const state = ports.state({ value: props.value })
       tone: 'success',
     })
   })
+
+  it('records requested Action defaults as program dependencies', () => {
+    const openDetails = new RAction()
+    openDetails.id = 7
+    openDetails.identity = 'flight.open-details'
+    openDetails.name = 'Open details'
+    Endge.domain.addAction(openDetails)
+    Endge.domain.addComponentSFC(component(8, 'flight-table', `<script setup lang="ts">
+const ports = definePorts({
+  request: {
+    openDetails: action<{ id: string }, void>({ default: 'flight.open-details' }),
+  },
+})
+</script>
+<template><Text>Flights</Text></template>`))
+
+    Endge.compiler.build({} as any)
+
+    expect(Endge.program.getArtifact('component-sfc', 'flight-table')?.dependencies).toContainEqual({
+      entityType: 'action',
+      id: 'flight.open-details',
+      identity: 'flight.open-details',
+      role: 'port-default-action',
+    })
+  })
 })
 
 function component(id: number, identity: string, source: string): RComponentSFC {
@@ -80,6 +108,7 @@ function component(id: number, identity: string, source: string): RComponentSFC 
 }
 
 function prepareCompilerContext(): void {
+  Endge.domain.reset()
   Endge.workspace.apply(TEST_ENDGE_WORKSPACE)
   Endge.domain.addProject(RProject.fromPlain({ id: 101, identity: 'project', name: 'Project' }))
   Endge.domain.addEnvironment(REnvironment.fromPlain({ id: 102, identity: 'environment', name: 'Environment' }))

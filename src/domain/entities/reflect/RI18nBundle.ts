@@ -2,6 +2,7 @@ import { Serialize } from '@endge/utils'
 import { Expose } from 'class-transformer'
 
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
+import type { DiagnosticsProblemInput } from '@/domain/types/diagnostics'
 import { REntity } from '@/domain/entities/reflect/REntity'
 
 /** Дерево сообщений по локали (формат vue-i18n). */
@@ -62,12 +63,14 @@ export class RI18nBundle extends REntity {
     }
   }
 
-  override compile(): void {
-    this.clearValidationErrors()
+  /** Возвращает validation problems i18n bundle без mutable entity state. */
+  override getDiagnosticProblems(): DiagnosticsProblemInput[] {
+    const problems: DiagnosticsProblemInput[] = []
     if (!String(this.identity ?? '').trim())
-      this.addValidationError('I18nBundle.identity не задан')
+      problems.push({ severity: 'warning', code: 'i18n-bundle.identity.required', message: 'I18nBundle.identity не задан' })
     if (!String(this.displayName ?? '').trim())
-      this.addValidationError('I18nBundle.displayName не задан')
+      problems.push({ severity: 'warning', code: 'i18n-bundle.display-name.required', message: 'I18nBundle.displayName не задан' })
+    return problems
   }
 
   override duplicate(options: DuplicateOptions): RI18nBundle {

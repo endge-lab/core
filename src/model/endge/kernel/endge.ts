@@ -5,7 +5,7 @@ import { DomainSectionType } from '@/domain/types/document/document.types'
 import type { EndgeAuth } from '@/model/endge/security/endge-auth'
 import type { EndgeAuthProfiles } from '@/model/endge/security/endge-auth-profiles'
 import { EndgeBind } from '@/model/endge/runtime/core/endge-bind'
-import { EndgeCommands } from '@/model/endge/runtime/core/endge-commands'
+import { EndgeActions } from '@/model/endge/runtime/core/endge-actions'
 import { EndgeConsole } from '@/model/endge/diagnostics/endge-console'
 import { EndgeContext } from '@/model/endge/context/endge-context'
 import { EndgeConfigurationModule } from '@/model/endge/context/endge-configuration'
@@ -399,11 +399,9 @@ export class Endge extends EndgeFederation {
     return this.getModule<EndgeBind>('bind')
   }
 
-  /**
-   * @deprecated Используйте Endge.runtime.commands.
-   */
-  static get commands(): EndgeCommands {
-    return this.runtime.commands
+  /** Доступ к единому registry вызываемых runtime Actions. */
+  static get actions(): EndgeActions {
+    return this.runtime.actions
   }
 
   /**

@@ -3,6 +3,7 @@ import { Expose } from 'class-transformer'
 
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
 import type { RMockContentSource, RMockContentType } from '@/domain/types/mock'
+import type { DiagnosticsProblemInput } from '@/domain/types/diagnostics'
 import { REntity } from '@/domain/entities/reflect/REntity'
 
 /** Persisted mock-документ. Payload остается source of truth для identity и связей. */
@@ -78,17 +79,17 @@ export class RMock extends REntity {
     }
   }
 
-  /** Проверяет persisted contract mock-документа. */
-  override compile(): void {
-    this.clearValidationErrors()
+  /** Возвращает validation problems mock-документа без mutable entity state. */
+  override getDiagnosticProblems(): DiagnosticsProblemInput[] {
+    const problems: DiagnosticsProblemInput[] = []
     if (!this.identity)
-      this.addValidationError('Mock.identity не задан')
+      problems.push({ severity: 'warning', code: 'mock.identity.required', message: 'Mock.identity не задан' })
     if (!this.displayName)
-      this.addValidationError('Mock.displayName не задан')
+      problems.push({ severity: 'warning', code: 'mock.display-name.required', message: 'Mock.displayName не задан' })
     if (this.contentSource === 'code-provider') {
       if (!this.codeRef)
-        this.addValidationError('Mock.codeRef не задан для code-provider')
-      return
+        problems.push({ severity: 'warning', code: 'mock.code-ref.required', message: 'Mock.codeRef не задан для code-provider' })
+      return problems
     }
     if (this.contentType === 'application/json') {
       try {
@@ -96,9 +97,10 @@ export class RMock extends REntity {
       }
       catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        this.addValidationError(`Mock.source содержит некорректный JSON: ${message}`)
+        problems.push({ severity: 'warning', code: 'mock.source.json-invalid', message: `Mock.source содержит некорректный JSON: ${message}`, sourcePath: 'source' })
       }
     }
+    return problems
   }
 
   /** Создает копию документа с новым identity. */

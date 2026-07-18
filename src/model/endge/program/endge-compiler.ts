@@ -24,6 +24,7 @@ import type { EndgeStyleSheetArtifact } from '@/domain/types/style'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
+import { RAction } from '@/domain/entities/reflect/RAction'
 import { RComputation } from '@/domain/entities/reflect/RComputation'
 import { RDataView } from '@/domain/entities/reflect/RDataView'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
@@ -42,6 +43,7 @@ import { parseComponentSFC } from '@/model/services/compiler/component-sfc/compo
 import { analyzeComponentSFCScript } from '@/model/services/compiler/component-sfc/component-sfc-script'
 import { compileEndgeCSS } from '@/model/services/style'
 import { resolveCompositionActivation } from '@/model/services/source-engine/composition-activation'
+import { createDiagnosticsEntityOwner } from '@/model/endge/diagnostics/endge-problems'
 
 type ComputationArtifact = ProgramArtifact<ComputationProgramPayload>
 
@@ -83,6 +85,10 @@ export class EndgeCompiler extends EndgeModule {
     const componentSFCs = Endge.domain.getComponentSFCs()
 
     Endge.program.beginCompile(ENDGE_COMPILER_VERSION)
+    Endge.diagnostics.problems.clear({
+      phases: ['build'],
+      entityTypes: [...this.handlers.keys()],
+    })
     this._prepareComponentTagRegistry(componentSFCs)
     this._compileSpan = Endge.diagnostics.startSpan('domain.compile', {
       scope: { name: 'endge.compiler', version: ENDGE_COMPILER_VERSION },
@@ -280,7 +286,37 @@ export class EndgeCompiler extends EndgeModule {
     if (!handler)
       throw new Error(`Compiler handler is not registered for "${entityType}"`)
 
-    return Endge.program.addArtifact(handler.compile(entity, context))
+    const artifact = Endge.program.addArtifact(handler.compile(entity, context))
+    const owner = createDiagnosticsEntityOwner(artifact.ref, 'build')
+    const problems = artifact.diagnostics.map((diagnostic) => {
+      const record = this._compileSpan?.log({
+        body: diagnostic.message,
+        severityNumber: diagnostic.severity === 'error' ? 17 : diagnostic.severity === 'warning' ? 13 : 9,
+        eventName: 'endge.compiler.diagnostic',
+        attributes: {
+          'endge.phase': 'build',
+          'endge.entity.type': artifact.ref.entityType,
+          'endge.entity.id': String(artifact.ref.id),
+          'endge.entity.identity': artifact.ref.identity,
+          'endge.diagnostic.code': diagnostic.code,
+          ...(diagnostic.sourcePath ? { 'endge.source.path': diagnostic.sourcePath } : {}),
+          ...(diagnostic.start != null ? { 'endge.source.start': diagnostic.start } : {}),
+          ...(diagnostic.end != null ? { 'endge.source.end': diagnostic.end } : {}),
+        },
+      })
+      return {
+        severity: diagnostic.severity,
+        code: diagnostic.code,
+        message: diagnostic.message,
+        sourcePath: diagnostic.sourcePath,
+        start: diagnostic.start,
+        end: diagnostic.end,
+        traceId: record?.traceId ?? this._compileSpan?.traceId,
+        recordId: record?.id,
+      }
+    })
+    Endge.diagnostics.problems.replace(owner, problems)
+    return artifact
   }
 
   /**
@@ -346,6 +382,12 @@ export class EndgeCompiler extends EndgeModule {
               id: dependency.id,
               identity: String(dependency.id),
               role: dependency.role,
+            })),
+            ...result.dependencies.actions.map(identity => ({
+              entityType: 'action',
+              id: identity,
+              identity,
+              role: 'port-default-action',
             })),
           ],
           nonBlockingSourcePaths: ['style'],
@@ -754,13 +796,16 @@ export class EndgeCompiler extends EndgeModule {
   /** Resolves a domain provider descriptor without requiring compile order among SFCs. */
   private _resolvePortProvider(
     identity: string,
-    expectedKind: 'computation' | 'component',
+    expectedKind: 'computation' | 'component' | 'action',
   ) {
     const computation = Endge.domain.getComputation(identity)
     const component = Endge.domain.getComponentSFC(identity)
+    const action = Endge.domain.getAction(identity)
     const target = expectedKind === 'computation'
-      ? computation ?? component
-      : component ?? computation
+      ? computation ?? component ?? action
+      : expectedKind === 'component'
+        ? component ?? computation ?? action
+        : action ?? computation ?? component
 
     if (target instanceof RComputation) {
       return {
@@ -779,6 +824,15 @@ export class EndgeCompiler extends EndgeModule {
         identity: target.identity,
         active: target.active !== false && !target.deletedAt,
         inputs: contract.inputs,
+      }
+    }
+    if (target instanceof RAction) {
+      return {
+        kind: 'action' as const,
+        identity: target.identity,
+        active: target.active !== false && !target.deletedAt,
+        input: fieldContract(target.input),
+        output: fieldContract(target.output),
       }
     }
     return null
@@ -867,7 +921,7 @@ export class EndgeCompiler extends EndgeModule {
   ): ProgramArtifact<TPayload> {
     const ref = this._makeRef(entity, entityType)
     const diagnostics = [
-      ...this._collectValidationDiagnostics(entity),
+      ...this._collectEntityDiagnostics(entity),
       ...(options.diagnostics ?? []),
     ].map(diagnostic => ({ ...diagnostic, entityRef: ref }))
     const blockingDiagnostics = diagnostics.filter(diagnostic => !options.nonBlockingSourcePaths?.includes(diagnostic.sourcePath ?? ''))
@@ -1693,21 +1747,19 @@ export class EndgeCompiler extends EndgeModule {
     return { entityType, id, identity }
   }
 
-  /**
-   * Переносит legacy validation errors сущности в diagnostics artifact.
-   *
-   * Старые ошибки пока считаются warning-ами, чтобы не ломать совместимость
-   * существующих моделей, которые уже могли содержать validation noise.
-   */
-  private _collectValidationDiagnostics(entity: any): Omit<ProgramDiagnostic, 'entityRef'>[] {
-    const errors = Array.isArray(entity?.validationErrors)
-      ? entity.validationErrors as unknown[]
+  /** Переносит pure entity validation result в diagnostics compiled artifact. */
+  private _collectEntityDiagnostics(entity: any): Omit<ProgramDiagnostic, 'entityRef'>[] {
+    const problems = typeof entity?.getDiagnosticProblems === 'function' ? entity.getDiagnosticProblems() : []
+    return Array.isArray(problems)
+      ? problems.map(problem => ({
+          severity: problem.severity === 'fatal' ? 'error' : problem.severity,
+          code: String(problem.code ?? 'entity.validation'),
+          message: String(problem.message ?? ''),
+          sourcePath: problem.sourcePath,
+          start: problem.start,
+          end: problem.end,
+        }))
       : []
-    return errors.map((message, index) => ({
-      severity: 'warning',
-      code: `validation.${index + 1}`,
-      message: String(message),
-    }))
   }
 
   /**

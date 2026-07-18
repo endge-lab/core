@@ -64,7 +64,7 @@ export interface RComponentContractInput {
 
 /** Контракт события, которое компонент может отправить наружу. */
 export interface RComponentContractEvent {
-  /** Имя события в template: @name="handler". */
+  /** Имя события, объявленное в definePorts.emits. */
   name: string
 
   /** Описание полезной нагрузки события. */

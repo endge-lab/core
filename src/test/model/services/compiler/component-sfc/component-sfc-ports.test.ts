@@ -22,16 +22,18 @@ interface CellProps {
 const props = defineProps<Props>()
 
 const ports = definePorts({
-  state: computation<ProcessStateInput, ProcessState>({
-    default: 'groundhandling-process-state',
-  }),
-  cell: component<CellProps>({
-    tag: 'GroundHandling.Cell',
-    default: 'groundhandling-process-cell',
-  }),
+  request: {
+    state: computation<ProcessStateInput, ProcessState>({
+      default: 'groundhandling-process-state',
+    }),
+    cell: component<CellProps>({
+      tag: 'GroundHandling.Cell',
+      default: 'groundhandling-process-cell',
+    }),
+  },
 })
 
-const state = ports.state({ process: props.process })
+const state = ports.request.state({ process: props.process })
 </script>
 
 <template>
@@ -39,6 +41,42 @@ const state = ports.state({ process: props.process })
 </template>`
 
 describe('ComponentSFC ports compiler', () => {
+  it('compiles requested and provided Actions plus emitted Events into one manifest', () => {
+    const result = compileComponentSFC(`<script setup lang="ts">
+interface OpenInput { id: string }
+interface RowActivated { id: string }
+const ports = definePorts({
+  request: {
+    openDetails: action<OpenInput, void>({ default: 'flight.open-details' }),
+  },
+  provides: {
+    'table.sort.clearAll': action<unknown, void>(),
+  },
+  emits: {
+    rowActivated: event<RowActivated>(),
+  },
+})
+</script>
+<template><Text>Flights</Text></template>`, {
+      resolvePortProvider: identity => ({
+        kind: 'action',
+        identity,
+        active: true,
+        input: { type: 'OpenInput' },
+        output: null,
+      }),
+    })
+
+    expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
+    expect(result.ir?.script.ports).toMatchObject({
+      request: { actions: [{ name: 'openDetails', defaultIdentity: 'flight.open-details' }] },
+      provides: { actions: [{ name: 'table.sort.clearAll' }] },
+      emits: { events: [{ name: 'rowActivated', payloadType: 'RowActivated' }] },
+    })
+    expect(result.contract.events).toEqual([{ name: 'rowActivated', payloadType: 'RowActivated' }])
+    expect(result.dependencies.actions).toContain('flight.open-details')
+  })
+
   it('compiles both port kinds, a computation local and a dotted local tag', () => {
     const result = compileComponentSFC(SOURCE, {
       resolveComponentTag: () => 'global-component-that-must-not-win',
@@ -63,8 +101,10 @@ describe('ComponentSFC ports compiler', () => {
       expect.objectContaining({ name: 'process', type: 'GroundHandlingOperation', optional: true }),
     ])
     expect(result.ir?.script.ports).toMatchObject({
-      computations: [{ name: 'state', defaultIdentity: 'groundhandling-process-state' }],
-      components: [{ name: 'cell', tag: 'GroundHandling.Cell', defaultIdentity: 'groundhandling-process-cell' }],
+      request: {
+        computations: [{ name: 'state', defaultIdentity: 'groundhandling-process-state' }],
+        components: [{ name: 'cell', tag: 'GroundHandling.Cell', defaultIdentity: 'groundhandling-process-cell' }],
+      },
     })
     expect(result.ir?.script.portCalls).toMatchObject([
       {
@@ -95,9 +135,11 @@ interface Input { value?: string }
 interface Output { tone?: string }
 interface Props { value?: string }
 const ports = definePorts({
-  state: computation<Input, Output>({}),
-  cell: component<Props>({ tag: 'Text', default: 'wrong-kind' }),
-  other: component<Props>({ tag: 'GroundHandling.Other', default: 'wrong-kind' }),
+  request: {
+    state: computation<Input, Output>({}),
+    cell: component<Props>({ tag: 'Text', default: 'wrong-kind' }),
+    other: component<Props>({ tag: 'GroundHandling.Other', default: 'wrong-kind' }),
+  },
 })
 </script>
 <template><Text /></template>`, {
@@ -120,7 +162,7 @@ const ports = definePorts({
   it('reports an unknown port call with a source range', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 const ports = definePorts({})
-const state = ports.unknown({})
+const state = ports.request.unknown({})
 </script>
 <template><Text>{{ state }}</Text></template>`)
 
@@ -139,11 +181,13 @@ const state = ports.unknown({})
 interface Input { value?: string }
 interface Output { value?: string }
 const ports = definePorts({
-  state: computation<Input, Output>({ default: 'state' }),
+  request: {
+    state: computation<Input, Output>({ default: 'state' }),
+  },
 })
 function invalid() {
   definePorts({})
-  return ports.state({ value: 'nested' })
+  return ports.request.state({ value: 'nested' })
 }
 </script>
 <template><Text>invalid</Text></template>`)
@@ -160,9 +204,11 @@ interface Input { value?: string }
 interface Output { tone?: string }
 interface Props { value?: string }
 const ports = definePorts({
-  missing: computation<Input, Output>({ default: 'missing' }),
-  state: computation<Input, Output>({ default: 'wrong-contract' }),
-  cell: component<Props>({ tag: 'Local.Cell', default: 'inactive-cell' }),
+  request: {
+    missing: computation<Input, Output>({ default: 'missing' }),
+    state: computation<Input, Output>({ default: 'wrong-contract' }),
+    cell: component<Props>({ tag: 'Local.Cell', default: 'inactive-cell' }),
+  },
 })
 </script>
 <template><Local.Cell /></template>`, {

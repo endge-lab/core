@@ -14,7 +14,7 @@ describe('FilterRuntimeHost', () => {
     Raph.app.reset()
   })
 
-  it('shares one state through commands and emits only structurally changed outputs', async () => {
+  it('shares one state through Actions and emits only structurally changed outputs', async () => {
     const host = createHost()
     const changed: string[] = []
     const eventOrder: string[] = []
@@ -23,19 +23,19 @@ describe('FilterRuntimeHost', () => {
     host.on('output:change', (event: any) => eventOrder.push(`output:${event.key}`))
 
     expect(host.getState()).toEqual({ search: '', codes: [] })
-    await host.command('patch').run({ search: 'SU' })
+    await host.action('patch').run({ search: 'SU' })
     expect(host.getState()).toEqual({ search: 'SU', codes: [] })
     expect((host.getOutput('request') as any).value).toEqual({ where: { search: 'SU' } })
     expect(changed).toEqual(['request'])
     expect(eventOrder).toEqual(['state', 'output:request'])
 
     changed.length = 0
-    await host.command('set').run({ key: 'search', value: 'SU' })
+    await host.action('set').run({ key: 'search', value: 'SU' })
     expect(changed).toEqual([])
 
-    await host.command('clear').run()
+    await host.action('clear').run()
     expect(host.getState()).toEqual({})
-    await host.command('reset').run()
+    await host.action('reset').run()
     expect(host.getState()).toEqual({ search: '', codes: [] })
   })
 
@@ -50,7 +50,7 @@ defineFilter({
 `)
     expect(host.getState()).toEqual({ from: '2026-07-09' })
     vi.setSystemTime(new Date('2026-07-12T12:00:00Z'))
-    await host.command('reset').run()
+    await host.action('reset').run()
     expect(host.getState()).toEqual({ from: '2026-07-11' })
   })
 
@@ -74,7 +74,7 @@ defineFilter({
     })
 
     vi.setSystemTime(new Date('2026-07-12T01:02:03.004Z'))
-    await host.command('reset').run()
+    await host.action('reset').run()
     expect(host.getState()).toEqual({
       from: '2026-07-05T00:00:00.000Z',
       to: '2026-07-12T23:59:59.999Z',
@@ -84,8 +84,8 @@ defineFilter({
 
   it('rejects unknown fields and invalid values', async () => {
     const host = createHost()
-    await expect(host.command('patch').run({ unknown: true })).rejects.toThrow('unknown field')
-    await expect(host.command('set').run({ key: 'search', value: 42 })).rejects.toThrow('invalid value')
+    await expect(host.action('patch').run({ unknown: true })).rejects.toThrow('unknown field')
+    await expect(host.action('set').run({ key: 'search', value: 42 })).rejects.toThrow('invalid value')
   })
 
   it('accepts string values for Time fields and rejects non-string values', async () => {
@@ -97,9 +97,9 @@ defineFilter({
 `)
 
     expect(host.getState()).toEqual({ departureTime: '06:30' })
-    await host.command('set').run({ key: 'departureTime', value: '12:45' })
+    await host.action('set').run({ key: 'departureTime', value: '12:45' })
     expect(host.getState()).toEqual({ departureTime: '12:45' })
-    await expect(host.command('set').run({ key: 'departureTime', value: 1245 })).rejects.toThrow('invalid value')
+    await expect(host.action('set').run({ key: 'departureTime', value: 1245 })).rejects.toThrow('invalid value')
   })
 })
 

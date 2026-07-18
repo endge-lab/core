@@ -2,7 +2,7 @@
 
 Документ фиксирует начальный набор тегов, атрибутов и стилей для нового Endge SFC-синтаксиса.
 
-Статус: действующий v1-контракт compiler/runtime pipeline. Синтаксис ориентирован на компоненты внутри ячеек таблиц и компилируется в общий Endge SFC IR, который DOM и Canvas renderer-слои могут использовать каждый своим способом.
+Статус: действующий v1-контракт compiler/runtime pipeline. Синтаксис описывает renderer-neutral компоненты, включая Table и её ячейки, и компилируется в общий Endge SFC IR, который DOM и Canvas renderer-слои могут использовать каждый своим способом.
 
 ## Базовая структура
 
@@ -42,10 +42,22 @@ defineMetadata({
 
 ## Ports
 
-`definePorts` объявляет source-first dependencies компонента. В v1 доступны
-только `computation` и `component`, и каждый port обязан иметь `default`.
-Отдельный persisted document для ports не создаётся: compiler сохраняет typed
-manifest и port calls в ComponentSFC artifact.
+`definePorts` объявляет все типизированные границы Component SFC. Направление
+задаётся именованными секциями `request`, `provides` и `emits`; неиспользуемую
+секцию можно не указывать. Отдельный
+persisted document для ports не создаётся: compiler сохраняет typed manifest и
+port calls в ComponentSFC artifact.
+
+| Секция | Смысл | Допустимые kinds |
+|---|---|---|
+| `request` | Компонент требует provider извне. | `computation`, `component`, `action` |
+| `provides` | Экземпляр компонента предоставляет вызываемое поведение. | `action` |
+| `emits` | Компонент публикует уведомление о произошедшем. | `event` |
+
+`Action` — вызываемая операция с одним provider. Она может иметь input, output и
+ошибку выполнения. `Event` — multicast-уведомление без результата: отправитель
+не знает, сколько подписчиков его обработает. Публичного понятия `Command` для UI
+interaction в Endge нет: прежние команды Table заменены Actions.
 
 ```vue
 <script setup lang="ts">
@@ -68,16 +80,27 @@ interface CellProps {
 const props = defineProps<Props>()
 
 const ports = definePorts({
-  state: computation<ProcessStateInput, ProcessState>({
-    default: 'groundhandling-process-state',
-  }),
-  cell: component<CellProps>({
-    tag: 'GroundHandling.Cell',
-    default: 'groundhandling-process-cell',
-  }),
+  request: {
+    state: computation<ProcessStateInput, ProcessState>({
+      default: 'groundhandling-process-state',
+    }),
+    cell: component<CellProps>({
+      tag: 'GroundHandling.Cell',
+      default: 'groundhandling-process-cell',
+    }),
+    openDetails: action<{ id: string }, void>({
+      default: 'groundhandling.open-details',
+    }),
+  },
+  provides: {
+    'table.sort.clearAll': action<unknown, void>(),
+  },
+  emits: {
+    rowActivated: event<{ id: string }>(),
+  },
 })
 
-const state = ports.state({
+const state = ports.request.state({
   process: props.process,
 })
 </script>
@@ -90,15 +113,56 @@ const state = ports.state({
 Rules for v1:
 
 - разрешён один top-level `const ports = definePorts({...})`;
-- computation вызывается только в top-level `const` и получает один input object;
+- `request` port ссылается на внешний provider через обязательный `default`;
+- `provides` Action не содержит `default`: implementation принадлежит runtime
+  экземпляру самого компонента;
+- `emits` Event не содержит provider и результата;
+- computation вызывается только как `ports.request.<name>(input)` в top-level
+  `const` и получает один input object;
 - component port задаёт local tag, включая dotted form;
 - local component tag имеет приоритет над global user tag;
 - built-in tags (`Text`, `Flex`, `Component` и другие) запрещены для component ports;
-- defaults проверяются на existence, active state и provider kind;
+- defaults для requested ports проверяются на existence, active state и provider kind;
 - computation generic types сохраняются в manifest, но в v1 не сравниваются с
   опциональными persisted `RComputation.input/output`; несовместимость проявляется
   естественной runtime-ошибкой;
-- Composition overrides, actions, converters и async computations пока не поддерживаются.
+- Composition overrides для requested ports и generic template event handlers
+  требуют отдельного binding syntax; они не маскируются неявными callbacks.
+
+### Table Actions
+
+Inline context menu Table ссылается только на Actions, объявленные в
+`definePorts.provides`:
+
+```vue
+<script setup lang="ts">
+defineProps<{ rows: unknown[] }>()
+
+const ports = definePorts({
+  provides: {
+    'table.sort.setColumnAsc': action<unknown, void>(),
+    'table.sort.clearAll': action<unknown, void>(),
+    'table.column.pinLeft': action<unknown, void>(),
+  },
+})
+</script>
+
+<template>
+  <Table :rows="rows" row-key="id" sort-mode="multiple" column-pin="enabled">
+    <ColumnMenu>
+      <MenuItem action="table.sort.setColumnAsc" label="По возрастанию" />
+      <MenuItem action="table.column.pinLeft" label="Закрепить слева" />
+      <MenuSeparator />
+      <MenuItem action="table.sort.clearAll" label="Сбросить сортировку" />
+    </ColumnMenu>
+    <Column key="number" title="Рейс" sortable pinnable />
+  </Table>
+</template>
+```
+
+Compiler отклоняет `MenuItem command="..."`, неизвестный Action и Action, не
+объявленный в `provides`. Runtime вызывает Action через единый
+`Endge.runtime.actions`; mounted Table предоставляет target для sort и pin.
 
 Source computation должна экспортировать одну синхронную function с одним
 return expression. JavaScript не исполняется напрямую: compiler превращает
@@ -663,7 +727,6 @@ Build сначала строит registry `tag -> component identity`, зате
 - `Dropdown`
 - `Tabs`
 - `Form`
-- `Table`
 - `VirtualList`
 - `Value`
 - `Spacer`

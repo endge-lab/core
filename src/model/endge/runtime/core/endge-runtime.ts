@@ -25,7 +25,7 @@ import { Endge } from '@/model/endge/kernel/endge'
 import { RuntimeBoundaryUpdatePhase } from '@/model/helpers/raph-phases/runtime-boundary-update-phase'
 import { RuntimeNodeUpdatePhase } from '@/model/helpers/raph-phases/runtime-node-update-phase'
 import Config from '@/model/config'
-import { EndgeCommands } from '@/model/endge/runtime/core/endge-commands'
+import { EndgeActions } from '@/model/endge/runtime/core/endge-actions'
 import { EndgeComposition } from '@/model/endge/runtime/execution/endge-composition'
 import { EndgeProject } from '@/model/endge/runtime/execution/endge-project'
 import { EndgeDataView } from '@/model/endge/runtime/execution/endge-data-view'
@@ -43,7 +43,7 @@ export class EndgeRuntime extends EndgeModule {
   public readonly project = new EndgeProject()
   public readonly flowRegistry = new EndgeFlowRegistry()
   public readonly flow = new EndgeFlow(this.flowRegistry)
-  public readonly commands = new EndgeCommands()
+  public readonly actions = new EndgeActions()
   public readonly scopes = new RuntimeScopeRegistry()
 
   private _hosts = new RuntimeHostRegistry()
@@ -367,7 +367,7 @@ export class EndgeRuntime extends EndgeModule {
     this._unsubscribeWorkspace?.()
     this._unsubscribeWorkspace = null
     this.flowRegistry.reset()
-    this.commands.reset()
+    this.actions.reset()
 
     // Единый notify после batch-reset.
     this.notify()

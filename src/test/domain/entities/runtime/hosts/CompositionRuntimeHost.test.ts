@@ -69,8 +69,8 @@ describe('Composition runtime session', () => {
         values: { search: '' },
       },
     })
-    await filter.command('set').run({ key: 'search', value: 'S' })
-    await filter.command('set').run({ key: 'search', value: 'SU' })
+    await filter.action('set').run({ key: 'search', value: 'S' })
+    await filter.action('set').run({ key: 'search', value: 'SU' })
     expect(filterView.getProps().requestPreview).toEqual({ where: { search: 'SU' } })
     expect(query.getProps()).toMatchObject({
       filterPayload: { where: { search: 'SU' } },
@@ -86,7 +86,7 @@ describe('Composition runtime session', () => {
     await vi.advanceTimersByTimeAsync(20)
     expect(run).toHaveBeenCalledTimes(2)
 
-    await filter.command('set').run({ key: 'search', value: 'S7' })
+    await filter.action('set').run({ key: 'search', value: 'S7' })
     await session.unmount()
     await vi.advanceTimersByTimeAsync(20)
     expect(run).toHaveBeenCalledTimes(2)

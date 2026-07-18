@@ -4,6 +4,8 @@ import type { RComponentDependencies, RComponentDiagnostic } from '@/domain/type
 import type {
   ComponentSFCComponentPort,
   ComponentSFCComputationPort,
+  ComponentSFCActionPort,
+  ComponentSFCEventPort,
   ComponentSFCPortManifest,
   ComponentSFCPortProviderDescriptor,
   RComponentSFC_AST_Script,
@@ -17,7 +19,7 @@ import { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sf
 export interface ComponentSFCPortAnalysisOptions {
   resolveProvider?: (
     identity: string,
-    expectedKind: 'computation' | 'component',
+    expectedKind: 'computation' | 'component' | 'action',
   ) => ComponentSFCPortProviderDescriptor | null
 }
 
@@ -137,133 +139,225 @@ function parsePortManifest(
     return
   }
 
-  const names = new Set<string>()
-  const tags = new Set<string>()
+  const roles = new Map<string, any>()
   for (const property of object.properties ?? []) {
     if (property.type !== 'ObjectProperty' || property.computed) {
       diagnostics.push(makeDiagnostic(
         'sfc-port-property-shape',
-        'Port должен быть обычным object property без spread/computed key.',
+        'Секция definePorts должна быть обычным object property без spread/computed key.',
         property,
         script,
       ))
       continue
     }
-    const name = readKey(property.key)
-    if (!name || names.has(name)) {
+    const role = readKey(property.key)
+    if (!role || !['request', 'provides', 'emits'].includes(role) || roles.has(role)) {
       diagnostics.push(makeDiagnostic(
-        'sfc-port-name-invalid',
-        `Port name "${name}" отсутствует или повторяется.`,
+        'sfc-port-role-invalid',
+        `definePorts поддерживает только уникальные секции request, provides и emits; получено "${role ?? ''}".`,
         property,
         script,
       ))
       continue
     }
-    names.add(name)
-
-    const definition = property.value
-    const kind = isCall(definition, 'computation')
-      ? 'computation'
-      : isCall(definition, 'component')
-        ? 'component'
-        : null
-    if (!kind) {
+    if (property.value?.type !== 'ObjectExpression') {
       diagnostics.push(makeDiagnostic(
-        'sfc-port-kind-unsupported',
-        `Port "${name}" должен использовать computation(...) или component(...).`,
-        definition,
+        'sfc-port-role-object-required',
+        `Секция definePorts.${role} должна быть object literal.`,
+        property.value,
         script,
       ))
       continue
     }
+    roles.set(role, property.value)
+  }
 
-    const config = definition.arguments?.[0]
-    if (definition.arguments?.length !== 1 || config?.type !== 'ObjectExpression') {
-      diagnostics.push(makeDiagnostic(
-        'sfc-port-config-required',
-        `Port "${name}" должен содержать один config object.`,
-        definition,
-        script,
-      ))
-      continue
-    }
-    const defaultIdentity = readStringProperty(config, 'default')
-    if (!defaultIdentity) {
-      diagnostics.push(makeDiagnostic(
-        'sfc-port-default-required',
-        `Port "${name}" должен содержать непустой string default.`,
-        config,
-        script,
-      ))
-      continue
-    }
+  const names = new Set<string>()
+  const tags = new Set<string>()
+  for (const role of ['request', 'provides', 'emits'] as const) {
+    const roleObject = roles.get(role)
+    if (!roleObject) continue
 
-    const typeSources = readTypeParameters(definition, script.content)
-    if (kind === 'computation') {
-      if (typeSources.length !== 2) {
+    for (const property of roleObject.properties ?? []) {
+      if (property.type !== 'ObjectProperty' || property.computed) {
         diagnostics.push(makeDiagnostic(
-          'sfc-computation-port-types',
-          `Computation port "${name}" требует <Input, Output>.`,
+          'sfc-port-property-shape',
+          `Port в definePorts.${role} должен быть обычным property.`,
+          property,
+          script,
+        ))
+        continue
+      }
+      const name = readKey(property.key)
+      if (!name || names.has(name)) {
+        diagnostics.push(makeDiagnostic(
+          'sfc-port-name-invalid',
+          `Port name "${name ?? ''}" отсутствует или повторяется.`,
+          property,
+          script,
+        ))
+        continue
+      }
+      names.add(name)
+
+      const definition = property.value
+      const kind = isCall(definition, 'computation')
+        ? 'computation'
+        : isCall(definition, 'component')
+          ? 'component'
+          : isCall(definition, 'action')
+            ? 'action'
+            : isCall(definition, 'event')
+              ? 'event'
+              : null
+      const allowed = role === 'request'
+        ? ['computation', 'component', 'action']
+        : role === 'provides'
+          ? ['action']
+          : ['event']
+      if (!kind || !allowed.includes(kind)) {
+        diagnostics.push(makeDiagnostic(
+          'sfc-port-kind-unsupported',
+          `Port "${name}" недопустим в definePorts.${role}. Разрешены: ${allowed.join(', ')}.`,
           definition,
           script,
         ))
         continue
       }
-      const port: ComponentSFCComputationPort = {
-        kind,
+
+      const typeSources = readTypeParameters(definition, script.content)
+      if (kind === 'event') {
+        if ((definition.arguments?.length ?? 0) !== 0 || typeSources.length > 1) {
+          diagnostics.push(makeDiagnostic(
+            'sfc-event-port-shape',
+            `Event port "${name}" объявляется как event<Payload>() без config.`,
+            definition,
+            script,
+          ))
+          continue
+        }
+        const port: ComponentSFCEventPort = {
+          kind,
+          role: 'emits',
+          name,
+          payloadType: typeSources[0] ?? 'void',
+          sourceRange: toRange(property, script),
+        }
+        manifest.emits.events.push(port)
+        continue
+      }
+
+      if (kind === 'action' && role === 'provides') {
+        if ((definition.arguments?.length ?? 0) !== 0 || typeSources.length !== 2) {
+          diagnostics.push(makeDiagnostic(
+            'sfc-provided-action-port-shape',
+            `Provided Action port "${name}" объявляется как action<Input, Output>() без default.`,
+            definition,
+            script,
+          ))
+          continue
+        }
+        const port: ComponentSFCActionPort = {
+          kind,
+          role,
+          name,
+          inputType: typeSources[0]!,
+          outputType: typeSources[1]!,
+          sourceRange: toRange(property, script),
+        }
+        manifest.provides.actions.push(port)
+        continue
+      }
+
+      const config = definition.arguments?.[0]
+      if (definition.arguments?.length !== 1 || config?.type !== 'ObjectExpression') {
+        diagnostics.push(makeDiagnostic(
+          'sfc-port-config-required',
+          `Requested port "${name}" должен содержать один config object.`,
+          definition,
+          script,
+        ))
+        continue
+      }
+      const defaultIdentity = readStringProperty(config, 'default')
+      if (!defaultIdentity) {
+        diagnostics.push(makeDiagnostic(
+          'sfc-port-default-required',
+          `Requested port "${name}" должен содержать непустой string default.`,
+          config,
+          script,
+        ))
+        continue
+      }
+
+      if (kind === 'computation') {
+        if (typeSources.length !== 2) {
+          diagnostics.push(makeDiagnostic('sfc-computation-port-types', `Computation port "${name}" требует <Input, Output>.`, definition, script))
+          continue
+        }
+        const port: ComponentSFCComputationPort = {
+          kind,
+          name,
+          defaultIdentity,
+          inputType: typeSources[0]!,
+          outputType: typeSources[1]!,
+          sourceRange: toRange(property, script),
+        }
+        manifest.request.computations.push(port)
+        dependencies.computations.push({ source: 'computation', id: defaultIdentity, role: 'port-default-computation' })
+        validateProvider(port, options, diagnostics, property, script)
+        continue
+      }
+
+      if (kind === 'component') {
+        const tag = readStringProperty(config, 'tag')
+        if (typeSources.length !== 1) {
+          diagnostics.push(makeDiagnostic('sfc-component-port-types', `Component port "${name}" требует <Props>.`, definition, script))
+          continue
+        }
+        if (!tag || !isValidTag(tag) || isComponentSFCBuiltInTag(tag) || tags.has(tag)) {
+          diagnostics.push(makeDiagnostic(
+            isComponentSFCBuiltInTag(tag ?? '') ? 'sfc-component-port-tag-reserved' : 'sfc-component-port-tag-invalid',
+            `Component port "${name}" содержит invalid, duplicate или reserved tag "${tag ?? ''}".`,
+            config,
+            script,
+          ))
+          continue
+        }
+        tags.add(tag)
+        const inputs = parseComponentSFCTypeFields(typeSources[0]!, script.content)
+        const port: ComponentSFCComponentPort = {
+          kind,
+          name,
+          tag,
+          defaultIdentity,
+          propsType: typeSources[0]!,
+          inputs,
+          sourceRange: toRange(property, script),
+        }
+        manifest.request.components.push(port)
+        dependencies.components.push({ source: 'component-sfc', id: defaultIdentity, role: 'port-default-component' })
+        validateProvider(port, options, diagnostics, property, script)
+        continue
+      }
+
+      if (typeSources.length !== 2) {
+        diagnostics.push(makeDiagnostic('sfc-action-port-types', `Action port "${name}" требует <Input, Output>.`, definition, script))
+        continue
+      }
+      const port: ComponentSFCActionPort = {
+        kind: 'action',
+        role: 'request',
         name,
         defaultIdentity,
         inputType: typeSources[0]!,
         outputType: typeSources[1]!,
         sourceRange: toRange(property, script),
       }
-      manifest.computations.push(port)
-      dependencies.computations.push({
-        source: 'computation',
-        id: defaultIdentity,
-        role: 'port-default-computation',
-      })
+      manifest.request.actions.push(port)
+      dependencies.actions.push(defaultIdentity)
       validateProvider(port, options, diagnostics, property, script)
-      continue
     }
-
-    const tag = readStringProperty(config, 'tag')
-    if (typeSources.length !== 1) {
-      diagnostics.push(makeDiagnostic(
-        'sfc-component-port-types',
-        `Component port "${name}" требует <Props>.`,
-        definition,
-        script,
-      ))
-      continue
-    }
-    if (!tag || !isValidTag(tag) || isComponentSFCBuiltInTag(tag) || tags.has(tag)) {
-      diagnostics.push(makeDiagnostic(
-        isComponentSFCBuiltInTag(tag ?? '') ? 'sfc-component-port-tag-reserved' : 'sfc-component-port-tag-invalid',
-        `Component port "${name}" содержит invalid, duplicate или reserved tag "${tag ?? ''}".`,
-        config,
-        script,
-      ))
-      continue
-    }
-    tags.add(tag)
-    const inputs = parseComponentSFCTypeFields(typeSources[0]!, script.content)
-    const port: ComponentSFCComponentPort = {
-      kind,
-      name,
-      tag,
-      defaultIdentity,
-      propsType: typeSources[0]!,
-      inputs,
-      sourceRange: toRange(property, script),
-    }
-    manifest.components.push(port)
-    dependencies.components.push({
-      source: 'component-sfc',
-      id: defaultIdentity,
-      role: 'port-default-component',
-    })
-    validateProvider(port, options, diagnostics, property, script)
   }
 }
 
@@ -276,8 +370,8 @@ function parsePortCalls(
   diagnostics: RComponentDiagnostic[],
 ): void {
   const portsByName = new Map<string, ComponentSFCComputationPort | ComponentSFCComponentPort>()
-  for (const port of manifest.computations) portsByName.set(port.name, port)
-  for (const port of manifest.components) portsByName.set(port.name, port)
+  for (const port of manifest.request.computations) portsByName.set(port.name, port)
+  for (const port of manifest.request.components) portsByName.set(port.name, port)
   const props = parseComponentSFCProps(script)
   const locals = script.bindings.map(binding => binding.name)
   const topLevelCalls = new Set<number>()
@@ -289,7 +383,7 @@ function parsePortCalls(
       if (!isPortCall(init, bindingName)) continue
       if (typeof init.start === 'number') topLevelCalls.add(init.start)
       const local = declaration.id?.type === 'Identifier' ? declaration.id.name : ''
-      const portName = readKey(init.callee.property)
+      const portName = readRequestedPortCallName(init, bindingName)
       const port = portName ? portsByName.get(portName) : null
       if (statement.kind !== 'const' || !local) {
         diagnostics.push(makeDiagnostic(
@@ -362,18 +456,20 @@ function parsePortCalls(
 }
 
 function validateProvider(
-  port: ComponentSFCComputationPort | ComponentSFCComponentPort,
+  port: ComponentSFCComputationPort | ComponentSFCComponentPort | ComponentSFCActionPort,
   options: ComponentSFCPortAnalysisOptions,
   diagnostics: RComponentDiagnostic[],
   node: any,
   script: RComponentSFC_AST_Script,
 ): void {
   if (!options.resolveProvider) return
-  const provider = options.resolveProvider(port.defaultIdentity, port.kind)
+  const defaultIdentity = port.defaultIdentity
+  if (!defaultIdentity) return
+  const provider = options.resolveProvider(defaultIdentity, port.kind)
   if (!provider) {
     diagnostics.push(makeDiagnostic(
       'sfc-port-default-missing',
-      `Default provider "${port.defaultIdentity}" для port "${port.name}" не найден.`,
+      `Default provider "${defaultIdentity}" для port "${port.name}" не найден.`,
       node,
       script,
     ))
@@ -382,7 +478,7 @@ function validateProvider(
   if (provider.kind !== port.kind) {
     diagnostics.push(makeDiagnostic(
       'sfc-port-default-kind',
-      `Default provider "${port.defaultIdentity}" имеет kind "${provider.kind}", ожидался "${port.kind}".`,
+      `Default provider "${defaultIdentity}" имеет kind "${provider.kind}", ожидался "${port.kind}".`,
       node,
       script,
     ))
@@ -391,7 +487,7 @@ function validateProvider(
   if (!provider.active) {
     diagnostics.push(makeDiagnostic(
       'sfc-port-default-inactive',
-      `Default provider "${port.defaultIdentity}" неактивен.`,
+      `Default provider "${defaultIdentity}" неактивен.`,
       node,
       script,
     ))
@@ -455,10 +551,16 @@ function isCall(node: any, name: string): boolean {
 }
 
 function isPortCall(node: any, bindingName: string): boolean {
-  return node?.type === 'CallExpression'
-    && node.callee?.type === 'MemberExpression'
-    && node.callee.object?.type === 'Identifier'
-    && node.callee.object.name === bindingName
+  return readRequestedPortCallName(node, bindingName) != null
+}
+
+function readRequestedPortCallName(node: any, bindingName: string): string | null {
+  const callee = node?.type === 'CallExpression' ? node.callee : null
+  const roleMember = callee?.type === 'MemberExpression' ? callee.object : null
+  if (roleMember?.type !== 'MemberExpression') return null
+  if (roleMember.object?.type !== 'Identifier' || roleMember.object.name !== bindingName) return null
+  if (readKey(roleMember.property) !== 'request') return null
+  return readKey(callee.property)
 }
 
 function walkBabelNodes(value: unknown, visit: (node: any) => void): void {

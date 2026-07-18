@@ -3,7 +3,8 @@ import type { RComponentContractInput } from '@/domain/types/component/component
 import type { RComponentSFC_IR_Value } from './ir.types'
 import type { RComponentSFC_SourceRange } from './location.types'
 
-export type ComponentSFCPortKind = 'computation' | 'component'
+export type ComponentSFCPortRole = 'request' | 'provides' | 'emits'
+export type ComponentSFCPortKind = 'computation' | 'component' | 'action' | 'event'
 
 /** Default provider descriptor, supplied by the domain build boundary. */
 export type ComponentSFCPortProviderDescriptor
@@ -19,6 +20,13 @@ export type ComponentSFCPortProviderDescriptor
       identity: string
       active: boolean
       inputs: RComponentContractInput[]
+    }
+    | {
+      kind: 'action'
+      identity: string
+      active: boolean
+      input: { type: string, isArray?: boolean, optional?: boolean } | null
+      output: { type: string, isArray?: boolean, optional?: boolean } | null
     }
 
 /** Computation port declared by `computation<Input, Output>`. */
@@ -42,10 +50,45 @@ export interface ComponentSFCComponentPort {
   sourceRange?: RComponentSFC_SourceRange
 }
 
-/** Typed port manifest stored in the compiled ComponentSFC artifact. */
-export interface ComponentSFCPortManifest {
+/** Callable Action required from the outside or provided by this component. */
+export interface ComponentSFCActionPort {
+  kind: 'action'
+  role: 'request' | 'provides'
+  name: string
+  inputType: string
+  outputType: string
+  defaultIdentity?: string
+  sourceRange?: RComponentSFC_SourceRange
+}
+
+/** Multicast notification emitted by this component. */
+export interface ComponentSFCEventPort {
+  kind: 'event'
+  role: 'emits'
+  name: string
+  payloadType: string
+  sourceRange?: RComponentSFC_SourceRange
+}
+
+export interface ComponentSFCRequestedPorts {
   computations: ComponentSFCComputationPort[]
   components: ComponentSFCComponentPort[]
+  actions: ComponentSFCActionPort[]
+}
+
+export interface ComponentSFCProvidedPorts {
+  actions: ComponentSFCActionPort[]
+}
+
+export interface ComponentSFCEmittedPorts {
+  events: ComponentSFCEventPort[]
+}
+
+/** Typed port manifest stored in the compiled ComponentSFC artifact. */
+export interface ComponentSFCPortManifest {
+  request: ComponentSFCRequestedPorts
+  provides: ComponentSFCProvidedPorts
+  emits: ComponentSFCEmittedPorts
 }
 
 /** One top-level local initialized through a computation port call. */
@@ -67,7 +110,16 @@ export interface RComponentSFC_IR_ComponentPortMarker {
 
 export function createEmptyComponentSFCPortManifest(): ComponentSFCPortManifest {
   return {
-    computations: [],
-    components: [],
+    request: {
+      computations: [],
+      components: [],
+      actions: [],
+    },
+    provides: {
+      actions: [],
+    },
+    emits: {
+      events: [],
+    },
   }
 }

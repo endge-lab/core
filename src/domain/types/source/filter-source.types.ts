@@ -49,13 +49,13 @@ export type FilterRuntimeOutput
   = | { key: string, kind: 'json', value: unknown }
     | { key: string, kind: 'predicate', test: (row: unknown) => boolean }
 
-export type FilterRuntimeCommandId = 'patch' | 'set' | 'reset' | 'clear'
+export type FilterRuntimeActionId = 'patch' | 'set' | 'reset' | 'clear'
 
 export interface FilterRuntimeSetPayload {
   key: string
   value: unknown
 }
 
-export interface FilterRuntimeCommandHandle {
+export interface FilterRuntimeActionHandle {
   run: (payload?: unknown) => Promise<void>
 }

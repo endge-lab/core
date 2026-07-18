@@ -15,6 +15,7 @@ import type {
   RComponentSFC_IR_Template,
   RComponentSFC_IR_Value,
   ComponentSFCComponentPort,
+  ComponentSFCActionPort,
 } from '@/domain/types/component/sfc'
 import type { ProgramNodeMetadata } from '@/domain/types/program/program-metadata.types'
 import { compileComponentSFCExpression } from '@/model/services/compiler/component-sfc/component-sfc-expression'
@@ -33,6 +34,9 @@ export interface ComponentSFCTemplateCompileContext {
 
   /** Local component ports have priority over the global user tag registry. */
   componentPorts?: ComponentSFCComponentPort[]
+
+  /** Actions exposed by this component and available to declarative handlers. */
+  providedActions?: ComponentSFCActionPort[]
 
   /** Разрешает зарегистрированный пользовательский tag в identity компонента. */
   resolveComponentTag?: (tag: string) => string | null
@@ -263,7 +267,8 @@ function compileElementNode(
   if (element.tag === 'Table') {
     diagnostics.push(...normalizeComponentSFCTableSort(element).diagnostics)
     diagnostics.push(...normalizeComponentSFCTableColumnPin(element).diagnostics)
-    diagnostics.push(...normalizeComponentSFCTableColumnMenu(element).diagnostics)
+    const menu = normalizeComponentSFCTableColumnMenu(element, context.providedActions)
+    diagnostics.push(...menu.diagnostics)
   }
 
   return element
