@@ -32,7 +32,7 @@ function isAdminUrl(url: string): boolean {
 /**
  * Подключает вкладку к каналу обмена для отладки.
  * start() - создаёт канал и слушает регистрации (вызывать в админке).
- * activate() - регистрирует текущую вкладку (в консоли: Endge.debugTab()).
+ * activate() - регистрирует текущую вкладку как клиент Runtime Debug.
  */
 export class EndgeRuntimeDebugger extends EndgeModule {
   /** Канал для отправки (activate) */
@@ -45,13 +45,6 @@ export class EndgeRuntimeDebugger extends EndgeModule {
   private _analysisByTabId: Record<string, string[]> = {}
   private _diagnosticsListener: ((record: DiagnosticsRecord) => void) | null = null
   private _unsubscribeDiagnostics: (() => void) | null = null
-
-  /**
-   * Регистрирует консольную команду подключения вкладки к runtime debugger.
-   */
-  public override start(): void {
-    Endge.console.register('debugTab', () => Endge.runtimeDebugger.activate(), 'Подключить текущую вкладку к Runtime Debug')
-  }
 
   /** Закрывает browser channels, timers и diagnostics subscription. */
   public override reset(): void {
@@ -309,7 +302,7 @@ export class EndgeRuntimeDebugger extends EndgeModule {
   }
 
   /**
-   * Зарегистрировать текущую вкладку в канале отладки (в консоли: Endge.debugTab()).
+   * Зарегистрировать текущую вкладку в канале отладки.
    * При активации подписывается на Endge.diagnostics и дублирует записи в канал для админки.
    */
   public activate(): void {

@@ -6,7 +6,6 @@ import type { EndgeAuth } from '@/model/endge/security/endge-auth'
 import type { EndgeAuthProfiles } from '@/model/endge/security/endge-auth-profiles'
 import { EndgeBind } from '@/model/endge/runtime/core/endge-bind'
 import { EndgeActions } from '@/model/endge/runtime/core/endge-actions'
-import { EndgeConsole } from '@/model/endge/diagnostics/endge-console'
 import { EndgeContext } from '@/model/endge/context/endge-context'
 import { EndgeConfigurationModule } from '@/model/endge/context/endge-configuration'
 import { EndgeDataView } from '@/model/endge/runtime/execution/endge-data-view'
@@ -402,13 +401,6 @@ export class Endge extends EndgeFederation {
   /** Доступ к единому registry вызываемых runtime Actions. */
   static get actions(): EndgeActions {
     return this.runtime.actions
-  }
-
-  /**
-   * Доступ к консольным debug-командам.
-   */
-  static get console(): EndgeConsole {
-    return this.getModule<EndgeConsole>('console')
   }
 
   /**
