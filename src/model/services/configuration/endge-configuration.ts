@@ -9,6 +9,15 @@ import type {
   EndgeThemeDefinition,
   EndgeVariableDefinition,
 } from '@/domain/types/configuration'
+import type {
+  DiagnosticsAttributes,
+  DiagnosticsFilter,
+  DiagnosticsSeverityNumber,
+  DiagnosticsSignal,
+  EndgeDiagnosticsConfiguration,
+  EndgeDiagnosticsRoute,
+} from '@/domain/types/diagnostics'
+import { DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION } from '@/model/config/diagnostics'
 
 const DEFAULT_CONFIGURATION_VALUE: EndgeConfiguration = {
   vars: [],
@@ -26,6 +35,7 @@ const DEFAULT_CONFIGURATION_VALUE: EndgeConfiguration = {
   defaultAuthProfileIdentity: null,
   sfcAdapterIds: ['native-vue'],
   defaultSfcAdapterId: 'native-vue',
+  diagnostics: structuredCloneSafe(DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION),
 }
 
 export const DEFAULT_ENDGE_CONFIGURATION: Readonly<EndgeConfiguration> = Object.freeze(DEFAULT_CONFIGURATION_VALUE)
@@ -59,6 +69,7 @@ export function normalizeEndgeConfiguration(input: unknown): EndgeConfiguration 
     defaultAuthProfileIdentity: normalizeNullableText(input.defaultAuthProfileIdentity),
     sfcAdapterIds,
     defaultSfcAdapterId,
+    diagnostics: normalizeDiagnosticsConfiguration(input.diagnostics),
   }
 }
 
@@ -99,6 +110,8 @@ export function applyEndgeConfigurationContribution(
     next.themes = applyCollectionPatch(next.themes, patch.themes, item => item.identity)
   if (patch.sfcAdapterIds)
     next.sfcAdapterIds = applyCollectionPatch(next.sfcAdapterIds, patch.sfcAdapterIds, item => item)
+  if (patch.diagnostics)
+    next.diagnostics = applyDiagnosticsPatch(next.diagnostics, patch.diagnostics)
 
   applyOptionalValue(next, 'sse', patch.sse)
   applyRequiredValue(next, 'defaultLocale', patch.defaultLocale)
@@ -126,6 +139,38 @@ function normalizePatch(input: unknown): EndgeConfigurationPatch {
     return {}
 
   return structuredCloneSafe(input) as EndgeConfigurationPatch
+}
+
+/** Применяет diagnostics patch без замены остальных configuration fields. */
+function applyDiagnosticsPatch(
+  upstream: EndgeDiagnosticsConfiguration,
+  patch: NonNullable<EndgeConfigurationPatch['diagnostics']>,
+): EndgeDiagnosticsConfiguration {
+  const next = structuredCloneSafe(upstream)
+  const collection = patch.collection
+
+  if (collection?.enabled?.op === 'set')
+    next.collection.enabled = collection.enabled.value
+  if (collection?.enabled?.op === 'remove')
+    throw new Error('[EndgeConfiguration] Required field "diagnostics.collection.enabled" cannot be removed')
+
+  if (collection?.signals)
+    next.collection.signals = applyCollectionPatch(next.collection.signals, collection.signals, item => item)
+
+  if (collection?.minSeverity?.op === 'set')
+    next.collection.minSeverity = collection.minSeverity.value
+  if (collection?.minSeverity?.op === 'remove')
+    throw new Error('[EndgeConfiguration] Required field "diagnostics.collection.minSeverity" cannot be removed')
+
+  if (collection?.maxRecords?.op === 'set')
+    next.collection.maxRecords = collection.maxRecords.value
+  if (collection?.maxRecords?.op === 'remove')
+    throw new Error('[EndgeConfiguration] Required field "diagnostics.collection.maxRecords" cannot be removed')
+
+  if (patch.routes)
+    next.routes = applyCollectionPatch(next.routes, patch.routes, item => item.id)
+
+  return normalizeDiagnosticsConfiguration(next)
 }
 
 function applyCollectionPatch<T>(
@@ -265,6 +310,121 @@ function normalizeSSE(input: unknown): EndgeSSEConfiguration | undefined {
 
 function normalizeSSEAuthMode(input: unknown): EndgeSSEAuthMode {
   return input === 'profile' || input === 'manual' || input === 'none' ? input : 'inherit'
+}
+
+/** Нормализует полную diagnostics configuration и добавляет системные defaults. */
+function normalizeDiagnosticsConfiguration(input: unknown): EndgeDiagnosticsConfiguration {
+  const defaults = structuredCloneSafe(DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION)
+  if (!isRecord(input))
+    return defaults
+
+  const rawCollection = isRecord(input.collection) ? input.collection : {}
+  const signals = normalizeDiagnosticsSignals(rawCollection.signals)
+  const minSeverity = normalizeDiagnosticsSeverity(rawCollection.minSeverity, defaults.collection.minSeverity)
+  const maxRecords = Math.max(1, Math.floor(Number(rawCollection.maxRecords ?? defaults.collection.maxRecords) || defaults.collection.maxRecords))
+
+  return {
+    collection: {
+      enabled: typeof rawCollection.enabled === 'boolean' ? rawCollection.enabled : defaults.collection.enabled,
+      signals,
+      minSeverity,
+      maxRecords,
+    },
+    routes: normalizeDiagnosticsRoutes(input.routes),
+  }
+}
+
+/** Нормализует уникальный список поддерживаемых diagnostics signals. */
+function normalizeDiagnosticsSignals(input: unknown): DiagnosticsSignal[] {
+  const source = Array.isArray(input) ? input : DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION.collection.signals
+  return [...new Set(source.filter((item): item is DiagnosticsSignal => item === 'log' || item === 'span'))]
+}
+
+/** Нормализует базовый OpenTelemetry severity number. */
+function normalizeDiagnosticsSeverity(input: unknown, fallback: DiagnosticsSeverityNumber): DiagnosticsSeverityNumber {
+  const value = Number(input)
+  return value === 1 || value === 5 || value === 9 || value === 13 || value === 17 || value === 21
+    ? value
+    : fallback
+}
+
+/** Нормализует routes и исключает записи без стабильного id или adapterId. */
+function normalizeDiagnosticsRoutes(input: unknown): EndgeDiagnosticsRoute[] {
+  const routes: EndgeDiagnosticsRoute[] = []
+  const used = new Set<string>()
+
+  for (const raw of Array.isArray(input) ? input : []) {
+    if (!isRecord(raw) || !isRecord(raw.target))
+      continue
+
+    const id = normalizeText(raw.id)
+    const adapterId = normalizeText(raw.target.adapterId)
+    if (!id || !adapterId || used.has(id))
+      continue
+
+    used.add(id)
+    const integrationId = normalizeText(raw.target.integrationId)
+    routes.push({
+      id,
+      enabled: raw.enabled !== false,
+      match: normalizeDiagnosticsFilter(raw.match),
+      target: {
+        adapterId,
+        ...(integrationId ? { integrationId } : {}),
+      },
+    })
+  }
+
+  return routes
+}
+
+/** Нормализует persisted route filter до поддерживаемого подмножества. */
+function normalizeDiagnosticsFilter(input: unknown): DiagnosticsFilter {
+  if (!isRecord(input))
+    return {}
+
+  const signals = Array.isArray(input.signals) ? normalizeDiagnosticsSignals(input.signals) : undefined
+  const scopes = normalizeOptionalStringArray(input.scopes)
+  const eventNames = normalizeOptionalStringArray(input.eventNames)
+  const attributes = normalizeDiagnosticsAttributes(input.attributes)
+  const minSeverity = input.minSeverity == null ? undefined : normalizeDiagnosticsSeverity(input.minSeverity, 1)
+
+  return {
+    ...(signals ? { signals } : {}),
+    ...(minSeverity ? { minSeverity } : {}),
+    ...(scopes ? { scopes } : {}),
+    ...(eventNames ? { eventNames } : {}),
+    ...(normalizeText(input.traceId) ? { traceId: normalizeText(input.traceId) } : {}),
+    ...(normalizeText(input.spanId) ? { spanId: normalizeText(input.spanId) } : {}),
+    ...(attributes ? { attributes } : {}),
+  }
+}
+
+/** Нормализует непустой список строк или возвращает undefined. */
+function normalizeOptionalStringArray(input: unknown): string[] | undefined {
+  if (!Array.isArray(input))
+    return undefined
+  const values = [...new Set(input.map(normalizeText).filter(Boolean))]
+  return values.length > 0 ? values : undefined
+}
+
+/** Нормализует безопасные scalar/array attributes route. */
+function normalizeDiagnosticsAttributes(input: unknown): DiagnosticsAttributes | undefined {
+  if (!isRecord(input))
+    return undefined
+
+  const attributes: DiagnosticsAttributes = {}
+  for (const [key, value] of Object.entries(input)) {
+    const normalizedKey = normalizeText(key)
+    if (!normalizedKey)
+      continue
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean')
+      attributes[normalizedKey] = value
+    else if (Array.isArray(value) && value.every(item => typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean'))
+      attributes[normalizedKey] = value as Array<string | number | boolean>
+  }
+
+  return Object.keys(attributes).length > 0 ? attributes : undefined
 }
 
 function requireMember(input: unknown, values: string[], field: string): string {

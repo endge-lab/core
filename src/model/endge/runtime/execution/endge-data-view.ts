@@ -69,7 +69,10 @@ export class EndgeDataView {
         evaluateSourceExpression(expression, {
           scope: input,
           onWarning: Endge.isConfigured
-            ? warning => Endge.debug.warn(`[DataView] ${warning.message}`, warning.data)
+            ? warning => Endge.diagnostics.warn(`[DataView] ${warning.message}`, {
+                scope: { name: 'endge.runtime.data-view' },
+                eventName: 'endge.expression.warning',
+              })
             : undefined,
         }),
       ]),
@@ -83,7 +86,10 @@ export class EndgeDataView {
     return evaluateSourceExpression(artifact.expression, {
       scope: input,
       onWarning: Endge.isConfigured
-        ? warning => Endge.debug.warn(`[DataView] ${warning.message}`, warning.data)
+        ? warning => Endge.diagnostics.warn(`[DataView] ${warning.message}`, {
+            scope: { name: 'endge.runtime.data-view' },
+            eventName: 'endge.expression.warning',
+          })
         : undefined,
     })
   }

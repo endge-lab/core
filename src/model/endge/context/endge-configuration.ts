@@ -22,7 +22,7 @@ export class EndgeConfigurationModule extends EndgeModule {
   private _current: EndgeConfiguration | null = null
   private _buildContext: EndgeBuildContext | null = null
 
-  /** Разрешает Workspace → Project → Environment → Tenant до compiler build. */
+  /** Разрешает Workspace → Tenant → Project → Environment до compiler build. */
   public override build(ctx: EndgeBootContext): void {
     const execution = Endge.context.resolveExecutionContext({
       explicit: ctx.context,
@@ -45,9 +45,9 @@ export class EndgeConfigurationModule extends EndgeModule {
     }
 
     let configuration = normalizeEndgeConfiguration(Endge.workspace.current.configuration)
+    configuration = applyEndgeConfigurationContribution(configuration, tenant?.configuration ?? EMPTY_CONTRIBUTION)
     configuration = applyEndgeConfigurationContribution(configuration, project?.configuration ?? EMPTY_CONTRIBUTION)
     configuration = applyEndgeConfigurationContribution(configuration, environment?.configuration ?? EMPTY_CONTRIBUTION)
-    configuration = applyEndgeConfigurationContribution(configuration, tenant?.configuration ?? EMPTY_CONTRIBUTION)
 
     const workspaceIdentity = Endge.workspace.current.identity
     this._current = configuration
@@ -105,20 +105,20 @@ export class EndgeConfigurationModule extends EndgeModule {
   /** Вычисляет upstream snapshot для общего редактора указанного слоя. */
   resolveUpstream(layer: EndgeConfigurationLayer): EndgeConfiguration {
     let configuration = normalizeEndgeConfiguration(Endge.workspace.current.configuration)
-    if (layer === 'workspace' || layer === 'project')
+    if (layer === 'workspace' || layer === 'tenant')
       return configuration
 
     const execution = Endge.context.getExecutionContext()
     configuration = applyEndgeConfigurationContribution(
       configuration,
-      Endge.domain.getProject(execution.projectIdentity)?.configuration ?? EMPTY_CONTRIBUTION,
+      Endge.domain.getTenant(execution.tenantIdentity)?.configuration ?? EMPTY_CONTRIBUTION,
     )
-    if (layer === 'environment')
+    if (layer === 'project')
       return configuration
 
     configuration = applyEndgeConfigurationContribution(
       configuration,
-      Endge.domain.getEnvironment(execution.environmentIdentity)?.configuration ?? EMPTY_CONTRIBUTION,
+      Endge.domain.getProject(execution.projectIdentity)?.configuration ?? EMPTY_CONTRIBUTION,
     )
     return configuration
   }

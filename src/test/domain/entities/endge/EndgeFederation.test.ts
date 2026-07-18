@@ -70,7 +70,7 @@ describe('EndgeFederation stages', () => {
     expect(calls).toHaveLength(8)
   })
 
-  it('continues reset after a module reset error', async () => {
+  it('resets modules in reverse order and continues after an error', async () => {
     const calls: string[] = []
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
@@ -101,7 +101,7 @@ describe('EndgeFederation stages', () => {
 
     try {
       await TestFederation.reset()
-      expect(calls).toEqual(['first:reset', 'second:reset'])
+      expect(calls).toEqual(['second:reset', 'first:reset'])
       expect(warnSpy).toHaveBeenCalledOnce()
     }
     finally {

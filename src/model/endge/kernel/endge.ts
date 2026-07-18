@@ -11,7 +11,6 @@ import { EndgeContext } from '@/model/endge/context/endge-context'
 import { EndgeConfigurationModule } from '@/model/endge/context/endge-configuration'
 import { EndgeDataView } from '@/model/endge/runtime/execution/endge-data-view'
 import { EndgeCompiler } from '@/model/endge/program/endge-compiler'
-import { EndgeDebug } from '@/model/endge/diagnostics/endge-debug'
 import { EndgeDiagnostics } from '@/model/endge/diagnostics/endge-diagnostics'
 import { EndgeDomain } from '@/model/endge/domain/endge-domain'
 import { EndgeEvents } from '@/model/endge/kernel/endge-events'
@@ -134,7 +133,6 @@ export class Endge extends EndgeFederation {
     if (this.isInitialized)
       return
 
-    Endge.debug.enabled = true
     await super.boot(ctx)
   }
 
@@ -236,14 +234,7 @@ export class Endge extends EndgeFederation {
   }
 
   /**
-   * Доступ к модулю debug-логирования.
-   */
-  static get debug(): EndgeDebug {
-    return this.getModule<EndgeDebug>('debug')
-  }
-
-  /**
-   * Доступ к модулю диагностических событий, трасс и snapshots.
+   * Доступ к централизованному модулю logs, spans и adapters.
    */
   static get diagnostics(): EndgeDiagnostics {
     return this.getModule<EndgeDiagnostics>('diagnostics')

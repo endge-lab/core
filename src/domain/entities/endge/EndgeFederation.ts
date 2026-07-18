@@ -183,10 +183,11 @@ export abstract class EndgeFederation {
   }
 
   /**
-   * Выполняет `reset()` у всех модулей и сбрасывает состояние федерации.
+   * Выполняет `reset()` в обратном dependency order и сбрасывает состояние федерации.
    */
   public static async reset(): Promise<void> {
-    for (const [key, module] of this.host.modules.entries()) {
+    const modules = [...this.host.modules.entries()].reverse()
+    for (const [key, module] of modules) {
       try {
         await module.reset()
       }

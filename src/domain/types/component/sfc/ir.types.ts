@@ -88,6 +88,7 @@ export type RComponentSFC_IR_Tag
     | 'Dot'
     | 'Box'
     | 'Flex'
+    | 'Grid'
     | 'Divider'
     | 'Input'
     | 'Textarea'

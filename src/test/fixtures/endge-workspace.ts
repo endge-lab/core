@@ -19,5 +19,14 @@ export const TEST_ENDGE_WORKSPACE: EndgeWorkspaceDefinition = {
     defaultAuthProfileIdentity: null,
     sfcAdapterIds: ['native-vue', 'shadcn-vue'],
     defaultSfcAdapterId: 'shadcn-vue',
+    diagnostics: {
+      collection: {
+        enabled: true,
+        signals: ['log', 'span'],
+        minSeverity: 9,
+        maxRecords: 2_000,
+      },
+      routes: [],
+    },
   },
 }

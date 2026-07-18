@@ -1,79 +1,100 @@
-import { DiagnosticsScopeHandle } from '@/domain/entities/diagnostics/DiagnosticsScopeHandle'
 import type {
-  DiagnosticsAttrs,
-  DiagnosticsContextRef,
-  DiagnosticsLevel,
-  DiagnosticsScopeOptions,
+  DiagnosticsAttributes,
+  DiagnosticsExceptionOptions,
+  DiagnosticsInstrumentationScope,
+  DiagnosticsLogInput,
+  DiagnosticsLogRecord,
+  DiagnosticsSpanEndOptions,
+  DiagnosticsSpanHandle,
+  DiagnosticsSpanOptions,
   DiagnosticsSpanOwner,
-} from '@/domain/types/diagnostics/diagnostics.types'
+  DiagnosticsSpanRecord,
+} from '@/domain/types/diagnostics'
 
-export class DiagnosticsSpan extends DiagnosticsScopeHandle {
-  private readonly _name: string
-  private readonly _parentSpanId: string | undefined
+/** Управляет одним активным span и завершает его через owner-модуль. */
+export class DiagnosticsSpan implements DiagnosticsSpanHandle {
+  private _ended = false
+  private _attributes: DiagnosticsAttributes
 
+  /** Создаёт handle с уже нормализованной correlation и scope. */
   public constructor(
-    diagnostics: DiagnosticsSpanOwner,
-    active: boolean,
-    traceId: string,
-    spanId: string | undefined,
-    parentSpanId: string | undefined,
-    name: string,
-    channel: string | undefined,
-    level: DiagnosticsLevel,
-    startedAt: number,
-    attrs: DiagnosticsAttrs | undefined,
-    entities: DiagnosticsScopeOptions['entities'],
-    context: DiagnosticsContextRef | undefined,
+    private readonly _owner: DiagnosticsSpanOwner,
+    public readonly traceId: string,
+    public readonly spanId: string,
+    public readonly parentSpanId: string | undefined,
+    private readonly _traceFlags: number | undefined,
+    private readonly _name: string,
+    private readonly _scope: DiagnosticsInstrumentationScope,
+    private readonly _startTimestamp: number,
+    attributes: DiagnosticsAttributes,
   ) {
-    super(diagnostics, active, traceId, spanId, channel, level, startedAt, attrs, entities, context)
-    this._name = name
-    this._parentSpanId = parentSpanId
+    this._attributes = { ...attributes }
   }
 
-  public span(name: string, options: DiagnosticsScopeOptions = {}): DiagnosticsSpan {
-    const diagnostics = this.diagnostics as DiagnosticsSpanOwner
+  /** Показывает, был ли span уже завершён. */
+  public get isEnded(): boolean {
+    return this._ended
+  }
 
-    if (!this.isActive)
-      return diagnostics.createInactiveSpan(this.traceId, this.spanId)
+  /** Добавляет или заменяет структурированные атрибуты активного span. */
+  public setAttributes(attributes: DiagnosticsAttributes): void {
+    if (this._ended)
+      return
+    this._attributes = { ...this._attributes, ...attributes }
+  }
 
-    return diagnostics.startSpan(name, {
+  /** Создаёт дочерний span с correlation текущего handle. */
+  public startChild(
+    name: string,
+    options: Omit<DiagnosticsSpanOptions, 'traceId' | 'parentSpanId'> = {},
+  ): DiagnosticsSpanHandle {
+    return this._owner.startSpan(name, {
       ...options,
-      channel: this.normalizeChannel(options.channel) ?? this.channel,
-      context: this.mergeContext(this.context, options.context),
-      attrs: {
-        ...(this.attrs ?? {}),
-        ...(options.attrs ?? {}),
-      },
-      entities: options.entities ?? this.entities,
       traceId: this.traceId,
       parentSpanId: this.spanId,
+      traceFlags: options.traceFlags ?? this._traceFlags,
+      scope: options.scope ?? this._scope,
     })
   }
 
-  public end(attrs?: DiagnosticsAttrs): void {
-    if (!this.isActive) {
-      this._closed = true
-      return
-    }
-
-    const diagnostics = this.diagnostics as DiagnosticsSpanOwner
-    const endedAt = Date.now()
-
-    diagnostics.writeSpanEnd({
-      name: this._name,
-      level: this.level,
-      channel: this.channel,
-      attrs: {
-        ...(this.attrs ?? {}),
-        ...(attrs ?? {}),
-      },
-      entities: this.entities,
-      context: this.context,
+  /** Записывает log с автоматической correlation текущего span. */
+  public log(input: Omit<DiagnosticsLogInput, 'traceId' | 'spanId'>): DiagnosticsLogRecord | null {
+    return this._owner.log({
+      ...input,
       traceId: this.traceId,
       spanId: this.spanId,
-      parentSpanId: this._parentSpanId,
-      durMs: Math.max(0, endedAt - this.startedAt),
+      traceFlags: input.traceFlags ?? this._traceFlags,
+      scope: input.scope ?? this._scope,
     })
-    this._closed = true
+  }
+
+  /** Записывает exception как связанный ERROR/FATAL log. */
+  public recordException(error: unknown, options: DiagnosticsExceptionOptions = {}): DiagnosticsLogRecord | null {
+    return this._owner.recordException(error, {
+      ...options,
+      traceId: this.traceId,
+      spanId: this.spanId,
+      traceFlags: options.traceFlags ?? this._traceFlags,
+      scope: options.scope ?? this._scope,
+    })
+  }
+
+  /** Идемпотентно завершает span и возвращает сохранённый record. */
+  public end(options: DiagnosticsSpanEndOptions = {}): DiagnosticsSpanRecord | null {
+    if (this._ended)
+      return null
+
+    this._ended = true
+    return this._owner.finishSpan({
+      traceId: this.traceId,
+      spanId: this.spanId,
+      parentSpanId: this.parentSpanId,
+      traceFlags: this._traceFlags,
+      name: this._name,
+      scope: this._scope,
+      startTimestamp: this._startTimestamp,
+      attributes: this._attributes,
+      options,
+    })
   }
 }

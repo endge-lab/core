@@ -48,6 +48,7 @@ describe('EndgeCompiler component tag registry', () => {
       expect.objectContaining({ code: 'component-sfc-tag-reserved', severity: 'error' }),
     ]))
   })
+
 })
 
 function createComponent(

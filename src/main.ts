@@ -25,9 +25,7 @@ export * from '@/model/endge/ui/endge-ui'
 export * from '@/model/endge/ui/endge-ui-registry'
 export * from '@/model/endge/ui/endge-styles'
 export * from '@/domain/entities/diagnostics/DiagnosticsRecordStore'
-export * from '@/domain/entities/diagnostics/DiagnosticsScopeHandle'
 export * from '@/domain/entities/diagnostics/DiagnosticsSpan'
-export * from '@/domain/entities/diagnostics/DiagnosticsTrace'
 
 export * from '@/domain/types/types'
 export * from '@/domain/types/api.types'
@@ -86,9 +84,6 @@ export * from '@/domain/entities/runtime/RuntimeBindingScope'
 export * from '@/domain/entities/runtime/RuntimeCommandRegistry'
 export * from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
 
-export * from '@/domain/entities/debug/tools/tree'
-export * from '@/domain/entities/debug/tools/base'
-
 export * from '@/domain/entities/endge/EndgeApi'
 export * from '@/domain/entities/endge/EndgeSlotRegistry'
 
@@ -106,7 +101,7 @@ export * from '@/tools/openapi-parser'
 export * from '@/tools/graphql-parser'
 export * from '@/tools/ScheduleUpdate-sse-generator'
 
-export * from '@/model/config/debug'
+export * from '@/model/config/diagnostics'
 export * from '@/model/config/storage_config'
 export * from '@/model/config/persistance_config'
 export * from '@/model/config/ui-composition-defaults'

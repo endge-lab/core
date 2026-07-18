@@ -54,6 +54,19 @@ export class EndgeRuntime extends EndgeModule {
   private _appScopes = new Map<string, RuntimeAppScope>()
   private _defaultAppScope: RuntimeAppScope
   private _unsubscribeWorkspace: (() => void) | null = null
+  private _retainDestroyedHostSnapshots = true
+
+  /** Показывает, сохраняются ли snapshots уничтоженных hosts для runtime inspection. */
+  public get retainDestroyedHostSnapshots(): boolean {
+    return this._retainDestroyedHostSnapshots
+  }
+
+  /** Включает или отключает сохранение snapshots уничтоженных runtime hosts. */
+  public set retainDestroyedHostSnapshots(value: boolean) {
+    this._retainDestroyedHostSnapshots = value === true
+    if (!this._retainDestroyedHostSnapshots)
+      this.clearDeletedRuntimeHostSnapshots()
+  }
 
   /** Создаёт default app scope и регистрирует runtime strategies. */
   public constructor() {
@@ -243,33 +256,25 @@ export class EndgeRuntime extends EndgeModule {
   }
 
   /**
-   * Возвращает снимки удалённых runtime-host из debug-архива.
+   * Возвращает snapshots удалённых runtime hosts для inspection tools.
    */
   public getDeletedRuntimeHostSnapshots() {
     return this._hosts.getDeletedSnapshots()
   }
 
   /**
-   * Полностью удалить snapshot runtime-host из debug-архива удалённых.
+   * Полностью удаляет один snapshot уничтоженного runtime host.
    */
   public removeDeletedRuntimeHostSnapshot(runtimeId: string): void {
-    if (!Endge.debug.enabled) {
-      return
-    }
-
     if (this._hosts.removeDeletedSnapshot(runtimeId)) {
       this.notify()
     }
   }
 
   /**
-   * Полностью очистить debug-архив удалённых runtime-host.
+   * Полностью очищает snapshots уничтоженных runtime hosts.
    */
   public clearDeletedRuntimeHostSnapshots(): void {
-    if (!Endge.debug.enabled) {
-      return
-    }
-
     this._hosts.clearDeleted()
     this.notify()
   }
@@ -426,7 +431,7 @@ export class EndgeRuntime extends EndgeModule {
       return
     }
 
-    if (Endge.debug.enabled) {
+    if (this._retainDestroyedHostSnapshots) {
       const snapshot = host.snapshot()
       this._hosts.rememberDeletedSnapshot({
         ...snapshot,
@@ -434,8 +439,8 @@ export class EndgeRuntime extends EndgeModule {
         status: 'destroyed',
         meta: {
           ...snapshot.meta,
-          debugArchived: true,
-          debugPreviousStatus: snapshot.status,
+          inspectionArchived: true,
+          inspectionPreviousStatus: snapshot.status,
         },
       })
     }

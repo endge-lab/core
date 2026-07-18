@@ -134,8 +134,13 @@ export class QueryExecutor {
 
   /** Публикует runtime warning безопасного expression evaluator. */
   private _writeExpressionWarning(message: string, data?: unknown): void {
-    if (Endge.isConfigured)
-      Endge.debug.warn(`[Query] ${message}`, data)
+    void data
+    if (Endge.isConfigured) {
+      Endge.diagnostics.warn(`[Query] ${message}`, {
+        scope: { name: 'endge.runtime.query' },
+        eventName: 'endge.expression.warning',
+      })
+    }
   }
 
   private _asRecord(value: unknown): Record<string, any> {

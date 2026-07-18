@@ -37,9 +37,15 @@ describe('Endge configuration cascade', () => {
     expect(result.vars).toEqual([{ name: 'ONLY', defaultValue: 'replacement' }])
   })
 
-  it('resolves project, environment and tenant contributions in order', () => {
+  it('resolves workspace, tenant, project and environment contributions in order', () => {
     const workspace = createDefaultEndgeConfiguration()
-    const project = applyEndgeConfigurationContribution(workspace, {
+    const tenant = applyEndgeConfigurationContribution(workspace, {
+      mode: 'inherit',
+      patch: {
+        vars: { entries: [{ key: 'ACCENT', op: 'upsert', value: { name: 'ACCENT', defaultValue: 'tenant' } }] },
+      },
+    })
+    const project = applyEndgeConfigurationContribution(tenant, {
       mode: 'inherit',
       patch: {
         vars: { entries: [{ key: 'ACCENT', op: 'upsert', value: { name: 'ACCENT', defaultValue: 'project' } }] },
@@ -51,17 +57,39 @@ describe('Endge configuration cascade', () => {
         vars: { entries: [{ key: 'ACCENT', op: 'upsert', value: { name: 'ACCENT', defaultValue: 'environment' } }] },
       },
     })
-    const tenant = applyEndgeConfigurationContribution(environment, {
+
+    expect(workspace.vars).toEqual([])
+    expect(tenant.vars).toEqual([{ name: 'ACCENT', defaultValue: 'tenant' }])
+    expect(project.vars).toEqual([{ name: 'ACCENT', defaultValue: 'project' }])
+    expect(environment.vars).toEqual([{ name: 'ACCENT', defaultValue: 'environment' }])
+  })
+
+  it('adds diagnostics defaults to legacy configuration and merges collection patches', () => {
+    const defaults = createDefaultEndgeConfiguration()
+    const result = applyEndgeConfigurationContribution(defaults, {
       mode: 'inherit',
       patch: {
-        vars: { entries: [{ key: 'ACCENT', op: 'remove' }] },
+        diagnostics: {
+          collection: {
+            minSeverity: { op: 'set', value: 17 },
+            maxRecords: { op: 'set', value: 250 },
+          },
+        },
       },
     })
 
-    expect(workspace.vars).toEqual([])
-    expect(project.vars).toEqual([{ name: 'ACCENT', defaultValue: 'project' }])
-    expect(environment.vars).toEqual([{ name: 'ACCENT', defaultValue: 'environment' }])
-    expect(tenant.vars).toEqual([])
+    expect(defaults.diagnostics.collection).toEqual({
+      enabled: true,
+      signals: ['log', 'span'],
+      minSeverity: 9,
+      maxRecords: 2_000,
+    })
+    expect(result.diagnostics.collection).toEqual({
+      enabled: true,
+      signals: ['log', 'span'],
+      minSeverity: 17,
+      maxRecords: 250,
+    })
   })
 
   it('creates a deterministic context hash', () => {

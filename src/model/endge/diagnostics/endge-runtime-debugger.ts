@@ -9,47 +9,7 @@ const REGISTER_INTERVAL_MS = 15000
 
 /** Сериализация записи для postMessage (structured clone). */
 function serializeRecordForChannel(record: DiagnosticsRecord): Record<string, unknown> {
-  const base: Record<string, unknown> = {
-    id: record.id,
-    ts: record.ts,
-    level: record.level,
-    kind: record.kind,
-    channel: record.channel,
-    name: record.name,
-    corr: record.corr,
-    attrs: record.attrs,
-    entities: record.entities,
-    context: record.context,
-  }
-  if ('message' in record && record.message !== undefined)
-    base.message = record.message
-  if ('durMs' in record && record.durMs !== undefined)
-    base.durMs = record.durMs
-  if ('value' in record && record.value !== undefined)
-    base.value = record.value
-  if ('unit' in record && record.unit !== undefined)
-    base.unit = record.unit
-  if ('data' in record && record.data !== undefined) {
-    try {
-      base.data = typeof record.data === 'object' && record.data !== null ? JSON.parse(JSON.stringify(record.data)) : record.data
-    }
-    catch {
-      base.data = String(record.data)
-    }
-  }
-  if ('error' in record && record.error !== undefined) {
-    const err = record.error
-    base.error = err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : String(err)
-  }
-  if ('payload' in record && record.payload !== undefined) {
-    try {
-      base.payload = typeof record.payload === 'object' && record.payload !== null ? JSON.parse(JSON.stringify(record.payload)) : record.payload
-    }
-    catch {
-      base.payload = String(record.payload)
-    }
-  }
-  return base
+  return JSON.parse(JSON.stringify(record)) as Record<string, unknown>
 }
 
 export interface RuntimeDebugTab {
@@ -84,12 +44,31 @@ export class EndgeRuntimeDebugger extends EndgeModule {
   private _autoRegisterTimer: number | null = null
   private _analysisByTabId: Record<string, string[]> = {}
   private _diagnosticsListener: ((record: DiagnosticsRecord) => void) | null = null
+  private _unsubscribeDiagnostics: (() => void) | null = null
 
   /**
    * Регистрирует консольную команду подключения вкладки к runtime debugger.
    */
   public override start(): void {
     Endge.console.register('debugTab', () => Endge.runtimeDebugger.activate(), 'Подключить текущую вкладку к Runtime Debug')
+  }
+
+  /** Закрывает browser channels, timers и diagnostics subscription. */
+  public override reset(): void {
+    this.stop()
+    if (this._channel) {
+      this._channel.removeEventListener('message', this._onClientMessage)
+      this._channel.close()
+      this._channel = null
+    }
+    if (this._autoRegisterTimer != null && typeof window !== 'undefined')
+      window.clearInterval(this._autoRegisterTimer)
+    this._autoRegisterTimer = null
+    this._unsubscribeDiagnostics?.()
+    this._unsubscribeDiagnostics = null
+    this._diagnosticsListener = null
+    this._tabId = null
+    this._analysisByTabId = {}
   }
 
   /** Доступ к текущему состоянию runtime debugger. */
@@ -369,6 +348,6 @@ export class EndgeRuntimeDebugger extends EndgeModule {
       }
     }
     this._diagnosticsListener = listener
-    Endge.diagnostics.addRecordListener(listener)
+    this._unsubscribeDiagnostics = Endge.diagnostics.subscribe({}, listener)
   }
 }

@@ -1,3 +1,10 @@
+import type {
+  DiagnosticsSeverityNumber,
+  DiagnosticsSignal,
+  EndgeDiagnosticsConfiguration,
+  EndgeDiagnosticsRoute,
+} from '@/domain/types/diagnostics'
+
 export interface EndgeLocaleDefinition {
   code: string
   displayName: string
@@ -36,6 +43,8 @@ export interface EndgeConfiguration {
   defaultAuthProfileIdentity: string | null
   sfcAdapterIds: string[]
   defaultSfcAdapterId: string
+  /** Настройки локального сбора и маршрутизации diagnostic records. */
+  diagnostics: EndgeDiagnosticsConfiguration
 }
 
 export type EndgeValueOverride<T> =
@@ -62,13 +71,29 @@ export interface EndgeConfigurationPatch {
   defaultAuthProfileIdentity?: EndgeValueOverride<string>
   sfcAdapterIds?: EndgeCollectionPatch<string>
   defaultSfcAdapterId?: EndgeValueOverride<string>
+  /** Локальный contribution diagnostics для текущего configuration layer. */
+  diagnostics?: EndgeDiagnosticsConfigurationPatch
+}
+
+/** Patch локальной collection policy модуля диагностики. */
+export interface EndgeDiagnosticsCollectionPatch {
+  enabled?: EndgeValueOverride<boolean>
+  signals?: EndgeCollectionPatch<DiagnosticsSignal>
+  minSeverity?: EndgeValueOverride<DiagnosticsSeverityNumber>
+  maxRecords?: EndgeValueOverride<number>
+}
+
+/** Patch diagnostics configuration с merge маршрутов по стабильному id. */
+export interface EndgeDiagnosticsConfigurationPatch {
+  collection?: EndgeDiagnosticsCollectionPatch
+  routes?: EndgeCollectionPatch<EndgeDiagnosticsRoute>
 }
 
 export type EndgeConfigurationContribution =
   | { mode: 'inherit', patch: EndgeConfigurationPatch }
   | { mode: 'replace', value: EndgeConfiguration }
 
-export type EndgeConfigurationLayer = 'workspace' | 'project' | 'environment' | 'tenant'
+export type EndgeConfigurationLayer = 'workspace' | 'tenant' | 'project' | 'environment'
 
 /** Structural context одного полного boot/build lifecycle. */
 export interface EndgeExecutionContext {

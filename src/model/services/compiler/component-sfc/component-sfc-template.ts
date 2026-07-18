@@ -65,6 +65,7 @@ const ENDGE_SFC_BUILT_IN_TAGS = new Set<RComponentSFC_IR_Tag>([
   'Dot',
   'Box',
   'Flex',
+  'Grid',
   'Divider',
   'Input',
   'Textarea',

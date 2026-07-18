@@ -16,6 +16,7 @@ export const ENDGE_SFC_RENDER_ADAPTER_REQUIRED_KEYS = [
   'Dot',
   'Box',
   'Flex',
+  'Grid',
   'Divider',
   'Input',
   'Textarea',

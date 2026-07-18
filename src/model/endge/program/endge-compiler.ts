@@ -1,4 +1,5 @@
 import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
+import type { DiagnosticsSpanHandle } from '@/domain/types/diagnostics'
 import type { DataViewMaterializationStrategy, DataViewRef, DataViewPipelineStep } from '@/domain/types/source/data-view-source.types'
 import type { FilterProgramPayload } from '@/domain/types/source/filter-source.types'
 import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
@@ -32,8 +33,7 @@ import { RStore } from '@/domain/entities/reflect/RStore'
 import { RStyle } from '@/domain/entities/reflect/RStyle'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sfc/component-sfc-template'
-import { ENDGE_COMPILER_VERSION } from '@/model/config/compiler'
-import { ENDGE_LOG_LANES } from '@/model/config/debug'
+import { ENDGE_COMPILER_SPAN_GROUPS, ENDGE_COMPILER_VERSION } from '@/model/config/compiler'
 import { Endge } from '@/model/endge/kernel/endge'
 import { createEmptyProgramMetadata } from '@/domain/types/program/program-metadata.types'
 import type { ProgramMetadata } from '@/domain/types/program/program-metadata.types'
@@ -59,6 +59,7 @@ export class EndgeCompiler extends EndgeModule {
   private _localDataViewCounter = 0
   private _localFilterCounter = 0
   private _componentTagDiagnosticsByIdentity = new Map<string, Omit<ProgramDiagnostic, 'entityRef'>[]>()
+  private _compileSpan: DiagnosticsSpanHandle | null = null
 
   /**
    * Создает singleton-bound compiler module и регистрирует стандартные handlers.
@@ -78,47 +79,69 @@ export class EndgeCompiler extends EndgeModule {
    * `Endge.program` compile cycle и строит artifacts для сущностей.
    */
   public override build(_ctx: EndgeBootContext): void {
-    const dbg = Endge.debug
     const context = this._createCompileContext()
     const componentSFCs = Endge.domain.getComponentSFCs()
 
     Endge.program.beginCompile(ENDGE_COMPILER_VERSION)
     this._prepareComponentTagRegistry(componentSFCs)
-    dbg.startTrace('compile', 'info')
+    this._compileSpan = Endge.diagnostics.startSpan('domain.compile', {
+      scope: { name: 'endge.compiler', version: ENDGE_COMPILER_VERSION },
+    })
 
-    if (!this.compilePhase('computation', ENDGE_LOG_LANES.COMPONENTS, 'computations', Endge.domain.getComputations(), context))
-      return
-    this._linkComputations()
+    try {
+      if (!this.compilePhase('computation', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'computations', Endge.domain.getComputations(), context))
+        return
+      this._linkComputations()
 
-    if (!this.compilePhase('component-sfc', ENDGE_LOG_LANES.COMPONENTS, 'SFC-компонентов', componentSFCs, context))
-      return
+      if (!this.compilePhase('component-sfc', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'SFC-компонентов', componentSFCs, context))
+        return
 
-    if (!this.compilePhase('style', ENDGE_LOG_LANES.COMPONENTS, 'EndgeCSS styles', this._orderedStyles(), context))
-      return
+      if (!this.compilePhase('style', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'EndgeCSS styles', this._orderedStyles(), context))
+        return
 
-    if (!this.compilePhase('data-view', ENDGE_LOG_LANES.QUERIES, 'data views', Endge.domain.getDataViews(), context))
-      return
+      if (!this.compilePhase('data-view', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'data views', Endge.domain.getDataViews(), context))
+        return
 
-    if (!this.compilePhase('store', ENDGE_LOG_LANES.QUERIES, 'stores', Endge.domain.getStores(), context))
-      return
+      if (!this.compilePhase('store', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'stores', Endge.domain.getStores(), context))
+        return
 
-    if (!this.compilePhase('filter', ENDGE_LOG_LANES.QUERIES, 'filter source', Endge.domain.getFilters(), context))
-      return
+      if (!this.compilePhase('filter', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'filter source', Endge.domain.getFilters(), context))
+        return
 
-    if (!this.compilePhase('query', ENDGE_LOG_LANES.QUERIES, 'query source', Endge.domain.getQueries(), context))
-      return
+      if (!this.compilePhase('query', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'query source', Endge.domain.getQueries(), context))
+        return
 
-    if (!this.compilePhase(
-      'composition',
-      ENDGE_LOG_LANES.COMPONENTS,
-      'compositions',
-      this._orderCompositionsForCompile(Endge.domain.getCompositions()),
-      context,
-    ))
-      return
+      if (!this.compilePhase(
+        'composition',
+        ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS,
+        'compositions',
+        this._orderCompositionsForCompile(Endge.domain.getCompositions()),
+        context,
+      ))
+        return
 
-    dbg.info('Проект успешно скомпилирован', { icon: 'ti ti-check text-xl' })
-    dbg.endTrace('info', { status: 'success' })
+      const diagnostics = Endge.program.getDiagnostics()
+      const errorCount = diagnostics.filter(diagnostic => diagnostic.severity === 'error').length
+      const warningCount = diagnostics.filter(diagnostic => diagnostic.severity === 'warning').length
+      const compileSpan = this._compileSpan
+      compileSpan?.log({
+        body: errorCount > 0 ? 'Компиляция проекта завершена с ошибками' : 'Компиляция проекта завершена',
+        severityNumber: errorCount > 0 ? 17 : warningCount > 0 ? 13 : 9,
+        eventName: 'endge.program.compiled',
+        attributes: {
+          'endge.diagnostics.error.count': errorCount,
+          'endge.diagnostics.warning.count': warningCount,
+        },
+      })
+      compileSpan?.end({ status: errorCount > 0 ? 'error' : 'ok' })
+      this._compileSpan = null
+    }
+    catch (error: unknown) {
+      this._compileSpan?.recordException(error, { eventName: 'endge.compiler.exception' })
+      this._compileSpan?.end({ status: 'error', message: 'Необработанная ошибка compiler pipeline' })
+      this._compileSpan = null
+      Endge.program.setStatus('error')
+    }
   }
 
   /** Компилирует один query source в Endge.program без запуска остальных compiler-фаз. */
@@ -192,7 +215,7 @@ export class EndgeCompiler extends EndgeModule {
   /**
    * Компилирует однотипную фазу доменных сущностей через зарегистрированный handler.
    *
-   * Метод отвечает за единый debug span, обработку ошибок и перевод
+   * Метод отвечает за единый diagnostics span, обработку ошибок и перевод
    * `Endge.program` в error status при неуспешной фазе.
    */
   private compilePhase<TEntity>(
@@ -203,24 +226,40 @@ export class EndgeCompiler extends EndgeModule {
     context: ProgramCompileContext,
     failTraceOnError = true,
   ): boolean {
-    const dbg = Endge.debug
-    dbg.startSpan(lane, 'compile', 'info')
-    dbg.info(`Начата компиляция ${title}`)
+    const span = this._compileSpan?.startChild(`compile.${entityType}`, {
+      attributes: {
+        'endge.compiler.group': lane,
+        'endge.compiler.entity.type': entityType,
+        'endge.compiler.entity.count': entities.length,
+      },
+    }) ?? Endge.diagnostics.startSpan(`compile.${entityType}`, {
+      scope: { name: 'endge.compiler', version: ENDGE_COMPILER_VERSION },
+    })
+    span.log({
+      body: `Начата компиляция ${title}`,
+      severityNumber: 9,
+      eventName: 'endge.compiler.phase.started',
+    })
 
     try {
       for (const entity of entities)
         this.compileEntity(entityType, entity, context)
 
-      dbg.info(`Компиляция ${title} успешно завершена`, { icon: 'ti ti-check text-xl' })
-      dbg.endSpan('info')
+      span.log({
+        body: `Компиляция ${title} завершена`,
+        severityNumber: 9,
+        eventName: 'endge.compiler.phase.completed',
+      })
+      span.end({ status: 'ok' })
       return true
     }
-    catch (e: any) {
-      dbg.error(`Ошибка компиляции ${title}: ${e?.message ?? e}`, { error: e })
-      dbg.error('action: alert', { icon: 'ti ti-alert-triangle text-xl' })
-      dbg.endSpan('error')
-      if (failTraceOnError)
-        dbg.endTrace('error')
+    catch (error: unknown) {
+      span.recordException(error, { eventName: 'endge.compiler.phase.exception' })
+      span.end({ status: 'error', message: `Ошибка компиляции ${title}` })
+      if (failTraceOnError) {
+        this._compileSpan?.end({ status: 'error', message: `Неуспешная compiler phase: ${entityType}` })
+        this._compileSpan = null
+      }
       Endge.program.setStatus('error')
       return false
     }

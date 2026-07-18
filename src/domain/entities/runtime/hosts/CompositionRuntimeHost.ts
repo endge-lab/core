@@ -892,7 +892,11 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       return evaluateSourceExpression(binding.expression, {
         environment: name => Endge.workspace.variables.resolve(`{${name}}`) || `{${name}}`,
         read: expression => this._readExpressionSource(expression),
-        onWarning: warning => Endge.debug.warn(`[Composition] ${warning.message}`, warning.data),
+        onWarning: warning => Endge.diagnostics.warn(`[Composition] ${warning.message}`, {
+          scope: { name: 'endge.runtime.composition' },
+          eventName: 'endge.expression.warning',
+          attributes: { 'endge.runtime.id': this.id },
+        }),
       })
     }
     const output = Raph.get(this._requireOutputBridge(binding.runtime, binding.output)) as any

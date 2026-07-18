@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
+import { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sfc/component-sfc-template'
 
 describe('compileComponentSFC', () => {
   it('extracts preview props without changing the component contract', () => {
@@ -119,6 +120,40 @@ defineProps<{
       kind: 'element',
       tag: 'Table',
     })
+  })
+
+  it('accepts Grid containers and preserves child placement props', () => {
+    const result = compileComponentSFC(`<template>
+<Grid columns="12" gap="2" autoRows="28px">
+  <Text colStart="1" colSpan="5" rowStart="1" rowSpan="2">Primary</Text>
+  <Text colStart="1" colSpan="12" rowStart="3">Secondary</Text>
+</Grid>
+</template>
+`)
+
+    expect(result.diagnostics.filter(item => item.code === 'sfc-template-tag-unsupported')).toEqual([])
+    expect(result.ir?.template.roots[0]).toMatchObject({
+      kind: 'element',
+      tag: 'Grid',
+      props: {
+        columns: { kind: 'literal', value: '12' },
+        gap: { kind: 'literal', value: '2' },
+        autoRows: { kind: 'literal', value: '28px' },
+      },
+    })
+    const grid = result.ir?.template.roots[0]
+    const firstChild = grid?.kind === 'element' ? grid.children[0] : null
+    expect(firstChild).toMatchObject({
+      kind: 'element',
+      tag: 'Text',
+      props: {
+        colStart: { kind: 'literal', value: '1' },
+        colSpan: { kind: 'literal', value: '5' },
+        rowStart: { kind: 'literal', value: '1' },
+        rowSpan: { kind: 'literal', value: '2' },
+      },
+    })
+    expect(isComponentSFCBuiltInTag('Grid')).toBe(true)
   })
 
   it('extracts entity and node metadata without leaking compiler attributes into IR props', () => {
