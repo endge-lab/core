@@ -5,14 +5,14 @@ import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
 import { REntity } from '@/domain/entities/reflect/REntity'
 import type { DomainDocumentType } from '@/domain/types/document/document.types'
 import type { NavigationTreeNodeDoc } from '@/domain/types/document/navigation.types'
+import type { EntityManagement } from '@/domain/types/document'
 
-export interface RNavigationSchema {
+export interface RNavigationSchema extends EntityManagement {
   id: string
   identity: string
   name: string
   displayName?: string
   description?: string | null
-  isSystem?: boolean
   folderId?: string | number | null
   tree?: NavigationTreeNodeDoc[]
   meta?: Record<string, unknown>
@@ -54,7 +54,8 @@ export class RNavigation extends REntity {
       name: this.name,
       displayName: this.displayName ?? this.name,
       description: this.description ?? null,
-      isSystem: this.isSystem,
+      managedBy: this.managedBy,
+      managedById: this.managedById,
       folderId: this.folderId ?? null,
       tree: this.tree?.length ? this.tree.map(cloneTreeNode) : undefined,
       meta: this.meta && Object.keys(this.meta).length > 0 ? { ...this.meta } : undefined,

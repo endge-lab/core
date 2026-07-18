@@ -16,6 +16,9 @@ export interface DiagnosticsAdapterCapabilities {
 export interface DiagnosticsAdapterCreateContext {
   sessionId: string
   resource: DiagnosticsResource
+
+  /** Разрешает persisted variable token без сохранения полученного секрета в configuration. */
+  resolveVariable?: (value: string) => string | undefined
 }
 
 /** Контекст доставки одной записи после применения route. */

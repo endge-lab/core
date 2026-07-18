@@ -766,6 +766,7 @@ export class EndgeTelemetry extends EndgeModule implements DiagnosticsSpanOwner 
         const adapter = this._adapterRegistry.create(output, {
           sessionId: this._sessionId,
           resource: this.resource,
+          resolveVariable: value => Endge.workspace.variables.resolve(value, { onInvalid: 'as-is' }),
         })
         if (adapter)
           this._configuredAdapters.set(output.id, adapter)

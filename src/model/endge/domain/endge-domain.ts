@@ -42,6 +42,7 @@ import { RType } from '@/domain/entities/reflect/RType'
 import { RVocabs } from '@/domain/entities/reflect/RVocabs'
 import { RI18nBundle } from '@/domain/entities/reflect/RI18nBundle'
 import { QueryType } from '@/domain/types/document/document.types'
+import { normalizeEntityManagement } from '@/domain/types/document/entity-management.type'
 import Config from '@/model/config'
 import { Endge } from '@/model/endge/kernel/endge'
 import { createDiagnosticsEntityOwner } from '@/model/endge/diagnostics/endge-problems'
@@ -70,6 +71,7 @@ function relationToId(v: any): string | number | null {
 export function queryPayloadDocToPlain(doc: any): any {
   const folderId = relationToId(doc?.folder ?? doc?.folderId)
   return {
+    ...normalizeEntityManagement(doc),
     id: doc?.id,
     identity: doc?.identity,
     name: doc?.displayName ?? doc?.name,
@@ -85,6 +87,7 @@ export function queryPayloadDocToPlain(doc: any): any {
 export function dataViewPayloadDocToPlain(doc: any): any {
   const folderId = relationToId(doc?.folder ?? doc?.folderId)
   return {
+    ...normalizeEntityManagement(doc),
     id: doc?.id,
     identity: doc?.identity,
     name: doc?.displayName ?? doc?.name,
@@ -103,6 +106,7 @@ export function dataViewPayloadDocToPlain(doc: any): any {
 /** Собирает plain-объект Composition из документа Payload. */
 export function compositionPayloadDocToPlain(doc: any): any {
   return {
+    ...normalizeEntityManagement(doc),
     id: doc?.id,
     identity: doc?.identity,
     name: doc?.displayName ?? doc?.name,
@@ -123,6 +127,7 @@ export function compositionPayloadDocToPlain(doc: any): any {
 /** Собирает plain-объект Store из документа Payload. */
 export function storePayloadDocToPlain(doc: any): any {
   return {
+    ...normalizeEntityManagement(doc),
     id: doc?.id,
     identity: doc?.identity,
     name: doc?.displayName ?? doc?.name,
@@ -141,6 +146,7 @@ export function storePayloadDocToPlain(doc: any): any {
 /** Собирает plain-объект Mock из документа Payload. */
 export function mockPayloadDocToPlain(doc: any): any {
   return {
+    ...normalizeEntityManagement(doc),
     id: doc?.id,
     identity: doc?.identity,
     name: doc?.displayName ?? doc?.name,
@@ -161,6 +167,7 @@ export function mockPayloadDocToPlain(doc: any): any {
 /** Собирает plain-объект Computation из документа Payload. */
 export function computationPayloadDocToPlain(doc: any): any {
   return {
+    ...normalizeEntityManagement(doc),
     id: doc?.id,
     identity: doc?.identity,
     name: doc?.displayName ?? doc?.name,
@@ -182,6 +189,7 @@ export function computationPayloadDocToPlain(doc: any): any {
 /** Собирает plain-объект Style из source-first документа Payload. */
 export function stylePayloadDocToPlain(doc: any): any {
   return {
+    ...normalizeEntityManagement(doc),
     id: doc?.id,
     identity: doc?.identity,
     name: doc?.displayName ?? doc?.name,
@@ -193,7 +201,6 @@ export function stylePayloadDocToPlain(doc: any): any {
     meta: (doc?.meta && typeof doc.meta === 'object' && !Array.isArray(doc.meta)) ? doc.meta : {},
     active: doc?.active !== false,
     author: doc?.author,
-    isSystem: doc?.isSystem === true,
     deletedAt: doc?.deletedAt ?? null,
   }
 }

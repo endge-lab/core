@@ -1,12 +1,13 @@
 import type { AxiosInstance } from 'axios'
+import type { ManagedBy } from '@/domain/types/document'
 
 export interface IntegrationDoc {
   id: number | string
   identity: string
   displayName: string
   description?: string | null
-  folder?: number | string
-  isSystem?: boolean
+  managedBy?: ManagedBy
+  managedById?: string | null
 }
 
 export class Integrations_Repository {
@@ -37,8 +38,8 @@ export class Integrations_Repository {
     identity: string
     displayName: string
     description?: string | null
-    folder?: number | string
-    isSystem?: boolean
+    managedBy?: ManagedBy
+    managedById?: string | null
   }): Promise<IntegrationDoc> {
     const r = await this.api.post('/integrations', data)
     return r.data
@@ -51,40 +52,28 @@ export class Integrations_Repository {
       identity: string
       displayName: string
       description: string | null
-      folder: number | string
-      isSystem: boolean
+      managedBy: ManagedBy
+      managedById: string | null
     }>,
   ): Promise<IntegrationDoc> {
     const r = await this.api.patch(`/integrations/${id}`, data)
     return r.data
   }
 
-  /** Только смена папки: PATCH с полем folder. Возвращает обновлённый документ. */
-  async patchFolder(documentPayloadId: number | string, folderPayloadId: number | string | null): Promise<any> {
-    const r = await this.api.patch(`/integrations/${documentPayloadId}`, { folder: folderPayloadId })
-    return r.data
-  }
-
-  async changeFolder(identity: string, folderPayloadId: number | string | null): Promise<any> {
-    const existing = await this.findByIdentity(identity)
-    if (!existing) return null
-    return this.patchFolder((existing as any).id, folderPayloadId)
-  }
-
   async upsert(data: {
     identity: string
     displayName: string
     description?: string | null
-    folder?: number | string
-    isSystem?: boolean
+    managedBy?: ManagedBy
+    managedById?: string | null
   }): Promise<IntegrationDoc> {
     const existing = await this.findByIdentity(data.identity)
     if (!existing) return this.create(data)
     return this.update(existing.id, {
       displayName: data.displayName,
       description: data.description ?? null,
-      folder: data.folder,
-      ...(data.isSystem !== undefined && { isSystem: data.isSystem }),
+      ...(data.managedBy !== undefined && { managedBy: data.managedBy }),
+      ...(data.managedById !== undefined && { managedById: data.managedById }),
     })
   }
 }

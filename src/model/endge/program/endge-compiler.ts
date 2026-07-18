@@ -615,7 +615,7 @@ export class EndgeCompiler extends EndgeModule {
 
   /** Stable source order: system documents first, then authored documents by identity. */
   private _orderedStyles(): RStyle[] {
-    const rank = (style: RStyle) => style.isSystem ? 0 : 1
+    const rank = (style: RStyle) => style.managedBy === 'system' ? 0 : 1
     return Endge.domain.getStyles()
       .filter(style => style.active !== false && !style.deletedAt)
       .sort((left, right) => rank(left) - rank(right) || left.identity.localeCompare(right.identity))

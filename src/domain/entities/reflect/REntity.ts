@@ -1,5 +1,7 @@
 import { Exclude, Expose } from 'class-transformer'
 import type { DiagnosticsProblemInput } from '@/domain/types/diagnostics'
+import type { EntityManagement, EntityManagementLike, ManagedBy } from '@/domain/types/document/entity-management.type'
+import { normalizeEntityManagement } from '@/domain/types/document/entity-management.type'
 
 /** Опции для дублирования сущности: новый identity и опционально имя. */
 export interface DuplicateOptions {
@@ -39,9 +41,13 @@ export class REntity {
   @Expose()
   folderId?: string | number | null = null
 
-  /** Системный документ (нельзя редактировать/сохранять в редакторе) */
+  /** Кто управляет жизненным циклом документа. */
   @Expose()
-  isSystem: boolean = false
+  managedBy: ManagedBy = 'user'
+
+  /** Opaque installation ID; используется только для integration-managed документов. */
+  @Expose()
+  managedById: string | null = null
 
   /** Временная сущность runtime/editor, не должна отображаться как обычный документ домена. */
   @Exclude()
@@ -70,12 +76,19 @@ export class REntity {
 
   /** Подмешивает storage-мета и meta из Payload */
   applyStorageMeta(raw: any): void {
+    this.applyManagement(raw)
     this.createdAt = raw.createdAt ?? undefined
     this.updatedAt = raw.updatedAt ?? undefined
     this.deletedAt = raw.deletedAt ?? null
     this.author = raw.author ?? null
     this.active = raw.active ?? null
     this.meta = (raw?.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? { ...raw.meta } : {}
+  }
+
+  applyManagement(raw: EntityManagement | Record<string, unknown> | null | undefined): void {
+    const management = normalizeEntityManagement(raw as EntityManagementLike)
+    this.managedBy = management.managedBy
+    this.managedById = management.managedById
   }
 
   /** Возвращает текущие validation problems без сохранения mutable state в сущности. */

@@ -74,7 +74,8 @@ export class RComponentSFC extends RComponentCore {
       displayName: this.displayName,
       description: this.description,
       folderId: this.folderId ?? null,
-      isSystem: this.isSystem,
+      managedBy: this.managedBy,
+      managedById: this.managedById,
       meta: { ...this.meta },
       kind: this.kind,
       type: this.type,
@@ -97,7 +98,7 @@ export class RComponentSFC extends RComponentCore {
     component.name = String(raw?.name ?? component.displayName)
     component.description = raw?.description ?? null
     component.folderId = raw?.folderId ?? raw?.folder ?? null
-    component.isSystem = Boolean(raw?.isSystem ?? false)
+    component.applyManagement(raw)
     component.meta = normalizeMeta(raw?.meta)
     component.modelVersion = Number(raw?.modelVersion ?? 1)
     component.supportedTargets = normalizeTargets(raw?.supportedTargets)

@@ -1,8 +1,15 @@
 import type { AxiosInstance } from 'axios'
+import type { ManagedBy, WorkspaceIntegrationReference } from '@/domain/types/document'
 
 export type WorkspacePayloadData = {
   identity: string
   displayName: string
+  managedBy: ManagedBy
+  managedById: string | null
+  installedIntegrations: Array<{
+    integration: WorkspaceIntegrationReference['integrationId']
+    version: string
+  }>
   configuration: import('@/domain/types/configuration').EndgeConfiguration
 }
 
@@ -13,6 +20,7 @@ export class Workspaces_Repository {
     const requestParams = {
       limit: 0,
       sort: 'identity',
+      depth: 1,
       ...params,
     }
 

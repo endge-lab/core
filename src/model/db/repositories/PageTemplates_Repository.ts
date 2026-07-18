@@ -1,4 +1,5 @@
 import type { AxiosInstance } from 'axios'
+import type { ManagedBy } from '@/domain/types/document'
 
 export interface PageTemplatePreviewDoc {
   rows: string[][]
@@ -11,7 +12,8 @@ export interface PageTemplateDoc {
   displayName: string
   description?: string | null
   folder?: number | string
-  isSystem?: boolean
+  managedBy?: ManagedBy
+  managedById?: string | null
   areas?: Array<{
     identity: string
     title?: string | null
@@ -51,7 +53,8 @@ export class PageTemplates_Repository {
     displayName: string
     description?: string | null
     folder?: number | string
-    isSystem?: boolean
+    managedBy?: ManagedBy
+    managedById?: string | null
     areas?: PageTemplateDoc['areas']
     preview?: PageTemplatePreviewDoc | null
     meta?: Record<string, unknown>
@@ -67,7 +70,8 @@ export class PageTemplates_Repository {
       displayName: string
       description: string | null
       folder: number | string
-      isSystem: boolean
+      managedBy: ManagedBy
+      managedById: string | null
       areas: PageTemplateDoc['areas']
       preview: PageTemplatePreviewDoc | null
       meta: Record<string, unknown>
@@ -82,7 +86,8 @@ export class PageTemplates_Repository {
     displayName: string
     description?: string | null
     folder?: number | string
-    isSystem?: boolean
+    managedBy?: ManagedBy
+    managedById?: string | null
     areas?: PageTemplateDoc['areas']
     preview?: PageTemplatePreviewDoc | null
     meta?: Record<string, unknown>
@@ -93,11 +98,11 @@ export class PageTemplates_Repository {
       displayName: data.displayName,
       description: data.description ?? null,
       folder: data.folder,
-      ...(data.isSystem !== undefined && { isSystem: data.isSystem }),
+      ...(data.managedBy !== undefined && { managedBy: data.managedBy }),
+      ...(data.managedById !== undefined && { managedById: data.managedById }),
       ...(data.areas !== undefined && { areas: data.areas }),
       ...(data.preview !== undefined && { preview: data.preview }),
       ...(data.meta !== undefined && { meta: data.meta }),
     })
   }
 }
-

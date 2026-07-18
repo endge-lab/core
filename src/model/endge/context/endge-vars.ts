@@ -137,7 +137,8 @@ export class WorkspaceVariables {
   }
 
   /**
-   * Резолвит строку вида `{VAR}` в значение переменной и применяет optional coercion.
+   * Резолвит строку вида `{{ VAR }}` или legacy `{VAR}` в значение переменной
+   * и применяет optional coercion.
    */
   resolve<T = string>(
     raw: unknown,
@@ -221,7 +222,10 @@ export class WorkspaceVariables {
       return { ok: false, reason: 'not-a-braced-endgeToken' }
     }
 
-    let inner: string = s.slice(1, -1).trim()
+    const usesDoubleBraces = s.startsWith('{{') && s.endsWith('}}')
+    let inner: string = usesDoubleBraces
+      ? s.slice(2, -2).trim()
+      : s.slice(1, -1).trim()
     if (!inner)
       return { ok: false, reason: 'empty' }
     if (inner.includes('{') || inner.includes('}')) {

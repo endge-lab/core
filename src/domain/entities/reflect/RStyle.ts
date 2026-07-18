@@ -50,7 +50,7 @@ export class RStyle extends REntity {
     style.sourceVersion = Math.max(1, Number(json?.sourceVersion ?? 1) || 1)
     style.folderId = json?.folderId ?? relationToId(json?.folder) ?? null
     style.meta = isPlainObject(json?.meta) ? { ...json.meta } : {}
-    style.isSystem = json?.isSystem === true
+    style.applyManagement(json)
     style.active = json?.active ?? null
     style.deletedAt = json?.deletedAt ?? null
     style.author = json?.author ?? null
@@ -71,7 +71,8 @@ export class RStyle extends REntity {
       folderId: this.folderId ?? null,
       meta: this.meta ?? {},
       active: this.active !== false,
-      isSystem: this.isSystem === true,
+      managedBy: this.managedBy,
+      managedById: this.managedById,
       deletedAt: this.deletedAt ?? null,
       author: this.author ?? null,
     }

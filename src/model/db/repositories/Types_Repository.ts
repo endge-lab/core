@@ -1,4 +1,5 @@
 // app/repositories/Types_Repository.ts
+import type { ManagedBy } from '@/domain/types/document'
 import type { AxiosInstance } from 'axios'
 
 export class Types_Repository {
@@ -30,7 +31,8 @@ export class Types_Repository {
     folder?: string
     active?: boolean
     isPrimitive?: boolean
-    isSystem?: boolean
+    managedBy?: ManagedBy
+    managedById?: string | null
     meta?: Record<string, unknown>
   }) {
     const r = await this.api.post('/types', { ...data, meta: data.meta ?? {} })
@@ -48,7 +50,8 @@ export class Types_Repository {
       folder: string
       active: boolean
       isPrimitive: boolean
-      isSystem: boolean
+      managedBy: ManagedBy
+      managedById: string | null
       meta: Record<string, unknown>
     }>,
   ) {
@@ -64,7 +67,8 @@ export class Types_Repository {
     folder?: string
     active?: boolean
     isPrimitive?: boolean
-    isSystem?: boolean
+    managedBy?: ManagedBy
+    managedById?: string | null
     meta?: Record<string, unknown>
   }) {
     const existing = await this.findByIdentity(data.identity)

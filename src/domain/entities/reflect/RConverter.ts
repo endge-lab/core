@@ -1,12 +1,12 @@
 import { Exclude, Expose } from 'class-transformer'
 
 import { REntity } from '@/domain/entities/reflect/REntity'
+import type { EntityManagement } from '@/domain/types/document'
 
-export interface RConverterSchema {
+export interface RConverterSchema extends EntityManagement {
   id: number
   name: string
   description?: string | null
-  isSystem?: boolean
 }
 
 export class RConverter extends REntity {
@@ -32,7 +32,8 @@ export class RConverter extends REntity {
       id: this.id,
       name: this.name,
       description: this.description ?? null,
-      isSystem: this.isSystem,
+      managedBy: this.managedBy,
+      managedById: this.managedById,
     }
   }
 }

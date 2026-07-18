@@ -4,6 +4,7 @@ import { Expose } from 'class-transformer'
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
 import { REntity } from '@/domain/entities/reflect/REntity'
 import type { DomainDocumentType } from '@/domain/types/document/document.types'
+import type { EntityManagement } from '@/domain/types/document'
 
 export interface RPageTemplateAreaSchema {
   identity: string
@@ -19,11 +20,10 @@ export interface RPageTemplatePreviewSchema {
   rowHeights?: RPageTemplatePreviewRowHeight[]
 }
 
-export interface RPageTemplateSchema {
+export interface RPageTemplateSchema extends EntityManagement {
   id: string
   name: string
   description?: string | null
-  isSystem?: boolean
   areas?: RPageTemplateAreaSchema[]
   preview?: RPageTemplatePreviewSchema | null
   meta?: Record<string, unknown>
@@ -50,7 +50,8 @@ export class RPageTemplate extends REntity {
       id: this.id,
       name: this.name,
       description: this.description ?? null,
-      isSystem: this.isSystem,
+      managedBy: this.managedBy,
+      managedById: this.managedById,
       areas: this.areas?.length ? this.areas.map(a => ({ ...a })) : undefined,
       preview: this.preview ?? undefined,
       meta: this.meta && Object.keys(this.meta).length > 0 ? { ...this.meta } : undefined,
@@ -67,4 +68,3 @@ export class RPageTemplate extends REntity {
     return Serialize.fromJSON(RPageTemplate, plain)
   }
 }
-

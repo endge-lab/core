@@ -1,4 +1,5 @@
 import type { AxiosInstance } from 'axios'
+import type { ManagedBy } from '@/domain/types/document'
 
 export interface ConverterDoc {
   id: number
@@ -6,7 +7,8 @@ export interface ConverterDoc {
   displayName: string
   description?: string | null
   folder?: number | string
-  isSystem?: boolean
+  managedBy?: ManagedBy
+  managedById?: string | null
 }
 
 export class Converters_Repository {
@@ -39,7 +41,8 @@ export class Converters_Repository {
     displayName: string
     description?: string | null
     folder?: number | string
-    isSystem?: boolean
+    managedBy?: ManagedBy
+    managedById?: string | null
   }): Promise<ConverterDoc> {
     const r = await this.api.post('/converters', data)
     return r.data
@@ -53,7 +56,8 @@ export class Converters_Repository {
       displayName: string
       description: string | null
       folder: number | string
-      isSystem: boolean
+      managedBy: ManagedBy
+      managedById: string | null
     }>,
   ): Promise<ConverterDoc> {
     const r = await this.api.patch(`/converters/${id}`, data)
@@ -77,7 +81,8 @@ export class Converters_Repository {
     displayName: string
     description?: string | null
     folder?: number | string
-    isSystem?: boolean
+    managedBy?: ManagedBy
+    managedById?: string | null
   }): Promise<ConverterDoc> {
     const existing = await this.findByIdentity(data.identity)
     if (!existing) return this.create(data)
@@ -85,7 +90,8 @@ export class Converters_Repository {
       displayName: data.displayName,
       description: data.description ?? null,
       folder: data.folder,
-      ...(data.isSystem !== undefined && { isSystem: data.isSystem }),
+      ...(data.managedBy !== undefined && { managedBy: data.managedBy }),
+      ...(data.managedById !== undefined && { managedById: data.managedById }),
     })
   }
 }

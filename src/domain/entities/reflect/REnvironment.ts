@@ -23,7 +23,8 @@ export class REnvironment extends REntity {
       identity: this.identity,
       name: this.name,
       folderId: this.folderId ?? null,
-      isSystem: this.isSystem,
+      managedBy: this.managedBy,
+      managedById: this.managedById,
       configuration: this.configuration,
     }
   }

@@ -3,12 +3,13 @@ import { Expose } from 'class-transformer'
 
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
 import { REntity } from '@/domain/entities/reflect/REntity'
+import type { EntityManagement } from '@/domain/types/document'
 
-export interface RIntegrationSchema {
-  id: string
+export interface RIntegrationSchema extends EntityManagement {
+  id: string | number
+  identity: string
   name: string
   description?: string | null
-  isSystem?: boolean
 }
 
 /** Сущность интеграции (коллекция integrations). */
@@ -19,9 +20,11 @@ export class RIntegration extends REntity {
   toPlain(): RIntegrationSchema {
     return {
       id: this.id,
+      identity: this.identity,
       name: this.name,
       description: this.description ?? null,
-      isSystem: this.isSystem,
+      managedBy: this.managedBy,
+      managedById: this.managedById,
     }
   }
 
@@ -31,7 +34,6 @@ export class RIntegration extends REntity {
     plain.identity = options.identity
     plain.name = name
     plain.displayName = name
-    plain.folderId = null
     return Serialize.fromJSON(RIntegration, plain)
   }
 }

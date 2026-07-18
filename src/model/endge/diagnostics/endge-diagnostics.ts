@@ -24,6 +24,7 @@ import type {
 import {
   CONSOLE_DIAGNOSTICS_ADAPTER_FACTORY,
   DiagnosticsAdapterRegistry,
+  SENTRY_DIAGNOSTICS_ADAPTER_FACTORY,
 } from '@/model/adapters/diagnostics'
 import { EndgeProblems } from '@/model/endge/diagnostics/endge-problems'
 import { EndgeTelemetry } from '@/model/endge/diagnostics/endge-telemetry'
@@ -51,6 +52,7 @@ export class EndgeDiagnostics extends EndgeModule {
     super()
     this.adapters = new DiagnosticsAdapterRegistry()
     this.adapters.register(CONSOLE_DIAGNOSTICS_ADAPTER_FACTORY)
+    this.adapters.register(SENTRY_DIAGNOSTICS_ADAPTER_FACTORY)
     this.telemetry = new EndgeTelemetry(this.adapters)
     this.problems = new EndgeProblems()
     this.telemetry.subscribe(() => this.notify())

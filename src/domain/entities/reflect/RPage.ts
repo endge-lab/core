@@ -4,6 +4,7 @@ import { Expose } from 'class-transformer'
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
 import { REntity } from '@/domain/entities/reflect/REntity'
 import type { DomainDocumentType } from '@/domain/types/document/document.types'
+import type { EntityManagement } from '@/domain/types/document'
 
 export interface RPageAreaBlockSchema {
   key: string
@@ -22,12 +23,11 @@ export interface RPageAreaSchema {
   blocks?: RPageAreaBlockSchema[]
 }
 
-export interface RPageSchema {
+export interface RPageSchema extends EntityManagement {
   id: number
   identity: string
   name: string
   description?: string | null
-  isSystem?: boolean
   routeName?: string | null
   routePath?: string | null
   templateId?: number | null
@@ -67,7 +67,8 @@ export class RPage extends REntity {
       identity: this.identity,
       name: this.name,
       description: this.description ?? null,
-      isSystem: this.isSystem,
+      managedBy: this.managedBy,
+      managedById: this.managedById,
       routeName: this.routeName ?? null,
       routePath: this.routePath ?? null,
       templateId: this.templateId ?? null,

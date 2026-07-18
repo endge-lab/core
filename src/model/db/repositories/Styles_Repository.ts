@@ -1,4 +1,5 @@
 import type { AxiosInstance } from 'axios'
+import type { ManagedBy } from '@/domain/types/document'
 
 export interface StylesPayloadFields {
   identity: string
@@ -11,7 +12,8 @@ export interface StylesPayloadFields {
   author?: string | null
   active?: boolean
   deletedAt?: string | null
-  isSystem?: boolean
+  managedBy?: ManagedBy
+  managedById?: string | null
 }
 
 export interface StyleDoc extends StylesPayloadFields {

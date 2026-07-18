@@ -1,4 +1,5 @@
 /** Типы документа навигации из Payload (коллекция navigations). */
+import type { EntityManagement } from './entity-management.type'
 
 interface NavigationTreeNodeBaseDoc {
   id?: string | null
@@ -33,13 +34,12 @@ export type NavigationTreeNodeDoc =
   | NavigationLinkNodeDoc
 
 /** Документ навигации из Payload. */
-export interface NavigationDoc {
+export interface NavigationDoc extends EntityManagement {
   id: number | string
   identity: string
   displayName: string
   description?: string | null
   folder?: number | string
-  isSystem?: boolean
   tree?: NavigationTreeNodeDoc[]
   meta?: Record<string, unknown>
 }

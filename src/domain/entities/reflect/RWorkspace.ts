@@ -2,6 +2,7 @@ import type { EndgeConfiguration } from '@/domain/types/configuration'
 import type {
   EndgeWorkspaceDefinition,
   EndgeWorkspaceDefinitionInput,
+  WorkspaceIntegrationReference,
 } from '@/domain/types/document/workspace.types'
 
 import { Expose } from 'class-transformer'
@@ -16,6 +17,9 @@ export class RWorkspace extends REntity implements EndgeWorkspaceDefinition {
   @Expose()
   configuration!: EndgeConfiguration
 
+  @Expose()
+  installedIntegrations: WorkspaceIntegrationReference[] = []
+
   static fromPlain(input: unknown): RWorkspace {
     return createWorkspace(input)
   }
@@ -28,6 +32,9 @@ export class RWorkspace extends REntity implements EndgeWorkspaceDefinition {
     return {
       identity: this.identity,
       displayName: this.displayName,
+      managedBy: this.managedBy,
+      managedById: this.managedById,
+      installedIntegrations: this.installedIntegrations.map(item => ({ ...item })),
       configuration: JSON.parse(JSON.stringify(this.configuration)) as EndgeConfiguration,
     }
   }
@@ -50,9 +57,29 @@ function createWorkspace(input: unknown): RWorkspace {
   workspace.identity = identity
   workspace.name = displayName
   workspace.displayName = displayName
+  workspace.applyManagement(source)
+  workspace.installedIntegrations = normalizeInstalledIntegrations(source.installedIntegrations)
   workspace.configuration = normalizeEndgeConfiguration(source.configuration)
 
   return workspace
+}
+
+function normalizeInstalledIntegrations(value: unknown): WorkspaceIntegrationReference[] {
+  if (!Array.isArray(value)) return []
+
+  return value.flatMap((item) => {
+    if (!isRecord(item)) return []
+    const relationship = item.integration ?? item.integrationId
+    const integration = isRecord(relationship) ? relationship : null
+    const integrationId = integration?.id ?? relationship
+    const integrationIdentity = String(item.integrationIdentity ?? integration?.identity ?? '').trim()
+    const version = String(item.version ?? '').trim()
+
+    if ((typeof integrationId !== 'string' && typeof integrationId !== 'number') || !integrationIdentity || !version)
+      return []
+
+    return [{ integrationId, integrationIdentity, version }]
+  })
 }
 
 function requireText(value: unknown, field: string): string {

@@ -1,4 +1,5 @@
 import type { AxiosInstance } from 'axios'
+import type { ManagedBy } from '@/domain/types/document'
 
 /** Полиморфная связь Payload: relationTo + value (id документа коллекции). */
 export interface PageAreaBlockDoc {
@@ -24,7 +25,8 @@ export interface PageDoc {
   displayName: string
   description?: string | null
   folder?: number | string
-  isSystem?: boolean
+  managedBy?: ManagedBy
+  managedById?: string | null
   routeName?: string | null
   routePath?: string | null
   template?: number | string | { id: number | string; identity?: string }
@@ -64,7 +66,8 @@ export class Pages_Repository {
     displayName: string
     description?: string | null
     folder?: number | string
-    isSystem?: boolean
+    managedBy?: ManagedBy
+    managedById?: string | null
     routeName?: string | null
     routePath?: string | null
     template: number | string
@@ -84,7 +87,8 @@ export class Pages_Repository {
       displayName: string
       description: string | null
       folder: number | string
-      isSystem: boolean
+      managedBy: ManagedBy
+      managedById: string | null
       routeName: string | null
       routePath: string | null
       template: number | string | null
@@ -103,7 +107,8 @@ export class Pages_Repository {
     displayName: string
     description?: string | null
     folder?: number | string
-    isSystem?: boolean
+    managedBy?: ManagedBy
+    managedById?: string | null
     routeName?: string | null
     routePath?: string | null
     template: number | string
@@ -118,7 +123,8 @@ export class Pages_Repository {
       displayName: data.displayName,
       description: data.description ?? null,
       folder: data.folder,
-      ...(data.isSystem !== undefined && { isSystem: data.isSystem }),
+      ...(data.managedBy !== undefined && { managedBy: data.managedBy }),
+      ...(data.managedById !== undefined && { managedById: data.managedById }),
       routeName: data.routeName ?? null,
       routePath: data.routePath ?? null,
       template: data.template,

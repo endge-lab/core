@@ -1,4 +1,5 @@
 import type { AxiosInstance } from 'axios'
+import type { ManagedBy } from '@/domain/types/document'
 import type { NavigationDoc, NavigationTreeNodeDoc } from '@/domain/types/document/navigation.types'
 
 export class Navigations_Repository {
@@ -33,7 +34,8 @@ export class Navigations_Repository {
       displayName: string
       description: string | null
       folder: number | string | null
-      isSystem: boolean
+      managedBy: ManagedBy
+      managedById: string | null
       tree: NavigationTreeNodeDoc[]
       meta: Record<string, unknown>
     }>,
@@ -47,7 +49,8 @@ export class Navigations_Repository {
     displayName: string
     description?: string | null
     folder?: number | string
-    isSystem?: boolean
+    managedBy?: ManagedBy
+    managedById?: string | null
     tree?: NavigationTreeNodeDoc[]
     meta?: Record<string, unknown>
   }): Promise<NavigationDoc> {
@@ -58,7 +61,8 @@ export class Navigations_Repository {
       displayName: data.displayName,
       description: data.description ?? null,
       folder: data.folder ?? null,
-      ...(data.isSystem !== undefined && { isSystem: data.isSystem }),
+      ...(data.managedBy !== undefined && { managedBy: data.managedBy }),
+      ...(data.managedById !== undefined && { managedById: data.managedById }),
       ...(data.tree !== undefined && { tree: data.tree }),
       ...(data.meta !== undefined && { meta: data.meta }),
     })
@@ -69,7 +73,8 @@ export class Navigations_Repository {
     displayName: string
     description?: string | null
     folder?: number | string
-    isSystem?: boolean
+    managedBy?: ManagedBy
+    managedById?: string | null
     tree?: NavigationTreeNodeDoc[]
     meta?: Record<string, unknown>
   }): Promise<NavigationDoc> {

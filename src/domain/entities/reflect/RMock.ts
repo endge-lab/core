@@ -48,7 +48,7 @@ export class RMock extends REntity {
     mock.source = typeof json?.source === 'string' ? json.source : '{}'
     mock.codeRef = String(json?.codeRef ?? '').trim() || null
     mock.folderId = json?.folderId ?? relationToId(json?.folder) ?? null
-    mock.isSystem = json?.isSystem === true
+    mock.applyManagement(json)
     mock.meta = isPlainObject(json?.meta) ? { ...json.meta } : {}
     mock.active = json?.active !== false
     mock.deletedAt = json?.deletedAt ?? null
@@ -73,7 +73,8 @@ export class RMock extends REntity {
       folderId: this.folderId ?? null,
       meta: this.meta ?? {},
       active: this.active !== false,
-      isSystem: this.isSystem === true,
+      managedBy: this.managedBy,
+      managedById: this.managedById,
       deletedAt: this.deletedAt ?? null,
       author: this.author ?? null,
     }

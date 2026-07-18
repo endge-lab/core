@@ -41,7 +41,8 @@ export function ReflectComponentFromPlain(
     table.kind = base.kind
     table.type = base.type
     table.folderId = base.folderId ?? null
-    table.isSystem = base.isSystem
+    table.managedBy = base.managedBy
+    table.managedById = base.managedById
     ;(table as any).group = (base as any).group ?? base.folderId
     table.inputFields = base.inputFields
     table.setupScript = base.setupScript

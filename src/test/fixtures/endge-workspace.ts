@@ -3,6 +3,9 @@ import type { EndgeWorkspaceDefinition } from '@/domain/types/document/workspace
 export const TEST_ENDGE_WORKSPACE: EndgeWorkspaceDefinition = {
   identity: 'workspace-test',
   displayName: 'Test Workspace',
+  managedBy: 'user',
+  managedById: null,
+  installedIntegrations: [],
   configuration: {
     vars: [],
     locales: [

@@ -1,11 +1,13 @@
 import type { AxiosInstance } from 'axios'
+import type { ManagedBy } from '@/domain/types/document'
 
 export interface EnvironmentDoc {
   id: number | string
   identity: string
   displayName: string
   folder?: number | string
-  isSystem?: boolean
+  managedBy?: ManagedBy
+  managedById?: string | null
   configuration?: import('@/domain/types/configuration').EndgeConfigurationContribution
 }
 
@@ -37,7 +39,8 @@ export class Environments_Repository {
     identity: string
     displayName: string
     folder?: number | string
-    isSystem?: boolean
+    managedBy?: ManagedBy
+    managedById?: string | null
     configuration?: import('@/domain/types/configuration').EndgeConfigurationContribution
   }): Promise<EnvironmentDoc> {
     const r = await this.api.post('/environments', data)
@@ -50,7 +53,8 @@ export class Environments_Repository {
       identity: string
       displayName: string
       folder: number | string
-      isSystem: boolean
+      managedBy: ManagedBy
+      managedById: string | null
       configuration: import('@/domain/types/configuration').EndgeConfigurationContribution
     }>,
   ): Promise<EnvironmentDoc> {
@@ -79,7 +83,8 @@ export class Environments_Repository {
     identity: string
     displayName: string
     folder?: number | string
-    isSystem?: boolean
+    managedBy?: ManagedBy
+    managedById?: string | null
     configuration?: import('@/domain/types/configuration').EndgeConfigurationContribution
   }): Promise<EnvironmentDoc> {
     const existing = await this.findByIdentity(data.identity)
@@ -88,7 +93,8 @@ export class Environments_Repository {
     return this.update((existing as any).id, {
       displayName: data.displayName,
       folder: data.folder,
-      ...(data.isSystem !== undefined && { isSystem: data.isSystem }),
+      ...(data.managedBy !== undefined && { managedBy: data.managedBy }),
+      ...(data.managedById !== undefined && { managedById: data.managedById }),
       ...(data.configuration !== undefined && { configuration: data.configuration }),
     })
   }
