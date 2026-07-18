@@ -43,14 +43,14 @@ defineMetadata({
 ## Ports
 
 `definePorts` объявляет все типизированные границы Component SFC. Направление
-задаётся именованными секциями `request`, `provides` и `emits`; неиспользуемую
+задаётся именованными секциями `require`, `provides` и `emits`; неиспользуемую
 секцию можно не указывать. Отдельный
 persisted document для ports не создаётся: compiler сохраняет typed manifest и
 port calls в ComponentSFC artifact.
 
 | Секция | Смысл | Допустимые kinds |
 |---|---|---|
-| `request` | Компонент требует provider извне. | `computation`, `component`, `action` |
+| `require` | Компонент требует provider извне. | `computation`, `component`, `action` |
 | `provides` | Экземпляр компонента предоставляет вызываемое поведение. | `action` |
 | `emits` | Компонент публикует уведомление о произошедшем. | `event` |
 
@@ -80,7 +80,7 @@ interface CellProps {
 const props = defineProps<Props>()
 
 const ports = definePorts({
-  request: {
+  require: {
     state: computation<ProcessStateInput, ProcessState>({
       default: 'groundhandling-process-state',
     }),
@@ -100,7 +100,7 @@ const ports = definePorts({
   },
 })
 
-const state = ports.request.state({
+const state = ports.require.state({
   process: props.process,
 })
 </script>
@@ -113,38 +113,85 @@ const state = ports.request.state({
 Rules for v1:
 
 - разрешён один top-level `const ports = definePorts({...})`;
-- `request` port ссылается на внешний provider через обязательный `default`;
+- `require` port ссылается на внешний provider через обязательный `default`;
 - `provides` Action не содержит `default`: implementation принадлежит runtime
   экземпляру самого компонента;
 - `emits` Event не содержит provider и результата;
-- computation вызывается только как `ports.request.<name>(input)` в top-level
+- computation вызывается только как `ports.require.<name>(input)` в top-level
   `const` и получает один input object;
 - component port задаёт local tag, включая dotted form;
 - local component tag имеет приоритет над global user tag;
 - built-in tags (`Text`, `Flex`, `Component` и другие) запрещены для component ports;
-- defaults для requested ports проверяются на existence, active state и provider kind;
+- defaults для required ports проверяются на existence, active state и provider kind;
 - computation generic types сохраняются в manifest, но в v1 не сравниваются с
   опциональными persisted `RComputation.input/output`; несовместимость проявляется
   естественной runtime-ошибкой;
-- Composition overrides для requested ports и generic template event handlers
+- Composition overrides для required ports и generic template event handlers
   требуют отдельного binding syntax; они не маскируются неявными callbacks.
+
+### Forward
+
+`forward` повторно публикует public port manifests компонентов, смонтированных в
+локальном template scope текущего SFC. Compiler не анализирует их внутренние
+template-деревья. Результат разворачивается в обычные `require`, `provides` и
+`emits` текущего artifact; каждый forwarded port сохраняет origin с node id,
+literal `ref`, component identity/tag и исходным port name.
+
+Короткая форма прокидывает все направления всех локальных component bindings:
+
+```ts
+const ports = definePorts({
+  forward: '*',
+})
+```
+
+Выборочная форма разделяет направления внутри одного правила:
+
+```ts
+const ports = definePorts({
+  forward: [
+    {
+      from: 'departures',
+      ports: {
+        provides: ['table.column.*', 'table.sort.clearAll'],
+        emits: ['rowActivated'],
+      },
+    },
+    {
+      from: 'filters',
+      ports: {
+        require: ['loadDictionary'],
+        provides: ['filter.apply', 'filter.reset'],
+        emits: ['valueChanged'],
+      },
+    },
+  ],
+})
+```
+
+`from` принимает `"*"`, один literal `ref` или массив refs. `ports` принимает
+`"*"` либо object с независимыми selectors `require`, `provides`, `emits`.
+Selector может быть `"*"`, массивом exact identities/wildcards или object с
+`include`, `exclude`, `rename`, `namespace`. Отсутствующее направление не
+прокидывается. Коллизия с explicit или ранее forwarded port является build
+error `sfc-port-forward-collision`; selector без совпадений создаёт warning
+`sfc-port-forward-selection-empty`. Silent override не используется.
+
+В текущем runtime `forward` формирует public compiled contract и origin map.
+Маршрутизация внешнего вызова или подписки к конкретному mounted child остаётся
+за Composition binding layer; compiler не подменяет её скрытым DOM callback.
 
 ### Table Actions
 
-Inline context menu Table ссылается только на Actions, объявленные в
-`definePorts.provides`:
+Inline context menu Table может напрямую ссылаться на intrinsic Actions самой
+Table. Объявлять их повторно в `definePorts.provides` не требуется; `forward`
+нужен только для повторной публикации этих Actions наружу из Component SFC:
 
 ```vue
 <script setup lang="ts">
 defineProps<{ rows: unknown[] }>()
 
-const ports = definePorts({
-  provides: {
-    'table.sort.setColumnAsc': action<unknown, void>(),
-    'table.sort.clearAll': action<unknown, void>(),
-    'table.column.pinLeft': action<unknown, void>(),
-  },
-})
+const ports = definePorts({ forward: '*' })
 </script>
 
 <template>
@@ -160,8 +207,8 @@ const ports = definePorts({
 </template>
 ```
 
-Compiler отклоняет `MenuItem command="..."`, неизвестный Action и Action, не
-объявленный в `provides`. Runtime вызывает Action через единый
+Compiler отклоняет `MenuItem command="..."` и Action, которого нет среди
+intrinsic Table capabilities или explicit `provides`. Runtime вызывает Action через единый
 `Endge.runtime.actions`; mounted Table предоставляет target для sort и pin.
 
 Source computation должна экспортировать одну синхронную function с одним

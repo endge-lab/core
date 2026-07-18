@@ -44,12 +44,12 @@ interface ProcessOutput { value?: string, tone?: string }
 interface CellProps { point?: ProcessOutput }
 const props = defineProps<Props>()
 const ports = definePorts({
-  request: {
+  require: {
     state: computation<ProcessInput, ProcessOutput>({ default: 'process-state' }),
     cell: component<CellProps>({ tag: 'Process.Cell', default: 'process-cell' }),
   },
 })
-const state = ports.request.state({ value: props.value })
+const state = ports.require.state({ value: props.value })
 </script>
 <template><Process.Cell :point="state" /></template>`)
 
@@ -71,7 +71,7 @@ const state = ports.request.state({ value: props.value })
     })
   })
 
-  it('records requested Action defaults as program dependencies', () => {
+  it('records required Action defaults as program dependencies', () => {
     const openDetails = new RAction()
     openDetails.id = 7
     openDetails.identity = 'flight.open-details'
@@ -79,7 +79,7 @@ const state = ports.request.state({ value: props.value })
     Endge.domain.addAction(openDetails)
     Endge.domain.addComponentSFC(component(8, 'flight-table', `<script setup lang="ts">
 const ports = definePorts({
-  request: {
+  require: {
     openDetails: action<{ id: string }, void>({ default: 'flight.open-details' }),
   },
 })
@@ -93,6 +93,56 @@ const ports = definePorts({
       id: 'flight.open-details',
       identity: 'flight.open-details',
       role: 'port-default-action',
+    })
+  })
+
+  it('publishes forward collisions to the build diagnostics system', () => {
+    Endge.domain.addComponentSFC(component(9, 'table-collision', `<script setup lang="ts">
+const ports = definePorts({
+  forward: '*',
+})
+</script>
+<template>
+  <Table ref="departures" :rows="[]" />
+  <Table ref="arrivals" :rows="[]" />
+</template>`))
+
+    Endge.compiler.build({} as any)
+
+    expect(Endge.program.getArtifact('component-sfc', 'table-collision')?.status).toBe('error')
+    expect(Endge.diagnostics.problems.query({ entityIdentity: 'table-collision' })).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'sfc-port-forward-collision', severity: 'error' }),
+    ]))
+  })
+
+  it('resolves forwarded child manifests independently from component compile order', () => {
+    const parent = component(10, 'parent-public', `<script setup lang="ts">
+const ports = definePorts({
+  forward: '*',
+})
+</script>
+<template><Component ref="child" is="child-public" /></template>`)
+    const child = component(11, 'child-public', `<script setup lang="ts">
+const ports = definePorts({
+  provides: {
+    refresh: action<void, void>(),
+  },
+  emits: {
+    changed: event<{ id: string }>(),
+  },
+})
+</script>
+<template><Text>Child</Text></template>`)
+    Endge.domain.addComponentSFC(parent)
+    Endge.domain.addComponentSFC(child)
+
+    Endge.compiler.build({} as any)
+
+    const parentArtifact = Endge.program.getArtifact('component-sfc', 'parent-public')
+    expect(parentArtifact?.status).toBe('valid')
+    expect(parentArtifact?.payload.ir?.script.ports).toMatchObject({
+      provides: { actions: [{ name: 'refresh', forwardedFrom: { ref: 'child' } }] },
+      emits: { events: [{ name: 'changed', forwardedFrom: { ref: 'child' } }] },
     })
   })
 })

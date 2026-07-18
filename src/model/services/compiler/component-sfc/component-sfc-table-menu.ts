@@ -4,6 +4,7 @@ import type {
   RComponentSFC_IR_ElementNode,
   RComponentSFC_IR_Value,
 } from '@/domain/types/component/sfc'
+import { TABLE_RUNTIME_ACTION_IDS } from '@/domain/types/runtime/action.types'
 import type {
   ContextMenuDescriptor,
   ContextMenuItemDescriptor,
@@ -133,7 +134,7 @@ function createItemDescriptor(
     diagnostics.push({
       severity: 'error',
       code: 'sfc-table-column-menu-item-command-removed',
-      message: 'Атрибут command удалён. Объявите Action в definePorts.provides и используйте MenuItem action.',
+      message: 'Атрибут command удалён. Используйте MenuItem action с intrinsic Table Action или Action из definePorts.provides.',
       sourcePath: 'template.Table.ColumnMenu.MenuItem.command',
       start: node.sourceRange?.start,
       end: node.sourceRange?.end,
@@ -151,11 +152,14 @@ function createItemDescriptor(
     })
   }
 
-  if (action && providedActions && !providedActions.some(port => port.name === action)) {
+  const isIntrinsicTableAction = action
+    ? Object.values(TABLE_RUNTIME_ACTION_IDS).some(identity => identity === action)
+    : false
+  if (action && providedActions && !isIntrinsicTableAction && !providedActions.some(port => port.name === action)) {
     diagnostics.push({
       severity: 'error',
       code: 'sfc-table-column-menu-item-action-not-provided',
-      message: `Action "${action}" не объявлен в definePorts.provides.`,
+      message: `Action "${action}" не является capability Table и не объявлен в definePorts.provides.`,
       sourcePath: 'template.Table.ColumnMenu.MenuItem.action',
       start: node.sourceRange?.start,
       end: node.sourceRange?.end,

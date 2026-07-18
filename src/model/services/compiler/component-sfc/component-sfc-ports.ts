@@ -6,6 +6,9 @@ import type {
   ComponentSFCComputationPort,
   ComponentSFCActionPort,
   ComponentSFCEventPort,
+  ComponentSFCPortForwardRule,
+  ComponentSFCPortForwardSelector,
+  ComponentSFCPortRole,
   ComponentSFCPortManifest,
   ComponentSFCPortProviderDescriptor,
   RComponentSFC_AST_Script,
@@ -140,6 +143,7 @@ function parsePortManifest(
   }
 
   const roles = new Map<string, any>()
+  let hasForward = false
   for (const property of object.properties ?? []) {
     if (property.type !== 'ObjectProperty' || property.computed) {
       diagnostics.push(makeDiagnostic(
@@ -151,10 +155,33 @@ function parsePortManifest(
       continue
     }
     const role = readKey(property.key)
-    if (!role || !['request', 'provides', 'emits'].includes(role) || roles.has(role)) {
+    if (role === 'request') {
+      diagnostics.push(makeDiagnostic(
+        'sfc-port-request-renamed',
+        'Секция definePorts.request переименована в definePorts.require.',
+        property,
+        script,
+      ))
+      continue
+    }
+    if (role === 'forward') {
+      if (hasForward) {
+        diagnostics.push(makeDiagnostic(
+          'sfc-port-forward-duplicate',
+          'definePorts допускает только одно поле forward.',
+          property,
+          script,
+        ))
+        continue
+      }
+      hasForward = true
+      parseForwardDefinition(property.value, property, script, manifest, diagnostics)
+      continue
+    }
+    if (!role || !['require', 'provides', 'emits'].includes(role) || roles.has(role)) {
       diagnostics.push(makeDiagnostic(
         'sfc-port-role-invalid',
-        `definePorts поддерживает только уникальные секции request, provides и emits; получено "${role ?? ''}".`,
+        `definePorts поддерживает только уникальные секции require, provides, emits и forward; получено "${role ?? ''}".`,
         property,
         script,
       ))
@@ -174,7 +201,7 @@ function parsePortManifest(
 
   const names = new Set<string>()
   const tags = new Set<string>()
-  for (const role of ['request', 'provides', 'emits'] as const) {
+  for (const role of ['require', 'provides', 'emits'] as const) {
     const roleObject = roles.get(role)
     if (!roleObject) continue
 
@@ -210,7 +237,7 @@ function parsePortManifest(
             : isCall(definition, 'event')
               ? 'event'
               : null
-      const allowed = role === 'request'
+      const allowed = role === 'require'
         ? ['computation', 'component', 'action']
         : role === 'provides'
           ? ['action']
@@ -273,7 +300,7 @@ function parsePortManifest(
       if (definition.arguments?.length !== 1 || config?.type !== 'ObjectExpression') {
         diagnostics.push(makeDiagnostic(
           'sfc-port-config-required',
-          `Requested port "${name}" должен содержать один config object.`,
+          `Required port "${name}" должен содержать один config object.`,
           definition,
           script,
         ))
@@ -283,7 +310,7 @@ function parsePortManifest(
       if (!defaultIdentity) {
         diagnostics.push(makeDiagnostic(
           'sfc-port-default-required',
-          `Requested port "${name}" должен содержать непустой string default.`,
+          `Required port "${name}" должен содержать непустой string default.`,
           config,
           script,
         ))
@@ -303,7 +330,7 @@ function parsePortManifest(
           outputType: typeSources[1]!,
           sourceRange: toRange(property, script),
         }
-        manifest.request.computations.push(port)
+        manifest.require.computations.push(port)
         dependencies.computations.push({ source: 'computation', id: defaultIdentity, role: 'port-default-computation' })
         validateProvider(port, options, diagnostics, property, script)
         continue
@@ -335,7 +362,7 @@ function parsePortManifest(
           inputs,
           sourceRange: toRange(property, script),
         }
-        manifest.request.components.push(port)
+        manifest.require.components.push(port)
         dependencies.components.push({ source: 'component-sfc', id: defaultIdentity, role: 'port-default-component' })
         validateProvider(port, options, diagnostics, property, script)
         continue
@@ -347,18 +374,272 @@ function parsePortManifest(
       }
       const port: ComponentSFCActionPort = {
         kind: 'action',
-        role: 'request',
+        role: 'require',
         name,
         defaultIdentity,
         inputType: typeSources[0]!,
         outputType: typeSources[1]!,
         sourceRange: toRange(property, script),
       }
-      manifest.request.actions.push(port)
+      manifest.require.actions.push(port)
       dependencies.actions.push(defaultIdentity)
       validateProvider(port, options, diagnostics, property, script)
     }
   }
+}
+
+function parseForwardDefinition(
+  definition: any,
+  node: any,
+  script: RComponentSFC_AST_Script,
+  manifest: ComponentSFCPortManifest,
+  diagnostics: RComponentDiagnostic[],
+): void {
+  if (definition?.type === 'StringLiteral' && definition.value === '*') {
+    manifest.forward.rules.push(createForwardAllRule(toRange(node, script)))
+    return
+  }
+
+  const definitions = definition?.type === 'ArrayExpression'
+    ? definition.elements ?? []
+    : [definition]
+
+  if (definition?.type !== 'ObjectExpression' && definition?.type !== 'ArrayExpression') {
+    diagnostics.push(makeDiagnostic(
+      'sfc-port-forward-shape',
+      'definePorts.forward должен быть "*", object rule или массивом object rules.',
+      definition ?? node,
+      script,
+    ))
+    return
+  }
+
+  for (const item of definitions) {
+    const rule = parseForwardRule(item, script, diagnostics)
+    if (rule)
+      manifest.forward.rules.push(rule)
+  }
+}
+
+function parseForwardRule(
+  definition: any,
+  script: RComponentSFC_AST_Script,
+  diagnostics: RComponentDiagnostic[],
+): ComponentSFCPortForwardRule | null {
+  if (definition?.type !== 'ObjectExpression') {
+    diagnostics.push(makeDiagnostic(
+      'sfc-port-forward-rule-object',
+      'Каждое правило definePorts.forward должно быть object literal.',
+      definition,
+      script,
+    ))
+    return null
+  }
+
+  const fromNode = readObjectPropertyValue(definition, 'from')
+  const from = readForwardSources(fromNode)
+  if (!from) {
+    diagnostics.push(makeDiagnostic(
+      'sfc-port-forward-from',
+      'Forward rule требует from: "*", literal ref или массив literal refs.',
+      fromNode ?? definition,
+      script,
+    ))
+    return null
+  }
+
+  const portsNode = readObjectPropertyValue(definition, 'ports')
+  const ports = portsNode == null
+    ? createForwardAllPorts()
+    : parseForwardPorts(portsNode, script, diagnostics)
+  if (!ports)
+    return null
+
+  const namespaceNode = readObjectPropertyValue(definition, 'namespace')
+  const namespace = namespaceNode == null ? 'none' : readLiteralString(namespaceNode)
+  if (namespace == null) {
+    diagnostics.push(makeDiagnostic(
+      'sfc-port-forward-namespace',
+      'Forward namespace должен быть literal string.',
+      namespaceNode,
+      script,
+    ))
+    return null
+  }
+
+  return {
+    from,
+    ports,
+    namespace,
+    sourceRange: toRange(definition, script),
+  }
+}
+
+function parseForwardPorts(
+  definition: any,
+  script: RComponentSFC_AST_Script,
+  diagnostics: RComponentDiagnostic[],
+): ComponentSFCPortForwardRule['ports'] | null {
+  if (definition?.type === 'StringLiteral' && definition.value === '*')
+    return createForwardAllPorts()
+
+  if (definition?.type !== 'ObjectExpression') {
+    diagnostics.push(makeDiagnostic(
+      'sfc-port-forward-ports',
+      'Forward ports должен быть "*" или object с секциями require, provides и emits.',
+      definition,
+      script,
+    ))
+    return null
+  }
+
+  const result: ComponentSFCPortForwardRule['ports'] = {}
+  const roles = new Set<ComponentSFCPortRole>()
+  for (const property of definition.properties ?? []) {
+    if (property.type !== 'ObjectProperty' || property.computed) {
+      diagnostics.push(makeDiagnostic('sfc-port-forward-ports-property', 'Forward ports допускает только обычные properties.', property, script))
+      continue
+    }
+    const rawRole = readKey(property.key)
+    if (rawRole === 'request') {
+      diagnostics.push(makeDiagnostic('sfc-port-request-renamed', 'Forward ports.request переименован в ports.require.', property, script))
+      continue
+    }
+    if (!rawRole || !['require', 'provides', 'emits'].includes(rawRole) || roles.has(rawRole as ComponentSFCPortRole)) {
+      diagnostics.push(makeDiagnostic(
+        'sfc-port-forward-role',
+        `Forward ports поддерживает уникальные require, provides и emits; получено "${rawRole ?? ''}".`,
+        property,
+        script,
+      ))
+      continue
+    }
+    const role = rawRole as ComponentSFCPortRole
+    roles.add(role)
+    const selector = parseForwardSelector(property.value, script, diagnostics)
+    if (selector)
+      result[role] = selector
+  }
+  return result
+}
+
+function parseForwardSelector(
+  definition: any,
+  script: RComponentSFC_AST_Script,
+  diagnostics: RComponentDiagnostic[],
+): ComponentSFCPortForwardSelector | null {
+  if (definition?.type === 'StringLiteral' && definition.value === '*')
+    return createForwardAllSelector()
+
+  const literalNames = readLiteralStringArray(definition)
+  if (literalNames) {
+    return {
+      include: literalNames,
+      exclude: [],
+      rename: {},
+    }
+  }
+
+  if (definition?.type !== 'ObjectExpression') {
+    diagnostics.push(makeDiagnostic(
+      'sfc-port-forward-selector',
+      'Forward selector должен быть "*", массивом port identities или object selector.',
+      definition,
+      script,
+    ))
+    return null
+  }
+
+  const includeNode = readObjectPropertyValue(definition, 'include')
+  const include = includeNode == null
+    ? '*'
+    : includeNode.type === 'StringLiteral' && includeNode.value === '*'
+      ? '*'
+      : readLiteralStringArray(includeNode)
+  const excludeNode = readObjectPropertyValue(definition, 'exclude')
+  const exclude = excludeNode == null ? [] : readLiteralStringArray(excludeNode)
+  const renameNode = readObjectPropertyValue(definition, 'rename')
+  const rename = renameNode == null ? {} : readLiteralStringMap(renameNode)
+  const namespaceNode = readObjectPropertyValue(definition, 'namespace')
+  const namespace = namespaceNode == null ? undefined : readLiteralString(namespaceNode) ?? undefined
+
+  if (include == null || exclude == null || rename == null || (namespaceNode != null && namespace == null)) {
+    diagnostics.push(makeDiagnostic(
+      'sfc-port-forward-selector-shape',
+      'Forward selector использует literal include, exclude, rename и namespace.',
+      definition,
+      script,
+    ))
+    return null
+  }
+
+  return { include, exclude, rename, namespace }
+}
+
+function createForwardAllRule(sourceRange?: ReturnType<typeof toRange>): ComponentSFCPortForwardRule {
+  return {
+    from: '*',
+    ports: createForwardAllPorts(),
+    namespace: 'none',
+    sourceRange,
+  }
+}
+
+function createForwardAllPorts(): ComponentSFCPortForwardRule['ports'] {
+  return {
+    require: createForwardAllSelector(),
+    provides: createForwardAllSelector(),
+    emits: createForwardAllSelector(),
+  }
+}
+
+function createForwardAllSelector(): ComponentSFCPortForwardSelector {
+  return { include: '*', exclude: [], rename: {} }
+}
+
+function readForwardSources(node: any): '*' | string[] | null {
+  if (node?.type === 'StringLiteral')
+    return node.value === '*' ? '*' : node.value.trim() ? [node.value.trim()] : null
+  const values = readLiteralStringArray(node)
+  if (!values?.length || values.includes('*'))
+    return null
+  return values
+}
+
+function readLiteralStringArray(node: any): string[] | null {
+  if (node?.type !== 'ArrayExpression') return null
+  const result: string[] = []
+  for (const item of node.elements ?? []) {
+    const value = readLiteralString(item)
+    if (!value) return null
+    result.push(value)
+  }
+  return result
+}
+
+function readLiteralStringMap(node: any): Record<string, string> | null {
+  if (node?.type !== 'ObjectExpression') return null
+  const result: Record<string, string> = {}
+  for (const property of node.properties ?? []) {
+    if (property.type !== 'ObjectProperty' || property.computed) return null
+    const key = readKey(property.key)
+    const value = readLiteralString(property.value)
+    if (!key || !value) return null
+    result[key] = value
+  }
+  return result
+}
+
+function readObjectPropertyValue(object: any, name: string): any | null {
+  for (const property of object?.properties ?? []) {
+    if (property.type === 'ObjectProperty' && !property.computed && readKey(property.key) === name)
+      return property.value
+  }
+  return null
+}
+
+function readLiteralString(node: any): string | null {
+  return node?.type === 'StringLiteral' ? node.value.trim() || null : null
 }
 
 function parsePortCalls(
@@ -370,8 +651,8 @@ function parsePortCalls(
   diagnostics: RComponentDiagnostic[],
 ): void {
   const portsByName = new Map<string, ComponentSFCComputationPort | ComponentSFCComponentPort>()
-  for (const port of manifest.request.computations) portsByName.set(port.name, port)
-  for (const port of manifest.request.components) portsByName.set(port.name, port)
+  for (const port of manifest.require.computations) portsByName.set(port.name, port)
+  for (const port of manifest.require.components) portsByName.set(port.name, port)
   const props = parseComponentSFCProps(script)
   const locals = script.bindings.map(binding => binding.name)
   const topLevelCalls = new Set<number>()
@@ -383,7 +664,7 @@ function parsePortCalls(
       if (!isPortCall(init, bindingName)) continue
       if (typeof init.start === 'number') topLevelCalls.add(init.start)
       const local = declaration.id?.type === 'Identifier' ? declaration.id.name : ''
-      const portName = readRequestedPortCallName(init, bindingName)
+      const portName = readRequiredPortCallName(init, bindingName)
       const port = portName ? portsByName.get(portName) : null
       if (statement.kind !== 'const' || !local) {
         diagnostics.push(makeDiagnostic(
@@ -551,15 +832,15 @@ function isCall(node: any, name: string): boolean {
 }
 
 function isPortCall(node: any, bindingName: string): boolean {
-  return readRequestedPortCallName(node, bindingName) != null
+  return readRequiredPortCallName(node, bindingName) != null
 }
 
-function readRequestedPortCallName(node: any, bindingName: string): string | null {
+function readRequiredPortCallName(node: any, bindingName: string): string | null {
   const callee = node?.type === 'CallExpression' ? node.callee : null
   const roleMember = callee?.type === 'MemberExpression' ? callee.object : null
   if (roleMember?.type !== 'MemberExpression') return null
   if (roleMember.object?.type !== 'Identifier' || roleMember.object.name !== bindingName) return null
-  if (readKey(roleMember.property) !== 'request') return null
+  if (readKey(roleMember.property) !== 'require') return null
   return readKey(callee.property)
 }
 

@@ -16,6 +16,7 @@ import type {
   RComponentSFC_AST,
   RComponentSFC_IR,
   RComponentSFC_RuntimeDependencies,
+  ComponentSFCPortManifest,
   ComponentSFCPortProviderDescriptor,
 } from '@/domain/types/component/sfc'
 import type { ProgramMetadata } from '@/domain/types/program/program-metadata.types'
@@ -27,6 +28,7 @@ import { compileComponentSFCTemplate } from '@/model/services/compiler/component
 import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component/sfc'
 import { createEmptyProgramMetadata } from '@/domain/types/program/program-metadata.types'
 import { analyzeComponentSFCPorts } from '@/model/services/compiler/component-sfc/component-sfc-ports'
+import { resolveComponentSFCPortForwards } from '@/model/services/compiler/component-sfc/component-sfc-forward'
 
 /** Результат полного SFC compiler pipeline в core. */
 export interface ComponentSFCCompileResult {
@@ -79,6 +81,9 @@ export interface ComponentSFCCompileOptions {
     identity: string,
     expectedKind: 'computation' | 'component' | 'action',
   ) => ComponentSFCPortProviderDescriptor | null
+
+  /** Resolves the compiled public port manifest of a nested SFC component. */
+  resolveComponentPortManifest?: (identity: string) => ComponentSFCPortManifest | null
 }
 
 /** Компилирует Endge SFC source до target-neutral artifact для Endge.program. */
@@ -116,23 +121,30 @@ export function compileComponentSFC(
   const templateResult = compileComponentSFCTemplate(parseResult.ast.template, {
     props: scriptResult.props.map(prop => prop.name),
     locals: templateLocals.map(local => local.name),
-    componentPorts: portResult.manifest.request.components,
+    componentPorts: portResult.manifest.require.components,
     providedActions: portResult.manifest.provides.actions,
     resolveComponentTag: options.resolveComponentTag,
     hasComponentIdentity: options.hasComponentIdentity,
   })
+  const forwardResult = resolveComponentSFCPortForwards(
+    portResult.manifest,
+    templateResult.template,
+    { resolveComponentPortManifest: options.resolveComponentPortManifest },
+  )
   const styleResult = compileComponentSFCStyle(parseResult.ast.style, { identity: options.identity })
 
   diagnostics.push(
     ...scriptResult.diagnostics,
     ...portResult.diagnostics,
     ...templateResult.diagnostics,
+    ...forwardResult.diagnostics,
     ...styleResult.diagnostics,
   )
 
   const dependencies = mergeDependencies(
     createEmptyComponentDependencies(),
     portResult.dependencies,
+    forwardResult.dependencies,
     templateResult.dependencies,
   )
 

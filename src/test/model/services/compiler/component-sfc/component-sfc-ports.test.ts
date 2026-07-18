@@ -22,7 +22,7 @@ interface CellProps {
 const props = defineProps<Props>()
 
 const ports = definePorts({
-  request: {
+  require: {
     state: computation<ProcessStateInput, ProcessState>({
       default: 'groundhandling-process-state',
     }),
@@ -33,7 +33,7 @@ const ports = definePorts({
   },
 })
 
-const state = ports.request.state({ process: props.process })
+const state = ports.require.state({ process: props.process })
 </script>
 
 <template>
@@ -41,12 +41,134 @@ const state = ports.request.state({ process: props.process })
 </template>`
 
 describe('ComponentSFC ports compiler', () => {
-  it('compiles requested and provided Actions plus emitted Events into one manifest', () => {
+  it('forwards all intrinsic public Table Actions with forward wildcard', () => {
+    const result = compileComponentSFC(`<script setup lang="ts">
+const ports = definePorts({
+  forward: '*',
+})
+</script>
+<template><Table ref="departures" :rows="[]" /></template>`)
+
+    expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
+    expect(result.ir?.script.ports.provides.actions).toHaveLength(9)
+    expect(result.ir?.script.ports.provides.actions).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: 'table.column.pinLeft',
+        forwardedFrom: expect.objectContaining({ ref: 'departures', componentTag: 'Table' }),
+      }),
+      expect.objectContaining({ name: 'table.sort.clearAll' }),
+    ]))
+  })
+
+  it('forwards different port selections from different component refs', () => {
+    const first = compileComponentSFC(`<script setup lang="ts">
+const ports = definePorts({
+  provides: {
+    'first.keep': action<unknown, void>(),
+    'first.skip': action<unknown, void>(),
+  },
+  emits: {
+    firstChanged: event<{ id: string }>(),
+  },
+})
+</script>
+<template><Text>First</Text></template>`).ir!.script.ports
+    const second = compileComponentSFC(`<script setup lang="ts">
+const ports = definePorts({
+  provides: {
+    'second.keep': action<unknown, void>(),
+    'second.skip': action<unknown, void>(),
+  },
+  emits: {
+    secondChanged: event<void>(),
+  },
+})
+</script>
+<template><Text>Second</Text></template>`).ir!.script.ports
+
+    const result = compileComponentSFC(`<script setup lang="ts">
+const ports = definePorts({
+  forward: [
+    {
+      from: 'first',
+      ports: {
+        provides: ['first.keep'],
+        emits: ['firstChanged'],
+      },
+    },
+    {
+      from: 'second',
+      ports: {
+        provides: ['second.keep'],
+      },
+    },
+  ],
+})
+</script>
+<template>
+  <First.Child ref="first" />
+  <Second.Child ref="second" />
+</template>`, {
+      resolveComponentTag: tag => ({
+        'First.Child': 'first-child',
+        'Second.Child': 'second-child',
+      })[tag] ?? null,
+      resolveComponentPortManifest: identity => ({
+        'first-child': first,
+        'second-child': second,
+      })[identity] ?? null,
+    })
+
+    expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
+    expect(result.ir?.script.ports.provides.actions.map(port => port.name)).toEqual([
+      'first.keep',
+      'second.keep',
+    ])
+    expect(result.ir?.script.ports.emits.events.map(port => port.name)).toEqual(['firstChanged'])
+    expect(result.contract.events).toEqual([{ name: 'firstChanged', payloadType: '{ id: string }' }])
+  })
+
+  it('reports forward collisions and unmatched selectors as build diagnostics', () => {
+    const result = compileComponentSFC(`<script setup lang="ts">
+const ports = definePorts({
+  forward: [
+    { from: 'departures', ports: { provides: '*' } },
+    { from: 'arrivals', ports: { provides: ['table.column.pinLeft', 'table.unknown'] } },
+  ],
+})
+</script>
+<template>
+  <Table ref="departures" :rows="[]" />
+  <Table ref="arrivals" :rows="[]" />
+</template>`)
+
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'sfc-port-forward-collision', severity: 'error' }),
+      expect.objectContaining({ code: 'sfc-port-forward-selection-empty', severity: 'warning' }),
+    ]))
+  })
+
+  it('rejects the removed request section with a targeted migration diagnostic', () => {
+    const result = compileComponentSFC(`<script setup lang="ts">
+const ports = definePorts({
+  request: {
+    open: action<unknown, void>({ default: 'open' }),
+  },
+})
+</script>
+<template><Text>Invalid</Text></template>`)
+
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'sfc-port-request-renamed', severity: 'error' }),
+    ]))
+  })
+
+  it('compiles required and provided Actions plus emitted Events into one manifest', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 interface OpenInput { id: string }
 interface RowActivated { id: string }
 const ports = definePorts({
-  request: {
+  require: {
     openDetails: action<OpenInput, void>({ default: 'flight.open-details' }),
   },
   provides: {
@@ -69,7 +191,7 @@ const ports = definePorts({
 
     expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
     expect(result.ir?.script.ports).toMatchObject({
-      request: { actions: [{ name: 'openDetails', defaultIdentity: 'flight.open-details' }] },
+      require: { actions: [{ name: 'openDetails', defaultIdentity: 'flight.open-details' }] },
       provides: { actions: [{ name: 'table.sort.clearAll' }] },
       emits: { events: [{ name: 'rowActivated', payloadType: 'RowActivated' }] },
     })
@@ -101,7 +223,7 @@ const ports = definePorts({
       expect.objectContaining({ name: 'process', type: 'GroundHandlingOperation', optional: true }),
     ])
     expect(result.ir?.script.ports).toMatchObject({
-      request: {
+      require: {
         computations: [{ name: 'state', defaultIdentity: 'groundhandling-process-state' }],
         components: [{ name: 'cell', tag: 'GroundHandling.Cell', defaultIdentity: 'groundhandling-process-cell' }],
       },
@@ -135,7 +257,7 @@ interface Input { value?: string }
 interface Output { tone?: string }
 interface Props { value?: string }
 const ports = definePorts({
-  request: {
+  require: {
     state: computation<Input, Output>({}),
     cell: component<Props>({ tag: 'Text', default: 'wrong-kind' }),
     other: component<Props>({ tag: 'GroundHandling.Other', default: 'wrong-kind' }),
@@ -162,7 +284,7 @@ const ports = definePorts({
   it('reports an unknown port call with a source range', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 const ports = definePorts({})
-const state = ports.request.unknown({})
+const state = ports.require.unknown({})
 </script>
 <template><Text>{{ state }}</Text></template>`)
 
@@ -181,13 +303,13 @@ const state = ports.request.unknown({})
 interface Input { value?: string }
 interface Output { value?: string }
 const ports = definePorts({
-  request: {
+  require: {
     state: computation<Input, Output>({ default: 'state' }),
   },
 })
 function invalid() {
   definePorts({})
-  return ports.request.state({ value: 'nested' })
+  return ports.require.state({ value: 'nested' })
 }
 </script>
 <template><Text>invalid</Text></template>`)
@@ -204,7 +326,7 @@ interface Input { value?: string }
 interface Output { tone?: string }
 interface Props { value?: string }
 const ports = definePorts({
-  request: {
+  require: {
     missing: computation<Input, Output>({ default: 'missing' }),
     state: computation<Input, Output>({ default: 'wrong-contract' }),
     cell: component<Props>({ tag: 'Local.Cell', default: 'inactive-cell' }),

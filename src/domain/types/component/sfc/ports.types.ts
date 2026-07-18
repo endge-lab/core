@@ -3,8 +3,33 @@ import type { RComponentContractInput } from '@/domain/types/component/component
 import type { RComponentSFC_IR_Value } from './ir.types'
 import type { RComponentSFC_SourceRange } from './location.types'
 
-export type ComponentSFCPortRole = 'request' | 'provides' | 'emits'
+export type ComponentSFCPortRole = 'require' | 'provides' | 'emits'
 export type ComponentSFCPortKind = 'computation' | 'component' | 'action' | 'event'
+
+/** Public child port selected by a compile-time `definePorts.forward` rule. */
+export interface ComponentSFCPortForwardOrigin {
+  nodeId: string
+  ref?: string
+  componentIdentity?: string
+  componentTag: string
+  portName: string
+}
+
+/** Normalized selector for one port direction inside a forward rule. */
+export interface ComponentSFCPortForwardSelector {
+  include: '*' | string[]
+  exclude: string[]
+  rename: Record<string, string>
+  namespace?: 'none' | 'ref' | string
+}
+
+/** Compile-time forwarding rule persisted in the Component SFC artifact. */
+export interface ComponentSFCPortForwardRule {
+  from: '*' | string[]
+  ports: Partial<Record<ComponentSFCPortRole, ComponentSFCPortForwardSelector>>
+  namespace: 'none' | 'ref' | string
+  sourceRange?: RComponentSFC_SourceRange
+}
 
 /** Default provider descriptor, supplied by the domain build boundary. */
 export type ComponentSFCPortProviderDescriptor
@@ -36,6 +61,7 @@ export interface ComponentSFCComputationPort {
   defaultIdentity: string
   inputType: string
   outputType: string
+  forwardedFrom?: ComponentSFCPortForwardOrigin
   sourceRange?: RComponentSFC_SourceRange
 }
 
@@ -47,17 +73,19 @@ export interface ComponentSFCComponentPort {
   defaultIdentity: string
   propsType: string
   inputs: RComponentContractInput[]
+  forwardedFrom?: ComponentSFCPortForwardOrigin
   sourceRange?: RComponentSFC_SourceRange
 }
 
 /** Callable Action required from the outside or provided by this component. */
 export interface ComponentSFCActionPort {
   kind: 'action'
-  role: 'request' | 'provides'
+  role: 'require' | 'provides'
   name: string
   inputType: string
   outputType: string
   defaultIdentity?: string
+  forwardedFrom?: ComponentSFCPortForwardOrigin
   sourceRange?: RComponentSFC_SourceRange
 }
 
@@ -67,10 +95,11 @@ export interface ComponentSFCEventPort {
   role: 'emits'
   name: string
   payloadType: string
+  forwardedFrom?: ComponentSFCPortForwardOrigin
   sourceRange?: RComponentSFC_SourceRange
 }
 
-export interface ComponentSFCRequestedPorts {
+export interface ComponentSFCRequiredPorts {
   computations: ComponentSFCComputationPort[]
   components: ComponentSFCComponentPort[]
   actions: ComponentSFCActionPort[]
@@ -86,9 +115,12 @@ export interface ComponentSFCEmittedPorts {
 
 /** Typed port manifest stored in the compiled ComponentSFC artifact. */
 export interface ComponentSFCPortManifest {
-  request: ComponentSFCRequestedPorts
+  require: ComponentSFCRequiredPorts
   provides: ComponentSFCProvidedPorts
   emits: ComponentSFCEmittedPorts
+  forward: {
+    rules: ComponentSFCPortForwardRule[]
+  }
 }
 
 /** One top-level local initialized through a computation port call. */
@@ -110,7 +142,7 @@ export interface RComponentSFC_IR_ComponentPortMarker {
 
 export function createEmptyComponentSFCPortManifest(): ComponentSFCPortManifest {
   return {
-    request: {
+    require: {
       computations: [],
       components: [],
       actions: [],
@@ -120,6 +152,9 @@ export function createEmptyComponentSFCPortManifest(): ComponentSFCPortManifest 
     },
     emits: {
       events: [],
+    },
+    forward: {
+      rules: [],
     },
   }
 }

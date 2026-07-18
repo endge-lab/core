@@ -78,7 +78,7 @@ describe('Component SFC table column menu', () => {
     `))
     const undeclared = compileComponentSFC(createTableSource(`
       <ColumnMenu>
-        <MenuItem action="table.column.pinLeft" label="Закрепить" />
+        <MenuItem action="flight.open" label="Открыть" />
       </ColumnMenu>
       <Column key="number" title="Flight" pinnable />
     `))

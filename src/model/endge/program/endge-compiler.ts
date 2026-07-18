@@ -38,6 +38,8 @@ import { ENDGE_COMPILER_SPAN_GROUPS, ENDGE_COMPILER_VERSION } from '@/model/conf
 import { Endge } from '@/model/endge/kernel/endge'
 import { createEmptyProgramMetadata } from '@/domain/types/program/program-metadata.types'
 import type { ProgramMetadata } from '@/domain/types/program/program-metadata.types'
+import type { ComponentSFCPortManifest } from '@/domain/types/component/sfc'
+import type { ComponentSFCCompileResult } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import { compileComputation } from '@/model/services/compiler/computation/computation-compile'
 import { parseComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-parse'
 import { analyzeComponentSFCScript } from '@/model/services/compiler/component-sfc/component-sfc-script'
@@ -61,6 +63,8 @@ export class EndgeCompiler extends EndgeModule {
   private _localDataViewCounter = 0
   private _localFilterCounter = 0
   private _componentTagDiagnosticsByIdentity = new Map<string, Omit<ProgramDiagnostic, 'entityRef'>[]>()
+  private _componentPortManifestCache = new Map<string, ComponentSFCPortManifest>()
+  private _componentPortManifestResolving = new Set<string>()
   private _compileSpan: DiagnosticsSpanHandle | null = null
 
   /**
@@ -85,6 +89,8 @@ export class EndgeCompiler extends EndgeModule {
     const componentSFCs = Endge.domain.getComponentSFCs()
 
     Endge.program.beginCompile(ENDGE_COMPILER_VERSION)
+    this._componentPortManifestCache.clear()
+    this._componentPortManifestResolving.clear()
     Endge.diagnostics.problems.clear({
       phases: ['build'],
       entityTypes: [...this.handlers.keys()],
@@ -346,12 +352,7 @@ export class EndgeCompiler extends EndgeModule {
     this.registerHandler<RComponentSFC, ComponentSFCProgramPayload>({
       entityType: 'component-sfc',
       compile: (entity, context) => {
-        const result = compileComponentSFC(entity.source, {
-          identity: entity.identity,
-          resolveComponentTag: tag => Endge.program.resolveComponentTag(tag),
-          hasComponentIdentity: identity => Endge.domain.getComponentSFC(identity) != null,
-          resolvePortProvider: (identity, expectedKind) => this._resolvePortProvider(identity, expectedKind),
-        })
+        const result = this._compileComponentSFCSource(entity)
         return this._makeArtifact(entity, 'component-sfc', context, {
           capabilities: result.ir ? ['compilable', 'runnable', 'renderable'] : ['compilable'],
           metadata: result.metadata,
@@ -791,6 +792,39 @@ export class EndgeCompiler extends EndgeModule {
       return null
     }
     return search(component[0]!, [component[0]!]) ?? [...component, component[0]!]
+  }
+
+  /** Compiles one SFC source and caches its resolved public port manifest for parent forwarding. */
+  private _compileComponentSFCSource(entity: RComponentSFC): ComponentSFCCompileResult {
+    const ownsResolvingMarker = !this._componentPortManifestResolving.has(entity.identity)
+    if (ownsResolvingMarker)
+      this._componentPortManifestResolving.add(entity.identity)
+    try {
+      const result = compileComponentSFC(entity.source, {
+        identity: entity.identity,
+        resolveComponentTag: tag => Endge.program.resolveComponentTag(tag),
+        hasComponentIdentity: identity => Endge.domain.getComponentSFC(identity) != null,
+        resolvePortProvider: (identity, expectedKind) => this._resolvePortProvider(identity, expectedKind),
+        resolveComponentPortManifest: identity => this._resolveComponentPortManifest(identity),
+      })
+      if (result.ir)
+        this._componentPortManifestCache.set(entity.identity, result.ir.script.ports)
+      return result
+    }
+    finally {
+      if (ownsResolvingMarker)
+        this._componentPortManifestResolving.delete(entity.identity)
+    }
+  }
+
+  /** Resolves child public ports independently from the domain component compile order. */
+  private _resolveComponentPortManifest(identity: string): ComponentSFCPortManifest | null {
+    const cached = this._componentPortManifestCache.get(identity)
+    if (cached) return cached
+    if (this._componentPortManifestResolving.has(identity)) return null
+    const component = Endge.domain.getComponentSFC(identity)
+    if (!component) return null
+    return this._compileComponentSFCSource(component).ir?.script.ports ?? null
   }
 
   /** Resolves a domain provider descriptor without requiring compile order among SFCs. */
