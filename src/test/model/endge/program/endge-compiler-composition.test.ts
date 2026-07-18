@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
+import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { REnvironment } from '@/domain/entities/reflect/REnvironment'
 import { RProject } from '@/domain/entities/reflect/RProject'
@@ -141,6 +142,39 @@ defineComposition({
     expect(artifact?.diagnostics).not.toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'composition-composition-artifact-missing' }),
     ]))
+  })
+
+  it('records component runtimes as component-sfc dependencies', () => {
+    const component = new RComponentSFC()
+    component.id = 30
+    component.identity = 'groundhandling-control-table'
+    component.name = 'Ground handling control table'
+    component.source = '<template><div /></template>'
+    Endge.domain.addComponentSFC(component)
+
+    const composition = new RComposition()
+    composition.id = 31
+    composition.identity = 'groundhandling-control-page'
+    composition.name = 'Ground handling control page'
+    composition.source = `
+defineComposition({
+  runtimes: {
+    table: component('groundhandling-control-table'),
+  },
+})
+`
+
+    const artifact = Endge.compiler.buildComposition(composition)
+
+    expect(artifact.dependencies).toContainEqual(expect.objectContaining({
+      entityType: 'component-sfc',
+      identity: 'groundhandling-control-table',
+      role: 'composition-runtime',
+    }))
+    expect(artifact.dependencies).not.toContainEqual(expect.objectContaining({
+      entityType: 'component',
+      identity: 'groundhandling-control-table',
+    }))
   })
 
   it('validates explicit Store data bindings against the nested Composition contract', () => {

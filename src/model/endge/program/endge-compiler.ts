@@ -1213,7 +1213,11 @@ export class EndgeCompiler extends EndgeModule {
         ? payload.runtimes.find(item => item.name === runtime.identity)
         : runtime
       dependencies.push({
-        entityType: runtime.kind === 'filter-view' ? 'filter' : runtime.kind,
+        entityType: runtime.kind === 'filter-view'
+          ? 'filter'
+          : runtime.kind === 'component'
+            ? 'component-sfc'
+            : runtime.kind,
         id: dependencySource?.identity ?? runtime.identity,
         identity: dependencySource?.identity ?? runtime.identity,
         role: 'composition-runtime',
