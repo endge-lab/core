@@ -2427,10 +2427,9 @@ export class EndgeSchemaStorage extends EndgeModule {
         displayName: workspace.displayName,
         managedBy: workspace.managedBy,
         managedById: workspace.managedById,
-        installedIntegrations: workspace.installedIntegrations.map(item => ({
-          integration: item.integrationId,
-          version: item.version,
-        })),
+        // Integration installation is not implemented yet. Keep the read model,
+        // but do not persist draft/stale relationship rows from the client.
+        installedIntegrations: [],
         configuration: workspace.configuration,
       })
       Endge.workspace.apply(normalizeSavedPayloadWorkspace(saved, workspace))

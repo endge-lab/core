@@ -1,7 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { normalizeEndgeWorkspaceDefinition } from '@/domain/entities/reflect/RWorkspace'
+import { Endge } from '@/model/endge/kernel/endge'
 import {
+  EndgeSchemaStorage,
   normalizePayloadWorkspace,
   normalizeSavedPayloadWorkspace,
 } from '@/model/endge/schema/endge-schema-database'
@@ -47,5 +49,27 @@ describe('Payload workspace schema mapping', () => {
       { identity: '' },
       TEST_ENDGE_WORKSPACE,
     )).toThrow('[RWorkspace] Payload field "identity" is required')
+  })
+
+  it('temporarily clears installed integrations when saving a workspace', async () => {
+    const workspace = {
+      ...TEST_ENDGE_WORKSPACE,
+      installedIntegrations: [{
+        integrationId: 7,
+        integrationIdentity: 'example-integration',
+        version: '1.0.0',
+      }],
+    }
+    const upsert = vi.fn(async (payload: Record<string, unknown>) => payload)
+    const storage = new EndgeSchemaStorage()
+
+    storage.repositories = { workspaces: { upsert } } as any
+    vi.spyOn(Endge.workspace, 'apply').mockImplementation(() => undefined)
+
+    await storage.saveDocument(workspace.identity, 'workspace', { model: workspace })
+
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({
+      installedIntegrations: [],
+    }))
   })
 })
