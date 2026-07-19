@@ -2,6 +2,8 @@
 
 export * from '@/model/endge/kernel/endge'
 export * from '@/model/endge/domain/endge-domain'
+export * from '@/model/endge/domain/resolved/resolved-entity-index'
+export * from '@/model/endge/runtime/implementation/endge-implementations'
 export * from '@/model/endge/program/endge-program'
 export * from '@/model/endge/program/endge-compiler'
 export * from '@/model/endge/program/endge-source'

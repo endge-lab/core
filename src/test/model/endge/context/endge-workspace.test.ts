@@ -26,8 +26,8 @@ describe('EndgeWorkspace', () => {
     expect(workspace.fallbackLocale).toBe('ru')
     expect(workspace.themes.map(theme => theme.identity)).toEqual(['light', 'dark'])
     expect(workspace.defaultTheme).toBe('light')
-    expect(workspace.sfcAdapterIds).toEqual(['native-vue', 'shadcn-vue'])
-    expect(workspace.defaultSfcAdapterId).toBe('shadcn-vue')
+    expect(workspace.sfcAdapterIds).toEqual(['native-vue', 'vue-shadcn'])
+    expect(workspace.defaultSfcAdapterId).toBe('vue-shadcn')
   })
 
   it('normalizes unsupported locales to default locale', () => {

@@ -6,6 +6,7 @@ import type { CompositionProgramPayload } from '@/domain/types/source/compositio
 import type { StoreSourceArtifact } from '@/domain/types/source/store-source.types'
 import type {
   ComponentSFCProgramPayload,
+  ActionProgramPayload,
   ComputationProgramPayload,
   ComponentSFCTagRegistryEntry,
   DataViewProgramPayload,
@@ -29,6 +30,7 @@ import { RComputation } from '@/domain/entities/reflect/RComputation'
 import { RDataView } from '@/domain/entities/reflect/RDataView'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RFilter } from '@/domain/entities/reflect/RFilter'
+import { RField } from '@/domain/entities/reflect/RField'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { RStore } from '@/domain/entities/reflect/RStore'
 import { RStyle } from '@/domain/entities/reflect/RStyle'
@@ -41,6 +43,7 @@ import type { ProgramMetadata } from '@/domain/types/program/program-metadata.ty
 import type { ComponentSFCPortManifest } from '@/domain/types/component/sfc'
 import type { ComponentSFCCompileResult } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import { compileComputation } from '@/model/services/compiler/computation/computation-compile'
+import { compileAction } from '@/model/services/compiler/action/action-compile'
 import { parseComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-parse'
 import { analyzeComponentSFCScript } from '@/model/services/compiler/component-sfc/component-sfc-script'
 import { compileEndgeCSS } from '@/model/services/style'
@@ -89,6 +92,7 @@ export class EndgeCompiler extends EndgeModule {
     const componentSFCs = Endge.domain.getComponentSFCs()
 
     Endge.program.beginCompile(ENDGE_COMPILER_VERSION)
+    Endge.domain.resolved.clearDerived('action')
     this._componentPortManifestCache.clear()
     this._componentPortManifestResolving.clear()
     Endge.diagnostics.problems.clear({
@@ -106,8 +110,12 @@ export class EndgeCompiler extends EndgeModule {
         return
       this._linkComputations()
 
+      if (!this.compilePhase('action', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'actions', Endge.domain.getActions(), context))
+        return
+
       if (!this.compilePhase('component-sfc', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'SFC-компонентов', componentSFCs, context))
         return
+      this._materializeProvidedActions(componentSFCs)
 
       if (!this.compilePhase('style', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'EndgeCSS styles', this._orderedStyles(), context))
         return
@@ -169,6 +177,11 @@ export class EndgeCompiler extends EndgeModule {
     const artifact = this.compileEntity('computation', entity, context) as ProgramArtifact<ComputationProgramPayload>
     this._linkComputations()
     return artifact
+  }
+
+  /** Compiles one persisted Action into an immutable Program artifact. */
+  public buildAction(entity: RAction): ProgramArtifact<ActionProgramPayload> {
+    return this.compileEntity('action', entity, this._createCompileContext()) as ProgramArtifact<ActionProgramPayload>
   }
 
   /** Компилирует один ComponentSFC без запуска полного domain build. */
@@ -334,6 +347,27 @@ export class EndgeCompiler extends EndgeModule {
    * source-first ветки `component-sfc`.
    */
   private registerDefaultHandlers(): void {
+    this.registerHandler<RAction, ActionProgramPayload>({
+      entityType: 'action',
+      compile: (entity, context) => {
+        const result = compileAction(entity)
+        const codeCollision = Endge.actions.getCodeDefinition(entity.identity)
+        return this._makeArtifact(entity, 'action', context, {
+          capabilities: result.payload.compiledFlow ? ['compilable', 'runnable', 'executable'] : ['compilable'],
+          payload: result.payload,
+          diagnostics: [
+            ...result.diagnostics,
+            ...(codeCollision ? [{
+              severity: 'error' as const,
+              code: 'action-identity-collision',
+              message: `Persisted Action "${entity.identity}" collides with ${codeCollision.origin.kind} Action from code.`,
+              sourcePath: 'identity',
+            }] : []),
+          ],
+        })
+      },
+    })
+
     this.registerHandler<RComputation, ComputationProgramPayload>({
       entityType: 'computation',
       compile: (entity, context) => {
@@ -827,6 +861,42 @@ export class EndgeCompiler extends EndgeModule {
     const component = Endge.domain.getComponentSFC(identity)
     if (!component) return null
     return this._compileComponentSFCSource(component).ir?.script.ports ?? null
+  }
+
+  /** Materializes final provided/forwarded SFC Action ports as derived descriptors. */
+  private _materializeProvidedActions(components: readonly RComponentSFC[]): void {
+    for (const component of components) {
+      const artifact = Endge.program.getArtifact<ComponentSFCProgramPayload>('component-sfc', component.identity)
+      const ports = artifact?.payload.ir?.script.ports.provides.actions ?? []
+      for (const port of ports) {
+        const identity = `${component.identity}.${port.name}`
+        if (Endge.domain.getAction(identity) || Endge.domain.resolved.get('action', identity)) {
+          artifact?.diagnostics.push({
+            severity: 'error',
+            code: 'component-sfc-provided-action-collision',
+            message: `Derived Action identity collision: ${identity}.`,
+            entityRef: artifact.ref,
+            sourcePath: 'script.ports.provides',
+          })
+          if (artifact) artifact.status = 'error'
+          continue
+        }
+        const action = new RAction()
+        action.identity = identity
+        action.name = port.name
+        action.displayName = port.name
+        action.origin = { kind: 'derived', source: { type: 'component-sfc', identity: component.identity } }
+        action.owner = { type: 'component-sfc', identity: component.identity }
+        action.managedBy = component.managedBy
+        action.target = [{ type: 'component-sfc', identity: component.identity }]
+        action.input = new RField('input', port.inputType)
+        action.output = new RField('output', port.outputType)
+        action.defaultImplementation = { kind: 'component-port', portName: port.name }
+        action.active = component.active !== false
+        Endge.domain.resolved.set('action', action)
+      }
+    }
+    Endge.program.recalculateStatus()
   }
 
   /** Resolves a domain provider descriptor without requiring compile order among SFCs. */

@@ -13,11 +13,25 @@ describe('EndgeWorkspace', () => {
       ...TEST_ENDGE_WORKSPACE,
       configuration: {
         ...TEST_ENDGE_WORKSPACE.configuration,
-        sfcAdapterIds: [' shadcn-vue ', 'customer:aodb', 'customer:aodb', ''],
+        sfcAdapterIds: [' vue-shadcn ', 'customer:aodb', 'customer:aodb', ''],
         defaultSfcAdapterId: 'customer:aodb',
       },
     })
-    expect(workspace.configuration.sfcAdapterIds).toEqual(['shadcn-vue', 'customer:aodb'])
+    expect(workspace.configuration.sfcAdapterIds).toEqual(['vue-shadcn', 'customer:aodb'])
+  })
+
+  it('migrates the persisted legacy Vue Shadcn adapter id', () => {
+    const workspace = normalizeEndgeWorkspaceDefinition({
+      ...TEST_ENDGE_WORKSPACE,
+      configuration: {
+        ...TEST_ENDGE_WORKSPACE.configuration,
+        sfcAdapterIds: ['native-vue', 'shadcn-vue', 'vue-shadcn'],
+        defaultSfcAdapterId: 'shadcn-vue',
+      },
+    })
+
+    expect(workspace.configuration.sfcAdapterIds).toEqual(['native-vue', 'vue-shadcn'])
+    expect(workspace.configuration.defaultSfcAdapterId).toBe('vue-shadcn')
   })
 
   it('rejects flat legacy workspace settings', () => {

@@ -1,5 +1,7 @@
 import type { ActionCompiledFlow, ActionDefinition, ActionStepHandler, FlowValidationIssue } from '@/domain/types/flow/action.types'
 import type { ActionFlowDefinition } from '@/domain/types/flow/endge-flow.types'
+import type { EntityRef } from '@/domain/types/document/entity-management.type'
+import type { ActionImplementation, ActionTargetSelector } from '@/domain/types/runtime/action.types'
 
 import { Serialize } from '@endge/utils'
 import { Exclude, Expose, Type } from 'class-transformer'
@@ -30,11 +32,20 @@ export class RAction extends REntity {
   @Type(() => RField)
   output: RField | null = null
 
-  @Exclude()
-  private readonly stepHandlers = new Map<string, ActionStepHandler>()
+  /** Optional alternatives for the one runtime target accepted by this Action. */
+  @Expose()
+  target: ActionTargetSelector[] | null = null
+
+  /** Default route used when runtime has no explicit override binding. */
+  @Expose()
+  defaultImplementation: ActionImplementation = { kind: 'flow' }
+
+  /** Definition that owns a derived/component-provided Action. */
+  @Expose()
+  owner?: EntityRef
 
   @Exclude()
-  private _compiledFlow: ActionCompiledFlow | null = null
+  private readonly stepHandlers = new Map<string, ActionStepHandler>()
 
   setStepHandler(runtimeId: string, fn: ActionStepHandler | undefined): void {
     const id = String(runtimeId).trim()
@@ -252,22 +263,26 @@ export class RAction extends REntity {
   }
 
   get compiledFlow(): ActionCompiledFlow | null {
-    return this._compiledFlow
+    return null
   }
 
   getValidationIssues(): FlowValidationIssue[] {
-    return this._compiledFlow?.issues ? [...this._compiledFlow.issues] : []
+    return this.buildCompiledFlow().issues
   }
 
   validate(): FlowValidationIssue[] {
-    this.compile()
     return this.getValidationIssues()
   }
 
   getCompiledRuntimeNodeId(runtimeId: string): string | null {
     const id = String(runtimeId).trim()
     if (!id) { return null }
-    return this._compiledFlow?.runtimeNodeIdByRuntimeId.get(id) ?? null
+    return this.buildCompiledFlow().runtimeNodeIdByRuntimeId.get(id) ?? null
+  }
+
+  /** Builds an immutable compiler payload without retaining compiled state on the entity. */
+  buildCompiledFlow(): ActionCompiledFlow {
+    return this._buildCompiledFlow(this._normalizeDefinition(this.definition))
   }
 
   override compile(): void {
@@ -279,13 +294,10 @@ export class RAction extends REntity {
       nodes: [...normalized.nodes],
       edges: [...normalized.edges],
     }
-    this._compiledFlow = this._buildCompiledFlow(normalized)
   }
 
-  run(): void {
-    const runtime = Endge.runtime.execute(this, {})
-    if (!runtime || runtime.kind !== 'action') { return }
-    Endge.runtime.flow.run(runtime)
+  run(): Promise<unknown> {
+    return Endge.actions.execute(this.identity)
   }
 
   toPlain(): Record<string, unknown> {
@@ -300,9 +312,14 @@ export class RAction extends REntity {
       displayName: this.displayName ?? this.name,
       description: this.description ?? null,
       folderId: this.folderId ?? null,
+      managedBy: this.managedBy,
+      managedById: this.managedById,
       definition: rawDefinition,
+      target: this.target?.map(selector => ({ ...selector })) ?? null,
       input: this._fieldToPlain(this.input),
       output: this._fieldToPlain(this.output),
+      defaultImplementation: { ...this.defaultImplementation },
+      ...(this.owner ? { owner: { ...this.owner } } : {}),
     }
   }
 

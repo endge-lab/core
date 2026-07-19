@@ -16,6 +16,7 @@ import type { QueryProgramProp, SourceExpressionIR } from '@/domain/types/source
 import type { ProgramMetadata } from '@/domain/types/program/program-metadata.types'
 import type { ComputationProgramPayload } from '@/domain/types/computation'
 import type { EndgeStyleSheetArtifact } from '@/domain/types/style'
+import type { ActionImplementation, ActionTargetSelector } from '@/domain/types/runtime/action.types'
 
 /** Тип доменной сущности, для которой compiler может построить program artifact. */
 export type ProgramEntityType
@@ -133,6 +134,10 @@ export interface ProgramArtifact<TPayload = unknown> {
 export interface ActionProgramPayload {
   /** Нормализованный action-flow с индексами и runtime-ready структурой. */
   compiledFlow: ActionCompiledFlow | null
+  target: ActionTargetSelector[] | null
+  input: { type: string, name?: string, isArray?: boolean, optional?: boolean } | null
+  output: { type: string, name?: string, isArray?: boolean, optional?: boolean } | null
+  implementation: ActionImplementation
 }
 
 export type QueryProgramOutputSource

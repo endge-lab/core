@@ -7,7 +7,6 @@ import type { EndgeFlowNodeDefinition } from '@/domain/types/flow/endge-flow.typ
 import type { QueryProgramPayload } from '@/domain/types/program/program.types'
 import type { RuntimeHost } from '@/domain/types/runtime/runtime-host.types'
 
-import { createActionContext } from '@/domain/entities/runtime/hosts/ActionRuntimeHost'
 import { Endge } from '@/model/endge/kernel/endge'
 import { EndgeFlowRegistry } from '@/model/endge/runtime/flow/endge-flow-registry'
 
@@ -222,6 +221,7 @@ export class EndgeFlow {
             const actionIdAsNumber = Number(actionIdRaw)
             const actionId: string | number = Number.isFinite(actionIdAsNumber) ? actionIdAsNumber : actionIdRaw
             const targetAction = Endge.domain.getAction(actionId)
+              ?? Endge.actions.getDefinition(actionIdRaw)
             if (!targetAction) {
               issues.push({
                 code: 'flow.action.missing',
@@ -236,26 +236,18 @@ export class EndgeFlow {
               stepOutput = payload != null && typeof payload === 'object' && !Array.isArray(payload)
                 ? { ...payload }
                 : (payload != null ? { output: payload } : undefined)
-              const nestedRuntime = this._createActionRuntime(targetAction, payload, host.id, host.context)
-              if (!nestedRuntime) {
-                issues.push({
-                  code: 'flow.runtime.missing',
-                  message: `Nested action runtime was not created: ${actionIdRaw}`,
-                  nodeId: node.id,
-                })
-              }
-              else {
-                await this.run(nestedRuntime)
-                const nestedResult = nestedRuntime.context.lastFlowResult
-                if (nestedResult && !nestedResult.ok) {
-                  for (const issue of nestedResult.issues) {
-                    issues.push({
-                      code: issue.code,
-                      message: issue.message,
-                      nodeId: issue.nodeId ?? node.id,
-                      edgeId: issue.edgeId,
-                    })
-                  }
+              const nestedResult = await Endge.actions.execute<FlowExecutionResult>(targetAction.identity, {
+                input: payload,
+                context: { parentRuntimeId: host.id },
+              })
+              if (nestedResult && !nestedResult.ok) {
+                for (const issue of nestedResult.issues) {
+                  issues.push({
+                    code: issue.code,
+                    message: issue.message,
+                    nodeId: issue.nodeId ?? node.id,
+                    edgeId: issue.edgeId,
+                  })
                 }
               }
             }
@@ -567,30 +559,6 @@ export class EndgeFlow {
     return elsePortId
   }
 
-  /** Создаёт дочерний action-runtime с новым контекстом и ссылкой на родительский контекст. */
-  /**
-   * Создает Action Runtime.
-   */
-  private _createActionRuntime(
-    action: RAction,
-    input: Record<string, unknown> | unknown,
-    parentRuntimeId: string | null,
-    parentContext?: import('@/domain/types/runtime/runtime-host.types').ActionRuntimeHostContext | null,
-  ): RuntimeHost<'action'> | null {
-    const runtime = Endge.runtime.execute(action, {
-      parent: parentRuntimeId,
-    })
-    if (!runtime || runtime.kind !== 'action') {
-      return null
-    }
-
-    const actionRuntime = runtime as RuntimeHost<'action'>
-    const childContext = createActionContext({ input, parent: parentContext ?? null })
-    actionRuntime.replaceContext(childContext)
-
-    return actionRuntime
-  }
-
   /**
    * Параметры, приходящие по входящему ребру на порт 'in':
    * если источник — entrypoint (flow-entry), берём state.input; иначе — выход предыдущего шага.
@@ -736,7 +704,6 @@ export class EndgeFlow {
 
     return Endge.program.getActionFlow(actionId)
       ?? (actionIdentity ? Endge.program.getActionFlow(actionIdentity) : null)
-      ?? action.compiledFlow
   }
 
   /** Рекурсивно резолвит параметры node через текущий flow-state. */

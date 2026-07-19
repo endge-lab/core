@@ -297,6 +297,24 @@ function toPayloadActionField(raw: any): { type: number | string | null, isArray
   }
 }
 
+function normalizeActionTargets(raw: unknown): Array<{ type: string, identity?: string }> | null {
+  if (!Array.isArray(raw) || raw.length === 0)
+    return null
+  const result: Array<{ type: string, identity?: string }> = []
+  const seen = new Set<string>()
+  for (const item of raw) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue
+    const type = String((item as any).type ?? '').trim()
+    const identity = String((item as any).identity ?? '').trim() || undefined
+    if (!type) continue
+    const key = `${type}\u0000${identity ?? ''}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    result.push(identity ? { type, identity } : { type })
+  }
+  return result.length ? result : null
+}
+
 /** Оставляет только targets, поддержанные SFC-моделью v1. */
 function normalizeComponentSFCTargets(raw: unknown): Array<'dom' | 'canvas'> {
   if (!Array.isArray(raw))
@@ -2728,6 +2746,9 @@ export class EndgeSchemaStorage extends EndgeModule {
         definition: normalizeFlowDefinition(rawEditorFlowDefinition ?? plain.definition),
         input: toPayloadActionField(plain.input),
         output: toPayloadActionField(plain.output),
+        target: normalizeActionTargets(plain.target),
+        managedBy: action.managedBy ?? 'user',
+        managedById: action.managedById ?? null,
         folder: folderId,
         active: action.active !== false,
         ...(action.author != null && action.author !== '' && { author: action.author }),
@@ -3704,6 +3725,12 @@ export class EndgeSchemaStorage extends EndgeModule {
         definition: normalizeFlowDefinition(raw.definition),
         input: normalizeActionField(raw.input, 'input'),
         output: normalizeActionField(raw.output, 'output'),
+        target: normalizeActionTargets(raw.target),
+        ...normalizeEntityManagement(raw),
+        origin: { kind: 'storage' },
+        active: raw.active !== false,
+        deletedAt: raw.deletedAt ?? null,
+        author: raw.author ?? null,
       }
     }
     if (documentType === 'converter' || documentType === 'integration') {

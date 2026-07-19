@@ -14,6 +14,9 @@ export interface ActionRepositoryPayload {
   definition: ActionFlowDefinition
   input?: ActionRepositoryFieldContract | null
   output?: ActionRepositoryFieldContract | null
+  target?: Array<{ type: string, identity?: string }> | null
+  managedBy?: 'system' | 'integration' | 'user'
+  managedById?: string | null
   folder?: number | string | null
   author?: string
   active?: boolean

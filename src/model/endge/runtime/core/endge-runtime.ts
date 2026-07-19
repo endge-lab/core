@@ -26,6 +26,7 @@ import { RuntimeBoundaryUpdatePhase } from '@/model/helpers/raph-phases/runtime-
 import { RuntimeNodeUpdatePhase } from '@/model/helpers/raph-phases/runtime-node-update-phase'
 import Config from '@/model/config'
 import { EndgeActions } from '@/model/endge/runtime/core/endge-actions'
+import { EndgeImplementations } from '@/model/endge/runtime/implementation/endge-implementations'
 import { EndgeComposition } from '@/model/endge/runtime/execution/endge-composition'
 import { EndgeProject } from '@/model/endge/runtime/execution/endge-project'
 import { EndgeDataView } from '@/model/endge/runtime/execution/endge-data-view'
@@ -43,7 +44,8 @@ export class EndgeRuntime extends EndgeModule {
   public readonly project = new EndgeProject()
   public readonly flowRegistry = new EndgeFlowRegistry()
   public readonly flow = new EndgeFlow(this.flowRegistry)
-  public readonly actions = new EndgeActions()
+  public readonly implementations = new EndgeImplementations()
+  public readonly actions = new EndgeActions(this.implementations)
   public readonly scopes = new RuntimeScopeRegistry()
 
   private _hosts = new RuntimeHostRegistry()

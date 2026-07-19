@@ -1,6 +1,6 @@
 import { Exclude, Expose } from 'class-transformer'
 import type { DiagnosticsProblemInput } from '@/domain/types/diagnostics'
-import type { EntityManagement, EntityManagementLike, ManagedBy } from '@/domain/types/document/entity-management.type'
+import type { EntityManagement, EntityManagementLike, EntityOrigin, ManagedBy } from '@/domain/types/document/entity-management.type'
 import { normalizeEntityManagement } from '@/domain/types/document/entity-management.type'
 
 /** Опции для дублирования сущности: новый identity и опционально имя. */
@@ -45,6 +45,10 @@ export class REntity {
   @Expose()
   managedBy: ManagedBy = 'user'
 
+  /** Источник effective entity; только storage-сущности сохраняются и экспортируются. */
+  @Exclude()
+  origin: EntityOrigin = { kind: 'storage' }
+
   /** Opaque installation ID; используется только для integration-managed документов. */
   @Expose()
   managedById: string | null = null
@@ -76,6 +80,7 @@ export class REntity {
 
   /** Подмешивает storage-мета и meta из Payload */
   applyStorageMeta(raw: any): void {
+    this.origin = { kind: 'storage' }
     this.applyManagement(raw)
     this.createdAt = raw.createdAt ?? undefined
     this.updatedAt = raw.updatedAt ?? undefined

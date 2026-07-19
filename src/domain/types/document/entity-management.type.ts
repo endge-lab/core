@@ -1,5 +1,25 @@
 export type ManagedBy = 'system' | 'integration' | 'user'
 
+/** Stable domain reference that never depends on a database identifier. */
+export interface EntityRef {
+  type: string
+  identity: string
+}
+
+/**
+ * Provenance of an entity in the effective domain read-model.
+ * Only storage entities participate in persistence and export operations.
+ */
+export type EntityOrigin
+  = | { kind: 'storage' }
+    | { kind: 'builtin', owner: string }
+    | { kind: 'local', owner: string }
+    | { kind: 'derived', source: EntityRef }
+
+export function isPersistedEntityOrigin(origin: EntityOrigin | null | undefined): boolean {
+  return origin?.kind === 'storage'
+}
+
 export interface EntityManagement {
   managedBy: ManagedBy
   managedById: string | null

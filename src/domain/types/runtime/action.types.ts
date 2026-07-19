@@ -1,5 +1,71 @@
+import type { EntityOrigin, EntityRef } from '@/domain/types/document/entity-management.type'
+
 export type RuntimeActionId = string
 export type RuntimeActionSurface = string
+
+/** One allowed target shape. Multiple selectors are alternatives. */
+export interface ActionTargetSelector {
+  type: string
+  identity?: string
+}
+
+/** Concrete runtime target. Database ids are intentionally not part of the contract. */
+export interface ActionExecutionTarget<TValue = unknown> {
+  type: string
+  identity: string
+  value: TValue
+}
+
+/** How an Action is executed when there is no higher-priority runtime binding. */
+export type ActionImplementation
+  = | { kind: 'flow' }
+    | { kind: 'provider', providerKey: string }
+    | { kind: 'component-port', portName: string }
+
+export interface ActionDefinitionInput {
+  identity: string
+  displayName?: string
+  description?: string | null
+  active?: boolean
+  target?: ActionTargetSelector[] | null
+  input?: unknown
+  output?: unknown
+  defaultImplementation?: ActionImplementation
+  owner?: EntityRef
+}
+
+export interface ActionExecuteOptions<TInput = unknown> {
+  input?: TInput
+  target?: ActionExecutionTarget
+  context?: Record<string, unknown>
+  resolution?: Partial<Record<Exclude<ImplementationBindingScope, 'default'>, string>>
+  providerKey?: string
+}
+
+export interface ResolvedActionDescriptor {
+  identity: string
+  displayName: string
+  description: string | null
+  active: boolean
+  origin: EntityOrigin
+  owner?: EntityRef
+  target: ActionTargetSelector[] | null
+  input: unknown | null
+  output: unknown | null
+  defaultImplementation: ActionImplementation
+  overridden: boolean
+  effectiveProviderKey: string | null
+  effectiveProviderOrigin: EntityOrigin | null
+  bindingScope: ImplementationBindingScope | null
+}
+
+export type ImplementationBindingScope
+  = 'default'
+    | 'application'
+    | 'workspace'
+    | 'composition'
+    | 'component'
+    | 'invocation'
 
 /** Renderer-neutral context passed to a runtime Action provider. */
 export interface RuntimeActionContext {
@@ -36,6 +102,7 @@ export type TableSortDirection = 'asc' | 'desc'
 export type TableSortMode = 'multiple' | 'single' | 'fixed' | 'disabled'
 
 export const TABLE_RUNTIME_ACTION_IDS = {
+  columnHide: 'table.column.hide',
   columnPinLeft: 'table.column.pinLeft',
   columnPinRight: 'table.column.pinRight',
   columnUnpin: 'table.column.unpin',
@@ -57,6 +124,7 @@ export interface TableColumnSortState {
 
 /** Operations implemented by one mounted Table instance. */
 export interface TableRuntimeActionTarget {
+  setColumnVisibility?: (columnKey: string, visible: boolean) => void | Promise<void>
   setColumnPin?: (columnKey: string, side: TableColumnPinSide) => void | Promise<void>
   resetColumnPin?: (columnKey: string) => void | Promise<void>
   resetAllPins?: () => void | Promise<void>
@@ -72,6 +140,7 @@ export interface TableColumnActionContext extends RuntimeActionContext {
   target: TableRuntimeActionTarget
   columnKey: string
   columnIndex: number
+  hideable: boolean
   pinnable: boolean
   pinMode: 'enabled' | 'disabled'
   pinState: TableColumnPinSide

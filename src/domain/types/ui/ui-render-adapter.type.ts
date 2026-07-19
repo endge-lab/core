@@ -33,6 +33,8 @@ export interface UIRenderAdapter<TImplementation = unknown> {
   protocolVersion: number
   renderer: string
   renderers: Readonly<Record<string, TImplementation>>
+  /** Opaque host entry points owned by this adapter: shell, SFC root, runtime root, etc. */
+  roots?: Readonly<Record<string, unknown>>
 }
 
 /** Требования consumer-а к renderer adapter-у. */
@@ -42,6 +44,7 @@ export interface UIRenderAdapterRequirement {
   protocolVersion?: number
   renderer?: string
   requiredRendererKeys?: readonly string[]
+  requiredRootKeys?: readonly string[]
 }
 
 /** Требования к уже активированному renderer adapter-у. */
@@ -54,4 +57,5 @@ export interface UIRenderAdapterDescriptor {
   protocolVersion: number
   renderer: string
   rendererKeys: string[]
+  rootKeys: string[]
 }

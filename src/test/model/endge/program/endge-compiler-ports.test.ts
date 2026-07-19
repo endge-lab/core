@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RAction } from '@/domain/entities/reflect/RAction'
@@ -144,6 +144,27 @@ const ports = definePorts({
       provides: { actions: [{ name: 'refresh', forwardedFrom: { ref: 'child' } }] },
       emits: { events: [{ name: 'changed', forwardedFrom: { ref: 'child' } }] },
     })
+    expect(Endge.domain.resolved.get<RAction>('action', 'parent-public.refresh')).toMatchObject({
+      origin: { kind: 'derived', source: { type: 'component-sfc', identity: 'parent-public' } },
+      target: [{ type: 'component-sfc', identity: 'parent-public' }],
+      defaultImplementation: { kind: 'component-port', portName: 'refresh' },
+    })
+  })
+
+  it('routes a derived component-port Action to the concrete runtime target', async () => {
+    Endge.domain.addComponentSFC(component(12, 'action-owner', `<script setup lang="ts">
+const ports = definePorts({ provides: { refresh: action<{ force: boolean }, void>() } })
+</script>
+<template><Text>Owner</Text></template>`))
+    Endge.compiler.build({} as any)
+    const invokeAction = vi.fn()
+
+    await Endge.actions.execute('action-owner.refresh', {
+      input: { force: true },
+      target: { type: 'component-sfc', identity: 'action-owner', value: { invokeAction } },
+    })
+
+    expect(invokeAction).toHaveBeenCalledWith('refresh', { force: true })
   })
 })
 

@@ -6,6 +6,16 @@ import { createTableRuntimeActions } from '@/model/services/runtime/table-action
 import { TABLE_RUNTIME_ACTION_IDS } from '@/domain/types/runtime/action.types'
 
 describe('Runtime table actions', () => {
+  it('hides a hideable column through the mounted table target', async () => {
+    const registry = createRegistry()
+    const setColumnVisibility = vi.fn()
+    const context = createContext({ target: { setColumnVisibility } })
+
+    expect(registry.canExecute(TABLE_RUNTIME_ACTION_IDS.columnHide, context)).toBe(true)
+    await registry.execute(TABLE_RUNTIME_ACTION_IDS.columnHide, context)
+    expect(setColumnVisibility).toHaveBeenCalledWith('number', false)
+  })
+
   it('runs column sort actions against the table runtime target', async () => {
     const registry = createRegistry()
     const setColumnSort = vi.fn()
@@ -190,6 +200,7 @@ function createContext(
     target: {},
     columnKey: 'number',
     columnIndex: 0,
+    hideable: true,
     pinnable: true,
     pinMode: 'enabled',
     pinState: 'none',

@@ -50,7 +50,7 @@ const ports = definePorts({
 <template><Table ref="departures" :rows="[]" /></template>`)
 
     expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
-    expect(result.ir?.script.ports.provides.actions).toHaveLength(9)
+    expect(result.ir?.script.ports.provides.actions).toHaveLength(10)
     expect(result.ir?.script.ports.provides.actions).toEqual(expect.arrayContaining([
       expect.objectContaining({
         name: 'table.column.pinLeft',

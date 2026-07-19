@@ -22,6 +22,10 @@ import type {
 } from '@/domain/types/diagnostics'
 import { DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION } from '@/model/config/diagnostics'
 
+const LEGACY_SFC_ADAPTER_IDS: Readonly<Record<string, string>> = {
+  'shadcn-vue': 'vue-shadcn',
+}
+
 const DEFAULT_CONFIGURATION_VALUE: EndgeConfiguration = {
   vars: [],
   locales: [
@@ -55,11 +59,15 @@ export function normalizeEndgeConfiguration(input: unknown): EndgeConfiguration 
 
   const locales = normalizeLocales(input.locales)
   const themes = normalizeThemes(input.themes)
-  const sfcAdapterIds = normalizeStringCollection(input.sfcAdapterIds, 'sfcAdapterIds')
+  const sfcAdapterIds = normalizeSfcAdapterIds(input.sfcAdapterIds)
   const defaultLocale = requireMember(input.defaultLocale, locales.map(item => item.code), 'defaultLocale')
   const fallbackLocale = requireMember(input.fallbackLocale, locales.map(item => item.code), 'fallbackLocale')
   const defaultTheme = requireMember(input.defaultTheme, themes.map(item => item.identity), 'defaultTheme')
-  const defaultSfcAdapterId = requireMember(input.defaultSfcAdapterId, sfcAdapterIds, 'defaultSfcAdapterId')
+  const defaultSfcAdapterId = requireMember(
+    normalizeSfcAdapterId(input.defaultSfcAdapterId),
+    sfcAdapterIds,
+    'defaultSfcAdapterId',
+  )
 
   return {
     vars: normalizeVars(input.vars),
@@ -74,6 +82,18 @@ export function normalizeEndgeConfiguration(input: unknown): EndgeConfiguration 
     defaultSfcAdapterId,
     diagnostics: normalizeDiagnosticsConfiguration(input.diagnostics),
   }
+}
+
+/** Migrates persisted adapter identifiers while exposing only canonical runtime ids. */
+function normalizeSfcAdapterIds(input: unknown): string[] {
+  return [...new Set(
+    normalizeStringCollection(input, 'sfcAdapterIds').map(normalizeSfcAdapterId),
+  )]
+}
+
+function normalizeSfcAdapterId(input: unknown): string {
+  const id = String(input ?? '').trim()
+  return LEGACY_SFC_ADAPTER_IDS[id] ?? id
 }
 
 /** Нормализует contribution сущности; пустое значение означает чистое наследование. */

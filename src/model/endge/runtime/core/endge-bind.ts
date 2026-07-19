@@ -94,6 +94,7 @@ export class EndgeBind extends EndgeModule {
 
   /**
    * Привязывает обработчик runtime-step в контексте конкретного action.
+   * @deprecated Для полного Action используйте Endge.actions.override(); этот API оставлен только для legacy runtimeAction nodes.
    * @param actionOrId - действие или его id/identity
    * @param runtimeId - id runtime-step внутри переданного action
    * @param handler - обработчик шага

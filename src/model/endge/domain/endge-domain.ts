@@ -46,6 +46,7 @@ import { normalizeEntityManagement } from '@/domain/types/document/entity-manage
 import Config from '@/model/config'
 import { Endge } from '@/model/endge/kernel/endge'
 import { createDiagnosticsEntityOwner } from '@/model/endge/diagnostics/endge-problems'
+import { ResolvedEntityIndex } from '@/model/endge/domain/resolved/resolved-entity-index'
 import { importGqlSchemaToDomain } from '@/tools/graphql-parser'
 import { importOpenApiSchemaToDomain } from '@/tools/openapi-parser'
 
@@ -244,6 +245,8 @@ export interface EndgeDomainParsed {
 
 /** Модуль хранения, индексации и изменения документов домена. */
 export class EndgeDomain extends EndgeModule {
+  /** Non-persisted descriptors materialized by core, plugins and compiler. */
+  public readonly resolved = new ResolvedEntityIndex()
   private _projectsById: Map<number, RProject> = new Map()
   private _projectsByIdentity: Map<string, RProject> = new Map()
 
@@ -387,6 +390,7 @@ export class EndgeDomain extends EndgeModule {
    * Сбрасывает доменные данные.
    */
   public override reset(): void {
+    this.resolved.clearDerived()
     this._projectsById.clear()
     this._projectsByIdentity.clear()
     this._typesById.clear()
@@ -2924,8 +2928,8 @@ export class EndgeDomain extends EndgeModule {
    * Преобразует EndgeDomain в JSON-объект.
    */
   public toPlain(): EndgeDomainPlain {
-    const persisted = <T extends { isTemporary?: boolean }>(items: T[]): T[] =>
-      items.filter(item => item.isTemporary !== true)
+    const persisted = <T extends { isTemporary?: boolean, origin?: { kind?: string } }>(items: T[]): T[] =>
+      items.filter(item => item.isTemporary !== true && (item.origin?.kind ?? 'storage') === 'storage')
 
     return {
       projects: persisted(this.getProjects()).map(x => Serialize.toPlain(x)),

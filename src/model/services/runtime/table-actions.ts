@@ -12,6 +12,7 @@ type TableTargetMethodName = keyof TableRuntimeActionTarget
 /** Built-in Action providers implemented by a mounted Table target. */
 export function createTableRuntimeActions(): RuntimeAction<TableColumnActionContext>[] {
   return [
+    action(TABLE_RUNTIME_ACTION_IDS.columnHide, context => context.hideable && hasTargetMethod(context, 'setColumnVisibility'), executeHideColumn),
     action(TABLE_RUNTIME_ACTION_IDS.columnPinLeft, context => canChangeColumnPin(context) && context.pinState !== 'left' && hasTargetMethod(context, 'setColumnPin'), context => executeSetColumnPin(context, 'left')),
     action(TABLE_RUNTIME_ACTION_IDS.columnPinRight, context => canChangeColumnPin(context) && context.pinState !== 'right' && hasTargetMethod(context, 'setColumnPin'), context => executeSetColumnPin(context, 'right')),
     action(TABLE_RUNTIME_ACTION_IDS.columnUnpin, context => canChangeColumnPin(context) && context.pinState !== 'none' && hasTargetMethod(context, 'setColumnPin'), context => executeSetColumnPin(context, 'none')),
@@ -22,6 +23,10 @@ export function createTableRuntimeActions(): RuntimeAction<TableColumnActionCont
     action(TABLE_RUNTIME_ACTION_IDS.sortClearColumn, context => canChangeColumnSort(context) && context.sortState.active && hasTargetMethod(context, 'clearColumnSort'), executeClearColumnSort),
     action(TABLE_RUNTIME_ACTION_IDS.sortClearAll, context => canChangeSort(context) && context.activeSortCount > 0 && hasTargetMethod(context, 'clearAllSort'), executeClearAllSort),
   ]
+}
+
+async function executeHideColumn(context: TableColumnActionContext): Promise<void> {
+  await requireTargetMethod(context, 'setColumnVisibility')(context.columnKey, false)
 }
 
 function action(

@@ -35,8 +35,33 @@ describe('UIAdapterRegistry', () => {
       protocolVersion: ENDGE_SFC_RENDER_ADAPTER_PROTOCOL_VERSION,
       renderer: 'vue',
       rendererKeys: ['Input'],
+      rootKeys: [],
     }])
     expect(onChange).toHaveBeenCalledTimes(2)
+  })
+
+  it('preserves opaque roots and validates required root entry points', () => {
+    const registry = new UIAdapterRegistry()
+    const shell = { name: 'AdapterShell' }
+
+    registry.register({
+      id: 'self-contained',
+      protocol: ENDGE_SFC_RENDER_ADAPTER_PROTOCOL,
+      protocolVersion: ENDGE_SFC_RENDER_ADAPTER_PROTOCOL_VERSION,
+      renderer: 'custom-host',
+      renderers: { Input: () => null },
+      roots: { shell },
+    })
+
+    expect(registry.require({
+      id: 'self-contained',
+      requiredRootKeys: ['shell'],
+    }).roots?.shell).toBe(shell)
+    expect(registry.list()[0]?.rootKeys).toEqual(['shell'])
+    expect(() => registry.require({
+      id: 'self-contained',
+      requiredRootKeys: ['shell', 'runtime'],
+    })).toThrow('missing roots: runtime')
   })
 
   it('rejects duplicate ids and incomplete adapters', () => {

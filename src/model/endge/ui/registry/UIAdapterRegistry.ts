@@ -93,6 +93,7 @@ export class UIAdapterRegistry {
       protocolVersion: adapter.protocolVersion,
       renderer: adapter.renderer,
       rendererKeys: Object.keys(adapter.renderers),
+      rootKeys: Object.keys(adapter.roots ?? {}),
     }))
   }
 
@@ -113,6 +114,7 @@ export class UIAdapterRegistry {
     const renderer = String(input?.renderer ?? '').trim()
     const protocolVersion = Number(input?.protocolVersion)
     const renderers = input?.renderers
+    const roots = input?.roots
 
     if (!id) throw new Error('[UIAdapterRegistry] adapter id is required')
     if (!protocol) throw new Error(`[UIAdapterRegistry] adapter "${id}" protocol is required`)
@@ -123,12 +125,22 @@ export class UIAdapterRegistry {
     if (!renderers || typeof renderers !== 'object' || Array.isArray(renderers)) {
       throw new Error(`[UIAdapterRegistry] adapter "${id}" renderers must be an object`)
     }
+    if (roots != null && (typeof roots !== 'object' || Array.isArray(roots))) {
+      throw new Error(`[UIAdapterRegistry] adapter "${id}" roots must be an object`)
+    }
 
     const normalizedRenderers = { ...renderers }
     for (const [key, implementation] of Object.entries(normalizedRenderers)) {
       if (!key.trim()) throw new Error(`[UIAdapterRegistry] adapter "${id}" contains an empty renderer key`)
       if (implementation == null) {
         throw new Error(`[UIAdapterRegistry] adapter "${id}" renderer "${key}" has no implementation`)
+      }
+    }
+    const normalizedRoots = { ...(roots ?? {}) }
+    for (const [key, implementation] of Object.entries(normalizedRoots)) {
+      if (!key.trim()) throw new Error(`[UIAdapterRegistry] adapter "${id}" contains an empty root key`)
+      if (implementation == null) {
+        throw new Error(`[UIAdapterRegistry] adapter "${id}" root "${key}" has no implementation`)
       }
     }
 
@@ -138,6 +150,7 @@ export class UIAdapterRegistry {
       protocolVersion,
       renderer,
       renderers: normalizedRenderers,
+      roots: normalizedRoots,
     }
   }
 
@@ -167,6 +180,14 @@ export class UIAdapterRegistry {
     if (missingKeys.length > 0) {
       throw new Error(
         `[UIAdapterRegistry] adapter "${adapter.id}" is missing renderers: ${missingKeys.join(', ')}`,
+      )
+    }
+
+    const missingRootKeys = (requirement.requiredRootKeys ?? [])
+      .filter(key => !(key in (adapter.roots ?? {})))
+    if (missingRootKeys.length > 0) {
+      throw new Error(
+        `[UIAdapterRegistry] adapter "${adapter.id}" is missing roots: ${missingRootKeys.join(', ')}`,
       )
     }
   }
