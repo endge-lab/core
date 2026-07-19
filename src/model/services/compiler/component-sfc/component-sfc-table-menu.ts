@@ -4,13 +4,15 @@ import type {
   RComponentSFC_IR_ElementNode,
   RComponentSFC_IR_Value,
 } from '@/domain/types/component/sfc'
-import { TABLE_RUNTIME_ACTION_IDS } from '@/domain/types/runtime/action.types'
+import { BUILTIN_ACTION_IDS, TABLE_RUNTIME_ACTION_IDS } from '@/domain/types/runtime/action.types'
 import type {
   ContextMenuDescriptor,
   ContextMenuItemDescriptor,
   ContextMenuNodeDescriptor,
   ContextMenuSeparatorDescriptor,
 } from '@/domain/types/ui/context-menu.types'
+import { parseExpression } from '@babel/parser'
+import * as t from '@babel/types'
 
 export const SFC_TABLE_COLUMN_MENU_MODES = ['default', 'disabled'] as const
 
@@ -124,7 +126,8 @@ function createItemDescriptor(
   diagnostics: RComponentDiagnostic[],
   providedActions?: ComponentSFCActionPort[],
 ): ContextMenuItemDescriptor | null {
-  const action = readLiteralStringProp(node, 'action')
+  const actionBinding = readActionBinding(node, diagnostics)
+  const action = actionBinding?.identity ?? ''
   const legacyCommand = readLiteralStringProp(node, 'command')
   const label = readLiteralStringProp(node, 'label')
   const id = readLiteralStringProp(node, 'id') || action || `item-${index}`
@@ -155,7 +158,10 @@ function createItemDescriptor(
   const isIntrinsicTableAction = action
     ? Object.values(TABLE_RUNTIME_ACTION_IDS).some(identity => identity === action)
     : false
-  if (action && providedActions && !isIntrinsicTableAction && !providedActions.some(port => port.name === action)) {
+  const isBuiltinAction = action
+    ? Object.values(BUILTIN_ACTION_IDS).some(identity => identity === action)
+    : false
+  if (action && providedActions && !isIntrinsicTableAction && !isBuiltinAction && !providedActions.some(port => port.name === action)) {
     diagnostics.push({
       severity: 'error',
       code: 'sfc-table-column-menu-item-action-not-provided',
@@ -185,8 +191,167 @@ function createItemDescriptor(
     id,
     label,
     action,
+    ...(actionBinding?.hasInput ? { input: actionBinding.input } : {}),
     ...(icon ? { icon } : {}),
   }
+}
+
+interface NormalizedMenuActionBinding {
+  identity: string
+  input?: unknown
+  hasInput: boolean
+}
+
+const STATIC_VALUE_UNSUPPORTED = Symbol('static-value-unsupported')
+
+function readActionBinding(
+  node: RComponentSFC_IR_ElementNode,
+  diagnostics: RComponentDiagnostic[],
+): NormalizedMenuActionBinding | null {
+  const value = node.props.action
+  if (value?.kind === 'literal') {
+    const identity = typeof value.value === 'string' ? value.value.trim() : ''
+    return identity ? { identity, hasInput: false } : null
+  }
+  if (value?.kind !== 'expression') {
+    return null
+  }
+
+  try {
+    const expression = unwrapExpression(parseExpression(value.source, {
+      sourceType: 'module',
+      plugins: ['typescript'],
+    }))
+    if (!t.isObjectExpression(expression)) {
+      pushActionBindingDiagnostic(diagnostics, node, 'sfc-table-column-menu-item-action-object-required', 'Dynamic action должен быть object literal с полями identity и input.')
+      return null
+    }
+
+    const properties = new Map<string, t.Expression>()
+    for (const property of expression.properties) {
+      if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
+        pushActionBindingDiagnostic(diagnostics, node, 'sfc-table-column-menu-item-action-object-invalid', 'Action binding не поддерживает spread, methods и computed properties.')
+        return null
+      }
+      const key = t.isIdentifier(property.key)
+        ? property.key.name
+        : t.isStringLiteral(property.key)
+          ? property.key.value
+          : ''
+      if (key) {
+        properties.set(key, property.value)
+      }
+    }
+
+    if (properties.has('payload')) {
+      pushActionBindingDiagnostic(diagnostics, node, 'sfc-table-column-menu-item-action-payload-removed', 'Используйте action.input вместо action.payload.')
+      return null
+    }
+    const unsupportedRootFields = [...properties.keys()]
+      .filter(key => key !== 'identity' && key !== 'input')
+    if (unsupportedRootFields.length > 0) {
+      pushActionBindingDiagnostic(diagnostics, node, 'sfc-table-column-menu-item-action-input-required', `Пользовательские поля Action должны находиться внутри input: ${unsupportedRootFields.join(', ')}.`)
+      return null
+    }
+
+    const identityValue = properties.get('identity')
+    const identity = identityValue && t.isStringLiteral(unwrapExpression(identityValue))
+      ? (unwrapExpression(identityValue) as t.StringLiteral).value.trim()
+      : ''
+    if (!identity) {
+      pushActionBindingDiagnostic(diagnostics, node, 'sfc-table-column-menu-item-action-identity-missing', 'Action binding должен содержать literal identity.')
+      return null
+    }
+
+    const inputExpression = properties.get('input')
+    if (!inputExpression) {
+      return { identity, hasInput: false }
+    }
+    const input = readStaticExpression(inputExpression)
+    if (input === STATIC_VALUE_UNSUPPORTED) {
+      pushActionBindingDiagnostic(diagnostics, node, 'sfc-table-column-menu-item-action-input-dynamic', 'Dynamic action.input пока не поддерживается. Используйте static object literal.')
+      return null
+    }
+    return { identity, input, hasInput: true }
+  }
+  catch {
+    pushActionBindingDiagnostic(diagnostics, node, 'sfc-table-column-menu-item-action-object-invalid', 'Не удалось разобрать object literal в MenuItem :action.')
+    return null
+  }
+}
+
+function readStaticExpression(node: t.Expression): unknown | typeof STATIC_VALUE_UNSUPPORTED {
+  const expression = unwrapExpression(node)
+  if (t.isStringLiteral(expression) || t.isNumericLiteral(expression) || t.isBooleanLiteral(expression)) {
+    return expression.value
+  }
+  if (t.isNullLiteral(expression)) {
+    return null
+  }
+  if (t.isUnaryExpression(expression) && expression.operator === '-' && t.isNumericLiteral(expression.argument)) {
+    return -expression.argument.value
+  }
+  if (t.isArrayExpression(expression)) {
+    const result: unknown[] = []
+    for (const element of expression.elements) {
+      if (!element || !t.isExpression(element)) {
+        return STATIC_VALUE_UNSUPPORTED
+      }
+      const item = readStaticExpression(element)
+      if (item === STATIC_VALUE_UNSUPPORTED) {
+        return STATIC_VALUE_UNSUPPORTED
+      }
+      result.push(item)
+    }
+    return result
+  }
+  if (t.isObjectExpression(expression)) {
+    const result: Record<string, unknown> = {}
+    for (const property of expression.properties) {
+      if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
+        return STATIC_VALUE_UNSUPPORTED
+      }
+      const key = t.isIdentifier(property.key)
+        ? property.key.name
+        : t.isStringLiteral(property.key)
+          ? property.key.value
+          : ''
+      if (!key) {
+        return STATIC_VALUE_UNSUPPORTED
+      }
+      const item = readStaticExpression(property.value)
+      if (item === STATIC_VALUE_UNSUPPORTED) {
+        return STATIC_VALUE_UNSUPPORTED
+      }
+      result[key] = item
+    }
+    return result
+  }
+  return STATIC_VALUE_UNSUPPORTED
+}
+
+function unwrapExpression(node: t.Expression): t.Expression {
+  let current = node
+  while (t.isTSAsExpression(current) || t.isTSTypeAssertion(current) || t.isTSNonNullExpression(current)) {
+    current = current.expression
+  }
+  return current
+}
+
+function pushActionBindingDiagnostic(
+  diagnostics: RComponentDiagnostic[],
+  node: RComponentSFC_IR_ElementNode,
+  code: string,
+  message: string,
+): void {
+  diagnostics.push({
+    severity: 'error',
+    code,
+    message,
+    sourcePath: 'template.Table.ColumnMenu.MenuItem.action',
+    start: node.sourceRange?.start,
+    end: node.sourceRange?.end,
+  })
 }
 
 function createSeparatorDescriptor(

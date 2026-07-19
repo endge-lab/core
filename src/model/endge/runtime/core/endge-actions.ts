@@ -12,6 +12,7 @@ import type {
   RuntimeActionRegistrySnapshot,
   TableColumnActionContext,
 } from '@/domain/types/runtime/action.types'
+import { BUILTIN_ACTION_IDS } from '@/domain/types/runtime/action.types'
 import type { ImplementationInvocation, ImplementationProvider } from '@/domain/types/runtime/implementation.types'
 import { Subscribable } from '@endge/utils'
 import { Endge } from '@/model/endge/kernel/endge'
@@ -24,6 +25,7 @@ const COMPONENT_PORT_PROVIDER_KEY = 'core.action.component-port'
 
 export interface CodeActionDefinition extends Omit<ActionDefinitionInput, 'owner'> {
   owner: string
+  catalogPath?: readonly string[]
   providerKey?: string
   execute?: ImplementationProvider['execute']
   canExecute?: ImplementationProvider['canExecute']
@@ -42,6 +44,7 @@ export interface ActionOverrideInput {
 /** Action-specific facade over semantic definitions and generic implementations. */
 export class EndgeActions extends Subscribable {
   private readonly _codeActions = new Map<string, RAction>()
+  private readonly _catalogPaths = new Map<string, string[]>()
   private readonly _codeActionDisposers = new Map<string, () => void>()
   private readonly _providerDisposers: Array<() => void> = []
   private _hasSynchronizedResolvedIndex = false
@@ -60,6 +63,7 @@ export class EndgeActions extends Subscribable {
         Endge.domain.resolved.delete('action', identity)
     }
     this._codeActions.clear()
+    this._catalogPaths.clear()
     this._codeActionDisposers.clear()
     this._implementations.clear()
     this._providerDisposers.splice(0).forEach(dispose => dispose())
@@ -275,6 +279,9 @@ export class EndgeActions extends Subscribable {
         })
       : () => {}
     this._codeActions.set(identity, action)
+    this._catalogPaths.set(identity, (definition.catalogPath ?? [])
+      .map(segment => String(segment ?? '').trim())
+      .filter(Boolean))
     this.notify()
 
     let disposed = false
@@ -284,6 +291,7 @@ export class EndgeActions extends Subscribable {
       disposeProvider()
       if (this._codeActions.get(identity) === action)
         this._codeActions.delete(identity)
+      this._catalogPaths.delete(identity)
       if (this._codeActionDisposers.get(identity) === dispose)
         this._codeActionDisposers.delete(identity)
       Endge.domain.resolved.delete('action', identity)
@@ -334,6 +342,7 @@ export class EndgeActions extends Subscribable {
       description: action.description ?? null,
       active: action.active !== false,
       origin: action.origin,
+      catalogPath: [...(this._catalogPaths.get(action.identity) ?? [])],
       owner: action.owner,
       target: action.target,
       input: action.input,
@@ -440,13 +449,21 @@ export class EndgeActions extends Subscribable {
 
   private _registerCoreActions(): void {
     this._defineCodeAction({
-      identity: 'console-log',
+      identity: BUILTIN_ACTION_IDS.consoleLog,
       displayName: 'Вывод в консоль',
-      description: 'Выводит input Action в консоль.',
+      description: 'Выводит сообщение или input Action в консоль.',
       owner: '@endge/core',
+      catalogPath: ['Debug'],
       execute: (invocation) => {
+        const input = invocation.input
+        const value = input != null
+          && typeof input === 'object'
+          && !Array.isArray(input)
+          && 'message' in input
+          ? (input as { message?: unknown }).message
+          : input
         // eslint-disable-next-line no-console
-        console.log(invocation.input)
+        console.log(value ?? '[Endge] built-in-console-log executed')
       },
     }, { kind: 'builtin', owner: '@endge/core' })
     this._defineCodeAction({

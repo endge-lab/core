@@ -16,6 +16,7 @@ export interface ContextMenuItemDescriptor {
   id: string
   label: string
   action: RuntimeActionId
+  input?: unknown
   icon?: string
 }
 

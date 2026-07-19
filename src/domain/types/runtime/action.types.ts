@@ -3,6 +3,17 @@ import type { EntityOrigin, EntityRef } from '@/domain/types/document/entity-man
 export type RuntimeActionId = string
 export type RuntimeActionSurface = string
 
+/** Stable identities of targetless Actions provided by Endge itself. */
+export const BUILTIN_ACTION_IDS = {
+  consoleLog: 'built-in-console-log',
+} as const
+
+/** Declarative reference accepted by interactive primitives such as MenuItem. */
+export interface ActionBinding<TInput = unknown> {
+  identity: RuntimeActionId
+  input?: TInput
+}
+
 /** One allowed target shape. Multiple selectors are alternatives. */
 export interface ActionTargetSelector {
   type: string
@@ -48,6 +59,8 @@ export interface ResolvedActionDescriptor {
   description: string | null
   active: boolean
   origin: EntityOrigin
+  /** Runtime catalog placement; it does not affect ownership or persistence. */
+  catalogPath?: string[]
   owner?: EntityRef
   target: ActionTargetSelector[] | null
   input: unknown | null

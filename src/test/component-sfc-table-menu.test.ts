@@ -48,6 +48,53 @@ describe('Component SFC table column menu', () => {
     })
   })
 
+  it('compiles a built-in Action binding with static input', () => {
+    const result = compileComponentSFC(createTableSource(`
+      <ColumnMenu>
+        <MenuItem
+          :action="{
+            identity: 'built-in-console-log',
+            input: { message: 'Контекстное меню работает' },
+          }"
+          label="Debug"
+        />
+      </ColumnMenu>
+      <Column key="number" title="Flight" sortable />
+    `))
+    const menu = normalizeComponentSFCTableColumnMenu(readTable(result))
+
+    expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
+    expect(menu.menu?.items).toEqual([{
+      kind: 'item',
+      id: 'built-in-console-log',
+      action: 'built-in-console-log',
+      input: { message: 'Контекстное меню работает' },
+      label: 'Debug',
+    }])
+  })
+
+  it('rejects payload and flattened Action input fields', () => {
+    const payload = compileComponentSFC(createTableSource(`
+      <ColumnMenu>
+        <MenuItem :action="{ identity: 'built-in-console-log', payload: { message: 'test' } }" label="Debug" />
+      </ColumnMenu>
+      <Column key="number" title="Flight" sortable />
+    `))
+    const flattened = compileComponentSFC(createTableSource(`
+      <ColumnMenu>
+        <MenuItem :action="{ identity: 'built-in-console-log', message: 'test' }" label="Debug" />
+      </ColumnMenu>
+      <Column key="number" title="Flight" sortable />
+    `))
+
+    expect(payload.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'sfc-table-column-menu-item-action-payload-removed' }),
+    ]))
+    expect(flattened.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'sfc-table-column-menu-item-action-input-required' }),
+    ]))
+  })
+
   it('reports MenuItem without action or label', () => {
     const result = compileComponentSFC(createTableSource(`
       <ColumnMenu>

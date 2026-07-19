@@ -1,12 +1,36 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { RAction } from '@/domain/entities/reflect/RAction'
+import { BUILTIN_ACTION_IDS } from '@/domain/types/runtime/action.types'
 import { EndgeImplementations } from '@/model/endge/runtime/implementation/endge-implementations'
 import { compileAction } from '@/model/services/compiler/action/action-compile'
 import { validateActionTarget } from '@/model/services/compiler/action/action-target-validation'
 import { Endge } from '@/model/endge/kernel/endge'
 
 describe('Action implementation pipeline', () => {
+  it('materializes console log only as a built-in Action and executes its default message', async () => {
+    const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const descriptor = Endge.actions.listResolved()
+      .find(action => action.identity === BUILTIN_ACTION_IDS.consoleLog)
+
+    expect(descriptor).toMatchObject({
+      identity: 'built-in-console-log',
+      origin: { kind: 'builtin', owner: '@endge/core' },
+      catalogPath: ['Debug'],
+      defaultImplementation: { kind: 'provider' },
+    })
+    expect(Endge.domain.getActions().some(action => action.identity === BUILTIN_ACTION_IDS.consoleLog)).toBe(false)
+
+    await Endge.actions.execute(BUILTIN_ACTION_IDS.consoleLog)
+    await Endge.actions.execute(BUILTIN_ACTION_IDS.consoleLog, {
+      input: { message: 'Проверка console Action' },
+    })
+
+    expect(consoleLog).toHaveBeenCalledWith('[Endge] built-in-console-log executed')
+    expect(consoleLog).toHaveBeenCalledWith('Проверка console Action')
+    consoleLog.mockRestore()
+  })
+
   it('resolves scope precedence and restores the default after dispose', async () => {
     const implementations = new EndgeImplementations()
     implementations.registerProvider(provider('default', 'default'))

@@ -4,7 +4,6 @@ import type { ComputationOverride } from '@/domain/types/computation'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { RAction } from '@/domain/entities/reflect/RAction'
 import { Endge } from '@/model/endge/kernel/endge'
-import { consoleLog } from '@/model/seed/actions/console_log'
 import { loadVocabs } from '@/model/seed/actions/load_vocabs'
 import { split } from '@/model/seed/converters/arrays/split'
 import { toArray } from '@/model/seed/converters/arrays/to-array'
@@ -74,7 +73,6 @@ export class EndgeBind extends EndgeModule {
    */
   private registerDefaultActions(): void {
     for (const action of Endge.domain.getActions()) {
-      this.action(action, 'console-log', consoleLog)
       this.action(action, 'load-vocabs', loadVocabs)
     }
   }
