@@ -19,6 +19,13 @@ export class RType extends REntity {
   @Expose()
   isPrimitive: boolean = false
 
+  /** Независимый Type Source. Legacy fields не генерируются из него автоматически. */
+  @Expose()
+  source: string = ''
+
+  @Expose()
+  sourceVersion: number = 1
+
   @Expose()
   @TypeMap(RField, 'name')
   fields: Map<string, RField> = new Map()

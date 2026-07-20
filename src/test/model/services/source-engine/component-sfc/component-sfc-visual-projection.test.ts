@@ -10,7 +10,17 @@ defineProps<{ rows: unknown[] }>()
 
 <template>
   <!-- table comment stays source-owned -->
-  <Table :rows="rows" row-key="id" sort-mode="single" default-pin="number:left">
+  <Table
+    :rows="rows"
+    row-key="id"
+    paging="pages"
+    page-size="25"
+    page-sizes="10,25,50"
+    sort-mode="single"
+    default-sort="number:asc"
+    default-pin="number:left"
+    default-hidden="status"
+  >
     <Column key="number" title="Flight" width="180" sortable sort-by="carrier, number">
       <Cell>
         <Text>{{ row.number }}</Text>
@@ -26,8 +36,13 @@ defineProps<{ rows: unknown[] }>()
       kind: 'table',
       rows: { kind: 'expression', source: 'rows' },
       rowKey: { kind: 'literal', value: 'id' },
+      paging: { kind: 'literal', value: 'pages' },
+      pageSize: { kind: 'literal', value: '25' },
+      pageSizes: { kind: 'literal', value: '10,25,50' },
       sortMode: { kind: 'literal', value: 'single' },
+      defaultSort: { kind: 'literal', value: 'number:asc' },
       defaultPin: { kind: 'literal', value: 'number:left' },
+      defaultHidden: { kind: 'literal', value: 'status' },
       columns: [
         {
           key: { kind: 'literal', value: 'number' },
@@ -35,7 +50,7 @@ defineProps<{ rows: unknown[] }>()
           width: { kind: 'literal', value: '180' },
           sortable: { kind: 'boolean', value: true },
           sortBy: { kind: 'literal', value: 'carrier, number' },
-          cell: { kind: 'source' },
+          cell: { kind: 'tag', tag: 'Text', syntax: 'cell', bindings: [] },
           hasCustomCell: true,
         },
         {
@@ -85,8 +100,21 @@ defineProps<{ rows: unknown[] }>()
     const managed = inspectComponentSFCVisual(`<template><Table><Column key="one"><Cell><Component is="Cell.Status" /></Cell></Column></Table></template>`)
     const dynamic = inspectComponentSFCVisual(`<template><Table><Column key="one"><Cell><Component :is="cellComponent" /></Cell></Column></Table></template>`)
 
-    expect(managed.projection?.columns[0]?.cell).toEqual({ kind: 'component', identity: 'Cell.Status', syntax: 'cell' })
+    expect(managed.projection?.columns[0]?.cell).toEqual({ kind: 'component', identity: 'Cell.Status', syntax: 'cell', bindings: [] })
     expect(dynamic.projection?.columns[0]?.cell).toEqual({ kind: 'source' })
+  })
+
+  it('recognizes direct and Cell-wrapped built-in tags', () => {
+    const wrapped = inspectComponentSFCVisual('<template><Table><Column key="one"><Cell><Number :value="value" /></Cell></Column></Table></template>')
+    const direct = inspectComponentSFCVisual('<template><Table><Column key="two"><Badge>{{ value }}</Badge></Column></Table></template>')
+
+    expect(wrapped.projection?.columns[0]?.cell).toEqual({
+      kind: 'tag',
+      tag: 'Number',
+      syntax: 'cell',
+      bindings: [{ name: 'value', value: { kind: 'expression', source: 'value' }, sourceRange: expect.any(Object) }],
+    })
+    expect(direct.projection?.columns[0]?.cell).toEqual({ kind: 'tag', tag: 'Badge', syntax: 'direct', bindings: [] })
   })
 
   it('recognizes a direct user component tag without requiring a Cell wrapper', () => {
@@ -105,7 +133,16 @@ defineProps<{ rows: unknown[] }>()
     })
 
     expect(result.projection?.columns[0]).toMatchObject({
-      cell: { kind: 'component', identity: 'aircraft-tail', syntax: 'direct' },
+      cell: {
+        kind: 'component',
+        identity: 'aircraft-tail',
+        syntax: 'direct',
+        bindings: [
+          { name: 'tail', value: { kind: 'expression', source: "row.departureLeg.attributes[name = 'ACTail']" } },
+          { name: 'aircraftType', value: { kind: 'expression', source: "row.departureLeg.attributes[name = 'ACType']" } },
+          { name: 'configuration', value: { kind: 'expression', source: "row.departureLeg.attributes[name = 'ACConfig']" } },
+        ],
+      },
       hasCustomCell: true,
     })
     expect(result.projection?.columns[0]?.cellSource).toContain('<AircraftTail')

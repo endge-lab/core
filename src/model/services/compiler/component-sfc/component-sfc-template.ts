@@ -22,6 +22,7 @@ import { compileComponentSFCExpression } from '@/model/services/compiler/compone
 import { normalizeComponentSFCTableColumnMenu } from '@/model/services/compiler/component-sfc/component-sfc-table-menu'
 import { normalizeComponentSFCTableColumnPin } from '@/model/services/compiler/component-sfc/component-sfc-table-pin'
 import { normalizeComponentSFCTableSort } from '@/model/services/compiler/component-sfc/component-sfc-table-sort'
+import { normalizeComponentSFCTableColumnVisibility } from '@/model/services/compiler/component-sfc/component-sfc-table-visibility'
 import { compileProgramMetadataSource } from '@/model/services/source-engine/compilers/source-metadata-compile'
 
 /** Контекст компиляции template в IR. */
@@ -267,6 +268,7 @@ function compileElementNode(
   if (element.tag === 'Table') {
     diagnostics.push(...normalizeComponentSFCTableSort(element).diagnostics)
     diagnostics.push(...normalizeComponentSFCTableColumnPin(element).diagnostics)
+    diagnostics.push(...normalizeComponentSFCTableColumnVisibility(element).diagnostics)
     const menu = normalizeComponentSFCTableColumnMenu(element, context.providedActions)
     diagnostics.push(...menu.diagnostics)
   }

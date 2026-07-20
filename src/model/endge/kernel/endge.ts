@@ -198,7 +198,6 @@ export class Endge extends EndgeFederation {
       },
     }
   }
-
   /**
    * Скачивает текущий workspace и домен как JSON-файл через браузерный download.
    */
@@ -206,7 +205,6 @@ export class Endge extends EndgeFederation {
     const bundle = Endge.exportDomainBundle()
     Endge.downloadBundle(bundle, 'endge-domain')
   }
-
   /**
    * Скачивает выбранные документы в той же portable JSON-структуре, что и полный домен.
    */

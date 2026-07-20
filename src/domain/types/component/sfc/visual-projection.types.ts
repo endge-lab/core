@@ -1,4 +1,5 @@
 import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
+import type { RComponentSFC_IR_Tag } from './ir.types'
 import type { RComponentSFC_SourceRange } from './location.types'
 
 /** Значение SFC source, подготовленное для безопасного отображения в visual editor. */
@@ -14,10 +15,29 @@ export interface ComponentSFCVisualAttribute {
   sourceRange?: RComponentSFC_SourceRange
 }
 
+/** Редактируемый prop binding единственного управляемого элемента колонки Table. */
+export type ComponentSFCTableCellBindingProjection = ComponentSFCVisualAttribute
+
 /** Способ, которым содержимое ячейки представлено в простом visual editor. */
+export type ComponentSFCTableVisualCellTag = Exclude<
+  RComponentSFC_IR_Tag,
+  'Component' | 'Table' | 'Column' | 'Cell' | 'ColumnMenu' | 'MenuItem' | 'MenuSeparator'
+>
+
 export type ComponentSFCTableCellProjection
   = | { kind: 'default' }
-    | { kind: 'component', identity: string | null, syntax: 'cell' | 'direct' }
+    | {
+      kind: 'component'
+      identity: string | null
+      syntax: 'cell' | 'direct'
+      bindings: ComponentSFCTableCellBindingProjection[]
+    }
+    | {
+      kind: 'tag'
+      tag: ComponentSFCTableVisualCellTag
+      syntax: 'cell' | 'direct'
+      bindings: ComponentSFCTableCellBindingProjection[]
+    }
     | { kind: 'source' }
 
 /** Registry context required to resolve direct user component tags while reading Source. */
@@ -62,7 +82,12 @@ export type ComponentSFCTableSourcePatch
     | {
       type: 'set-column-attribute'
       columnIndex: number
-      name: 'key' | 'title' | 'width'
+      name: 'key' | 'title' | 'width' | 'sortable'
+      value: string | null
+    }
+    | {
+      type: 'set-table-attribute'
+      name: 'paging' | 'page-size' | 'page-sizes' | 'default-pin' | 'default-sort' | 'default-hidden'
       value: string | null
     }
     | {
@@ -70,6 +95,19 @@ export type ComponentSFCTableSourcePatch
       columnIndex: number
       identity: string | null
       syntax?: 'cell' | 'direct'
+    }
+    | {
+      type: 'set-column-tag'
+      columnIndex: number
+      tag: ComponentSFCTableVisualCellTag | null
+      syntax?: 'cell' | 'direct'
+    }
+    | {
+      type: 'set-column-cell-attribute'
+      columnIndex: number
+      name: string
+      value: string | null
+      valueKind: 'expression' | 'literal'
     }
 
 /** Результат точечного изменения SFC Table source. */
@@ -87,10 +125,14 @@ export interface ComponentSFCTableVisualProjection {
   kind: 'table'
   rows: ComponentSFCVisualSourceValue | null
   rowKey: ComponentSFCVisualSourceValue | null
+  paging: ComponentSFCVisualSourceValue | null
+  pageSize: ComponentSFCVisualSourceValue | null
+  pageSizes: ComponentSFCVisualSourceValue | null
   sortMode: ComponentSFCVisualSourceValue | null
   defaultSort: ComponentSFCVisualSourceValue | null
   columnPin: ComponentSFCVisualSourceValue | null
   defaultPin: ComponentSFCVisualSourceValue | null
+  defaultHidden: ComponentSFCVisualSourceValue | null
   columnMenu: ComponentSFCVisualSourceValue | null
   attributes: ComponentSFCVisualAttribute[]
   columns: ComponentSFCTableColumnProjection[]

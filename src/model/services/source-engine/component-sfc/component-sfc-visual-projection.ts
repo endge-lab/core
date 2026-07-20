@@ -4,6 +4,7 @@ import type {
   ComponentSFCVisualInspectionOptions,
   ComponentSFCVisualSourceValue,
   ComponentSFCTableColumnProjection,
+  ComponentSFCTableVisualCellTag,
   ComponentSFCTableVisualProjection,
   RComponentSFC_AST_Directive,
   RComponentSFC_AST_ElementNode,
@@ -12,6 +13,17 @@ import type {
   RComponentSFC_IR_Value,
 } from '@/domain/types/component/sfc'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
+import { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sfc/component-sfc-template'
+
+const NON_VISUAL_CELL_TAGS = new Set([
+  'Component',
+  'Table',
+  'Column',
+  'Cell',
+  'ColumnMenu',
+  'MenuItem',
+  'MenuSeparator',
+])
 
 /** Строит UI-neutral visual projection только для SFC с одним корневым Table. */
 export function inspectComponentSFCVisual(
@@ -88,10 +100,14 @@ function projectTable(
     kind: 'table',
     rows: readProp(ir, 'rows'),
     rowKey: readProp(ir, 'row-key', 'rowKey'),
+    paging: readProp(ir, 'paging'),
+    pageSize: readProp(ir, 'page-size', 'pageSize'),
+    pageSizes: readProp(ir, 'page-sizes', 'pageSizes'),
     sortMode: readProp(ir, 'sort-mode', 'sortMode'),
     defaultSort: readProp(ir, 'default-sort', 'defaultSort'),
     columnPin: readProp(ir, 'column-pin', 'columnPin'),
     defaultPin: readProp(ir, 'default-pin', 'defaultPin'),
+    defaultHidden: readProp(ir, 'default-hidden', 'defaultHidden'),
     columnMenu: readProp(ir, 'column-menu', 'columnMenu'),
     attributes: projectAttributes(source, ast, ir),
     columns: astColumns.map((column, index) => projectColumn(source, column, irColumns[index] ?? null, index)),
@@ -174,9 +190,13 @@ function projectColumnCell(
     : null
 
   return {
-    projection: child && identity && !source.slice(column.range.start, column.range.end).includes('<!--')
-      ? { kind: 'component', identity, syntax: 'direct' }
-      : { kind: 'source' },
+    projection: projectSingleCellElement(
+      source,
+      column,
+      child,
+      identity,
+      'direct',
+    ),
     hasCustomCell: true,
     source: directSource,
   }
@@ -224,19 +244,30 @@ function projectManagedCell(
 
   const children = cell.children.filter(isSemanticRoot)
   if (children.length === 0)
-    return { kind: 'component', identity: null, syntax: 'cell' }
+    return { kind: 'component', identity: null, syntax: 'cell', bindings: [] }
 
-  const component = children.length === 1 && children[0].kind === 'element' && children[0].tag === 'Component'
+  const child = children.length === 1 && children[0].kind === 'element'
     ? children[0]
     : null
-  if (!component)
+  if (!child)
     return { kind: 'source' }
 
-  const identity = component.attributes.find(attribute => attribute.name === 'is')
+  if (child.tag !== 'Component') {
+    return isVisualCellTag(child.tag)
+      ? {
+          kind: 'tag',
+          tag: child.tag,
+          syntax: 'cell',
+          bindings: projectCellBindings(child),
+        }
+      : { kind: 'source' }
+  }
+
+  const identity = child.attributes.find(attribute => attribute.name === 'is')
   if (identity?.dynamic)
     return { kind: 'source' }
 
-  const hasDynamicIs = component.directives.some((directive) => {
+  const hasDynamicIs = child.directives.some((directive) => {
     const raw = source.slice(directive.range.start, directive.range.end).trim()
     return directive.name === 'bind' && directive.argument === 'is'
       || raw.startsWith(':is')
@@ -249,7 +280,56 @@ function projectManagedCell(
     kind: 'component',
     identity: identity?.value?.trim() || null,
     syntax: 'cell',
+    bindings: projectCellBindings(child, new Set(['is'])),
   }
+}
+
+function projectSingleCellElement(
+  source: string,
+  owner: RComponentSFC_AST_ElementNode,
+  child: RComponentSFC_AST_ElementNode | null,
+  componentIdentity: string | null,
+  syntax: 'cell' | 'direct',
+): ComponentSFCTableColumnProjection['cell'] {
+  if (!child || source.slice(owner.range.start, owner.range.end).includes('<!--'))
+    return { kind: 'source' }
+  if (componentIdentity)
+    return {
+      kind: 'component',
+      identity: componentIdentity,
+      syntax,
+      bindings: projectCellBindings(child, new Set(['is'])),
+    }
+  if (isVisualCellTag(child.tag))
+    return {
+      kind: 'tag',
+      tag: child.tag,
+      syntax,
+      bindings: projectCellBindings(child),
+    }
+  return { kind: 'source' }
+}
+
+/** Проецирует только props управляемого элемента, не затрагивая его children. */
+function projectCellBindings(
+  node: RComponentSFC_AST_ElementNode,
+  excludedNames: ReadonlySet<string> = new Set(),
+): ComponentSFCVisualAttribute[] {
+  return node.attributes
+    .filter(attribute => !excludedNames.has(attribute.name))
+    .map(attribute => ({
+      name: attribute.name,
+      value: attribute.dynamic
+        ? { kind: 'expression' as const, source: attribute.value ?? '' }
+        : attribute.value == null
+          ? { kind: 'boolean' as const, value: true }
+          : { kind: 'literal' as const, value: attribute.value },
+      sourceRange: attribute.range,
+    }))
+}
+
+function isVisualCellTag(tag: string): tag is ComponentSFCTableVisualCellTag {
+  return isComponentSFCBuiltInTag(tag) && !NON_VISUAL_CELL_TAGS.has(tag)
 }
 
 function readLiteralString(value: RComponentSFC_IR_Value | undefined): string | null {

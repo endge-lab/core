@@ -1,12 +1,15 @@
 import type {
   ComponentSFCTableSourcePatch,
   ComponentSFCTableSourcePatchResult,
+  ComponentSFCTableVisualCellTag,
   RComponentSFC_AST_ElementNode,
   RComponentSFC_AST_TemplateNode,
 } from '@/domain/types/component/sfc'
 import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
 
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
+import { compileComponentSFCExpression } from '@/model/services/compiler/component-sfc/component-sfc-expression'
+import { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sfc/component-sfc-template'
 import { inspectComponentSFCVisual } from '@/model/services/source-engine/component-sfc/component-sfc-visual-projection'
 
 interface TableSourceContext {
@@ -14,6 +17,16 @@ interface TableSourceContext {
   columns: RComponentSFC_AST_ElementNode[]
   diagnostics: RComponentDiagnostic[]
 }
+
+const NON_VISUAL_CELL_TAGS = new Set([
+  'Component',
+  'Table',
+  'Column',
+  'Cell',
+  'ColumnMenu',
+  'MenuItem',
+  'MenuSeparator',
+])
 
 /** Применяет одну узкую visual-editor операцию, не перепечатывая остальной SFC source. */
 export function patchComponentSFCTableSource(
@@ -86,12 +99,34 @@ function applyTablePatch(
         patch.name,
         patch.value,
       )
+    case 'set-table-attribute':
+      return setNodeAttribute(
+        source,
+        context.table,
+        patch.name,
+        patch.value,
+      )
     case 'set-column-component':
       return setColumnComponent(
         source,
         requireColumn(context, patch.columnIndex),
         patch.identity,
         patch.syntax,
+      )
+    case 'set-column-tag':
+      return setColumnTag(
+        source,
+        requireColumn(context, patch.columnIndex),
+        patch.tag,
+        patch.syntax,
+      )
+    case 'set-column-cell-attribute':
+      return setColumnCellAttribute(
+        source,
+        requireColumn(context, patch.columnIndex),
+        patch.name,
+        patch.value,
+        patch.valueKind,
       )
   }
 }
@@ -207,17 +242,80 @@ function setColumnComponent(
     && semanticChildren[0].tag === 'Component'
     ? semanticChildren[0]
     : null
+  const managedTag = semanticChildren.length === 1
+    && semanticChildren[0].kind === 'element'
+    && isVisualCellTag(semanticChildren[0].tag)
+    ? semanticChildren[0]
+    : null
   const isEmptyManagedCell = semanticChildren.length === 0
 
-  if (!component && !isEmptyManagedCell)
+  if (!component && !managedTag && !isEmptyManagedCell)
     throw new Error('Ячейка содержит произвольный Source. Измените её во вкладке Source.')
 
   if (!identity)
     return removeNode(source, cell)
+  if (managedTag)
+    return replaceRange(source, managedTag.range.start, managedTag.range.end, `<Component is="${escapeAttribute(identity)}" />`)
   if (!component)
     return insertChild(source, cell, `<Component is="${escapeAttribute(identity)}" />`)
 
   return setNodeAttribute(source, component, 'is', identity)
+}
+
+function setColumnTag(
+  source: string,
+  column: RComponentSFC_AST_ElementNode,
+  tag: ComponentSFCTableVisualCellTag | null,
+  syntax: 'cell' | 'direct' | undefined,
+): string {
+  if (tag && !isVisualCellTag(tag))
+    throw new Error(`Tag ${tag} нельзя использовать как простой Table Cell.`)
+
+  const cell = column.children.find(
+    (node): node is RComponentSFC_AST_ElementNode => node.kind === 'element' && node.tag === 'Cell',
+  ) ?? null
+
+  if (!cell) {
+    const directChildren = column.children.filter(isSemanticNode)
+    if (directChildren.length === 0)
+      return tag ? insertChild(source, column, tagCellMarkup(tag)) : source
+    if (syntax !== 'direct' || directChildren.length !== 1 || directChildren[0].kind !== 'element')
+      throw new Error('Колонка содержит произвольный Source. Измените её во вкладке Source.')
+    if (source.slice(column.range.start, column.range.end).includes('<!--'))
+      throw new Error('Колонка содержит комментарии или произвольный Source. Измените её во вкладке Source.')
+    if (!tag)
+      return removeNode(source, directChildren[0])
+    if (isVisualCellTag(directChildren[0].tag)) {
+      return directChildren[0].tag === tag
+        ? source
+        : replaceRange(source, directChildren[0].range.start, directChildren[0].range.end, tagMarkup(tag))
+    }
+    return replaceRange(source, directChildren[0].range.start, directChildren[0].range.end, tagMarkup(tag))
+  }
+
+  if (source.slice(cell.range.start, cell.range.end).includes('<!--'))
+    throw new Error('Ячейка содержит комментарии или произвольный Source. Измените её во вкладке Source.')
+
+  const semanticChildren = cell.children.filter(isSemanticNode)
+  if (semanticChildren.length === 0) {
+    if (!tag)
+      return removeNode(source, cell)
+    return insertChild(source, cell, tagMarkup(tag))
+  }
+
+  const child = semanticChildren.length === 1 && semanticChildren[0].kind === 'element'
+    ? semanticChildren[0]
+    : null
+  if (!child || (child.tag !== 'Component' && !isVisualCellTag(child.tag)))
+    throw new Error('Ячейка содержит произвольный Source. Измените её во вкладке Source.')
+  if (!tag)
+    return removeNode(source, cell)
+  if (isVisualCellTag(child.tag)) {
+    return child.tag === tag
+      ? source
+      : replaceRange(source, child.range.start, child.range.end, tagMarkup(tag))
+  }
+  return replaceRange(source, child.range.start, child.range.end, tagMarkup(tag))
 }
 
 function setDirectColumnComponent(
@@ -244,6 +342,49 @@ function setDirectColumnComponent(
 
   const normalizedSource = renameElementTag(source, component, 'Component')
   return insertAttribute(normalizedSource, component, serializeAttribute('is', identity))
+}
+
+function setColumnCellAttribute(
+  source: string,
+  column: RComponentSFC_AST_ElementNode,
+  rawName: string,
+  value: string | null,
+  valueKind: 'expression' | 'literal',
+): string {
+  const name = rawName.trim()
+  if (!/^[A-Za-z_$][\w$.-]*$/.test(name))
+    throw new Error(`Некорректное имя входного параметра "${rawName}".`)
+  if (name === 'is')
+    throw new Error('Параметр is управляется выбором компонента.')
+
+  const child = requireManagedColumnCellElement(source, column)
+  if (valueKind === 'expression' && value != null) {
+    const result = compileComponentSFCExpression(value, {
+      sourcePath: `template.Table.Column.${name}`,
+    })
+    const error = result.diagnostics.find(item => item.severity === 'error')
+    if (error)
+      throw new Error(error.message)
+  }
+
+  return setNodeAttributeValue(source, child, name, value, valueKind)
+}
+
+function requireManagedColumnCellElement(
+  source: string,
+  column: RComponentSFC_AST_ElementNode,
+): RComponentSFC_AST_ElementNode {
+  if (source.slice(column.range.start, column.range.end).includes('<!--'))
+    throw new Error('Колонка содержит комментарии или произвольный Source.')
+
+  const cell = column.children.find(
+    (node): node is RComponentSFC_AST_ElementNode => node.kind === 'element' && node.tag === 'Cell',
+  ) ?? null
+  const children = (cell?.children ?? column.children).filter(isSemanticNode)
+  if (children.length !== 1 || children[0].kind !== 'element')
+    throw new Error('Для visual bindings нужен один Component или Tag внутри колонки.')
+
+  return children[0]
 }
 
 function renameElementTag(
@@ -275,6 +416,28 @@ function renameElementTag(
 
 function componentCellMarkup(identity: string): string {
   return `<Cell>\n  <Component is="${escapeAttribute(identity)}" />\n</Cell>`
+}
+
+function tagCellMarkup(tag: ComponentSFCTableVisualCellTag): string {
+  return `<Cell>\n  ${tagMarkup(tag)}\n</Cell>`
+}
+
+function tagMarkup(tag: ComponentSFCTableVisualCellTag): string {
+  if (tag === 'Text' || tag === 'DateTime' || tag === 'Number' || tag === 'Input' || tag === 'Textarea' || tag === 'Select')
+    return `<${tag} :value="value" />`
+  if (tag === 'Icon')
+    return '<Icon :name="value" />'
+  if (tag === 'Checkbox')
+    return '<Checkbox :checked="Boolean(value)" />'
+  if (tag === 'Dot')
+    return '<Dot :tone="value" />'
+  if (tag === 'Divider')
+    return '<Divider />'
+  return `<${tag}>{{ value }}</${tag}>`
+}
+
+function isVisualCellTag(tag: string): tag is ComponentSFCTableVisualCellTag {
+  return isComponentSFCBuiltInTag(tag) && !NON_VISUAL_CELL_TAGS.has(tag)
 }
 
 function setNodeAttribute(
@@ -313,8 +476,45 @@ function setNodeAttribute(
   return insertAttribute(source, node, serializeAttribute(name, value))
 }
 
+function setNodeAttributeValue(
+  source: string,
+  node: RComponentSFC_AST_ElementNode,
+  name: string,
+  value: string | null,
+  valueKind: 'expression' | 'literal',
+): string {
+  const declarations = node.attributes.filter(item => item.name === name)
+  if (declarations.length > 1)
+    throw new Error(`Параметр ${name} объявлен несколько раз. Измените его во вкладке Source.`)
+
+  const declaration = declarations[0] ?? null
+  if (declaration) {
+    if (value == null)
+      return removeRangeWithWhitespace(source, declaration.range.start, declaration.range.end)
+    return replaceRange(
+      source,
+      declaration.range.start,
+      declaration.range.end,
+      serializeAttributeValue(name, value, valueKind),
+    )
+  }
+
+  if (value == null)
+    return source
+  return insertAttribute(source, node, serializeAttributeValue(name, value, valueKind))
+}
+
 function serializeAttribute(name: string, value: string): string {
   return `${name}="${escapeAttribute(value)}"`
+}
+
+function serializeAttributeValue(
+  name: string,
+  value: string,
+  valueKind: 'expression' | 'literal',
+): string {
+  const prefix = valueKind === 'expression' ? ':' : ''
+  return `${prefix}${name}="${escapeAttribute(value)}"`
 }
 
 function escapeAttribute(value: string): string {

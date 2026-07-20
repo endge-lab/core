@@ -22,6 +22,7 @@ import { RMock } from '@/domain/entities/reflect/RMock'
 import { RComputation } from '@/domain/entities/reflect/RComputation'
 import { RStyle } from '@/domain/entities/reflect/RStyle'
 import { RTenant } from '@/domain/entities/reflect/RTenant'
+import { RType } from '@/domain/entities/reflect/RType'
 import { RVocabs } from '@/domain/entities/reflect/RVocabs'
 import { ComponentType, FilterType, QueryType } from '@/domain/types/document/document.types'
 import { Endge } from '@/model/endge/kernel/endge'
@@ -150,6 +151,19 @@ export class DocumentDraftFactory {
         item.source = Endge.source.createDefault('computation')
         item.sourceVersion = 1
         item.contractVersion = 1
+        if (folderId != null)
+          item.folderId = folderId
+        return item
+      }
+
+      case 'type': {
+        const item = new RType(identity)
+        item.identity = identity
+        item.name = title
+        item.displayName = title
+        item.isPrimitive = false
+        item.source = Endge.source.createDefault('type')
+        item.sourceVersion = 1
         if (folderId != null)
           item.folderId = folderId
         return item

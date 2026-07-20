@@ -7,6 +7,7 @@ import { RMock } from '@/domain/entities/reflect/RMock'
 import { RComputation } from '@/domain/entities/reflect/RComputation'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { ENDGE_STYLE_DEFAULT_SOURCE, RStyle } from '@/domain/entities/reflect/RStyle'
+import { RType } from '@/domain/entities/reflect/RType'
 import { ComponentType, QueryType } from '@/domain/types/document/document.types'
 import { DocumentDraftFactory } from '@/model/services/document/DocumentDraftFactory'
 
@@ -124,6 +125,25 @@ describe('DocumentDraftFactory', () => {
       folderId: 'root-styles',
     })
     expect((draft as RStyle).toPlain()).not.toHaveProperty('styles')
+  })
+
+  it('creates a source-first complex type draft', () => {
+    const draft = DocumentDraftFactory.create('type', {
+      identity: 'flight-status',
+      name: 'Flight status',
+      folderId: 'root-types',
+    })
+
+    expect(draft).toBeInstanceOf(RType)
+    expect(draft).toMatchObject({
+      identity: 'flight-status',
+      name: 'Flight status',
+      displayName: 'Flight status',
+      isPrimitive: false,
+      sourceVersion: 1,
+      folderId: 'root-types',
+    })
+    expect((draft as RType).source).toContain('defineType')
   })
 
   it('rejects an empty identity', () => {

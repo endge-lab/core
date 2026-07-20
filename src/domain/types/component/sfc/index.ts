@@ -1,4 +1,6 @@
 export * from './source.types'
+export * from './table-visibility.types'
+export * from './tag-input-contract.types'
 export * from './location.types'
 export * from './ast.types'
 export * from './ir.types'

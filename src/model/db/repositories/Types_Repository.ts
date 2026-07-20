@@ -27,8 +27,10 @@ export class Types_Repository {
     identity: string
     displayName: string
     schema: any
+    source?: string
+    sourceVersion?: number
     author?: string
-    folder?: string
+    folder?: number | string
     active?: boolean
     isPrimitive?: boolean
     managedBy?: ManagedBy
@@ -46,8 +48,10 @@ export class Types_Repository {
       identity: string
       displayName: string
       schema: any
+      source: string
+      sourceVersion: number
       author?: string
-      folder: string
+      folder: number | string
       active: boolean
       isPrimitive: boolean
       managedBy: ManagedBy
@@ -63,8 +67,10 @@ export class Types_Repository {
     identity: string
     displayName: string
     schema: any
+    source?: string
+    sourceVersion?: number
     author?: string
-    folder?: string
+    folder?: number | string
     active?: boolean
     isPrimitive?: boolean
     managedBy?: ManagedBy

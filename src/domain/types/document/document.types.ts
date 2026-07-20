@@ -11,6 +11,7 @@ import type { RDataView } from '@/domain/entities/reflect/RDataView'
 import type { RPolicy } from '@/domain/entities/reflect/RPolicy'
 import type { RStyle } from '@/domain/entities/reflect/RStyle'
 import type { RTenant } from '@/domain/entities/reflect/RTenant'
+import type { RType } from '@/domain/entities/reflect/RType'
 import type { RVocabs } from '@/domain/entities/reflect/RVocabs'
 import type { RI18nBundle } from '@/domain/entities/reflect/RI18nBundle'
 import type { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
@@ -132,4 +133,4 @@ export interface Document {
 /**
  * Описывает любой документ рефлекцию
  */
-export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RComposition | RStore | RMock | RAction | RConverter | RComputation | RIntegration | RParameter | RFilter | RPolicy | RStyle | RVocabs | RI18nBundle | RAuthProfile | RWorkspace | RTenant | RPageTemplate | RPage | RNavigation
+export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RComposition | RStore | RMock | RAction | RConverter | RComputation | RIntegration | RParameter | RFilter | RPolicy | RStyle | RType | RVocabs | RI18nBundle | RAuthProfile | RWorkspace | RTenant | RPageTemplate | RPage | RNavigation

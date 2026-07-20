@@ -1048,6 +1048,8 @@ export class EndgeSchemaStorage extends EndgeModule {
         id,
         identity,
         name,
+        source: typeof raw.source === 'string' ? raw.source : '',
+        sourceVersion: Math.max(1, Number(raw.sourceVersion ?? 1) || 1),
         folderId: relationToId(raw.folder) ?? schema.folderId ?? schema.folder ?? null,
         isPrimitive: schema.isPrimitive === true || raw.isPrimitive === true,
         ...normalizeEntityManagement(raw),
@@ -2360,6 +2362,19 @@ export class EndgeSchemaStorage extends EndgeModule {
       data.meta = (data.meta && typeof data.meta === 'object' && !Array.isArray(data.meta)) ? data.meta : {}
       saved = await repos.computations.upsert(data as any)
     }
+    else if (documentType === 'type') {
+      const schema = data.schema != null && typeof data.schema === 'object' && !Array.isArray(data.schema)
+        ? { ...data.schema }
+        : {}
+      delete schema.source
+      delete schema.sourceVersion
+      data.schema = schema
+      data.source = typeof data.source === 'string' ? data.source : ''
+      data.sourceVersion = Math.max(1, Number(data.sourceVersion ?? 1) || 1)
+      data.isPrimitive = false
+      data.meta = (data.meta && typeof data.meta === 'object' && !Array.isArray(data.meta)) ? data.meta : {}
+      saved = await repos.types.upsert(data as any)
+    }
     else if (documentType === 'action') {
       saved = await repos.actions.upsert(data as any)
     }
@@ -2459,11 +2474,23 @@ export class EndgeSchemaStorage extends EndgeModule {
       const type = ((opts?.model as any) ?? domain.getType(documentId)) as any
       if (!type || type.isPrimitive)
         throw new Error(`Тип не найден или примитив: ${documentId}`)
-      const schema = Serialize.toPlain(type)
+      const identity = String(type.identity ?? type.name ?? '').trim()
+      if (!identity)
+        throw new Error(`У типа отсутствует identity: ${documentId}`)
+      const folder = type.folderId != null
+        ? await this.resolveFolderPayloadId(type.folderId)
+        : undefined
+      const serialized = Serialize.toPlain(type) as Record<string, unknown>
+      const schema = { ...serialized }
+      delete schema.source
+      delete schema.sourceVersion
       const saved = await repos.types.upsert({
-        identity: type.name,
-        displayName: type.name,
+        identity,
+        displayName: String(type.name ?? type.displayName ?? identity),
         schema,
+        folder: folder ?? undefined,
+        source: typeof type.source === 'string' ? type.source : '',
+        sourceVersion: Math.max(1, Number(type.sourceVersion ?? 1) || 1),
         meta: (type.meta && typeof type.meta === 'object' && !Array.isArray(type.meta)) ? type.meta : {},
       })
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
@@ -3708,6 +3735,8 @@ export class EndgeSchemaStorage extends EndgeModule {
         id,
         identity: schema.identity ?? raw.identity,
         name: schema.name ?? raw.displayName,
+        source: typeof raw.source === 'string' ? raw.source : '',
+        sourceVersion: Math.max(1, Number(raw.sourceVersion ?? 1) || 1),
         folderId: relationToId(raw.folder) ?? schema.folderId ?? schema.folder ?? null,
         isPrimitive: schema.isPrimitive === true || raw.isPrimitive === true,
         ...normalizeEntityManagement(raw),
