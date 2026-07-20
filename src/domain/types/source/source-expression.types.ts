@@ -1,5 +1,14 @@
-/** Поддерживаемые scalar-типы полей source DSL. */
-export type SourceFieldType = 'String' | 'Number' | 'Boolean' | 'Date' | 'Time' | 'DateTime' | 'Object'
+/** Type Registry identity used by Query/Filter field contracts. */
+export type SourceFieldType
+  = | 'String'
+    | 'Number'
+    | 'Boolean'
+    | 'Date'
+    | 'Time'
+    | 'DateTime'
+    | 'Object'
+    | 'Any'
+    | (string & {})
 
 /** Источник безопасного чтения значения внутри source expression. */
 export type SourceExpressionReadKind

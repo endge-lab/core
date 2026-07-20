@@ -7,6 +7,7 @@ import type {
 } from '@/domain/types/source/source-engine.types'
 
 import { compileTypeSource } from '@/model/services/source-engine/compilers/type-source-compile'
+import { validateTypeDefinitionReferences } from '@/model/services/compiler/type/type-program-validation'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
 import { resolveSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
 import { TYPE_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/type.default.source'
@@ -29,14 +30,34 @@ export class TypeSourceLanguageStrategy implements SourceLanguageStrategy {
     return TYPE_DEFAULT_SOURCE
   }
 
-  public validate(source: string): SourceLanguageValidationResult {
+  public validate(source: string, context?: SourceLanguageContext): SourceLanguageValidationResult {
     const result = compileTypeSource(source)
-    const ok = !result.diagnostics.some(item => item.severity === 'error')
-    return { ok, diagnostics: result.diagnostics, message: ok ? undefined : 'Type source contains validation errors.' }
+    const symbols = context?.typeSymbols
+    const diagnostics = symbols
+      ? [
+          ...result.diagnostics,
+          ...validateTypeDefinitionReferences(
+            result.document?.definition ?? null,
+            new Set(symbols.map(item => item.identity)),
+          ),
+        ]
+      : result.diagnostics
+    const ok = !diagnostics.some(item => item.severity === 'error')
+    return { ok, diagnostics, message: ok ? undefined : 'Type source contains validation errors.' }
   }
 
-  public completions(_context: SourceLanguageContext): SourceLanguageCompletion[] {
-    return TYPE_COMPLETIONS
+  public completions(context: SourceLanguageContext): SourceLanguageCompletion[] {
+    const known = new Set(TYPE_COMPLETIONS.map(item => item.label))
+    const symbols = (context.typeSymbols ?? [])
+      .filter(item => item.identity !== context.ownerIdentity && !known.has(item.identity))
+      .map<SourceLanguageCompletion>(item => ({
+        label: item.identity,
+        kind: 'value',
+        insertText: item.identity,
+        detail: `${item.category ?? 'user'} type`,
+        documentation: item.displayName && item.displayName !== item.identity ? item.displayName : undefined,
+      }))
+    return [...TYPE_COMPLETIONS, ...symbols]
   }
 
   public resolveReference(context: SourceLanguageContext) {

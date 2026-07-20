@@ -2,6 +2,7 @@ import type { ActionCompiledFlow } from '@/domain/types/flow/action.types'
 import type { FilterProgramPayload } from '@/domain/types/source/filter-source.types'
 import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
 import type { StoreSourceArtifact } from '@/domain/types/source/store-source.types'
+import type { TypeProgramCatalogEntry, TypeProgramPayload } from '@/domain/types/source/type-source.types'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import type {
   DataViewProgramPayload,
@@ -163,6 +164,33 @@ export class EndgeProgram extends EndgeModule {
   /** Returns a compiled EndgeCSS document by persisted id or identity. */
   public getStyleArtifact(idOrIdentity: string | number): ProgramArtifact<EndgeStyleProgramPayload> | null {
     return this.getArtifact<EndgeStyleProgramPayload>('style', idOrIdentity)
+  }
+
+  /** Returns one compiler-owned Type artifact. */
+  public getTypeArtifact(idOrIdentity: string | number): ProgramArtifact<TypeProgramPayload> | null {
+    return this.getArtifact<TypeProgramPayload>('type', idOrIdentity)
+  }
+
+  /** Stable editor-facing catalog derived only from compiled Type artifacts. */
+  public getTypeCatalog(): TypeProgramCatalogEntry[] {
+    return this.getArtifacts()
+      .filter((artifact): artifact is ProgramArtifact<TypeProgramPayload> => artifact.ref.entityType === 'type')
+      .map(artifact => ({
+        id: artifact.ref.id,
+        identity: artifact.ref.identity,
+        displayName: artifact.payload.displayName ?? artifact.ref.identity,
+        category: artifact.payload.category ?? 'user',
+        sourceVersion: artifact.payload.sourceVersion,
+        definition: artifact.payload.definition,
+        runtimeType: artifact.payload.runtimeType,
+        entityReference: artifact.payload.entityReference,
+        status: artifact.status,
+      }))
+      .sort((left, right) => {
+        const rank = { primitive: 0, reference: 1, user: 2 }
+        return rank[left.category] - rank[right.category]
+          || left.displayName.localeCompare(right.displayName)
+      })
   }
 
   /**

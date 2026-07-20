@@ -11,6 +11,7 @@ import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine
 import { resolveSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
 import { QUERY_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/query.default.source'
 import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/model/services/source-engine/value-expression-language'
+import { validateTypeExpressionUsage } from '@/model/services/compiler/type/type-program-validation'
 
 /** Source language strategy для editor-facing операций RQuery source. */
 export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
@@ -46,20 +47,36 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
   }
 
   /** Валидирует query source через текущий compiler pass. */
-  public validate(source: string): SourceLanguageValidationResult {
+  public validate(source: string, context?: SourceLanguageContext): SourceLanguageValidationResult {
     const result = compileQuerySource(source)
-    const ok = !result.diagnostics.some(diagnostic => diagnostic.severity === 'error')
+    const typeDiagnostics = context?.typeSymbols
+      ? (result.artifact?.props.flatMap(prop => validateTypeExpressionUsage(
+          prop.type,
+          context.typeSymbols!.map((type, index) => ({
+            id: index,
+            identity: type.identity,
+            displayName: type.displayName ?? type.identity,
+            category: type.category ?? 'user',
+            sourceVersion: 1,
+            definition: null,
+            status: 'valid',
+          })),
+          `props.${prop.key}.type`,
+        )) ?? [])
+      : []
+    const diagnostics = [...result.diagnostics, ...typeDiagnostics]
+    const ok = !diagnostics.some(diagnostic => diagnostic.severity === 'error')
 
     return {
       ok,
-      diagnostics: result.diagnostics,
+      diagnostics,
       message: ok ? undefined : 'Query source contains validation errors.',
     }
   }
 
   /** Возвращает подсказки source-only Query v2 API. */
-  public completions(_context: SourceLanguageContext): SourceLanguageCompletion[] {
-    return [...QUERY_SOURCE_COMPLETIONS, ...VALUE_EXPRESSION_COMPLETIONS]
+  public completions(context: SourceLanguageContext): SourceLanguageCompletion[] {
+    return [...QUERY_SOURCE_COMPLETIONS, ...VALUE_EXPRESSION_COMPLETIONS, ...typeCompletions(context)]
   }
 
   public resolveReference(context: SourceLanguageContext) {
@@ -67,6 +84,7 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
       functions: {
         converter: 'converter',
         dataView: 'data-view',
+        field: 'type',
         filter: 'filter',
       },
       methods: {
@@ -76,6 +94,16 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
       properties: [{ property: 'profile', parentProperty: 'auth', target: 'auth-profile' }],
     })
   }
+}
+
+function typeCompletions(context: SourceLanguageContext): SourceLanguageCompletion[] {
+  return (context.typeSymbols ?? []).map(type => ({
+    label: type.identity,
+    kind: 'value',
+    insertText: type.identity,
+    detail: `${type.category ?? 'user'} type`,
+    documentation: type.displayName,
+  }))
 }
 
 const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [

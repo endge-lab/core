@@ -25,6 +25,16 @@ export interface SourceLanguageContext {
 
   /** Текущая позиция курсора, если она есть у editor adapter. */
   position?: SourceLanguagePosition
+
+  /** Source-backed Type Registry symbols available to this editor. */
+  typeSymbols?: Array<{
+    identity: string
+    displayName?: string
+    category?: 'primitive' | 'reference' | 'user'
+  }>
+
+  /** Identity of the document that owns current source diagnostics. */
+  ownerIdentity?: string
 }
 
 /** Нейтральная completion item, которую editor adapter мапит в свой формат. */
@@ -226,7 +236,7 @@ export interface SourceLanguageStrategy {
   createDefaultSource: () => string
 
   /** Валидирует source без знания о конкретном editor adapter. */
-  validate: (source: string) => SourceLanguageValidationResult
+  validate: (source: string, context?: SourceLanguageContext) => SourceLanguageValidationResult
 
   /** Возвращает доступные подсказки языка в нейтральном формате. */
   completions: (context: SourceLanguageContext) => SourceLanguageCompletion[]

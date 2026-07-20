@@ -59,7 +59,29 @@ export interface TypeSourceDocument {
 export interface TypeProgramPayload {
   type: 'type'
   sourceVersion: number
-  definition: TypeSourceDefinition
+  /** Stable identity of the compiled type. Parser-only artifacts may omit it. */
+  identity?: string
+  displayName?: string
+  category?: 'primitive' | 'reference' | 'user'
+  definition: TypeSourceDefinition | null
+  runtimeType?: string
+  entityReference?: {
+    target: string
+    storage: 'id' | 'identity'
+  }
+}
+
+/** Read-only projection used by editors and language tooling. */
+export interface TypeProgramCatalogEntry {
+  id: string | number
+  identity: string
+  displayName: string
+  category: 'primitive' | 'reference' | 'user'
+  sourceVersion: number
+  definition: TypeSourceDefinition | null
+  runtimeType?: string
+  entityReference?: TypeProgramPayload['entityReference']
+  status: 'valid' | 'warning' | 'error'
 }
 
 /** Результат безопасного разбора Type Source. */

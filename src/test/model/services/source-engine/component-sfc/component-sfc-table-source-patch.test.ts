@@ -61,6 +61,43 @@ describe('Component SFC Table source patch', () => {
     expect(result.projection?.columns[0]?.sortable).toEqual({ kind: 'literal', value: 'true' })
   })
 
+  it('writes sort settings independently without removing ordered sort-by paths', () => {
+    const source = `<template><Table><Column key="aircraft" /></Table></template>`
+    const withComparator = patchComponentSFCTableSource(source, {
+      type: 'set-column-attribute',
+      columnIndex: 0,
+      name: 'sort',
+      value: 'text',
+    })
+    const withPaths = patchComponentSFCTableSource(withComparator.source, {
+      type: 'set-column-attribute',
+      columnIndex: 0,
+      name: 'sort-by',
+      value: 'departureLeg.aircraft.tail,departureLeg.aircraft.type',
+    })
+    const changedComparator = patchComponentSFCTableSource(withPaths.source, {
+      type: 'set-column-attribute',
+      columnIndex: 0,
+      name: 'sort',
+      value: 'natural',
+    })
+    const withDirection = patchComponentSFCTableSource(changedComparator.source, {
+      type: 'set-table-attribute',
+      name: 'default-sort',
+      value: 'aircraft:desc',
+    })
+
+    expect(withDirection.ok).toBe(true)
+    expect(withDirection.source).toContain('sort="natural"')
+    expect(withDirection.source).toContain('sort-by="departureLeg.aircraft.tail,departureLeg.aircraft.type"')
+    expect(withDirection.source).toContain('default-sort="aircraft:desc"')
+    expect(withDirection.projection?.columns[0]?.sort).toEqual({ kind: 'literal', value: 'natural' })
+    expect(withDirection.projection?.columns[0]?.sortBy).toEqual({
+      kind: 'literal',
+      value: 'departureLeg.aircraft.tail,departureLeg.aircraft.type',
+    })
+  })
+
   it('adds, updates and removes editable Table attributes without touching its children', () => {
     const source = `<template>
   <Table :rows="rows">

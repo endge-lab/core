@@ -4,6 +4,7 @@ import type { DataViewMaterializationStrategy, DataViewRef, DataViewPipelineStep
 import type { FilterProgramPayload } from '@/domain/types/source/filter-source.types'
 import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
 import type { StoreSourceArtifact } from '@/domain/types/source/store-source.types'
+import type { TypeProgramCatalogEntry, TypeProgramPayload } from '@/domain/types/source/type-source.types'
 import type {
   ComponentSFCProgramPayload,
   ActionProgramPayload,
@@ -34,6 +35,7 @@ import { RField } from '@/domain/entities/reflect/RField'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { RStore } from '@/domain/entities/reflect/RStore'
 import { RStyle } from '@/domain/entities/reflect/RStyle'
+import { RType } from '@/domain/entities/reflect/RType'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sfc/component-sfc-template'
 import { ENDGE_COMPILER_SPAN_GROUPS, ENDGE_COMPILER_VERSION } from '@/model/config/compiler'
@@ -49,6 +51,13 @@ import { analyzeComponentSFCScript } from '@/model/services/compiler/component-s
 import { compileEndgeCSS } from '@/model/services/style'
 import { resolveCompositionActivation } from '@/model/services/source-engine/composition-activation'
 import { createDiagnosticsEntityOwner } from '@/model/endge/diagnostics/endge-problems'
+import { compileTypeSource } from '@/model/services/source-engine/compilers/type-source-compile'
+import {
+  collectTypeExpressionReferences,
+  collectTypeDefinitionReferences,
+  validateTypeDefinitionReferences,
+  validateTypeExpressionUsage,
+} from '@/model/services/compiler/type/type-program-validation'
 
 type ComputationArtifact = ProgramArtifact<ComputationProgramPayload>
 
@@ -106,6 +115,9 @@ export class EndgeCompiler extends EndgeModule {
     })
 
     try {
+      if (!this.compilePhase('type', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'types', Endge.domain.getTypes(), context))
+        return
+
       if (!this.compilePhase('computation', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'computations', Endge.domain.getComputations(), context))
         return
       this._linkComputations()
@@ -177,6 +189,11 @@ export class EndgeCompiler extends EndgeModule {
     const artifact = this.compileEntity('computation', entity, context) as ProgramArtifact<ComputationProgramPayload>
     this._linkComputations()
     return artifact
+  }
+
+  /** Compiles one Type Source into the shared Type Registry. */
+  public buildType(entity: RType): ProgramArtifact<TypeProgramPayload> {
+    return this.compileEntity('type', entity, this._createCompileContext()) as ProgramArtifact<TypeProgramPayload>
   }
 
   /** Compiles one persisted Action into an immutable Program artifact. */
@@ -347,6 +364,79 @@ export class EndgeCompiler extends EndgeModule {
    * source-first ветки `component-sfc`.
    */
   private registerDefaultHandlers(): void {
+    this.registerHandler<RType, TypeProgramPayload>({
+      entityType: 'type',
+      compile: (entity, context) => {
+        const primitiveKind = String(entity.meta?.primitiveKind ?? '').trim()
+        const category: TypeProgramPayload['category'] = primitiveKind === 'reference'
+          ? 'reference'
+          : entity.isPrimitive
+            ? 'primitive'
+            : 'user'
+
+        if (entity.isPrimitive || category === 'reference') {
+          const target = String(entity.meta?.target ?? '').trim()
+          const storage = entity.meta?.storage === 'identity' ? 'identity' as const : 'id' as const
+          return this._makeArtifact(entity, 'type', context, {
+            capabilities: ['compilable', 'configuration'],
+            payload: {
+              type: 'type',
+              identity: entity.identity,
+              displayName: entity.displayName || entity.name || entity.identity,
+              category,
+              sourceVersion: Number(entity.sourceVersion ?? 1) || 1,
+              definition: null,
+              runtimeType: String(entity.meta?.runtimeType ?? entity.identity),
+              ...(category === 'reference' && target
+                ? { entityReference: { target, storage } }
+                : {}),
+            },
+          })
+        }
+
+        const result = compileTypeSource(entity.source, entity.sourceVersion)
+        const definition = result.document?.definition ?? null
+        const knownIdentities = new Set(Endge.domain.getTypes().map(type => type.identity))
+        const semanticDiagnostics = validateTypeDefinitionReferences(definition, knownIdentities)
+        const dependencies = collectTypeDefinitionReferences(definition)
+          .filter(identity => identity !== 'Any')
+          .map((identity) => {
+            const target = Endge.domain.getType(identity)
+            return {
+              entityType: 'type' as const,
+              id: target?.id ?? identity,
+              identity,
+              role: 'type-reference',
+            }
+          })
+        const diagnostics = [
+          ...result.diagnostics,
+          ...semanticDiagnostics,
+          ...(!String(entity.source ?? '').trim()
+            ? [{
+                severity: 'warning' as const,
+                code: 'type-source-empty',
+                message: `Type "${entity.identity}" пока не содержит Type Source.`,
+                sourcePath: 'source',
+              }]
+            : []),
+        ]
+        return this._makeArtifact(entity, 'type', context, {
+          capabilities: ['compilable', 'configuration'],
+          payload: {
+            type: 'type',
+            identity: entity.identity,
+            displayName: entity.displayName || entity.name || entity.identity,
+            category: 'user',
+            sourceVersion: Number(entity.sourceVersion ?? 1) || 1,
+            definition,
+          },
+          dependencies,
+          diagnostics,
+        })
+      },
+    })
+
     this.registerHandler<RAction, ActionProgramPayload>({
       entityType: 'action',
       compile: (entity, context) => {
@@ -363,7 +453,10 @@ export class EndgeCompiler extends EndgeModule {
               message: `Persisted Action "${entity.identity}" collides with ${codeCollision.origin.kind} Action from code.`,
               sourcePath: 'identity',
             }] : []),
+            ...this._typeContractDiagnostics(entity.input?.type, 'input.type'),
+            ...this._typeContractDiagnostics(entity.output?.type, 'output.type'),
           ],
+          dependencies: this._typeDependencies([entity.input?.type, entity.output?.type]),
         })
       },
     })
@@ -379,8 +472,15 @@ export class EndgeCompiler extends EndgeModule {
         return this._makeArtifact(entity, 'computation', context, {
           capabilities: ['compilable', 'runnable'],
           payload: result.payload,
-          diagnostics: result.diagnostics,
-          dependencies: this._computationDependencies(result.payload),
+          diagnostics: [
+            ...result.diagnostics,
+            ...this._typeContractDiagnostics(entity.input?.type, 'input.type'),
+            ...this._typeContractDiagnostics(entity.output?.type, 'output.type'),
+          ],
+          dependencies: [
+            ...this._computationDependencies(result.payload),
+            ...this._typeDependencies([entity.input?.type, entity.output?.type]),
+          ],
         })
       },
     })
@@ -389,6 +489,7 @@ export class EndgeCompiler extends EndgeModule {
       entityType: 'component-sfc',
       compile: (entity, context) => {
         const result = this._compileComponentSFCSource(entity)
+        const localTypes = collectLocalTypeDeclarations(entity.source)
         return this._makeArtifact(entity, 'component-sfc', context, {
           capabilities: result.ir ? ['compilable', 'runnable', 'renderable'] : ['compilable'],
           metadata: result.metadata,
@@ -406,6 +507,21 @@ export class EndgeCompiler extends EndgeModule {
           diagnostics: [
             ...(this._componentTagDiagnosticsByIdentity.get(entity.identity) ?? []),
             ...result.diagnostics,
+            ...result.contract.inputs.flatMap(input => this._typeContractDiagnostics(input.type, `script.defineProps.${input.name}`, localTypes)),
+            ...(result.ir?.script.ports.require.computations.flatMap(port => [
+              ...this._typeContractDiagnostics(port.inputType, `script.ports.require.${port.name}.input`, localTypes),
+              ...this._typeContractDiagnostics(port.outputType, `script.ports.require.${port.name}.output`, localTypes),
+            ]) ?? []),
+            ...(result.ir?.script.ports.require.actions.flatMap(port => [
+              ...this._typeContractDiagnostics(port.inputType, `script.ports.require.${port.name}.input`, localTypes),
+              ...this._typeContractDiagnostics(port.outputType, `script.ports.require.${port.name}.output`, localTypes),
+            ]) ?? []),
+            ...(result.ir?.script.ports.provides.actions.flatMap(port => [
+              ...this._typeContractDiagnostics(port.inputType, `script.ports.provides.${port.name}.input`, localTypes),
+              ...this._typeContractDiagnostics(port.outputType, `script.ports.provides.${port.name}.output`, localTypes),
+            ]) ?? []),
+            ...(result.ir?.script.ports.emits.events.flatMap(port =>
+              this._typeContractDiagnostics(port.payloadType, `script.ports.emits.${port.name}`, localTypes)) ?? []),
           ],
           dependencies: [
             ...result.dependencies.components.map(dependency => ({
@@ -426,6 +542,13 @@ export class EndgeCompiler extends EndgeModule {
               identity,
               role: 'port-default-action',
             })),
+            ...this._typeDependencies([
+              ...result.contract.inputs.map(input => input.type),
+              ...(result.ir?.script.ports.require.computations.flatMap(port => [port.inputType, port.outputType]) ?? []),
+              ...(result.ir?.script.ports.require.actions.flatMap(port => [port.inputType, port.outputType]) ?? []),
+              ...(result.ir?.script.ports.provides.actions.flatMap(port => [port.inputType, port.outputType]) ?? []),
+              ...(result.ir?.script.ports.emits.events.map(port => port.payloadType) ?? []),
+            ], localTypes),
           ],
           nonBlockingSourcePaths: ['style'],
         })
@@ -488,10 +611,15 @@ export class EndgeCompiler extends EndgeModule {
             ast: result.ast ?? null,
             sourceDocument: result.document ?? null,
           },
-          dependencies: local.dependencies,
           diagnostics: [
             ...((result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]),
             ...local.diagnostics,
+            ...(local.payload ?? artifact)?.props.flatMap(prop =>
+              this._typeContractDiagnostics(prop.type, `props.${prop.key}.type`)) ?? [],
+          ],
+          dependencies: [
+            ...local.dependencies,
+            ...this._typeDependencies((local.payload ?? artifact)?.props.map(prop => prop.type) ?? []),
           ],
           children: local.children,
         })
@@ -618,8 +746,15 @@ export class EndgeCompiler extends EndgeModule {
           capabilities: ['compilable', 'executable', 'data-provider', 'configuration'],
           metadata: { self: result.metadata ?? {}, nodes: [] },
           payload: payload ?? this._makeEmptyFilterPayload(entity.sourceVersion),
-          dependencies,
-          diagnostics: (result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[],
+          dependencies: [
+            ...dependencies,
+            ...this._typeDependencies(payload?.fields.map(field => field.type) ?? []),
+          ],
+          diagnostics: [
+            ...((result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]),
+            ...(payload?.fields.flatMap(field =>
+              this._typeContractDiagnostics(field.type, `fields.${field.key}.type`)) ?? []),
+          ],
         })
       },
     })
@@ -672,6 +807,76 @@ export class EndgeCompiler extends EndgeModule {
       })
     }
     return dependencies
+  }
+
+  /** Validates one owner contract against the source-backed Type Registry. */
+  private _typeContractDiagnostics(
+    expression: string | null | undefined,
+    sourcePath: string,
+    localTypes: ReadonlySet<string> = new Set(),
+  ): Omit<ProgramDiagnostic, 'entityRef'>[] {
+    const compiledCatalog = Endge.program.getTypeCatalog()
+    const catalog: TypeProgramCatalogEntry[] = compiledCatalog.length
+      ? compiledCatalog
+      : Endge.domain.getTypes().map((type) => {
+          const primitiveKind = String(type.meta?.primitiveKind ?? '').trim()
+          const category: TypeProgramCatalogEntry['category'] = primitiveKind === 'reference'
+            ? 'reference'
+            : type.isPrimitive
+              ? 'primitive'
+              : 'user'
+          const target = String(type.meta?.target ?? '').trim()
+          return {
+            id: type.id,
+            identity: type.identity,
+            displayName: type.displayName || type.name || type.identity,
+            category,
+            sourceVersion: Number(type.sourceVersion ?? 1) || 1,
+            definition: null,
+            runtimeType: type.isPrimitive ? String(type.meta?.runtimeType ?? type.identity) : undefined,
+            entityReference: category === 'reference' && target
+              ? { target, storage: type.meta?.storage === 'identity' ? 'identity' : 'id' }
+              : undefined,
+            status: 'valid',
+          }
+        })
+    const catalogWithLocals = localTypes.size
+      ? [
+          ...catalog,
+          ...[...localTypes].map((identity, index): TypeProgramCatalogEntry => ({
+            id: `local:${index}:${identity}`,
+            identity,
+            displayName: identity,
+            category: 'user',
+            sourceVersion: 1,
+            definition: null,
+            status: 'valid',
+          })),
+        ]
+      : catalog
+    return validateTypeExpressionUsage(expression, catalogWithLocals, sourcePath)
+  }
+
+  /** Creates stable Program dependencies for every custom type expression. */
+  private _typeDependencies(
+    expressions: Array<string | null | undefined>,
+    excluded: ReadonlySet<string> = new Set(),
+  ): ProgramArtifact['dependencies'] {
+    const identities = new Set<string>()
+    for (const expression of expressions) {
+      for (const identity of collectTypeExpressionReferences(expression)) {
+        if (!excluded.has(identity)) identities.add(identity)
+      }
+    }
+    return [...identities].map((identity) => {
+      const type = Endge.domain.getType(identity)
+      return {
+        entityType: 'type' as const,
+        id: type?.id ?? identity,
+        identity,
+        role: 'type-contract',
+      }
+    })
   }
 
   /** Связывает computation artifacts, запрещает missing/invalid/cyclic references и выводит effective execution mode. */
@@ -2003,6 +2208,14 @@ export class EndgeCompiler extends EndgeModule {
       hash = ((hash << 5) - hash + value.charCodeAt(index)) | 0
     return Math.abs(hash).toString(36)
   }
+}
+
+function collectLocalTypeDeclarations(source: string): Set<string> {
+  const identities = new Set<string>()
+  for (const match of String(source ?? '').matchAll(/\b(?:interface|type|class|enum)\s+([A-Za-z_$][\w$]*)/g)) {
+    if (match[1]) identities.add(match[1])
+  }
+  return identities
 }
 
 function fieldContract(field: { type: string, isArray?: boolean, optional?: boolean } | null | undefined) {

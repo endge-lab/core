@@ -224,4 +224,37 @@ describe('type source compiler', () => {
 
     expect(reference).toMatchObject({ target: 'type', identity: 'Customer' })
   })
+
+  it('offers source-backed Type Registry symbols', () => {
+    const strategy = new TypeSourceLanguageStrategy()
+    const completions = strategy.completions({
+      source: `defineType({ customer: field('') })`,
+      ownerIdentity: 'Order',
+      typeSymbols: [
+        { identity: 'String', category: 'primitive' },
+        { identity: 'Customer', displayName: 'Customer model', category: 'user' },
+        { identity: 'Order', category: 'user' },
+      ],
+    })
+
+    expect(completions).toContainEqual(expect.objectContaining({ label: 'Customer', detail: 'user type' }))
+    expect(completions).not.toContainEqual(expect.objectContaining({ label: 'Order' }))
+  })
+
+  it('reports missing registry references and allows Any with a warning', () => {
+    const strategy = new TypeSourceLanguageStrategy()
+    const result = strategy.validate(`defineType({
+      unknown: field('MissingType'),
+      metadata: field('Any'),
+    })`, {
+      source: '',
+      typeSymbols: [{ identity: 'String', category: 'primitive' }],
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'type-reference-missing', severity: 'error' }),
+      expect.objectContaining({ code: 'type-any-usage', severity: 'warning' }),
+    ]))
+  })
 })

@@ -788,6 +788,7 @@ function validateProvider(
         `Component "${provider.identity}" не соответствует props contract port "${port.name}".`,
         node,
         script,
+        'warning',
       ))
     }
   }
@@ -875,10 +876,11 @@ function makeDiagnostic(
   message: string,
   node: any,
   script: RComponentSFC_AST_Script,
+  severity: RComponentDiagnostic['severity'] = 'error',
 ): RComponentDiagnostic {
   const range = toRange(node, script)
   return {
-    severity: 'error',
+    severity,
     code,
     message,
     sourcePath: 'script.definePorts',

@@ -141,8 +141,12 @@ export class EndgeSource extends EndgeModule {
   }
 
   /** Валидирует source указанного source-kind для editor-facing сценариев. */
-  public validate(sourceKind: SourceKind | string, source: string): SourceLanguageValidationResult {
-    return this._resolveRequiredLanguageStrategy(sourceKind).validate(source)
+  public validate(
+    sourceKind: SourceKind | string,
+    source: string,
+    context?: Omit<SourceLanguageContext, 'source'>,
+  ): SourceLanguageValidationResult {
+    return this._resolveRequiredLanguageStrategy(sourceKind).validate(source, { source, ...context })
   }
 
   /** Возвращает editor-facing completion items для указанного source-kind. */

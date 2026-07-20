@@ -23,8 +23,6 @@ export interface SourceFieldParseResult {
   defaultSource?: SourceFieldDefaultSource
 }
 
-const FIELD_TYPES = new Set<SourceFieldType>(['String', 'Number', 'Boolean', 'Date', 'Time', 'DateTime', 'Object'])
-
 /** Компилирует chain field(...).optional().array()... в общий field contract. */
 export function compileSourceField(
   key: string,
@@ -50,8 +48,8 @@ export function compileSourceField(
   }
 
   const rawType = readStringArgument(current, 0)
-  if (!rawType || !FIELD_TYPES.has(rawType as SourceFieldType)) {
-    diagnostics.push(diagnostic('error', 'source-field-type', `Тип поля "${rawType ?? ''}" не поддерживается.`, sourcePath, current))
+  if (!rawType?.trim()) {
+    diagnostics.push(diagnostic('error', 'source-field-type', 'field(type) требует непустую identity типа.', sourcePath, current))
     return null
   }
 
@@ -257,7 +255,11 @@ function isScalarValue(type: SourceFieldType, value: unknown): boolean {
     return typeof value === 'number'
   if (type === 'Boolean')
     return typeof value === 'boolean'
-  return typeof value === 'object' && !Array.isArray(value)
+  if (type === 'Object')
+    return typeof value === 'object' && !Array.isArray(value)
+  // Custom types and Any require Type Registry structural validation, which is
+  // intentionally diagnostic-only during the migration.
+  return true
 }
 
 function readProperty(node: t.ObjectExpression, name: string): t.Expression | null {

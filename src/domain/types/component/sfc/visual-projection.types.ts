@@ -82,7 +82,7 @@ export type ComponentSFCTableSourcePatch
     | {
       type: 'set-column-attribute'
       columnIndex: number
-      name: 'key' | 'title' | 'width' | 'sortable'
+      name: 'key' | 'title' | 'width' | 'sortable' | 'sort' | 'sort-by'
       value: string | null
     }
     | {
