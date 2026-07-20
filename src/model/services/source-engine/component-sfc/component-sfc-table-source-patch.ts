@@ -91,6 +91,7 @@ function applyTablePatch(
         source,
         requireColumn(context, patch.columnIndex),
         patch.identity,
+        patch.syntax,
       )
   }
 }
@@ -179,6 +180,7 @@ function setColumnComponent(
   source: string,
   column: RComponentSFC_AST_ElementNode,
   rawIdentity: string | null,
+  syntax: 'cell' | 'direct' | undefined,
 ): string {
   const identity = rawIdentity?.trim() || null
   const cell = column.children.find(
@@ -186,6 +188,11 @@ function setColumnComponent(
   ) ?? null
 
   if (!cell) {
+    const directChildren = column.children.filter(isSemanticNode)
+    if (directChildren.length > 0 && syntax !== 'direct')
+      throw new Error('Колонка содержит прямой компонент или произвольный Source. Измените её во вкладке Source.')
+    if (directChildren.length > 0)
+      return setDirectColumnComponent(source, column, directChildren, identity)
     if (!identity)
       return source
     return insertChild(source, column, componentCellMarkup(identity))
@@ -211,6 +218,59 @@ function setColumnComponent(
     return insertChild(source, cell, `<Component is="${escapeAttribute(identity)}" />`)
 
   return setNodeAttribute(source, component, 'is', identity)
+}
+
+function setDirectColumnComponent(
+  source: string,
+  column: RComponentSFC_AST_ElementNode,
+  children: RComponentSFC_AST_TemplateNode[],
+  identity: string | null,
+): string {
+  const component = children.length === 1 && children[0].kind === 'element'
+    ? children[0]
+    : null
+  if (!component || source.slice(column.range.start, column.range.end).includes('<!--'))
+    throw new Error('Колонка содержит произвольный Source. Измените её во вкладке Source.')
+
+  if (!identity)
+    return removeNode(source, component)
+  if (component.tag === 'Component')
+    return setNodeAttribute(source, component, 'is', identity)
+
+  const hasReservedIs = component.attributes.some(attribute => attribute.name === 'is')
+    || component.directives.some(directive => directive.name === 'bind' && directive.argument === 'is')
+  if (hasReservedIs)
+    throw new Error('Direct component содержит зарезервированный attribute is. Измените его во вкладке Source.')
+
+  const normalizedSource = renameElementTag(source, component, 'Component')
+  return insertAttribute(normalizedSource, component, serializeAttribute('is', identity))
+}
+
+function renameElementTag(
+  source: string,
+  node: RComponentSFC_AST_ElementNode,
+  nextTag: string,
+): string {
+  if (node.tag === nextTag)
+    return source
+
+  let nextSource = source
+  if (!node.selfClosing) {
+    const closingTagStart = findClosingTagStart(source, node)
+    nextSource = replaceRange(
+      nextSource,
+      closingTagStart + 2,
+      closingTagStart + 2 + node.tag.length,
+      nextTag,
+    )
+  }
+
+  return replaceRange(
+    nextSource,
+    node.range.start + 1,
+    node.range.start + 1 + node.tag.length,
+    nextTag,
+  )
 }
 
 function componentCellMarkup(identity: string): string {
@@ -280,6 +340,9 @@ function insertAttribute(source: string, node: RComponentSFC_AST_ElementNode, at
     const indent = inferAttributeIndent(source, node)
     return replaceRange(source, lineStart, lineStart, `${indent}${attribute}\n`)
   }
+
+  while (insertOffset > node.range.start && /[ \t]/.test(source[insertOffset - 1]))
+    insertOffset -= 1
 
   return replaceRange(source, insertOffset, insertOffset, ` ${attribute}`)
 }

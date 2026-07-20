@@ -17,8 +17,13 @@ export interface ComponentSFCVisualAttribute {
 /** Способ, которым содержимое ячейки представлено в простом visual editor. */
 export type ComponentSFCTableCellProjection
   = | { kind: 'default' }
-    | { kind: 'component', identity: string | null }
+    | { kind: 'component', identity: string | null, syntax: 'cell' | 'direct' }
     | { kind: 'source' }
+
+/** Registry context required to resolve direct user component tags while reading Source. */
+export interface ComponentSFCVisualInspectionOptions {
+  resolveComponentTag?: (tag: string) => string | null
+}
 
 /** Visual read-model одной прямой Column внутри корневого Table. */
 export interface ComponentSFCTableColumnProjection {
@@ -64,6 +69,7 @@ export type ComponentSFCTableSourcePatch
       type: 'set-column-component'
       columnIndex: number
       identity: string | null
+      syntax?: 'cell' | 'direct'
     }
 
 /** Результат точечного изменения SFC Table source. */

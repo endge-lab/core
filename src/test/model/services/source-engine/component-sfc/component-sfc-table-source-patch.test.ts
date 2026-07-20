@@ -125,6 +125,59 @@ describe('Component SFC Table source patch', () => {
     expect(result.message).toContain('Source')
   })
 
+  it('does not duplicate a direct component when applying a managed cell patch', () => {
+    const source = `<template><Table><Column key="aircraft"><AircraftTail :tail="row.tail" /></Column></Table></template>`
+
+    const result = patchComponentSFCTableSource(source, {
+      type: 'set-column-component',
+      columnIndex: 0,
+      identity: 'aircraft-status',
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.source).toBe(source)
+    expect(result.source).not.toContain('<Cell>')
+    expect(result.message).toContain('Source')
+  })
+
+  it('replaces and removes a direct component while preserving its bindings', () => {
+    const source = `<template>
+  <Table>
+    <Column key="aircraft">
+      <AircraftTail :tail="row.tail" configuration="default" />
+    </Column>
+  </Table>
+</template>`
+
+    const replaced = patchComponentSFCTableSource(source, {
+      type: 'set-column-component',
+      columnIndex: 0,
+      identity: 'aircraft-status',
+      syntax: 'direct',
+    })
+    const updated = patchComponentSFCTableSource(replaced.source, {
+      type: 'set-column-component',
+      columnIndex: 0,
+      identity: 'aircraft-card',
+      syntax: 'direct',
+    })
+    const removed = patchComponentSFCTableSource(updated.source, {
+      type: 'set-column-component',
+      columnIndex: 0,
+      identity: null,
+      syntax: 'direct',
+    })
+
+    expect(replaced.ok).toBe(true)
+    expect(replaced.source).toContain('<Component :tail="row.tail" configuration="default" is="aircraft-status" />')
+    expect(replaced.source).not.toContain('<Cell>')
+    expect(updated.ok).toBe(true)
+    expect(updated.source).toContain('is="aircraft-card"')
+    expect(updated.source).not.toContain('aircraft-status')
+    expect(removed.ok).toBe(true)
+    expect(removed.source).not.toContain('<Component')
+  })
+
   it('does not remove comments stored inside a managed-looking Cell', () => {
     const source = `<template><Table><Column key="status"><Cell><!-- keep --><Component is="Cell.Status" /></Cell></Column></Table></template>`
 

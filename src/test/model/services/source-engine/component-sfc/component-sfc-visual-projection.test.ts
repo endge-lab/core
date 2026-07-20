@@ -85,7 +85,29 @@ defineProps<{ rows: unknown[] }>()
     const managed = inspectComponentSFCVisual(`<template><Table><Column key="one"><Cell><Component is="Cell.Status" /></Cell></Column></Table></template>`)
     const dynamic = inspectComponentSFCVisual(`<template><Table><Column key="one"><Cell><Component :is="cellComponent" /></Cell></Column></Table></template>`)
 
-    expect(managed.projection?.columns[0]?.cell).toEqual({ kind: 'component', identity: 'Cell.Status' })
+    expect(managed.projection?.columns[0]?.cell).toEqual({ kind: 'component', identity: 'Cell.Status', syntax: 'cell' })
     expect(dynamic.projection?.columns[0]?.cell).toEqual({ kind: 'source' })
+  })
+
+  it('recognizes a direct user component tag without requiring a Cell wrapper', () => {
+    const result = inspectComponentSFCVisual(`<template>
+  <Table>
+    <Column key="aircraft" title="ВС" width="200">
+      <AircraftTail
+        :tail="row.departureLeg.attributes[name = 'ACTail']"
+        :aircraftType="row.departureLeg.attributes[name = 'ACType']"
+        :configuration="row.departureLeg.attributes[name = 'ACConfig']"
+      />
+    </Column>
+  </Table>
+</template>`, {
+      resolveComponentTag: tag => tag === 'AircraftTail' ? 'aircraft-tail' : null,
+    })
+
+    expect(result.projection?.columns[0]).toMatchObject({
+      cell: { kind: 'component', identity: 'aircraft-tail', syntax: 'direct' },
+      hasCustomCell: true,
+    })
+    expect(result.projection?.columns[0]?.cellSource).toContain('<AircraftTail')
   })
 })

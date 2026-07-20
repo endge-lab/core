@@ -1,6 +1,7 @@
 import type {
   ComponentSFCVisualAttribute,
   ComponentSFCVisualInspection,
+  ComponentSFCVisualInspectionOptions,
   ComponentSFCVisualSourceValue,
   ComponentSFCTableColumnProjection,
   ComponentSFCTableVisualProjection,
@@ -13,8 +14,13 @@ import type {
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 
 /** Строит UI-neutral visual projection только для SFC с одним корневым Table. */
-export function inspectComponentSFCVisual(source: string): ComponentSFCVisualInspection {
-  const compileResult = compileComponentSFC(source)
+export function inspectComponentSFCVisual(
+  source: string,
+  options: ComponentSFCVisualInspectionOptions = {},
+): ComponentSFCVisualInspection {
+  const compileResult = compileComponentSFC(source, {
+    resolveComponentTag: options.resolveComponentTag,
+  })
   const template = compileResult.ast?.template
 
   if (!source.trim()) {
@@ -103,10 +109,10 @@ function projectColumn(
   const key = keyDirective && ir?.directives.key
     ? readKeyDirective(source, keyDirective, ir.directives.key)
     : readDirectiveValue(ast.directives, 'key')
-  const cell = ast.children.find(
+  const cellNode = ast.children.find(
     (node): node is RComponentSFC_AST_ElementNode => node.kind === 'element' && node.tag === 'Cell',
   ) ?? null
-  const cellProjection = projectCell(source, cell)
+  const cell = projectColumnCell(source, ast, ir, cellNode)
   const stableKey = valueLabel(key).trim()
 
   return {
@@ -120,10 +126,59 @@ function projectColumn(
     sortBy: readProp(ir, 'sort-by', 'sortBy'),
     pinnable: readProp(ir, 'pinnable'),
     attributes: projectAttributes(source, ast, ir),
-    cell: cellProjection,
-    hasCustomCell: cell != null,
-    cellSource: cell ? source.slice(cell.range.start, cell.range.end) : null,
+    cell: cell.projection,
+    hasCustomCell: cell.hasCustomCell,
+    cellSource: cell.source,
     sourceRange: ast.range,
+  }
+}
+
+interface ProjectedColumnCell {
+  projection: ComponentSFCTableColumnProjection['cell']
+  hasCustomCell: boolean
+  source: string | null
+}
+
+function projectColumnCell(
+  source: string,
+  column: RComponentSFC_AST_ElementNode,
+  irColumn: RComponentSFC_IR_ElementNode | null,
+  cell: RComponentSFC_AST_ElementNode | null,
+): ProjectedColumnCell {
+  if (cell) {
+    return {
+      projection: projectManagedCell(source, cell),
+      hasCustomCell: true,
+      source: source.slice(cell.range.start, cell.range.end),
+    }
+  }
+
+  const children = column.children.filter(isSemanticRoot)
+  if (children.length === 0) {
+    return {
+      projection: { kind: 'default' },
+      hasCustomCell: false,
+      source: null,
+    }
+  }
+
+  const directSource = source.slice(children[0].range.start, children.at(-1)!.range.end)
+  const child = children.length === 1 && children[0].kind === 'element'
+    ? children[0]
+    : null
+  const irChild = child
+    ? irColumn?.children.find(node => node.sourceRange?.start === child.range.start) ?? null
+    : null
+  const identity = irChild?.kind === 'element' && irChild.tag === 'Component'
+    ? readLiteralString(irChild.props.is)
+    : null
+
+  return {
+    projection: child && identity && !source.slice(column.range.start, column.range.end).includes('<!--')
+      ? { kind: 'component', identity, syntax: 'direct' }
+      : { kind: 'source' },
+    hasCustomCell: true,
+    source: directSource,
   }
 }
 
@@ -157,7 +212,7 @@ function projectAttributes(
   return attributes
 }
 
-function projectCell(
+function projectManagedCell(
   source: string,
   cell: RComponentSFC_AST_ElementNode | null,
 ): ComponentSFCTableColumnProjection['cell'] {
@@ -169,7 +224,7 @@ function projectCell(
 
   const children = cell.children.filter(isSemanticRoot)
   if (children.length === 0)
-    return { kind: 'component', identity: null }
+    return { kind: 'component', identity: null, syntax: 'cell' }
 
   const component = children.length === 1 && children[0].kind === 'element' && children[0].tag === 'Component'
     ? children[0]
@@ -193,7 +248,14 @@ function projectCell(
   return {
     kind: 'component',
     identity: identity?.value?.trim() || null,
+    syntax: 'cell',
   }
+}
+
+function readLiteralString(value: RComponentSFC_IR_Value | undefined): string | null {
+  return value?.kind === 'literal' && typeof value.value === 'string'
+    ? value.value.trim() || null
+    : null
 }
 
 function readDirectiveValue(
