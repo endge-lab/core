@@ -263,6 +263,7 @@ function mapElementNode(node: ElementNode, baseOffset: number): RComponentSFC_AS
         name: directive.name === 'bind' && arg === 'key' ? 'key' : directive.name,
         argument: arg,
         expression,
+        modifiers: (directive.modifiers ?? []).map((modifier: any) => typeof modifier === 'string' ? modifier : modifier.content),
         range: rangeFromLoc(directive.loc, baseOffset),
       })
     }
@@ -301,6 +302,7 @@ function attributeToDirective(attribute: AttributeNode, baseOffset: number): RCo
   return {
     name: attribute.name,
     expression: attribute.value?.content,
+    modifiers: [],
     range: rangeFromLoc(attribute.loc, baseOffset),
   }
 }

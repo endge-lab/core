@@ -1,26 +1,74 @@
 import type { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentSFCRuntimeHost'
 import type {
   ComponentSFCEventPort,
+  RComponentSFC_IR_EventBinding,
   ComponentSFCEventRuntimeSource,
   ComponentSFCPortManifest,
 } from '@/domain/types/component/sfc'
 
 /** Mount-scoped Event router for one Component SFC artifact boundary. */
 export class ComponentSFCEventBoundary {
+  private readonly consumedLocalOnce = new Set<string>()
+
   public constructor(
     private readonly host: ComponentSFCRuntimeHost | null,
     public readonly componentIdentity: string,
     private readonly manifest: ComponentSFCPortManifest,
     private readonly parent: ComponentSFCEventBoundary | null = null,
     private readonly parentSource?: ComponentSFCEventRuntimeSource,
+    private readonly parentBindings: readonly RComponentSFC_IR_EventBinding[] = [],
   ) {}
 
   public createChild(
     componentIdentity: string,
     manifest: ComponentSFCPortManifest,
     source: ComponentSFCEventRuntimeSource,
+    bindings: readonly RComponentSFC_IR_EventBinding[] = [],
   ): ComponentSFCEventBoundary {
-    return new ComponentSFCEventBoundary(this.host, componentIdentity, manifest, this, source)
+    return new ComponentSFCEventBoundary(this.host, componentIdentity, manifest, this, source, bindings)
+  }
+
+  /** True when the current public manifest observes one Event of this child source. */
+  public observesChild(source: ComponentSFCEventRuntimeSource, event: string): boolean {
+    return this.manifest.emits.events.some(port => matchesSource(port, source, event))
+  }
+
+  /** Runs local `@event` reactions, then routes the occurrence unless `.stop` is present. */
+  public async routeChild(
+    source: ComponentSFCEventRuntimeSource,
+    event: string,
+    payload: unknown,
+    bindings: readonly RComponentSFC_IR_EventBinding[] = [],
+    trace: string[] = [],
+    depth = 0,
+  ): Promise<void> {
+    const local = bindings.flatMap((binding, index) => {
+      if (binding.name !== event) return []
+      if (!binding.modifiers.includes('once')) return [binding]
+      const key = `${source.nodeId}:${event}:${binding.sourceRange?.start ?? index}`
+      if (this.consumedLocalOnce.has(key)) return []
+      this.consumedLocalOnce.add(key)
+      return [binding]
+    })
+    const reactions = local.map(binding => this.host?.executeEventPortAction(
+      this.componentIdentity,
+      {
+        kind: 'event',
+        role: 'emits',
+        name: `${source.nodeId}:${event}`,
+        payloadType: 'unknown',
+        action: binding.action,
+      },
+      payload,
+      source,
+      (name, nextPayload, nextTrace, nextDepth) => this.emitOwn(name, nextPayload, nextTrace, nextDepth),
+      trace,
+      depth,
+    ))
+    const routed = local.some(binding => binding.modifiers.includes('stop'))
+      ? Promise.resolve()
+      : this.emitChild(source, event, payload, trace, depth)
+    await Promise.allSettled([...reactions.filter(Boolean), routed] as Promise<unknown>[])
   }
 
   /** Receives an intrinsic or nested child occurrence and resolves public ports by origin. */
@@ -58,7 +106,7 @@ export class ComponentSFCEventBoundary {
       ? { ...this.parentSource, target: source?.target ?? this.parentSource.target }
       : source
     if (this.parent && this.parentSource)
-      void this.parent.emitChild(forwardedSource!, port.name, payload, trace, depth + 1).catch(error => this.reportError(port, error))
+      void this.parent.routeChild(forwardedSource!, port.name, payload, this.parentBindings, trace, depth + 1).catch(error => this.reportError(port, error))
     else
       this.host?.publishEventPort(port.name, payload, source)
 

@@ -20,7 +20,7 @@ import type {
 import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc'
 import { compileComponentSFCExpression } from '@/model/services/compiler/component-sfc/component-sfc-expression'
 import { parseComponentSFCTypeFields } from '@/model/services/compiler/component-sfc/component-sfc-script'
-import { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sfc/component-sfc-template'
+import { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sfc/component-sfc-built-in-tags'
 
 export interface ComponentSFCPortAnalysisOptions {
   resolveProvider?: (
@@ -28,6 +28,48 @@ export interface ComponentSFCPortAnalysisOptions {
     expectedKind: 'computation' | 'component' | 'action',
   ) => ComponentSFCPortProviderDescriptor | null
   resolveTypeDefinition?: (identity: string) => TypeSourceDefinition | null
+}
+
+/** Compiles the safe reaction grammar used by local `@event` template bindings. */
+export function compileComponentSFCLocalEventAction(
+  eventName: string,
+  source: string,
+  sourceOffset: number,
+  dependencies: RComponentDependencies,
+  diagnostics: RComponentDiagnostic[],
+): ComponentSFCEventAction | null {
+  let expression: any
+  try {
+    const program = parseTS(source, { sourceType: 'module', plugins: ['typescript'] }).program
+    expression = program.body.length === 1 && program.body[0]?.type === 'ExpressionStatement'
+      ? program.body[0].expression
+      : null
+  }
+  catch {
+    expression = null
+  }
+  if (!expression) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-template-event-action-syntax',
+      message: `@${eventName} должен содержать action({...}) или typescript({...}).`,
+      sourcePath: `template.on.${eventName}`,
+      start: sourceOffset,
+      end: sourceOffset + source.length,
+    })
+    return null
+  }
+  if (isCall(expression, 'action') && expression.arguments?.length === 1)
+    expression = expression.arguments[0]
+  const script = {
+    content: source,
+    range: { start: sourceOffset, end: sourceOffset + source.length },
+  } as RComponentSFC_AST_Script
+  const diagnosticsStart = diagnostics.length
+  const result = parseEventAction(eventName, expression, script, dependencies, diagnostics)
+  for (const diagnostic of diagnostics.slice(diagnosticsStart))
+    diagnostic.sourcePath = `template.on.${eventName}`
+  return result
 }
 
 export interface ComponentSFCPortAnalysisResult {

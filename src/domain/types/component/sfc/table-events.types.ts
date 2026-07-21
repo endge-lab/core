@@ -74,19 +74,20 @@ export type TableEventName = keyof TableEventMap
 
 export interface TableEventDefinition {
   name: TableEventName
+  displayName: string
   payloadType: string
   description: string
 }
 
 /** Canonical renderer-neutral Event manifest of the built-in Table tag. */
 export const TABLE_EVENT_DEFINITIONS: readonly TableEventDefinition[] = [
-  { name: 'rowActivated', payloadType: 'TableRowActivatedEvent', description: 'Строка активирована указателем или клавиатурой.' },
-  { name: 'rowContextMenuRequested', payloadType: 'TableRowContextMenuRequestedEvent', description: 'Для строки запрошено контекстное меню.' },
-  { name: 'selectionChanged', payloadType: 'TableSelectionChangedEvent', description: 'Изменился выбор строк.' },
-  { name: 'sortChanged', payloadType: 'TableSortChangedEvent', description: 'Изменилась сортировка.' },
-  { name: 'columnVisibilityChanged', payloadType: 'TableColumnVisibilityChangedEvent', description: 'Изменилась видимость колонок.' },
-  { name: 'columnPinChanged', payloadType: 'TableColumnPinChangedEvent', description: 'Изменилось закрепление колонок.' },
-  { name: 'columnOrderChanged', payloadType: 'TableColumnOrderChangedEvent', description: 'Изменился порядок колонок.' },
-  { name: 'columnSizeChanged', payloadType: 'TableColumnSizeChangedEvent', description: 'Изменился размер колонки.' },
-  { name: 'pageChanged', payloadType: 'TablePageChangedEvent', description: 'Изменилась страница или её размер.' },
+  { name: 'rowActivated', displayName: 'Активация строки', payloadType: 'TableRowActivatedEvent', description: 'Строка активирована указателем или клавиатурой.' },
+  { name: 'rowContextMenuRequested', displayName: 'Контекстное меню строки', payloadType: 'TableRowContextMenuRequestedEvent', description: 'Для строки запрошено контекстное меню.' },
+  { name: 'selectionChanged', displayName: 'Изменение выбора строк', payloadType: 'TableSelectionChangedEvent', description: 'Изменился выбор строк.' },
+  { name: 'sortChanged', displayName: 'Изменение сортировки', payloadType: 'TableSortChangedEvent', description: 'Изменилась сортировка.' },
+  { name: 'columnVisibilityChanged', displayName: 'Изменение видимости колонок', payloadType: 'TableColumnVisibilityChangedEvent', description: 'Изменилась видимость колонок.' },
+  { name: 'columnPinChanged', displayName: 'Изменение закрепления колонок', payloadType: 'TableColumnPinChangedEvent', description: 'Изменилось закрепление колонок.' },
+  { name: 'columnOrderChanged', displayName: 'Изменение порядка колонок', payloadType: 'TableColumnOrderChangedEvent', description: 'Изменился порядок колонок.' },
+  { name: 'columnSizeChanged', displayName: 'Изменение размера колонки', payloadType: 'TableColumnSizeChangedEvent', description: 'Изменился размер колонки.' },
+  { name: 'pageChanged', displayName: 'Изменение страницы', payloadType: 'TablePageChangedEvent', description: 'Изменилась страница или её размер.' },
 ] as const

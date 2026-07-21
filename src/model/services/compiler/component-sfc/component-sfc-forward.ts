@@ -14,6 +14,10 @@ import type {
   RComponentSFC_IR_Template,
 } from '@/domain/types/component/sfc'
 import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc'
+import {
+  getComponentSFCIntrinsicEventDefinitions,
+  listComponentSFCEventCapableTags,
+} from '@/domain/types/component/sfc/intrinsic-events.types'
 import { TABLE_EVENT_DEFINITIONS } from '@/domain/types/component/sfc/table-events.types'
 import { TABLE_RUNTIME_ACTION_IDS } from '@/domain/types/runtime/action.types'
 
@@ -104,19 +108,27 @@ export function resolveComponentSFCPortForwards(
 
 /** Returns the intrinsic public manifest of a renderer-neutral built-in component. */
 export function createBuiltInComponentPortManifest(tag: string): ComponentSFCPortManifest | null {
-  if (tag !== 'Table') return null
+  const normalizedTag = listComponentSFCEventCapableTags().find(candidate => candidate === tag)
+  if (!normalizedTag) return null
   const manifest = createEmptyComponentSFCPortManifest()
-  manifest.provides.actions = Object.values(TABLE_RUNTIME_ACTION_IDS).map(name => ({
-    kind: 'action',
-    role: 'provides',
-    name,
-    inputType: 'unknown',
-    outputType: 'void',
-  }))
-  manifest.emits.events = TABLE_EVENT_DEFINITIONS.map(event => ({
+  if (normalizedTag === 'Table') {
+    manifest.provides.actions = Object.values(TABLE_RUNTIME_ACTION_IDS).map(name => ({
+      kind: 'action',
+      role: 'provides',
+      name,
+      inputType: 'unknown',
+      outputType: 'void',
+    }))
+  }
+  const events = [
+    ...getComponentSFCIntrinsicEventDefinitions(normalizedTag),
+    ...(normalizedTag === 'Table' ? TABLE_EVENT_DEFINITIONS : []),
+  ]
+  manifest.emits.events = events.map(event => ({
     kind: 'event',
     role: 'emits',
     name: event.name,
+    displayName: event.displayName,
     payloadType: event.payloadType,
   }))
   return manifest
@@ -124,8 +136,10 @@ export function createBuiltInComponentPortManifest(tag: string): ComponentSFCPor
 
 /** Built-in manifests used by compiler and frontend-only event catalogs. */
 export function listBuiltInComponentPortManifests(): Array<{ tag: string, manifest: ComponentSFCPortManifest }> {
-  const table = createBuiltInComponentPortManifest('Table')
-  return table ? [{ tag: 'Table', manifest: table }] : []
+  return listComponentSFCEventCapableTags().map(tag => ({
+    tag,
+    manifest: createBuiltInComponentPortManifest(tag)!,
+  }))
 }
 
 function validateExplicitEventSources(
@@ -170,6 +184,7 @@ function validateExplicitEventSources(
       })
       continue
     }
+    event.displayName ??= sourceEvent.displayName
     event.forwardedFrom = {
       nodeId: source.nodeId,
       ref: source.ref,
@@ -188,12 +203,13 @@ function collectLocalComponentBindings(
   const visit = (node: RComponentSFC_IR_Node): void => {
     if (node.kind !== 'element') return
     const ref = literalString(node.props.ref)
-    if (node.tag === 'Table') {
+    const builtInManifest = createBuiltInComponentPortManifest(node.tag)
+    if (builtInManifest) {
       result.push({
         nodeId: node.id,
         ref,
-        componentTag: 'Table',
-        manifest: createBuiltInComponentPortManifest('Table'),
+        componentTag: node.tag,
+        manifest: builtInManifest,
       })
     }
     else if (node.tag === 'Component') {
@@ -241,9 +257,11 @@ function resolveRuleSource(
         if (
           role === 'emits'
           && existing.kind === 'event'
+          && port.kind === 'event'
           && existingSource?.ref === source.ref
           && existingSource?.event === port.name
         ) {
+          existing.displayName ??= port.displayName
           existing.forwardedFrom ??= {
             nodeId: source.nodeId,
             ref: source.ref,

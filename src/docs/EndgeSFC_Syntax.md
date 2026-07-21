@@ -137,8 +137,42 @@ Rules for v1:
 - computation generic types сохраняются в manifest, но в v1 не сравниваются с
   опциональными persisted `RComputation.input/output`; несовместимость проявляется
   естественной runtime-ошибкой;
-- Composition overrides для required ports и generic template event handlers
-  требуют отдельного binding syntax; они не маскируются неявными callbacks.
+- Composition overrides для required ports требуют отдельного binding syntax;
+  они не маскируются неявными callbacks.
+
+### Intrinsic Events тегов
+
+Built-in tags имеют renderer-neutral registry стандартных Events: pointer/mouse,
+keyboard, focus, wheel/scroll и drag-and-drop. Form tags дополнительно публикуют
+`input` и `change`. `Table` объединяет этот набор со своими девятью semantic
+Events.
+
+Локальную реакцию можно объявить без публичного `emits`:
+
+```vue
+<Text
+  ref="title"
+  @click.stop.prevent="action({
+    identity: 'audit.track-click',
+    input: { pointer: event() },
+  })"
+>
+  Открыть
+</Text>
+```
+
+Поддержаны `.stop`, `.prevent`, `.self`, `.once`, `.capture`, `.passive`;
+`.passive.prevent` является compile error. `.stop` не отменяет local reaction,
+но прекращает native bubbling и semantic routing occurrence. Для публикации
+родителю тот же Event явно связывается через `emits.from` или `forward`:
+
+```ts
+emits: {
+  titleClicked: event<ComponentSFCPointerEventPayload>({
+    from: { ref: 'title', event: 'click' },
+  }),
+}
+```
 
 ### Forward
 

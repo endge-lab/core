@@ -176,6 +176,9 @@ export interface RComponentSFC_AST_Directive {
   /** Выражение директивы, если оно есть. */
   expression?: string
 
+  /** Static modifiers such as `.stop`, `.prevent` and `.capture`. */
+  modifiers: string[]
+
   /** Позиция директивы в полном source. */
   range: RComponentSFC_SourceRange
 }

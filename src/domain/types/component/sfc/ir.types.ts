@@ -1,5 +1,6 @@
 import type { RComponentSFC_SourceRange } from './location.types'
 import type {
+  ComponentSFCEventAction,
   ComponentSFCPortManifest,
   RComponentSFC_IR_ComponentPortMarker,
   RComponentSFC_IR_PortCall,
@@ -122,6 +123,9 @@ export interface RComponentSFC_IR_ElementNode {
   /** Нормализованные control-flow директивы элемента. */
   directives: RComponentSFC_IR_Directives
 
+  /** Local renderer Event reactions declared through `@event` attributes. */
+  events?: RComponentSFC_IR_EventBinding[]
+
   /** Дочерние IR-узлы. */
   children: RComponentSFC_IR_Node[]
 
@@ -129,6 +133,16 @@ export interface RComponentSFC_IR_ElementNode {
   port?: RComponentSFC_IR_ComponentPortMarker
 
   /** Позиция исходного AST-узла. */
+  sourceRange?: RComponentSFC_SourceRange
+}
+
+export type RComponentSFC_IR_EventModifier
+  = 'stop' | 'prevent' | 'self' | 'once' | 'capture' | 'passive'
+
+export interface RComponentSFC_IR_EventBinding {
+  name: string
+  modifiers: RComponentSFC_IR_EventModifier[]
+  action: ComponentSFCEventAction
   sourceRange?: RComponentSFC_SourceRange
 }
 

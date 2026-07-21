@@ -9,6 +9,8 @@ import type {
   RComponentSFC_AST_TemplateNode,
   RComponentSFC_AST_TextNode,
   RComponentSFC_IR_Directives,
+  RComponentSFC_IR_EventBinding,
+  RComponentSFC_IR_EventModifier,
   RComponentSFC_IR_ElementNode,
   RComponentSFC_IR_Node,
   RComponentSFC_IR_Tag,
@@ -16,9 +18,13 @@ import type {
   RComponentSFC_IR_Value,
   ComponentSFCComponentPort,
   ComponentSFCActionPort,
+  ComponentSFCPortManifest,
 } from '@/domain/types/component/sfc'
 import type { ProgramNodeMetadata } from '@/domain/types/program/program-metadata.types'
 import { compileComponentSFCExpression } from '@/model/services/compiler/component-sfc/component-sfc-expression'
+import { compileComponentSFCLocalEventAction } from '@/model/services/compiler/component-sfc/component-sfc-ports'
+import { createBuiltInComponentPortManifest } from '@/model/services/compiler/component-sfc/component-sfc-forward'
+import { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sfc/component-sfc-built-in-tags'
 import { normalizeComponentSFCTableColumnMenu } from '@/model/services/compiler/component-sfc/component-sfc-table-menu'
 import { normalizeComponentSFCTableColumnPin } from '@/model/services/compiler/component-sfc/component-sfc-table-pin'
 import { normalizeComponentSFCTableSort } from '@/model/services/compiler/component-sfc/component-sfc-table-sort'
@@ -44,6 +50,9 @@ export interface ComponentSFCTemplateCompileContext {
 
   /** Проверяет статическую identity из Component is. */
   hasComponentIdentity?: (identity: string) => boolean
+
+  /** Resolves public Events of a nested user Component for local `@event` bindings. */
+  resolveComponentPortManifest?: (identity: string) => ComponentSFCPortManifest | null
 }
 
 /** Результат компиляции template в IR. */
@@ -61,34 +70,7 @@ export interface ComponentSFCTemplateCompileResult {
   metadata: ProgramNodeMetadata[]
 }
 
-const ENDGE_SFC_BUILT_IN_TAGS = new Set<RComponentSFC_IR_Tag>([
-  'Text',
-  'DateTime',
-  'Number',
-  'Icon',
-  'Badge',
-  'Dot',
-  'Box',
-  'Flex',
-  'Grid',
-  'Divider',
-  'Input',
-  'Textarea',
-  'Checkbox',
-  'Select',
-  'Component',
-  'Table',
-  'Column',
-  'Cell',
-  'ColumnMenu',
-  'MenuItem',
-  'MenuSeparator',
-])
-
-/** Проверяет, является ли tag встроенным renderer-neutral SFC primitive. */
-export function isComponentSFCBuiltInTag(tag: string): tag is RComponentSFC_IR_Tag {
-  return ENDGE_SFC_BUILT_IN_TAGS.has(tag as RComponentSFC_IR_Tag)
-}
+export { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sfc/component-sfc-built-in-tags'
 
 /** Компилирует AST template в renderer-neutral Endge SFC IR. */
 export function compileComponentSFCTemplate(
@@ -214,8 +196,12 @@ function compileElementNode(
     context,
     diagnostics,
   )
-  const directives = compileDirectives(node.directives, context, diagnostics)
+  const directives = compileDirectives(node.directives.filter(directive => directive.name !== 'on'), context, diagnostics)
   const tag: RComponentSFC_IR_Tag = directComponentIdentity ? 'Component' : node.tag as RComponentSFC_IR_Tag
+  const eventManifest = directComponentIdentity
+    ? context.resolveComponentPortManifest?.(directComponentIdentity) ?? null
+    : createBuiltInComponentPortManifest(tag)
+  const events = compileEventBindings(node.directives, eventManifest, dependencies, diagnostics)
 
   if (directComponentIdentity) {
     if (props.is) {
@@ -241,6 +227,7 @@ function compileElementNode(
     componentTag: directComponentIdentity ? node.tag : undefined,
     props,
     directives,
+    events,
     children: node.children
       .map((child, index) => compileTemplateNode(child, `${id}-${index}`, context, dependencies, metadata, diagnostics))
       .filter((child): child is RComponentSFC_IR_Node => child != null),
@@ -274,6 +261,81 @@ function compileElementNode(
   }
 
   return element
+}
+
+const LOCAL_EVENT_MODIFIERS = new Set<RComponentSFC_IR_EventModifier>([
+  'stop', 'prevent', 'self', 'once', 'capture', 'passive',
+])
+
+function compileEventBindings(
+  directives: RComponentSFC_AST_Directive[],
+  manifest: ComponentSFCPortManifest | null,
+  dependencies: RComponentDependencies,
+  diagnostics: RComponentDiagnostic[],
+): RComponentSFC_IR_EventBinding[] {
+  const result: RComponentSFC_IR_EventBinding[] = []
+  for (const directive of directives.filter(item => item.name === 'on')) {
+    const name = directive.argument?.trim() ?? ''
+    const available = manifest?.emits.events.find(event => event.name === name)
+    if (!name || !available) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'sfc-template-event-unknown',
+        message: name
+          ? `Event "${name}" не объявлен source-тегом.`
+          : 'Event binding требует static имя, например `@click`.',
+        sourcePath: 'template.on',
+        start: directive.range.start,
+        end: directive.range.end,
+      })
+      continue
+    }
+    const modifiers: RComponentSFC_IR_EventModifier[] = []
+    let invalid = false
+    for (const modifier of directive.modifiers ?? []) {
+      if (!LOCAL_EVENT_MODIFIERS.has(modifier as RComponentSFC_IR_EventModifier)) {
+        diagnostics.push({
+          severity: 'error',
+          code: 'sfc-template-event-modifier',
+          message: `@${name} не поддерживает modifier ".${modifier}".`,
+          sourcePath: `template.on.${name}`,
+          start: directive.range.start,
+          end: directive.range.end,
+        })
+        invalid = true
+      }
+      else if (!modifiers.includes(modifier as RComponentSFC_IR_EventModifier)) {
+        modifiers.push(modifier as RComponentSFC_IR_EventModifier)
+      }
+    }
+    if (modifiers.includes('passive') && modifiers.includes('prevent')) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'sfc-template-event-passive-prevent',
+        message: `@${name}.passive нельзя объединять с .prevent.`,
+        sourcePath: `template.on.${name}`,
+        start: directive.range.start,
+        end: directive.range.end,
+      })
+      invalid = true
+    }
+    const expression = directive.expression?.trim() ?? ''
+    if (invalid || !expression) {
+      if (!expression) diagnostics.push({
+        severity: 'error',
+        code: 'sfc-template-event-action-missing',
+        message: `@${name} требует локальную reaction.`,
+        sourcePath: `template.on.${name}`,
+        start: directive.range.start,
+        end: directive.range.end,
+      })
+      continue
+    }
+    const action = compileComponentSFCLocalEventAction(name, expression, directive.range.start, dependencies, diagnostics)
+    if (!action) continue
+    result.push({ name, modifiers, action, sourceRange: directive.range })
+  }
+  return result
 }
 
 function validateSemanticStyleAttributes(

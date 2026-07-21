@@ -1,6 +1,7 @@
 export * from './source.types'
 export * from './table-visibility.types'
 export * from './table-events.types'
+export * from './intrinsic-events.types'
 export * from './tag-input-contract.types'
 export * from './location.types'
 export * from './ast.types'

@@ -94,6 +94,8 @@ export interface ComponentSFCEventPort {
   kind: 'event'
   role: 'emits'
   name: string
+  /** Human-readable catalog label. Identity remains based on `name`. */
+  displayName?: string
   payloadType: string
   /** Optional local producer whose Event is republished by this component. */
   from?: ComponentSFCEventSource

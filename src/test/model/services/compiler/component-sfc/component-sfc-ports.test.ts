@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
+import { getComponentSFCIntrinsicEventDefinitions, TABLE_EVENT_DEFINITIONS } from '@/domain/types/component/sfc'
 
 const SOURCE = `<script setup lang="ts">
 interface Props {
@@ -126,16 +127,43 @@ const ports = definePorts({ forward: { from: 'table', ports: { emits: '*' } } })
 </script><template><Table ref="table" :rows="[]" /></template>`)
 
     expect(result.ir?.script.ports.emits.events.map(event => event.name)).toEqual([
-      'rowActivated',
-      'rowContextMenuRequested',
-      'selectionChanged',
-      'sortChanged',
-      'columnVisibilityChanged',
-      'columnPinChanged',
-      'columnOrderChanged',
-      'columnSizeChanged',
-      'pageChanged',
+      ...getComponentSFCIntrinsicEventDefinitions('Table').map(event => event.name),
+      ...TABLE_EVENT_DEFINITIONS.map(event => event.name),
     ])
+  })
+
+  it('publishes a click from a referenced Text tag and compiles a local stopped reaction', () => {
+    const result = compileComponentSFC(`<script setup lang="ts">
+const ports = definePorts({
+  emits: {
+    titleClicked: event<ComponentSFCPointerEventPayload>({
+      from: { ref: 'title', event: 'click' },
+    }),
+  },
+})
+</script>
+<template>
+  <Text
+    ref="title"
+    @click.stop.prevent="action({ identity: 'flight.open-details', input: { id: event('targetId') } })"
+  >Открыть</Text>
+</template>`)
+
+    expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
+    expect(result.ir?.script.ports.emits.events[0]).toMatchObject({
+      name: 'titleClicked',
+      displayName: 'Нажатие',
+      forwardedFrom: { ref: 'title', componentTag: 'Text', portName: 'click' },
+    })
+    expect(result.ir?.template.roots[0]).toMatchObject({
+      tag: 'Text',
+      events: [{
+        name: 'click',
+        modifiers: ['stop', 'prevent'],
+        action: { kind: 'action', identity: 'flight.open-details' },
+      }],
+    })
+    expect(result.dependencies.actions).toContain('flight.open-details')
   })
 
   it('forwards all intrinsic public Table Actions with forward wildcard', () => {

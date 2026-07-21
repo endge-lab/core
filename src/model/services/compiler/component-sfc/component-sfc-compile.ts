@@ -134,6 +134,7 @@ export function compileComponentSFC(
     providedActions: portResult.manifest.provides.actions,
     resolveComponentTag: options.resolveComponentTag,
     hasComponentIdentity: options.hasComponentIdentity,
+    resolveComponentPortManifest: options.resolveComponentPortManifest,
   })
   const forwardResult = resolveComponentSFCPortForwards(
     portResult.manifest,
