@@ -12,6 +12,7 @@ export type ProjectPayloadData = {
   folder?: number | string | null
   deletedAt?: string | null
   configuration?: import('@/domain/types/configuration').EndgeConfigurationContribution
+  meta?: Record<string, unknown>
 }
 
 export class Projects_Repository {
@@ -51,6 +52,7 @@ export class Projects_Repository {
     if (data.folder !== undefined) payload.folder = data.folder
     if (data.deletedAt !== undefined) payload.deletedAt = data.deletedAt
     if (data.configuration !== undefined) payload.configuration = data.configuration
+    if (data.meta !== undefined) payload.meta = data.meta
     const r = await this.api.post('/projects', payload)
     return r.data
   }

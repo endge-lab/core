@@ -56,6 +56,7 @@ export class RFolder extends REntity {
       : null
     f.parent = json.parent ?? null
     f.folderId = null
+    f.applyEntityMeta(json)
 
     return f
   }
@@ -68,6 +69,7 @@ export class RFolder extends REntity {
       displayName: this.displayName,
       entityType: this.entityType,
       parent: this.parent,
+      meta: { ...this.meta },
     }
   }
 

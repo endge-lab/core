@@ -9,6 +9,7 @@ export interface EnvironmentDoc {
   managedBy?: ManagedBy
   managedById?: string | null
   configuration?: import('@/domain/types/configuration').EndgeConfigurationContribution
+  meta?: Record<string, unknown>
 }
 
 export class Environments_Repository {
@@ -42,6 +43,7 @@ export class Environments_Repository {
     managedBy?: ManagedBy
     managedById?: string | null
     configuration?: import('@/domain/types/configuration').EndgeConfigurationContribution
+    meta?: Record<string, unknown>
   }): Promise<EnvironmentDoc> {
     const r = await this.api.post('/environments', data)
     return r.data
@@ -56,6 +58,7 @@ export class Environments_Repository {
       managedBy: ManagedBy
       managedById: string | null
       configuration: import('@/domain/types/configuration').EndgeConfigurationContribution
+      meta: Record<string, unknown>
     }>,
   ): Promise<EnvironmentDoc> {
     const r = await this.api.patch(`/environments/${id}`, data)
@@ -86,6 +89,7 @@ export class Environments_Repository {
     managedBy?: ManagedBy
     managedById?: string | null
     configuration?: import('@/domain/types/configuration').EndgeConfigurationContribution
+    meta?: Record<string, unknown>
   }): Promise<EnvironmentDoc> {
     const existing = await this.findByIdentity(data.identity)
     if (!existing)
@@ -96,6 +100,7 @@ export class Environments_Repository {
       ...(data.managedBy !== undefined && { managedBy: data.managedBy }),
       ...(data.managedById !== undefined && { managedById: data.managedById }),
       ...(data.configuration !== undefined && { configuration: data.configuration }),
+      ...(data.meta !== undefined && { meta: data.meta }),
     })
   }
 }

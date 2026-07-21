@@ -325,7 +325,7 @@ defineComposition({
     })
   })
 
-  it('compiles nested Composition runtimes and keeps their inputs explicit', () => {
+  it('compiles nested Composition runtimes and keeps their props explicit', () => {
     const valid = compileCompositionSource(`
 defineComposition({
   data: {
@@ -364,17 +364,61 @@ defineComposition({
     })
     expect(valid.artifact?.graph.publications).toHaveLength(2)
 
-    const invalid = compileCompositionSource(`
+    const withProps = compileCompositionSource(`
 defineComposition({
   runtimes: {
     requests: composition('groundhandling-default').withProps({ value: 1 }),
   },
 })
 `)
-    expect(invalid.artifact).toBeNull()
-    expect(invalid.diagnostics).toEqual(expect.arrayContaining([
-      expect.objectContaining({ code: 'composition-composition-props-unsupported' }),
-    ]))
+    expect(withProps.diagnostics).toEqual([])
+    expect(withProps.artifact?.runtimes[0]?.props.value).toEqual({ kind: 'literal', value: 1 })
+  })
+
+  it('compiles public Composition props and explicit nested prop bindings', () => {
+    const provider = compileCompositionSource(`
+defineComposition({
+  props: defineProps({
+    requirements: field('Object'),
+  }),
+  runtimes: {
+    attributes: query('attributes-leg-select').withProps({
+      names: prop('requirements.arrival.attributes'),
+    }),
+  },
+})
+`)
+
+    expect(provider.diagnostics).toEqual([])
+    expect(provider.artifact?.props).toEqual([
+      { key: 'requirements', type: 'Object', optional: false, array: false },
+    ])
+    expect(provider.artifact?.runtimes[0]?.props.names).toEqual({
+      kind: 'expression',
+      expression: {
+        type: 'read',
+        source: 'prop',
+        path: 'requirements.arrival.attributes',
+      },
+    })
+
+    const consumer = compileCompositionSource(`
+defineComposition({
+  runtimes: {
+    requests: composition('groundhandling-default').withProps({
+      requirements: metadataOf('table', 'groundhandling.query'),
+    }),
+    table: component('groundhandling-control-table'),
+  },
+})
+`)
+
+    expect(consumer.diagnostics).toEqual([])
+    expect(consumer.artifact?.runtimes[0]?.props.requirements).toMatchObject({
+      kind: 'runtime-metadata',
+      runtime: 'table',
+      namespace: 'groundhandling.query',
+    })
   })
 
   it('compiles contextual Store policies and explicit nested data bindings', () => {

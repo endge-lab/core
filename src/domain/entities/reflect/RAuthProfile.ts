@@ -64,7 +64,7 @@ export class RAuthProfile extends REntity {
     profile.folderId = raw.folderId ?? raw.folder ?? null
     profile.active = raw.active !== false
     profile.deletedAt = raw.deletedAt ?? null
-    profile.meta = normalizeObject(raw.meta)
+    profile.applyEntityMeta(raw)
     return profile
   }
 

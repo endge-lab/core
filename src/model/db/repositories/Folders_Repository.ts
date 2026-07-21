@@ -28,6 +28,7 @@ export class Folders_Repository {
     entityType: string
     workspace?: number | string | null
     parent?: string | null
+    meta?: Record<string, unknown>
   }) {
     const r = await this.api.post('/folders', data)
     return r.data
@@ -40,6 +41,7 @@ export class Folders_Repository {
     entityType: string
     workspace?: number | string | null
     parent?: string | null
+    meta?: Record<string, unknown>
   }>) {
     const r = await this.api.patch(`/folders/${id}`, data)
     return r.data
@@ -51,6 +53,7 @@ export class Folders_Repository {
     entityType: string
     workspace?: number | string | null
     parent?: string | null
+    meta?: Record<string, unknown>
   }) {
     const existing = await this.findByIdentity(data.identity)
     if (!existing) return this.create(data)

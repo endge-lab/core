@@ -10,6 +10,7 @@ export interface RIntegrationSchema extends EntityManagement {
   identity: string
   name: string
   description?: string | null
+  meta: Record<string, unknown>
 }
 
 /** Сущность интеграции (коллекция integrations). */
@@ -25,6 +26,7 @@ export class RIntegration extends REntity {
       description: this.description ?? null,
       managedBy: this.managedBy,
       managedById: this.managedById,
+      meta: { ...this.meta },
     }
   }
 

@@ -9,6 +9,7 @@ export interface I18nBundleDoc {
   active?: boolean
   folder?: number | string | null
   deletedAt?: string | null
+  meta?: Record<string, unknown>
 }
 
 export class I18nBundles_Repository {
@@ -43,6 +44,7 @@ export class I18nBundles_Repository {
     active?: boolean
     folder?: number | string | null
     deletedAt?: string | null
+    meta?: Record<string, unknown>
   }): Promise<I18nBundleDoc> {
     const r = await this.api.post('/i18n-bundles', {
       ...data,
@@ -61,6 +63,7 @@ export class I18nBundles_Repository {
       active: boolean
       folder: number | string | null
       deletedAt: string | null
+      meta: Record<string, unknown>
     }>,
   ): Promise<I18nBundleDoc> {
     const r = await this.api.patch(`/i18n-bundles/${id}`, data)
@@ -75,6 +78,7 @@ export class I18nBundles_Repository {
     active?: boolean
     folder?: number | string | null
     deletedAt?: string | null
+    meta?: Record<string, unknown>
   }): Promise<I18nBundleDoc> {
     const existing = await this.findByIdentity(data.identity)
     if (!existing)
@@ -86,6 +90,7 @@ export class I18nBundles_Repository {
       active: data.active !== false,
       folder: data.folder ?? null,
       deletedAt: data.deletedAt ?? null,
+      ...(data.meta !== undefined && { meta: data.meta }),
     })
   }
 

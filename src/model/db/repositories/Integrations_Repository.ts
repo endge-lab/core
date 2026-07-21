@@ -8,6 +8,7 @@ export interface IntegrationDoc {
   description?: string | null
   managedBy?: ManagedBy
   managedById?: string | null
+  meta?: Record<string, unknown>
 }
 
 export class Integrations_Repository {
@@ -40,6 +41,7 @@ export class Integrations_Repository {
     description?: string | null
     managedBy?: ManagedBy
     managedById?: string | null
+    meta?: Record<string, unknown>
   }): Promise<IntegrationDoc> {
     const r = await this.api.post('/integrations', data)
     return r.data
@@ -54,6 +56,7 @@ export class Integrations_Repository {
       description: string | null
       managedBy: ManagedBy
       managedById: string | null
+      meta: Record<string, unknown>
     }>,
   ): Promise<IntegrationDoc> {
     const r = await this.api.patch(`/integrations/${id}`, data)
@@ -66,6 +69,7 @@ export class Integrations_Repository {
     description?: string | null
     managedBy?: ManagedBy
     managedById?: string | null
+    meta?: Record<string, unknown>
   }): Promise<IntegrationDoc> {
     const existing = await this.findByIdentity(data.identity)
     if (!existing) return this.create(data)
@@ -74,6 +78,7 @@ export class Integrations_Repository {
       description: data.description ?? null,
       ...(data.managedBy !== undefined && { managedBy: data.managedBy }),
       ...(data.managedById !== undefined && { managedById: data.managedById }),
+      ...(data.meta !== undefined && { meta: data.meta }),
     })
   }
 }

@@ -11,6 +11,7 @@ export type WorkspacePayloadData = {
     version: string
   }>
   configuration: import('@/domain/types/configuration').EndgeConfiguration
+  meta?: Record<string, unknown>
 }
 
 export class Workspaces_Repository {

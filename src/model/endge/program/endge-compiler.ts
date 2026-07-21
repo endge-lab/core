@@ -4,7 +4,7 @@ import type { DataViewMaterializationStrategy, DataViewRef, DataViewPipelineStep
 import type { FilterProgramPayload } from '@/domain/types/source/filter-source.types'
 import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
 import type { StoreSourceArtifact } from '@/domain/types/source/store-source.types'
-import type { TypeProgramCatalogEntry, TypeProgramPayload } from '@/domain/types/source/type-source.types'
+import type { TypeProgramCatalogEntry, TypeProgramPayload, TypeSourceDefinition } from '@/domain/types/source/type-source.types'
 import type {
   ComponentSFCProgramPayload,
   ActionProgramPayload,
@@ -507,6 +507,7 @@ export class EndgeCompiler extends EndgeModule {
           diagnostics: [
             ...(this._componentTagDiagnosticsByIdentity.get(entity.identity) ?? []),
             ...result.diagnostics,
+            ...this._typeContractDiagnostics(result.ast?.script?.props?.source, 'script.defineProps', localTypes),
             ...result.contract.inputs.flatMap(input => this._typeContractDiagnostics(input.type, `script.defineProps.${input.name}`, localTypes)),
             ...(result.ir?.script.ports.require.computations.flatMap(port => [
               ...this._typeContractDiagnostics(port.inputType, `script.ports.require.${port.name}.input`, localTypes),
@@ -516,6 +517,8 @@ export class EndgeCompiler extends EndgeModule {
               ...this._typeContractDiagnostics(port.inputType, `script.ports.require.${port.name}.input`, localTypes),
               ...this._typeContractDiagnostics(port.outputType, `script.ports.require.${port.name}.output`, localTypes),
             ]) ?? []),
+            ...(result.ir?.script.ports.require.components.flatMap(port =>
+              this._typeContractDiagnostics(port.propsType, `script.ports.require.${port.name}.props`, localTypes)) ?? []),
             ...(result.ir?.script.ports.provides.actions.flatMap(port => [
               ...this._typeContractDiagnostics(port.inputType, `script.ports.provides.${port.name}.input`, localTypes),
               ...this._typeContractDiagnostics(port.outputType, `script.ports.provides.${port.name}.output`, localTypes),
@@ -543,9 +546,11 @@ export class EndgeCompiler extends EndgeModule {
               role: 'port-default-action',
             })),
             ...this._typeDependencies([
+              result.ast?.script?.props?.source,
               ...result.contract.inputs.map(input => input.type),
               ...(result.ir?.script.ports.require.computations.flatMap(port => [port.inputType, port.outputType]) ?? []),
               ...(result.ir?.script.ports.require.actions.flatMap(port => [port.inputType, port.outputType]) ?? []),
+              ...(result.ir?.script.ports.require.components.map(port => port.propsType) ?? []),
               ...(result.ir?.script.ports.provides.actions.flatMap(port => [port.inputType, port.outputType]) ?? []),
               ...(result.ir?.script.ports.emits.events.map(port => port.payloadType) ?? []),
             ], localTypes),
@@ -772,10 +777,15 @@ export class EndgeCompiler extends EndgeModule {
           capabilities: ['compilable', 'executable', 'configuration'],
           metadata: { self: result.metadata ?? {}, nodes: [] },
           payload: payload ?? this._makeEmptyCompositionPayload(entity.sourceVersion),
-          dependencies: validation.dependencies,
+          dependencies: [
+            ...validation.dependencies,
+            ...this._typeDependencies(payload?.props.map(prop => prop.type) ?? []),
+          ],
           diagnostics: [
             ...((result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]),
             ...validation.diagnostics,
+            ...(payload?.props.flatMap(prop =>
+              this._typeContractDiagnostics(prop.type, `props.${prop.key}.type`)) ?? []),
           ],
         })
       },
@@ -1047,6 +1057,7 @@ export class EndgeCompiler extends EndgeModule {
         hasComponentIdentity: identity => Endge.domain.getComponentSFC(identity) != null,
         resolvePortProvider: (identity, expectedKind) => this._resolvePortProvider(identity, expectedKind),
         resolveComponentPortManifest: identity => this._resolveComponentPortManifest(identity),
+        resolveTypeDefinition: identity => this._resolveTypeDefinition(identity),
       })
       if (result.ir)
         this._componentPortManifestCache.set(entity.identity, result.ir.script.ports)
@@ -1066,6 +1077,18 @@ export class EndgeCompiler extends EndgeModule {
     const component = Endge.domain.getComponentSFC(identity)
     if (!component) return null
     return this._compileComponentSFCSource(component).ir?.script.ports ?? null
+  }
+
+  /** Resolves Type Source independently from type/component compilation order. */
+  private _resolveTypeDefinition(identity: string): TypeSourceDefinition | null {
+    const compiled = Endge.program.getTypeArtifact(identity)?.payload.definition
+    if (compiled)
+      return compiled
+
+    const type = Endge.domain.getType(identity)
+    if (!type || type.isPrimitive)
+      return null
+    return compileTypeSource(type.source, type.sourceVersion).document?.definition ?? null
   }
 
   /** Materializes final provided/forwarded SFC Action ports as derived descriptors. */
@@ -1129,7 +1152,9 @@ export class EndgeCompiler extends EndgeModule {
     }
     if (target instanceof RComponentSFC) {
       const parsed = parseComponentSFC(target.source)
-      const contract = analyzeComponentSFCScript(parsed.ast?.script ?? null).contract
+      const contract = analyzeComponentSFCScript(parsed.ast?.script ?? null, {
+        resolveTypeDefinition: identity => this._resolveTypeDefinition(identity),
+      }).contract
       return {
         kind: 'component' as const,
         identity: target.identity,
@@ -1731,6 +1756,27 @@ export class EndgeCompiler extends EndgeModule {
           artifact.payload.activation,
           payload.scopes.find(scope => scope.path === runtime.scopePath)?.effectiveActivation,
         )
+        const propNames = new Set(artifact.payload.props.map(prop => prop.key))
+        for (const propName of Object.keys(runtime.props)) {
+          if (!propNames.has(propName)) {
+            diagnostics.push({
+              severity: 'error',
+              code: 'composition-with-props-target-missing',
+              message: `Composition "${runtime.identity}" не объявляет prop "${propName}".`,
+              sourcePath: `runtimes.${runtime.name}.withProps.${propName}`,
+            })
+          }
+        }
+        for (const prop of artifact.payload.props) {
+          if (!prop.optional && prop.defaultValue === undefined && !Object.prototype.hasOwnProperty.call(runtime.props, prop.key)) {
+            diagnostics.push({
+              severity: 'error',
+              code: 'composition-with-props-required',
+              message: `Composition "${runtime.identity}" требует prop "${prop.key}".`,
+              sourcePath: `runtimes.${runtime.name}.withProps.${prop.key}`,
+            })
+          }
+        }
         for (const [targetDataName, sourceDataName] of Object.entries(runtime.dataBindings ?? {})) {
           const sourceData = payload.data.find(item => item.name === sourceDataName)
           const targetData = artifact.payload.data.find(item => item.name === targetDataName)
@@ -2162,6 +2208,7 @@ export class EndgeCompiler extends EndgeModule {
       type: 'composition',
       sourceVersion,
       activation: null,
+      props: [],
       data: [],
       resources: [],
       scopes: [{

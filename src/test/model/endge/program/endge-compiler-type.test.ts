@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { RAction } from '@/domain/entities/reflect/RAction'
+import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { REnvironment } from '@/domain/entities/reflect/REnvironment'
 import { RField } from '@/domain/entities/reflect/RField'
 import { RProject } from '@/domain/entities/reflect/RProject'
@@ -84,6 +85,37 @@ describe('EndgeCompiler Type Program', () => {
     expect(validateTypeCompatibility('Customer', 'Order', 'input.type')).toEqual([
       expect.objectContaining({ code: 'type-contract-mismatch', severity: 'warning' }),
     ])
+  })
+
+  it('resolves an external RType in an SFC props contract and keeps the direct dependency', () => {
+    const stringType = makeType('String', '', true)
+    const flightRow = makeType('FlightRow', `defineType({
+      id: field('String'),
+      tags: field('String').array(),
+    })`)
+    Endge.domain.addType(stringType)
+    Endge.domain.addType(flightRow)
+    Endge.compiler.buildType(stringType)
+    Endge.compiler.buildType(flightRow)
+
+    const component = new RComponentSFC()
+    component.id = 42
+    component.identity = 'flight-row-card'
+    component.name = component.identity
+    component.source = `<script setup lang="ts">
+defineProps<FlightRow>()
+</script>
+<template><Text>Flight</Text></template>`
+    const artifact = Endge.compiler.buildComponentSFC(component)
+
+    expect(artifact.payload.contract.inputs).toEqual([
+      { name: 'id', type: 'String', isArray: false, optional: false },
+      { name: 'tags', type: 'Array<String>', isArray: true, optional: false },
+    ])
+    expect(artifact.dependencies).toContainEqual(expect.objectContaining({
+      entityType: 'type',
+      identity: 'FlightRow',
+    }))
   })
 })
 

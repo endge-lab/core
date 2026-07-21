@@ -28,6 +28,7 @@ describe('Composition style scope integration', () => {
       type: 'composition',
       sourceVersion: 1,
       activation: { mode: 'startup' },
+      props: [],
       data: [],
       resources: [
         { name: 'projectTheme', path: 'projectTheme', scopePath: 'scope_default', kind: 'style', identity: 'project-theme', sourceOrder: 0 },

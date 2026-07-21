@@ -314,6 +314,7 @@ export class RAction extends REntity {
       folderId: this.folderId ?? null,
       managedBy: this.managedBy,
       managedById: this.managedById,
+      meta: { ...this.meta },
       definition: rawDefinition,
       target: this.target?.map(selector => ({ ...selector })) ?? null,
       input: this._fieldToPlain(this.input),

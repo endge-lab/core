@@ -17,6 +17,7 @@ import type {
   FilterViewControlType,
 } from '@/domain/types/ui/filter-view.type'
 import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
+import type { SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
@@ -28,6 +29,7 @@ import {
   readStringArgument,
   unwrapExpression,
 } from '@/model/services/source-engine/compilers/source-expression-compile'
+import { compileSourceField } from '@/model/services/source-engine/compilers/source-field-compile'
 import { compileProgramMetadataProperty } from '@/model/services/source-engine/compilers/source-metadata-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
@@ -56,6 +58,7 @@ export function compileCompositionSource(source: string, sourceVersion = 1): Com
     validateRootProperties(definition, diagnostics)
     const metadata = compileProgramMetadataProperty(definition, diagnostics)
     const activationValue = propertyValue(definition, 'activateOn')
+    const propsValue = propertyValue(definition, 'props')
     const dataValue = propertyValue(definition, 'data')
     const resourcesValue = propertyValue(definition, 'resources')
     const runtimesValue = propertyValue(definition, 'runtimes')
@@ -77,6 +80,7 @@ export function compileCompositionSource(source: string, sourceVersion = 1): Com
       diagnostics.push(diagnostic('error', 'composition-source-hooks-shape', 'hooks должен быть array literal.', 'hooks', hooksValue))
     if (outputsValue && !outputsNode)
       diagnostics.push(diagnostic('error', 'composition-source-outputs-shape', 'outputs должен быть object literal.', 'outputs', outputsValue))
+    const props = propsValue ? readProps(propsValue, source, diagnostics) : []
     const data = dataNode ? readData(dataNode, diagnostics) : []
     const dataNames = new Set(data.map(item => item.name))
     const defaultActivation = activation ?? { mode: 'startup' as const }
@@ -120,10 +124,10 @@ export function compileCompositionSource(source: string, sourceVersion = 1): Com
     if (!runtimesNode)
       diagnostics.push(diagnostic('error', 'composition-source-runtimes-missing', 'defineComposition требует runtimes.', 'runtimes', definition))
     validatePersistKeys(runtimes, diagnostics)
-    validateBindingReferences(data, runtimes, diagnostics)
+    validateBindingReferences(props, data, runtimes, diagnostics)
     validateRuntimeCycles(runtimes, hooks, diagnostics)
 
-    const document: CompositionSourceDocument = { activation, data, resources, scopes, runtimes, hooks, outputs }
+    const document: CompositionSourceDocument = { activation, props, data, resources, scopes, runtimes, hooks, outputs }
     const hasErrors = diagnostics.some(item => item.severity === 'error')
     return {
       ast,
@@ -199,9 +203,55 @@ function validateRootProperties(node: t.ObjectExpression, diagnostics: Diagnosti
       continue
     }
     const name = propertyName(property.key)
-    if (name !== 'metadata' && name !== 'activateOn' && name !== 'data' && name !== 'resources' && name !== 'runtimes' && name !== 'hooks' && name !== 'outputs')
+    if (name !== 'metadata' && name !== 'activateOn' && name !== 'props' && name !== 'data' && name !== 'resources' && name !== 'runtimes' && name !== 'hooks' && name !== 'outputs')
       diagnostics.push(diagnostic('error', 'composition-source-property-unsupported', `Свойство "${name ?? ''}" не поддерживается Composition v1.`, name ?? 'defineComposition', property))
   }
+}
+
+function readProps(
+  raw: t.Expression,
+  source: string,
+  diagnostics: DiagnosticDraft[],
+): SourceFieldDefinition[] {
+  const expression = unwrapExpression(raw)
+  if (!t.isCallExpression(expression) || !t.isIdentifier(expression.callee, { name: 'defineProps' })) {
+    diagnostics.push(diagnostic('error', 'composition-source-props-shape', 'props должен иметь вид defineProps({...}).', 'props', expression))
+    return []
+  }
+  const definition = expression.arguments[0]
+  if (!definition || !t.isObjectExpression(definition) || expression.arguments.length !== 1) {
+    diagnostics.push(diagnostic('error', 'composition-source-props-definition', 'defineProps(...) принимает один object literal.', 'props', expression))
+    return []
+  }
+
+  const props: SourceFieldDefinition[] = []
+  const declared = new Set<string>()
+  for (const property of definition.properties) {
+    if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
+      diagnostics.push(diagnostic('error', 'composition-prop-property', 'defineProps допускает только обычные properties.', 'props', property))
+      continue
+    }
+    const key = propertyName(property.key)
+    if (!key || declared.has(key)) {
+      diagnostics.push(diagnostic('error', 'composition-prop-duplicate', `Prop "${key ?? ''}" объявлен повторно.`, `props.${key ?? ''}`, property))
+      continue
+    }
+    declared.add(key)
+    const compiled = compileSourceField(key, property.value, source, diagnostics, `props.${key}`)
+    if (!compiled)
+      continue
+    if (compiled.defaultSource) {
+      diagnostics.push(diagnostic(
+        'error',
+        'composition-prop-default-source-unsupported',
+        'Composition prop не поддерживает field().from(...); используйте static .default(...).',
+        `props.${key}.from`,
+        property.value,
+      ))
+    }
+    props.push(compiled.field)
+  }
+  return props
 }
 
 function readActivation(
@@ -536,13 +586,11 @@ function readRuntime(
       continue
     }
     if (modifier.name === 'withProps') {
-      if (kind === 'filter' || kind === 'composition') {
+      if (kind === 'filter') {
         diagnostics.push(diagnostic(
           'error',
-          kind === 'filter' ? 'composition-filter-props-unsupported' : 'composition-composition-props-unsupported',
-          kind === 'filter'
-            ? 'Filter runtime v1 не принимает .withProps(...).'
-            : 'Composition runtime v1 не принимает .withProps(...): публичный input contract для Composition пока не определен.',
+          'composition-filter-props-unsupported',
+          'Filter runtime v1 не принимает .withProps(...).',
           `runtimes.${name}.withProps`,
           modifier.call,
         ))
@@ -719,6 +767,15 @@ function readBindings(
         bindings[key] = { kind: 'data', data, path }
       continue
     }
+    if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'metadataOf' })) {
+      const runtime = readStringArgument(expression, 0)
+      const namespace = readStringArgument(expression, 1)
+      if (!runtime || !namespace || expression.arguments.length !== 2)
+        diagnostics.push(diagnostic('error', 'composition-binding-runtime-metadata', 'metadataOf(runtime, namespace) требует две строки.', `${sourcePath}.${key}`, expression))
+      else
+        bindings[key] = { kind: 'runtime-metadata', runtime, namespace }
+      continue
+    }
     const filterBinding = readFilterFieldsBinding(expression, diagnostics, `${sourcePath}.${key}`)
     if (filterBinding) {
       bindings[key] = filterBinding
@@ -875,7 +932,13 @@ function validatePersistKeys(runtimes: CompositionRuntimeDescriptor[], diagnosti
   }
 }
 
-function validateBindingReferences(data: CompositionDataDescriptor[], runtimes: CompositionRuntimeDescriptor[], diagnostics: DiagnosticDraft[]): void {
+function validateBindingReferences(
+  props: SourceFieldDefinition[],
+  data: CompositionDataDescriptor[],
+  runtimes: CompositionRuntimeDescriptor[],
+  diagnostics: DiagnosticDraft[],
+): void {
+  const propNames = new Set(props.map(prop => prop.key))
   const dataByName = new Map(data.map(item => [item.name, item]))
   const runtimeByName = new Map(runtimes.map(runtime => [runtime.name, runtime]))
   for (const runtime of runtimes) {
@@ -907,12 +970,17 @@ function validateBindingReferences(data: CompositionDataDescriptor[], runtimes: 
           const dataRef = read.source === 'composition-data'
             ? String(read.parameters?.[0] ?? '').split('.')[0]
             : undefined
+          const propRef = read.source === 'prop'
+            ? read.path.split('.')[0]
+            : undefined
           if (runtimeRef && !runtimeByName.has(runtimeRef))
             diagnostics.push(diagnostic('error', 'composition-binding-runtime-missing', `Expression ссылается на отсутствующий runtime "${runtimeRef}".`, `runtimes.${runtime.name}.withProps.${prop}`))
           if (read.source === 'composition-filter-fields' && runtimeRef && runtimeByName.get(runtimeRef)?.kind !== 'filter')
             diagnostics.push(diagnostic('error', 'composition-binding-filter-runtime-kind', `fromFilter(...) должен ссылаться на Filter runtime, получен "${runtimeByName.get(runtimeRef)?.kind ?? ''}".`, `runtimes.${runtime.name}.withProps.${prop}`))
           if (dataRef && !dataByName.has(dataRef))
             diagnostics.push(diagnostic('error', 'composition-binding-data-missing', `Expression ссылается на отсутствующий data alias "${dataRef}".`, `runtimes.${runtime.name}.withProps.${prop}`))
+          if (propRef && !propNames.has(propRef))
+            diagnostics.push(diagnostic('error', 'composition-binding-prop-missing', `prop(...) ссылается на необъявленный Composition prop "${propRef}".`, `runtimes.${runtime.name}.withProps.${prop}`))
         }
       }
       if ((binding.kind === 'output' || binding.kind === 'filter-fields') && !runtimeByName.has(binding.runtime)) {
@@ -920,6 +988,14 @@ function validateBindingReferences(data: CompositionDataDescriptor[], runtimes: 
           'error',
           'composition-binding-runtime-missing',
           `Binding ссылается на отсутствующий runtime "${binding.runtime}".`,
+          `runtimes.${runtime.name}.withProps.${prop}`,
+        ))
+      }
+      if (binding.kind === 'runtime-metadata' && !runtimeByName.has(binding.runtime)) {
+        diagnostics.push(diagnostic(
+          'error',
+          'composition-binding-runtime-missing',
+          `metadataOf(...) ссылается на отсутствующий runtime "${binding.runtime}".`,
           `runtimes.${runtime.name}.withProps.${prop}`,
         ))
       }

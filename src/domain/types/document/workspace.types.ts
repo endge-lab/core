@@ -26,6 +26,7 @@ export interface WorkspaceIntegrationReference {
 export interface EndgeWorkspaceDefinition extends EntityManagement {
   identity: string
   displayName: string
+  meta?: Record<string, unknown>
   installedIntegrations: WorkspaceIntegrationReference[]
   configuration: EndgeConfiguration
 }

@@ -218,6 +218,44 @@ defineComposition({
     ]))
   })
 
+  it('validates required public props of a nested Composition', () => {
+    const child = new RComposition()
+    child.id = 25
+    child.identity = 'requirements-provider'
+    child.name = 'Requirements provider'
+    child.source = `
+defineComposition({
+  props: defineProps({
+    requirements: field('Object'),
+  }),
+  runtimes: {},
+})
+`
+    Endge.domain.addComposition(child)
+    Endge.compiler.buildComposition(child)
+
+    const parent = new RComposition()
+    parent.id = 26
+    parent.identity = 'requirements-consumer'
+    parent.name = 'Requirements consumer'
+    parent.source = `
+defineComposition({
+  runtimes: {
+    requests: composition('requirements-provider'),
+  },
+})
+`
+    expect(Endge.compiler.buildComposition(parent).diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'composition-with-props-required' }),
+    ]))
+
+    parent.source = parent.source.replace(
+      "composition('requirements-provider')",
+      "composition('requirements-provider').withProps({ requirements: {} })",
+    )
+    expect(Endge.compiler.buildComposition(parent).status).toBe('valid')
+  })
+
   it('reports transitive Composition dependency cycles during compilation', () => {
     const first = createNestedComposition('second')
     first.identity = 'first'

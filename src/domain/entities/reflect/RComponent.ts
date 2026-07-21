@@ -49,7 +49,7 @@ export function ReflectComponentFromPlain(
     table.sourceIndex = json.sourceIndex
     table.rowSize = json.rowSize
     table.runtimeFilters = base.runtimeFilters
-    table.meta = (json.meta && typeof json.meta === 'object' && !Array.isArray(json.meta)) ? { ...json.meta } : (base.meta ?? {})
+    table.applyEntityMeta(json)
 
     const rawBindings = json.bindings
     table.bindings = { keys: {} }

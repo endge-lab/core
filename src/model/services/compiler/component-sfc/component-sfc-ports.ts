@@ -1,6 +1,7 @@
 import { parse as parseTS } from '@babel/parser'
 
 import type { RComponentDependencies, RComponentDiagnostic } from '@/domain/types/component/component-core.types'
+import type { TypeSourceDefinition } from '@/domain/types/source/type-source.types'
 import type {
   ComponentSFCComponentPort,
   ComponentSFCComputationPort,
@@ -24,6 +25,7 @@ export interface ComponentSFCPortAnalysisOptions {
     identity: string,
     expectedKind: 'computation' | 'component' | 'action',
   ) => ComponentSFCPortProviderDescriptor | null
+  resolveTypeDefinition?: (identity: string) => TypeSourceDefinition | null
 }
 
 export interface ComponentSFCPortAnalysisResult {
@@ -117,6 +119,7 @@ export function analyzeComponentSFCPorts(
       manifest,
       calls,
       diagnostics,
+      options,
     )
   }
 
@@ -352,7 +355,7 @@ function parsePortManifest(
           continue
         }
         tags.add(tag)
-        const inputs = parseComponentSFCTypeFields(typeSources[0]!, script.content)
+        const inputs = parseComponentSFCTypeFields(typeSources[0]!, script.content, options)
         const port: ComponentSFCComponentPort = {
           kind,
           name,
@@ -649,11 +652,12 @@ function parsePortCalls(
   manifest: ComponentSFCPortManifest,
   calls: RComponentSFC_IR_PortCall[],
   diagnostics: RComponentDiagnostic[],
+  options: ComponentSFCPortAnalysisOptions,
 ): void {
   const portsByName = new Map<string, ComponentSFCComputationPort | ComponentSFCComponentPort>()
   for (const port of manifest.require.computations) portsByName.set(port.name, port)
   for (const port of manifest.require.components) portsByName.set(port.name, port)
-  const props = parseComponentSFCProps(script)
+  const props = parseComponentSFCProps(script, options)
   const locals = script.bindings.map(binding => binding.name)
   const topLevelCalls = new Set<number>()
 
@@ -798,9 +802,12 @@ function normalizeType(value: string): string {
   return String(value ?? '').replace(/\s+/g, '')
 }
 
-function parseComponentSFCProps(script: RComponentSFC_AST_Script): string[] {
+function parseComponentSFCProps(
+  script: RComponentSFC_AST_Script,
+  options: ComponentSFCPortAnalysisOptions,
+): string[] {
   return script.props
-    ? parseComponentSFCTypeFields(script.props.source, script.content).map(prop => prop.name)
+    ? parseComponentSFCTypeFields(script.props.source, script.content, options).map(prop => prop.name)
     : []
 }
 

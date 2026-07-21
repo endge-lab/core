@@ -32,6 +32,7 @@ export function inspectComponentSFCVisual(
 ): ComponentSFCVisualInspection {
   const compileResult = compileComponentSFC(source, {
     resolveComponentTag: options.resolveComponentTag,
+    resolveTypeDefinition: options.resolveTypeDefinition,
   })
   const template = compileResult.ast?.template
 

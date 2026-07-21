@@ -9,6 +9,7 @@ export interface ConverterDoc {
   folder?: number | string
   managedBy?: ManagedBy
   managedById?: string | null
+  meta?: Record<string, unknown>
 }
 
 export class Converters_Repository {
@@ -43,6 +44,7 @@ export class Converters_Repository {
     folder?: number | string
     managedBy?: ManagedBy
     managedById?: string | null
+    meta?: Record<string, unknown>
   }): Promise<ConverterDoc> {
     const r = await this.api.post('/converters', data)
     return r.data
@@ -58,6 +60,7 @@ export class Converters_Repository {
       folder: number | string
       managedBy: ManagedBy
       managedById: string | null
+      meta: Record<string, unknown>
     }>,
   ): Promise<ConverterDoc> {
     const r = await this.api.patch(`/converters/${id}`, data)
@@ -83,6 +86,7 @@ export class Converters_Repository {
     folder?: number | string
     managedBy?: ManagedBy
     managedById?: string | null
+    meta?: Record<string, unknown>
   }): Promise<ConverterDoc> {
     const existing = await this.findByIdentity(data.identity)
     if (!existing) return this.create(data)
@@ -92,6 +96,7 @@ export class Converters_Repository {
       folder: data.folder,
       ...(data.managedBy !== undefined && { managedBy: data.managedBy }),
       ...(data.managedById !== undefined && { managedById: data.managedById }),
+      ...(data.meta !== undefined && { meta: data.meta }),
     })
   }
 }

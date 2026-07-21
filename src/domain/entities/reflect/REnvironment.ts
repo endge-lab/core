@@ -25,6 +25,7 @@ export class REnvironment extends REntity {
       folderId: this.folderId ?? null,
       managedBy: this.managedBy,
       managedById: this.managedById,
+      meta: { ...this.meta },
       configuration: this.configuration,
     }
   }

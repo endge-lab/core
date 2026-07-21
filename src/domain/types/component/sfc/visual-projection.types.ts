@@ -1,4 +1,5 @@
 import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
+import type { TypeSourceDefinition } from '@/domain/types/source/type-source.types'
 import type { RComponentSFC_IR_Tag } from './ir.types'
 import type { RComponentSFC_SourceRange } from './location.types'
 
@@ -43,6 +44,7 @@ export type ComponentSFCTableCellProjection
 /** Registry context required to resolve direct user component tags while reading Source. */
 export interface ComponentSFCVisualInspectionOptions {
   resolveComponentTag?: (tag: string) => string | null
+  resolveTypeDefinition?: (identity: string) => TypeSourceDefinition | null
 }
 
 /** Visual read-model одной прямой Column внутри корневого Table. */

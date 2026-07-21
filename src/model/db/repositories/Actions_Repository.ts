@@ -20,6 +20,7 @@ export interface ActionRepositoryPayload {
   folder?: number | string | null
   author?: string
   active?: boolean
+  meta?: Record<string, unknown>
 }
 
 export class Actions_Repository {

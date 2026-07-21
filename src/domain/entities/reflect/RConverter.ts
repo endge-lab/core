@@ -7,6 +7,7 @@ export interface RConverterSchema extends EntityManagement {
   id: number
   name: string
   description?: string | null
+  meta: Record<string, unknown>
 }
 
 export class RConverter extends REntity {
@@ -34,6 +35,7 @@ export class RConverter extends REntity {
       description: this.description ?? null,
       managedBy: this.managedBy,
       managedById: this.managedById,
+      meta: { ...this.meta },
     }
   }
 }

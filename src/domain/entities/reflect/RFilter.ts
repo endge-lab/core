@@ -54,7 +54,7 @@ export class RFilter extends REntity {
     f.fields = Array.isArray(json.fields) ? json.fields.map(x => ({ ...x, multiple: x.multiple !== false })) : []
     f.source = String(json.source ?? '')
     f.sourceVersion = Number(json.sourceVersion ?? 1) || 1
-    f.meta = (json.meta && typeof json.meta === 'object' && !Array.isArray(json.meta)) ? { ...json.meta } : {}
+    f.applyEntityMeta(json)
     return f
   }
 

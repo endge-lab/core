@@ -96,6 +96,7 @@ export class RProject extends REntity {
     p.navigationId = normalizeRelationId(json.navigation ?? json.navigationId ?? null)
     p.allowedEnvironmentIds = normalizeRelationIds(json.allowedEnvironments ?? json.allowedEnvironmentIds ?? [])
     p.configuration = normalizeEndgeConfigurationContribution(json.configuration)
+    p.applyEntityMeta(json)
 
     // STORAGE META
     p.applyStorageMeta(json)
@@ -150,6 +151,7 @@ export class RProject extends REntity {
       navigationId: this.navigationId ?? null,
       allowedEnvironmentIds: [...(this.allowedEnvironmentIds ?? [])],
       configuration: this.configuration,
+      meta: { ...this.meta },
     }
   }
 

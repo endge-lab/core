@@ -47,6 +47,7 @@ export class RI18nBundle extends REntity {
     v.locales = (json.locales && typeof json.locales === 'object' && !Array.isArray(json.locales)) ? json.locales : {}
     v.folderId = json.folderId ?? json.folder ?? null
     v.active = json.active !== false
+    v.applyEntityMeta(json)
     return v
   }
 
@@ -60,6 +61,7 @@ export class RI18nBundle extends REntity {
       locales: this.locales ?? {},
       folderId: this.folderId ?? null,
       active: this.active !== false,
+      meta: { ...this.meta },
     }
   }
 

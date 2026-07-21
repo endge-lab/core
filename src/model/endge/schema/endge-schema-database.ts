@@ -18,6 +18,7 @@ import axios from 'axios'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { ReflectComponentToPayloadData, ReflectComponentToPlain } from '@/domain/entities/reflect/RComponent'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
+import { normalizeEntityMeta } from '@/domain/entities/reflect/REntity'
 import { normalizeEndgeWorkspaceDefinition } from '@/domain/entities/reflect/RWorkspace'
 import { RVersion } from '@/domain/entities/reflect/RVersion'
 import { ComponentType, FilterType, ParameterType, QueryType } from '@/domain/types/document/document.types'
@@ -116,6 +117,7 @@ export function normalizePayloadWorkspace(raw: any): Record<string, unknown> {
     identity: raw.identity,
     name: raw.name ?? raw.displayName,
     displayName: raw.displayName ?? raw.name,
+    meta: normalizeEntityMeta(raw.meta),
     installedIntegrations: raw.installedIntegrations,
     configuration: raw.configuration,
   }
@@ -144,6 +146,7 @@ export function normalizeSavedPayloadWorkspace(
     displayName: saved.displayName === undefined && saved.name === undefined
       ? fallback.displayName
       : saved.displayName ?? saved.name,
+    meta: saved.meta === undefined ? fallback.meta : normalizeEntityMeta(saved.meta),
     installedIntegrations: saved.installedIntegrations === undefined
       ? fallback.installedIntegrations
       : normalizeSavedWorkspaceIntegrationReferences(saved.installedIntegrations, fallback),
@@ -902,6 +905,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         name: raw.displayName,
         description: raw.description,
         folderId: relationToId(raw.folder) ?? null,
+        meta: normalizeEntityMeta(raw.meta),
       }
     }
 
@@ -914,6 +918,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         ...normalizeEntityManagement(raw),
         folderId: relationToId(raw.folder) ?? null,
         configuration: raw.configuration,
+        meta: normalizeEntityMeta(raw.meta),
       }
     }
 
@@ -928,6 +933,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         description: raw.description ?? null,
         folderId: relationToId(raw.folder) ?? null,
         configuration: raw.configuration,
+        meta: normalizeEntityMeta(raw.meta),
       }
     }
 
@@ -941,10 +947,10 @@ export class EndgeSchemaStorage extends EndgeModule {
         folderId: relationToId(raw.folder) ?? null,
         source: typeof raw.source === 'string' ? raw.source : '',
         sourceVersion: Math.max(1, Number(raw.sourceVersion ?? 1) || 1),
-        meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
         active: raw.active !== false,
         author: raw.author,
         ...normalizeEntityManagement(raw),
+        meta: normalizeEntityMeta(raw.meta),
         deletedAt: raw.deletedAt ?? null,
       }
     }
@@ -1244,6 +1250,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         parent: relationToId(raw.parent) ?? null,
         folderId: null,
         ...normalizeEntityManagement(raw),
+        meta: normalizeEntityMeta(raw.meta),
       }
     }
 
@@ -1260,6 +1267,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         navigationId: relationToId(raw.navigation) ?? null,
         allowedEnvironmentIds: relationToNumericIds(raw.allowedEnvironments ?? raw.allowedEnvironmentIds ?? []),
         configuration: raw.configuration,
+        meta: normalizeEntityMeta(raw.meta),
       }
     }
 
@@ -1279,7 +1287,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         folderId: relationToId(raw.folder) ?? null,
         active: raw.active !== false,
         deletedAt: raw.deletedAt ?? null,
-        meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
+        meta: normalizeEntityMeta(raw.meta),
       }
     }
 
@@ -1298,7 +1306,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         folderId: relationToId(raw.folder) ?? null,
         active: raw.active !== false,
         deletedAt: raw.deletedAt ?? null,
-        meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
+        meta: normalizeEntityMeta(raw.meta),
       }
     }
 
@@ -1314,6 +1322,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         folderId: relationToId(raw.folder) ?? null,
         active: raw.active !== false,
         deletedAt: raw.deletedAt ?? null,
+        meta: normalizeEntityMeta(raw.meta),
       }
     }
 
@@ -1330,6 +1339,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         deletedAt: raw.deletedAt ?? null,
         fields: raw.fields ?? [],
         runtimeFilters: raw.runtimeFilters ?? [],
+        meta: normalizeEntityMeta(raw.meta),
       }
     }
 
@@ -1362,7 +1372,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         fields,
         source: String(raw.source ?? ''),
         sourceVersion: Number(raw.sourceVersion ?? 1) || 1,
-        meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : {},
+        meta: normalizeEntityMeta(raw.meta),
       }
     }
 
@@ -1373,6 +1383,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         name: raw.displayName,
         description: raw.description ?? null,
         ...normalizeEntityManagement(raw),
+        meta: normalizeEntityMeta(raw.meta),
         folderId: relationToId(raw.folder) ?? null,
       }
     }
@@ -1384,6 +1395,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         name: raw.displayName,
         description: raw.description ?? null,
         ...normalizeEntityManagement(raw),
+        meta: normalizeEntityMeta(raw.meta),
       }
     }
 
@@ -1432,6 +1444,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         definition: normalizeFlowDefinition(raw.definition),
         input: normalizeActionField(raw.input, 'input'),
         output: normalizeActionField(raw.output, 'output'),
+        meta: normalizeEntityMeta(raw.meta),
       }
     }
 
@@ -2227,6 +2240,7 @@ export class EndgeSchemaStorage extends EndgeModule {
       displayName: plain.displayName ?? plain.name ?? identity,
       entityType,
       parent: parent ?? undefined,
+      meta: normalizeEntityMeta(plain.meta),
     })
     if (saved && typeof saved === 'object') {
       const payloadId = (saved as any).id
@@ -2292,6 +2306,7 @@ export class EndgeSchemaStorage extends EndgeModule {
       throw new Error('JSON документа должен быть объектом')
 
     const data = { ...(payloadDoc as Record<string, any>) }
+    data.meta = normalizeEntityMeta(data.meta)
     const identity = String(data.identity ?? '').trim()
     if (!identity)
       throw new Error('В JSON обязательно поле "identity"')
@@ -2460,6 +2475,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         displayName: workspace.displayName,
         managedBy: workspace.managedBy,
         managedById: workspace.managedById,
+        meta: normalizeEntityMeta(workspace.meta),
         // Integration installation is not implemented yet. Keep the read model,
         // but do not persist draft/stale relationship rows from the client.
         installedIntegrations: [],
@@ -2778,6 +2794,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         managedById: action.managedById ?? null,
         folder: folderId,
         active: action.active !== false,
+        meta: normalizeEntityMeta(plain.meta),
         ...(action.author != null && action.author !== '' && { author: action.author }),
       })
 
@@ -2799,6 +2816,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         active: plain.active,
         fields: plain.fields,
         runtimeFilters: (plain as any).runtimeFilters,
+        meta: normalizeEntityMeta(plain.meta),
       })
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
@@ -2852,6 +2870,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         managedBy: plain.managedBy,
         managedById: plain.managedById,
         folder: folderId,
+        meta: normalizeEntityMeta(plain.meta),
       })
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
@@ -2869,6 +2888,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         description: plain.description ?? undefined,
         managedBy: plain.managedBy,
         managedById: plain.managedById,
+        meta: normalizeEntityMeta(plain.meta),
       })
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
@@ -2878,7 +2898,7 @@ export class EndgeSchemaStorage extends EndgeModule {
       const environment = ((opts?.model as any) ?? domain.getEnvironment(documentId)) as any
       if (!environment)
         throw new Error(`Окружение не найдено: ${documentId}`)
-      const plain = environment.toPlain() as { id: string, name: string, folder?: string | null, managedBy?: import('@/domain/types/document').ManagedBy, managedById?: string | null, configuration?: any }
+      const plain = environment.toPlain() as { id: string, name: string, folder?: string | null, managedBy?: import('@/domain/types/document').ManagedBy, managedById?: string | null, configuration?: any, meta?: Record<string, unknown> }
       const environmentIdentity = String((environment as any).identity ?? plain.id ?? environment.id ?? '')
       let folderId: number | string | undefined
       const existing = await repos.environments.findByIdentity(environmentIdentity)
@@ -2896,6 +2916,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         managedById: plain.managedById,
         folder: folderId,
         configuration: plain.configuration,
+        meta: normalizeEntityMeta(plain.meta),
       })
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
@@ -2905,7 +2926,7 @@ export class EndgeSchemaStorage extends EndgeModule {
       const tenant = ((opts?.model as any) ?? domain.getTenant(documentId)) as any
       if (!tenant)
         throw new Error(`Тенант не найден: ${documentId}`)
-      const plain = tenant.toPlain() as { id: string, name: string, displayName?: string, code?: string, description?: string | null, configuration?: any }
+      const plain = tenant.toPlain() as { id: string, name: string, displayName?: string, code?: string, description?: string | null, configuration?: any, meta?: Record<string, unknown> }
       const tenantIdentity = String((tenant as any).identity ?? plain.id ?? tenant.id ?? '')
       let folderId: number | string | undefined
       const existing = await repos.tenants.findByIdentity(tenantIdentity)
@@ -2923,6 +2944,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         description: plain.description ?? null,
         folder: folderId,
         configuration: plain.configuration,
+        meta: normalizeEntityMeta(plain.meta),
       })
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
@@ -2932,7 +2954,7 @@ export class EndgeSchemaStorage extends EndgeModule {
       const policy = ((opts?.model as any) ?? domain.getPolicy(documentId)) as any
       if (!policy)
         throw new Error(`Политика не найдена: ${documentId}`)
-      const plain = policy.toPlain() as { id: string, name: string, description?: string | null, folder?: string | null }
+      const plain = policy.toPlain() as { id: string, name: string, description?: string | null, folder?: string | null, meta?: Record<string, unknown> }
       const policyIdentity = String((policy as any).identity ?? plain.id ?? policy.id ?? '')
       let folderId: number | string | undefined
       const existing = await repos.policies.findByIdentity(policyIdentity)
@@ -2948,6 +2970,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         displayName: plain.name,
         description: plain.description ?? undefined,
         folder: folderId,
+        meta: normalizeEntityMeta(plain.meta),
       })
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
@@ -3027,7 +3050,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         active: plain.active !== false,
         folder: folderId,
         deletedAt: null,
-        meta: plain.meta ?? {},
+        meta: normalizeEntityMeta(plain.meta),
       })
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
@@ -3302,6 +3325,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         'folder': plain.folderId ?? plain.folder ?? null,
         'deletedAt': plain.deletedAt ?? null,
         'configuration': plain.configuration,
+        'meta': normalizeEntityMeta(plain.meta),
       })
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return

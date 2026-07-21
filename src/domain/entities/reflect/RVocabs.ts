@@ -65,7 +65,7 @@ export class RVocabs extends REntity {
     v.authProfileIdentity = json.authProfileIdentity ?? null
     v.folderId = json.folderId ?? json.folder ?? null
     v.active = json.active !== false
-    v.meta = (json.meta && typeof json.meta === 'object' && !Array.isArray(json.meta)) ? json.meta : {}
+    v.applyEntityMeta(json)
     return v
   }
 

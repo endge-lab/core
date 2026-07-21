@@ -14,7 +14,7 @@ import type {
   CompositionRuntimeOutputHandle,
   CompositionRuntimePublicationConnection,
 } from '@/domain/types/source/composition-source.types'
-import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext, RuntimeHostInputSource, RuntimeHostUpdateContext } from '@/domain/types/runtime/runtime-host.types'
+import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext, RuntimeHostInputBinding, RuntimeHostInputSource, RuntimeHostUpdateContext } from '@/domain/types/runtime/runtime-host.types'
 
 import { Raph, RaphNode } from '@endge/raph'
 
@@ -51,6 +51,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   private _storeRuntimeIds = new Map<string, string>()
   private _storeProviderRuntimeIds = new Map<string, Set<string>>()
   private _ownedStoreRuntimeIds = new Set<string>()
+  private _compositionInputBindings = new Map<string, RuntimeHostInputBinding>()
   private _mounted = false
 
   public constructor(input: {
@@ -101,6 +102,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     Raph.app.addNode(node)
     host.addRaphNode(node)
     host.addResource({ id: `node:${node.id}`, kind: 'raph-node', title: node.id })
+    host.setInputSource(input.meta?.input as RuntimeHostInputSource | undefined)
     return host
   }
 
@@ -113,6 +115,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       throw new Error(`[CompositionRuntimeHost] artifact is missing for "${this.entityIdentity}".`)
 
     try {
+      this._assertRequiredProps(payload)
       this._mountData(payload)
       this._prepareOutputBridges(payload)
       this._buildLifecycleScopes(payload)
@@ -191,6 +194,54 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     return Object.fromEntries(
       Array.from(this._dataPaths.entries()).map(([name, path]) => [name, Raph.get(path)]),
     )
+  }
+
+  /** Возвращает текущие значения публичных Composition props. */
+  public getProps(): Readonly<Record<string, unknown>> {
+    return this.readInputs()
+  }
+
+  /** Устанавливает literal/Raph-backed источник публичных Composition props. */
+  public setInputSource(input: RuntimeHostInputSource | null | undefined): void {
+    const payload = this.getArtifactPayload()
+    if (!payload)
+      return
+
+    this._compositionInputBindings.clear()
+    for (const descriptor of payload.props) {
+      if (descriptor.defaultValue === undefined)
+        continue
+      const value = evaluateSourceExpression(descriptor.defaultValue, {
+        environment: name => Endge.workspace.variables.resolve(`{${name}}`) || `{${name}}`,
+      })
+      const binding: RuntimeHostInputBinding = { kind: 'literal', value }
+      this._compositionInputBindings.set(descriptor.key, binding)
+      this.bindInput(descriptor.key, binding)
+    }
+
+    const literals = input?.props ?? {}
+    for (const [name, value] of Object.entries(literals)) {
+      const binding: RuntimeHostInputBinding = { kind: 'literal', value }
+      this._compositionInputBindings.set(name, binding)
+      this.bindInput(name, binding)
+    }
+    if (input?.kind === 'raph') {
+      for (const [name, source] of Object.entries(input.bindings)) {
+        const binding: RuntimeHostInputBinding = { kind: 'raph', path: source.path }
+        this._compositionInputBindings.set(name, binding)
+        this.bindInput(name, binding)
+      }
+    }
+  }
+
+  /** Проверяет обязательные props до создания child runtime graph. */
+  private _assertRequiredProps(payload: CompositionProgramPayload): void {
+    for (const descriptor of payload.props) {
+      if (descriptor.optional || descriptor.defaultValue !== undefined)
+        continue
+      if (this.readInput(descriptor.key) === undefined)
+        throw new Error(`[CompositionRuntimeHost] Required prop "${descriptor.key}" is missing for "${this.entityIdentity}".`)
+    }
   }
 
   /** Возвращает runtime Raph path объявленной data-зависимости. */
@@ -443,6 +494,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     this._dataPaths.clear()
     this._storeRuntimeIds.clear()
     this._storeProviderRuntimeIds.clear()
+    this._compositionInputBindings.clear()
     this._mounted = false
     super.destroy()
   }
@@ -697,6 +749,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       runtimeScopeId: this._requireScope(descriptor.scopePath).id,
     }
     if (descriptor.kind === 'composition') {
+      meta.input = this._makeInputSource(descriptor.name)
       const dataRuntimes = Object.fromEntries(
         (this.getArtifactPayload()?.graph.dataInputs ?? [])
           .filter(connection => connection.targetRuntime === descriptor.name)
@@ -762,6 +815,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       }
       return
     }
+
+    if (descriptor.kind === 'composition')
+      return
 
     if (descriptor.kind !== 'component')
       return
@@ -886,6 +942,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       return Raph.get(binding.key)
     if (binding.kind === 'data')
       return Raph.get(this._requireDataPath(binding.data, binding.path))
+    if (binding.kind === 'runtime-metadata')
+      return this._readRuntimeMetadata(binding.runtime, binding.namespace)
     if (binding.kind === 'filter-fields')
       return this._readFilterFieldsBinding(binding)
     if (binding.kind === 'expression') {
@@ -915,6 +973,22 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     )
   }
 
+  /** Материализует authored bindings в единый runtime input source child Composition. */
+  private _makeInputSource(runtimeName: string): RuntimeHostInputSource {
+    const literals: Record<string, unknown> = {}
+    const bindings: Record<string, { path: string }> = {}
+    for (const [name, binding] of Object.entries(this._compiledInputs(runtimeName))) {
+      if (binding.kind === 'literal') {
+        literals[name] = binding.value
+        continue
+      }
+      bindings[name] = { path: this._bindingPath(runtimeName, name, binding) }
+    }
+    return Object.keys(bindings).length
+      ? { kind: 'raph', bindings, props: literals }
+      : { kind: 'local', props: literals }
+  }
+
   private _subscribeBinding(binding: CompositionBindingValue, sync: () => void): void {
     if (binding.kind === 'literal')
       return
@@ -928,6 +1002,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       this._disposers.push(dispose)
       return
     }
+    if (binding.kind === 'runtime-metadata')
+      return
     if (binding.kind === 'filter-fields') {
       const runtime = this._children.get(binding.runtime)
       if (!runtime)
@@ -971,7 +1047,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   private _materializeBinding(
     runtimeName: string,
     prop: string,
-    binding: Extract<CompositionBindingValue, { kind: 'output' | 'filter-fields' | 'data' | 'expression' }>,
+    binding: Extract<CompositionBindingValue, { kind: 'output' | 'filter-fields' | 'data' | 'runtime-metadata' | 'expression' }>,
   ): string {
     const path = `${this.basePath}.bindings.${encodePathPart(runtimeName)}.${encodePathPart(prop)}`
     const sync = () => Raph.set(path, this._readBinding(binding))
@@ -979,6 +1055,24 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     this._subscribeBinding(binding, sync)
     this._bridgePaths.add(path)
     return path
+  }
+
+  /** Читает namespace compiled metadata сущности, объявленной runtime alias-ом. */
+  private _readRuntimeMetadata(runtimePath: string, namespace: string): unknown {
+    const descriptor = this.getArtifactPayload()?.runtimes.find(runtime => runtime.path === runtimePath)
+    if (!descriptor)
+      return undefined
+    const dependency = descriptor.kind === 'filter-view'
+      ? this.getArtifactPayload()?.runtimes.find(runtime => runtime.path === descriptor.identity)
+      : descriptor
+    if (!dependency)
+      return undefined
+    const entityType = dependency.kind === 'component'
+      ? 'component-sfc'
+      : dependency.kind === 'filter-view'
+        ? 'filter'
+        : dependency.kind
+    return Endge.program.getArtifact(entityType, dependency.identity)?.metadata.self[namespace]
   }
 
   private _readExpressionSource(
@@ -1002,6 +1096,12 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         runtime: parameters[0],
         fields: parameters.slice(1),
       })
+    }
+    if (read.source === 'prop') {
+      const dot = read.path.indexOf('.')
+      const prop = dot > 0 ? read.path.slice(0, dot) : read.path
+      const path = dot > 0 ? read.path.slice(dot + 1) : ''
+      return readValuePath(this.readInput(prop), path)
     }
     if (read.source === 'metadata')
       return Endge.program.getArtifact(parameters[0] as any, parameters[1])?.metadata
@@ -1031,6 +1131,14 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     const parameters = read.parameters ?? []
     if (read.source === 'metadata' || read.source === 'current' || read.source === 'env')
       return
+    if (read.source === 'prop') {
+      const dot = read.path.indexOf('.')
+      const prop = dot > 0 ? read.path.slice(0, dot) : read.path
+      const source = this._compositionInputBindings.get(prop)
+      if (source?.kind === 'raph')
+        this._disposers.push(Raph.watch([source.path, `${source.path}.*`], sync))
+      return
+    }
     if (read.source === 'composition-output') {
       const path = this._requireOutputBridge(parameters[0], parameters[1])
       this._disposers.push(Raph.watch([path, `${path}.*`], sync))
@@ -1126,4 +1234,14 @@ function storeProviderKey(identity: string, slot: string | null | undefined): st
 
 function encodePathPart(value: string): string {
   return encodeURIComponent(String(value)).replace(/\./g, '%2E')
+}
+
+function readValuePath(value: unknown, path: string): unknown {
+  if (!path)
+    return value
+  return path.split('.').reduce<unknown>((current, segment) => {
+    if (current == null || typeof current !== 'object')
+      return undefined
+    return (current as Record<string, unknown>)[segment]
+  }, value)
 }

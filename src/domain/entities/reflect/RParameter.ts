@@ -64,6 +64,7 @@ export class RParameter extends REntity {
     f.active = json.active ?? true
     f.deletedAt = json.deletedAt ?? null
     f.runtimeFilters = (json as any).runtimeFilters ?? []
+    f.applyEntityMeta(json)
 
     f.fields = new Map()
     if (Array.isArray(json.fields)) {
@@ -86,6 +87,7 @@ export class RParameter extends REntity {
       deletedAt: this.deletedAt ?? null,
       fields: [...this.fields.values()].map(x => ({ ...x })),
       runtimeFilters: (this.runtimeFilters ?? []).map(x => ({ ...x })),
+      meta: { ...this.meta },
     }
   }
 }

@@ -20,6 +20,7 @@ import type {
   ComponentSFCPortProviderDescriptor,
 } from '@/domain/types/component/sfc'
 import type { ProgramMetadata } from '@/domain/types/program/program-metadata.types'
+import type { TypeSourceDefinition } from '@/domain/types/source/type-source.types'
 import { parseComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-parse'
 import { analyzeComponentSFCScript } from '@/model/services/compiler/component-sfc/component-sfc-script'
 import { analyzeComponentSFCRuntimeDependencies } from '@/model/services/compiler/component-sfc/component-sfc-dependencies'
@@ -84,6 +85,9 @@ export interface ComponentSFCCompileOptions {
 
   /** Resolves the compiled public port manifest of a nested SFC component. */
   resolveComponentPortManifest?: (identity: string) => ComponentSFCPortManifest | null
+
+  /** Resolves an external Type Registry definition used by a named SFC contract. */
+  resolveTypeDefinition?: (identity: string) => TypeSourceDefinition | null
 }
 
 /** Компилирует Endge SFC source до target-neutral artifact для Endge.program. */
@@ -110,11 +114,16 @@ export function compileComponentSFC(
     }
   }
 
-  const scriptResult = analyzeComponentSFCScript(parseResult.ast.script)
+  const scriptResult = analyzeComponentSFCScript(parseResult.ast.script, {
+    resolveTypeDefinition: options.resolveTypeDefinition,
+  })
   const portResult = analyzeComponentSFCPorts(
     parseResult.ast.script,
     createEmptyComponentDependencies(),
-    { resolveProvider: options.resolvePortProvider },
+    {
+      resolveProvider: options.resolvePortProvider,
+      resolveTypeDefinition: options.resolveTypeDefinition,
+    },
   )
   const templateLocals = scriptResult.locals
     .filter(local => local.name !== portResult.bindingName)

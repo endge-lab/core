@@ -34,6 +34,7 @@ export class RWorkspace extends REntity implements EndgeWorkspaceDefinition {
       displayName: this.displayName,
       managedBy: this.managedBy,
       managedById: this.managedById,
+      meta: { ...this.meta },
       installedIntegrations: this.installedIntegrations.map(item => ({ ...item })),
       configuration: JSON.parse(JSON.stringify(this.configuration)) as EndgeConfiguration,
     }
@@ -58,6 +59,7 @@ function createWorkspace(input: unknown): RWorkspace {
   workspace.name = displayName
   workspace.displayName = displayName
   workspace.applyManagement(source)
+  workspace.applyEntityMeta(source)
   workspace.installedIntegrations = normalizeInstalledIntegrations(source.installedIntegrations)
   workspace.configuration = normalizeEndgeConfiguration(source.configuration)
 

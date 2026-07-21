@@ -6,6 +6,7 @@ export interface PolicyDoc {
   displayName: string
   description?: string | null
   folder?: number | string
+  meta?: Record<string, unknown>
 }
 
 export class Policies_Repository {
@@ -37,6 +38,7 @@ export class Policies_Repository {
     displayName: string
     description?: string | null
     folder?: number | string
+    meta?: Record<string, unknown>
   }): Promise<PolicyDoc> {
     const r = await this.api.post('/policies', data)
     return r.data
@@ -49,6 +51,7 @@ export class Policies_Repository {
       displayName: string
       description: string | null
       folder: number | string
+      meta: Record<string, unknown>
     }>,
   ): Promise<PolicyDoc> {
     const r = await this.api.patch(`/policies/${id}`, data)
@@ -77,6 +80,7 @@ export class Policies_Repository {
     displayName: string
     description?: string | null
     folder?: number | string
+    meta?: Record<string, unknown>
   }): Promise<PolicyDoc> {
     const existing = await this.findByIdentity(data.identity)
     if (!existing)
@@ -85,6 +89,7 @@ export class Policies_Repository {
       displayName: data.displayName,
       description: data.description ?? null,
       folder: data.folder,
+      ...(data.meta !== undefined && { meta: data.meta }),
     })
   }
 }

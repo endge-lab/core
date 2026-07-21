@@ -99,7 +99,7 @@ export class RComponentSFC extends RComponentCore {
     component.description = raw?.description ?? null
     component.folderId = raw?.folderId ?? raw?.folder ?? null
     component.applyManagement(raw)
-    component.meta = normalizeMeta(raw?.meta)
+    component.applyEntityMeta(raw)
     component.modelVersion = Number(raw?.modelVersion ?? 1)
     component.supportedTargets = normalizeTargets(raw?.supportedTargets)
     component.tag = normalizeTag(raw?.tag)
@@ -127,11 +127,4 @@ function normalizeTargets(raw: unknown): RComponentRenderTarget[] {
 
   const targets = raw.filter((target): target is RComponentRenderTarget => target === 'dom' || target === 'canvas')
   return targets.length ? targets : ['dom', 'canvas']
-}
-
-/** Нормализует meta так, чтобы модель не делила mutable объект с Payload. */
-function normalizeMeta(raw: unknown): Record<string, unknown> {
-  return raw && typeof raw === 'object' && !Array.isArray(raw)
-    ? { ...(raw as Record<string, unknown>) }
-    : {}
 }

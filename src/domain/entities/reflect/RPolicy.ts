@@ -16,6 +16,7 @@ export class RPolicy extends REntity {
       name: this.name,
       description: this.description ?? null,
       folderId: this.folderId ?? null,
+      meta: { ...this.meta },
     }
   }
 

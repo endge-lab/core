@@ -118,7 +118,7 @@ function composition(id: number, identity: string, project: string): RCompositio
 
 function payload(mode: 'startup' | 'manual'): CompositionProgramPayload {
   return {
-    type: 'composition', sourceVersion: 1, activation: { mode }, data: [], resources: [], runtimes: [], hooks: [], outputs: [],
+    type: 'composition', sourceVersion: 1, activation: { mode }, props: [], data: [], resources: [], runtimes: [], hooks: [], outputs: [],
     scopes: [{
       name: 'scope_default', path: 'scope_default', parentPath: null,
       activationOverride: { mode }, effectiveActivation: { mode },
@@ -130,7 +130,7 @@ function payload(mode: 'startup' | 'manual'): CompositionProgramPayload {
 
 function payloadWithPages(): CompositionProgramPayload {
   return {
-    type: 'composition', sourceVersion: 1, activation: { mode: 'startup' }, data: [], resources: [], runtimes: [], hooks: [],
+    type: 'composition', sourceVersion: 1, activation: { mode: 'startup' }, props: [], data: [], resources: [], runtimes: [], hooks: [],
     scopes: [
       {
         name: 'scope_default', path: 'scope_default', parentPath: null,

@@ -84,6 +84,7 @@ export interface RParameterSchema {
   author?: string
   active: boolean
   deletedAt?: string | null
+  meta: Record<string, unknown>
 }
 
 export class RuntimeFilterLinkEntity {

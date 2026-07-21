@@ -10,6 +10,7 @@ export interface ParameterDoc {
   deletedAt?: string | null
   author?: string
   fields: any[]
+  meta?: Record<string, unknown>
 }
 
 export class Parameters_Repository {
@@ -45,6 +46,7 @@ export class Parameters_Repository {
     active?: boolean
     fields?: any[]
     runtimeFilters?: any[]
+    meta?: Record<string, unknown>
   }): Promise<ParameterDoc> {
     const r = await this.api.post('/parameters', data)
     return r.data
@@ -62,6 +64,7 @@ export class Parameters_Repository {
       active: boolean
       fields: any[]
       runtimeFilters: any[]
+      meta: Record<string, unknown>
     }>,
   ): Promise<ParameterDoc> {
     const r = await this.api.patch(`/parameters/${id}`, data)
@@ -77,6 +80,7 @@ export class Parameters_Repository {
     active?: boolean
     fields?: any[]
     runtimeFilters?: any[]
+    meta?: Record<string, unknown>
   }): Promise<ParameterDoc> {
     const existing = await this.findByIdentity(data.identity)
     if (!existing) return this.create(data)

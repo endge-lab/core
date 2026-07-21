@@ -49,7 +49,7 @@ export class RStyle extends REntity {
     style.source = typeof json?.source === 'string' ? json.source : ENDGE_STYLE_DEFAULT_SOURCE
     style.sourceVersion = Math.max(1, Number(json?.sourceVersion ?? 1) || 1)
     style.folderId = json?.folderId ?? relationToId(json?.folder) ?? null
-    style.meta = isPlainObject(json?.meta) ? { ...json.meta } : {}
+    style.applyEntityMeta(json)
     style.applyManagement(json)
     style.active = json?.active ?? null
     style.deletedAt = json?.deletedAt ?? null
@@ -95,8 +95,4 @@ function relationToId(value: any): string | number | null {
   if (typeof value === 'object')
     return relationToId(value.id ?? value.value)
   return value
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return value != null && typeof value === 'object' && !Array.isArray(value)
 }

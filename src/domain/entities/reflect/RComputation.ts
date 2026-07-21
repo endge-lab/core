@@ -52,7 +52,7 @@ export class RComputation extends REntity {
     computation.input = fieldFromPlain(json?.input, 'input')
     computation.output = fieldFromPlain(json?.output, 'output')
     computation.folderId = json?.folderId ?? relationToId(json?.folder) ?? null
-    computation.meta = isPlainObject(json?.meta) ? { ...json.meta } : {}
+    computation.applyEntityMeta(json)
     computation.active = json?.active !== false
     computation.deletedAt = json?.deletedAt ?? null
     computation.author = json?.author ?? null
@@ -124,8 +124,4 @@ function fieldToPlain(field: RField | null): Record<string, unknown> | null {
   return field
     ? { type: field.type, isArray: field.isArray === true, optional: field.optional === true }
     : null
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return value != null && typeof value === 'object' && !Array.isArray(value)
 }

@@ -26,6 +26,7 @@ export class RTenant extends REntity {
       description: this.description ?? null,
       folderId: this.folderId ?? null,
       configuration: this.configuration,
+      meta: { ...this.meta },
     }
   }
 

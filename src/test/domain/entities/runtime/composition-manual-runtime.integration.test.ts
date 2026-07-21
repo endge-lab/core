@@ -79,7 +79,7 @@ function compositionArtifact(model: RComposition): ProgramArtifact<CompositionPr
     },
   ]
   return baseArtifact('composition', model.id, model.identity, {
-    type: 'composition', sourceVersion: 1, activation: { mode: 'startup' }, data: [], resources: [], runtimes, hooks: [], outputs: [],
+    type: 'composition', sourceVersion: 1, activation: { mode: 'startup' }, props: [], data: [], resources: [], runtimes, hooks: [], outputs: [],
     scopes: [{
       name: 'scope_default', path: 'scope_default', parentPath: null,
       activationOverride: { mode: 'startup' }, effectiveActivation: { mode: 'startup' },

@@ -1,4 +1,4 @@
-import { Exclude, Expose } from 'class-transformer'
+import { Exclude, Expose, Transform } from 'class-transformer'
 import type { DiagnosticsProblemInput } from '@/domain/types/diagnostics'
 import type { EntityManagement, EntityManagementLike, EntityOrigin, ManagedBy } from '@/domain/types/document/entity-management.type'
 import { normalizeEntityManagement } from '@/domain/types/document/entity-management.type'
@@ -7,6 +7,13 @@ import { normalizeEntityManagement } from '@/domain/types/document/entity-manage
 export interface DuplicateOptions {
   identity: string
   name?: string
+}
+
+/** Нормализует произвольную metadata документа и разрывает ссылку на transport object. */
+export function normalizeEntityMeta(value: unknown): Record<string, unknown> {
+  return value != null && typeof value === 'object' && !Array.isArray(value)
+    ? { ...(value as Record<string, unknown>) }
+    : {}
 }
 
 export class REntity {
@@ -59,6 +66,7 @@ export class REntity {
 
   /** Произвольные метаданные (из Payload meta, по умолчанию {}). */
   @Expose()
+  @Transform(({ value }) => normalizeEntityMeta(value), { toClassOnly: true })
   meta: Record<string, unknown> = {}
 
   //  STORAGE META (НЕ входят в экспорт схемы)
@@ -78,7 +86,15 @@ export class REntity {
   @Exclude()
   active?: boolean | null
 
-  /** Подмешивает storage-мета и meta из Payload */
+  /** Применяет общий meta-контракт к transport/plain документу. */
+  applyEntityMeta(raw: unknown): void {
+    const source = raw != null && typeof raw === 'object' && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>).meta
+      : undefined
+    this.meta = normalizeEntityMeta(source)
+  }
+
+  /** Подмешивает storage-мета и meta из Payload. */
   applyStorageMeta(raw: any): void {
     this.origin = { kind: 'storage' }
     this.applyManagement(raw)
@@ -87,7 +103,7 @@ export class REntity {
     this.deletedAt = raw.deletedAt ?? null
     this.author = raw.author ?? null
     this.active = raw.active ?? null
-    this.meta = (raw?.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? { ...raw.meta } : {}
+    this.applyEntityMeta(raw)
   }
 
   applyManagement(raw: EntityManagement | Record<string, unknown> | null | undefined): void {

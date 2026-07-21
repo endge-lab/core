@@ -14,7 +14,12 @@ import type {
   RComponentSFC_IR_Prop,
 } from '@/domain/types/component/sfc'
 import type { ProgramMetadataMap } from '@/domain/types/program/program-metadata.types'
+import type { TypeSourceDefinition, TypeSourceExpression } from '@/domain/types/source/type-source.types'
 import { compileProgramMetadataSource } from '@/model/services/source-engine/compilers/source-metadata-compile'
+
+export interface ComponentSFCTypeResolutionOptions {
+  resolveTypeDefinition?: (identity: string) => TypeSourceDefinition | null
+}
 
 /** Результат анализа script-секции SFC. */
 export interface ComponentSFCScriptAnalysisResult {
@@ -41,7 +46,10 @@ export interface ComponentSFCScriptAnalysisResult {
 }
 
 /** Анализирует script setup и извлекает контракт/locals для IR. */
-export function analyzeComponentSFCScript(script: RComponentSFC_AST_Script | null): ComponentSFCScriptAnalysisResult {
+export function analyzeComponentSFCScript(
+  script: RComponentSFC_AST_Script | null,
+  options: ComponentSFCTypeResolutionOptions = {},
+): ComponentSFCScriptAnalysisResult {
   const diagnostics: RComponentDiagnostic[] = []
   const contract = createEmptyComponentContract()
 
@@ -74,7 +82,7 @@ export function analyzeComponentSFCScript(script: RComponentSFC_AST_Script | nul
   }
 
   const props = script.props
-    ? parseComponentSFCTypeFields(script.props.source, script.content)
+    ? parseComponentSFCTypeFields(script.props.source, script.content, options)
     : []
   const previewPropsResult = script.previewProps
     ? parsePreviewPropsSource(script.previewProps.source, script.previewProps.optionsSource)
@@ -123,12 +131,20 @@ export function analyzeComponentSFCScript(script: RComponentSFC_AST_Script | nul
 export function parseComponentSFCTypeFields(
   source: string,
   scriptContent = '',
+  options: ComponentSFCTypeResolutionOptions = {},
 ): RComponentSFC_IR_Prop[] {
-  const named = /^[A-Za-z_$][\w$]*$/.test(source.trim())
-    ? findNamedTypeLiteral(source.trim(), scriptContent)
+  const identity = source.trim()
+  const named = /^[A-Za-z_$][\w$]*$/.test(identity)
+    ? findNamedTypeLiteral(identity, scriptContent)
     : null
   if (named)
     return readTypeMembers(named.members, named.content)
+
+  if (/^[A-Za-z_$][\w$]*$/.test(identity)) {
+    const definition = options.resolveTypeDefinition?.(identity) ?? null
+    if (definition?.kind === 'object')
+      return readTypeSourceFields(definition)
+  }
 
   const prefix = 'type __EndgeContract = '
   const content = `${prefix}${source}`
@@ -146,6 +162,40 @@ export function parseComponentSFCTypeFields(
   }
 
   return []
+}
+
+function readTypeSourceFields(
+  definition: Extract<TypeSourceDefinition, { kind: 'object' }>,
+): RComponentSFC_IR_Prop[] {
+  return definition.fields.map((field) => {
+    const type = field.array
+      ? `Array<${typeSourceExpressionToTypeScript(field.type)}>`
+      : typeSourceExpressionToTypeScript(field.type)
+    return {
+      name: field.key,
+      type,
+      isArray: field.array || field.type.kind === 'array',
+      optional: field.optional,
+    }
+  })
+}
+
+function typeSourceExpressionToTypeScript(expression: TypeSourceExpression): string {
+  if (expression.kind === 'reference')
+    return expression.identity
+  if (expression.kind === 'array')
+    return `Array<${typeSourceExpressionToTypeScript(expression.items)}>`
+  if (expression.kind === 'union')
+    return expression.variants.map(typeSourceExpressionToTypeScript).join(' | ')
+  if (expression.kind === 'enum')
+    return expression.values.map(value => JSON.stringify(value)).join(' | ')
+  const fields = expression.fields.map((field) => {
+    const type = field.array
+      ? `Array<${typeSourceExpressionToTypeScript(field.type)}>`
+      : typeSourceExpressionToTypeScript(field.type)
+    return `${JSON.stringify(field.key)}${field.optional ? '?' : ''}: ${type}`
+  })
+  return `{ ${fields.join('; ')} }`
 }
 
 function findNamedTypeLiteral(

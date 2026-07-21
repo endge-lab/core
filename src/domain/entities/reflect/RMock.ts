@@ -49,7 +49,7 @@ export class RMock extends REntity {
     mock.codeRef = String(json?.codeRef ?? '').trim() || null
     mock.folderId = json?.folderId ?? relationToId(json?.folder) ?? null
     mock.applyManagement(json)
-    mock.meta = isPlainObject(json?.meta) ? { ...json.meta } : {}
+    mock.applyEntityMeta(json)
     mock.active = json?.active !== false
     mock.deletedAt = json?.deletedAt ?? null
     mock.author = json?.author ?? null
@@ -123,8 +123,4 @@ function relationToId(value: any): string | number | null {
   if (typeof value === 'object')
     return relationToId(value.id ?? value.value)
   return value
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return value != null && typeof value === 'object' && !Array.isArray(value)
 }

@@ -6,6 +6,7 @@ import { Raph } from '@endge/raph'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { RComposition } from '@/domain/entities/reflect/RComposition'
+import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RStore } from '@/domain/entities/reflect/RStore'
@@ -270,6 +271,97 @@ describe('Composition runtime session', () => {
     expect(Endge.runtime.getRuntimeHosts()).toEqual([])
   })
 
+  it('passes public props into nested and standalone Compositions before their onMount queries run', async () => {
+    const run = vi.spyOn(QueryRuntimeHost.prototype, 'run').mockResolvedValue({})
+    const query = new RQuery()
+    query.id = 50
+    query.identity = 'attributes-leg-select'
+    query.name = 'Attributes'
+    const inner = new RComposition()
+    inner.id = 51
+    inner.identity = 'groundhandling-default'
+    inner.name = 'Ground handling requests'
+    const outer = new RComposition()
+    outer.id = 52
+    outer.identity = 'groundhandling-page'
+    outer.name = 'Ground handling page'
+    const table = new RComponentSFC()
+    table.id = 53
+    table.identity = 'groundhandling-control-table'
+    table.name = 'Ground handling table'
+    Endge.domain.addQuery(query)
+    Endge.domain.addComposition(inner)
+    Endge.domain.addComposition(outer)
+    Endge.domain.addComponentSFC(table)
+
+    const queryPayload: QueryProgramPayload = {
+      type: 'query-rest', sourceVersion: 2, endpoint: '', query: '',
+      props: [{ key: 'names', type: 'String', optional: false, array: true }],
+      requestBody: null, outputs: [],
+    }
+    const requirements = {
+      arrival: { attributes: ['LegStatus', 'BestOn'] },
+    }
+    const innerPayload = makeCompositionPayload({
+      props: [{ key: 'requirements', type: 'Object', optional: false, array: false }],
+      data: [],
+      runtimes: [{
+        name: 'attributes', kind: 'query', identity: 'attributes-leg-select', storeTo: [],
+        props: {
+          names: {
+            kind: 'expression',
+            expression: { type: 'read', source: 'prop', path: 'requirements.arrival.attributes' },
+          },
+        },
+      }],
+      hooks: [{ kind: 'mount', target: 'attributes' }],
+      outputs: [],
+    })
+    const outerPayload = makeCompositionPayload({
+      data: [],
+      runtimes: [{
+        name: 'requests', kind: 'composition', identity: 'groundhandling-default', storeTo: [],
+        props: { requirements: { kind: 'runtime-metadata', runtime: 'table', namespace: 'groundhandling.query' } },
+      }, {
+        name: 'table', kind: 'component', identity: 'groundhandling-control-table', storeTo: [], props: {},
+        activationOverride: { mode: 'manual' }, effectiveActivation: { mode: 'manual' },
+      }],
+      hooks: [],
+      outputs: [],
+    })
+    Endge.program.beginCompile('test')
+    Endge.program.addArtifact(artifact('query', 50, 'attributes-leg-select', queryPayload))
+    Endge.program.addArtifact(artifact('composition', 51, 'groundhandling-default', innerPayload))
+    Endge.program.addArtifact(artifact('composition', 52, 'groundhandling-page', outerPayload))
+    Endge.program.addArtifact(artifact('component-sfc', 53, 'groundhandling-control-table', {}, {
+      'groundhandling.query': requirements,
+    }))
+
+    const session = await Endge.runtime.composition.mount('groundhandling-page')
+    const nested = session.host.getChild('requests') as CompositionRuntimeHost
+    const attributes = nested.getChild('attributes') as QueryRuntimeHost
+
+    expect(nested.getProps()).toEqual({ requirements })
+    expect(attributes.getProps().names).toEqual(['LegStatus', 'BestOn'])
+    expect(run).toHaveBeenCalledTimes(1)
+
+    await session.unmount()
+
+    const directRequirements = {
+      arrival: { attributes: ['FlightNumber', 'STD'] },
+    }
+    const direct = await Endge.runtime.composition.mount('groundhandling-default', {
+      props: { requirements: directRequirements },
+    })
+    const directAttributes = direct.host.getChild('attributes') as QueryRuntimeHost
+
+    expect(direct.host.getProps()).toEqual({ requirements: directRequirements })
+    expect(directAttributes.getProps().names).toEqual(['FlightNumber', 'STD'])
+    expect(run).toHaveBeenCalledTimes(2)
+
+    await direct.unmount()
+  })
+
   it('mounts a nested Composition and exposes its outputs reactively', async () => {
     const initialRows = [{ id: 1, flight: 'SU100' }]
     vi.spyOn(QueryRuntimeHost.prototype, 'run').mockImplementation(async function (this: QueryRuntimeHost) {
@@ -451,6 +543,7 @@ function makeCompositionPayload(document: any): CompositionProgramPayload {
   }))
   const normalized = {
     activation: { mode: 'startup' as const },
+    props: document.props ?? [],
     data: document.data,
     resources: [],
     scopes: [{
@@ -537,15 +630,16 @@ function installContextualStoreCompositions(input: {
 }
 
 function artifact<T>(
-  entityType: 'filter' | 'query' | 'composition' | 'store',
+  entityType: 'filter' | 'query' | 'composition' | 'store' | 'component-sfc',
   id: number,
   identity: string,
   payload: T,
+  metadata: Record<string, any> = {},
 ): ProgramArtifact<T> {
   return {
     ref: { entityType, id, identity },
     sourceHash: 'test', compilerVersion: 'test', status: 'valid',
     diagnostics: [], dependencies: [], capabilities: ['compilable', 'executable'],
-    metadata: { self: {}, nodes: [] }, payload,
+    metadata: { self: metadata, nodes: [] }, payload,
   }
 }

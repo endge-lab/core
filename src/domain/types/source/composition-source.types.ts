@@ -41,6 +41,7 @@ export type CompositionBindingValue
     | { kind: 'output', runtime: string, output: string }
     | { kind: 'store', key: string }
     | { kind: 'data', data: string, path: string }
+    | { kind: 'runtime-metadata', runtime: string, namespace: string }
     | { kind: 'filter-fields', runtime: string, fields: string[] }
     | { kind: 'expression', expression: SourceExpressionIR }
 
@@ -119,6 +120,8 @@ export type CompositionOutputDescriptor
 
 export interface CompositionSourceDocument {
   activation: CompositionActivationDescriptor | null
+  /** Публичный props contract Composition. */
+  props: SourceFieldDefinition[]
   data: CompositionDataDescriptor[]
   resources: CompositionResourceDescriptor[]
   scopes: CompositionScopeDescriptor[]
@@ -215,6 +218,8 @@ export type CompositionPublicOutputHandle
 
 export interface CompositionMountOptions {
   id?: string
+  /** Значения публичных Composition props для standalone mount. */
+  props?: Record<string, unknown>
   /** Явные runtime-id Store instances для data aliases. */
   dataRuntimes?: Record<string, string>
 }
