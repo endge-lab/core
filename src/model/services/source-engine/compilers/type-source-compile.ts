@@ -166,7 +166,7 @@ function readField(key: string, raw: t.Expression, diagnostics: DiagnosticDraft[
   }
 
   if (!t.isCallExpression(cursor) || !t.isIdentifier(cursor.callee, { name: 'field' })) {
-    diagnostics.push(diagnostic('error', 'type-source-field-shape', `Поле "${key}" должно начинаться с field('Type') или field(objectOf(...)).`, key, raw))
+    diagnostics.push(diagnostic('error', 'type-source-field-shape', `Поле "${key}" должно начинаться с field(Type) или field(objectOf(...)).`, key, raw))
     return null
   }
 
@@ -176,7 +176,7 @@ function readField(key: string, raw: t.Expression, diagnostics: DiagnosticDraft[
   field.type = fieldType
 
   if ((field.min != null || field.max != null) && !(fieldType.kind === 'reference' && fieldType.identity === 'Number')) {
-    diagnostics.push(diagnostic('error', 'type-source-field-range-type', `.min/.max разрешены только для field('Number'), поле "${key}" имеет другой type expression.`, key, raw))
+    diagnostics.push(diagnostic('error', 'type-source-field-range-type', `.min/.max разрешены только для field(Number), поле "${key}" имеет другой type expression.`, key, raw))
   }
   if (field.min != null && field.max != null && field.min > field.max) {
     diagnostics.push(diagnostic('error', 'type-source-field-range', `Для поля "${key}" min не может быть больше max.`, key, raw))
@@ -196,6 +196,9 @@ function readFieldType(
   }
 
   const arg = unwrapExpression(call.arguments[0])
+  if (t.isIdentifier(arg))
+    return { kind: 'reference', identity: arg.name }
+
   if (t.isStringLiteral(arg)) {
     const identity = arg.value.trim()
     if (!identity) {
@@ -315,6 +318,9 @@ function readTypeExpression(
   sourcePath: string,
 ): TypeSourceExpression | null {
   const node = unwrapExpression(raw)
+  if (t.isIdentifier(node))
+    return { kind: 'reference', identity: node.name }
+
   if (t.isCallExpression(node) && t.isIdentifier(node.callee, { name: 'type' }))
     return readReferenceCall(node, 'type', diagnostics, sourcePath)
   if (t.isObjectExpression(node)) {
@@ -333,12 +339,15 @@ function readReferenceCall(
 ): TypeSourceReference | null {
   const node = unwrapExpression(raw)
   if (!t.isCallExpression(node) || !t.isIdentifier(node.callee, { name: callee })) {
-    diagnostics.push(diagnostic('error', 'type-source-reference', `${sourcePath} должен использовать ${callee}('Type').`, sourcePath, node))
+    diagnostics.push(diagnostic('error', 'type-source-reference', `${sourcePath} должен использовать ${callee}(Type).`, sourcePath, node))
     return null
   }
-  const identity = readStringCallArgument(node)?.trim()
+  const argument = node.arguments.length === 1 ? node.arguments[0] : null
+  const identity = argument && t.isIdentifier(argument)
+    ? argument.name
+    : readStringCallArgument(node)?.trim()
   if (!identity) {
-    diagnostics.push(diagnostic('error', 'type-source-reference-identity', `${callee}(...) принимает одну непустую строку identity.`, sourcePath, node))
+    diagnostics.push(diagnostic('error', 'type-source-reference-identity', `${callee}(...) принимает одну type identity.`, sourcePath, node))
     return null
   }
   return { kind: 'reference', identity }

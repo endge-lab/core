@@ -86,6 +86,14 @@ export interface SourceDocumentReference {
   }
 }
 
+/** Renderer-neutral semantic emphasis for one source range. */
+export interface SourceLanguageSemanticHighlight {
+  kind: 'type-reference'
+  status: 'resolved' | 'unresolved'
+  identity: string
+  range: SourceDocumentReference['range']
+}
+
 /** Результат validation source language strategy. */
 export interface SourceLanguageValidationResult extends SourceEngineResult {
   /** Diagnostics, найденные language strategy. */
@@ -235,6 +243,9 @@ export interface SourceLanguageStrategy {
   /** Возвращает базовый source для новой сущности. */
   createDefaultSource: () => string
 
+  /** Нормализует поддержанный syntax, сохраняя остальной авторский source. */
+  normalize?: (source: string) => string
+
   /** Валидирует source без знания о конкретном editor adapter. */
   validate: (source: string, context?: SourceLanguageContext) => SourceLanguageValidationResult
 
@@ -243,4 +254,7 @@ export interface SourceLanguageStrategy {
 
   /** Возвращает внешнюю document reference под курсором, если язык её поддерживает. */
   resolveReference?: (context: SourceLanguageContext) => SourceDocumentReference | null
+
+  /** Возвращает semantic highlights без привязки к конкретному editor adapter. */
+  semanticHighlights?: (context: SourceLanguageContext) => SourceLanguageSemanticHighlight[]
 }

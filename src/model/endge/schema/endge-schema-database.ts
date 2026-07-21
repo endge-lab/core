@@ -2457,7 +2457,7 @@ export class EndgeSchemaStorage extends EndgeModule {
   public async saveDocument(
     documentId: string | number,
     documentType: DomainDocumentType,
-    opts?: { model?: unknown },
+    opts?: { model?: unknown, previousIdentity?: string },
   ): Promise<void> {
     const repos = this.repositories
     if (!repos) {
@@ -2508,7 +2508,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         source: typeof type.source === 'string' ? type.source : '',
         sourceVersion: Math.max(1, Number(type.sourceVersion ?? 1) || 1),
         meta: (type.meta && typeof type.meta === 'object' && !Array.isArray(type.meta)) ? type.meta : {},
-      })
+      }, opts?.previousIdentity)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }

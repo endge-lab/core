@@ -4,6 +4,7 @@ import type {
   SourceEngineStrategy,
   SourceLanguageCompletion,
   SourceLanguageContext,
+  SourceLanguageSemanticHighlight,
   SourceDocumentReference,
   SourceLanguageStrategy,
   SourceLanguageValidationResult,
@@ -140,6 +141,11 @@ export class EndgeSource extends EndgeModule {
     return this._resolveRequiredLanguageStrategy(sourceKind).createDefaultSource()
   }
 
+  /** Нормализует source через language strategy без изменения semantic document. */
+  public normalize(sourceKind: SourceKind | string, source: string): string {
+    return this._resolveRequiredLanguageStrategy(sourceKind).normalize?.(source) ?? source
+  }
+
   /** Валидирует source указанного source-kind для editor-facing сценариев. */
   public validate(
     sourceKind: SourceKind | string,
@@ -157,6 +163,11 @@ export class EndgeSource extends EndgeModule {
   /** Возвращает семантическую ссылку на внешний документ под курсором. */
   public referenceAt(sourceKind: SourceKind | string, context: SourceLanguageContext): SourceDocumentReference | null {
     return this._resolveRequiredLanguageStrategy(sourceKind).resolveReference?.(context) ?? null
+  }
+
+  /** Возвращает renderer-neutral semantic highlights для source-документа. */
+  public semanticHighlights(sourceKind: SourceKind | string, context: SourceLanguageContext): SourceLanguageSemanticHighlight[] {
+    return this._resolveRequiredLanguageStrategy(sourceKind).semanticHighlights?.(context) ?? []
   }
 
   /** Регистрирует встроенные strategies ядра. */

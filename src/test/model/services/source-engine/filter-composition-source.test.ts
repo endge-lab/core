@@ -421,6 +421,36 @@ defineComposition({
     })
   })
 
+  it('compiles inline and mock-backed Composition preview props without turning them into defaults', () => {
+    const result = compileCompositionSource(`
+defineComposition({
+  props: defineProps({
+    requirements: field('GroundHandlingQueryRequirements'),
+    airport: field('String'),
+  }),
+  previewProps: definePreviewProps({
+    requirements: mock('groundhandling-query-requirements'),
+    airport: 'SVO',
+    ignored: true,
+  }),
+  runtimes: {},
+})
+`)
+
+    expect(result.artifact?.previewProps).toEqual({
+      requirements: { kind: 'mock', identity: 'groundhandling-query-requirements' },
+      airport: { kind: 'literal', value: 'SVO' },
+    })
+    expect(result.artifact?.props.every(prop => prop.defaultValue === undefined)).toBe(true)
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        severity: 'warning',
+        code: 'composition-preview-prop-unknown',
+        sourcePath: 'previewProps.ignored',
+      }),
+    ]))
+  })
+
   it('compiles contextual Store policies and explicit nested data bindings', () => {
     const result = compileCompositionSource(`
 defineComposition({

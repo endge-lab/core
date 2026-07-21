@@ -1,4 +1,4 @@
-import type { CompositionMountOptions, CompositionSession } from '@/domain/types/source/composition-source.types'
+import type { CompositionMountOptions, CompositionPreviewProps, CompositionSession } from '@/domain/types/source/composition-source.types'
 
 import type { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
 import { Endge } from '@/model/endge/kernel/endge'
@@ -54,4 +54,22 @@ export class EndgeComposition {
       },
     }
   }
+}
+
+/** Materializes preview-only literals and RMock references into regular Composition props. */
+export function materializeCompositionPreviewProps(
+  previewProps: CompositionPreviewProps | null | undefined,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(previewProps ?? {}).map(([key, value]) => [
+      key,
+      value.kind === 'mock'
+        ? Endge.mock.get(value.identity)
+        : clonePreviewValue(value.value),
+    ]),
+  )
+}
+
+function clonePreviewValue<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T
 }

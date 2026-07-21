@@ -709,12 +709,11 @@ export class EndgeDomain extends EndgeModule {
   /**
    * Удаляет Type из домена по id.
    */
-  removeTypeById(id: number): void {
+  removeTypeById(id: string | number): void {
     const type = this._typesById.get(id)
     if (!type)
       return
-    this._typesById.delete(type.id)
-    this._typesByIdentity.delete(type.identity)
+    this._removeTypeFromIndexes(type)
     this.notify()
   }
 
@@ -725,9 +724,19 @@ export class EndgeDomain extends EndgeModule {
     const type = this._typesByIdentity.get(identity)
     if (!type)
       return
-    this._typesById.delete(type.id)
-    this._typesByIdentity.delete(type.identity)
+    this._removeTypeFromIndexes(type)
     this.notify()
+  }
+
+  private _removeTypeFromIndexes(type: RType): void {
+    for (const [id, candidate] of this._typesById) {
+      if (candidate === type)
+        this._typesById.delete(id)
+    }
+    for (const [identity, candidate] of this._typesByIdentity) {
+      if (candidate === type)
+        this._typesByIdentity.delete(identity)
+    }
   }
 
   /**

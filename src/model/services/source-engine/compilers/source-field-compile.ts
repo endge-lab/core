@@ -47,7 +47,10 @@ export function compileSourceField(
     return null
   }
 
-  const rawType = readStringArgument(current, 0)
+  const typeArgument = current.arguments[0]
+  const rawType = typeArgument && t.isIdentifier(typeArgument)
+    ? typeArgument.name
+    : readStringArgument(current, 0)
   if (!rawType?.trim()) {
     diagnostics.push(diagnostic('error', 'source-field-type', 'field(type) требует непустую identity типа.', sourcePath, current))
     return null

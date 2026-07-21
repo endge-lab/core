@@ -4,6 +4,8 @@ import type {
   CompositionDataDescriptor,
   CompositionOutputDescriptor,
   CompositionHook,
+  CompositionPreviewLiteral,
+  CompositionPreviewProps,
   CompositionResourceDescriptor,
   CompositionRuntimeDescriptor,
   CompositionRuntimeGraph,
@@ -59,6 +61,7 @@ export function compileCompositionSource(source: string, sourceVersion = 1): Com
     const metadata = compileProgramMetadataProperty(definition, diagnostics)
     const activationValue = propertyValue(definition, 'activateOn')
     const propsValue = propertyValue(definition, 'props')
+    const previewPropsValue = propertyValue(definition, 'previewProps')
     const dataValue = propertyValue(definition, 'data')
     const resourcesValue = propertyValue(definition, 'resources')
     const runtimesValue = propertyValue(definition, 'runtimes')
@@ -81,6 +84,9 @@ export function compileCompositionSource(source: string, sourceVersion = 1): Com
     if (outputsValue && !outputsNode)
       diagnostics.push(diagnostic('error', 'composition-source-outputs-shape', 'outputs должен быть object literal.', 'outputs', outputsValue))
     const props = propsValue ? readProps(propsValue, source, diagnostics) : []
+    const previewProps = previewPropsValue
+      ? readPreviewProps(previewPropsValue, new Set(props.map(prop => prop.key)), diagnostics)
+      : null
     const data = dataNode ? readData(dataNode, diagnostics) : []
     const dataNames = new Set(data.map(item => item.name))
     const defaultActivation = activation ?? { mode: 'startup' as const }
@@ -127,7 +133,7 @@ export function compileCompositionSource(source: string, sourceVersion = 1): Com
     validateBindingReferences(props, data, runtimes, diagnostics)
     validateRuntimeCycles(runtimes, hooks, diagnostics)
 
-    const document: CompositionSourceDocument = { activation, props, data, resources, scopes, runtimes, hooks, outputs }
+    const document: CompositionSourceDocument = { activation, props, previewProps, data, resources, scopes, runtimes, hooks, outputs }
     const hasErrors = diagnostics.some(item => item.severity === 'error')
     return {
       ast,
@@ -203,7 +209,7 @@ function validateRootProperties(node: t.ObjectExpression, diagnostics: Diagnosti
       continue
     }
     const name = propertyName(property.key)
-    if (name !== 'metadata' && name !== 'activateOn' && name !== 'props' && name !== 'data' && name !== 'resources' && name !== 'runtimes' && name !== 'hooks' && name !== 'outputs')
+    if (name !== 'metadata' && name !== 'activateOn' && name !== 'props' && name !== 'previewProps' && name !== 'data' && name !== 'resources' && name !== 'runtimes' && name !== 'hooks' && name !== 'outputs')
       diagnostics.push(diagnostic('error', 'composition-source-property-unsupported', `Свойство "${name ?? ''}" не поддерживается Composition v1.`, name ?? 'defineComposition', property))
   }
 }
@@ -252,6 +258,61 @@ function readProps(
     props.push(compiled.field)
   }
   return props
+}
+
+function readPreviewProps(
+  raw: t.Expression,
+  propNames: ReadonlySet<string>,
+  diagnostics: DiagnosticDraft[],
+): CompositionPreviewProps | null {
+  const expression = unwrapExpression(raw)
+  if (!t.isCallExpression(expression) || !t.isIdentifier(expression.callee, { name: 'definePreviewProps' })) {
+    diagnostics.push(diagnostic('warning', 'composition-preview-props-shape', 'previewProps должен иметь вид definePreviewProps({...}).', 'previewProps', expression))
+    return null
+  }
+  const definition = expression.arguments[0]
+  if (!definition || !t.isObjectExpression(definition) || expression.arguments.length !== 1) {
+    diagnostics.push(diagnostic('warning', 'composition-preview-props-definition', 'definePreviewProps(...) принимает один object literal с preview-значениями props.', 'previewProps', expression))
+    return null
+  }
+
+  const previewProps: CompositionPreviewProps = {}
+  const declared = new Set<string>()
+  for (const property of definition.properties) {
+    if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
+      diagnostics.push(diagnostic('warning', 'composition-preview-prop-property', 'definePreviewProps допускает только обычные properties.', 'previewProps', property))
+      continue
+    }
+    const key = propertyName(property.key)
+    if (!key || declared.has(key)) {
+      diagnostics.push(diagnostic('warning', 'composition-preview-prop-duplicate', `Preview prop "${key ?? ''}" объявлен повторно.`, `previewProps.${key ?? ''}`, property))
+      continue
+    }
+    declared.add(key)
+    if (!propNames.has(key)) {
+      diagnostics.push(diagnostic('warning', 'composition-preview-prop-unknown', `Composition не объявляет prop "${key}". Preview-значение проигнорировано.`, `previewProps.${key}`, property))
+      continue
+    }
+
+    const value = unwrapExpression(property.value)
+    if (t.isCallExpression(value) && t.isIdentifier(value.callee, { name: 'mock' })) {
+      const identity = readStringArgument(value, 0)
+      if (!identity || value.arguments.length !== 1) {
+        diagnostics.push(diagnostic('warning', 'composition-preview-prop-mock', 'mock(identity) требует одну непустую строку.', `previewProps.${key}`, value))
+        continue
+      }
+      previewProps[key] = { kind: 'mock', identity }
+      continue
+    }
+
+    const literal = staticValue(value)
+    if (!literal.ok) {
+      diagnostics.push(diagnostic('warning', 'composition-preview-prop-value', 'Preview prop принимает только static JSON value или mock(identity).', `previewProps.${key}`, value))
+      continue
+    }
+    previewProps[key] = { kind: 'literal', value: literal.value as CompositionPreviewLiteral }
+  }
+  return previewProps
 }
 
 function readActivation(

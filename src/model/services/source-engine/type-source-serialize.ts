@@ -5,6 +5,8 @@ import type {
   TypeSourceField,
 } from '@/domain/types/source/type-source.types'
 
+import * as t from '@babel/types'
+
 /** Deterministic serializer for canonical Type Source v1 documents. */
 export function serializeTypeSourceDocument(document: TypeSourceDocument): string {
   return `defineType(${serializeDefinition(document.definition)})\n`
@@ -23,7 +25,7 @@ function serializeObject(definition: Extract<TypeSourceDefinition, { kind: 'obje
 }
 
 function serializeExpression(expression: TypeSourceExpression, indent: number): string {
-  if (expression.kind === 'reference') return `type(${sourceString(expression.identity)})`
+  if (expression.kind === 'reference') return serializeTypeSourceReference(expression.identity)
   if (expression.kind === 'object') return `objectOf(${serializeObject(expression, indent)})`
   if (expression.kind === 'enum') {
     const values = expression.values
@@ -44,7 +46,7 @@ function serializeField(field: TypeSourceField, indent: number): string {
   const prefix = ' '.repeat(indent)
   const modifierPrefix = ' '.repeat(indent + 2)
   const type = field.type.kind === 'reference'
-    ? sourceString(field.type.identity)
+    ? serializeTypeSourceReference(field.type.identity)
     : serializeExpression(field.type, indent)
   const lines = [`${prefix}${propertyName(field.key)}: field(${type})`]
   if (field.description) lines.push(`${modifierPrefix}.description(${sourceString(field.description)})`)
@@ -75,4 +77,9 @@ function propertyName(value: string): string {
 function sourceString(value: string): string {
   const json = JSON.stringify(value)
   return `'${json.slice(1, -1).replace(/\\"/g, '"').replace(/'/g, String.raw`\'`)}'`
+}
+
+/** Serializes one named type reference using canonical bare syntax when possible. */
+export function serializeTypeSourceReference(identity: string): string {
+  return t.isValidIdentifier(identity) ? identity : `type(${sourceString(identity)})`
 }

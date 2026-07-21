@@ -76,8 +76,8 @@ export class Types_Repository {
     managedBy?: ManagedBy
     managedById?: string | null
     meta?: Record<string, unknown>
-  }) {
-    const existing = await this.findByIdentity(data.identity)
+  }, previousIdentity?: string) {
+    const existing = await this.findByIdentity(previousIdentity ?? data.identity)
     if (!existing)
       return this.create(data)
     return this.update(existing.id, data)

@@ -9,6 +9,7 @@ import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
+import { RMock } from '@/domain/entities/reflect/RMock'
 import { RStore } from '@/domain/entities/reflect/RStore'
 import { FilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
 import { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
@@ -18,6 +19,7 @@ import { StoreRuntimeHost } from '@/domain/entities/runtime/hosts/StoreRuntimeHo
 import { compileFilterSource } from '@/model/services/source-engine/compilers/filter-source-compile'
 import { buildRuntimeGraph } from '@/model/services/source-engine/compilers/composition-source-compile'
 import { Endge } from '@/model/endge/kernel/endge'
+import { materializeCompositionPreviewProps } from '@/model/endge/runtime/execution/endge-composition'
 
 describe('Composition runtime session', () => {
   afterEach(() => {
@@ -27,6 +29,29 @@ describe('Composition runtime session', () => {
     Endge.program.clear()
     Endge.domain.reset()
     Raph.app.reset()
+  })
+
+  it('materializes isolated inline and RMock-backed preview props on demand', () => {
+    const mock = new RMock()
+    mock.id = 49
+    mock.identity = 'groundhandling-query-requirements'
+    mock.name = 'Ground handling requirements'
+    mock.displayName = mock.name
+    mock.source = JSON.stringify({ arrival: { attributes: ['LegStatus'] } })
+    Endge.domain.addMock(mock)
+
+    const first = materializeCompositionPreviewProps({
+      airport: { kind: 'literal', value: 'SVO' },
+      requirements: { kind: 'mock', identity: mock.identity },
+    })
+    ;(first.requirements as any).arrival.attributes.push('BestOn')
+    const second = materializeCompositionPreviewProps({
+      airport: { kind: 'literal', value: 'SVO' },
+      requirements: { kind: 'mock', identity: mock.identity },
+    })
+
+    expect(first.airport).toBe('SVO')
+    expect(second.requirements).toEqual({ arrival: { attributes: ['LegStatus'] } })
   })
 
   it('mounts children, binds output, debounces changes and unmounts the runtime tree', async () => {

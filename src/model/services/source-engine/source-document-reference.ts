@@ -77,19 +77,31 @@ function referenceFromCall(
   rules: SourceDocumentReferenceRules,
 ): SourceDocumentReference | null {
   const argument = call.arguments[0]
-  if (!argument || !t.isStringLiteral(argument) || !argument.value.trim())
+  if (!argument)
     return null
 
   if (t.isIdentifier(call.callee)) {
     const target = rules.functions?.[call.callee.name]
-    return target ? createReference(target, argument.value, call.callee, argument) : null
+    return target ? createCallReference(target, argument, call.callee) : null
   }
 
   if (t.isMemberExpression(call.callee) && !call.callee.computed && t.isIdentifier(call.callee.property)) {
     const target = rules.methods?.[call.callee.property.name]
-    return target ? createReference(target, argument.value, call.callee.property, argument) : null
+    return target ? createCallReference(target, argument, call.callee.property) : null
   }
 
+  return null
+}
+
+function createCallReference(
+  target: SourceDocumentReferenceTarget,
+  argument: t.CallExpression['arguments'][number],
+  callee: t.Node,
+): SourceDocumentReference | null {
+  if (t.isStringLiteral(argument) && argument.value.trim())
+    return createReference(target, argument.value, callee, argument)
+  if (target === 'type' && t.isIdentifier(argument) && argument.name.trim())
+    return createReference(target, argument.name, callee, argument)
   return null
 }
 

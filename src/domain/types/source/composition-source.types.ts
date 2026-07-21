@@ -5,6 +5,7 @@ import type { RuntimeScopeHandle } from '@/domain/types/runtime/runtime-scope.ty
 import type { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
 import type { SourceExpressionIR, SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 import type { FilterViewControlDefinition } from '@/domain/types/ui/filter-view.type'
+import type { EndgeMockReference } from '@/domain/types/mock'
 
 export type CompositionRuntimeKind = 'filter' | 'query' | 'component' | 'composition' | 'filter-view'
 
@@ -118,10 +119,26 @@ export type CompositionOutputDescriptor
   = | CompositionRuntimeOutputDescriptor
     | CompositionScopeOutputDescriptor
 
+export type CompositionPreviewLiteral
+  = | null
+    | string
+    | number
+    | boolean
+    | CompositionPreviewLiteral[]
+    | { [key: string]: CompositionPreviewLiteral }
+
+export type CompositionPreviewPropValue
+  = | { kind: 'literal', value: CompositionPreviewLiteral }
+    | EndgeMockReference
+
+export type CompositionPreviewProps = Record<string, CompositionPreviewPropValue>
+
 export interface CompositionSourceDocument {
   activation: CompositionActivationDescriptor | null
   /** Публичный props contract Composition. */
   props: SourceFieldDefinition[]
+  /** Preview-only fixtures. Не являются runtime defaults. */
+  previewProps?: CompositionPreviewProps | null
   data: CompositionDataDescriptor[]
   resources: CompositionResourceDescriptor[]
   scopes: CompositionScopeDescriptor[]

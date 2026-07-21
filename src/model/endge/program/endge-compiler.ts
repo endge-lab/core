@@ -3,8 +3,9 @@ import type { DiagnosticsSpanHandle } from '@/domain/types/diagnostics'
 import type { DataViewMaterializationStrategy, DataViewRef, DataViewPipelineStep } from '@/domain/types/source/data-view-source.types'
 import type { FilterProgramPayload } from '@/domain/types/source/filter-source.types'
 import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
+import type { SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 import type { StoreSourceArtifact } from '@/domain/types/source/store-source.types'
-import type { TypeProgramCatalogEntry, TypeProgramPayload, TypeSourceDefinition } from '@/domain/types/source/type-source.types'
+import type { TypeProgramCatalogEntry, TypeProgramPayload, TypeSourceDefinition, TypeSourceExpression } from '@/domain/types/source/type-source.types'
 import type {
   ComponentSFCProgramPayload,
   ActionProgramPayload,
@@ -780,12 +781,14 @@ export class EndgeCompiler extends EndgeModule {
           dependencies: [
             ...validation.dependencies,
             ...this._typeDependencies(payload?.props.map(prop => prop.type) ?? []),
+            ...this._compositionPreviewDependencies(payload),
           ],
           diagnostics: [
             ...((result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]),
             ...validation.diagnostics,
             ...(payload?.props.flatMap(prop =>
               this._typeContractDiagnostics(prop.type, `props.${prop.key}.type`)) ?? []),
+            ...this._compositionPreviewDiagnostics(payload),
           ],
         })
       },
@@ -887,6 +890,54 @@ export class EndgeCompiler extends EndgeModule {
         role: 'type-contract',
       }
     })
+  }
+
+  /** Adds explicit RMock dependencies used only by Composition preview fixtures. */
+  private _compositionPreviewDependencies(
+    payload: CompositionProgramPayload | undefined,
+  ): ProgramArtifact['dependencies'] {
+    return Object.entries(payload?.previewProps ?? {}).flatMap(([prop, value]) => value.kind === 'mock'
+      ? [{
+          entityType: 'mock-data',
+          id: value.identity,
+          identity: value.identity,
+          role: `composition-preview:${prop}`,
+        }]
+      : [])
+  }
+
+  /** Preview diagnostics stay warnings so a broken fixture never invalidates production execution. */
+  private _compositionPreviewDiagnostics(
+    payload: CompositionProgramPayload | undefined,
+  ): Omit<ProgramDiagnostic, 'entityRef'>[] {
+    if (!payload?.previewProps)
+      return []
+    const diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[] = []
+    const props = new Map(payload.props.map(prop => [prop.key, prop]))
+    const catalog = Endge.program.getTypeCatalog()
+    for (const [key, value] of Object.entries(payload.previewProps)) {
+      const prop = props.get(key)
+      if (!prop)
+        continue
+      if (value.kind === 'literal') {
+        diagnostics.push(...validatePreviewPropValue(prop, value.value, catalog, `previewProps.${key}`))
+        continue
+      }
+      const status = Endge.mock.getBindingStatus(value.identity)
+      if (status === 'document' || status === 'connected')
+        continue
+      diagnostics.push({
+        severity: 'warning',
+        code: status === 'missing-document'
+          ? 'composition-preview-mock-document-missing'
+          : status === 'missing-provider'
+            ? 'composition-preview-mock-provider-missing'
+            : 'composition-preview-mock-invalid-content',
+        message: `Preview mock "${value.identity}" для prop "${key}" недоступен: ${status}.`,
+        sourcePath: `previewProps.${key}`,
+      })
+    }
+    return diagnostics
   }
 
   /** Связывает computation artifacts, запрещает missing/invalid/cyclic references и выводит effective execution mode. */
@@ -2209,6 +2260,7 @@ export class EndgeCompiler extends EndgeModule {
       sourceVersion,
       activation: null,
       props: [],
+      previewProps: null,
       data: [],
       resources: [],
       scopes: [{
@@ -2263,6 +2315,129 @@ function collectLocalTypeDeclarations(source: string): Set<string> {
     if (match[1]) identities.add(match[1])
   }
   return identities
+}
+
+function validatePreviewPropValue(
+  field: SourceFieldDefinition,
+  value: unknown,
+  catalog: readonly TypeProgramCatalogEntry[],
+  sourcePath: string,
+): Omit<ProgramDiagnostic, 'entityRef'>[] {
+  if (field.array) {
+    if (!Array.isArray(value))
+      return [previewTypeDiagnostic(sourcePath, `ожидался массив значений типа "${field.type}"`)]
+    return value.flatMap((item, index) => validatePreviewTypeExpression(
+      { kind: 'reference', identity: field.type },
+      item,
+      catalog,
+      `${sourcePath}.${index}`,
+      new Set(),
+    ))
+  }
+  return validatePreviewTypeExpression(
+    { kind: 'reference', identity: field.type },
+    value,
+    catalog,
+    sourcePath,
+    new Set(),
+  )
+}
+
+function validatePreviewTypeExpression(
+  expression: TypeSourceExpression,
+  value: unknown,
+  catalog: readonly TypeProgramCatalogEntry[],
+  sourcePath: string,
+  visiting: Set<string>,
+): Omit<ProgramDiagnostic, 'entityRef'>[] {
+  if (expression.kind === 'reference') {
+    const primitive = validatePreviewPrimitive(expression.identity, value, sourcePath)
+    if (primitive)
+      return primitive
+    const type = catalog.find(item => item.identity === expression.identity)
+    if (!type?.definition || visiting.has(expression.identity))
+      return []
+    visiting.add(expression.identity)
+    const diagnostics = validatePreviewTypeExpression(type.definition, value, catalog, sourcePath, visiting)
+    visiting.delete(expression.identity)
+    return diagnostics
+  }
+  if (expression.kind === 'array') {
+    if (!Array.isArray(value))
+      return [previewTypeDiagnostic(sourcePath, 'ожидался массив')]
+    return value.flatMap((item, index) => validatePreviewTypeExpression(expression.items, item, catalog, `${sourcePath}.${index}`, visiting))
+  }
+  if (expression.kind === 'enum') {
+    return expression.values.some(item => Object.is(item, value))
+      ? []
+      : [previewTypeDiagnostic(sourcePath, `значение не входит в enum: ${expression.values.map(item => JSON.stringify(item)).join(', ')}`)]
+  }
+  if (expression.kind === 'union') {
+    const variants = expression.variants.map(variant => validatePreviewTypeExpression(variant, value, catalog, sourcePath, new Set(visiting)))
+    return variants.some(diagnostics => diagnostics.length === 0)
+      ? []
+      : [previewTypeDiagnostic(sourcePath, 'значение не соответствует ни одному варианту union')]
+  }
+  if (!isPreviewRecord(value))
+    return [previewTypeDiagnostic(sourcePath, 'ожидался объект')]
+
+  const diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[] = []
+  for (const field of expression.fields) {
+    if (!Object.prototype.hasOwnProperty.call(value, field.key)) {
+      if (!field.optional)
+        diagnostics.push(previewTypeDiagnostic(`${sourcePath}.${field.key}`, 'отсутствует обязательное поле'))
+      continue
+    }
+    const fieldValue = value[field.key]
+    if (field.array) {
+      if (!Array.isArray(fieldValue)) {
+        diagnostics.push(previewTypeDiagnostic(`${sourcePath}.${field.key}`, 'ожидался массив'))
+        continue
+      }
+      diagnostics.push(...fieldValue.flatMap((item, index) => validatePreviewTypeExpression(
+        field.type,
+        item,
+        catalog,
+        `${sourcePath}.${field.key}.${index}`,
+        new Set(visiting),
+      )))
+      continue
+    }
+    diagnostics.push(...validatePreviewTypeExpression(field.type, fieldValue, catalog, `${sourcePath}.${field.key}`, new Set(visiting)))
+  }
+  return diagnostics
+}
+
+function validatePreviewPrimitive(
+  identity: string,
+  value: unknown,
+  sourcePath: string,
+): Omit<ProgramDiagnostic, 'entityRef'>[] | null {
+  if (identity === 'Any' || identity === 'any' || identity === 'unknown') return []
+  if (identity === 'String' || identity === 'Date' || identity === 'Time' || identity === 'DateTime')
+    return typeof value === 'string' ? [] : [previewTypeDiagnostic(sourcePath, `ожидался ${identity}`)]
+  if (identity === 'Number')
+    return typeof value === 'number' && Number.isFinite(value) ? [] : [previewTypeDiagnostic(sourcePath, 'ожидался Number')]
+  if (identity === 'Boolean')
+    return typeof value === 'boolean' ? [] : [previewTypeDiagnostic(sourcePath, 'ожидался Boolean')]
+  if (identity === 'ID')
+    return typeof value === 'string' || typeof value === 'number' ? [] : [previewTypeDiagnostic(sourcePath, 'ожидался ID')]
+  if (identity === 'Object' || identity === 'Record')
+    return isPreviewRecord(value) ? [] : [previewTypeDiagnostic(sourcePath, 'ожидался Object')]
+  return null
+}
+
+function previewTypeDiagnostic(sourcePath: string, detail: string): Omit<ProgramDiagnostic, 'entityRef'> {
+  return {
+    severity: 'warning',
+    code: 'composition-preview-prop-type-mismatch',
+    message: `Preview prop не соответствует объявленному типу: ${detail}.`,
+    sourcePath,
+  }
+}
+
+function isPreviewRecord(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === 'object' && !Array.isArray(value)
 }
 
 function fieldContract(field: { type: string, isArray?: boolean, optional?: boolean } | null | undefined) {

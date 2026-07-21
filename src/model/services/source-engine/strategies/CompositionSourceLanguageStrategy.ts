@@ -7,6 +7,7 @@ import type {
 } from '@/domain/types/source/source-engine.types'
 
 import { compileCompositionSource } from '@/model/services/source-engine/compilers/composition-source-compile'
+import { normalizeCompositionSourceTypeReferences } from '@/model/services/source-engine/composition-source-normalize'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
 import { resolveSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
 import { COMPOSITION_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/composition.default.source'
@@ -19,13 +20,13 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
     alias: 'Endge Composition Source',
     extension: '.endge-composition.ts',
     keywords: [
-      'component', 'composition', 'control', 'data', 'defineComposition', 'filter', 'filterView', 'fromData', 'fromFilter', 'fromOutput', 'fromStore', 'manual', 'onChange',
+      'component', 'composition', 'control', 'data', 'defineComposition', 'definePreviewProps', 'defineProps', 'filter', 'filterView', 'fromData', 'fromFilter', 'fromOutput', 'fromStore', 'manual', 'mock', 'onChange',
       'onMount', 'output', 'query', 'metadata', 'resources', 'scope', 'startup', 'style', ...VALUE_EXPRESSION_FUNCTION_NAMES,
     ],
     functions: [
       'activateOn', 'component', 'contextual', 'controls', 'debounce', 'fields', 'fromRuntime', 'fromScope', 'injected', 'isolated', 'persist', 'run', 'select', 'slot', 'store', 'storeTo', 'vocab', 'withData', 'withProps', ...VALUE_EXPRESSION_METHOD_NAMES,
     ],
-    properties: ['activateOn', 'data', 'hooks', 'key', 'metadata', 'outputs', 'resources', 'runtimes'],
+    properties: ['activateOn', 'data', 'hooks', 'key', 'metadata', 'outputs', 'previewProps', 'props', 'resources', 'runtimes'],
   })
 
   public supports(sourceKind: SourceKind | string): boolean {
@@ -34,6 +35,10 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
 
   public createDefaultSource(): string {
     return COMPOSITION_DEFAULT_SOURCE
+  }
+
+  public normalize(source: string): string {
+    return normalizeCompositionSourceTypeReferences(source)
   }
 
   public validate(source: string): SourceLanguageValidationResult {
@@ -51,8 +56,10 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
       functions: {
         component: 'component',
         composition: 'composition',
+        field: 'type',
         filter: 'filter',
         filterView: 'filter',
+        mock: 'mock',
         query: 'query',
         store: 'store',
         style: 'style',
@@ -68,6 +75,9 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
 const COMPOSITION_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'defineComposition', kind: 'snippet', insertText: COMPOSITION_DEFAULT_SOURCE.trimEnd(), detail: 'Создать Composition source' },
   { label: 'metadata', kind: 'property', insertText: `metadata: {\n  'namespace.feature': {},\n},`, detail: 'Статическая metadata Composition' },
+  { label: 'props', kind: 'property', insertText: `props: defineProps({\n  value: field('Object'),\n}),`, detail: 'Typed public Composition props' },
+  { label: 'previewProps', kind: 'property', insertText: `previewProps: definePreviewProps({\n  propName: {},\n}),`, detail: 'Preview-only props: static JSON values or mock(identity)' },
+  { label: 'mock', kind: 'function', insertText: `mock('identity')`, detail: 'RMock value for one preview prop' },
   { label: 'filter', kind: 'function', insertText: `filter('identity')`, detail: 'Filter runtime' },
   { label: 'store', kind: 'function', insertText: `store('identity')`, detail: 'Contextual Store data: nearest provider or local fallback' },
   { label: 'isolated', kind: 'function', insertText: `.isolated()`, detail: 'Always create a local Store instance' },

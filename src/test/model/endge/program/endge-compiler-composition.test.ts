@@ -6,6 +6,7 @@ import { REnvironment } from '@/domain/entities/reflect/REnvironment'
 import { RProject } from '@/domain/entities/reflect/RProject'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RStore } from '@/domain/entities/reflect/RStore'
+import { RType } from '@/domain/entities/reflect/RType'
 import { RTenant } from '@/domain/entities/reflect/RTenant'
 import { Endge } from '@/model/endge/kernel/endge'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
@@ -254,6 +255,69 @@ defineComposition({
       "composition('requirements-provider').withProps({ requirements: {} })",
     )
     expect(Endge.compiler.buildComposition(parent).status).toBe('valid')
+  })
+
+  it('keeps preview fixture failures non-blocking and indexes RMock dependencies', () => {
+    const stringType = new RType('String')
+    stringType.identity = 'String'
+    stringType.displayName = 'String'
+    stringType.isPrimitive = true
+    const requirementsType = new RType('GroundHandlingQueryRequirements')
+    requirementsType.identity = 'GroundHandlingQueryRequirements'
+    requirementsType.displayName = requirementsType.identity
+    requirementsType.source = `
+defineType({
+  arrival: field(objectOf({
+    attributes: field('String').array(),
+  })),
+  departure: field(objectOf({
+    attributes: field('String').array(),
+  })),
+})
+`
+    Endge.domain.addType(stringType)
+    Endge.domain.addType(requirementsType)
+    Endge.compiler.buildType(stringType)
+    Endge.compiler.buildType(requirementsType)
+
+    const composition = new RComposition()
+    composition.id = 27
+    composition.identity = 'requirements-preview'
+    composition.name = 'Requirements preview'
+    composition.source = `
+defineComposition({
+  props: defineProps({
+    inlineRequirements: field('GroundHandlingQueryRequirements'),
+    mockRequirements: field('GroundHandlingQueryRequirements'),
+  }),
+  previewProps: definePreviewProps({
+    inlineRequirements: {
+      arrival: { attributes: ['LegStatus'] },
+    },
+    mockRequirements: mock('groundhandling-query-requirements'),
+  }),
+  runtimes: {},
+})
+`
+
+    const artifact = Endge.compiler.buildComposition(composition)
+
+    expect(artifact.status).toBe('warning')
+    expect(artifact.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'composition-preview-prop-type-mismatch',
+        sourcePath: 'previewProps.inlineRequirements.departure',
+      }),
+      expect.objectContaining({
+        code: 'composition-preview-mock-document-missing',
+        sourcePath: 'previewProps.mockRequirements',
+      }),
+    ]))
+    expect(artifact.dependencies).toContainEqual(expect.objectContaining({
+      entityType: 'mock-data',
+      identity: 'groundhandling-query-requirements',
+      role: 'composition-preview:mockRequirements',
+    }))
   })
 
   it('reports transitive Composition dependency cycles during compilation', () => {

@@ -6,12 +6,15 @@ describe('source document references', () => {
   it.each([
     ['composition', "style('default')", 'default', 'style'],
     ['composition', "composition('groundhandling-control-page')", 'groundhandling-control-page', 'composition'],
+    ['composition', 'field(MyType)', 'MyType', 'type'],
     ['composition', "query('load-flights')", 'load-flights', 'query'],
+    ['composition', "mock('groundhandling-query-requirements')", 'groundhandling-query-requirements', 'mock'],
     ['composition', "filterView('flight-filter')", 'flight-filter', 'filter'],
     ['composition', "filterView('flight-filter').component('compact-filter')", 'compact-filter', 'component'],
     ['query', "dataView('normalize-flight')", 'normalize-flight', 'data-view'],
     ['query', "output().from('raw').dataView('normalize-flight')", 'normalize-flight', 'data-view'],
     ['query', "filter('flight-filter')", 'flight-filter', 'filter'],
+    ['query', 'field(MyType)', 'MyType', 'type'],
     ['query', "{ auth: { mode: 'profile', profile: 'keycloak-dev' } }", 'keycloak-dev', 'auth-profile'],
     ['data-view', "dataView('normalize-flight')", 'normalize-flight', 'data-view'],
     ['data-view', "from('items').dataView('normalize-flight')", 'normalize-flight', 'data-view'],
@@ -21,6 +24,7 @@ describe('source document references', () => {
     ['store', "dataView('normalize-flight')", 'normalize-flight', 'data-view'],
     ['store', "derived().from('raw').dataView('normalize-flight')", 'normalize-flight', 'data-view'],
     ['filter', "field('String').vocab('airports')", 'airports', 'vocabs'],
+    ['filter', 'field(MyType)', 'MyType', 'type'],
     ['computation', "computation('calculate-duration', {})", 'calculate-duration', 'computation'],
   ] as const)('resolves %s reference %s', (sourceKind, expression, identity, target) => {
     const source = `const value = ${expression}`
@@ -36,6 +40,15 @@ describe('source document references', () => {
     expect(Endge.source.referenceAt('composition', contextAt(source, 'composition'))).toMatchObject({
       target: 'composition',
       identity: 'groundhandling-control-page',
+    })
+  })
+
+  it('resolves a type reference when the cursor is on the field constructor', () => {
+    const source = 'defineComposition({ props: defineProps({ value: field(MyType) }) })'
+
+    expect(Endge.source.referenceAt('composition', contextAt(source, 'field'))).toMatchObject({
+      target: 'type',
+      identity: 'MyType',
     })
   })
 
