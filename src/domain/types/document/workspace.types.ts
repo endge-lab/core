@@ -9,6 +9,7 @@ import type {
 import type { EntityManagement } from './entity-management.type'
 
 export type EndgeWorkspaceLocale = EndgeLocaleDefinition
+export type EndgeDataMode = 'live' | 'mock'
 
 export type EndgeWorkspaceLocaleLabelMode = keyof Pick<EndgeWorkspaceLocale, 'displayName' | 'shortLabel'>
 
@@ -26,6 +27,7 @@ export interface WorkspaceIntegrationReference {
 export interface EndgeWorkspaceDefinition extends EntityManagement {
   identity: string
   displayName: string
+  dataMode: EndgeDataMode
   meta?: Record<string, unknown>
   installedIntegrations: WorkspaceIntegrationReference[]
   configuration: EndgeConfiguration

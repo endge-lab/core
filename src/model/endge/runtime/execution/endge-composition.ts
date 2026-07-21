@@ -61,12 +61,14 @@ export function materializeCompositionPreviewProps(
   previewProps: CompositionPreviewProps | null | undefined,
 ): Record<string, unknown> {
   return Object.fromEntries(
-    Object.entries(previewProps ?? {}).map(([key, value]) => [
-      key,
-      value.kind === 'mock'
-        ? Endge.mock.get(value.identity)
-        : clonePreviewValue(value.value),
-    ]),
+    Object.entries(previewProps ?? {}).flatMap(([key, value]) => {
+      if (value.kind === 'mock') {
+        return Endge.context.isMockEnabled
+          ? [[key, Endge.mock.get(value.identity)] as const]
+          : []
+      }
+      return [[key, clonePreviewValue(value.value)] as const]
+    }),
   )
 }
 

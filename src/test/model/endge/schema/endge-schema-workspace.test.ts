@@ -14,6 +14,7 @@ describe('Payload workspace schema mapping', () => {
     const mapped = normalizePayloadWorkspace({ id: 1, ...TEST_ENDGE_WORKSPACE })
     const workspace = normalizeEndgeWorkspaceDefinition(mapped)
     expect(mapped.configuration).toEqual(TEST_ENDGE_WORKSPACE.configuration)
+    expect(mapped.dataMode).toBe('live')
     expect(workspace.configuration.defaultTheme).toBe('light')
   })
 
@@ -25,6 +26,7 @@ describe('Payload workspace schema mapping', () => {
 
     expect(saved.identity).toBe(TEST_ENDGE_WORKSPACE.identity)
     expect(saved.displayName).toBe(TEST_ENDGE_WORKSPACE.displayName)
+    expect(saved.dataMode).toBe('live')
     expect(saved.configuration).toEqual(TEST_ENDGE_WORKSPACE.configuration)
   })
 
@@ -69,6 +71,7 @@ describe('Payload workspace schema mapping', () => {
     await storage.saveDocument(workspace.identity, 'workspace', { model: workspace })
 
     expect(upsert).toHaveBeenCalledWith(expect.objectContaining({
+      dataMode: 'live',
       installedIntegrations: [],
     }))
   })

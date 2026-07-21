@@ -1,6 +1,7 @@
 import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 import type { EndgeConfiguration } from '@/domain/types/configuration'
 import type {
+  EndgeDataMode,
   EndgeWorkspaceDefinition,
   EndgeWorkspaceLocale,
   EndgeWorkspaceLocaleLabelMode,
@@ -46,6 +47,7 @@ export class EndgeWorkspace extends EndgeModule {
     this._current = null
     this.variables.setEnvironment({})
     setActiveEndgeWorkspace(null)
+    Endge.context.setWorkspaceDataMode('live')
     this.notify()
   }
 
@@ -89,6 +91,7 @@ export class EndgeWorkspace extends EndgeModule {
     this._current = next
     setActiveEndgeWorkspace(next)
     Endge.context.setCurrentWorkspace(next.identity)
+    Endge.context.setWorkspaceDataMode(next.dataMode)
     this.notify()
   }
 
@@ -132,6 +135,16 @@ export class EndgeWorkspace extends EndgeModule {
   /** Возвращает текущую нормализованную workspace-конфигурацию. */
   get current(): EndgeWorkspaceDefinition {
     return this._requireCurrent()
+  }
+
+  /** Returns the persisted default used when the runtime has no local override. */
+  get dataMode(): EndgeDataMode {
+    return this._requireCurrent().dataMode
+  }
+
+  /** Shows whether this workspace starts runtimes with mock data by default. */
+  get isMockEnabled(): boolean {
+    return this.dataMode === 'mock'
   }
 
   /** Возвращает доступные workspace locales. */

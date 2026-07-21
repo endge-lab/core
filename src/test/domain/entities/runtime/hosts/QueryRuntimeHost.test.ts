@@ -12,6 +12,7 @@ import { Endge } from '@/model/endge/kernel/endge'
 describe('QueryRuntimeHost', () => {
   afterEach(() => {
     vi.restoreAllMocks()
+    Endge.context.setDataMode('live')
     Endge.runtime.reset()
     Endge.program.clear()
     Endge.domain.reset()
@@ -53,6 +54,27 @@ describe('QueryRuntimeHost', () => {
     expect(host.getProps()).toEqual({ filterPayload: { active: true } })
     host.setProps({ filterPayload: { active: false } })
     expect(host.getProps()).toEqual({ filterPayload: { active: false } })
+  })
+
+  it('skips transport and aborts an in-flight request when mock mode is enabled', async () => {
+    const request = deferred<Record<string, unknown>>()
+    const execute = vi.spyOn(Endge.runtime.query, 'executeArtifact')
+      .mockImplementation(input => new Promise((resolve, reject) => {
+        input.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+        request.promise.then(resolve, reject)
+      }))
+    const host = createHost()
+    const skipped = vi.fn()
+    host.on('run:skipped', skipped)
+
+    const liveRun = host.run()
+    Endge.context.setDataMode('mock')
+    await liveRun
+    const result = await host.run()
+
+    expect(execute).toHaveBeenCalledTimes(1)
+    expect(result).toEqual({})
+    expect(skipped).toHaveBeenCalledWith({ reason: 'mock-mode' })
   })
 
   it('mounts a local default Filter only without an explicit prop and owns its lifecycle', () => {

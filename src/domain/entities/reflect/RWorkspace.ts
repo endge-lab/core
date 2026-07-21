@@ -1,5 +1,6 @@
 import type { EndgeConfiguration } from '@/domain/types/configuration'
 import type {
+  EndgeDataMode,
   EndgeWorkspaceDefinition,
   EndgeWorkspaceDefinitionInput,
   WorkspaceIntegrationReference,
@@ -13,6 +14,9 @@ import { normalizeEndgeConfiguration } from '@/model/services/configuration'
 export class RWorkspace extends REntity implements EndgeWorkspaceDefinition {
   @Expose()
   displayName = ''
+
+  @Expose()
+  dataMode: EndgeDataMode = 'live'
 
   @Expose()
   configuration!: EndgeConfiguration
@@ -32,6 +36,7 @@ export class RWorkspace extends REntity implements EndgeWorkspaceDefinition {
     return {
       identity: this.identity,
       displayName: this.displayName,
+      dataMode: this.dataMode,
       managedBy: this.managedBy,
       managedById: this.managedById,
       meta: { ...this.meta },
@@ -58,12 +63,17 @@ function createWorkspace(input: unknown): RWorkspace {
   workspace.identity = identity
   workspace.name = displayName
   workspace.displayName = displayName
+  workspace.dataMode = normalizeDataMode(source.dataMode)
   workspace.applyManagement(source)
   workspace.applyEntityMeta(source)
   workspace.installedIntegrations = normalizeInstalledIntegrations(source.installedIntegrations)
   workspace.configuration = normalizeEndgeConfiguration(source.configuration)
 
   return workspace
+}
+
+function normalizeDataMode(value: unknown): EndgeDataMode {
+  return value === 'mock' ? 'mock' : 'live'
 }
 
 function normalizeInstalledIntegrations(value: unknown): WorkspaceIntegrationReference[] {

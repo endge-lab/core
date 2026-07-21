@@ -1,9 +1,10 @@
 import type { AxiosInstance } from 'axios'
-import type { ManagedBy, WorkspaceIntegrationReference } from '@/domain/types/document'
+import type { EndgeDataMode, ManagedBy, WorkspaceIntegrationReference } from '@/domain/types/document'
 
 export type WorkspacePayloadData = {
   identity: string
   displayName: string
+  dataMode: EndgeDataMode
   managedBy: ManagedBy
   managedById: string | null
   installedIntegrations: Array<{

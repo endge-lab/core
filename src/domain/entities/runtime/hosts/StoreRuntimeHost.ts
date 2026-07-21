@@ -177,10 +177,12 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
         strategy: full(),
         immediate: true,
         disposeTarget: 'delete',
-        compute: input => field.dataViews.reduce(
-          (value, ref) => Endge.runtime.dataView.runRef(ref, value),
-          input,
-        ),
+        compute: input => input === undefined
+          ? undefined
+          : field.dataViews.reduce<unknown>(
+              (value, ref) => Endge.runtime.dataView.runRef(ref, value),
+              input,
+            ),
       })
       this.node?.addChild(handle.node, { invalidate: false })
       this._derivedHandles.push(handle)
@@ -206,9 +208,11 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
 }
 
 function resolveStoreInitialValue(field: StoreValueDescriptor): unknown {
-  return field.initial.kind === 'mock'
+  if (field.initial.kind !== 'mock')
+    return field.initial.value
+  return Endge.context.isMockEnabled
     ? Endge.mock.get(field.initial.identity)
-    : field.initial.value
+    : undefined
 }
 
 function appendStorePath(base: string, path: string): string {

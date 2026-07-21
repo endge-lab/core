@@ -99,6 +99,35 @@ describe('EndgeContext persistence', () => {
     })
   })
 
+  it('resolves Workspace data mode with a non-persisted host override', async () => {
+    const context = new EndgeContext()
+    context.deserialize({ project: 'project-a', environment: 'prod' })
+    await Promise.resolve()
+
+    context.setWorkspaceDataMode('mock')
+
+    expect(context.dataMode).toBe('mock')
+    expect(context.isDataModeOverridden).toBe(false)
+
+    context.setDataMode('live')
+
+    expect(context.dataMode).toBe('live')
+    expect(context.isMockEnabled).toBe(false)
+    expect(context.isDataModeOverridden).toBe(true)
+    expect(context.getExecutionContext()).toEqual({
+      tenantIdentity: 'default',
+      projectIdentity: 'project-a',
+      environmentIdentity: 'prod',
+    })
+    expect(JSON.parse(localStorage.getItem('endge:context:v1') ?? '{}')).not.toHaveProperty('dataMode')
+    expect(JSON.parse(localStorage.getItem('endge:context:v1') ?? '{}')).not.toHaveProperty('dataModeOverride')
+
+    context.clearDataModeOverride()
+    expect(context.dataMode).toBe('mock')
+    expect(context.isMockEnabled).toBe(true)
+    expect(context.isDataModeOverridden).toBe(false)
+  })
+
   it('builds runtime storage keys from full scope and encodes ids', () => {
     const scope = {
       workspaceId: 'workspace/a',

@@ -626,6 +626,7 @@ export class EndgeCompiler extends EndgeModule {
           dependencies: [
             ...local.dependencies,
             ...this._typeDependencies((local.payload ?? artifact)?.props.map(prop => prop.type) ?? []),
+            ...this._queryAuthDependencies(local.payload ?? artifact),
           ],
           children: local.children,
         })
@@ -890,6 +891,28 @@ export class EndgeCompiler extends EndgeModule {
         role: 'type-contract',
       }
     })
+  }
+
+  /** Exposes a static Query auth-profile reference to the shared Program graph. */
+  private _queryAuthDependencies(
+    payload: QueryProgramPayload | undefined,
+  ): ProgramArtifact['dependencies'] {
+    const auth = payload?.auth
+    if (!auth || typeof auth !== 'object' || Array.isArray(auth) || 'type' in auth) {
+      return []
+    }
+    const record = auth as Record<string, unknown>
+    const identity = String(record.profile ?? record.authProfileIdentity ?? '').trim()
+    if (!identity) {
+      return []
+    }
+    const profile = Endge.domain.getAuthProfile(identity)
+    return [{
+      entityType: 'auth-profile',
+      id: profile?.id ?? identity,
+      identity,
+      role: 'query-auth',
+    }]
   }
 
   /** Adds explicit RMock dependencies used only by Composition preview fixtures. */

@@ -6,6 +6,7 @@ import type {
   EndgeStorageAdapter,
 } from '@/domain/types/runtime/context-persistence.types'
 import type { EndgeExecutionContext } from '@/domain/types/configuration'
+import type { EndgeDataMode } from '@/domain/types/document/workspace.types'
 import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
@@ -84,6 +85,8 @@ export class EndgeContext extends EndgeModule {
   private _pendingLocale: string | null = null
   private _currentTheme = ''
   private _pendingTheme: string | null = null
+  private _workspaceDataMode: EndgeDataMode = 'live'
+  private _dataModeOverride: EndgeDataMode | null = null
   private _sessionProvider: EndgeSessionIdentityProvider | null = null
   private _isHydrating = false
   private _executionContextLocked = false
@@ -170,6 +173,7 @@ export class EndgeContext extends EndgeModule {
     this._currentUser = normalizeScopePart(payload?.user, DEFAULT_SCOPE.userId)
     const rawLocale = normalizeOptionalText(payload?.locale)
     const rawTheme = normalizeOptionalText(payload?.theme) ?? readLegacyThemePreference()
+    this._dataModeOverride = null
     if (hasActiveEndgeWorkspace()) {
       this._currentLocale = normalizeWorkspaceLocale(rawLocale)
       this._pendingLocale = null
@@ -280,6 +284,7 @@ export class EndgeContext extends EndgeModule {
       return
 
     this._currentWorkspace = next
+    this._dataModeOverride = null
     this.saveToStorage()
     this.notify()
   }
@@ -387,6 +392,57 @@ export class EndgeContext extends EndgeModule {
   /** Устанавливает fallback identity текущего user. */
   public setCurrentUser(identity: string | null): void {
     this.setScopeValue('_currentUser', identity, DEFAULT_SCOPE.userId)
+  }
+
+  /** Returns the current data execution mode for Store fixtures and external Query runs. */
+  get dataMode(): EndgeDataMode {
+    return this._dataModeOverride ?? this._workspaceDataMode
+  }
+
+  /** Shows whether runtime consumers should resolve persisted RMock fixtures. */
+  get isMockEnabled(): boolean {
+    return this.dataMode === 'mock'
+  }
+
+  /** Shows whether the effective mode comes from a local runtime override. */
+  get isDataModeOverridden(): boolean {
+    return this._dataModeOverride != null
+  }
+
+  /** Applies the persisted Workspace default without writing it into local context storage. */
+  public setWorkspaceDataMode(mode: EndgeDataMode): void {
+    const next = normalizeDataMode(mode)
+    if (next === this._workspaceDataMode)
+      return
+
+    const previousEffective = this.dataMode
+    this._workspaceDataMode = next
+    if (previousEffective !== this.dataMode)
+      this.notify()
+  }
+
+  /** Applies a host-owned data mode override without rebuilding the structural context. */
+  public setDataMode(mode: EndgeDataMode): void {
+    const next = normalizeDataMode(mode)
+    if (next === this._dataModeOverride)
+      return
+
+    this._dataModeOverride = next
+    this.notify()
+  }
+
+  /** Removes the local override and restores the current Workspace default. */
+  public clearDataModeOverride(): void {
+    if (this._dataModeOverride == null)
+      return
+
+    this._dataModeOverride = null
+    this.notify()
+  }
+
+  /** Convenience API for UI toggles that expose mock mode as a boolean state. */
+  public setMockEnabled(enabled: boolean): void {
+    this.setDataMode(enabled ? 'mock' : 'live')
   }
 
   /** Возвращает текущую locale или locale активного workspace. */
@@ -520,6 +576,10 @@ export class EndgeContext extends EndgeModule {
       return
     throw new Error('[EndgeContext] Structural context is immutable during boot. Call Endge.reset() and boot with a new context.')
   }
+}
+
+function normalizeDataMode(value: unknown): EndgeDataMode {
+  return value === 'mock' ? 'mock' : 'live'
 }
 
 function normalizeScopePart(value: unknown, fallback: string): string {

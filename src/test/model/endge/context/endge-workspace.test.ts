@@ -28,6 +28,17 @@ describe('EndgeWorkspace', () => {
     expect(workspace.defaultTheme).toBe('light')
     expect(workspace.sfcAdapterIds).toEqual(['native-vue', 'vue-shadcn'])
     expect(workspace.defaultSfcAdapterId).toBe('vue-shadcn')
+    expect(workspace.dataMode).toBe('live')
+    expect(Endge.context.dataMode).toBe('live')
+  })
+
+  it('applies the persisted mock default to EndgeContext', () => {
+    Endge.context.clearDataModeOverride()
+
+    Endge.workspace.apply({ ...TEST_ENDGE_WORKSPACE, dataMode: 'mock' })
+
+    expect(Endge.workspace.isMockEnabled).toBe(true)
+    expect(Endge.context.isMockEnabled).toBe(true)
   })
 
   it('normalizes unsupported locales to default locale', () => {

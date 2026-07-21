@@ -11,6 +11,7 @@ import { Endge } from '@/model/endge/kernel/endge'
 
 describe('StoreRuntimeHost', () => {
   afterEach(() => {
+    Endge.context.setDataMode('live')
     Endge.runtime.reset()
     Endge.program.clear()
     Endge.domain.reset()
@@ -74,6 +75,7 @@ describe('StoreRuntimeHost', () => {
   })
 
   it('resolves a persisted mock before immediate derived materialization', () => {
+    Endge.context.setDataMode('mock')
     const mock = new RMock()
     mock.id = 103
     mock.identity = 'groundhandling'
@@ -147,6 +149,59 @@ describe('StoreRuntimeHost', () => {
 
     snapshot.raw.splice(0)
     expect(Endge.mock.get<any[]>('groundhandling')).toHaveLength(2)
+  })
+
+  it('keeps mock-backed fields empty in live mode until a runtime publication writes them', () => {
+    const mock = new RMock()
+    mock.id = 106
+    mock.identity = 'groundhandling-live'
+    mock.name = 'Ground Handling Live'
+    mock.displayName = mock.name
+    mock.source = JSON.stringify([{ id: 1 }])
+    Endge.domain.addMock(mock)
+
+    const store = new RStore()
+    store.id = 107
+    store.identity = 'groundhandling-live-db'
+    store.name = 'Ground Handling Live DB'
+    store.source = `defineStore({
+      data: {
+        raw: value(mock('groundhandling-live')),
+        table: derived()
+          .from('raw')
+          .dataView(defineDataView({
+            mode: 'pipeline',
+            steps: [
+              from('').as('row'),
+              map({ ...spread('row') }),
+            ],
+          })),
+      },
+    })`
+    Endge.domain.addStore(store)
+
+    const payload = Endge.source.compile('store', store.source).artifact as StoreSourceArtifact
+    Endge.program.beginCompile('test-live-mode')
+    Endge.program.addArtifact({
+      ref: { entityType: 'store', id: store.id, identity: store.identity },
+      sourceHash: 'test-live-mode',
+      compilerVersion: 'test',
+      status: 'valid',
+      diagnostics: [],
+      dependencies: [],
+      capabilities: ['compilable', 'executable', 'data-provider'],
+      metadata: { self: {}, nodes: [] },
+      payload,
+    })
+
+    const runtime = Endge.runtime.execute(store, { id: 'store:groundhandling-live' }) as StoreRuntimeHost
+    expect(runtime.getDataSnapshot()).toEqual({})
+
+    runtime.set('raw', [{ id: 2 }])
+    expect(runtime.getDataSnapshot()).toEqual({
+      raw: [{ id: 2 }],
+      table: [{ id: 2 }],
+    })
   })
 
   it('materializes a root select expression as the derived array itself', () => {

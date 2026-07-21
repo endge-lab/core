@@ -23,6 +23,7 @@ import { materializeCompositionPreviewProps } from '@/model/endge/runtime/execut
 
 describe('Composition runtime session', () => {
   afterEach(() => {
+    Endge.context.setDataMode('live')
     vi.useRealTimers()
     vi.restoreAllMocks()
     Endge.runtime.reset()
@@ -32,6 +33,7 @@ describe('Composition runtime session', () => {
   })
 
   it('materializes isolated inline and RMock-backed preview props on demand', () => {
+    Endge.context.setDataMode('mock')
     const mock = new RMock()
     mock.id = 49
     mock.identity = 'groundhandling-query-requirements'
@@ -52,6 +54,13 @@ describe('Composition runtime session', () => {
 
     expect(first.airport).toBe('SVO')
     expect(second.requirements).toEqual({ arrival: { attributes: ['LegStatus'] } })
+  })
+
+  it('omits RMock-backed preview props in live mode but keeps literal fixtures', () => {
+    expect(materializeCompositionPreviewProps({
+      airport: { kind: 'literal', value: 'SVO' },
+      requirements: { kind: 'mock', identity: 'groundhandling-query-requirements' },
+    })).toEqual({ airport: 'SVO' })
   })
 
   it('mounts children, binds output, debounces changes and unmounts the runtime tree', async () => {

@@ -41,6 +41,7 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
   private _responseInputPaths = new Map<string, string>()
   private readonly _internalBase: string
   private _derivedErrorActive = false
+  private _contextOff: (() => void) | null = null
 
   public constructor(input: {
     id: string
@@ -101,6 +102,12 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     host._props = host._literalDefaults(artifact.payload)
     host._applyProps(host._props, true)
     host._applyProps(input.meta?.props ?? {}, true)
+    host._contextOff = Endge.context.subscribe(() => {
+      if (!Endge.context.isMockEnabled)
+        return
+      host._runSequence += 1
+      host._abortController?.abort()
+    })
     try {
       host._mountOutputGraph(artifact)
     }
@@ -190,6 +197,15 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     if (propsPatch)
       this._applyProps(propsPatch, false)
 
+    if (Endge.context.isMockEnabled) {
+      this._runSequence += 1
+      this._abortController?.abort()
+      const updatedAt = new Date().toISOString()
+      this.setContext({ status: 'success', updatedAt })
+      this.emit('run:skipped', { reason: 'mock-mode' })
+      return this.getOutputs() as Record<string, unknown>
+    }
+
     const payload = this.getArtifactPayload()
     const artifact = this.getArtifact()
     if (!payload || !artifact)
@@ -266,6 +282,8 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
 
   public override destroy(): void {
     this._abortController?.abort()
+    this._contextOff?.()
+    this._contextOff = null
     for (const dispose of this._outputWatchers)
       dispose()
     this._outputWatchers = []

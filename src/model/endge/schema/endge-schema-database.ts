@@ -117,6 +117,7 @@ export function normalizePayloadWorkspace(raw: any): Record<string, unknown> {
     identity: raw.identity,
     name: raw.name ?? raw.displayName,
     displayName: raw.displayName ?? raw.name,
+    dataMode: raw.dataMode,
     meta: normalizeEntityMeta(raw.meta),
     installedIntegrations: raw.installedIntegrations,
     configuration: raw.configuration,
@@ -146,6 +147,7 @@ export function normalizeSavedPayloadWorkspace(
     displayName: saved.displayName === undefined && saved.name === undefined
       ? fallback.displayName
       : saved.displayName ?? saved.name,
+    dataMode: saved.dataMode === undefined ? fallback.dataMode : saved.dataMode,
     meta: saved.meta === undefined ? fallback.meta : normalizeEntityMeta(saved.meta),
     installedIntegrations: saved.installedIntegrations === undefined
       ? fallback.installedIntegrations
@@ -2473,6 +2475,7 @@ export class EndgeSchemaStorage extends EndgeModule {
       const saved = await repos.workspaces!.upsert({
         identity: workspace.identity,
         displayName: workspace.displayName,
+        dataMode: workspace.dataMode,
         managedBy: workspace.managedBy,
         managedById: workspace.managedById,
         meta: normalizeEntityMeta(workspace.meta),
