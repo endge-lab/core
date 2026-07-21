@@ -89,7 +89,7 @@ export type ComponentSFCTableSourcePatch
     }
     | {
       type: 'set-table-attribute'
-      name: 'paging' | 'page-size' | 'page-sizes' | 'default-pin' | 'default-sort' | 'default-hidden'
+      name: 'ref' | 'selection-mode' | 'paging' | 'page-size' | 'page-sizes' | 'default-pin' | 'default-sort' | 'default-hidden'
       value: string | null
     }
     | {
@@ -125,6 +125,8 @@ export interface ComponentSFCTableSourcePatchResult {
 /** Visual read-model SFC, template которого содержит один корневой Table. */
 export interface ComponentSFCTableVisualProjection {
   kind: 'table'
+  ref: ComponentSFCVisualSourceValue | null
+  selectionMode: ComponentSFCVisualSourceValue | null
   rows: ComponentSFCVisualSourceValue | null
   rowKey: ComponentSFCVisualSourceValue | null
   paging: ComponentSFCVisualSourceValue | null

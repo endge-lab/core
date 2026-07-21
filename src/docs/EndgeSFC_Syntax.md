@@ -96,7 +96,14 @@ const ports = definePorts({
     'table.sort.clearAll': action<unknown, void>(),
   },
   emits: {
-    rowActivated: event<{ id: string }>(),
+    detailsOpened: event<{ id: string }>(),
+    rowActivated: event<TableRowActivatedEvent>({
+      from: { ref: 'table', event: 'rowActivated' },
+      action: {
+        identity: 'groundhandling.open-details',
+        input: { id: event('rowId') },
+      },
+    }),
   },
 })
 
@@ -116,7 +123,11 @@ Rules for v1:
 - `require` port ссылается на внешний provider через обязательный `default`;
 - `provides` Action не содержит `default`: implementation принадлежит runtime
   экземпляру самого компонента;
-- `emits` Event не содержит provider и результата;
+- `emits` Event не содержит provider и результата; необязательный `action`
+  задаёт текущую реакцию Source, не поглощая публикацию;
+- Event без `from` является собственным, а `from` связывает его с Event
+  дочернего literal `ref`;
+- `event()` передаёт весь payload в Action, `event('row.id')` читает dot-path;
 - computation вызывается только как `ports.require.<name>(input)` в top-level
   `const` и получает один input object;
 - component port задаёт local tag, включая dotted form;
@@ -177,9 +188,37 @@ Selector может быть `"*"`, массивом exact identities/wildcards 
 error `sfc-port-forward-collision`; selector без совпадений создаёт warning
 `sfc-port-forward-selection-empty`. Silent override не используется.
 
-В текущем runtime `forward` формирует public compiled contract и origin map.
-Маршрутизация внешнего вызова или подписки к конкретному mounted child остаётся
-за Composition binding layer; compiler не подменяет её скрытым DOM callback.
+Runtime создаёт отдельную Event boundary для каждого смонтированного Component
+SFC. Renderer публикует occurrence на границе текущего экземпляра, после чего
+dispatcher запускает `action`, применяет `forward` и передаёт Event родителю.
+Ошибка реакции не отменяет публикацию. Автоматического дублирования каждого
+occurrence в глобальный `Endge.events` нет.
+
+### TypeScript reaction
+
+```ts
+const ports = definePorts({
+  emits: {
+    detailsOpened: event<{ id: string }>(),
+    rowContextMenuRequested: event<TableRowContextMenuRequestedEvent>({
+      from: { ref: 'table', event: 'rowContextMenuRequested' },
+      action: typescript({
+        inputs: { event: event() },
+        compute({ event }, api) {
+          return [
+            api.action('audit.write', { rowId: event.rowId }),
+            ports.emits.detailsOpened({ id: event.rowId }),
+          ]
+        },
+      }),
+    }),
+  },
+})
+```
+
+Sandbox допускает только `api.action(...)` и объявленные `ports.emits.*`.
+DOM, network, imports, timers и прямой `Endge` запрещены. Одна цепочка
+ограничена 32 Event-hops/effects и защищена от циклического повторного emit.
 
 ### Table Actions
 

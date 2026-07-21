@@ -184,6 +184,33 @@ defineProps<{
       }),
     })
   })
+
+  it('publishes declared Event ports through the host API', async () => {
+    const source = `<script setup lang="ts">
+const ports = definePorts({ emits: { opened: event<{ id: string }>() } })
+</script>
+<template><Text>Events</Text></template>`
+    const artifact = createSFCArtifact(compileComponentSFC(source))
+    const model = RComponentSFC.fromPlain({ id: 1, identity: 'event-host', name: 'Event host', source })
+    const host = ComponentSFCRuntimeHost.createRuntime({
+      id: 'event-host-runtime',
+      model,
+      artifactReader: { getArtifact: <TPayload>() => artifact as unknown as ProgramArtifact<TPayload> },
+    })
+    const received: unknown[] = []
+    const dispose = host.onEventPort('opened', occurrence => received.push(occurrence))
+
+    await host.emitEventPort('opened', { id: 'row-1' })
+    dispose()
+    await host.emitEventPort('opened', { id: 'row-2' })
+
+    expect(received).toEqual([expect.objectContaining({
+      componentIdentity: 'event-host',
+      event: 'opened',
+      payload: { id: 'row-1' },
+    })])
+    host.destroy()
+  })
 })
 
 function createSFCArtifact(

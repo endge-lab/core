@@ -95,8 +95,65 @@ export interface ComponentSFCEventPort {
   role: 'emits'
   name: string
   payloadType: string
+  /** Optional local producer whose Event is republished by this component. */
+  from?: ComponentSFCEventSource
+  /** Optional reaction executed after the Event occurrence is published. */
+  action?: ComponentSFCEventAction
   forwardedFrom?: ComponentSFCPortForwardOrigin
   sourceRange?: RComponentSFC_SourceRange
+}
+
+/** Literal child Event reference used by `event({ from })`. */
+export interface ComponentSFCEventSource {
+  ref: string
+  event: string
+}
+
+/** Renderer-neutral value mapped from an Event payload into Action input. */
+export type ComponentSFCEventInputValue
+  = | { kind: 'event', path: string | null }
+    | { kind: 'literal', value: unknown }
+    | { kind: 'array', items: ComponentSFCEventInputValue[] }
+    | { kind: 'object', entries: Record<string, ComponentSFCEventInputValue> }
+
+/** One Action selected directly in Component SFC Source. */
+export interface ComponentSFCEventDirectAction {
+  kind: 'action'
+  identity: string
+  input?: ComponentSFCEventInputValue
+}
+
+/** Sandboxed TypeScript reaction. Its result is a validated list of effects. */
+export interface ComponentSFCEventTypescriptAction {
+  kind: 'typescript'
+  inputs: Record<string, { kind: 'event', path: string | null }>
+  /** Original `typescript({...})` expression for source projection/editor round-trips. */
+  definitionSource?: string
+  source: string
+  emittedEvents: string[]
+}
+
+export type ComponentSFCEventAction
+  = ComponentSFCEventDirectAction
+    | ComponentSFCEventTypescriptAction
+
+export interface ComponentSFCEventRuntimeSource {
+  nodeId: string
+  ref?: string
+  componentIdentity?: string
+  componentTag: string
+  target?: {
+    type: string
+    identity: string
+    value: unknown
+  }
+}
+
+export interface ComponentSFCEventOccurrence<TPayload = unknown> {
+  componentIdentity: string
+  event: string
+  payload: TPayload
+  source?: ComponentSFCEventRuntimeSource
 }
 
 export interface ComponentSFCRequiredPorts {

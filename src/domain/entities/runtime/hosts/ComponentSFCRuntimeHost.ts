@@ -18,6 +18,12 @@ import type {
   ProgramDiagnostic,
 } from '@/domain/types/program/program.types'
 import type {
+  ComponentSFCEventInputValue,
+  ComponentSFCEventOccurrence,
+  ComponentSFCEventPort,
+  ComponentSFCEventRuntimeSource,
+} from '@/domain/types/component/sfc'
+import type {
   RuntimeArtifactReader,
   RuntimeBoundaryPatch,
   RuntimeCollectionProjectionPatch,
@@ -49,6 +55,28 @@ function createDefaultSFCContext(target: RComponentRenderTarget | null): Runtime
   }
 }
 
+function evaluateEventInput(value: ComponentSFCEventInputValue, payload: unknown): unknown {
+  if (value.kind === 'event') return value.path == null ? payload : readPath(payload, value.path)
+  if (value.kind === 'literal') return value.value
+  if (value.kind === 'array') return value.items.map(item => evaluateEventInput(item, payload))
+  return Object.fromEntries(Object.entries(value.entries).map(([key, item]) => [key, evaluateEventInput(item, payload)]))
+}
+
+function readPath(value: unknown, path: string): unknown {
+  return String(path ?? '').split('.').filter(Boolean).reduce<unknown>((current, key) => {
+    return isRecord(current) || Array.isArray(current) ? (current as any)[key] : undefined
+  }, value)
+}
+
+function hashSource(source: string): string {
+  let hash = 2166136261
+  for (let index = 0; index < source.length; index++) {
+    hash ^= source.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return (hash >>> 0).toString(36)
+}
+
 /**
  * Runtime-host нового SFC-компонента.
  *
@@ -65,6 +93,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   private readonly _computationResources = new ComputationResourceRegistry()
   private readonly _computationErrorSignatures = new Map<string, string>()
   private _styleLease: EndgeStyleLease | null = null
+  private readonly _eventPortListeners = new Map<string, Set<(occurrence: ComponentSFCEventOccurrence) => void>>()
 
   constructor(input: {
     id: string
@@ -224,6 +253,102 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     return this.getArtifactPayload()?.previewOptions ?? null
   }
 
+  /** Subscribes to one public Event port of this mounted component instance. */
+  public onEventPort(name: string, listener: (occurrence: ComponentSFCEventOccurrence) => void): () => void {
+    const key = String(name ?? '').trim()
+    if (!key) throw new Error('Event port name is required.')
+    const listeners = this._eventPortListeners.get(key) ?? new Set()
+    listeners.add(listener)
+    this._eventPortListeners.set(key, listeners)
+    return () => {
+      listeners.delete(listener)
+      if (listeners.size === 0) this._eventPortListeners.delete(key)
+    }
+  }
+
+  /** Emits an own/public Event through the root Component SFC boundary. */
+  public async emitEventPort(name: string, payload: unknown, source?: ComponentSFCEventRuntimeSource): Promise<void> {
+    await this._emitRootEventPort(name, payload, source, [], 0)
+  }
+
+  /** Executes one compiler-linked Event reaction for a renderer boundary. */
+  public async executeEventPortAction(
+    ownerIdentity: string,
+    port: ComponentSFCEventPort,
+    payload: unknown,
+    source: ComponentSFCEventRuntimeSource | undefined,
+    emitOwn: (name: string, payload: unknown, trace: string[], depth: number) => Promise<void>,
+    trace: string[] = [],
+    depth = 0,
+  ): Promise<void> {
+    if (!port.action) return
+    const traceKey = `${ownerIdentity}.${port.name}`
+    if (depth >= 32 || trace.includes(traceKey)) {
+      this.emit('event:error', { code: 'event-cycle', ownerIdentity, event: port.name, trace })
+      return
+    }
+    const nextTrace = [...trace, traceKey]
+    try {
+      if (port.action.kind === 'action') {
+        await this._executeEventActionEffect(port.action.identity, port.action.input
+          ? evaluateEventInput(port.action.input, payload)
+          : payload, source, ownerIdentity, port.name)
+        return
+      }
+
+      const inputs = Object.fromEntries(Object.entries(port.action.inputs).map(([key, read]) => [
+        key,
+        read.path == null ? payload : readPath(payload, read.path),
+      ]))
+      const result = await Endge.runtime.computation.executeSandbox({
+        computationIdentity: `${ownerIdentity}.${port.name}`,
+        outputName: 'event-action',
+        moduleKey: `event:${ownerIdentity}:${port.name}:${hashSource(port.action.source)}`,
+        source: port.action.source,
+        inputs,
+      })
+      const effects = Array.isArray(result) ? result : result == null ? [] : [result]
+      if (effects.length > 32) throw new Error('Event reaction effect budget exceeded 32.')
+      for (const effect of effects) {
+        if (!isRecord(effect)) throw new Error('Event reaction must return JSON effect objects.')
+        if (effect.kind === 'action') {
+          const identity = String(effect.identity ?? '').trim()
+          if (!identity) throw new Error('Event Action effect identity is required.')
+          await this._executeEventActionEffect(identity, effect.input, source, ownerIdentity, port.name)
+          continue
+        }
+        if (effect.kind === 'emit') {
+          const event = String(effect.event ?? '').trim()
+          if (!port.action.emittedEvents.includes(event)) throw new Error(`Event effect is not compiler-linked: ${event}.`)
+          await emitOwn(event, effect.payload, nextTrace, depth + 1)
+          continue
+        }
+        throw new Error(`Unsupported Event reaction effect: ${String(effect.kind ?? '')}.`)
+      }
+    }
+    catch (error) {
+      console.error('[ComponentSFCRuntimeHost] Event reaction failed.', {
+        componentIdentity: ownerIdentity,
+        event: port.name,
+        error,
+      })
+      this.emit('event:error', { code: 'event-reaction-failed', ownerIdentity, event: port.name, error })
+    }
+  }
+
+  /** Publishes an already routed root Event without using the global Endge.events bus. */
+  public publishEventPort(name: string, payload: unknown, source?: ComponentSFCEventRuntimeSource): void {
+    const occurrence: ComponentSFCEventOccurrence = {
+      componentIdentity: this.entityIdentity,
+      event: name,
+      payload,
+      source,
+    }
+    this.emit('event:port', occurrence)
+    this.emit(`event:port:${name}`, occurrence)
+    for (const listener of this._eventPortListeners.get(name) ?? []) listener(occurrence)
+  }
+
   /** Returns one host-owned computation resource isolated by renderer consumer scope. */
   public getComputationResource(
     identity: string,
@@ -301,7 +426,50 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     this._computationErrorSignatures.clear()
     this._styleLease?.release()
     this._styleLease = null
+    this._eventPortListeners.clear()
     super.destroy()
+  }
+
+  private async _emitRootEventPort(
+    name: string,
+    payload: unknown,
+    source: ComponentSFCEventRuntimeSource | undefined,
+    trace: string[],
+    depth: number,
+  ): Promise<void> {
+    const port = this.getIr()?.script.ports.emits.events.find(candidate => candidate.name === name)
+    if (!port) throw new Error(`Component Event port is not declared: ${name}.`)
+    this.publishEventPort(name, payload, source)
+    await this.executeEventPortAction(
+      this.entityIdentity,
+      port,
+      payload,
+      source,
+      (event, nextPayload, nextTrace, nextDepth) => this._emitRootEventPort(event, nextPayload, source, nextTrace, nextDepth),
+      trace,
+      depth,
+    )
+  }
+
+  private async _executeEventActionEffect(
+    identity: string,
+    input: unknown,
+    source: ComponentSFCEventRuntimeSource | undefined,
+    ownerIdentity: string,
+    eventName: string,
+  ): Promise<void> {
+    await Endge.actions.execute(identity, {
+      input,
+      target: source?.target,
+      context: {
+        surface: 'component-event',
+        parentRuntimeId: this.id,
+        componentIdentity: ownerIdentity,
+        eventName,
+        source,
+      },
+      resolution: { component: ownerIdentity },
+    })
   }
 
   private _reportComputationError(

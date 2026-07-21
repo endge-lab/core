@@ -14,6 +14,7 @@ import type {
   RComponentSFC_IR_Template,
 } from '@/domain/types/component/sfc'
 import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc'
+import { TABLE_EVENT_DEFINITIONS } from '@/domain/types/component/sfc/table-events.types'
 import { TABLE_RUNTIME_ACTION_IDS } from '@/domain/types/runtime/action.types'
 
 type ForwardablePort = ComponentSFCComputationPort | ComponentSFCComponentPort | ComponentSFCActionPort | ComponentSFCEventPort
@@ -43,7 +44,7 @@ export function resolveComponentSFCPortForwards(
 ): ComponentSFCPortForwardResult {
   const diagnostics: RComponentDiagnostic[] = []
   const dependencies = createEmptyDependencies()
-  if (!template || manifest.forward.rules.length === 0)
+  if (!template)
     return { diagnostics, dependencies }
 
   const bindings = collectLocalComponentBindings(template, options)
@@ -62,6 +63,10 @@ export function resolveComponentSFCPortForwards(
     }
     refs.set(binding.ref, binding)
   }
+
+  validateExplicitEventSources(manifest, refs, diagnostics)
+  if (manifest.forward.rules.length === 0)
+    return { diagnostics, dependencies }
 
   const names = collectManifestNames(manifest)
   const componentTags = new Set(manifest.require.components.map(port => port.tag))
@@ -108,7 +113,71 @@ export function createBuiltInComponentPortManifest(tag: string): ComponentSFCPor
     inputType: 'unknown',
     outputType: 'void',
   }))
+  manifest.emits.events = TABLE_EVENT_DEFINITIONS.map(event => ({
+    kind: 'event',
+    role: 'emits',
+    name: event.name,
+    payloadType: event.payloadType,
+  }))
   return manifest
+}
+
+/** Built-in manifests used by compiler and frontend-only event catalogs. */
+export function listBuiltInComponentPortManifests(): Array<{ tag: string, manifest: ComponentSFCPortManifest }> {
+  const table = createBuiltInComponentPortManifest('Table')
+  return table ? [{ tag: 'Table', manifest: table }] : []
+}
+
+function validateExplicitEventSources(
+  manifest: ComponentSFCPortManifest,
+  refs: Map<string, LocalComponentBinding>,
+  diagnostics: RComponentDiagnostic[],
+): void {
+  for (const event of manifest.emits.events) {
+    if (!event.from) continue
+    const source = refs.get(event.from.ref)
+    if (!source) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'sfc-event-from-ref-missing',
+        message: `Event source ref "${event.from.ref}" не найден в local component scope.`,
+        sourcePath: 'script.definePorts.emits',
+        start: event.sourceRange?.start,
+        end: event.sourceRange?.end,
+      })
+      continue
+    }
+    const sourceEvent = source.manifest?.emits.events.find(candidate => candidate.name === event.from!.event)
+    if (!sourceEvent) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'sfc-event-from-event-missing',
+        message: `Component "${describeSource(source)}" не публикует Event "${event.from.event}".`,
+        sourcePath: 'script.definePorts.emits',
+        start: event.sourceRange?.start,
+        end: event.sourceRange?.end,
+      })
+      continue
+    }
+    if (normalizeType(sourceEvent.payloadType) !== normalizeType(event.payloadType)) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'sfc-event-from-payload-mismatch',
+        message: `Payload Event "${event.name}" (${event.payloadType}) не совпадает с ${describeSource(source)}.${sourceEvent.name} (${sourceEvent.payloadType}).`,
+        sourcePath: 'script.definePorts.emits',
+        start: event.sourceRange?.start,
+        end: event.sourceRange?.end,
+      })
+      continue
+    }
+    event.forwardedFrom = {
+      nodeId: source.nodeId,
+      ref: source.ref,
+      componentIdentity: source.componentIdentity,
+      componentTag: source.componentTag,
+      portName: sourceEvent.name,
+    }
+  }
 }
 
 function collectLocalComponentBindings(
@@ -168,6 +237,22 @@ function resolveRuleSource(
       if (!publicName) continue
       const existing = names.get(publicName)
       if (existing) {
+        const existingSource = existing.kind === 'event' ? existing.from : undefined
+        if (
+          role === 'emits'
+          && existing.kind === 'event'
+          && existingSource?.ref === source.ref
+          && existingSource?.event === port.name
+        ) {
+          existing.forwardedFrom ??= {
+            nodeId: source.nodeId,
+            ref: source.ref,
+            componentIdentity: source.componentIdentity,
+            componentTag: source.componentTag,
+            portName: port.name,
+          }
+          continue
+        }
         diagnostics.push(forwardDiagnostic(
           'error',
           'sfc-port-forward-collision',
@@ -201,6 +286,10 @@ function resolveRuleSource(
       appendDependency(dependencies, forwarded)
     }
   }
+}
+
+function normalizeType(value: string): string {
+  return String(value ?? '').replace(/\s+/g, '')
 }
 
 function portsForRole(manifest: ComponentSFCPortManifest, role: ComponentSFCPortRole): ForwardablePort[] {

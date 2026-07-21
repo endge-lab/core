@@ -67,6 +67,8 @@ export enum DomainSectionType {
   Store = 'store',
   Mock = 'mock',
   Action = 'action',
+  /** Frontend-only catalog classification; Event is not a persisted document. */
+  Event = 'event',
   Converter = 'converter',
   Computation = 'computation',
   Integration = 'integration',

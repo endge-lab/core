@@ -7,6 +7,8 @@ import type {
   ComponentSFCComputationPort,
   ComponentSFCActionPort,
   ComponentSFCEventPort,
+  ComponentSFCEventAction,
+  ComponentSFCEventInputValue,
   ComponentSFCPortForwardRule,
   ComponentSFCPortForwardSelector,
   ComponentSFCPortRole,
@@ -257,11 +259,21 @@ function parsePortManifest(
 
       const typeSources = readTypeParameters(definition, script.content)
       if (kind === 'event') {
-        if ((definition.arguments?.length ?? 0) !== 0 || typeSources.length > 1) {
+        if ((definition.arguments?.length ?? 0) > 1 || typeSources.length > 1) {
           diagnostics.push(makeDiagnostic(
             'sfc-event-port-shape',
-            `Event port "${name}" объявляется как event<Payload>() без config.`,
+            `Event port "${name}" объявляется как event<Payload>() или event<Payload>({ from, action }).`,
             definition,
+            script,
+          ))
+          continue
+        }
+        const config = definition.arguments?.[0]
+        if (config && config.type !== 'ObjectExpression') {
+          diagnostics.push(makeDiagnostic(
+            'sfc-event-port-config',
+            `Event port "${name}" принимает только object literal config.`,
+            config,
             script,
           ))
           continue
@@ -272,6 +284,12 @@ function parsePortManifest(
           name,
           payloadType: typeSources[0] ?? 'void',
           sourceRange: toRange(property, script),
+        }
+        if (config) {
+          const parsed = parseEventConfig(name, config, script, dependencies, diagnostics)
+          if (!parsed.valid) continue
+          port.from = parsed.from
+          port.action = parsed.action
         }
         manifest.emits.events.push(port)
         continue
@@ -389,6 +407,203 @@ function parsePortManifest(
       validateProvider(port, options, diagnostics, property, script)
     }
   }
+}
+
+function parseEventConfig(
+  eventName: string,
+  config: any,
+  script: RComponentSFC_AST_Script,
+  dependencies: RComponentDependencies,
+  diagnostics: RComponentDiagnostic[],
+): { valid: boolean, from?: ComponentSFCEventPort['from'], action?: ComponentSFCEventAction } {
+  let valid = true
+  let from: ComponentSFCEventPort['from']
+  let action: ComponentSFCEventAction | undefined
+  const seen = new Set<string>()
+  for (const property of config.properties ?? []) {
+    if (property.type !== 'ObjectProperty' || property.computed) {
+      diagnostics.push(makeDiagnostic('sfc-event-config-property', 'Event config не поддерживает spread, computed keys и methods.', property, script))
+      valid = false
+      continue
+    }
+    const key = readKey(property.key)
+    if (!key || seen.has(key) || (key !== 'from' && key !== 'action')) {
+      diagnostics.push(makeDiagnostic('sfc-event-config-property', `Event config содержит недопустимое или повторное поле "${key ?? ''}".`, property, script))
+      valid = false
+      continue
+    }
+    seen.add(key)
+    if (key === 'from') {
+      const value = property.value
+      const ref = value?.type === 'ObjectExpression' ? readStringProperty(value, 'ref') : null
+      const childEvent = value?.type === 'ObjectExpression' ? readStringProperty(value, 'event') : null
+      if (!ref || !childEvent) {
+        diagnostics.push(makeDiagnostic('sfc-event-from-shape', 'event.from требует literal `{ ref, event }`.', value, script))
+        valid = false
+      }
+      else {
+        from = { ref, event: childEvent }
+      }
+      continue
+    }
+    const parsedAction = parseEventAction(eventName, property.value, script, dependencies, diagnostics)
+    if (!parsedAction) valid = false
+    else action = parsedAction
+  }
+  return { valid, from, action }
+}
+
+function parseEventAction(
+  eventName: string,
+  node: any,
+  script: RComponentSFC_AST_Script,
+  dependencies: RComponentDependencies,
+  diagnostics: RComponentDiagnostic[],
+): ComponentSFCEventAction | null {
+  if (node?.type === 'ObjectExpression') {
+    const identity = readStringProperty(node, 'identity')
+    const unsupported = (node.properties ?? []).some((property: any) =>
+      property.type !== 'ObjectProperty'
+      || property.computed
+      || !['identity', 'input'].includes(readKey(property.key) ?? ''),
+    )
+    if (!identity || unsupported) {
+      diagnostics.push(makeDiagnostic('sfc-event-action-shape', 'event.action требует `{ identity, input? }`.', node, script))
+      return null
+    }
+    const inputNode = readObjectPropertyValue(node, 'input')
+    const input = inputNode ? parseEventInput(inputNode, script, diagnostics) : undefined
+    if (inputNode && !input) return null
+    if (!dependencies.actions.includes(identity)) dependencies.actions.push(identity)
+    return { kind: 'action', identity, ...(input ? { input } : {}) }
+  }
+
+  if (!isCall(node, 'typescript') || node.arguments?.length !== 1 || node.arguments[0]?.type !== 'ObjectExpression') {
+    diagnostics.push(makeDiagnostic('sfc-event-action-shape', 'event.action поддерживает Action object или typescript({...}).', node, script))
+    return null
+  }
+  const definition = node.arguments[0]
+  const inputsNode = readObjectPropertyValue(definition, 'inputs')
+  const computeProperty = (definition.properties ?? []).find((property: any) => readKey(property.key) === 'compute')
+  if (inputsNode?.type !== 'ObjectExpression' || !computeProperty) {
+    diagnostics.push(makeDiagnostic('sfc-event-typescript-shape', 'typescript reaction требует inputs object и compute function.', definition, script))
+    return null
+  }
+  const inputs: Record<string, { kind: 'event', path: string | null }> = {}
+  for (const property of inputsNode.properties ?? []) {
+    const key = property.type === 'ObjectProperty' && !property.computed ? readKey(property.key) : null
+    const value = property.type === 'ObjectProperty' ? parseEventRead(property.value) : null
+    if (!key || !value) {
+      diagnostics.push(makeDiagnostic('sfc-event-typescript-input', 'typescript.inputs допускает только `name: event()` или `name: event("path")`.', property, script))
+      return null
+    }
+    inputs[key] = value
+  }
+  const compute = readComputeFunction(computeProperty)
+  if (!compute || compute.async || compute.generator) {
+    diagnostics.push(makeDiagnostic('sfc-event-typescript-compute', 'typescript.compute должен быть синхронной function/method.', computeProperty, script))
+    return null
+  }
+  const forbidden = new Set([
+    'eval', 'Function', 'Promise', 'fetch', 'XMLHttpRequest', 'WebSocket', 'Worker', 'SharedWorker',
+    'setTimeout', 'setInterval', 'require', 'process', 'Deno', 'Bun', 'globalThis', 'self', 'window',
+    'document', 'navigator', 'Endge',
+  ])
+  let invalid = false
+  const emittedEvents = new Set<string>()
+  walkBabelNodes(compute.body ?? compute, (current) => {
+    if (current.type === 'AwaitExpression' || current.type === 'Import' || current.type === 'ImportDeclaration') invalid = true
+    if (current.type === 'Identifier' && forbidden.has(current.name)) invalid = true
+    const emitted = readPortsEmitCall(current)
+    if (emitted) {
+      emittedEvents.add(emitted)
+      if (emitted === eventName) {
+        diagnostics.push(makeDiagnostic('sfc-event-reaction-self-cycle', `Event "${eventName}" не может напрямую emit-ить сам себя.`, current, script))
+        invalid = true
+      }
+    }
+    const actionIdentity = readApiActionCall(current)
+    if (actionIdentity && !dependencies.actions.includes(actionIdentity)) dependencies.actions.push(actionIdentity)
+  })
+  if (invalid) {
+    diagnostics.push(makeDiagnostic('sfc-event-typescript-unsafe', 'typescript.compute содержит запрещённый global, import, await или self-emit.', computeProperty, script))
+    return null
+  }
+  const rawSource = computeFunctionSource(compute, script.content)
+  const source = rawSource.replace(/\bports\.emits\.([A-Za-z_$][\w$]*)\s*\(/g, (_match, name: string) => `api.emit(${JSON.stringify(name)}, `)
+  return {
+    kind: 'typescript',
+    inputs,
+    definitionSource: script.content.slice(node.start, node.end),
+    source,
+    emittedEvents: [...emittedEvents],
+  }
+}
+
+function parseEventInput(node: any, script: RComponentSFC_AST_Script, diagnostics: RComponentDiagnostic[]): ComponentSFCEventInputValue | null {
+  const eventRead = parseEventRead(node)
+  if (eventRead) return eventRead
+  if (node?.type === 'StringLiteral' || node?.type === 'NumericLiteral' || node?.type === 'BooleanLiteral')
+    return { kind: 'literal', value: node.value }
+  if (node?.type === 'NullLiteral') return { kind: 'literal', value: null }
+  if (node?.type === 'UnaryExpression' && node.operator === '-' && node.argument?.type === 'NumericLiteral')
+    return { kind: 'literal', value: -node.argument.value }
+  if (node?.type === 'ArrayExpression') {
+    const items: ComponentSFCEventInputValue[] = []
+    for (const item of node.elements ?? []) {
+      const parsed = parseEventInput(item, script, diagnostics)
+      if (!parsed) return null
+      items.push(parsed)
+    }
+    return { kind: 'array', items }
+  }
+  if (node?.type === 'ObjectExpression') {
+    const entries: Record<string, ComponentSFCEventInputValue> = {}
+    for (const property of node.properties ?? []) {
+      const key = property.type === 'ObjectProperty' && !property.computed ? readKey(property.key) : null
+      const parsed = property.type === 'ObjectProperty' ? parseEventInput(property.value, script, diagnostics) : null
+      if (!key || !parsed) return null
+      entries[key] = parsed
+    }
+    return { kind: 'object', entries }
+  }
+  diagnostics.push(makeDiagnostic('sfc-event-action-input', 'action.input поддерживает literals, arrays, objects и event(path).', node, script))
+  return null
+}
+
+function parseEventRead(node: any): { kind: 'event', path: string | null } | null {
+  if (!isCall(node, 'event')) return null
+  if ((node.arguments?.length ?? 0) === 0) return { kind: 'event', path: null }
+  const path = node.arguments?.length === 1 ? readLiteralString(node.arguments[0]) : null
+  return path ? { kind: 'event', path } : null
+}
+
+function readComputeFunction(property: any): any | null {
+  if (property?.type === 'ObjectMethod') return property
+  if (property?.type === 'ObjectProperty' && ['FunctionExpression', 'ArrowFunctionExpression'].includes(property.value?.type)) return property.value
+  return null
+}
+
+function computeFunctionSource(node: any, source: string): string {
+  if (node.type !== 'ObjectMethod') return source.slice(node.start, node.end)
+  const params = (node.params ?? []).map((param: any) => source.slice(param.start, param.end)).join(', ')
+  return `function (${params}) ${source.slice(node.body.start, node.body.end)}`
+}
+
+function readPortsEmitCall(node: any): string | null {
+  const callee = node?.type === 'CallExpression' ? node.callee : null
+  const emits = callee?.type === 'MemberExpression' ? callee.object : null
+  return emits?.type === 'MemberExpression'
+    && emits.object?.type === 'Identifier' && emits.object.name === 'ports'
+    && readKey(emits.property) === 'emits'
+    ? readKey(callee.property)
+    : null
+}
+
+function readApiActionCall(node: any): string | null {
+  const callee = node?.type === 'CallExpression' ? node.callee : null
+  if (callee?.type !== 'MemberExpression' || callee.object?.type !== 'Identifier' || callee.object.name !== 'api' || readKey(callee.property) !== 'action') return null
+  return readLiteralString(node.arguments?.[0])
 }
 
 function parseForwardDefinition(

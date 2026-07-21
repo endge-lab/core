@@ -41,6 +41,103 @@ const state = ports.require.state({ process: props.process })
 </template>`
 
 describe('ComponentSFC ports compiler', () => {
+  it('compiles sourced Events with direct Action input mappings', () => {
+    const result = compileComponentSFC(`<script setup lang="ts">
+const ports = definePorts({
+  emits: {
+    rowActivated: event<TableRowActivatedEvent>({
+      from: { ref: 'table', event: 'rowActivated' },
+      action: {
+        identity: 'flight.open-details',
+        input: { id: event('rowId'), row: event('row') },
+      },
+    }),
+  },
+})
+</script>
+<template><Table ref="table" :rows="[]" /></template>`)
+
+    expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
+    expect(result.ir?.script.ports.emits.events[0]).toMatchObject({
+      name: 'rowActivated',
+      from: { ref: 'table', event: 'rowActivated' },
+      forwardedFrom: { ref: 'table', componentTag: 'Table', portName: 'rowActivated' },
+      action: {
+        kind: 'action',
+        identity: 'flight.open-details',
+        input: {
+          kind: 'object',
+          entries: {
+            id: { kind: 'event', path: 'rowId' },
+            row: { kind: 'event', path: 'row' },
+          },
+        },
+      },
+    })
+    expect(result.dependencies.actions).toContain('flight.open-details')
+  })
+
+  it('compiles sandboxed Event effects and rejects a direct self cycle', () => {
+    const valid = compileComponentSFC(`<script setup lang="ts">
+const ports = definePorts({
+  emits: {
+    detailsOpened: event<{ id: string }>(),
+    rowActivated: event<TableRowActivatedEvent>({
+      from: { ref: 'table', event: 'rowActivated' },
+      action: typescript({
+        inputs: { event: event() },
+        compute({ event }, api) {
+          return [
+            api.action('audit.write', { id: event.rowId }),
+            ports.emits.detailsOpened({ id: event.rowId }),
+          ]
+        },
+      }),
+    }),
+  },
+})
+</script>
+<template><Table ref="table" :rows="[]" /></template>`)
+
+    expect(valid.diagnostics.filter(item => item.severity === 'error')).toEqual([])
+    expect(valid.ir?.script.ports.emits.events[1]?.action).toMatchObject({
+      kind: 'typescript',
+      inputs: { event: { kind: 'event', path: null } },
+      emittedEvents: ['detailsOpened'],
+    })
+    expect((valid.ir?.script.ports.emits.events[1]?.action as any).source).toContain('api.emit("detailsOpened",')
+    expect(valid.dependencies.actions).toContain('audit.write')
+
+    const invalid = compileComponentSFC(`<script setup lang="ts">
+const ports = definePorts({ emits: {
+  saved: event<{ id: string }>({
+    action: typescript({ inputs: { event: event() }, compute({ event }) { return ports.emits.saved(event) } }),
+  }),
+} })
+</script><template><Text /></template>`)
+    expect(invalid.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'sfc-event-reaction-self-cycle' }),
+    ]))
+  })
+
+  it('adds the intrinsic Table Event manifest to wildcard forwarding', () => {
+    const result = compileComponentSFC(`<script setup lang="ts">
+const ports = definePorts({ forward: { from: 'table', ports: { emits: '*' } } })
+</script><template><Table ref="table" :rows="[]" /></template>`)
+
+    expect(result.ir?.script.ports.emits.events.map(event => event.name)).toEqual([
+      'rowActivated',
+      'rowContextMenuRequested',
+      'selectionChanged',
+      'sortChanged',
+      'columnVisibilityChanged',
+      'columnPinChanged',
+      'columnOrderChanged',
+      'columnSizeChanged',
+      'pageChanged',
+    ])
+  })
+
   it('forwards all intrinsic public Table Actions with forward wildcard', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 const ports = definePorts({

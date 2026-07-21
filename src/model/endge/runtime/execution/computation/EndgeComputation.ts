@@ -3,6 +3,7 @@ import type {
   ComputationExecutionScope,
   ComputationProgramPayload,
   ComputationSandboxAdapter,
+  ComputationSandboxRequest,
 } from '@/domain/types/computation'
 import type { ProgramArtifact } from '@/domain/types/program/program.types'
 
@@ -33,6 +34,13 @@ export class EndgeComputation {
   public setSandboxAdapter(adapter: ComputationSandboxAdapter | null): void {
     this.sandbox?.dispose?.()
     this.sandbox = adapter
+  }
+
+  /** Executes an already compiler-validated function in the shared isolated sandbox. */
+  public async executeSandbox(request: ComputationSandboxRequest): Promise<unknown> {
+    if (!this.sandbox)
+      throw new ComputationRuntimeError('Computation sandbox adapter is not registered.', request.computationIdentity, 'sandbox-missing')
+    return await this.sandbox.execute(request)
   }
 
   public async run(idOrIdentity: string | number, input: unknown): Promise<unknown> {
