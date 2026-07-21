@@ -373,6 +373,17 @@ defineComposition({
 `)
     expect(withProps.diagnostics).toEqual([])
     expect(withProps.artifact?.runtimes[0]?.props.value).toEqual({ kind: 'literal', value: 1 })
+    const runtime = withProps.artifact?.runtimes[0]
+    expect(runtime?.sourceLocations?.runtime).toEqual({
+      start: expect.any(Number),
+      end: expect.any(Number),
+    })
+    const locations = runtime!.sourceLocations!
+    expect(locations.call.end).toBeLessThan(locations.withProps!.start)
+    expect(locations.withProps).toEqual({
+      start: expect.any(Number),
+      end: expect.any(Number),
+    })
   })
 
   it('compiles public Composition props and explicit nested prop bindings', () => {

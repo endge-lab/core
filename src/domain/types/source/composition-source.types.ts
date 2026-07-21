@@ -76,6 +76,12 @@ export interface CompositionRuntimeDescriptor {
   path: string
   /** Internal path owning RuntimeScope. */
   scopePath: string
+  /** Source offsets used by authoring tools; runtime does not interpret them. */
+  sourceLocations?: {
+    runtime: { start: number, end: number }
+    call: { start: number, end: number }
+    withProps: { start: number, end: number } | null
+  }
   kind: CompositionRuntimeKind
   identity: string
   /** Явный override в месте вызова runtime. */

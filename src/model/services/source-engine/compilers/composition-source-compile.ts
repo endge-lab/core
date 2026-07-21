@@ -581,6 +581,11 @@ function readRuntime(
     name,
     path: name,
     scopePath,
+    sourceLocations: {
+      runtime: sourceRange(raw),
+      call: sourceRange(chain.base),
+      withProps: null,
+    },
     kind,
     identity,
     activationOverride: null,
@@ -662,6 +667,7 @@ function readRuntime(
         diagnostics.push(diagnostic('error', 'composition-props-object', '.withProps(...) принимает object literal.', `runtimes.${name}.withProps`, modifier.call))
         continue
       }
+      descriptor.sourceLocations!.withProps = sourceRange(config)
       descriptor.props = readBindings(config, diagnostics, `runtimes.${name}.withProps`)
       continue
     }
@@ -1163,6 +1169,14 @@ function memberChain(raw: t.Expression): {
     current = unwrapExpression(current.callee.object)
   }
   return t.isCallExpression(current) ? { base: current, modifiers } : null
+}
+
+function sourceRange(node: t.Node): { start: number, end: number } {
+  const start = Math.max(0, Number(node.start ?? 0))
+  return {
+    start,
+    end: Math.max(start, Number(node.end ?? start)),
+  }
 }
 
 function readDataTarget(raw: t.CallExpression['arguments'][number] | undefined): string | null {
