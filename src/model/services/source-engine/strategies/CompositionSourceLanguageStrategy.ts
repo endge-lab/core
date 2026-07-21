@@ -21,7 +21,7 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
     extension: '.endge-composition.ts',
     keywords: [
       'component', 'composition', 'control', 'data', 'defineComposition', 'definePreviewProps', 'defineProps', 'filter', 'filterView', 'fromData', 'fromFilter', 'fromOutput', 'fromStore', 'manual', 'mock', 'onChange',
-      'onMount', 'output', 'query', 'metadata', 'resources', 'scope', 'startup', 'style', ...VALUE_EXPRESSION_FUNCTION_NAMES,
+      'onMount', 'onSuccess', 'output', 'query', 'metadata', 'resources', 'scope', 'startup', 'style', ...VALUE_EXPRESSION_FUNCTION_NAMES,
     ],
     functions: [
       'activateOn', 'component', 'contextual', 'controls', 'debounce', 'fields', 'fromRuntime', 'fromScope', 'injected', 'isolated', 'persist', 'run', 'select', 'slot', 'store', 'storeTo', 'vocab', 'withData', 'withProps', ...VALUE_EXPRESSION_METHOD_NAMES,
@@ -102,4 +102,5 @@ const COMPOSITION_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'fromFilter', kind: 'function', insertText: `fromFilter('filter').fields([])`, detail: 'Filter fields runtime slice binding' },
   { label: 'fromStore', kind: 'function', insertText: `fromStore('path')`, detail: 'Raph store binding' },
   { label: 'onChange', kind: 'function', insertText: `onChange('runtime.output').debounce(200).run('query')`, detail: 'Debounced hook' },
+  { label: 'onSuccess', kind: 'function', insertText: `onSuccess('query').run('dependent-query')`, detail: 'Run after Query succeeds' },
 ]

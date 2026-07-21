@@ -304,6 +304,80 @@ defineComposition({
     ]))
   })
 
+  it('compiles onSuccess hooks into success graph edges and validates their sources', () => {
+    const valid = compileCompositionSource(`
+defineComposition({
+  runtimes: {
+    arrivalPairs: query('arrival-pairs'),
+    arrivalAttributes: query('arrival-attributes'),
+    arrivalGroundHandling: query('arrival-ground-handling'),
+  },
+  hooks: [
+    onMount().run('arrivalPairs'),
+    onSuccess('arrivalPairs').run('arrivalAttributes'),
+    onSuccess('arrivalPairs').run('arrivalGroundHandling'),
+  ],
+})
+`)
+
+    expect(valid.diagnostics).toEqual([])
+    expect(valid.artifact?.hooks).toEqual([
+      { kind: 'mount', target: 'arrivalPairs' },
+      { kind: 'success', runtime: 'arrivalPairs', target: 'arrivalAttributes' },
+      { kind: 'success', runtime: 'arrivalPairs', target: 'arrivalGroundHandling' },
+    ])
+    expect(valid.artifact?.graph.successes).toEqual([
+      {
+        id: 'hook:1:arrivalPairs:success->arrivalAttributes',
+        sourceRuntime: 'arrivalPairs',
+        targetRuntime: 'arrivalAttributes',
+        updateKind: 'run',
+      },
+      {
+        id: 'hook:2:arrivalPairs:success->arrivalGroundHandling',
+        sourceRuntime: 'arrivalPairs',
+        targetRuntime: 'arrivalGroundHandling',
+        updateKind: 'run',
+      },
+    ])
+
+    const invalidSource = compileCompositionSource(`
+defineComposition({
+  runtimes: {
+    filter: filter('schedule'),
+    query: query('search'),
+  },
+  hooks: [
+    onSuccess('filter').debounce(10).run('query'),
+    onSuccess('missing').run('query'),
+  ],
+})
+`)
+    expect(invalidSource.artifact).toBeNull()
+    expect(invalidSource.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'composition-hook-success-source-kind' }),
+      expect.objectContaining({ code: 'composition-hook-success-source' }),
+      expect.objectContaining({ code: 'composition-hook-debounce-kind' }),
+    ]))
+
+    const cycle = compileCompositionSource(`
+defineComposition({
+  runtimes: {
+    first: query('first'),
+    second: query('second'),
+  },
+  hooks: [
+    onSuccess('first').run('second'),
+    onSuccess('second').run('first'),
+  ],
+})
+`)
+    expect(cycle.artifact).toBeNull()
+    expect(cycle.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'composition-binding-cycle' }),
+    ]))
+  })
+
   it('compiles optional custom component construction for Filter view', () => {
     const result = compileCompositionSource(`
 defineComposition({

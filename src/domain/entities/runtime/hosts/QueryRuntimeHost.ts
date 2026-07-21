@@ -250,7 +250,9 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
       }
       const updatedAt = new Date().toISOString()
       this.setContext({ status: 'success', updatedAt })
-      return this.getOutputs() as Record<string, unknown>
+      const outputs = this.getOutputs() as Record<string, unknown>
+      this.emit('run:success', { outputs })
+      return outputs
     }
     catch (error: any) {
       if (sequence !== this._runSequence || error?.name === 'CanceledError' || error?.name === 'AbortError')

@@ -52,6 +52,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   private _storeProviderRuntimeIds = new Map<string, Set<string>>()
   private _ownedStoreRuntimeIds = new Set<string>()
   private _compositionInputBindings = new Map<string, RuntimeHostInputBinding>()
+  private _orchestratedQueries = new Set<string>()
+  private _orchestratedSuccesses = new Set<string>()
   private _mounted = false
 
   public constructor(input: {
@@ -130,8 +132,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       for (const mount of payload.graph.mounts) {
         if (!this._children.has(mount.targetRuntime))
           throw new Error(`[CompositionRuntimeHost] onMount target "${mount.targetRuntime}" is inactive.`)
-        await this._runQuery(mount.targetRuntime)
       }
+      await this._runQueries(payload.graph.mounts.map(mount => mount.targetRuntime))
     }
     catch (error) {
       this.destroy()
@@ -332,6 +334,11 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       this._hookDisposers.get(connection.id)?.()
       this._hookDisposers.delete(connection.id)
     }
+    if ((this.getArtifactPayload()?.graph.successes ?? []).some(connection => connection.sourceRuntime === path)) {
+      const id = this._successHookId(path)
+      this._hookDisposers.get(id)?.()
+      this._hookDisposers.delete(id)
+    }
     for (const publication of this.getArtifactPayload()?.graph.publications ?? []) {
       if (publication.sourceRuntime !== path) continue
       this._publicationDisposers.get(publication.id)?.()
@@ -404,6 +411,12 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     for (const connection of payload.graph.inputs) {
       if (connection.source.kind === 'output')
         this._requireOutputBridge(connection.source.runtime, connection.source.output)
+      else if (connection.source.kind === 'expression') {
+        for (const read of this._collectExpressionReads(connection.source.expression)) {
+          if (read.source === 'composition-output')
+            this._requireOutputBridge(read.parameters?.[0] ?? '', read.parameters?.[1] ?? '')
+        }
+      }
     }
     for (const connection of payload.graph.updates)
       this._requireOutputBridge(connection.sourceRuntime, connection.sourceOutput)
@@ -495,6 +508,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     this._storeRuntimeIds.clear()
     this._storeProviderRuntimeIds.clear()
     this._compositionInputBindings.clear()
+    this._orchestratedQueries.clear()
+    this._orchestratedSuccesses.clear()
     this._mounted = false
     super.destroy()
   }
@@ -905,6 +920,27 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       }))
     }
 
+    const successSources = new Set<string>()
+    for (const connection of payload.graph.successes ?? []) {
+      if (this._children.has(connection.sourceRuntime))
+        successSources.add(connection.sourceRuntime)
+    }
+    for (const sourceRuntime of successSources) {
+      const id = this._successHookId(sourceRuntime)
+      if (this._hookDisposers.has(id))
+        continue
+      const source = this._children.get(sourceRuntime) as unknown as QueryRuntimeHost
+      const runTargets = (): void => {
+        if (this._orchestratedQueries.has(sourceRuntime)) {
+          this._orchestratedSuccesses.add(sourceRuntime)
+          return
+        }
+        void this._runSuccessTargets(sourceRuntime, payload).catch(() => undefined)
+      }
+      source.on('run:success', runTargets)
+      this._hookDisposers.set(id, () => source.off('run:success', runTargets))
+    }
+
     for (const publication of payload.graph.publications) {
       if (this._publicationDisposers.has(publication.id)) continue
       const source = this._children.get(publication.sourceRuntime)
@@ -930,9 +966,40 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     const query = this._children.get(name) as unknown as QueryRuntimeHost | undefined
     if (!query || typeof query.run !== 'function')
       throw new Error(`[CompositionRuntimeHost] Query runtime "${name}" is missing.`)
-    await query.run()
-    const now = new Date().toISOString()
-    this.setContext({ updatedAt: now, lastHookAt: now })
+    this._orchestratedQueries.add(name)
+    this._orchestratedSuccesses.delete(name)
+    try {
+      await query.run()
+      const now = new Date().toISOString()
+      this.setContext({ updatedAt: now, lastHookAt: now })
+      if (this._orchestratedSuccesses.delete(name)) {
+        const payload = this.getArtifactPayload()
+        if (payload)
+          await this._runSuccessTargets(name, payload)
+      }
+    }
+    finally {
+      this._orchestratedQueries.delete(name)
+      this._orchestratedSuccesses.delete(name)
+    }
+  }
+
+  /** Запускает все одновременно готовые Query hooks одним parallel batch. */
+  private async _runQueries(names: string[]): Promise<void> {
+    await Promise.all(names.map(name => this._runQuery(name)))
+  }
+
+  private async _runSuccessTargets(sourceRuntime: string, payload: CompositionProgramPayload): Promise<void> {
+    const targets = [...new Set(
+      (payload.graph.successes ?? [])
+        .filter(connection => connection.sourceRuntime === sourceRuntime && this._children.has(connection.targetRuntime))
+        .map(connection => connection.targetRuntime),
+    )]
+    await this._runQueries(targets)
+  }
+
+  private _successHookId(sourceRuntime: string): string {
+    return `success:${sourceRuntime}`
   }
 
   private _readBinding(binding: CompositionBindingValue): unknown {

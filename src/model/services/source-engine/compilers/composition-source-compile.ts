@@ -176,6 +176,14 @@ export function buildRuntimeGraph(document: CompositionSourceDocument): Composit
         debounceMs: hook.debounceMs,
       }]
     : [])
+  const successes = document.hooks.flatMap((hook, index) => hook.kind === 'success'
+    ? [{
+        id: `hook:${index}:${hook.runtime}:success->${hook.target}`,
+        sourceRuntime: hook.runtime,
+        targetRuntime: hook.target,
+        updateKind: 'run' as const,
+      }]
+    : [])
   const mounts = document.hooks.flatMap(hook => hook.kind === 'mount'
     ? [{ targetRuntime: hook.target, updateKind: 'run' as const }]
     : [])
@@ -188,7 +196,7 @@ export function buildRuntimeGraph(document: CompositionSourceDocument): Composit
       targetPath,
     }))
   )))
-  return { inputs, dataInputs, updates, publications, mounts }
+  return { inputs, dataInputs, updates, successes, publications, mounts }
 }
 
 function findDefineComposition(ast: t.File): t.CallExpression | null {
@@ -873,11 +881,11 @@ function readHooks(
       return
     const chain = memberChain(element)
     if (!chain || !t.isIdentifier(chain.base.callee)) {
-      diagnostics.push(diagnostic('error', 'composition-hook-shape', 'Hook должен начинаться с onMount() или onChange(path).', `hooks.${index}`, element))
+      diagnostics.push(diagnostic('error', 'composition-hook-shape', 'Hook должен начинаться с onMount(), onChange(path) или onSuccess(runtime).', `hooks.${index}`, element))
       return
     }
     const root = chain.base.callee.name
-    if (root !== 'onMount' && root !== 'onChange') {
+    if (root !== 'onMount' && root !== 'onChange' && root !== 'onSuccess') {
       diagnostics.push(diagnostic('error', 'composition-hook-kind', `Hook "${root}" не поддерживается.`, `hooks.${index}`, chain.base))
       return
     }
@@ -887,6 +895,10 @@ function readHooks(
       if (modifier.name === 'run')
         target = readStringArgument(modifier.call, 0) ?? ''
       else if (modifier.name === 'debounce') {
+        if (root !== 'onChange') {
+          diagnostics.push(diagnostic('error', 'composition-hook-debounce-kind', '.debounce(...) поддерживается только для onChange.', `hooks.${index}`, modifier.call))
+          continue
+        }
         const value = modifier.call.arguments[0]
         debounceMs = value && t.isNumericLiteral(value) ? value.value : Number.NaN
       }
@@ -907,6 +919,20 @@ function readHooks(
         return
       }
       hooks.push({ kind: 'mount', target })
+      return
+    }
+    if (root === 'onSuccess') {
+      const runtime = readStringArgument(chain.base, 0) ?? ''
+      const source = runtimes.find(item => item.name === runtime)
+      if (!source) {
+        diagnostics.push(diagnostic('error', 'composition-hook-success-source', `onSuccess source "${runtime}" не найден.`, `hooks.${index}`, chain.base))
+        return
+      }
+      if (source.kind !== 'query') {
+        diagnostics.push(diagnostic('error', 'composition-hook-success-source-kind', 'onSuccess может наблюдать только Query runtime.', `hooks.${index}`, chain.base))
+        return
+      }
+      hooks.push({ kind: 'success', runtime, target })
       return
     }
     if (!Number.isInteger(debounceMs) || debounceMs < 0 || debounceMs > 60000) {
@@ -1119,7 +1145,7 @@ function validateRuntimeCycles(
       : propEdges)
   }
   for (const hook of hooks) {
-    if (hook.kind === 'change')
+    if (hook.kind === 'change' || hook.kind === 'success')
       edges.set(hook.target, [...(edges.get(hook.target) ?? []), hook.runtime])
   }
   const visiting = new Set<string>()

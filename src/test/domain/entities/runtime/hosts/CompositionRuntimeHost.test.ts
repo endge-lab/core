@@ -17,7 +17,7 @@ import { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHo
 import { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
 import { StoreRuntimeHost } from '@/domain/entities/runtime/hosts/StoreRuntimeHost'
 import { compileFilterSource } from '@/model/services/source-engine/compilers/filter-source-compile'
-import { buildRuntimeGraph } from '@/model/services/source-engine/compilers/composition-source-compile'
+import { buildRuntimeGraph, compileCompositionSource } from '@/model/services/source-engine/compilers/composition-source-compile'
 import { Endge } from '@/model/endge/kernel/endge'
 import { materializeCompositionPreviewProps } from '@/model/endge/runtime/execution/endge-composition'
 
@@ -126,6 +126,130 @@ describe('Composition runtime session', () => {
     await vi.advanceTimersByTimeAsync(20)
     expect(run).toHaveBeenCalledTimes(2)
     expect(Endge.runtime.getRuntimeHosts()).toEqual([])
+    await session.unmount()
+  })
+
+  it('runs mount roots and successful sibling targets in parallel batches', async () => {
+    const names = [
+      'arrivalPairs',
+      'departurePairs',
+      'arrivalAttributes',
+      'arrivalGroundHandling',
+      'departureAttributes',
+      'departureGroundHandling',
+    ]
+    const gates = new Map(names.map(name => [name, deferred<void>()]))
+    const started: string[] = []
+    const propsAtStart = new Map<string, Readonly<Record<string, unknown>>>()
+    vi.spyOn(QueryRuntimeHost.prototype, 'run').mockImplementation(async function (this: QueryRuntimeHost) {
+      const name = String(this.meta.instance)
+      started.push(name)
+      propsAtStart.set(name, this.getProps())
+      await gates.get(name)?.promise
+      if (name === 'arrivalPairs') {
+        Raph.set(this.outputPath('raw'), [
+          { arrivalLeg: { id: 'SU100' } },
+          { arrivalLeg: { id: 'SU100' } },
+          { arrivalLeg: { id: 'SU200' } },
+          { arrivalLeg: null },
+        ])
+      }
+      if (name === 'departurePairs') {
+        Raph.set(this.outputPath('raw'), [
+          { departureLeg: { id: 'SU300' } },
+          { departureLeg: { id: 'SU400' } },
+        ])
+      }
+      const outputs = this.getOutputs() as Record<string, unknown>
+      this.emit('run:success', { outputs })
+      return outputs
+    })
+
+    const queries = names.map((name, index) => {
+      const query = new RQuery()
+      query.id = 100 + index
+      query.identity = `query-${name}`
+      query.name = name
+      Endge.domain.addQuery(query)
+      return query
+    })
+    const composition = new RComposition()
+    composition.id = 200
+    composition.identity = 'parallel-success-hooks'
+    composition.name = 'Parallel success hooks'
+    Endge.domain.addComposition(composition)
+
+    const queryPayload: QueryProgramPayload = {
+      type: 'query-rest', sourceVersion: 2, endpoint: '', query: '',
+      props: [{ key: 'legIds', type: 'String', optional: true, array: true }],
+      requestBody: null, outputs: [],
+    }
+    const compositionPayload = compileCompositionSource(`
+defineComposition({
+  runtimes: {
+    arrivalPairs: query('query-arrivalPairs'),
+    departurePairs: query('query-departurePairs'),
+    arrivalAttributes: query('query-arrivalAttributes').withProps({
+      legIds: fromOutput('arrivalPairs', 'raw').map(get('arrivalLeg.id')).compact().uniq(),
+    }),
+    arrivalGroundHandling: query('query-arrivalGroundHandling').withProps({
+      legIds: fromOutput('arrivalPairs', 'raw').map(get('arrivalLeg.id')).compact().uniq(),
+    }),
+    departureAttributes: query('query-departureAttributes').withProps({
+      legIds: fromOutput('departurePairs', 'raw').map(get('departureLeg.id')).compact().uniq(),
+    }),
+    departureGroundHandling: query('query-departureGroundHandling').withProps({
+      legIds: fromOutput('departurePairs', 'raw').map(get('departureLeg.id')).compact().uniq(),
+    }),
+  },
+  hooks: [
+    onMount().run('arrivalPairs'),
+    onMount().run('departurePairs'),
+    onSuccess('arrivalPairs').run('arrivalAttributes'),
+    onSuccess('arrivalPairs').run('arrivalGroundHandling'),
+    onSuccess('departurePairs').run('departureAttributes'),
+    onSuccess('departurePairs').run('departureGroundHandling'),
+  ],
+})
+`).artifact as CompositionProgramPayload
+    Endge.program.beginCompile('test')
+    queries.forEach(query => Endge.program.addArtifact(artifact('query', query.id, query.identity, queryPayload)))
+    Endge.program.addArtifact(artifact('composition', composition.id, composition.identity, compositionPayload))
+
+    let mounted = false
+    const mounting = Endge.runtime.composition.mount(composition.identity).then((session) => {
+      mounted = true
+      return session
+    })
+    await vi.waitFor(() => expect(started).toEqual(['arrivalPairs', 'departurePairs']))
+
+    gates.get('arrivalPairs')?.resolve(undefined)
+    await vi.waitFor(() => expect(started).toEqual([
+      'arrivalPairs',
+      'departurePairs',
+      'arrivalAttributes',
+      'arrivalGroundHandling',
+    ]))
+    expect(propsAtStart.get('arrivalAttributes')).toEqual({ legIds: ['SU100', 'SU200'] })
+    expect(propsAtStart.get('arrivalGroundHandling')).toEqual({ legIds: ['SU100', 'SU200'] })
+
+    gates.get('departurePairs')?.resolve(undefined)
+    await vi.waitFor(() => expect(started).toEqual([
+      'arrivalPairs',
+      'departurePairs',
+      'arrivalAttributes',
+      'arrivalGroundHandling',
+      'departureAttributes',
+      'departureGroundHandling',
+    ]))
+    expect(propsAtStart.get('departureAttributes')).toEqual({ legIds: ['SU300', 'SU400'] })
+    expect(propsAtStart.get('departureGroundHandling')).toEqual({ legIds: ['SU300', 'SU400'] })
+    expect(mounted).toBe(false)
+
+    for (const name of names.slice(2))
+      gates.get(name)?.resolve(undefined)
+    const session = await mounting
+    expect(mounted).toBe(true)
     await session.unmount()
   })
 
@@ -676,4 +800,14 @@ function artifact<T>(
     diagnostics: [], dependencies: [], capabilities: ['compilable', 'executable'],
     metadata: { self: metadata, nodes: [] }, payload,
   }
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+  return { promise, resolve, reject }
 }

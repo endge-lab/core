@@ -33,6 +33,8 @@ describe('QueryRuntimeHost', () => {
         return second.promise
       })
     const host = createHost()
+    const success = vi.fn()
+    host.on('run:success', success)
 
     const firstRun = host.run()
     const secondRun = host.run()
@@ -47,6 +49,8 @@ describe('QueryRuntimeHost', () => {
     expect(host.getOutput('raw')).toBe('new')
     expect(host.context.status).toBe('success')
     expect(host.getOutputs()).toEqual({ raw: 'new' })
+    expect(success).toHaveBeenCalledTimes(1)
+    expect(success).toHaveBeenCalledWith({ outputs: { raw: 'new' } })
   })
 
   it('updates declared props without store-key remount restrictions', () => {

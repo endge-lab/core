@@ -107,6 +107,7 @@ export interface CompositionRuntimeChildHandle {
 export type CompositionHook
   = | { kind: 'mount', target: string }
     | { kind: 'change', runtime: string, output: string, target: string, debounceMs: number }
+    | { kind: 'success', runtime: string, target: string }
 
 export interface CompositionRuntimeOutputDescriptor {
   key: string
@@ -177,6 +178,14 @@ export interface CompositionRuntimeUpdateConnection {
   debounceMs: number
 }
 
+/** Запуск target Query после успешного выполнения source Query. */
+export interface CompositionRuntimeSuccessConnection {
+  id: string
+  sourceRuntime: string
+  targetRuntime: string
+  updateKind: 'run'
+}
+
 /** Публикация output runtime-ноды в Composition data. */
 export interface CompositionRuntimePublicationConnection {
   id: string
@@ -197,6 +206,8 @@ export interface CompositionRuntimeGraph {
   inputs: CompositionRuntimeInputConnection[]
   dataInputs?: CompositionRuntimeDataConnection[]
   updates: CompositionRuntimeUpdateConnection[]
+  /** Optional для чтения artifacts, скомпилированных до появления onSuccess. */
+  successes?: CompositionRuntimeSuccessConnection[]
   publications: CompositionRuntimePublicationConnection[]
   mounts: CompositionRuntimeMountConnection[]
 }
