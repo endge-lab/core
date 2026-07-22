@@ -21,10 +21,10 @@ export class DataViewSourceLanguageStrategy implements SourceLanguageStrategy {
     extension: '.endge-data-view.ts',
     keywords: [
       'auto', 'collectionByKey', 'convert', 'converter', 'dataView', 'defineDataView', 'field',
-      'from', 'full', 'incremental', 'join', 'map', 'output', 'path', 'pick', 'spread',
+      'from', 'full', 'incremental', 'join', 'map', 'output', 'path', 'pick', 'select', 'spread',
       'template', 'transform', ...VALUE_EXPRESSION_FUNCTION_NAMES,
     ],
-    functions: ['as', 'auto', 'by', 'collectionByKey', 'convert', 'converter', 'dataView', 'find', 'from', 'full', 'join', 'map', 'pick', ...VALUE_EXPRESSION_METHOD_NAMES],
+    functions: ['as', 'auto', 'by', 'collectionByKey', 'convert', 'converter', 'dataView', 'find', 'from', 'full', 'join', 'map', 'pick', 'select', ...VALUE_EXPRESSION_METHOD_NAMES],
     properties: ['incremental', 'input', 'left', 'manual', 'metadata', 'mode', 'output', 'pipeline', 'right', 'steps', 'tools'],
   })
 
@@ -111,6 +111,21 @@ const DATA_VIEW_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
 })`,
     detail: 'Pipeline transform steps',
   },
+  {
+    label: 'pipeline.select',
+    kind: 'snippet',
+    insertText: `defineDataView({
+  mode: 'pipeline',
+
+  steps: [
+    select({
+      rows: path('items'),
+    }),
+    select(path('rows')),
+  ],
+})`,
+    detail: 'Последовательные whole-value преобразования',
+  },
   { label: 'transform', kind: 'function', insertText: `transform(input, tools) {\n  return input\n}`, detail: 'Manual transform' },
   { label: 'steps', kind: 'property', insertText: `steps: [\n  from('items').as('item'),\n  map({})\n],`, detail: 'Pipeline steps' },
   { label: 'output', kind: 'property', insertText: `output: {\n  rows: path('items'),\n},`, detail: 'Object projection над целым input' },
@@ -122,6 +137,7 @@ const DATA_VIEW_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'dataView', kind: 'function', insertText: `dataView('data-view-identity')`, detail: 'Ссылка на доменный DataView' },
   { label: 'join', kind: 'function', insertText: `join('attrs').by({ left: 'item.id', right: 'itemId', as: 'attrs' })`, detail: 'Связка по ключам' },
   { label: 'map', kind: 'function', insertText: `map({\n  id: path('item.id'),\n})`, detail: 'Формирует output row' },
+  { label: 'select', kind: 'function', insertText: `select(path('items'))`, detail: 'Преобразует весь результат предыдущего step' },
   { label: 'spread', kind: 'function', insertText: `...spread('item')`, detail: 'Копирует объект в output row перед переопределениями' },
   { label: 'path', kind: 'function', insertText: `path('item.id')`, detail: 'Читает путь из scope' },
   { label: 'template', kind: 'function', insertText: `template('{item.code}/{item.number}')`, detail: 'String template из scope' },

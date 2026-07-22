@@ -1,5 +1,6 @@
 export * from './codegen.types'
 export * from './document.types'
+export * from './document-create.type'
 export * from './document-draft.type'
 export * from './domain-export.type'
 export * from './entity-management.type'

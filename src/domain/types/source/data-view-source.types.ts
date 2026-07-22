@@ -31,6 +31,12 @@ export type DataViewPipelineStep
   = | DataViewFromStep
     | DataViewJoinStep
     | DataViewMapStep
+    | DataViewSelectStep
+
+export interface DataViewSelectStep {
+  type: 'select'
+  expression: SourceExpressionIR
+}
 
 export interface DataViewFromStep {
   type: 'from'

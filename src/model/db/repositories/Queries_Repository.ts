@@ -4,6 +4,7 @@ import type { AxiosInstance } from 'axios'
 export interface QueriesPayloadFields {
   identity: string
   displayName: string
+  folder?: string | number | null
   source?: string
   sourceVersion?: number
   author?: string

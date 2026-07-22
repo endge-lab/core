@@ -1,4 +1,5 @@
 import type { DomainDocumentType } from '@/domain/types/document/document.types'
+import type { DocumentCreateRequest, DocumentCreateResult } from '@/domain/types/document/document-create.type'
 import { normalizeEntityManagement } from '@/domain/types/document/entity-management.type'
 import type { EndgeWorkspaceDefinition } from '@/domain/types/document/workspace.types'
 import type {
@@ -1776,6 +1777,50 @@ export class EndgeSchemaStorage extends EndgeModule {
     return null
   }
 
+  /** Проверяет, свободен ли identity в Payload-коллекции выбранного типа. */
+  public async isDocumentIdentityAvailable(
+    documentType: DomainDocumentType,
+    identity: string,
+  ): Promise<boolean> {
+    const normalizedIdentity = identity.trim()
+    if (!normalizedIdentity)
+      return false
+
+    return (await this.findPayloadDocumentByIdentity(documentType, normalizedIdentity)) == null
+  }
+
+  /**
+   * Создаёт новый документ и не разрешает create-flow обновлять существующий identity.
+   * Обычный save/upsert остаётся отдельным editing-контрактом.
+   */
+  public async createDocument(request: DocumentCreateRequest): Promise<DocumentCreateResult> {
+    const identity = request.identity.trim()
+    if (!identity)
+      throw new Error('Document identity is required.')
+
+    if (!(await this.isDocumentIdentityAvailable(request.documentType, identity)))
+      throw new Error(`Документ "${identity}" уже существует`)
+
+    if (request.mode === 'payload') {
+      const payloadIdentity = String(request.payload.identity ?? '').trim()
+      if (payloadIdentity && payloadIdentity !== identity)
+        throw new Error('Identity запроса не совпадает с identity Payload-документа')
+
+      await this.upsertPayloadDocumentRaw(request.documentType, {
+        ...request.payload,
+        identity,
+      })
+    }
+    else {
+      await this.saveDocument(identity, request.documentType, { model: request.model })
+    }
+
+    return {
+      documentType: request.documentType,
+      identity,
+    }
+  }
+
   /**
    * Разрешает Document Payload Id For Folder Patch.
    */
@@ -2542,13 +2587,14 @@ export class EndgeSchemaStorage extends EndgeModule {
         saved = await repos.components.update((existing as any).id, payloadData)
       }
       else {
-        const rootFolder = await repos.folders.findByIdentity('root-components')
-        const folderId = rootFolder?.id
+        const folderId = await this.resolveFolderPayloadId(
+          component.folderId ?? (component as any).group ?? 'root-components',
+        )
         saved = await repos.components.create({
           identity: payloadData.identity,
           displayName: payloadData.displayName,
           ...payloadData,
-          folder: folderId,
+          folder: folderId ?? undefined,
           schema: ReflectComponentToPlain(component) ?? {},
         })
       }
@@ -2591,9 +2637,13 @@ export class EndgeSchemaStorage extends EndgeModule {
       const plain = Serialize.toPlain(query) as Record<string, any>
       const queryIdentity = String((query as any).identity ?? query.id ?? '')
       const existing = await repos.queries.findByIdentity(queryIdentity)
+      const folder = await this.resolveFolderPayloadId(
+        query.folderId ?? relationToId(existing?.folder) ?? 'root-queries',
+      )
       const payload: Partial<QueriesPayloadFields> & Pick<QueriesPayloadFields, 'identity' | 'displayName'> = {
         identity: queryIdentity,
         displayName: query.name ?? query.id,
+        folder,
         source: plain.source,
         sourceVersion: plain.sourceVersion,
         meta: (query.meta && typeof query.meta === 'object' && !Array.isArray(query.meta)) ? query.meta : {},
@@ -2903,15 +2953,10 @@ export class EndgeSchemaStorage extends EndgeModule {
         throw new Error(`Окружение не найдено: ${documentId}`)
       const plain = environment.toPlain() as { id: string, name: string, folder?: string | null, managedBy?: import('@/domain/types/document').ManagedBy, managedById?: string | null, configuration?: any, meta?: Record<string, unknown> }
       const environmentIdentity = String((environment as any).identity ?? plain.id ?? environment.id ?? '')
-      let folderId: number | string | undefined
       const existing = await repos.environments.findByIdentity(environmentIdentity)
-      if (existing && ((existing as any).folderId ?? (existing as any).folder) != null) {
-        folderId = (existing as any).folderId ?? (existing as any).folder
-      }
-      else {
-        const folderDoc = await repos.folders.findByIdentity('root-environments')
-        folderId = folderDoc?.id
-      }
+      const folderId = await this.resolveFolderPayloadId(
+        environment.folderId ?? (plain as any).folderId ?? relationToId(existing?.folder) ?? 'root-environments',
+      ) ?? undefined
       const saved = await repos.environments.upsert({
         identity: environmentIdentity,
         displayName: plain.name,
@@ -2931,15 +2976,10 @@ export class EndgeSchemaStorage extends EndgeModule {
         throw new Error(`Тенант не найден: ${documentId}`)
       const plain = tenant.toPlain() as { id: string, name: string, displayName?: string, code?: string, description?: string | null, configuration?: any, meta?: Record<string, unknown> }
       const tenantIdentity = String((tenant as any).identity ?? plain.id ?? tenant.id ?? '')
-      let folderId: number | string | undefined
       const existing = await repos.tenants.findByIdentity(tenantIdentity)
-      if (existing && ((existing as any).folderId ?? (existing as any).folder) != null) {
-        folderId = (existing as any).folderId ?? (existing as any).folder
-      }
-      else {
-        const folderDoc = await repos.folders.findByIdentity('root-tenants')
-        folderId = folderDoc?.id
-      }
+      const folderId = await this.resolveFolderPayloadId(
+        tenant.folderId ?? (plain as any).folderId ?? relationToId(existing?.folder) ?? 'root-tenants',
+      ) ?? undefined
       const saved = await repos.tenants.upsert({
         identity: tenantIdentity,
         displayName: plain.displayName ?? plain.name ?? tenantIdentity,
@@ -2959,15 +2999,10 @@ export class EndgeSchemaStorage extends EndgeModule {
         throw new Error(`Политика не найдена: ${documentId}`)
       const plain = policy.toPlain() as { id: string, name: string, description?: string | null, folder?: string | null, meta?: Record<string, unknown> }
       const policyIdentity = String((policy as any).identity ?? plain.id ?? policy.id ?? '')
-      let folderId: number | string | undefined
       const existing = await repos.policies.findByIdentity(policyIdentity)
-      if (existing && ((existing as any).folderId ?? (existing as any).folder) != null) {
-        folderId = (existing as any).folderId ?? (existing as any).folder
-      }
-      else {
-        const folderDoc = await repos.folders.findByIdentity('root-policies')
-        folderId = folderDoc?.id
-      }
+      const folderId = await this.resolveFolderPayloadId(
+        policy.folderId ?? (plain as any).folderId ?? relationToId(existing?.folder) ?? 'root-policies',
+      ) ?? undefined
       const saved = await repos.policies.upsert({
         identity: policyIdentity,
         displayName: plain.name,
@@ -3032,15 +3067,10 @@ export class EndgeSchemaStorage extends EndgeModule {
         meta?: Record<string, unknown>
       }
       const vocabIdentity = String((vocab as any).identity ?? plain.id ?? vocab.id ?? '')
-      let folderId: number | string | undefined
       const existing = await repos.vocabs.findByIdentity(vocabIdentity)
-      if (existing && ((existing as any).folderId ?? (existing as any).folder) != null) {
-        folderId = (existing as any).folderId ?? (existing as any).folder
-      }
-      else {
-        const folderDoc = await repos.folders.findByIdentity('root-vocabs')
-        folderId = folderDoc?.id
-      }
+      const folderId = await this.resolveFolderPayloadId(
+        vocab.folderId ?? plain.folderId ?? relationToId(existing?.folder) ?? 'root-vocabs',
+      ) ?? undefined
       const saved = await repos.vocabs.upsert({
         identity: vocabIdentity,
         displayName: plain.displayName ?? plain.name ?? vocabIdentity,
@@ -3078,18 +3108,15 @@ export class EndgeSchemaStorage extends EndgeModule {
         meta?: Record<string, unknown>
       }
       const profileIdentity = String((profile as any).identity ?? plain.identity ?? plain.id ?? '')
-      let folderId: number | string | undefined
       const existing = await repos.authProfiles.findByIdentity(profileIdentity)
-      if (existing && ((existing as any).folderId ?? (existing as any).folder) != null) {
-        folderId = (existing as any).folderId ?? (existing as any).folder
-      }
-      else {
-        folderId = await this.ensurePayloadRootFolder({
-          identity: 'root-auth-profiles',
-          displayName: 'Аутентификация',
-          entityType: 'auth-profiles',
-        }) ?? undefined
-      }
+      const requestedFolder = profile.folderId ?? plain.folderId ?? relationToId(existing?.folder)
+      const folderId = requestedFolder != null
+        ? await this.resolveFolderPayloadId(requestedFolder) ?? undefined
+        : await this.ensurePayloadRootFolder({
+            identity: 'root-auth-profiles',
+            displayName: 'Аутентификация',
+            entityType: 'auth-profiles',
+          }) ?? undefined
       const saved = await repos.authProfiles.upsert({
         identity: profileIdentity,
         displayName: plain.displayName ?? plain.name ?? profileIdentity,
@@ -3122,15 +3149,10 @@ export class EndgeSchemaStorage extends EndgeModule {
         folderId?: string | number | null
       }
       const bundleIdentity = String((bundle as any).identity ?? plain.id ?? bundle.id ?? '')
-      let folderId: number | string | undefined
       const existing = await repos.i18nBundles.findByIdentity(bundleIdentity)
-      if (existing && ((existing as any).folderId ?? (existing as any).folder) != null) {
-        folderId = (existing as any).folderId ?? (existing as any).folder
-      }
-      else {
-        const folderDoc = await repos.folders.findByIdentity('root-i18n-bundles')
-        folderId = folderDoc?.id
-      }
+      const folderId = await this.resolveFolderPayloadId(
+        bundle.folderId ?? plain.folderId ?? relationToId(existing?.folder) ?? 'root-i18n-bundles',
+      ) ?? undefined
       const saved = await repos.i18nBundles.upsert({
         identity: bundleIdentity,
         displayName: plain.displayName ?? plain.name ?? bundleIdentity,
@@ -3150,15 +3172,10 @@ export class EndgeSchemaStorage extends EndgeModule {
         throw new Error(`Шаблон страницы не найден: ${documentId}`)
       const plain = tpl.toPlain()
       const pageTemplateIdentity = String((tpl as any).identity ?? plain.id ?? tpl.id ?? '')
-      let folderId: number | string | undefined
       const existing = await repos.pageTemplates.findByIdentity(pageTemplateIdentity)
-      if (existing && ((existing as any).folderId ?? (existing as any).folder) != null) {
-        folderId = (existing as any).folderId ?? (existing as any).folder
-      }
-      else {
-        const folderDoc = await repos.folders.findByIdentity('root-page-templates')
-        folderId = folderDoc?.id
-      }
+      const folderId = await this.resolveFolderPayloadId(
+        tpl.folderId ?? relationToId(existing?.folder) ?? 'root-page-templates',
+      ) ?? undefined
       const saved = await repos.pageTemplates.upsert({
         identity: pageTemplateIdentity,
         displayName: plain.name,
@@ -3179,15 +3196,10 @@ export class EndgeSchemaStorage extends EndgeModule {
       if (!page)
         throw new Error(`Страница не найдена: ${documentId}`)
       const plain = page.toPlain()
-      let folderId: number | string | undefined
       const existing = await repos.pages.findByIdentity(plain.identity)
-      if (existing && ((existing as any).folderId ?? (existing as any).folder) != null) {
-        folderId = (existing as any).folderId ?? (existing as any).folder
-      }
-      else {
-        const folderDoc = await repos.folders.findByIdentity('root-pages')
-        folderId = folderDoc?.id
-      }
+      const folderId = await this.resolveFolderPayloadId(
+        page.folderId ?? relationToId(existing?.folder) ?? 'root-pages',
+      ) ?? undefined
 
       const templateRef = (plain as any).templateId ?? (plain as any).templateIdentity ?? null
       let templatePayloadId: number | string
@@ -3288,15 +3300,10 @@ export class EndgeSchemaStorage extends EndgeModule {
         throw new Error(`Навигация не найдена: ${documentId}`)
       const plain = nav.toPlain()
       const navigationIdentity = String((nav as any).identity ?? plain.id ?? nav.id ?? '')
-      let folderId: number | string | undefined
       const existing = await repos.navigations.findByIdentity(navigationIdentity)
-      if (existing && ((existing as any).folderId ?? (existing as any).folder) != null) {
-        folderId = (existing as any).folderId ?? (existing as any).folder
-      }
-      else {
-        const folderDoc = await repos.folders.findByIdentity('root-navigations')
-        folderId = folderDoc?.id
-      }
+      const folderId = await this.resolveFolderPayloadId(
+        nav.folderId ?? plain.folderId ?? relationToId(existing?.folder) ?? 'root-navigations',
+      ) ?? undefined
       const saved = await repos.navigations.upsert({
         identity: navigationIdentity,
         displayName: plain.name,

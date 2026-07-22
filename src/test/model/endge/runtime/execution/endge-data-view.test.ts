@@ -63,6 +63,29 @@ const INPUT = {
 }
 
 describe('EndgeDataView pipeline transform', () => {
+  it('passes each select result to the next step and returns the last result', () => {
+    const output = dataView.runSource(`
+defineDataView({
+  mode: 'pipeline',
+  steps: [
+    select({
+      rows: path('items').where(match({ active: true })),
+    }),
+    select(path('rows').map(pick(['id', 'name']))),
+  ],
+})
+`, {
+      items: [
+        { id: 1, name: 'First', active: true },
+        { id: 2, name: 'Second', active: false },
+      ],
+    })
+
+    expect(output).toEqual([
+      { id: 1, name: 'First' },
+    ])
+  })
+
   it('returns a root expression result without an object projection wrapper', () => {
     const output = dataView.runSource(`
 defineDataView({

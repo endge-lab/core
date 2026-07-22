@@ -179,6 +179,9 @@ export class EndgeDataView {
     tools: DataViewRunTools,
     context: { children?: ProgramArtifact[] },
   ): unknown {
+    if (artifact.steps.some(step => step.type === 'select'))
+      return this._runSelectPipeline(artifact, input)
+
     let rows: unknown[] = []
     let alias = 'item'
     const joins: Array<{ source: string, left: string, right: string, as: string }> = []
@@ -215,6 +218,29 @@ export class EndgeDataView {
     }
 
     return rows
+  }
+
+  /** Последовательно вычисляет whole-value steps; каждый select получает результат предыдущего. */
+  private _runSelectPipeline(artifact: DataViewProgramPayload, input: unknown): unknown {
+    let value = input
+
+    for (const step of artifact.steps) {
+      if (step.type !== 'select')
+        throw new Error('[DataView] select pipeline cannot contain structural steps.')
+
+      value = evaluateSourceExpression(step.expression, {
+        scope: value,
+        onWarning: Endge.isConfigured
+          ? warning => Endge.diagnostics.warn(`[DataView] ${warning.message}`, {
+              scope: { name: 'endge.runtime.data-view' },
+              phase: 'runtime',
+              eventName: 'endge.expression.warning',
+            })
+          : undefined,
+      })
+    }
+
+    return value
   }
 
   /** Собирает базовый output для map step из spread-источников. */

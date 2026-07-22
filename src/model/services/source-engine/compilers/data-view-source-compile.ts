@@ -206,6 +206,7 @@ function parseDocument(
       'steps',
     ))
   }
+  validatePipelineStepKinds(steps, diagnostics)
 
   if (incremental.mode === 'collection-by-key' && !isRowLocalPipeline(steps, incremental.key)) {
     diagnostics.push(createDiagnostic(
@@ -300,11 +301,11 @@ function readManualTransform(
 function readPipelineSteps(node: t.ArrayExpression, source: string, diagnostics: DiagnosticDraft[]): DataViewPipelineStep[] {
   const steps: DataViewPipelineStep[] = []
 
-  for (const element of node.elements) {
+  for (const [index, element] of node.elements.entries()) {
     if (!element || !t.isExpression(element))
       continue
 
-    const step = readPipelineStep(unwrapExpression(element), source, diagnostics)
+    const step = readPipelineStep(unwrapExpression(element), source, diagnostics, index)
     if (step)
       steps.push(step)
   }
@@ -312,8 +313,16 @@ function readPipelineSteps(node: t.ArrayExpression, source: string, diagnostics:
   return steps
 }
 
-function readPipelineStep(node: t.Expression, source: string, diagnostics: DiagnosticDraft[]): DataViewPipelineStep | null {
+function readPipelineStep(
+  node: t.Expression,
+  source: string,
+  diagnostics: DiagnosticDraft[],
+  index: number,
+): DataViewPipelineStep | null {
   const expression = unwrapExpression(node)
+
+  if (t.isCallExpression(expression) && isIdentifierCallee(expression, 'select'))
+    return readSelectStep(expression, diagnostics, index)
 
   const from = readFromStep(expression, source, diagnostics)
   if (from)
@@ -330,9 +339,54 @@ function readPipelineStep(node: t.Expression, source: string, diagnostics: Diagn
   diagnostics.push(createDiagnostic(
     'warning',
     'data-view-source-step-unsupported',
-    'Pipeline step пропущен: поддерживаются только from(...), join(...).by(...) и map({...}).',
+    'Pipeline step пропущен: поддерживаются select(...), from(...), join(...).by(...) и map({...}).',
+    `steps.${index}`,
   ))
   return null
+}
+
+function readSelectStep(
+  node: t.Expression,
+  diagnostics: DiagnosticDraft[],
+  index: number,
+): DataViewPipelineStep | null {
+  if (!t.isCallExpression(node) || !isIdentifierCallee(node, 'select'))
+    return null
+
+  const argument = node.arguments[0]
+  if (node.arguments.length !== 1 || !argument || !t.isExpression(argument)) {
+    diagnostics.push(createDiagnostic(
+      'error',
+      'data-view-source-select-expression-missing',
+      'select(...) требует одно ValueExpression.',
+      `steps.${index}`,
+    ))
+    return null
+  }
+
+  const expression = compileSourceExpression(
+    unwrapExpression(argument),
+    diagnostics,
+    `steps.${index}.select`,
+  )
+  return expression ? { type: 'select', expression } : null
+}
+
+function validatePipelineStepKinds(
+  steps: DataViewPipelineStep[],
+  diagnostics: DiagnosticDraft[],
+): void {
+  const hasSelect = steps.some(step => step.type === 'select')
+  const hasStructural = steps.some(step => step.type !== 'select')
+  if (!hasSelect || !hasStructural)
+    return
+
+  diagnostics.push(createDiagnostic(
+    'error',
+    'data-view-source-pipeline-step-kind-mixed',
+    'Pipeline DataView не может смешивать select(...) с from(...), join(...) или map(...).',
+    'steps',
+  ))
 }
 
 function readFromStep(node: t.Expression, source: string, diagnostics: DiagnosticDraft[]) {
