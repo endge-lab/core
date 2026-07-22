@@ -105,9 +105,14 @@ export interface CompositionRuntimeChildHandle {
   runtime: RuntimeHost<any, any>
 }
 
+/** Источник изменения для управляемого повторного запуска Query. */
+export type CompositionChangeSource
+  = | { kind: 'runtime-output', runtime: string, output: string }
+    | { kind: 'prop', path: string }
+
 export type CompositionHook
   = | { kind: 'mount', target: string }
-    | { kind: 'change', runtime: string, output: string, target: string, debounceMs: number }
+    | { kind: 'change', source: CompositionChangeSource, target: string, debounceMs: number }
     | { kind: 'success', runtime: string, target: string }
 
 export interface CompositionRuntimeOutputDescriptor {
@@ -172,8 +177,7 @@ export interface CompositionRuntimeDataConnection {
 /** Нормализованный trigger логического update runtime-ноды. */
 export interface CompositionRuntimeUpdateConnection {
   id: string
-  sourceRuntime: string
-  sourceOutput: string
+  source: CompositionChangeSource
   targetRuntime: string
   updateKind: 'run'
   debounceMs: number

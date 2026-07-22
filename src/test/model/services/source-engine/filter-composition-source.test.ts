@@ -310,7 +310,12 @@ defineComposition({
 	    expect(valid.diagnostics).toEqual([])
 	    expect(valid.artifact?.hooks).toHaveLength(2)
 	    expect(valid.artifact?.graph).toMatchObject({
-	      updates: [{ sourceRuntime: 'filter', sourceOutput: 'request', targetRuntime: 'query', updateKind: 'run', debounceMs: 200 }],
+	      updates: [{
+	        source: { kind: 'runtime-output', runtime: 'filter', output: 'request' },
+	        targetRuntime: 'query',
+	        updateKind: 'run',
+	        debounceMs: 200,
+	      }],
 	      mounts: [{ targetRuntime: 'query', updateKind: 'run' }],
 	    })
 	    expect(valid.artifact?.runtimes.find(runtime => runtime.name === 'dateFilter')).toMatchObject({
@@ -425,6 +430,72 @@ defineComposition({
     expect(cycle.artifact).toBeNull()
     expect(cycle.diagnostics).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'composition-binding-cycle' }),
+    ]))
+  })
+
+  it('compiles public prop change hooks into explicit run graph edges', () => {
+    const valid = compileCompositionSource(`
+defineComposition({
+  props: defineProps({
+    filter: field('Object'),
+  }),
+  runtimes: {
+    arrivalPairs: query('arrival-pairs').withProps({
+      filter: prop('filter.arrival'),
+    }),
+    departurePairs: query('departure-pairs').withProps({
+      filter: prop('filter.departure'),
+    }),
+  },
+  hooks: [
+    onChange(prop('filter.arrival')).debounce(200).run('arrivalPairs'),
+    onChange(prop('filter.departure')).run('departurePairs'),
+  ],
+})
+`)
+
+    expect(valid.diagnostics).toEqual([])
+    expect(valid.artifact?.hooks).toEqual([
+      { kind: 'change', source: { kind: 'prop', path: 'filter.arrival' }, target: 'arrivalPairs', debounceMs: 200 },
+      { kind: 'change', source: { kind: 'prop', path: 'filter.departure' }, target: 'departurePairs', debounceMs: 200 },
+    ])
+    expect(valid.artifact?.graph.updates).toEqual([
+      {
+        id: 'hook:0:prop(filter.arrival)->arrivalPairs',
+        source: { kind: 'prop', path: 'filter.arrival' },
+        targetRuntime: 'arrivalPairs',
+        updateKind: 'run',
+        debounceMs: 200,
+      },
+      {
+        id: 'hook:1:prop(filter.departure)->departurePairs',
+        source: { kind: 'prop', path: 'filter.departure' },
+        targetRuntime: 'departurePairs',
+        updateKind: 'run',
+        debounceMs: 200,
+      },
+    ])
+
+    const invalid = compileCompositionSource(`
+defineComposition({
+  props: defineProps({
+    filter: field('Object'),
+  }),
+  runtimes: {
+    filterRuntime: filter('schedule'),
+    query: query('search'),
+  },
+  hooks: [
+    onChange(prop('missing.value')).run('query'),
+    onChange(fromOutput('filterRuntime', 'request')).run('query'),
+  ],
+})
+`)
+
+    expect(invalid.artifact).toBeNull()
+    expect(invalid.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'composition-hook-prop-missing' }),
+      expect.objectContaining({ code: 'composition-hook-change-source' }),
     ]))
   })
 

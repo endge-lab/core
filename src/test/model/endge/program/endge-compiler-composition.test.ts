@@ -330,6 +330,56 @@ defineComposition({
     expect(Endge.compiler.buildComposition(parent).status).toBe('valid')
   })
 
+  it('links public prop change hooks as explicit Query updates', () => {
+    const query = new RQuery()
+    query.id = 28
+    query.identity = 'arrival-pairs'
+    query.name = 'Arrival pairs'
+    query.sourceVersion = 2
+    query.source = `
+defineQuery({
+  kind: 'rest',
+  request: {
+    endpoint: 'https://example.test',
+    path: '/arrival-pairs',
+    method: 'POST',
+  },
+})
+`
+    Endge.domain.addQuery(query)
+    Endge.compiler.buildQuery(query)
+
+    const composition = new RComposition()
+    composition.id = 29
+    composition.identity = 'groundhandling-query-general'
+    composition.name = 'Ground handling queries'
+    composition.source = `
+defineComposition({
+  props: defineProps({
+    filter: field('Object'),
+  }),
+  runtimes: {
+    arrivalPairs: query('arrival-pairs'),
+  },
+  hooks: [
+    onChange(prop('filter.arrival')).run('arrivalPairs'),
+  ],
+})
+`
+
+    const artifact = Endge.compiler.buildComposition(composition)
+
+    expect(artifact.status).toBe('valid')
+    expect(artifact.payload.graph.updates).toEqual([
+      expect.objectContaining({
+        source: { kind: 'prop', path: 'filter.arrival' },
+        targetRuntime: 'arrivalPairs',
+        updateKind: 'run',
+        debounceMs: 200,
+      }),
+    ])
+  })
+
   it('keeps preview fixture failures non-blocking and indexes RMock dependencies', () => {
     const stringType = new RType('String')
     stringType.identity = 'String'

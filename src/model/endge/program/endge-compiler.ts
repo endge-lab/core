@@ -1995,14 +1995,27 @@ export class EndgeCompiler extends EndgeModule {
     for (const hook of payload.hooks) {
       if (hook.kind !== 'change')
         continue
-      const source = payload.runtimes.find(item => item.name === hook.runtime)
-      const outputExists = runtimeHasOutput(source, hook.output)
+      const hookSource = hook.source
+      if (hookSource.kind === 'prop') {
+        const prop = hookSource.path.split('.')[0]
+        if (!payload.props.some(item => item.key === prop)) {
+          diagnostics.push({
+            severity: 'error',
+            code: 'composition-hook-prop-missing',
+            message: `Hook source prop "${prop}" не существует.`,
+            sourcePath: `hooks.prop.${hookSource.path}`,
+          })
+        }
+        continue
+      }
+      const source = payload.runtimes.find(item => item.name === hookSource.runtime)
+      const outputExists = runtimeHasOutput(source, hookSource.output)
       if (!outputExists) {
         diagnostics.push({
           severity: 'error',
           code: 'composition-hook-output-missing',
-          message: `Hook source "${hook.runtime}.${hook.output}" не существует.`,
-          sourcePath: `hooks.${hook.runtime}.${hook.output}`,
+          message: `Hook source "${hookSource.runtime}.${hookSource.output}" не существует.`,
+          sourcePath: `hooks.${hookSource.runtime}.${hookSource.output}`,
         })
       }
     }

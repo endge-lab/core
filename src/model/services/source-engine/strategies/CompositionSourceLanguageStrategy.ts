@@ -102,6 +102,6 @@ const COMPOSITION_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'metadataOf', kind: 'function', insertText: `metadataOf('runtime')`, detail: 'All runtime metadata; pass a second argument to select one namespace' },
   { label: 'fromFilter', kind: 'function', insertText: `fromFilter('filter').fields([])`, detail: 'Filter fields runtime slice binding' },
   { label: 'fromStore', kind: 'function', insertText: `fromStore('path')`, detail: 'Raph store binding' },
-  { label: 'onChange', kind: 'function', insertText: `onChange('runtime.output').debounce(200).run('query')`, detail: 'Debounced hook' },
+  { label: 'onChange', kind: 'function', insertText: `onChange('runtime.output').debounce(200).run('query')`, detail: 'Run Query after a runtime output or public prop changes' },
   { label: 'onSuccess', kind: 'function', insertText: `onSuccess('query').run('dependent-query')`, detail: 'Run after Query succeeds' },
 ]

@@ -42,6 +42,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   private _scopes = new Map<string, RuntimeScope>()
   private _runtimeHandles = new Map<string, CompositionRuntimeActivationHandle>()
   private _outputBridges = new Map<string, string>()
+  private _updateSourcePaths = new Map<string, string>()
   private _outputBridgeDisposers = new Map<string, () => void>()
   private _hookDisposers = new Map<string, () => void>()
   private _publicationDisposers = new Map<string, () => void>()
@@ -427,8 +428,15 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         }
       }
     }
-    for (const connection of payload.graph.updates)
-      this._requireOutputBridge(connection.sourceRuntime, connection.sourceOutput)
+    for (const connection of payload.graph.updates) {
+      const sourcePath = connection.source.kind === 'runtime-output'
+        ? this._requireOutputBridge(connection.source.runtime, connection.source.output)
+        : this._materializeBinding('__hooks__', connection.id, {
+            kind: 'expression',
+            expression: { type: 'read', source: 'prop', path: connection.source.path },
+          })
+      this._updateSourcePaths.set(connection.id, sourcePath)
+    }
     for (const connection of payload.graph.publications)
       this._requireOutputBridge(connection.sourceRuntime, connection.sourceOutput)
     for (const output of payload.outputs) {
@@ -509,6 +517,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     for (const dispose of this._outputBridgeDisposers.values()) dispose()
     this._outputBridgeDisposers.clear()
     this._outputBridges.clear()
+    this._updateSourcePaths.clear()
     for (const dispose of this._hookDisposers.values()) dispose()
     this._hookDisposers.clear()
     for (const dispose of this._publicationDisposers.values()) dispose()
@@ -917,13 +926,13 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   private _bindHooks(payload: CompositionProgramPayload): void {
     for (const connection of payload.graph.updates) {
       if (this._hookDisposers.has(connection.id)) continue
-      const source = this._children.get(connection.sourceRuntime)
       const target = this._children.get(connection.targetRuntime)
-      if (!source || !target)
+      const sourcePath = this._updateSourcePaths.get(connection.id)
+      if (!sourcePath || !target)
         continue
       this._hookDisposers.set(connection.id, target.bindUpdate({
         id: connection.id,
-        sourcePath: this._requireOutputBridge(connection.sourceRuntime, connection.sourceOutput),
+        sourcePath,
         update: { kind: connection.updateKind },
         policy: { debounceMs: connection.debounceMs, distinct: 'structural' },
       }))

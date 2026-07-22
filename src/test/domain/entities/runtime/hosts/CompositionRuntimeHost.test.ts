@@ -437,6 +437,106 @@ defineComposition({
     expect(Endge.runtime.getRuntimeHosts()).toEqual([])
   })
 
+  it('reruns a nested Composition Query when its reactive public prop changes', async () => {
+    vi.useFakeTimers()
+    const run = vi.spyOn(QueryRuntimeHost.prototype, 'run').mockResolvedValue({})
+
+    const filter = new RFilter()
+    filter.id = 40
+    filter.identity = 'groundhandling-filter'
+    filter.name = 'Ground handling filter'
+    const query = new RQuery()
+    query.id = 41
+    query.identity = 'arrival-pairs'
+    query.name = 'Arrival pairs'
+    const inner = new RComposition()
+    inner.id = 42
+    inner.identity = 'groundhandling-query-general'
+    inner.name = 'Ground handling queries'
+    const outer = new RComposition()
+    outer.id = 43
+    outer.identity = 'groundhandling-control-page'
+    outer.name = 'Ground handling page'
+    Endge.domain.addFilter(filter)
+    Endge.domain.addQuery(query)
+    Endge.domain.addComposition(inner)
+    Endge.domain.addComposition(outer)
+
+    const filterPayload = compileFilterSource(`
+defineFilter({
+  fields: {
+    search: field('String').default(''),
+  },
+  outputs: {
+    request: output().json(({ value }) => ({
+      arrival: { search: value('search') },
+    })),
+  },
+})
+`).artifact!
+    const queryPayload: QueryProgramPayload = {
+      type: 'query-rest', sourceVersion: 2, endpoint: '', query: '',
+      props: [{ key: 'filter', type: 'Object', optional: false, array: false }],
+      requestBody: null, outputs: [],
+    }
+    const innerPayload = compileCompositionSource(`
+defineComposition({
+  props: defineProps({
+    filter: field('Object'),
+  }),
+  runtimes: {
+    arrivalPairs: query('arrival-pairs').withProps({
+      filter: prop('filter.arrival'),
+    }),
+  },
+  hooks: [
+    onMount().run('arrivalPairs'),
+    onChange(prop('filter.arrival')).debounce(20).run('arrivalPairs'),
+  ],
+})
+`).artifact!
+    const outerPayload = compileCompositionSource(`
+defineComposition({
+  runtimes: {
+    filters: filter('groundhandling-filter'),
+    requests: composition('groundhandling-query-general').withProps({
+      filter: fromOutput('filters', 'request'),
+    }),
+  },
+})
+`).artifact!
+
+    Endge.program.beginCompile('test')
+    Endge.program.addArtifact(artifact('filter', filter.id, filter.identity, filterPayload))
+    Endge.program.addArtifact(artifact('query', query.id, query.identity, queryPayload))
+    Endge.program.addArtifact(artifact('composition', inner.id, inner.identity, innerPayload))
+    Endge.program.addArtifact(artifact('composition', outer.id, outer.identity, outerPayload))
+
+    const session = await Endge.runtime.composition.mount(outer.identity)
+    const filterRuntime = session.host.getChild('filters') as FilterRuntimeHost
+    const nested = session.host.getChild('requests') as CompositionRuntimeHost
+    const arrivalPairs = nested.getChild('arrivalPairs') as QueryRuntimeHost
+
+    expect(nested.getProps()).toEqual({ filter: { arrival: { search: '' } } })
+    expect(arrivalPairs.getProps()).toEqual({ filter: { search: '' } })
+    expect(run).toHaveBeenCalledTimes(1)
+
+    await filterRuntime.action('set').run({ key: 'search', value: 'SU' })
+
+    expect(nested.getProps()).toEqual({ filter: { arrival: { search: 'SU' } } })
+    expect(arrivalPairs.getProps()).toEqual({ filter: { search: 'SU' } })
+    expect(run).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(20)
+    expect(run).toHaveBeenCalledTimes(2)
+
+    await filterRuntime.action('set').run({ key: 'search', value: 'SU' })
+    await vi.advanceTimersByTimeAsync(20)
+    expect(run).toHaveBeenCalledTimes(2)
+
+    await session.unmount()
+  })
+
   it('passes public props into nested and standalone Compositions before their onMount queries run', async () => {
     const run = vi.spyOn(QueryRuntimeHost.prototype, 'run').mockResolvedValue({})
     const query = new RQuery()
@@ -689,7 +789,12 @@ defineFilter({
     ],
     hooks: [
       { kind: 'mount', target: 'query' },
-      { kind: 'change', runtime: 'filter', output: 'request', target: 'query', debounceMs: 20 },
+      {
+        kind: 'change',
+        source: { kind: 'runtime-output', runtime: 'filter', output: 'request' },
+        target: 'query',
+        debounceMs: 20,
+      },
     ],
     outputs: [{ key: 'filter', runtime: 'filter' }],
   })

@@ -123,7 +123,9 @@ export function compileCompositionSource(source: string, sourceVersion = 1): Com
     scopes[0].runtimes = runtimes.filter(item => item.scopePath === 'scope_default').map(item => item.path)
     scopes[0].children = scopes.filter(item => item.parentPath === 'scope_default').map(item => item.path)
     const runtimeNames = new Set(runtimes.map(item => item.name))
-    const hooks = hooksNode ? readHooks(hooksNode, runtimeNames, runtimes, diagnostics) : []
+    const hooks = hooksNode
+      ? readHooks(hooksNode, runtimeNames, new Set(props.map(prop => prop.key)), runtimes, diagnostics)
+      : []
     const scopeNames = new Set(scopes.filter(item => item.path !== 'scope_default').map(item => item.path))
     const outputs = outputsNode ? readOutputs(outputsNode, runtimeNames, scopeNames, diagnostics) : []
 
@@ -168,9 +170,8 @@ export function buildRuntimeGraph(document: CompositionSourceDocument): Composit
   })))
   const updates = document.hooks.flatMap((hook, index) => hook.kind === 'change'
     ? [{
-        id: `hook:${index}:${hook.runtime}.${hook.output}->${hook.target}`,
-        sourceRuntime: hook.runtime,
-        sourceOutput: hook.output,
+        id: `hook:${index}:${formatChangeSource(hook.source)}->${hook.target}`,
+        source: hook.source,
         targetRuntime: hook.target,
         updateKind: 'run' as const,
         debounceMs: hook.debounceMs,
@@ -880,6 +881,7 @@ function readBindings(
 function readHooks(
   node: t.ArrayExpression,
   runtimeNames: Set<string>,
+  propNames: Set<string>,
   runtimes: CompositionRuntimeDescriptor[],
   diagnostics: DiagnosticDraft[],
 ): CompositionHook[] {
@@ -947,17 +949,61 @@ function readHooks(
       diagnostics.push(diagnostic('error', 'composition-hook-debounce', 'debounce должен быть целым числом от 0 до 60000.', `hooks.${index}`, element))
       return
     }
-    const path = readStringArgument(chain.base, 0) ?? ''
-    const dot = path.indexOf('.')
-    const runtime = dot > 0 ? path.slice(0, dot) : ''
-    const output = dot > 0 ? path.slice(dot + 1) : ''
-    if (!runtimeNames.has(runtime) || !output) {
-      diagnostics.push(diagnostic('error', 'composition-hook-path', `onChange path "${path}" должен иметь вид runtime.output.`, `hooks.${index}`, chain.base))
-      return
-    }
-    hooks.push({ kind: 'change', runtime, output, target, debounceMs })
+    const source = readChangeSource(chain.base, runtimeNames, propNames, diagnostics, `hooks.${index}`)
+    if (source)
+      hooks.push({ kind: 'change', source, target, debounceMs })
   })
   return hooks
+}
+
+/** Разбирает поддерживаемый источник onChange без расширения hooks до произвольных выражений. */
+function readChangeSource(
+  call: t.CallExpression,
+  runtimeNames: Set<string>,
+  propNames: Set<string>,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+): Extract<CompositionHook, { kind: 'change' }>['source'] | null {
+  const argument = call.arguments[0]
+  if (call.arguments.length !== 1 || !argument || !t.isExpression(argument)) {
+    diagnostics.push(diagnostic('error', 'composition-hook-change-source', 'onChange принимает runtime.output или prop(path).', sourcePath, call))
+    return null
+  }
+
+  const expression = unwrapExpression(argument)
+  if (t.isStringLiteral(expression)) {
+    const dot = expression.value.indexOf('.')
+    const runtime = dot > 0 ? expression.value.slice(0, dot) : ''
+    const output = dot > 0 ? expression.value.slice(dot + 1) : ''
+    if (!runtimeNames.has(runtime) || !output) {
+      diagnostics.push(diagnostic('error', 'composition-hook-path', `onChange path "${expression.value}" должен иметь вид runtime.output.`, sourcePath, call))
+      return null
+    }
+    return { kind: 'runtime-output', runtime, output }
+  }
+
+  if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'prop' })) {
+    const path = readStringArgument(expression, 0) ?? ''
+    const root = path.split('.')[0]
+    if (expression.arguments.length !== 1 || !path) {
+      diagnostics.push(diagnostic('error', 'composition-hook-prop-path', 'onChange(prop(path)) требует один непустой строковый path.', sourcePath, expression))
+      return null
+    }
+    if (!propNames.has(root)) {
+      diagnostics.push(diagnostic('error', 'composition-hook-prop-missing', `onChange(prop(...)) ссылается на необъявленный Composition prop "${root}".`, sourcePath, expression))
+      return null
+    }
+    return { kind: 'prop', path }
+  }
+
+  diagnostics.push(diagnostic('error', 'composition-hook-change-source', 'onChange принимает runtime.output или prop(path).', sourcePath, argument))
+  return null
+}
+
+function formatChangeSource(source: Extract<CompositionHook, { kind: 'change' }>['source']): string {
+  return source.kind === 'runtime-output'
+    ? `${source.runtime}.${source.output}`
+    : `prop(${source.path})`
 }
 
 function readOutputs(
@@ -1153,8 +1199,10 @@ function validateRuntimeCycles(
       : propEdges)
   }
   for (const hook of hooks) {
-    if (hook.kind === 'change' || hook.kind === 'success')
+    if (hook.kind === 'success')
       edges.set(hook.target, [...(edges.get(hook.target) ?? []), hook.runtime])
+    else if (hook.kind === 'change' && hook.source.kind === 'runtime-output')
+      edges.set(hook.target, [...(edges.get(hook.target) ?? []), hook.source.runtime])
   }
   const visiting = new Set<string>()
   const visited = new Set<string>()
