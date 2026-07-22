@@ -2499,7 +2499,37 @@ export class EndgeSchemaStorage extends EndgeModule {
   }
 
   /**
-   * Сохраняет один документ в Payload по типу: дергает нужный репозиторий и upsert.
+   * Ищет сохраняемый Payload-документ по identity, с которым он был открыт.
+   */
+  private async _findPayloadDocumentForSave(
+    repository: { findByIdentity: (identity: string) => Promise<any> },
+    identity: string,
+    previousIdentity?: string,
+  ): Promise<any | null> {
+    const persistedIdentity = String(previousIdentity ?? '').trim() || identity
+    return repository.findByIdentity(persistedIdentity)
+  }
+
+  /**
+   * Обновляет найденный по исходному identity документ или создаёт новый.
+   */
+  private async _upsertPayloadDocumentForSave(
+    repository: {
+      findByIdentity: (identity: string) => Promise<any>
+      create: (data: any) => Promise<any>
+      update: (id: number | string, data: any) => Promise<any>
+    },
+    data: { identity: string } & Record<string, any>,
+    previousIdentity?: string,
+  ): Promise<any> {
+    const existing = await this._findPayloadDocumentForSave(repository, data.identity, previousIdentity)
+    return existing
+      ? repository.update(existing.id, data)
+      : repository.create(data)
+  }
+
+  /**
+   * Сохраняет один документ через соответствующий Payload-репозиторий.
    */
   public async saveDocument(
     documentId: string | number,
@@ -2581,7 +2611,11 @@ export class EndgeSchemaStorage extends EndgeModule {
       }
       const payloadData = ReflectComponentToPayloadData(component, componentIdentityToId, converterIdentityToId)
       const componentIdentity = String((component as any).identity ?? component.id ?? '')
-      const existing = await repos.components.findByIdentity(componentIdentity)
+      const existing = await this._findPayloadDocumentForSave(
+        repos.components,
+        componentIdentity,
+        opts?.previousIdentity,
+      )
       let saved: any = null
       if (existing) {
         saved = await repos.components.update((existing as any).id, payloadData)
@@ -2607,10 +2641,14 @@ export class EndgeSchemaStorage extends EndgeModule {
       if (!component)
         throw new Error(`SFC-компонент не найден: ${documentId}`)
 
-      const existing = await repos.componentSFCs.findByIdentity(component.identity)
+      const existing = await this._findPayloadDocumentForSave(
+        repos.componentSFCs,
+        component.identity,
+        opts?.previousIdentity,
+      )
       const fallbackFolder = existing?.folder ?? await resolveDefaultComponentFolder(repos)
       const folder = component.folderId ?? relationToId(fallbackFolder) ?? null
-      const saved = await repos.componentSFCs.upsert({
+      const payload = {
         identity: component.identity,
         tag: normalizeOptionalComponentSFCTag(component.tag),
         displayName: component.displayName ?? component.name ?? component.identity,
@@ -2621,7 +2659,10 @@ export class EndgeSchemaStorage extends EndgeModule {
         meta: (component.meta && typeof component.meta === 'object' && !Array.isArray(component.meta)) ? component.meta : {},
         active: component.active ?? true,
         author: component.author ?? undefined,
-      })
+      }
+      const saved = existing
+        ? await repos.componentSFCs.update(existing.id, payload)
+        : await repos.componentSFCs.create(payload)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -2636,7 +2677,11 @@ export class EndgeSchemaStorage extends EndgeModule {
         throw new Error(`Запрос не найден: ${documentId}`)
       const plain = Serialize.toPlain(query) as Record<string, any>
       const queryIdentity = String((query as any).identity ?? query.id ?? '')
-      const existing = await repos.queries.findByIdentity(queryIdentity)
+      const existing = await this._findPayloadDocumentForSave(
+        repos.queries,
+        queryIdentity,
+        opts?.previousIdentity,
+      )
       const folder = await this.resolveFolderPayloadId(
         query.folderId ?? relationToId(existing?.folder) ?? 'root-queries',
       )
@@ -2660,10 +2705,14 @@ export class EndgeSchemaStorage extends EndgeModule {
       if (!dataView)
         throw new Error(`DataView не найден: ${documentId}`)
 
-      const existing = await repos.dataViews.findByIdentity(dataView.identity)
+      const existing = await this._findPayloadDocumentForSave(
+        repos.dataViews,
+        dataView.identity,
+        opts?.previousIdentity,
+      )
       const fallbackFolder = existing?.folder ?? await resolveDefaultFolderByIdentity(repos, 'root-data-views')
       const folder = dataView.folderId ?? relationToId(fallbackFolder) ?? null
-      const saved = await repos.dataViews.upsert({
+      const payload = {
         identity: String(dataView.identity ?? documentId),
         displayName: dataView.displayName ?? dataView.name ?? String(dataView.identity ?? documentId),
         description: dataView.description ?? null,
@@ -2673,7 +2722,10 @@ export class EndgeSchemaStorage extends EndgeModule {
         meta: (dataView.meta && typeof dataView.meta === 'object' && !Array.isArray(dataView.meta)) ? dataView.meta : {},
         active: dataView.active ?? true,
         author: dataView.author ?? undefined,
-      })
+      }
+      const saved = existing
+        ? await repos.dataViews.update(existing.id, payload)
+        : await repos.dataViews.create(payload)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -2683,10 +2735,14 @@ export class EndgeSchemaStorage extends EndgeModule {
       if (!composition)
         throw new Error(`Composition не найдена: ${documentId}`)
 
-      const existing = await repos.compositions.findByIdentity(composition.identity)
+      const existing = await this._findPayloadDocumentForSave(
+        repos.compositions,
+        composition.identity,
+        opts?.previousIdentity,
+      )
       const fallbackFolder = existing?.folder ?? await resolveDefaultFolderByIdentity(repos, 'root-compositions')
       const folder = composition.folderId ?? relationToId(fallbackFolder) ?? null
-      const saved = await repos.compositions.upsert({
+      const payload = {
         identity: String(composition.identity ?? documentId),
         displayName: composition.displayName ?? composition.name ?? String(composition.identity ?? documentId),
         description: composition.description ?? null,
@@ -2698,7 +2754,10 @@ export class EndgeSchemaStorage extends EndgeModule {
         meta: (composition.meta && typeof composition.meta === 'object' && !Array.isArray(composition.meta)) ? composition.meta : {},
         active: composition.active ?? true,
         author: composition.author ?? undefined,
-      })
+      }
+      const saved = existing
+        ? await repos.compositions.update(existing.id, payload)
+        : await repos.compositions.create(payload)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -2708,7 +2767,11 @@ export class EndgeSchemaStorage extends EndgeModule {
       if (!store)
         throw new Error(`Store не найден: ${documentId}`)
 
-      const existing = await repos.stores.findByIdentity(store.identity)
+      const existing = await this._findPayloadDocumentForSave(
+        repos.stores,
+        store.identity,
+        opts?.previousIdentity,
+      )
       const fallbackFolder = existing?.folder ?? await resolveDefaultFolderByIdentity(repos, 'root-stores')
       const folder = store.folderId ?? relationToId(fallbackFolder) ?? null
       const payload = {
@@ -2725,7 +2788,9 @@ export class EndgeSchemaStorage extends EndgeModule {
       const storageId = store.id
       const saved = !this.isMalformedPayloadDocumentId(storageId)
         ? await repos.stores.update(storageId, payload)
-        : await repos.stores.upsert(payload)
+        : existing
+          ? await repos.stores.update(existing.id, payload)
+          : await repos.stores.create(payload)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -2735,7 +2800,11 @@ export class EndgeSchemaStorage extends EndgeModule {
       if (!mock)
         throw new Error(`Mock не найден: ${documentId}`)
 
-      const existing = await repos.mocks.findByIdentity(mock.identity)
+      const existing = await this._findPayloadDocumentForSave(
+        repos.mocks,
+        mock.identity,
+        opts?.previousIdentity,
+      )
       const fallbackFolder = existing?.folder ?? await resolveDefaultFolderByIdentity(repos, 'root-mocks')
       const folder = mock.folderId ?? relationToId(fallbackFolder) ?? null
       const payload = {
@@ -2754,7 +2823,9 @@ export class EndgeSchemaStorage extends EndgeModule {
       const storageId = mock.id
       const saved = !this.isMalformedPayloadDocumentId(storageId)
         ? await repos.mocks.update(storageId, payload)
-        : await repos.mocks.upsert(payload)
+        : existing
+          ? await repos.mocks.update(existing.id, payload)
+          : await repos.mocks.create(payload)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -2764,7 +2835,11 @@ export class EndgeSchemaStorage extends EndgeModule {
       if (!computation)
         throw new Error(`Вычисление не найдено: ${documentId}`)
 
-      const existing = await repos.computations.findByIdentity(computation.identity)
+      const existing = await this._findPayloadDocumentForSave(
+        repos.computations,
+        computation.identity,
+        opts?.previousIdentity,
+      )
       const requestedFolder = computation.folderId ?? relationToId(existing?.folder) ?? null
       const folder = requestedFolder != null
         ? await this.resolveFolderPayloadId(requestedFolder)
@@ -2793,7 +2868,9 @@ export class EndgeSchemaStorage extends EndgeModule {
       const storageId = computation.id
       const saved = !this.isMalformedPayloadDocumentId(storageId)
         ? await repos.computations.update(storageId, payload)
-        : await repos.computations.upsert(payload)
+        : existing
+          ? await repos.computations.update(existing.id, payload)
+          : await repos.computations.create(payload)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -2822,7 +2899,11 @@ export class EndgeSchemaStorage extends EndgeModule {
 
       const actionIdentity = String((action as any).identity ?? plain.identity ?? action.id ?? '')
       let folderId: number | string | undefined
-      const existing = await repos.actions.findByIdentity(actionIdentity)
+      const existing = await this._findPayloadDocumentForSave(
+        repos.actions,
+        actionIdentity,
+        opts?.previousIdentity,
+      )
 
       if (existing && ((existing as any).folderId ?? (existing as any).folder) != null) {
         folderId = (existing as any).folderId ?? (existing as any).folder
@@ -2835,7 +2916,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         folderId = folderDoc?.id
       }
 
-      const saved = await repos.actions.upsert({
+      const payload = {
         identity: actionIdentity,
         displayName: String(plain.displayName ?? plain.name ?? actionIdentity),
         description: plain.description ?? null,
@@ -2849,7 +2930,10 @@ export class EndgeSchemaStorage extends EndgeModule {
         active: action.active !== false,
         meta: normalizeEntityMeta(plain.meta),
         ...(action.author != null && action.author !== '' && { author: action.author }),
-      })
+      }
+      const saved = existing
+        ? await repos.actions.update(existing.id, payload)
+        : await repos.actions.create(payload)
 
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
@@ -2860,7 +2944,7 @@ export class EndgeSchemaStorage extends EndgeModule {
       if (!parameter)
         throw new Error(`Параметр не найден: ${documentId}`)
       const plain = parameter.toPlain()
-      const saved = await repos.parameters.upsert({
+      const saved = await this._upsertPayloadDocumentForSave(repos.parameters, {
         identity: plain.identity,
         displayName: plain.displayName,
         description: plain.description,
@@ -2870,7 +2954,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         fields: plain.fields,
         runtimeFilters: (plain as any).runtimeFilters,
         meta: normalizeEntityMeta(plain.meta),
-      })
+      }, opts?.previousIdentity)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -2886,7 +2970,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         active: f.active !== false,
         converterIdentities: (f.converterIdentities ?? []).map((id: string) => ({ identity: id })),
       }))
-      const saved = await repos.filters.upsert({
+      const saved = await this._upsertPayloadDocumentForSave(repos.filters, {
         identity: plain.identity,
         displayName: plain.displayName,
         folder: folderId as number | string | undefined,
@@ -2896,7 +2980,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         source: String(plain.source ?? ''),
         sourceVersion: Number(plain.sourceVersion ?? 1) || 1,
         meta: (plain.meta && typeof plain.meta === 'object' && !Array.isArray(plain.meta)) ? plain.meta : {},
-      })
+      }, opts?.previousIdentity)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -2908,7 +2992,11 @@ export class EndgeSchemaStorage extends EndgeModule {
       const plain = converter.toPlain()
       const converterIdentity = String((converter as any).identity ?? plain.id ?? converter.id ?? '')
       let folderId: number | string | undefined
-      const existing = await repos.converters.findByIdentity(converterIdentity)
+      const existing = await this._findPayloadDocumentForSave(
+        repos.converters,
+        converterIdentity,
+        opts?.previousIdentity,
+      )
       if (existing && (((existing as any).folderId ?? existing.folder) != null)) {
         folderId = (existing as any).folderId ?? existing.folder
       }
@@ -2916,7 +3004,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         const folderDoc = await repos.folders.findByIdentity('root-converters')
         folderId = folderDoc?.id
       }
-      const saved = await repos.converters.upsert({
+      const payload = {
         identity: converterIdentity,
         displayName: plain.name,
         description: plain.description ?? undefined,
@@ -2924,7 +3012,10 @@ export class EndgeSchemaStorage extends EndgeModule {
         managedById: plain.managedById,
         folder: folderId,
         meta: normalizeEntityMeta(plain.meta),
-      })
+      }
+      const saved = existing
+        ? await repos.converters.update(existing.id, payload)
+        : await repos.converters.create(payload)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -2935,14 +3026,14 @@ export class EndgeSchemaStorage extends EndgeModule {
         throw new Error(`Интеграция не найдена: ${documentId}`)
       const plain = integration.toPlain()
       const integrationIdentity = String((integration as any).identity ?? plain.id ?? integration.id ?? '')
-      const saved = await repos.integrations.upsert({
+      const saved = await this._upsertPayloadDocumentForSave(repos.integrations, {
         identity: integrationIdentity,
         displayName: plain.name,
         description: plain.description ?? undefined,
         managedBy: plain.managedBy,
         managedById: plain.managedById,
         meta: normalizeEntityMeta(plain.meta),
-      })
+      }, opts?.previousIdentity)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -2953,11 +3044,15 @@ export class EndgeSchemaStorage extends EndgeModule {
         throw new Error(`Окружение не найдено: ${documentId}`)
       const plain = environment.toPlain() as { id: string, name: string, folder?: string | null, managedBy?: import('@/domain/types/document').ManagedBy, managedById?: string | null, configuration?: any, meta?: Record<string, unknown> }
       const environmentIdentity = String((environment as any).identity ?? plain.id ?? environment.id ?? '')
-      const existing = await repos.environments.findByIdentity(environmentIdentity)
+      const existing = await this._findPayloadDocumentForSave(
+        repos.environments,
+        environmentIdentity,
+        opts?.previousIdentity,
+      )
       const folderId = await this.resolveFolderPayloadId(
         environment.folderId ?? (plain as any).folderId ?? relationToId(existing?.folder) ?? 'root-environments',
       ) ?? undefined
-      const saved = await repos.environments.upsert({
+      const payload = {
         identity: environmentIdentity,
         displayName: plain.name,
         managedBy: plain.managedBy,
@@ -2965,7 +3060,10 @@ export class EndgeSchemaStorage extends EndgeModule {
         folder: folderId,
         configuration: plain.configuration,
         meta: normalizeEntityMeta(plain.meta),
-      })
+      }
+      const saved = existing
+        ? await repos.environments.update(existing.id, payload)
+        : await repos.environments.create(payload)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -2976,11 +3074,15 @@ export class EndgeSchemaStorage extends EndgeModule {
         throw new Error(`Тенант не найден: ${documentId}`)
       const plain = tenant.toPlain() as { id: string, name: string, displayName?: string, code?: string, description?: string | null, configuration?: any, meta?: Record<string, unknown> }
       const tenantIdentity = String((tenant as any).identity ?? plain.id ?? tenant.id ?? '')
-      const existing = await repos.tenants.findByIdentity(tenantIdentity)
+      const existing = await this._findPayloadDocumentForSave(
+        repos.tenants,
+        tenantIdentity,
+        opts?.previousIdentity,
+      )
       const folderId = await this.resolveFolderPayloadId(
         tenant.folderId ?? (plain as any).folderId ?? relationToId(existing?.folder) ?? 'root-tenants',
       ) ?? undefined
-      const saved = await repos.tenants.upsert({
+      const payload = {
         identity: tenantIdentity,
         displayName: plain.displayName ?? plain.name ?? tenantIdentity,
         code: String(plain.code ?? tenantIdentity).trim() || tenantIdentity,
@@ -2988,7 +3090,10 @@ export class EndgeSchemaStorage extends EndgeModule {
         folder: folderId,
         configuration: plain.configuration,
         meta: normalizeEntityMeta(plain.meta),
-      })
+      }
+      const saved = existing
+        ? await repos.tenants.update(existing.id, payload)
+        : await repos.tenants.create(payload)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -2999,17 +3104,24 @@ export class EndgeSchemaStorage extends EndgeModule {
         throw new Error(`Политика не найдена: ${documentId}`)
       const plain = policy.toPlain() as { id: string, name: string, description?: string | null, folder?: string | null, meta?: Record<string, unknown> }
       const policyIdentity = String((policy as any).identity ?? plain.id ?? policy.id ?? '')
-      const existing = await repos.policies.findByIdentity(policyIdentity)
+      const existing = await this._findPayloadDocumentForSave(
+        repos.policies,
+        policyIdentity,
+        opts?.previousIdentity,
+      )
       const folderId = await this.resolveFolderPayloadId(
         policy.folderId ?? (plain as any).folderId ?? relationToId(existing?.folder) ?? 'root-policies',
       ) ?? undefined
-      const saved = await repos.policies.upsert({
+      const payload = {
         identity: policyIdentity,
         displayName: plain.name,
         description: plain.description ?? undefined,
         folder: folderId,
         meta: normalizeEntityMeta(plain.meta),
-      })
+      }
+      const saved = existing
+        ? await repos.policies.update(existing.id, payload)
+        : await repos.policies.create(payload)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -3019,7 +3131,11 @@ export class EndgeSchemaStorage extends EndgeModule {
       if (!style)
         throw new Error(`Стиль не найден: ${documentId}`)
 
-      const existing = await repos.styles.findByIdentity(style.identity)
+      const existing = await this._findPayloadDocumentForSave(
+        repos.styles,
+        style.identity,
+        opts?.previousIdentity,
+      )
       const fallbackFolder = existing?.folder ?? await this.ensurePayloadRootFolder({
         identity: 'root-styles',
         displayName: 'Стили',
@@ -3042,7 +3158,9 @@ export class EndgeSchemaStorage extends EndgeModule {
       const storageId = style.id
       const saved = !this.isMalformedPayloadDocumentId(storageId)
         ? await repos.styles.update(storageId, payload)
-        : await repos.styles.upsert(payload)
+        : existing
+          ? await repos.styles.update(existing.id, payload)
+          : await repos.styles.create(payload)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -3067,11 +3185,15 @@ export class EndgeSchemaStorage extends EndgeModule {
         meta?: Record<string, unknown>
       }
       const vocabIdentity = String((vocab as any).identity ?? plain.id ?? vocab.id ?? '')
-      const existing = await repos.vocabs.findByIdentity(vocabIdentity)
+      const existing = await this._findPayloadDocumentForSave(
+        repos.vocabs,
+        vocabIdentity,
+        opts?.previousIdentity,
+      )
       const folderId = await this.resolveFolderPayloadId(
         vocab.folderId ?? plain.folderId ?? relationToId(existing?.folder) ?? 'root-vocabs',
       ) ?? undefined
-      const saved = await repos.vocabs.upsert({
+      const payload = {
         identity: vocabIdentity,
         displayName: plain.displayName ?? plain.name ?? vocabIdentity,
         description: plain.description ?? null,
@@ -3084,7 +3206,10 @@ export class EndgeSchemaStorage extends EndgeModule {
         folder: folderId,
         deletedAt: null,
         meta: normalizeEntityMeta(plain.meta),
-      })
+      }
+      const saved = existing
+        ? await repos.vocabs.update(existing.id, payload)
+        : await repos.vocabs.create(payload)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -3108,7 +3233,11 @@ export class EndgeSchemaStorage extends EndgeModule {
         meta?: Record<string, unknown>
       }
       const profileIdentity = String((profile as any).identity ?? plain.identity ?? plain.id ?? '')
-      const existing = await repos.authProfiles.findByIdentity(profileIdentity)
+      const existing = await this._findPayloadDocumentForSave(
+        repos.authProfiles,
+        profileIdentity,
+        opts?.previousIdentity,
+      )
       const requestedFolder = profile.folderId ?? plain.folderId ?? relationToId(existing?.folder)
       const folderId = requestedFolder != null
         ? await this.resolveFolderPayloadId(requestedFolder) ?? undefined
@@ -3117,7 +3246,7 @@ export class EndgeSchemaStorage extends EndgeModule {
             displayName: 'Аутентификация',
             entityType: 'auth-profiles',
           }) ?? undefined
-      const saved = await repos.authProfiles.upsert({
+      const payload = {
         identity: profileIdentity,
         displayName: plain.displayName ?? plain.name ?? profileIdentity,
         description: plain.description ?? null,
@@ -3129,7 +3258,10 @@ export class EndgeSchemaStorage extends EndgeModule {
         folder: folderId,
         deletedAt: null,
         meta: plain.meta ?? {},
-      })
+      }
+      const saved = existing
+        ? await repos.authProfiles.update(existing.id, payload)
+        : await repos.authProfiles.create(payload)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -3149,11 +3281,15 @@ export class EndgeSchemaStorage extends EndgeModule {
         folderId?: string | number | null
       }
       const bundleIdentity = String((bundle as any).identity ?? plain.id ?? bundle.id ?? '')
-      const existing = await repos.i18nBundles.findByIdentity(bundleIdentity)
+      const existing = await this._findPayloadDocumentForSave(
+        repos.i18nBundles,
+        bundleIdentity,
+        opts?.previousIdentity,
+      )
       const folderId = await this.resolveFolderPayloadId(
         bundle.folderId ?? plain.folderId ?? relationToId(existing?.folder) ?? 'root-i18n-bundles',
       ) ?? undefined
-      const saved = await repos.i18nBundles.upsert({
+      const payload = {
         identity: bundleIdentity,
         displayName: plain.displayName ?? plain.name ?? bundleIdentity,
         description: plain.description ?? null,
@@ -3161,7 +3297,10 @@ export class EndgeSchemaStorage extends EndgeModule {
         active: plain.active !== false,
         folder: folderId,
         deletedAt: null,
-      })
+      }
+      const saved = existing
+        ? await repos.i18nBundles.update(existing.id, payload)
+        : await repos.i18nBundles.create(payload)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -3172,11 +3311,15 @@ export class EndgeSchemaStorage extends EndgeModule {
         throw new Error(`Шаблон страницы не найден: ${documentId}`)
       const plain = tpl.toPlain()
       const pageTemplateIdentity = String((tpl as any).identity ?? plain.id ?? tpl.id ?? '')
-      const existing = await repos.pageTemplates.findByIdentity(pageTemplateIdentity)
+      const existing = await this._findPayloadDocumentForSave(
+        repos.pageTemplates,
+        pageTemplateIdentity,
+        opts?.previousIdentity,
+      )
       const folderId = await this.resolveFolderPayloadId(
         tpl.folderId ?? relationToId(existing?.folder) ?? 'root-page-templates',
       ) ?? undefined
-      const saved = await repos.pageTemplates.upsert({
+      const payload = {
         identity: pageTemplateIdentity,
         displayName: plain.name,
         description: plain.description ?? undefined,
@@ -3186,7 +3329,10 @@ export class EndgeSchemaStorage extends EndgeModule {
         areas: plain.areas ?? [],
         preview: plain.preview ?? undefined,
         meta: plain.meta ?? {},
-      })
+      }
+      const saved = existing
+        ? await repos.pageTemplates.update(existing.id, payload)
+        : await repos.pageTemplates.create(payload)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -3196,7 +3342,11 @@ export class EndgeSchemaStorage extends EndgeModule {
       if (!page)
         throw new Error(`Страница не найдена: ${documentId}`)
       const plain = page.toPlain()
-      const existing = await repos.pages.findByIdentity(plain.identity)
+      const existing = await this._findPayloadDocumentForSave(
+        repos.pages,
+        plain.identity,
+        opts?.previousIdentity,
+      )
       const folderId = await this.resolveFolderPayloadId(
         page.folderId ?? relationToId(existing?.folder) ?? 'root-pages',
       ) ?? undefined
@@ -3276,7 +3426,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         areasForPayload.push({ slotId: a.slotId, blocks })
       }
 
-      const saved = await repos.pages.upsert({
+      const payload = {
         identity: plain.identity,
         displayName: plain.name,
         description: plain.description ?? undefined,
@@ -3289,7 +3439,10 @@ export class EndgeSchemaStorage extends EndgeModule {
         enabled: plain.enabled ?? true,
         areas: areasForPayload,
         meta: plain.meta ?? {},
-      })
+      }
+      const saved = existing
+        ? await repos.pages.update(existing.id, payload)
+        : await repos.pages.create(payload)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -3300,11 +3453,15 @@ export class EndgeSchemaStorage extends EndgeModule {
         throw new Error(`Навигация не найдена: ${documentId}`)
       const plain = nav.toPlain()
       const navigationIdentity = String((nav as any).identity ?? plain.id ?? nav.id ?? '')
-      const existing = await repos.navigations.findByIdentity(navigationIdentity)
+      const existing = await this._findPayloadDocumentForSave(
+        repos.navigations,
+        navigationIdentity,
+        opts?.previousIdentity,
+      )
       const folderId = await this.resolveFolderPayloadId(
         nav.folderId ?? plain.folderId ?? relationToId(existing?.folder) ?? 'root-navigations',
       ) ?? undefined
-      const saved = await repos.navigations.upsert({
+      const payload = {
         identity: navigationIdentity,
         displayName: plain.name,
         description: plain.description ?? undefined,
@@ -3313,7 +3470,10 @@ export class EndgeSchemaStorage extends EndgeModule {
         managedById: plain.managedById,
         tree: plain.tree ?? [],
         meta: plain.meta ?? {},
-      })
+      }
+      const saved = existing
+        ? await repos.navigations.update(existing.id, payload)
+        : await repos.navigations.create(payload)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -3324,7 +3484,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         throw new Error(`Проект не найден: ${documentId}`)
       const plain = project.toPlain()
       const allowedEnvironments = relationToNumericIds(plain.allowedEnvironmentIds ?? plain.allowedEnvironments ?? [])
-      const saved = await repos.projects.upsert({
+      const saved = await this._upsertPayloadDocumentForSave(repos.projects, {
         'identity': plain.identity,
         'displayName': plain.displayName ?? plain.name ?? plain.identity,
         'description': plain.description ?? undefined,
@@ -3336,7 +3496,7 @@ export class EndgeSchemaStorage extends EndgeModule {
         'deletedAt': plain.deletedAt ?? null,
         'configuration': plain.configuration,
         'meta': normalizeEntityMeta(plain.meta),
-      })
+      }, opts?.previousIdentity)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
