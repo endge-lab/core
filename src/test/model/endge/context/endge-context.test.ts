@@ -9,20 +9,38 @@ describe('EndgeContext locale and theme', () => {
     Endge.workspace.apply(TEST_ENDGE_WORKSPACE)
   })
 
-  it('uses ru as the default locale', () => {
+  it('uses en when the stored locale is not set', () => {
     const context = new EndgeContext()
 
     context.deserialize(undefined)
 
-    expect(context.currentLocale).toBe('ru')
+    expect(context.currentLocale).toBe('en')
   })
 
-  it('uses the workspace default theme', () => {
+  it('uses en before the workspace is loaded', () => {
+    Endge.workspace.reset()
     const context = new EndgeContext()
 
     context.deserialize(undefined)
 
-    expect(context.currentTheme).toBe('light')
+    expect(context.currentLocale).toBe('en')
+  })
+
+  it('uses dark when the stored theme is not set', () => {
+    const context = new EndgeContext()
+
+    context.deserialize(undefined)
+
+    expect(context.currentTheme).toBe('dark')
+  })
+
+  it('uses dark before the workspace is loaded', () => {
+    Endge.workspace.reset()
+    const context = new EndgeContext()
+
+    context.deserialize(undefined)
+
+    expect(context.currentTheme).toBe('dark')
   })
 
   it('keeps supported stored locales', () => {
@@ -76,7 +94,7 @@ describe('EndgeContext locale and theme', () => {
     off()
 
     expect(context.currentTheme).toBe('light')
-    expect(listener).toHaveBeenCalledTimes(2)
+    expect(listener).toHaveBeenCalledTimes(1)
   })
 
   it('reconciles stored locale after workspace locales are loaded', () => {

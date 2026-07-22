@@ -5,9 +5,24 @@ import {
   applyEndgeConfigurationContribution,
   createDefaultEndgeConfiguration,
   createEndgeContextHash,
+  normalizeEndgeConfiguration,
 } from '@/model/services/configuration'
 
 describe('Endge configuration cascade', () => {
+  it('uses en locales and the dark theme when defaults are not set', () => {
+    const configuration = createDefaultEndgeConfiguration()
+    const result = normalizeEndgeConfiguration({
+      ...configuration,
+      defaultLocale: undefined,
+      fallbackLocale: undefined,
+      defaultTheme: undefined,
+    })
+
+    expect(result.defaultLocale).toBe('en')
+    expect(result.fallbackLocale).toBe('en')
+    expect(result.defaultTheme).toBe('dark')
+  })
+
   it('applies keyed upserts, removals and scalar overrides', () => {
     const contribution: EndgeConfigurationContribution = {
       mode: 'inherit',

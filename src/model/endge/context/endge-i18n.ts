@@ -4,11 +4,13 @@ import type { I18nLocaleMessages, I18nMessagesOptions, I18nRuntimeCatalog, I18nT
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { Endge } from '@/model/endge/kernel/endge'
 
+const DEFAULT_FALLBACK_LOCALE = 'en'
+
 /**
  * Runtime-доступ к доменным словарям переводов.
  */
 export class EndgeI18n extends EndgeModule {
-  private _fallbackLocale = ''
+  private _fallbackLocale = DEFAULT_FALLBACK_LOCALE
   private _offContext: (() => void) | null = null
   private _offDomain: (() => void) | null = null
   private _lastLocale = ''
@@ -37,7 +39,7 @@ export class EndgeI18n extends EndgeModule {
    * Компилирует активные i18n-bundles в плоские индексы для O(1) lookup.
    */
   public override build(): void {
-    this._fallbackLocale = Endge.workspace.fallbackLocale
+    this._fallbackLocale = Endge.workspace.fallbackLocale || DEFAULT_FALLBACK_LOCALE
     this.rebuildIndexes()
   }
 
@@ -49,7 +51,7 @@ export class EndgeI18n extends EndgeModule {
     this._offDomain?.()
     this._offContext = null
     this._offDomain = null
-    this._fallbackLocale = ''
+    this._fallbackLocale = DEFAULT_FALLBACK_LOCALE
     this._lastLocale = ''
     this._messagesByLocale.clear()
     this._messagesByBundle.clear()

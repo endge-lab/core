@@ -229,10 +229,10 @@ describe('EndgeContext persistence', () => {
     const listener = vi.fn()
 
     const off = context.subscribe(listener)
-    context.setCurrentLocale('en')
+    context.setCurrentLocale('ru')
     off()
 
-    expect(context.currentLocale).toBe('en')
+    expect(context.currentLocale).toBe('ru')
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
@@ -241,11 +241,11 @@ describe('EndgeContext persistence', () => {
     context.deserialize(undefined)
     await Promise.resolve()
 
-    context.setCurrentTheme('dark')
+    context.setCurrentTheme('light')
 
-    expect(context.currentTheme).toBe('dark')
-    expect(context.serialize().theme).toBe('dark')
-    expect(JSON.parse(localStorage.getItem('endge:context:v1') ?? '{}').theme).toBe('dark')
+    expect(context.currentTheme).toBe('light')
+    expect(context.serialize().theme).toBe('light')
+    expect(JSON.parse(localStorage.getItem('endge:context:v1') ?? '{}').theme).toBe('light')
   })
 })
 

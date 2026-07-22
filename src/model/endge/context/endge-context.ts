@@ -28,6 +28,8 @@ import { LocalStorageContextAdapter } from '@/model/endge/context/persistence/ad
 const CONTEXT_STORAGE_KEY = 'endge:context:v1'
 const LEGACY_CONTEXT_STORAGE_KEY = 'endge-context'
 const LEGACY_THEME_STORAGE_KEY = 'endge:theme'
+const DEFAULT_LOCALE = 'en'
+const DEFAULT_THEME = 'dark'
 
 const DEFAULT_SCOPE = {
   tenantId: 'default',
@@ -81,9 +83,9 @@ export class EndgeContext extends EndgeModule {
   private _currentProject: string = DEFAULT_SCOPE.projectId
   private _currentEnvironment: string = DEFAULT_SCOPE.environmentId
   private _currentUser: string = DEFAULT_SCOPE.userId
-  private _currentLocale = ''
+  private _currentLocale = DEFAULT_LOCALE
   private _pendingLocale: string | null = null
-  private _currentTheme = ''
+  private _currentTheme = DEFAULT_THEME
   private _pendingTheme: string | null = null
   private _workspaceDataMode: EndgeDataMode = 'live'
   private _dataModeOverride: EndgeDataMode | null = null
@@ -175,16 +177,16 @@ export class EndgeContext extends EndgeModule {
     const rawTheme = normalizeOptionalText(payload?.theme) ?? readLegacyThemePreference()
     this._dataModeOverride = null
     if (hasActiveEndgeWorkspace()) {
-      this._currentLocale = normalizeWorkspaceLocale(rawLocale)
+      this._currentLocale = normalizeWorkspaceLocale(rawLocale ?? DEFAULT_LOCALE)
       this._pendingLocale = null
-      this._currentTheme = normalizeWorkspaceTheme(rawTheme)
+      this._currentTheme = normalizeWorkspaceTheme(rawTheme ?? DEFAULT_THEME)
       this._pendingTheme = null
     }
     else {
-      this._currentLocale = rawLocale ?? ''
-      this._pendingLocale = rawLocale
-      this._currentTheme = rawTheme ?? ''
-      this._pendingTheme = rawTheme
+      this._currentLocale = rawLocale ?? DEFAULT_LOCALE
+      this._pendingLocale = rawLocale ?? DEFAULT_LOCALE
+      this._currentTheme = rawTheme ?? DEFAULT_THEME
+      this._pendingTheme = rawTheme ?? DEFAULT_THEME
     }
   }
 
@@ -447,7 +449,11 @@ export class EndgeContext extends EndgeModule {
 
   /** Возвращает текущую locale или locale активного workspace. */
   get currentLocale(): string {
-    return this._currentLocale || getActiveEndgeConfiguration().defaultLocale
+    if (this._currentLocale)
+      return this._currentLocale
+    if (hasActiveEndgeWorkspace())
+      return getActiveEndgeConfiguration().defaultLocale
+    return DEFAULT_LOCALE
   }
 
   /** Нормализует, сохраняет и публикует новую locale. */
@@ -482,7 +488,11 @@ export class EndgeContext extends EndgeModule {
 
   /** Возвращает текущую тему или тему по умолчанию активного workspace. */
   get currentTheme(): string {
-    return this._currentTheme || getActiveEndgeConfiguration().defaultTheme
+    if (this._currentTheme)
+      return this._currentTheme
+    if (hasActiveEndgeWorkspace())
+      return getActiveEndgeConfiguration().defaultTheme
+    return DEFAULT_THEME
   }
 
   /** Нормализует, сохраняет и публикует пользовательскую тему. */

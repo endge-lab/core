@@ -26,19 +26,22 @@ const LEGACY_SFC_ADAPTER_IDS: Readonly<Record<string, string>> = {
   'shadcn-vue': 'vue-shadcn',
 }
 
+const DEFAULT_LOCALE = 'en'
+const DEFAULT_THEME = 'dark'
+
 const DEFAULT_CONFIGURATION_VALUE: EndgeConfiguration = {
   vars: [],
   locales: [
     { code: 'ru', displayName: 'Русский', shortLabel: 'RU', direction: 'ltr' },
     { code: 'en', displayName: 'English', shortLabel: 'EN', direction: 'ltr' },
   ],
-  defaultLocale: 'ru',
-  fallbackLocale: 'ru',
+  defaultLocale: DEFAULT_LOCALE,
+  fallbackLocale: DEFAULT_LOCALE,
   themes: [
     { identity: 'light', displayName: 'Светлая' },
     { identity: 'dark', displayName: 'Тёмная' },
   ],
-  defaultTheme: 'light',
+  defaultTheme: DEFAULT_THEME,
   defaultAuthProfileIdentity: null,
   sfcAdapterIds: ['native-vue'],
   defaultSfcAdapterId: 'native-vue',
@@ -60,9 +63,22 @@ export function normalizeEndgeConfiguration(input: unknown): EndgeConfiguration 
   const locales = normalizeLocales(input.locales)
   const themes = normalizeThemes(input.themes)
   const sfcAdapterIds = normalizeSfcAdapterIds(input.sfcAdapterIds)
-  const defaultLocale = requireMember(input.defaultLocale, locales.map(item => item.code), 'defaultLocale')
-  const fallbackLocale = requireMember(input.fallbackLocale, locales.map(item => item.code), 'fallbackLocale')
-  const defaultTheme = requireMember(input.defaultTheme, themes.map(item => item.identity), 'defaultTheme')
+  const localeCodes = locales.map(item => item.code)
+  const defaultLocale = requireMember(
+    normalizeText(input.defaultLocale) || DEFAULT_LOCALE,
+    localeCodes,
+    'defaultLocale',
+  )
+  const fallbackLocale = requireMember(
+    normalizeText(input.fallbackLocale) || DEFAULT_LOCALE,
+    localeCodes,
+    'fallbackLocale',
+  )
+  const defaultTheme = requireMember(
+    normalizeText(input.defaultTheme) || DEFAULT_THEME,
+    themes.map(item => item.identity),
+    'defaultTheme',
+  )
   const defaultSfcAdapterId = requireMember(
     normalizeSfcAdapterId(input.defaultSfcAdapterId),
     sfcAdapterIds,

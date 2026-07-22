@@ -31,7 +31,7 @@ export interface ThemeConfig {
 }
 
 export const themeConfig: ThemeConfig = {
-  defaultTheme: 'light',
+  defaultTheme: 'dark',
   availableThemes: ['light', 'dark', 'light_calm'],
   storageKey: 'endge:theme',
 }
