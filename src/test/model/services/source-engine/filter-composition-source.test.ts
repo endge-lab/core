@@ -146,6 +146,58 @@ defineQuery({
     })
   })
 
+  it('compiles nested object and record Query prop contracts', () => {
+    const result = compileQuerySource(`
+defineQuery({
+  kind: 'rest',
+  props: defineProps({
+    payload: field(objectOf({
+      flightNumber: field(String),
+      route: field(objectOf({
+        departure: field(String),
+        arrival: field(String),
+      })),
+    })),
+    properties: field(recordOf(objectOf({
+      name: field(String),
+      type: field(String),
+      text: field(String),
+    }))),
+  }),
+  request: {
+    method: 'PUT',
+    endpoint: env('API'),
+    path: '/schedule',
+    body: body(({ prop }) => prop('payload')),
+  },
+  outputs: { raw: output().from(response()) },
+})
+`)
+
+    expect(result.diagnostics).toEqual([])
+    expect(result.artifact?.props).toMatchObject([
+      {
+        key: 'payload',
+        type: 'Object',
+        typeExpression: {
+          kind: 'object',
+          fields: [
+            { key: 'flightNumber', type: { kind: 'reference', identity: 'String' } },
+            { key: 'route', type: { kind: 'object' } },
+          ],
+        },
+      },
+      {
+        key: 'properties',
+        type: 'Object',
+        typeExpression: {
+          kind: 'record',
+          values: { kind: 'object' },
+        },
+      },
+    ])
+  })
+
   it('compiles props in every runtime request field', () => {
     const result = compileQuerySource(`
 defineQuery({

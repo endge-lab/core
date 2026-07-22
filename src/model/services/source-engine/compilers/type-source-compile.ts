@@ -312,6 +312,28 @@ function readArrayDefinition(call: t.CallExpression, diagnostics: DiagnosticDraf
   return items ? { kind: 'array', items } : null
 }
 
+function readRecordDefinition(
+  call: t.CallExpression,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+): TypeSourceExpression | null {
+  if (call.arguments.length !== 1 || !isExpressionArgument(call.arguments[0])) {
+    diagnostics.push(diagnostic('error', 'type-source-record-arity', 'recordOf принимает ровно один type expression.', sourcePath, call))
+    return null
+  }
+  const values = readTypeExpression(call.arguments[0], diagnostics, `${sourcePath}.values`)
+  return values ? { kind: 'record', values } : null
+}
+
+/** Компилирует одно рекурсивное inline type expression без выполнения JavaScript. */
+export function compileTypeSourceExpression(
+  raw: t.Expression,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+): TypeSourceExpression | null {
+  return readTypeExpression(raw, diagnostics, sourcePath)
+}
+
 function readTypeExpression(
   raw: t.Expression,
   diagnostics: DiagnosticDraft[],
@@ -323,6 +345,8 @@ function readTypeExpression(
 
   if (t.isCallExpression(node) && t.isIdentifier(node.callee, { name: 'type' }))
     return readReferenceCall(node, 'type', diagnostics, sourcePath)
+  if (t.isCallExpression(node) && t.isIdentifier(node.callee, { name: 'recordOf' }))
+    return readRecordDefinition(node, diagnostics, sourcePath)
   if (t.isObjectExpression(node)) {
     diagnostics.push(diagnostic('error', 'type-source-object-wrapper', `${sourcePath}: inline object должен быть обёрнут в objectOf({...}).`, sourcePath, node))
     return null

@@ -261,7 +261,9 @@ function readProps(
       continue
     }
     declared.add(key)
-    const parsed = compileSourceField(key, property.value, source, diagnostics, `props.${key}`)
+    const parsed = compileSourceField(key, property.value, source, diagnostics, `props.${key}`, {
+      allowInlineTypeExpressions: true,
+    })
     if (parsed)
       props.push({ ...parsed.field, defaultSource: parsed.defaultSource })
   }

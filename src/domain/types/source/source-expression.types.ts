@@ -1,3 +1,5 @@
+import type { TypeSourceExpression } from '@/domain/types/source/type-source.types'
+
 /** Type Registry identity used by Query/Filter field contracts. */
 export type SourceFieldType
   = | 'String'
@@ -132,6 +134,8 @@ export interface SourceFieldVocab {
 export interface SourceFieldDefinition {
   key: string
   type: SourceFieldType
+  /** Точный inline-контракт для objectOf/recordOf; type сохраняет coarse runtime identity. */
+  typeExpression?: TypeSourceExpression
   optional: boolean
   array: boolean
   defaultValue?: SourceExpressionIR

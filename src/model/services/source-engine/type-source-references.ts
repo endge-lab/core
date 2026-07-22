@@ -85,7 +85,7 @@ function collectTypeExpression(raw: t.Expression, references: TypeSourceReferenc
     }
     return
   }
-  if (node.callee.name === 'arrayOf') {
+  if (node.callee.name === 'arrayOf' || node.callee.name === 'recordOf') {
     const argument = node.arguments[0]
     if (argument && t.isExpression(argument)) collectTypeExpression(argument, references)
   }

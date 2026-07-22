@@ -189,6 +189,8 @@ function typeSourceExpressionToTypeScript(expression: TypeSourceExpression): str
     return expression.variants.map(typeSourceExpressionToTypeScript).join(' | ')
   if (expression.kind === 'enum')
     return expression.values.map(value => JSON.stringify(value)).join(' | ')
+  if (expression.kind === 'record')
+    return `Record<string, ${typeSourceExpressionToTypeScript(expression.values)}>`
   const fields = expression.fields.map((field) => {
     const type = field.array
       ? `Array<${typeSourceExpressionToTypeScript(field.type)}>`

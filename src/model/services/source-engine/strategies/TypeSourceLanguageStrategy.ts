@@ -19,7 +19,7 @@ export class TypeSourceLanguageStrategy implements SourceLanguageStrategy {
   public readonly syntax = createTypeScriptLikeSourceSyntax({
     alias: 'Endge Type Source',
     extension: '.endge-type.ts',
-    keywords: ['defineType', 'objectOf', 'enumOf', 'unionOf', 'arrayOf'],
+    keywords: ['defineType', 'objectOf', 'recordOf', 'enumOf', 'unionOf', 'arrayOf'],
     functions: ['field', 'type', 'description', 'min', 'max', 'example', 'array', 'optional'],
   })
 
@@ -111,6 +111,14 @@ const TYPE_COMPLETIONS: SourceLanguageCompletion[] = [
   property: field(String),
 })`,
     detail: 'Anonymous inline object type expression',
+  },
+  {
+    label: 'recordOf',
+    kind: 'function',
+    insertText: `recordOf(objectOf({
+  property: field(String),
+}))`,
+    detail: 'String-keyed dictionary type expression',
   },
   { label: 'description', kind: 'function', insertText: `.description('')`, detail: 'Field description' },
   { label: 'optional', kind: 'function', insertText: `.optional()`, detail: 'Optional field' },

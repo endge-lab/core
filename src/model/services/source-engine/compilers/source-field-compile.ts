@@ -15,12 +15,17 @@ import {
   readStringArgument,
   unwrapExpression,
 } from '@/model/services/source-engine/compilers/source-expression-compile'
+import { compileTypeSourceExpression } from '@/model/services/source-engine/compilers/type-source-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
 export interface SourceFieldParseResult {
   field: SourceFieldDefinition
   defaultSource?: SourceFieldDefaultSource
+}
+
+interface SourceFieldCompileOptions {
+  allowInlineTypeExpressions?: boolean
 }
 
 /** Компилирует chain field(...).optional().array()... в общий field contract. */
@@ -30,6 +35,7 @@ export function compileSourceField(
   source: string,
   diagnostics: DiagnosticDraft[],
   sourcePath: string,
+  options: SourceFieldCompileOptions = {},
 ): SourceFieldParseResult | null {
   let current = unwrapExpression(raw)
   const modifiers: Array<{ name: string, call: t.CallExpression }> = []
@@ -48,17 +54,32 @@ export function compileSourceField(
   }
 
   const typeArgument = current.arguments[0]
+  const inlineTypeNode = typeArgument && t.isExpression(typeArgument)
+    ? unwrapExpression(typeArgument)
+    : null
+  const inlineTypeCallee = inlineTypeNode && t.isCallExpression(inlineTypeNode) && t.isIdentifier(inlineTypeNode.callee)
+    ? inlineTypeNode.callee.name
+    : null
+  const hasInlineType = options.allowInlineTypeExpressions === true
+    && (inlineTypeCallee === 'objectOf' || inlineTypeCallee === 'recordOf')
+  const typeExpression = hasInlineType && inlineTypeNode
+    ? compileTypeSourceExpression(inlineTypeNode, diagnostics, `${sourcePath}.type`)
+    : null
+  if (hasInlineType && !typeExpression)
+    return null
+
   const rawType = typeArgument && t.isIdentifier(typeArgument)
     ? typeArgument.name
     : readStringArgument(current, 0)
-  if (!rawType?.trim()) {
-    diagnostics.push(diagnostic('error', 'source-field-type', 'field(type) требует непустую identity типа.', sourcePath, current))
+  if (!rawType?.trim() && !typeExpression) {
+    diagnostics.push(diagnostic('error', 'source-field-type', 'field(type) требует непустую identity типа или inline objectOf/recordOf.', sourcePath, current))
     return null
   }
 
   const field: SourceFieldDefinition = {
     key,
-    type: rawType as SourceFieldType,
+    type: typeExpression ? 'Object' : rawType as SourceFieldType,
+    ...(typeExpression ? { typeExpression } : {}),
     optional: false,
     array: false,
   }

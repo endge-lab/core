@@ -11,7 +11,7 @@ import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine
 import { resolveSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
 import { QUERY_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/query.default.source'
 import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/model/services/source-engine/value-expression-language'
-import { validateTypeExpressionUsage } from '@/model/services/compiler/type/type-program-validation'
+import { validateTypeExpressionUsage, validateTypeSourceExpressionUsage } from '@/model/services/compiler/type/type-program-validation'
 
 /** Source language strategy для editor-facing операций RQuery source. */
 export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
@@ -22,7 +22,7 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
     extension: '.endge-query.ts',
     keywords: [
       'auto', 'body', 'collectionByKey', 'compact', 'converter', 'dataView', 'defineDataView', 'defineFilter', 'defineProps',
-      'defineQuery', 'endgeVar', 'env', 'field', 'filter', 'merge', 'output', 'prop',
+      'defineQuery', 'endgeVar', 'env', 'field', 'filter', 'merge', 'objectOf', 'output', 'prop', 'recordOf',
       'full', 'incremental', 'response', ...VALUE_EXPRESSION_FUNCTION_NAMES,
     ],
     functions: [
@@ -49,20 +49,20 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
   /** Валидирует query source через текущий compiler pass. */
   public validate(source: string, context?: SourceLanguageContext): SourceLanguageValidationResult {
     const result = compileQuerySource(source)
-    const typeDiagnostics = context?.typeSymbols
-      ? (result.artifact?.props.flatMap(prop => validateTypeExpressionUsage(
-          prop.type,
-          context.typeSymbols!.map((type, index) => ({
-            id: index,
-            identity: type.identity,
-            displayName: type.displayName ?? type.identity,
-            category: type.category ?? 'user',
-            sourceVersion: 1,
-            definition: null,
-            status: 'valid',
-          })),
-          `props.${prop.key}.type`,
-        )) ?? [])
+    const typeCatalog = context?.typeSymbols?.map((type, index) => ({
+      id: index,
+      identity: type.identity,
+      displayName: type.displayName ?? type.identity,
+      category: type.category ?? 'user',
+      sourceVersion: 1,
+      definition: null,
+      status: 'valid',
+    } as const))
+    const typeDiagnostics = typeCatalog
+      ? (result.artifact?.props.flatMap(prop => [
+          ...validateTypeExpressionUsage(prop.type, typeCatalog, `props.${prop.key}.type`),
+          ...validateTypeSourceExpressionUsage(prop.typeExpression, typeCatalog, `props.${prop.key}.typeExpression`),
+        ]) ?? [])
       : []
     const diagnostics = [...result.diagnostics, ...typeDiagnostics]
     const ok = !diagnostics.some(diagnostic => diagnostic.severity === 'error')
@@ -214,6 +214,22 @@ const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
     insertText: `field('String')`,
     detail: 'Описание поля',
     documentation: 'Поддерживает chain API: field(...).array().optional().default(...).from(...).',
+  },
+  {
+    label: 'field.object',
+    kind: 'snippet',
+    insertText: `field(objectOf({
+  property: field(String),
+}))`,
+    detail: 'Вложенный объектный Query prop',
+  },
+  {
+    label: 'field.record',
+    kind: 'snippet',
+    insertText: `field(recordOf(objectOf({
+  property: field(String),
+})))`,
+    detail: 'Query prop с произвольными string-ключами',
   },
   {
     label: 'filter',

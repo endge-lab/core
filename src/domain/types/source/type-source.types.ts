@@ -38,6 +38,12 @@ export interface TypeSourceArrayDefinition {
   items: TypeSourceExpression
 }
 
+/** Словарь с произвольными string-ключами и единым типом значений. */
+export interface TypeSourceRecordDefinition {
+  kind: 'record'
+  values: TypeSourceExpression
+}
+
 /** Поддержанные корневые формы Type Source v1. */
 export type TypeSourceDefinition
   = | TypeSourceObjectDefinition
@@ -49,6 +55,7 @@ export type TypeSourceDefinition
 export type TypeSourceExpression
   = | TypeSourceReference
     | TypeSourceDefinition
+    | TypeSourceRecordDefinition
 
 /** Canonical authoring document Type Source v1. */
 export interface TypeSourceDocument {

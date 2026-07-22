@@ -57,8 +57,10 @@ import { compileTypeSource } from '@/model/services/source-engine/compilers/type
 import {
   collectTypeExpressionReferences,
   collectTypeDefinitionReferences,
+  collectTypeSourceExpressionReferences,
   validateTypeDefinitionReferences,
   validateTypeExpressionUsage,
+  validateTypeSourceExpressionUsage,
 } from '@/model/services/compiler/type/type-program-validation'
 
 type ComputationArtifact = ProgramArtifact<ComputationProgramPayload>
@@ -621,12 +623,14 @@ export class EndgeCompiler extends EndgeModule {
           diagnostics: [
             ...((result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]),
             ...local.diagnostics,
-            ...(local.payload ?? artifact)?.props.flatMap(prop =>
-              this._typeContractDiagnostics(prop.type, `props.${prop.key}.type`)) ?? [],
+            ...(local.payload ?? artifact)?.props.flatMap(prop => [
+              ...this._typeContractDiagnostics(prop.type, `props.${prop.key}.type`),
+              ...this._typeContractDiagnostics(prop.typeExpression, `props.${prop.key}.typeExpression`),
+            ]) ?? [],
           ],
           dependencies: [
             ...local.dependencies,
-            ...this._typeDependencies((local.payload ?? artifact)?.props.map(prop => prop.type) ?? []),
+            ...this._typeDependencies((local.payload ?? artifact)?.props.flatMap(prop => [prop.type, prop.typeExpression]) ?? []),
             ...this._queryAuthDependencies(local.payload ?? artifact),
           ],
           children: local.children,
@@ -832,7 +836,7 @@ export class EndgeCompiler extends EndgeModule {
 
   /** Validates one owner contract against the source-backed Type Registry. */
   private _typeContractDiagnostics(
-    expression: string | null | undefined,
+    expression: string | TypeSourceExpression | null | undefined,
     sourcePath: string,
     localTypes: ReadonlySet<string> = new Set(),
   ): Omit<ProgramDiagnostic, 'entityRef'>[] {
@@ -875,17 +879,23 @@ export class EndgeCompiler extends EndgeModule {
           })),
         ]
       : catalog
-    return validateTypeExpressionUsage(expression, catalogWithLocals, sourcePath)
+    return typeof expression === 'string' || expression == null
+      ? validateTypeExpressionUsage(expression, catalogWithLocals, sourcePath)
+      : validateTypeSourceExpressionUsage(expression, catalogWithLocals, sourcePath)
   }
 
   /** Creates stable Program dependencies for every custom type expression. */
   private _typeDependencies(
-    expressions: Array<string | null | undefined>,
+    expressions: Array<string | TypeSourceExpression | null | undefined>,
     excluded: ReadonlySet<string> = new Set(),
   ): ProgramArtifact['dependencies'] {
     const identities = new Set<string>()
     for (const expression of expressions) {
-      for (const identity of collectTypeExpressionReferences(expression)) {
+      const referenced = typeof expression === 'string' || expression == null
+        ? collectTypeExpressionReferences(expression)
+        : new Set(collectTypeSourceExpressionReferences(expression)
+            .filter(identity => collectTypeExpressionReferences(identity).has(identity)))
+      for (const identity of referenced) {
         if (!excluded.has(identity)) identities.add(identity)
       }
     }
@@ -2606,6 +2616,17 @@ function validatePreviewTypeExpression(
     return variants.some(diagnostics => diagnostics.length === 0)
       ? []
       : [previewTypeDiagnostic(sourcePath, 'значение не соответствует ни одному варианту union')]
+  }
+  if (expression.kind === 'record') {
+    if (!isPreviewRecord(value))
+      return [previewTypeDiagnostic(sourcePath, 'ожидался объект-словарь')]
+    return Object.entries(value).flatMap(([key, item]) => validatePreviewTypeExpression(
+      expression.values,
+      item,
+      catalog,
+      `${sourcePath}.${key}`,
+      new Set(visiting),
+    ))
   }
   if (!isPreviewRecord(value))
     return [previewTypeDiagnostic(sourcePath, 'ожидался объект')]

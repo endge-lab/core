@@ -15,9 +15,14 @@ const TYPE_EXPRESSION_BUILTINS = new Set([
 
 /** Returns every named reference without expanding the referenced document. */
 export function collectTypeDefinitionReferences(definition: TypeSourceDefinition | null): string[] {
-  if (!definition) return []
+  return collectTypeSourceExpressionReferences(definition)
+}
+
+/** Returns every named reference from one recursive source type expression. */
+export function collectTypeSourceExpressionReferences(expression: TypeSourceExpression | null | undefined): string[] {
+  if (!expression) return []
   const references = new Set<string>()
-  visitDefinition(definition, (identity) => references.add(identity))
+  visitExpression(expression, identity => references.add(identity))
   return [...references]
 }
 
@@ -45,6 +50,37 @@ export function validateTypeDefinitionReferences(
         sourcePath: 'source',
       })
     }
+  }
+  return diagnostics
+}
+
+/** Diagnostics for a structural inline type expression owned by Query or another source document. */
+export function validateTypeSourceExpressionUsage(
+  expression: TypeSourceExpression | null | undefined,
+  catalog: readonly TypeProgramCatalogEntry[],
+  sourcePath: string,
+): DiagnosticDraft[] {
+  if (!expression) return []
+  const known = new Set(catalog.map(item => item.identity))
+  const diagnostics: DiagnosticDraft[] = []
+
+  for (const identity of collectTypeSourceExpressionReferences(expression)) {
+    if (identity === 'Any' || identity === 'any') {
+      diagnostics.push({
+        severity: 'warning',
+        code: 'type-any-usage',
+        message: `Контракт "${sourcePath}" использует Any и не может быть строго проверен.`,
+        sourcePath,
+      })
+      continue
+    }
+    if (TYPE_EXPRESSION_BUILTINS.has(identity) || known.has(identity)) continue
+    diagnostics.push({
+      severity: 'error',
+      code: 'type-reference-missing',
+      message: `Тип "${identity}" из контракта "${sourcePath}" не найден.`,
+      sourcePath,
+    })
   }
   return diagnostics
 }
@@ -125,6 +161,10 @@ function visitDefinition(definition: TypeSourceDefinition, visit: (identity: str
 function visitExpression(expression: TypeSourceExpression, visit: (identity: string) => void): void {
   if (expression.kind === 'reference') {
     visit(expression.identity)
+    return
+  }
+  if (expression.kind === 'record') {
+    visitExpression(expression.values, visit)
     return
   }
   visitDefinition(expression, visit)

@@ -39,6 +39,8 @@ function serializeExpression(expression: TypeSourceExpression, indent: number): 
       .join('\n')
     return `unionOf(\n${variants}\n${' '.repeat(indent)})`
   }
+  if (expression.kind === 'record')
+    return `recordOf(${serializeExpression(expression.values, indent)})`
   return `arrayOf(\n${' '.repeat(indent + 2)}${serializeExpression(expression.items, indent + 2)},\n${' '.repeat(indent)})`
 }
 
