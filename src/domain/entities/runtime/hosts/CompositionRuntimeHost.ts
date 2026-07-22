@@ -15,6 +15,7 @@ import type {
   CompositionRuntimePublicationConnection,
 } from '@/domain/types/source/composition-source.types'
 import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext, RuntimeHostInputBinding, RuntimeHostInputSource, RuntimeHostUpdateContext } from '@/domain/types/runtime/runtime-host.types'
+import type { I18nRuntimeCatalog } from '@/domain/types/i18n.types'
 
 import { Raph, RaphNode } from '@endge/raph'
 
@@ -23,6 +24,7 @@ import { RuntimeScope } from '@/domain/entities/runtime/RuntimeScope'
 import { FilterViewRuntimeHost as EndgeFilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
 import { Endge } from '@/model/endge/kernel/endge'
 import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
+import { cloneI18nRuntimeCatalog, extendI18nRuntimeCatalog } from '@/model/services/i18n/i18n-catalog'
 
 function defaultContext(): RuntimeHostContext<'composition'> {
   return {
@@ -53,6 +55,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   private _storeProviderRuntimeIds = new Map<string, Set<string>>()
   private _ownedStoreRuntimeIds = new Set<string>()
   private _compositionInputBindings = new Map<string, RuntimeHostInputBinding>()
+  private _i18nCatalogs = new Map<string, I18nRuntimeCatalog>()
   private _orchestratedQueries = new Set<string>()
   private _orchestratedSuccesses = new Set<string>()
   private _mounted = false
@@ -121,6 +124,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       this._assertRequiredProps(payload)
       this._mountData(payload)
       this._prepareOutputBridges(payload)
+      this._buildI18nCatalogs(payload)
       this._buildLifecycleScopes(payload)
       const rootScope = this._requireScope('scope_default')
       await rootScope.activate()
@@ -169,6 +173,11 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
 
   public getScope(path: string): RuntimeScope | null {
     return this._scopes.get(String(path ?? '').trim()) ?? null
+  }
+
+  /** Возвращает накопленный translation catalog для заданного lifecycle scope. */
+  public getI18nCatalog(scopePath = 'scope_default'): I18nRuntimeCatalog {
+    return cloneI18nRuntimeCatalog(this._i18nCatalogs.get(scopePath) ?? {})
   }
 
   public getRuntimeHandle(path: string): CompositionRuntimeActivationHandle | null {
@@ -526,10 +535,26 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     this._storeRuntimeIds.clear()
     this._storeProviderRuntimeIds.clear()
     this._compositionInputBindings.clear()
+    this._i18nCatalogs.clear()
     this._orchestratedQueries.clear()
     this._orchestratedSuccesses.clear()
     this._mounted = false
     super.destroy()
+  }
+
+  /** Строит effective catalogs по той же иерархии, что и lifecycle scopes. */
+  private _buildI18nCatalogs(payload: CompositionProgramPayload): void {
+    this._i18nCatalogs.clear()
+    const inherited = (this.meta.i18nCatalog ?? {}) as I18nRuntimeCatalog
+    for (const scope of [...payload.scopes].sort((left, right) => left.sourceOrder - right.sourceOrder)) {
+      const parent = scope.parentPath
+        ? this._i18nCatalogs.get(scope.parentPath) ?? inherited
+        : inherited
+      const resources = (payload.i18nResources ?? [])
+        .filter(resource => resource.scopePath === scope.path)
+        .sort((left, right) => left.sourceOrder - right.sourceOrder)
+      this._i18nCatalogs.set(scope.path, extendI18nRuntimeCatalog(parent, resources))
+    }
   }
 
   /** Монтирует vocab data и разрешает Store aliases через explicit, ancestor или local provider. */
@@ -736,6 +761,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
           sourceRuntime: descriptor.identity,
           persistence: this.meta.persistence ?? 'disabled',
           runtimeScopeId: this._requireScope(descriptor.scopePath).id,
+          i18nCatalog: this.getI18nCatalog(descriptor.scopePath),
         },
       })
       const node = new RaphNode(Raph.app, {
@@ -780,6 +806,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       basePath,
       input: { kind: 'local', props: initialProps },
       runtimeScopeId: this._requireScope(descriptor.scopePath).id,
+      i18nCatalog: this.getI18nCatalog(descriptor.scopePath),
     }
     if (descriptor.kind === 'composition') {
       meta.input = this._makeInputSource(descriptor.name)

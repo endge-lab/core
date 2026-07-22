@@ -34,6 +34,7 @@ import type {
 } from '@/domain/types/runtime/runtime-host.types'
 import type { ComputationResource } from '@/domain/types/computation'
 import type { EndgeStyleLease } from '@/domain/types/style'
+import type { I18nRuntimeCatalog } from '@/domain/types/i18n.types'
 
 import { DataPath, Raph, RaphNode } from '@endge/raph'
 
@@ -215,6 +216,15 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   /** Возвращает diagnostics compiled artifact. */
   public getDiagnostics(): ProgramDiagnostic[] {
     return this.getArtifact()?.diagnostics ?? []
+  }
+
+  /** Переводит public key через накопленный Composition catalog этого runtime. */
+  public translate(key: string, fallback?: string): string {
+    return Endge.i18n.translate(
+      (this.meta.i18nCatalog ?? {}) as I18nRuntimeCatalog,
+      key,
+      fallback,
+    )
   }
 
   /** Возвращает внешний контракт компонента из compiled artifact. */

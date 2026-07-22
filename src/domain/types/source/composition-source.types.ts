@@ -6,6 +6,7 @@ import type { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/Com
 import type { SourceExpressionIR, SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 import type { FilterViewControlDefinition } from '@/domain/types/ui/filter-view.type'
 import type { EndgeMockReference } from '@/domain/types/mock'
+import type { I18nCompiledLocales } from '@/domain/types/i18n.types'
 
 export type CompositionRuntimeKind = 'filter' | 'query' | 'component' | 'composition' | 'filter-view'
 
@@ -19,9 +20,19 @@ export interface CompositionResourceDescriptor {
   name: string
   path: string
   scopePath: string
-  kind: 'style'
+  kind: 'style' | 'i18n'
   identity: string
   sourceOrder: number
+}
+
+/** Материализованный i18n-resource внутри Composition program artifact. */
+export interface CompositionI18nResourceArtifact {
+  name: string
+  path: string
+  scopePath: string
+  identity: string
+  sourceOrder: number
+  messages: I18nCompiledLocales
 }
 
 export interface CompositionScopeDescriptor {
@@ -221,6 +232,8 @@ export interface CompositionRuntimeGraph {
 export interface CompositionProgramPayload extends CompositionSourceDocument {
   type: 'composition'
   sourceVersion: number
+  /** Снимки словарей, которые runtime читает без обращения к Domain. */
+  i18nResources?: CompositionI18nResourceArtifact[]
   graph: CompositionRuntimeGraph
 }
 

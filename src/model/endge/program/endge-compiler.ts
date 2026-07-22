@@ -51,6 +51,7 @@ import { parseComponentSFC } from '@/model/services/compiler/component-sfc/compo
 import { analyzeComponentSFCScript } from '@/model/services/compiler/component-sfc/component-sfc-script'
 import { compileEndgeCSS } from '@/model/services/style'
 import { resolveCompositionActivation } from '@/model/services/source-engine/composition-activation'
+import { collectI18nMessageKeys, compileI18nLocales } from '@/model/services/i18n/i18n-catalog'
 import { createDiagnosticsEntityOwner } from '@/model/endge/diagnostics/endge-problems'
 import { compileTypeSource } from '@/model/services/source-engine/compilers/type-source-compile'
 import {
@@ -771,21 +772,27 @@ export class EndgeCompiler extends EndgeModule {
       compile: (entity, context) => {
         const result = Endge.source.compile('composition', this._resolveCompositionSource(entity))
         const compiledPayload = result.artifact as CompositionProgramPayload | undefined
-        const payload = compiledPayload
+        const sourcePayload = compiledPayload
           ? { ...compiledPayload, sourceVersion: Number(entity.sourceVersion ?? 1) || 1 }
           : undefined
+        const i18n = sourcePayload
+          ? this._materializeCompositionI18n(sourcePayload)
+          : { payload: undefined, diagnostics: [], dependencies: [] }
+        const payload = i18n.payload
         const validation = payload ? this._validateComposition(payload, entity) : { diagnostics: [], dependencies: [] }
         return this._makeArtifact(entity, 'composition', context, {
           capabilities: ['compilable', 'executable', 'configuration'],
           metadata: { self: result.metadata ?? {}, nodes: [] },
           payload: payload ?? this._makeEmptyCompositionPayload(entity.sourceVersion),
           dependencies: [
+            ...i18n.dependencies,
             ...validation.dependencies,
             ...this._typeDependencies(payload?.props.map(prop => prop.type) ?? []),
             ...this._compositionPreviewDependencies(payload),
           ],
           diagnostics: [
             ...((result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]),
+            ...i18n.diagnostics,
             ...validation.diagnostics,
             ...(payload?.props.flatMap(prop =>
               this._typeContractDiagnostics(prop.type, `props.${prop.key}.type`)) ?? []),
@@ -1621,6 +1628,132 @@ export class EndgeCompiler extends EndgeModule {
     })
   }
 
+  /** Материализует i18n resources в Composition program artifact. */
+  private _materializeCompositionI18n(payload: CompositionProgramPayload): {
+    payload: CompositionProgramPayload
+    diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
+    dependencies: ProgramArtifact['dependencies']
+  } {
+    const diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[] = []
+    const dependencies: ProgramArtifact['dependencies'] = []
+    const i18nResources: NonNullable<CompositionProgramPayload['i18nResources']> = []
+
+    for (const resource of payload.resources) {
+      if (resource.kind !== 'i18n')
+        continue
+      const bundle = Endge.domain.getI18nBundleByIdentity(resource.identity)
+      if (!bundle) {
+        diagnostics.push({
+          severity: 'error',
+          code: 'composition-i18n-missing',
+          message: `I18n bundle "${resource.identity}" не найден.`,
+          sourcePath: `resources.${resource.path}`,
+        })
+        continue
+      }
+      if (bundle.active === false) {
+        diagnostics.push({
+          severity: 'error',
+          code: 'composition-i18n-inactive',
+          message: `I18n bundle "${resource.identity}" выключен.`,
+          sourcePath: `resources.${resource.path}`,
+        })
+        continue
+      }
+      dependencies.push({
+        entityType: 'i18n-bundles',
+        id: bundle.id,
+        identity: bundle.identity,
+        role: 'composition-resource',
+      })
+      i18nResources.push({
+        name: resource.name,
+        path: resource.path,
+        scopePath: resource.scopePath,
+        identity: resource.identity,
+        sourceOrder: resource.sourceOrder,
+        messages: compileI18nLocales(bundle.locales ?? {}),
+      })
+    }
+
+    return {
+      payload: { ...payload, i18nResources },
+      diagnostics,
+      dependencies,
+    }
+  }
+
+  /**
+   * Запрещает неявный override одного public translation key вдоль
+   * Composition/scope ancestry. Разные aliases остаются независимыми.
+   */
+  private _compositionI18nCollisionDiagnostics(
+    payload: CompositionProgramPayload,
+    owner: RComposition,
+  ): Omit<ProgramDiagnostic, 'entityRef'>[] {
+    interface TranslationOrigin {
+      composition: string
+      resource: string
+    }
+
+    const diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[] = []
+    const visitPayload = (
+      current: CompositionProgramPayload,
+      inherited: Map<string, TranslationOrigin>,
+      compositionIdentity: string,
+      ownerBoundaryPath: string | null,
+      ancestry: Set<string>,
+    ): void => {
+      const visitScope = (scopePath: string, parentCatalog: Map<string, TranslationOrigin>): void => {
+        const catalog = new Map(parentCatalog)
+        for (const resource of (current.i18nResources ?? [])
+          .filter(item => item.scopePath === scopePath)
+          .sort((left, right) => left.sourceOrder - right.sourceOrder)) {
+          for (const key of collectI18nMessageKeys(resource.messages)) {
+            const publicKey = `${resource.name}:${key}`
+            const previous = catalog.get(publicKey)
+            if (previous) {
+              diagnostics.push({
+                severity: 'error',
+                code: 'composition-i18n-key-collision',
+                message: `Ключ перевода "${publicKey}" из "${compositionIdentity}:${resource.identity}" дублирует ключ вышестоящего ресурса "${previous.composition}:${previous.resource}". Translation override в Composition пока запрещён.`,
+                sourcePath: ownerBoundaryPath ?? `resources.${resource.path}`,
+              })
+              continue
+            }
+            catalog.set(publicKey, { composition: compositionIdentity, resource: resource.identity })
+          }
+        }
+
+        for (const runtime of current.runtimes.filter(item => item.kind === 'composition' && item.scopePath === scopePath)) {
+          const artifact = Endge.program.getCompositionArtifact(runtime.identity)
+          if (!artifact || artifact.status === 'error' || ancestry.has(runtime.identity))
+            continue
+          const nextAncestry = new Set(ancestry)
+          nextAncestry.add(runtime.identity)
+          visitPayload(
+            artifact.payload,
+            catalog,
+            runtime.identity,
+            ownerBoundaryPath ?? `runtimes.${runtime.path}`,
+            nextAncestry,
+          )
+        }
+
+        for (const child of current.scopes
+          .filter(item => item.parentPath === scopePath)
+          .sort((left, right) => left.sourceOrder - right.sourceOrder)) {
+          visitScope(child.path, catalog)
+        }
+      }
+
+      visitScope('scope_default', inherited)
+    }
+
+    visitPayload(payload, new Map(), owner.identity, null, new Set([owner.identity]))
+    return diagnostics
+  }
+
   /** Проверяет domain/program references и stable-prop bindings Composition. */
   private _validateComposition(payload: CompositionProgramPayload, owner: RComposition): {
     diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
@@ -1629,6 +1762,7 @@ export class EndgeCompiler extends EndgeModule {
     const diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[] = []
     const dependencies: ProgramArtifact['dependencies'] = []
     const storeArtifacts = new Map<string, StoreSourceArtifact>()
+    diagnostics.push(...this._compositionI18nCollisionDiagnostics(payload, owner))
 
     if (owner.kind === 'project' && !payload.activation) {
       diagnostics.push({
@@ -1640,6 +1774,8 @@ export class EndgeCompiler extends EndgeModule {
     }
 
     for (const resource of payload.resources) {
+      if (resource.kind !== 'style')
+        continue
       const style = Endge.domain.getStyle(resource.identity)
       const artifact = Endge.program.getStyleArtifact(resource.identity)
       if (!style) {
@@ -2369,6 +2505,7 @@ export class EndgeCompiler extends EndgeModule {
       runtimes: [],
       hooks: [],
       outputs: [],
+      i18nResources: [],
       graph: { inputs: [], dataInputs: [], updates: [], publications: [], mounts: [] },
     }
   }

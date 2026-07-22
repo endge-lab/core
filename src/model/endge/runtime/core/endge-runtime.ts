@@ -248,6 +248,23 @@ export class EndgeRuntime extends EndgeModule {
     return this._hosts.getAll()
   }
 
+  /**
+   * Инвалидирует все renderable roots активных application scopes.
+   * Операция намеренно coarse-grained: locale меняется редко, поэтому отдельный
+   * dependency graph переводов на этом этапе не нужен.
+   */
+  public invalidateApplicationScopes(): void {
+    if (!this._inited)
+      return
+    Raph.transaction(() => {
+      for (const host of this._hosts.getAll()) {
+        if (!host.capabilities.includes('renderable') || !host.node)
+          continue
+        host.node.dirty(RuntimeNodeUpdatePhase.PHASE_NAME)
+      }
+    })
+  }
+
   /** Регистрирует host, созданный владельцем составной runtime-сущности. */
   public registerRuntimeHost(host: AnyRuntimeHost): boolean {
     this.start()

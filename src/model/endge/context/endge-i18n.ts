@@ -1,5 +1,5 @@
 import type { RI18nBundle } from '@/domain/entities/reflect/RI18nBundle'
-import type { I18nLocaleMessages, I18nMessagesOptions, I18nTranslateOptions } from '@/domain/types/i18n.types'
+import type { I18nLocaleMessages, I18nMessagesOptions, I18nRuntimeCatalog, I18nTranslateOptions } from '@/domain/types/i18n.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { Endge } from '@/model/endge/kernel/endge'
@@ -11,6 +11,7 @@ export class EndgeI18n extends EndgeModule {
   private _fallbackLocale = ''
   private _offContext: (() => void) | null = null
   private _offDomain: (() => void) | null = null
+  private _lastLocale = ''
   private readonly _messagesByLocale = new Map<string, Map<string, string>>()
   private readonly _messagesByBundle = new Map<string, Map<string, Map<string, string>>>()
 
@@ -20,7 +21,15 @@ export class EndgeI18n extends EndgeModule {
   public override setup(): void {
     this._offContext?.()
     this._offDomain?.()
-    this._offContext = Endge.context.subscribe(() => this.notify())
+    this._lastLocale = Endge.context.currentLocale
+    this._offContext = Endge.context.subscribe(() => {
+      const locale = Endge.context.currentLocale
+      if (locale !== this._lastLocale) {
+        this._lastLocale = locale
+        Endge.runtime.invalidateApplicationScopes()
+      }
+      this.notify()
+    })
     this._offDomain = Endge.domain.subscribe(() => this.rebuildIndexes())
   }
 
@@ -41,6 +50,7 @@ export class EndgeI18n extends EndgeModule {
     this._offContext = null
     this._offDomain = null
     this._fallbackLocale = ''
+    this._lastLocale = ''
     this._messagesByLocale.clear()
     this._messagesByBundle.clear()
   }
@@ -75,6 +85,7 @@ export class EndgeI18n extends EndgeModule {
       return
 
     this._fallbackLocale = next
+    Endge.runtime.invalidateApplicationScopes()
     this.notify()
   }
 
@@ -121,6 +132,25 @@ export class EndgeI18n extends EndgeModule {
 
     const text = typeof value === 'string' ? value : String(value)
     return this._interpolate(text, normalized.params)
+  }
+
+  /**
+   * Разрешает `alias:key.path` только в переданном Composition catalog.
+   * Физический identity i18n-документа не является частью публичного ключа.
+   */
+  public translate(catalog: I18nRuntimeCatalog, key: string, fallback?: string): string {
+    const rawKey = String(key ?? '').trim()
+    const separator = rawKey.indexOf(':')
+    if (separator > 0) {
+      const alias = rawKey.slice(0, separator)
+      const messageKey = rawKey.slice(separator + 1)
+      const entry = catalog[alias]
+      const value = entry?.messages[this.locale]?.[messageKey]
+        ?? entry?.messages[this._fallbackLocale]?.[messageKey]
+      if (value != null)
+        return value
+    }
+    return fallback ?? `{{${rawKey}}}`
   }
 
   /**

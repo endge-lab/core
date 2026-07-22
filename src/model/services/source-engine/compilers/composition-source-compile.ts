@@ -144,6 +144,7 @@ export function compileCompositionSource(source: string, sourceVersion = 1): Com
         type: 'composition',
         sourceVersion,
         ...document,
+        i18nResources: [],
         graph: buildRuntimeGraph(document),
       },
       metadata,
@@ -376,20 +377,25 @@ function readResources(
       continue
     }
     declared.add(name)
-    if (!t.isCallExpression(expression) || !t.isIdentifier(expression.callee, { name: 'style' })) {
-      diagnostics.push(diagnostic('error', 'composition-resource-kind', `Resource "${path}" должен иметь вид style(identity).`, `resources.${path}`, expression))
+    if (
+      !t.isCallExpression(expression)
+      || !t.isIdentifier(expression.callee)
+      || (expression.callee.name !== 'style' && expression.callee.name !== 'i18n')
+    ) {
+      diagnostics.push(diagnostic('error', 'composition-resource-kind', `Resource "${path}" должен иметь вид style(identity) или i18n(identity).`, `resources.${path}`, expression))
       continue
     }
+    const kind = expression.callee.name
     const identity = readStringArgument(expression, 0)
     if (!identity || expression.arguments.length !== 1) {
-      diagnostics.push(diagnostic('error', 'composition-resource-style-identity', `Style resource "${path}" требует один identity.`, `resources.${path}`, expression))
+      diagnostics.push(diagnostic('error', `composition-resource-${kind}-identity`, `${kind === 'style' ? 'Style' : 'I18n'} resource "${path}" требует один identity.`, `resources.${path}`, expression))
       continue
     }
     resources.push({
       name,
       path,
       scopePath,
-      kind: 'style',
+      kind,
       identity,
       sourceOrder: order.value++,
     })
