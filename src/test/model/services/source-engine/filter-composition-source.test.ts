@@ -228,6 +228,56 @@ defineComposition({
     })
   })
 
+  it('compiles all-output fromOutput bindings and rejects an empty explicit output', () => {
+    const valid = compileCompositionSource(`
+defineComposition({
+  runtimes: {
+    filter: filter('schedule'),
+    query: query('search').withProps({
+      payload: fromOutput('filter'),
+      rows: fromOutput('filter').getOr('request.rows', []),
+    }),
+  },
+})
+`)
+
+    expect(valid.diagnostics).toEqual([])
+    const props = valid.artifact?.runtimes.find(runtime => runtime.name === 'query')?.props
+    expect(props?.payload).toEqual({ kind: 'outputs', runtime: 'filter' })
+    expect(props?.rows).toMatchObject({
+      kind: 'expression',
+      expression: {
+        type: 'operation',
+        operation: 'get-or',
+      },
+    })
+    expect(props?.rows.kind === 'expression' ? props.rows.expression : null).toMatchObject({
+      arguments: [
+        { type: 'read', source: 'composition-outputs', path: '', parameters: ['filter'] },
+        { type: 'literal', value: 'request.rows' },
+        { type: 'array', items: [] },
+      ],
+    })
+
+    const invalid = compileCompositionSource(`
+defineComposition({
+  runtimes: {
+    filter: filter('schedule'),
+    query: query('search').withProps({
+      payload: fromOutput('filter', ''),
+      rows: fromOutput('filter', '').get('rows'),
+    }),
+  },
+})
+`)
+
+    expect(invalid.artifact).toBeNull()
+    expect(invalid.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'composition-binding-output' }),
+      expect.objectContaining({ code: 'source-expression-domain-read' }),
+    ]))
+  })
+
   it('compiles Composition graph and rejects cycles, duplicate persist keys and render config', () => {
     const valid = compileCompositionSource(`
 	defineComposition({
@@ -491,7 +541,12 @@ defineComposition({
 defineComposition({
   runtimes: {
     requests: composition('groundhandling-default').withProps({
-      requirements: metadataOf('table', 'groundhandling.query'),
+      requirements: metadataOf('table'),
+      queryRequirements: metadataOf('table', 'groundhandling.query'),
+      manualRequirements: {
+        arrival: metadataOf('table', 'groundhandling.arrival'),
+        departure: metadataOf('table', 'groundhandling.departure'),
+      },
     }),
     table: component('groundhandling-control-table'),
   },
@@ -502,7 +557,29 @@ defineComposition({
     expect(consumer.artifact?.runtimes[0]?.props.requirements).toMatchObject({
       kind: 'runtime-metadata',
       runtime: 'table',
+    })
+    expect(consumer.artifact?.runtimes[0]?.props.queryRequirements).toMatchObject({
+      kind: 'runtime-metadata',
+      runtime: 'table',
       namespace: 'groundhandling.query',
+    })
+    expect(consumer.artifact?.runtimes[0]?.props.manualRequirements).toMatchObject({
+      kind: 'expression',
+      expression: {
+        type: 'object',
+        properties: {
+          arrival: {
+            type: 'read',
+            source: 'composition-runtime-metadata',
+            parameters: ['table', 'groundhandling.arrival'],
+          },
+          departure: {
+            type: 'read',
+            source: 'composition-runtime-metadata',
+            parameters: ['table', 'groundhandling.departure'],
+          },
+        },
+      },
     })
   })
 

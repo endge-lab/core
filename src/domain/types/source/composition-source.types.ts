@@ -40,9 +40,10 @@ export interface CompositionScopeDescriptor {
 export type CompositionBindingValue
   = | { kind: 'literal', value: unknown }
     | { kind: 'output', runtime: string, output: string }
+    | { kind: 'outputs', runtime: string, outputs?: string[] }
     | { kind: 'store', key: string }
     | { kind: 'data', data: string, path: string }
-    | { kind: 'runtime-metadata', runtime: string, namespace: string }
+    | { kind: 'runtime-metadata', runtime: string, namespace?: string }
     | { kind: 'filter-fields', runtime: string, fields: string[] }
     | { kind: 'expression', expression: SourceExpressionIR }
 

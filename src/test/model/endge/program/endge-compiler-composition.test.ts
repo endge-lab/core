@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { REnvironment } from '@/domain/entities/reflect/REnvironment'
+import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { RProject } from '@/domain/entities/reflect/RProject'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RStore } from '@/domain/entities/reflect/RStore'
@@ -45,6 +46,78 @@ describe('EndgeCompiler composition validation', () => {
         message: 'Query "schedule" найден в домене, но не собран в compiled program. Проверьте source запроса или предыдущие ошибки build.',
       }),
     ]))
+  })
+
+  it('collects all runtime outputs while preserving explicit output selection', () => {
+    const component = new RComponentSFC()
+    component.id = 40
+    component.identity = 'output-consumer'
+    component.name = 'Output consumer'
+    component.source = '<template><div /></template>'
+    Endge.domain.addComponentSFC(component)
+
+    const filter = new RFilter()
+    filter.id = 41
+    filter.identity = 'runtime-output-filter'
+    filter.name = 'Runtime output filter'
+    filter.source = `
+defineFilter({
+  fields: {},
+  outputs: {
+    request: output().json(() => ({ value: 1 })),
+    preview: output().json(() => ({ value: 2 })),
+  },
+})
+`
+    Endge.domain.addFilter(filter)
+    Endge.compiler.buildFilter(filter)
+
+    const composition = new RComposition()
+    composition.id = 42
+    composition.identity = 'implicit-output-page'
+    composition.name = 'Implicit output page'
+    composition.source = `
+defineComposition({
+  runtimes: {
+    filters: filter('runtime-output-filter'),
+    consumer: component('output-consumer').withProps({
+      direct: fromOutput('filters'),
+      selected: fromOutput('filters', 'request'),
+      nested: fromOutput('filters').get('request.value'),
+      manual: {
+        request: fromOutput('filters', 'request'),
+        preview: fromOutput('filters', 'preview'),
+      },
+    }),
+  },
+})
+`
+
+    const valid = Endge.compiler.buildComposition(composition)
+    const consumer = valid.payload.runtimes.find(runtime => runtime.name === 'consumer')
+    expect(valid.status).toBe('valid')
+    expect(consumer?.props.direct).toEqual({
+      kind: 'outputs',
+      runtime: 'filters',
+      outputs: ['request', 'preview'],
+    })
+    expect(consumer?.props.selected).toEqual({
+      kind: 'output',
+      runtime: 'filters',
+      output: 'request',
+    })
+    expect(consumer?.props.nested).toMatchObject({ kind: 'expression' })
+    expect(consumer?.props.nested.kind === 'expression' ? consumer.props.nested.expression : null).toMatchObject({
+      arguments: [
+        { type: 'read', source: 'composition-outputs', path: '', parameters: ['filters', 'request', 'preview'] },
+        { type: 'literal', value: 'request.value' },
+      ],
+    })
+    expect(valid.payload.graph.inputs.find(input => input.targetProp === 'direct')?.source).toEqual({
+      kind: 'outputs',
+      runtime: 'filters',
+      outputs: ['request', 'preview'],
+    })
   })
 
   it('validates nested Composition references and rejects self-reference', () => {

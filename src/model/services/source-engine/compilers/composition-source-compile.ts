@@ -817,10 +817,14 @@ function readBindings(
     if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'fromOutput' })) {
       const runtime = readStringArgument(expression, 0)
       const output = readStringArgument(expression, 1)
-      if (!runtime || !output)
-        diagnostics.push(diagnostic('error', 'composition-binding-output', 'fromOutput(runtime, output) требует две строки.', `${sourcePath}.${key}`, expression))
-      else
-        bindings[key] = { kind: 'output', runtime, output }
+      if (!runtime || expression.arguments.length < 1 || expression.arguments.length > 2 || (expression.arguments.length === 2 && !output)) {
+        diagnostics.push(diagnostic('error', 'composition-binding-output', 'fromOutput(runtime[, output]) требует одну или две непустые строки.', `${sourcePath}.${key}`, expression))
+      }
+      else {
+        bindings[key] = output
+          ? { kind: 'output', runtime, output }
+          : { kind: 'outputs', runtime }
+      }
       continue
     }
     if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'fromStore' })) {
@@ -845,10 +849,14 @@ function readBindings(
     if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'metadataOf' })) {
       const runtime = readStringArgument(expression, 0)
       const namespace = readStringArgument(expression, 1)
-      if (!runtime || !namespace || expression.arguments.length !== 2)
-        diagnostics.push(diagnostic('error', 'composition-binding-runtime-metadata', 'metadataOf(runtime, namespace) требует две строки.', `${sourcePath}.${key}`, expression))
-      else
-        bindings[key] = { kind: 'runtime-metadata', runtime, namespace }
+      if (!runtime || expression.arguments.length < 1 || expression.arguments.length > 2 || (expression.arguments.length === 2 && !namespace)) {
+        diagnostics.push(diagnostic('error', 'composition-binding-runtime-metadata', 'metadataOf(runtime[, namespace]) требует одну или две непустые строки.', `${sourcePath}.${key}`, expression))
+      }
+      else {
+        bindings[key] = namespace
+          ? { kind: 'runtime-metadata', runtime, namespace }
+          : { kind: 'runtime-metadata', runtime }
+      }
       continue
     }
     const filterBinding = readFilterFieldsBinding(expression, diagnostics, `${sourcePath}.${key}`)
@@ -1057,7 +1065,7 @@ function validateBindingReferences(
     for (const [prop, binding] of Object.entries(runtime.props)) {
       if (binding.kind === 'expression') {
         for (const read of collectExpressionReads(binding.expression)) {
-          const runtimeRef = read.source === 'composition-output' || read.source === 'composition-filter-fields'
+          const runtimeRef = read.source === 'composition-output' || read.source === 'composition-outputs' || read.source === 'composition-filter-fields' || read.source === 'composition-runtime-metadata'
             ? read.parameters?.[0]
             : undefined
           const dataRef = read.source === 'composition-data'
@@ -1076,7 +1084,7 @@ function validateBindingReferences(
             diagnostics.push(diagnostic('error', 'composition-binding-prop-missing', `prop(...) ссылается на необъявленный Composition prop "${propRef}".`, `runtimes.${runtime.name}.withProps.${prop}`))
         }
       }
-      if ((binding.kind === 'output' || binding.kind === 'filter-fields') && !runtimeByName.has(binding.runtime)) {
+      if ((binding.kind === 'output' || binding.kind === 'outputs' || binding.kind === 'filter-fields') && !runtimeByName.has(binding.runtime)) {
         diagnostics.push(diagnostic(
           'error',
           'composition-binding-runtime-missing',
@@ -1131,11 +1139,11 @@ function validateRuntimeCycles(
   for (const runtime of runtimes) {
     const propEdges = Object.values(runtime.props)
       .flatMap((binding) => {
-        if (binding.kind === 'output' || binding.kind === 'filter-fields')
+        if (binding.kind === 'output' || binding.kind === 'outputs' || binding.kind === 'filter-fields')
           return [binding.runtime]
         if (binding.kind === 'expression')
           return collectExpressionReads(binding.expression)
-            .filter(read => read.source === 'composition-output' || read.source === 'composition-filter-fields')
+            .filter(read => read.source === 'composition-output' || read.source === 'composition-outputs' || read.source === 'composition-filter-fields')
             .map(read => read.parameters?.[0])
             .filter((value): value is string => Boolean(value))
         return []

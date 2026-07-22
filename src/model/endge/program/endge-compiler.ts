@@ -3,7 +3,7 @@ import type { DiagnosticsSpanHandle } from '@/domain/types/diagnostics'
 import type { DataViewMaterializationStrategy, DataViewRef, DataViewPipelineStep } from '@/domain/types/source/data-view-source.types'
 import type { FilterProgramPayload } from '@/domain/types/source/filter-source.types'
 import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
-import type { SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
+import type { SourceExpressionIR, SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 import type { StoreSourceArtifact } from '@/domain/types/source/store-source.types'
 import type { TypeProgramCatalogEntry, TypeProgramPayload, TypeSourceDefinition, TypeSourceExpression } from '@/domain/types/source/type-source.types'
 import type {
@@ -1892,14 +1892,40 @@ export class EndgeCompiler extends EndgeModule {
       }
     }
 
+    const runtimeOutputNames = (runtime: CompositionProgramPayload['runtimes'][number] | undefined): string[] | null => {
+      if (runtime?.kind === 'filter') {
+        const artifact = Endge.program.getFilterArtifact(runtime.identity)
+        return artifact && artifact.status !== 'error'
+          ? artifact.payload.outputs.map(item => item.key)
+          : null
+      }
+      if (runtime?.kind === 'query') {
+        const artifact = Endge.program.getQueryArtifact(runtime.identity)
+        return artifact && artifact.status !== 'error'
+          ? artifact.payload.outputs.map(item => item.key)
+          : null
+      }
+      if (runtime?.kind === 'composition') {
+        const artifact = Endge.program.getCompositionArtifact(runtime.identity)
+        return artifact && artifact.status !== 'error'
+          ? artifact.payload.outputs.map(item => item.key)
+          : null
+      }
+      return []
+    }
     const runtimeHasOutput = (runtime: CompositionProgramPayload['runtimes'][number] | undefined, output: string): boolean => {
-      if (runtime?.kind === 'filter')
-        return Endge.program.getFilterArtifact(runtime.identity)?.payload.outputs.some(item => item.key === output) ?? false
-      if (runtime?.kind === 'query')
-        return Endge.program.getQueryArtifact(runtime.identity)?.payload.outputs.some(item => item.key === output) ?? false
-      if (runtime?.kind === 'composition')
-        return Endge.program.getCompositionArtifact(runtime.identity)?.payload.outputs.some(item => item.key === output) ?? false
-      return false
+      return runtimeOutputNames(runtime)?.includes(output) ?? false
+    }
+    const collectCompositionOutputReads = (expression: SourceExpressionIR): Array<Extract<SourceExpressionIR, { type: 'read' }>> => {
+      if (expression.type === 'read')
+        return expression.source === 'composition-output' || expression.source === 'composition-outputs' ? [expression] : []
+      if (expression.type === 'operation')
+        return expression.arguments.flatMap(collectCompositionOutputReads)
+      if (expression.type === 'array')
+        return expression.items.flatMap(collectCompositionOutputReads)
+      if (expression.type === 'object')
+        return Object.values(expression.properties).flatMap(collectCompositionOutputReads)
+      return []
     }
 
     for (const output of payload.outputs) {
@@ -1919,6 +1945,36 @@ export class EndgeCompiler extends EndgeModule {
 
     for (const target of payload.runtimes) {
       for (const [propName, binding] of Object.entries(target.props)) {
+        if (binding.kind === 'expression') {
+          for (const read of collectCompositionOutputReads(binding.expression)) {
+            const runtimeName = read.parameters?.[0] ?? ''
+            const source = payload.runtimes.find(item => item.name === runtimeName)
+            const sourcePath = `runtimes.${target.name}.withProps.${propName}`
+            if (read.source === 'composition-outputs') {
+              const outputNames = runtimeOutputNames(source)
+              if (outputNames != null)
+                read.parameters = [runtimeName, ...outputNames]
+              continue
+            }
+            const outputName = read.parameters?.[1] ?? ''
+            if (!runtimeHasOutput(source, outputName)) {
+              diagnostics.push({
+                severity: 'error',
+                code: 'composition-binding-output-missing',
+                message: `Runtime "${runtimeName}" не содержит output "${outputName}".`,
+                sourcePath,
+              })
+            }
+          }
+          continue
+        }
+        if (binding.kind === 'outputs') {
+          const source = payload.runtimes.find(item => item.name === binding.runtime)
+          const outputNames = runtimeOutputNames(source)
+          if (outputNames != null)
+            binding.outputs = outputNames
+          continue
+        }
         if (binding.kind !== 'output')
           continue
         const source = payload.runtimes.find(item => item.name === binding.runtime)

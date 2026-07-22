@@ -349,21 +349,35 @@ function compileDomainRead(
   if (!t.isIdentifier(node.callee))
     return null
   const name = node.callee.name
-  const specs: Record<string, { source: SourceExpressionReadKind, count: number }> = {
-    fromOutput: { source: 'composition-output', count: 2 },
-    fromData: { source: 'composition-data', count: 1 },
-    fromStore: { source: 'composition-store', count: 1 },
-    metadata: { source: 'metadata', count: 2 },
+  const specs: Record<string, { source: SourceExpressionReadKind, min: number, max: number }> = {
+    fromOutput: { source: 'composition-output', min: 1, max: 2 },
+    metadataOf: { source: 'composition-runtime-metadata', min: 1, max: 2 },
+    fromData: { source: 'composition-data', min: 1, max: 1 },
+    fromStore: { source: 'composition-store', min: 1, max: 1 },
+    metadata: { source: 'metadata', min: 2, max: 2 },
   }
   const spec = specs[name]
   if (!spec)
     return null
-  const parameters = Array.from({ length: spec.count }, (_, index) => readStringArgument(node, index))
-  if (node.arguments.length !== spec.count || parameters.some(value => value == null)) {
-    diagnostics.push(diagnostic('error', 'source-expression-domain-read', `${name}(...) требует ${spec.count} строковых arguments.`, sourcePath, node))
+  const parameters = node.arguments.map((_, index) => readStringArgument(node, index))
+  const invalidArity = node.arguments.length < spec.min || node.arguments.length > spec.max
+  const requiresNonEmptyStrings = name === 'fromOutput' || name === 'metadataOf'
+  const invalidParameters = parameters.some(value => value == null || (requiresNonEmptyStrings && !value))
+  if (invalidArity || invalidParameters) {
+    const expected = spec.min === spec.max
+      ? `${spec.min} строковых arguments`
+      : 'одну или две непустые строки'
+    diagnostics.push(diagnostic('error', 'source-expression-domain-read', `${name}(...) требует ${expected}.`, sourcePath, node))
     return { type: 'literal', value: undefined }
   }
-  return { type: 'read', source: spec.source, path: '', parameters: parameters as string[] }
+  return {
+    type: 'read',
+    source: name === 'fromOutput' && parameters.length === 1
+      ? 'composition-outputs'
+      : spec.source,
+    path: '',
+    parameters: parameters as string[],
+  }
 }
 
 /** Извлекает expression-body из arrow/function callback и компилирует его в IR. */

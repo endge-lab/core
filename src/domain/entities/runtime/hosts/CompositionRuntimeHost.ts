@@ -411,10 +411,19 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     for (const connection of payload.graph.inputs) {
       if (connection.source.kind === 'output')
         this._requireOutputBridge(connection.source.runtime, connection.source.output)
+      else if (connection.source.kind === 'outputs') {
+        for (const output of this._requireResolvedOutputs(connection.source.runtime, connection.source.outputs))
+          this._requireOutputBridge(connection.source.runtime, output)
+      }
       else if (connection.source.kind === 'expression') {
         for (const read of this._collectExpressionReads(connection.source.expression)) {
           if (read.source === 'composition-output')
             this._requireOutputBridge(read.parameters?.[0] ?? '', read.parameters?.[1] ?? '')
+          else if (read.source === 'composition-outputs') {
+            const [runtime = '', ...outputs] = read.parameters ?? []
+            for (const output of outputs)
+              this._requireOutputBridge(runtime, output)
+          }
         }
       }
     }
@@ -1013,6 +1022,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       return this._readRuntimeMetadata(binding.runtime, binding.namespace)
     if (binding.kind === 'filter-fields')
       return this._readFilterFieldsBinding(binding)
+    if (binding.kind === 'outputs')
+      return this._readRuntimeOutputs(binding.runtime, this._requireResolvedOutputs(binding.runtime, binding.outputs))
     if (binding.kind === 'expression') {
       return evaluateSourceExpression(binding.expression, {
         environment: name => Endge.workspace.variables.resolve(`{${name}}`) || `{${name}}`,
@@ -1025,8 +1036,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         }),
       })
     }
-    const output = Raph.get(this._requireOutputBridge(binding.runtime, binding.output)) as any
-    return output?.kind === 'json' ? output.value : output
+    return this._readRuntimeOutput(binding.runtime, binding.output)
   }
 
   private _compiledInputs(runtimeName: string): Record<string, CompositionBindingValue> {
@@ -1092,6 +1102,16 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       }
       return
     }
+    if (binding.kind === 'outputs') {
+      const paths = this._requireResolvedOutputs(binding.runtime, binding.outputs)
+        .flatMap((output) => {
+          const path = this._requireOutputBridge(binding.runtime, output)
+          return [path, `${path}.*`]
+        })
+      if (paths.length)
+        this._disposers.push(Raph.watch(paths, sync))
+      return
+    }
     const path = this._requireOutputBridge(binding.runtime, binding.output)
     this._disposers.push(Raph.watch([path, `${path}.*`], sync))
   }
@@ -1105,16 +1125,15 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       return binding.key
     if (binding.kind === 'data')
       return this._requireDataPath(binding.data, binding.path)
-    if (binding.kind === 'output') {
+    if (binding.kind === 'output')
       return this._requireOutputBridge(binding.runtime, binding.output)
-    }
     return this._materializeBinding(runtimeName, prop, binding)
   }
 
   private _materializeBinding(
     runtimeName: string,
     prop: string,
-    binding: Extract<CompositionBindingValue, { kind: 'output' | 'filter-fields' | 'data' | 'runtime-metadata' | 'expression' }>,
+    binding: Extract<CompositionBindingValue, { kind: 'output' | 'outputs' | 'filter-fields' | 'data' | 'runtime-metadata' | 'expression' }>,
   ): string {
     const path = `${this.basePath}.bindings.${encodePathPart(runtimeName)}.${encodePathPart(prop)}`
     const sync = () => Raph.set(path, this._readBinding(binding))
@@ -1124,8 +1143,26 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     return path
   }
 
-  /** Читает namespace compiled metadata сущности, объявленной runtime alias-ом. */
-  private _readRuntimeMetadata(runtimePath: string, namespace: string): unknown {
+  /** Гарантирует, что список outputs для fromOutput(runtime) был связан до запуска runtime. */
+  private _requireResolvedOutputs(runtime: string, outputs: string[] | undefined): string[] {
+    if (!outputs)
+      throw new Error(`[CompositionRuntimeHost] fromOutput("${runtime}") was not linked by the compiler.`)
+    return outputs
+  }
+
+  /** Читает и распаковывает один именованный runtime output. */
+  private _readRuntimeOutput(runtime: string, output: string): unknown {
+    const value = Raph.get(this._requireOutputBridge(runtime, output)) as any
+    return value?.kind === 'json' ? value.value : value
+  }
+
+  /** Собирает объект всех runtime outputs с сохранением их публичных имён. */
+  private _readRuntimeOutputs(runtime: string, outputs: string[]): Record<string, unknown> {
+    return Object.fromEntries(outputs.map(output => [output, this._readRuntimeOutput(runtime, output)]))
+  }
+
+  /** Читает весь compiled metadata map или один namespace сущности runtime alias-а. */
+  private _readRuntimeMetadata(runtimePath: string, namespace?: string): unknown {
     const descriptor = this.getArtifactPayload()?.runtimes.find(runtime => runtime.path === runtimePath)
     if (!descriptor)
       return undefined
@@ -1139,7 +1176,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       : dependency.kind === 'filter-view'
         ? 'filter'
         : dependency.kind
-    return Endge.program.getArtifact(entityType, dependency.identity)?.metadata.self[namespace]
+    const metadata = Endge.program.getArtifact(entityType, dependency.identity)?.metadata.self
+    return namespace ? metadata?.[namespace] : metadata
   }
 
   private _readExpressionSource(
@@ -1147,9 +1185,12 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   ): unknown {
     const parameters = read.parameters ?? []
     if (read.source === 'composition-output') {
-      const output = Raph.get(this._requireOutputBridge(parameters[0], parameters[1])) as any
-      return output?.kind === 'json' ? output.value : output
+      return this._readRuntimeOutput(parameters[0], parameters[1])
     }
+    if (read.source === 'composition-outputs')
+      return this._readRuntimeOutputs(parameters[0], parameters.slice(1))
+    if (read.source === 'composition-runtime-metadata')
+      return this._readRuntimeMetadata(parameters[0], parameters[1])
     if (read.source === 'composition-store')
       return Raph.get(parameters[0])
     if (read.source === 'composition-data') {
@@ -1196,7 +1237,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     sync: () => void,
   ): void {
     const parameters = read.parameters ?? []
-    if (read.source === 'metadata' || read.source === 'current' || read.source === 'env')
+    if (read.source === 'metadata' || read.source === 'composition-runtime-metadata' || read.source === 'current' || read.source === 'env')
       return
     if (read.source === 'prop') {
       const dot = read.path.indexOf('.')
@@ -1209,6 +1250,16 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     if (read.source === 'composition-output') {
       const path = this._requireOutputBridge(parameters[0], parameters[1])
       this._disposers.push(Raph.watch([path, `${path}.*`], sync))
+      return
+    }
+    if (read.source === 'composition-outputs') {
+      const [runtime = '', ...outputs] = parameters
+      const paths = outputs.flatMap((output) => {
+        const path = this._requireOutputBridge(runtime, output)
+        return [path, `${path}.*`]
+      })
+      if (paths.length)
+        this._disposers.push(Raph.watch(paths, sync))
       return
     }
     if (read.source === 'composition-filter-fields') {
@@ -1275,11 +1326,11 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       if (runtime.kind === 'filter-view')
         visit(runtime.identity)
       for (const binding of Object.values(this._compiledInputs(runtime.name))) {
-        if (binding.kind === 'output' || binding.kind === 'filter-fields')
+        if (binding.kind === 'output' || binding.kind === 'outputs' || binding.kind === 'filter-fields')
           visit(binding.runtime)
         else if (binding.kind === 'expression') {
           for (const read of this._collectExpressionReads(binding.expression)) {
-            if (read.source === 'composition-output' || read.source === 'composition-filter-fields')
+            if (read.source === 'composition-output' || read.source === 'composition-outputs' || read.source === 'composition-filter-fields')
               visit(read.parameters?.[0] ?? '')
           }
         }

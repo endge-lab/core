@@ -21,9 +21,11 @@ export type SourceExpressionReadKind
     | 'current'
     | 'scope'
     | 'composition-output'
+    | 'composition-outputs'
     | 'composition-data'
     | 'composition-store'
     | 'composition-filter-fields'
+    | 'composition-runtime-metadata'
     | 'metadata'
     | 'computation-output'
 

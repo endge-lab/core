@@ -96,6 +96,10 @@ describe('Composition runtime session', () => {
     expect(run).toHaveBeenCalledTimes(1)
     expect(query.getProps()).toMatchObject({
       filterPayload: { where: { search: '' } },
+      filterBundle: {
+        request: { where: { search: '' } },
+        summary: { search: '' },
+      },
       filterModel: {
         kind: 'filter-fields',
         runtimeId: filter.id,
@@ -109,6 +113,10 @@ describe('Composition runtime session', () => {
     expect(filterView.getProps().requestPreview).toEqual({ where: { search: 'SU' } })
     expect(query.getProps()).toMatchObject({
       filterPayload: { where: { search: 'SU' } },
+      filterBundle: {
+        request: { where: { search: 'SU' } },
+        summary: { search: 'SU' },
+      },
       filterModel: {
         kind: 'filter-fields',
         runtimeId: filter.id,
@@ -479,7 +487,7 @@ defineComposition({
       data: [],
       runtimes: [{
         name: 'requests', kind: 'composition', identity: 'groundhandling-default', storeTo: [],
-        props: { requirements: { kind: 'runtime-metadata', runtime: 'table', namespace: 'groundhandling.query' } },
+        props: { requirements: { kind: 'runtime-metadata', runtime: 'table' } },
       }, {
         name: 'table', kind: 'component', identity: 'groundhandling-control-table', storeTo: [], props: {},
         activationOverride: { mode: 'manual' }, effectiveActivation: { mode: 'manual' },
@@ -491,9 +499,7 @@ defineComposition({
     Endge.program.addArtifact(artifact('query', 50, 'attributes-leg-select', queryPayload))
     Endge.program.addArtifact(artifact('composition', 51, 'groundhandling-default', innerPayload))
     Endge.program.addArtifact(artifact('composition', 52, 'groundhandling-page', outerPayload))
-    Endge.program.addArtifact(artifact('component-sfc', 53, 'groundhandling-control-table', {}, {
-      'groundhandling.query': requirements,
-    }))
+    Endge.program.addArtifact(artifact('component-sfc', 53, 'groundhandling-control-table', {}, requirements))
 
     const session = await Endge.runtime.composition.mount('groundhandling-page')
     const nested = session.host.getChild('requests') as CompositionRuntimeHost
@@ -647,6 +653,7 @@ defineFilter({
   fields: { search: field('String').optional().default('') },
   outputs: {
     request: output().json(({ value }) => compact({ where: { search: value('search') } })),
+    summary: output().json(({ value }) => ({ search: value('search') })),
   },
 })
 `).artifact!
@@ -654,6 +661,7 @@ defineFilter({
     type: 'query-rest', sourceVersion: 2, endpoint: '', query: '',
     props: [
       { key: 'filterPayload', type: 'Object', optional: true, array: false },
+      { key: 'filterBundle', type: 'Object', optional: true, array: false },
       { key: 'filterModel', type: 'Object', optional: true, array: false },
     ],
     requestBody: null, outputs: [],
@@ -674,6 +682,7 @@ defineFilter({
         name: 'query', kind: 'query', identity: 'schedule-query', storeTo: [],
         props: {
           filterPayload: { kind: 'output', runtime: 'filter', output: 'request' },
+          filterBundle: { kind: 'outputs', runtime: 'filter', outputs: ['request', 'summary'] },
           filterModel: { kind: 'filter-fields', runtime: 'filter', fields: ['search'] },
         },
       },
