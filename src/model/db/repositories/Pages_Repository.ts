@@ -135,6 +135,11 @@ export class Pages_Repository {
     })
   }
 
+  async patchFolder(id: number | string, folder: number | string | null): Promise<PageDoc> {
+    const r = await this.api.patch(`/pages/${id}`, { folder })
+    return r.data
+  }
+
   async hardDelete(identity: string): Promise<void> {
     const existing = await this.findByIdentity(identity)
     if (!existing) return

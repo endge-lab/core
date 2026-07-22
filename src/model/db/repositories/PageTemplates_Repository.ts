@@ -105,4 +105,9 @@ export class PageTemplates_Repository {
       ...(data.meta !== undefined && { meta: data.meta }),
     })
   }
+
+  async patchFolder(id: number | string, folder: number | string | null): Promise<PageTemplateDoc> {
+    const r = await this.api.patch(`/page-templates/${id}`, { folder })
+    return r.data
+  }
 }
