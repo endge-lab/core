@@ -654,8 +654,8 @@ function readRuntime(
       continue
     }
     if (modifier.name === 'persist') {
-      if (kind !== 'filter') {
-        diagnostics.push(diagnostic('error', 'composition-persist-runtime-kind', '.persist(...) в v1 поддерживается только Filter runtime.', `runtimes.${name}.persist`, modifier.call))
+      if (kind !== 'filter' && kind !== 'component') {
+        diagnostics.push(diagnostic('error', 'composition-persist-runtime-kind', '.persist(...) в v1 поддерживается только Filter и Component runtime.', `runtimes.${name}.persist`, modifier.call))
         continue
       }
       const config = modifier.call.arguments[0]

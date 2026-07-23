@@ -23,7 +23,8 @@ import type {
 import { DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION } from '@/model/config/diagnostics'
 
 const LEGACY_SFC_ADAPTER_IDS: Readonly<Record<string, string>> = {
-  'shadcn-vue': 'vue-shadcn',
+  'shadcn-vue': 'native-vue',
+  'vue-shadcn': 'native-vue',
 }
 
 const DEFAULT_LOCALE = 'en'
