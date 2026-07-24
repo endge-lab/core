@@ -1,6 +1,10 @@
 import { Raph } from '@endge/raph'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
+import type {
+  VocabCacheOperationResult,
+  VocabReference,
+} from '@/domain/types/runtime/vocab-cache.types'
 import { Endge } from '@/model/endge/kernel/endge'
 
 type VocabRuntimeConfig = {
@@ -22,6 +26,9 @@ export class EndgeVocabs extends EndgeModule {
    */
   private index: Record<string, string> = {}
   private byIdCache: Record<string, any[]> = {}
+  private readonly loadedIdentities = new Set<string>()
+  private readonly inFlight = new Map<string, Promise<any[]>>()
+  private readonly cacheVersions = new Map<string, number>()
   private _loadingRequests: number = 0
   loading: boolean = false
 
@@ -207,12 +214,71 @@ export class EndgeVocabs extends EndgeModule {
    * Очищает cache словаря по id.
    */
   clearCacheById(vocabId: string | number): void {
-    const cfg = this.resolveVocabConfigById(vocabId)
+    const cfg = this.resolveVocabConfigByIdOrIdentity(vocabId)
     if (!cfg)
       return
 
+    this.bumpCacheVersion(cfg.identity)
+    this.loadedIdentities.delete(cfg.identity)
     delete this.byIdCache[cfg.identity]
-    Raph.set(`vocabsByIdentity.${cfg.identity}`, [])
+    Raph.delete(`vocabsByIdentity.${cfg.identity}`)
+    Raph.delete(`vocabs.${cfg.slug}`)
+  }
+
+  /**
+   * Загружает отсутствующие справочники параллельно и переиспользует cache.
+   */
+  async acquire(vocabs: readonly VocabReference[]): Promise<VocabCacheOperationResult[]> {
+    return await Promise.all(this.normalizeReferences(vocabs).map(async (reference) => {
+      const cfg = this.requireVocabConfig(reference)
+      const cached = Raph.get(`vocabs.${cfg.slug}`)
+      if (this.loadedIdentities.has(cfg.identity) || Array.isArray(cached)) {
+        return {
+          identity: cfg.identity,
+          status: 'cache-hit',
+          count: Array.isArray(cached) ? cached.length : 0,
+        }
+      }
+
+      const docs = await this.loadShared(cfg, false)
+      return {
+        identity: cfg.identity,
+        status: 'loaded',
+        count: docs.length,
+      }
+    }))
+  }
+
+  /**
+   * Принудительно обновляет справочники параллельно, сохраняя дедупликацию одновременных запросов.
+   */
+  async refresh(vocabs: readonly VocabReference[]): Promise<VocabCacheOperationResult[]> {
+    return await Promise.all(this.normalizeReferences(vocabs).map(async (reference) => {
+      const cfg = this.requireVocabConfig(reference)
+      const docs = await this.loadShared(cfg, true)
+      return {
+        identity: cfg.identity,
+        status: 'refreshed',
+        count: docs.length,
+      }
+    }))
+  }
+
+  /**
+   * Удаляет справочники только из runtime cache, не выполняя сетевых запросов.
+   */
+  invalidate(vocabs: readonly VocabReference[]): VocabCacheOperationResult[] {
+    return this.normalizeReferences(vocabs).map((reference) => {
+      const cfg = this.requireVocabConfig(reference)
+      const cached = Raph.get(`vocabs.${cfg.slug}`)
+      const count = Array.isArray(cached) ? cached.length : 0
+      this.clearCacheById(reference)
+      return {
+        identity: cfg.identity,
+        status: 'invalidated',
+        count,
+      }
+    })
   }
 
   /**
@@ -374,12 +440,61 @@ export class EndgeVocabs extends EndgeModule {
     return String(vocabId ?? '').trim()
   }
 
+  private normalizeReferences(vocabs: readonly VocabReference[]): VocabReference[] {
+    return [...new Map(vocabs
+      .map(reference => [this.normalizeVocabId(reference), reference] as const)
+      .filter(([key]) => Boolean(key))).values()]
+  }
+
+  private requireVocabConfig(reference: VocabReference): VocabRuntimeConfig {
+    const cfg = this.resolveVocabConfigByIdOrIdentity(reference)
+    if (!cfg)
+      throw new Error(`Vocab "${String(reference)}" не найден.`)
+    return cfg
+  }
+
+  private async loadShared(cfg: VocabRuntimeConfig, force: boolean): Promise<any[]> {
+    const existing = this.inFlight.get(cfg.identity)
+    if (existing)
+      return await existing
+
+    if (!force) {
+      const cached = Raph.get(`vocabs.${cfg.slug}`)
+      if (this.loadedIdentities.has(cfg.identity) || Array.isArray(cached))
+        return Array.isArray(cached) ? cached : []
+    }
+
+    const version = this.cacheVersions.get(cfg.identity) ?? 0
+    const request = this.loadVocab(cfg.identity, { throwOnError: true })
+      .then((docs) => {
+        if ((this.cacheVersions.get(cfg.identity) ?? 0) !== version) {
+          delete this.byIdCache[cfg.identity]
+          this.loadedIdentities.delete(cfg.identity)
+          Raph.delete(`vocabsByIdentity.${cfg.identity}`)
+          Raph.delete(`vocabs.${cfg.slug}`)
+        }
+        return docs
+      })
+      .finally(() => {
+        if (this.inFlight.get(cfg.identity) === request)
+          this.inFlight.delete(cfg.identity)
+      })
+
+    this.inFlight.set(cfg.identity, request)
+    return await request
+  }
+
+  private bumpCacheVersion(identity: string): void {
+    this.cacheVersions.set(identity, (this.cacheVersions.get(identity) ?? 0) + 1)
+  }
+
   /**
    * Устанавливает By Identity Cache.
    */
   private setByIdentityCache(identity: string, docs: any[]): void {
     this.byIdCache[identity] = Array.isArray(docs) ? docs : []
     Raph.set(`vocabsByIdentity.${identity}`, this.byIdCache[identity])
+    this.loadedIdentities.add(identity)
   }
 
   /**

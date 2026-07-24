@@ -27,6 +27,37 @@ export interface ComponentSFCExpressionCompileResult {
   diagnostics: RComponentDiagnostic[]
 }
 
+/** Возвращает статический fallback из `t(key, fallback)` без i18n/runtime-контекста. */
+export function readComponentSFCTranslationFallback(source: string): string | null {
+  try {
+    const expression = parseExpression(String(source ?? '').trim(), {
+      sourceType: 'module',
+      plugins: ['typescript'],
+    })
+
+    if (
+      expression?.type !== 'CallExpression'
+      || expression.callee?.type !== 'Identifier'
+      || expression.callee.name !== 't'
+    ) {
+      return null
+    }
+
+    const fallback = expression.arguments?.[1]
+    if (fallback?.type === 'StringLiteral') {
+      return fallback.value
+    }
+    if (fallback?.type === 'TemplateLiteral' && fallback.expressions?.length === 0) {
+      return fallback.quasis?.[0]?.value?.cooked ?? fallback.quasis?.[0]?.value?.raw ?? null
+    }
+  }
+  catch {
+    return null
+  }
+
+  return null
+}
+
 /** Компилирует expression и извлекает reactive reads для runtime-подписок. */
 export function compileComponentSFCExpression(
   source: string,

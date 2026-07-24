@@ -171,6 +171,42 @@ export interface CompositionSourceDocument {
   outputs: CompositionOutputDescriptor[]
 }
 
+/** Добавление data dependency в canonical Composition source. */
+export interface CompositionSourceAddDataPatch {
+  type: 'add-data'
+  name: string
+  kind: CompositionDataDescriptor['kind']
+  identity: string
+}
+
+/** Добавление owned resource в canonical Composition source. */
+export interface CompositionSourceAddResourcePatch {
+  type: 'add-resource'
+  name: string
+  kind: CompositionResourceDescriptor['kind']
+  identity: string
+}
+
+/** Добавление runtime dependency в canonical Composition source. */
+export interface CompositionSourceAddRuntimePatch {
+  type: 'add-runtime'
+  name: string
+  kind: Exclude<CompositionRuntimeKind, 'filter-view'>
+  identity: string
+  activation?: CompositionActivationMode
+}
+
+/** Одна узкая source-preserving операция над Composition dependencies. */
+export type CompositionSourcePatchOperation
+  = | CompositionSourceAddDataPatch
+    | CompositionSourceAddResourcePatch
+    | CompositionSourceAddRuntimePatch
+
+/** Composition source patch: одиночная операция или атомарная пачка. */
+export type CompositionSourcePatch
+  = | CompositionSourcePatchOperation
+    | CompositionSourcePatchOperation[]
+
 /** Нормализованная связь input runtime-ноды. */
 export interface CompositionRuntimeInputConnection {
   targetRuntime: string

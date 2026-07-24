@@ -1,4 +1,4 @@
-import type { RField } from '@/domain/entities/reflect/RField'
+import { RField } from '@/domain/entities/reflect/RField'
 import { RAction } from '@/domain/entities/reflect/RAction'
 import type {
   ActionDefinitionInput,
@@ -466,22 +466,50 @@ export class EndgeActions extends Subscribable {
         console.log(value ?? '[Endge] built-in-console-log executed')
       },
     }, { kind: 'builtin', owner: '@endge/core' })
-    this._defineCodeAction({
-      identity: 'load-vocabs',
-      displayName: 'Загрузка справочников',
-      description: 'Загружает справочники через Endge.vocabs.',
-      owner: '@endge/core',
-      execute: async (invocation) => {
-        const raw = invocation.input
-        const ids = Array.isArray(raw)
-          ? raw
-          : (raw != null && typeof raw === 'object' && Array.isArray((raw as { input?: unknown }).input)
-              ? (raw as { input: unknown[] }).input
-              : [])
-        const normalized = ids.map(value => Number(value)).filter(Number.isFinite)
-        await Promise.all(normalized.map(id => Endge.vocabs.loadById(id)))
+    const vocabActions: Array<CodeActionDefinition> = [
+      {
+        identity: BUILTIN_ACTION_IDS.vocabAcquire,
+        displayName: 'Загрузить справочники',
+        description: 'Загружает только отсутствующие в runtime cache справочники.',
+        owner: '@endge/core',
+        catalogPath: ['Справочники'],
+        input: new RField('vocabs', 'RefVocab', true),
+        execute: invocation => Endge.vocabs.acquire(this._vocabReferences(invocation.input)),
       },
-    }, { kind: 'builtin', owner: '@endge/core' })
+      {
+        identity: BUILTIN_ACTION_IDS.vocabRefresh,
+        displayName: 'Обновить справочники',
+        description: 'Принудительно загружает свежие значения справочников.',
+        owner: '@endge/core',
+        catalogPath: ['Справочники'],
+        input: new RField('vocabs', 'RefVocab', true),
+        execute: invocation => Endge.vocabs.refresh(this._vocabReferences(invocation.input)),
+      },
+      {
+        identity: BUILTIN_ACTION_IDS.vocabInvalidate,
+        displayName: 'Очистить кеш справочников',
+        description: 'Удаляет значения справочников из runtime cache без сетевого запроса.',
+        owner: '@endge/core',
+        catalogPath: ['Справочники'],
+        input: new RField('vocabs', 'RefVocab', true),
+        execute: invocation => Endge.vocabs.invalidate(this._vocabReferences(invocation.input)),
+      },
+    ]
+    for (const definition of vocabActions)
+      this._defineCodeAction(definition, { kind: 'builtin', owner: '@endge/core' })
+  }
+
+  private _vocabReferences(input: unknown): Array<string | number> {
+    const raw = Array.isArray(input)
+      ? input
+      : (input != null && typeof input === 'object'
+          ? ((input as { vocabs?: unknown }).vocabs ?? (input as { input?: unknown }).input)
+          : input)
+    const values = Array.isArray(raw) ? raw : (raw == null ? [] : [raw])
+    return values.filter((value): value is string | number =>
+      (typeof value === 'string' && value.trim().length > 0)
+      || (typeof value === 'number' && Number.isFinite(value)),
+    )
   }
 
   private _syncResolvedIndex(): void {

@@ -1,4 +1,5 @@
 export * from './action.types'
+export * from './vocab-cache.types'
 export * from './implementation.types'
 export * from './context-persistence.types'
 export * from './query-execution.types'
