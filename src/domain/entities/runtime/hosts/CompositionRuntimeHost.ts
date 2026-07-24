@@ -858,6 +858,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
 
     const child = Endge.runtime.execute(model, {
       parent: this,
+      artifactReader: this.getArtifactReader() ?? undefined,
       persistence: descriptor.persistKey ? 'local' : 'disabled',
       persistenceKey: descriptor.persistKey,
       meta,

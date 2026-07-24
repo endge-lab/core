@@ -435,6 +435,9 @@ export interface RuntimeHost<
   /** Возвращает compiled artifact, связанный с host, если он доступен. */
   getArtifact: () => ProgramArtifact<TArtifactPayload> | null
 
+  /** Возвращает session-local reader, через который host читает compiled artifacts. */
+  getArtifactReader: () => RuntimeArtifactReader | null
+
   /** Возвращает payload compiled artifact, связанный с host, если он доступен. */
   getArtifactPayload: () => TArtifactPayload | null
 

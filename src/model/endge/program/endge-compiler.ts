@@ -236,6 +236,17 @@ export class EndgeCompiler extends EndgeModule {
     return this.compileEntity('composition', entity, context) as ProgramArtifact<CompositionProgramPayload>
   }
 
+  /**
+   * Компилирует transient Composition artifact без публикации в Endge.program.
+   * Используется runtime session overlays, которым нельзя менять общий build.
+   */
+  public compileCompositionArtifact(entity: RComposition): ProgramArtifact<CompositionProgramPayload> {
+    const handler = this.handlers.get('composition') as EntityCompilerHandler<RComposition, CompositionProgramPayload> | undefined
+    if (!handler)
+      throw new Error('Compiler handler is not registered for "composition"')
+    return handler.compile(entity, this._createCompileContext())
+  }
+
   /** Compiles one global source-first EndgeCSS document. */
   public buildStyle(entity: RStyle): ProgramArtifact<EndgeStyleProgramPayload> {
     const context = this._createCompileContext()

@@ -446,6 +446,11 @@ export abstract class RuntimeHostBase<
     )
   }
 
+  /** Возвращает read-only artifact reader текущей runtime session. */
+  public getArtifactReader(): RuntimeArtifactReader | null {
+    return this._artifactReader
+  }
+
   /**
    * ACCESS
    */

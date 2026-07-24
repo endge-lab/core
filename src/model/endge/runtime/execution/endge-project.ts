@@ -1,10 +1,11 @@
-import type { CompositionSession } from '@/domain/types/source/composition-source.types'
+import type { CompositionProgramPayload, CompositionSession } from '@/domain/types/source/composition-source.types'
 import type {
   ProjectCompositionHandle,
   ProjectCompositionRegistry,
   ProjectRuntimeMountOptions,
   ProjectRuntimeSession,
 } from '@/domain/types/runtime/runtime-project-session.types'
+import type { RuntimeArtifactReader } from '@/domain/types/runtime/runtime-host.types'
 
 import type { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
 import type { ProjectRuntimeHost } from '@/domain/entities/runtime/hosts/ProjectRuntimeHost'
@@ -20,6 +21,7 @@ class ProjectCompositionHandleImpl implements ProjectCompositionHandle {
     identity: string,
     private readonly _projectHost: ProjectRuntimeHost,
     private readonly _projectScope: RuntimeScope,
+    private readonly _artifactReader: RuntimeArtifactReader,
   ) {
     this.identity = identity
   }
@@ -39,11 +41,12 @@ class ProjectCompositionHandleImpl implements ProjectCompositionHandle {
       throw new Error(`[EndgeProject] Composition "${this.identity}" handle is disposed.`)
     if (!this._host) {
       const model = Endge.domain.getComposition(this.identity)
-      const artifact = Endge.program.getCompositionArtifact(this.identity)
+      const artifact = this._artifactReader.getArtifact<CompositionProgramPayload>('composition', this.identity)
       if (!model || !artifact || artifact.status === 'error')
         throw new Error(`[EndgeProject] Composition "${this.identity}" is unavailable.`)
       const host = Endge.runtime.execute(model, {
         parent: this._projectHost,
+        artifactReader: this._artifactReader,
         persistence: 'disabled',
         meta: { runtimeScopeId: this._projectScope.id, projectSession: this._projectHost.id },
       }) as CompositionRuntimeHost | null
@@ -119,7 +122,11 @@ export class EndgeProject {
     const model = Endge.domain.getProject(normalized)
     if (!model)
       throw new Error(`[EndgeProject] Project "${normalized}" is missing.`)
-    const host = Endge.runtime.execute(model, { persistence: 'disabled' }) as ProjectRuntimeHost | null
+    const artifactReader = options.artifactReader ?? Endge.program
+    const host = Endge.runtime.execute(model, {
+      artifactReader,
+      persistence: 'disabled',
+    }) as ProjectRuntimeHost | null
     if (!host)
       throw new Error(`[EndgeProject] Project "${normalized}" cannot be mounted.`)
     const ownerScope = Endge.runtime.getRuntimeScopeByHost(host.id)
@@ -142,11 +149,16 @@ export class EndgeProject {
       .filter(item => item.kind === 'project' && item.kindIdentity === normalized && item.active !== false && !item.deletedAt)
       .sort((left, right) => left.identity.localeCompare(right.identity))
     for (const composition of compositions)
-      handles.set(composition.identity, new ProjectCompositionHandleImpl(composition.identity, host, projectScope))
+      handles.set(composition.identity, new ProjectCompositionHandleImpl(
+        composition.identity,
+        host,
+        projectScope,
+        artifactReader,
+      ))
 
     try {
       for (const composition of compositions) {
-        const artifact = Endge.program.getCompositionArtifact(composition.identity)
+        const artifact = artifactReader.getArtifact<CompositionProgramPayload>('composition', composition.identity)
         if (!artifact || artifact.status === 'error')
           throw new Error(`[EndgeProject] Project Composition "${composition.identity}" is invalid.`)
         if (options.autoActivate !== 'none' && artifact.payload.activation?.mode === 'startup')
