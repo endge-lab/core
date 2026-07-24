@@ -2,6 +2,7 @@ import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
 import type { ProgramMetadataMap } from '@/domain/types/program/program-metadata.types'
 import type { RuntimeHost } from '@/domain/types/runtime/runtime-host.types'
 import type { RuntimeScopeHandle } from '@/domain/types/runtime/runtime-scope.types'
+import type { VocabLoadPolicy } from '@/domain/types/runtime/vocab-cache.types'
 import type { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
 import type { SourceExpressionIR, SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 import type { FilterViewControlDefinition } from '@/domain/types/ui/filter-view.type'
@@ -42,6 +43,8 @@ export interface CompositionScopeDescriptor {
   parentPath: string | null
   activationOverride: CompositionActivationDescriptor | null
   effectiveActivation: CompositionActivationDescriptor
+  /** Data dependencies, активируемые вместе с lifecycle scope. */
+  data?: string[]
   resources: string[]
   runtimes: string[]
   children: string[]
@@ -60,12 +63,18 @@ export type CompositionBindingValue
 
 export interface CompositionDataDescriptor {
   name: string
+  /** Полный data path. Для root data совпадает с name. */
+  path?: string
+  /** Lifecycle scope, которому принадлежит dependency. */
+  scopePath?: string
   kind: 'store' | 'vocab'
   identity: string
   /** Политика разрешения Store; для Vocab не используется. */
   resolution?: 'contextual' | 'isolated' | 'injected'
   /** Provider slot для нескольких Store instances с одной identity. */
   slot?: string | null
+  /** Нормализованная политика загрузки Vocab; для Store не используется. */
+  policy?: VocabLoadPolicy
 }
 
 export interface CompositionStorePublication {

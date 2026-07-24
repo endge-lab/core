@@ -1800,23 +1800,24 @@ export class EndgeCompiler extends EndgeModule {
     }
 
     for (const data of payload.data) {
+      const dataPath = data.path ?? data.name
       if (data.kind === 'store') {
         const store = Endge.domain.getStore(data.identity)
         if (!store) {
-          diagnostics.push({ severity: 'error', code: 'composition-store-missing', message: `Store "${data.identity}" не найден.`, sourcePath: `data.${data.name}` })
+          diagnostics.push({ severity: 'error', code: 'composition-store-missing', message: `Store "${data.identity}" не найден.`, sourcePath: `data.${dataPath}` })
           continue
         }
         const compiled = Endge.program.getStoreArtifact(store.id ?? store.identity)
         if (!compiled || compiled.status === 'error')
-          diagnostics.push({ severity: 'error', code: 'composition-store-invalid', message: `Store "${data.identity}" содержит compile errors.`, sourcePath: `data.${data.name}` })
+          diagnostics.push({ severity: 'error', code: 'composition-store-invalid', message: `Store "${data.identity}" содержит compile errors.`, sourcePath: `data.${dataPath}` })
         else
-          storeArtifacts.set(data.name, compiled.payload)
+          storeArtifacts.set(dataPath, compiled.payload)
         dependencies.push({ entityType: 'store', id: store.id, identity: store.identity, role: 'composition-data' })
       }
       else {
         const vocab = Endge.domain.getVocab(data.identity)
         if (!vocab)
-          diagnostics.push({ severity: 'error', code: 'composition-vocab-missing', message: `Vocab "${data.identity}" не найден.`, sourcePath: `data.${data.name}` })
+          diagnostics.push({ severity: 'error', code: 'composition-vocab-missing', message: `Vocab "${data.identity}" не найден.`, sourcePath: `data.${dataPath}` })
         else
           dependencies.push({ entityType: 'vocabs', id: vocab.id, identity: vocab.identity, role: 'composition-data' })
       }
@@ -1998,7 +1999,7 @@ export class EndgeCompiler extends EndgeModule {
           }
         }
         for (const [targetDataName, sourceDataName] of Object.entries(runtime.dataBindings ?? {})) {
-          const sourceData = payload.data.find(item => item.name === sourceDataName)
+          const sourceData = payload.data.find(item => (item.path ?? item.name) === sourceDataName)
           const targetData = artifact.payload.data.find(item => item.name === targetDataName)
           if (!targetData) {
             diagnostics.push({
@@ -2507,6 +2508,7 @@ export class EndgeCompiler extends EndgeModule {
         parentPath: null,
         activationOverride: null,
         effectiveActivation: { mode: 'startup' },
+        data: [],
         resources: [],
         runtimes: [],
         children: [],

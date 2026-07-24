@@ -300,6 +300,16 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     payload: CompositionProgramPayload,
   ): Promise<void> {
     const scope = this._requireScope(descriptor.path)
+    const scopeData = descriptor.data ?? payload.data
+      .filter(data => (data.scopePath ?? 'scope_default') === descriptor.path)
+      .map(data => data.path ?? data.name)
+    await Promise.all(scopeData.map(async (dataPath) => {
+      const data = payload.data.find(item => (item.path ?? item.name) === dataPath)
+      if (!data || data.kind !== 'vocab')
+        return
+      await Endge.vocabs.acquire([data.identity], data.policy)
+    }))
+
     Endge.styles.transaction(() => {
       for (const resourcePath of descriptor.resources) {
         const resource = payload.resources.find(item => item.path === resourcePath)
@@ -557,7 +567,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }
   }
 
-  /** Монтирует vocab data и разрешает Store aliases через explicit, ancestor или local provider. */
+  /** Регистрирует shared Vocab paths и разрешает Store aliases через explicit, ancestor или local provider. */
   private _mountData(payload: CompositionProgramPayload): void {
     const explicitStoreRuntimes = (
       this.meta.dataRuntimes && typeof this.meta.dataRuntimes === 'object'
@@ -566,21 +576,27 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     ) as Record<string, unknown>
 
     for (const descriptor of payload.data) {
-      const basePath = `${this.basePath}.data.${encodePathPart(descriptor.name)}`
+      const descriptorPath = descriptor.path ?? descriptor.name
 
       if (descriptor.kind === 'vocab') {
         const vocab = Endge.domain.getVocab(descriptor.identity)
         if (!vocab)
           throw new Error(`[CompositionRuntimeHost] Vocab data "${descriptor.identity}" is missing.`)
-        this._dataPaths.set(descriptor.name, basePath)
-        this._bridgePaths.add(basePath)
-        Raph.set(basePath, vocab)
+        const vocabPath = `vocabs.${String(vocab.collectionSlug ?? '').trim()}`
+        this._dataPaths.set(descriptorPath, vocabPath)
         this.addResource({
-          id: `data:${descriptor.name}`,
-          kind: 'raph-node',
+          id: `data:${descriptorPath}`,
+          kind: 'meta',
           title: `Data ${descriptor.name}`,
           subtitle: descriptor.identity,
-          payload: { path: basePath, kind: descriptor.kind, identity: descriptor.identity, ownership: 'owned' },
+          payload: {
+            path: vocabPath,
+            kind: descriptor.kind,
+            identity: descriptor.identity,
+            ownership: 'shared',
+            scopePath: descriptor.scopePath ?? 'scope_default',
+            policy: descriptor.policy,
+          },
         })
         continue
       }
@@ -588,7 +604,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       const store = Endge.domain.getStore(descriptor.identity)
       if (!store)
         throw new Error(`[CompositionRuntimeHost] Store data "${descriptor.identity}" is missing.`)
-      const explicitRuntimeId = String(explicitStoreRuntimes[descriptor.name] ?? '').trim()
+      const explicitRuntimeId = String(explicitStoreRuntimes[descriptorPath] ?? explicitStoreRuntimes[descriptor.name] ?? '').trim()
       let storeRuntime: StoreRuntimeHost | null = null
       let ownership: 'owned' | 'borrowed' = 'owned'
       let provider: 'explicit' | 'ancestor' | 'local' = 'local'
@@ -623,11 +639,11 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       }
 
       const storePath = storeRuntime.getDataPath()
-      this._dataPaths.set(descriptor.name, storePath)
-      this._storeRuntimeIds.set(descriptor.name, storeRuntime.id)
+      this._dataPaths.set(descriptorPath, storePath)
+      this._storeRuntimeIds.set(descriptorPath, storeRuntime.id)
       this._registerStoreProvider(descriptor.identity, descriptor.slot, storeRuntime.id)
       this.addResource({
-        id: `data:${descriptor.name}`,
+        id: `data:${descriptorPath}`,
         kind: 'meta',
         title: `Store ${descriptor.name}`,
         subtitle: descriptor.identity,
@@ -722,6 +738,18 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     if (!basePath)
       throw new Error(`[CompositionRuntimeHost] Data alias "${name}" is missing.`)
     return path ? `${basePath}.${path.split('.').map(encodePathPart).join('.')}` : basePath
+  }
+
+  private _resolveDataReference(reference: string): { data: string, path: string } | null {
+    const data = [...this._dataPaths.keys()]
+      .sort((left, right) => right.length - left.length)
+      .find(candidate => reference === candidate || reference.startsWith(`${candidate}.`))
+    if (!data)
+      return null
+    return {
+      data,
+      path: reference === data ? '' : reference.slice(data.length + 1),
+    }
   }
 
   private async _createChild(descriptor: CompositionProgramPayload['runtimes'][number]): Promise<void> {
@@ -1231,8 +1259,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       return Raph.get(parameters[0])
     if (read.source === 'composition-data') {
       const ref = parameters[0] ?? ''
-      const dot = ref.indexOf('.')
-      return Raph.get(this._requireDataPath(dot > 0 ? ref.slice(0, dot) : ref, dot > 0 ? ref.slice(dot + 1) : ''))
+      const resolved = this._resolveDataReference(ref)
+      return resolved ? Raph.get(this._requireDataPath(resolved.data, resolved.path)) : undefined
     }
     if (read.source === 'composition-filter-fields') {
       return this._readFilterFieldsBinding({
@@ -1310,8 +1338,10 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }
     if (read.source === 'composition-data') {
       const ref = parameters[0] ?? ''
-      const dot = ref.indexOf('.')
-      const path = this._requireDataPath(dot > 0 ? ref.slice(0, dot) : ref, dot > 0 ? ref.slice(dot + 1) : '')
+      const resolved = this._resolveDataReference(ref)
+      if (!resolved)
+        throw new Error(`[CompositionRuntimeHost] Data reference "${ref}" is missing.`)
+      const path = this._requireDataPath(resolved.data, resolved.path)
       this._disposers.push(Raph.watch(`${path}.*`, sync))
     }
   }

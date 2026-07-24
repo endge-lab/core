@@ -21,10 +21,10 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
     extension: '.endge-composition.ts',
     keywords: [
       'component', 'composition', 'control', 'data', 'defineComposition', 'definePreviewProps', 'defineProps', 'filter', 'filterView', 'fromData', 'fromFilter', 'fromOutput', 'fromStore', 'manual', 'mock', 'onChange',
-      'onMount', 'onSuccess', 'output', 'query', 'metadata', 'resources', 'scope', 'startup', 'style', ...VALUE_EXPRESSION_FUNCTION_NAMES,
+      'onMount', 'onSuccess', 'output', 'policy', 'query', 'metadata', 'resources', 'scope', 'startup', 'style', 'vocab', ...VALUE_EXPRESSION_FUNCTION_NAMES,
     ],
     functions: [
-      'activateOn', 'component', 'contextual', 'controls', 'debounce', 'fields', 'fromRuntime', 'fromScope', 'injected', 'isolated', 'persist', 'run', 'select', 'slot', 'store', 'storeTo', 'vocab', 'withData', 'withProps', ...VALUE_EXPRESSION_METHOD_NAMES,
+      'activateOn', 'component', 'contextual', 'controls', 'debounce', 'fields', 'fromRuntime', 'fromScope', 'injected', 'isolated', 'persist', 'policy', 'run', 'select', 'slot', 'store', 'storeTo', 'vocab', 'withData', 'withProps', ...VALUE_EXPRESSION_METHOD_NAMES,
     ],
     properties: ['activateOn', 'data', 'hooks', 'key', 'metadata', 'outputs', 'previewProps', 'props', 'resources', 'runtimes'],
   })
@@ -80,6 +80,12 @@ const COMPOSITION_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'mock', kind: 'function', insertText: `mock('identity')`, detail: 'RMock value for one preview prop' },
   { label: 'filter', kind: 'function', insertText: `filter('identity')`, detail: 'Filter runtime' },
   { label: 'store', kind: 'function', insertText: `store('identity')`, detail: 'Contextual Store data: nearest provider or local fallback' },
+  { label: 'vocab', kind: 'function', insertText: `vocab('identity')`, detail: 'Shared Vocab data loaded into Raph on scope activation' },
+  { label: 'policy', kind: 'function', insertText: `.policy({
+  strategy: 'cache-first',
+  maxAgeMs: null,
+  onError: 'fail',
+})`, detail: 'Vocab cache and loading policy' },
   { label: 'isolated', kind: 'function', insertText: `.isolated()`, detail: 'Always create a local Store instance' },
   { label: 'injected', kind: 'function', insertText: `.injected()`, detail: 'Require an ancestor or explicit Store provider' },
   { label: 'slot', kind: 'function', insertText: `.slot('name')`, detail: 'Select a named Store provider slot' },
@@ -94,7 +100,7 @@ const COMPOSITION_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'withData', kind: 'function', insertText: `.withData({
   childAlias: data('parentAlias'),
 })`, detail: 'Explicit Store data binding for nested Composition' },
-  { label: 'scope', kind: 'function', insertText: `scope({\n  resources: {},\n  runtimes: {},\n}).activateOn(manual())`, detail: 'Runtime lifecycle scope' },
+  { label: 'scope', kind: 'function', insertText: `scope({\n  data: {},\n  resources: {},\n  runtimes: {},\n}).activateOn(manual())`, detail: 'Data/resource/runtime lifecycle scope' },
   { label: 'style', kind: 'function', insertText: `style('style-identity')`, detail: 'Owned EndgeCSS resource' },
   { label: 'activateOn', kind: 'function', insertText: `.activateOn(startup())`, detail: 'Instance activation override' },
   { label: 'fromScope', kind: 'function', insertText: `output().fromScope('scope.path')`, detail: 'Public RuntimeScope handle' },

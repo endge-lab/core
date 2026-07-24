@@ -3,8 +3,10 @@ import { Raph } from '@endge/raph'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import type {
   VocabCacheOperationResult,
+  VocabLoadPolicy,
   VocabReference,
 } from '@/domain/types/runtime/vocab-cache.types'
+import { DEFAULT_VOCAB_LOAD_POLICY } from '@/domain/types/runtime/vocab-cache.types'
 import { Endge } from '@/model/endge/kernel/endge'
 
 type VocabRuntimeConfig = {
@@ -27,6 +29,7 @@ export class EndgeVocabs extends EndgeModule {
   private index: Record<string, string> = {}
   private byIdCache: Record<string, any[]> = {}
   private readonly loadedIdentities = new Set<string>()
+  private readonly loadedAtByIdentity = new Map<string, number>()
   private readonly inFlight = new Map<string, Promise<any[]>>()
   private readonly cacheVersions = new Map<string, number>()
   private _loadingRequests: number = 0
@@ -82,6 +85,7 @@ export class EndgeVocabs extends EndgeModule {
 
       this.setByIdentityCache(cfg.identity, docs)
       Raph.set(`vocabs.${cfg.slug}`, docs)
+      this.markLoaded(cfg.identity)
     }
     catch (e: any) {
       const msg = e?.message ?? String(e)
@@ -220,6 +224,7 @@ export class EndgeVocabs extends EndgeModule {
 
     this.bumpCacheVersion(cfg.identity)
     this.loadedIdentities.delete(cfg.identity)
+    this.loadedAtByIdentity.delete(cfg.identity)
     delete this.byIdCache[cfg.identity]
     Raph.delete(`vocabsByIdentity.${cfg.identity}`)
     Raph.delete(`vocabs.${cfg.slug}`)
@@ -228,23 +233,61 @@ export class EndgeVocabs extends EndgeModule {
   /**
    * Загружает отсутствующие справочники параллельно и переиспользует cache.
    */
-  async acquire(vocabs: readonly VocabReference[]): Promise<VocabCacheOperationResult[]> {
+  async acquire(
+    vocabs: readonly VocabReference[],
+    policy: Partial<VocabLoadPolicy> = {},
+  ): Promise<VocabCacheOperationResult[]> {
+    const effectivePolicy = this.normalizePolicy(policy)
     return await Promise.all(this.normalizeReferences(vocabs).map(async (reference) => {
       const cfg = this.requireVocabConfig(reference)
       const cached = Raph.get(`vocabs.${cfg.slug}`)
-      if (this.loadedIdentities.has(cfg.identity) || Array.isArray(cached)) {
+      const hasCache = Array.isArray(cached)
+      const isFresh = hasCache && this.isFresh(cfg.identity, effectivePolicy.maxAgeMs)
+
+      if (effectivePolicy.strategy === 'cache-first' && isFresh) {
         return {
           identity: cfg.identity,
           status: 'cache-hit',
-          count: Array.isArray(cached) ? cached.length : 0,
+          count: cached.length,
         }
       }
 
-      const docs = await this.loadShared(cfg, false)
-      return {
-        identity: cfg.identity,
-        status: 'loaded',
-        count: docs.length,
+      if (effectivePolicy.strategy === 'stale-while-revalidate' && hasCache) {
+        if (isFresh) {
+          return {
+            identity: cfg.identity,
+            status: 'cache-hit',
+            count: cached.length,
+          }
+        }
+        void this.loadShared(cfg, true).catch((error: any) => {
+          console.warn(`[EndgeVocabs.acquire] background refresh ${cfg.identity}:`, error?.message ?? error)
+        })
+        return {
+          identity: cfg.identity,
+          status: 'refreshing',
+          count: cached.length,
+        }
+      }
+
+      try {
+        const docs = await this.loadShared(cfg, hasCache || effectivePolicy.strategy === 'network-first')
+        return {
+          identity: cfg.identity,
+          status: hasCache ? 'refreshed' : 'loaded',
+          count: docs.length,
+        }
+      }
+      catch (error) {
+        const fallback = Raph.get(`vocabs.${cfg.slug}`)
+        if (effectivePolicy.onError === 'use-cache' && Array.isArray(fallback)) {
+          return {
+            identity: cfg.identity,
+            status: 'cache-hit',
+            count: fallback.length,
+          }
+        }
+        throw error
       }
     }))
   }
@@ -302,6 +345,7 @@ export class EndgeVocabs extends EndgeModule {
       const docs = this.extractDocs(json)
       this.setByIdentityCache(cfg.identity, docs)
       Raph.set(`vocabs.${cfg.slug}`, docs)
+      this.markLoaded(cfg.identity)
     }
     catch (e: any) {
       console.warn(`[EndgeVocabs.loadById] ${cfg.idKey}/${cfg.slug}:`, e?.message ?? e)
@@ -411,6 +455,7 @@ export class EndgeVocabs extends EndgeModule {
 
       this.setByIdentityCache(cfg.identity, allDocs)
       Raph.set(`vocabs.${cfg.slug}`, allDocs)
+      this.markLoaded(cfg.identity)
 
       console.log('[EndgeVocabs.loadVocab] loaded', {
         id: cfg.idKey,
@@ -460,8 +505,8 @@ export class EndgeVocabs extends EndgeModule {
 
     if (!force) {
       const cached = Raph.get(`vocabs.${cfg.slug}`)
-      if (this.loadedIdentities.has(cfg.identity) || Array.isArray(cached))
-        return Array.isArray(cached) ? cached : []
+      if (Array.isArray(cached))
+        return cached
     }
 
     const version = this.cacheVersions.get(cfg.identity) ?? 0
@@ -470,6 +515,7 @@ export class EndgeVocabs extends EndgeModule {
         if ((this.cacheVersions.get(cfg.identity) ?? 0) !== version) {
           delete this.byIdCache[cfg.identity]
           this.loadedIdentities.delete(cfg.identity)
+          this.loadedAtByIdentity.delete(cfg.identity)
           Raph.delete(`vocabsByIdentity.${cfg.identity}`)
           Raph.delete(`vocabs.${cfg.slug}`)
         }
@@ -486,6 +532,27 @@ export class EndgeVocabs extends EndgeModule {
 
   private bumpCacheVersion(identity: string): void {
     this.cacheVersions.set(identity, (this.cacheVersions.get(identity) ?? 0) + 1)
+  }
+
+  private normalizePolicy(policy: Partial<VocabLoadPolicy>): VocabLoadPolicy {
+    return {
+      strategy: policy.strategy ?? DEFAULT_VOCAB_LOAD_POLICY.strategy,
+      maxAgeMs: policy.maxAgeMs === undefined
+        ? DEFAULT_VOCAB_LOAD_POLICY.maxAgeMs
+        : policy.maxAgeMs,
+      onError: policy.onError ?? DEFAULT_VOCAB_LOAD_POLICY.onError,
+    }
+  }
+
+  private isFresh(identity: string, maxAgeMs: number | null): boolean {
+    if (maxAgeMs === null)
+      return true
+    const loadedAt = this.loadedAtByIdentity.get(identity)
+    return typeof loadedAt === 'number' && Date.now() - loadedAt <= maxAgeMs
+  }
+
+  private markLoaded(identity: string): void {
+    this.loadedAtByIdentity.set(identity, Date.now())
   }
 
   /**
