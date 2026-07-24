@@ -1,6 +1,6 @@
 {
   "name": "@endge/core",
-  "version": "1.2.7",
+  "version": "1.2.8",
   "private": false,
   "license": "Apache-2.0",
   "type": "module",

@@ -4,6 +4,7 @@ import type { RComponentDiagnostic } from '@/domain/types/component/component-co
 import type {
   RComponentSFC_IR_Read,
   RComponentSFC_IR_Value,
+  RComponentSFC_IR_VocabRead,
 } from '@/domain/types/component/sfc'
 
 /** Контекст анализа выражения SFC template/script. */
@@ -81,12 +82,14 @@ export function compileComponentSFCExpression(
       sourceType: 'module',
       plugins: ['typescript'],
     }) as unknown
+    const vocabReads = collectVocabReads(ast, expression, diagnostics, context)
 
     return {
       value: {
         kind: 'expression',
         source: expression,
         reads: collectExpressionReads(ast, context),
+        ...(vocabReads.length ? { vocabReads } : {}),
       },
       diagnostics,
     }
@@ -109,6 +112,79 @@ export function compileComponentSFCExpression(
       diagnostics,
     }
   }
+}
+
+/**
+ * Извлекает только статические `vocab(alias, mapping?)`, чтобы alias оставался
+ * compiler-visible, а runtime не пытался угадывать физическую identity.
+ */
+function collectVocabReads(
+  ast: unknown,
+  source: string,
+  diagnostics: RComponentDiagnostic[],
+  context: ComponentSFCExpressionContext,
+): RComponentSFC_IR_VocabRead[] {
+  const result: RComponentSFC_IR_VocabRead[] = []
+
+  visitExpressionNode(ast, (node) => {
+    if (
+      node.type !== 'CallExpression'
+      || node.callee?.type !== 'Identifier'
+      || node.callee.name !== 'vocab'
+    ) {
+      return
+    }
+
+    const args = Array.isArray(node.arguments) ? node.arguments : []
+    const alias = args[0]?.type === 'StringLiteral'
+      ? String(args[0].value ?? '').trim()
+      : ''
+    const mapping = readVocabMapping(args[1])
+
+    if (!alias || args.length > 2 || (args[1] != null && !mapping)) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'sfc-vocab-call-shape',
+        message: 'vocab() принимает статический alias и optional mapping { valuePath, labelPath } со строковыми значениями.',
+        sourcePath: context.sourcePath,
+        start: typeof node.start === 'number' ? node.start : undefined,
+        end: typeof node.end === 'number' ? node.end : undefined,
+      })
+      return
+    }
+
+    result.push({
+      alias,
+      valuePath: mapping?.valuePath ?? 'value',
+      labelPath: mapping?.labelPath ?? 'label',
+      raw: source,
+    })
+  })
+
+  return result
+}
+
+function readVocabMapping(node: any): { valuePath: string, labelPath: string } | null {
+  if (!node || node.type !== 'ObjectExpression')
+    return null
+
+  const values = new Map<string, string>()
+  for (const property of node.properties ?? []) {
+    if (property?.type !== 'ObjectProperty' || property.computed)
+      return null
+    const key = property.key?.type === 'Identifier'
+      ? property.key.name
+      : property.key?.type === 'StringLiteral'
+        ? property.key.value
+        : null
+    if ((key !== 'valuePath' && key !== 'labelPath') || property.value?.type !== 'StringLiteral')
+      return null
+    values.set(key, String(property.value.value ?? '').trim())
+  }
+
+  const valuePath = values.get('valuePath') ?? ''
+  const labelPath = values.get('labelPath') ?? ''
+  return valuePath && labelPath ? { valuePath, labelPath } : null
 }
 
 function collectExpressionReads(ast: unknown, context: ComponentSFCExpressionContext): RComponentSFC_IR_Read[] {

@@ -60,6 +60,21 @@ export interface RComponentSFC_RuntimeBoundaryDependency {
   columns: RComponentSFC_RuntimeTableColumnDependency[]
 }
 
+/** Runtime-зависимость SFC от Vocab alias ближайшего Composition scope. */
+export interface RComponentSFC_RuntimeVocabDependency {
+  /** Публичный, scope-local alias; физическая Vocab identity сюда не протекает. */
+  alias: string
+
+  /** Путь option value внутри элемента Vocab. */
+  valuePath: string
+
+  /** Путь option label внутри элемента Vocab. */
+  labelPath: string
+
+  /** Исходное выражение для diagnostics/debug. */
+  raw: string
+}
+
 /** Набор runtime-зависимостей SFC artifact. */
 export interface RComponentSFC_RuntimeDependencies {
   /** Зависимости от props, которые можно связать с внешним input source. */
@@ -67,6 +82,9 @@ export interface RComponentSFC_RuntimeDependencies {
 
   /** Patchable boundaries, для которых runtime строит отдельные Raph-ноды. */
   boundaries: RComponentSFC_RuntimeBoundaryDependency[]
+
+  /** Vocab aliases, которые должен предоставить ближайший Composition scope. */
+  vocabs?: RComponentSFC_RuntimeVocabDependency[]
 }
 
 /** Создает пустой dependency artifact SFC runtime. */
@@ -74,5 +92,6 @@ export function createEmptyComponentSFCRuntimeDependencies(): RComponentSFC_Runt
   return {
     props: [],
     boundaries: [],
+    vocabs: [],
   }
 }

@@ -4,7 +4,6 @@ import type { ComputationOverride } from '@/domain/types/computation'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { RAction } from '@/domain/entities/reflect/RAction'
 import { Endge } from '@/model/endge/kernel/endge'
-import { loadVocabs } from '@/model/seed/actions/load_vocabs'
 import { split } from '@/model/seed/converters/arrays/split'
 import { toArray } from '@/model/seed/converters/arrays/to-array'
 import { dateToDateString } from '@/model/seed/converters/date/date-to-date-string'
@@ -32,11 +31,10 @@ import { stringTrim } from '@/model/seed/converters/strings/string-trim'
 export class EndgeBind extends EndgeModule {
   private readonly computationOverrides = new Map<string, ComputationOverride>()
   /**
-   * Регистрирует built-in converters и runtime action handlers после загрузки домена.
+   * Регистрирует built-in converters после загрузки домена.
    */
   public override start(): void {
     this.registerDefaultConverters()
-    this.registerDefaultActions()
     for (const identity of this.computationOverrides.keys()) {
       if (!Endge.domain.getComputation(identity))
         console.error(`[EndgeBind] Computation "${identity}" is not present in the active domain.`)
@@ -66,15 +64,6 @@ export class EndgeBind extends EndgeModule {
     this.converter('number-to-string', numberToString)
     this.converter('json-parse', jsonParse)
     this.converter('json-stringify', jsonStringify)
-  }
-
-  /**
-   * Регистрирует Default Actions.
-   */
-  private registerDefaultActions(): void {
-    for (const action of Endge.domain.getActions()) {
-      this.action(action, 'load-vocabs', loadVocabs)
-    }
   }
 
   /**

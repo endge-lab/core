@@ -8,11 +8,12 @@ import type {
   FilterViewRenderModel,
 } from '@/domain/types/ui/filter-view.type'
 import type { RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime/runtime-host.types'
-import type { SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
+import type { SourceFieldDefinition, SourceFieldOption } from '@/domain/types/source/source-expression.types'
 
 import { Raph } from '@endge/raph'
 
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
+import { Endge } from '@/model/endge/kernel/endge'
 
 function defaultContext(instance: string): RuntimeHostContext<'filter'> {
   return {
@@ -33,6 +34,7 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
   private readonly _implementation: FilterViewImplementation
   private readonly _onSourceChange: () => void
   private readonly _disposeSourceWatch: () => void
+  private readonly _disposeVocabWatch: () => void
   private _props: Record<string, unknown>
 
   public constructor(input: {
@@ -90,6 +92,15 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
       this._sourceRuntime.statePath(),
       `${this._sourceRuntime.statePath()}.*`,
     ], this._onSourceChange)
+    const vocabPaths = [...new Set(this._sourceRuntime.getFields()
+      .filter(field => this._fieldKeys.includes(field.key))
+      .flatMap((field) => {
+        const path = this._resolveVocabPath(field)
+        return path ? [path, `${path}.*`] : []
+      }))]
+    this._disposeVocabWatch = vocabPaths.length
+      ? Raph.watch(vocabPaths, this._onSourceChange)
+      : () => {}
   }
 
   /** Возвращает renderer-neutral модель встроенного или пользовательского Filter view. */
@@ -102,7 +113,7 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
         ...field,
         control: this._resolveControl(field),
         value: state[field.key],
-        options: field.options ?? [],
+        options: this._resolveOptions(field),
       }))
 
     return {
@@ -148,6 +159,7 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
 
   public override destroy(): void {
     this._disposeSourceWatch()
+    this._disposeVocabWatch()
     super.destroy()
   }
 
@@ -160,5 +172,50 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
     if (field.type === 'Boolean')
       return { type: 'Checkbox' }
     return { type: 'Input' }
+  }
+
+  /**
+   * Возвращает готовые renderer-neutral options без сетевых запросов.
+   */
+  private _resolveOptions(field: SourceFieldDefinition): SourceFieldOption[] {
+    const config = field.vocab
+    if (!config)
+      return field.options ?? []
+
+    const vocab = Endge.domain.getVocab(config.identity)
+    const rows = Endge.vocabs.getValues(vocab?.collectionSlug ?? config.identity)
+    return rows.map((row) => {
+      const rawValue = this._readPath(row, config.valuePath)
+      const value = typeof rawValue === 'string' || typeof rawValue === 'number' || typeof rawValue === 'boolean'
+        ? rawValue
+        : String(rawValue ?? '')
+      return {
+        value,
+        label: String(this._readPath(row, config.labelPath) ?? value),
+      }
+    })
+  }
+
+  /**
+   * Возвращает Raph path справочника, используемого полем.
+   */
+  private _resolveVocabPath(field: SourceFieldDefinition): string | null {
+    const identity = String(field.vocab?.identity ?? '').trim()
+    if (!identity)
+      return null
+    const vocab = Endge.domain.getVocab(identity)
+    const slug = String(vocab?.collectionSlug ?? identity).trim()
+    return slug ? `vocabs.${slug}` : null
+  }
+
+  /**
+   * Читает вложенное значение строки справочника.
+   */
+  private _readPath(source: unknown, path: string): unknown {
+    return String(path ?? '').split('.').filter(Boolean).reduce<unknown>((value, key) => {
+      return value && typeof value === 'object'
+        ? (value as Record<string, unknown>)[key]
+        : undefined
+    }, source)
   }
 }

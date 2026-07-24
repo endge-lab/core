@@ -16,6 +16,7 @@ import type {
 } from '@/domain/types/source/composition-source.types'
 import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext, RuntimeHostInputBinding, RuntimeHostInputSource, RuntimeHostUpdateContext } from '@/domain/types/runtime/runtime-host.types'
 import type { I18nRuntimeCatalog } from '@/domain/types/i18n.types'
+import type { VocabRuntimeCatalog } from '@/domain/types/runtime/vocab-cache.types'
 
 import { Raph, RaphNode } from '@endge/raph'
 
@@ -56,6 +57,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   private _ownedStoreRuntimeIds = new Set<string>()
   private _compositionInputBindings = new Map<string, RuntimeHostInputBinding>()
   private _i18nCatalogs = new Map<string, I18nRuntimeCatalog>()
+  private _vocabCatalogs = new Map<string, VocabRuntimeCatalog>()
   private _orchestratedQueries = new Set<string>()
   private _orchestratedSuccesses = new Set<string>()
   private _mounted = false
@@ -123,6 +125,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     try {
       this._assertRequiredProps(payload)
       this._mountData(payload)
+      this._buildVocabCatalogs(payload)
       this._prepareOutputBridges(payload)
       this._buildI18nCatalogs(payload)
       this._buildLifecycleScopes(payload)
@@ -178,6 +181,11 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   /** Возвращает накопленный translation catalog для заданного lifecycle scope. */
   public getI18nCatalog(scopePath = 'scope_default'): I18nRuntimeCatalog {
     return cloneI18nRuntimeCatalog(this._i18nCatalogs.get(scopePath) ?? {})
+  }
+
+  /** Возвращает накопленный Vocab catalog для заданного lifecycle scope. */
+  public getVocabCatalog(scopePath = 'scope_default'): VocabRuntimeCatalog {
+    return { ...(this._vocabCatalogs.get(scopePath) ?? {}) }
   }
 
   public getRuntimeHandle(path: string): CompositionRuntimeActivationHandle | null {
@@ -546,6 +554,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     this._storeProviderRuntimeIds.clear()
     this._compositionInputBindings.clear()
     this._i18nCatalogs.clear()
+    this._vocabCatalogs.clear()
     this._orchestratedQueries.clear()
     this._orchestratedSuccesses.clear()
     this._mounted = false
@@ -564,6 +573,34 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         .filter(resource => resource.scopePath === scope.path)
         .sort((left, right) => left.sourceOrder - right.sourceOrder)
       this._i18nCatalogs.set(scope.path, extendI18nRuntimeCatalog(parent, resources))
+    }
+  }
+
+  /** Строит nearest-scope catalog публичных Vocab aliases поверх shared cache paths. */
+  private _buildVocabCatalogs(payload: CompositionProgramPayload): void {
+    this._vocabCatalogs.clear()
+    const inherited = (this.meta.vocabCatalog ?? {}) as VocabRuntimeCatalog
+
+    for (const scope of [...payload.scopes].sort((left, right) => left.sourceOrder - right.sourceOrder)) {
+      const parent = scope.parentPath
+        ? this._vocabCatalogs.get(scope.parentPath) ?? inherited
+        : inherited
+      const catalog: VocabRuntimeCatalog = { ...parent }
+
+      for (const descriptor of payload.data) {
+        if (descriptor.kind !== 'vocab' || (descriptor.scopePath ?? 'scope_default') !== scope.path)
+          continue
+        const descriptorPath = descriptor.path ?? descriptor.name
+        const path = this._dataPaths.get(descriptorPath)
+        if (!path)
+          throw new Error(`[CompositionRuntimeHost] Vocab data path "${descriptorPath}" is missing.`)
+        catalog[descriptor.name] = {
+          identity: descriptor.identity,
+          path,
+        }
+      }
+
+      this._vocabCatalogs.set(scope.path, catalog)
     }
   }
 
@@ -790,6 +827,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
           persistence: this.meta.persistence ?? 'disabled',
           runtimeScopeId: this._requireScope(descriptor.scopePath).id,
           i18nCatalog: this.getI18nCatalog(descriptor.scopePath),
+          vocabCatalog: this.getVocabCatalog(descriptor.scopePath),
         },
       })
       const node = new RaphNode(Raph.app, {
@@ -835,6 +873,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       input: { kind: 'local', props: initialProps },
       runtimeScopeId: this._requireScope(descriptor.scopePath).id,
       i18nCatalog: this.getI18nCatalog(descriptor.scopePath),
+      vocabCatalog: this.getVocabCatalog(descriptor.scopePath),
     }
     if (descriptor.kind === 'composition') {
       meta.input = this._makeInputSource(descriptor.name)

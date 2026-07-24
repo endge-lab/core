@@ -35,6 +35,11 @@ import type {
 import type { ComputationResource } from '@/domain/types/computation'
 import type { EndgeStyleLease } from '@/domain/types/style'
 import type { I18nRuntimeCatalog } from '@/domain/types/i18n.types'
+import type { SourceFieldOption } from '@/domain/types/source/source-expression.types'
+import type {
+  VocabOptionMapping,
+  VocabRuntimeCatalog,
+} from '@/domain/types/runtime/vocab-cache.types'
 
 import { DataPath, Raph, RaphNode } from '@endge/raph'
 
@@ -95,6 +100,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   private readonly _computationErrorSignatures = new Map<string, string>()
   private _styleLease: EndgeStyleLease | null = null
   private readonly _eventPortListeners = new Map<string, Set<(occurrence: ComponentSFCEventOccurrence) => void>>()
+  private readonly _vocabDisposers = new Map<string, VoidFunction>()
 
   constructor(input: {
     id: string
@@ -227,6 +233,42 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     )
   }
 
+  /**
+   * Читает Vocab alias из ближайшего Composition scope и преобразует cache
+   * records в renderer-neutral Select options.
+   */
+  public resolveVocabOptions(alias: string, mapping?: Partial<VocabOptionMapping>): SourceFieldOption[] {
+    const key = String(alias ?? '').trim()
+    const catalog = (this.meta.vocabCatalog ?? {}) as VocabRuntimeCatalog
+    const entry = catalog[key]
+    if (!key || !entry) {
+      throw new Error(
+        `[ComponentSFCRuntimeHost] Vocab alias "${key || alias}" is not provided for "${this.entityIdentity}".`,
+      )
+    }
+
+    this._ensureVocabSubscription(key, entry.path)
+    const values = Raph.get(entry.path)
+    if (!Array.isArray(values))
+      return []
+
+    const valuePath = String(mapping?.valuePath ?? 'value').trim()
+    const labelPath = String(mapping?.labelPath ?? 'label').trim()
+    if (!valuePath || !labelPath)
+      throw new Error(`[ComponentSFCRuntimeHost] Vocab alias "${key}" requires non-empty valuePath and labelPath.`)
+
+    return values.flatMap((item): SourceFieldOption[] => {
+      const value = readPath(item, valuePath)
+      if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean')
+        return []
+      const label = readPath(item, labelPath)
+      return [{
+        value,
+        label: label == null ? String(value) : String(label),
+      }]
+    })
+  }
+
   /** Возвращает внешний контракт компонента из compiled artifact. */
   public getContract(): RComponentContract | null {
     return this.getArtifactPayload()?.contract ?? null
@@ -239,8 +281,12 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
 
   /** Возвращает runtime-зависимости SFC v1 из compiled artifact. */
   public getRuntimeDependencies(): RComponentSFC_RuntimeDependencies {
-    return this.getArtifactPayload()?.runtimeDependencies
+    const dependencies = this.getArtifactPayload()?.runtimeDependencies
       ?? createEmptyComponentSFCRuntimeDependencies()
+    return {
+      ...dependencies,
+      vocabs: dependencies.vocabs ?? [],
+    }
   }
 
   /** Возвращает parser-level AST из compiled artifact. */
@@ -432,6 +478,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   /** Очищает Raph subscriptions перед общим destroy host-а. */
   public override destroy(): void {
     this._clearRaphInputSubscriptions()
+    for (const dispose of this._vocabDisposers.values())
+      dispose()
+    this._vocabDisposers.clear()
     this._computationResources.dispose()
     this._computationErrorSignatures.clear()
     this._styleLease?.release()
@@ -545,7 +594,20 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
       dependencies: artifact.dependencies.length,
       runtimeDependencies: artifact.payload.runtimeDependencies?.props.length ?? 0,
       runtimeBoundaries: artifact.payload.runtimeDependencies?.boundaries.length ?? 0,
+      runtimeVocabs: artifact.payload.runtimeDependencies?.vocabs?.length ?? 0,
     }
+  }
+
+  /** Подписывает host на shared Vocab path один раз, включая вложенные SFC artifacts. */
+  private _ensureVocabSubscription(alias: string, path: string): void {
+    const key = `${alias}\u0000${path}`
+    if (this._vocabDisposers.has(key))
+      return
+
+    const dispose = Raph.watch([path, `${path}.*`], () => {
+      this.emit('resource:dirty', { kind: 'vocab', alias, path })
+    })
+    this._vocabDisposers.set(key, dispose)
   }
 
   private _createRuntimeBoundaryNodes(root: RaphNode): void {

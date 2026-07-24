@@ -200,6 +200,24 @@ export interface RComponentSFC_IR_ExpressionValue {
 
   /** Зависимости, которые выражение читает. */
   reads: RComponentSFC_IR_Read[]
+
+  /** Статические обращения к Vocab aliases текущего Composition scope. */
+  vocabReads?: RComponentSFC_IR_VocabRead[]
+}
+
+/** Статическое обращение `vocab(alias, mapping?)` внутри SFC expression. */
+export interface RComponentSFC_IR_VocabRead {
+  /** Публичный alias из ближайшего Composition scope. */
+  alias: string
+
+  /** Путь option value внутри элемента Vocab. */
+  valuePath: string
+
+  /** Путь option label внутри элемента Vocab. */
+  labelPath: string
+
+  /** Исходное выражение для diagnostics/debug. */
+  raw: string
 }
 
 /** Реактивное чтение, найденное внутри выражения. */

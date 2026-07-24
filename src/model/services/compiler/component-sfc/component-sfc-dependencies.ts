@@ -9,6 +9,7 @@ import type {
   RComponentSFC_RuntimeDependencies,
   RComponentSFC_RuntimeDependency,
   RComponentSFC_RuntimeTableColumnDependency,
+  RComponentSFC_RuntimeVocabDependency,
 } from '@/domain/types/component/sfc'
 import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component/sfc'
 
@@ -22,12 +23,13 @@ export function analyzeComponentSFCRuntimeDependencies(
 
   const props = new Set(ir.script.props.map(prop => prop.name))
   const seen = new Set<string>()
+  const seenVocabs = new Set<string>()
 
   for (const call of ir.script.portCalls)
-    collectValueDependencies(call.input, props, result, seen)
+    collectValueDependencies(call.input, props, result, seen, seenVocabs)
 
   for (const node of ir.template.roots) {
-    collectNodeDependencies(node, props, result, seen)
+    collectNodeDependencies(node, props, result, seen, seenVocabs)
     collectBoundaryDependencies(node, props, result)
   }
 
@@ -41,9 +43,10 @@ function collectNodeDependencies(
   props: Set<string>,
   result: RComponentSFC_RuntimeDependencies,
   seen: Set<string>,
+  seenVocabs: Set<string>,
 ): void {
   if (node.kind === 'expression') {
-    collectValueDependencies(node.value, props, result, seen)
+    collectValueDependencies(node.value, props, result, seen, seenVocabs)
     return
   }
 
@@ -51,12 +54,12 @@ function collectNodeDependencies(
     return
 
   for (const value of Object.values(node.props))
-    collectValueDependencies(value, props, result, seen)
+    collectValueDependencies(value, props, result, seen, seenVocabs)
 
-  collectDirectiveDependencies(node.directives, props, result, seen)
+  collectDirectiveDependencies(node.directives, props, result, seen, seenVocabs)
 
   for (const child of node.children)
-    collectNodeDependencies(child, props, result, seen)
+    collectNodeDependencies(child, props, result, seen, seenVocabs)
 }
 
 function collectDirectiveDependencies(
@@ -64,11 +67,12 @@ function collectDirectiveDependencies(
   props: Set<string>,
   result: RComponentSFC_RuntimeDependencies,
   seen: Set<string>,
+  seenVocabs: Set<string>,
 ): void {
-  collectValueDependencies(directives.if, props, result, seen)
-  collectValueDependencies(directives.elseIf, props, result, seen)
-  collectValueDependencies(directives.key, props, result, seen)
-  collectValueDependencies(directives.for?.source, props, result, seen)
+  collectValueDependencies(directives.if, props, result, seen, seenVocabs)
+  collectValueDependencies(directives.elseIf, props, result, seen, seenVocabs)
+  collectValueDependencies(directives.key, props, result, seen, seenVocabs)
+  collectValueDependencies(directives.for?.source, props, result, seen, seenVocabs)
 }
 
 function collectValueDependencies(
@@ -76,6 +80,7 @@ function collectValueDependencies(
   props: Set<string>,
   result: RComponentSFC_RuntimeDependencies,
   seen: Set<string>,
+  seenVocabs: Set<string>,
 ): void {
   if (!value || value.kind !== 'expression')
     return
@@ -91,6 +96,17 @@ function collectValueDependencies(
 
     seen.add(key)
     result.props.push(dependency)
+  }
+
+  for (const read of value.vocabReads ?? []) {
+    const dependency: RComponentSFC_RuntimeVocabDependency = { ...read }
+    const key = `${dependency.alias}\u0000${dependency.valuePath}\u0000${dependency.labelPath}`
+    if (seenVocabs.has(key))
+      continue
+
+    seenVocabs.add(key)
+    result.vocabs ??= []
+    result.vocabs.push(dependency)
   }
 }
 
