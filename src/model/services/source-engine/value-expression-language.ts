@@ -5,6 +5,19 @@ export const VALUE_EXPRESSION_FUNCTION_NAMES = [
   'get', 'getOr', 'pick', 'omit', 'match', 'eq', 'ne', 'gt', 'gte', 'lt', 'lte',
   'inList', 'includes', 'and', 'or', 'when', 'not', 'isNil', 'isEmpty', 'has',
   'leftJoin', 'fullJoin', 'lookupOne', 'lookupMany',
+  'coalesce', 'choose', 'lookupValue',
+  'toString', 'toNumber', 'toBoolean', 'typeOf',
+  'isString', 'isNumber', 'isBoolean', 'isArray', 'isObject', 'isDateTime', 'isDuration',
+  'add', 'subtract', 'multiply', 'divide', 'modulo', 'abs', 'negate', 'round', 'floor', 'ceil', 'clamp',
+  'average', 'averageBy',
+  'startsWith', 'endsWith', 'replace', 'replaceAll', 'slice', 'padStart', 'padEnd', 'normalizeWhitespace',
+  'set', 'unset', 'rename', 'getKey', 'fromEntries',
+  'first', 'last', 'at', 'reverse', 'sortByDesc', 'orderBy', 'chunk',
+  'union', 'intersection', 'difference', 'countBy',
+  'dateTime', 'duration', 'dateTimeAdd', 'dateTimeSubtract', 'dateTimeDifference',
+  'dateTimeStartOf', 'dateTimeEndOf', 'dateTimePart',
+  'durationAdd', 'durationSubtract', 'durationTotal',
+  'containsAll', 'containsAny',
 ]
 
 export const VALUE_EXPRESSION_METHOD_NAMES = [
@@ -15,6 +28,18 @@ export const VALUE_EXPRESSION_METHOD_NAMES = [
   'size', 'sum', 'sumBy', 'min', 'max', 'minBy', 'maxBy',
   'trim', 'lowerCase', 'upperCase', 'split', 'join',
   'by', 'byAny', 'coalesce', 'enrich',
+  'lookupValue', 'toString', 'toNumber', 'toBoolean', 'typeOf',
+  'isString', 'isNumber', 'isBoolean', 'isArray', 'isObject', 'isDateTime', 'isDuration',
+  'add', 'subtract', 'multiply', 'divide', 'modulo', 'abs', 'negate', 'round', 'floor', 'ceil', 'clamp',
+  'average', 'averageBy',
+  'startsWith', 'endsWith', 'replace', 'replaceAll', 'slice', 'padStart', 'padEnd', 'normalizeWhitespace',
+  'set', 'unset', 'rename', 'getKey',
+  'first', 'last', 'at', 'reverse', 'sortByDesc', 'orderBy', 'chunk',
+  'union', 'intersection', 'difference', 'countBy',
+  'dateTime', 'dateTimeAdd', 'dateTimeSubtract', 'dateTimeDifference',
+  'dateTimeStartOf', 'dateTimeEndOf', 'dateTimePart',
+  'durationAdd', 'durationSubtract', 'durationTotal',
+  'containsAll', 'containsAny',
 ]
 
 export const VALUE_EXPRESSION_COMPLETIONS: SourceLanguageCompletion[] = [
@@ -24,6 +49,9 @@ export const VALUE_EXPRESSION_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'and', kind: 'function', insertText: 'and()', detail: 'Predicate: логическое И' },
   { label: 'or', kind: 'function', insertText: 'or()', detail: 'Predicate: логическое ИЛИ' },
   { label: 'when', kind: 'function', insertText: 'when(condition, value, fallback)', detail: 'Условный выбор значения' },
+  { label: 'choose', kind: 'function', insertText: 'choose([], fallback)', detail: 'Последовательный выбор первой подходящей ветки' },
+  { label: 'dateTimeAdd', kind: 'function', insertText: 'dateTimeAdd(value, duration({ minutes: 5 }))', detail: 'Чистая арифметика даты и времени' },
+  { label: 'duration', kind: 'function', insertText: 'duration({ minutes: 5 })', detail: 'JSON-compatible длительность' },
   { label: 'leftJoin', kind: 'function', insertText: `leftJoin(left, right).by('id')`, detail: 'Left join двух коллекций' },
   { label: 'fullJoin', kind: 'function', insertText: `fullJoin(left, right).byAny('id')`, detail: 'Full join двух коллекций' },
   { label: 'lookupOne', kind: 'function', insertText: `lookupOne(source).by('foreignId')`, detail: 'Одна связанная запись по id текущего объекта' },

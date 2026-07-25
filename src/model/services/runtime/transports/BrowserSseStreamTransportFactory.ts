@@ -19,7 +19,13 @@ export class BrowserSseStreamTransportFactory implements StreamTransportFactory 
       const manager = new SSEManager({
         url: artifact.transport.url,
         retryInterval: 5000,
-        getToken: () => Endge.auth.token || undefined,
+        getToken: async () => {
+          const session = await Endge.auth.profiles.resolveRequestAuth({ mode: 'inherit' })
+          const token = String(session.accessToken ?? '').trim()
+          if (!token)
+            throw new Error('[BrowserSseStreamTransportFactory] Default auth profile did not provide an access token.')
+          return token
+        },
         onOpen: callbacks.open,
         onError: callbacks.error,
         onEvent: data => callbacks.message({

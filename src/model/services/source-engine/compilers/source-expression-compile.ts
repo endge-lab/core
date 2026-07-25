@@ -21,7 +21,7 @@ const READ_FUNCTIONS: Record<string, SourceExpressionReadKind> = {
   __computationOutput: 'computation-output',
 }
 
-const OPERATION_FUNCTIONS: Record<string, SourceExpressionOperation> = {
+const OPERATION_FUNCTIONS: Record<string, SourceExpressionOperation> = Object.assign(Object.create(null), {
   merge: 'merge',
   compact: 'compact',
   get: 'get',
@@ -89,6 +89,73 @@ const OPERATION_FUNCTIONS: Record<string, SourceExpressionOperation> = {
   lookupOne: 'lookup-one',
   lookupMany: 'lookup-many',
   enrich: 'enrich',
+  choose: 'choose',
+  lookupValue: 'lookup-value',
+  toString: 'to-string',
+  toNumber: 'to-number',
+  toBoolean: 'to-boolean',
+  typeOf: 'type-of',
+  isString: 'is-string',
+  isNumber: 'is-number',
+  isBoolean: 'is-boolean',
+  isArray: 'is-array',
+  isObject: 'is-object',
+  isDateTime: 'is-date-time',
+  isDuration: 'is-duration',
+  add: 'add',
+  subtract: 'subtract',
+  multiply: 'multiply',
+  divide: 'divide',
+  modulo: 'modulo',
+  abs: 'abs',
+  negate: 'negate',
+  round: 'round',
+  floor: 'floor',
+  ceil: 'ceil',
+  clamp: 'clamp',
+  average: 'average',
+  averageBy: 'average-by',
+  startsWith: 'starts-with',
+  endsWith: 'ends-with',
+  replace: 'replace',
+  replaceAll: 'replace-all',
+  slice: 'slice',
+  padStart: 'pad-start',
+  padEnd: 'pad-end',
+  normalizeWhitespace: 'normalize-whitespace',
+  set: 'set',
+  unset: 'unset',
+  rename: 'rename',
+  getKey: 'get-key',
+  fromEntries: 'from-entries',
+  first: 'first',
+  last: 'last',
+  at: 'at',
+  reverse: 'reverse',
+  sortByDesc: 'sort-by-desc',
+  orderBy: 'order-by',
+  chunk: 'chunk',
+  union: 'union',
+  intersection: 'intersection',
+  difference: 'difference',
+  countBy: 'count-by',
+  dateTime: 'date-time',
+  duration: 'duration',
+  dateTimeAdd: 'date-time-add',
+  dateTimeSubtract: 'date-time-subtract',
+  dateTimeDifference: 'date-time-difference',
+  dateTimeStartOf: 'date-time-start-of',
+  dateTimeEndOf: 'date-time-end-of',
+  dateTimePart: 'date-time-part',
+  durationAdd: 'duration-add',
+  durationSubtract: 'duration-subtract',
+  durationTotal: 'duration-total',
+  containsAll: 'contains-all',
+  containsAny: 'contains-any',
+})
+
+const FUNCTION_OPERATION_OVERRIDES: Record<string, SourceExpressionOperation> = {
+  coalesce: 'coalesce',
 }
 
 const IMPLICIT_CURRENT_OPERATIONS = new Set<SourceExpressionOperation>([
@@ -165,6 +232,70 @@ const OPERATION_ARITY: Record<SourceExpressionOperation, { min: number, max?: nu
   'lookup-one': { min: 1, max: 1 },
   'lookup-many': { min: 1, max: 1 },
   enrich: { min: 3, max: 3 },
+  coalesce: { min: 1 },
+  choose: { min: 2, max: 2 },
+  'lookup-value': { min: 2, max: 3 },
+  'to-string': { min: 1, max: 1 },
+  'to-number': { min: 1, max: 2 },
+  'to-boolean': { min: 1, max: 2 },
+  'type-of': { min: 1, max: 1 },
+  'is-string': { min: 1, max: 1 },
+  'is-number': { min: 1, max: 1 },
+  'is-boolean': { min: 1, max: 1 },
+  'is-array': { min: 1, max: 1 },
+  'is-object': { min: 1, max: 1 },
+  'is-date-time': { min: 1, max: 1 },
+  'is-duration': { min: 1, max: 1 },
+  add: { min: 2 },
+  subtract: { min: 2, max: 2 },
+  multiply: { min: 2 },
+  divide: { min: 2, max: 2 },
+  modulo: { min: 2, max: 2 },
+  abs: { min: 1, max: 1 },
+  negate: { min: 1, max: 1 },
+  round: { min: 1, max: 2 },
+  floor: { min: 1, max: 1 },
+  ceil: { min: 1, max: 1 },
+  clamp: { min: 3, max: 3 },
+  average: { min: 1, max: 1 },
+  'average-by': { min: 2, max: 2 },
+  'starts-with': { min: 2, max: 2 },
+  'ends-with': { min: 2, max: 2 },
+  replace: { min: 3, max: 3 },
+  'replace-all': { min: 3, max: 3 },
+  slice: { min: 2, max: 3 },
+  'pad-start': { min: 2, max: 3 },
+  'pad-end': { min: 2, max: 3 },
+  'normalize-whitespace': { min: 1, max: 1 },
+  set: { min: 3, max: 3 },
+  unset: { min: 2, max: 2 },
+  rename: { min: 3, max: 3 },
+  'get-key': { min: 2, max: 2 },
+  'from-entries': { min: 1, max: 1 },
+  first: { min: 1, max: 1 },
+  last: { min: 1, max: 1 },
+  at: { min: 2, max: 2 },
+  reverse: { min: 1, max: 1 },
+  'sort-by-desc': { min: 2, max: 2 },
+  'order-by': { min: 2, max: 2 },
+  chunk: { min: 2, max: 2 },
+  union: { min: 2 },
+  intersection: { min: 2, max: 2 },
+  difference: { min: 2, max: 2 },
+  'count-by': { min: 2, max: 2 },
+  'date-time': { min: 1, max: 1 },
+  duration: { min: 1, max: 1 },
+  'date-time-add': { min: 2, max: 2 },
+  'date-time-subtract': { min: 2, max: 2 },
+  'date-time-difference': { min: 2, max: 2 },
+  'date-time-start-of': { min: 2, max: 2 },
+  'date-time-end-of': { min: 2, max: 2 },
+  'date-time-part': { min: 2, max: 2 },
+  'duration-add': { min: 2 },
+  'duration-subtract': { min: 2, max: 2 },
+  'duration-total': { min: 2, max: 2 },
+  'contains-all': { min: 2, max: 2 },
+  'contains-any': { min: 2, max: 2 },
 }
 
 /** Компилирует разрешенное source-expression в безопасный IR. */
@@ -182,6 +313,13 @@ export function compileSourceExpression(
 
   if (t.isStringLiteral(node) || t.isNumericLiteral(node) || t.isBooleanLiteral(node) || t.isNullLiteral(node)) {
     return { type: 'literal', value: literalValue(node) }
+  }
+
+  if (t.isUnaryExpression(node) && (node.operator === '-' || node.operator === '+') && t.isNumericLiteral(node.argument)) {
+    return {
+      type: 'literal',
+      value: node.operator === '-' ? -node.argument.value : node.argument.value,
+    }
   }
 
   if (t.isIdentifier(node, { name: 'undefined' }))
@@ -245,7 +383,9 @@ export function compileSourceExpression(
 
   if (t.isCallExpression(node) && t.isIdentifier(node.callee)) {
     const calleeName = node.callee.name
-    const readSource = READ_FUNCTIONS[calleeName]
+    const readSource = Object.prototype.hasOwnProperty.call(READ_FUNCTIONS, calleeName)
+      ? READ_FUNCTIONS[calleeName]
+      : undefined
     if (readSource) {
       if (readSource === 'response' && node.arguments.length === 0)
         return { type: 'read', source: readSource, path: '' }
@@ -263,7 +403,9 @@ export function compileSourceExpression(
     if (domainRead)
       return domainRead
 
-    const operation = OPERATION_FUNCTIONS[calleeName]
+    const operation = Object.prototype.hasOwnProperty.call(FUNCTION_OPERATION_OVERRIDES, calleeName)
+      ? FUNCTION_OPERATION_OVERRIDES[calleeName]
+      : OPERATION_FUNCTIONS[calleeName]
     if (operation) {
       const args = compileArguments(node, diagnostics, sourcePath, calleeName)
       const arity = OPERATION_ARITY[operation]
@@ -356,7 +498,7 @@ function compileDomainRead(
     fromStore: { source: 'composition-store', min: 1, max: 1 },
     metadata: { source: 'metadata', min: 2, max: 2 },
   }
-  const spec = specs[name]
+  const spec = Object.prototype.hasOwnProperty.call(specs, name) ? specs[name] : undefined
   if (!spec)
     return null
   const parameters = node.arguments.map((_, index) => readStringArgument(node, index))

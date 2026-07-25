@@ -12,6 +12,7 @@ import {
   ENDGE_COMPUTATION_MAX_CALL_DEPTH,
   ENDGE_COMPUTATION_MAX_CALLS,
 } from '@/model/config/computation'
+import { compileComputation } from '@/model/services/compiler/computation/computation-compile'
 import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
 
 import { ComputationGraphExecutor, ComputationRuntimeError } from './ComputationGraphExecutor'
@@ -51,6 +52,30 @@ export class EndgeComputation {
     this.assertArtifact(artifact)
     const scope = this._enterExecution(artifact.ref.identity, createExecutionScope())
     return this.executor.run(artifact.payload, input, artifact.ref.identity, scope)
+  }
+
+  /**
+   * Компилирует и выполняет transient source без публикации в Endge.program.
+   *
+   * Используется редакторами и preview-инструментами для несохранённого draft.
+   */
+  public async runSource(
+    source: string,
+    input: unknown,
+    identity = 'computation-source-preview',
+  ): Promise<unknown> {
+    const compiled = compileComputation({ source, input: null, output: null })
+    const error = compiled.diagnostics.find(item => item.severity === 'error')
+    if (error) {
+      throw new ComputationRuntimeError(
+        error.message,
+        identity,
+        'compile-errors',
+      )
+    }
+
+    const scope = this._enterExecution(identity, createExecutionScope())
+    return this.executor.run(compiled.payload, input, identity, scope)
   }
 
   public runSync(idOrIdentity: string | number, input: unknown): unknown {
