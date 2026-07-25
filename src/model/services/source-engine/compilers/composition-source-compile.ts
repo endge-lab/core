@@ -843,12 +843,19 @@ function readRuntime(
         diagnostics.push(diagnostic('error', 'composition-dispatch-to-runtime-kind', '.dispatchTo(...) поддерживается только Stream runtime.', `runtimes.${name}.dispatchTo`, modifier.call))
         continue
       }
-      const dataName = readDataTarget(modifier.call.arguments[0])
-      const resolvedDataName = dataName ? visibleData.get(dataName) : undefined
-      if (!dataName || !resolvedDataName)
-        diagnostics.push(diagnostic('error', 'composition-dispatch-to-data', '.dispatchTo(data(...)) должен ссылаться на объявленный Store data alias.', `runtimes.${name}.dispatchTo`, modifier.call))
+      const resolvedTargets = modifier.call.arguments.flatMap((argument) => {
+        const dataName = readDataTarget(argument)
+        const resolvedDataName = dataName ? visibleData.get(dataName) : undefined
+        if (!dataName || !resolvedDataName) {
+          diagnostics.push(diagnostic('error', 'composition-dispatch-to-data', '.dispatchTo(data(...), ...) должен ссылаться на объявленные Store data aliases.', `runtimes.${name}.dispatchTo`, argument))
+          return []
+        }
+        return [resolvedDataName]
+      })
+      if (!resolvedTargets.length)
+        diagnostics.push(diagnostic('error', 'composition-dispatch-to-empty', '.dispatchTo(...) требует хотя бы один Store data alias.', `runtimes.${name}.dispatchTo`, modifier.call))
       else
-        descriptor.dispatchTo = resolvedDataName
+        descriptor.dispatchTo = [...new Set(resolvedTargets)]
       continue
     }
     if (modifier.name === 'batch') {

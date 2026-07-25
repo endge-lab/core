@@ -1,8 +1,15 @@
 export const UPDATE_DEFAULT_SOURCE = `defineUpdate({
-  handles: null,
-  strategy: 'merge',
-  target: 'items[id=$key]',
-  keyFrom: 'id',
-  valueFrom: '',
+  handles: [],
+  mutations: [
+    {
+      strategy: 'merge',
+      target: 'items[id=$id]',
+      ifExists: null,
+      valueFrom: '',
+      vars: {
+        id: 'id',
+      },
+    },
+  ],
 })
 `

@@ -4,11 +4,33 @@ import type {
   StreamTransportMessage,
 } from '@/domain/types/runtime/stream-runtime.types'
 
+import { SSEManager } from '@endge/utils'
+
+import { Endge } from '@/model/endge/kernel/endge'
+
 /** Browser adapter that owns native EventSource and converts it to a Core transport port. */
 export class BrowserSseStreamTransportFactory implements StreamTransportFactory {
   public open(artifact: Parameters<StreamTransportFactory['open']>[0], callbacks: Parameters<StreamTransportFactory['open']>[1]): StreamTransportConnection {
     if (artifact.transport.kind !== 'sse')
       throw new Error(`Unsupported Stream transport: ${(artifact.transport as any).kind}`)
+    if (artifact.transport.authMode !== 'none') {
+      if (artifact.events.some(event => event.sourceEvent !== 'message'))
+        throw new Error('Authenticated SSE transport supports only the default "message" event.')
+      const manager = new SSEManager({
+        url: artifact.transport.url,
+        retryInterval: 5000,
+        getToken: () => Endge.auth.token || undefined,
+        onOpen: callbacks.open,
+        onError: callbacks.error,
+        onEvent: data => callbacks.message({
+          sourceEvent: 'message',
+          id: null,
+          data,
+        }),
+      })
+      manager.start()
+      return { close: () => manager.stop() }
+    }
     if (typeof EventSource === 'undefined')
       throw new Error('EventSource is unavailable in the current runtime.')
 

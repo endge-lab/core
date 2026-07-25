@@ -96,9 +96,9 @@ const COMPOSITION_COMPLETIONS: SourceLanguageCompletion[] = [
 })`, detail: 'Atomic Query output publication to Store data' },
   { label: 'filterView', kind: 'function', insertText: `filterView('filter')`, detail: 'Renderable Filter view runtime' },
   { label: 'query', kind: 'function', insertText: `query('identity').withProps({})`, detail: 'Query runtime' },
-  { label: 'stream', kind: 'function', insertText: `stream('identity').batch({ maxItems: 50, maxWaitMs: 16 }).dispatchTo(data('store'))`, detail: 'Stream runtime routed to Store updates' },
+  { label: 'stream', kind: 'function', insertText: `stream('identity').batch({ maxItems: 50, maxWaitMs: 16 }).dispatchTo(data('firstStore'), data('secondStore'))`, detail: 'Stream runtime routed to Store updates' },
   { label: 'batch', kind: 'function', insertText: `.batch({ maxItems: 50, maxWaitMs: 16 })`, detail: 'Composition-owned Stream batching' },
-  { label: 'dispatchTo', kind: 'function', insertText: `.dispatchTo(data('store'))`, detail: 'Dispatch normalized events to Store update handlers' },
+  { label: 'dispatchTo', kind: 'function', insertText: `.dispatchTo(data('store'))`, detail: 'Dispatch normalized events to one or more Store update handlers' },
   { label: 'component', kind: 'function', insertText: `component('identity').withProps({})`, detail: 'Component runtime' },
   { label: 'composition', kind: 'function', insertText: `composition('identity')`, detail: 'Nested Composition runtime' },
   { label: 'withData', kind: 'function', insertText: `.withData({

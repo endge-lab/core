@@ -117,8 +117,8 @@ export interface CompositionRuntimeDescriptor {
   /** Локальный data alias child -> data alias owner Composition. */
   dataBindings?: Record<string, string>
   storeTo: CompositionStorePublication[]
-  /** Store data alias receiving normalized Stream events. */
-  dispatchTo?: string
+  /** Store data aliases receiving normalized Stream events. */
+  dispatchTo?: string[]
   /** Optional Composition-owned event batching policy. */
   batch?: {
     maxItems: number

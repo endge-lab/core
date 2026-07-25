@@ -28,7 +28,7 @@ export interface StoreSourceDocument {
 /** Скомпилированная таблица маршрутизации событий к дочерним Update. */
 export interface StoreUpdateHandlerDescriptor {
   identity: string
-  eventType: string | null
+  eventTypes: string[]
 }
 
 /** Runtime-ready Store source artifact v1. */

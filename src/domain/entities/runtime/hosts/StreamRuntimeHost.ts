@@ -6,6 +6,7 @@ import type { StreamEventEnvelope, StreamSourceArtifact } from '@/domain/types/s
 import { Raph, RaphNode } from '@endge/raph'
 
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
+import { Endge } from '@/model/endge/kernel/endge'
 
 function defaultContext(): RuntimeHostContext<'stream'> {
   return {
@@ -85,7 +86,17 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
     if (!artifact)
       throw new Error(`[StreamRuntimeHost] Artifact is unavailable for "${this.entityIdentity}".`)
     this.setContext({ status: 'running', startedAt: new Date().toISOString() })
-    this._connection = this._transportFactory.open(artifact, {
+    const resolvedUrl = String(
+      Endge.workspace.variables.resolve(artifact.transport.url)
+      ?? artifact.transport.url,
+    ).trim()
+    if (!resolvedUrl || /^\{\{?\s*[A-Z_][A-Z0-9_]*\s*\}?\}$/.test(resolvedUrl))
+      throw new Error(`[StreamRuntimeHost] SSE url "${artifact.transport.url}" is not resolved.`)
+    const runtimeArtifact: StreamSourceArtifact = {
+      ...artifact,
+      transport: { ...artifact.transport, url: resolvedUrl },
+    }
+    this._connection = this._transportFactory.open(runtimeArtifact, {
       open: () => this.setContext({ status: 'running', updatedAt: new Date().toISOString() }),
       error: error => {
         this.setContext({ status: 'error', updatedAt: new Date().toISOString() })
@@ -111,8 +122,14 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
     if (!descriptor)
       return
     const now = new Date().toISOString()
+    const type = descriptor.type ?? String(readPayloadPath(message.data, descriptor.typePath) ?? '').trim()
+    if (!type) {
+      this.setContext({ status: 'error', updatedAt: now })
+      this.emit('event:error', new Error(`[StreamRuntimeHost] Event type is empty for "${descriptor.sourceEvent}".`))
+      return
+    }
     const envelope: StreamEventEnvelope = {
-      type: descriptor.type,
+      type,
       payload: readPayloadPath(message.data, descriptor.payloadPath),
       meta: {
         id: message.id,

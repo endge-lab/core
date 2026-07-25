@@ -718,11 +718,8 @@ export class EndgeCompiler extends EndgeModule {
           payload: {
             type: 'update',
             sourceVersion: Number(entity.sourceVersion ?? 1) || 1,
-            handles: null,
-            strategy: 'merge',
-            target: '',
-            keyFrom: null,
-            valueFrom: null,
+            handles: [],
+            mutations: [],
             ...(compiled ?? {}),
             storeIdentity: entity.storeIdentity,
           },
@@ -751,21 +748,23 @@ export class EndgeCompiler extends EndgeModule {
                 sourcePath: `updates.${update.identity}`,
               })
             }
-            const targetRoot = String(artifact?.payload.target ?? '').split(/[.[\]]/)[0] ?? ''
             const writable = new Set(payload?.data
               .filter(field => field.kind === 'value')
               .map(field => field.key) ?? [])
-            if (artifact && targetRoot && !writable.has(targetRoot)) {
-              ;(result.diagnostics ??= []).push({
-                severity: 'error',
-                code: 'store-update-target-invalid',
-                message: `Update "${update.identity}" пишет в отсутствующее или derived поле "${targetRoot}".`,
-                sourcePath: `updates.${update.identity}.target`,
-              })
+            for (const [mutationIndex, mutation] of (artifact?.payload.mutations ?? []).entries()) {
+              const targetRoot = String(mutation.target ?? '').split(/[.[\]]/)[0] ?? ''
+              if (targetRoot && !writable.has(targetRoot)) {
+                ;(result.diagnostics ??= []).push({
+                  severity: 'error',
+                  code: 'store-update-target-invalid',
+                  message: `Update "${update.identity}" пишет в отсутствующее или derived поле "${targetRoot}".`,
+                  sourcePath: `updates.${update.identity}.mutations.${mutationIndex}.target`,
+                })
+              }
             }
             return {
               identity: update.identity,
-              eventType: artifact?.payload.handles ?? null,
+              eventTypes: artifact?.payload.handles ?? [],
             }
           })
         const handlersByType = new Map<string, string>()
@@ -774,21 +773,21 @@ export class EndgeCompiler extends EndgeModule {
             entityType: 'update',
             id: Endge.domain.getUpdate(handler.identity)?.id ?? handler.identity,
             identity: handler.identity,
-            role: handler.eventType ? `store-update:${handler.eventType}` : 'store-update:named',
+            role: handler.eventTypes.length ? `store-update:${handler.eventTypes.join(',')}` : 'store-update:named',
           })
-          if (!handler.eventType)
-            continue
-          const previous = handlersByType.get(handler.eventType)
-          if (previous) {
-            ;(result.diagnostics ??= []).push({
-              severity: 'error',
-              code: 'store-update-event-duplicate',
-              message: `Store "${entity.identity}" содержит два Update для события "${handler.eventType}": "${previous}" и "${handler.identity}".`,
-              sourcePath: `updates.${handler.identity}`,
-            })
-          }
-          else {
-            handlersByType.set(handler.eventType, handler.identity)
+          for (const eventType of handler.eventTypes) {
+            const previous = handlersByType.get(eventType)
+            if (previous) {
+              ;(result.diagnostics ??= []).push({
+                severity: 'error',
+                code: 'store-update-event-duplicate',
+                message: `Store "${entity.identity}" содержит два Update для события "${eventType}": "${previous}" и "${handler.identity}".`,
+                sourcePath: `updates.${handler.identity}`,
+              })
+            }
+            else {
+              handlersByType.set(eventType, handler.identity)
+            }
           }
         }
         for (const field of payload?.data ?? []) {
@@ -860,7 +859,7 @@ export class EndgeCompiler extends EndgeModule {
           payload: payload ?? {
             type: 'stream',
             sourceVersion: Number(entity.sourceVersion ?? 1) || 1,
-            transport: { kind: 'sse', url: '', withCredentials: false },
+            transport: { kind: 'sse', url: '', withCredentials: false, authMode: 'inherit' },
             events: [],
           },
           diagnostics: (result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[],
@@ -2097,11 +2096,14 @@ export class EndgeCompiler extends EndgeModule {
           diagnostics.push({ severity: 'error', code: 'composition-stream-missing', message: `Stream "${runtime.identity}" не найден.`, sourcePath: `runtimes.${runtime.name}` })
         else if (!artifact || artifact.status === 'error')
           diagnostics.push({ severity: 'error', code: 'composition-stream-invalid', message: `Stream "${runtime.identity}" не собран или содержит compile errors.`, sourcePath: `runtimes.${runtime.name}` })
-        if (!runtime.dispatchTo) {
+        if (!runtime.dispatchTo?.length) {
           diagnostics.push({ severity: 'warning', code: 'composition-stream-dispatch-missing', message: `Stream "${runtime.name}" не маршрутизирует события в Store.`, sourcePath: `runtimes.${runtime.name}` })
         }
-        else if (!storeArtifacts.has(runtime.dispatchTo)) {
-          diagnostics.push({ severity: 'error', code: 'composition-stream-store-missing', message: `Stream "${runtime.name}" ссылается на отсутствующий Store data alias "${runtime.dispatchTo}".`, sourcePath: `runtimes.${runtime.name}.dispatchTo` })
+        else {
+          for (const dataAlias of runtime.dispatchTo) {
+            if (!storeArtifacts.has(dataAlias))
+              diagnostics.push({ severity: 'error', code: 'composition-stream-store-missing', message: `Stream "${runtime.name}" ссылается на отсутствующий Store data alias "${dataAlias}".`, sourcePath: `runtimes.${runtime.name}.dispatchTo` })
+          }
         }
       }
       else if (runtime.kind === 'composition') {

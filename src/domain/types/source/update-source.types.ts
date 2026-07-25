@@ -2,12 +2,18 @@ import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
 
 export type UpdateMutationStrategy = 'set' | 'merge' | 'replace' | 'append' | 'remove'
 
-export interface UpdateSourceDocument {
-  handles: string | null
+export interface UpdateMutationDescriptor {
   strategy: UpdateMutationStrategy
   target: string
-  keyFrom: string | null
+  forEach: string | null
+  ifExists: string | null
   valueFrom: string | null
+  vars: Record<string, string>
+}
+
+export interface UpdateSourceDocument {
+  handles: string[]
+  mutations: UpdateMutationDescriptor[]
 }
 
 /** Runtime-ready Update artifact, always scoped to its owner Store. */

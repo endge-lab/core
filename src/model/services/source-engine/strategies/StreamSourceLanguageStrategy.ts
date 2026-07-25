@@ -10,9 +10,9 @@ export class StreamSourceLanguageStrategy implements SourceLanguageStrategy {
   public readonly syntax = createTypeScriptLikeSourceSyntax({
     alias: 'Endge Stream Source',
     extension: '.endge-stream.ts',
-    keywords: ['defineStream', 'sse', 'event'],
-    functions: ['defineStream', 'sse', 'event'],
-    properties: ['transport', 'events', 'url', 'withCredentials'],
+    keywords: ['defineStream', 'sse', 'event', 'env'],
+    functions: ['defineStream', 'sse', 'event', 'env'],
+    properties: ['transport', 'events', 'url', 'withCredentials', 'auth', 'typeFrom', 'payloadFrom'],
   })
 
   public supports(sourceKind: SourceKind | string): boolean { return sourceKind === this.sourceKind }
@@ -26,8 +26,10 @@ export class StreamSourceLanguageStrategy implements SourceLanguageStrategy {
   public completions(_context: SourceLanguageContext): SourceLanguageCompletion[] {
     return [
       { label: 'defineStream', kind: 'snippet', insertText: STREAM_DEFAULT_SOURCE.trimEnd(), detail: 'Создать Stream source' },
-      { label: 'sse', kind: 'snippet', insertText: "sse({\n  url: '/events',\n  withCredentials: false,\n})", detail: 'SSE transport' },
+      { label: 'sse', kind: 'snippet', insertText: "sse({\n  url: env('ENDPOINT_SSE'),\n  withCredentials: false,\n  auth: 'inherit',\n})", detail: 'SSE transport' },
+      { label: 'env', kind: 'function', insertText: "env('ENDPOINT_SSE')", detail: 'Ссылка на environment variable' },
       { label: 'event', kind: 'function', insertText: "event('domain.event')", detail: 'Нормализовать transport event' },
+      { label: 'eventFrom', kind: 'snippet', insertText: "event({\n  typeFrom: 'eventInfo.name',\n  payloadFrom: '',\n})", detail: 'Получить тип и payload из сообщения' },
     ]
   }
 }

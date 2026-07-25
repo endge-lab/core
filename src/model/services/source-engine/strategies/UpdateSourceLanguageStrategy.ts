@@ -12,7 +12,7 @@ export class UpdateSourceLanguageStrategy implements SourceLanguageStrategy {
     extension: '.endge-update.ts',
     keywords: ['defineUpdate', 'set', 'merge', 'replace', 'append', 'remove'],
     functions: ['defineUpdate'],
-    properties: ['handles', 'strategy', 'target', 'keyFrom', 'valueFrom'],
+    properties: ['handles', 'mutations', 'strategy', 'target', 'forEach', 'ifExists', 'valueFrom', 'vars'],
   })
 
   public supports(sourceKind: SourceKind | string): boolean { return sourceKind === this.sourceKind }
@@ -26,10 +26,13 @@ export class UpdateSourceLanguageStrategy implements SourceLanguageStrategy {
   public completions(_context: SourceLanguageContext): SourceLanguageCompletion[] {
     return [
       { label: 'defineUpdate', kind: 'snippet', insertText: UPDATE_DEFAULT_SOURCE.trimEnd(), detail: 'Создать Store Update source' },
-      { label: 'handles', kind: 'property', insertText: "handles: 'domain.event',", detail: 'Канонический event type для dispatch' },
+      { label: 'handles', kind: 'property', insertText: "handles: ['domain.created', 'domain.updated'],", detail: 'Канонические event types для dispatch' },
+      { label: 'mutations', kind: 'snippet', insertText: "mutations: [\n  {\n    strategy: 'merge',\n    target: 'items[id=$id]',\n    ifExists: null,\n    valueFrom: '',\n    vars: { id: 'id' },\n  },\n],", detail: 'Атомарный набор индексированных Store mutations' },
       { label: 'strategy', kind: 'property', insertText: "strategy: 'merge',", detail: 'set | merge | replace | append | remove' },
-      { label: 'target', kind: 'property', insertText: "target: 'items[id=$key]',", detail: 'Store-relative индексированный Raph path' },
-      { label: 'keyFrom', kind: 'property', insertText: "keyFrom: 'id',", detail: 'Payload path для $key' },
+      { label: 'target', kind: 'property', insertText: "target: 'items[id=$id]',", detail: 'Store-relative индексированный Raph path' },
+      { label: 'forEach', kind: 'property', insertText: "forEach: 'items[]',", detail: 'Развернуть mutation для элементов payload array' },
+      { label: 'ifExists', kind: 'property', insertText: "ifExists: 'items[id=$id]',", detail: 'Не создавать ветку, если guard path отсутствует' },
+      { label: 'vars', kind: 'property', insertText: "vars: { id: 'id' },", detail: 'Selector variables и payload paths' },
       { label: 'valueFrom', kind: 'property', insertText: "valueFrom: '',", detail: 'Payload path; пустая строка означает весь payload' },
     ]
   }

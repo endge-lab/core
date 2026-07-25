@@ -4,13 +4,15 @@ export interface StreamSseTransportDescriptor {
   kind: 'sse'
   url: string
   withCredentials: boolean
+  authMode: 'inherit' | 'none'
 }
 
 export type StreamTransportDescriptor = StreamSseTransportDescriptor
 
 export interface StreamEventDescriptor {
   sourceEvent: string
-  type: string
+  type: string | null
+  typePath: string | null
   payloadPath: string | null
 }
 

@@ -1020,29 +1020,35 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     descriptor: CompositionProgramPayload['runtimes'][number],
     stream: StreamRuntimeHost,
   ): void {
-    if (!descriptor.dispatchTo)
+    if (!descriptor.dispatchTo?.length)
       return
-    const runtimeId = this._storeRuntimeIds.get(descriptor.dispatchTo)
-    const store = runtimeId ? Endge.runtime.getRuntimeById<StoreRuntimeHost>(runtimeId) : null
-    if (!store || store.entityType !== 'store')
-      throw new Error(`[CompositionRuntimeHost] Store data "${descriptor.dispatchTo}" is not mounted.`)
+    const stores = descriptor.dispatchTo.map((dataAlias) => {
+      const runtimeId = this._storeRuntimeIds.get(dataAlias)
+      const store = runtimeId ? Endge.runtime.getRuntimeById<StoreRuntimeHost>(runtimeId) : null
+      if (!store || store.entityType !== 'store')
+        throw new Error(`[CompositionRuntimeHost] Store data "${dataAlias}" is not mounted.`)
+      return store
+    })
 
     const receive = (event: StreamEventEnvelope) => {
       const batch = descriptor.batch
       if (!batch || (batch.maxItems === 1 && batch.maxWaitMs === 0)) {
-        store.dispatch(event)
+        Raph.transaction(() => {
+          for (const store of stores)
+            store.dispatch(event)
+        })
         return
       }
       const pending = this._streamBatches.get(descriptor.name) ?? []
       pending.push(event)
       this._streamBatches.set(descriptor.name, pending)
       if (pending.length >= batch.maxItems) {
-        this._flushStreamBatch(descriptor.name, store)
+        this._flushStreamBatch(descriptor.name, stores)
         return
       }
       if (batch.maxWaitMs > 0 && !this._streamBatchTimers.has(descriptor.name)) {
         this._streamBatchTimers.set(descriptor.name, setTimeout(
-          () => this._flushStreamBatch(descriptor.name, store),
+          () => this._flushStreamBatch(descriptor.name, stores),
           batch.maxWaitMs,
         ))
       }
@@ -1051,7 +1057,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     this._disposers.push(() => stream.off('event', receive))
   }
 
-  private _flushStreamBatch(name: string, store: StoreRuntimeHost): void {
+  private _flushStreamBatch(name: string, stores: StoreRuntimeHost[]): void {
     const timer = this._streamBatchTimers.get(name)
     if (timer)
       clearTimeout(timer)
@@ -1061,8 +1067,10 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     if (!events.length)
       return
     Raph.transaction(() => {
-      for (const event of events)
-        store.dispatch(event)
+      for (const event of events) {
+        for (const store of stores)
+          store.dispatch(event)
+      }
     })
   }
 

@@ -43,13 +43,23 @@ export function compileStreamSource(source: string, sourceVersion = 1): StreamSo
           diagnostics.push(diagnostic('error', 'stream-transport-shape', 'transport должен иметь вид sse({ url, withCredentials? }).', 'transport', value))
           continue
         }
-        const config = readObject(value.arguments[0])
-        const url = typeof config.url === 'string' ? config.url.trim() : ''
+        const transportDefinition = value.arguments[0]
+        const config = readObject(transportDefinition)
+        const url = readEnvironmentStringProperty(transportDefinition, 'url', diagnostics, 'transport.url')
         if (!url) {
-          diagnostics.push(diagnostic('error', 'stream-transport-url', 'SSE transport требует непустой url.', 'transport.url', value))
+          if (!diagnostics.some(item => item.sourcePath === 'transport.url'))
+            diagnostics.push(diagnostic('error', 'stream-transport-url', 'SSE transport требует непустой url или env(...).', 'transport.url', value))
           continue
         }
-        transport = { kind: 'sse', url, withCredentials: config.withCredentials === true }
+        const authMode = config.auth === 'none' ? 'none' : 'inherit'
+        if (config.auth != null && config.auth !== 'none' && config.auth !== 'inherit')
+          diagnostics.push(diagnostic('error', 'stream-transport-auth', 'transport.auth должен быть inherit или none.', 'transport.auth', value))
+        transport = {
+          kind: 'sse',
+          url,
+          withCredentials: config.withCredentials === true,
+          authMode,
+        }
         continue
       }
       if (name === 'events') {
@@ -92,19 +102,31 @@ function readEvents(node: t.ObjectExpression, diagnostics: DiagnosticDraft[]): S
     const sourceEvent = propertyName(property.key)
     const call = unwrapExpression(property.value)
     if (!sourceEvent || !t.isCallExpression(call) || !t.isIdentifier(call.callee, { name: 'event' })) {
-      diagnostics.push(diagnostic('error', 'stream-event-shape', 'Stream event должен иметь вид sourceEvent: event(type[, payloadPath]).', 'events', property))
+      diagnostics.push(diagnostic('error', 'stream-event-shape', 'Stream event должен иметь вид sourceEvent: event(type[, payloadPath]) или event({ typeFrom, payloadFrom? }).', 'events', property))
       continue
     }
-    const type = readStringArgument(call, 0)?.trim() ?? ''
-    const payloadPath = readStringArgument(call, 1)?.trim() ?? null
-    if (!type) {
-      diagnostics.push(diagnostic('error', 'stream-event-type', `Событие "${sourceEvent}" требует канонический type.`, `events.${sourceEvent}`, call))
+    const first = call.arguments[0]
+    let type: string | null = null
+    let typePath: string | null = null
+    let payloadPath: string | null = null
+    if (first && t.isObjectExpression(first)) {
+      const config = readObject(first)
+      typePath = typeof config.typeFrom === 'string' ? config.typeFrom.trim() : null
+      payloadPath = typeof config.payloadFrom === 'string' ? config.payloadFrom.trim() || null : null
+    }
+    else {
+      type = readStringArgument(call, 0)?.trim() || null
+      payloadPath = readStringArgument(call, 1)?.trim() || null
+    }
+    if (!type && !typePath) {
+      diagnostics.push(diagnostic('error', 'stream-event-type', `Событие "${sourceEvent}" требует type или typeFrom.`, `events.${sourceEvent}`, call))
       continue
     }
-    if (types.has(type))
+    if (type && types.has(type))
       diagnostics.push(diagnostic('warning', 'stream-event-type-duplicate', `Несколько transport events нормализуются в "${type}".`, `events.${sourceEvent}`, call))
-    types.add(type)
-    events.push({ sourceEvent, type, payloadPath })
+    if (type)
+      types.add(type)
+    events.push({ sourceEvent, type, typePath, payloadPath })
   }
   return events
 }
@@ -122,6 +144,59 @@ function readObject(node: t.ObjectExpression): Record<string, unknown> {
       out[key] = value.value
   }
   return out
+}
+
+/**
+ * Reads a string authoring value and normalizes env('NAME') to the existing
+ * workspace-variable token consumed by runtime artifacts.
+ */
+function readEnvironmentStringProperty(
+  node: t.ObjectExpression,
+  key: string,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+): string {
+  const property = node.properties.find(item =>
+    t.isObjectProperty(item)
+    && !item.computed
+    && propertyName(item.key) === key,
+  )
+  if (!property || !t.isObjectProperty(property) || !t.isExpression(property.value))
+    return ''
+
+  const value = unwrapExpression(property.value)
+  if (t.isStringLiteral(value))
+    return value.value.trim()
+
+  if (
+    t.isCallExpression(value)
+    && (
+      t.isIdentifier(value.callee, { name: 'env' })
+      || t.isIdentifier(value.callee, { name: 'endgeVar' })
+    )
+  ) {
+    const name = readStringArgument(value, 0)?.trim() ?? ''
+    if (!name || value.arguments.length !== 1) {
+      diagnostics.push(diagnostic(
+        'error',
+        'stream-transport-env',
+        'env(...) принимает ровно одно непустое строковое имя переменной.',
+        sourcePath,
+        value,
+      ))
+      return ''
+    }
+    return `{${name}}`
+  }
+
+  diagnostics.push(diagnostic(
+    'error',
+    'stream-transport-url-expression',
+    'transport.url поддерживает строку или env(\'VARIABLE_NAME\').',
+    sourcePath,
+    value,
+  ))
+  return ''
 }
 
 function findDefinition(ast: t.File, name: string): t.CallExpression | null {

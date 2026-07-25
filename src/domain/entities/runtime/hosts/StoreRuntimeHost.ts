@@ -135,7 +135,7 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
    */
   public dispatch(event: StreamEventEnvelope): boolean {
     const handler = this.getArtifactPayload()?.updateHandlers
-      .find(item => item.eventType === event.type)
+      .find(item => item.eventTypes.includes(event.type))
     if (!handler)
       return false
     this.applyUpdate(handler.identity, event.payload)
@@ -155,7 +155,21 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
     if (artifact.payload.storeIdentity !== this.entityIdentity)
       throw new Error(`[StoreRuntimeHost] Update "${updateIdentity}" belongs to another Store.`)
 
-    this.applyMutation(this._makeMutationPlan(artifact.payload, payload))
+    const plans = this._makeMutationPlans(artifact.payload, payload)
+    Raph.transaction(() => {
+      for (const plan of plans)
+        this._applyMutationPlan(plan)
+    })
+    const now = new Date().toISOString()
+    this.setContext({ status: 'success', updatedAt: now, lastStateChangeAt: now })
+    this.emit('state:change', {
+      update: updateIdentity,
+      mutations: plans.map(plan => ({
+        path: plan.path,
+        strategy: plan.strategy,
+        value: cloneRuntimeValue(plan.value),
+      })),
+    })
   }
 
   /**
@@ -167,28 +181,7 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
     if (!target || !this.isWritable(target))
       throw new Error(`[StoreRuntimeHost] Store path "${target}" is derived or missing.`)
 
-    const path = appendRawStorePath(this.basePath, target)
-    const options = plan.vars ? { vars: plan.vars } : undefined
-    Raph.transaction(() => {
-      switch (plan.strategy) {
-        case 'merge':
-          Raph.merge(path, cloneRuntimeValue(plan.value), options)
-          break
-        case 'remove':
-          Raph.delete(path, options)
-          break
-        case 'append': {
-          const current = Raph.get(path, options)
-          const additions = Array.isArray(plan.value) ? plan.value : [plan.value]
-          Raph.set(path, [...(Array.isArray(current) ? current : []), ...cloneRuntimeValue(additions)], options)
-          break
-        }
-        case 'replace':
-        case 'set':
-          Raph.set(path, cloneRuntimeValue(plan.value), options)
-          break
-      }
-    })
+    Raph.transaction(() => this._applyMutationPlan(plan))
 
     const now = new Date().toISOString()
     this.setContext({ status: 'success', updatedAt: now, lastStateChangeAt: now })
@@ -274,15 +267,58 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
     this.setContext({ status: 'success', startedAt: now, updatedAt: now, lastStateChangeAt: now })
   }
 
-  private _makeMutationPlan(update: UpdateSourceArtifact, payload: unknown): StoreMutationPlan {
-    const key = update.keyFrom ? readPayloadPath(payload, update.keyFrom) : undefined
-    if (update.target.includes('$key') && (key == null || key === ''))
-      throw new Error(`[StoreRuntimeHost] Update "${update.storeIdentity}" cannot resolve keyFrom "${update.keyFrom}".`)
-    return {
-      strategy: update.strategy,
-      path: update.target,
-      value: update.strategy === 'remove' ? undefined : readPayloadPath(payload, update.valueFrom ?? ''),
-      vars: update.target.includes('$key') ? { key } : undefined,
+  private _makeMutationPlans(update: UpdateSourceArtifact, payload: unknown): StoreMutationPlan[] {
+    return update.mutations.flatMap((mutation) => {
+      if (!mutation.target || !this.isWritable(mutation.target))
+        throw new Error(`[StoreRuntimeHost] Update "${update.storeIdentity}" targets derived or missing path "${mutation.target}".`)
+      const contexts = mutation.forEach
+        ? expandPayloadContexts(payload, mutation.forEach)
+        : [{ root: payload, current: payload, parent: null }]
+      return contexts.flatMap((context) => {
+        const vars = Object.fromEntries(Object.entries(mutation.vars).map(([name, path]) => {
+          const value = readContextPath(context, path)
+          if (value == null || value === '')
+            throw new Error(`[StoreRuntimeHost] Update "${update.storeIdentity}" cannot resolve var "${name}" from "${path}".`)
+          return [name, value]
+        }))
+        const options = Object.keys(vars).length ? { vars } : undefined
+        if (mutation.ifExists) {
+          const guardPath = appendRawStorePath(this.basePath, mutation.ifExists)
+          if (Raph.get(guardPath, options) === undefined)
+            return []
+        }
+        return [{
+          strategy: mutation.strategy,
+          path: mutation.target,
+          value: mutation.strategy === 'remove'
+            ? undefined
+            : readContextPath(context, mutation.valueFrom ?? ''),
+          vars: options?.vars,
+        }]
+      })
+    })
+  }
+
+  private _applyMutationPlan(plan: StoreMutationPlan): void {
+    const path = appendRawStorePath(this.basePath, plan.path)
+    const options = plan.vars ? { vars: plan.vars } : undefined
+    switch (plan.strategy) {
+      case 'merge':
+        Raph.merge(path, cloneRuntimeValue(plan.value), options)
+        break
+      case 'remove':
+        Raph.delete(path, options)
+        break
+      case 'append': {
+        const current = Raph.get(path, options)
+        const additions = Array.isArray(plan.value) ? plan.value : [plan.value]
+        Raph.set(path, [...(Array.isArray(current) ? current : []), ...cloneRuntimeValue(additions)], options)
+        break
+      }
+      case 'replace':
+      case 'set':
+        Raph.set(path, cloneRuntimeValue(plan.value), options)
+        break
     }
   }
 }
@@ -315,6 +351,51 @@ function readPayloadPath(value: unknown, path: string): unknown {
       return undefined
     return (current as Record<string, unknown>)[key]
   }, value)
+}
+
+interface UpdatePayloadContext {
+  root: unknown
+  current: unknown
+  parent: unknown
+}
+
+function expandPayloadContexts(root: unknown, path: string): UpdatePayloadContext[] {
+  const segments = String(path ?? '').split('.').map(item => item.trim()).filter(Boolean)
+  let states: UpdatePayloadContext[] = [{ root, current: root, parent: null }]
+  for (const segment of segments) {
+    const iterate = segment.endsWith('[]')
+    const key = iterate ? segment.slice(0, -2) : segment
+    const next: UpdatePayloadContext[] = []
+    for (const state of states) {
+      const container = key ? readPayloadPath(state.current, key) : state.current
+      if (iterate) {
+        if (!Array.isArray(container))
+          continue
+        for (const item of container)
+          next.push({ root, current: item, parent: state.current })
+      }
+      else {
+        next.push({ root, current: container, parent: state.current })
+      }
+    }
+    states = next
+  }
+  return states
+}
+
+function readContextPath(context: UpdatePayloadContext, path: string): unknown {
+  const normalized = String(path ?? '').trim()
+  if (!normalized)
+    return context.current
+  if (normalized === '$root')
+    return context.root
+  if (normalized.startsWith('$root.'))
+    return readPayloadPath(context.root, normalized.slice(6))
+  if (normalized === '$parent')
+    return context.parent
+  if (normalized.startsWith('$parent.'))
+    return readPayloadPath(context.parent, normalized.slice(8))
+  return readPayloadPath(context.current, normalized)
 }
 
 function encodePathPart(value: string): string {
