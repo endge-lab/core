@@ -9,7 +9,7 @@ import type { FilterViewControlDefinition } from '@/domain/types/ui/filter-view.
 import type { EndgeMockReference } from '@/domain/types/mock'
 import type { I18nCompiledLocales } from '@/domain/types/i18n.types'
 
-export type CompositionRuntimeKind = 'filter' | 'query' | 'component' | 'composition' | 'filter-view'
+export type CompositionRuntimeKind = 'filter' | 'query' | 'component' | 'composition' | 'stream' | 'filter-view'
 
 export type CompositionActivationMode = 'startup' | 'manual'
 
@@ -117,6 +117,13 @@ export interface CompositionRuntimeDescriptor {
   /** Локальный data alias child -> data alias owner Composition. */
   dataBindings?: Record<string, string>
   storeTo: CompositionStorePublication[]
+  /** Store data alias receiving normalized Stream events. */
+  dispatchTo?: string
+  /** Optional Composition-owned event batching policy. */
+  batch?: {
+    maxItems: number
+    maxWaitMs: number
+  }
 }
 
 export interface CompositionRuntimeChildHandle {

@@ -5,6 +5,8 @@ import type { FilterProgramPayload } from '@/domain/types/source/filter-source.t
 import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
 import type { SourceExpressionIR, SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 import type { StoreSourceArtifact } from '@/domain/types/source/store-source.types'
+import type { StreamSourceArtifact } from '@/domain/types/source/stream-source.types'
+import type { UpdateSourceArtifact } from '@/domain/types/source/update-source.types'
 import type { TypeProgramCatalogEntry, TypeProgramPayload, TypeSourceDefinition, TypeSourceExpression } from '@/domain/types/source/type-source.types'
 import type {
   ComponentSFCProgramPayload,
@@ -35,6 +37,8 @@ import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { RField } from '@/domain/entities/reflect/RField'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { RStore } from '@/domain/entities/reflect/RStore'
+import { RStream } from '@/domain/entities/reflect/RStream'
+import { RUpdate } from '@/domain/entities/reflect/RUpdate'
 import { RStyle } from '@/domain/entities/reflect/RStyle'
 import { RType } from '@/domain/entities/reflect/RType'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
@@ -139,7 +143,13 @@ export class EndgeCompiler extends EndgeModule {
       if (!this.compilePhase('data-view', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'data views', Endge.domain.getDataViews(), context))
         return
 
+      if (!this.compilePhase('update', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'updates', Endge.domain.getUpdates(), context))
+        return
+
       if (!this.compilePhase('store', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'stores', Endge.domain.getStores(), context))
+        return
+
+      if (!this.compilePhase('stream', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'streams', Endge.domain.getStreams(), context))
         return
 
       if (!this.compilePhase('filter', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'filter source', Endge.domain.getFilters(), context))
@@ -222,6 +232,16 @@ export class EndgeCompiler extends EndgeModule {
   public buildStore(entity: RStore): ProgramArtifact<StoreSourceArtifact> {
     const context = this._createCompileContext()
     return this.compileEntity('store', entity, context) as ProgramArtifact<StoreSourceArtifact>
+  }
+
+  /** Компилирует один Stream source в Endge.program. */
+  public buildStream(entity: RStream): ProgramArtifact<StreamSourceArtifact> {
+    return this.compileEntity('stream', entity, this._createCompileContext()) as ProgramArtifact<StreamSourceArtifact>
+  }
+
+  /** Компилирует один дочерний Update source в Endge.program. */
+  public buildUpdate(entity: RUpdate): ProgramArtifact<UpdateSourceArtifact> {
+    return this.compileEntity('update', entity, this._createCompileContext()) as ProgramArtifact<UpdateSourceArtifact>
   }
 
   /** Компилирует один Filter source в Endge.program. */
@@ -677,12 +697,100 @@ export class EndgeCompiler extends EndgeModule {
       },
     })
 
+    this.registerHandler<RUpdate, UpdateSourceArtifact>({
+      entityType: 'update',
+      compile: (entity, context) => {
+        const result = Endge.source.compile('update', entity.source)
+        const compiled = result.artifact as Omit<UpdateSourceArtifact, 'storeIdentity'> | undefined
+        const diagnostics = (result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]
+        const store = Endge.domain.getStore(entity.storeIdentity)
+        if (!entity.storeIdentity || !store) {
+          diagnostics.push({
+            severity: 'error',
+            code: 'update-store-owner-missing',
+            message: `Update "${entity.identity}" должен принадлежать существующему Store.`,
+            sourcePath: 'store',
+          })
+        }
+        return this._makeArtifact(entity, 'update', context, {
+          capabilities: ['compilable', 'executable'],
+          metadata: createEmptyProgramMetadata(),
+          payload: {
+            type: 'update',
+            sourceVersion: Number(entity.sourceVersion ?? 1) || 1,
+            handles: null,
+            strategy: 'merge',
+            target: '',
+            keyFrom: null,
+            valueFrom: null,
+            ...(compiled ?? {}),
+            storeIdentity: entity.storeIdentity,
+          },
+          dependencies: store
+            ? [{ entityType: 'store', id: store.id, identity: store.identity, role: 'update-owner' }]
+            : [],
+          diagnostics,
+        })
+      },
+    })
+
     this.registerHandler<RStore, StoreSourceArtifact>({
       entityType: 'store',
       compile: (entity, context) => {
         const result = Endge.source.compile('store', entity.source)
         const payload = result.artifact as StoreSourceArtifact | undefined
         const dependencies: ProgramArtifact['dependencies'] = []
+        const updateHandlers = Endge.domain.getUpdatesByStoreIdentity(entity.identity)
+          .map((update) => {
+            const artifact = Endge.program.getUpdateArtifact(update.identity)
+            if (!artifact || artifact.status === 'error') {
+              ;(result.diagnostics ??= []).push({
+                severity: 'error',
+                code: 'store-update-invalid',
+                message: `Update "${update.identity}" отсутствует в compiled program или содержит ошибки.`,
+                sourcePath: `updates.${update.identity}`,
+              })
+            }
+            const targetRoot = String(artifact?.payload.target ?? '').split(/[.[\]]/)[0] ?? ''
+            const writable = new Set(payload?.data
+              .filter(field => field.kind === 'value')
+              .map(field => field.key) ?? [])
+            if (artifact && targetRoot && !writable.has(targetRoot)) {
+              ;(result.diagnostics ??= []).push({
+                severity: 'error',
+                code: 'store-update-target-invalid',
+                message: `Update "${update.identity}" пишет в отсутствующее или derived поле "${targetRoot}".`,
+                sourcePath: `updates.${update.identity}.target`,
+              })
+            }
+            return {
+              identity: update.identity,
+              eventType: artifact?.payload.handles ?? null,
+            }
+          })
+        const handlersByType = new Map<string, string>()
+        for (const handler of updateHandlers) {
+          dependencies.push({
+            entityType: 'update',
+            id: Endge.domain.getUpdate(handler.identity)?.id ?? handler.identity,
+            identity: handler.identity,
+            role: handler.eventType ? `store-update:${handler.eventType}` : 'store-update:named',
+          })
+          if (!handler.eventType)
+            continue
+          const previous = handlersByType.get(handler.eventType)
+          if (previous) {
+            ;(result.diagnostics ??= []).push({
+              severity: 'error',
+              code: 'store-update-event-duplicate',
+              message: `Store "${entity.identity}" содержит два Update для события "${handler.eventType}": "${previous}" и "${handler.identity}".`,
+              sourcePath: `updates.${handler.identity}`,
+            })
+          }
+          else {
+            handlersByType.set(handler.eventType, handler.identity)
+          }
+        }
         for (const field of payload?.data ?? []) {
           if (field.kind === 'value' && field.initial.kind === 'mock') {
             dependencies.push({
@@ -731,8 +839,30 @@ export class EndgeCompiler extends EndgeModule {
         return this._makeArtifact(entity, 'store', context, {
           capabilities: ['compilable', 'executable', 'data-provider'],
           metadata: createEmptyProgramMetadata(),
-          payload: payload ?? { type: 'store', sourceVersion: Number(entity.sourceVersion ?? 1) || 1, data: [] },
+          payload: {
+            ...(payload ?? { type: 'store', sourceVersion: Number(entity.sourceVersion ?? 1) || 1, data: [] }),
+            updateHandlers,
+          },
           dependencies,
+          diagnostics: (result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[],
+        })
+      },
+    })
+
+    this.registerHandler<RStream, StreamSourceArtifact>({
+      entityType: 'stream',
+      compile: (entity, context) => {
+        const result = Endge.source.compile('stream', entity.source)
+        const payload = result.artifact as StreamSourceArtifact | undefined
+        return this._makeArtifact(entity, 'stream', context, {
+          capabilities: ['compilable', 'runnable', 'data-provider'],
+          metadata: createEmptyProgramMetadata(),
+          payload: payload ?? {
+            type: 'stream',
+            sourceVersion: Number(entity.sourceVersion ?? 1) || 1,
+            transport: { kind: 'sse', url: '', withCredentials: false },
+            events: [],
+          },
           diagnostics: (result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[],
         })
       },
@@ -1959,6 +2089,20 @@ export class EndgeCompiler extends EndgeModule {
         }
         const outputNames = new Set(artifact.payload.outputs.map(output => output.key))
         validateStoreTo(runtime, outputNames, 'Query')
+      }
+      else if (runtime.kind === 'stream') {
+        const model = Endge.domain.getStream(runtime.identity)
+        const artifact = Endge.program.getStreamArtifact(runtime.identity)
+        if (!model)
+          diagnostics.push({ severity: 'error', code: 'composition-stream-missing', message: `Stream "${runtime.identity}" не найден.`, sourcePath: `runtimes.${runtime.name}` })
+        else if (!artifact || artifact.status === 'error')
+          diagnostics.push({ severity: 'error', code: 'composition-stream-invalid', message: `Stream "${runtime.identity}" не собран или содержит compile errors.`, sourcePath: `runtimes.${runtime.name}` })
+        if (!runtime.dispatchTo) {
+          diagnostics.push({ severity: 'warning', code: 'composition-stream-dispatch-missing', message: `Stream "${runtime.name}" не маршрутизирует события в Store.`, sourcePath: `runtimes.${runtime.name}` })
+        }
+        else if (!storeArtifacts.has(runtime.dispatchTo)) {
+          diagnostics.push({ severity: 'error', code: 'composition-stream-store-missing', message: `Stream "${runtime.name}" ссылается на отсутствующий Store data alias "${runtime.dispatchTo}".`, sourcePath: `runtimes.${runtime.name}.dispatchTo` })
+        }
       }
       else if (runtime.kind === 'composition') {
         const model = Endge.domain.getComposition(runtime.identity)

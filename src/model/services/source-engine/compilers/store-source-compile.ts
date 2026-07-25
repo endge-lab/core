@@ -57,7 +57,7 @@ export function compileStoreSource(source: string, sourceVersion = 1): StoreSour
     return {
       ast,
       document: hasErrors ? null : document,
-      artifact: hasErrors ? null : { type: 'store', sourceVersion, ...document },
+      artifact: hasErrors ? null : { type: 'store', sourceVersion, ...document, updateHandlers: [] },
       diagnostics,
     }
   }

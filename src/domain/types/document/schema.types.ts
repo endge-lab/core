@@ -24,6 +24,8 @@ import type { Tenants_Repository } from '@/model/db/repositories/Tenants_Reposit
 import type { Workspaces_Repository } from '@/model/db/repositories/Workspaces_Repository'
 import type { Compositions_Repository } from '@/model/db/repositories/Compositions_Repository'
 import type { Stores_Repository } from '@/model/db/repositories/Stores_Repository'
+import type { Streams_Repository } from '@/model/db/repositories/Streams_Repository'
+import type { Updates_Repository } from '@/model/db/repositories/Updates_Repository'
 import type { Mocks_Repository } from '@/model/db/repositories/Mocks_Repository'
 import type { Computations_Repository } from '@/model/db/repositories/Computations_Repository'
 
@@ -36,6 +38,8 @@ export interface EndgeSchemaDump {
   dataViews: any[]
   compositions: any[]
   stores: any[]
+  streams: any[]
+  updates: any[]
   mocks: any[]
   folders: any[]
   components: any[]
@@ -80,6 +84,8 @@ export type RepositoriesBag = {
   dataViews: DataViews_Repository
   compositions: Compositions_Repository
   stores: Stores_Repository
+  streams: Streams_Repository
+  updates: Updates_Repository
   mocks: Mocks_Repository
   folders: Folders_Repository
   components: Components_Repository

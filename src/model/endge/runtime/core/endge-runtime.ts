@@ -21,6 +21,7 @@ import { QueryRuntimeStrategy } from '@/model/services/runtime/strategies/QueryR
 import { FilterRuntimeStrategy } from '@/model/services/runtime/strategies/FilterRuntimeStrategy'
 import { CompositionRuntimeStrategy } from '@/model/services/runtime/strategies/CompositionRuntimeStrategy'
 import { StoreRuntimeStrategy } from '@/model/services/runtime/strategies/StoreRuntimeStrategy'
+import { StreamRuntimeStrategy } from '@/model/services/runtime/strategies/StreamRuntimeStrategy'
 import { Endge } from '@/model/endge/kernel/endge'
 import { RuntimeBoundaryUpdatePhase } from '@/model/helpers/raph-phases/runtime-boundary-update-phase'
 import { RuntimeNodeUpdatePhase } from '@/model/helpers/raph-phases/runtime-node-update-phase'
@@ -545,6 +546,7 @@ export class EndgeRuntime extends EndgeModule {
   private registerDefaultStrategies(): void {
     this.registerStrategy(new CompositionRuntimeStrategy())
     this.registerStrategy(new StoreRuntimeStrategy())
+    this.registerStrategy(new StreamRuntimeStrategy())
     this.registerStrategy(new FilterRuntimeStrategy())
     this.registerStrategy(new QueryRuntimeStrategy())
     this.registerStrategy(new ComponentSFCRuntimeStrategy())

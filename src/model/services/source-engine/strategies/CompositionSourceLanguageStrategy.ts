@@ -21,10 +21,10 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
     extension: '.endge-composition.ts',
     keywords: [
       'component', 'composition', 'control', 'data', 'defineComposition', 'definePreviewProps', 'defineProps', 'filter', 'filterView', 'fromData', 'fromFilter', 'fromOutput', 'fromStore', 'manual', 'mock', 'onChange',
-      'onMount', 'onSuccess', 'output', 'policy', 'query', 'metadata', 'resources', 'scope', 'startup', 'style', 'vocab', ...VALUE_EXPRESSION_FUNCTION_NAMES,
+      'onMount', 'onSuccess', 'output', 'policy', 'query', 'metadata', 'resources', 'scope', 'startup', 'stream', 'style', 'vocab', ...VALUE_EXPRESSION_FUNCTION_NAMES,
     ],
     functions: [
-      'activateOn', 'component', 'contextual', 'controls', 'debounce', 'fields', 'fromRuntime', 'fromScope', 'injected', 'isolated', 'persist', 'policy', 'run', 'select', 'slot', 'store', 'storeTo', 'vocab', 'withData', 'withProps', ...VALUE_EXPRESSION_METHOD_NAMES,
+      'activateOn', 'batch', 'component', 'contextual', 'controls', 'debounce', 'dispatchTo', 'fields', 'fromRuntime', 'fromScope', 'injected', 'isolated', 'persist', 'policy', 'run', 'select', 'slot', 'store', 'storeTo', 'vocab', 'withData', 'withProps', ...VALUE_EXPRESSION_METHOD_NAMES,
     ],
     properties: ['activateOn', 'data', 'hooks', 'key', 'metadata', 'outputs', 'previewProps', 'props', 'resources', 'runtimes'],
   })
@@ -61,6 +61,7 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
         filterView: 'filter',
         mock: 'mock',
         query: 'query',
+        stream: 'stream',
         store: 'store',
         style: 'style',
         vocab: 'vocabs',
@@ -95,6 +96,9 @@ const COMPOSITION_COMPLETIONS: SourceLanguageCompletion[] = [
 })`, detail: 'Atomic Query output publication to Store data' },
   { label: 'filterView', kind: 'function', insertText: `filterView('filter')`, detail: 'Renderable Filter view runtime' },
   { label: 'query', kind: 'function', insertText: `query('identity').withProps({})`, detail: 'Query runtime' },
+  { label: 'stream', kind: 'function', insertText: `stream('identity').batch({ maxItems: 50, maxWaitMs: 16 }).dispatchTo(data('store'))`, detail: 'Stream runtime routed to Store updates' },
+  { label: 'batch', kind: 'function', insertText: `.batch({ maxItems: 50, maxWaitMs: 16 })`, detail: 'Composition-owned Stream batching' },
+  { label: 'dispatchTo', kind: 'function', insertText: `.dispatchTo(data('store'))`, detail: 'Dispatch normalized events to Store update handlers' },
   { label: 'component', kind: 'function', insertText: `component('identity').withProps({})`, detail: 'Component runtime' },
   { label: 'composition', kind: 'function', insertText: `composition('identity')`, detail: 'Nested Composition runtime' },
   { label: 'withData', kind: 'function', insertText: `.withData({

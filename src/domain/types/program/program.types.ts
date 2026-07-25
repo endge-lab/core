@@ -27,6 +27,8 @@ export type ProgramEntityType
     | 'query'
     | 'data-view'
     | 'store'
+    | 'stream'
+    | 'update'
     | 'filter'
     | 'composition'
     | 'style'

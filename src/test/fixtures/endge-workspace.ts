@@ -22,8 +22,8 @@ export const TEST_ENDGE_WORKSPACE: EndgeWorkspaceDefinition = {
     ],
     defaultTheme: 'light',
     defaultAuthProfileIdentity: null,
-    sfcAdapterIds: ['native-vue'],
-    defaultSfcAdapterId: 'native-vue',
+    sfcAdapterIds: ['vue-native'],
+    defaultSfcAdapterId: 'vue-native',
     diagnostics: {
       telemetry: {
         collection: {

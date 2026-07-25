@@ -12,7 +12,7 @@ describe('UIAdapterRegistry', () => {
     const renderer = () => null
 
     registry.register({
-      id: 'native-vue',
+      id: 'vue-native',
       protocol: ENDGE_SFC_RENDER_ADAPTER_PROTOCOL,
       protocolVersion: ENDGE_SFC_RENDER_ADAPTER_PROTOCOL_VERSION,
       renderer: 'vue',
@@ -20,7 +20,7 @@ describe('UIAdapterRegistry', () => {
     })
 
     const active = registry.activate({
-      id: 'native-vue',
+      id: 'vue-native',
       protocol: ENDGE_SFC_RENDER_ADAPTER_PROTOCOL,
       protocolVersion: ENDGE_SFC_RENDER_ADAPTER_PROTOCOL_VERSION,
       renderer: 'vue',
@@ -28,9 +28,9 @@ describe('UIAdapterRegistry', () => {
     })
 
     expect(active.renderers.Input).toBe(renderer)
-    expect(registry.active?.id).toBe('native-vue')
+    expect(registry.active?.id).toBe('vue-native')
     expect(registry.list()).toEqual([{
-      id: 'native-vue',
+      id: 'vue-native',
       protocol: ENDGE_SFC_RENDER_ADAPTER_PROTOCOL,
       protocolVersion: ENDGE_SFC_RENDER_ADAPTER_PROTOCOL_VERSION,
       renderer: 'vue',
@@ -67,7 +67,7 @@ describe('UIAdapterRegistry', () => {
   it('rejects duplicate ids and incomplete adapters', () => {
     const registry = new UIAdapterRegistry()
     registry.register({
-      id: 'native-vue',
+      id: 'vue-native',
       protocol: ENDGE_SFC_RENDER_ADAPTER_PROTOCOL,
       protocolVersion: ENDGE_SFC_RENDER_ADAPTER_PROTOCOL_VERSION,
       renderer: 'vue',
@@ -75,7 +75,7 @@ describe('UIAdapterRegistry', () => {
     })
 
     expect(() => registry.register({
-      id: 'native-vue',
+      id: 'vue-native',
       protocol: ENDGE_SFC_RENDER_ADAPTER_PROTOCOL,
       protocolVersion: ENDGE_SFC_RENDER_ADAPTER_PROTOCOL_VERSION,
       renderer: 'vue',
@@ -83,7 +83,7 @@ describe('UIAdapterRegistry', () => {
     })).toThrow('already registered')
 
     expect(() => registry.require({
-      id: 'native-vue',
+      id: 'vue-native',
       requiredRendererKeys: ['Input', 'Select'],
     })).toThrow('missing renderers: Select')
   })
@@ -91,7 +91,7 @@ describe('UIAdapterRegistry', () => {
   it('reports the selected id and actually registered adapters', () => {
     const registry = new UIAdapterRegistry()
     registry.register({
-      id: 'native-vue',
+      id: 'vue-native',
       protocol: ENDGE_SFC_RENDER_ADAPTER_PROTOCOL,
       protocolVersion: ENDGE_SFC_RENDER_ADAPTER_PROTOCOL_VERSION,
       renderer: 'vue',
@@ -99,7 +99,7 @@ describe('UIAdapterRegistry', () => {
     })
 
     expect(() => registry.activate('customer-aodb')).toThrow(
-      'adapter "customer-aodb" is not registered. Registered adapters: native-vue',
+      'adapter "customer-aodb" is not registered. Registered adapters: vue-native',
     )
   })
 })

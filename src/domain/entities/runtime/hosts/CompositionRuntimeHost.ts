@@ -4,6 +4,9 @@ import type { FilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/Filt
 import type { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
 import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
 import type { StoreRuntimeHost } from '@/domain/entities/runtime/hosts/StoreRuntimeHost'
+import type { StreamRuntimeHost } from '@/domain/entities/runtime/hosts/StreamRuntimeHost'
+import type { StreamEventEnvelope } from '@/domain/types/source/stream-source.types'
+import type { StoreMutationPlan } from '@/domain/types/source/update-source.types'
 import type {
   CompositionBindingValue,
   CompositionFilterFieldsSlice,
@@ -60,6 +63,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   private _vocabCatalogs = new Map<string, VocabRuntimeCatalog>()
   private _orchestratedQueries = new Set<string>()
   private _orchestratedSuccesses = new Set<string>()
+  private _streamBatches = new Map<string, StreamEventEnvelope[]>()
+  private _streamBatchTimers = new Map<string, ReturnType<typeof setTimeout>>()
   private _mounted = false
 
   public constructor(input: {
@@ -219,6 +224,16 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   /** Возвращает текущие значения публичных Composition props. */
   public getProps(): Readonly<Record<string, unknown>> {
     return this.readInputs()
+  }
+
+  /** Imperative local mutation for UI flows that do not need a persisted RUpdate. */
+  public mutateStore(dataAlias: string, plan: StoreMutationPlan): void {
+    this._requireStoreRuntime(dataAlias).applyMutation(plan)
+  }
+
+  /** Explicitly invokes one named Store-owned RUpdate outside Stream dispatch. */
+  public applyStoreUpdate(dataAlias: string, updateIdentity: string, payload: unknown): void {
+    this._requireStoreRuntime(dataAlias).applyUpdate(updateIdentity, payload)
   }
 
   /** Устанавливает literal/Raph-backed источник публичных Composition props. */
@@ -516,6 +531,10 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   }
 
   public override async destroy(): Promise<void> {
+    for (const timer of this._streamBatchTimers.values())
+      clearTimeout(timer)
+    this._streamBatchTimers.clear()
+    this._streamBatches.clear()
     for (const dispose of this._disposers)
       dispose()
     this._disposers = []
@@ -777,6 +796,14 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     return path ? `${basePath}.${path.split('.').map(encodePathPart).join('.')}` : basePath
   }
 
+  private _requireStoreRuntime(dataAlias: string): StoreRuntimeHost {
+    const runtimeId = this._storeRuntimeIds.get(String(dataAlias ?? '').trim())
+    const runtime = runtimeId ? Endge.runtime.getRuntimeById<StoreRuntimeHost>(runtimeId) : null
+    if (!runtime || runtime.entityType !== 'store')
+      throw new Error(`[CompositionRuntimeHost] Store data "${dataAlias}" is not mounted.`)
+    return runtime
+  }
+
   private _resolveDataReference(reference: string): { data: string, path: string } | null {
     const data = [...this._dataPaths.keys()]
       .sort((left, right) => right.length - left.length)
@@ -851,6 +878,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       model = Endge.domain.getFilter(descriptor.identity)
     else if (descriptor.kind === 'query')
       model = Endge.domain.getQuery(descriptor.identity)
+    else if (descriptor.kind === 'stream')
+      model = Endge.domain.getStream(descriptor.identity)
     else if (descriptor.kind === 'composition')
       model = Endge.domain.getComposition(descriptor.identity)
     else
@@ -944,6 +973,11 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       return
     }
 
+    if (descriptor.kind === 'stream') {
+      this._bindStreamDispatch(descriptor, child as unknown as StreamRuntimeHost)
+      return
+    }
+
     if (descriptor.kind === 'composition')
       return
 
@@ -980,6 +1014,56 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     syncLegacy()
     for (const binding of Object.values(inputBindings))
       this._subscribeBinding(binding, syncLegacy)
+  }
+
+  private _bindStreamDispatch(
+    descriptor: CompositionProgramPayload['runtimes'][number],
+    stream: StreamRuntimeHost,
+  ): void {
+    if (!descriptor.dispatchTo)
+      return
+    const runtimeId = this._storeRuntimeIds.get(descriptor.dispatchTo)
+    const store = runtimeId ? Endge.runtime.getRuntimeById<StoreRuntimeHost>(runtimeId) : null
+    if (!store || store.entityType !== 'store')
+      throw new Error(`[CompositionRuntimeHost] Store data "${descriptor.dispatchTo}" is not mounted.`)
+
+    const receive = (event: StreamEventEnvelope) => {
+      const batch = descriptor.batch
+      if (!batch || (batch.maxItems === 1 && batch.maxWaitMs === 0)) {
+        store.dispatch(event)
+        return
+      }
+      const pending = this._streamBatches.get(descriptor.name) ?? []
+      pending.push(event)
+      this._streamBatches.set(descriptor.name, pending)
+      if (pending.length >= batch.maxItems) {
+        this._flushStreamBatch(descriptor.name, store)
+        return
+      }
+      if (batch.maxWaitMs > 0 && !this._streamBatchTimers.has(descriptor.name)) {
+        this._streamBatchTimers.set(descriptor.name, setTimeout(
+          () => this._flushStreamBatch(descriptor.name, store),
+          batch.maxWaitMs,
+        ))
+      }
+    }
+    stream.on('event', receive)
+    this._disposers.push(() => stream.off('event', receive))
+  }
+
+  private _flushStreamBatch(name: string, store: StoreRuntimeHost): void {
+    const timer = this._streamBatchTimers.get(name)
+    if (timer)
+      clearTimeout(timer)
+    this._streamBatchTimers.delete(name)
+    const events = this._streamBatches.get(name) ?? []
+    this._streamBatches.delete(name)
+    if (!events.length)
+      return
+    Raph.transaction(() => {
+      for (const event of events)
+        store.dispatch(event)
+    })
   }
 
   private _makeOutputs(payload: CompositionProgramPayload): void {

@@ -108,6 +108,11 @@ export interface StoreRuntimeHostContext extends RuntimeHostContextBase {
   derivedFields: string[]
 }
 
+export interface StreamRuntimeHostContext extends RuntimeHostContextBase {
+  lastEventAt: string | null
+  receivedCount: number
+}
+
 export interface ComponentSFCRuntimeHostContext extends RuntimeHostContextBase {
   /** Target последней подготовки SFC. */
   target: 'dom' | 'canvas' | null
@@ -136,6 +141,7 @@ export interface RuntimeHostContextMap {
   filter: FilterRuntimeHostContext
   composition: CompositionRuntimeHostContext
   store: StoreRuntimeHostContext
+  stream: StreamRuntimeHostContext
   'component-sfc': ComponentSFCRuntimeHostContext
   page: PageRuntimeHostContext
   project: ProjectRuntimeHostContext

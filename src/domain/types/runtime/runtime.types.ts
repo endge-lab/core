@@ -1,6 +1,7 @@
 import type { RFilter } from '@/domain/entities/reflect/RFilter'
 import type { RComposition } from '@/domain/entities/reflect/RComposition'
 import type { RStore } from '@/domain/entities/reflect/RStore'
+import type { RStream } from '@/domain/entities/reflect/RStream'
 import type { RAction } from '@/domain/entities/reflect/RAction'
 import type { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import type { RPage } from '@/domain/entities/reflect/RPage'
@@ -11,7 +12,7 @@ import type { RuntimeHostRegistrySnapshot } from '@/domain/types/runtime/runtime
 /**
  * Runtime kinds
  */
-export type RuntimeKind = 'query' | 'filter' | 'composition' | 'store' | 'action' | 'runtime'
+export type RuntimeKind = 'query' | 'filter' | 'composition' | 'store' | 'stream' | 'action' | 'runtime'
 
 export type RuntimeExecutableModel
   = | RQuery
@@ -22,6 +23,7 @@ export type RuntimeExecutableModel
     | RFilter
     | RComposition
     | RStore
+    | RStream
 
 export interface EndgeRuntimeSnapshot extends RuntimeHostRegistrySnapshot {
   generatedAt: number

@@ -23,6 +23,8 @@ import {
   RComposition,
 } from '@/domain/entities/reflect/RComposition'
 import { RStore } from '@/domain/entities/reflect/RStore'
+import { RStream } from '@/domain/entities/reflect/RStream'
+import { RUpdate } from '@/domain/entities/reflect/RUpdate'
 import { RMock } from '@/domain/entities/reflect/RMock'
 import { RComputation } from '@/domain/entities/reflect/RComputation'
 import { REnvironment } from '@/domain/entities/reflect/REnvironment'
@@ -144,6 +146,48 @@ export function storePayloadDocToPlain(doc: any): any {
   }
 }
 
+/** Собирает plain-объект Stream из документа Payload. */
+export function streamPayloadDocToPlain(doc: any): any {
+  return {
+    ...normalizeEntityManagement(doc),
+    id: doc?.id,
+    identity: doc?.identity,
+    name: doc?.displayName ?? doc?.name,
+    displayName: doc?.displayName ?? doc?.name,
+    description: doc?.description ?? null,
+    source: doc?.source ?? '',
+    sourceVersion: doc?.sourceVersion ?? 1,
+    folderId: relationToId(doc?.folder ?? doc?.folderId),
+    meta: (doc?.meta && typeof doc.meta === 'object' && !Array.isArray(doc.meta)) ? doc.meta : {},
+    active: doc?.active !== false,
+    author: doc?.author,
+    deletedAt: doc?.deletedAt ?? null,
+  }
+}
+
+/** Собирает plain-объект Update и его persisted Store-owner из Payload. */
+export function updatePayloadDocToPlain(doc: any): any {
+  const store = doc?.store
+  const storeIdentity = typeof store === 'object'
+    ? String(store?.identity ?? '')
+    : String(doc?.storeIdentity ?? '')
+  return {
+    ...normalizeEntityManagement(doc),
+    id: doc?.id,
+    identity: doc?.identity,
+    name: doc?.displayName ?? doc?.name,
+    displayName: doc?.displayName ?? doc?.name,
+    description: doc?.description ?? null,
+    storeIdentity,
+    source: doc?.source ?? '',
+    sourceVersion: doc?.sourceVersion ?? 1,
+    meta: (doc?.meta && typeof doc.meta === 'object' && !Array.isArray(doc.meta)) ? doc.meta : {},
+    active: doc?.active !== false,
+    author: doc?.author,
+    deletedAt: doc?.deletedAt ?? null,
+  }
+}
+
 /** Собирает plain-объект Mock из документа Payload. */
 export function mockPayloadDocToPlain(doc: any): any {
   return {
@@ -223,6 +267,8 @@ export interface EndgeDomainParsed {
   dataViews: RDataView[]
   compositions: RComposition[]
   stores: RStore[]
+  streams: RStream[]
+  updates: RUpdate[]
   mocks: RMock[]
   computations: RComputation[]
   actions: RAction[]
@@ -264,6 +310,13 @@ export class EndgeDomain extends EndgeModule {
 
   private _storesById: Map<string | number, RStore> = new Map()
   private _storesByIdentity: Map<string, RStore> = new Map()
+
+  private _streamsById: Map<string | number, RStream> = new Map()
+  private _streamsByIdentity: Map<string, RStream> = new Map()
+
+  private _updatesById: Map<string | number, RUpdate> = new Map()
+  private _updatesByIdentity: Map<string, RUpdate> = new Map()
+  private _updatesByStoreIdentity: Map<string, Map<string, RUpdate>> = new Map()
 
   private _mocksById: Map<string | number, RMock> = new Map()
   private _mocksByIdentity: Map<string, RMock> = new Map()
@@ -403,6 +456,11 @@ export class EndgeDomain extends EndgeModule {
     this._compositionsByIdentity.clear()
     this._storesById.clear()
     this._storesByIdentity.clear()
+    this._streamsById.clear()
+    this._streamsByIdentity.clear()
+    this._updatesById.clear()
+    this._updatesByIdentity.clear()
+    this._updatesByStoreIdentity.clear()
     this._mocksById.clear()
     this._mocksByIdentity.clear()
     this._computationsById.clear()
@@ -482,6 +540,17 @@ export class EndgeDomain extends EndgeModule {
     const compositionsPlain = compositionsRaw.map((row: any) => compositionPayloadDocToPlain(row))
     const storesRaw = Array.isArray((payload as any)?.stores) ? (payload as any).stores : []
     const storesPlain = storesRaw.map((row: any) => storePayloadDocToPlain(row))
+    const streamsRaw = Array.isArray((payload as any)?.streams) ? (payload as any).streams : []
+    const streamsPlain = streamsRaw.map((row: any) => streamPayloadDocToPlain(row))
+    const updatesRaw = Array.isArray((payload as any)?.updates) ? (payload as any).updates : []
+    const storeIdentityById = new Map(storesRaw.map((row: any) => [String(row?.id), String(row?.identity ?? '')]))
+    const updatesPlain = updatesRaw.map((row: any) => {
+      const storeId = relationToId(row?.store)
+      return updatePayloadDocToPlain({
+        ...row,
+        storeIdentity: row?.storeIdentity || (storeId != null ? storeIdentityById.get(String(storeId)) : ''),
+      })
+    })
     const mocksRaw = Array.isArray((payload as any)?.mocks) ? (payload as any).mocks : []
     const mocksPlain = mocksRaw.map((row: any) => mockPayloadDocToPlain(row))
     const computationsRaw = Array.isArray((payload as any)?.computations) ? (payload as any).computations : []
@@ -517,6 +586,8 @@ export class EndgeDomain extends EndgeModule {
       dataViews: dataViewsPlain,
       compositions: compositionsPlain,
       stores: storesPlain,
+      streams: streamsPlain,
+      updates: updatesPlain,
       mocks: mocksPlain,
       computations: computationsPlain,
       components: componentsRaw,
@@ -1023,6 +1094,11 @@ export class EndgeDomain extends EndgeModule {
     const store = this.getStoreById(id)
     if (!store)
       return
+    for (const update of this.getUpdatesByStoreIdentity(store.identity)) {
+      this._updatesById.delete(update.id)
+      this._updatesByIdentity.delete(update.identity)
+    }
+    this._updatesByStoreIdentity.delete(store.identity)
     this._storesById.delete(store.id)
     this._storesByIdentity.delete(store.identity)
     this.notify()
@@ -1043,6 +1119,113 @@ export class EndgeDomain extends EndgeModule {
     const store = this.getStore(idOrIdentity)
     if (store)
       this.removeStoreById(store.id)
+  }
+
+  /** Возвращает все Stream-документы. */
+  getStreams(): RStream[] {
+    return Array.from(this._streamsByIdentity.values())
+  }
+
+  getStreamById(id: string | number): RStream | null {
+    return this._streamsById.get(id) ?? null
+  }
+
+  getStreamByIdentity(identity: string): RStream | null {
+    return this._streamsByIdentity.get(identity) ?? null
+  }
+
+  getStream(idOrIdentity: string | number): RStream | null {
+    return this.getStreamById(idOrIdentity)
+      ?? this.getStreamById(Number(idOrIdentity))
+      ?? this.getStreamByIdentity(String(idOrIdentity))
+  }
+
+  addStream(stream: RStream): void {
+    if (this._streamsByIdentity.has(stream.identity) || this._streamsById.has(stream.id))
+      return
+    this._streamsById.set(stream.id, stream)
+    this._streamsByIdentity.set(stream.identity, stream)
+    this.notify()
+  }
+
+  removeStreamById(id: string | number): void {
+    const stream = this.getStreamById(id)
+    if (!stream)
+      return
+    this._streamsById.delete(stream.id)
+    this._streamsByIdentity.delete(stream.identity)
+    this.notify()
+  }
+
+  removeStreamByIdentity(identity: string): void {
+    const stream = this.getStreamByIdentity(identity)
+    if (stream)
+      this.removeStreamById(stream.id)
+  }
+
+  removeStream(idOrIdentity: string | number): void {
+    const stream = this.getStream(idOrIdentity)
+    if (stream)
+      this.removeStreamById(stream.id)
+  }
+
+  /** Возвращает все Update-документы независимо от Store-owner. */
+  getUpdates(): RUpdate[] {
+    return Array.from(this._updatesByIdentity.values())
+  }
+
+  getUpdatesByStoreIdentity(storeIdentity: string): RUpdate[] {
+    return Array.from(this._updatesByStoreIdentity.get(storeIdentity)?.values() ?? [])
+  }
+
+  getUpdateById(id: string | number): RUpdate | null {
+    return this._updatesById.get(id) ?? null
+  }
+
+  getUpdateByIdentity(identity: string): RUpdate | null {
+    return this._updatesByIdentity.get(identity) ?? null
+  }
+
+  getUpdate(idOrIdentity: string | number): RUpdate | null {
+    return this.getUpdateById(idOrIdentity)
+      ?? this.getUpdateById(Number(idOrIdentity))
+      ?? this.getUpdateByIdentity(String(idOrIdentity))
+  }
+
+  addUpdate(update: RUpdate): void {
+    if (this._updatesByIdentity.has(update.identity) || this._updatesById.has(update.id))
+      return
+    this._updatesById.set(update.id, update)
+    this._updatesByIdentity.set(update.identity, update)
+    const owned = this._updatesByStoreIdentity.get(update.storeIdentity) ?? new Map<string, RUpdate>()
+    owned.set(update.identity, update)
+    this._updatesByStoreIdentity.set(update.storeIdentity, owned)
+    this.notify()
+  }
+
+  removeUpdateById(id: string | number): void {
+    const update = this.getUpdateById(id)
+    if (!update)
+      return
+    this._updatesById.delete(update.id)
+    this._updatesByIdentity.delete(update.identity)
+    const owned = this._updatesByStoreIdentity.get(update.storeIdentity)
+    owned?.delete(update.identity)
+    if (owned?.size === 0)
+      this._updatesByStoreIdentity.delete(update.storeIdentity)
+    this.notify()
+  }
+
+  removeUpdateByIdentity(identity: string): void {
+    const update = this.getUpdateByIdentity(identity)
+    if (update)
+      this.removeUpdateById(update.id)
+  }
+
+  removeUpdate(idOrIdentity: string | number): void {
+    const update = this.getUpdate(idOrIdentity)
+    if (update)
+      this.removeUpdateById(update.id)
   }
 
   /** Возвращает все Mock-документы. */
@@ -2947,6 +3130,8 @@ export class EndgeDomain extends EndgeModule {
       dataViews: persisted(this.getDataViews()).map(x => Serialize.toPlain(x)),
       compositions: persisted(this.getCompositions()).map(x => Serialize.toPlain(x)),
       stores: persisted(this.getStores()).map(x => Serialize.toPlain(x)),
+      streams: persisted(this.getStreams()).map(x => Serialize.toPlain(x)),
+      updates: persisted(this.getUpdates()).map(x => Serialize.toPlain(x)),
       mocks: persisted(this.getMocks()).map(x => x.toPlain()),
       computations: persisted(this.getComputations()).map(x => x.toPlain()),
       components: persisted(this.getComponents()).map(x => ReflectComponentToPlain(x)),
@@ -3033,6 +3218,8 @@ export class EndgeDomain extends EndgeModule {
       dataViews: [],
       compositions: [],
       stores: [],
+      streams: [],
+      updates: [],
       mocks: [],
       computations: [],
       actions: [],
@@ -3086,6 +3273,16 @@ export class EndgeDomain extends EndgeModule {
     if (json.stores && Array.isArray(json.stores)) {
       json.stores.forEach((storeJson: any) => {
         out.stores.push(Serialize.fromJSON(RStore, storeJson))
+      })
+    }
+    if (json.streams && Array.isArray(json.streams)) {
+      json.streams.forEach((streamJson: any) => {
+        out.streams.push(Serialize.fromJSON(RStream, streamJson))
+      })
+    }
+    if (json.updates && Array.isArray(json.updates)) {
+      json.updates.forEach((updateJson: any) => {
+        out.updates.push(Serialize.fromJSON(RUpdate, updateJson))
       })
     }
     if (json.mocks && Array.isArray(json.mocks)) {
@@ -3164,6 +3361,8 @@ export class EndgeDomain extends EndgeModule {
     parsed.dataViews.forEach(dv => this.addDataView(dv))
     parsed.compositions.forEach(composition => this.addComposition(composition))
     parsed.stores.forEach(store => this.addStore(store))
+    parsed.streams.forEach(stream => this.addStream(stream))
+    parsed.updates.forEach(update => this.addUpdate(update))
     parsed.mocks.forEach(mock => this.addMock(mock))
     parsed.computations.forEach(computation => this.addComputation(computation))
     parsed.actions.forEach(a => this.addAction(a))

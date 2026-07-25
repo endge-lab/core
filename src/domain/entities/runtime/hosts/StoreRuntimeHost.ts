@@ -1,6 +1,8 @@
 import type { RStore } from '@/domain/entities/reflect/RStore'
 import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime/runtime-host.types'
 import type { StoreDataDescriptor, StoreSourceArtifact, StoreValueDescriptor } from '@/domain/types/source/store-source.types'
+import type { StoreMutationPlan, UpdateSourceArtifact } from '@/domain/types/source/update-source.types'
+import type { StreamEventEnvelope } from '@/domain/types/source/stream-source.types'
 
 import { Raph, RaphNode, full, type RaphDerivedHandle } from '@endge/raph'
 
@@ -111,7 +113,7 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
 
   /** Проверяет, можно ли записывать в root field указанного Store path. */
   public isWritable(path: string): boolean {
-    const root = String(path ?? '').split('.')[0] ?? ''
+    const root = String(path ?? '').split(/[.[\]]/)[0] ?? ''
     return this.getFields().some(field => field.kind === 'value' && field.key === root)
   }
 
@@ -125,6 +127,72 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
     const now = new Date().toISOString()
     this.setContext({ status: 'success', updatedAt: now, lastStateChangeAt: now })
     this.emit('state:change', { path: normalizedPath, value: cloneRuntimeValue(value) })
+  }
+
+  /**
+   * Маршрутизирует нормализованное событие по compile-time таблице Store.
+   * Возвращает false, если Store не объявляет Update для данного типа.
+   */
+  public dispatch(event: StreamEventEnvelope): boolean {
+    const handler = this.getArtifactPayload()?.updateHandlers
+      .find(item => item.eventType === event.type)
+    if (!handler)
+      return false
+    this.applyUpdate(handler.identity, event.payload)
+    return true
+  }
+
+  /** Применяет именованный дочерний Update к Store без привязки к транспорту. */
+  public applyUpdate(updateIdentity: string, payload: unknown): void {
+    const descriptor = this.getArtifactPayload()?.updateHandlers
+      .find(item => item.identity === updateIdentity)
+    if (!descriptor)
+      throw new Error(`[StoreRuntimeHost] Update "${updateIdentity}" does not belong to Store "${this.entityIdentity}".`)
+
+    const artifact = this.getArtifactReader()?.getArtifact<UpdateSourceArtifact>('update', updateIdentity)
+    if (!artifact || artifact.status === 'error')
+      throw new Error(`[StoreRuntimeHost] Update "${updateIdentity}" is not compiled.`)
+    if (artifact.payload.storeIdentity !== this.entityIdentity)
+      throw new Error(`[StoreRuntimeHost] Update "${updateIdentity}" belongs to another Store.`)
+
+    this.applyMutation(this._makeMutationPlan(artifact.payload, payload))
+  }
+
+  /**
+   * Применяет inline mutation из Composition/UI.
+   * Это escape hatch для локальных изменений, которым не нужен persisted RUpdate.
+   */
+  public applyMutation(plan: StoreMutationPlan): void {
+    const target = String(plan.path ?? '').trim()
+    if (!target || !this.isWritable(target))
+      throw new Error(`[StoreRuntimeHost] Store path "${target}" is derived or missing.`)
+
+    const path = appendRawStorePath(this.basePath, target)
+    const options = plan.vars ? { vars: plan.vars } : undefined
+    Raph.transaction(() => {
+      switch (plan.strategy) {
+        case 'merge':
+          Raph.merge(path, cloneRuntimeValue(plan.value), options)
+          break
+        case 'remove':
+          Raph.delete(path, options)
+          break
+        case 'append': {
+          const current = Raph.get(path, options)
+          const additions = Array.isArray(plan.value) ? plan.value : [plan.value]
+          Raph.set(path, [...(Array.isArray(current) ? current : []), ...cloneRuntimeValue(additions)], options)
+          break
+        }
+        case 'replace':
+        case 'set':
+          Raph.set(path, cloneRuntimeValue(plan.value), options)
+          break
+      }
+    })
+
+    const now = new Date().toISOString()
+    this.setContext({ status: 'success', updatedAt: now, lastStateChangeAt: now })
+    this.emit('state:change', { path: target, strategy: plan.strategy, value: cloneRuntimeValue(plan.value) })
   }
 
   /** Освобождает derived registrations до удаления Store state. */
@@ -205,6 +273,18 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
     const now = new Date().toISOString()
     this.setContext({ status: 'success', startedAt: now, updatedAt: now, lastStateChangeAt: now })
   }
+
+  private _makeMutationPlan(update: UpdateSourceArtifact, payload: unknown): StoreMutationPlan {
+    const key = update.keyFrom ? readPayloadPath(payload, update.keyFrom) : undefined
+    if (update.target.includes('$key') && (key == null || key === ''))
+      throw new Error(`[StoreRuntimeHost] Update "${update.storeIdentity}" cannot resolve keyFrom "${update.keyFrom}".`)
+    return {
+      strategy: update.strategy,
+      path: update.target,
+      value: update.strategy === 'remove' ? undefined : readPayloadPath(payload, update.valueFrom ?? ''),
+      vars: update.target.includes('$key') ? { key } : undefined,
+    }
+  }
 }
 
 function resolveStoreInitialValue(field: StoreValueDescriptor): unknown {
@@ -220,6 +300,21 @@ function appendStorePath(base: string, path: string): string {
   if (!suffix)
     return base
   return `${base}.${suffix.split('.').map(encodePathPart).join('.')}`
+}
+
+function appendRawStorePath(base: string, path: string): string {
+  return path ? `${base}.${path}` : base
+}
+
+function readPayloadPath(value: unknown, path: string): unknown {
+  const normalized = String(path ?? '').trim()
+  if (!normalized)
+    return value
+  return normalized.split('.').reduce<unknown>((current, key) => {
+    if (current == null || typeof current !== 'object')
+      return undefined
+    return (current as Record<string, unknown>)[key]
+  }, value)
 }
 
 function encodePathPart(value: string): string {

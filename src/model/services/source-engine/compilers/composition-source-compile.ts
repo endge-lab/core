@@ -674,13 +674,13 @@ function readRuntime(
 ): CompositionRuntimeDescriptor | null {
   const chain = memberChain(raw)
   if (!chain || !t.isIdentifier(chain.base.callee)) {
-    diagnostics.push(diagnostic('error', 'composition-runtime-shape', `Runtime "${name}" должен начинаться с filter/query/component/composition/filterView(identity).`, `runtimes.${name}`, raw))
+    diagnostics.push(diagnostic('error', 'composition-runtime-shape', `Runtime "${name}" должен начинаться с filter/query/component/composition/stream/filterView(identity).`, `runtimes.${name}`, raw))
     return null
   }
 
   const rawKind = chain.base.callee.name
   const kind = (rawKind === 'filterView' ? 'filter-view' : rawKind) as CompositionRuntimeKind
-  if (kind !== 'filter' && kind !== 'query' && kind !== 'component' && kind !== 'composition' && kind !== 'filter-view') {
+  if (kind !== 'filter' && kind !== 'query' && kind !== 'component' && kind !== 'composition' && kind !== 'stream' && kind !== 'filter-view') {
     diagnostics.push(diagnostic('error', 'composition-runtime-kind', `Runtime kind "${rawKind}" не поддерживается.`, `runtimes.${name}`, chain.base))
     return null
   }
@@ -836,6 +836,38 @@ function readRuntime(
         continue
       }
       descriptor.storeTo.push({ data: resolvedDataName, fields })
+      continue
+    }
+    if (modifier.name === 'dispatchTo') {
+      if (kind !== 'stream') {
+        diagnostics.push(diagnostic('error', 'composition-dispatch-to-runtime-kind', '.dispatchTo(...) поддерживается только Stream runtime.', `runtimes.${name}.dispatchTo`, modifier.call))
+        continue
+      }
+      const dataName = readDataTarget(modifier.call.arguments[0])
+      const resolvedDataName = dataName ? visibleData.get(dataName) : undefined
+      if (!dataName || !resolvedDataName)
+        diagnostics.push(diagnostic('error', 'composition-dispatch-to-data', '.dispatchTo(data(...)) должен ссылаться на объявленный Store data alias.', `runtimes.${name}.dispatchTo`, modifier.call))
+      else
+        descriptor.dispatchTo = resolvedDataName
+      continue
+    }
+    if (modifier.name === 'batch') {
+      if (kind !== 'stream') {
+        diagnostics.push(diagnostic('error', 'composition-batch-runtime-kind', '.batch(...) поддерживается только Stream runtime.', `runtimes.${name}.batch`, modifier.call))
+        continue
+      }
+      const config = modifier.call.arguments[0]
+      if (!config || !t.isObjectExpression(config)) {
+        diagnostics.push(diagnostic('error', 'composition-batch-object', '.batch(...) принимает { maxItems, maxWaitMs }.', `runtimes.${name}.batch`, modifier.call))
+        continue
+      }
+      const maxItems = numberProperty(config, 'maxItems') ?? 1
+      const maxWaitMs = numberProperty(config, 'maxWaitMs') ?? 0
+      if (maxItems < 1 || maxWaitMs < 0) {
+        diagnostics.push(diagnostic('error', 'composition-batch-values', 'maxItems должен быть >= 1, maxWaitMs >= 0.', `runtimes.${name}.batch`, config))
+        continue
+      }
+      descriptor.batch = { maxItems: Math.floor(maxItems), maxWaitMs: Math.floor(maxWaitMs) }
       continue
     }
 
@@ -1513,6 +1545,15 @@ function propertyValue(node: t.ObjectExpression, name: string): t.Expression | n
 function stringProperty(node: t.ObjectExpression, name: string): string | null {
   const value = propertyValue(node, name)
   return value && t.isStringLiteral(value) ? value.value : null
+}
+
+function numberProperty(node: t.ObjectExpression, name: string): number | null {
+  const property = node.properties.find((item): item is t.ObjectProperty =>
+    t.isObjectProperty(item) && !item.computed && propertyName(item.key) === name)
+  if (!property || !t.isExpression(property.value))
+    return null
+  const value = unwrapExpression(property.value)
+  return t.isNumericLiteral(value) && Number.isFinite(value.value) ? value.value : null
 }
 
 function staticValue(node: t.Expression): { ok: true, value: unknown } | { ok: false } {

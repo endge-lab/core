@@ -23,8 +23,8 @@ import type {
 import { DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION } from '@/model/config/diagnostics'
 
 const LEGACY_SFC_ADAPTER_IDS: Readonly<Record<string, string>> = {
-  'shadcn-vue': 'native-vue',
-  'vue-shadcn': 'native-vue',
+  'native-vue': 'vue-native',
+  'shadcn-vue': 'vue-shadcn',
 }
 
 const DEFAULT_LOCALE = 'en'
@@ -44,8 +44,8 @@ const DEFAULT_CONFIGURATION_VALUE: EndgeConfiguration = {
   ],
   defaultTheme: DEFAULT_THEME,
   defaultAuthProfileIdentity: null,
-  sfcAdapterIds: ['native-vue'],
-  defaultSfcAdapterId: 'native-vue',
+  sfcAdapterIds: ['vue-native'],
+  defaultSfcAdapterId: 'vue-native',
   diagnostics: structuredCloneSafe(DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION),
 }
 

@@ -20,6 +20,8 @@ import type { RWorkspace } from '@/domain/entities/reflect/RWorkspace'
 import type { RComponent } from '@/domain/types/component/component.types'
 import type { RComposition } from '@/domain/entities/reflect/RComposition'
 import type { RStore } from '@/domain/entities/reflect/RStore'
+import type { RStream } from '@/domain/entities/reflect/RStream'
+import type { RUpdate } from '@/domain/entities/reflect/RUpdate'
 import type { RMock } from '@/domain/entities/reflect/RMock'
 import type { RComputation } from '@/domain/entities/reflect/RComputation'
 
@@ -99,6 +101,8 @@ export type DomainDocumentType
     | 'data-view'
     | 'composition'
     | 'store'
+    | 'stream'
+    | 'update'
     | 'mock'
     | 'integration'
     | 'page-template'
@@ -135,4 +139,4 @@ export interface Document {
 /**
  * Описывает любой документ рефлекцию
  */
-export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RComposition | RStore | RMock | RAction | RConverter | RComputation | RIntegration | RParameter | RFilter | RPolicy | RStyle | RType | RVocabs | RI18nBundle | RAuthProfile | RWorkspace | RTenant | RPageTemplate | RPage | RNavigation
+export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RComposition | RStore | RStream | RUpdate | RMock | RAction | RConverter | RComputation | RIntegration | RParameter | RFilter | RPolicy | RStyle | RType | RVocabs | RI18nBundle | RAuthProfile | RWorkspace | RTenant | RPageTemplate | RPage | RNavigation

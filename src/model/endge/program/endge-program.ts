@@ -2,6 +2,8 @@ import type { ActionCompiledFlow } from '@/domain/types/flow/action.types'
 import type { FilterProgramPayload } from '@/domain/types/source/filter-source.types'
 import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
 import type { StoreSourceArtifact } from '@/domain/types/source/store-source.types'
+import type { StreamSourceArtifact } from '@/domain/types/source/stream-source.types'
+import type { UpdateSourceArtifact } from '@/domain/types/source/update-source.types'
 import type { TypeProgramCatalogEntry, TypeProgramPayload } from '@/domain/types/source/type-source.types'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import type {
@@ -149,6 +151,16 @@ export class EndgeProgram extends EndgeModule {
   /** Возвращает compiled Store artifact по id или identity. */
   public getStoreArtifact(idOrIdentity: string | number): ProgramArtifact<StoreSourceArtifact> | null {
     return this.getArtifact<StoreSourceArtifact>('store', idOrIdentity)
+  }
+
+  /** Возвращает compiled Stream artifact по id или identity. */
+  public getStreamArtifact(idOrIdentity: string | number): ProgramArtifact<StreamSourceArtifact> | null {
+    return this.getArtifact<StreamSourceArtifact>('stream', idOrIdentity)
+  }
+
+  /** Возвращает compiled Update artifact по id или identity. */
+  public getUpdateArtifact(idOrIdentity: string | number): ProgramArtifact<UpdateSourceArtifact> | null {
+    return this.getArtifact<UpdateSourceArtifact>('update', idOrIdentity)
   }
 
   /** Возвращает compiled Filter artifact по id или identity. */

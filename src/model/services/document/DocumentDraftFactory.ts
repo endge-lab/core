@@ -18,6 +18,8 @@ import { RPageTemplate } from '@/domain/entities/reflect/RPageTemplate'
 import { RPolicy } from '@/domain/entities/reflect/RPolicy'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RStore } from '@/domain/entities/reflect/RStore'
+import { RStream } from '@/domain/entities/reflect/RStream'
+import { RUpdate } from '@/domain/entities/reflect/RUpdate'
 import { RMock } from '@/domain/entities/reflect/RMock'
 import { RComputation } from '@/domain/entities/reflect/RComputation'
 import { RStyle } from '@/domain/entities/reflect/RStyle'
@@ -127,6 +129,28 @@ export class DocumentDraftFactory {
         item.sourceVersion = 1
         if (folderId != null)
           item.folderId = folderId
+        return item
+      }
+
+      case 'stream': {
+        const item = new RStream()
+        item.identity = identity
+        item.name = title
+        item.displayName = title
+        item.source = Endge.source.createDefault('stream')
+        item.sourceVersion = 1
+        if (folderId != null)
+          item.folderId = folderId
+        return item
+      }
+
+      case 'update': {
+        const item = new RUpdate()
+        item.identity = identity
+        item.name = title
+        item.displayName = title
+        item.source = Endge.source.createDefault('update')
+        item.sourceVersion = 1
         return item
       }
 

@@ -24,13 +24,15 @@ import { normalizeEndgeWorkspaceDefinition } from '@/domain/entities/reflect/RWo
 import { RVersion } from '@/domain/entities/reflect/RVersion'
 import { ComponentType, FilterType, ParameterType, QueryType } from '@/domain/types/document/document.types'
 import { Endge } from '@/model/endge/kernel/endge'
-import { compositionPayloadDocToPlain, computationPayloadDocToPlain, dataViewPayloadDocToPlain, mockPayloadDocToPlain, queryPayloadDocToPlain, storePayloadDocToPlain } from '@/model/endge/domain/endge-domain'
+import { compositionPayloadDocToPlain, computationPayloadDocToPlain, dataViewPayloadDocToPlain, mockPayloadDocToPlain, queryPayloadDocToPlain, storePayloadDocToPlain, streamPayloadDocToPlain, updatePayloadDocToPlain } from '@/model/endge/domain/endge-domain'
 import { Actions_Repository } from '@/model/db/repositories/Actions_Repository'
 import { AuthProfiles_Repository } from '@/model/db/repositories/AuthProfiles_Repository'
 import { Components_Repository } from '@/model/db/repositories/Components_Repository'
 import { ComponentSFCs_Repository } from '@/model/db/repositories/ComponentSFCs_Repository'
 import { Compositions_Repository } from '@/model/db/repositories/Compositions_Repository'
 import { Stores_Repository } from '@/model/db/repositories/Stores_Repository'
+import { Streams_Repository } from '@/model/db/repositories/Streams_Repository'
+import { Updates_Repository } from '@/model/db/repositories/Updates_Repository'
 import { Mocks_Repository } from '@/model/db/repositories/Mocks_Repository'
 import { Computations_Repository } from '@/model/db/repositories/Computations_Repository'
 import { Converters_Repository } from '@/model/db/repositories/Converters_Repository'
@@ -61,6 +63,8 @@ const WORKSPACE_SCOPED_PAYLOAD_COLLECTIONS = new Set([
   'component-sfcs',
   'compositions',
   'stores',
+  'streams',
+  'updates',
   'mocks',
   'converters',
   'computations',
@@ -514,6 +518,8 @@ export class EndgeSchemaStorage extends EndgeModule {
     'data-views',
     'compositions',
     'stores',
+    'streams',
+    'updates',
     'mocks',
     'parameters',
     'filters',
@@ -775,6 +781,8 @@ export class EndgeSchemaStorage extends EndgeModule {
         dataViews: new DataViews_Repository(this.api),
         compositions: new Compositions_Repository(this.api),
         stores: new Stores_Repository(this.api),
+        streams: new Streams_Repository(this.api),
+        updates: new Updates_Repository(this.api),
         mocks: new Mocks_Repository(this.api),
         folders: new Folders_Repository(this.api),
         components: new Components_Repository(this.api),
@@ -878,6 +886,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       dataViews: [],
       compositions: [],
       stores: [],
+      streams: [],
+      updates: [],
       mocks: [],
       components: [],
       componentSFCs: [],
@@ -1240,6 +1250,8 @@ export class EndgeSchemaStorage extends EndgeModule {
     const normalizeDataView = (raw: any) => dataViewPayloadDocToPlain(raw)
     const normalizeComposition = (raw: any) => compositionPayloadDocToPlain(raw)
     const normalizeStore = (raw: any) => storePayloadDocToPlain(raw)
+    const normalizeStream = (raw: any) => streamPayloadDocToPlain(raw)
+    const normalizeUpdate = (raw: any) => updatePayloadDocToPlain(raw)
     const normalizeMock = (raw: any) => mockPayloadDocToPlain(raw)
     const normalizeComputation = (raw: any) => computationPayloadDocToPlain(raw)
 
@@ -1494,6 +1506,16 @@ export class EndgeSchemaStorage extends EndgeModule {
         return rows.map(normalizeStore)
       }),
 
+      load('streams', async () => {
+        const rows = await this.repositories!.streams.findAll()
+        return rows.map(normalizeStream)
+      }),
+
+      load('updates', async () => {
+        const rows = await this.repositories!.updates.findAll()
+        return rows.map(normalizeUpdate)
+      }),
+
       load('mocks', async () => {
         const rows = await this.repositories!.mocks.findAll()
         return rows.map(normalizeMock)
@@ -1627,6 +1649,10 @@ export class EndgeSchemaStorage extends EndgeModule {
       return domain.getComposition(documentIdOrIdentity)
     if (documentType === 'store')
       return domain.getStore(documentIdOrIdentity)
+    if (documentType === 'stream')
+      return domain.getStream(documentIdOrIdentity)
+    if (documentType === 'update')
+      return domain.getUpdate(documentIdOrIdentity)
     if (documentType === 'mock')
       return domain.getMock(documentIdOrIdentity)
     if (documentType === ParameterType.DefaultParameter)
@@ -1739,6 +1765,10 @@ export class EndgeSchemaStorage extends EndgeModule {
       return repos.compositions.findByIdentity(identity)
     if (documentType === 'store')
       return repos.stores.findByIdentity(identity)
+    if (documentType === 'stream')
+      return repos.streams.findByIdentity(identity)
+    if (documentType === 'update')
+      return repos.updates.findByIdentity(identity)
     if (documentType === 'mock')
       return repos.mocks.findByIdentity(identity)
     if (documentType === ParameterType.DefaultParameter)
@@ -1880,6 +1910,8 @@ export class EndgeSchemaStorage extends EndgeModule {
       return repos.compositions.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === 'store')
       return repos.stores.patchFolder(documentPayloadId, folderPayloadId)
+    if (documentType === 'stream')
+      return repos.streams.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === 'mock')
       return repos.mocks.patchFolder(documentPayloadId, folderPayloadId)
     if (documentType === ParameterType.DefaultParameter)
@@ -2001,6 +2033,19 @@ export class EndgeSchemaStorage extends EndgeModule {
     }
     if (documentType === 'store') {
       await repos.stores.softDelete(resolvedIdentity, folderId)
+      const now = new Date().toISOString()
+      for (const update of Endge.domain.getUpdatesByStoreIdentity(resolvedIdentity)) {
+        update.active = false
+        update.deletedAt = now
+      }
+      return
+    }
+    if (documentType === 'stream') {
+      await repos.streams.softDelete(resolvedIdentity, folderId)
+      return
+    }
+    if (documentType === 'update') {
+      await repos.updates.softDelete(resolvedIdentity)
       return
     }
     if (documentType === 'mock') {
@@ -2075,6 +2120,14 @@ export class EndgeSchemaStorage extends EndgeModule {
     }
     if (documentType === 'store') {
       await repos.stores.hardDelete(resolvedIdentity)
+      return
+    }
+    if (documentType === 'stream') {
+      await repos.streams.hardDelete(resolvedIdentity)
+      return
+    }
+    if (documentType === 'update') {
+      await repos.updates.hardDelete(resolvedIdentity)
       return
     }
     if (documentType === 'mock') {
@@ -2176,7 +2229,30 @@ export class EndgeSchemaStorage extends EndgeModule {
       return
     }
     if (documentType === 'store') {
+      const store = await repos.stores.findByIdentity(resolvedIdentity)
       await repos.stores.restore(resolvedIdentity)
+      if (store?.id != null) {
+        const updates = await repos.updates.findAll({ 'where[store][equals]': store.id })
+        await Promise.all(updates.map((update: any) => repos.updates.update(update.id, {
+          active: true,
+          deletedAt: null,
+        })))
+      }
+      for (const update of Endge.domain.getUpdatesByStoreIdentity(resolvedIdentity)) {
+        update.active = true
+        update.deletedAt = null
+      }
+      return
+    }
+    if (documentType === 'stream') {
+      const root = await repos.folders.findByIdentity('root-queries')
+      if (root?.id == null)
+        throw new Error('Корневая папка «Обмен данными» не найдена.')
+      await repos.streams.restore(resolvedIdentity, root.id)
+      return
+    }
+    if (documentType === 'update') {
+      await repos.updates.restore(resolvedIdentity)
       return
     }
     if (documentType === 'mock') {
@@ -2410,6 +2486,22 @@ export class EndgeSchemaStorage extends EndgeModule {
       data.sourceVersion = Number(data.sourceVersion ?? 1)
       data.meta = (data.meta && typeof data.meta === 'object' && !Array.isArray(data.meta)) ? data.meta : {}
       saved = await repos.stores.upsert(data as any)
+    }
+    else if (documentType === 'stream') {
+      data.source = typeof data.source === 'string' ? data.source : ''
+      data.sourceVersion = Number(data.sourceVersion ?? 1)
+      data.meta = (data.meta && typeof data.meta === 'object' && !Array.isArray(data.meta)) ? data.meta : {}
+      saved = await repos.streams.upsert(data as any)
+    }
+    else if (documentType === 'update') {
+      data.source = typeof data.source === 'string' ? data.source : ''
+      data.sourceVersion = Number(data.sourceVersion ?? 1)
+      data.meta = (data.meta && typeof data.meta === 'object' && !Array.isArray(data.meta)) ? data.meta : {}
+      const owner = Endge.domain.getStore(String(data.storeIdentity ?? ''))
+      if (!owner)
+        throw new Error(`Store-owner для Update "${data.identity}" не найден.`)
+      data.store = owner.id
+      saved = await repos.updates.upsert(data as any)
     }
     else if (documentType === 'mock') {
       data.contentSource = data.contentSource === 'code-provider' ? 'code-provider' : 'document'
@@ -2795,6 +2887,72 @@ export class EndgeSchemaStorage extends EndgeModule {
         : existing
           ? await repos.stores.update(existing.id, payload)
           : await repos.stores.create(payload)
+      this._applyPayloadDocToDomain(documentType, saved, documentId, true)
+      return
+    }
+
+    if (documentType === 'stream') {
+      const stream = ((opts?.model as any) ?? domain.getStream(documentId)) as any
+      if (!stream)
+        throw new Error(`Stream не найден: ${documentId}`)
+
+      const existing = await this._findPayloadDocumentForSave(
+        repos.streams,
+        stream.identity,
+        opts?.previousIdentity,
+      )
+      const fallbackFolder = existing?.folder ?? await resolveDefaultFolderByIdentity(repos, 'root-queries')
+      const folder = stream.folderId ?? relationToId(fallbackFolder) ?? null
+      const payload = {
+        identity: String(stream.identity ?? documentId),
+        displayName: stream.displayName ?? stream.name ?? String(stream.identity ?? documentId),
+        description: stream.description ?? null,
+        folder,
+        source: stream.source ?? '',
+        sourceVersion: Number(stream.sourceVersion ?? 1),
+        meta: (stream.meta && typeof stream.meta === 'object' && !Array.isArray(stream.meta)) ? stream.meta : {},
+        active: stream.active ?? true,
+        author: stream.author ?? undefined,
+      }
+      const storageId = stream.id
+      const saved = !this.isMalformedPayloadDocumentId(storageId)
+        ? await repos.streams.update(storageId, payload)
+        : existing
+          ? await repos.streams.update(existing.id, payload)
+          : await repos.streams.create(payload)
+      this._applyPayloadDocToDomain(documentType, saved, documentId, true)
+      return
+    }
+
+    if (documentType === 'update') {
+      const update = ((opts?.model as any) ?? domain.getUpdate(documentId)) as any
+      if (!update)
+        throw new Error(`Update не найден: ${documentId}`)
+      const owner = domain.getStore(update.storeIdentity)
+      if (!owner || this.isMalformedPayloadDocumentId(owner.id))
+        throw new Error(`Store-owner "${update.storeIdentity}" для Update "${update.identity}" не сохранён.`)
+      const existing = await this._findPayloadDocumentForSave(
+        repos.updates,
+        update.identity,
+        opts?.previousIdentity,
+      )
+      const payload = {
+        identity: String(update.identity ?? documentId),
+        displayName: update.displayName ?? update.name ?? String(update.identity ?? documentId),
+        description: update.description ?? null,
+        store: owner.id,
+        source: update.source ?? '',
+        sourceVersion: Number(update.sourceVersion ?? 1),
+        meta: (update.meta && typeof update.meta === 'object' && !Array.isArray(update.meta)) ? update.meta : {},
+        active: update.active ?? true,
+        author: update.author ?? undefined,
+      }
+      const storageId = update.id
+      const saved = !this.isMalformedPayloadDocumentId(storageId)
+        ? await repos.updates.update(storageId, payload)
+        : existing
+          ? await repos.updates.update(existing.id, payload)
+          : await repos.updates.create(payload)
       this._applyPayloadDocToDomain(documentType, saved, documentId, true)
       return
     }
@@ -3669,6 +3827,20 @@ export class EndgeSchemaStorage extends EndgeModule {
       )
       return
     }
+    if (documentType === 'stream') {
+      removeBy(
+        x => Endge.domain.removeStreamById(x),
+        x => Endge.domain.removeStream(x),
+      )
+      return
+    }
+    if (documentType === 'update') {
+      removeBy(
+        x => Endge.domain.removeUpdateById(x),
+        x => Endge.domain.removeUpdate(x),
+      )
+      return
+    }
     if (documentType === 'mock') {
       removeBy(
         x => Endge.domain.removeMockById(x),
@@ -3835,6 +4007,10 @@ export class EndgeSchemaStorage extends EndgeModule {
       return 'compositions'
     if (documentType === 'store')
       return 'stores'
+    if (documentType === 'stream')
+      return 'streams'
+    if (documentType === 'update')
+      return 'updates'
     if (documentType === 'mock')
       return 'mocks'
     if (documentType === 'computation')
@@ -3886,6 +4062,15 @@ export class EndgeSchemaStorage extends EndgeModule {
       return compositionPayloadDocToPlain(raw)
     if (documentType === 'store')
       return storePayloadDocToPlain(raw)
+    if (documentType === 'stream')
+      return streamPayloadDocToPlain(raw)
+    if (documentType === 'update')
+      return updatePayloadDocToPlain({
+        ...raw,
+        storeIdentity: typeof raw?.store === 'object'
+          ? raw.store?.identity
+          : Endge.domain.getStore(relationToId(raw?.store) ?? '')?.identity,
+      })
     if (documentType === 'mock')
       return mockPayloadDocToPlain(raw)
     if (documentType === 'computation')

@@ -25,10 +25,17 @@ export interface StoreSourceDocument {
   data: StoreDataDescriptor[]
 }
 
+/** Скомпилированная таблица маршрутизации событий к дочерним Update. */
+export interface StoreUpdateHandlerDescriptor {
+  identity: string
+  eventType: string | null
+}
+
 /** Runtime-ready Store source artifact v1. */
 export interface StoreSourceArtifact extends StoreSourceDocument {
   type: 'store'
   sourceVersion: number
+  updateHandlers: StoreUpdateHandlerDescriptor[]
 }
 
 export interface StoreSourceCompileResult {

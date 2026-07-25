@@ -30,6 +30,10 @@ import { QuerySourceLanguageStrategy } from '@/model/services/source-engine/stra
 import { QuerySourcePatchStrategy } from '@/model/services/source-engine/strategies/QuerySourcePatchStrategy'
 import { StoreSourceEngineStrategy } from '@/model/services/source-engine/strategies/StoreSourceEngineStrategy'
 import { StoreSourceLanguageStrategy } from '@/model/services/source-engine/strategies/StoreSourceLanguageStrategy'
+import { StreamSourceEngineStrategy } from '@/model/services/source-engine/strategies/StreamSourceEngineStrategy'
+import { StreamSourceLanguageStrategy } from '@/model/services/source-engine/strategies/StreamSourceLanguageStrategy'
+import { UpdateSourceEngineStrategy } from '@/model/services/source-engine/strategies/UpdateSourceEngineStrategy'
+import { UpdateSourceLanguageStrategy } from '@/model/services/source-engine/strategies/UpdateSourceLanguageStrategy'
 import { ComputationSourceEngineStrategy } from '@/model/services/source-engine/strategies/ComputationSourceEngineStrategy'
 import { ComputationSourceLanguageStrategy } from '@/model/services/source-engine/strategies/ComputationSourceLanguageStrategy'
 import { StyleSourceEngineStrategy } from '@/model/services/source-engine/strategies/StyleSourceEngineStrategy'
@@ -178,6 +182,8 @@ export class EndgeSource extends EndgeModule {
     this._strategies.register(new FilterSourceEngineStrategy())
     this._strategies.register(new CompositionSourceEngineStrategy())
     this._strategies.register(new StoreSourceEngineStrategy())
+    this._strategies.register(new StreamSourceEngineStrategy())
+    this._strategies.register(new UpdateSourceEngineStrategy())
     this._strategies.register(new ComputationSourceEngineStrategy())
     this._strategies.register(new StyleSourceEngineStrategy())
     this._strategies.register(new TypeSourceEngineStrategy())
@@ -186,6 +192,8 @@ export class EndgeSource extends EndgeModule {
     this._languageStrategies.register(new FilterSourceLanguageStrategy())
     this._languageStrategies.register(new CompositionSourceLanguageStrategy())
     this._languageStrategies.register(new StoreSourceLanguageStrategy())
+    this._languageStrategies.register(new StreamSourceLanguageStrategy())
+    this._languageStrategies.register(new UpdateSourceLanguageStrategy())
     this._languageStrategies.register(new ComputationSourceLanguageStrategy())
     this._languageStrategies.register(new StyleSourceLanguageStrategy())
     this._languageStrategies.register(new TypeSourceLanguageStrategy())
