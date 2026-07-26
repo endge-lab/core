@@ -26,12 +26,12 @@ export class Types_Repository {
   async create(data: {
     identity: string
     displayName: string
+    description?: string | null
     source: string
     sourceVersion?: number
     author?: string
     folder?: number | string
     active?: boolean
-    isPrimitive?: boolean
     managedBy?: ManagedBy
     managedById?: string | null
     meta?: Record<string, unknown>
@@ -46,12 +46,12 @@ export class Types_Repository {
     data: Partial<{
       identity: string
       displayName: string
+      description: string | null
       source: string
       sourceVersion: number
       author?: string
       folder: number | string
       active: boolean
-      isPrimitive: boolean
       managedBy: ManagedBy
       managedById: string | null
       meta: Record<string, unknown>
@@ -64,12 +64,12 @@ export class Types_Repository {
   async upsert(data: {
     identity: string
     displayName: string
+    description?: string | null
     source: string
     sourceVersion?: number
     author?: string
     folder?: number | string
     active?: boolean
-    isPrimitive?: boolean
     managedBy?: ManagedBy
     managedById?: string | null
     meta?: Record<string, unknown>

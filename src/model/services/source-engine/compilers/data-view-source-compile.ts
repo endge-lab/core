@@ -2,6 +2,7 @@ import type {
   DataViewExpression,
   DataViewIncrementalRequest,
   DataViewMaterializationStrategy,
+  DataViewSourceContract,
   DataViewRef,
   DataViewManualTransform,
   DataViewPathOperation,
@@ -17,6 +18,7 @@ import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
 import { compileProgramMetadataProperty } from '@/model/services/source-engine/compilers/source-metadata-compile'
 import { compileSourceExpression } from '@/model/services/source-engine/compilers/source-expression-compile'
+import { compileSourceField } from '@/model/services/source-engine/compilers/source-field-compile'
 import { readSourceModelIdentity, readSourceModelReference } from '@/model/services/source-engine/compilers/source-model-reference-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
@@ -97,6 +99,7 @@ function parseDocument(
 ): DataViewSourceDocument {
   const declaredMode = readStringProperty(definition, 'mode')
   const incremental = readIncrementalRequest(definition, diagnostics)
+  const contract = readDataViewContract(definition, source, diagnostics)
   const transformNode = readObjectProperty(definition, 'transform')
   const stepsNode = readArrayProperty(definition, 'steps')
   const outputValue = readPropertyValue(definition, 'output')
@@ -150,7 +153,7 @@ function parseDocument(
         'incremental',
       ))
     }
-    return { mode, incremental, output }
+    return { mode, incremental, contract, output }
   }
 
   if (mode === 'expression') {
@@ -173,7 +176,7 @@ function parseDocument(
         'incremental',
       ))
     }
-    return { mode, incremental, expression: expression ?? undefined }
+    return { mode, incremental, contract, expression: expression ?? undefined }
   }
 
   if (mode === 'manual') {
@@ -194,7 +197,7 @@ function parseDocument(
         'incremental',
       ))
     }
-    return { mode, incremental, transform: transform ?? undefined }
+    return { mode, incremental, contract, transform: transform ?? undefined }
   }
 
   const steps = stepsNode ? readPipelineSteps(stepsNode, source, diagnostics) : []
@@ -217,7 +220,48 @@ function parseDocument(
     ))
   }
 
-  return { mode, incremental, steps }
+  return { mode, incremental, contract, steps }
+}
+
+function readDataViewContract(
+  definition: t.ObjectExpression,
+  source: string,
+  diagnostics: DiagnosticDraft[],
+): DataViewSourceContract | null {
+  const raw = readPropertyValue(definition, 'contract')
+  if (!raw)
+    return null
+  if (!t.isObjectExpression(raw)) {
+    diagnostics.push(createDiagnostic(
+      'error',
+      'data-view-source-contract-object',
+      'DataView contract должен быть объектом { input, output }.',
+      'contract',
+    ))
+    return null
+  }
+
+  const inputNode = readPropertyValue(raw, 'input')
+  const outputNode = readPropertyValue(raw, 'output')
+  if (!inputNode || !outputNode) {
+    diagnostics.push(createDiagnostic(
+      'error',
+      'data-view-source-contract-fields',
+      'DataView contract требует поля input и output.',
+      'contract',
+    ))
+    return null
+  }
+
+  const input = compileSourceField('input', inputNode, source, diagnostics, 'contract.input', {
+    allowInlineTypeExpressions: true,
+  })
+  const output = compileSourceField('output', outputNode, source, diagnostics, 'contract.output', {
+    allowInlineTypeExpressions: true,
+  })
+  return input && output
+    ? { input: input.field, output: output.field }
+    : null
 }
 
 function readProjectionOutput(
@@ -633,6 +677,7 @@ function createDataViewArtifact(document: DataViewSourceDocument): DataViewProgr
     mode: document.mode,
     materializationStrategy: resolveMaterializationStrategy(document),
     sourceDocument: document,
+    contract: document.contract,
     transform: document.transform ?? null,
     steps: document.steps ?? [],
     output: document.output ?? {},

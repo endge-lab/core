@@ -270,7 +270,7 @@ defineComputation({
 })
 `
 
-const compiled = compileComputation({ source, input: null, output: null })
+const compiled = compileComputation({ source })
 const executor = new ComputationGraphExecutor(() => null)
 
 describe('groundhandling-process-state declarative computation', () => {

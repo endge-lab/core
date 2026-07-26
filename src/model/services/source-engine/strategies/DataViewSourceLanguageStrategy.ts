@@ -8,7 +8,7 @@ import type {
 
 import { compileDataViewSource } from '@/model/services/source-engine/compilers/data-view-source-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
-import { resolveSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
+import { resolveTypedSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
 import { DATA_VIEW_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/data-view.default.source'
 import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/model/services/source-engine/value-expression-language'
 
@@ -20,12 +20,12 @@ export class DataViewSourceLanguageStrategy implements SourceLanguageStrategy {
     alias: 'Endge DataView Source',
     extension: '.endge-data-view.ts',
     keywords: [
-      'auto', 'collectionByKey', 'convert', 'converter', 'dataView', 'defineDataView', 'field',
+      'auto', 'collectionByKey', 'contract', 'convert', 'converter', 'dataView', 'defineDataView', 'field',
       'from', 'full', 'incremental', 'join', 'map', 'output', 'path', 'pick', 'select', 'spread',
       'template', 'transform', ...VALUE_EXPRESSION_FUNCTION_NAMES,
     ],
     functions: ['as', 'auto', 'by', 'collectionByKey', 'convert', 'converter', 'dataView', 'find', 'from', 'full', 'join', 'map', 'pick', 'select', ...VALUE_EXPRESSION_METHOD_NAMES],
-    properties: ['incremental', 'input', 'left', 'manual', 'metadata', 'mode', 'output', 'pipeline', 'right', 'steps', 'tools'],
+    properties: ['contract', 'incremental', 'input', 'left', 'manual', 'metadata', 'mode', 'output', 'pipeline', 'right', 'steps', 'tools'],
   })
 
   /** Проверяет, что strategy обслуживает DataView source. */
@@ -56,7 +56,7 @@ export class DataViewSourceLanguageStrategy implements SourceLanguageStrategy {
   }
 
   public resolveReference(context: SourceLanguageContext) {
-    return resolveSourceDocumentReference(context, {
+    return resolveTypedSourceDocumentReference(context, {
       functions: {
         converter: 'converter',
         dataView: 'data-view',
@@ -83,6 +83,15 @@ const DATA_VIEW_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
   'namespace.feature': {},
 },`,
     detail: 'Статическая metadata DataView',
+  },
+  {
+    label: 'contract',
+    kind: 'property',
+    insertText: `contract: {
+  input: field(InputType).array(),
+  output: field(OutputType).array(),
+},`,
+    detail: 'Входной и выходной тип DataView',
   },
   {
     label: 'manual.transform',
@@ -142,5 +151,5 @@ const DATA_VIEW_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'path', kind: 'function', insertText: `path('item.id')`, detail: 'Читает путь из scope' },
   { label: 'template', kind: 'function', insertText: `template('{item.code}/{item.number}')`, detail: 'String template из scope' },
   { label: 'convert', kind: 'function', insertText: `.convert('date.iso_to_time', { format: 'HH:mm' })`, detail: 'Применяет converter' },
-  { label: 'field', kind: 'function', insertText: `field('String')`, detail: 'Будущий contract helper' },
+  { label: 'field', kind: 'function', insertText: `field('String')`, detail: 'Описание поля контракта' },
 ]

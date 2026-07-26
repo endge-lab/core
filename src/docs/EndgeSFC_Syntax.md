@@ -134,9 +134,9 @@ Rules for v1:
 - local component tag имеет приоритет над global user tag;
 - built-in tags (`Text`, `Flex`, `Component` и другие) запрещены для component ports;
 - defaults для required ports проверяются на existence, active state и provider kind;
-- computation generic types сохраняются в manifest, но в v1 не сравниваются с
-  опциональными persisted `RComputation.input/output`; несовместимость проявляется
-  естественной runtime-ошибкой;
+- computation generic types сохраняются в manifest; контракт самого Computation
+  опционально объявляется в source через `input: field(Type)` и
+  `output: field(Type)`;
 - Composition overrides для required ports требуют отдельного binding syntax;
   они не маскируются неявными callbacks.
 

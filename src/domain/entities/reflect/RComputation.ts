@@ -1,10 +1,9 @@
 import { Serialize } from '@endge/utils'
-import { Expose, Type } from 'class-transformer'
+import { Expose } from 'class-transformer'
 
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
 import type { DiagnosticsProblemInput } from '@/domain/types/diagnostics'
 import { REntity } from '@/domain/entities/reflect/REntity'
-import { RField } from '@/domain/entities/reflect/RField'
 
 /** Persisted executable specification. Runtime execution is provided separately. */
 export class RComputation extends REntity {
@@ -22,14 +21,6 @@ export class RComputation extends REntity {
 
   @Expose()
   contractVersion: number = 1
-
-  @Expose()
-  @Type(() => RField)
-  input: RField | null = null
-
-  @Expose()
-  @Type(() => RField)
-  output: RField | null = null
 
   static fromPayload(json: any): RComputation {
     return RComputation.fromPlain({
@@ -49,8 +40,6 @@ export class RComputation extends REntity {
     computation.source = typeof json?.source === 'string' ? json.source : ''
     computation.sourceVersion = Math.max(1, Number(json?.sourceVersion ?? 1) || 1)
     computation.contractVersion = Math.max(1, Number(json?.contractVersion ?? 1) || 1)
-    computation.input = fieldFromPlain(json?.input, 'input')
-    computation.output = fieldFromPlain(json?.output, 'output')
     computation.folderId = json?.folderId ?? relationToId(json?.folder) ?? null
     computation.applyEntityMeta(json)
     computation.active = json?.active !== false
@@ -71,8 +60,6 @@ export class RComputation extends REntity {
       source: this.source,
       sourceVersion: this.sourceVersion,
       contractVersion: this.contractVersion,
-      input: fieldToPlain(this.input),
-      output: fieldToPlain(this.output),
       folderId: this.folderId ?? null,
       meta: this.meta ?? {},
       active: this.active !== false,
@@ -111,17 +98,4 @@ function relationToId(value: any): string | number | null {
   if (typeof value === 'object')
     return relationToId(value.id ?? value.value)
   return value
-}
-
-function fieldFromPlain(value: any, name: string): RField | null {
-  const type = relationToId(value?.type)
-  if (type == null || String(type).trim() === '')
-    return null
-  return new RField(name, String(type), value?.isArray === true, value?.optional === true)
-}
-
-function fieldToPlain(field: RField | null): Record<string, unknown> | null {
-  return field
-    ? { type: field.type, isArray: field.isArray === true, optional: field.optional === true }
-    : null
 }

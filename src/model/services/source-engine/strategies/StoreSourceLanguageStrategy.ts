@@ -2,7 +2,7 @@ import type { SourceKind, SourceLanguageCompletion, SourceLanguageContext, Sourc
 
 import { compileStoreSource } from '@/model/services/source-engine/compilers/store-source-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
-import { resolveSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
+import { resolveTypedSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
 import { STORE_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/store.default.source'
 import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/model/services/source-engine/value-expression-language'
 
@@ -12,8 +12,8 @@ export class StoreSourceLanguageStrategy implements SourceLanguageStrategy {
   public readonly syntax = createTypeScriptLikeSourceSyntax({
     alias: 'Endge Store Source',
     extension: '.endge-store.ts',
-    keywords: ['converter', 'dataView', 'defineDataView', 'defineStore', 'derived', 'mock', 'select', 'value', ...VALUE_EXPRESSION_FUNCTION_NAMES],
-    functions: ['converter', 'dataView', 'derived', 'from', 'mock', 'select', 'value', ...VALUE_EXPRESSION_METHOD_NAMES],
+    keywords: ['contract', 'converter', 'dataView', 'defineDataView', 'defineStore', 'derived', 'field', 'mock', 'select', 'value', ...VALUE_EXPRESSION_FUNCTION_NAMES],
+    functions: ['contract', 'converter', 'dataView', 'derived', 'field', 'from', 'mock', 'select', 'value', ...VALUE_EXPRESSION_METHOD_NAMES],
     properties: ['data'],
   })
 
@@ -47,6 +47,12 @@ export class StoreSourceLanguageStrategy implements SourceLanguageStrategy {
         detail: 'Применить внешний DataView',
       },
       {
+        label: 'contract',
+        kind: 'function',
+        insertText: '.contract(field(TypeIdentity).array())',
+        detail: 'Тип значения Store field',
+      },
+      {
         label: 'select',
         kind: 'function',
         insertText: `.select({\n  rows: path('items'),\n})`,
@@ -57,7 +63,7 @@ export class StoreSourceLanguageStrategy implements SourceLanguageStrategy {
   }
 
   public resolveReference(context: SourceLanguageContext) {
-    return resolveSourceDocumentReference(context, {
+    return resolveTypedSourceDocumentReference(context, {
       functions: {
         converter: 'converter',
         dataView: 'data-view',

@@ -8,7 +8,7 @@ import type {
 
 import { compileComputation } from '@/model/services/compiler/computation/computation-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
-import { resolveSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
+import { resolveTypedSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
 import { COMPUTATION_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/computation.default.source'
 import {
   VALUE_EXPRESSION_COMPLETIONS,
@@ -23,8 +23,8 @@ export class ComputationSourceLanguageStrategy implements SourceLanguageStrategy
     alias: 'Endge Computation Source',
     extension: '.endge-computation.ts',
     keywords: ['defineComputation', 'input', 'output', 'computation', 'typescript', ...VALUE_EXPRESSION_FUNCTION_NAMES],
-    functions: ['defineComputation', 'input', 'output', 'computation', 'typescript', ...VALUE_EXPRESSION_METHOD_NAMES],
-    properties: ['outputs', 'result', 'inputs', 'compute'],
+    functions: ['defineComputation', 'field', 'input', 'output', 'computation', 'typescript', ...VALUE_EXPRESSION_METHOD_NAMES],
+    properties: ['input', 'output', 'outputs', 'result', 'inputs', 'compute'],
   })
 
   public supports(sourceKind: SourceKind | string): boolean {
@@ -36,7 +36,7 @@ export class ComputationSourceLanguageStrategy implements SourceLanguageStrategy
   }
 
   public validate(source: string): SourceLanguageValidationResult {
-    const result = compileComputation({ source, input: null, output: null })
+    const result = compileComputation({ source })
     const ok = !result.diagnostics.some(item => item.severity === 'error')
     return { ok, diagnostics: result.diagnostics, message: ok ? undefined : 'Computation source contains validation errors.' }
   }
@@ -44,6 +44,7 @@ export class ComputationSourceLanguageStrategy implements SourceLanguageStrategy
   public completions(_context: SourceLanguageContext): SourceLanguageCompletion[] {
     return [
       { label: 'defineComputation', kind: 'snippet', insertText: COMPUTATION_DEFAULT_SOURCE.trimEnd(), detail: 'Создать computation graph' },
+      { label: 'field', kind: 'snippet', insertText: 'field(Type)', detail: 'Объявить input/output contract' },
       { label: 'typescript', kind: 'snippet', insertText: "typescript({\n  inputs: {\n    value: input('value'),\n  },\n  compute({ value }, api) {\n    return value\n  },\n})", detail: 'Sandboxed TypeScript output node' },
       { label: 'computation', kind: 'snippet', insertText: "computation('identity', {\n  value: input('value'),\n})", detail: 'Вызвать внешний computation' },
       { label: 'input', kind: 'function', insertText: "input('path')", detail: 'Прочитать внешний computation input' },
@@ -53,7 +54,7 @@ export class ComputationSourceLanguageStrategy implements SourceLanguageStrategy
   }
 
   public resolveReference(context: SourceLanguageContext) {
-    return resolveSourceDocumentReference(context, {
+    return resolveTypedSourceDocumentReference(context, {
       functions: {
         computation: 'computation',
       },

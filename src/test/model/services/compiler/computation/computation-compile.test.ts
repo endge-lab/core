@@ -6,9 +6,9 @@ import { ComputationGraphExecutor } from '@/model/endge/runtime/execution/comput
 describe('compileComputation graph', () => {
   it('compiles forward references and evaluates the safe graph once', () => {
     const result = compileComputation({
-      input: { type: 'ProcessStateInput' },
-      output: { type: 'ProcessState' },
       source: `defineComputation({
+  input: field(ProcessStateInput),
+  output: field(ProcessState),
   outputs: {
     state: {
       target: output('targetState'),
@@ -33,8 +33,6 @@ describe('compileComputation graph', () => {
 
   it('compiles a mixed graph and executes a TypeScript node through the adapter', async () => {
     const result = compileComputation({
-      input: null,
-      output: null,
       source: `defineComputation({
   outputs: {
     base: 5,
@@ -57,8 +55,6 @@ describe('compileComputation graph', () => {
 
   it('starts independent TypeScript outputs concurrently', async () => {
     const result = compileComputation({
-      input: null,
-      output: null,
       source: `defineComputation({
         outputs: {
           a: typescript({ inputs: {}, compute() { return 1 } }),
@@ -87,8 +83,6 @@ describe('compileComputation graph', () => {
 
   it('lifts external computations from value-expression chains into graph nodes', () => {
     const result = compileComputation({
-      input: null,
-      output: null,
       source: `defineComputation({
         outputs: {
           label: computation('shared.normalize', {
@@ -117,8 +111,6 @@ describe('compileComputation graph', () => {
 
   it('rejects dynamic external computation identities', () => {
     const result = compileComputation({
-      input: null,
-      output: null,
       source: `defineComputation({
         outputs: { value: computation(input('identity'), input('value')) },
         result: output('value'),
@@ -132,8 +124,6 @@ describe('compileComputation graph', () => {
 
   it('reports unknown outputs, cycles, async blocks and the legacy syntax', () => {
     const invalid = compileComputation({
-      input: null,
-      output: null,
       source: `defineComputation({
   outputs: {
     a: output('b'),
@@ -153,8 +143,6 @@ describe('compileComputation graph', () => {
     ]))
 
     expect(compileComputation({
-      input: null,
-      output: null,
       source: 'export default function compute(input: unknown) { return input }',
     }).diagnostics).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'computation-legacy-source-unsupported' }),
@@ -163,8 +151,6 @@ describe('compileComputation graph', () => {
 
   it('rejects forbidden globals without rejecting local names or object keys', () => {
     const local = compileComputation({
-      input: null,
-      output: null,
       source: `defineComputation({
         outputs: {
           value: typescript({
@@ -181,8 +167,6 @@ describe('compileComputation graph', () => {
     expect(local.diagnostics.filter(item => item.code === 'computation-typescript-global')).toEqual([])
 
     const global = compileComputation({
-      input: null,
-      output: null,
       source: `defineComputation({
         outputs: {
           value: typescript({ inputs: {}, compute() { return fetch('/private') } }),

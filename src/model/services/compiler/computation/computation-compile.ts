@@ -16,6 +16,7 @@ import {
   propertyName,
   unwrapExpression,
 } from '@/model/services/source-engine/compilers/source-expression-compile'
+import { compileSourceField } from '@/model/services/source-engine/compilers/source-field-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
@@ -27,8 +28,6 @@ interface ExternalComputationCompileContext {
 
 export interface ComputationCompileInput {
   source: string
-  input: ComputationContractField | null
-  output: ComputationContractField | null
 }
 
 export interface ComputationCompileResult {
@@ -40,8 +39,8 @@ export interface ComputationCompileResult {
 export function compileComputation(input: ComputationCompileInput): ComputationCompileResult {
   const diagnostics: DiagnosticDraft[] = []
   const payload: ComputationProgramPayload = {
-    input: input.input,
-    output: input.output,
+    input: null,
+    output: null,
     sourceDocument: null,
     nodes: [],
     result: null,
@@ -116,13 +115,33 @@ export function compileComputation(input: ComputationCompileInput): ComputationC
 
   let outputsNode: t.ObjectExpression | null = null
   let resultNode: t.Expression | null = null
+  let inputContract: ComputationContractField | null = null
+  let outputContract: ComputationContractField | null = null
   for (const property of definition.properties) {
     if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
       diagnostics.push(diagnostic('error', 'computation-definition-property', 'defineComputation допускает только обычные properties.', 'source', property))
       continue
     }
     const name = propertyName(property.key)
-    if (name === 'outputs') {
+    if (name === 'input' || name === 'output') {
+      const compiled = compileSourceField(
+        name,
+        property.value,
+        input.source,
+        diagnostics,
+        name,
+      )
+      if (compiled) {
+        const contract = {
+          type: compiled.field.type,
+          isArray: compiled.field.array,
+          optional: compiled.field.optional,
+        }
+        if (name === 'input') inputContract = contract
+        else outputContract = contract
+      }
+    }
+    else if (name === 'outputs') {
       const value = unwrapExpression(property.value)
       if (t.isObjectExpression(value)) outputsNode = value
       else diagnostics.push(diagnostic('error', 'computation-outputs-object', 'outputs должен быть object literal.', 'outputs', value))
@@ -131,6 +150,8 @@ export function compileComputation(input: ComputationCompileInput): ComputationC
     else diagnostics.push(diagnostic('error', 'computation-definition-property-unsupported', `Свойство "${name ?? ''}" не поддерживается.`, 'source', property))
   }
 
+  payload.input = inputContract
+  payload.output = outputContract
   if (!outputsNode || outputsNode.properties.length === 0)
     diagnostics.push(diagnostic('error', 'computation-outputs-required', 'defineComputation требует непустой outputs object.', 'outputs', outputsNode ?? definition))
   if (!resultNode)
@@ -223,7 +244,12 @@ export function compileComputation(input: ComputationCompileInput): ComputationC
   }
 
   const ordered = topologicalSort(programNodes, diagnostics, outputsNode)
-  const document: ComputationSourceDocument = { outputs: sourceNodes, result }
+  const document: ComputationSourceDocument = {
+    input: inputContract,
+    output: outputContract,
+    outputs: sourceNodes,
+    result,
+  }
   payload.sourceDocument = document
   payload.nodes = ordered
   payload.result = result

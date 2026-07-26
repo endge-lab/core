@@ -50,8 +50,6 @@ describe('ComputationResourceState', () => {
   it('uses a local identity override as a full replacement without fallback', () => {
     const compiled = compileComputation({
       source: 'defineComputation({ outputs: { value: 1 }, result: output(\'value\') })',
-      input: null,
-      output: null,
     })
     Endge.program.beginCompile('test')
     Endge.program.addArtifact({

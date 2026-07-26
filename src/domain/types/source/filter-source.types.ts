@@ -8,6 +8,47 @@ export interface FilterSourceDocument {
   outputs: FilterProgramOutput[]
 }
 
+/** Абсолютный диапазон узла внутри Filter source. */
+export interface FilterSourceRange {
+  start: number
+  end: number
+}
+
+/** Source-backed поле для визуального редактора Filter. */
+export interface FilterSourceEditorField extends SourceFieldDefinition {
+  sourceRange: FilterSourceRange
+  keyRange: FilterSourceRange
+  valueRange: FilterSourceRange
+  valueSource: string
+  defaultSource: string | null
+}
+
+/** Source-backed output для навигации из визуального редактора. */
+export interface FilterSourceEditorOutput {
+  key: string
+  kind: FilterProgramOutput['kind']
+  sourceRange: FilterSourceRange
+  source: string
+}
+
+/** Проекция Filter source, которая не хранится отдельно от source. */
+export interface FilterSourceEditorDocument {
+  fields: FilterSourceEditorField[]
+  outputs: FilterSourceEditorOutput[]
+}
+
+/** Узкие операции визуального редактора над canonical Filter source. */
+export type FilterSourcePatchOperation
+  = | { type: 'add-field', key: string, expression: string }
+    | { type: 'remove-field', key: string }
+    | { type: 'move-field', key: string, toIndex: number }
+    | { type: 'rename-field', key: string, nextKey: string }
+    | { type: 'set-field', key: string, expression: string }
+
+export type FilterSourcePatch
+  = FilterSourcePatchOperation
+    | FilterSourcePatchOperation[]
+
 /** JSON-output фильтра. */
 export interface FilterProgramJsonOutput {
   key: string

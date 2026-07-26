@@ -22,6 +22,7 @@ import { DataViewSourceEngineStrategy } from '@/model/services/source-engine/str
 import { DataViewSourceLanguageStrategy } from '@/model/services/source-engine/strategies/DataViewSourceLanguageStrategy'
 import { FilterSourceEngineStrategy } from '@/model/services/source-engine/strategies/FilterSourceEngineStrategy'
 import { FilterSourceLanguageStrategy } from '@/model/services/source-engine/strategies/FilterSourceLanguageStrategy'
+import { FilterSourcePatchStrategy } from '@/model/services/source-engine/strategies/FilterSourcePatchStrategy'
 import { CompositionSourceEngineStrategy } from '@/model/services/source-engine/strategies/CompositionSourceEngineStrategy'
 import { CompositionSourceLanguageStrategy } from '@/model/services/source-engine/strategies/CompositionSourceLanguageStrategy'
 import { CompositionSourcePatchStrategy } from '@/model/services/source-engine/strategies/CompositionSourcePatchStrategy'
@@ -198,6 +199,7 @@ export class EndgeSource extends EndgeModule {
     this._languageStrategies.register(new StyleSourceLanguageStrategy())
     this._languageStrategies.register(new TypeSourceLanguageStrategy())
     this._patchStrategies.register(new CompositionSourcePatchStrategy())
+    this._patchStrategies.register(new FilterSourcePatchStrategy())
     this._patchStrategies.register(new QuerySourcePatchStrategy())
   }
 

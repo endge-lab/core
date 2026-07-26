@@ -7,6 +7,7 @@ import { EndgeContext } from '@/model/endge/context/endge-context'
 import { EndgeConfigurationModule } from '@/model/endge/context/endge-configuration'
 import { EndgeDiagnostics } from '@/model/endge/diagnostics/endge-diagnostics'
 import { EndgeDomain } from '@/model/endge/domain/endge-domain'
+import { EndgeTypes } from '@/model/endge/domain/endge-types'
 import { EndgeEvents } from '@/model/endge/kernel/endge-events'
 import { EndgeI18n } from '@/model/endge/context/endge-i18n'
 import { EndgeMock } from '@/model/endge/mock/EndgeMock'
@@ -29,11 +30,12 @@ export const ENDGE_CORE_MODULES: EndgeModuleDefinition[] = [
   { key: 'schema', module: EndgeSchemaStorage, after: 'context' },
   { key: 'workspace', module: EndgeWorkspace, after: ['context', 'schema'] },
   { key: 'domain', module: EndgeDomain, after: 'schema' },
+  { key: 'types', module: EndgeTypes, after: 'domain' },
   { key: 'configuration', module: EndgeConfigurationModule, after: ['workspace', 'domain', 'context'] },
   { key: 'diagnostics', module: EndgeDiagnostics, after: 'configuration' },
   { key: 'source', module: EndgeSource, after: 'domain' },
   { key: 'program', module: EndgeProgram, after: 'domain' },
-  { key: 'compiler', module: EndgeCompiler, after: ['domain', 'configuration', 'diagnostics', 'source', 'program', 'mock'] },
+  { key: 'compiler', module: EndgeCompiler, after: ['domain', 'types', 'configuration', 'diagnostics', 'source', 'program', 'mock'] },
   { key: 'auth', module: EndgeAuth, after: ['configuration', 'domain'] },
   { key: 'vocabs', module: EndgeVocabs, after: ['domain', 'auth'] },
   { key: 'i18n', module: EndgeI18n, after: ['domain', 'configuration'] },

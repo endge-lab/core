@@ -64,7 +64,7 @@ export class EndgeComputation {
     input: unknown,
     identity = 'computation-source-preview',
   ): Promise<unknown> {
-    const compiled = compileComputation({ source, input: null, output: null })
+    const compiled = compileComputation({ source })
     const error = compiled.diagnostics.find(item => item.severity === 'error')
     if (error) {
       throw new ComputationRuntimeError(

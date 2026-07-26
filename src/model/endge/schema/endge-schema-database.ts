@@ -244,69 +244,6 @@ function relationToNumericIds(v: any): number[] {
   return Array.from(new Set(out))
 }
 
-function relationToIdentity(v: any): string | null {
-  if (v == null)
-    return null
-  if (typeof v === 'object') {
-    const identity = (v as any).identity ?? (v as any).name
-    if (identity != null) {
-      const text = String(identity).trim()
-      if (text)
-        return text
-    }
-    const nested = (v as any).value
-    if (nested != null)
-      return relationToIdentity(nested)
-    return null
-  }
-  const text = String(v).trim()
-  return text || null
-}
-
-function normalizeActionField(
-  raw: any,
-  fallbackName: string,
-): { name: string, type: string, isArray: boolean, optional: boolean } | null {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw))
-    return null
-
-  const rawType = relationToIdentity(raw.type) ?? relationToId(raw.type)
-  if (rawType == null)
-    return null
-
-  const type = String(rawType).trim()
-  if (!type)
-    return null
-
-  return {
-    name: String(raw.name ?? '').trim() || fallbackName,
-    type,
-    isArray: raw.isArray === true,
-    optional: raw.optional === true,
-  }
-}
-
-function toPayloadActionField(raw: any): { type: number | string | null, isArray: boolean, optional: boolean } | null {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw))
-    return null
-
-  const rawType = relationToId(raw.type) ?? relationToIdentity(raw.type)
-  if (rawType == null)
-    return null
-
-  const typeText = String(rawType).trim()
-  if (!typeText)
-    return null
-
-  const resolvedType = Endge.domain.getType(rawType as string | number)?.id ?? rawType
-
-  return {
-    type: resolvedType,
-    isArray: raw.isArray === true,
-    optional: raw.optional === true,
-  }
-}
-
 function normalizeActionTargets(raw: unknown): Array<{ type: string, identity?: string }> | null {
   if (!Array.isArray(raw) || raw.length === 0)
     return null
@@ -1055,10 +992,10 @@ export class EndgeSchemaStorage extends EndgeModule {
       identity: raw.identity,
       name: raw.displayName,
       displayName: raw.displayName,
+      description: raw.description ?? null,
       source: typeof raw.source === 'string' ? raw.source : '',
       sourceVersion: Math.max(1, Number(raw.sourceVersion ?? 1) || 1),
       folderId: relationToId(raw.folder) ?? null,
-      isPrimitive: raw.isPrimitive === true,
       ...normalizeEntityManagement(raw),
       meta: normalizeEntityMeta(raw.meta),
     })
@@ -1444,8 +1381,6 @@ export class EndgeSchemaStorage extends EndgeModule {
 
         folderId: relationToId(raw.folder) ?? null,
         definition: normalizeFlowDefinition(raw.definition),
-        input: normalizeActionField(raw.input, 'input'),
-        output: normalizeActionField(raw.output, 'output'),
         meta: normalizeEntityMeta(raw.meta),
       }
     }
@@ -2510,7 +2445,6 @@ export class EndgeSchemaStorage extends EndgeModule {
     else if (documentType === 'type') {
       data.source = typeof data.source === 'string' ? data.source : ''
       data.sourceVersion = Math.max(1, Number(data.sourceVersion ?? 1) || 1)
-      data.isPrimitive = false
       data.meta = (data.meta && typeof data.meta === 'object' && !Array.isArray(data.meta)) ? data.meta : {}
       saved = await repos.types.upsert(data as any)
     }
@@ -2654,6 +2588,7 @@ export class EndgeSchemaStorage extends EndgeModule {
       const saved = await repos.types.upsert({
         identity,
         displayName: String(type.name ?? type.displayName ?? identity),
+        description: typeof type.description === 'string' ? type.description.trim() || null : null,
         folder: folder ?? undefined,
         source: typeof type.source === 'string' ? type.source : '',
         sourceVersion: Math.max(1, Number(type.sourceVersion ?? 1) || 1),
@@ -2988,7 +2923,6 @@ export class EndgeSchemaStorage extends EndgeModule {
           })
       if (folder == null)
         throw new Error('Не удалось определить папку для вычисления')
-      const plain = typeof computation.toPlain === 'function' ? computation.toPlain() : computation
       const payload = {
         identity: String(computation.identity ?? documentId),
         displayName: computation.displayName ?? computation.name ?? String(computation.identity ?? documentId),
@@ -2997,8 +2931,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         source: typeof computation.source === 'string' ? computation.source : '',
         sourceVersion: Math.max(1, Number(computation.sourceVersion ?? 1) || 1),
         contractVersion: Math.max(1, Number(computation.contractVersion ?? 1) || 1),
-        input: plain.input != null && typeof plain.input === 'object' && !Array.isArray(plain.input) ? plain.input : {},
-        output: plain.output != null && typeof plain.output === 'object' && !Array.isArray(plain.output) ? plain.output : {},
         meta: (computation.meta && typeof computation.meta === 'object' && !Array.isArray(computation.meta)) ? computation.meta : {},
         active: computation.active ?? true,
         author: computation.author ?? undefined,
@@ -3031,8 +2963,6 @@ export class EndgeSchemaStorage extends EndgeModule {
             description: action.description ?? null,
             folderId: action.folderId ?? null,
             definition: normalizeFlowDefinition(action.definition),
-            input: action.input ?? null,
-            output: action.output ?? null,
           }
 
       const actionIdentity = String((action as any).identity ?? plain.identity ?? action.id ?? '')
@@ -3059,8 +2989,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         displayName: String(plain.displayName ?? plain.name ?? actionIdentity),
         description: plain.description ?? null,
         definition: normalizeFlowDefinition(rawEditorFlowDefinition ?? plain.definition),
-        input: toPayloadActionField(plain.input),
-        output: toPayloadActionField(plain.output),
         target: normalizeActionTargets(plain.target),
         managedBy: action.managedBy ?? 'user',
         managedById: action.managedById ?? null,
@@ -4092,10 +4020,10 @@ export class EndgeSchemaStorage extends EndgeModule {
         identity: raw.identity,
         name: raw.displayName,
         displayName: raw.displayName,
+        description: raw.description ?? null,
         source: typeof raw.source === 'string' ? raw.source : '',
         sourceVersion: Math.max(1, Number(raw.sourceVersion ?? 1) || 1),
         folderId: relationToId(raw.folder) ?? null,
-        isPrimitive: raw.isPrimitive === true,
         ...normalizeEntityManagement(raw),
         meta: normalizeEntityMeta(raw.meta),
       }
@@ -4109,8 +4037,6 @@ export class EndgeSchemaStorage extends EndgeModule {
         description: raw.description ?? null,
         folderId: relationToId(raw.folder) ?? null,
         definition: normalizeFlowDefinition(raw.definition),
-        input: normalizeActionField(raw.input, 'input'),
-        output: normalizeActionField(raw.output, 'output'),
         target: normalizeActionTargets(raw.target),
         ...normalizeEntityManagement(raw),
         origin: { kind: 'storage' },

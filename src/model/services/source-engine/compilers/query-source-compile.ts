@@ -211,6 +211,7 @@ function createQueryArtifact(document: QuerySourceDocument): QueryProgramPayload
       key: output.key,
       source: output.source,
       dataViews: output.dataViews,
+      contract: output.contract,
       materialization: output.source.type === 'response' && output.dataViews.length === 0
         ? { kind: 'source' as const }
         : { kind: 'derived' as const, strategy: { kind: 'full' as const } },
@@ -367,6 +368,7 @@ function readOutput(
 
   let outputSource: QueryOutputSource | null = null
   const dataViews: DataViewRef[] = []
+  let contract: QuerySourceOutput['contract'] = null
 
   for (const call of calls.modifiers) {
     if (call.name === 'from') {
@@ -378,6 +380,32 @@ function readOutput(
       const dataViewRef = readDataViewRef(call.arguments[0], source, diagnostics, `outputs.${key}.dataView`)
       if (dataViewRef)
         dataViews.push(dataViewRef)
+      continue
+    }
+
+    if (call.name === 'contract') {
+      if (contract) {
+        diagnostics.push(createDiagnostic(
+          'error',
+          'query-source-output-contract-duplicate',
+          `Output "${key}" содержит повторный .contract(...).`,
+          `outputs.${key}.contract`,
+        ))
+        continue
+      }
+      const raw = call.arguments[0]
+      if (!raw || !t.isExpression(raw)) {
+        diagnostics.push(createDiagnostic(
+          'error',
+          'query-source-output-contract-missing',
+          'output().contract(...) требует field(type).',
+          `outputs.${key}.contract`,
+        ))
+        continue
+      }
+      contract = compileSourceField(key, raw, source, diagnostics, `outputs.${key}.contract`, {
+        allowInlineTypeExpressions: true,
+      })?.field ?? null
       continue
     }
 
@@ -400,7 +428,7 @@ function readOutput(
     return null
   }
 
-  return { key, source: outputSource, dataViews }
+  return { key, source: outputSource, dataViews, contract }
 }
 
 function unsupportedOutput(

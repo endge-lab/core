@@ -1,6 +1,6 @@
 import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
 import type { ProgramMetadataMap } from '@/domain/types/program/program-metadata.types'
-import type { SourceExpressionIR } from '@/domain/types/source/source-expression.types'
+import type { SourceExpressionIR, SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 
 export type DataViewSourceMode = 'manual' | 'pipeline' | 'projection' | 'expression'
 
@@ -13,9 +13,15 @@ export type DataViewMaterializationStrategy
   = | { kind: 'full' }
     | { kind: 'collection-by-key', key: string }
 
+export interface DataViewSourceContract {
+  input: SourceFieldDefinition
+  output: SourceFieldDefinition
+}
+
 export interface DataViewSourceDocument {
   mode: DataViewSourceMode
   incremental: DataViewIncrementalRequest
+  contract?: DataViewSourceContract | null
   transform?: DataViewManualTransform
   steps?: DataViewPipelineStep[]
   output?: Record<string, SourceExpressionIR>

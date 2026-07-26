@@ -12,6 +12,7 @@ import { EndgeDataView } from '@/model/endge/runtime/execution/endge-data-view'
 import { EndgeCompiler } from '@/model/endge/program/endge-compiler'
 import { EndgeDiagnostics } from '@/model/endge/diagnostics/endge-diagnostics'
 import { EndgeDomain } from '@/model/endge/domain/endge-domain'
+import { EndgeTypes } from '@/model/endge/domain/endge-types'
 import { EndgeEvents } from '@/model/endge/kernel/endge-events'
 import { EndgeFlow } from '@/model/endge/runtime/flow/endge-flow'
 import { EndgeFlowRegistry } from '@/model/endge/runtime/flow/endge-flow-registry'
@@ -242,6 +243,11 @@ export class Endge extends EndgeFederation {
    */
   static get domain(): EndgeDomain {
     return this.getModule<EndgeDomain>('domain')
+  }
+
+  /** Доступ к effective registry встроенных и пользовательских типов. */
+  static get types(): EndgeTypes {
+    return this.getModule<EndgeTypes>('types')
   }
 
   /**

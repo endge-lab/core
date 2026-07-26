@@ -6,6 +6,7 @@ import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
 
 import { diagnostic, propertyName, readStringArgument, unwrapExpression } from '@/model/services/source-engine/compilers/source-expression-compile'
+import { compileSourceField } from '@/model/services/source-engine/compilers/source-field-compile'
 import { readSourceModelReference } from '@/model/services/source-engine/compilers/source-model-reference-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
@@ -83,10 +84,16 @@ function readData(node: t.ObjectExpression, source: string, diagnostics: Diagnos
       continue
     }
     const expression = unwrapExpression(property.value)
-    if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'value' })) {
-      const initialNode = expression.arguments[0]
+    const chain = memberChain(expression)
+    if (!chain) {
+      diagnostics.push(diagnostic('error', 'store-data-shape', `Data field "${key}" должен быть value(...) или derived().from(...).`, `data.${key}`, expression))
+      continue
+    }
+
+    if (t.isIdentifier(chain.base.callee, { name: 'value' })) {
+      const initialNode = chain.base.arguments[0]
       if (!initialNode || !t.isExpression(initialNode)) {
-        diagnostics.push(diagnostic('error', 'store-value-initial', `value(...) для "${key}" требует initial value.`, `data.${key}`, expression))
+        diagnostics.push(diagnostic('error', 'store-value-initial', `value(...) для "${key}" требует initial value.`, `data.${key}`, chain.base))
         continue
       }
       const initial = readValueInitializer(initialNode)
@@ -94,18 +101,30 @@ function readData(node: t.ObjectExpression, source: string, diagnostics: Diagnos
         diagnostics.push(diagnostic('error', 'store-value-static', `value(...) для "${key}" принимает JSON-compatible значение или mock(identity).`, `data.${key}`, initialNode))
         continue
       }
-      descriptors.push({ key, kind: 'value', initial: initial.initial })
+      let contract: StoreDataDescriptor['contract'] = null
+      for (const modifier of chain.modifiers) {
+        if (modifier.name === 'contract') {
+          if (contract) {
+            diagnostics.push(diagnostic('error', 'store-contract-duplicate', `Data field "${key}" содержит повторный .contract(...).`, `data.${key}.contract`, modifier.call))
+            continue
+          }
+          contract = readStoreContract(key, modifier.call.arguments[0], source, diagnostics)
+          continue
+        }
+        diagnostics.push(diagnostic('error', 'store-value-method', `value().${modifier.name}(...) не поддерживается.`, `data.${key}`, modifier.call))
+      }
+      descriptors.push({ key, kind: 'value', initial: initial.initial, contract })
       declared.add(key)
       continue
     }
 
-    const chain = memberChain(expression)
     if (!chain || !t.isIdentifier(chain.base.callee, { name: 'derived' })) {
       diagnostics.push(diagnostic('error', 'store-data-shape', `Data field "${key}" должен быть value(...) или derived().from(...).`, `data.${key}`, expression))
       continue
     }
     let sourceKey = ''
     const dataViews: DataViewRef[] = []
+    let contract: StoreDataDescriptor['contract'] = null
     for (const modifier of chain.modifiers) {
       if (modifier.name === 'from') {
         sourceKey = readStringArgument(modifier.call, 0) ?? ''
@@ -123,6 +142,14 @@ function readData(node: t.ObjectExpression, source: string, diagnostics: Diagnos
           dataViews.push(ref)
         continue
       }
+      if (modifier.name === 'contract') {
+        if (contract) {
+          diagnostics.push(diagnostic('error', 'store-contract-duplicate', `Data field "${key}" содержит повторный .contract(...).`, `data.${key}.contract`, modifier.call))
+          continue
+        }
+        contract = readStoreContract(key, modifier.call.arguments[0], source, diagnostics)
+        continue
+      }
       diagnostics.push(diagnostic('error', 'store-derived-method', `derived().${modifier.name}(...) не поддерживается.`, `data.${key}`, modifier.call))
     }
     if (!sourceKey) {
@@ -137,10 +164,25 @@ function readData(node: t.ObjectExpression, source: string, diagnostics: Diagnos
       diagnostics.push(diagnostic('error', 'store-derived-transform', `Derived field "${key}" требует .dataView(...) или .select(...).`, `data.${key}`, expression))
       continue
     }
-    descriptors.push({ key, kind: 'derived', source: sourceKey, dataViews })
+    descriptors.push({ key, kind: 'derived', source: sourceKey, dataViews, contract })
     declared.add(key)
   }
   return descriptors
+}
+
+function readStoreContract(
+  key: string,
+  raw: t.CallExpression['arguments'][number] | undefined,
+  source: string,
+  diagnostics: DiagnosticDraft[],
+): StoreDataDescriptor['contract'] {
+  if (!raw || !t.isExpression(raw)) {
+    diagnostics.push(diagnostic('error', 'store-contract-missing', '.contract(...) требует field(type).', `data.${key}.contract`))
+    return null
+  }
+  return compileSourceField(key, raw, source, diagnostics, `data.${key}.contract`, {
+    allowInlineTypeExpressions: true,
+  })?.field ?? null
 }
 
 function readSelectDataViewRef(

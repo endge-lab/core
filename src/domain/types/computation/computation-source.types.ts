@@ -1,4 +1,5 @@
 import type { SourceExpressionIR } from '@/domain/types/source/source-expression.types'
+import type { ComputationContractField } from './computation-program.types'
 
 export interface ComputationSourceRange {
   start: number
@@ -29,6 +30,8 @@ export type ComputationSourceNode
 
 /** Canonical compiler-derived representation of defineComputation source. */
 export interface ComputationSourceDocument {
+  input: ComputationContractField | null
+  output: ComputationContractField | null
   outputs: ComputationSourceNode[]
   result: SourceExpressionIR
 }

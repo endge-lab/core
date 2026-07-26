@@ -1,6 +1,7 @@
 import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
 import type { EndgeMockReference } from '@/domain/types/mock'
 import type { DataViewRef } from '@/domain/types/source/data-view-source.types'
+import type { SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 
 export type StoreDataDescriptor = StoreValueDescriptor | StoreDerivedDescriptor
 
@@ -8,6 +9,7 @@ export interface StoreValueDescriptor {
   key: string
   kind: 'value'
   initial: StoreValueInitializer
+  contract?: SourceFieldDefinition | null
 }
 
 export type StoreValueInitializer
@@ -19,6 +21,7 @@ export interface StoreDerivedDescriptor {
   kind: 'derived'
   source: string
   dataViews: DataViewRef[]
+  contract?: SourceFieldDefinition | null
 }
 
 export interface StoreSourceDocument {

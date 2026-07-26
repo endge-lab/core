@@ -8,7 +8,7 @@ import type {
 
 import { compileQuerySource } from '@/model/services/source-engine/compilers/query-source-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
-import { resolveSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
+import { resolveTypedSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
 import { QUERY_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/query.default.source'
 import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/model/services/source-engine/value-expression-language'
 import { validateTypeExpressionUsage, validateTypeSourceExpressionUsage } from '@/model/services/compiler/type/type-program-validation'
@@ -21,12 +21,12 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
     alias: 'Endge Query Source',
     extension: '.endge-query.ts',
     keywords: [
-      'auto', 'body', 'collectionByKey', 'compact', 'converter', 'dataView', 'defineDataView', 'defineFilter', 'defineProps',
+      'auto', 'body', 'collectionByKey', 'compact', 'contract', 'converter', 'dataView', 'defineDataView', 'defineFilter', 'defineProps',
       'defineQuery', 'endgeVar', 'env', 'field', 'filter', 'merge', 'objectOf', 'output', 'prop', 'recordOf',
       'full', 'incremental', 'response', ...VALUE_EXPRESSION_FUNCTION_NAMES,
     ],
     functions: [
-      'array', 'as', 'auto', 'by', 'collectionByKey', 'converter', 'dataView', 'default', 'from', 'full', 'map', 'optional',
+      'array', 'as', 'auto', 'by', 'collectionByKey', 'contract', 'converter', 'dataView', 'default', 'from', 'full', 'map', 'optional',
       'options', 'vocab', ...VALUE_EXPRESSION_METHOD_NAMES,
     ],
     properties: [
@@ -59,10 +59,16 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
       status: 'valid',
     } as const))
     const typeDiagnostics = typeCatalog
-      ? (result.artifact?.props.flatMap(prop => [
-          ...validateTypeExpressionUsage(prop.type, typeCatalog, `props.${prop.key}.type`),
-          ...validateTypeSourceExpressionUsage(prop.typeExpression, typeCatalog, `props.${prop.key}.typeExpression`),
-        ]) ?? [])
+      ? [
+          ...(result.artifact?.props.flatMap(prop => [
+            ...validateTypeExpressionUsage(prop.type, typeCatalog, `props.${prop.key}.type`),
+            ...validateTypeSourceExpressionUsage(prop.typeExpression, typeCatalog, `props.${prop.key}.typeExpression`),
+          ]) ?? []),
+          ...(result.artifact?.outputs.flatMap(output => [
+            ...validateTypeExpressionUsage(output.contract?.type, typeCatalog, `outputs.${output.key}.contract.type`),
+            ...validateTypeSourceExpressionUsage(output.contract?.typeExpression, typeCatalog, `outputs.${output.key}.contract.typeExpression`),
+          ]) ?? []),
+        ]
       : []
     const diagnostics = [...result.diagnostics, ...typeDiagnostics]
     const ok = !diagnostics.some(diagnostic => diagnostic.severity === 'error')
@@ -80,11 +86,10 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
   }
 
   public resolveReference(context: SourceLanguageContext) {
-    return resolveSourceDocumentReference(context, {
+    return resolveTypedSourceDocumentReference(context, {
       functions: {
         converter: 'converter',
         dataView: 'data-view',
-        field: 'type',
         filter: 'filter',
       },
       methods: {
@@ -181,6 +186,12 @@ const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
     kind: 'function',
     insertText: `output().from(response('items'))`,
     detail: 'Описывает output из response или предыдущего output',
+  },
+  {
+    label: 'output.contract',
+    kind: 'function',
+    insertText: `.contract(field(TypeIdentity).array())`,
+    detail: 'Тип результата Query output',
   },
   {
     label: 'response',

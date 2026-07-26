@@ -12,7 +12,7 @@ import type {
   RComponentSFC_RuntimeDependencies,
   RComponentSFCSource_Parts,
 } from '@/domain/types/component/sfc'
-import type { QueryProgramProp, SourceExpressionIR } from '@/domain/types/source/source-expression.types'
+import type { QueryProgramProp, SourceExpressionIR, SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 import type { ProgramMetadata } from '@/domain/types/program/program-metadata.types'
 import type { ComputationProgramPayload } from '@/domain/types/computation'
 import type { EndgeStyleSheetArtifact } from '@/domain/types/style'
@@ -157,6 +157,7 @@ export interface QueryProgramOutput {
   key: string
   source: QueryProgramOutputSource
   dataViews: DataViewRef[]
+  contract?: SourceFieldDefinition | null
   materialization:
     | { kind: 'source' }
     | { kind: 'derived', strategy: import('@/domain/types/source/data-view-source.types').DataViewMaterializationStrategy }
@@ -229,6 +230,9 @@ export interface DataViewProgramPayload {
 
   /** Canonical source document для debug/preview UI. */
   sourceDocument: DataViewSourceDocument | null
+
+  /** Декларативный входной и выходной тип DataView. */
+  contract?: DataViewSourceDocument['contract']
 
   /** Compiled manual transform. Используется только в mode=manual. */
   transform: DataViewManualTransform | null

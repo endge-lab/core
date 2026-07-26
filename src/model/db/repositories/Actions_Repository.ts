@@ -1,19 +1,11 @@
 import type { AxiosInstance } from 'axios'
 import type { ActionFlowDefinition } from '@/domain/types/flow/endge-flow.types'
 
-export interface ActionRepositoryFieldContract {
-  type: number | string | null
-  isArray?: boolean
-  optional?: boolean
-}
-
 export interface ActionRepositoryPayload {
   identity: string
   displayName: string
   description?: string | null
   definition: ActionFlowDefinition
-  input?: ActionRepositoryFieldContract | null
-  output?: ActionRepositoryFieldContract | null
   target?: Array<{ type: string, identity?: string }> | null
   managedBy?: 'system' | 'integration' | 'user'
   managedById?: string | null

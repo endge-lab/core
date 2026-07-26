@@ -221,8 +221,6 @@ export function computationPayloadDocToPlain(doc: any): any {
     source: typeof doc?.source === 'string' ? doc.source : '',
     sourceVersion: Math.max(1, Number(doc?.sourceVersion ?? 1) || 1),
     contractVersion: Math.max(1, Number(doc?.contractVersion ?? 1) || 1),
-    input: doc?.input ?? null,
-    output: doc?.output ?? null,
     folderId: relationToId(doc?.folder ?? doc?.folderId),
     meta: (doc?.meta && typeof doc.meta === 'object' && !Array.isArray(doc.meta)) ? doc.meta : {},
     active: doc?.active !== false,

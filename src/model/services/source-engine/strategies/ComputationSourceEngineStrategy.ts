@@ -11,7 +11,7 @@ export class ComputationSourceEngineStrategy implements SourceEngineStrategy {
   }
 
   public compile(source: string): SourceEngineCompileResult {
-    const result = compileComputation({ source, input: null, output: null })
+    const result = compileComputation({ source })
     const ok = !result.diagnostics.some(item => item.severity === 'error')
     return {
       ok,

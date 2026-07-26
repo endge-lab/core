@@ -7,8 +7,6 @@ export interface ComputationsPayloadFields {
   source: string
   sourceVersion: number
   contractVersion: number
-  input?: Record<string, unknown> | null
-  output?: Record<string, unknown> | null
   folder?: string | number | null
   meta?: Record<string, unknown>
   author?: string | null
