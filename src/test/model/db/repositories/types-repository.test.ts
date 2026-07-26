@@ -18,13 +18,13 @@ describe('Types_Repository', () => {
     const saved = await repository.upsert({
       identity: 'new-type',
       displayName: 'New type',
-      schema: {},
+      source: 'defineType({})',
     }, 'old-type')
 
     expect(patch).toHaveBeenCalledWith('/types/42', {
       identity: 'new-type',
       displayName: 'New type',
-      schema: {},
+      source: 'defineType({})',
     })
     expect(post).not.toHaveBeenCalled()
     expect(saved).toEqual({ id: 42, identity: 'new-type' })

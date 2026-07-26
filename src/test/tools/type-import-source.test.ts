@@ -7,7 +7,7 @@ import { importOpenApiSchemaToDomain } from '@/tools/openapi-parser'
 describe('type importers', () => {
   afterEach(() => Endge.domain.reset())
 
-  it('writes OpenAPI fields to canonical source and keeps legacy fields', () => {
+  it('writes OpenAPI fields to canonical Type Source', () => {
     importOpenApiSchemaToDomain(`
 openapi: 3.0.0
 components:
@@ -28,7 +28,6 @@ components:
 
     const type = Endge.domain.getType('Customer')
     const compiled = Endge.source.compile('type', type?.source ?? '')
-    expect(type?.fields.size).toBe(3)
     expect(compiled.diagnostics).toEqual([])
     expect(compiled.document).toMatchObject({
       definition: {
@@ -51,7 +50,6 @@ components:
 
     const customer = Endge.domain.getType('Customer')
     const compiled = Endge.source.compile('type', customer?.source ?? '')
-    expect(customer?.fields.size).toBe(2)
     expect(compiled.document).toMatchObject({
       definition: {
         fields: [

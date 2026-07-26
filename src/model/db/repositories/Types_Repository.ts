@@ -26,8 +26,7 @@ export class Types_Repository {
   async create(data: {
     identity: string
     displayName: string
-    schema: any
-    source?: string
+    source: string
     sourceVersion?: number
     author?: string
     folder?: number | string
@@ -47,7 +46,6 @@ export class Types_Repository {
     data: Partial<{
       identity: string
       displayName: string
-      schema: any
       source: string
       sourceVersion: number
       author?: string
@@ -66,8 +64,7 @@ export class Types_Repository {
   async upsert(data: {
     identity: string
     displayName: string
-    schema: any
-    source?: string
+    source: string
     sourceVersion?: number
     author?: string
     folder?: number | string

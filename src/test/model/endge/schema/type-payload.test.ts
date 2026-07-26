@@ -8,6 +8,7 @@ describe('type Payload persistence', () => {
   it('uses the last persisted identity when saving a renamed type', async () => {
     const type = new RType('Renamed type')
     type.identity = 'renamed-type'
+    type.source = 'defineType({})'
     const upsert = vi.fn(async (payload: Record<string, unknown>) => payload)
     const storage = new EndgeSchemaStorage()
 
@@ -23,6 +24,8 @@ describe('type Payload persistence', () => {
     expect(upsert).toHaveBeenCalledWith(expect.objectContaining({
       identity: 'renamed-type',
       displayName: 'Renamed type',
+      source: 'defineType({})',
     }), 'original-type')
+    expect(upsert.mock.calls[0]?.[0]).not.toHaveProperty('schema')
   })
 })

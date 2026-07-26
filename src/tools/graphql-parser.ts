@@ -2,7 +2,6 @@ import type { DocumentNode, ObjectTypeDefinitionNode } from 'graphql'
 import { parse, visit } from 'graphql'
 import { Endge } from '@/model/endge/kernel/endge'
 import { RType } from '@/domain/entities/reflect/RType'
-import { RField } from '@/domain/entities/reflect/RField'
 import type { TypeSourceField } from '@/domain/types/source/type-source.types'
 import { serializeTypeSourceDocument } from '@/model/services/source-engine/type-source-serialize'
 
@@ -27,7 +26,7 @@ export function importGqlSchemaToDomain(schema: string): void {
       if (['Mutation', 'Subscription', 'Query'].includes(name)) return
 
       const sourceFields: TypeSourceField[] = []
-      const fields = (node.fields || []).map((field) => {
+      for (const field of node.fields || []) {
         const { typeStr, isArray, optional } = resolveFieldTypeWithMeta(field.type)
         sourceFields.push({
           key: field.name.value,
@@ -37,11 +36,9 @@ export function importGqlSchemaToDomain(schema: string): void {
           description: field.description?.value,
           examples: [],
         })
-        return new RField(field.name.value, typeStr, isArray, optional)
-      })
+      }
 
       const rType = new RType(name)
-      fields.forEach((field) => rType.addField(field))
       rType.sourceVersion = 1
       rType.source = serializeTypeSourceDocument({ definition: { kind: 'object', fields: sourceFields } })
       typeMap.set(name, rType)

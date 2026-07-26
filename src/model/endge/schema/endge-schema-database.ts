@@ -1050,31 +1050,18 @@ export class EndgeSchemaStorage extends EndgeModule {
       project: relationToId(raw.project) ?? null,
     })
 
-    const normalizeSchemaEntity = (raw: any) => {
-      const schema = raw.schema ?? {}
-
-      const id
-        = schema.id ?? raw.id
-
-      const name
-        = schema.name
-          ?? raw.displayName
-
-      const identity = schema.identity ?? raw.identity
-
-      return {
-        ...schema,
-        id,
-        identity,
-        name,
-        source: typeof raw.source === 'string' ? raw.source : '',
-        sourceVersion: Math.max(1, Number(raw.sourceVersion ?? 1) || 1),
-        folderId: relationToId(raw.folder) ?? schema.folderId ?? schema.folder ?? null,
-        isPrimitive: schema.isPrimitive === true || raw.isPrimitive === true,
-        ...normalizeEntityManagement(raw),
-        meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : (schema.meta ?? {}),
-      }
-    }
+    const normalizeSchemaEntity = (raw: any) => ({
+      id: raw.id,
+      identity: raw.identity,
+      name: raw.displayName,
+      displayName: raw.displayName,
+      source: typeof raw.source === 'string' ? raw.source : '',
+      sourceVersion: Math.max(1, Number(raw.sourceVersion ?? 1) || 1),
+      folderId: relationToId(raw.folder) ?? null,
+      isPrimitive: raw.isPrimitive === true,
+      ...normalizeEntityManagement(raw),
+      meta: normalizeEntityMeta(raw.meta),
+    })
 
     /** Компонент из flat-полей payload (без использования raw.schema). */
     const normalizeComponentFromPayload = (raw: any) => {
@@ -2521,12 +2508,6 @@ export class EndgeSchemaStorage extends EndgeModule {
       saved = await repos.computations.upsert(data as any)
     }
     else if (documentType === 'type') {
-      const schema = data.schema != null && typeof data.schema === 'object' && !Array.isArray(data.schema)
-        ? { ...data.schema }
-        : {}
-      delete schema.source
-      delete schema.sourceVersion
-      data.schema = schema
       data.source = typeof data.source === 'string' ? data.source : ''
       data.sourceVersion = Math.max(1, Number(data.sourceVersion ?? 1) || 1)
       data.isPrimitive = false
@@ -2670,14 +2651,9 @@ export class EndgeSchemaStorage extends EndgeModule {
       const folder = type.folderId != null
         ? await this.resolveFolderPayloadId(type.folderId)
         : undefined
-      const serialized = Serialize.toPlain(type) as Record<string, unknown>
-      const schema = { ...serialized }
-      delete schema.source
-      delete schema.sourceVersion
       const saved = await repos.types.upsert({
         identity,
         displayName: String(type.name ?? type.displayName ?? identity),
-        schema,
         folder: folder ?? undefined,
         source: typeof type.source === 'string' ? type.source : '',
         sourceVersion: Math.max(1, Number(type.sourceVersion ?? 1) || 1),
@@ -4111,19 +4087,17 @@ export class EndgeSchemaStorage extends EndgeModule {
       }
     }
     if (documentType === 'type' || documentType === 'primitive') {
-      const schema = raw.schema ?? {}
-      const id = schema.id ?? (raw.id != null ? String(raw.id) : undefined)
       return {
-        ...schema,
-        id,
-        identity: schema.identity ?? raw.identity,
-        name: schema.name ?? raw.displayName,
+        id: raw.id != null ? String(raw.id) : undefined,
+        identity: raw.identity,
+        name: raw.displayName,
+        displayName: raw.displayName,
         source: typeof raw.source === 'string' ? raw.source : '',
         sourceVersion: Math.max(1, Number(raw.sourceVersion ?? 1) || 1),
-        folderId: relationToId(raw.folder) ?? schema.folderId ?? schema.folder ?? null,
-        isPrimitive: schema.isPrimitive === true || raw.isPrimitive === true,
+        folderId: relationToId(raw.folder) ?? null,
+        isPrimitive: raw.isPrimitive === true,
         ...normalizeEntityManagement(raw),
-        meta: (raw.meta && typeof raw.meta === 'object' && !Array.isArray(raw.meta)) ? raw.meta : (schema.meta ?? {}),
+        meta: normalizeEntityMeta(raw.meta),
       }
     }
     if (documentType === 'action') {

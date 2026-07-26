@@ -1,6 +1,5 @@
 import { parse as parseYaml } from 'yaml'
 import { RType } from '@/domain/entities/reflect/RType'
-import { RField } from '@/domain/entities/reflect/RField'
 import { Endge } from '@/model/endge/kernel/endge'
 import type { TypeSourceExpression, TypeSourceField } from '@/domain/types/source/type-source.types'
 import { serializeTypeSourceDocument } from '@/model/services/source-engine/type-source-serialize'
@@ -24,11 +23,8 @@ export function importOpenApiSchemaToDomain(yamlText: string): void {
       for (const [propName, propSchema] of Object.entries<any>(
         schema.properties || {},
       )) {
-        const type = resolveOpenApiType(propSchema)
         const isArray = propSchema.type === 'array'
         const optional = !required.has(propName)
-        const field = new RField(propName, type, isArray, optional)
-        rtype.addField(field)
         const constraints = propSchema.type === 'array' ? propSchema.items ?? {} : propSchema
         sourceFields.push({
           key: propName,
