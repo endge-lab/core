@@ -20,12 +20,15 @@ describe('source document references', () => {
     ['data-view', "from('items').dataView('normalize-flight')", 'normalize-flight', 'data-view'],
     ['data-view', "path('item.std').convert('date.iso_to_time')", 'date.iso_to_time', 'converter'],
     ['data-view', "path('item.std').convert(converter('date.iso_to_time'))", 'date.iso_to_time', 'converter'],
+    ['data-view', 'field(MyType)', 'MyType', 'type'],
     ['store', "mock('flight-list')", 'flight-list', 'mock'],
     ['store', "dataView('normalize-flight')", 'normalize-flight', 'data-view'],
     ['store', "derived().from('raw').dataView('normalize-flight')", 'normalize-flight', 'data-view'],
+    ['store', 'field(MyType)', 'MyType', 'type'],
     ['filter', "field('String').vocab('airports')", 'airports', 'vocabs'],
     ['filter', 'field(MyType)', 'MyType', 'type'],
     ['computation', "computation('calculate-duration', {})", 'calculate-duration', 'computation'],
+    ['computation', 'field(MyType)', 'MyType', 'type'],
   ] as const)('resolves %s reference %s', (sourceKind, expression, identity, target) => {
     const source = `const value = ${expression}`
     const reference = Endge.source.referenceAt(sourceKind, contextAt(source, identity))

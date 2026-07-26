@@ -9,7 +9,7 @@ import type {
 import { compileCompositionSource } from '@/model/services/source-engine/compilers/composition-source-compile'
 import { normalizeCompositionSourceTypeReferences } from '@/model/services/source-engine/composition-source-normalize'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
-import { resolveSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
+import { resolveTypedSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
 import { COMPOSITION_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/composition.default.source'
 import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/model/services/source-engine/value-expression-language'
 
@@ -52,11 +52,10 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
   }
 
   public resolveReference(context: SourceLanguageContext) {
-    return resolveSourceDocumentReference(context, {
+    return resolveTypedSourceDocumentReference(context, {
       functions: {
         component: 'component',
         composition: 'composition',
-        field: 'type',
         filter: 'filter',
         filterView: 'filter',
         mock: 'mock',

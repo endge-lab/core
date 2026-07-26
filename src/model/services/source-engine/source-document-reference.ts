@@ -50,6 +50,25 @@ export function resolveSourceDocumentReference(
   }
 }
 
+/**
+ * Разрешает ссылки типизированного DSL-документа.
+ *
+ * `field(TypeIdentity)` является общим source-контрактом Type Registry,
+ * поэтому каждый новый типизированный язык не должен регистрировать его отдельно.
+ */
+export function resolveTypedSourceDocumentReference(
+  context: SourceLanguageContext,
+  rules: SourceDocumentReferenceRules = {},
+): SourceDocumentReference | null {
+  return resolveSourceDocumentReference(context, {
+    ...rules,
+    functions: {
+      ...rules.functions,
+      field: 'type',
+    },
+  })
+}
+
 function referenceFromProperty(
   property: t.ObjectProperty,
   ancestors: t.Node[],
