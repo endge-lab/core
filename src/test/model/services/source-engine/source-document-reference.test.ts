@@ -55,6 +55,33 @@ describe('source document references', () => {
     })
   })
 
+  it.each([
+    'composition',
+    'query',
+    'data-view',
+    'store',
+    'filter',
+    'computation',
+  ] as const)('highlights openable field type references in %s source', (sourceKind) => {
+    const source = 'const contract = { external: field(Flight), primitive: field(String), missing: field(MissingType) }'
+    const highlights = Endge.source.semanticHighlights(sourceKind, {
+      source,
+      typeSymbols: [
+        { identity: 'Flight', category: 'user' },
+        { identity: 'String', category: 'primitive' },
+      ],
+    })
+
+    expect(highlights.map(highlight => ({
+      identity: highlight.identity,
+      status: highlight.status,
+      source: source.slice(highlight.range.start, highlight.range.end),
+    }))).toEqual([
+      { identity: 'Flight', status: 'resolved', source: 'Flight' },
+      { identity: 'MissingType', status: 'unresolved', source: 'MissingType' },
+    ])
+  })
+
   it('chooses the nested external reference instead of its wrapping method call', () => {
     const source = "from('items').dataView(dataView('normalize-flight')).as('item')"
 

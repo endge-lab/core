@@ -2,6 +2,7 @@ import type {
   SourceDocumentReference,
   SourceDocumentReferenceTarget,
   SourceLanguageContext,
+  SourceLanguageSemanticHighlight,
 } from '@/domain/types/source/source-engine.types'
 
 import { parse as parseTS } from '@babel/parser'
@@ -17,6 +18,11 @@ export interface SourceDocumentReferenceRules {
   }>
 }
 
+interface LocatedSourceDocumentReference {
+  reference: SourceDocumentReference
+  identityRange: SourceDocumentReference['range']
+}
+
 /** Разрешает внешнюю document reference под курсором по AST и правилам DSL. */
 export function resolveSourceDocumentReference(
   context: SourceLanguageContext,
@@ -26,27 +32,74 @@ export function resolveSourceDocumentReference(
   if (offset == null)
     return null
 
+  return collectSourceDocumentReferences(context.source, rules)
+    .filter(location => containsOffset(location.reference.range, offset))
+    .sort((left, right) => rangeLength(left.reference) - rangeLength(right.reference))[0]
+    ?.reference ?? null
+}
+
+/** Подсвечивает ссылки `field(Type)` на отдельные Type Source документы. */
+export function typedSourceTypeReferenceHighlights(
+  context: SourceLanguageContext,
+): SourceLanguageSemanticHighlight[] {
+  const references = collectSourceDocumentReferences(context.source, typedReferenceRules())
+    .map(location => ({
+      ...location.reference,
+      range: location.identityRange,
+    }))
+
+  return typeReferenceHighlights(context, references)
+}
+
+/** Создаёт единый semantic highlight для разрешимых Type Source ссылок. */
+export function typeReferenceHighlights(
+  context: SourceLanguageContext,
+  references: readonly SourceDocumentReference[],
+): SourceLanguageSemanticHighlight[] {
+  if (!context.typeSymbols)
+    return []
+
+  const symbols = new Map(context.typeSymbols.map(symbol => [symbol.identity, symbol]))
+  return references.flatMap((reference) => {
+    if (reference.identity === context.ownerIdentity)
+      return []
+    const symbol = symbols.get(reference.identity)
+    if (symbol && symbol.category !== 'user')
+      return []
+    return [{
+      kind: 'type-reference' as const,
+      status: symbol ? 'resolved' as const : 'unresolved' as const,
+      identity: reference.identity,
+      range: reference.range,
+    }]
+  })
+}
+
+function collectSourceDocumentReferences(
+  source: string,
+  rules: SourceDocumentReferenceRules,
+): LocatedSourceDocumentReference[] {
   try {
-    const ast = parseTS(context.source, {
+    const ast = parseTS(source, {
       sourceType: 'module',
       plugins: ['typescript'],
       errorRecovery: true,
     })
-    const matches: SourceDocumentReference[] = []
+    const matches: LocatedSourceDocumentReference[] = []
     visitNode(ast, (node, ancestors) => {
       const reference = t.isCallExpression(node)
         ? referenceFromCall(node, rules)
         : t.isObjectProperty(node)
           ? referenceFromProperty(node, ancestors, rules)
           : null
-      if (reference && containsOffset(reference.range, offset))
+      if (reference)
         matches.push(reference)
     })
 
-    return matches.sort((left, right) => rangeLength(left) - rangeLength(right))[0] ?? null
+    return matches
   }
   catch {
-    return null
+    return []
   }
 }
 
@@ -60,20 +113,26 @@ export function resolveTypedSourceDocumentReference(
   context: SourceLanguageContext,
   rules: SourceDocumentReferenceRules = {},
 ): SourceDocumentReference | null {
-  return resolveSourceDocumentReference(context, {
+  return resolveSourceDocumentReference(context, typedReferenceRules(rules))
+}
+
+function typedReferenceRules(
+  rules: SourceDocumentReferenceRules = {},
+): SourceDocumentReferenceRules {
+  return {
     ...rules,
     functions: {
       ...rules.functions,
       field: 'type',
     },
-  })
+  }
 }
 
 function referenceFromProperty(
   property: t.ObjectProperty,
   ancestors: t.Node[],
   rules: SourceDocumentReferenceRules,
-): SourceDocumentReference | null {
+): LocatedSourceDocumentReference | null {
   if (property.computed || !t.isStringLiteral(property.value))
     return null
   const propertyName = staticPropertyName(property.key)
@@ -88,13 +147,13 @@ function referenceFromProperty(
     candidate.property === propertyName
     && (candidate.parentProperty == null || candidate.parentProperty === parentPropertyName),
   )
-  return rule ? createReference(rule.target, property.value.value, property.key, property.value) : null
+  return rule ? createReference(rule.target, property.value.value, property.key, property.value, property.value) : null
 }
 
 function referenceFromCall(
   call: t.CallExpression,
   rules: SourceDocumentReferenceRules,
-): SourceDocumentReference | null {
+): LocatedSourceDocumentReference | null {
   const argument = call.arguments[0]
   if (!argument)
     return null
@@ -116,11 +175,11 @@ function createCallReference(
   target: SourceDocumentReferenceTarget,
   argument: t.CallExpression['arguments'][number],
   callee: t.Node,
-): SourceDocumentReference | null {
+): LocatedSourceDocumentReference | null {
   if (t.isStringLiteral(argument) && argument.value.trim())
-    return createReference(target, argument.value, callee, argument)
+    return createReference(target, argument.value, callee, argument, argument)
   if (target === 'type' && t.isIdentifier(argument) && argument.name.trim())
-    return createReference(target, argument.name, callee, argument)
+    return createReference(target, argument.name, callee, argument, argument)
   return null
 }
 
@@ -129,13 +188,17 @@ function createReference(
   identity: string,
   startNode: t.Node,
   endNode: t.Node,
-): SourceDocumentReference | null {
-  if (startNode.start == null || endNode.end == null)
+  identityNode: t.Node,
+): LocatedSourceDocumentReference | null {
+  if (startNode.start == null || endNode.end == null || identityNode.start == null || identityNode.end == null)
     return null
   return {
-    target,
-    identity,
-    range: { start: startNode.start, end: endNode.end },
+    reference: {
+      target,
+      identity,
+      range: { start: startNode.start, end: endNode.end },
+    },
+    identityRange: { start: identityNode.start, end: identityNode.end },
   }
 }
 

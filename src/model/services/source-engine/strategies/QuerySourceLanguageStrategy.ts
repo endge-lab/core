@@ -8,7 +8,7 @@ import type {
 
 import { compileQuerySource } from '@/model/services/source-engine/compilers/query-source-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
-import { resolveTypedSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
+import { resolveTypedSourceDocumentReference, typedSourceTypeReferenceHighlights } from '@/model/services/source-engine/source-document-reference'
 import { QUERY_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/query.default.source'
 import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/model/services/source-engine/value-expression-language'
 import { validateTypeExpressionUsage, validateTypeSourceExpressionUsage } from '@/model/services/compiler/type/type-program-validation'
@@ -98,6 +98,10 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
       },
       properties: [{ property: 'profile', parentProperty: 'auth', target: 'auth-profile' }],
     })
+  }
+
+  public semanticHighlights(context: SourceLanguageContext) {
+    return typedSourceTypeReferenceHighlights(context)
   }
 }
 

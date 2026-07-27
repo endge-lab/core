@@ -8,6 +8,7 @@ import type {
 
 import { compileTypeSource } from '@/model/services/source-engine/compilers/type-source-compile'
 import { collectTypeDefinitionReferences, validateTypeDefinitionReferences } from '@/model/services/compiler/type/type-program-validation'
+import { typeReferenceHighlights } from '@/model/services/source-engine/source-document-reference'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
 import { TYPE_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/type.default.source'
 import { collectTypeSourceReferences, normalizeTypeSourceReferences, resolveTypeSourceReference } from '@/model/services/source-engine/type-source-references'
@@ -79,14 +80,7 @@ export class TypeSourceLanguageStrategy implements SourceLanguageStrategy {
   }
 
   public semanticHighlights(context: SourceLanguageContext) {
-    const known = new Set((context.typeSymbols ?? []).map(item => item.identity))
-    if (!context.typeSymbols) return []
-    return collectTypeSourceReferences(context.source).map(reference => ({
-      kind: 'type-reference' as const,
-      status: known.has(reference.identity) ? 'resolved' as const : 'unresolved' as const,
-      identity: reference.identity,
-      range: reference.range,
-    }))
+    return typeReferenceHighlights(context, collectTypeSourceReferences(context.source))
   }
 }
 

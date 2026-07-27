@@ -286,13 +286,16 @@ describe('type source compiler', () => {
 
   it('returns resolved and unresolved semantic type highlights', () => {
     const strategy = new TypeSourceLanguageStrategy()
-    const source = `defineType({ known: field(String), missing: field(MissingType) })`
+    const source = `defineType({ known: field(Flight), primitive: field(String), missing: field(MissingType) })`
 
     expect(strategy.semanticHighlights({
       source,
-      typeSymbols: [{ identity: 'String', category: 'primitive' }],
+      typeSymbols: [
+        { identity: 'Flight', category: 'user' },
+        { identity: 'String', category: 'primitive' },
+      ],
     })).toEqual([
-      expect.objectContaining({ identity: 'String', status: 'resolved' }),
+      expect.objectContaining({ identity: 'Flight', status: 'resolved' }),
       expect.objectContaining({ identity: 'MissingType', status: 'unresolved' }),
     ])
   })

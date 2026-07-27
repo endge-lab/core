@@ -8,7 +8,7 @@ import type {
 
 import { compileDataViewSource } from '@/model/services/source-engine/compilers/data-view-source-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
-import { resolveTypedSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
+import { resolveTypedSourceDocumentReference, typedSourceTypeReferenceHighlights } from '@/model/services/source-engine/source-document-reference'
 import { DATA_VIEW_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/data-view.default.source'
 import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/model/services/source-engine/value-expression-language'
 
@@ -66,6 +66,10 @@ export class DataViewSourceLanguageStrategy implements SourceLanguageStrategy {
         dataView: 'data-view',
       },
     })
+  }
+
+  public semanticHighlights(context: SourceLanguageContext) {
+    return typedSourceTypeReferenceHighlights(context)
   }
 }
 

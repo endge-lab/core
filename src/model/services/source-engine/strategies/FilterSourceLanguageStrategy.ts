@@ -8,7 +8,7 @@ import type {
 
 import { compileFilterSource } from '@/model/services/source-engine/compilers/filter-source-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
-import { resolveTypedSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
+import { resolveTypedSourceDocumentReference, typedSourceTypeReferenceHighlights } from '@/model/services/source-engine/source-document-reference'
 import { FILTER_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/filter.default.source'
 import { validateTypeExpressionUsage } from '@/model/services/compiler/type/type-program-validation'
 
@@ -77,6 +77,10 @@ export class FilterSourceLanguageStrategy implements SourceLanguageStrategy {
         vocab: 'vocabs',
       },
     })
+  }
+
+  public semanticHighlights(context: SourceLanguageContext) {
+    return typedSourceTypeReferenceHighlights(context)
   }
 }
 

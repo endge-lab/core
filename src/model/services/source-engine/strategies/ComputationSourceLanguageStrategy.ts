@@ -8,7 +8,7 @@ import type {
 
 import { compileComputation } from '@/model/services/compiler/computation/computation-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
-import { resolveTypedSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
+import { resolveTypedSourceDocumentReference, typedSourceTypeReferenceHighlights } from '@/model/services/source-engine/source-document-reference'
 import { COMPUTATION_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/computation.default.source'
 import {
   VALUE_EXPRESSION_COMPLETIONS,
@@ -59,5 +59,9 @@ export class ComputationSourceLanguageStrategy implements SourceLanguageStrategy
         computation: 'computation',
       },
     })
+  }
+
+  public semanticHighlights(context: SourceLanguageContext) {
+    return typedSourceTypeReferenceHighlights(context)
   }
 }

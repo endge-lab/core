@@ -25,6 +25,11 @@ export interface EndgePayloadProviderOptions {
   secret: string
 }
 
+export interface EndgeUIBootOptions {
+  /** Host-local fallback order when the configured adapter implementation is unavailable. */
+  adapterFallbackIds?: readonly string[]
+}
+
 export interface EndgeBootContext {
   /**
    * Источник получения доменных данных
@@ -43,6 +48,9 @@ export interface EndgeBootContext {
    * Runtime/env vars, которые нужны ядру.
    */
   vars: Record<string, unknown>
+
+  /** Host-local UI policy; it does not mutate persisted Workspace configuration. */
+  ui?: EndgeUIBootOptions
 
   /**
    * Для plain provider.

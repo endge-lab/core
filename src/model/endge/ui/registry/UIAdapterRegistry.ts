@@ -36,6 +36,24 @@ export class UIAdapterRegistry {
     return (adapter as UIRenderAdapter<TImplementation> | undefined) ?? null
   }
 
+  /** Возвращает configured adapter либо первый зарегистрированный fallback в заданном порядке. */
+  public resolveAvailable<TImplementation = unknown>(
+    preferredId: string | null | undefined,
+    fallbackIds: readonly string[] = [],
+  ): UIRenderAdapter<TImplementation> | null {
+    const preferred = this.get<TImplementation>(preferredId)
+    if (preferred)
+      return preferred
+
+    for (const fallbackId of fallbackIds) {
+      const fallback = this.get<TImplementation>(fallbackId)
+      if (fallback)
+        return fallback
+    }
+
+    return null
+  }
+
   /** Возвращает adapter и проверяет его protocol, renderer и обязательные renderer keys. */
   public require<TImplementation = unknown>(requirement: UIRenderAdapterRequirement): UIRenderAdapter<TImplementation> {
     const id = String(requirement.id ?? '').trim()

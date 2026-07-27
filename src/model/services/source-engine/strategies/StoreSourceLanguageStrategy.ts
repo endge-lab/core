@@ -2,7 +2,7 @@ import type { SourceKind, SourceLanguageCompletion, SourceLanguageContext, Sourc
 
 import { compileStoreSource } from '@/model/services/source-engine/compilers/store-source-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
-import { resolveTypedSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
+import { resolveTypedSourceDocumentReference, typedSourceTypeReferenceHighlights } from '@/model/services/source-engine/source-document-reference'
 import { STORE_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/store.default.source'
 import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/model/services/source-engine/value-expression-language'
 
@@ -74,5 +74,9 @@ export class StoreSourceLanguageStrategy implements SourceLanguageStrategy {
         dataView: 'data-view',
       },
     })
+  }
+
+  public semanticHighlights(context: SourceLanguageContext) {
+    return typedSourceTypeReferenceHighlights(context)
   }
 }
