@@ -345,6 +345,7 @@ export class EndgeContext extends EndgeModule {
       requested: sessionTenant ?? explicitTenant ?? this._currentTenant,
       required: sessionTenant != null || explicitTenant != null,
       available: tenants,
+      fallbackWhenEmpty: DEFAULT_SCOPE.tenantId,
     })
     const projectIdentity = resolveAvailableIdentity({
       label: 'Project',
@@ -629,6 +630,7 @@ function resolveAvailableIdentity(input: {
   requested: string | null | undefined
   required: boolean
   available: readonly string[]
+  fallbackWhenEmpty?: string
 }): string {
   const available = normalizeIdentityList(input.available)
   const requested = normalizeOptionalText(input.requested)
@@ -639,9 +641,14 @@ function resolveAvailableIdentity(input: {
     throw new Error(`[EndgeContext] ${input.label} "${requested}" was not found in loaded Domain`)
 
   const fallback = available[0]
-  if (!fallback)
-    throw new Error(`[EndgeContext] Cannot resolve ${input.label}: no available entities were loaded`)
-  return fallback
+  if (fallback)
+    return fallback
+
+  const fallbackWhenEmpty = normalizeOptionalText(input.fallbackWhenEmpty)
+  if (fallbackWhenEmpty)
+    return fallbackWhenEmpty
+
+  throw new Error(`[EndgeContext] Cannot resolve ${input.label}: no available entities were loaded`)
 }
 
 function readLegacyThemePreference(): string | null {

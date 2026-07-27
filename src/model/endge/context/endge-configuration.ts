@@ -38,7 +38,7 @@ export class EndgeConfigurationModule extends EndgeModule {
     })
     const project = this._resolveEntity('Project', execution.projectIdentity, identity => Endge.domain.getProject(identity))
     const environment = this._resolveEntity('Environment', execution.environmentIdentity, identity => Endge.domain.getEnvironment(identity))
-    const tenant = this._resolveEntity('Tenant', execution.tenantIdentity, identity => Endge.domain.getTenant(identity))
+    const tenant = Endge.domain.getTenant(execution.tenantIdentity)
 
     if (project && environment && project.allowedEnvironmentIds.length > 0 && !project.allowedEnvironmentIds.includes(Number(environment.id))) {
       throw new Error(`[EndgeConfiguration] Environment "${environment.identity}" is not allowed for Project "${project.identity}"`)
