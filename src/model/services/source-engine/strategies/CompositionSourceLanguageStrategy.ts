@@ -21,10 +21,10 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
     extension: '.endge-composition.ts',
     keywords: [
       'component', 'composition', 'control', 'data', 'defineComposition', 'definePreviewProps', 'defineProps', 'filter', 'filterView', 'fromData', 'fromFilter', 'fromOutput', 'fromStore', 'manual', 'mock', 'onChange',
-      'onMount', 'onSuccess', 'output', 'policy', 'query', 'metadata', 'resources', 'scope', 'startup', 'stream', 'style', 'vocab', ...VALUE_EXPRESSION_FUNCTION_NAMES,
+      'onMount', 'onSuccess', 'onEvent', 'event', 'action', 'update', 'output', 'policy', 'query', 'metadata', 'resources', 'scope', 'startup', 'stream', 'style', 'vocab', ...VALUE_EXPRESSION_FUNCTION_NAMES,
     ],
     functions: [
-      'activateOn', 'batch', 'component', 'contextual', 'controls', 'debounce', 'dispatchTo', 'fields', 'fromRuntime', 'fromScope', 'injected', 'isolated', 'persist', 'policy', 'run', 'select', 'slot', 'store', 'storeTo', 'vocab', 'withData', 'withProps', ...VALUE_EXPRESSION_METHOD_NAMES,
+      'activateOn', 'applyUpdate', 'batch', 'component', 'contextual', 'controls', 'debounce', 'dispatchTo', 'executeAction', 'fields', 'fromRuntime', 'fromScope', 'injected', 'isolated', 'mutate', 'persist', 'policy', 'run', 'select', 'slot', 'store', 'storeTo', 'vocab', 'withData', 'withProps', ...VALUE_EXPRESSION_METHOD_NAMES,
     ],
     properties: ['activateOn', 'data', 'hooks', 'key', 'metadata', 'outputs', 'previewProps', 'props', 'resources', 'runtimes'],
   })
@@ -101,7 +101,8 @@ const COMPOSITION_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'query', kind: 'function', insertText: `query('identity').withProps({})`, detail: 'Query runtime' },
   { label: 'stream', kind: 'function', insertText: `stream('identity').batch({ maxItems: 50, maxWaitMs: 16 }).dispatchTo(data('firstStore'), data('secondStore'))`, detail: 'Stream runtime routed to Store updates' },
   { label: 'batch', kind: 'function', insertText: `.batch({ maxItems: 50, maxWaitMs: 16 })`, detail: 'Composition-owned Stream batching' },
-  { label: 'dispatchTo', kind: 'function', insertText: `.dispatchTo(data('store'))`, detail: 'Dispatch normalized events to one or more Store update handlers' },
+  { label: 'dispatchTo', kind: 'function', insertText: `.dispatchTo(data('store'))`, detail: 'Dispatch Stream or Component events to Store update handlers' },
+  { label: 'onEvent', kind: 'function', insertText: `onEvent('componentRuntime', 'edited').applyUpdate(data('store'), update('update-identity'))`, detail: 'Route one Component Event explicitly' },
   { label: 'component', kind: 'function', insertText: `component('identity').withProps({})`, detail: 'Component runtime' },
   { label: 'composition', kind: 'function', insertText: `composition('identity')`, detail: 'Nested Composition runtime' },
   { label: 'withData', kind: 'function', insertText: `.withData({

@@ -71,6 +71,37 @@ export interface RComponentSFC_IR_LocalBinding {
 export interface RComponentSFC_IR_Template {
   /** Корневые узлы нормализованного template. */
   roots: RComponentSFC_IR_Node[]
+
+  /** Явные renderer-neutral варианты корневого представления. */
+  variants?: ComponentSFCVariant[]
+}
+
+/** Один именованный вариант представления внутри template или Editable. */
+export interface ComponentSFCVariant {
+  name: string
+  nodeId: string
+}
+
+/** Декларативный триггер входа в edit-вариант. */
+export interface ComponentSFCEditTrigger {
+  event: string
+  key?: string[]
+  button?: number
+  stop?: boolean
+  prevent?: boolean
+  self?: boolean
+}
+
+/** Renderer-neutral поведение редактируемого template-узла. */
+export interface ComponentSFCEditableBehavior {
+  value: RComponentSFC_IR_Value
+  triggers: RComponentSFC_IR_Value
+}
+
+/** Нормализованное публичное событие завершённого редактирования. */
+export interface ComponentSFCEditedEventPayload<T = unknown> {
+  value: T
+  previousValue: T
 }
 
 /** IR узел template после нормализации в Endge primitives. */
@@ -102,6 +133,8 @@ export type RComponentSFC_IR_Tag
     | 'ColumnMenu'
     | 'MenuItem'
     | 'MenuSeparator'
+    | 'Editable'
+    | 'Variant'
 
 /** IR element-узел, который renderer-слои могут читать без знания исходного синтаксиса. */
 export interface RComponentSFC_IR_ElementNode {
@@ -125,6 +158,9 @@ export interface RComponentSFC_IR_ElementNode {
 
   /** Local renderer Event reactions declared through `@event` attributes. */
   events?: RComponentSFC_IR_EventBinding[]
+
+  /** Compiler-owned edit behavior; editable/edit-on не передаются visual adapter-у как props. */
+  editable?: ComponentSFCEditableBehavior
 
   /** Дочерние IR-узлы. */
   children: RComponentSFC_IR_Node[]

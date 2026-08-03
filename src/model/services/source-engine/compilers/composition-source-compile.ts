@@ -21,6 +21,8 @@ import type {
 import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
 import type { SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 import type { VocabLoadPolicy } from '@/domain/types/runtime/vocab-cache.types'
+import type { ComponentSFCEventInputValue } from '@/domain/types/component/sfc'
+import type { UpdateMutationStrategy } from '@/domain/types/source/update-source.types'
 
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
@@ -128,7 +130,7 @@ export function compileCompositionSource(source: string, sourceVersion = 1): Com
     scopes[0].children = scopes.filter(item => item.parentPath === 'scope_default').map(item => item.path)
     const runtimeNames = new Set(runtimes.map(item => item.name))
     const hooks = hooksNode
-      ? readHooks(hooksNode, runtimeNames, new Set(props.map(prop => prop.key)), runtimes, diagnostics)
+      ? readHooks(hooksNode, runtimeNames, new Set(props.map(prop => prop.key)), runtimes, data, diagnostics)
       : []
     const scopeNames = new Set(scopes.filter(item => item.path !== 'scope_default').map(item => item.path))
     const outputs = outputsNode ? readOutputs(outputsNode, runtimeNames, scopeNames, diagnostics) : []
@@ -202,7 +204,10 @@ export function buildRuntimeGraph(document: CompositionSourceDocument): Composit
       targetPath,
     }))
   )))
-  return { inputs, dataInputs, updates, successes, publications, mounts }
+  const events = document.hooks.flatMap((hook, index) => hook.kind === 'event'
+    ? [{ ...hook, id: `hook:${index}:${hook.runtime}:${hook.event}:${hook.effect.kind}` }]
+    : [])
+  return { inputs, dataInputs, updates, successes, publications, mounts, events }
 }
 
 function findDefineComposition(ast: t.File): t.CallExpression | null {
@@ -839,8 +844,8 @@ function readRuntime(
       continue
     }
     if (modifier.name === 'dispatchTo') {
-      if (kind !== 'stream') {
-        diagnostics.push(diagnostic('error', 'composition-dispatch-to-runtime-kind', '.dispatchTo(...) поддерживается только Stream runtime.', `runtimes.${name}.dispatchTo`, modifier.call))
+      if (kind !== 'stream' && kind !== 'component') {
+        diagnostics.push(diagnostic('error', 'composition-dispatch-to-runtime-kind', '.dispatchTo(...) поддерживается Stream и Component runtime.', `runtimes.${name}.dispatchTo`, modifier.call))
         continue
       }
       const resolvedTargets = modifier.call.arguments.flatMap((argument) => {
@@ -1095,6 +1100,7 @@ function readHooks(
   runtimeNames: Set<string>,
   propNames: Set<string>,
   runtimes: CompositionRuntimeDescriptor[],
+  data: CompositionDataDescriptor[],
   diagnostics: DiagnosticDraft[],
 ): CompositionHook[] {
   const hooks: CompositionHook[] = []
@@ -1103,12 +1109,17 @@ function readHooks(
       return
     const chain = memberChain(element)
     if (!chain || !t.isIdentifier(chain.base.callee)) {
-      diagnostics.push(diagnostic('error', 'composition-hook-shape', 'Hook должен начинаться с onMount(), onChange(path) или onSuccess(runtime).', `hooks.${index}`, element))
+      diagnostics.push(diagnostic('error', 'composition-hook-shape', 'Hook должен начинаться с onMount(), onChange(path), onSuccess(runtime) или onEvent(runtime, event).', `hooks.${index}`, element))
       return
     }
     const root = chain.base.callee.name
-    if (root !== 'onMount' && root !== 'onChange' && root !== 'onSuccess') {
+    if (root !== 'onMount' && root !== 'onChange' && root !== 'onSuccess' && root !== 'onEvent') {
       diagnostics.push(diagnostic('error', 'composition-hook-kind', `Hook "${root}" не поддерживается.`, `hooks.${index}`, chain.base))
+      return
+    }
+    if (root === 'onEvent') {
+      const hook = readComponentEventHook(chain, runtimes, data, diagnostics, `hooks.${index}`)
+      if (hook) hooks.push(hook)
       return
     }
     let target = ''
@@ -1166,6 +1177,148 @@ function readHooks(
       hooks.push({ kind: 'change', source, target, debounceMs })
   })
   return hooks
+}
+
+function readComponentEventHook(
+  chain: ReturnType<typeof memberChain> & {},
+  runtimes: CompositionRuntimeDescriptor[],
+  data: CompositionDataDescriptor[],
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+): Extract<CompositionHook, { kind: 'event' }> | null {
+  const runtime = readStringArgument(chain.base, 0) ?? ''
+  const event = readStringArgument(chain.base, 1) ?? ''
+  const runtimeDescriptor = runtimes.find(item => item.name === runtime)
+  if (chain.base.arguments.length !== 2 || !runtime || !event) {
+    diagnostics.push(diagnostic('error', 'composition-event-source', 'onEvent требует static runtime alias и Event name.', sourcePath, chain.base))
+    return null
+  }
+  if (runtimeDescriptor?.kind !== 'component') {
+    diagnostics.push(diagnostic('error', 'composition-event-runtime-kind', `onEvent source "${runtime}" должен быть Component runtime.`, sourcePath, chain.base))
+    return null
+  }
+  if (chain.modifiers.length !== 1) {
+    diagnostics.push(diagnostic('error', 'composition-event-effect-count', 'onEvent требует ровно один terminal effect.', sourcePath, chain.base))
+    return null
+  }
+  const terminal = chain.modifiers[0]!
+  const storeData = new Map(data.filter(item => item.kind === 'store').map(item => [item.name, item.path ?? item.name]))
+  if (terminal.name === 'applyUpdate') {
+    const dataAlias = readDataTarget(terminal.call.arguments[0])
+    const resolvedData = dataAlias ? storeData.get(dataAlias) : undefined
+    const update = readIdentityCall(terminal.call.arguments[1], 'update')
+    const inputNode = terminal.call.arguments[2]
+    const input = inputNode && t.isExpression(inputNode) ? readCompositionEventInput(inputNode, diagnostics, sourcePath) : undefined
+    if (!resolvedData || !update || terminal.call.arguments.length > 3 || (inputNode && !input)) {
+      diagnostics.push(diagnostic('error', 'composition-event-apply-update', 'applyUpdate требует data(store), update(identity) и optional Event input mapping.', sourcePath, terminal.call))
+      return null
+    }
+    return { kind: 'event', runtime, event, effect: { kind: 'apply-update', data: resolvedData, update, ...(input ? { input } : {}) } }
+  }
+  if (terminal.name === 'executeAction') {
+    const action = readIdentityCall(terminal.call.arguments[0], 'action')
+    const inputNode = terminal.call.arguments[1]
+    const input = inputNode && t.isExpression(inputNode) ? readCompositionEventInput(inputNode, diagnostics, sourcePath) : undefined
+    if (!action || terminal.call.arguments.length > 2 || (inputNode && !input)) {
+      diagnostics.push(diagnostic('error', 'composition-event-execute-action', 'executeAction требует action(identity) и optional Event input mapping.', sourcePath, terminal.call))
+      return null
+    }
+    return { kind: 'event', runtime, event, effect: { kind: 'execute-action', action, ...(input ? { input } : {}) } }
+  }
+  if (terminal.name === 'mutate') {
+    const dataAlias = readDataTarget(terminal.call.arguments[0])
+    const resolvedData = dataAlias ? storeData.get(dataAlias) : undefined
+    const definition = terminal.call.arguments[1]
+    if (!resolvedData || terminal.call.arguments.length !== 2 || !definition || !t.isObjectExpression(definition)) {
+      diagnostics.push(diagnostic('error', 'composition-event-mutate', 'mutate требует data(store) и mutation object.', sourcePath, terminal.call))
+      return null
+    }
+    const strategy = readStringObjectProperty(definition, 'strategy') as UpdateMutationStrategy
+    const path = readStringObjectProperty(definition, 'path') ?? ''
+    if (!['set', 'merge', 'replace', 'append', 'remove'].includes(strategy) || !path) {
+      diagnostics.push(diagnostic('error', 'composition-event-mutate-shape', 'mutation требует valid strategy и static path.', sourcePath, definition))
+      return null
+    }
+    const valueNode = propertyValue(definition, 'value')
+    const value = valueNode ? readCompositionEventInput(valueNode, diagnostics, sourcePath) : undefined
+    const varsNode = propertyValue(definition, 'vars')
+    const vars: Record<string, ComponentSFCEventInputValue> = {}
+    if (varsNode) {
+      if (!t.isObjectExpression(varsNode)) {
+        diagnostics.push(diagnostic('error', 'composition-event-mutate-vars', 'mutation.vars должен быть object literal Event mappings.', sourcePath, varsNode))
+        return null
+      }
+      for (const property of varsNode.properties) {
+        const key = t.isObjectProperty(property) && !property.computed ? propertyName(property.key) : null
+        const mapped = t.isObjectProperty(property) && t.isExpression(property.value)
+          ? readCompositionEventInput(property.value, diagnostics, sourcePath)
+          : null
+        if (!key || !mapped) return null
+        vars[key] = mapped
+      }
+    }
+    if (valueNode && !value) return null
+    return {
+      kind: 'event', runtime, event,
+      effect: {
+        kind: 'mutate-store',
+        data: resolvedData,
+        mutation: { strategy, path, ...(value ? { value } : {}), ...(Object.keys(vars).length ? { vars } : {}) },
+      },
+    }
+  }
+  diagnostics.push(diagnostic('error', 'composition-event-effect', `onEvent effect ".${terminal.name}" не поддерживается.`, sourcePath, terminal.call))
+  return null
+}
+
+function readCompositionEventInput(
+  node: t.Expression,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+): ComponentSFCEventInputValue | null {
+  if (t.isCallExpression(node) && t.isIdentifier(node.callee, { name: 'event' })) {
+    if (node.arguments.length === 0) return { kind: 'event', path: null }
+    const path = readStringArgument(node, 0)
+    if (node.arguments.length === 1 && path) return { kind: 'event', path }
+  }
+  if (t.isStringLiteral(node) || t.isNumericLiteral(node) || t.isBooleanLiteral(node)) return { kind: 'literal', value: node.value }
+  if (t.isNullLiteral(node)) return { kind: 'literal', value: null }
+  if (t.isUnaryExpression(node, { operator: '-' }) && t.isNumericLiteral(node.argument)) return { kind: 'literal', value: -node.argument.value }
+  if (t.isArrayExpression(node)) {
+    const items: ComponentSFCEventInputValue[] = []
+    for (const item of node.elements) {
+      if (!item || !t.isExpression(item)) return null
+      const value = readCompositionEventInput(item, diagnostics, sourcePath)
+      if (!value) return null
+      items.push(value)
+    }
+    return { kind: 'array', items }
+  }
+  if (t.isObjectExpression(node)) {
+    const entries: Array<{ key: string, value: ComponentSFCEventInputValue }> = []
+    for (const property of node.properties) {
+      const key = t.isObjectProperty(property) && !property.computed ? propertyName(property.key) : null
+      const value = t.isObjectProperty(property) && t.isExpression(property.value)
+        ? readCompositionEventInput(property.value, diagnostics, sourcePath)
+        : null
+      if (!key || !value) return null
+      entries.push({ key, value })
+    }
+    return { kind: 'object', entries }
+  }
+  diagnostics.push(diagnostic('error', 'composition-event-input', 'Event input поддерживает event(path), literals, arrays и objects.', sourcePath, node))
+  return null
+}
+
+function readIdentityCall(node: any, name: string): string | null {
+  return node && t.isCallExpression(node) && t.isIdentifier(node.callee, { name })
+    ? readStringArgument(node, 0)
+    : null
+}
+
+function readStringObjectProperty(node: t.ObjectExpression, name: string): string | null {
+  const value = propertyValue(node, name)
+  return value && t.isStringLiteral(value) ? value.value.trim() : null
 }
 
 /** Разбирает поддерживаемый источник onChange без расширения hooks до произвольных выражений. */

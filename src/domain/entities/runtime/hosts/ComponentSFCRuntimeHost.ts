@@ -22,6 +22,7 @@ import type {
   ComponentSFCEventOccurrence,
   ComponentSFCEventPort,
   ComponentSFCEventRuntimeSource,
+  ComponentSFCEditedEventPayload,
 } from '@/domain/types/component/sfc'
 import type {
   RuntimeArtifactReader,
@@ -61,11 +62,15 @@ function createDefaultSFCContext(target: RComponentRenderTarget | null): Runtime
   }
 }
 
-function evaluateEventInput(value: ComponentSFCEventInputValue, payload: unknown): unknown {
+function evaluateEventInput(value: ComponentSFCEventInputValue, payload: unknown, scope: Record<string, unknown> = {}): unknown {
   if (value.kind === 'event') return value.path == null ? payload : readPath(payload, value.path)
+  if (value.kind === 'scope') return readPath(scope, value.path)
   if (value.kind === 'literal') return value.value
-  if (value.kind === 'array') return value.items.map(item => evaluateEventInput(item, payload))
-  return Object.fromEntries(Object.entries(value.entries).map(([key, item]) => [key, evaluateEventInput(item, payload)]))
+  if (value.kind === 'array') return value.items.map(item => evaluateEventInput(item, payload, scope))
+  return Object.fromEntries(value.entries.map(entry => [
+    typeof entry.key === 'string' ? entry.key : String(evaluateEventInput(entry.key, payload, scope)),
+    evaluateEventInput(entry.value, payload, scope),
+  ]))
 }
 
 function readPath(value: unknown, path: string): unknown {
@@ -81,6 +86,13 @@ function hashSource(source: string): string {
     hash = Math.imul(hash, 16777619)
   }
   return (hash >>> 0).toString(36)
+}
+
+export interface ComponentSFCEditSession {
+  key: string
+  originalValue: unknown
+  draftValue: unknown
+  baseVariant: string
 }
 
 /**
@@ -101,6 +113,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   private _styleLease: EndgeStyleLease | null = null
   private readonly _eventPortListeners = new Map<string, Set<(occurrence: ComponentSFCEventOccurrence) => void>>()
   private readonly _vocabDisposers = new Map<string, VoidFunction>()
+  private _editSession: ComponentSFCEditSession | null = null
 
   constructor(input: {
     id: string
@@ -336,6 +349,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     emitOwn: (name: string, payload: unknown, trace: string[], depth: number) => Promise<void>,
     trace: string[] = [],
     depth = 0,
+    scope: Record<string, unknown> = {},
   ): Promise<void> {
     if (!port.action) return
     const traceKey = `${ownerIdentity}.${port.name}`
@@ -345,9 +359,18 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     }
     const nextTrace = [...trace, traceKey]
     try {
+      if (port.action.kind === 'emit') {
+        await emitOwn(
+          port.action.event,
+          port.action.payload ? evaluateEventInput(port.action.payload, payload, scope) : payload,
+          nextTrace,
+          depth + 1,
+        )
+        return
+      }
       if (port.action.kind === 'action') {
         await this._executeEventActionEffect(port.action.identity, port.action.input
-          ? evaluateEventInput(port.action.input, payload)
+          ? evaluateEventInput(port.action.input, payload, scope)
           : payload, source, ownerIdentity, port.name)
         return
       }
@@ -403,6 +426,52 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     this.emit('event:port', occurrence)
     this.emit(`event:port:${name}`, occurrence)
     for (const listener of this._eventPortListeners.get(name) ?? []) listener(occurrence)
+  }
+
+  /** Возвращает активную host-owned edit-сессию конкретного renderer consumer. */
+  public getEditSession(key: string): Readonly<ComponentSFCEditSession> | null {
+    return this._editSession?.key === key ? this._editSession : null
+  }
+
+  /** Открывает единственную edit-сессию runtime; предыдущая отменяется без Event. */
+  public beginEditSession(key: string, originalValue: unknown, baseVariant = 'default'): ComponentSFCEditSession {
+    const normalizedKey = String(key ?? '').trim()
+    if (!normalizedKey) throw new Error('Editable consumer key is required.')
+    this._editSession = {
+      key: normalizedKey,
+      originalValue: cloneEditValue(originalValue),
+      draftValue: cloneEditValue(originalValue),
+      baseVariant: String(baseVariant ?? '').trim() || 'default',
+    }
+    this.emit('resource:dirty', { kind: 'editable', action: 'begin', key: normalizedKey })
+    return this._editSession
+  }
+
+  /** Обновляет renderer-owned draft активной edit-сессии. */
+  public updateEditDraft(key: string, value: unknown): void {
+    if (this._editSession?.key !== key) return
+    this._editSession.draftValue = cloneEditValue(value)
+  }
+
+  /** Завершает edit-сессию и возвращает нормализованный semantic payload. */
+  public commitEditSession(key: string, value?: unknown): ComponentSFCEditedEventPayload | null {
+    const session = this._editSession
+    if (!session || session.key !== key) return null
+    const payload = {
+      value: cloneEditValue(arguments.length >= 2 ? value : session.draftValue),
+      previousValue: cloneEditValue(session.originalValue),
+    }
+    this._editSession = null
+    this.emit('resource:dirty', { kind: 'editable', action: 'commit', key })
+    return payload
+  }
+
+  /** Отменяет edit-сессию без публикации edited. */
+  public cancelEditSession(key?: string): void {
+    if (!this._editSession || (key && this._editSession.key !== key)) return
+    const sessionKey = this._editSession.key
+    this._editSession = null
+    this.emit('resource:dirty', { kind: 'editable', action: 'cancel', key: sessionKey })
   }
 
   /** Returns one host-owned computation resource isolated by renderer consumer scope. */
@@ -486,6 +555,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     this._styleLease?.release()
     this._styleLease = null
     this._eventPortListeners.clear()
+    this._editSession = null
     super.destroy()
   }
 
@@ -976,4 +1046,10 @@ function normalizeTarget(raw: unknown): RComponentRenderTarget | null {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function cloneEditValue<T>(value: T): T {
+  if (value == null || typeof value !== 'object') return value
+  if (typeof structuredClone === 'function') return structuredClone(value)
+  return JSON.parse(JSON.stringify(value)) as T
 }

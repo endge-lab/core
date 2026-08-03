@@ -211,6 +211,28 @@ const ports = definePorts({ emits: { opened: event<{ id: string }>() } })
     })])
     host.destroy()
   })
+
+  it('owns one edit session and cancels the previous consumer without publishing', () => {
+    const source = '<template><Text value="A" editable /></template>'
+    const artifact = createSFCArtifact(compileComponentSFC(source))
+    const model = RComponentSFC.fromPlain({ id: 2, identity: 'editable-host', name: 'Editable host', source })
+    const host = ComponentSFCRuntimeHost.createRuntime({
+      id: 'editable-runtime',
+      model,
+      artifactReader: { getArtifact: <TPayload>() => artifact as unknown as ProgramArtifact<TPayload> },
+    })
+
+    host.beginEditSession('row:1/status', 'RUN')
+    host.updateEditDraft('row:1/status', 'STOP')
+    host.beginEditSession('row:2/status', 'RUN')
+
+    expect(host.getEditSession('row:1/status')).toBeNull()
+    expect(host.getEditSession('row:2/status')).toMatchObject({ originalValue: 'RUN', draftValue: 'RUN' })
+    host.updateEditDraft('row:2/status', 'DONE')
+    expect(host.commitEditSession('row:2/status')).toEqual({ value: 'DONE', previousValue: 'RUN' })
+    expect(host.getEditSession('row:2/status')).toBeNull()
+    host.destroy()
+  })
 })
 
 function createSFCArtifact(

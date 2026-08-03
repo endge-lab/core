@@ -86,6 +86,9 @@ export interface ComponentSFCCompileOptions {
   /** Resolves the compiled public port manifest of a nested SFC component. */
   resolveComponentPortManifest?: (identity: string) => ComponentSFCPortManifest | null
 
+  /** Resolves explicit root variants of one nested custom component. */
+  resolveComponentVariants?: (identity: string) => string[] | null
+
   /** Resolves an external Type Registry definition used by a named SFC contract. */
   resolveTypeDefinition?: (identity: string) => TypeSourceDefinition | null
 }
@@ -135,7 +138,27 @@ export function compileComponentSFC(
     resolveComponentTag: options.resolveComponentTag,
     hasComponentIdentity: options.hasComponentIdentity,
     resolveComponentPortManifest: options.resolveComponentPortManifest,
+    resolveComponentVariants: options.resolveComponentVariants,
   })
+  for (const eventName of templateResult.emittedEvents) {
+    if (portResult.manifest.emits.events.some(event => event.name === eventName))
+      continue
+    if (eventName === 'edited') {
+      portResult.manifest.emits.events.push({
+        kind: 'event',
+        role: 'emits',
+        name: 'edited',
+        payloadType: 'unknown',
+      })
+      continue
+    }
+    templateResult.diagnostics.push({
+      severity: 'error',
+      code: 'sfc-template-emit-port-missing',
+      message: `Event "${eventName}" должен быть объявлен в definePorts.emits.`,
+      sourcePath: `template.emit.${eventName}`,
+    })
+  }
   const forwardResult = resolveComponentSFCPortForwards(
     portResult.manifest,
     templateResult.template,

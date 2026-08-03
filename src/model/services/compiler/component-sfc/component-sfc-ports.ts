@@ -52,12 +52,36 @@ export function compileComponentSFCLocalEventAction(
     diagnostics.push({
       severity: 'error',
       code: 'sfc-template-event-action-syntax',
-      message: `@${eventName} должен содержать action({...}) или typescript({...}).`,
+      message: `@${eventName} должен содержать emit(...), action({...}) или typescript({...}).`,
       sourcePath: `template.on.${eventName}`,
       start: sourceOffset,
       end: sourceOffset + source.length,
     })
     return null
+  }
+  if (isCall(expression, 'emit')) {
+    const emittedEvent = expression.arguments?.length >= 1
+      ? readLiteralString(expression.arguments[0])
+      : null
+    const payloadNode = expression.arguments?.[1]
+    if (!emittedEvent || expression.arguments.length > 2) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'sfc-template-event-emit-shape',
+        message: 'emit() принимает static имя Event и optional payload.',
+        sourcePath: `template.on.${eventName}`,
+        start: sourceOffset,
+        end: sourceOffset + source.length,
+      })
+      return null
+    }
+    const script = {
+      content: source,
+      range: { start: sourceOffset, end: sourceOffset + source.length },
+    } as RComponentSFC_AST_Script
+    const payload = payloadNode ? parseEventInput(payloadNode, script, diagnostics) : undefined
+    if (payloadNode && !payload) return null
+    return { kind: 'emit', event: emittedEvent, ...(payload ? { payload } : {}) }
   }
   if (isCall(expression, 'action') && expression.arguments?.length === 1)
     expression = expression.arguments[0]
@@ -585,6 +609,8 @@ function parseEventAction(
 function parseEventInput(node: any, script: RComponentSFC_AST_Script, diagnostics: RComponentDiagnostic[]): ComponentSFCEventInputValue | null {
   const eventRead = parseEventRead(node)
   if (eventRead) return eventRead
+  const scopeRead = parseScopeRead(node)
+  if (scopeRead) return scopeRead
   if (node?.type === 'StringLiteral' || node?.type === 'NumericLiteral' || node?.type === 'BooleanLiteral')
     return { kind: 'literal', value: node.value }
   if (node?.type === 'NullLiteral') return { kind: 'literal', value: null }
@@ -600,17 +626,34 @@ function parseEventInput(node: any, script: RComponentSFC_AST_Script, diagnostic
     return { kind: 'array', items }
   }
   if (node?.type === 'ObjectExpression') {
-    const entries: Record<string, ComponentSFCEventInputValue> = {}
+    const entries: Array<{ key: string | ComponentSFCEventInputValue, value: ComponentSFCEventInputValue }> = []
     for (const property of node.properties ?? []) {
-      const key = property.type === 'ObjectProperty' && !property.computed ? readKey(property.key) : null
+      const staticKey = property.type === 'ObjectProperty' && !property.computed ? readKey(property.key) : null
+      const dynamicKey = property.type === 'ObjectProperty' && property.computed
+        ? parseEventInput(property.key, script, diagnostics)
+        : null
       const parsed = property.type === 'ObjectProperty' ? parseEventInput(property.value, script, diagnostics) : null
-      if (!key || !parsed) return null
-      entries[key] = parsed
+      if ((!staticKey && !dynamicKey) || !parsed) return null
+      entries.push({ key: staticKey ?? dynamicKey!, value: parsed })
     }
     return { kind: 'object', entries }
   }
-  diagnostics.push(makeDiagnostic('sfc-event-action-input', 'action.input поддерживает literals, arrays, objects и event(path).', node, script))
+  diagnostics.push(makeDiagnostic('sfc-event-action-input', 'Event payload поддерживает literals, arrays, objects, event(path) и lexical SFC scope.', node, script))
   return null
+}
+
+function parseScopeRead(node: any): { kind: 'scope', path: string } | null {
+  const parts: string[] = []
+  let current = node
+  while (current?.type === 'MemberExpression' || current?.type === 'OptionalMemberExpression') {
+    const key = current.computed ? readLiteralString(current.property) : readKey(current.property)
+    if (!key) return null
+    parts.unshift(key)
+    current = current.object
+  }
+  if (current?.type !== 'Identifier' || !current.name || current.name === 'event') return null
+  parts.unshift(current.name)
+  return { kind: 'scope', path: parts.join('.') }
 }
 
 function parseEventRead(node: any): { kind: 'event', path: string | null } | null {

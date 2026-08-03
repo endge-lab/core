@@ -115,6 +115,37 @@ const ports = definePorts({
     ]))
   })
 
+  it('accepts Core-owned Event payload types without hiding missing user types', () => {
+    Endge.domain.addComponentSFC(component(10, 'table-events', `<script setup lang="ts">
+const ports = definePorts({ forward: { from: 'table', ports: { emits: '*' } } })
+</script>
+<template><Table ref="table" :rows="[]" /></template>`))
+    Endge.domain.addComponentSFC(component(11, 'unknown-event', `<script setup lang="ts">
+const ports = definePorts({ emits: { changed: event<MissingUserEvent>() } })
+</script>
+<template><Text>Unknown</Text></template>`))
+
+    Endge.compiler.build({} as any)
+
+    const tableArtifact = Endge.program.getArtifact('component-sfc', 'table-events')
+    expect(tableArtifact?.status).toBe('valid')
+    expect(tableArtifact?.diagnostics).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'type-reference-missing' }),
+    ]))
+    expect(tableArtifact?.dependencies).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ entityType: 'type' }),
+    ]))
+
+    const unknownArtifact = Endge.program.getArtifact('component-sfc', 'unknown-event')
+    expect(unknownArtifact?.status).toBe('error')
+    expect(unknownArtifact?.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'type-reference-missing',
+        message: expect.stringContaining('MissingUserEvent'),
+      }),
+    ]))
+  })
+
   it('resolves forwarded child manifests independently from component compile order', () => {
     const parent = component(10, 'parent-public', `<script setup lang="ts">
 const ports = definePorts({

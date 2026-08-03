@@ -8,6 +8,8 @@ import type { SourceExpressionIR, SourceFieldDefinition } from '@/domain/types/s
 import type { FilterViewControlDefinition } from '@/domain/types/ui/filter-view.type'
 import type { EndgeMockReference } from '@/domain/types/mock'
 import type { I18nCompiledLocales } from '@/domain/types/i18n.types'
+import type { ComponentSFCEventInputValue } from '@/domain/types/component/sfc'
+import type { UpdateMutationStrategy } from '@/domain/types/source/update-source.types'
 
 export type CompositionRuntimeKind = 'filter' | 'query' | 'component' | 'composition' | 'stream' | 'filter-view'
 
@@ -141,6 +143,43 @@ export type CompositionHook
   = | { kind: 'mount', target: string }
     | { kind: 'change', source: CompositionChangeSource, target: string, debounceMs: number }
     | { kind: 'success', runtime: string, target: string }
+    | CompositionComponentEventHook
+
+export interface ComponentEventApplyUpdateEffect {
+  kind: 'apply-update'
+  data: string
+  update: string
+  input?: ComponentSFCEventInputValue
+}
+
+export interface ComponentEventStoreMutationEffect {
+  kind: 'mutate-store'
+  data: string
+  mutation: {
+    strategy: UpdateMutationStrategy
+    path: string
+    value?: ComponentSFCEventInputValue
+    vars?: Record<string, ComponentSFCEventInputValue>
+  }
+}
+
+export interface ComponentEventExecuteActionEffect {
+  kind: 'execute-action'
+  action: string
+  input?: ComponentSFCEventInputValue
+}
+
+export type CompositionComponentEventEffect
+  = ComponentEventApplyUpdateEffect
+    | ComponentEventStoreMutationEffect
+    | ComponentEventExecuteActionEffect
+
+export interface CompositionComponentEventHook {
+  kind: 'event'
+  runtime: string
+  event: string
+  effect: CompositionComponentEventEffect
+}
 
 export interface CompositionRuntimeOutputDescriptor {
   key: string
@@ -269,6 +308,10 @@ export interface CompositionRuntimeMountConnection {
   updateKind: 'run'
 }
 
+export interface CompositionRuntimeEventConnection extends CompositionComponentEventHook {
+  id: string
+}
+
 /** Исполняемый граф Composition, построенный компилятором из source document. */
 export interface CompositionRuntimeGraph {
   inputs: CompositionRuntimeInputConnection[]
@@ -278,6 +321,8 @@ export interface CompositionRuntimeGraph {
   successes?: CompositionRuntimeSuccessConnection[]
   publications: CompositionRuntimePublicationConnection[]
   mounts: CompositionRuntimeMountConnection[]
+  /** Component semantic Event effects owned by this Composition. */
+  events?: CompositionRuntimeEventConnection[]
 }
 
 /** Payload Composition artifact без runtime state. */

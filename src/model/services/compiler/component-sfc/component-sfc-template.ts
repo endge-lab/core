@@ -19,7 +19,9 @@ import type {
   ComponentSFCComponentPort,
   ComponentSFCActionPort,
   ComponentSFCPortManifest,
+  ComponentSFCVariant,
 } from '@/domain/types/component/sfc'
+import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc'
 import type { ProgramNodeMetadata } from '@/domain/types/program/program-metadata.types'
 import { compileComponentSFCExpression } from '@/model/services/compiler/component-sfc/component-sfc-expression'
 import { compileComponentSFCLocalEventAction } from '@/model/services/compiler/component-sfc/component-sfc-ports'
@@ -53,6 +55,9 @@ export interface ComponentSFCTemplateCompileContext {
 
   /** Resolves public Events of a nested user Component for local `@event` bindings. */
   resolveComponentPortManifest?: (identity: string) => ComponentSFCPortManifest | null
+
+  /** Resolves explicit root Variant names of a nested custom component. */
+  resolveComponentVariants?: (identity: string) => string[] | null
 }
 
 /** Результат компиляции template в IR. */
@@ -68,6 +73,9 @@ export interface ComponentSFCTemplateCompileResult {
 
   /** Публичная metadata внутренних template-узлов. */
   metadata: ProgramNodeMetadata[]
+
+  /** Events emitted by declarative template reactions or editable behavior. */
+  emittedEvents: string[]
 }
 
 export { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sfc/component-sfc-built-in-tags'
@@ -94,18 +102,25 @@ export function compileComponentSFCTemplate(
       dependencies,
       metadata,
       diagnostics,
+      emittedEvents: [],
     }
   }
 
+  const roots = template.roots
+    .map((node, index) => compileTemplateNode(node, `root-${index}`, context, dependencies, metadata, diagnostics))
+    .filter((node): node is RComponentSFC_IR_Node => node != null)
+  const variants = validateVariantContainer(roots, diagnostics, 'template', false)
+  const emittedEvents = collectTemplateEmittedEvents(roots)
+
   return {
     template: {
-      roots: template.roots
-        .map((node, index) => compileTemplateNode(node, `root-${index}`, context, dependencies, metadata, diagnostics))
-        .filter((node): node is RComponentSFC_IR_Node => node != null),
+      roots,
+      ...(variants.length ? { variants } : {}),
     },
     dependencies,
     metadata,
     diagnostics,
+    emittedEvents,
   }
 }
 
@@ -192,15 +207,19 @@ function compileElementNode(
   const nodeMetadata = compileNodeMetadata(node.attributes, diagnostics, `template.${id}.metadata`)
   validateSemanticStyleAttributes(node.attributes, diagnostics, `template.${id}`)
   const props = compileAttributes(
-    node.attributes.filter(attribute => attribute.name !== 'metadata'),
+    node.attributes.filter(attribute => !['metadata', 'editable', 'edit-on'].includes(attribute.name)),
     context,
     diagnostics,
   )
   const directives = compileDirectives(node.directives.filter(directive => directive.name !== 'on'), context, diagnostics)
   const tag: RComponentSFC_IR_Tag = directComponentIdentity ? 'Component' : node.tag as RComponentSFC_IR_Tag
-  const eventManifest = directComponentIdentity
+  const baseEventManifest = directComponentIdentity
     ? context.resolveComponentPortManifest?.(directComponentIdentity) ?? null
     : createBuiltInComponentPortManifest(tag)
+  const editable = compileEditableBehavior(node, tag, props, context, diagnostics)
+  const eventManifest = editable
+    ? withEditableEventManifest(baseEventManifest)
+    : baseEventManifest
   const events = compileEventBindings(node.directives, eventManifest, dependencies, diagnostics)
 
   if (directComponentIdentity) {
@@ -239,7 +258,33 @@ function compileElementNode(
           defaultIdentity: localComponentPort.defaultIdentity,
         }
       : undefined,
+    editable,
   }
+
+  if (editable && element.tag === 'Component') {
+    const identity = element.props.is?.kind === 'literal' ? String(element.props.is.value ?? '').trim() : ''
+    const variants = identity ? context.resolveComponentVariants?.(identity) : null
+    if (variants && !variants.includes('edit')) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'sfc-editable-component-variant-missing',
+        message: `Component "${identity}" используется с editable, но не объявляет Variant name="edit".`,
+        sourcePath: `template.${id}.editable`,
+        start: node.range.start,
+        end: node.range.end,
+      })
+    }
+  }
+
+  if (editable && !events.some(binding => binding.name === 'edited')) {
+    events.push({
+      name: 'edited',
+      modifiers: [],
+      action: { kind: 'emit', event: 'edited', payload: { kind: 'event', path: null } },
+    })
+  }
+
+  validateNestedVariants(element, diagnostics, `template.${id}`)
 
   if (Object.keys(nodeMetadata).length > 0) {
     const staticKey = node.directives.find(directive => directive.name === 'key' && !directive.argument)
@@ -261,6 +306,181 @@ function compileElementNode(
   }
 
   return element
+}
+
+function compileEditableBehavior(
+  node: RComponentSFC_AST_ElementNode,
+  tag: RComponentSFC_IR_Tag,
+  props: Record<string, RComponentSFC_IR_Value>,
+  context: ComponentSFCTemplateCompileContext,
+  diagnostics: RComponentDiagnostic[],
+) {
+  const editableAttribute = node.attributes.find(attribute => attribute.name === 'editable')
+  const enabled = tag === 'Editable' || Boolean(editableAttribute)
+  if (!enabled) return undefined
+
+  if (editableAttribute?.dynamic || (editableAttribute?.value != null && editableAttribute.value !== '')) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-editable-static',
+      message: 'editable является статическим boolean-атрибутом.',
+      sourcePath: 'template.editable',
+      start: editableAttribute.range.start,
+      end: editableAttribute.range.end,
+    })
+  }
+
+  let value = props.value
+  if (!value && tag === 'Text') {
+    const meaningful = node.children.filter(child => child.kind !== 'text' || child.content.trim())
+    if (meaningful.length === 1 && meaningful[0]?.kind === 'interpolation') {
+      const compiled = compileComponentSFCExpression(meaningful[0].expression, {
+        props: context.props,
+        locals: context.locals,
+        sourcePath: 'template.editable.value',
+      })
+      diagnostics.push(...compiled.diagnostics)
+      value = compiled.value
+    }
+    else if (meaningful.length > 0) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'sfc-editable-text-value',
+        message: 'Text editable требует :value или ровно одну interpolation без смешанного текста.',
+        sourcePath: 'template.editable.value',
+        start: node.range.start,
+        end: node.range.end,
+      })
+    }
+  }
+  if (!value) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-editable-value-required',
+      message: `${tag} editable требует value.`,
+      sourcePath: 'template.editable.value',
+      start: node.range.start,
+      end: node.range.end,
+    })
+    value = { kind: 'literal', value: null }
+  }
+
+  const triggerAttribute = node.attributes.find(attribute => attribute.name === 'edit-on')
+  let triggers: RComponentSFC_IR_Value = { kind: 'literal', value: 'click' }
+  if (triggerAttribute?.dynamic) {
+    const compiled = compileComponentSFCExpression(triggerAttribute.value ?? '', {
+      props: context.props,
+      locals: context.locals,
+      sourcePath: 'template.edit-on',
+    })
+    diagnostics.push(...compiled.diagnostics)
+    triggers = compiled.value
+  }
+  else if (triggerAttribute) {
+    const event = String(triggerAttribute.value ?? '').trim()
+    if (!event) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'sfc-edit-on-empty',
+        message: 'edit-on требует непустое имя события.',
+        sourcePath: 'template.edit-on',
+        start: triggerAttribute.range.start,
+        end: triggerAttribute.range.end,
+      })
+    }
+    else triggers = { kind: 'literal', value: event }
+  }
+
+  return { value, triggers }
+}
+
+function withEditableEventManifest(manifest: ComponentSFCPortManifest | null): ComponentSFCPortManifest {
+  const result = manifest
+    ? {
+        ...manifest,
+        emits: { events: [...manifest.emits.events] },
+      }
+    : createEmptyComponentSFCPortManifest()
+  if (!result.emits.events.some(event => event.name === 'edited')) {
+    result.emits.events.push({
+      kind: 'event',
+      role: 'emits',
+      name: 'edited',
+      payloadType: 'unknown',
+    })
+  }
+  return result
+}
+
+function validateNestedVariants(
+  node: RComponentSFC_IR_ElementNode,
+  diagnostics: RComponentDiagnostic[],
+  sourcePath: string,
+): void {
+  if (node.tag === 'Editable')
+    validateVariantContainer(node.children, diagnostics, sourcePath, true)
+  for (const child of node.children) {
+    if (child.kind === 'element') validateNestedVariants(child, diagnostics, `${sourcePath}.${child.id}`)
+  }
+}
+
+function validateVariantContainer(
+  nodes: RComponentSFC_IR_Node[],
+  diagnostics: RComponentDiagnostic[],
+  sourcePath: string,
+  requireEdit: boolean,
+): ComponentSFCVariant[] {
+  const variantNodes = nodes.filter((node): node is RComponentSFC_IR_ElementNode => node.kind === 'element' && node.tag === 'Variant')
+  if (!variantNodes.length) {
+    if (requireEdit) diagnostics.push({
+      severity: 'error',
+      code: 'sfc-editable-variants-required',
+      message: 'Editable требует Variant name="default" и Variant name="edit".',
+      sourcePath,
+    })
+    return []
+  }
+  if (variantNodes.length !== nodes.length) diagnostics.push({
+    severity: 'error',
+    code: 'sfc-variant-roots-only',
+    message: 'При явных Variant все соседние корневые узлы контейнера должны быть Variant.',
+    sourcePath,
+  })
+  const result: ComponentSFCVariant[] = []
+  const names = new Set<string>()
+  for (const variant of variantNodes) {
+    const name = variant.props.name?.kind === 'literal' ? String(variant.props.name.value ?? '').trim() : ''
+    if (!name || names.has(name)) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'sfc-variant-name',
+        message: 'Variant name должен быть статическим, непустым и уникальным.',
+        sourcePath,
+        start: variant.sourceRange?.start,
+        end: variant.sourceRange?.end,
+      })
+      continue
+    }
+    names.add(name)
+    result.push({ name, nodeId: variant.id })
+  }
+  if (!names.has('default')) diagnostics.push({ severity: 'error', code: 'sfc-variant-default-required', message: 'Явные Variant требуют ровно один name="default".', sourcePath })
+  if (requireEdit && !names.has('edit')) diagnostics.push({ severity: 'error', code: 'sfc-variant-edit-required', message: 'Editable требует Variant name="edit".', sourcePath })
+  return result
+}
+
+function collectTemplateEmittedEvents(nodes: RComponentSFC_IR_Node[]): string[] {
+  const result = new Set<string>()
+  const visit = (node: RComponentSFC_IR_Node): void => {
+    if (node.kind !== 'element') return
+    if (node.editable) result.add('edited')
+    for (const binding of node.events ?? []) {
+      if (binding.action.kind === 'emit') result.add(binding.action.event)
+    }
+    node.children.forEach(visit)
+  }
+  nodes.forEach(visit)
+  return [...result]
 }
 
 const LOCAL_EVENT_MODIFIERS = new Set<RComponentSFC_IR_EventModifier>([

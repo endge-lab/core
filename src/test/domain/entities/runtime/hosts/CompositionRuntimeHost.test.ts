@@ -1,6 +1,7 @@
 import type { CompositionProgramPayload, CompositionRuntimeOutputHandle } from '@/domain/types/source/composition-source.types'
 import type { ProgramArtifact, QueryProgramPayload } from '@/domain/types/program/program.types'
 import type { StoreSourceArtifact } from '@/domain/types/source/store-source.types'
+import type { UpdateSourceArtifact } from '@/domain/types/source/update-source.types'
 
 import { Raph } from '@endge/raph'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -11,15 +12,18 @@ import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RMock } from '@/domain/entities/reflect/RMock'
 import { RStore } from '@/domain/entities/reflect/RStore'
+import { RUpdate } from '@/domain/entities/reflect/RUpdate'
 import { FilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
 import { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
 import { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
 import { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
 import { StoreRuntimeHost } from '@/domain/entities/runtime/hosts/StoreRuntimeHost'
+import { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentSFCRuntimeHost'
 import { compileFilterSource } from '@/model/services/source-engine/compilers/filter-source-compile'
 import { buildRuntimeGraph, compileCompositionSource } from '@/model/services/source-engine/compilers/composition-source-compile'
 import { Endge } from '@/model/endge/kernel/endge'
 import { materializeCompositionPreviewProps } from '@/model/endge/runtime/execution/endge-composition'
+import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 
 describe('Composition runtime session', () => {
   afterEach(() => {
@@ -727,6 +731,84 @@ defineComposition({
     await session.unmount()
     expect(Endge.runtime.getRuntimeHosts()).toEqual([])
   })
+
+  it('routes Component events automatically by handles and manually to a named Update', async () => {
+    const store = new RStore()
+    store.id = 70
+    store.identity = 'telegraph-store'
+    store.name = 'Telegraph Store'
+    store.source = `defineStore({ data: { rows: value([{ id: 1, status: 'RUN' }]) } })`
+    const update = new RUpdate()
+    update.id = 71
+    update.identity = 'telegraph-update-row'
+    update.name = 'Update row'
+    update.storeIdentity = store.identity
+    update.source = `defineUpdate({
+      handles: ['edited'],
+      mutations: [{
+        strategy: 'merge', target: 'rows[id=$id]', ifExists: 'rows[id=$id]',
+        valueFrom: 'patch', vars: { id: 'id' },
+      }],
+    })`
+    const component = new RComponentSFC()
+    component.id = 72
+    component.identity = 'telegraph-component'
+    component.name = 'Telegraph Component'
+    component.source = `<script setup lang="ts">
+const ports = definePorts({ emits: { selected: event<unknown>() } })
+</script><template><Text value="RUN" editable /></template>`
+    const composition = new RComposition()
+    composition.id = 73
+    composition.identity = 'telegraph-page-events'
+    composition.name = 'Telegraph Page'
+    composition.source = `defineComposition({
+      data: { telegraph: store('telegraph-store') },
+      runtimes: {
+        table: component('telegraph-component').dispatchTo(data('telegraph')),
+      },
+      hooks: [
+        onEvent('table', 'selected').applyUpdate(data('telegraph'), update('telegraph-update-row')),
+      ],
+    })`
+    Endge.domain.addStore(store)
+    Endge.domain.addUpdate(update)
+    Endge.domain.addComponentSFC(component)
+    Endge.domain.addComposition(composition)
+
+    const updateCompiled = Endge.source.compile('update', update.source).artifact as Omit<UpdateSourceArtifact, 'storeIdentity'>
+    const storeCompiled = Endge.source.compile('store', store.source).artifact as StoreSourceArtifact
+    storeCompiled.updateHandlers = [{ identity: update.identity, eventTypes: ['edited'] }]
+    const componentCompiled = compileComponentSFC(component.source)
+    const compositionCompiled = compileCompositionSource(composition.source).artifact!
+    Endge.program.beginCompile('test')
+    Endge.program.addArtifact(artifact('update', update.id, update.identity, { ...updateCompiled, storeIdentity: store.identity }))
+    Endge.program.addArtifact(artifact('store', store.id, store.identity, storeCompiled))
+    Endge.program.addArtifact(artifact('component-sfc', component.id, component.identity, {
+      sourceParts: componentCompiled.sourceParts,
+      sections: componentCompiled.sections,
+      contract: componentCompiled.contract,
+      dependencies: componentCompiled.dependencies,
+      runtimeDependencies: componentCompiled.runtimeDependencies,
+      previewProps: componentCompiled.previewProps,
+      previewOptions: componentCompiled.previewOptions,
+      ast: componentCompiled.ast,
+      ir: componentCompiled.ir,
+    }))
+    Endge.program.addArtifact(artifact('composition', composition.id, composition.identity, compositionCompiled))
+
+    const session = await Endge.runtime.composition.mount(composition.identity, { id: 'telegraph-event-session' })
+    const table = session.host.getChild('table') as ComponentSFCRuntimeHost
+    const storeRuntime = Endge.runtime.getRuntimeHosts().find(host => host.entityIdentity === store.identity) as StoreRuntimeHost
+    await table.emitEventPort('edited', { id: 1, patch: { status: 'STOP' } })
+    expect((storeRuntime.getDataSnapshot().rows as any[])[0].status).toBe('STOP')
+
+    await table.emitEventPort('selected', { id: 1, patch: { status: 'DONE' } })
+    expect((storeRuntime.getDataSnapshot().rows as any[])[0].status).toBe('DONE')
+
+    await session.unmount()
+    await table.emitEventPort('edited', { id: 1, patch: { status: 'IGNORED' } }).catch(() => undefined)
+    expect(Endge.runtime.getRuntimeHosts()).toEqual([])
+  })
 })
 
 function installDomainAndProgram(): void {
@@ -902,7 +984,7 @@ function installContextualStoreCompositions(input: {
 }
 
 function artifact<T>(
-  entityType: 'filter' | 'query' | 'composition' | 'store' | 'component-sfc',
+  entityType: 'filter' | 'query' | 'composition' | 'store' | 'component-sfc' | 'update',
   id: number,
   identity: string,
   payload: T,

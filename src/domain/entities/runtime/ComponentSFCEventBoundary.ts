@@ -17,6 +17,7 @@ export class ComponentSFCEventBoundary {
     private readonly parent: ComponentSFCEventBoundary | null = null,
     private readonly parentSource?: ComponentSFCEventRuntimeSource,
     private readonly parentBindings: readonly RComponentSFC_IR_EventBinding[] = [],
+    private readonly parentEventTransform?: (event: string, payload: unknown) => { event: string, payload: unknown } | null,
   ) {}
 
   public createChild(
@@ -24,8 +25,9 @@ export class ComponentSFCEventBoundary {
     manifest: ComponentSFCPortManifest,
     source: ComponentSFCEventRuntimeSource,
     bindings: readonly RComponentSFC_IR_EventBinding[] = [],
+    transform?: (event: string, payload: unknown) => { event: string, payload: unknown } | null,
   ): ComponentSFCEventBoundary {
-    return new ComponentSFCEventBoundary(this.host, componentIdentity, manifest, this, source, bindings)
+    return new ComponentSFCEventBoundary(this.host, componentIdentity, manifest, this, source, bindings, transform)
   }
 
   /** True when the current public manifest observes one Event of this child source. */
@@ -41,6 +43,7 @@ export class ComponentSFCEventBoundary {
     bindings: readonly RComponentSFC_IR_EventBinding[] = [],
     trace: string[] = [],
     depth = 0,
+    scope: Record<string, unknown> = {},
   ): Promise<void> {
     const local = bindings.flatMap((binding, index) => {
       if (binding.name !== event) return []
@@ -64,6 +67,7 @@ export class ComponentSFCEventBoundary {
       (name, nextPayload, nextTrace, nextDepth) => this.emitOwn(name, nextPayload, nextTrace, nextDepth),
       trace,
       depth,
+      scope,
     ))
     const routed = local.some(binding => binding.modifiers.includes('stop'))
       ? Promise.resolve()
@@ -105,8 +109,13 @@ export class ComponentSFCEventBoundary {
     const forwardedSource = this.parentSource
       ? { ...this.parentSource, target: source?.target ?? this.parentSource.target }
       : source
-    if (this.parent && this.parentSource)
-      void this.parent.routeChild(forwardedSource!, port.name, payload, this.parentBindings, trace, depth + 1).catch(error => this.reportError(port, error))
+    if (this.parent && this.parentSource) {
+      const transformed = this.parentEventTransform
+        ? this.parentEventTransform(port.name, payload)
+        : { event: port.name, payload }
+      if (transformed)
+        void this.parent.routeChild(forwardedSource!, transformed.event, transformed.payload, this.parentBindings, trace, depth + 1).catch(error => this.reportError(port, error))
+    }
     else
       this.host?.publishEventPort(port.name, payload, source)
 

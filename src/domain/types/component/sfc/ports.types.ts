@@ -114,9 +114,15 @@ export interface ComponentSFCEventSource {
 /** Renderer-neutral value mapped from an Event payload into Action input. */
 export type ComponentSFCEventInputValue
   = | { kind: 'event', path: string | null }
+    | { kind: 'scope', path: string }
     | { kind: 'literal', value: unknown }
     | { kind: 'array', items: ComponentSFCEventInputValue[] }
-    | { kind: 'object', entries: Record<string, ComponentSFCEventInputValue> }
+    | { kind: 'object', entries: ComponentSFCEventInputEntry[] }
+
+export interface ComponentSFCEventInputEntry {
+  key: string | ComponentSFCEventInputValue
+  value: ComponentSFCEventInputValue
+}
 
 /** One Action selected directly in Component SFC Source. */
 export interface ComponentSFCEventDirectAction {
@@ -135,9 +141,17 @@ export interface ComponentSFCEventTypescriptAction {
   emittedEvents: string[]
 }
 
+/** Безопасный локальный emit из template reaction. */
+export interface ComponentSFCEventEmitAction {
+  kind: 'emit'
+  event: string
+  payload?: ComponentSFCEventInputValue
+}
+
 export type ComponentSFCEventAction
   = ComponentSFCEventDirectAction
     | ComponentSFCEventTypescriptAction
+    | ComponentSFCEventEmitAction
 
 export interface ComponentSFCEventRuntimeSource {
   nodeId: string

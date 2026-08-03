@@ -124,6 +124,9 @@ export function collectTypeExpressionReferences(expression: string | null | unde
   const result = new Set<string>()
   for (const match of value.matchAll(/\b[A-Za-z_$][\w$]*\b/g)) {
     const token = match[0]
+    const tail = value.slice((match.index ?? 0) + token.length)
+    // Property names are part of the TypeScript shape, not Type Registry references.
+    if (/^\s*\??\s*:/.test(tail)) continue
     if (!TYPE_EXPRESSION_BUILTINS.has(token) && /^[A-Z]/.test(token)) result.add(token)
   }
   return result

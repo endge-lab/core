@@ -20,6 +20,8 @@ import type {
 import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext, RuntimeHostInputBinding, RuntimeHostInputSource, RuntimeHostUpdateContext } from '@/domain/types/runtime/runtime-host.types'
 import type { I18nRuntimeCatalog } from '@/domain/types/i18n.types'
 import type { VocabRuntimeCatalog } from '@/domain/types/runtime/vocab-cache.types'
+import type { ComponentSFCEventInputValue, ComponentSFCEventOccurrence } from '@/domain/types/component/sfc'
+import type { CompositionComponentEventEffect } from '@/domain/types/source/composition-source.types'
 
 import { Raph, RaphNode } from '@endge/raph'
 
@@ -38,6 +40,17 @@ function defaultContext(): RuntimeHostContext<'composition'> {
     mountedChildren: 0,
     lastHookAt: null,
   }
+}
+
+function evaluateComponentEventInput(value: ComponentSFCEventInputValue, payload: unknown): unknown {
+  if (value.kind === 'event') return value.path == null ? payload : readValuePath(payload, value.path)
+  if (value.kind === 'literal') return value.value
+  if (value.kind === 'scope') return undefined
+  if (value.kind === 'array') return value.items.map(item => evaluateComponentEventInput(item, payload))
+  return Object.fromEntries(value.entries.map(entry => [
+    typeof entry.key === 'string' ? entry.key : String(evaluateComponentEventInput(entry.key, payload)),
+    evaluateComponentEventInput(entry.value, payload),
+  ]))
 }
 
 /** Runtime orchestration host: children, bindings, hooks и public handles. */
@@ -1003,6 +1016,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         ? { kind: 'raph', bindings, props: literals }
         : { kind: 'local', props: literals }
       ;(child as unknown as ComponentSFCRuntimeHost).setInputSource(input)
+      this._bindComponentDispatch(descriptor, child as unknown as ComponentSFCRuntimeHost)
       return
     }
 
@@ -1055,6 +1069,32 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }
     stream.on('event', receive)
     this._disposers.push(() => stream.off('event', receive))
+  }
+
+  private _bindComponentDispatch(
+    descriptor: CompositionProgramPayload['runtimes'][number],
+    component: ComponentSFCRuntimeHost,
+  ): void {
+    if (!descriptor.dispatchTo?.length) return
+    const stores = descriptor.dispatchTo.map(dataAlias => this._requireStoreRuntime(dataAlias))
+    for (const port of component.getIr()?.script.ports.emits.events ?? []) {
+      const dispose = component.onEventPort(port.name, (occurrence) => {
+        const envelope: StreamEventEnvelope = {
+          type: occurrence.event,
+          payload: occurrence.payload,
+          meta: {
+            id: null,
+            source: component.entityIdentity,
+            sourceEvent: occurrence.event,
+            occurredAt: new Date().toISOString(),
+          },
+        }
+        Raph.transaction(() => {
+          for (const store of stores) store.dispatch(envelope)
+        })
+      })
+      this._disposers.push(dispose)
+    }
   }
 
   private _flushStreamBatch(name: string, stores: StoreRuntimeHost[]): void {
@@ -1111,6 +1151,16 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   }
 
   private _bindHooks(payload: CompositionProgramPayload): void {
+    for (const connection of payload.graph.events ?? []) {
+      if (this._hookDisposers.has(connection.id)) continue
+      const source = this._children.get(connection.runtime)
+      if (!source || source.entityType !== 'component-sfc') continue
+      const component = source as unknown as ComponentSFCRuntimeHost
+      this._hookDisposers.set(connection.id, component.onEventPort(connection.event, occurrence => {
+        void this._executeComponentEventEffect(connection.effect, occurrence, connection.runtime)
+      }))
+    }
+
     for (const connection of payload.graph.updates) {
       if (this._hookDisposers.has(connection.id)) continue
       const target = this._children.get(connection.targetRuntime)
@@ -1165,6 +1215,57 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     })
     if (initialPublications.length)
       this._publishUpdates(initialPublications)
+  }
+
+  private async _executeComponentEventEffect(
+    effect: CompositionComponentEventEffect,
+    occurrence: ComponentSFCEventOccurrence,
+    runtimeAlias: string,
+  ): Promise<void> {
+    try {
+      if (effect.kind === 'apply-update') {
+        this.applyStoreUpdate(
+          effect.data,
+          effect.update,
+          effect.input ? evaluateComponentEventInput(effect.input, occurrence.payload) : occurrence.payload,
+        )
+        return
+      }
+      if (effect.kind === 'mutate-store') {
+        this.mutateStore(effect.data, {
+          strategy: effect.mutation.strategy,
+          path: effect.mutation.path,
+          ...(effect.mutation.value ? { value: evaluateComponentEventInput(effect.mutation.value, occurrence.payload) } : {}),
+          ...(effect.mutation.vars
+            ? { vars: Object.fromEntries(Object.entries(effect.mutation.vars).map(([key, value]) => [key, evaluateComponentEventInput(value, occurrence.payload)])) }
+            : {}),
+        })
+        return
+      }
+      await Endge.actions.execute(effect.action, {
+        input: effect.input ? evaluateComponentEventInput(effect.input, occurrence.payload) : occurrence.payload,
+        target: occurrence.source?.target,
+        context: {
+          surface: 'composition-event',
+          parentRuntimeId: this.id,
+          compositionIdentity: this.entityIdentity,
+          runtimeAlias,
+          componentIdentity: occurrence.componentIdentity,
+          eventName: occurrence.event,
+          source: occurrence.source,
+        },
+        resolution: { composition: this.entityIdentity },
+      })
+    }
+    catch (error) {
+      this.emit('event:error', {
+        code: 'composition-event-effect-failed',
+        runtimeAlias,
+        event: occurrence.event,
+        effect: effect.kind,
+        error,
+      })
+    }
   }
 
   private async _runQuery(name: string): Promise<void> {

@@ -48,6 +48,11 @@ import { Endge } from '@/model/endge/kernel/endge'
 import { createEmptyProgramMetadata } from '@/domain/types/program/program-metadata.types'
 import type { ProgramMetadata } from '@/domain/types/program/program-metadata.types'
 import type { ComponentSFCPortManifest } from '@/domain/types/component/sfc'
+import {
+  COMPONENT_SFC_FORM_EVENT_DEFINITIONS,
+  COMPONENT_SFC_INTERACTION_EVENT_DEFINITIONS,
+  TABLE_EVENT_DEFINITIONS,
+} from '@/domain/types/component/sfc'
 import type { ComponentSFCCompileResult } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import { compileComputation } from '@/model/services/compiler/computation/computation-compile'
 import { compileAction } from '@/model/services/compiler/action/action-compile'
@@ -74,6 +79,12 @@ const COMPUTATION_LINK_DIAGNOSTICS = new Set([
   'computation-reference-invalid',
   'computation-reference-cycle',
 ])
+
+const COMPONENT_SFC_BUILTIN_EVENT_PAYLOAD_TYPES = new Set([
+  ...COMPONENT_SFC_INTERACTION_EVENT_DEFINITIONS,
+  ...COMPONENT_SFC_FORM_EVENT_DEFINITIONS,
+  ...TABLE_EVENT_DEFINITIONS,
+].map(event => event.payloadType))
 
 /**
  * Компилятор persisted domain model в compiled program artifacts.
@@ -531,7 +542,10 @@ export class EndgeCompiler extends EndgeModule {
       entityType: 'component-sfc',
       compile: (entity, context) => {
         const result = this._compileComponentSFCSource(entity)
-        const localTypes = collectLocalTypeDeclarations(entity.source)
+        const knownComponentTypes = new Set([
+          ...collectLocalTypeDeclarations(entity.source),
+          ...COMPONENT_SFC_BUILTIN_EVENT_PAYLOAD_TYPES,
+        ])
         return this._makeArtifact(entity, 'component-sfc', context, {
           capabilities: result.ir ? ['compilable', 'runnable', 'renderable'] : ['compilable'],
           metadata: result.metadata,
@@ -549,24 +563,24 @@ export class EndgeCompiler extends EndgeModule {
           diagnostics: [
             ...(this._componentTagDiagnosticsByIdentity.get(entity.identity) ?? []),
             ...result.diagnostics,
-            ...this._typeContractDiagnostics(result.ast?.script?.props?.source, 'script.defineProps', localTypes),
-            ...result.contract.inputs.flatMap(input => this._typeContractDiagnostics(input.type, `script.defineProps.${input.name}`, localTypes)),
+            ...this._typeContractDiagnostics(result.ast?.script?.props?.source, 'script.defineProps', knownComponentTypes),
+            ...result.contract.inputs.flatMap(input => this._typeContractDiagnostics(input.type, `script.defineProps.${input.name}`, knownComponentTypes)),
             ...(result.ir?.script.ports.require.computations.flatMap(port => [
-              ...this._typeContractDiagnostics(port.inputType, `script.ports.require.${port.name}.input`, localTypes),
-              ...this._typeContractDiagnostics(port.outputType, `script.ports.require.${port.name}.output`, localTypes),
+              ...this._typeContractDiagnostics(port.inputType, `script.ports.require.${port.name}.input`, knownComponentTypes),
+              ...this._typeContractDiagnostics(port.outputType, `script.ports.require.${port.name}.output`, knownComponentTypes),
             ]) ?? []),
             ...(result.ir?.script.ports.require.actions.flatMap(port => [
-              ...this._typeContractDiagnostics(port.inputType, `script.ports.require.${port.name}.input`, localTypes),
-              ...this._typeContractDiagnostics(port.outputType, `script.ports.require.${port.name}.output`, localTypes),
+              ...this._typeContractDiagnostics(port.inputType, `script.ports.require.${port.name}.input`, knownComponentTypes),
+              ...this._typeContractDiagnostics(port.outputType, `script.ports.require.${port.name}.output`, knownComponentTypes),
             ]) ?? []),
             ...(result.ir?.script.ports.require.components.flatMap(port =>
-              this._typeContractDiagnostics(port.propsType, `script.ports.require.${port.name}.props`, localTypes)) ?? []),
+              this._typeContractDiagnostics(port.propsType, `script.ports.require.${port.name}.props`, knownComponentTypes)) ?? []),
             ...(result.ir?.script.ports.provides.actions.flatMap(port => [
-              ...this._typeContractDiagnostics(port.inputType, `script.ports.provides.${port.name}.input`, localTypes),
-              ...this._typeContractDiagnostics(port.outputType, `script.ports.provides.${port.name}.output`, localTypes),
+              ...this._typeContractDiagnostics(port.inputType, `script.ports.provides.${port.name}.input`, knownComponentTypes),
+              ...this._typeContractDiagnostics(port.outputType, `script.ports.provides.${port.name}.output`, knownComponentTypes),
             ]) ?? []),
             ...(result.ir?.script.ports.emits.events.flatMap(port =>
-              this._typeContractDiagnostics(port.payloadType, `script.ports.emits.${port.name}`, localTypes)) ?? []),
+              this._typeContractDiagnostics(port.payloadType, `script.ports.emits.${port.name}`, knownComponentTypes)) ?? []),
           ],
           dependencies: [
             ...result.dependencies.components.map(dependency => ({
@@ -595,7 +609,7 @@ export class EndgeCompiler extends EndgeModule {
               ...(result.ir?.script.ports.require.components.map(port => port.propsType) ?? []),
               ...(result.ir?.script.ports.provides.actions.flatMap(port => [port.inputType, port.outputType]) ?? []),
               ...(result.ir?.script.ports.emits.events.map(port => port.payloadType) ?? []),
-            ], localTypes),
+            ], knownComponentTypes),
           ],
           nonBlockingSourcePaths: ['style'],
         })
@@ -1325,6 +1339,7 @@ export class EndgeCompiler extends EndgeModule {
         hasComponentIdentity: identity => Endge.domain.getComponentSFC(identity) != null,
         resolvePortProvider: (identity, expectedKind) => this._resolvePortProvider(identity, expectedKind),
         resolveComponentPortManifest: identity => this._resolveComponentPortManifest(identity),
+        resolveComponentVariants: identity => this._resolveComponentVariantNames(identity),
         resolveTypeDefinition: identity => this._resolveTypeDefinition(identity),
       })
       if (result.ir)
@@ -1335,6 +1350,21 @@ export class EndgeCompiler extends EndgeModule {
       if (ownsResolvingMarker)
         this._componentPortManifestResolving.delete(entity.identity)
     }
+  }
+
+  /** Reads explicit root Variant names without recursively compiling the child. */
+  private _resolveComponentVariantNames(identity: string): string[] | null {
+    const component = Endge.domain.getComponentSFC(identity)
+    if (!component) return null
+    const template = parseComponentSFC(component.source).ast?.template
+    if (!template) return null
+    const roots = template.roots.filter(node => node.kind !== 'text' || node.content.trim())
+    const variants = roots.flatMap((node) => {
+      if (node.kind !== 'element' || node.tag !== 'Variant') return []
+      const name = node.attributes.find(attribute => attribute.name === 'name' && !attribute.dynamic)?.value?.trim()
+      return name ? [name] : []
+    })
+    return variants.length ? variants : []
   }
 
   /** Resolves child public ports independently from the domain component compile order. */
@@ -2228,9 +2258,73 @@ export class EndgeCompiler extends EndgeModule {
       }
       else {
         const componentSFC = Endge.domain.getComponentSFC(runtime.identity)
+        const componentArtifact = Endge.program.getArtifact<ComponentSFCProgramPayload>('component-sfc', runtime.identity)
         if (!componentSFC) {
           diagnostics.push({ severity: 'error', code: 'composition-component-sfc-missing', message: `SFC component "${runtime.identity}" не найден. Legacy Table/DSL documents are data-only and cannot be executed.`, sourcePath: `runtimes.${runtime.name}` })
         }
+        else if (!componentArtifact || componentArtifact.status === 'error') {
+          diagnostics.push({ severity: 'error', code: 'composition-component-sfc-invalid', message: `SFC component "${runtime.identity}" не собран или содержит compile errors.`, sourcePath: `runtimes.${runtime.name}` })
+        }
+        if (runtime.dispatchTo?.length) {
+          const eventNames = new Set(componentArtifact?.payload.ir?.script.ports.emits.events.map(event => event.name) ?? [])
+          for (const dataAlias of runtime.dispatchTo) {
+            const storeArtifact = storeArtifacts.get(dataAlias)
+            if (!storeArtifact) {
+              diagnostics.push({ severity: 'error', code: 'composition-component-store-missing', message: `Component "${runtime.name}" ссылается на отсутствующий Store data alias "${dataAlias}".`, sourcePath: `runtimes.${runtime.name}.dispatchTo` })
+              continue
+            }
+            const matched = storeArtifact.updateHandlers.some(handler => handler.eventTypes.some(type => eventNames.has(type)))
+            if (!matched) {
+              diagnostics.push({ severity: 'error', code: 'composition-component-dispatch-unmatched', message: `Component "${runtime.name}" не публикует Event, обрабатываемый Store "${dataAlias}".`, sourcePath: `runtimes.${runtime.name}.dispatchTo` })
+            }
+          }
+        }
+      }
+    }
+
+    for (const hook of payload.hooks) {
+      if (hook.kind !== 'event') continue
+      const effect = hook.effect
+      const runtime = payload.runtimes.find(item => item.name === hook.runtime)
+      const componentArtifact = runtime?.kind === 'component'
+        ? Endge.program.getArtifact<ComponentSFCProgramPayload>('component-sfc', runtime.identity)
+        : null
+      if (!componentArtifact?.payload.ir?.script.ports.emits.events.some(event => event.name === hook.event)) {
+        diagnostics.push({ severity: 'error', code: 'composition-event-port-missing', message: `Component runtime "${hook.runtime}" не публикует Event "${hook.event}".`, sourcePath: `hooks.${hook.runtime}.${hook.event}` })
+      }
+      if (effect.kind === 'execute-action') {
+        const action = Endge.domain.getAction(effect.action)
+        if (!action) diagnostics.push({ severity: 'error', code: 'composition-event-action-missing', message: `Action "${effect.action}" не найден.`, sourcePath: `hooks.${hook.runtime}.${hook.event}.executeAction` })
+        else dependencies.push({ entityType: 'action', id: action.id, identity: action.identity, role: 'composition-event-action' })
+        continue
+      }
+      const data = payload.data.find(item => (item.path ?? item.name) === effect.data)
+      const storeArtifact = storeArtifacts.get(effect.data)
+      if (!data || data.kind !== 'store' || !storeArtifact) {
+        diagnostics.push({ severity: 'error', code: 'composition-event-store-missing', message: `Event hook ссылается на отсутствующий Store data alias "${effect.data}".`, sourcePath: `hooks.${hook.runtime}.${hook.event}` })
+        continue
+      }
+      if (
+        runtime?.dispatchTo?.includes(effect.data)
+        && storeArtifact.updateHandlers.some(handler => handler.eventTypes.includes(hook.event))
+      ) {
+        diagnostics.push({ severity: 'error', code: 'composition-event-store-double-mutation', message: `Event "${hook.runtime}.${hook.event}" одновременно использует dispatchTo и ручную Store mutation для "${effect.data}".`, sourcePath: `hooks.${hook.runtime}.${hook.event}` })
+      }
+      if (effect.kind === 'apply-update') {
+        const update = Endge.domain.getUpdate(effect.update)
+        const updateArtifact = Endge.program.getUpdateArtifact(effect.update)
+        if (!update || !updateArtifact || updateArtifact.status === 'error') {
+          diagnostics.push({ severity: 'error', code: 'composition-event-update-missing', message: `Update "${effect.update}" не найден или содержит compile errors.`, sourcePath: `hooks.${hook.runtime}.${hook.event}.applyUpdate` })
+        }
+        else if (update.storeIdentity !== data.identity) {
+          diagnostics.push({ severity: 'error', code: 'composition-event-update-owner', message: `Update "${effect.update}" не принадлежит Store "${data.identity}".`, sourcePath: `hooks.${hook.runtime}.${hook.event}.applyUpdate` })
+        }
+        else dependencies.push({ entityType: 'update', id: update.id, identity: update.identity, role: 'composition-event-update' })
+      }
+      else {
+        const root = effect.mutation.path.split(/[.[\]]/)[0] ?? ''
+        const writable = new Set(storeArtifact.data.filter(field => field.kind === 'value').map(field => field.key))
+        if (!writable.has(root)) diagnostics.push({ severity: 'error', code: 'composition-event-mutation-readonly', message: `Store target "${effect.data}.${effect.mutation.path}" отсутствует или является derived.`, sourcePath: `hooks.${hook.runtime}.${hook.event}.mutate` })
       }
     }
 
