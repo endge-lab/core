@@ -1,10 +1,10 @@
 // @vitest-environment node
+import type { DiagnosticsAdapterCreateContext } from '@/domain/types/diagnostics/diagnostics-adapter.type'
 import type {
-  DiagnosticsAdapterCreateContext,
   DiagnosticsLogRecord,
   DiagnosticsSnapshot,
   EndgeDiagnosticsOutputConfiguration,
-} from '@/domain/types/diagnostics'
+} from '@/domain/types/diagnostics/diagnostics.types'
 import { SentryDiagnosticsAdapter } from '@/model/adapters/diagnostics/SentryDiagnosticsAdapter'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 

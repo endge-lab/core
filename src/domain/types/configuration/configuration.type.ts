@@ -4,7 +4,8 @@ import type {
   EndgeDiagnosticsOutputConfiguration,
   EndgeDiagnosticsConfiguration,
   EndgeDiagnosticsRoute,
-} from '@/domain/types/diagnostics'
+} from '@/domain/types/diagnostics/diagnostics.types'
+import type { EndgeExecutionContext } from '@/domain/types/runtime/execution-context.types'
 
 export interface EndgeLocaleDefinition {
   code: string
@@ -124,13 +125,6 @@ export type EndgeConfigurationContribution =
   | { mode: 'replace', value: EndgeConfiguration }
 
 export type EndgeConfigurationLayer = 'workspace' | 'tenant' | 'project' | 'environment'
-
-/** Structural context одного полного boot/build lifecycle. */
-export interface EndgeExecutionContext {
-  tenantIdentity: string
-  projectIdentity: string
-  environmentIdentity: string
-}
 
 /** Immutable input, передаваемый compiler strategies. */
 export interface EndgeBuildContext {

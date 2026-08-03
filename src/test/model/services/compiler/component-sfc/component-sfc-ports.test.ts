@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
-import { getComponentSFCIntrinsicEventDefinitions, TABLE_EVENT_DEFINITIONS } from '@/domain/types/component/sfc'
+import { getComponentSFCIntrinsicEventDefinitions } from '@/domain/types/component/sfc/intrinsic-events.types'
+import { TABLE_EVENT_DEFINITIONS } from '@/domain/types/component/sfc/table-events.types'
 
 const SOURCE = `<script setup lang="ts">
 interface Props {

@@ -9,7 +9,7 @@ import type {
   DiagnosticsSpanOptions,
   DiagnosticsSpanOwner,
   DiagnosticsSpanRecord,
-} from '@/domain/types/diagnostics'
+} from '@/domain/types/diagnostics/diagnostics.types'
 
 /** Управляет одним активным span и завершает его через owner-модуль. */
 export class DiagnosticsSpan implements DiagnosticsSpanHandle {

@@ -25,7 +25,7 @@ import { StreamRuntimeStrategy } from '@/model/services/runtime/strategies/Strea
 import { Endge } from '@/model/endge/kernel/endge'
 import { RuntimeBoundaryUpdatePhase } from '@/model/helpers/raph-phases/runtime-boundary-update-phase'
 import { RuntimeNodeUpdatePhase } from '@/model/helpers/raph-phases/runtime-node-update-phase'
-import Config from '@/model/config'
+import Config from '@/model/config/config'
 import { EndgeActions } from '@/model/endge/runtime/core/endge-actions'
 import { EndgeImplementations } from '@/model/endge/runtime/implementation/endge-implementations'
 import { EndgeComposition } from '@/model/endge/runtime/execution/endge-composition'

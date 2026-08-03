@@ -13,8 +13,8 @@ import {
 import { parse as parseTS } from '@babel/parser'
 
 import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
+import type { RComponentSFCSource_Parts } from '@/domain/types/component/sfc/source.types'
 import type {
-  RComponentSFCSource_Parts,
   RComponentSFC_AST,
   RComponentSFC_AST_Attribute,
   RComponentSFC_AST_Directive,
@@ -29,8 +29,8 @@ import type {
   RComponentSFC_AST_Template,
   RComponentSFC_AST_TemplateNode,
   RComponentSFC_AST_TextNode,
-  RComponentSFC_SourceRange,
-} from '@/domain/types/component/sfc'
+} from '@/domain/types/component/sfc/ast.types'
+import type { RComponentSFC_SourceRange } from '@/domain/types/component/sfc/location.types'
 import { parseSFCSourceParts } from '@/model/services/compiler/component-sfc/component-sfc-source-parts'
 
 /** Результат parser pass для SFC-компонента. */

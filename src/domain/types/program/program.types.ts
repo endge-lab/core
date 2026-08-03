@@ -6,16 +6,14 @@ import type {
   DataViewRef,
   DataViewSourceDocument,
 } from '@/domain/types/source/data-view-source.types'
-import type {
-  RComponentSFC_AST,
-  RComponentSFC_IR,
-  RComponentSFC_RuntimeDependencies,
-  RComponentSFCSource_Parts,
-} from '@/domain/types/component/sfc'
+import type { RComponentSFC_AST } from '@/domain/types/component/sfc/ast.types'
+import type { RComponentSFC_IR } from '@/domain/types/component/sfc/ir.types'
+import type { RComponentSFC_RuntimeDependencies } from '@/domain/types/component/sfc/dependencies.types'
+import type { RComponentSFCSource_Parts } from '@/domain/types/component/sfc/source.types'
 import type { QueryProgramProp, SourceExpressionIR, SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 import type { ProgramMetadata } from '@/domain/types/program/program-metadata.types'
-import type { ComputationProgramPayload } from '@/domain/types/computation'
-import type { EndgeStyleSheetArtifact } from '@/domain/types/style'
+import type { ComputationProgramPayload } from '@/domain/types/computation/computation-program.types'
+import type { EndgeStyleSheetArtifact } from '@/domain/types/style/style.types'
 import type { ActionImplementation, ActionTargetSelector } from '@/domain/types/runtime/action.types'
 
 /** Тип доменной сущности, для которой compiler может построить program artifact. */
@@ -345,7 +343,7 @@ export interface ProgramCompileContext {
   compilerVersion: string
 
   /** Immutable structural context and effective configuration of this build. */
-  buildContext: import('@/domain/types/configuration').EndgeBuildContext
+  buildContext: import('@/domain/types/configuration/configuration.type').EndgeBuildContext
 }
 
 /** Handler компиляции одного типа доменных сущностей. */

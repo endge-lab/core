@@ -1,4 +1,4 @@
-import type { RComponentSFC_SourceRange } from '@/domain/types/component/sfc'
+import type { RComponentSFC_SourceRange } from '@/domain/types/component/sfc/location.types'
 
 /** Семантический вид узла в живом SFC render tree. */
 export type SFCRenderInspectionNodeKind = 'component' | 'element' | 'text' | 'expression'

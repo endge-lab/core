@@ -2,9 +2,8 @@ import type { RI18nBundle } from '@/domain/entities/reflect/RI18nBundle'
 import type { I18nLocaleMessages, I18nMessagesOptions, I18nRuntimeCatalog, I18nTranslateOptions } from '@/domain/types/i18n.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
+import { DEFAULT_FALLBACK_LOCALE } from '@/model/config/context'
 import { Endge } from '@/model/endge/kernel/endge'
-
-const DEFAULT_FALLBACK_LOCALE = 'en'
 
 /**
  * Runtime-доступ к доменным словарям переводов.

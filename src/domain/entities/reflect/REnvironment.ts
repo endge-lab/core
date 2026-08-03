@@ -2,9 +2,9 @@ import { Serialize } from '@endge/utils'
 import { Expose } from 'class-transformer'
 
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
-import type { EndgeConfigurationContribution } from '@/domain/types/configuration'
+import type { EndgeConfigurationContribution } from '@/domain/types/configuration/configuration.type'
 import { REntity } from '@/domain/entities/reflect/REntity'
-import { normalizeEndgeConfigurationContribution } from '@/model/services/configuration'
+import { normalizeEndgeConfigurationContribution } from '@/model/services/configuration/endge-configuration'
 
 /** Сущность окружения (коллекция environments). Без привязки к проекту. */
 export class REnvironment extends REntity {

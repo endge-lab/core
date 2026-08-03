@@ -4,10 +4,10 @@ import type {
   ComponentSFCPortsSourcePatch,
   ComponentSFCPortsSourcePatchResult,
   ComponentSFCPortsSourceProjection,
-  ComponentSFCPortRole,
-  RComponentSFC_AST_Script,
-} from '@/domain/types/component/sfc'
-import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc'
+} from '@/domain/types/component/sfc/ports-source.types'
+import type { ComponentSFCPortRole } from '@/domain/types/component/sfc/ports.types'
+import type { RComponentSFC_AST_Script } from '@/domain/types/component/sfc/ast.types'
+import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
 import type { ComponentSFCCompileOptions } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import { parseComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-parse'

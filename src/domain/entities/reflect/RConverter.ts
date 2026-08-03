@@ -1,7 +1,7 @@
 import { Exclude, Expose } from 'class-transformer'
 
 import { REntity } from '@/domain/entities/reflect/REntity'
-import type { EntityManagement } from '@/domain/types/document'
+import type { EntityManagement } from '@/domain/types/document/entity-management.type'
 
 export interface RConverterSchema extends EntityManagement {
   id: number

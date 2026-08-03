@@ -1,10 +1,12 @@
 import type {
   ComputationDependencyRunner,
   ComputationExecutionScope,
+  ComputationSandboxAdapter,
+} from '@/domain/types/computation/computation-runtime.types'
+import type {
   ComputationProgramNode,
   ComputationProgramPayload,
-  ComputationSandboxAdapter,
-} from '@/domain/types/computation'
+} from '@/domain/types/computation/computation-program.types'
 import type { SourceExpressionIR } from '@/domain/types/source/source-expression.types'
 
 import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'

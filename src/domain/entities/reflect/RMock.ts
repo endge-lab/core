@@ -2,8 +2,11 @@ import { Serialize } from '@endge/utils'
 import { Expose } from 'class-transformer'
 
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
-import type { RMockContentSource, RMockContentType } from '@/domain/types/mock'
-import type { DiagnosticsProblemInput } from '@/domain/types/diagnostics'
+import type {
+  RMockContentSource,
+  RMockContentType,
+} from '@/domain/types/mock/mock-data.type'
+import type { DiagnosticsProblemInput } from '@/domain/types/diagnostics/diagnostics.types'
 import { REntity } from '@/domain/entities/reflect/REntity'
 
 /** Persisted mock-документ. Payload остается source of truth для identity и связей. */

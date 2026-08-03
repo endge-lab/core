@@ -1,7 +1,7 @@
 import type {
   ComputationResource as ComputationResourceContract,
   ComputationRuntimeErrorShape,
-} from '@/domain/types/computation'
+} from '@/domain/types/computation/computation-runtime.types'
 
 import { ComputationRuntimeError } from './ComputationGraphExecutor'
 

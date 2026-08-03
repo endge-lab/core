@@ -14,10 +14,10 @@ import type {
   ComponentSFCPortRole,
   ComponentSFCPortManifest,
   ComponentSFCPortProviderDescriptor,
-  RComponentSFC_AST_Script,
   RComponentSFC_IR_PortCall,
-} from '@/domain/types/component/sfc'
-import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc'
+} from '@/domain/types/component/sfc/ports.types'
+import type { RComponentSFC_AST_Script } from '@/domain/types/component/sfc/ast.types'
+import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
 import { compileComponentSFCExpression } from '@/model/services/compiler/component-sfc/component-sfc-expression'
 import { parseComponentSFCTypeFields } from '@/model/services/compiler/component-sfc/component-sfc-script'
 import { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sfc/component-sfc-built-in-tags'

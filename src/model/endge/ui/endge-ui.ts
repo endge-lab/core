@@ -4,7 +4,6 @@ import type {
 } from '@/domain/types/ui/ui.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
-import { getActiveEndgeConfiguration, hasActiveEndgeWorkspace } from '@/model/config/endge-workspace'
 import { Endge } from '@/model/endge/kernel/endge'
 import {
   ALL_THEME_CLASSES,
@@ -185,9 +184,9 @@ export class EndgeUI extends EndgeModule {
 
   /** Возвращает workspace theme catalog; до boot используется безопасный bootstrap fallback. */
   public get availableThemes(): string[] {
-    if (!hasActiveEndgeWorkspace())
+    if (!Endge.workspace.isLoaded)
       return [...themeConfig.availableThemes]
-    return getActiveEndgeConfiguration().themes.map(theme => theme.identity)
+    return Endge.workspace.themes.map(theme => theme.identity)
   }
 
   /**
@@ -210,7 +209,7 @@ export class EndgeUI extends EndgeModule {
   }
 
   private syncThemeFromContext(): boolean {
-    if (!hasActiveEndgeWorkspace())
+    if (!Endge.workspace.isLoaded)
       return false
 
     const next = Endge.context.currentTheme

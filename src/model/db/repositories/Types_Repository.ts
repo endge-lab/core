@@ -1,5 +1,5 @@
 // app/repositories/Types_Repository.ts
-import type { ManagedBy } from '@/domain/types/document'
+import type { ManagedBy } from '@/domain/types/document/entity-management.type'
 import type { AxiosInstance } from 'axios'
 
 export class Types_Repository {

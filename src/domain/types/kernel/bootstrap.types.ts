@@ -1,4 +1,4 @@
-import type { EndgeExecutionContext } from '@/domain/types/configuration'
+import type { EndgeExecutionContext } from '@/domain/types/runtime/execution-context.types'
 
 /**
  * Источник получения доменных данных

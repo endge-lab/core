@@ -4,7 +4,7 @@ import type {
   EndgeMockProvider,
   EndgeMockRegistration,
   EndgeMockSnapshot,
-} from '@/domain/types/mock'
+} from '@/domain/types/mock/mock-data.type'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { Endge } from '@/model/endge/kernel/endge'

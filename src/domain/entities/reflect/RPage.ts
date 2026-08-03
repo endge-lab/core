@@ -4,7 +4,7 @@ import { Expose } from 'class-transformer'
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
 import { REntity } from '@/domain/entities/reflect/REntity'
 import type { DomainDocumentType } from '@/domain/types/document/document.types'
-import type { EntityManagement } from '@/domain/types/document'
+import type { EntityManagement } from '@/domain/types/document/entity-management.type'
 
 export interface RPageAreaBlockSchema {
   key: string

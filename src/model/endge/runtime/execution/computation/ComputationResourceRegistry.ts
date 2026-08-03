@@ -1,4 +1,6 @@
-import type { ComputationResource as ComputationResourceContract } from '@/domain/types/computation'
+import type {
+  ComputationResource as ComputationResourceContract,
+} from '@/domain/types/computation/computation-runtime.types'
 
 import { ComputationResourceState } from './ComputationResource'
 

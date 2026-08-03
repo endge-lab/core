@@ -11,7 +11,7 @@ export type ProjectPayloadData = {
   allowedEnvironments?: Array<number | string>
   folder?: number | string | null
   deletedAt?: string | null
-  configuration?: import('@/domain/types/configuration').EndgeConfigurationContribution
+  configuration?: import('@/domain/types/configuration/configuration.type').EndgeConfigurationContribution
   meta?: Record<string, unknown>
 }
 

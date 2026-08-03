@@ -32,68 +32,9 @@ import type { WorkspaceVariables } from '@/model/endge/context/endge-vars'
 import { EndgeVocabs } from '@/model/endge/domain/endge-vocabs'
 import { EndgeWorkspace } from '@/model/endge/context/endge-workspace'
 import { EndgeUIRegistry } from '@/model/endge/ui/endge-ui-registry'
+import { ENDGE_DOMAIN_BUNDLE_VERSION } from '@/model/config/domain-bundle'
 import { ENDGE_CORE_MODULES } from '@/model/config/endge-modules'
 import type { EndgeComposition } from '@/model/endge/runtime/execution/endge-composition'
-
-const ENDGE_DOMAIN_BUNDLE_VERSION = '1.1.0'
-
-type EndgeDomainCollection = keyof EndgeDomainPlain
-
-function resolveSelectionCollection(selection: EndgeDomainSelection): EndgeDomainCollection | null {
-  switch (selection.sectionType) {
-    case DomainSectionType.Primitive:
-    case DomainSectionType.Type:
-      return 'types'
-    case DomainSectionType.Component:
-      return selection.docType === 'component-sfc' ? 'componentSFCs' : 'components'
-    case DomainSectionType.Query:
-      return 'queries'
-    case DomainSectionType.DataView:
-      return 'dataViews'
-    case DomainSectionType.Composition:
-      return 'compositions'
-    case DomainSectionType.Store:
-      return 'stores'
-    case DomainSectionType.Mock:
-      return 'mocks'
-    case DomainSectionType.Action:
-      return 'actions'
-    case DomainSectionType.Converter:
-      return 'converters'
-    case DomainSectionType.Computation:
-      return 'computations'
-    case DomainSectionType.Integration:
-      return 'integrations'
-    case DomainSectionType.Parameters:
-      return 'parameters'
-    case DomainSectionType.Filters:
-      return 'filters'
-    case DomainSectionType.Environment:
-      return 'environments'
-    case DomainSectionType.Tenant:
-      return 'tenants'
-    case DomainSectionType.Policy:
-      return 'policies'
-    case DomainSectionType.Style:
-      return 'styles'
-    case DomainSectionType.PageTemplate:
-      return 'pageTemplates'
-    case DomainSectionType.Page:
-      return 'pages'
-    case DomainSectionType.Navigation:
-      return 'navigations'
-    case DomainSectionType.Vocabs:
-      return 'vocabs'
-    case DomainSectionType.I18nBundles:
-      return 'i18nBundles'
-    case DomainSectionType.AuthProfile:
-      return 'authProfiles'
-    case DomainSectionType.Project:
-      return 'projects'
-    default:
-      return null
-  }
-}
 
 /**
  * Единая статическая федерация Endge.
@@ -137,20 +78,34 @@ export class Endge extends EndgeFederation {
   }
 
   /**
-   * Собирает переносимый snapshot workspace и текущего домена.
+   * Скачивает текущий workspace и домен либо только выбранные документы как JSON-файл.
    */
-  static exportDomainBundle(): EndgeDomainBundle {
-    return this.createDomainBundle(Endge.domain.toPlain())
+  static download(selection?: readonly EndgeDomainSelection[]): void {
+    const domain = selection === undefined
+      ? Endge.domain.toPlain()
+      : Endge.selectDomain(selection)
+    const bundle = Endge.createDomainBundle(domain)
+    const filenamePrefix = selection === undefined ? 'endge-domain' : 'endge-domain-selected'
+    const timestamp = new Date().toISOString().replace(/:/g, '-').replace(/\..+/, '')
+    const blob = new Blob([JSON.stringify(bundle)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+
+    anchor.href = url
+    anchor.download = `${filenamePrefix}-${timestamp}.json`
+    anchor.click()
+
+    URL.revokeObjectURL(url)
   }
 
   /**
-   * Собирает bundle только с перечисленными документами, сохраняя полную структуру domain.
+   * Возвращает domain только с перечисленными документами, сохраняя полную структуру коллекций.
    * Тип секции обязателен, потому что id сущностей уникален только внутри своей коллекции.
    */
-  static exportSelectedDomainBundle(selection: readonly EndgeDomainSelection[]): EndgeDomainBundle {
-    const selectedKeys = new Map<EndgeDomainCollection, Set<string>>()
+  private static selectDomain(selection: readonly EndgeDomainSelection[]): EndgeDomainPlain {
+    const selectedKeys = new Map<keyof EndgeDomainPlain, Set<string>>()
     for (const item of selection) {
-      const collection = resolveSelectionCollection(item)
+      const collection = Endge.resolveSelectionCollection(item)
       if (!collection)
         continue
 
@@ -162,8 +117,8 @@ export class Endge extends EndgeFederation {
     }
 
     const domain = Endge.domain.toPlain()
-    const selectedDomain = Object.fromEntries(
-      (Object.entries(domain) as Array<[EndgeDomainCollection, unknown[]]>).map(([collection, entities]) => {
+    return Object.fromEntries(
+      (Object.entries(domain) as Array<[keyof EndgeDomainPlain, unknown[]]>).map(([collection, entities]) => {
         const keys = selectedKeys.get(collection)
         if (!keys)
           return [collection, []]
@@ -177,8 +132,6 @@ export class Endge extends EndgeFederation {
         })]
       }),
     ) as unknown as EndgeDomainPlain
-
-    return this.createDomainBundle(selectedDomain)
   }
 
   private static createDomainBundle(domain: EndgeDomainPlain): EndgeDomainBundle {
@@ -199,36 +152,61 @@ export class Endge extends EndgeFederation {
       },
     }
   }
-  /**
-   * Скачивает текущий workspace и домен как JSON-файл через браузерный download.
-   */
-  static async download(): Promise<void> {
-    const bundle = Endge.exportDomainBundle()
-    Endge.downloadBundle(bundle, 'endge-domain')
-  }
-  /**
-   * Скачивает выбранные документы в той же portable JSON-структуре, что и полный домен.
-   */
-  static async downloadSelected(selection: readonly EndgeDomainSelection[]): Promise<void> {
-    const bundle = Endge.exportSelectedDomainBundle(selection)
-    Endge.downloadBundle(bundle, 'endge-domain-selected')
-  }
 
-  private static downloadBundle(bundle: EndgeDomainBundle, filenamePrefix: string): void {
-    const jsonString = JSON.stringify(bundle)
-
-    const now = new Date()
-    const timestamp = now.toISOString().replace(/:/g, '-').replace(/\..+/, '')
-
-    const blob = new Blob([jsonString], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${filenamePrefix}-${timestamp}.json`
-    a.click()
-
-    URL.revokeObjectURL(url)
+  private static resolveSelectionCollection(selection: EndgeDomainSelection): (keyof EndgeDomainPlain) | null {
+    switch (selection.sectionType) {
+      case DomainSectionType.Primitive:
+      case DomainSectionType.Type:
+        return 'types'
+      case DomainSectionType.Component:
+        return selection.docType === 'component-sfc' ? 'componentSFCs' : 'components'
+      case DomainSectionType.Query:
+        return 'queries'
+      case DomainSectionType.DataView:
+        return 'dataViews'
+      case DomainSectionType.Composition:
+        return 'compositions'
+      case DomainSectionType.Store:
+        return 'stores'
+      case DomainSectionType.Mock:
+        return 'mocks'
+      case DomainSectionType.Action:
+        return 'actions'
+      case DomainSectionType.Converter:
+        return 'converters'
+      case DomainSectionType.Computation:
+        return 'computations'
+      case DomainSectionType.Integration:
+        return 'integrations'
+      case DomainSectionType.Parameters:
+        return 'parameters'
+      case DomainSectionType.Filters:
+        return 'filters'
+      case DomainSectionType.Environment:
+        return 'environments'
+      case DomainSectionType.Tenant:
+        return 'tenants'
+      case DomainSectionType.Policy:
+        return 'policies'
+      case DomainSectionType.Style:
+        return 'styles'
+      case DomainSectionType.PageTemplate:
+        return 'pageTemplates'
+      case DomainSectionType.Page:
+        return 'pages'
+      case DomainSectionType.Navigation:
+        return 'navigations'
+      case DomainSectionType.Vocabs:
+        return 'vocabs'
+      case DomainSectionType.I18nBundles:
+        return 'i18nBundles'
+      case DomainSectionType.AuthProfile:
+        return 'authProfiles'
+      case DomainSectionType.Project:
+        return 'projects'
+      default:
+        return null
+    }
   }
 
   /**

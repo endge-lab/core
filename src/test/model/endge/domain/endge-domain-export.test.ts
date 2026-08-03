@@ -6,6 +6,7 @@ import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { RDataView } from '@/domain/entities/reflect/RDataView'
 import type { REntity } from '@/domain/entities/reflect/REntity'
 import { DomainSectionType, QueryType } from '@/domain/types/document/document.types'
+import type { EndgeDomainBundle, EndgeDomainSelection } from '@/domain/types/document/domain-export.type'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RStore } from '@/domain/entities/reflect/RStore'
 import { RMock } from '@/domain/entities/reflect/RMock'
@@ -31,6 +32,27 @@ function initializeEntity<T extends REntity>(entity: T, id: number, identity: st
   entity.name = identity
   entity.displayName = identity
   return entity
+}
+
+async function downloadBundle(selection?: readonly EndgeDomainSelection[]): Promise<EndgeDomainBundle> {
+  const downloadedBlobs: Blob[] = []
+  vi.stubGlobal('document', {
+    createElement: vi.fn(() => ({ click: vi.fn() })),
+  })
+  vi.stubGlobal('URL', {
+    createObjectURL: vi.fn((blob: Blob) => {
+      downloadedBlobs.push(blob)
+      return 'blob:endge-domain'
+    }),
+    revokeObjectURL: vi.fn(),
+  })
+
+  Endge.download(selection)
+  const downloadedBlob = downloadedBlobs[0]
+  if (!downloadedBlob)
+    throw new Error('Endge.download() did not create a bundle Blob')
+
+  return JSON.parse(await downloadedBlob.text()) as EndgeDomainBundle
 }
 
 describe('Endge domain export', () => {
@@ -98,7 +120,7 @@ describe('Endge domain export', () => {
     expect(plain.authProfiles).toEqual([expect.objectContaining({ identity: 'auth-profile' })])
   })
 
-  it('builds a workspace-aware bundle that can restore the domain', () => {
+  it('builds a workspace-aware bundle that can restore the domain', async () => {
     const workspace = {
       ...TEST_ENDGE_WORKSPACE,
       identity: 'workspace-export-test',
@@ -113,7 +135,7 @@ describe('Endge domain export', () => {
     Endge.workspace.apply(workspace)
     Endge.domain.addQuery(createQuery(1, 'bundle-query', QueryType.Custom))
 
-    const bundle = Endge.exportDomainBundle()
+    const bundle = await downloadBundle()
     const restored = EndgeDomain.fromPlain(bundle)
 
     expect(bundle.version).toBe('1.1.0')
@@ -128,7 +150,7 @@ describe('Endge domain export', () => {
     expect(restored.getQueryByIdentity('bundle-query')).not.toBeNull()
   })
 
-  it('downloads the domain when used as an unbound event handler', async () => {
+  it('downloads the domain when used as an unbound event handler', () => {
     Endge.workspace.apply(TEST_ENDGE_WORKSPACE)
     const click = vi.fn()
     const createObjectURL = vi.fn(() => 'blob:endge-domain')
@@ -139,14 +161,14 @@ describe('Endge domain export', () => {
     vi.stubGlobal('URL', { createObjectURL, revokeObjectURL })
 
     const eventHandler = Endge.download
-    await eventHandler()
+    eventHandler()
 
     expect(createObjectURL).toHaveBeenCalledOnce()
     expect(click).toHaveBeenCalledOnce()
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:endge-domain')
   })
 
-  it('exports only selected documents and scopes ids by domain collection', () => {
+  it('exports only selected documents and scopes ids by domain collection', async () => {
     Endge.workspace.apply(TEST_ENDGE_WORKSPACE)
     const query = createQuery(1, 'selected-query', QueryType.REST)
     const dataViewWithSameId = initializeEntity(new RDataView(), 1, 'not-selected-data-view')
@@ -155,7 +177,7 @@ describe('Endge domain export', () => {
     Endge.domain.addDataView(dataViewWithSameId)
     Endge.domain.addComposition(composition)
 
-    const bundle = Endge.exportSelectedDomainBundle([
+    const bundle = await downloadBundle([
       {
         id: query.id,
         identity: query.identity,

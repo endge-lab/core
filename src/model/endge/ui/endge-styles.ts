@@ -6,12 +6,15 @@ import type {
   EndgeStyleResolvedDeclaration,
   EndgeStyleSheetArtifact,
   EndgeStyleTargetProfile,
-} from '@/domain/types/style'
-import type { EndgeStyleProgramPayload, ProgramArtifact } from '@/domain/types/program'
+} from '@/domain/types/style/style.types'
+import type {
+  EndgeStyleProgramPayload,
+  ProgramArtifact,
+} from '@/domain/types/program/program.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { Endge } from '@/model/endge/kernel/endge'
-import { resolveEndgeStyleDeclarations } from '@/model/services/style'
+import { resolveEndgeStyleDeclarations } from '@/model/services/style/endgecss-match'
 
 export interface EndgeStyleResolver {
   readonly target: EndgeStyleTargetProfile

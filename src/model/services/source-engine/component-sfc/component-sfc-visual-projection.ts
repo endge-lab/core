@@ -6,12 +6,16 @@ import type {
   ComponentSFCTableColumnProjection,
   ComponentSFCTableVisualCellTag,
   ComponentSFCTableVisualProjection,
+} from '@/domain/types/component/sfc/visual-projection.types'
+import type {
   RComponentSFC_AST_Directive,
   RComponentSFC_AST_ElementNode,
   RComponentSFC_AST_TemplateNode,
+} from '@/domain/types/component/sfc/ast.types'
+import type {
   RComponentSFC_IR_ElementNode,
   RComponentSFC_IR_Value,
-} from '@/domain/types/component/sfc'
+} from '@/domain/types/component/sfc/ir.types'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sfc/component-sfc-template'
 

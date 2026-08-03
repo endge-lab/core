@@ -1,10 +1,10 @@
 import type {
   ComputationExecutionApi,
   ComputationExecutionScope,
-  ComputationProgramPayload,
   ComputationSandboxAdapter,
   ComputationSandboxRequest,
-} from '@/domain/types/computation'
+} from '@/domain/types/computation/computation-runtime.types'
+import type { ComputationProgramPayload } from '@/domain/types/computation/computation-program.types'
 import type { ProgramArtifact } from '@/domain/types/program/program.types'
 
 import { Endge } from '@/model/endge/kernel/endge'

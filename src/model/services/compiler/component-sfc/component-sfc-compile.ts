@@ -11,14 +11,14 @@ import type {
   ComponentSFCPreviewOptions,
   ComponentSFCPreviewProps,
 } from '@/domain/types/program/program.types'
+import type { RComponentSFCSource_Parts } from '@/domain/types/component/sfc/source.types'
+import type { RComponentSFC_AST } from '@/domain/types/component/sfc/ast.types'
+import type { RComponentSFC_IR } from '@/domain/types/component/sfc/ir.types'
+import type { RComponentSFC_RuntimeDependencies } from '@/domain/types/component/sfc/dependencies.types'
 import type {
-  RComponentSFCSource_Parts,
-  RComponentSFC_AST,
-  RComponentSFC_IR,
-  RComponentSFC_RuntimeDependencies,
   ComponentSFCPortManifest,
   ComponentSFCPortProviderDescriptor,
-} from '@/domain/types/component/sfc'
+} from '@/domain/types/component/sfc/ports.types'
 import type { ProgramMetadata } from '@/domain/types/program/program-metadata.types'
 import type { TypeSourceDefinition } from '@/domain/types/source/type-source.types'
 import { parseComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-parse'
@@ -26,7 +26,7 @@ import { analyzeComponentSFCScript } from '@/model/services/compiler/component-s
 import { analyzeComponentSFCRuntimeDependencies } from '@/model/services/compiler/component-sfc/component-sfc-dependencies'
 import { compileComponentSFCStyle } from '@/model/services/compiler/component-sfc/component-sfc-style'
 import { compileComponentSFCTemplate } from '@/model/services/compiler/component-sfc/component-sfc-template'
-import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component/sfc'
+import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component/sfc/dependencies.types'
 import { createEmptyProgramMetadata } from '@/domain/types/program/program-metadata.types'
 import { analyzeComponentSFCPorts } from '@/model/services/compiler/component-sfc/component-sfc-ports'
 import { resolveComponentSFCPortForwards } from '@/model/services/compiler/component-sfc/component-sfc-forward'

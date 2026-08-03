@@ -2,7 +2,7 @@ import type { RComponentDiagnostic } from '@/domain/types/component/component-co
 import type {
   RComponentSFC_IR_ElementNode,
   RComponentSFC_IR_Value,
-} from '@/domain/types/component/sfc'
+} from '@/domain/types/component/sfc/ir.types'
 
 export const SFC_TABLE_SORT_MODES = ['multiple', 'single', 'fixed', 'disabled'] as const
 export const SFC_TABLE_SORT_COMPARATORS = ['natural', 'text', 'number', 'date', 'time', 'boolean'] as const

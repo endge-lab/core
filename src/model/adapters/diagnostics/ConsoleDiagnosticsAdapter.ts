@@ -3,10 +3,12 @@ import type {
   DiagnosticsAdapterFactory,
   DiagnosticsAdapterRecordContext,
   DiagnosticsAdapterSnapshotContext,
+} from '@/domain/types/diagnostics/diagnostics-adapter.type'
+import type {
   DiagnosticsRecord,
   DiagnosticsSnapshot,
   EndgeDiagnosticsOutputConfiguration,
-} from '@/domain/types/diagnostics'
+} from '@/domain/types/diagnostics/diagnostics.types'
 
 type ConsoleFormat = 'pretty' | 'json'
 

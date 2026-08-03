@@ -1,5 +1,5 @@
 import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
-import type { EndgeMockReference } from '@/domain/types/mock'
+import type { EndgeMockReference } from '@/domain/types/mock/mock-data.type'
 import type { DataViewRef } from '@/domain/types/source/data-view-source.types'
 import type { SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 

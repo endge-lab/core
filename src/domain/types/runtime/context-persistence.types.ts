@@ -4,6 +4,20 @@ export interface EndgePersistenceOptions {
   driver?: EndgePersistenceDriver
 }
 
+export interface EndgeContextPersistenceConfig {
+  context?: EndgePersistenceDriver | EndgePersistenceOptions | null
+}
+
+export interface EndgeContextSnapshot {
+  workspace: string | null
+  tenant: string | null
+  project: string | null
+  environment: string | null
+  user: string | null
+  locale: string | null
+  theme: string | null
+}
+
 export interface EndgePersistenceScope {
   workspaceId: string
   tenantId: string

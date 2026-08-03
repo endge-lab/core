@@ -5,7 +5,7 @@ import type {
   EndgeSSEConfiguration,
   EndgeThemeDefinition,
   EndgeVariableDefinition,
-} from '@/domain/types/configuration'
+} from '@/domain/types/configuration/configuration.type'
 import type { EntityManagement } from './entity-management.type'
 
 export type EndgeWorkspaceLocale = EndgeLocaleDefinition

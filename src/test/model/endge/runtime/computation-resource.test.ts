@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { ComputationProgramPayload } from '@/domain/types/computation'
+import type { ComputationProgramPayload } from '@/domain/types/computation/computation-program.types'
 import type { ProgramArtifact } from '@/domain/types/program/program.types'
 import { Endge } from '@/model/endge/kernel/endge'
 import { ComputationResourceState } from '@/model/endge/runtime/execution/computation/ComputationResource'

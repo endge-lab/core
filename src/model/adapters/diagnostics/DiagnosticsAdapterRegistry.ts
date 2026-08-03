@@ -2,8 +2,8 @@ import type {
   DiagnosticsAdapter,
   DiagnosticsAdapterCreateContext,
   DiagnosticsAdapterFactory,
-  EndgeDiagnosticsOutputConfiguration,
-} from '@/domain/types/diagnostics'
+} from '@/domain/types/diagnostics/diagnostics-adapter.type'
+import type { EndgeDiagnosticsOutputConfiguration } from '@/domain/types/diagnostics/diagnostics.types'
 
 /** Реестр расширяемых типов diagnostics adapters. */
 export class DiagnosticsAdapterRegistry {

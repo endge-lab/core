@@ -2,7 +2,7 @@ import type { RComponentDiagnostic } from '@/domain/types/component/component-co
 import type {
   RComponentSFC_IR_ElementNode,
   RComponentSFC_IR_Value,
-} from '@/domain/types/component/sfc'
+} from '@/domain/types/component/sfc/ir.types'
 import type { TableColumnPinSide } from '@/domain/types/runtime/action.types'
 
 export const SFC_TABLE_COLUMN_PIN_MODES = ['enabled', 'disabled'] as const

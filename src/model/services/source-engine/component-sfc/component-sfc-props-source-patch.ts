@@ -1,8 +1,8 @@
 import type {
   ComponentSFCPropsSourcePatchResult,
   ComponentSFCPropsVisualProjection,
-  RComponentSFC_IR_Prop,
-} from '@/domain/types/component/sfc'
+} from '@/domain/types/component/sfc/props-visual.types'
+import type { RComponentSFC_IR_Prop } from '@/domain/types/component/sfc/ir.types'
 
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import { parseComponentSFCTypeFields } from '@/model/services/compiler/component-sfc/component-sfc-script'

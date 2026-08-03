@@ -8,11 +8,11 @@ import type {
   ComponentSFCPreviewProps,
   ComponentSFCPreviewRunTarget,
 } from '@/domain/types/program/program.types'
+import type { RComponentSFC_AST_Script } from '@/domain/types/component/sfc/ast.types'
 import type {
-  RComponentSFC_AST_Script,
   RComponentSFC_IR_LocalBinding,
   RComponentSFC_IR_Prop,
-} from '@/domain/types/component/sfc'
+} from '@/domain/types/component/sfc/ir.types'
 import type { ProgramMetadataMap } from '@/domain/types/program/program-metadata.types'
 import type { TypeSourceDefinition, TypeSourceExpression } from '@/domain/types/source/type-source.types'
 import { compileProgramMetadataSource } from '@/model/services/source-engine/compilers/source-metadata-compile'

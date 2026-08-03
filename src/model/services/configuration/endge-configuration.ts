@@ -8,7 +8,7 @@ import type {
   EndgeSSEConfiguration,
   EndgeThemeDefinition,
   EndgeVariableDefinition,
-} from '@/domain/types/configuration'
+} from '@/domain/types/configuration/configuration.type'
 import type {
   DiagnosticsAttributes,
   DiagnosticsAdapterOptionValue,
@@ -19,16 +19,14 @@ import type {
   EndgeDiagnosticsConfiguration,
   EndgeDiagnosticsOutputConfiguration,
   EndgeDiagnosticsRoute,
-} from '@/domain/types/diagnostics'
+} from '@/domain/types/diagnostics/diagnostics.types'
+import { DEFAULT_FALLBACK_LOCALE, DEFAULT_LOCALE, DEFAULT_THEME } from '@/model/config/context'
 import { DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION } from '@/model/config/diagnostics'
 
 const LEGACY_SFC_ADAPTER_IDS: Readonly<Record<string, string>> = {
   'native-vue': 'vue-native',
   'shadcn-vue': 'vue-shadcn',
 }
-
-const DEFAULT_LOCALE = 'en'
-const DEFAULT_THEME = 'dark'
 
 const DEFAULT_CONFIGURATION_VALUE: EndgeConfiguration = {
   vars: [],
@@ -37,7 +35,7 @@ const DEFAULT_CONFIGURATION_VALUE: EndgeConfiguration = {
     { code: 'en', displayName: 'English', shortLabel: 'EN', direction: 'ltr' },
   ],
   defaultLocale: DEFAULT_LOCALE,
-  fallbackLocale: DEFAULT_LOCALE,
+  fallbackLocale: DEFAULT_FALLBACK_LOCALE,
   themes: [
     { identity: 'light', displayName: 'Светлая' },
     { identity: 'dark', displayName: 'Тёмная' },
@@ -71,7 +69,7 @@ export function normalizeEndgeConfiguration(input: unknown): EndgeConfiguration 
     'defaultLocale',
   )
   const fallbackLocale = requireMember(
-    normalizeText(input.fallbackLocale) || DEFAULT_LOCALE,
+    normalizeText(input.fallbackLocale) || DEFAULT_FALLBACK_LOCALE,
     localeCodes,
     'fallbackLocale',
   )

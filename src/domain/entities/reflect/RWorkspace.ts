@@ -1,4 +1,4 @@
-import type { EndgeConfiguration } from '@/domain/types/configuration'
+import type { EndgeConfiguration } from '@/domain/types/configuration/configuration.type'
 import type {
   EndgeDataMode,
   EndgeWorkspaceDefinition,
@@ -8,7 +8,7 @@ import type {
 
 import { Expose } from 'class-transformer'
 import { REntity } from '@/domain/entities/reflect/REntity'
-import { normalizeEndgeConfiguration } from '@/model/services/configuration'
+import { normalizeEndgeConfiguration } from '@/model/services/configuration/endge-configuration'
 
 /** Persisted Workspace root with one complete configuration document. */
 export class RWorkspace extends REntity implements EndgeWorkspaceDefinition {

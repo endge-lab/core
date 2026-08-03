@@ -1,10 +1,10 @@
 import type { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentSFCRuntimeHost'
 import type {
   ComponentSFCEventPort,
-  RComponentSFC_IR_EventBinding,
   ComponentSFCEventRuntimeSource,
   ComponentSFCPortManifest,
-} from '@/domain/types/component/sfc'
+} from '@/domain/types/component/sfc/ports.types'
+import type { RComponentSFC_IR_EventBinding } from '@/domain/types/component/sfc/ir.types'
 
 /** Mount-scoped Event router for one Component SFC artifact boundary. */
 export class ComponentSFCEventBoundary {

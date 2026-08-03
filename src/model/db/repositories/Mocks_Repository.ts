@@ -1,6 +1,9 @@
 import type { AxiosInstance } from 'axios'
 
-import type { RMockContentSource, RMockContentType } from '@/domain/types/mock'
+import type {
+  RMockContentSource,
+  RMockContentType,
+} from '@/domain/types/mock/mock-data.type'
 
 export interface MocksPayloadFields {
   identity: string

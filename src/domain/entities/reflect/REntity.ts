@@ -1,5 +1,5 @@
 import { Exclude, Expose, Transform } from 'class-transformer'
-import type { DiagnosticsProblemInput } from '@/domain/types/diagnostics'
+import type { DiagnosticsProblemInput } from '@/domain/types/diagnostics/diagnostics.types'
 import type { EntityManagement, EntityManagementLike, EntityOrigin, ManagedBy } from '@/domain/types/document/entity-management.type'
 import { normalizeEntityManagement } from '@/domain/types/document/entity-management.type'
 

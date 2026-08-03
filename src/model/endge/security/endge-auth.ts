@@ -4,7 +4,7 @@ import type {
   StoredAuthToken,
 } from '@/domain/types/auth/auth.types'
 import type { EndgeAuthContext } from '@/domain/types/auth/auth-profile.types'
-import type { DiagnosticsAttributes } from '@/domain/types/diagnostics'
+import type { DiagnosticsAttributes } from '@/domain/types/diagnostics/diagnostics.types'
 import type { AxiosInstance } from 'axios'
 
 import axios from 'axios'

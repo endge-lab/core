@@ -1,6 +1,6 @@
 import type { SourceEngineCompileResult, SourceEngineStrategy, SourceKind } from '@/domain/types/source/source-engine.types'
 
-import { compileEndgeCSS } from '@/model/services/style'
+import { compileEndgeCSS } from '@/model/services/style/endgecss-compile'
 
 export class StyleSourceEngineStrategy implements SourceEngineStrategy {
   public readonly id = 'source:style'

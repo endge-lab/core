@@ -5,9 +5,11 @@ import type {
   ComputationContractField,
   ComputationProgramNode,
   ComputationProgramPayload,
+} from '@/domain/types/computation/computation-program.types'
+import type {
   ComputationSourceDocument,
   ComputationSourceNode,
-} from '@/domain/types/computation'
+} from '@/domain/types/computation/computation-source.types'
 import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
 import type { SourceExpressionIR } from '@/domain/types/source/source-expression.types'
 import {

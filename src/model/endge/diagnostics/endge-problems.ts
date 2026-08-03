@@ -7,7 +7,7 @@ import type {
   DiagnosticsProblemInput,
   DiagnosticsProblemOwner,
   DiagnosticsProblemsSnapshot,
-} from '@/domain/types/diagnostics'
+} from '@/domain/types/diagnostics/diagnostics.types'
 
 /** Создаёт стабильного owner для проблем одной доменной сущности и фазы. */
 export function createDiagnosticsEntityOwner(

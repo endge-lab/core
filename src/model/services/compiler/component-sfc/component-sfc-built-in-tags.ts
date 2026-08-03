@@ -1,4 +1,4 @@
-import type { RComponentSFC_IR_Tag } from '@/domain/types/component/sfc'
+import type { RComponentSFC_IR_Tag } from '@/domain/types/component/sfc/ir.types'
 
 export const ENDGE_SFC_BUILT_IN_TAGS = new Set<RComponentSFC_IR_Tag>([
   'Text', 'DateTime', 'Number', 'Icon', 'Badge', 'Dot', 'Box', 'Flex', 'Grid', 'Divider',

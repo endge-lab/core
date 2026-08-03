@@ -1,5 +1,9 @@
 import type { AxiosInstance } from 'axios'
-import type { EndgeDataMode, ManagedBy, WorkspaceIntegrationReference } from '@/domain/types/document'
+import type {
+  EndgeDataMode,
+  WorkspaceIntegrationReference,
+} from '@/domain/types/document/workspace.types'
+import type { ManagedBy } from '@/domain/types/document/entity-management.type'
 
 export type WorkspacePayloadData = {
   identity: string
@@ -11,7 +15,7 @@ export type WorkspacePayloadData = {
     integration: WorkspaceIntegrationReference['integrationId']
     version: string
   }>
-  configuration: import('@/domain/types/configuration').EndgeConfiguration
+  configuration: import('@/domain/types/configuration/configuration.type').EndgeConfiguration
   meta?: Record<string, unknown>
 }
 

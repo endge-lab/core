@@ -7,7 +7,6 @@ export interface EndgeFederationHost {
   isConfiguring: boolean
   isSetup: boolean
   isInitialized: boolean
-  isHydrating: boolean
   bootContext: EndgeBootContext | null
   moduleDescriptors: EndgeModuleDescriptor[]
   modules: Map<string, EndgeModule>

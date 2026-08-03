@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { compileEndgeCSS } from '@/model/services/style/endgecss-compile'
 import { matchEndgeStyleSelector, resolveEndgeStyleDeclarations } from '@/model/services/style/endgecss-match'
-import type { EndgeStyleMatchNode } from '@/domain/types/style'
+import type { EndgeStyleMatchNode } from '@/domain/types/style/style.types'
 
 function node(input: Partial<EndgeStyleMatchNode> & Pick<EndgeStyleMatchNode, 'tag'>): EndgeStyleMatchNode {
   return {

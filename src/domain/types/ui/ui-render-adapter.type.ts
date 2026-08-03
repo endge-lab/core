@@ -1,4 +1,4 @@
-import type { RComponentSFC_IR_Tag } from '@/domain/types/component/sfc'
+import type { RComponentSFC_IR_Tag } from '@/domain/types/component/sfc/ir.types'
 
 /** Протокол renderer-адаптеров для SFC v1. */
 export const ENDGE_SFC_RENDER_ADAPTER_PROTOCOL = 'endge-sfc'

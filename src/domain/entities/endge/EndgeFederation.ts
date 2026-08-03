@@ -4,6 +4,7 @@ import type { EndgeFederationHost } from '@/domain/types/kernel/federation.types
 
 import type { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { sortEndgeModuleDescriptors } from '@/domain/entities/endge/sort-endge-modules'
+import { ENDGE_FEDERATION_REGISTRY_KEY } from '@/model/config/federation'
 
 function toArray(value: string | string[] | undefined): string[] {
   if (!value)
@@ -20,18 +21,12 @@ export abstract class EndgeFederation {
   protected static readonly federationId: string = 'default'
   protected static readonly storageKey: string | null = null
 
-  private static readonly REGISTRY_KEY = Symbol.for('endge.federation.registry.v2')
-
   public static get isInitialized(): boolean {
     return this.host.isInitialized
   }
 
   public static get isConfigured(): boolean {
     return this.getOrCreateHost().isConfigured
-  }
-
-  public static get isLoadingFromStorage(): boolean {
-    return this.host.isHydrating
   }
 
   /**
@@ -101,6 +96,8 @@ export abstract class EndgeFederation {
       key: normalizedKey,
     }
 
+    //
+    // Топологическая сортировка модулей
     const beforeIndex = toArray(descriptor.before)
       .map(target => host.moduleDescriptors.findIndex(item => item.key === target))
       .find(index => index >= 0)
@@ -124,6 +121,10 @@ export abstract class EndgeFederation {
     return descriptor.module
   }
 
+  /**
+   * Декларирует модули федерации.
+   * Итоговый порядок строится после установки plugin-модулей.
+   */
   public static defineModules(descriptors: EndgeModuleDescriptor[]): void {
     for (const descriptor of descriptors)
       this.defineModule(descriptor)
@@ -199,7 +200,6 @@ export abstract class EndgeFederation {
     const host = this.host
     host.isSetup = false
     host.isInitialized = false
-    host.isHydrating = false
     host.bootContext = null
   }
 
@@ -208,7 +208,7 @@ export abstract class EndgeFederation {
    */
   public static saveToStorage(): void {
     const storageKey = this.storageKey
-    if (!storageKey || this.isLoadingFromStorage)
+    if (!storageKey)
       return
 
     const payload: Record<string, unknown> = {}
@@ -239,7 +239,6 @@ export abstract class EndgeFederation {
       return {}
 
     const host = this.host
-    host.isHydrating = true
 
     try {
       const raw = localStorage.getItem(storageKey)
@@ -268,11 +267,6 @@ export abstract class EndgeFederation {
       }
 
       return {}
-    }
-    finally {
-      queueMicrotask(() => {
-        host.isHydrating = false
-      })
     }
   }
 
@@ -335,7 +329,6 @@ export abstract class EndgeFederation {
       isConfiguring: false,
       isSetup: false,
       isInitialized: false,
-      isHydrating: false,
       bootContext: null,
       moduleDescriptors: [],
       modules: new Map<string, EndgeModule>(),
@@ -389,9 +382,9 @@ export abstract class EndgeFederation {
   private static registry(): Map<string, EndgeFederationHost> {
     const globalRegistry = globalThis as typeof globalThis & Record<string | symbol, unknown>
 
-    if (!(this.REGISTRY_KEY in globalRegistry))
-      globalRegistry[this.REGISTRY_KEY] = new Map<string, EndgeFederationHost>()
+    if (!(ENDGE_FEDERATION_REGISTRY_KEY in globalRegistry))
+      globalRegistry[ENDGE_FEDERATION_REGISTRY_KEY] = new Map<string, EndgeFederationHost>()
 
-    return globalRegistry[this.REGISTRY_KEY] as Map<string, EndgeFederationHost>
+    return globalRegistry[ENDGE_FEDERATION_REGISTRY_KEY] as Map<string, EndgeFederationHost>
   }
 }

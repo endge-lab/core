@@ -1,5 +1,5 @@
 import type { AxiosInstance } from 'axios'
-import type { ManagedBy } from '@/domain/types/document'
+import type { ManagedBy } from '@/domain/types/document/entity-management.type'
 
 export interface EnvironmentDoc {
   id: number | string
@@ -8,7 +8,7 @@ export interface EnvironmentDoc {
   folder?: number | string
   managedBy?: ManagedBy
   managedById?: string | null
-  configuration?: import('@/domain/types/configuration').EndgeConfigurationContribution
+  configuration?: import('@/domain/types/configuration/configuration.type').EndgeConfigurationContribution
   meta?: Record<string, unknown>
 }
 
@@ -42,7 +42,7 @@ export class Environments_Repository {
     folder?: number | string
     managedBy?: ManagedBy
     managedById?: string | null
-    configuration?: import('@/domain/types/configuration').EndgeConfigurationContribution
+    configuration?: import('@/domain/types/configuration/configuration.type').EndgeConfigurationContribution
     meta?: Record<string, unknown>
   }): Promise<EnvironmentDoc> {
     const r = await this.api.post('/environments', data)
@@ -57,7 +57,7 @@ export class Environments_Repository {
       folder: number | string
       managedBy: ManagedBy
       managedById: string | null
-      configuration: import('@/domain/types/configuration').EndgeConfigurationContribution
+      configuration: import('@/domain/types/configuration/configuration.type').EndgeConfigurationContribution
       meta: Record<string, unknown>
     }>,
   ): Promise<EnvironmentDoc> {
@@ -88,7 +88,7 @@ export class Environments_Repository {
     folder?: number | string
     managedBy?: ManagedBy
     managedById?: string | null
-    configuration?: import('@/domain/types/configuration').EndgeConfigurationContribution
+    configuration?: import('@/domain/types/configuration/configuration.type').EndgeConfigurationContribution
     meta?: Record<string, unknown>
   }): Promise<EnvironmentDoc> {
     const existing = await this.findByIdentity(data.identity)

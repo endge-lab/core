@@ -1,6 +1,6 @@
 import type { REntity } from '@/domain/entities/reflect/REntity'
 
-/** Generic index for non-persisted effective-domain descriptors. */
+/** Универсальный индекс неперсистентных дескрипторов результирующего домена. */
 export class ResolvedEntityIndex {
   private readonly _entities = new Map<string, Map<string, REntity>>()
 
@@ -25,7 +25,7 @@ export class ResolvedEntityIndex {
     this._entities.get(type)?.delete(identity)
   }
 
-  /** Clears only build-derived records while preserving builtin and local ones. */
+  /** Удаляет только вычисленные при сборке записи, сохраняя встроенные и локальные. */
   public clearDerived(type?: string): void {
     const entries = type ? [[type, this._entities.get(type)] as const] : [...this._entities.entries()]
     for (const [, byIdentity] of entries) {

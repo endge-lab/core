@@ -20,7 +20,10 @@ import type {
 import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext, RuntimeHostInputBinding, RuntimeHostInputSource, RuntimeHostUpdateContext } from '@/domain/types/runtime/runtime-host.types'
 import type { I18nRuntimeCatalog } from '@/domain/types/i18n.types'
 import type { VocabRuntimeCatalog } from '@/domain/types/runtime/vocab-cache.types'
-import type { ComponentSFCEventInputValue, ComponentSFCEventOccurrence } from '@/domain/types/component/sfc'
+import type {
+  ComponentSFCEventInputValue,
+  ComponentSFCEventOccurrence,
+} from '@/domain/types/component/sfc/ports.types'
 import type { CompositionComponentEventEffect } from '@/domain/types/source/composition-source.types'
 
 import { Raph, RaphNode } from '@endge/raph'

@@ -3108,7 +3108,7 @@ export class EndgeSchemaStorage extends EndgeModule {
       const environment = ((opts?.model as any) ?? domain.getEnvironment(documentId)) as any
       if (!environment)
         throw new Error(`Окружение не найдено: ${documentId}`)
-      const plain = environment.toPlain() as { id: string, name: string, folder?: string | null, managedBy?: import('@/domain/types/document').ManagedBy, managedById?: string | null, configuration?: any, meta?: Record<string, unknown> }
+      const plain = environment.toPlain() as { id: string, name: string, folder?: string | null, managedBy?: import('@/domain/types/document/entity-management.type').ManagedBy, managedById?: string | null, configuration?: any, meta?: Record<string, unknown> }
       const environmentIdentity = String((environment as any).identity ?? plain.id ?? environment.id ?? '')
       const existing = await this._findPayloadDocumentForSave(
         repos.environments,

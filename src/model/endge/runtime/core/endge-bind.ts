@@ -1,5 +1,5 @@
 import type { ActionStepHandler } from '@/domain/types/flow/action.types'
-import type { ComputationOverride } from '@/domain/types/computation'
+import type { ComputationOverride } from '@/domain/types/computation/computation-runtime.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { RAction } from '@/domain/entities/reflect/RAction'

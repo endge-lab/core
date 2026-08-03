@@ -7,7 +7,7 @@ import type {
 } from '@/domain/types/source/source-engine.types'
 
 import { ENDGE_STYLE_DEFAULT_SOURCE } from '@/domain/entities/reflect/RStyle'
-import { compileEndgeCSS } from '@/model/services/style'
+import { compileEndgeCSS } from '@/model/services/style/endgecss-compile'
 
 export class StyleSourceLanguageStrategy implements SourceLanguageStrategy {
   public readonly id = 'source-language:style'

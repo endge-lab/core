@@ -19,7 +19,7 @@ import type {
   EndgeStyleSupportCondition,
   EndgeStyleTheme,
   EndgeStyleValueToken,
-} from '@/domain/types/style'
+} from '@/domain/types/style/style.types'
 
 const DEFAULT_MAX_NESTED_SELECTORS = 256
 

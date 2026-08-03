@@ -5,7 +5,7 @@ import type {
   RComponentSFC_IR_ComponentPortMarker,
   RComponentSFC_IR_PortCall,
 } from './ports.types'
-import type { EndgeStyleSheetArtifact } from '@/domain/types/style'
+import type { EndgeStyleSheetArtifact } from '@/domain/types/style/style.types'
 
 /** Семантическая модель компонента после compiler pipeline, независимая от DOM и Nova. */
 export interface RComponentSFC_IR {

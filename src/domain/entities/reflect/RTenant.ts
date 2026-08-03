@@ -2,7 +2,7 @@ import { Serialize } from '@endge/utils'
 import { Expose } from 'class-transformer'
 
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
-import type { EndgeConfigurationContribution } from '@/domain/types/configuration'
+import type { EndgeConfigurationContribution } from '@/domain/types/configuration/configuration.type'
 import { REntity } from '@/domain/entities/reflect/REntity'
 
 /** Сущность тенанта (коллекция tenants). */

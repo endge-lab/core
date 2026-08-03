@@ -9,7 +9,7 @@ import type {
   EndgeStyleSpecificity,
   EndgeStyleSupportCondition,
   EndgeStyleTargetProfile,
-} from '@/domain/types/style'
+} from '@/domain/types/style/style.types'
 
 function attributeMatches(selector: EndgeStyleAttributeSelector, node: EndgeStyleMatchNode): boolean {
   const raw = selector.name === 'part'

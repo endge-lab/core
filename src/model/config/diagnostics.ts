@@ -1,7 +1,7 @@
 import type {
   DiagnosticsSeverityNumber,
   EndgeDiagnosticsConfiguration,
-} from '@/domain/types/diagnostics'
+} from '@/domain/types/diagnostics/diagnostics.types'
 
 /** Системная diagnostics configuration для workspace без явных настроек. */
 export const DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION: Readonly<EndgeDiagnosticsConfiguration> = Object.freeze({

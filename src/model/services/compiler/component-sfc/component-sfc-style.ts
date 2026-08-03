@@ -1,7 +1,8 @@
 import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
-import type { RComponentSFC_AST_Style, RComponentSFC_IR_Style } from '@/domain/types/component/sfc'
+import type { RComponentSFC_AST_Style } from '@/domain/types/component/sfc/ast.types'
+import type { RComponentSFC_IR_Style } from '@/domain/types/component/sfc/ir.types'
 
-import { compileEndgeCSS } from '@/model/services/style'
+import { compileEndgeCSS } from '@/model/services/style/endgecss-compile'
 
 export interface ComponentSFCStyleCompileResult {
   style: RComponentSFC_IR_Style | null

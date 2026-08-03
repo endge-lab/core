@@ -1,20 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { setActiveEndgeWorkspace } from '@/model/config/endge-workspace'
 import { EndgeContext } from '@/model/endge/context/endge-context'
 import { buildRuntimeStateStorageKey, RuntimeStateController } from '@/model/endge/context/persistence/RuntimeStateController'
 import { DisabledContextAdapter } from '@/model/endge/context/persistence/adapters/DisabledContextAdapter'
 import { LocalStorageContextAdapter } from '@/model/endge/context/persistence/adapters/LocalStorageContextAdapter'
-import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
 describe('EndgeContext persistence', () => {
   beforeEach(() => {
     installLocalStorageMock()
-    setActiveEndgeWorkspace(TEST_ENDGE_WORKSPACE)
-  })
-
-  afterEach(() => {
-    setActiveEndgeWorkspace(null)
   })
 
   it('keeps workspace unresolved until Payload selects it', () => {

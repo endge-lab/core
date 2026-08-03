@@ -1,9 +1,9 @@
 // RProject.ts
 import { Expose } from 'class-transformer'
-import type { EndgeConfigurationContribution } from '@/domain/types/configuration'
-import type { DiagnosticsProblemInput } from '@/domain/types/diagnostics'
+import type { EndgeConfigurationContribution } from '@/domain/types/configuration/configuration.type'
+import type { DiagnosticsProblemInput } from '@/domain/types/diagnostics/diagnostics.types'
 import { REntity } from '@/domain/entities/reflect/REntity'
-import { normalizeEndgeConfigurationContribution } from '@/model/services/configuration'
+import { normalizeEndgeConfigurationContribution } from '@/model/services/configuration/endge-configuration'
 
 function normalizeRelationId(value: unknown): number | null {
   if (value == null)

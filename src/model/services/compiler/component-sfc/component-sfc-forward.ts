@@ -9,11 +9,13 @@ import type {
   ComponentSFCPortForwardSelector,
   ComponentSFCPortManifest,
   ComponentSFCPortRole,
+} from '@/domain/types/component/sfc/ports.types'
+import type {
   RComponentSFC_IR_ElementNode,
   RComponentSFC_IR_Node,
   RComponentSFC_IR_Template,
-} from '@/domain/types/component/sfc'
-import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc'
+} from '@/domain/types/component/sfc/ir.types'
+import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
 import {
   getComponentSFCIntrinsicEventDefinitions,
   listComponentSFCEventCapableTags,

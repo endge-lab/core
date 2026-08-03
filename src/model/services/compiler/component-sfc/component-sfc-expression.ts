@@ -5,7 +5,7 @@ import type {
   RComponentSFC_IR_Read,
   RComponentSFC_IR_Value,
   RComponentSFC_IR_VocabRead,
-} from '@/domain/types/component/sfc'
+} from '@/domain/types/component/sfc/ir.types'
 
 /** Контекст анализа выражения SFC template/script. */
 export interface ComponentSFCExpressionContext {

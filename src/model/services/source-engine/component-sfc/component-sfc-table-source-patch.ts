@@ -2,9 +2,11 @@ import type {
   ComponentSFCTableSourcePatch,
   ComponentSFCTableSourcePatchResult,
   ComponentSFCTableVisualCellTag,
+} from '@/domain/types/component/sfc/visual-projection.types'
+import type {
   RComponentSFC_AST_ElementNode,
   RComponentSFC_AST_TemplateNode,
-} from '@/domain/types/component/sfc'
+} from '@/domain/types/component/sfc/ast.types'
 import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
 
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'

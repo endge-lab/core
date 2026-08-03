@@ -53,10 +53,11 @@ describe('EndgeContext locale and theme', () => {
     expect(context.currentLocale).toBe('ru')
   })
 
-  it('normalizes unsupported stored locales to ru', () => {
+  it('reconciles unsupported stored locales to ru', () => {
     const context = new EndgeContext()
 
     context.deserialize({ project: null, environment: 'dev', locale: 'kk' })
+    context.reconcileCurrentLocaleWithWorkspace()
 
     expect(context.currentLocale).toBe('ru')
   })

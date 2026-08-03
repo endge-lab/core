@@ -4,13 +4,15 @@ import type {
   DiagnosticsAdapterFactory,
   DiagnosticsAdapterRecordContext,
   DiagnosticsAdapterSnapshotContext,
+} from '@/domain/types/diagnostics/diagnostics-adapter.type'
+import type {
   DiagnosticsAttributes,
   DiagnosticsLogRecord,
   DiagnosticsRecord,
   DiagnosticsSnapshot,
   DiagnosticsSpanRecord,
   EndgeDiagnosticsOutputConfiguration,
-} from '@/domain/types/diagnostics'
+} from '@/domain/types/diagnostics/diagnostics.types'
 import type { SentryDiagnosticsAdapterOptions } from './SentryDiagnosticsAdapter.types'
 
 const SENTRY_PROTOCOL_VERSION = '7'

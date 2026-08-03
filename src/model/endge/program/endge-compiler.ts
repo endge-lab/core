@@ -1,5 +1,5 @@
 import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
-import type { DiagnosticsSpanHandle } from '@/domain/types/diagnostics'
+import type { DiagnosticsSpanHandle } from '@/domain/types/diagnostics/diagnostics.types'
 import type { DataViewMaterializationStrategy, DataViewRef, DataViewPipelineStep } from '@/domain/types/source/data-view-source.types'
 import type { FilterProgramPayload } from '@/domain/types/source/filter-source.types'
 import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
@@ -25,7 +25,7 @@ import type {
   QueryProgramOutput,
   EndgeStyleProgramPayload,
 } from '@/domain/types/program/program.types'
-import type { EndgeStyleSheetArtifact } from '@/domain/types/style'
+import type { EndgeStyleSheetArtifact } from '@/domain/types/style/style.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
@@ -47,18 +47,18 @@ import { ENDGE_COMPILER_SPAN_GROUPS, ENDGE_COMPILER_VERSION } from '@/model/conf
 import { Endge } from '@/model/endge/kernel/endge'
 import { createEmptyProgramMetadata } from '@/domain/types/program/program-metadata.types'
 import type { ProgramMetadata } from '@/domain/types/program/program-metadata.types'
-import type { ComponentSFCPortManifest } from '@/domain/types/component/sfc'
+import type { ComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
 import {
   COMPONENT_SFC_FORM_EVENT_DEFINITIONS,
   COMPONENT_SFC_INTERACTION_EVENT_DEFINITIONS,
-  TABLE_EVENT_DEFINITIONS,
-} from '@/domain/types/component/sfc'
+} from '@/domain/types/component/sfc/intrinsic-events.types'
+import { TABLE_EVENT_DEFINITIONS } from '@/domain/types/component/sfc/table-events.types'
 import type { ComponentSFCCompileResult } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import { compileComputation } from '@/model/services/compiler/computation/computation-compile'
 import { compileAction } from '@/model/services/compiler/action/action-compile'
 import { parseComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-parse'
 import { analyzeComponentSFCScript } from '@/model/services/compiler/component-sfc/component-sfc-script'
-import { compileEndgeCSS } from '@/model/services/style'
+import { compileEndgeCSS } from '@/model/services/style/endgecss-compile'
 import { resolveCompositionActivation } from '@/model/services/source-engine/composition-activation'
 import { collectI18nMessageKeys, compileI18nLocales } from '@/model/services/i18n/i18n-catalog'
 import { createDiagnosticsEntityOwner } from '@/model/endge/diagnostics/endge-problems'

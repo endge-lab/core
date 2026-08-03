@@ -1,4 +1,4 @@
-import type { DiagnosticsAttributeScalar } from '@/domain/types/diagnostics'
+import type { DiagnosticsAttributeScalar } from '@/domain/types/diagnostics/diagnostics.types'
 
 /** JSON-safe настройки одного Sentry diagnostics output. */
 export interface SentryDiagnosticsAdapterOptions {

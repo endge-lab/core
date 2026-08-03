@@ -5,13 +5,15 @@ import type {
   RComponentSFC_IR_Node,
   RComponentSFC_IR_Read,
   RComponentSFC_IR_Value,
+} from '@/domain/types/component/sfc/ir.types'
+import type {
   RComponentSFC_RuntimeBoundaryDependency,
   RComponentSFC_RuntimeDependencies,
   RComponentSFC_RuntimeDependency,
   RComponentSFC_RuntimeTableColumnDependency,
   RComponentSFC_RuntimeVocabDependency,
-} from '@/domain/types/component/sfc'
-import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component/sfc'
+} from '@/domain/types/component/sfc/dependencies.types'
+import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component/sfc/dependencies.types'
 
 /** Анализирует SFC IR и собирает runtime-зависимости от входных props. */
 export function analyzeComponentSFCRuntimeDependencies(

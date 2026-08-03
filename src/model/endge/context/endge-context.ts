@@ -1,21 +1,29 @@
 import type {
-  EndgePersistenceDriver,
+  EndgeContextPersistenceConfig,
+  EndgeContextSnapshot,
   EndgePersistenceOptions,
   EndgePersistenceScope,
   EndgeSessionIdentityProvider,
   EndgeStorageAdapter,
 } from '@/domain/types/runtime/context-persistence.types'
-import type { EndgeExecutionContext } from '@/domain/types/configuration'
+import type { EndgeConfiguration } from '@/domain/types/configuration/configuration.type'
 import type { EndgeDataMode } from '@/domain/types/document/workspace.types'
 import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
+import type {
+  EndgeExecutionContext,
+  EndgeExecutionContextResolutionInput,
+} from '@/domain/types/runtime/execution-context.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import {
-  getActiveEndgeConfiguration,
-  hasActiveEndgeWorkspace,
-  normalizeWorkspaceLocale,
-  normalizeWorkspaceTheme,
-} from '@/model/config/endge-workspace'
+  CONTEXT_STORAGE_KEY,
+  DEFAULT_LOCALE,
+  DEFAULT_SCOPE,
+  DEFAULT_THEME,
+  LEGACY_CONTEXT_STORAGE_KEY,
+  LEGACY_THEME_STORAGE_KEY,
+} from '@/model/config/context'
+import { Endge } from '@/model/endge/kernel/endge'
 import {
   EndgeStorageAdapterRegistry,
   normalizePersistence,
@@ -24,50 +32,6 @@ import {
 import { RuntimeStateController } from '@/model/endge/context/persistence/RuntimeStateController'
 import { DisabledContextAdapter } from '@/model/endge/context/persistence/adapters/DisabledContextAdapter'
 import { LocalStorageContextAdapter } from '@/model/endge/context/persistence/adapters/LocalStorageContextAdapter'
-
-const CONTEXT_STORAGE_KEY = 'endge:context:v1'
-const LEGACY_CONTEXT_STORAGE_KEY = 'endge-context'
-const LEGACY_THEME_STORAGE_KEY = 'endge:theme'
-const DEFAULT_LOCALE = 'en'
-const DEFAULT_THEME = 'dark'
-
-const DEFAULT_SCOPE = {
-  tenantId: 'default',
-  projectId: 'default',
-  environmentId: 'dev',
-  userId: 'anonymous',
-} satisfies Omit<EndgePersistenceScope, 'workspaceId'>
-
-export interface EndgeContextSnapshot {
-  workspace: string | null
-  tenant: string | null
-  project: string | null
-  environment: string | null
-  user: string | null
-  locale: string | null
-  theme: string | null
-}
-
-export interface EndgeContextPersistenceConfig {
-  context?: EndgePersistenceDriver | EndgePersistenceOptions | null
-}
-
-export interface EndgeExecutionContextProjectCandidate {
-  identity: string
-  allowedEnvironmentIds: readonly number[]
-}
-
-export interface EndgeExecutionContextEnvironmentCandidate {
-  id: string | number
-  identity: string
-}
-
-export interface EndgeExecutionContextResolutionInput {
-  explicit?: Partial<EndgeExecutionContext>
-  tenants: readonly string[]
-  projects: readonly EndgeExecutionContextProjectCandidate[]
-  environments: readonly EndgeExecutionContextEnvironmentCandidate[]
-}
 
 /**
  * Контекст выполнения Endge: текущий workspace/project/environment/user scope
@@ -176,18 +140,10 @@ export class EndgeContext extends EndgeModule {
     const rawLocale = normalizeOptionalText(payload?.locale)
     const rawTheme = normalizeOptionalText(payload?.theme) ?? readLegacyThemePreference()
     this._dataModeOverride = null
-    if (hasActiveEndgeWorkspace()) {
-      this._currentLocale = normalizeWorkspaceLocale(rawLocale ?? DEFAULT_LOCALE)
-      this._pendingLocale = null
-      this._currentTheme = normalizeWorkspaceTheme(rawTheme ?? DEFAULT_THEME)
-      this._pendingTheme = null
-    }
-    else {
-      this._currentLocale = rawLocale ?? DEFAULT_LOCALE
-      this._pendingLocale = rawLocale ?? DEFAULT_LOCALE
-      this._currentTheme = rawTheme ?? DEFAULT_THEME
-      this._pendingTheme = rawTheme ?? DEFAULT_THEME
-    }
+    this._currentLocale = rawLocale ?? DEFAULT_LOCALE
+    this._pendingLocale = rawLocale ?? DEFAULT_LOCALE
+    this._currentTheme = rawTheme ?? DEFAULT_THEME
+    this._pendingTheme = rawTheme ?? DEFAULT_THEME
   }
 
   /** Сохраняет текущий context snapshot через выбранный adapter. */
@@ -199,7 +155,8 @@ export class EndgeContext extends EndgeModule {
     try {
       this.resolveAdapter(this._contextPersistence).write(CONTEXT_STORAGE_KEY, this.serialize())
     }
-    catch {
+    catch(err) {
+      console.warn(err)
       /* Ошибка storage не должна прерывать работу контекста. */
     }
   }
@@ -448,36 +405,38 @@ export class EndgeContext extends EndgeModule {
     this.setDataMode(enabled ? 'mock' : 'live')
   }
 
-  /** Возвращает текущую locale или locale активного workspace. */
+  /** Возвращает текущую locale контекста. */
   get currentLocale(): string {
-    if (this._currentLocale)
-      return this._currentLocale
-    if (hasActiveEndgeWorkspace())
-      return getActiveEndgeConfiguration().defaultLocale
-    return DEFAULT_LOCALE
+    return this._currentLocale || DEFAULT_LOCALE
   }
 
   /** Нормализует, сохраняет и публикует новую locale. */
   set currentLocale(value: string) {
-    const next = normalizeWorkspaceLocale(value)
-    if (next === this._currentLocale) {
+    const configuration = this._activeConfiguration()
+    const raw = normalizeOptionalText(value) ?? DEFAULT_LOCALE
+    const next = this._normalizeLocale(raw, configuration)
+    this._pendingLocale = configuration ? null : raw
+    if (next === this._currentLocale)
       return
-    }
+
     this._currentLocale = next
-    this._pendingLocale = null
     this.saveToStorage()
     this.notify()
   }
 
   /** Устанавливает текущую locale через публичный method API. */
   public setCurrentLocale(locale: string | null): void {
-    this.currentLocale = normalizeWorkspaceLocale(locale)
+    this.currentLocale = normalizeOptionalText(locale) ?? DEFAULT_LOCALE
   }
 
-  /** Согласует текущую locale с активной workspace-конфигурацией. */
-  public reconcileCurrentLocaleWithWorkspace(): void {
+  /** Согласует текущую locale с effective configuration после workspace resolution. */
+  public reconcileCurrentLocaleWithWorkspace(configuration?: EndgeConfiguration): void {
+    const activeConfiguration = configuration ?? this._activeConfiguration()
+    if (!activeConfiguration)
+      return
+
     const pending = this._pendingLocale
-    const next = normalizeWorkspaceLocale(pending ?? this._currentLocale)
+    const next = this._normalizeLocale(pending ?? this._currentLocale, activeConfiguration)
     this._pendingLocale = null
     if (next === this._currentLocale)
       return
@@ -487,36 +446,38 @@ export class EndgeContext extends EndgeModule {
     this.notify()
   }
 
-  /** Возвращает текущую тему или тему по умолчанию активного workspace. */
+  /** Возвращает текущую тему контекста. */
   get currentTheme(): string {
-    if (this._currentTheme)
-      return this._currentTheme
-    if (hasActiveEndgeWorkspace())
-      return getActiveEndgeConfiguration().defaultTheme
-    return DEFAULT_THEME
+    return this._currentTheme || DEFAULT_THEME
   }
 
   /** Нормализует, сохраняет и публикует пользовательскую тему. */
   set currentTheme(value: string) {
-    const next = normalizeWorkspaceTheme(value)
+    const configuration = this._activeConfiguration()
+    const raw = normalizeOptionalText(value) ?? DEFAULT_THEME
+    const next = this._normalizeTheme(raw, configuration)
+    this._pendingTheme = configuration ? null : raw
     if (next === this._currentTheme)
       return
 
     this._currentTheme = next
-    this._pendingTheme = null
     this.saveToStorage()
     this.notify()
   }
 
   /** Устанавливает текущую пользовательскую тему. */
   public setCurrentTheme(theme: string | null): void {
-    this.currentTheme = normalizeWorkspaceTheme(theme)
+    this.currentTheme = normalizeOptionalText(theme) ?? DEFAULT_THEME
   }
 
-  /** Согласует сохранённую тему с каталогом активного workspace. */
-  public reconcileCurrentThemeWithWorkspace(): void {
+  /** Согласует сохранённую тему с effective configuration после workspace resolution. */
+  public reconcileCurrentThemeWithWorkspace(configuration?: EndgeConfiguration): void {
+    const activeConfiguration = configuration ?? this._activeConfiguration()
+    if (!activeConfiguration)
+      return
+
     const pending = this._pendingTheme
-    const next = normalizeWorkspaceTheme(pending ?? this._currentTheme)
+    const next = this._normalizeTheme(pending ?? this._currentTheme, activeConfiguration)
     this._pendingTheme = null
     if (next === this._currentTheme)
       return
@@ -524,6 +485,32 @@ export class EndgeContext extends EndgeModule {
     this._currentTheme = next
     this.saveToStorage()
     this.notify()
+  }
+
+  /** Возвращает effective configuration либо persisted workspace configuration до resolution. */
+  private _activeConfiguration(): EndgeConfiguration | null {
+    try {
+      if (Endge.configuration.isResolved)
+        return Endge.configuration.current
+      if (Endge.workspace.isLoaded)
+        return Endge.workspace.current.configuration
+    }
+    catch {
+      // Federation ещё не завершила configuration lifecycle.
+    }
+    return null
+  }
+
+  private _normalizeLocale(value: string, configuration: EndgeConfiguration | null): string {
+    if (!configuration)
+      return value
+    return configuration.locales.some(item => item.code === value) ? value : configuration.defaultLocale
+  }
+
+  private _normalizeTheme(value: string, configuration: EndgeConfiguration | null): string {
+    if (!configuration)
+      return value
+    return configuration.themes.some(item => item.identity === value) ? value : configuration.defaultTheme
   }
 
   /** Выбирает storage adapter для заданной persistence policy. */

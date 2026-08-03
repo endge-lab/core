@@ -1,5 +1,5 @@
 import type { AxiosInstance } from 'axios'
-import type { ManagedBy } from '@/domain/types/document'
+import type { ManagedBy } from '@/domain/types/document/entity-management.type'
 
 export interface IntegrationDoc {
   id: number | string

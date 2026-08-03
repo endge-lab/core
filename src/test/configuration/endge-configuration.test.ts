@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import type { EndgeConfigurationContribution } from '@/domain/types/configuration'
+import type { EndgeConfigurationContribution } from '@/domain/types/configuration/configuration.type'
 import {
   applyEndgeConfigurationContribution,
   createDefaultEndgeConfiguration,
   createEndgeContextHash,
   normalizeEndgeConfiguration,
-} from '@/model/services/configuration'
+} from '@/model/services/configuration/endge-configuration'
 
 describe('Endge configuration cascade', () => {
   it('uses en locales and the dark theme when defaults are not set', () => {

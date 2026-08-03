@@ -8,6 +8,8 @@ import type {
   RComponentSFC_AST_Template,
   RComponentSFC_AST_TemplateNode,
   RComponentSFC_AST_TextNode,
+} from '@/domain/types/component/sfc/ast.types'
+import type {
   RComponentSFC_IR_Directives,
   RComponentSFC_IR_EventBinding,
   RComponentSFC_IR_EventModifier,
@@ -16,12 +18,14 @@ import type {
   RComponentSFC_IR_Tag,
   RComponentSFC_IR_Template,
   RComponentSFC_IR_Value,
+  ComponentSFCVariant,
+} from '@/domain/types/component/sfc/ir.types'
+import type {
   ComponentSFCComponentPort,
   ComponentSFCActionPort,
   ComponentSFCPortManifest,
-  ComponentSFCVariant,
-} from '@/domain/types/component/sfc'
-import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc'
+} from '@/domain/types/component/sfc/ports.types'
+import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
 import type { ProgramNodeMetadata } from '@/domain/types/program/program-metadata.types'
 import { compileComponentSFCExpression } from '@/model/services/compiler/component-sfc/component-sfc-expression'
 import { compileComponentSFCLocalEventAction } from '@/model/services/compiler/component-sfc/component-sfc-ports'

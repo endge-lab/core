@@ -3,10 +3,12 @@ import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import type {
   DiagnosticsAdapter,
   DiagnosticsAdapterFactory,
+  DiagnosticsFlushResult,
+} from '@/domain/types/diagnostics/diagnostics-adapter.type'
+import type {
   DiagnosticsContextProvider,
   DiagnosticsExceptionOptions,
   DiagnosticsFilter,
-  DiagnosticsFlushResult,
   DiagnosticsListener,
   DiagnosticsLogInput,
   DiagnosticsLogOptions,
@@ -20,12 +22,10 @@ import type {
   DiagnosticsSpanRecord,
   DiagnosticsSubscribeOptions,
   EndgeDiagnosticsConfiguration,
-} from '@/domain/types/diagnostics'
-import {
-  CONSOLE_DIAGNOSTICS_ADAPTER_FACTORY,
-  DiagnosticsAdapterRegistry,
-  SENTRY_DIAGNOSTICS_ADAPTER_FACTORY,
-} from '@/model/adapters/diagnostics'
+} from '@/domain/types/diagnostics/diagnostics.types'
+import { CONSOLE_DIAGNOSTICS_ADAPTER_FACTORY } from '@/model/adapters/diagnostics/ConsoleDiagnosticsAdapter'
+import { DiagnosticsAdapterRegistry } from '@/model/adapters/diagnostics/DiagnosticsAdapterRegistry'
+import { SENTRY_DIAGNOSTICS_ADAPTER_FACTORY } from '@/model/adapters/diagnostics/SentryDiagnosticsAdapter'
 import { EndgeProblems } from '@/model/endge/diagnostics/endge-problems'
 import { EndgeTelemetry } from '@/model/endge/diagnostics/endge-telemetry'
 

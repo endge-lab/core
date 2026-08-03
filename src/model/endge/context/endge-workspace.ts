@@ -1,5 +1,5 @@
 import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
-import type { EndgeConfiguration } from '@/domain/types/configuration'
+import type { EndgeConfiguration } from '@/domain/types/configuration/configuration.type'
 import type {
   EndgeDataMode,
   EndgeWorkspaceDefinition,
@@ -12,7 +12,6 @@ import type {
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { normalizeEndgeWorkspaceDefinition } from '@/domain/entities/reflect/RWorkspace'
-import { setActiveEndgeWorkspace } from '@/model/config/endge-workspace'
 import { Endge } from '@/model/endge/kernel/endge'
 import { WorkspaceVariables } from '@/model/endge/context/endge-vars'
 
@@ -46,7 +45,6 @@ export class EndgeWorkspace extends EndgeModule {
   public override reset(): void {
     this._current = null
     this.variables.setEnvironment({})
-    setActiveEndgeWorkspace(null)
     Endge.context.setWorkspaceDataMode('live')
     this.notify()
   }
@@ -89,7 +87,6 @@ export class EndgeWorkspace extends EndgeModule {
   public apply(input: unknown): void {
     const next = normalizeEndgeWorkspaceDefinition(input)
     this._current = next
-    setActiveEndgeWorkspace(next)
     Endge.context.setCurrentWorkspace(next.identity)
     Endge.context.setWorkspaceDataMode(next.dataMode)
     this.notify()

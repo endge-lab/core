@@ -1,9 +1,9 @@
 import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
+import type { ComponentSFCActionPort } from '@/domain/types/component/sfc/ports.types'
 import type {
-  ComponentSFCActionPort,
   RComponentSFC_IR_ElementNode,
   RComponentSFC_IR_Value,
-} from '@/domain/types/component/sfc'
+} from '@/domain/types/component/sfc/ir.types'
 import { BUILTIN_ACTION_IDS, TABLE_RUNTIME_ACTION_IDS } from '@/domain/types/runtime/action.types'
 import type {
   ContextMenuDescriptor,

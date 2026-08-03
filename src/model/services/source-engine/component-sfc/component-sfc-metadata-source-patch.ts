@@ -1,7 +1,7 @@
 import type {
   ComponentSFCMetadataSourcePatchResult,
   ComponentSFCMetadataVisualProjection,
-} from '@/domain/types/component/sfc'
+} from '@/domain/types/component/sfc/metadata-visual.types'
 import type { ProgramMetadataMap } from '@/domain/types/program/program-metadata.types'
 
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'

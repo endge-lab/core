@@ -1,7 +1,7 @@
 import type {
   DiagnosticsRecord,
   DiagnosticsSignal,
-} from '@/domain/types/diagnostics'
+} from '@/domain/types/diagnostics/diagnostics.types'
 
 /** Ограниченное кольцевое хранилище diagnostic records с основными индексами. */
 export class DiagnosticsRecordStore {

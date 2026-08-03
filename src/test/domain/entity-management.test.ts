@@ -10,7 +10,7 @@ import {
   isSystemManaged,
   isUserManaged,
   normalizeEntityManagement,
-} from '@/domain/types/document'
+} from '@/domain/types/document/entity-management.type'
 import { Integrations_Repository } from '@/model/db/repositories/Integrations_Repository'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 

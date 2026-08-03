@@ -21,7 +21,7 @@ import type {
 import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
 import type { SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 import type { VocabLoadPolicy } from '@/domain/types/runtime/vocab-cache.types'
-import type { ComponentSFCEventInputValue } from '@/domain/types/component/sfc'
+import type { ComponentSFCEventInputValue } from '@/domain/types/component/sfc/ports.types'
 import type { UpdateMutationStrategy } from '@/domain/types/source/update-source.types'
 
 import { parse as parseTS } from '@babel/parser'

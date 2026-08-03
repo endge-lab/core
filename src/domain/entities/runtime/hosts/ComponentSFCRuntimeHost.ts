@@ -4,14 +4,14 @@ import type {
   RComponentDependencies,
   RComponentRenderTarget,
 } from '@/domain/types/component/component-core.types'
+import type { RComponentSFC_AST } from '@/domain/types/component/sfc/ast.types'
+import type { RComponentSFC_IR } from '@/domain/types/component/sfc/ir.types'
 import type {
-  RComponentSFC_AST,
-  RComponentSFC_IR,
   RComponentSFC_RuntimeBoundaryDependency,
   RComponentSFC_RuntimeDependencies,
   RComponentSFC_RuntimeTableColumnDependency,
-  RComponentSFCSource_Parts,
-} from '@/domain/types/component/sfc'
+} from '@/domain/types/component/sfc/dependencies.types'
+import type { RComponentSFCSource_Parts } from '@/domain/types/component/sfc/source.types'
 import type {
   ComponentSFCPreviewOptions,
   ComponentSFCProgramPayload,
@@ -22,8 +22,8 @@ import type {
   ComponentSFCEventOccurrence,
   ComponentSFCEventPort,
   ComponentSFCEventRuntimeSource,
-  ComponentSFCEditedEventPayload,
-} from '@/domain/types/component/sfc'
+} from '@/domain/types/component/sfc/ports.types'
+import type { ComponentSFCEditedEventPayload } from '@/domain/types/component/sfc/ir.types'
 import type {
   RuntimeArtifactReader,
   RuntimeBoundaryPatch,
@@ -33,8 +33,8 @@ import type {
   RuntimeHostInputSource,
   RuntimeHostUpdateContext,
 } from '@/domain/types/runtime/runtime-host.types'
-import type { ComputationResource } from '@/domain/types/computation'
-import type { EndgeStyleLease } from '@/domain/types/style'
+import type { ComputationResource } from '@/domain/types/computation/computation-runtime.types'
+import type { EndgeStyleLease } from '@/domain/types/style/style.types'
 import type { I18nRuntimeCatalog } from '@/domain/types/i18n.types'
 import type { SourceFieldOption } from '@/domain/types/source/source-expression.types'
 import type {
@@ -47,7 +47,7 @@ import { DataPath, Raph, RaphNode } from '@endge/raph'
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 import { Endge } from '@/model/endge/kernel/endge'
 import { ComputationResourceRegistry } from '@/model/endge/runtime/execution/computation/ComputationResourceRegistry'
-import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component/sfc'
+import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component/sfc/dependencies.types'
 import { RUNTIME_BOUNDARY_UPDATE_PHASE_NAME } from '@/domain/types/runtime/runtime-host.types'
 
 function createDefaultSFCContext(target: RComponentRenderTarget | null): RuntimeHostContext<'component-sfc'> {

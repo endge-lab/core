@@ -4,13 +4,15 @@ import { DiagnosticsSpan } from '@/domain/entities/diagnostics/DiagnosticsSpan'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import type {
   DiagnosticsAdapter,
+  DiagnosticsFlushResult,
+} from '@/domain/types/diagnostics/diagnostics-adapter.type'
+import type {
   DiagnosticsAttributes,
   DiagnosticsAttributeValue,
   DiagnosticsCounters,
   DiagnosticsContextProvider,
   DiagnosticsExceptionOptions,
   DiagnosticsFilter,
-  DiagnosticsFlushResult,
   DiagnosticsInstrumentationScope,
   DiagnosticsListener,
   DiagnosticsLogInput,
@@ -30,7 +32,7 @@ import type {
   DiagnosticsSubscribeOptions,
   EndgeDiagnosticsConfiguration,
   EndgeDiagnosticsOutputConfiguration,
-} from '@/domain/types/diagnostics'
+} from '@/domain/types/diagnostics/diagnostics.types'
 import { DiagnosticsAdapterRegistry } from '@/model/adapters/diagnostics/DiagnosticsAdapterRegistry'
 import {
   DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION,

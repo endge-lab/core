@@ -3,17 +3,16 @@ import type {
   EndgeConfiguration,
   EndgeConfigurationContribution,
   EndgeConfigurationLayer,
-} from '@/domain/types/configuration'
+} from '@/domain/types/configuration/configuration.type'
 import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
-import { setActiveEndgeConfiguration } from '@/model/config/endge-workspace'
 import { Endge } from '@/model/endge/kernel/endge'
 import {
   applyEndgeConfigurationContribution,
   createEndgeContextHash,
   normalizeEndgeConfiguration,
-} from '@/model/services/configuration'
+} from '@/model/services/configuration/endge-configuration'
 
 const EMPTY_CONTRIBUTION: EndgeConfigurationContribution = { mode: 'inherit', patch: {} }
 
@@ -57,9 +56,8 @@ export class EndgeConfigurationModule extends EndgeModule {
       configuration,
       contextHash: createEndgeContextHash({ workspaceIdentity, execution, configuration }),
     }
-    setActiveEndgeConfiguration(configuration)
-    Endge.context.reconcileCurrentLocaleWithWorkspace()
-    Endge.context.reconcileCurrentThemeWithWorkspace()
+    Endge.context.reconcileCurrentLocaleWithWorkspace(configuration)
+    Endge.context.reconcileCurrentThemeWithWorkspace(configuration)
     this.notify()
   }
 
@@ -67,7 +65,6 @@ export class EndgeConfigurationModule extends EndgeModule {
   public override reset(): void {
     this._current = null
     this._buildContext = null
-    setActiveEndgeConfiguration(null)
     this.notify()
   }
 

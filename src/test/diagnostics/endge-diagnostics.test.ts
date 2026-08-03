@@ -1,10 +1,10 @@
 // @vitest-environment node
+import type { DiagnosticsAdapter } from '@/domain/types/diagnostics/diagnostics-adapter.type'
 import type {
-  DiagnosticsAdapter,
   DiagnosticsLogRecord,
   DiagnosticsSpanRecord,
   EndgeDiagnosticsConfiguration,
-} from '@/domain/types/diagnostics'
+} from '@/domain/types/diagnostics/diagnostics.types'
 import { EndgeDiagnostics } from '@/model/endge/diagnostics/endge-diagnostics'
 import { describe, expect, it, vi } from 'vitest'
 
