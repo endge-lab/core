@@ -31,6 +31,7 @@ import { EndgeUpdates } from '@/model/endge/runtime/core/endge-updates'
 import type { WorkspaceVariables } from '@/model/endge/context/endge-vars'
 import { EndgeVocabs } from '@/model/endge/domain/endge-vocabs'
 import { EndgeWorkspace } from '@/model/endge/context/endge-workspace'
+import { migrateQuerySourceV1ToV2 } from '@/model/services/source-engine/migrations/query-source-v1-migration'
 import { EndgeUIRegistry } from '@/model/endge/ui/endge-ui-registry'
 import { ENDGE_DOMAIN_BUNDLE_VERSION } from '@/model/config/domain-bundle'
 import { ENDGE_CORE_MODULES } from '@/model/config/endge-modules'
@@ -150,7 +151,7 @@ export class Endge extends EndgeFederation {
       environments: Endge._portableDocuments(domain.environments, folders),
       folders: Endge._portableFolders(domain.folders),
       types: Endge._portableDocuments(domain.types, folders),
-      queries: Endge._portableDocuments(domain.queries, folders),
+      queries: Endge._portableQueries(domain.queries, folders),
       'data-views': Endge._portableDocuments(domain.dataViews, folders),
       compositions: Endge._portableDocuments(domain.compositions, folders),
       stores: Endge._portableDocuments(domain.stores, folders),
@@ -235,6 +236,25 @@ export class Endge extends EndgeFederation {
       }
 
       return [result]
+    })
+  }
+
+  /** Переводит legacy Query source в обязательный portable Query v2 contract. */
+  private static _portableQueries(values: unknown[], folders: Map<string, string>): Record<string, unknown>[] {
+    return Endge._portableDocuments(values, folders).map((query) => {
+      if (Number(query.sourceVersion) !== 1)
+        return query
+
+      const identity = String(query.identity ?? '').trim()
+      const migration = migrateQuerySourceV1ToV2(String(query.source ?? ''))
+      if (!migration.ok)
+        throw new Error(`Query "${identity}" cannot be exported: ${migration.message}`)
+
+      return {
+        ...query,
+        source: migration.source,
+        sourceVersion: migration.sourceVersion,
+      }
     })
   }
 
