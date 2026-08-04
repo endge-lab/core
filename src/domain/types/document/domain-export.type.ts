@@ -38,11 +38,49 @@ export interface EndgeDomainPlain {
   navigations: unknown[]
 }
 
-/** Переносимый bundle текущего workspace и его загруженного домена. */
-export interface EndgeDomainBundle {
+/** Коллекции документов канонического snapshot нового backend-сервиса. */
+export interface EndgePortableDocuments {
+  projects: unknown[]
+  tenants: unknown[]
+  environments: unknown[]
+  folders: unknown[]
+  types: unknown[]
+  queries: unknown[]
+  'data-views': unknown[]
+  compositions: unknown[]
+  stores: unknown[]
+  streams: unknown[]
+  updates: unknown[]
+  mocks: unknown[]
+  components: unknown[]
+  actions: unknown[]
+  filters: unknown[]
+  converters: unknown[]
+  computations: unknown[]
+  vocabs: unknown[]
+  'i18n-bundles': unknown[]
+  'auth-profiles': unknown[]
+  navigations: unknown[]
+  styles: unknown[]
+}
+
+export interface EndgeInstalledIntegrationExport {
+  identity: string
   version: string
-  workspace: EndgeWorkspaceExport
-  domain: EndgeDomainPlain
+  configuration: Record<string, unknown>
+}
+
+export type EndgePortableWorkspace = Omit<EndgeWorkspaceExport, 'installedIntegrations' | 'dataMode'> & {
+  dataMode: 'development' | 'production'
+}
+
+/** Переносимый workspace snapshot, принимаемый новым backend import API. */
+export interface EndgeDomainBundle {
+  schemaVersion: number
+  kind: 'workspace-snapshot'
+  workspace: EndgePortableWorkspace
+  installedIntegrations: EndgeInstalledIntegrationExport[]
+  documents: EndgePortableDocuments
 }
 
 /** Ссылка на выбранный документ с типом коллекции, в которой локален его id. */

@@ -17,7 +17,6 @@ type VocabRuntimeConfig = {
   authMode: 'inherit' | 'profile' | 'manual' | 'none'
   authProfileIdentity?: string | null
 }
-
 /**
  * Модуль загрузки и чтения external vocabs в Raph cache.
  */

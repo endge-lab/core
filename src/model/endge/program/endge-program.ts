@@ -17,10 +17,8 @@ import type {
   ProgramDiagnostic,
   ProgramEntityType,
   QueryProgramPayload,
-  EndgeStyleProgramPayload,
+  EndgeStyleProgramPayload, ProgramArtifactKey,
 } from '@/domain/types/program/program.types'
-
-type ProgramArtifactKey = string
 
 /**
  * Хранилище compiled artifacts, полученных после компиляции домена.
@@ -28,7 +26,10 @@ type ProgramArtifactKey = string
 export class EndgeProgram extends EndgeModule {
   private _artifacts = new Map<ProgramArtifactKey, ProgramArtifact>()
   private _indexByIdentity = new Map<ProgramArtifactKey, ProgramArtifactKey>()
+
+  // Для компонентов в пользовательским SFC <Тегом>
   private _componentIdentityByTag = new Map<string, string>()
+
   private _status: ProgramArtifactStatus = 'valid'
   private _compilerVersion = '0'
 

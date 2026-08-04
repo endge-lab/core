@@ -16,6 +16,8 @@ import type { ComputationProgramPayload } from '@/domain/types/computation/compu
 import type { EndgeStyleSheetArtifact } from '@/domain/types/style/style.types'
 import type { ActionImplementation, ActionTargetSelector } from '@/domain/types/runtime/action.types'
 
+export type ProgramArtifactKey = string
+
 /** Тип доменной сущности, для которой compiler может построить program artifact. */
 export type ProgramEntityType
   = 'type'

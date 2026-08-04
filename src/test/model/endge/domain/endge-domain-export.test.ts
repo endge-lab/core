@@ -120,7 +120,7 @@ describe('Endge domain export', () => {
     expect(plain.authProfiles).toEqual([expect.objectContaining({ identity: 'auth-profile' })])
   })
 
-  it('builds a workspace-aware bundle that can restore the domain', async () => {
+  it('builds a workspace snapshot accepted by the new backend import contract', async () => {
     const workspace = {
       ...TEST_ENDGE_WORKSPACE,
       identity: 'workspace-export-test',
@@ -136,18 +136,11 @@ describe('Endge domain export', () => {
     Endge.domain.addQuery(createQuery(1, 'bundle-query', QueryType.Custom))
 
     const bundle = await downloadBundle()
-    const restored = EndgeDomain.fromPlain(bundle)
-
-    expect(bundle.version).toBe('1.1.0')
-    expect(bundle.workspace).toEqual({
-      ...workspace,
-      sse: {
-        url: '/api/events',
-        authMode: 'manual',
-      },
-    })
-    expect(bundle.workspace.sse).not.toHaveProperty('manualToken')
-    expect(restored.getQueryByIdentity('bundle-query')).not.toBeNull()
+    expect(bundle.schemaVersion).toBe(1)
+    expect(bundle.kind).toBe('workspace-snapshot')
+    expect(bundle.workspace.identity).toBe('workspace-export-test')
+    expect(bundle.workspace.configuration.sse).not.toHaveProperty('manualToken')
+    expect(bundle.documents.queries).toEqual([expect.objectContaining({ identity: 'bundle-query' })])
   })
 
   it('downloads the domain when used as an unbound event handler', () => {
@@ -192,11 +185,11 @@ describe('Endge domain export', () => {
       },
     ])
 
-    expect(bundle.version).toBe('1.1.0')
-    expect(Object.keys(bundle.domain).sort()).toEqual(Object.keys(Endge.domain.toPlain()).sort())
-    expect(bundle.domain.queries).toEqual([expect.objectContaining({ identity: 'selected-query' })])
-    expect(bundle.domain.compositions).toEqual([expect.objectContaining({ identity: 'selected-composition' })])
-    expect(bundle.domain.dataViews).toEqual([])
-    expect(Object.values(bundle.domain).flat()).toHaveLength(2)
+    expect(bundle.schemaVersion).toBe(1)
+    expect(bundle.kind).toBe('workspace-snapshot')
+    expect(bundle.documents.queries).toEqual([expect.objectContaining({ identity: 'selected-query' })])
+    expect(bundle.documents.compositions).toEqual([expect.objectContaining({ identity: 'selected-composition' })])
+    expect(bundle.documents['data-views']).toEqual([])
+    expect(Object.values(bundle.documents).flat()).toHaveLength(2)
   })
 })
