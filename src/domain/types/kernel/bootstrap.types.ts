@@ -1,4 +1,5 @@
 import type { EndgeExecutionContext } from '@/domain/types/runtime/execution-context.types'
+import type { EndgeDomainProvider } from '@/domain/types/document/domain-provider.type'
 
 /**
  * Источник получения доменных данных
@@ -61,6 +62,9 @@ export interface EndgeBootContext {
    * Для payload provider.
    */
   payload?: EndgePayloadProviderOptions
+
+  /** Внешний источник live snapshot для default backend provider. */
+  domainProvider?: EndgeDomainProvider
 
   /**
    * Для отмены долгой загрузки/сборки.

@@ -1,6 +1,10 @@
 import type { RVersion } from '@/domain/entities/reflect/RVersion'
 import type { RComponent } from '@/domain/types/component/component.types'
 import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
+import type {
+  EndgeLiveDomainDocument,
+  EndgeLiveDomainSnapshot,
+} from '@/domain/types/document/domain-snapshot.type'
 import type { EndgeDomainPlain } from '@/domain/types/document/domain-export.type'
 import type { FilterFieldSchema } from '@/domain/types/document/query.types'
 import type { EndgeSchemaDump } from '@/domain/types/document/schema.types'
@@ -69,6 +73,80 @@ function relationToId(v: any): string | number | null {
     return null
   }
   return v
+}
+
+function snapshotIdentityToServerID(
+  documents: readonly EndgeLiveDomainDocument[],
+): Map<string, string> {
+  const result = new Map<string, string>()
+
+  for (const document of documents) {
+    const identity = String(document.identity ?? '').trim()
+    const id = String(document.state.id ?? '').trim()
+    if (identity && id)
+      result.set(identity, id)
+  }
+
+  return result
+}
+
+function normalizeSnapshotDocuments(
+  documents: readonly EndgeLiveDomainDocument[],
+  folderIds: ReadonlyMap<string, string>,
+): Record<string, unknown>[] {
+  return documents.map((document) => {
+    const { state, folderIdentity, ...domainDocument } = document
+    const identity = String(domainDocument.identity ?? '').trim()
+    const displayName = String(
+      domainDocument.displayName
+      ?? domainDocument.name
+      ?? identity,
+    )
+    const normalizedFolderIdentity = String(folderIdentity ?? '').trim()
+
+    return {
+      ...domainDocument,
+      id: state.id,
+      identity,
+      name: displayName,
+      displayName,
+      folderId: normalizedFolderIdentity
+        ? folderIds.get(normalizedFolderIdentity) ?? normalizedFolderIdentity
+        : null,
+      createdAt: state.createdAt,
+      updatedAt: state.updatedAt,
+    }
+  })
+}
+
+function normalizeSnapshotFolders(
+  folders: readonly EndgeLiveDomainDocument[],
+  folderIds: ReadonlyMap<string, string>,
+): Record<string, unknown>[] {
+  return folders.map((folder) => {
+    const { state, parentIdentity, ...domainFolder } = folder
+    const identity = String(domainFolder.identity ?? '').trim()
+    const displayName = String(
+      domainFolder.displayName
+      ?? domainFolder.name
+      ?? identity,
+    )
+    const normalizedParentIdentity = String(parentIdentity ?? '').trim()
+
+    return {
+      ...domainFolder,
+      id: state.id,
+      identity,
+      name: displayName,
+      displayName,
+      parent: normalizedParentIdentity
+        ? folderIds.get(normalizedParentIdentity) ?? normalizedParentIdentity
+        : null,
+      folderId: null,
+      createdAt: state.createdAt,
+      updatedAt: state.updatedAt,
+    }
+  })
 }
 
 export function queryPayloadDocToPlain(doc: any): any {
@@ -398,6 +476,14 @@ export class EndgeDomain extends EndgeModule {
       return
     }
 
+    if (ctx.dataProvider === 'default') {
+      const snapshot = Endge.schema.getLoadedSnapshot()
+      if (!snapshot)
+        throw new Error('[EndgeDomain] live workspace snapshot is not loaded')
+      this.mergeFromSnapshot(snapshot)
+      return
+    }
+
     const source = Endge.schema.getLoadedSource()
     if (!source)
       throw new Error('[EndgeDomain] source is not loaded')
@@ -611,6 +697,53 @@ export class EndgeDomain extends EndgeModule {
 
     this.merge(normalized)
 
+    this.notify()
+  }
+
+  /** Нормализует live workspace snapshot нового backend и объединяет его с доменом. */
+  public mergeFromSnapshot(snapshot: EndgeLiveDomainSnapshot): void {
+    const folders = snapshot.documents.folders
+    const folderIds = snapshotIdentityToServerID(folders)
+    const environmentIds = snapshotIdentityToServerID(snapshot.documents.environments)
+
+    const documents = snapshot.documents
+    const plain: EndgeDomainPlain = {
+      projects: normalizeSnapshotDocuments(documents.projects, folderIds).map((project) => ({
+        ...project,
+        allowedEnvironmentIds: Array.isArray(project.allowedEnvironments)
+          ? project.allowedEnvironments.map(identity => environmentIds.get(String(identity)) ?? identity)
+          : [],
+      })),
+      types: normalizeSnapshotDocuments(documents.types, folderIds),
+      queries: normalizeSnapshotDocuments(documents.queries, folderIds),
+      dataViews: normalizeSnapshotDocuments(documents['data-views'], folderIds),
+      compositions: normalizeSnapshotDocuments(documents.compositions, folderIds),
+      stores: normalizeSnapshotDocuments(documents.stores, folderIds),
+      streams: normalizeSnapshotDocuments(documents.streams, folderIds),
+      updates: normalizeSnapshotDocuments(documents.updates, folderIds),
+      mocks: normalizeSnapshotDocuments(documents.mocks, folderIds),
+      components: [],
+      componentSFCs: normalizeSnapshotDocuments(documents.components, folderIds),
+      actions: normalizeSnapshotDocuments(documents.actions, folderIds),
+      converters: normalizeSnapshotDocuments(documents.converters, folderIds),
+      computations: normalizeSnapshotDocuments(documents.computations, folderIds),
+      integrations: [],
+      folders: normalizeSnapshotFolders(folders, folderIds),
+      parameters: [],
+      filters: normalizeSnapshotDocuments(documents.filters, folderIds),
+      environments: normalizeSnapshotDocuments(documents.environments, folderIds),
+      tenants: normalizeSnapshotDocuments(documents.tenants, folderIds),
+      policies: [],
+      styles: normalizeSnapshotDocuments(documents.styles, folderIds),
+      vocabs: normalizeSnapshotDocuments(documents.vocabs, folderIds),
+      authProfiles: normalizeSnapshotDocuments(documents['auth-profiles'], folderIds),
+      i18nBundles: normalizeSnapshotDocuments(documents['i18n-bundles'], folderIds),
+      pageTemplates: [],
+      pages: [],
+      navigations: normalizeSnapshotDocuments(documents.navigations, folderIds),
+    }
+
+    this.importFromSchema(EndgeDomain.parsePlain(plain))
     this.notify()
   }
 

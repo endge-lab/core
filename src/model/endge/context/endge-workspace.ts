@@ -30,9 +30,26 @@ export class EndgeWorkspace extends EndgeModule {
 
   /** Строит workspace из загруженного source. */
   public override build(ctx: EndgeBootContext): void {
-    if (ctx.dataProvider !== 'payload') {
-      throw new Error('[EndgeWorkspace] Workspace can only be loaded from Payload')
+    if (ctx.dataProvider === 'default') {
+      const snapshot = Endge.schema.getLoadedSnapshot()
+      if (!snapshot)
+        throw new Error('[EndgeWorkspace] live workspace snapshot is unavailable')
+
+      const { state: _serverState, ...workspace } = snapshot.workspace
+      this.apply({
+        ...workspace,
+        dataMode: workspace.dataMode === 'development' ? 'mock' : 'live',
+        installedIntegrations: snapshot.installedIntegrations.map(integration => ({
+          integrationId: integration.identity,
+          integrationIdentity: integration.identity,
+          version: integration.version,
+        })),
+      })
+      return
     }
+
+    if (ctx.dataProvider !== 'payload')
+      throw new Error(`[EndgeWorkspace] Workspace cannot be loaded from ${ctx.dataProvider} provider`)
 
     this.apply(selectPayloadWorkspace(
       Endge.schema.getLoadedSource(),

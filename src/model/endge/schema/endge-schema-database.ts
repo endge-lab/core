@@ -1,5 +1,13 @@
 import type { DomainDocumentType } from '@/domain/types/document/document.types'
 import type { DocumentCreateRequest, DocumentCreateResult } from '@/domain/types/document/document-create.type'
+import type {
+  EndgeDomainProvider,
+  EndgeSchemaCapabilities,
+} from '@/domain/types/document/domain-provider.type'
+import type {
+  EndgeDocumentServerState,
+  EndgeLiveDomainSnapshot,
+} from '@/domain/types/document/domain-snapshot.type'
 import { normalizeEntityManagement } from '@/domain/types/document/entity-management.type'
 import type { EndgeWorkspaceDefinition } from '@/domain/types/document/workspace.types'
 import type {
@@ -399,6 +407,11 @@ const ROOT_FOLDER_ENTITY_TYPE_BY_IDENTITY: Record<string, string> = {
 export class EndgeSchemaStorage extends EndgeModule {
   public isFirstCheck = true
   private _loadedSource: EndgeSchemaDump | null = null
+  private _loadedSnapshot: EndgeLiveDomainSnapshot | null = null
+  private _domainProvider: EndgeDomainProvider | null = null
+  private _domainETag: string | null = null
+  private _documentServerState = new Map<string, EndgeDocumentServerState>()
+  private _capabilities: EndgeSchemaCapabilities = { provider: 'payload', mutations: true }
 
   public payloadBaseAPI!: string
   public payloadSecret!: string
@@ -423,6 +436,16 @@ export class EndgeSchemaStorage extends EndgeModule {
    */
   public get ERRORS(): readonly EndgeSchemaError[] {
     return this._errors
+  }
+
+  /** Возможности активного schema provider. */
+  public get capabilities(): EndgeSchemaCapabilities {
+    return { ...this._capabilities }
+  }
+
+  /** ETag последнего live workspace snapshot. */
+  public get domainETag(): string | null {
+    return this._domainETag
   }
 
   /** Подключённые репозитории (после configurePayload/refresh). */
@@ -480,6 +503,8 @@ export class EndgeSchemaStorage extends EndgeModule {
    * Возвращает совокупное состояние здоровья Payload/schema слоя.
    */
   public get isHealthy(): boolean {
+    if (this._capabilities.provider === 'service-backend')
+      return this._loadedSnapshot != null && this._errors.length === 0
     return (
       this.isPayloadAvailable
       && this.areCollectionsAvailable
@@ -491,6 +516,8 @@ export class EndgeSchemaStorage extends EndgeModule {
    * Показывает, есть ли ошибки подключения, health-check или доступности коллекций.
    */
   public get hasErrors(): boolean {
+    if (this._capabilities.provider === 'service-backend')
+      return this._loadedSnapshot == null || this._errors.length > 0
     return (
       !this.isPayloadAvailable
       || !this.areCollectionsAvailable
@@ -558,8 +585,25 @@ export class EndgeSchemaStorage extends EndgeModule {
    * На фазе `setup` настраивает Payload client, если boot идет через payload-provider.
    */
   public override async setup(ctx: EndgeBootContext): Promise<void> {
-    if (ctx.dataProvider !== 'payload')
+    if (ctx.dataProvider === 'default') {
+      if (!ctx.domainProvider)
+        throw new Error('[EndgeSchemaStorage] domainProvider is required for default data provider')
+      this._domainProvider = ctx.domainProvider
+      this._capabilities = {
+        provider: 'service-backend',
+        mutations: ctx.domainProvider.capabilities.mutations,
+      }
+      this.repositories = null
       return
+    }
+    if (ctx.dataProvider === 'plain') {
+      this._domainProvider = null
+      this._capabilities = { provider: 'plain', mutations: false }
+      return
+    }
+
+    this._domainProvider = null
+    this._capabilities = { provider: 'payload', mutations: true }
 
     await this.configurePayload({
       payloadBaseAPI: ctx.payload?.baseAPI ?? '',
@@ -571,6 +615,20 @@ export class EndgeSchemaStorage extends EndgeModule {
    * На фазе `load` выгружает schema dump из Payload и сохраняет его внутри модуля.
    */
   public override async load(ctx: EndgeBootContext): Promise<void> {
+    if (ctx.dataProvider === 'default') {
+      const provider = this._domainProvider
+      const workspaceIdentity = String(ctx.scope.workspaceIdentity ?? '').trim()
+      if (!provider)
+        throw new Error('[EndgeSchemaStorage] domainProvider is not configured')
+      if (!workspaceIdentity)
+        throw new Error('[EndgeSchemaStorage] workspaceIdentity is required for live snapshot')
+
+      const snapshot = await provider.loadWorkspace({ workspaceIdentity, signal: ctx.signal })
+      this._loadedSnapshot = snapshot
+      this._domainETag = provider.etag
+      this._indexSnapshotServerState(snapshot)
+      return
+    }
     if (ctx.dataProvider !== 'payload')
       return
 
@@ -584,11 +642,46 @@ export class EndgeSchemaStorage extends EndgeModule {
     return this._loadedSource
   }
 
+  /** Возвращает live workspace snapshot нового backend. */
+  public getLoadedSnapshot(): EndgeLiveDomainSnapshot | null {
+    return this._loadedSnapshot
+  }
+
+  /** Возвращает server-side revision state документа по transport type и identity. */
+  public getDocumentServerState(documentType: string, identity: string): EndgeDocumentServerState | null {
+    return this._documentServerState.get(this._serverStateKey(documentType, identity)) ?? null
+  }
+
   /**
    * Очищает загруженный schema dump при reset federation.
    */
   public override reset(): void {
     this._loadedSource = null
+    this._loadedSnapshot = null
+    this._domainProvider = null
+    this._domainETag = null
+    this._documentServerState.clear()
+  }
+
+  private _indexSnapshotServerState(snapshot: EndgeLiveDomainSnapshot): void {
+    this._documentServerState.clear()
+    for (const [documentType, documents] of Object.entries(snapshot.documents)) {
+      for (const document of documents) {
+        const identity = String(document.identity ?? '').trim()
+        if (identity)
+          this._documentServerState.set(this._serverStateKey(documentType, identity), { ...document.state })
+      }
+    }
+  }
+
+  private _serverStateKey(documentType: string, identity: string): string {
+    return `${documentType}:${identity}`
+  }
+
+  private _assertMutationsSupported(): void {
+    if (this._capabilities.mutations)
+      return
+    throw new EndgeSchemaProviderReadOnlyError(this._capabilities.provider)
   }
 
   /** Устанавливает interceptor для lock override и workspace relation. */
@@ -1746,6 +1839,7 @@ export class EndgeSchemaStorage extends EndgeModule {
    * Обычный save/upsert остаётся отдельным editing-контрактом.
    */
   public async createDocument(request: DocumentCreateRequest): Promise<DocumentCreateResult> {
+    this._assertMutationsSupported()
     const identity = request.identity.trim()
     if (!identity)
       throw new Error('Document identity is required.')
@@ -1918,6 +2012,7 @@ export class EndgeSchemaStorage extends EndgeModule {
     documentIdOrIdentity: string,
     documentType: DomainDocumentType,
   ): Promise<void> {
+    this._assertMutationsSupported()
     const repos = this.repositories
     if (!repos) {
       throw new Error(
@@ -2007,6 +2102,7 @@ export class EndgeSchemaStorage extends EndgeModule {
     documentIdOrIdentity: string,
     documentType: DomainDocumentType,
   ): Promise<void> {
+    this._assertMutationsSupported()
     const repos = this.repositories
     if (!repos) {
       throw new Error(
@@ -2117,6 +2213,7 @@ export class EndgeSchemaStorage extends EndgeModule {
     documentIdOrIdentity: string,
     documentType: DomainDocumentType,
   ): Promise<void> {
+    this._assertMutationsSupported()
     const repos = this.repositories
     if (!repos) {
       throw new Error(
@@ -2258,6 +2355,7 @@ export class EndgeSchemaStorage extends EndgeModule {
    * Сохраняет папку в Payload (создаёт или обновляет по identity).
    */
   public async saveFolder(folderId: string): Promise<void> {
+    this._assertMutationsSupported()
     const repos = this.repositories
     if (!repos) {
       throw new Error(
@@ -2327,6 +2425,7 @@ export class EndgeSchemaStorage extends EndgeModule {
    * Удаляет папку в Payload (DELETE). Дочерние папки на бэкенде переносятся в beforeDelete.
    */
   public async deleteFolder(folderIdentity: string): Promise<void> {
+    this._assertMutationsSupported()
     const repos = this.repositories
     if (!repos) {
       throw new Error(
@@ -2344,6 +2443,7 @@ export class EndgeSchemaStorage extends EndgeModule {
     documentType: DomainDocumentType,
     payloadDoc: Record<string, unknown>,
   ): Promise<void> {
+    this._assertMutationsSupported()
     const repos = this.repositories
     if (!repos) {
       throw new Error(
@@ -2547,6 +2647,7 @@ export class EndgeSchemaStorage extends EndgeModule {
     documentType: DomainDocumentType,
     opts?: { model?: unknown, previousIdentity?: string },
   ): Promise<void> {
+    this._assertMutationsSupported()
     const repos = this.repositories
     if (!repos) {
       throw new Error(
@@ -3581,6 +3682,7 @@ export class EndgeSchemaStorage extends EndgeModule {
     documentType: DomainDocumentType,
     folderIdOrIdentity: string | number | null,
   ): Promise<void> {
+    this._assertMutationsSupported()
     const repos = this.repositories
     if (!repos) {
       throw new Error(
@@ -4322,10 +4424,24 @@ export class EndgeSchemaStorage extends EndgeModule {
   public toJSON(): any {
     return {
       isHealthy: this.isHealthy,
+      capabilities: this.capabilities,
+      domainETag: this.domainETag,
       isPayloadAvailable: this.isPayloadAvailable,
       areCollectionsAvailable: this.areCollectionsAvailable,
       errors: this._errors,
       collectionsInfo: this.collectionsInfo,
     }
+  }
+}
+
+/** Явная ошибка попытки записи через read-only schema provider. */
+export class EndgeSchemaProviderReadOnlyError extends Error {
+  public readonly code = 'provider_read_only'
+
+  public constructor(provider: string) {
+    super(provider === 'service-backend'
+      ? 'Service backend mutations are not implemented in this migration stage'
+      : `Schema provider "${provider}" is read-only`)
+    this.name = 'EndgeSchemaProviderReadOnlyError'
   }
 }
