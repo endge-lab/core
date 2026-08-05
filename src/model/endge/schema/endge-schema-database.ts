@@ -1,12 +1,14 @@
 import type { DomainDocumentType } from '@/domain/types/document/document.types'
 import type { DocumentCreateRequest, DocumentCreateResult } from '@/domain/types/document/document-create.type'
 import type {
+  EndgeDomainCollection,
   EndgeDomainProvider,
   EndgeSchemaCapabilities,
 } from '@/domain/types/document/domain-provider.type'
 import type {
   EndgeDocumentServerState,
   EndgeLiveDomainSnapshot,
+  EndgeWorkspaceServerState,
 } from '@/domain/types/document/domain-snapshot.type'
 import { normalizeEntityManagement } from '@/domain/types/document/entity-management.type'
 import type { EndgeWorkspaceDefinition } from '@/domain/types/document/workspace.types'
@@ -32,7 +34,9 @@ import { normalizeEndgeWorkspaceDefinition } from '@/domain/entities/reflect/RWo
 import { RVersion } from '@/domain/entities/reflect/RVersion'
 import { ComponentType, FilterType, ParameterType, QueryType } from '@/domain/types/document/document.types'
 import { Endge } from '@/model/endge/kernel/endge'
-import { compositionPayloadDocToPlain, computationPayloadDocToPlain, dataViewPayloadDocToPlain, mockPayloadDocToPlain, queryPayloadDocToPlain, storePayloadDocToPlain, streamPayloadDocToPlain, updatePayloadDocToPlain } from '@/model/endge/domain/endge-domain'
+import { compositionPayloadDocToPlain, computationPayloadDocToPlain, dataViewPayloadDocToPlain, mockPayloadDocToPlain, normalizeSnapshotDocuments, normalizeSnapshotFolders, queryPayloadDocToPlain, storePayloadDocToPlain, streamPayloadDocToPlain, updatePayloadDocToPlain } from '@/model/endge/domain/endge-domain'
+import { resolveEndgeServiceCollection, resolveEndgeServiceStateCollection } from '@/model/config/domain-provider'
+import { serializeServiceDocument, serializeServiceFolder } from '@/model/endge/schema/endge-service-document-serializer'
 import { Actions_Repository } from '@/model/db/repositories/Actions_Repository'
 import { AuthProfiles_Repository } from '@/model/db/repositories/AuthProfiles_Repository'
 import { Components_Repository } from '@/model/db/repositories/Components_Repository'
@@ -411,7 +415,13 @@ export class EndgeSchemaStorage extends EndgeModule {
   private _domainProvider: EndgeDomainProvider | null = null
   private _domainETag: string | null = null
   private _documentServerState = new Map<string, EndgeDocumentServerState>()
-  private _capabilities: EndgeSchemaCapabilities = { provider: 'payload', mutations: true }
+  private _workspaceServerState: EndgeWorkspaceServerState | null = null
+  private _capabilities: EndgeSchemaCapabilities = {
+    provider: 'payload',
+    mutations: true,
+    softDelete: true,
+    restore: true,
+  }
 
   public payloadBaseAPI!: string
   public payloadSecret!: string
@@ -592,18 +602,20 @@ export class EndgeSchemaStorage extends EndgeModule {
       this._capabilities = {
         provider: 'service-backend',
         mutations: ctx.domainProvider.capabilities.mutations,
+        softDelete: ctx.domainProvider.capabilities.softDelete,
+        restore: ctx.domainProvider.capabilities.restore,
       }
       this.repositories = null
       return
     }
     if (ctx.dataProvider === 'plain') {
       this._domainProvider = null
-      this._capabilities = { provider: 'plain', mutations: false }
+      this._capabilities = { provider: 'plain', mutations: false, softDelete: false, restore: false }
       return
     }
 
     this._domainProvider = null
-    this._capabilities = { provider: 'payload', mutations: true }
+    this._capabilities = { provider: 'payload', mutations: true, softDelete: true, restore: true }
 
     await this.configurePayload({
       payloadBaseAPI: ctx.payload?.baseAPI ?? '',
@@ -626,6 +638,7 @@ export class EndgeSchemaStorage extends EndgeModule {
       const snapshot = await provider.loadWorkspace({ workspaceIdentity, signal: ctx.signal })
       this._loadedSnapshot = snapshot
       this._domainETag = provider.etag
+      this._workspaceServerState = { ...snapshot.workspace.state }
       this._indexSnapshotServerState(snapshot)
       return
     }
@@ -649,7 +662,10 @@ export class EndgeSchemaStorage extends EndgeModule {
 
   /** Возвращает server-side revision state документа по transport type и identity. */
   public getDocumentServerState(documentType: string, identity: string): EndgeDocumentServerState | null {
-    return this._documentServerState.get(this._serverStateKey(documentType, identity)) ?? null
+    const collection = this._capabilities.provider === 'service-backend'
+      ? resolveEndgeServiceStateCollection(documentType)
+      : documentType
+    return this._documentServerState.get(this._serverStateKey(collection, identity)) ?? null
   }
 
   /**
@@ -660,6 +676,7 @@ export class EndgeSchemaStorage extends EndgeModule {
     this._loadedSnapshot = null
     this._domainProvider = null
     this._domainETag = null
+    this._workspaceServerState = null
     this._documentServerState.clear()
   }
 
@@ -678,10 +695,148 @@ export class EndgeSchemaStorage extends EndgeModule {
     return `${documentType}:${identity}`
   }
 
+  private _findServerIdentity(collection: EndgeDomainCollection, documentId: string | number): string | null {
+    const id = String(documentId)
+    const prefix = `${collection}:`
+    for (const [key, state] of this._documentServerState) {
+      if (key.startsWith(prefix) && String(state.id) === id)
+        return key.slice(prefix.length)
+    }
+    return null
+  }
+
   private _assertMutationsSupported(): void {
     if (this._capabilities.mutations)
       return
     throw new EndgeSchemaProviderReadOnlyError(this._capabilities.provider)
+  }
+
+  private _serviceProvider(): EndgeDomainProvider | null {
+    return this._capabilities.provider === 'service-backend' ? this._domainProvider : null
+  }
+
+  private _serviceWorkspaceIdentity(): string {
+    const identity = String(
+      this._loadedSnapshot?.workspace.identity
+      ?? (Endge.workspace.isLoaded ? Endge.workspace.current.identity : ''),
+    ).trim()
+    if (!identity)
+      throw new Error('[EndgeSchemaStorage] Service workspace identity is unavailable')
+    return identity
+  }
+
+  private _serviceFolderIds(): Map<string, string> {
+    const result = new Map<string, string>()
+    for (const folder of Endge.domain.getFolders()) {
+      const identity = String((folder as any).identity ?? '').trim()
+      const id = String((folder as any).id ?? '').trim()
+      if (identity && id)
+        result.set(identity, id)
+    }
+    return result
+  }
+
+  private _applyServiceDocument(
+    documentType: DomainDocumentType,
+    document: import('@/domain/types/document/domain-snapshot.type').EndgeLiveDomainDocument,
+    replaceRef?: string | number,
+  ): void {
+    const collection = resolveEndgeServiceCollection(documentType)
+    const identity = String(document.identity ?? '').trim()
+    const previousIdentity = replaceRef == null
+      ? ''
+      : String((this.getDomainDocumentByType(documentType, replaceRef) as any)?.identity ?? replaceRef).trim()
+
+    if (replaceRef != null)
+      this._removeDomainDocumentByType(documentType, replaceRef)
+    if (previousIdentity && previousIdentity !== identity)
+      this._documentServerState.delete(this._serverStateKey(collection, previousIdentity))
+
+    const key = this._getDumpKey(documentType)
+    if (!key)
+      throw new Error(`[EndgeSchemaStorage] Unsupported service document type: ${documentType}`)
+    const plain = normalizeSnapshotDocuments([document], this._serviceFolderIds())[0]
+    Endge.domain.merge({ [key]: [plain] })
+    this._documentServerState.set(this._serverStateKey(collection, identity), { ...document.state })
+    ;(AppBus.emit as (event: string, payload?: unknown) => void)('domainChanged', undefined)
+  }
+
+  private _applyServiceFolder(
+    document: import('@/domain/types/document/domain-snapshot.type').EndgeLiveDomainDocument,
+    replaceRef?: string | number,
+  ): void {
+    const identity = String(document.identity ?? '').trim()
+    const existing = replaceRef == null ? null : Endge.domain.getFolder(replaceRef)
+    const previousIdentity = String((existing as any)?.identity ?? replaceRef ?? '').trim()
+    if (existing)
+      Endge.domain.removeFolderById(existing.id)
+    if (previousIdentity && previousIdentity !== identity)
+      this._documentServerState.delete(this._serverStateKey('folders', previousIdentity))
+
+    const folderIds = this._serviceFolderIds()
+    folderIds.set(identity, document.state.id)
+    const plain = normalizeSnapshotFolders([document], folderIds)[0]
+    Endge.domain.merge({ folders: [plain] })
+    this._documentServerState.set(this._serverStateKey('folders', identity), { ...document.state })
+    ;(AppBus.emit as (event: string, payload?: unknown) => void)('domainChanged', undefined)
+  }
+
+  private async _saveServiceDocument(
+    documentId: string | number,
+    documentType: DomainDocumentType,
+    opts?: { model?: unknown, previousIdentity?: string },
+  ): Promise<void> {
+    const provider = this._serviceProvider()
+    if (!provider)
+      throw new Error('[EndgeSchemaStorage] Service domain provider is unavailable')
+
+    if (documentType === 'workspace') {
+      const workspace = normalizeEndgeWorkspaceDefinition(opts?.model ?? Endge.workspace.current)
+      const state = this._workspaceServerState
+      if (!state)
+        throw new Error('[EndgeSchemaStorage] Workspace server state is unavailable')
+      const result = await provider.updateWorkspace({
+        workspaceIdentity: this._serviceWorkspaceIdentity(),
+        expectedRevision: state.revision,
+        document: {
+          identity: workspace.identity,
+          displayName: workspace.displayName,
+          dataMode: workspace.dataMode === 'mock' ? 'development' : 'production',
+          configuration: workspace.configuration,
+          meta: normalizeEntityMeta(workspace.meta),
+        },
+      })
+      this._workspaceServerState = { ...result.workspace.state }
+      this._domainETag = result.etag
+      Endge.workspace.apply(normalizeEndgeWorkspaceDefinition({
+        ...result.workspace,
+        dataMode: result.workspace.dataMode === 'development' ? 'mock' : 'live',
+      }))
+      ;(AppBus.emit as (event: string, payload?: unknown) => void)('domainChanged', undefined)
+      return
+    }
+
+    const model = opts?.model ?? this.getDomainDocumentByType(documentType, documentId)
+    if (!model)
+      throw new Error(`Документ не найден: ${String(documentId)}`)
+    const document = serializeServiceDocument(documentType, model)
+    const identity = String(document.identity ?? '').trim()
+    const collection = resolveEndgeServiceCollection(documentType)
+    const persistedIdentity = String(opts?.previousIdentity ?? '').trim()
+      || this._findServerIdentity(collection, documentId)
+      || String((this.getDomainDocumentByType(documentType, documentId) as any)?.identity ?? identity).trim()
+    const state = this._documentServerState.get(this._serverStateKey(collection, persistedIdentity))
+    const request = {
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      collection,
+      identity: persistedIdentity || identity,
+      document,
+    }
+    const result = state
+      ? await provider.updateDocument({ ...request, expectedRevision: state.revision })
+      : await provider.createDocument(request)
+    this._domainETag = result.etag
+    this._applyServiceDocument(documentType, result.document, documentId)
   }
 
   /** Устанавливает interceptor для lock override и workspace relation. */
@@ -1831,6 +1986,9 @@ export class EndgeSchemaStorage extends EndgeModule {
     if (!normalizedIdentity)
       return false
 
+    if (this._serviceProvider())
+      return this.getDomainDocumentByType(documentType, normalizedIdentity) == null
+
     return (await this.findPayloadDocumentByIdentity(documentType, normalizedIdentity)) == null
   }
 
@@ -1847,7 +2005,10 @@ export class EndgeSchemaStorage extends EndgeModule {
     if (!(await this.isDocumentIdentityAvailable(request.documentType, identity)))
       throw new Error(`Документ "${identity}" уже существует`)
 
-    if (request.mode === 'payload') {
+    if (request.mode === 'portable') {
+      await this.saveDocument(identity, request.documentType, { model: request.document })
+    }
+    else if (request.mode === 'payload') {
       const payloadIdentity = String(request.payload.identity ?? '').trim()
       if (payloadIdentity && payloadIdentity !== identity)
         throw new Error('Identity запроса не совпадает с identity Payload-документа')
@@ -2013,6 +2174,25 @@ export class EndgeSchemaStorage extends EndgeModule {
     documentType: DomainDocumentType,
   ): Promise<void> {
     this._assertMutationsSupported()
+    const provider = this._serviceProvider()
+    if (provider) {
+      if (!this._capabilities.softDelete)
+        throw new EndgeSchemaProviderReadOnlyError(this._capabilities.provider)
+      const resolvedIdentity = this.resolveDocumentIdentity(documentIdOrIdentity, documentType)
+      const collection = resolveEndgeServiceCollection(documentType)
+      const state = this._documentServerState.get(this._serverStateKey(collection, resolvedIdentity))
+      if (!state)
+        throw new Error(`Server state не найден для ${collection}/${resolvedIdentity}`)
+      const result = await provider.softDeleteDocument({
+        workspaceIdentity: this._serviceWorkspaceIdentity(),
+        collection,
+        identity: resolvedIdentity,
+        expectedRevision: state.revision,
+      })
+      this._domainETag = result.etag
+      this._applyServiceDocument(documentType, result.document, documentIdOrIdentity)
+      return
+    }
     const repos = this.repositories
     if (!repos) {
       throw new Error(
@@ -2098,7 +2278,7 @@ export class EndgeSchemaStorage extends EndgeModule {
   /**
    * Жёсткое удаление документа из Payload (DELETE). Используется для уже удалённых сущностей (из папки «Удалённые»).
    */
-  public async deleteDocumentHard(
+  protected async _deleteDocumentHard(
     documentIdOrIdentity: string,
     documentType: DomainDocumentType,
   ): Promise<void> {
@@ -2214,6 +2394,25 @@ export class EndgeSchemaStorage extends EndgeModule {
     documentType: DomainDocumentType,
   ): Promise<void> {
     this._assertMutationsSupported()
+    const provider = this._serviceProvider()
+    if (provider) {
+      if (!this._capabilities.restore)
+        throw new EndgeSchemaProviderReadOnlyError(this._capabilities.provider)
+      const resolvedIdentity = this.resolveDocumentIdentity(documentIdOrIdentity, documentType)
+      const collection = resolveEndgeServiceCollection(documentType)
+      const state = this._documentServerState.get(this._serverStateKey(collection, resolvedIdentity))
+      if (!state)
+        throw new Error(`Server state не найден для ${collection}/${resolvedIdentity}`)
+      const result = await provider.restoreDocument({
+        workspaceIdentity: this._serviceWorkspaceIdentity(),
+        collection,
+        identity: resolvedIdentity,
+        expectedRevision: state.revision,
+      })
+      this._domainETag = result.etag
+      this._applyServiceDocument(documentType, result.document, documentIdOrIdentity)
+      return
+    }
     const repos = this.repositories
     if (!repos) {
       throw new Error(
@@ -2356,6 +2555,28 @@ export class EndgeSchemaStorage extends EndgeModule {
    */
   public async saveFolder(folderId: string): Promise<void> {
     this._assertMutationsSupported()
+    const provider = this._serviceProvider()
+    if (provider) {
+      const folder = Endge.domain.getFolder(folderId)
+      if (!folder)
+        throw new Error(`Папка не найдена: ${folderId}`)
+      const document = serializeServiceFolder(folder)
+      const identity = String(document.identity ?? '').trim()
+      const persistedIdentity = this._findServerIdentity('folders', folder.id) || identity
+      const state = this._documentServerState.get(this._serverStateKey('folders', persistedIdentity))
+      const request = {
+        workspaceIdentity: this._serviceWorkspaceIdentity(),
+        collection: 'folders' as const,
+        identity: persistedIdentity,
+        document,
+      }
+      const result = state
+        ? await provider.updateDocument({ ...request, expectedRevision: state.revision })
+        : await provider.createDocument(request)
+      this._domainETag = result.etag
+      this._applyServiceFolder(result.document, folderId)
+      return
+    }
     const repos = this.repositories
     if (!repos) {
       throw new Error(
@@ -2426,6 +2647,23 @@ export class EndgeSchemaStorage extends EndgeModule {
    */
   public async deleteFolder(folderIdentity: string): Promise<void> {
     this._assertMutationsSupported()
+    const provider = this._serviceProvider()
+    if (provider) {
+      const folder = Endge.domain.getFolder(folderIdentity)
+      const identity = String((folder as any)?.identity ?? folderIdentity).trim()
+      const state = this._documentServerState.get(this._serverStateKey('folders', identity))
+      if (!state)
+        throw new Error(`Server state не найден для folders/${identity}`)
+      const result = await provider.softDeleteDocument({
+        workspaceIdentity: this._serviceWorkspaceIdentity(),
+        collection: 'folders',
+        identity,
+        expectedRevision: state.revision,
+      })
+      this._domainETag = result.etag
+      this._applyServiceFolder(result.document, folderIdentity)
+      return
+    }
     const repos = this.repositories
     if (!repos) {
       throw new Error(
@@ -2433,6 +2671,27 @@ export class EndgeSchemaStorage extends EndgeModule {
       )
     }
     await repos.folders.deleteByIdentity(folderIdentity)
+  }
+
+  /** Восстанавливает soft-deleted папку через активный provider. */
+  public async restoreFolder(folderIdentity: string): Promise<void> {
+    this._assertMutationsSupported()
+    const provider = this._serviceProvider()
+    if (!provider)
+      throw new Error('[EndgeSchemaStorage.restoreFolder] Restore folder is available only through service-backend')
+    const folder = Endge.domain.getFolder(folderIdentity)
+    const identity = String((folder as any)?.identity ?? folderIdentity).trim()
+    const state = this._documentServerState.get(this._serverStateKey('folders', identity))
+    if (!state)
+      throw new Error(`Server state не найден для folders/${identity}`)
+    const result = await provider.restoreDocument({
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      collection: 'folders',
+      identity,
+      expectedRevision: state.revision,
+    })
+    this._domainETag = result.etag
+    this._applyServiceFolder(result.document, folderIdentity)
   }
 
   /**
@@ -2648,6 +2907,10 @@ export class EndgeSchemaStorage extends EndgeModule {
     opts?: { model?: unknown, previousIdentity?: string },
   ): Promise<void> {
     this._assertMutationsSupported()
+    if (this._serviceProvider()) {
+      await this._saveServiceDocument(documentId, documentType, opts)
+      return
+    }
     const repos = this.repositories
     if (!repos) {
       throw new Error(
@@ -3683,6 +3946,18 @@ export class EndgeSchemaStorage extends EndgeModule {
     folderIdOrIdentity: string | number | null,
   ): Promise<void> {
     this._assertMutationsSupported()
+    if (this._serviceProvider()) {
+      const model = this.getDomainDocumentByType(documentType, documentId)
+      if (!model)
+        throw new Error(`Документ не найден: ${String(documentId)}`)
+      const document = serializeServiceDocument(documentType, model)
+      const folder = folderIdOrIdentity == null ? null : Endge.domain.getFolder(folderIdOrIdentity)
+      document.folderIdentity = folderIdOrIdentity == null
+        ? null
+        : String((folder as any)?.identity ?? folderIdOrIdentity).trim()
+      await this._saveServiceDocument(documentId, documentType, { model: document })
+      return
+    }
     const repos = this.repositories
     if (!repos) {
       throw new Error(

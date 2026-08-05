@@ -114,9 +114,10 @@ describe('service-backend Core provider', () => {
     const loadWorkspace = vi.fn().mockResolvedValue(snapshot)
     const provider: EndgeDomainProvider = {
       id: 'service-backend',
-      capabilities: { snapshot: true, mutations: false },
+      capabilities: { snapshot: true, mutations: false, softDelete: false, restore: false },
       etag: '"generation-id:4"',
       loadWorkspace,
+      createDocument: vi.fn(), updateDocument: vi.fn(), softDeleteDocument: vi.fn(), restoreDocument: vi.fn(), updateWorkspace: vi.fn(),
     }
     const storage = new EndgeSchemaStorage()
 
@@ -130,7 +131,7 @@ describe('service-backend Core provider', () => {
     })
     expect(storage.repositories).toBeNull()
     expect(storage.domainETag).toBe('"generation-id:4"')
-    expect(storage.capabilities).toEqual({ provider: 'service-backend', mutations: false })
+    expect(storage.capabilities).toEqual({ provider: 'service-backend', mutations: false, softDelete: false, restore: false })
     expect(storage.getDocumentServerState('queries', 'queries-item')).toMatchObject({
       id: 'queries-item-server-id',
       revision: 7,
@@ -192,9 +193,10 @@ describe('service-backend Core provider', () => {
   it('blocks every public mutation before any Payload request', async () => {
     const provider: EndgeDomainProvider = {
       id: 'service-backend',
-      capabilities: { snapshot: true, mutations: false },
+      capabilities: { snapshot: true, mutations: false, softDelete: false, restore: false },
       etag: null,
       loadWorkspace: vi.fn().mockResolvedValue(liveSnapshot()),
+      createDocument: vi.fn(), updateDocument: vi.fn(), softDeleteDocument: vi.fn(), restoreDocument: vi.fn(), updateWorkspace: vi.fn(),
     }
     const storage = new EndgeSchemaStorage()
     const api = {
@@ -210,7 +212,6 @@ describe('service-backend Core provider', () => {
       () => storage.createDocument({ documentType: 'query-rest' as never, identity: 'new', mode: 'model', model: {} }),
       () => storage.saveDocument('item', 'query-rest' as never, { model: {} }),
       () => storage.deleteDocument('item', 'query-rest' as never),
-      () => storage.deleteDocumentHard('item', 'query-rest' as never),
       () => storage.restoreDocument('item', 'query-rest' as never),
       () => storage.changeDocumentFolder('item', 'query-rest' as never, null),
       () => storage.saveFolder('folder-root'),

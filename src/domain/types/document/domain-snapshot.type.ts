@@ -14,6 +14,7 @@ export interface EndgeSnapshotActor {
 export interface EndgeDocumentServerState {
   id: string
   revision: number
+  deletedAt?: string
   createdBy?: EndgeSnapshotActor
   updatedBy?: EndgeSnapshotActor
   createdAt?: string

@@ -14,6 +14,12 @@ export type DocumentCreateRequest =
       mode: 'payload'
       payload: Record<string, unknown>
     }
+  | {
+      documentType: DomainDocumentType
+      identity: string
+      mode: 'portable'
+      document: Record<string, unknown>
+    }
 
 /** Результат create-flow после регистрации документа в домене. */
 export interface DocumentCreateResult {

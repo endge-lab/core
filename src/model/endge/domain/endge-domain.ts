@@ -90,7 +90,7 @@ function snapshotIdentityToServerID(
   return result
 }
 
-function normalizeSnapshotDocuments(
+export function normalizeSnapshotDocuments(
   documents: readonly EndgeLiveDomainDocument[],
   folderIds: ReadonlyMap<string, string>,
 ): Record<string, unknown>[] {
@@ -115,11 +115,12 @@ function normalizeSnapshotDocuments(
         : null,
       createdAt: state.createdAt,
       updatedAt: state.updatedAt,
+      deletedAt: state.deletedAt ?? null,
     }
   })
 }
 
-function normalizeSnapshotFolders(
+export function normalizeSnapshotFolders(
   folders: readonly EndgeLiveDomainDocument[],
   folderIds: ReadonlyMap<string, string>,
 ): Record<string, unknown>[] {
@@ -145,6 +146,7 @@ function normalizeSnapshotFolders(
       folderId: null,
       createdAt: state.createdAt,
       updatedAt: state.updatedAt,
+      deletedAt: state.deletedAt ?? null,
     }
   })
 }
