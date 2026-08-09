@@ -2,7 +2,7 @@ import { QueryType } from '@/domain/types/document/document.types'
 
 import { Expose } from 'class-transformer'
 
-import { Endge } from '@/model/endge/kernel/endge'
+import { Endge } from '@/model/kernel/endge'
 import { REntity } from '@/domain/entities/reflect/REntity'
 
 /**

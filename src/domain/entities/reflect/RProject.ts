@@ -79,31 +79,6 @@ export class RProject extends REntity {
    *   ...
    * }
    */
-  static fromPayload(json: any): RProject {
-    const p = new RProject()
-
-    // SCHEMA FIELDS
-    p.id = json.id
-    p.identity = json.identity ?? ''
-    p.name = json.displayName ?? p.identity
-    p.displayName = json.displayName ?? p.name
-    // Проект не лежит в папке
-    p.folderId = null
-
-    p.description = json.description ?? null
-    p.slug = json.slug ?? null
-    p.order = json.order != null ? Number(json.order) : null
-    p.navigationId = normalizeRelationId(json.navigation ?? json.navigationId ?? null)
-    p.allowedEnvironmentIds = normalizeRelationIds(json.allowedEnvironments ?? json.allowedEnvironmentIds ?? [])
-    p.configuration = normalizeEndgeConfigurationContribution(json.configuration)
-    p.applyEntityMeta(json)
-
-    // STORAGE META
-    p.applyStorageMeta(json)
-
-    return p
-  }
-
   /**
    * Создание проекта из plain-схемы (schema.toPlain()).
    *

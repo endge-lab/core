@@ -28,10 +28,6 @@ export class RWorkspace extends REntity implements EndgeWorkspaceDefinition {
     return createWorkspace(input)
   }
 
-  static fromPayload(input: unknown): RWorkspace {
-    return createWorkspace(input)
-  }
-
   toPlain(): EndgeWorkspaceDefinition {
     return {
       identity: this.identity,
@@ -52,7 +48,7 @@ export function normalizeEndgeWorkspaceDefinition(input: unknown): EndgeWorkspac
 
 function createWorkspace(input: unknown): RWorkspace {
   if (!isRecord(input))
-    throw new Error('[RWorkspace] Payload workspace must be an object')
+    throw new Error('[RWorkspace] Workspace must be an object')
 
   const source = input as EndgeWorkspaceDefinitionInput
   const workspace = new RWorkspace()
@@ -97,7 +93,7 @@ function normalizeInstalledIntegrations(value: unknown): WorkspaceIntegrationRef
 function requireText(value: unknown, field: string): string {
   const text = String(value ?? '').trim()
   if (!text)
-    throw new Error(`[RWorkspace] Payload field "${field}" is required`)
+    throw new Error(`[RWorkspace] Field "${field}" is required`)
   return text
 }
 

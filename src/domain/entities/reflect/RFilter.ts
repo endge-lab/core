@@ -25,23 +25,6 @@ export class RFilter extends REntity {
     return FilterType.DefaultFilter
   }
 
-  static fromPayload(raw: any): RFilter {
-    const f = new RFilter()
-    f.id = raw.id
-    f.identity = raw.identity ?? ''
-    const displayName = raw.displayName ?? raw.identity
-    f.name = displayName
-    f.displayName = displayName
-    const folderId = raw.folder != null && typeof raw.folder === 'object' ? raw.folder.id : (typeof raw.folder === 'number' || typeof raw.folder === 'string' ? raw.folder : null)
-    f.folderId = folderId ?? null
-    f.active = raw.active ?? true
-    f.fields = Array.isArray(raw.fields) ? raw.fields.map((x: any) => ({ ...x, multiple: x.multiple !== false })) : []
-    f.source = String(raw.source ?? '')
-    f.sourceVersion = Number(raw.sourceVersion ?? 1) || 1
-    f.applyStorageMeta(raw)
-    return f
-  }
-
   static fromPlain(json: RFilterSchema): RFilter {
     const f = new RFilter()
     f.id = (json as any).id ?? json.identity

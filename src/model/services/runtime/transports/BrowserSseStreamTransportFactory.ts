@@ -6,7 +6,7 @@ import type {
 
 import { SSEManager } from '@endge/utils'
 
-import { Endge } from '@/model/endge/kernel/endge'
+import { Endge } from '@/model/kernel/endge'
 
 /** Browser adapter that owns native EventSource and converts it to a Core transport port. */
 export class BrowserSseStreamTransportFactory implements StreamTransportFactory {

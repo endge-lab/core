@@ -29,30 +29,6 @@ export class RParameter extends REntity {
     return ParameterType.DefaultParameter
   }
 
-  static fromPayload(raw: any): RParameter {
-    const f = new RParameter()
-    f.id = raw.id
-    f.identity = raw.identity ?? ''
-    f.name = raw.displayName ?? raw.identity
-    f.displayName = raw.displayName ?? raw.identity
-    f.description = raw.description ?? undefined
-    f.folderId = raw.folder != null && typeof raw.folder === 'object' ? raw.folder.id : raw.folder ?? null
-    f.active = raw.active ?? true
-    f.runtimeFilters = raw.runtimeFilters ?? []
-
-    f.fields = new Map()
-    if (Array.isArray(raw.fields)) {
-      for (const fld of raw.fields) {
-        const key = fld.key
-        if (!key) continue
-        f.fields.set(key, { ...fld })
-      }
-    }
-
-    f.applyStorageMeta(raw)
-    return f
-  }
-
   static fromPlain(json: RParameterSchema): RParameter {
     const f = new RParameter()
     f.id = (json as any).id ?? json.identity

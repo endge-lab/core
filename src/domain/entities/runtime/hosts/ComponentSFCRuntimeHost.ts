@@ -45,8 +45,8 @@ import type {
 import { DataPath, Raph, RaphNode } from '@endge/raph'
 
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
-import { Endge } from '@/model/endge/kernel/endge'
-import { ComputationResourceRegistry } from '@/model/endge/runtime/execution/computation/ComputationResourceRegistry'
+import { Endge } from '@/model/kernel/endge'
+import { ComputationResourceRegistry } from '@/model/modules/runtime/execution/computation/ComputationResourceRegistry'
 import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component/sfc/dependencies.types'
 import { RUNTIME_BOUNDARY_UPDATE_PHASE_NAME } from '@/domain/types/runtime/runtime-host.types'
 

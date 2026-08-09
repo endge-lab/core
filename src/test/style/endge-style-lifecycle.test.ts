@@ -3,7 +3,7 @@ import type { EndgeStyleProgramPayload, ProgramArtifact } from '@/domain/types/p
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { RStyle } from '@/domain/entities/reflect/RStyle'
-import { Endge } from '@/model/endge/kernel/endge'
+import { Endge } from '@/model/kernel/endge'
 import { compileEndgeCSS } from '@/model/services/style/endgecss-compile'
 
 describe('Endge style leases', () => {

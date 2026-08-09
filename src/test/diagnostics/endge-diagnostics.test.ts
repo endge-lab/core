@@ -5,7 +5,7 @@ import type {
   DiagnosticsSpanRecord,
   EndgeDiagnosticsConfiguration,
 } from '@/domain/types/diagnostics/diagnostics.types'
-import { EndgeDiagnostics } from '@/model/endge/diagnostics/endge-diagnostics'
+import { EndgeDiagnostics } from '@/model/modules/diagnostics/endge-diagnostics'
 import { describe, expect, it, vi } from 'vitest'
 
 /** Создаёт независимую configuration для одного тестового diagnostics module. */

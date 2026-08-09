@@ -27,7 +27,7 @@ import { RTenant } from '@/domain/entities/reflect/RTenant'
 import { RType } from '@/domain/entities/reflect/RType'
 import { RVocabs } from '@/domain/entities/reflect/RVocabs'
 import { ComponentType, FilterType, QueryType } from '@/domain/types/document/document.types'
-import { Endge } from '@/model/endge/kernel/endge'
+import { Endge } from '@/model/kernel/endge'
 import { COMPONENT_SFC_DEFAULT_SOURCE } from '@/model/services/compiler/component-sfc/templates/component-sfc.default.source'
 
 /** Создаёт черновики документов без регистрации и сохранения. */

@@ -4,7 +4,7 @@ import type { EndgeFederationHost } from '@/domain/types/kernel/federation.types
 
 import type { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { sortEndgeModuleDescriptors } from '@/domain/entities/endge/sort-endge-modules'
-import { ENDGE_FEDERATION_REGISTRY_KEY } from '@/model/config/federation'
+import { ENDGE_FEDERATION_REGISTRY_KEY } from '@/model/config/kernel.config'
 
 function toArray(value: string | string[] | undefined): string[] {
   if (!value)

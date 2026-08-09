@@ -1,6 +1,6 @@
 import type { DocumentNode, ObjectTypeDefinitionNode } from 'graphql'
 import { parse, visit } from 'graphql'
-import { Endge } from '@/model/endge/kernel/endge'
+import { Endge } from '@/model/kernel/endge'
 import { RType } from '@/domain/entities/reflect/RType'
 import type { TypeSourceField } from '@/domain/types/source/type-source.types'
 import { serializeTypeSourceDocument } from '@/model/services/source-engine/type-source-serialize'

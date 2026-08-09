@@ -9,7 +9,7 @@ import { Exclude, Expose, Type } from 'class-transformer'
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
 import { REntity } from '@/domain/entities/reflect/REntity'
 import { RField } from '@/domain/entities/reflect/RField'
-import { Endge } from '@/model/endge/kernel/endge'
+import { Endge } from '@/model/kernel/endge'
 
 /**
  * Действие хранится как flow-описание.

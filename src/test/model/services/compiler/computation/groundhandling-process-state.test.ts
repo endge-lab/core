@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { ComputationGraphExecutor } from '@/model/endge/runtime/execution/computation/ComputationGraphExecutor'
+import { ComputationGraphExecutor } from '@/model/modules/runtime/execution/computation/ComputationGraphExecutor'
 import { compileComputation } from '@/model/services/compiler/computation/computation-compile'
 
 const source = `

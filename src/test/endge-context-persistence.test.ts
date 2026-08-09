@@ -1,22 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { EndgeContext } from '@/model/endge/context/endge-context'
-import { buildRuntimeStateStorageKey, RuntimeStateController } from '@/model/endge/context/persistence/RuntimeStateController'
-import { DisabledContextAdapter } from '@/model/endge/context/persistence/adapters/DisabledContextAdapter'
-import { LocalStorageContextAdapter } from '@/model/endge/context/persistence/adapters/LocalStorageContextAdapter'
+import { EndgeContext } from '@/model/modules/context/endge-context'
+import { buildRuntimeStateStorageKey, RuntimeStateController } from '@/model/modules/context/persistence/RuntimeStateController'
+import { DisabledContextAdapter } from '@/model/modules/context/persistence/adapters/DisabledContextAdapter'
+import { LocalStorageContextAdapter } from '@/model/modules/context/persistence/adapters/LocalStorageContextAdapter'
 
 describe('EndgeContext persistence', () => {
   beforeEach(() => {
     installLocalStorageMock()
   })
 
-  it('keeps workspace unresolved until Payload selects it', () => {
+  it('keeps workspace unresolved until the backend selects it', () => {
     const context = new EndgeContext()
     context.deserialize(undefined)
 
     expect(context.getCurrentWorkspace()).toBeNull()
     expect(context.serialize().workspace).toBeNull()
-    expect(() => context.getPersistenceScope()).toThrow('Active workspace has not been loaded from Payload')
+    expect(() => context.getPersistenceScope()).toThrow('Active workspace has not been loaded')
   })
 
   it('normalizes empty non-workspace scope values to defaults', () => {

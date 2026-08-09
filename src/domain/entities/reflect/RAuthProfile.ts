@@ -33,23 +33,6 @@ export class RAuthProfile extends REntity {
   @Expose()
   override active: boolean = true
 
-  static fromPayload(raw: any): RAuthProfile {
-    const profile = new RAuthProfile()
-    profile.id = raw.id
-    profile.identity = raw.identity ?? ''
-    profile.name = raw.displayName ?? raw.identity ?? ''
-    profile.displayName = raw.displayName ?? profile.name
-    profile.description = raw.description ?? null
-    profile.adapterId = normalizeAdapterId(raw.adapterId)
-    profile.config = normalizeObject(raw.config)
-    profile.credentialRefs = normalizeStringObject(raw.credentialRefs)
-    profile.persist = normalizePersist(raw.persist)
-    profile.folderId = raw.folder?.id ?? raw.folder ?? null
-    profile.active = raw.active !== false
-    profile.applyStorageMeta(raw)
-    return profile
-  }
-
   static fromPlain(raw: any): RAuthProfile {
     const profile = new RAuthProfile()
     profile.id = raw.id

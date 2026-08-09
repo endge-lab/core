@@ -62,11 +62,11 @@ export interface EndgeDomainProvider {
   updateWorkspace(request: EndgeWorkspaceMutationRequest): Promise<EndgeWorkspaceMutationResult>
 }
 
-export type EndgeSchemaProviderId = 'payload' | 'service-backend' | 'bundle' | 'plain'
+export type EndgeDomainRepositoryProviderId = 'service-backend' | 'bundle' | 'plain'
 
-/** Публичные возможности активного schema provider. */
-export interface EndgeSchemaCapabilities {
-  provider: EndgeSchemaProviderId
+/** Публичные возможности активного источника persisted domain. */
+export interface EndgeDomainRepositoryCapabilities {
+  provider: EndgeDomainRepositoryProviderId
   mutations: boolean
   softDelete: boolean
   restore: boolean

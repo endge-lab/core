@@ -5,7 +5,6 @@ import { Exclude, Expose } from 'class-transformer'
  * data подгружается только по требованию (скачивание).
  */
 export class RVersion {
-  /** Payload id (в Payload - число) */
   @Expose()
   id!: number
 
@@ -25,8 +24,8 @@ export class RVersion {
   @Exclude()
   updatedAt?: string
 
-  /** Заполнить из ответа API (без data для списка). */
-  static fromPayload(doc: { id: string | number; identity?: string; description?: string; data?: any; createdAt?: string; updatedAt?: string }): RVersion {
+  /** Заполнить из persisted document (без data для списка). */
+  static fromPlain(doc: { id: number; identity?: string; description?: string; data?: any; createdAt?: string; updatedAt?: string }): RVersion {
     const v = new RVersion()
     v.id = doc.id
     v.identity = doc.identity ?? ''

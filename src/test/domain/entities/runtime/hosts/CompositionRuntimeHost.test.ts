@@ -21,8 +21,8 @@ import { StoreRuntimeHost } from '@/domain/entities/runtime/hosts/StoreRuntimeHo
 import { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentSFCRuntimeHost'
 import { compileFilterSource } from '@/model/services/source-engine/compilers/filter-source-compile'
 import { buildRuntimeGraph, compileCompositionSource } from '@/model/services/source-engine/compilers/composition-source-compile'
-import { Endge } from '@/model/endge/kernel/endge'
-import { materializeCompositionPreviewProps } from '@/model/endge/runtime/execution/endge-composition'
+import { Endge } from '@/model/kernel/endge'
+import { materializeCompositionPreviewProps } from '@/model/modules/runtime/execution/endge-composition'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 
 describe('Composition runtime session', () => {

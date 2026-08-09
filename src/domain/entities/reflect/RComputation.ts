@@ -22,14 +22,6 @@ export class RComputation extends REntity {
   @Expose()
   contractVersion: number = 1
 
-  static fromPayload(json: any): RComputation {
-    return RComputation.fromPlain({
-      ...json,
-      name: json?.displayName ?? json?.name,
-      folderId: relationToId(json?.folder ?? json?.folderId),
-    }, json)
-  }
-
   static fromPlain(json: any, storageMeta?: any): RComputation {
     const computation = new RComputation()
     computation.id = json?.id

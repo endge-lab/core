@@ -11,12 +11,6 @@ export type DocumentCreateRequest =
   | {
       documentType: DomainDocumentType
       identity: string
-      mode: 'payload'
-      payload: Record<string, unknown>
-    }
-  | {
-      documentType: DomainDocumentType
-      identity: string
       mode: 'portable'
       document: Record<string, unknown>
     }

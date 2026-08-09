@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { compileComputation } from '@/model/services/compiler/computation/computation-compile'
-import { ComputationGraphExecutor } from '@/model/endge/runtime/execution/computation/ComputationGraphExecutor'
+import { ComputationGraphExecutor } from '@/model/modules/runtime/execution/computation/ComputationGraphExecutor'
 
 describe('compileComputation graph', () => {
   it('compiles forward references and evaluates the safe graph once', () => {

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { Endge } from '@/model/endge/kernel/endge'
+import { Endge } from '@/model/kernel/endge'
 import { importGqlSchemaToDomain } from '@/tools/graphql-parser'
 import { importOpenApiSchemaToDomain } from '@/tools/openapi-parser'
 

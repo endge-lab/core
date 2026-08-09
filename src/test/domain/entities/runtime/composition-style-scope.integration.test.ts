@@ -5,7 +5,7 @@ import { RStyle } from '@/domain/entities/reflect/RStyle'
 import type { ProgramArtifact } from '@/domain/types/program/program.types'
 import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
 import type { RuntimeScopeHandle } from '@/domain/types/runtime/runtime-scope.types'
-import { Endge } from '@/model/endge/kernel/endge'
+import { Endge } from '@/model/kernel/endge'
 import { compileEndgeCSS } from '@/model/services/style/endgecss-compile'
 
 describe('Composition style scope integration', () => {

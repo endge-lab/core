@@ -6,7 +6,7 @@ import type { StreamEventEnvelope, StreamSourceArtifact } from '@/domain/types/s
 import { Raph, RaphNode } from '@endge/raph'
 
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
-import { Endge } from '@/model/endge/kernel/endge'
+import { Endge } from '@/model/kernel/endge'
 
 function defaultContext(): RuntimeHostContext<'stream'> {
   return {

@@ -31,14 +31,6 @@ export class RStyle extends REntity {
   @Expose()
   sourceVersion: number = 1
 
-  static fromPayload(json: any): RStyle {
-    return RStyle.fromPlain({
-      ...json,
-      name: json?.displayName ?? json?.name,
-      folderId: relationToId(json?.folder ?? json?.folderId),
-    }, json)
-  }
-
   static fromPlain(json: any, storageMeta?: any): RStyle {
     const style = new RStyle()
     style.id = json?.id

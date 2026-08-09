@@ -21,6 +21,13 @@ export interface EndgeCustomEventMap {
   [event: string]: unknown
 }
 
+/** Статические события Endge Core. */
+export interface EndgeCoreEventMap {
+  'sse:message': { message: unknown }
+  'updates:message': { type: string, message: unknown }
+  'updates:applied': { identity: string, count: number }
+}
+
 //
 //
 export interface EndgeEmitOptions {

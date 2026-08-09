@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import { REntity } from '@/domain/entities/reflect/REntity'
 import { RIntegration } from '@/domain/entities/reflect/RIntegration'
@@ -11,7 +11,6 @@ import {
   isUserManaged,
   normalizeEntityManagement,
 } from '@/domain/types/document/entity-management.type'
-import { Integrations_Repository } from '@/model/db/repositories/Integrations_Repository'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
 describe('entity management', () => {
@@ -65,8 +64,8 @@ describe('entity management', () => {
 })
 
 describe('workspace integration references', () => {
-  it('normalizes populated Payload relationships and serializes stable references', () => {
-    const workspace = RWorkspace.fromPayload({
+  it('normalizes populated integration relationships and serializes stable references', () => {
+    const workspace = RWorkspace.fromPlain({
       id: 10,
       identity: 'main',
       displayName: 'Main',
@@ -83,27 +82,5 @@ describe('workspace integration references', () => {
     expect(workspace.toPlain().installedIntegrations).toEqual([
       { integrationId: 7, integrationIdentity: 'example.operations', version: '1.2.3' },
     ])
-  })
-})
-
-describe('global integration repository', () => {
-  it('does not inject workspace or folder data', async () => {
-    const post = vi.fn().mockResolvedValue({ data: { id: 1 } })
-    const api = { post } as any
-    const repository = new Integrations_Repository(api)
-
-    await repository.create({
-      identity: 'example.operations',
-      displayName: 'Operations',
-      managedBy: 'user',
-      managedById: null,
-    })
-
-    expect(post).toHaveBeenCalledWith('/integrations', {
-      identity: 'example.operations',
-      displayName: 'Operations',
-      managedBy: 'user',
-      managedById: null,
-    })
   })
 })

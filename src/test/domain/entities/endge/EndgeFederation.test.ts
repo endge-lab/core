@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { EndgeFederation } from '@/domain/entities/endge/EndgeFederation'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
-import { ENDGE_CORE_MODULES } from '@/model/config/endge-modules'
+import { ENDGE_CORE_MODULES } from '@/model/config/modules.config'
 
 function createBootContext(): EndgeBootContext {
   return {
@@ -216,11 +216,11 @@ describe('EndgeFederation stages', () => {
   it('keeps schema before domain in core modules', () => {
     const keys = ENDGE_CORE_MODULES.map(item => item.key)
 
-    expect(keys.indexOf('schema')).toBeGreaterThanOrEqual(0)
+    expect(keys.indexOf('domainRepository')).toBeGreaterThanOrEqual(0)
     expect(keys.indexOf('domain')).toBeGreaterThanOrEqual(0)
     expect(keys.indexOf('workspace')).toBeGreaterThanOrEqual(0)
     expect(keys.indexOf('context')).toBeLessThan(keys.indexOf('workspace'))
-    expect(keys.indexOf('schema')).toBeLessThan(keys.indexOf('domain'))
+    expect(keys.indexOf('domainRepository')).toBeLessThan(keys.indexOf('domain'))
     expect(keys.indexOf('domain')).toBeLessThan(keys.indexOf('compiler'))
     expect(keys.indexOf('compiler')).toBeLessThan(keys.indexOf('runtime'))
   })

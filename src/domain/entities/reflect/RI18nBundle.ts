@@ -23,20 +23,6 @@ export class RI18nBundle extends REntity {
   @Expose()
   override active: boolean = true
 
-  static fromPayload(json: any): RI18nBundle {
-    const v = new RI18nBundle()
-    v.id = json.id
-    v.identity = json.identity ?? ''
-    v.name = json.displayName ?? v.identity
-    v.displayName = json.displayName ?? v.name
-    v.description = json.description ?? null
-    v.locales = (json.locales && typeof json.locales === 'object' && !Array.isArray(json.locales)) ? json.locales : {}
-    v.folderId = json.folder?.id ?? json.folder ?? null
-    v.active = json.active !== false
-    v.applyStorageMeta(json)
-    return v
-  }
-
   static fromPlain(json: any): RI18nBundle {
     const v = new RI18nBundle()
     v.id = json.id

@@ -11,7 +11,7 @@ import type {
   RuntimeHostUpdateContext,
 } from '@/domain/types/runtime/runtime-host.types'
 import { RuntimeBoundaryUpdatePhase } from '@/model/helpers/raph-phases/runtime-boundary-update-phase'
-import { Endge } from '@/model/endge/kernel/endge'
+import { Endge } from '@/model/kernel/endge'
 
 describe('ComponentSFCRuntimeHost', () => {
   afterEach(() => {

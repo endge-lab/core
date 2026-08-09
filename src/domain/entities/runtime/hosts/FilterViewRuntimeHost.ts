@@ -13,7 +13,7 @@ import type { SourceFieldDefinition, SourceFieldOption } from '@/domain/types/so
 import { Raph } from '@endge/raph'
 
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
-import { Endge } from '@/model/endge/kernel/endge'
+import { Endge } from '@/model/kernel/endge'
 
 function defaultContext(instance: string): RuntimeHostContext<'filter'> {
   return {

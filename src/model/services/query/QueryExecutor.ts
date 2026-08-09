@@ -6,7 +6,7 @@ import type { AxiosInstance } from 'axios'
 
 import axios from 'axios'
 
-import { Endge } from '@/model/endge/kernel/endge'
+import { Endge } from '@/model/kernel/endge'
 import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
 
 /** Выполняет source-only compiled query artifact. */

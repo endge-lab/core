@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
 import { compileFilterSource } from '@/model/services/source-engine/compilers/filter-source-compile'
-import { Endge } from '@/model/endge/kernel/endge'
+import { Endge } from '@/model/kernel/endge'
 
 describe('QueryRuntimeHost', () => {
   afterEach(() => {

@@ -1,8 +1,8 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest'
 
-import { EndgeDiagnostics } from '@/model/endge/diagnostics/endge-diagnostics'
-import { createDiagnosticsEntityOwner, EndgeProblems } from '@/model/endge/diagnostics/endge-problems'
+import { EndgeDiagnostics } from '@/model/modules/diagnostics/endge-diagnostics'
+import { createDiagnosticsEntityOwner, EndgeProblems } from '@/model/modules/diagnostics/endge-problems'
 import { RMock } from '@/domain/entities/reflect/RMock'
 
 describe('EndgeProblems', () => {

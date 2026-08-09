@@ -7,7 +7,7 @@ import type { StreamEventEnvelope } from '@/domain/types/source/stream-source.ty
 import { Raph, RaphNode, full, type RaphDerivedHandle } from '@endge/raph'
 
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
-import { Endge } from '@/model/endge/kernel/endge'
+import { Endge } from '@/model/kernel/endge'
 
 function defaultContext(artifact: StoreSourceArtifact): RuntimeHostContext<'store'> {
   return {

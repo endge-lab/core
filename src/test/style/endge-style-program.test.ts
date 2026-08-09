@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { RStyle } from '@/domain/entities/reflect/RStyle'
-import { Endge } from '@/model/endge/kernel/endge'
-import { EndgeUI } from '@/model/endge/ui/endge-ui'
+import { Endge } from '@/model/kernel/endge'
+import { EndgeUI } from '@/model/modules/ui/endge-ui'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 import { RProject } from '@/domain/entities/reflect/RProject'
 import { REnvironment } from '@/domain/entities/reflect/REnvironment'

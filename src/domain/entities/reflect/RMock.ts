@@ -9,7 +9,7 @@ import type {
 import type { DiagnosticsProblemInput } from '@/domain/types/diagnostics/diagnostics.types'
 import { REntity } from '@/domain/entities/reflect/REntity'
 
-/** Persisted mock-документ. Payload остается source of truth для identity и связей. */
+/** Persisted source-first mock document. */
 export class RMock extends REntity {
   @Expose()
   override displayName: string = ''
@@ -28,15 +28,6 @@ export class RMock extends REntity {
 
   @Expose()
   codeRef: string | null = null
-
-  /** Создает доменную модель из Payload response. */
-  static fromPayload(json: any): RMock {
-    return RMock.fromPlain({
-      ...json,
-      name: json?.displayName ?? json?.name,
-      folderId: relationToId(json?.folder ?? json?.folderId),
-    }, json)
-  }
 
   /** Создает доменную модель из portable plain source. */
   static fromPlain(json: any, storageMeta?: any): RMock {

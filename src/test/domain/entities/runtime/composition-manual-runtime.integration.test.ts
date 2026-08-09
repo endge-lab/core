@@ -6,7 +6,7 @@ import { RQuery } from '@/domain/entities/reflect/RQuery'
 import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
 import type { ProgramArtifact, QueryProgramPayload } from '@/domain/types/program/program.types'
 import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
-import { Endge } from '@/model/endge/kernel/endge'
+import { Endge } from '@/model/kernel/endge'
 
 describe('Composition manual runtime handle', () => {
   afterEach(async () => {

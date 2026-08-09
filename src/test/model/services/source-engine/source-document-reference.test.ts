@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { Endge } from '@/model/endge/kernel/endge'
+import { Endge } from '@/model/kernel/endge'
 
 describe('source document references', () => {
   it.each([

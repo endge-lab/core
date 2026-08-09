@@ -2,10 +2,10 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { RAction } from '@/domain/entities/reflect/RAction'
 import { BUILTIN_ACTION_IDS } from '@/domain/types/runtime/action.types'
-import { EndgeImplementations } from '@/model/endge/runtime/implementation/endge-implementations'
+import { EndgeImplementations } from '@/model/modules/runtime/implementation/endge-implementations'
 import { compileAction } from '@/model/services/compiler/action/action-compile'
 import { validateActionTarget } from '@/model/services/compiler/action/action-target-validation'
-import { Endge } from '@/model/endge/kernel/endge'
+import { Endge } from '@/model/kernel/endge'
 
 describe('Action implementation pipeline', () => {
   it('materializes console log only as a built-in Action and executes its default message', async () => {

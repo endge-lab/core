@@ -33,24 +33,6 @@ export class RVocabs extends REntity {
   @Expose()
   authProfileIdentity?: string | null = null
 
-  static fromPayload(json: any): RVocabs {
-    const v = new RVocabs()
-    v.id = json.id
-    v.identity = json.identity ?? ''
-    v.name = json.displayName ?? v.identity
-    v.displayName = json.displayName ?? v.name
-    v.description = json.description ?? null
-    v.mode = json.mode === 'internal' ? 'internal' : 'external_payload'
-    v.baseApiUrl = json.baseApiUrl ?? null
-    v.collectionSlug = json.collectionSlug ?? null
-    v.authMode = normalizeVocabAuthMode(json.authMode)
-    v.authProfileIdentity = json.authProfileIdentity ?? null
-    v.folderId = json.folder?.id ?? json.folder ?? null
-    v.active = json.active !== false
-    v.applyStorageMeta(json)
-    return v
-  }
-
   static fromPlain(json: any): RVocabs {
     const v = new RVocabs()
     v.id = json.id

@@ -8,7 +8,7 @@ import { evaluateValueExpression } from '@/model/services/source-engine/source-e
 import { compileQuerySource } from '@/model/services/source-engine/compilers/query-source-compile'
 import { compileCompositionSource } from '@/model/services/source-engine/compilers/composition-source-compile'
 import { compileDataViewSource } from '@/model/services/source-engine/compilers/data-view-source-compile'
-import { EndgeDataView } from '@/model/endge/runtime/execution/endge-data-view'
+import { EndgeDataView } from '@/model/modules/runtime/execution/endge-data-view'
 import { QueryExecutor } from '@/model/services/query/QueryExecutor'
 
 function compile(source: string) {

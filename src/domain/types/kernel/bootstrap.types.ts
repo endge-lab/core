@@ -6,27 +6,20 @@ import type { EndgeDomainBundle } from '@/domain/types/document/domain-export.ty
  * Источник получения доменных данных
  * default - работа с внешним сервисом backend
  * bundle - read-only работа с переносимым workspace snapshot
- * payload - @Deprecated внешний сервис на payload
  * plain - данные подтягиваются из файла
  */
 export type EndgeDataProvider =
   | 'default'
   | 'bundle'
-  | 'payload'
   | 'plain'
 
 /**
  * Конфигурация загрузки движка
- * Определяет workspace, данные которого должны быть активированы из Payload.
+ * Определяет workspace, данные которого должны быть активированы из persisted Domain.
  * Tenant, project и environment передаются отдельно через EndgeBootContext.context.
  */
 export interface EndgeLoadScope {
   workspaceIdentity?: string
-}
-
-export interface EndgePayloadProviderOptions {
-  baseAPI: string
-  secret: string
 }
 
 export interface EndgeUIBootOptions {
@@ -41,7 +34,7 @@ export interface EndgeBootContext {
   dataProvider: EndgeDataProvider
 
   /**
-   * Граница загружаемых данных.
+   * Граница загружаемого persisted Domain.
    */
   scope: EndgeLoadScope
 
@@ -60,11 +53,6 @@ export interface EndgeBootContext {
    * Для plain provider.
    */
   plainSource?: unknown
-
-  /**
-   * Для payload provider.
-   */
-  payload?: EndgePayloadProviderOptions
 
   /** Внешний источник live snapshot для default backend provider. */
   domainProvider?: EndgeDomainProvider

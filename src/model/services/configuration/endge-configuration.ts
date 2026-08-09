@@ -20,8 +20,8 @@ import type {
   EndgeDiagnosticsOutputConfiguration,
   EndgeDiagnosticsRoute,
 } from '@/domain/types/diagnostics/diagnostics.types'
-import { DEFAULT_FALLBACK_LOCALE, DEFAULT_LOCALE, DEFAULT_THEME } from '@/model/config/context'
-import { DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION } from '@/model/config/diagnostics'
+import { DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION } from '@/model/config/diagnostics.config'
+import { DEFAULT_FALLBACK_LOCALE, DEFAULT_LOCALE, DEFAULT_THEME } from '@/model/config/kernel.config'
 
 const LEGACY_SFC_ADAPTER_IDS: Readonly<Record<string, string>> = {
   'native-vue': 'vue-native',

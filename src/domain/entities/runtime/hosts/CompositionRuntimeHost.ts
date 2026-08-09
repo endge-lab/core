@@ -31,7 +31,7 @@ import { Raph, RaphNode } from '@endge/raph'
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 import { RuntimeScope } from '@/domain/entities/runtime/RuntimeScope'
 import { FilterViewRuntimeHost as EndgeFilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
-import { Endge } from '@/model/endge/kernel/endge'
+import { Endge } from '@/model/kernel/endge'
 import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
 import { cloneI18nRuntimeCatalog, extendI18nRuntimeCatalog } from '@/model/services/i18n/i18n-catalog'
 

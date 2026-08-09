@@ -9,7 +9,7 @@ import { RStore } from '@/domain/entities/reflect/RStore'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
 import { StoreRuntimeHost } from '@/domain/entities/runtime/hosts/StoreRuntimeHost'
-import { Endge } from '@/model/endge/kernel/endge'
+import { Endge } from '@/model/kernel/endge'
 
 describe('RuntimeAppScope', () => {
   afterEach(async () => {

@@ -15,7 +15,7 @@ import {
 import { RFilter as FilterModel } from '@/domain/entities/reflect/RFilter'
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
-import { Endge } from '@/model/endge/kernel/endge'
+import { Endge } from '@/model/kernel/endge'
 import type { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
 
 function defaultContext(): RuntimeHostContext<'query'> {
