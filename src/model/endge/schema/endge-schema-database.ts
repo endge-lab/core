@@ -613,6 +613,13 @@ export class EndgeSchemaStorage extends EndgeModule {
       this._capabilities = { provider: 'plain', mutations: false, softDelete: false, restore: false }
       return
     }
+    if (ctx.dataProvider === 'bundle') {
+      if (!ctx.bundleSource)
+        throw new Error('[EndgeSchemaStorage] bundleSource is required for bundle data provider')
+      this._domainProvider = null
+      this._capabilities = { provider: 'bundle', mutations: false, softDelete: false, restore: false }
+      return
+    }
 
     this._domainProvider = null
     this._capabilities = { provider: 'payload', mutations: true, softDelete: true, restore: true }

@@ -62,7 +62,7 @@ export interface EndgeDomainProvider {
   updateWorkspace(request: EndgeWorkspaceMutationRequest): Promise<EndgeWorkspaceMutationResult>
 }
 
-export type EndgeSchemaProviderId = 'payload' | 'service-backend' | 'plain'
+export type EndgeSchemaProviderId = 'payload' | 'service-backend' | 'bundle' | 'plain'
 
 /** Публичные возможности активного schema provider. */
 export interface EndgeSchemaCapabilities {

@@ -1,14 +1,17 @@
 import type { EndgeExecutionContext } from '@/domain/types/runtime/execution-context.types'
 import type { EndgeDomainProvider } from '@/domain/types/document/domain-provider.type'
+import type { EndgeDomainBundle } from '@/domain/types/document/domain-export.type'
 
 /**
  * Источник получения доменных данных
  * default - работа с внешним сервисом backend
+ * bundle - read-only работа с переносимым workspace snapshot
  * payload - @Deprecated внешний сервис на payload
  * plain - данные подтягиваются из файла
  */
 export type EndgeDataProvider =
   | 'default'
+  | 'bundle'
   | 'payload'
   | 'plain'
 
@@ -65,6 +68,9 @@ export interface EndgeBootContext {
 
   /** Внешний источник live snapshot для default backend provider. */
   domainProvider?: EndgeDomainProvider
+
+  /** Переносимый read-only workspace snapshot для bundle provider. */
+  bundleSource?: EndgeDomainBundle
 
   /**
    * Для отмены долгой загрузки/сборки.

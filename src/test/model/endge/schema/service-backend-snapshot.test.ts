@@ -1,5 +1,6 @@
 import type {
   EndgeBootContext,
+  EndgeDomainBundle,
   EndgeDomainProvider,
   EndgeLiveDomainDocument,
   EndgeLiveDomainSnapshot,
@@ -103,6 +104,23 @@ function defaultContext(provider: EndgeDomainProvider): EndgeBootContext {
     scope: { workspaceIdentity: 'workspace-a' },
     vars: {},
     domainProvider: provider,
+  }
+}
+
+function releaseBundle(): EndgeDomainBundle {
+  const snapshot = liveSnapshot()
+  const { state: _workspaceState, ...workspace } = snapshot.workspace
+  const documents = Object.fromEntries(DOCUMENT_KEYS.map(key => [
+    key,
+    snapshot.documents[key].map(({ state: _documentState, ...document }) => document),
+  ])) as unknown as EndgeDomainBundle['documents']
+
+  return {
+    kind: snapshot.kind,
+    schemaVersion: snapshot.schemaVersion,
+    workspace,
+    installedIntegrations: snapshot.installedIntegrations,
+    documents,
   }
 }
 
@@ -251,5 +269,42 @@ describe('service-backend Core provider', () => {
     }])
     expect(Endge.context.getCurrentTenant()).toBe(tenantBefore)
     expect(Endge.context.getCurrentUser()).toBe(userBefore)
+  })
+
+  it('loads an immutable release bundle without service-backend revision state', async () => {
+    const bundle = releaseBundle()
+    const context: EndgeBootContext = {
+      dataProvider: 'bundle',
+      scope: { workspaceIdentity: 'workspace-a' },
+      vars: {},
+      bundleSource: bundle,
+    }
+    const storage = new EndgeSchemaStorage()
+    const domain = new EndgeDomain()
+    const parsePlain = vi.spyOn(EndgeDomain, 'parsePlain').mockReturnValue({} as never)
+    vi.spyOn(domain, 'importFromSchema').mockImplementation(() => undefined)
+
+    await storage.setup(context)
+    domain.load(context)
+    Endge.workspace.build(context)
+
+    expect(storage.capabilities).toEqual({
+      provider: 'bundle',
+      mutations: false,
+      softDelete: false,
+      restore: false,
+    })
+    const plain = parsePlain.mock.calls[0]![0]
+    expect(plain.componentSFCs[0]).toMatchObject({
+      id: 'component-sfc-a',
+      identity: 'component-sfc-a',
+      folderId: 'folder-root',
+    })
+    expect(plain.projects[0]).toMatchObject({
+      id: 'project-a',
+      allowedEnvironmentIds: ['environment-dev'],
+    })
+    expect(Endge.workspace.current.identity).toBe('workspace-a')
+    expect(Endge.workspace.current.dataMode).toBe('mock')
   })
 })

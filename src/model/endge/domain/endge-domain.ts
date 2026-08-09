@@ -5,7 +5,7 @@ import type {
   EndgeLiveDomainDocument,
   EndgeLiveDomainSnapshot,
 } from '@/domain/types/document/domain-snapshot.type'
-import type { EndgeDomainPlain } from '@/domain/types/document/domain-export.type'
+import type { EndgeDomainBundle, EndgeDomainPlain } from '@/domain/types/document/domain-export.type'
 import type { FilterFieldSchema } from '@/domain/types/document/query.types'
 import type { EndgeSchemaDump } from '@/domain/types/document/schema.types'
 
@@ -88,6 +88,83 @@ function snapshotIdentityToServerID(
   }
 
   return result
+}
+
+function bundleDocuments(
+  documents: readonly unknown[],
+  collection: string,
+): Record<string, unknown>[] {
+  return documents.map((document) => {
+    if (document == null || typeof document !== 'object' || Array.isArray(document))
+      throw new Error(`[EndgeDomain] Invalid document in bundle collection: ${collection}`)
+
+    const record = document as Record<string, unknown>
+    if (!String(record.identity ?? '').trim())
+      throw new Error(`[EndgeDomain] Bundle document identity is required: ${collection}`)
+    return record
+  })
+}
+
+function bundleIdentityToRuntimeID(documents: readonly Record<string, unknown>[]): Map<string, string> {
+  return new Map(documents.map((document) => {
+    const identity = String(document.identity).trim()
+    return [identity, identity]
+  }))
+}
+
+function normalizeBundleDocuments(
+  documents: readonly Record<string, unknown>[],
+  folderIds: ReadonlyMap<string, string>,
+): Record<string, unknown>[] {
+  return documents.map((document) => {
+    const { folderIdentity, ...domainDocument } = document
+    const identity = String(domainDocument.identity).trim()
+    const displayName = String(
+      domainDocument.displayName
+      ?? domainDocument.name
+      ?? identity,
+    )
+    const normalizedFolderIdentity = String(folderIdentity ?? '').trim()
+
+    return {
+      ...domainDocument,
+      id: identity,
+      identity,
+      name: displayName,
+      displayName,
+      folderId: normalizedFolderIdentity
+        ? folderIds.get(normalizedFolderIdentity) ?? normalizedFolderIdentity
+        : null,
+    }
+  })
+}
+
+function normalizeBundleFolders(
+  folders: readonly Record<string, unknown>[],
+  folderIds: ReadonlyMap<string, string>,
+): Record<string, unknown>[] {
+  return folders.map((folder) => {
+    const { parentIdentity, ...domainFolder } = folder
+    const identity = String(domainFolder.identity).trim()
+    const displayName = String(
+      domainFolder.displayName
+      ?? domainFolder.name
+      ?? identity,
+    )
+    const normalizedParentIdentity = String(parentIdentity ?? '').trim()
+
+    return {
+      ...domainFolder,
+      id: identity,
+      identity,
+      name: displayName,
+      displayName,
+      parent: normalizedParentIdentity
+        ? folderIds.get(normalizedParentIdentity) ?? normalizedParentIdentity
+        : null,
+      folderId: null,
+    }
+  })
 }
 
 export function normalizeSnapshotDocuments(
@@ -478,6 +555,13 @@ export class EndgeDomain extends EndgeModule {
       return
     }
 
+    if (ctx.dataProvider === 'bundle') {
+      if (!ctx.bundleSource)
+        throw new Error('[EndgeDomain] Workspace bundle is not loaded')
+      this.mergeFromBundle(ctx.bundleSource)
+      return
+    }
+
     if (ctx.dataProvider === 'default') {
       const snapshot = Endge.schema.getLoadedSnapshot()
       if (!snapshot)
@@ -743,6 +827,76 @@ export class EndgeDomain extends EndgeModule {
       pageTemplates: [],
       pages: [],
       navigations: normalizeSnapshotDocuments(documents.navigations, folderIds),
+    }
+
+    this.importFromSchema(EndgeDomain.parsePlain(plain))
+    this.notify()
+  }
+
+  /** Нормализует immutable workspace bundle без создания фиктивного server-side state. */
+  public mergeFromBundle(bundle: EndgeDomainBundle): void {
+    const documents = bundle.documents
+    const normalized = {
+      projects: bundleDocuments(documents.projects, 'projects'),
+      tenants: bundleDocuments(documents.tenants, 'tenants'),
+      environments: bundleDocuments(documents.environments, 'environments'),
+      folders: bundleDocuments(documents.folders, 'folders'),
+      types: bundleDocuments(documents.types, 'types'),
+      queries: bundleDocuments(documents.queries, 'queries'),
+      dataViews: bundleDocuments(documents['data-views'], 'data-views'),
+      compositions: bundleDocuments(documents.compositions, 'compositions'),
+      stores: bundleDocuments(documents.stores, 'stores'),
+      streams: bundleDocuments(documents.streams, 'streams'),
+      updates: bundleDocuments(documents.updates, 'updates'),
+      mocks: bundleDocuments(documents.mocks, 'mocks'),
+      componentSFCs: bundleDocuments(documents.components, 'components'),
+      actions: bundleDocuments(documents.actions, 'actions'),
+      filters: bundleDocuments(documents.filters, 'filters'),
+      converters: bundleDocuments(documents.converters, 'converters'),
+      computations: bundleDocuments(documents.computations, 'computations'),
+      vocabs: bundleDocuments(documents.vocabs, 'vocabs'),
+      i18nBundles: bundleDocuments(documents['i18n-bundles'], 'i18n-bundles'),
+      authProfiles: bundleDocuments(documents['auth-profiles'], 'auth-profiles'),
+      navigations: bundleDocuments(documents.navigations, 'navigations'),
+      styles: bundleDocuments(documents.styles, 'styles'),
+    }
+    const folderIds = bundleIdentityToRuntimeID(normalized.folders)
+    const environmentIds = bundleIdentityToRuntimeID(normalized.environments)
+
+    const plain: EndgeDomainPlain = {
+      projects: normalizeBundleDocuments(normalized.projects, folderIds).map(project => ({
+        ...project,
+        allowedEnvironmentIds: Array.isArray(project.allowedEnvironments)
+          ? project.allowedEnvironments.map(identity => environmentIds.get(String(identity)) ?? identity)
+          : [],
+      })),
+      types: normalizeBundleDocuments(normalized.types, folderIds),
+      queries: normalizeBundleDocuments(normalized.queries, folderIds),
+      dataViews: normalizeBundleDocuments(normalized.dataViews, folderIds),
+      compositions: normalizeBundleDocuments(normalized.compositions, folderIds),
+      stores: normalizeBundleDocuments(normalized.stores, folderIds),
+      streams: normalizeBundleDocuments(normalized.streams, folderIds),
+      updates: normalizeBundleDocuments(normalized.updates, folderIds),
+      mocks: normalizeBundleDocuments(normalized.mocks, folderIds),
+      components: [],
+      componentSFCs: normalizeBundleDocuments(normalized.componentSFCs, folderIds),
+      actions: normalizeBundleDocuments(normalized.actions, folderIds),
+      converters: normalizeBundleDocuments(normalized.converters, folderIds),
+      computations: normalizeBundleDocuments(normalized.computations, folderIds),
+      integrations: [],
+      folders: normalizeBundleFolders(normalized.folders, folderIds),
+      parameters: [],
+      filters: normalizeBundleDocuments(normalized.filters, folderIds),
+      environments: normalizeBundleDocuments(normalized.environments, folderIds),
+      tenants: normalizeBundleDocuments(normalized.tenants, folderIds),
+      policies: [],
+      styles: normalizeBundleDocuments(normalized.styles, folderIds),
+      vocabs: normalizeBundleDocuments(normalized.vocabs, folderIds),
+      authProfiles: normalizeBundleDocuments(normalized.authProfiles, folderIds),
+      i18nBundles: normalizeBundleDocuments(normalized.i18nBundles, folderIds),
+      pageTemplates: [],
+      pages: [],
+      navigations: normalizeBundleDocuments(normalized.navigations, folderIds),
     }
 
     this.importFromSchema(EndgeDomain.parsePlain(plain))

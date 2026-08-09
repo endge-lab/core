@@ -30,6 +30,24 @@ export class EndgeWorkspace extends EndgeModule {
 
   /** Строит workspace из загруженного source. */
   public override build(ctx: EndgeBootContext): void {
+    if (ctx.dataProvider === 'bundle') {
+      const bundle = ctx.bundleSource
+      if (!bundle)
+        throw new Error('[EndgeWorkspace] Workspace bundle is unavailable')
+
+      const workspace = bundle.workspace
+      this.apply({
+        ...workspace,
+        dataMode: workspace.dataMode === 'development' ? 'mock' : 'live',
+        installedIntegrations: bundle.installedIntegrations.map(integration => ({
+          integrationId: integration.identity,
+          integrationIdentity: integration.identity,
+          version: integration.version,
+        })),
+      })
+      return
+    }
+
     if (ctx.dataProvider === 'default') {
       const snapshot = Endge.schema.getLoadedSnapshot()
       if (!snapshot)
