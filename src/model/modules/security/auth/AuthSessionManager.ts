@@ -105,15 +105,30 @@ export class AuthSessionManager {
       throw new Error('[EndgeAuth] Default application auth profile is not configured')
     if (profile.adapterId !== 'keycloak' || profile.config.loginMode !== 'interactive')
       throw new Error(`[EndgeAuth] Application profile does not support interactive login: ${profile.identity}`)
+    await this._loginWithProfile(profile, credentials)
+  }
+
+  /** Входит в указанный Keycloak profile по переданным credentials и делает его application session. */
+  public async loginWithProfile(profileIdentity: string, credentials: AuthLoginCredentials): Promise<void> {
+    const profile = this._profiles.requireActive(profileIdentity)
+    if (profile.adapterId !== 'keycloak')
+      throw new Error(`[EndgeAuth] Application profile does not support credential login: ${profile.identity}`)
+    await this._loginWithProfile(profile, credentials)
+  }
+
+  private async _loginWithProfile(profile: AuthProfileSchema, credentials: AuthLoginCredentials): Promise<void> {
     const username = String(credentials.username ?? '').trim()
     const password = String(credentials.password ?? '').trim()
     if (!username || !password)
       throw new Error('[EndgeAuth] Username and password are required')
-    await this._singleFlight(profile.identity, async () => {
-      const token = await this._authenticate(profile, { username, password })
-      this._setState(profile, token)
-      return token
-    })
+    const token = await this._singleFlight(
+      profile.identity,
+      () => this._authenticate(profile, { username, password }),
+    )
+    if (!token)
+      throw new Error(`[EndgeAuth] Credential login returned no session: ${profile.identity}`)
+    this._applicationProfile = profile
+    this._setState(profile, token)
   }
 
   /** Гарантирует действующую application session. */
@@ -207,7 +222,7 @@ export class AuthSessionManager {
         catch (error) {
           if (isInvalidGrant(error)) {
             this._clearState(profile)
-            return this._authenticateWhenAllowed(profile)
+            return this._authenticateWhenAllowed(profile, options)
           }
           if (this._isAccessTokenUsable(state!.token))
             return state!.token
@@ -218,7 +233,7 @@ export class AuthSessionManager {
 
     if (state && this._isRefreshExpired(state.token))
       this._clearState(profile)
-    return this._singleFlight(profile.identity, () => this._authenticateWhenAllowed(profile))
+    return this._singleFlight(profile.identity, () => this._authenticateWhenAllowed(profile, options))
   }
 
   /** Преобразует token set в transport-neutral request session. */
@@ -250,8 +265,15 @@ export class AuthSessionManager {
     this._dependencies.onApplicationSessionChange()
   }
 
-  private async _authenticateWhenAllowed(profile: AuthProfileSchema): Promise<AuthTokenSet | null> {
+  private async _authenticateWhenAllowed(
+    profile: AuthProfileSchema,
+    options: AuthEnsureOptions = {},
+  ): Promise<AuthTokenSet | null> {
     if (profile.adapterId === 'keycloak' && profile.config.loginMode === 'interactive') {
+      this._clearState(profile)
+      return null
+    }
+    if (profile.adapterId === 'keycloak' && options.allowServiceLogin === false) {
       this._clearState(profile)
       return null
     }

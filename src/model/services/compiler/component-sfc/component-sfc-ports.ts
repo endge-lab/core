@@ -52,7 +52,7 @@ export function compileComponentSFCLocalEventAction(
     diagnostics.push({
       severity: 'error',
       code: 'sfc-template-event-action-syntax',
-      message: `@${eventName} должен содержать emit(...), action({...}) или typescript({...}).`,
+      message: `@${eventName} должен содержать emit(...), action({...}), query({...}) или typescript({...}).`,
       sourcePath: `template.on.${eventName}`,
       start: sourceOffset,
       end: sourceOffset + source.length,
@@ -526,26 +526,49 @@ function parseEventAction(
   dependencies: RComponentDependencies,
   diagnostics: RComponentDiagnostic[],
 ): ComponentSFCEventAction | null {
-  if (node?.type === 'ObjectExpression') {
-    const identity = readStringProperty(node, 'identity')
-    const unsupported = (node.properties ?? []).some((property: any) =>
+  const directKind = node?.type === 'ObjectExpression'
+    ? 'action'
+    : isCall(node, 'query') ? 'query' : null
+  const directNode = directKind === 'query' && node.arguments?.length === 1
+    ? node.arguments[0]
+    : directKind === 'action' ? node : null
+
+  if (directKind && directNode?.type === 'ObjectExpression') {
+    const identity = readStringProperty(directNode, 'identity')
+    const unsupported = (directNode.properties ?? []).some((property: any) =>
       property.type !== 'ObjectProperty'
       || property.computed
       || !['identity', 'input'].includes(readKey(property.key) ?? ''),
     )
     if (!identity || unsupported) {
-      diagnostics.push(makeDiagnostic('sfc-event-action-shape', 'event.action требует `{ identity, input? }`.', node, script))
+      diagnostics.push(makeDiagnostic(
+        directKind === 'query' ? 'sfc-event-query-shape' : 'sfc-event-action-shape',
+        `${directKind} reaction требует \`{ identity, input? }\`.`,
+        directNode,
+        script,
+      ))
       return null
     }
-    const inputNode = readObjectPropertyValue(node, 'input')
+    const inputNode = readObjectPropertyValue(directNode, 'input')
     const input = inputNode ? parseEventInput(inputNode, script, diagnostics) : undefined
     if (inputNode && !input) return null
-    if (!dependencies.actions.includes(identity)) dependencies.actions.push(identity)
-    return { kind: 'action', identity, ...(input ? { input } : {}) }
+    const identities = directKind === 'query' ? dependencies.queries : dependencies.actions
+    if (!identities.includes(identity)) identities.push(identity)
+    return { kind: directKind, identity, ...(input ? { input } : {}) }
+  }
+
+  if (directKind === 'query') {
+    diagnostics.push(makeDiagnostic(
+      'sfc-event-query-shape',
+      'query reaction требует `query({ identity, input? })`.',
+      node,
+      script,
+    ))
+    return null
   }
 
   if (!isCall(node, 'typescript') || node.arguments?.length !== 1 || node.arguments[0]?.type !== 'ObjectExpression') {
-    diagnostics.push(makeDiagnostic('sfc-event-action-shape', 'event.action поддерживает Action object или typescript({...}).', node, script))
+    diagnostics.push(makeDiagnostic('sfc-event-action-shape', 'Event reaction поддерживает Action object, query({...}) или typescript({...}).', node, script))
     return null
   }
   const definition = node.arguments[0]

@@ -62,6 +62,8 @@ export interface AuthLoginCredentials {
 
 export interface AuthEnsureOptions {
   forceRefresh?: boolean
+  /** Запрещает первичный auto-login service-профиля, сохраняя restore и refresh. */
+  allowServiceLogin?: boolean
 }
 
 /** Минимальный синхронный auth context без tokens и полного claims payload. */

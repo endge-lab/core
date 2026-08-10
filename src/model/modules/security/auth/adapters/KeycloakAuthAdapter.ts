@@ -81,12 +81,14 @@ export class KeycloakAuthAdapter implements AuthProfileAdapter {
   /** Выполняет interactive или service password grant. */
   public async authenticate(context: AuthAdapterContext): Promise<AuthTokenSet> {
     const config = this._config(context.profile)
-    const credentials = config.loginMode === 'interactive'
-      ? context.credentials ?? {}
-      : {
-          username: await context.resolveCredential('username'),
-          password: await context.resolveCredential('password'),
-        }
+    const credentials = context.credentials ?? (
+      config.loginMode === 'interactive'
+        ? {}
+        : {
+            username: await context.resolveCredential('username'),
+            password: await context.resolveCredential('password'),
+          }
+    )
     const username = String(credentials.username ?? '').trim()
     const password = String(credentials.password ?? '').trim()
     if (!username || !password)

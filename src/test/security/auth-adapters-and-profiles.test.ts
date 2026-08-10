@@ -75,6 +75,17 @@ describe('built-in auth adapters', () => {
       expect.objectContaining({ username: 'robot', password: 'robot-secret' }),
       undefined,
     )
+
+    resolveCredential.mockClear()
+    await adapter.authenticate(context(service, {
+      credentials: { username: 'alice', password: 'secret' },
+      resolveCredential,
+    }))
+    expect(resolveCredential).not.toHaveBeenCalled()
+    expect(transport.passwordGrant).toHaveBeenLastCalledWith(
+      expect.objectContaining({ username: 'alice', password: 'secret' }),
+      undefined,
+    )
   })
 
   it('resolves bearer tokens only through the host resolver and enforces memory persistence', async () => {

@@ -131,6 +131,13 @@ export interface ComponentSFCEventDirectAction {
   input?: ComponentSFCEventInputValue
 }
 
+/** One Query selected directly in Component SFC Source. */
+export interface ComponentSFCEventDirectQuery {
+  kind: 'query'
+  identity: string
+  input?: ComponentSFCEventInputValue
+}
+
 /** Sandboxed TypeScript reaction. Its result is a validated list of effects. */
 export interface ComponentSFCEventTypescriptAction {
   kind: 'typescript'
@@ -150,6 +157,7 @@ export interface ComponentSFCEventEmitAction {
 
 export type ComponentSFCEventAction
   = ComponentSFCEventDirectAction
+    | ComponentSFCEventDirectQuery
     | ComponentSFCEventTypescriptAction
     | ComponentSFCEventEmitAction
 

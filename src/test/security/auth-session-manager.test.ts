@@ -63,6 +63,37 @@ describe('AuthSessionManager lifecycle and request policies', () => {
     expect(localStorage.length).toBe(0)
   })
 
+  it('logs in by profile identity and makes that profile the inherited application session', async () => {
+    const defaultProfile = authProfile({ identity: 'default-auth' })
+    const runtimeProfile = serviceProfile({ identity: 'aodb-auth' })
+    const authenticate = vi.fn(async (context: AuthAdapterContext) => tokenSet({
+      accessToken: jwt({ sub: context.profile.identity }),
+      accessExpiresAt: now + 60_000,
+    }))
+    const runtime = createRuntime(
+      [defaultProfile, runtimeProfile],
+      fakeAdapter({ authenticate }),
+      () => now,
+    )
+    runtime.sessions.configureDefault(defaultProfile)
+
+    await runtime.sessions.loginWithProfile(runtimeProfile.identity, {
+      username: 'alice',
+      password: 'secret',
+    })
+
+    expect(runtime.sessions.profileIdentity).toBe(runtimeProfile.identity)
+    expect(runtime.sessions.context.subject).toBe(runtimeProfile.identity)
+    expect(await runtime.requests.resolve({ mode: 'inherit' })).toEqual(expect.objectContaining({
+      profileIdentity: runtimeProfile.identity,
+      subject: runtimeProfile.identity,
+    }))
+    expect(authenticate).toHaveBeenCalledWith(expect.objectContaining({
+      profile: runtimeProfile,
+      credentials: { username: 'alice', password: 'secret' },
+    }))
+  })
+
   it('auto-authenticates a service profile once for parallel inherited requests', async () => {
     const profile = serviceProfile()
     const authenticate = vi.fn(async () => tokenSet({ accessExpiresAt: now + 60_000 }))
@@ -81,6 +112,16 @@ describe('AuthSessionManager lifecycle and request policies', () => {
       profileIdentity: profile.identity,
       headers: { Authorization: 'Bearer access-token' },
     }))
+  })
+
+  it('can restore or refresh a service session without starting a new service login', async () => {
+    const profile = serviceProfile()
+    const authenticate = vi.fn(async () => tokenSet({ accessExpiresAt: now + 60_000 }))
+    const runtime = createRuntime([profile], fakeAdapter({ authenticate }), () => now)
+    runtime.sessions.configureDefault(profile)
+
+    expect(await runtime.sessions.ensureValid({ allowServiceLogin: false })).toBe(false)
+    expect(authenticate).not.toHaveBeenCalled()
   })
 
   it('resolves inherit as anonymous when no default application profile exists', async () => {

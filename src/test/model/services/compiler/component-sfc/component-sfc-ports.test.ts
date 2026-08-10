@@ -69,10 +69,10 @@ const ports = definePorts({
         identity: 'flight.open-details',
         input: {
           kind: 'object',
-          entries: {
-            id: { kind: 'event', path: 'rowId' },
-            row: { kind: 'event', path: 'row' },
-          },
+          entries: [
+            { key: 'id', value: { kind: 'event', path: 'rowId' } },
+            { key: 'row', value: { kind: 'event', path: 'row' } },
+          ],
         },
       },
     })
@@ -165,6 +165,36 @@ const ports = definePorts({
       }],
     })
     expect(result.dependencies.actions).toContain('flight.open-details')
+  })
+
+  it('compiles a direct Query reaction with lexical and Event input mappings', () => {
+    const result = compileComponentSFC(`<template>
+  <Text
+    value="A320"
+    editable
+    @edited.stop="query({
+      identity: 'schedule-sandbox-update-leg',
+      input: {
+        id: rowKey,
+        payload: { aircraftType: event('value') },
+      },
+    })"
+  />
+</template>`)
+
+    expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
+    expect(result.ir?.template.roots[0]).toMatchObject({
+      tag: 'Text',
+      events: [{
+        name: 'edited',
+        modifiers: ['stop'],
+        action: {
+          kind: 'query',
+          identity: 'schedule-sandbox-update-leg',
+        },
+      }],
+    })
+    expect(result.dependencies.queries).toContain('schedule-sandbox-update-leg')
   })
 
   it('forwards all intrinsic public Table Actions with forward wildcard', () => {

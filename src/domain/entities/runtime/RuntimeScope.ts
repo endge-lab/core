@@ -125,7 +125,7 @@ export class RuntimeScope implements RuntimeScopeHandle {
   public deactivate(): Promise<void> {
     this._abortController?.abort()
     return this._enqueue(async () => {
-      if (this.state === 'inactive') return
+      if (this.state === 'inactive' || this.state === 'disposed') return
       this._assertNotDisposed('deactivate')
       this._setState('deactivating')
       this._updateGateOpen = false

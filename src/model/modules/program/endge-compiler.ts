@@ -601,6 +601,12 @@ export class EndgeCompiler extends EndgeModule {
               identity,
               role: 'port-default-action',
             })),
+            ...result.dependencies.queries.map(identity => ({
+              entityType: 'query',
+              id: identity,
+              identity,
+              role: 'event-query',
+            })),
             ...this._typeDependencies([
               result.ast?.script?.props?.source,
               ...result.contract.inputs.map(input => input.type),

@@ -241,6 +241,7 @@ function mergeDependencies(
     base.components.push(...item.components)
     base.computations.push(...item.computations)
     base.actions.push(...item.actions)
+    base.queries.push(...item.queries)
     base.dataSources.push(...item.dataSources)
     base.renderers.push(...item.renderers)
   }

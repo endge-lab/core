@@ -103,6 +103,9 @@ export interface RComponentDependencies {
   /** Действия, которые вызываются из handlers или bindings. */
   actions: string[]
 
+  /** Query, которые запускаются из локальных Event reactions. */
+  queries: string[]
+
   /** Источники данных, которые компонент читает напрямую. */
   dataSources: string[]
 
@@ -125,6 +128,7 @@ export function createEmptyComponentDependencies(): RComponentDependencies {
     components: [],
     computations: [],
     actions: [],
+    queries: [],
     dataSources: [],
     renderers: [],
   }

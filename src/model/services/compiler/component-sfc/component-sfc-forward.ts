@@ -443,6 +443,7 @@ function createEmptyDependencies(): RComponentDependencies {
     components: [],
     computations: [],
     actions: [],
+    queries: [],
     dataSources: [],
     renderers: [],
   }

@@ -1,10 +1,12 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Raph } from '@endge/raph'
 
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
+import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentSFCRuntimeHost'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import type { ComponentSFCProgramPayload, ProgramArtifact } from '@/domain/types/program/program.types'
+import type { ComponentSFCEventPort } from '@/domain/types/component/sfc/ports.types'
 import type {
   RuntimeBoundaryPatch,
   RuntimeArtifactReader,
@@ -16,6 +18,7 @@ import { Endge } from '@/model/kernel/endge'
 describe('ComponentSFCRuntimeHost', () => {
   afterEach(() => {
     Endge.styles.reset()
+    Endge.domain.reset()
     Raph.app.reset()
     Raph.clearPhases()
   })
@@ -209,6 +212,62 @@ const ports = definePorts({ emits: { opened: event<{ id: string }>() } })
       event: 'opened',
       payload: { id: 'row-1' },
     })])
+    host.destroy()
+  })
+
+  it('runs a compiler-linked Query reaction with evaluated Event and lexical input', async () => {
+    const source = '<template><Text>Query reaction</Text></template>'
+    const artifact = createSFCArtifact(compileComponentSFC(source))
+    const model = RComponentSFC.fromPlain({ id: 3, identity: 'query-owner', name: 'Query owner', source })
+    const query = new RQuery()
+    query.id = 4
+    query.identity = 'schedule-sandbox-update-leg'
+    query.name = 'Update schedule leg'
+    const run = vi.spyOn(query, 'run').mockResolvedValue({})
+    Endge.domain.addQuery(query)
+    const host = ComponentSFCRuntimeHost.createRuntime({
+      id: 'query-owner-runtime',
+      model,
+      artifactReader: { getArtifact: <TPayload>() => artifact as unknown as ProgramArtifact<TPayload> },
+    })
+    const port: ComponentSFCEventPort = {
+      kind: 'event',
+      role: 'emits',
+      name: 'edited',
+      payloadType: 'unknown',
+      action: {
+        kind: 'query',
+        identity: query.identity,
+        input: {
+          kind: 'object',
+          entries: [
+            { key: 'id', value: { kind: 'scope', path: 'rowKey' } },
+            {
+              key: 'payload',
+              value: {
+                kind: 'object',
+                entries: [
+                  { key: 'aircraftType', value: { kind: 'event', path: 'value' } },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    }
+
+    await host.executeEventPortAction(
+      model.identity,
+      port,
+      { value: 'A320', previousValue: 'A319' },
+      undefined,
+      async () => undefined,
+      [],
+      0,
+      { rowKey: 15 },
+    )
+
+    expect(run).toHaveBeenCalledWith({ id: 15, payload: { aircraftType: 'A320' } })
     host.destroy()
   })
 

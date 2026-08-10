@@ -5,6 +5,7 @@ import { RAction } from '@/domain/entities/reflect/RAction'
 import { RComputation } from '@/domain/entities/reflect/RComputation'
 import { REnvironment } from '@/domain/entities/reflect/REnvironment'
 import { RProject } from '@/domain/entities/reflect/RProject'
+import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RTenant } from '@/domain/entities/reflect/RTenant'
 import { Endge } from '@/model/kernel/endge'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
@@ -93,6 +94,31 @@ const ports = definePorts({
       id: 'flight.open-details',
       identity: 'flight.open-details',
       role: 'port-default-action',
+    })
+  })
+
+  it('records direct Event Query reactions as program dependencies', () => {
+    const query = new RQuery()
+    query.id = 8
+    query.identity = 'schedule-sandbox-update-leg'
+    query.name = 'Update schedule leg'
+    query.source = `defineQuery({
+      kind: 'rest',
+      request: { endpoint: '', path: '/sandbox/schedule', method: 'PUT' },
+      outputs: { raw: output().from(response()) },
+    })`
+    Endge.domain.addQuery(query)
+    Endge.domain.addComponentSFC(component(9, 'schedule-table', `<template>
+  <Text value="A320" editable @edited="query({ identity: 'schedule-sandbox-update-leg', input: { id: rowKey } })" />
+</template>`))
+
+    Endge.compiler.build({} as any)
+
+    expect(Endge.program.getArtifact('component-sfc', 'schedule-table')?.dependencies).toContainEqual({
+      entityType: 'query',
+      id: 'schedule-sandbox-update-leg',
+      identity: 'schedule-sandbox-update-leg',
+      role: 'event-query',
     })
   })
 

@@ -108,6 +108,7 @@ describe('RuntimeScope lifecycle', () => {
       resources: { total: 0, paused: false },
     })
     await scope.dispose()
+    await expect(scope.deactivate()).resolves.toBeUndefined()
     expect(scope.state).toBe('disposed')
   })
 })

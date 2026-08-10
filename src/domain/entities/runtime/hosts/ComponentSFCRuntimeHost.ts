@@ -374,6 +374,13 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
           : payload, source, ownerIdentity, port.name)
         return
       }
+      if (port.action.kind === 'query') {
+        await this._executeEventQueryEffect(
+          port.action.identity,
+          port.action.input ? evaluateEventInput(port.action.input, payload, scope) : {},
+        )
+        return
+      }
 
       const inputs = Object.fromEntries(Object.entries(port.action.inputs).map(([key, read]) => [
         key,
@@ -599,6 +606,16 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
       },
       resolution: { component: ownerIdentity },
     })
+  }
+
+  private async _executeEventQueryEffect(identity: string, input: unknown): Promise<void> {
+    const query = Endge.domain.getQuery(identity)
+    if (!query)
+      throw new Error(`Event Query is missing: ${identity}.`)
+    if (!isRecord(input))
+      throw new Error(`Event Query input must be an object: ${identity}.`)
+
+    await query.run(input)
   }
 
   private _reportComputationError(
