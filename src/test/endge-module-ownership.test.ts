@@ -9,9 +9,11 @@ describe('Endge module ownership', () => {
     expect(Endge.hasModule('updates')).toBe(true)
   })
 
-  it('owns auth profiles through EndgeAuth', () => {
+  it('owns auth profiles through EndgeAuth without a parallel module', () => {
     expect(Endge.hasModule('authProfiles')).toBe(false)
-    expect(Endge.authProfiles).toBe(Endge.auth.profiles)
+    expect(Endge.auth.profiles).toBeDefined()
+    expect(Endge.auth.session).toBeDefined()
+    expect(Endge.auth.requests).toBeDefined()
   })
 
   it('owns execution services through EndgeRuntime', () => {

@@ -3,7 +3,6 @@ import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 import type { EndgeDomainBundle, EndgeDomainPlain, EndgeDomainSelection, EndgePortableDocuments } from '@/domain/types/document/domain-export.type'
 import { DomainSectionType } from '@/domain/types/document/document.types'
 import type { EndgeAuth } from '@/model/modules/security/endge-auth'
-import type { EndgeAuthProfiles } from '@/model/modules/security/endge-auth-profiles'
 import { EndgeBind } from '@/model/modules/runtime/core/endge-bind'
 import { EndgeActions } from '@/model/modules/runtime/core/endge-actions'
 import { EndgeContext } from '@/model/modules/context/endge-context'
@@ -137,9 +136,6 @@ export class Endge extends EndgeFederation {
 
   private static createDomainBundle(domain: EndgeDomainPlain): EndgeDomainBundle {
     const workspace = Endge.workspace.serialize()
-    const sse = workspace.configuration.sse ? { ...workspace.configuration.sse } : undefined
-    if (sse)
-      delete sse.manualToken
 
     const folders = Endge._portableIdentityIndex(domain.folders)
     const environments = Endge._portableIdentityIndex(domain.environments)
@@ -177,10 +173,7 @@ export class Endge extends EndgeFederation {
       workspace: {
         ...workspaceContent,
         dataMode: workspace.dataMode === 'mock' ? 'development' : 'production',
-        configuration: {
-          ...workspace.configuration,
-          ...(sse ? { sse } : {}),
-        },
+        configuration: workspace.configuration,
       } as EndgeDomainBundle['workspace'],
       installedIntegrations: installedIntegrations.map(item => ({
         identity: item.integrationIdentity,
@@ -488,13 +481,6 @@ export class Endge extends EndgeFederation {
    */
   static get auth(): EndgeAuth {
     return this.getModule<EndgeAuth>('auth')
-  }
-
-  /**
-   * @deprecated Используйте Endge.auth.profiles.
-   */
-  static get authProfiles(): EndgeAuthProfiles {
-    return this.auth.profiles
   }
 
   /**

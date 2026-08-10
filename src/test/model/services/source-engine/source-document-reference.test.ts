@@ -15,7 +15,7 @@ describe('source document references', () => {
     ['query', "output().from('raw').dataView('normalize-flight')", 'normalize-flight', 'data-view'],
     ['query', "filter('flight-filter')", 'flight-filter', 'filter'],
     ['query', 'field(MyType)', 'MyType', 'type'],
-    ['query', "{ auth: { mode: 'profile', profile: 'keycloak-dev' } }", 'keycloak-dev', 'auth-profile'],
+    ['query', "{ auth: { mode: 'profile', profileIdentity: 'keycloak-dev' } }", 'keycloak-dev', 'auth-profile'],
     ['data-view', "dataView('normalize-flight')", 'normalize-flight', 'data-view'],
     ['data-view', "from('items').dataView('normalize-flight')", 'normalize-flight', 'data-view'],
     ['data-view', "path('item.std').convert('date.iso_to_time')", 'date.iso_to_time', 'converter'],

@@ -1,7 +1,4 @@
 import type { EndgeModuleDefinition } from '@/domain/types/kernel/endge-modules.types'
-
-/** Декларативный граф загрузки модулей Endge Core. */
-
 import { EndgeAuth } from '@/model/modules/security/endge-auth'
 import { EndgeBind } from '@/model/modules/runtime/core/endge-bind'
 import { EndgeCompiler } from '@/model/modules/program/endge-compiler'
@@ -26,6 +23,8 @@ import { EndgeUpdates } from '@/model/modules/runtime/core/endge-updates'
 import { EndgeVocabs } from '@/model/modules/domain/endge-vocabs'
 import { EndgeWorkspace } from '@/model/modules/context/endge-workspace'
 
+
+/** Декларативный граф загрузки модулей Endge Core. */
 export const ENDGE_CORE_MODULES: EndgeModuleDefinition[] = [
   { key: 'context', module: EndgeContext },
   { key: 'mock', module: EndgeMock, after: 'context' },

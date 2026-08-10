@@ -6,18 +6,37 @@ import {
 } from '@endge/raph'
 
 import { RConverter } from '@/domain/entities/reflect/RConverter'
+import { REnvironment } from '@/domain/entities/reflect/REnvironment'
 import { RFilter } from '@/domain/entities/reflect/RFilter'
+import { RProject } from '@/domain/entities/reflect/RProject'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
+import { RTenant } from '@/domain/entities/reflect/RTenant'
 import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
 import { Endge } from '@/model/kernel/endge'
 import { timeStringToDate } from '@/model/seed/converters/date/time-string-to-date'
 import { weekdaysRange } from '@/model/seed/converters/date/weekdays-range'
+import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
 describe('Query Raph derived integration', () => {
   beforeEach(() => {
     Endge.runtime.reset()
     Endge.program.clear()
     Endge.domain.reset()
+    Endge.workspace.apply(TEST_ENDGE_WORKSPACE)
+    Endge.domain.addProject(RProject.fromPlain({ id: 101, identity: 'project', name: 'Project' }))
+    Endge.domain.addEnvironment(REnvironment.fromPlain({ id: 102, identity: 'environment', name: 'Environment' }))
+    const tenant = new RTenant()
+    tenant.id = 103
+    tenant.identity = 'tenant'
+    tenant.name = 'Tenant'
+    tenant.code = 'tenant'
+    Endge.domain.addTenant(tenant)
+    Endge.configuration.build({
+      dataProvider: 'plain',
+      scope: {},
+      vars: {},
+      context: { projectIdentity: 'project', environmentIdentity: 'environment', tenantIdentity: 'tenant' },
+    })
     Raph.app.reset()
     Raph.app.kernel.clear()
     registerConverter(1, 'time-string-to-date', timeStringToDate)
@@ -30,6 +49,8 @@ describe('Query Raph derived integration', () => {
     Endge.runtime.reset()
     Endge.program.clear()
     Endge.domain.reset()
+    Endge.configuration.reset()
+    Endge.workspace.reset()
     Raph.app.reset()
     Raph.app.kernel.clear()
   })
@@ -218,7 +239,7 @@ defineQuery({
       Accept: 'application/json',
       'Content-Type': 'application/json',
     },
-    auth: { mode: 'profile', profile: 'keycloak-dev' },
+    auth: { mode: 'profile', profileIdentity: 'keycloak-dev' },
     body: body(({ prop }) => merge({}, prop('filterPayload'))),
   },
   outputs: {

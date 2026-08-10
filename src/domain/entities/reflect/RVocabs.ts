@@ -28,7 +28,7 @@ export class RVocabs extends REntity {
   override active: boolean = true
 
   @Expose()
-  authMode: 'inherit' | 'profile' | 'manual' | 'none' = 'inherit'
+  authMode: 'inherit' | 'profile' | 'none' = 'inherit'
 
   @Expose()
   authProfileIdentity?: string | null = null
@@ -97,9 +97,11 @@ export class RVocabs extends REntity {
   }
 }
 
-function normalizeVocabAuthMode(value: unknown): 'inherit' | 'profile' | 'manual' | 'none' {
+function normalizeVocabAuthMode(value: unknown): 'inherit' | 'profile' | 'none' {
   const mode = String(value ?? '').trim()
-  if (mode === 'profile' || mode === 'manual' || mode === 'none')
+  if (mode === 'profile' || mode === 'none')
     return mode
+  if (mode && mode !== 'inherit')
+    throw new Error(`[RVocabs] Unsupported authMode: ${mode}`)
   return 'inherit'
 }

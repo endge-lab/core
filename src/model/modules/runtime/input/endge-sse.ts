@@ -11,9 +11,8 @@ import { Endge } from '@/model/kernel/endge'
 
 type EndgeSSEConfig = {
   url: string
-  authMode?: 'inherit' | 'profile' | 'none' | 'manual'
+  authMode?: 'inherit' | 'profile' | 'none'
   authProfileIdentity?: string | null
-  manualToken?: string | null
 }
 
 /**
@@ -25,8 +24,7 @@ export class EndgeSSE extends EndgeModule {
   private readonly _delayExecutor: NamedExecutor
   private readonly _upsMeter: UPSMeter_Service = new UPSMeter_Service()
 
-  private _tokenCached: string | undefined
-  private _tokenRefreshTimer: Nullable<ReturnType<typeof setInterval>> = null
+  private _forceRefreshOnReconnect = false
 
   /**
    * Создает SSE-модуль и delayed executor для пакетного уведомления подписчиков.
@@ -83,26 +81,36 @@ export class EndgeSSE extends EndgeModule {
     // console.log('[EndgeSSE] sse cfg:', cfg)
 
     this.stopSSE()
-    await this.refreshTokenCached(cfg)
-
     this._sseManager = new SSEManager({
       url,
       retryInterval: 5000,
 
-      // ВАЖНО: сюда отдаём ТОЛЬКО токен (без "Bearer ")
-      getToken: (): string | undefined => {
-        return this._tokenCached
+      getToken: async (): Promise<string | undefined> => {
+        const mode = cfg.authMode ?? 'inherit'
+        if (mode === 'none')
+          return undefined
+        const forceRefresh = this._forceRefreshOnReconnect
+        const session = await Endge.auth.requests.resolve(
+          mode === 'profile'
+            ? { mode: 'profile', profileIdentity: String(cfg.authProfileIdentity ?? '').trim() }
+            : { mode: 'inherit' },
+          { forceRefresh },
+        )
+        this._forceRefreshOnReconnect = false
+        return session.accessToken
       },
 
       onEvent: (message: unknown): void => {
         this.emitCustomSSEEvent(message)
       },
+      onError: (error: Error): void => {
+        if (isUnauthorizedSseError(error))
+          this._forceRefreshOnReconnect = true
+      },
     })
 
     this._sseManager.start()
     // console.log('[EndgeSSE] started')
-
-    this.startTokenRefreshTimer(cfg)
 
     console.groupEnd()
   }
@@ -128,17 +136,12 @@ export class EndgeSSE extends EndgeModule {
   public stopSSE(): void {
     // console.log('[EndgeSSE] stopSSE')
 
-    if (this._tokenRefreshTimer) {
-      clearInterval(this._tokenRefreshTimer)
-      this._tokenRefreshTimer = null
-    }
-
     if (this._sseManager) {
       this._sseManager.stop()
       this._sseManager = null
     }
 
-    this._tokenCached = undefined
+    this._forceRefreshOnReconnect = false
   }
 
   /**
@@ -169,55 +172,8 @@ export class EndgeSSE extends EndgeModule {
     return this._sseManager !== null && this._sseManager.isConnected
   }
 
-  /**
-   * Запускает Token Refresh Timer.
-   */
-  private startTokenRefreshTimer(cfg: EndgeSSEConfig): void {
-    if (this._tokenRefreshTimer)
-      return
+}
 
-    this._tokenRefreshTimer = setInterval((): void => {
-      void this.refreshTokenCached(cfg)
-    }, 30_000)
-  }
-
-  /**
-   * Внутренний helper модуля: refresh Token Cached.
-   */
-  private async refreshTokenCached(cfg: EndgeSSEConfig): Promise<void> {
-    const mode = cfg.authMode ?? 'inherit'
-
-    // console.group('[EndgeSSE] refreshTokenCached')
-    // console.log('authMode:', mode)
-
-    const prevToken: string | undefined = this._tokenCached
-
-    try {
-      const token: string | undefined
-        = mode === 'none'
-          ? undefined
-          : mode === 'manual'
-            ? (await Endge.auth.profiles.resolveRequestAuth({ mode: 'manual', manualToken: cfg.manualToken ?? '' })).accessToken
-            : mode === 'profile'
-              ? (await Endge.auth.profiles.resolveRequestAuth({ mode: 'profile', authProfileIdentity: cfg.authProfileIdentity ?? undefined })).accessToken
-              : (await Endge.auth.profiles.resolveRequestAuth({ mode: 'inherit' })).accessToken
-
-      this._tokenCached = token
-
-      // console.log('tokenCached:', token ? `${token.slice(0, 12)}...` : '<none>')
-
-      // Если токен появился/сменился - делаем reconnect (иначе SSE может сидеть в 401 до retry)
-      if (this._sseManager && prevToken !== token) {
-        console.log('[EndgeSSE] token changed -> reconnect')
-        this._sseManager.stop()
-        this._sseManager.start()
-      }
-    }
-    catch (e) {
-      console.warn('[EndgeSSE] token refresh failed:', e)
-    }
-    finally {
-      console.groupEnd()
-    }
-  }
+function isUnauthorizedSseError(error: unknown): boolean {
+  return /unexpected response:\s*(401|403)\b/i.test(String((error as Error | undefined)?.message ?? error))
 }

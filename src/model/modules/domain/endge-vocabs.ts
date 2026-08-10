@@ -14,7 +14,7 @@ type VocabRuntimeConfig = {
   identity: string
   baseApiUrl: string
   slug: string
-  authMode: 'inherit' | 'profile' | 'manual' | 'none'
+  authMode: 'inherit' | 'profile' | 'none'
   authProfileIdentity?: string | null
 }
 /**
@@ -620,15 +620,14 @@ export class EndgeVocabs extends EndgeModule {
   }
 
   /** Собирает auth headers для обращения к внешнему справочнику. */
-  private async resolveAuthHeaders(cfg: { authMode?: 'inherit' | 'profile' | 'manual' | 'none'; authProfileIdentity?: string | null }): Promise<Record<string, string>> {
+  private async resolveAuthHeaders(cfg: { authMode?: 'inherit' | 'profile' | 'none'; authProfileIdentity?: string | null }): Promise<Record<string, string>> {
     const mode = cfg.authMode ?? 'inherit'
-    if (mode === 'none')
-      return {}
-    const session = await Endge.auth.profiles.resolveRequestAuth({
-      mode,
-      authProfileIdentity: cfg.authProfileIdentity ?? undefined,
-    })
-    return session.headers ?? {}
+    const session = await Endge.auth.requests.resolve(
+      mode === 'profile'
+        ? { mode: 'profile', profileIdentity: String(cfg.authProfileIdentity ?? '').trim() }
+        : { mode },
+    )
+    return session.headers
   }
 
   /**

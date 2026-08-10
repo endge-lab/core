@@ -251,7 +251,7 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
         id: `node:derived:${field.key}`,
         kind: 'raph-node',
         title: `Derived ${field.key}`,
-        subtitle: `${field.source} → ${field.key}`,
+        subtitle: `${field.source} - ${field.key}`,
         payload: { path: this.getDataPath(field.key), sourcePath: this.getDataPath(field.source) },
       })
     }

@@ -19,7 +19,7 @@ export class RAuthProfile extends REntity {
   override description: string | null = null
 
   @Expose()
-  adapterId: AuthProfileAdapterId = 'manual_token'
+  adapterId: AuthProfileAdapterId = 'bearer'
 
   @Expose()
   config: AuthProfileConfig = {}
@@ -28,7 +28,7 @@ export class RAuthProfile extends REntity {
   credentialRefs: AuthProfileCredentialRefs = {}
 
   @Expose()
-  persist: AuthProfilePersist = 'localStorage'
+  persist: AuthProfilePersist = 'memory'
 
   @Expose()
   override active: boolean = true
@@ -82,16 +82,16 @@ export class RAuthProfile extends REntity {
 
 function normalizeAdapterId(value: unknown): AuthProfileAdapterId {
   const id = String(value ?? '').trim()
-  if (id === 'keycloak_manual' || id === 'keycloak_form' || id === 'manual_token')
-    return id
-  return 'manual_token'
+  if (!id)
+    throw new Error('[RAuthProfile] adapterId is required')
+  return id
 }
 
 function normalizePersist(value: unknown): AuthProfilePersist {
   const persist = String(value ?? '').trim()
   if (persist === 'localStorage' || persist === 'sessionStorage' || persist === 'memory')
     return persist
-  return 'localStorage'
+  throw new Error(`[RAuthProfile] Unsupported persist policy: ${persist || '<empty>'}`)
 }
 
 function normalizeObject(value: unknown): Record<string, unknown> {

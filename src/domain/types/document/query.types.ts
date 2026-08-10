@@ -1,19 +1,11 @@
 import { Expose } from 'class-transformer'
 
-export type RQueryAuthMode = 'none' | 'token' | 'inherit' | 'profile' | 'manual'
+export type RQueryAuthMode = 'none' | 'inherit' | 'profile'
 
 export interface RQueryAuth {
   mode: RQueryAuthMode
-  /** Identity auth-profile для source DSL. */
-  profile?: string
-  /** @deprecated use profile. Kept for persisted/legacy compatibility. */
-  authProfileIdentity?: string
-
-  /**
-   * Необязательный ручной токен. Если НЕ задан, будет взят из Endge.auth.
-   * Пример: "eyJhbGciOi..."
-   */
-  manualToken?: string
+  /** Identity auth-profile для mode=profile. */
+  profileIdentity?: string
 
   /** Схема для заголовка (по умолчанию "Bearer"). */
   scheme?: string

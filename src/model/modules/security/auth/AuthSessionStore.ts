@@ -1,0 +1,106 @@
+import type { AuthProfileSchema } from '@/domain/types/auth/auth-profile.types'
+import type { AuthSessionSnapshot } from '@/domain/types/auth/auth-runtime.types'
+
+/** Хранит versioned token snapshots согласно profile persistence policy. */
+export class AuthSessionStore {
+  private readonly _memory = new Map<string, AuthSessionSnapshot>()
+
+  /** Возвращает namespaced storage key для workspace/profile. */
+  public getKey(workspaceIdentity: string, profileIdentity: string): string {
+    return `endge:auth:v1:${encodeURIComponent(workspaceIdentity)}:${encodeURIComponent(profileIdentity)}`
+  }
+
+  /** Восстанавливает snapshot и удаляет повреждённое значение. */
+  public read(workspaceIdentity: string, profile: AuthProfileSchema): AuthSessionSnapshot | null {
+    const key = this.getKey(workspaceIdentity, profile.identity)
+    if (profile.persist === 'memory')
+      return this._memory.get(key) ?? null
+
+    const storage = this._storage(profile.persist)
+    if (!storage)
+      return null
+    try {
+      const raw = storage.getItem(key)
+      if (!raw)
+        return null
+      const snapshot = JSON.parse(raw)
+      if (isAuthSessionSnapshot(snapshot, profile))
+        return snapshot
+      storage.removeItem(key)
+      return null
+    }
+    catch {
+      try {
+        storage.removeItem(key)
+      }
+      catch {
+        // Недоступный browser storage означает anonymous session.
+      }
+      return null
+    }
+  }
+
+  /** Сохраняет token snapshot без credentials и userinfo. */
+  public write(workspaceIdentity: string, profile: AuthProfileSchema, snapshot: AuthSessionSnapshot): void {
+    const key = this.getKey(workspaceIdentity, profile.identity)
+    if (profile.persist === 'memory') {
+      this._memory.set(key, snapshot)
+      return
+    }
+    const storage = this._storage(profile.persist)
+    if (!storage)
+      return
+    try {
+      storage.setItem(key, JSON.stringify(snapshot))
+    }
+    catch {
+      // Storage quota/privacy restrictions не должны ломать полученную session.
+    }
+  }
+
+  /** Удаляет session из всех поддерживаемых storage. */
+  public remove(workspaceIdentity: string, profileIdentity: string): void {
+    const key = this.getKey(workspaceIdentity, profileIdentity)
+    this._memory.delete(key)
+    for (const storage of [this._storage('localStorage'), this._storage('sessionStorage')]) {
+      try {
+        storage?.removeItem(key)
+      }
+      catch {
+        // Local cleanup остаётся best effort.
+      }
+    }
+  }
+
+  /** Очищает только memory sessions при reset lifecycle. */
+  public resetRuntime(): void {
+    this._memory.clear()
+  }
+
+  private _storage(persist: 'localStorage' | 'sessionStorage'): Storage | null {
+    try {
+      if (persist === 'localStorage')
+        return typeof globalThis.localStorage === 'undefined' ? null : globalThis.localStorage
+      return typeof globalThis.sessionStorage === 'undefined' ? null : globalThis.sessionStorage
+    }
+    catch {
+      return null
+    }
+  }
+}
+
+function isAuthSessionSnapshot(value: unknown, profile: AuthProfileSchema): value is AuthSessionSnapshot {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    return false
+  const snapshot = value as Record<string, any>
+  const token = snapshot.token
+  return snapshot.version === 1
+    && snapshot.profileIdentity === profile.identity
+    && snapshot.adapterId === profile.adapterId
+    && typeof snapshot.updatedAt === 'string'
+    && token != null
+    && typeof token === 'object'
+    && typeof token.accessToken === 'string'
+    && (token.accessExpiresAt === null || Number.isFinite(token.accessExpiresAt))
+    && (token.refreshExpiresAt == null || Number.isFinite(token.refreshExpiresAt))
+}

@@ -21,7 +21,7 @@ export class EndgeConfigurationModule extends EndgeModule {
   private _current: EndgeConfiguration | null = null
   private _buildContext: EndgeBuildContext | null = null
 
-  /** Разрешает Workspace → Tenant → Project → Environment до compiler build. */
+  /** Разрешает Workspace - Tenant - Project - Environment до compiler build. */
   public override build(ctx: EndgeBootContext): void {
     const execution = Endge.context.resolveExecutionContext({
       explicit: ctx.context,

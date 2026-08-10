@@ -19,7 +19,7 @@ export interface EndgeThemeDefinition {
   displayName: string
 }
 
-export type EndgeSSEAuthMode = 'inherit' | 'profile' | 'manual' | 'none'
+export type EndgeSSEAuthMode = 'inherit' | 'profile' | 'none'
 
 export interface EndgeVariableDefinition {
   name: string
@@ -30,7 +30,6 @@ export interface EndgeSSEConfiguration {
   url: string
   authMode?: EndgeSSEAuthMode
   authProfileIdentity?: string | null
-  manualToken?: string | null
 }
 
 /** Полная конфигурация, с которой компилируется один Endge context. */

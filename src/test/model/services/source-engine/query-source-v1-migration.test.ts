@@ -7,7 +7,7 @@ describe('Query source v1 migration', () => {
   it('migrates an empty legacy params/filter contract and preserves response contract', () => {
     const result = migrateQuerySourceV1ToV2(`defineQuery({
   kind: 'rest',
-  request: { endpoint: '', path: '', method: 'POST', auth: { mode: 'token' } },
+  request: { endpoint: '', path: '', method: 'POST', auth: { mode: 'inherit' } },
   params: {},
   filters: { mode: 'merge', items: [] },
   response: { subField: '', return: field('null') },
@@ -22,6 +22,16 @@ describe('Query source v1 migration', () => {
     expect(result.source).toContain('.from(response())')
     expect(result.source).toContain(".contract(field('null'))")
     expect(compileQuerySource(result.source).diagnostics).toEqual([])
+  })
+
+  it('refuses to normalize a legacy token auth mode', () => {
+    const result = migrateQuerySourceV1ToV2(`defineQuery({
+  request: { endpoint: '', auth: { mode: 'token' } },
+  params: {},
+  filters: { items: [] },
+})`)
+
+    expect(result).toMatchObject({ ok: false, code: 'query_v1_auth_migration_required' })
   })
 
   it('refuses a lossy automatic migration of non-empty legacy filters', () => {

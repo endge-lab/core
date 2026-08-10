@@ -248,7 +248,11 @@ export class QueryExecutor {
       return
     }
 
-    const session = await Endge.auth.profiles.resolveRequestAuth(current)
+    const session = await Endge.auth.requests.resolve(
+      current.mode === 'profile'
+        ? { mode: 'profile', profileIdentity: String(current.profileIdentity ?? '').trim() }
+        : { mode: 'inherit' },
+    )
     const token = session.accessToken
 
     if (!token)

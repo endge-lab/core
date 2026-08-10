@@ -16,7 +16,7 @@ export class RI18nBundle extends REntity {
   @Expose()
   description?: string | null = null
 
-  /** По коду локали (ru, en) — дерево ключ→значение. */
+  /** По коду локали (ru, en) — дерево ключ-значение. */
   @Expose()
   locales: RI18nBundleLocales = {}
 

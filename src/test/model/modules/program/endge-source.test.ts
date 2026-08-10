@@ -165,7 +165,7 @@ defineQuery({
     expect(legacyResult.artifact).toMatchObject({ endpoint: '{ENDPOINT_AODB}' })
   })
 
-  it('uses profile as canonical query auth profile syntax', () => {
+  it('uses profileIdentity as canonical query auth profile syntax', () => {
     const result = Endge.source.compile('query', `
 defineQuery({
   request: {
@@ -173,7 +173,7 @@ defineQuery({
     path: '/select',
     auth: {
       mode: 'profile',
-      profile: 'keycloak-dev',
+      profileIdentity: 'keycloak-dev',
     },
   },
 })
@@ -182,8 +182,7 @@ defineQuery({
     expect(result.artifact).toMatchObject({
       auth: {
         mode: 'profile',
-        profile: 'keycloak-dev',
-        authProfileIdentity: 'keycloak-dev',
+        profileIdentity: 'keycloak-dev',
       },
     })
 
@@ -313,7 +312,7 @@ defineQuery({
     path: '/flights',
     method: 'GET',
     headers: { Accept: 'application/json' },
-    auth: { mode: 'token' },
+    auth: { mode: 'inherit' },
     timeoutMs: 10000,
   },
 

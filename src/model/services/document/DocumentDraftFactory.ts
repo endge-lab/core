@@ -326,10 +326,10 @@ export class DocumentDraftFactory {
         item.identity = identity
         item.name = title
         item.displayName = title
-        item.adapterId = 'manual_token'
+        item.adapterId = 'bearer'
         item.config = {}
         item.credentialRefs = {}
-        item.persist = 'localStorage'
+        item.persist = 'memory'
         item.active = true
         if (folderId != null)
           item.folderId = folderId

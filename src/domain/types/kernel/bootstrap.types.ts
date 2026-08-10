@@ -1,4 +1,5 @@
 import type { EndgeExecutionContext } from '@/domain/types/runtime/execution-context.types'
+import type { EndgeAuthBootOptions } from '@/domain/types/auth/auth-profile.types'
 import type { EndgeDomainProvider } from '@/domain/types/document/domain-provider.type'
 import type { EndgeDomainBundle } from '@/domain/types/document/domain-export.type'
 
@@ -48,6 +49,9 @@ export interface EndgeBootContext {
 
   /** Host-local UI policy; it does not mutate persisted Workspace configuration. */
   ui?: EndgeUIBootOptions
+
+  /** Host-owned resolver credential material for AuthProfile references. */
+  auth?: EndgeAuthBootOptions
 
   /**
    * Для plain provider.

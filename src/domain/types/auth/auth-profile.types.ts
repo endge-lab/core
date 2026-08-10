@@ -1,6 +1,8 @@
-export type AuthProfileAdapterId = 'keycloak_manual' | 'keycloak_form' | 'manual_token'
+export type AuthProfileAdapterId = 'keycloak' | 'bearer' | (string & {})
 
 export type AuthProfilePersist = 'localStorage' | 'sessionStorage' | 'memory'
+
+export type AuthLoginMode = 'interactive' | 'service'
 
 export interface AuthProfileConfig {
   [key: string]: unknown
@@ -26,14 +28,40 @@ export interface AuthProfileSchema {
   meta?: Record<string, unknown>
 }
 
-export interface AuthSession {
+export interface AuthTokenSet {
+  accessToken: string
+  refreshToken?: string
+  idToken?: string
+  sessionState?: string
+  accessExpiresAt: number | null
+  refreshExpiresAt?: number | null
+}
+
+export interface AuthResolvedSession {
+  profileIdentity: string | null
   accessToken?: string
-  headers?: Record<string, string>
-  expiresAt?: number | null
-  subject?: string | null
-  sessionId?: string | null
-  claims?: Record<string, unknown>
-  raw?: unknown
+  headers: Record<string, string>
+  expiresAt: number | null
+  subject?: string
+  sessionId?: string
+}
+
+export type AuthRequestPolicy
+  = | { mode: 'none' }
+    | { mode: 'inherit' }
+    | { mode: 'profile', profileIdentity: string }
+
+export interface AuthResolveOptions {
+  forceRefresh?: boolean
+}
+
+export interface AuthLoginCredentials {
+  username: string
+  password: string
+}
+
+export interface AuthEnsureOptions {
+  forceRefresh?: boolean
 }
 
 /** Минимальный синхронный auth context без tokens и полного claims payload. */
@@ -44,15 +72,48 @@ export interface EndgeAuthContext {
   profileIdentity?: string
 }
 
-export interface AuthProfileAdapterContext {
+export interface AuthCredentialResolveInput {
+  ref: string
+  profileIdentity: string
+  credential: string
+  signal?: AbortSignal
+}
+
+export type EndgeAuthCredentialResolver = (
+  input: AuthCredentialResolveInput,
+) => string | undefined | Promise<string | undefined>
+
+export interface EndgeAuthBootOptions {
+  resolveCredential?: EndgeAuthCredentialResolver
+}
+
+export interface AuthAdapterContext {
   profile: AuthProfileSchema
-  manualToken?: string
+  credentials?: Record<string, string>
+  token?: AuthTokenSet
+  signal?: AbortSignal
+  resolveCredential: (credential: string) => Promise<string>
+}
+
+/** Контракт расширяемого auth adapter. Storage и application state остаются в EndgeAuth. */
+export interface AuthProfileAdapter {
+  id: AuthProfileAdapterId
+  label: string
+  validate(profile: AuthProfileSchema): void
+  authenticate(context: AuthAdapterContext): Promise<AuthTokenSet>
+  refresh?(context: AuthAdapterContext): Promise<AuthTokenSet>
+  logout?(context: AuthAdapterContext): Promise<void>
+  loadUserInfo?(context: AuthAdapterContext): Promise<Record<string, unknown> | null>
+}
+
+export interface AuthProfileTestOptions {
   credentials?: Record<string, string>
 }
 
-export interface AuthProfileAdapter {
-  id: AuthProfileAdapterId | string
-  label: string
-  resolve(ctx: AuthProfileAdapterContext): Promise<AuthSession>
-  logout?(ctx: AuthProfileAdapterContext): Promise<void>
+export interface AuthProfileTestResult {
+  authenticated: boolean
+  profileIdentity: string
+  expiresAt: number | null
+  context: EndgeAuthContext
+  userInfo: Record<string, unknown> | null
 }

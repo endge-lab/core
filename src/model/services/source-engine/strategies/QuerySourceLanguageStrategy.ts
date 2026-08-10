@@ -96,7 +96,7 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
         convert: 'converter',
         dataView: 'data-view',
       },
-      properties: [{ property: 'profile', parentProperty: 'auth', target: 'auth-profile' }],
+      properties: [{ property: 'profileIdentity', parentProperty: 'auth', target: 'auth-profile' }],
     })
   }
 
@@ -259,11 +259,11 @@ const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
     detail: 'Ссылка на environment variable',
   },
   {
-    label: 'auth.profile',
+    label: 'auth.profileIdentity',
     kind: 'value',
     insertText: `auth: {
   mode: 'profile',
-  profile: 'auth-profile-identity',
+  profileIdentity: 'auth-profile-identity',
 },`,
     detail: 'Auth profile config',
   },

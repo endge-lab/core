@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import { Endge } from '@/model/kernel/endge'
 import { QueryExecutor } from '@/model/services/query/QueryExecutor'
 import { compileQuerySource } from '@/model/services/source-engine/compilers/query-source-compile'
 
@@ -58,5 +59,35 @@ defineQuery({
       data: { limit: 100 },
       timeout: 2500,
     }))
+  })
+
+  it('resolves canonical profile auth through EndgeAuth requests', async () => {
+    const request = vi.fn().mockResolvedValue({ data: { ok: true } })
+    const resolve = vi.spyOn(Endge.auth.requests, 'resolve').mockResolvedValue({
+      profileIdentity: 'payload-auth',
+      accessToken: 'resolved-token',
+      headers: { Authorization: 'Bearer resolved-token' },
+      expiresAt: null,
+    })
+    const executor = new QueryExecutor({ request } as any)
+    const payload = compileQuerySource(`
+defineQuery({
+  request: {
+    endpoint: 'https://payload.example.test',
+    path: '/items',
+    method: 'GET',
+    auth: { mode: 'profile', profileIdentity: 'payload-auth' },
+  },
+  outputs: { raw: output().from(response()) },
+})
+`).artifact!
+
+    await executor.execute({ payload })
+
+    expect(resolve).toHaveBeenCalledWith({ mode: 'profile', profileIdentity: 'payload-auth' })
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({
+      headers: { Authorization: 'Bearer resolved-token' },
+    }))
+    resolve.mockRestore()
   })
 })

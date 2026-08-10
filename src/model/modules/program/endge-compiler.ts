@@ -1110,7 +1110,7 @@ export class EndgeCompiler extends EndgeModule {
       return []
     }
     const record = auth as Record<string, unknown>
-    const identity = String(record.profile ?? record.authProfileIdentity ?? '').trim()
+    const identity = String(record.profileIdentity ?? '').trim()
     if (!identity) {
       return []
     }
@@ -2182,7 +2182,7 @@ export class EndgeCompiler extends EndgeModule {
           continue
         }
         if (this._compositionDependsOn(runtime.identity, owner.identity)) {
-          diagnostics.push({ severity: 'error', code: 'composition-reference-cycle', message: `Composition dependency cycle: "${owner.identity}" → "${runtime.identity}" → "${owner.identity}".`, sourcePath: `runtimes.${runtime.name}` })
+          diagnostics.push({ severity: 'error', code: 'composition-reference-cycle', message: `Composition dependency cycle: "${owner.identity}" - "${runtime.identity}" - "${owner.identity}".`, sourcePath: `runtimes.${runtime.name}` })
           continue
         }
         if (!model) {
@@ -2239,7 +2239,7 @@ export class EndgeCompiler extends EndgeModule {
             diagnostics.push({
               severity: 'error',
               code: 'composition-with-data-kind',
-              message: `withData binding "${sourceDataName}" → "${targetDataName}" должен связывать два Store data alias.`,
+              message: `withData binding "${sourceDataName}" - "${targetDataName}" должен связывать два Store data alias.`,
               sourcePath: `runtimes.${runtime.name}.withData.${targetDataName}`,
             })
             continue

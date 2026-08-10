@@ -43,6 +43,16 @@ export function migrateQuerySourceV1ToV2(source: string): QuerySourceV1Migration
   if (!request) {
     return failure('query_v1_request_missing', 'Query v1 request is required.')
   }
+  if (t.isObjectExpression(request)) {
+    const auth = readObjectProperty(request, 'auth')
+    const authMode = auth ? readStringProperty(auth, 'mode') : null
+    if (authMode && authMode !== 'none' && authMode !== 'inherit' && authMode !== 'profile') {
+      return failure(
+        'query_v1_auth_migration_required',
+        'Legacy Query auth must be replaced with none, inherit or an explicit AuthProfile before migration.',
+      )
+    }
+  }
 
   const response = readObjectProperty(definition, 'response')
   const subField = response ? readStringProperty(response, 'subField') ?? 'items' : 'items'

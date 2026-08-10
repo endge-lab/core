@@ -641,14 +641,13 @@ function readAuthRequestValue(value: unknown): RQueryAuth | undefined {
     return undefined
 
   const auth = value as Partial<RQueryAuth>
-  const profile = auth.profile ?? auth.authProfileIdentity
   if (auth.mode === 'none')
     return { ...auth, mode: 'none' }
-  if (auth.mode === 'manual')
-    return { ...auth, mode: 'manual' }
   if (auth.mode === 'profile')
-    return { ...auth, mode: 'profile', profile, authProfileIdentity: profile }
-  return { ...auth, mode: 'inherit' }
+    return { ...auth, mode: 'profile', profileIdentity: auth.profileIdentity }
+  if (auth.mode === 'inherit' || auth.mode == null)
+    return { ...auth, mode: 'inherit' }
+  return undefined
 }
 
 function isStaticRequestExpression(node: t.Expression): boolean {

@@ -349,7 +349,7 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
           id: `derived:${handle.id}`,
           kind: 'raph-node',
           title: `Derived ${output.key}`,
-          subtitle: `${from} → ${to}`,
+          subtitle: `${from} - ${to}`,
           payload: { output: output.key, from, to, strategy: output.materialization.strategy.kind },
         })
       }

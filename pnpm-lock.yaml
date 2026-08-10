@@ -71,9 +71,6 @@ importers:
       primevue:
         specifier: ^4.0.0-rc.1
         version: 4.5.5(vue@3.5.39)
-      qs:
-        specifier: ^6.14.0
-        version: 6.15.3
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2

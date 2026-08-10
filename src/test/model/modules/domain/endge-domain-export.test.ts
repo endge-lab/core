@@ -103,9 +103,11 @@ describe('Endge domain export', () => {
       'projects',
       'queries',
       'stores',
+      'streams',
       'styles',
       'tenants',
       'types',
+      'updates',
       'vocabs',
     ])
     expect(plain.queries).toEqual([
@@ -120,16 +122,18 @@ describe('Endge domain export', () => {
     expect(plain.authProfiles).toEqual([expect.objectContaining({ identity: 'auth-profile' })])
   })
 
-  it('builds a workspace snapshot accepted by the new backend import contract', async () => {
+  it('builds a credential-free workspace snapshot accepted by the backend import contract', async () => {
     const workspace = {
       ...TEST_ENDGE_WORKSPACE,
       identity: 'workspace-export-test',
       displayName: 'Workspace export test',
-      vars: [{ name: 'apiBaseUrl', defaultValue: '/api/test' }],
-      sse: {
-        url: '/api/events',
-        authMode: 'manual' as const,
-        manualToken: 'must-not-be-exported',
+      configuration: {
+        ...TEST_ENDGE_WORKSPACE.configuration,
+        vars: [{ name: 'apiBaseUrl', defaultValue: '/api/test' }],
+        sse: {
+          url: '/api/events',
+          authMode: 'none' as const,
+        },
       },
     }
     Endge.workspace.apply(workspace)
@@ -139,7 +143,7 @@ describe('Endge domain export', () => {
     expect(bundle.schemaVersion).toBe(1)
     expect(bundle.kind).toBe('workspace-snapshot')
     expect(bundle.workspace.identity).toBe('workspace-export-test')
-    expect(bundle.workspace.configuration.sse).not.toHaveProperty('manualToken')
+    expect(bundle.workspace.configuration.sse).toEqual({ url: '/api/events', authMode: 'none' })
     expect(bundle.documents.queries).toEqual([expect.objectContaining({ identity: 'bundle-query' })])
   })
 

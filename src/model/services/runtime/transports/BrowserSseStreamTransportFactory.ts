@@ -16,18 +16,27 @@ export class BrowserSseStreamTransportFactory implements StreamTransportFactory 
     if (artifact.transport.authMode !== 'none') {
       if (artifact.events.some(event => event.sourceEvent !== 'message'))
         throw new Error('Authenticated SSE transport supports only the default "message" event.')
+      let forceRefreshOnReconnect = false
       const manager = new SSEManager({
         url: artifact.transport.url,
         retryInterval: 5000,
         getToken: async () => {
-          const session = await Endge.auth.profiles.resolveRequestAuth({ mode: 'inherit' })
+          const session = await Endge.auth.requests.resolve(
+            { mode: 'inherit' },
+            { forceRefresh: forceRefreshOnReconnect },
+          )
+          forceRefreshOnReconnect = false
           const token = String(session.accessToken ?? '').trim()
           if (!token)
             throw new Error('[BrowserSseStreamTransportFactory] Default auth profile did not provide an access token.')
           return token
         },
         onOpen: callbacks.open,
-        onError: callbacks.error,
+        onError: (error) => {
+          if (isUnauthorizedSseError(error))
+            forceRefreshOnReconnect = true
+          callbacks.error(error)
+        },
         onEvent: data => callbacks.message({
           sourceEvent: 'message',
           id: null,
@@ -69,6 +78,10 @@ export class BrowserSseStreamTransportFactory implements StreamTransportFactory 
       },
     }
   }
+}
+
+function isUnauthorizedSseError(error: unknown): boolean {
+  return /unexpected response:\s*(401|403)\b/i.test(String((error as Error | undefined)?.message ?? error))
 }
 
 function parseEventData(value: unknown): unknown {

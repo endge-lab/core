@@ -1,10 +1,8 @@
-import type { EndgeWorkspaceDefinition, EndgeWorkspaceSSEConfig } from '@/domain/types/document/workspace.types'
+import type { EndgeWorkspaceDefinition } from '@/domain/types/document/workspace.types'
 import type { DomainDocumentType, DomainSectionType } from './document.types'
 
-/** Workspace-конфигурация без прямых credential-значений. */
-export type EndgeWorkspaceExport = Omit<EndgeWorkspaceDefinition, 'sse'> & {
-  sse?: Omit<EndgeWorkspaceSSEConfig, 'manualToken'>
-}
+/** Workspace-конфигурация не содержит credential material. */
+export type EndgeWorkspaceExport = EndgeWorkspaceDefinition
 
 /** Persisted-срез домена, который можно восстановить через plain provider. */
 export interface EndgeDomainPlain {

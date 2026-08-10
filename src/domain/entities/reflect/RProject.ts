@@ -57,11 +57,11 @@ export class RProject extends REntity {
   @Expose()
   order?: number | null = null
 
-  /** Id навигации (relationship → navigations) */
+  /** Id навигации (relationship - navigations) */
   @Expose()
   navigationId?: number | null = null
 
-  /** Список разрешённых окружений проекта (relationship[] → environments). */
+  /** Список разрешённых окружений проекта (relationship[] - environments). */
   @Expose()
   allowedEnvironmentIds: number[] = []
 

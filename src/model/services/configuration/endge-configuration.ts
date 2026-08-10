@@ -373,20 +373,20 @@ function normalizeSSE(input: unknown): EndgeSSEConfiguration | undefined {
     return undefined
   const url = normalizeText(input.url)
   const authProfileIdentity = normalizeNullableText(input.authProfileIdentity)
-  const manualToken = normalizeNullableText(input.manualToken)
   const authMode = normalizeSSEAuthMode(input.authMode)
-  if (!url && !authProfileIdentity && !manualToken && authMode === 'inherit')
+  if (!url && !authProfileIdentity && authMode === 'inherit')
     return undefined
   return {
     url,
     authMode,
     ...(authProfileIdentity ? { authProfileIdentity } : {}),
-    ...(manualToken ? { manualToken } : {}),
   }
 }
 
 function normalizeSSEAuthMode(input: unknown): EndgeSSEAuthMode {
-  return input === 'profile' || input === 'manual' || input === 'none' ? input : 'inherit'
+  if (input === 'profile' || input === 'none' || input == null || input === 'inherit')
+    return input === 'profile' || input === 'none' ? input : 'inherit'
+  throw new Error(`[EndgeConfiguration] Unsupported SSE authMode: ${String(input)}`)
 }
 
 /** Нормализует полную diagnostics configuration и добавляет системные defaults. */
