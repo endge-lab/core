@@ -18,6 +18,7 @@ describe('AuthSessionStore', () => {
 
   it('isolates snapshots by workspace, profile and persistence policy', () => {
     const store = new AuthSessionStore()
+    store.setNamespace('https://backend-a.example.com')
     const localProfile = authProfile()
     const sessionProfile = authProfile({ identity: 'session', persist: 'sessionStorage' })
     const memoryProfile = authProfile({ identity: 'memory', persist: 'memory' })
@@ -26,13 +27,25 @@ describe('AuthSessionStore', () => {
     store.write('workspace-a', sessionProfile, snapshot(sessionProfile.identity))
     store.write('workspace-a', memoryProfile, snapshot(memoryProfile.identity))
 
-    expect(store.getKey('workspace-a', 'auth-main')).toBe('endge:auth:v1:workspace-a:auth-main')
+    expect(store.getKey('workspace-a', 'auth-main')).toBe('endge:auth:v2:https%3A%2F%2Fbackend-a.example.com:workspace-a:auth-main')
     expect(store.read('workspace-a', localProfile)?.token.accessToken).toBe('access-token')
     expect(store.read('workspace-b', localProfile)).toBeNull()
     expect(store.read('workspace-a', sessionProfile)).not.toBeNull()
     expect(store.read('workspace-a', memoryProfile)).not.toBeNull()
     expect(localStorage.length).toBe(1)
     expect(sessionStorage.length).toBe(1)
+  })
+
+  it('does not restore a token from another backend namespace or the legacy v1 key', () => {
+    const store = new AuthSessionStore()
+    const profile = authProfile()
+    store.setNamespace('https://backend-a.example.com')
+    store.write('workspace', profile, snapshot(profile.identity))
+
+    store.setNamespace('https://backend-b.example.com')
+    localStorage.setItem('endge:auth:v1:workspace:auth-main', JSON.stringify(snapshot(profile.identity)))
+
+    expect(store.read('workspace', profile)).toBeNull()
   })
 
   it('deletes corrupted, mismatched and version-mismatched snapshots', () => {

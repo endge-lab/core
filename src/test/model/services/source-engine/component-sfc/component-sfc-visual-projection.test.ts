@@ -147,4 +147,33 @@ defineProps<{ rows: unknown[] }>()
     })
     expect(result.projection?.columns[0]?.cellSource).toContain('<AircraftTail')
   })
+
+  it('projects row menus, translation labels and built-in Action choices without a parallel model', () => {
+    const result = inspectComponentSFCVisual(`<template>
+  <Table :rows="[]">
+    <RowMenu>
+      <MenuItem
+        action="built-in-console-log"
+        :label="t('schedule:menu.open', 'Открыть')"
+        :input="{ rowId, columnKey, value }"
+      />
+    </RowMenu>
+  </Table>
+</template>`)
+
+    expect(result.projection?.menus.row).toMatchObject({
+      mode: 'custom',
+      sourceOwned: false,
+      items: [{
+        kind: 'item',
+        action: { kind: 'literal', value: 'built-in-console-log' },
+        label: { kind: 'expression', source: "t('schedule:menu.open', 'Открыть')" },
+        input: { kind: 'expression', source: '{ rowId, columnKey, value }' },
+      }],
+    })
+    expect(result.projection?.menuActions).toEqual(expect.arrayContaining([
+      { identity: 'built-in-console-log', source: 'built-in' },
+      { identity: 'table.sort.clearAll', source: 'intrinsic' },
+    ]))
+  })
 })

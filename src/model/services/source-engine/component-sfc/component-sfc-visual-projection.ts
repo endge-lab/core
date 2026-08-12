@@ -4,6 +4,9 @@ import type {
   ComponentSFCVisualInspectionOptions,
   ComponentSFCVisualSourceValue,
   ComponentSFCTableColumnProjection,
+  ComponentSFCTableMenuActionOption,
+  ComponentSFCTableMenuProjection,
+  ComponentSFCTableMenuNodeProjection,
   ComponentSFCTableVisualCellTag,
   ComponentSFCTableVisualProjection,
 } from '@/domain/types/component/sfc/visual-projection.types'
@@ -16,6 +19,8 @@ import type {
   RComponentSFC_IR_ElementNode,
   RComponentSFC_IR_Value,
 } from '@/domain/types/component/sfc/ir.types'
+import type { ComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
+import { BUILTIN_ACTION_IDS, TABLE_RUNTIME_ACTION_IDS } from '@/domain/types/runtime/action.types'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sfc/component-sfc-template'
 
@@ -25,6 +30,7 @@ const NON_VISUAL_CELL_TAGS = new Set([
   'Column',
   'Cell',
   'ColumnMenu',
+  'RowMenu',
   'MenuItem',
   'MenuSeparator',
 ])
@@ -80,7 +86,7 @@ export function inspectComponentSFCVisual(
 
   return {
     support: { kind: 'table' },
-    projection: projectTable(source, root, irRoot),
+    projection: projectTable(source, root, irRoot, compileResult.ir?.script.ports ?? null),
     diagnostics: compileResult.diagnostics,
   }
 }
@@ -93,6 +99,7 @@ function projectTable(
   source: string,
   ast: RComponentSFC_AST_ElementNode,
   ir: RComponentSFC_IR_ElementNode | null,
+  ports: ComponentSFCPortManifest | null,
 ): ComponentSFCTableVisualProjection {
   const astColumns = ast.children.filter(
     (node): node is RComponentSFC_AST_ElementNode => node.kind === 'element' && node.tag === 'Column',
@@ -100,6 +107,8 @@ function projectTable(
   const irColumns = ir?.children.filter(
     (node): node is RComponentSFC_IR_ElementNode => node.kind === 'element' && node.tag === 'Column',
   ) ?? []
+  const columnMenu = projectMenu(source, ast, ir, 'column')
+  const rowMenu = projectMenu(source, ast, ir, 'row')
 
   return {
     kind: 'table',
@@ -116,10 +125,105 @@ function projectTable(
     defaultPin: readProp(ir, 'default-pin', 'defaultPin'),
     defaultHidden: readProp(ir, 'default-hidden', 'defaultHidden'),
     columnMenu: readProp(ir, 'column-menu', 'columnMenu'),
+    menus: { column: columnMenu, row: rowMenu },
+    menuActions: projectMenuActions(ir, ports),
     attributes: projectAttributes(source, ast, ir),
     columns: astColumns.map((column, index) => projectColumn(source, column, irColumns[index] ?? null, index)),
     sourceRange: ast.range,
   }
+}
+
+function projectMenu(
+  source: string,
+  table: RComponentSFC_AST_ElementNode,
+  irTable: RComponentSFC_IR_ElementNode | null,
+  kind: 'column' | 'row',
+): ComponentSFCTableMenuProjection {
+  const tag = kind === 'column' ? 'ColumnMenu' : 'RowMenu'
+  const menu = table.children.find(
+    (node): node is RComponentSFC_AST_ElementNode => node.kind === 'element' && node.tag === tag,
+  ) ?? null
+  const tableMode = kind === 'column' ? readProp(irTable, 'column-menu', 'columnMenu') : null
+  const mode = kind === 'column'
+    ? tableMode?.kind === 'expression'
+      ? 'source'
+      : sourceValueText(tableMode) === 'disabled'
+        ? 'disabled'
+        : menu ? 'custom' : 'default'
+    : menu ? 'custom' : 'none'
+
+  if (!menu) return { kind, mode, sourceOwned: mode === 'source', items: [] }
+  const sourceOwned = source.slice(menu.range.start, menu.range.end).includes('<!--')
+    || menu.children.some(node => node.kind === 'element' && node.tag !== 'MenuItem' && node.tag !== 'MenuSeparator')
+  return {
+    kind,
+    mode,
+    sourceOwned,
+    sourceRange: menu.range,
+    items: menu.children.flatMap<ComponentSFCTableMenuNodeProjection>((node, index) => {
+      if (node.kind !== 'element') return []
+      if (node.tag === 'MenuSeparator') return [{
+        kind: 'separator',
+        id: staticAttribute(node, 'id') || `separator-${index}`,
+        sourceRange: node.range,
+      }]
+      if (node.tag !== 'MenuItem') return []
+      const action = visualAttribute(node, 'action')
+      const itemSourceOwned = sourceOwned
+        || action?.kind === 'expression'
+        || node.attributes.some(attribute => !['id', 'label', 'action', 'input', 'icon'].includes(attribute.name))
+        || node.directives.length > 0
+      return [{
+        kind: 'item',
+        id: staticAttribute(node, 'id') || staticAttribute(node, 'action') || `item-${index}`,
+        label: visualAttribute(node, 'label'),
+        action,
+        input: visualAttribute(node, 'input'),
+        icon: visualAttribute(node, 'icon'),
+        sourceOwned: itemSourceOwned,
+        sourceRange: node.range,
+      }]
+    }),
+  }
+}
+
+function projectMenuActions(
+  table: RComponentSFC_IR_ElementNode | null,
+  ports: ComponentSFCPortManifest | null,
+): ComponentSFCTableMenuActionOption[] {
+  const result = new Map<string, ComponentSFCTableMenuActionOption>()
+  for (const identity of Object.values(TABLE_RUNTIME_ACTION_IDS))
+    result.set(identity, { identity, source: 'intrinsic' })
+  for (const identity of Object.values(BUILTIN_ACTION_IDS))
+    result.set(identity, { identity, source: 'built-in' })
+  for (const port of ports?.require.actions ?? [])
+    result.set(port.name, { identity: port.name, source: 'required' })
+  for (const port of ports?.provides.actions ?? []) {
+    if (port.forwardedFrom && port.forwardedFrom.nodeId !== table?.id) continue
+    result.set(port.name, {
+      identity: port.name,
+      source: port.forwardedFrom ? 'forwarded' : 'provided',
+    })
+  }
+  return [...result.values()].sort((left, right) => left.identity.localeCompare(right.identity))
+}
+
+function visualAttribute(node: RComponentSFC_AST_ElementNode, name: string): ComponentSFCVisualSourceValue | null {
+  const attribute = node.attributes.find(item => item.name === name)
+  if (!attribute) return null
+  if (attribute.dynamic) return { kind: 'expression', source: attribute.value ?? '' }
+  if (attribute.value == null) return { kind: 'boolean', value: true }
+  return { kind: 'literal', value: attribute.value }
+}
+
+function staticAttribute(node: RComponentSFC_AST_ElementNode, name: string): string {
+  const value = visualAttribute(node, name)
+  return value?.kind === 'literal' ? String(value.value ?? '').trim() : ''
+}
+
+function sourceValueText(value: ComponentSFCVisualSourceValue | null): string {
+  if (!value) return ''
+  return value.kind === 'expression' ? value.source : String(value.value ?? '')
 }
 
 function projectColumn(

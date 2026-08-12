@@ -4,10 +4,16 @@ import type { AuthSessionSnapshot } from '@/domain/types/auth/auth-runtime.types
 /** Хранит versioned token snapshots согласно profile persistence policy. */
 export class AuthSessionStore {
   private readonly _memory = new Map<string, AuthSessionSnapshot>()
+  private _namespace = 'default'
+
+  /** Устанавливает namespace, предоставленный host-приложением до restore/build. */
+  public setNamespace(namespace: string | undefined): void {
+    this._namespace = String(namespace ?? '').trim() || 'default'
+  }
 
   /** Возвращает namespaced storage key для workspace/profile. */
   public getKey(workspaceIdentity: string, profileIdentity: string): string {
-    return `endge:auth:v1:${encodeURIComponent(workspaceIdentity)}:${encodeURIComponent(profileIdentity)}`
+    return `endge:auth:v2:${encodeURIComponent(this._namespace)}:${encodeURIComponent(workspaceIdentity)}:${encodeURIComponent(profileIdentity)}`
   }
 
   /** Восстанавливает snapshot и удаляет повреждённое значение. */

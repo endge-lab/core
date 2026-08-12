@@ -167,3 +167,16 @@ export interface TableColumnActionContext extends RuntimeActionContext {
   sortState: TableColumnSortState
   activeSortCount: number
 }
+
+/** Renderer-neutral row/cell context shared by every Table menu adapter. */
+export interface TableRowActionContext extends RuntimeActionContext {
+  surface: 'table-row'
+  tableRuntimeId: string
+  tableId: string
+  target: TableRuntimeActionTarget
+  row: Record<string, unknown>
+  rowId: string
+  rowIndex: number
+  columnKey: string
+  value: unknown
+}

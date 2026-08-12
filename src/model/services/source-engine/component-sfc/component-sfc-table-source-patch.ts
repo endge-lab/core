@@ -2,6 +2,7 @@ import type {
   ComponentSFCTableSourcePatch,
   ComponentSFCTableSourcePatchResult,
   ComponentSFCTableVisualCellTag,
+  ComponentSFCTableVisualMenuKind,
 } from '@/domain/types/component/sfc/visual-projection.types'
 import type {
   RComponentSFC_AST_ElementNode,
@@ -10,13 +11,17 @@ import type {
 import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
 
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
-import { compileComponentSFCExpression } from '@/model/services/compiler/component-sfc/component-sfc-expression'
+import {
+  compileComponentSFCExpression,
+  readComponentSFCTranslationFallback,
+} from '@/model/services/compiler/component-sfc/component-sfc-expression'
 import { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sfc/component-sfc-template'
 import { inspectComponentSFCVisual } from '@/model/services/source-engine/component-sfc/component-sfc-visual-projection'
 
 interface TableSourceContext {
   table: RComponentSFC_AST_ElementNode
   columns: RComponentSFC_AST_ElementNode[]
+  menus: Partial<Record<ComponentSFCTableVisualMenuKind, RComponentSFC_AST_ElementNode>>
   diagnostics: RComponentDiagnostic[]
 }
 
@@ -26,6 +31,7 @@ const NON_VISUAL_CELL_TAGS = new Set([
   'Column',
   'Cell',
   'ColumnMenu',
+  'RowMenu',
   'MenuItem',
   'MenuSeparator',
 ])
@@ -130,6 +136,16 @@ function applyTablePatch(
         patch.value,
         patch.valueKind,
       )
+    case 'set-menu-mode':
+      return setMenuMode(source, context, patch.menu, patch.mode)
+    case 'add-menu-node':
+      return addMenuNode(source, context, patch.menu, patch.node)
+    case 'remove-menu-node':
+      return removeNode(source, requireMenuNode(context, patch.menu, patch.nodeIndex))
+    case 'move-menu-node':
+      return moveMenuNode(source, context, patch.menu, patch.fromIndex, patch.toIndex)
+    case 'set-menu-item-attribute':
+      return setMenuItemAttribute(source, context, patch.menu, patch.nodeIndex, patch.name, patch.value, patch.valueKind)
   }
 }
 
@@ -144,8 +160,135 @@ function resolveTableContext(source: string): TableSourceContext | null {
     columns: roots[0].children.filter(
       (node): node is RComponentSFC_AST_ElementNode => node.kind === 'element' && node.tag === 'Column',
     ),
+    menus: Object.fromEntries(roots[0].children.flatMap((node) => {
+      if (node.kind !== 'element') return []
+      if (node.tag === 'ColumnMenu') return [['column', node]]
+      if (node.tag === 'RowMenu') return [['row', node]]
+      return []
+    })) as TableSourceContext['menus'],
     diagnostics: result.diagnostics,
   }
+}
+
+function requireMenu(context: TableSourceContext, kind: ComponentSFCTableVisualMenuKind): RComponentSFC_AST_ElementNode {
+  const menu = context.menus[kind]
+  if (!menu) throw new Error(`${kind === 'column' ? 'ColumnMenu' : 'RowMenu'} не найден.`)
+  return menu
+}
+
+function menuNodes(menu: RComponentSFC_AST_ElementNode): RComponentSFC_AST_ElementNode[] {
+  return menu.children.filter(
+    (node): node is RComponentSFC_AST_ElementNode => node.kind === 'element' && (node.tag === 'MenuItem' || node.tag === 'MenuSeparator'),
+  )
+}
+
+function requireMenuNode(
+  context: TableSourceContext,
+  kind: ComponentSFCTableVisualMenuKind,
+  index: number,
+): RComponentSFC_AST_ElementNode {
+  const node = menuNodes(requireMenu(context, kind))[index]
+  if (!node) throw new Error(`Пункт меню с индексом ${index} не найден.`)
+  return node
+}
+
+function assertManagedMenu(source: string, menu: RComponentSFC_AST_ElementNode): void {
+  if (source.slice(menu.range.start, menu.range.end).includes('<!--'))
+    throw new Error('Меню содержит комментарии и управляется во вкладке Source.')
+  if (menu.children.some(node => node.kind === 'element' && node.tag !== 'MenuItem' && node.tag !== 'MenuSeparator'))
+    throw new Error('Меню содержит неизвестные конструкции и управляется во вкладке Source.')
+}
+
+function setMenuMode(
+  source: string,
+  context: TableSourceContext,
+  kind: ComponentSFCTableVisualMenuKind,
+  mode: 'default' | 'disabled' | 'none' | 'custom',
+): string {
+  const menu = context.menus[kind]
+  if (menu) assertManagedMenu(source, menu)
+  if (kind === 'column') {
+    if (mode === 'none') throw new Error('ColumnMenu поддерживает режимы default, custom и disabled.')
+    if (mode === 'custom') {
+      const withMenu = menu ? source : insertChild(source, context.table, '<ColumnMenu></ColumnMenu>')
+      return setNodeAttribute(withMenu, context.table, 'column-menu', null)
+    }
+    const withoutMenu = menu ? removeNode(source, menu) : source
+    return setNodeAttribute(withoutMenu, context.table, 'column-menu', mode === 'disabled' ? 'disabled' : null)
+  }
+  if (mode === 'default' || mode === 'disabled') throw new Error('RowMenu поддерживает режимы none и custom.')
+  if (mode === 'none') return menu ? removeNode(source, menu) : source
+  return menu ? source : insertChild(source, context.table, '<RowMenu></RowMenu>')
+}
+
+function addMenuNode(
+  source: string,
+  context: TableSourceContext,
+  kind: ComponentSFCTableVisualMenuKind,
+  node: 'item' | 'separator',
+): string {
+  const menu = requireMenu(context, kind)
+  assertManagedMenu(source, menu)
+  const markup = node === 'separator'
+    ? '<MenuSeparator />'
+    : '<MenuItem action="built-in-console-log" label="Новый пункт" />'
+  return insertChild(source, menu, markup)
+}
+
+function moveMenuNode(
+  source: string,
+  context: TableSourceContext,
+  kind: ComponentSFCTableVisualMenuKind,
+  fromIndex: number,
+  toIndex: number,
+): string {
+  const menu = requireMenu(context, kind)
+  assertManagedMenu(source, menu)
+  const nodes = menuNodes(menu)
+  if (!nodes[fromIndex] || !nodes[toIndex]) throw new Error('Пункт меню не найден.')
+  if (fromIndex === toIndex) return source
+  const fragments = nodes.map(node => source.slice(node.range.start, node.range.end))
+  const [moved] = fragments.splice(fromIndex, 1)
+  fragments.splice(toIndex, 0, moved!)
+  return nodes.map((node, index) => ({ start: node.range.start, end: node.range.end, value: fragments[index]! }))
+    .sort((left, right) => right.start - left.start)
+    .reduce((next, replacement) => replaceRange(next, replacement.start, replacement.end, replacement.value), source)
+}
+
+function setMenuItemAttribute(
+  source: string,
+  context: TableSourceContext,
+  kind: ComponentSFCTableVisualMenuKind,
+  nodeIndex: number,
+  name: 'label' | 'action' | 'input' | 'icon',
+  value: string | null,
+  valueKind: 'expression' | 'literal',
+): string {
+  const menu = requireMenu(context, kind)
+  assertManagedMenu(source, menu)
+  const item = requireMenuNode(context, kind, nodeIndex)
+  if (item.tag !== 'MenuItem') throw new Error('MenuSeparator не содержит attributes.')
+  if (source.slice(item.range.start, item.range.end).includes('<!--'))
+    throw new Error('Пункт меню управляется во вкладке Source.')
+  const actionAttribute = item.attributes.find(attribute => attribute.name === 'action')
+  const labelAttribute = item.attributes.find(attribute => attribute.name === 'label')
+  if (actionAttribute?.dynamic)
+    throw new Error('Legacy :action object управляется во вкладке Source.')
+  if (labelAttribute?.dynamic && readComponentSFCTranslationFallback(labelAttribute.value ?? '') == null)
+    throw new Error('Неизвестное label expression управляется во вкладке Source.')
+  if (item.attributes.some(attribute => !['id', 'label', 'action', 'input', 'icon'].includes(attribute.name)) || item.directives.length)
+    throw new Error('Пункт меню содержит неизвестные конструкции и управляется во вкладке Source.')
+  if (name === 'action' && valueKind !== 'literal')
+    throw new Error('Visual editor поддерживает literal action="...". Legacy :action object остаётся Source-owned.')
+  if (valueKind === 'expression' && value) {
+    const result = compileComponentSFCExpression(value, {
+      locals: kind === 'row' ? ['row', 'rowId', 'rowIndex', 'columnKey', 'value'] : [],
+      sourcePath: `template.Table.${kind === 'row' ? 'RowMenu' : 'ColumnMenu'}.MenuItem.${name}`,
+    })
+    const error = result.diagnostics.find(item => item.severity === 'error')
+    if (error) throw new Error(error.message)
+  }
+  return setNodeAttributeValue(source, item, name, value, valueKind)
 }
 
 function isSemanticNode(node: RComponentSFC_AST_TemplateNode): boolean {

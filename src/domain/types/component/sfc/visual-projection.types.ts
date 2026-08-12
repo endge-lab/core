@@ -22,7 +22,7 @@ export type ComponentSFCTableCellBindingProjection = ComponentSFCVisualAttribute
 /** Способ, которым содержимое ячейки представлено в простом visual editor. */
 export type ComponentSFCTableVisualCellTag = Exclude<
   RComponentSFC_IR_Tag,
-  'Component' | 'Table' | 'Column' | 'Cell' | 'ColumnMenu' | 'MenuItem' | 'MenuSeparator'
+  'Component' | 'Table' | 'Column' | 'Cell' | 'ColumnMenu' | 'RowMenu' | 'MenuItem' | 'MenuSeparator'
 >
 
 export type ComponentSFCTableCellProjection
@@ -63,6 +63,39 @@ export interface ComponentSFCTableColumnProjection {
   hasCustomCell: boolean
   cellSource: string | null
   sourceRange: RComponentSFC_SourceRange
+}
+
+export type ComponentSFCTableVisualMenuKind = 'column' | 'row'
+export type ComponentSFCTableVisualMenuMode = 'default' | 'disabled' | 'none' | 'custom' | 'source'
+
+export interface ComponentSFCTableMenuActionOption {
+  identity: string
+  source: 'intrinsic' | 'built-in' | 'required' | 'provided' | 'forwarded'
+}
+
+export type ComponentSFCTableMenuNodeProjection
+  = | {
+    kind: 'separator'
+    id: string
+    sourceRange: RComponentSFC_SourceRange
+  }
+    | {
+      kind: 'item'
+      id: string
+      label: ComponentSFCVisualSourceValue | null
+      action: ComponentSFCVisualSourceValue | null
+      input: ComponentSFCVisualSourceValue | null
+      icon: ComponentSFCVisualSourceValue | null
+      sourceOwned: boolean
+      sourceRange: RComponentSFC_SourceRange
+    }
+
+export interface ComponentSFCTableMenuProjection {
+  kind: ComponentSFCTableVisualMenuKind
+  mode: ComponentSFCTableVisualMenuMode
+  sourceOwned: boolean
+  items: ComponentSFCTableMenuNodeProjection[]
+  sourceRange?: RComponentSFC_SourceRange
 }
 
 /** Минимальные source-preserving операции visual editor таблицы. */
@@ -111,6 +144,35 @@ export type ComponentSFCTableSourcePatch
       value: string | null
       valueKind: 'expression' | 'literal'
     }
+    | {
+      type: 'set-menu-mode'
+      menu: ComponentSFCTableVisualMenuKind
+      mode: 'default' | 'disabled' | 'none' | 'custom'
+    }
+    | {
+      type: 'add-menu-node'
+      menu: ComponentSFCTableVisualMenuKind
+      node: 'item' | 'separator'
+    }
+    | {
+      type: 'remove-menu-node'
+      menu: ComponentSFCTableVisualMenuKind
+      nodeIndex: number
+    }
+    | {
+      type: 'move-menu-node'
+      menu: ComponentSFCTableVisualMenuKind
+      fromIndex: number
+      toIndex: number
+    }
+    | {
+      type: 'set-menu-item-attribute'
+      menu: ComponentSFCTableVisualMenuKind
+      nodeIndex: number
+      name: 'label' | 'action' | 'input' | 'icon'
+      value: string | null
+      valueKind: 'expression' | 'literal'
+    }
 
 /** Результат точечного изменения SFC Table source. */
 export interface ComponentSFCTableSourcePatchResult {
@@ -138,6 +200,11 @@ export interface ComponentSFCTableVisualProjection {
   defaultPin: ComponentSFCVisualSourceValue | null
   defaultHidden: ComponentSFCVisualSourceValue | null
   columnMenu: ComponentSFCVisualSourceValue | null
+  menus: {
+    column: ComponentSFCTableMenuProjection
+    row: ComponentSFCTableMenuProjection
+  }
+  menuActions: ComponentSFCTableMenuActionOption[]
   attributes: ComponentSFCVisualAttribute[]
   columns: ComponentSFCTableColumnProjection[]
   sourceRange: RComponentSFC_SourceRange

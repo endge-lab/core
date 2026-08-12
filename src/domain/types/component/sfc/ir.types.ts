@@ -1,6 +1,8 @@
 import type { RComponentSFC_SourceRange } from './location.types'
+import type { RComponentDiagnostic } from '../component-core.types'
 import type {
   ComponentSFCEventAction,
+  ComponentSFCPortForwardOrigin,
   ComponentSFCPortManifest,
   RComponentSFC_IR_ComponentPortMarker,
   RComponentSFC_IR_PortCall,
@@ -131,6 +133,7 @@ export type RComponentSFC_IR_Tag
     | 'Column'
     | 'Cell'
     | 'ColumnMenu'
+    | 'RowMenu'
     | 'MenuItem'
     | 'MenuSeparator'
     | 'Editable'
@@ -168,8 +171,57 @@ export interface RComponentSFC_IR_ElementNode {
   /** Local component port marker retained for future provider overrides. */
   port?: RComponentSFC_IR_ComponentPortMarker
 
+  /** Compiler-resolved Table menus, including forwarded Action identities and targets. */
+  tableMenus?: RComponentSFC_IR_TableMenus
+
   /** Позиция исходного AST-узла. */
   sourceRange?: RComponentSFC_SourceRange
+}
+
+export interface RComponentSFC_IR_TableMenus {
+  column: ComponentSFCTableColumnMenuDescriptor
+  row: ComponentSFCTableRowMenuDescriptor
+}
+
+export type ComponentSFCTableColumnMenuMode = 'default' | 'disabled' | 'inline'
+export type ComponentSFCTableRowMenuMode = 'none' | 'inline'
+
+/** Renderer-neutral menu retained in compiled SFC form until a concrete row/column context exists. */
+export interface ComponentSFCTableMenuDescriptor {
+  kind: 'sfc-table-menu'
+  items: ComponentSFCTableMenuNodeDescriptor[]
+}
+
+export type ComponentSFCTableMenuNodeDescriptor
+  = | ComponentSFCTableMenuItemDescriptor
+    | ComponentSFCTableMenuSeparatorDescriptor
+
+export interface ComponentSFCTableMenuItemDescriptor {
+  kind: 'item'
+  id: string
+  label: RComponentSFC_IR_Value
+  action: string
+  input?: RComponentSFC_IR_Value
+  icon?: string
+  /** Set only for a provided alias forwarded from this exact Table node. */
+  forwardedFrom?: ComponentSFCPortForwardOrigin
+}
+
+export interface ComponentSFCTableMenuSeparatorDescriptor {
+  kind: 'separator'
+  id: string
+}
+
+export interface ComponentSFCTableColumnMenuDescriptor {
+  mode: ComponentSFCTableColumnMenuMode
+  menu: ComponentSFCTableMenuDescriptor | null
+  diagnostics: RComponentDiagnostic[]
+}
+
+export interface ComponentSFCTableRowMenuDescriptor {
+  mode: ComponentSFCTableRowMenuMode
+  menu: ComponentSFCTableMenuDescriptor | null
+  diagnostics: RComponentDiagnostic[]
 }
 
 export type RComponentSFC_IR_EventModifier

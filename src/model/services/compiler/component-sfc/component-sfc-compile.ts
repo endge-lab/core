@@ -13,9 +13,10 @@ import type {
 } from '@/domain/types/program/program.types'
 import type { RComponentSFCSource_Parts } from '@/domain/types/component/sfc/source.types'
 import type { RComponentSFC_AST } from '@/domain/types/component/sfc/ast.types'
-import type { RComponentSFC_IR } from '@/domain/types/component/sfc/ir.types'
+import type { RComponentSFC_IR, RComponentSFC_IR_Node, RComponentSFC_IR_Template } from '@/domain/types/component/sfc/ir.types'
 import type { RComponentSFC_RuntimeDependencies } from '@/domain/types/component/sfc/dependencies.types'
 import type {
+  ComponentSFCActionPort,
   ComponentSFCPortManifest,
   ComponentSFCPortProviderDescriptor,
 } from '@/domain/types/component/sfc/ports.types'
@@ -30,6 +31,10 @@ import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/compo
 import { createEmptyProgramMetadata } from '@/domain/types/program/program-metadata.types'
 import { analyzeComponentSFCPorts } from '@/model/services/compiler/component-sfc/component-sfc-ports'
 import { resolveComponentSFCPortForwards } from '@/model/services/compiler/component-sfc/component-sfc-forward'
+import {
+  normalizeComponentSFCTableColumnMenu,
+  normalizeComponentSFCTableRowMenu,
+} from '@/model/services/compiler/component-sfc/component-sfc-table-menu'
 
 /** Результат полного SFC compiler pipeline в core. */
 export interface ComponentSFCCompileResult {
@@ -134,7 +139,6 @@ export function compileComponentSFC(
     props: scriptResult.props.map(prop => prop.name),
     locals: templateLocals.map(local => local.name),
     componentPorts: portResult.manifest.require.components,
-    providedActions: portResult.manifest.provides.actions,
     resolveComponentTag: options.resolveComponentTag,
     hasComponentIdentity: options.hasComponentIdentity,
     resolveComponentPortManifest: options.resolveComponentPortManifest,
@@ -164,6 +168,11 @@ export function compileComponentSFC(
     templateResult.template,
     { resolveComponentPortManifest: options.resolveComponentPortManifest },
   )
+  const availableMenuActions = [
+    ...portResult.manifest.require.actions,
+    ...portResult.manifest.provides.actions,
+  ]
+  const menuDiagnostics = collectTableMenuDiagnostics(templateResult.template, availableMenuActions)
   const styleResult = compileComponentSFCStyle(parseResult.ast.style, { identity: options.identity })
 
   diagnostics.push(
@@ -171,6 +180,7 @@ export function compileComponentSFC(
     ...portResult.diagnostics,
     ...templateResult.diagnostics,
     ...forwardResult.diagnostics,
+    ...menuDiagnostics,
     ...styleResult.diagnostics,
   )
 
@@ -220,6 +230,25 @@ export function compileComponentSFC(
     diagnostics,
     sections: sectionStatuses(diagnostics),
   }
+}
+
+function collectTableMenuDiagnostics(
+  template: RComponentSFC_IR_Template | null,
+  availableActions: ComponentSFCActionPort[],
+): RComponentDiagnostic[] {
+  const diagnostics: RComponentDiagnostic[] = []
+  const visit = (node: RComponentSFC_IR_Node): void => {
+    if (node.kind !== 'element') return
+    if (node.tag === 'Table') {
+      const column = normalizeComponentSFCTableColumnMenu(node, { availableActions })
+      const row = normalizeComponentSFCTableRowMenu(node, { availableActions })
+      node.tableMenus = { column, row }
+      diagnostics.push(...column.diagnostics, ...row.diagnostics)
+    }
+    for (const child of node.children) visit(child)
+  }
+  for (const root of template?.roots ?? []) visit(root)
+  return diagnostics
 }
 
 function sectionStatuses(diagnostics: RComponentDiagnostic[]): Record<'script' | 'template' | 'style', 'valid' | 'warning' | 'error'> {

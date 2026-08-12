@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest'
 
 import type { RComponentSFC_IR_ElementNode } from '@/domain/types/component/sfc/ir.types'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
-import { normalizeComponentSFCTableColumnMenu } from '@/model/services/compiler/component-sfc/component-sfc-table-menu'
+import {
+  normalizeComponentSFCTableColumnMenu,
+  normalizeComponentSFCTableRowMenu,
+} from '@/model/services/compiler/component-sfc/component-sfc-table-menu'
 
 describe('Component SFC table column menu', () => {
   it('compiles Table > ColumnMenu into a context menu descriptor', () => {
@@ -20,19 +23,19 @@ describe('Component SFC table column menu', () => {
     expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
     expect(menu.mode).toBe('inline')
     expect(menu.menu).toEqual({
-      kind: 'context-menu',
+      kind: 'sfc-table-menu',
       items: [
         {
           kind: 'item',
           id: 'table.sort.setColumnAsc',
           action: 'table.sort.setColumnAsc',
-          label: 'Сортировать по возрастанию',
+          label: { kind: 'literal', value: 'Сортировать по возрастанию' },
         },
         {
           kind: 'item',
           id: 'table.sort.setColumnDesc',
           action: 'table.sort.setColumnDesc',
-          label: 'Сортировать по убыванию',
+          label: { kind: 'literal', value: 'Сортировать по убыванию' },
         },
         {
           kind: 'separator',
@@ -42,7 +45,7 @@ describe('Component SFC table column menu', () => {
           kind: 'item',
           id: 'table.sort.clearAll',
           action: 'table.sort.clearAll',
-          label: 'Сбросить все сортировки',
+          label: { kind: 'literal', value: 'Сбросить все сортировки' },
         },
       ],
     })
@@ -68,8 +71,8 @@ describe('Component SFC table column menu', () => {
       kind: 'item',
       id: 'built-in-console-log',
       action: 'built-in-console-log',
-      input: { message: 'Контекстное меню работает' },
-      label: 'Debug',
+      input: { kind: 'literal', value: { message: 'Контекстное меню работает' } },
+      label: { kind: 'literal', value: 'Debug' },
     }])
   })
 
@@ -166,6 +169,92 @@ describe('Component SFC table column menu', () => {
     expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
     expect(menu.mode).toBe('disabled')
     expect(menu.menu).toBeNull()
+  })
+
+  it('compiles RowMenu with t() label and row/cell input expressions', () => {
+    const result = compileComponentSFC(createTableSource(`
+      <RowMenu>
+        <MenuItem
+          action="built-in-console-log"
+          :label="t('schedule:menu.open', 'Открыть')"
+          :input="{ row, rowId, rowIndex, columnKey, value }"
+        />
+      </RowMenu>
+      <Column key="number" title="Flight" />
+    `))
+    const menu = normalizeComponentSFCTableRowMenu(readTable(result))
+
+    expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
+    expect(menu.mode).toBe('inline')
+    expect(menu.menu?.items).toEqual([expect.objectContaining({
+      kind: 'item',
+      action: 'built-in-console-log',
+      label: expect.objectContaining({ kind: 'expression', source: "t('schedule:menu.open', 'Открыть')" }),
+      input: expect.objectContaining({ kind: 'expression', source: '{ row, rowId, rowIndex, columnKey, value }' }),
+    })])
+  })
+
+  it('reports conflicting legacy action.input and explicit :input', () => {
+    const result = compileComponentSFC(createTableSource(`
+      <RowMenu>
+        <MenuItem
+          :action="{ identity: 'built-in-console-log', input: { source: 'legacy' } }"
+          :input="{ rowId }"
+          label="Debug"
+        />
+      </RowMenu>
+    `))
+
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'sfc-table-row-menu-item-input-conflict' }),
+    ]))
+  })
+
+  it('expands a namespaced forwarded alias to the Action of the same mounted Table', () => {
+    const result = compileComponentSFC(`<script setup lang="ts">
+const ports = definePorts({
+  forward: {
+    from: 'schedule',
+    namespace: 'schedule',
+    ports: { provides: ['table.sort.clearAll'] },
+  },
+})
+</script>
+<template>
+  <Table ref="schedule" :rows="[]">
+    <ColumnMenu><MenuItem action="schedule.table.sort.clearAll" label="Сбросить" /></ColumnMenu>
+  </Table>
+</template>`)
+    const menu = readTable(result).tableMenus?.column
+
+    expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
+    expect(menu?.menu?.items[0]).toMatchObject({
+      kind: 'item',
+      action: 'table.sort.clearAll',
+      forwardedFrom: { ref: 'schedule', portName: 'table.sort.clearAll' },
+    })
+  })
+
+  it('rejects a forwarded Action owned by another mounted Table', () => {
+    const result = compileComponentSFC(`<script setup lang="ts">
+const ports = definePorts({
+  forward: {
+    from: 'other',
+    namespace: 'other',
+    ports: { provides: ['table.sort.clearAll'] },
+  },
+})
+</script>
+<template>
+  <Table ref="schedule" :rows="[]">
+    <ColumnMenu><MenuItem action="other.table.sort.clearAll" label="Сбросить" /></ColumnMenu>
+  </Table>
+  <Table ref="other" :rows="[]" />
+</template>`)
+
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'sfc-table-column-menu-item-action-target-incompatible' }),
+    ]))
   })
 })
 

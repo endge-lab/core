@@ -87,6 +87,8 @@ export type EndgeAuthCredentialResolver = (
 
 export interface EndgeAuthBootOptions {
   resolveCredential?: EndgeAuthCredentialResolver
+  /** Host-owned namespace isolates persisted sessions of identical Workspaces across backends. */
+  storageNamespace?: string
 }
 
 export interface AuthAdapterContext {

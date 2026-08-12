@@ -428,4 +428,52 @@ describe('Component SFC Table source patch', () => {
     expect(result.source).toContain('<!-- keep -->')
     expect(result.source).toContain('key="second"')
   })
+
+  it('round-trips RowMenu t() label and dynamic row input through narrow patches', () => {
+    const source = '<template><Table><Column key="flight" /></Table></template>'
+    const custom = patchComponentSFCTableSource(source, { type: 'set-menu-mode', menu: 'row', mode: 'custom' })
+    const added = patchComponentSFCTableSource(custom.source, { type: 'add-menu-node', menu: 'row', node: 'item' })
+    const label = patchComponentSFCTableSource(added.source, {
+      type: 'set-menu-item-attribute',
+      menu: 'row',
+      nodeIndex: 0,
+      name: 'label',
+      value: "t('schedule:menu.open', 'Открыть')",
+      valueKind: 'expression',
+    })
+    const input = patchComponentSFCTableSource(label.source, {
+      type: 'set-menu-item-attribute',
+      menu: 'row',
+      nodeIndex: 0,
+      name: 'input',
+      value: '{ rowId, columnKey, value }',
+      valueKind: 'expression',
+    })
+
+    expect(input.ok).toBe(true)
+    expect(input.source).toContain('<RowMenu>')
+    expect(input.source).toContain(`:label="t('schedule:menu.open', 'Открыть')"`)
+    expect(input.source).toContain(':input="{ rowId, columnKey, value }"')
+    expect(input.projection?.menus.row.items[0]).toMatchObject({
+      kind: 'item',
+      label: { kind: 'expression', source: "t('schedule:menu.open', 'Открыть')" },
+      input: { kind: 'expression', source: '{ rowId, columnKey, value }' },
+    })
+  })
+
+  it('preserves Source-owned menu expressions', () => {
+    const source = '<template><Table><RowMenu><MenuItem action="built-in-console-log" :label="formatLabel(row)" /></RowMenu></Table></template>'
+    const result = patchComponentSFCTableSource(source, {
+      type: 'set-menu-item-attribute',
+      menu: 'row',
+      nodeIndex: 0,
+      name: 'label',
+      value: 'Changed',
+      valueKind: 'literal',
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.source).toBe(source)
+    expect(result.message).toContain('Source')
+  })
 })

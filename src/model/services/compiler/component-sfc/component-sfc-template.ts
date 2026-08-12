@@ -22,7 +22,6 @@ import type {
 } from '@/domain/types/component/sfc/ir.types'
 import type {
   ComponentSFCComponentPort,
-  ComponentSFCActionPort,
   ComponentSFCPortManifest,
 } from '@/domain/types/component/sfc/ports.types'
 import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
@@ -31,7 +30,6 @@ import { compileComponentSFCExpression } from '@/model/services/compiler/compone
 import { compileComponentSFCLocalEventAction } from '@/model/services/compiler/component-sfc/component-sfc-ports'
 import { createBuiltInComponentPortManifest } from '@/model/services/compiler/component-sfc/component-sfc-forward'
 import { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sfc/component-sfc-built-in-tags'
-import { normalizeComponentSFCTableColumnMenu } from '@/model/services/compiler/component-sfc/component-sfc-table-menu'
 import { normalizeComponentSFCTableColumnPin } from '@/model/services/compiler/component-sfc/component-sfc-table-pin'
 import { normalizeComponentSFCTableSort } from '@/model/services/compiler/component-sfc/component-sfc-table-sort'
 import { normalizeComponentSFCTableColumnVisibility } from '@/model/services/compiler/component-sfc/component-sfc-table-visibility'
@@ -47,9 +45,6 @@ export interface ComponentSFCTemplateCompileContext {
 
   /** Local component ports have priority over the global user tag registry. */
   componentPorts?: ComponentSFCComponentPort[]
-
-  /** Actions exposed by this component and available to declarative handlers. */
-  providedActions?: ComponentSFCActionPort[]
 
   /** Разрешает зарегистрированный пользовательский tag в identity компонента. */
   resolveComponentTag?: (tag: string) => string | null
@@ -305,8 +300,6 @@ function compileElementNode(
     diagnostics.push(...normalizeComponentSFCTableSort(element).diagnostics)
     diagnostics.push(...normalizeComponentSFCTableColumnPin(element).diagnostics)
     diagnostics.push(...normalizeComponentSFCTableColumnVisibility(element).diagnostics)
-    const menu = normalizeComponentSFCTableColumnMenu(element, context.providedActions)
-    diagnostics.push(...menu.diagnostics)
   }
 
   return element

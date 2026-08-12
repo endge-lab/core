@@ -24,6 +24,7 @@ export class EndgeAuth extends EndgeModule {
   private _abortController: AbortController | null = null
   private _detachHostAbort: (() => void) | null = null
   private _unregisterDiagnosticsContext: (() => void) | null = null
+  private readonly _store: AuthSessionStore
 
   /** Собирает auth subsystem и регистрирует встроенные adapters один раз. */
   public constructor() {
@@ -39,8 +40,8 @@ export class EndgeAuth extends EndgeModule {
       getSignal: () => this._signal,
     })
 
-    const store = new AuthSessionStore()
-    this.session = new AuthSessionManager(this.profiles, this.adapters, store, {
+    this._store = new AuthSessionStore()
+    this.session = new AuthSessionManager(this.profiles, this.adapters, this._store, {
       getWorkspaceIdentity: () => Endge.context.getCurrentWorkspace() ?? '',
       onApplicationSessionChange: () => this.notify(),
     })
@@ -50,6 +51,7 @@ export class EndgeAuth extends EndgeModule {
   /** Подключает host credential port и безопасные context providers. */
   public override setup(ctx: EndgeBootContext): void {
     this._credentialResolver = ctx.auth?.resolveCredential
+    this._store.setNamespace(ctx.auth?.storageNamespace)
     this._abortController?.abort()
     this._detachHostAbort?.()
     const controller = new AbortController()
@@ -89,6 +91,7 @@ export class EndgeAuth extends EndgeModule {
     this._detachHostAbort?.()
     this._detachHostAbort = null
     this.session.resetRuntime()
+    this._store.setNamespace(undefined)
     this._credentialResolver = undefined
     this._signal = undefined
     this._unregisterDiagnosticsContext?.()
