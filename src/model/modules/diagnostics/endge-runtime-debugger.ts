@@ -112,7 +112,6 @@ export class EndgeRuntimeDebugger extends EndgeModule {
   public startListening(): void {
     if (typeof BroadcastChannel === 'undefined' || this._listenerChannel != null)
       return
-    console.log('[EndgeRuntimeDebugger] start: создаём канал прослушки', CHANNEL_NAME)
     this._listenerChannel = new BroadcastChannel(CHANNEL_NAME)
     this._listenerChannel.addEventListener('message', this._onMessage)
     this.notify()
@@ -148,11 +147,9 @@ export class EndgeRuntimeDebugger extends EndgeModule {
       const idx = this._tabs.findIndex(t => t.id === tab.id)
       if (idx >= 0) {
         this._tabs.splice(idx, 1, tab)
-        console.debug('[EndgeRuntimeDebugger] register: обновление вкладки', tab)
       }
       else {
         this._tabs.push(tab)
-        console.log('[EndgeRuntimeDebugger] register: новая вкладка', tab)
       }
       this.notify()
       return
@@ -167,10 +164,6 @@ export class EndgeRuntimeDebugger extends EndgeModule {
         .map((t: unknown) => String(t ?? '').trim())
         .filter((t: string) => t.length > 0)
       this._analysisByTabId[tabId] = targets
-      console.log('[EndgeRuntimeDebugger] analysis-result: получены цели', {
-        tabId,
-        targets,
-      })
       this.notify()
     }
   }
@@ -243,19 +236,7 @@ export class EndgeRuntimeDebugger extends EndgeModule {
     if (targetTabId && targetTabId !== currentTabId)
       return
 
-    // Базовый лог о том, что команда дошла до клиента
-    console.log('[EndgeRuntimeDebugger] команда получена в клиенте', {
-      command: data.command,
-      payload: data.payload,
-      tabId: currentTabId,
-    })
-
     if (data.command === 'template-analysis') {
-      console.log('[EndgeRuntimeDebugger] template-analysis: команда анализа шаблона получена', {
-        tabId: currentTabId,
-        payload: data.payload,
-      })
-
       if (typeof document !== 'undefined') {
         const nodes = document.querySelectorAll<HTMLElement>('[data-type="endge-layout-area"][data-target]')
         const targetsSet = new Set<string>()
@@ -273,11 +254,6 @@ export class EndgeRuntimeDebugger extends EndgeModule {
           url: typeof location !== 'undefined' ? location.href : '',
           targets,
           at: Date.now(),
-        })
-
-        console.log('[EndgeRuntimeDebugger] template-analysis: отправлен результат анализа', {
-          tabId: currentTabId,
-          targets,
         })
       }
     }
@@ -309,7 +285,6 @@ export class EndgeRuntimeDebugger extends EndgeModule {
     this._postRegister()
     this._ensureAutoRegister()
     this._ensureDiagnosticsForwarding()
-    console.log('DebugTab активирован')
   }
 
   /** Один раз подписаться на diagnostics и слать записи в канал. Не делаем на странице админки. */

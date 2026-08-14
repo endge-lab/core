@@ -112,7 +112,6 @@ export class EndgeSSE extends EndgeModule {
     this._sseManager.start()
     // console.log('[EndgeSSE] started')
 
-    console.groupEnd()
   }
 
   /**

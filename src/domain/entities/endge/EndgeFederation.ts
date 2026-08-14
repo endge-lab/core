@@ -193,7 +193,7 @@ export abstract class EndgeFederation {
         await module.reset()
       }
       catch (error) {
-        console.warn(`[${this.name}] Failed to reset module "${key}":`, error)
+        console.warn(`[${this.name}] Failed to reset module "${key}": ${error instanceof Error ? error.message : String(error)}`)
       }
     }
 

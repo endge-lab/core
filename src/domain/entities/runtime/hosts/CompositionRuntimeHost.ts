@@ -546,7 +546,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }
   }
 
-  public override async destroy(): Promise<void> {
+  public override quiesce(): void {
+    super.quiesce()
     for (const timer of this._streamBatchTimers.values())
       clearTimeout(timer)
     this._streamBatchTimers.clear()
@@ -557,6 +558,16 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     for (const path of this._bridgePaths)
       Raph.delete(path)
     this._bridgePaths.clear()
+    for (const dispose of this._outputBridgeDisposers.values()) dispose()
+    this._outputBridgeDisposers.clear()
+    for (const dispose of this._hookDisposers.values()) dispose()
+    this._hookDisposers.clear()
+    for (const dispose of this._publicationDisposers.values()) dispose()
+    this._publicationDisposers.clear()
+  }
+
+  public override async destroy(): Promise<void> {
+    this.quiesce()
     for (const child of this._children.values()) {
       if (Endge.runtime.getRuntimeById(child.id))
         await Endge.runtime.destroyRuntimeTreeAsync(child.id)
@@ -576,14 +587,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }
     this._scopes.clear()
     this._runtimeHandles.clear()
-    for (const dispose of this._outputBridgeDisposers.values()) dispose()
-    this._outputBridgeDisposers.clear()
     this._outputBridges.clear()
     this._updateSourcePaths.clear()
-    for (const dispose of this._hookDisposers.values()) dispose()
-    this._hookDisposers.clear()
-    for (const dispose of this._publicationDisposers.values()) dispose()
-    this._publicationDisposers.clear()
     this._dataPaths.clear()
     this._storeRuntimeIds.clear()
     this._storeProviderRuntimeIds.clear()

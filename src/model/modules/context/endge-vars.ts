@@ -68,7 +68,7 @@ export class WorkspaceVariables {
       return []
     }
     catch (e) {
-      console.warn('[WorkspaceVariables] Failed to read workspace vars', e)
+      console.warn(`[WorkspaceVariables] Failed to read workspace vars: ${e instanceof Error ? e.message : String(e)}`)
       return []
     }
   }

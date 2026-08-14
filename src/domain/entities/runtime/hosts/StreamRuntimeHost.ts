@@ -112,8 +112,14 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
     this.setContext({ status: 'idle', updatedAt: new Date().toISOString() })
   }
 
+  public override quiesce(): void {
+    this._connection?.close()
+    this._connection = null
+    super.quiesce()
+  }
+
   public override destroy(): void {
-    this.stop()
+    this.quiesce()
     super.destroy()
   }
 

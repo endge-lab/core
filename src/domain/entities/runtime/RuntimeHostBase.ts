@@ -95,6 +95,7 @@ export abstract class RuntimeHostBase<
   private _updateBindings = new Map<string, RuntimeHostUpdateBinding>()
   private _updateDisposers = new Map<string, Array<() => void>>()
   private _updateTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  private _quiesced = false
 
   /** Read-only доступ к compiled artifacts, если host связан с program artifact. */
   private _artifactReader: RuntimeArtifactReader | null
@@ -219,11 +220,11 @@ export abstract class RuntimeHostBase<
       this.setStatus('unmounted')
   }
 
-  /**
-   * LIFECYCLE
-   */
-  public destroy(): void {
-    this.setStatus('destroyed')
+  /** Останавливает доставку новых updates, не освобождая данные host-а. */
+  public quiesce(): void {
+    if (this._quiesced)
+      return
+    this._quiesced = true
     for (const timer of this._updateTimers.values())
       clearTimeout(timer)
     this._updateTimers.clear()
@@ -233,6 +234,14 @@ export abstract class RuntimeHostBase<
     }
     this._updateDisposers.clear()
     this._updateBindings.clear()
+  }
+
+  /**
+   * LIFECYCLE
+   */
+  public destroy(): void {
+    this.quiesce()
+    this.setStatus('destroyed')
     this._inputBindings.clear()
     for (const node of this._raphNodes.values())
       Raph.app.removeNode(node)
@@ -259,7 +268,7 @@ export abstract class RuntimeHostBase<
    * решает, как обновлять свои данные, запросы или render-boundary.
    */
   public update(ctx: RuntimeHostUpdateContext): void {
-    if (this.status === 'paused' || this.status === 'stopping' || this.status === 'stopped' || this.status === 'unmounted' || this.status === 'destroyed')
+    if (this._quiesced || this.status === 'paused' || this.status === 'stopping' || this.status === 'stopped' || this.status === 'unmounted' || this.status === 'destroyed')
       return
     const immediate: RuntimeHostResolvedUpdate[] = []
     let matchedBinding = false

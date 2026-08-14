@@ -463,7 +463,7 @@ export class EndgeActions extends Subscribable {
           ? (input as { message?: unknown }).message
           : input
         // eslint-disable-next-line no-console
-        console.log(value ?? '[Endge] built-in-console-log executed')
+        console.log(formatConsoleActionValue(value))
       },
     }, { kind: 'builtin', owner: '@endge/core' })
     const vocabActions: Array<CodeActionDefinition> = [
@@ -540,4 +540,16 @@ export class EndgeActions extends Subscribable {
       value: context.target,
     }
   }
+}
+
+function formatConsoleActionValue(value: unknown): string {
+  if (value == null)
+    return '[Endge] built-in-console-log executed'
+  if (typeof value === 'string')
+    return value
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint')
+    return String(value)
+  if (Array.isArray(value))
+    return `[Endge] Array(${value.length}) omitted from Console to avoid retaining runtime data.`
+  return `[Endge] ${typeof value === 'object' ? 'Object' : typeof value} omitted from Console to avoid retaining runtime data.`
 }

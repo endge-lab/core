@@ -18,8 +18,8 @@ importers:
         specifier: ^3.0.5
         version: 3.0.5
       '@endge/utils':
-        specifier: ^0.24.6
-        version: 0.24.6(pinia@3.0.4)(vue@3.5.39)
+        specifier: ^0.24.7
+        version: 0.24.7(pinia@3.0.4)(vue@3.5.39)
       '@primevue/themes':
         specifier: ^4.0.0-rc.1
         version: 4.5.4
@@ -377,8 +377,8 @@ packages:
     resolution: {integrity: sha512-aiujCX1NCGv6Uuaa4mY70hxKZMCZuS8dKU+rtDbG2xpN2Pk5E7PsBBoqUEuY32I3GygRfU0+5HU0uAsfzvtYyw==}
     dev: false
 
-  /@endge/utils@0.24.6(pinia@3.0.4)(vue@3.5.39):
-    resolution: {integrity: sha512-jEZmc6rWGqojew2VIqgGeBmvIefIWc86yIkyDuFG5LUzp2OMvTy/wT23DDcHcYHHQBpQ2jyxCeIaTO3jbwenqA==}
+  /@endge/utils@0.24.7(pinia@3.0.4)(vue@3.5.39):
+    resolution: {integrity: sha512-0sbGOQ6/tS0N8PQE5A3G7DYWvP1OgRI/SVQARUH+qSTSKwaEWw0tSU9fFHXB+HFZxb4qn1DEreOSPMzB36I8lA==}
     peerDependencies:
       pinia: ^2.1.7 || ^3.0.0
       vue: ^3.5.13

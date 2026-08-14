@@ -117,32 +117,6 @@ export function createBoundaryAggregationPhase(
       if (!ctxs.length)
         return
 
-      // ---------------- DEBUG (всё, что нужно для поиска col/row) ----------------
-      console.groupCollapsed(`[PHASE:${String(name)}] ctxs=${ctxs.length}`)
-      try {
-        console.log(
-          '[ctxs meta]',
-          ctxs.map(c => ({
-            nodeId: c.node?.id,
-            kind: c.node?.meta?.kind,
-            type: c.node?.meta?.type,
-            entityId: c.node?.meta?.entityId,
-            basePath: c.node?.meta?.basePath,
-            runtimeId: c.node?.meta?.runtimeId,
-            columnIndex: c.node?.meta?.columnIndex,
-            events: c.events?.length ?? 0,
-            canonical: (c.events ?? []).map((e: any) => e?.canonical),
-            resolvedLens: (c.events ?? []).map(
-              (e: any) => e?.resolved?.length ?? 0,
-            ),
-          })),
-        )
-      }
-      finally {
-        console.groupEnd()
-      }
-      // -------------------------------------------------------------------------
-
       // nodeId -> PhaseEvent[]
       const eventsByNode = new Map<string, PhaseEvent[]>()
       for (const { node, events } of ctxs) {
@@ -165,55 +139,14 @@ export function createBoundaryAggregationPhase(
         if (kind === 'root') {
           dirtyRoots.add(dirtyNode.id)
 
-          // DEBUG
-          console.log('[tables] dirty ROOT', {
-            dirtyNodeId: dirtyNode.id,
-            basePath: dirtyNode.meta?.basePath,
-            runtimeId: dirtyNode.meta?.runtimeId,
-            events: ctx.events ?? [],
-          })
-
           continue
         }
 
         // 1) Найти ближайший boundary
         const b = nearestBoundary(dirtyNode, graph, isBoundary)
         if (!b) {
-          // DEBUG
-          console.warn('[tables] nearestBoundary NOT FOUND', {
-            dirtyNodeId: dirtyNode.id,
-            dirtyKind: kind,
-            dirtyMeta: dirtyNode.meta,
-            events: eventsByNode.get(dirtyNode.id),
-          })
+          console.warn(`[tables] nearest boundary not found for node "${dirtyNode.id}" (${String(kind ?? 'unknown')})`)
           continue
-        }
-
-        // DEBUG: boundary + колонка
-        console.groupCollapsed('[tables] boundary found')
-        try {
-          console.log('dirtyNode', {
-            id: dirtyNode.id,
-            kind: dirtyNode.meta?.kind,
-            meta: dirtyNode.meta,
-          })
-          console.log('boundaryNode', {
-            id: b.id,
-            kind: b.meta?.kind,
-            columnIndex: b.meta?.columnIndex,
-            meta: b.meta,
-          })
-          console.log(
-            'dirty events',
-            (eventsByNode.get(dirtyNode.id) ?? []).map((e: any) => ({
-              original: e.original,
-              canonical: e.canonical,
-              resolved: e.resolved,
-            })),
-          )
-        }
-        finally {
-          console.groupEnd()
         }
 
         // onBoundary -  один раз за тик
@@ -225,22 +158,9 @@ export function createBoundaryAggregationPhase(
         // 2) Найти root для boundary
         const r = toRoot(b, graph)
         if (!r) {
-          // DEBUG
-          console.warn('[tables] toRoot NOT FOUND', {
-            boundaryId: b.id,
-            boundaryMeta: b.meta,
-          })
+          console.warn(`[tables] root not found for boundary "${b.id}"`)
           continue
         }
-
-        // DEBUG: root
-        console.log('[tables] root resolved', {
-          rootId: r.id,
-          rootRuntimeId: r.meta?.runtimeId,
-          rootBasePath: r.meta?.basePath,
-          boundaryId: b.id,
-          boundaryColumnIndex: b.meta?.columnIndex,
-        })
 
         // 3) Агрегация boundary контекстов по root
         let map = byRoot.get(r.id)
@@ -257,6 +177,7 @@ export function createBoundaryAggregationPhase(
             phase: name,
             node: b,
             events: ev?.slice(),
+            frame: ctx.frame,
           })
         }
         else if (ev?.length) {
@@ -274,31 +195,6 @@ export function createBoundaryAggregationPhase(
 
         const children = Array.from(childrenMap.values())
 
-        // DEBUG summary
-        console.groupCollapsed('[tables] emitToRoot update:boundaries')
-        try {
-          console.log('root', {
-            id: root.id,
-            runtimeId: root.meta?.runtimeId,
-            basePath: root.meta?.basePath,
-          })
-          console.log(
-            'children',
-            children.map(c => ({
-              boundaryId: c.node.id,
-              columnIndex: c.node.meta?.columnIndex,
-              events: c.events?.length ?? 0,
-              resolvedLens: (c.events ?? []).map(
-                (e: any) => e?.resolved?.length ?? 0,
-              ),
-              canonicals: (c.events ?? []).map((e: any) => e?.canonical),
-            })),
-          )
-        }
-        finally {
-          console.groupEnd()
-        }
-
         emitToRoot(root, children)
       }
 
@@ -311,13 +207,6 @@ export function createBoundaryAggregationPhase(
         const root = graph.getNode(rootId)
         if (!root)
           continue
-
-        // DEBUG
-        console.log('[tables] emitToRoot update:root', {
-          rootId: root.id,
-          runtimeId: root.meta?.runtimeId,
-          basePath: root.meta?.basePath,
-        })
 
         emitToRoot(root, [])
       }

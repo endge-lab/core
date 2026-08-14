@@ -129,7 +129,7 @@ export class EndgeRuntime extends EndgeModule {
   ): AnyRuntimeHost | null {
     const strategy = this._strategies.resolve(model)
     if (!strategy) {
-      console.error('[EndgeRuntime] Unsupported runtime model', model)
+      console.error(`[EndgeRuntime] Unsupported runtime model "${String((model as any)?.identity ?? (model as any)?.id ?? 'unknown')}"`)
       return null
     }
 
@@ -366,7 +366,11 @@ export class EndgeRuntime extends EndgeModule {
       return
     }
 
-    for (const id of this._hosts.getTreePostOrder(rootId)) {
+    const postOrder = this._hosts.getTreePostOrder(rootId)
+    for (const id of [...postOrder].reverse())
+      void this._hosts.getById(id)?.quiesce()
+
+    for (const id of postOrder) {
       void this.destroyRuntimeInternal(id, false)
     }
 
@@ -380,7 +384,11 @@ export class EndgeRuntime extends EndgeModule {
       return
     }
 
-    for (const id of this._hosts.getTreePostOrder(rootId)) {
+    const postOrder = this._hosts.getTreePostOrder(rootId)
+    for (const id of [...postOrder].reverse())
+      await this._hosts.getById(id)?.quiesce()
+
+    for (const id of postOrder) {
       await this.destroyRuntimeInternal(id, false)
     }
 
@@ -457,7 +465,7 @@ export class EndgeRuntime extends EndgeModule {
       }
     }
     catch (error) {
-      console.error('[EndgeRuntime] Failed to hydrate runtime filters', error)
+      console.error(`[EndgeRuntime] Failed to hydrate runtime filters: ${errorText(error)}`)
     }
   }
 
@@ -482,6 +490,9 @@ export class EndgeRuntime extends EndgeModule {
 
     let cleanupError: unknown = null
     try {
+      const quiesceCleanup = host.quiesce()
+      if (quiesceCleanup)
+        await quiesceCleanup
       try {
         const strategyCleanup = this._strategies.resolve(host.model)?.destroy?.({ host })
         if (strategyCleanup)
@@ -562,7 +573,7 @@ export class EndgeRuntime extends EndgeModule {
       this.scopes.attachRuntime(String(host.meta.runtimeScopeId ?? ''), host)
     }
     catch (error) {
-      console.error('[EndgeRuntime] Failed to register runtime host', error)
+      console.error(`[EndgeRuntime] Failed to register runtime host "${host.id}": ${errorText(error)}`)
       this.scopes.detachRuntime(host.id)
       this._hosts.removeById(host.id)
       return false
@@ -696,6 +707,10 @@ export class EndgeRuntime extends EndgeModule {
     }
     return rawReader
   }
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? `${error.name}: ${error.message}` : String(error)
 }
 
 function isRuntimeArtifactReader(value: unknown): value is RuntimeArtifactReader {

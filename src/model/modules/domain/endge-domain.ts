@@ -473,8 +473,6 @@ export class EndgeDomain extends EndgeModule {
    */
   public merge(json: any): void {
     const parsed = EndgeDomain.parsePlain(json)
-    console.log(json)
-    console.log(parsed)
     this.importFromSchema(parsed)
 
     this.notify()
@@ -3093,7 +3091,7 @@ export class EndgeDomain extends EndgeModule {
       )
     }
     catch (e) {
-      console.error('[EndgeDomain] Не удалось сохранить состояние:', e)
+      console.error(`[EndgeDomain] Не удалось сохранить состояние: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 

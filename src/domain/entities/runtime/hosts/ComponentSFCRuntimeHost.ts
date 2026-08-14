@@ -413,11 +413,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
       }
     }
     catch (error) {
-      console.error('[ComponentSFCRuntimeHost] Event reaction failed.', {
-        componentIdentity: ownerIdentity,
-        event: port.name,
-        error,
-      })
+      console.error(`[ComponentSFCRuntimeHost] Event reaction failed for "${ownerIdentity}.${port.name}": ${error instanceof Error ? error.message : String(error)}`)
       this.emit('event:error', { code: 'event-reaction-failed', ownerIdentity, event: port.name, error })
     }
   }
@@ -632,13 +628,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     if (this._computationErrorSignatures.get(consumerKey) === signature)
       return
     this._computationErrorSignatures.set(consumerKey, signature)
-    console.error('[ComponentSFCRuntimeHost] Computation port failed.', {
-      componentIdentity: this.entityIdentity,
-      portName: portName ?? null,
-      computationIdentity: resource.error.computationIdentity || identity,
-      outputName: resource.error.outputName ?? null,
-      kind: resource.error.kind,
-    })
+    console.error(`[ComponentSFCRuntimeHost] Computation port failed for "${this.entityIdentity}.${portName ?? 'unknown'}" (${resource.error.computationIdentity || identity}/${resource.error.outputName ?? 'unknown'}, ${resource.error.kind})`)
   }
 
   /** Синхронизирует runtime context с текущим compiled artifact. */

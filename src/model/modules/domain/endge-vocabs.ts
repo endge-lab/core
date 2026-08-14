@@ -177,7 +177,7 @@ export class EndgeVocabs extends EndgeModule {
       return docs.slice(0, limit)
     }
     catch (e: any) {
-      console.warn(`[EndgeVocabs.getSample] ${cfg.identity}/${cfg.slug}:`, e?.message ?? e)
+      console.warn(`[EndgeVocabs.getSample] ${cfg.identity}/${cfg.slug}: ${e instanceof Error ? e.message : String(e)}`)
       return []
     }
   }
@@ -260,7 +260,7 @@ export class EndgeVocabs extends EndgeModule {
           }
         }
         void this.loadShared(cfg, true).catch((error: any) => {
-          console.warn(`[EndgeVocabs.acquire] background refresh ${cfg.identity}:`, error?.message ?? error)
+          console.warn(`[EndgeVocabs.acquire] background refresh ${cfg.identity}: ${error instanceof Error ? error.message : String(error)}`)
         })
         return {
           identity: cfg.identity,
@@ -347,7 +347,7 @@ export class EndgeVocabs extends EndgeModule {
       this.markLoaded(cfg.identity)
     }
     catch (e: any) {
-      console.warn(`[EndgeVocabs.loadById] ${cfg.idKey}/${cfg.slug}:`, e?.message ?? e)
+      console.warn(`[EndgeVocabs.loadById] ${cfg.idKey}/${cfg.slug}: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
@@ -386,7 +386,7 @@ export class EndgeVocabs extends EndgeModule {
       return docs.slice(0, maxLimit)
     }
     catch (e: any) {
-      console.warn(`[EndgeVocabs.getSampleById] ${cfg.idKey}/${cfg.slug}:`, e?.message ?? e)
+      console.warn(`[EndgeVocabs.getSampleById] ${cfg.idKey}/${cfg.slug}: ${e instanceof Error ? e.message : String(e)}`)
       return []
     }
   }
@@ -456,18 +456,10 @@ export class EndgeVocabs extends EndgeModule {
       Raph.set(`vocabs.${cfg.slug}`, allDocs)
       this.markLoaded(cfg.identity)
 
-      console.log('[EndgeVocabs.loadVocab] loaded', {
-        id: cfg.idKey,
-        identity: cfg.identity,
-        slug: cfg.slug,
-        count: allDocs.length,
-      })
-      console.log(allDocs)
-
       return allDocs
     }
     catch (e: any) {
-      console.warn(`[EndgeVocabs.loadVocab] ${cfg.idKey}/${cfg.slug}:`, e?.message ?? e)
+      console.warn(`[EndgeVocabs.loadVocab] ${cfg.idKey}/${cfg.slug}: ${e instanceof Error ? e.message : String(e)}`)
       if (options.throwOnError)
         throw e
       return []

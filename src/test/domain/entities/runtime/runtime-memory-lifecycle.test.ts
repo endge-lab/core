@@ -5,7 +5,7 @@ import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 import { RuntimeHostRegistry } from '@/domain/entities/runtime/RuntimeHostRegistry'
 import type { ProgramArtifact, QueryProgramPayload } from '@/domain/types/program/program.types'
-import type { RuntimeHostContext } from '@/domain/types/runtime/runtime-host.types'
+import type { RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime/runtime-host.types'
 import { Endge } from '@/model/kernel/endge'
 
 describe('runtime memory lifecycle', () => {
@@ -36,7 +36,42 @@ describe('runtime memory lifecycle', () => {
 
     expect(listener).toHaveBeenCalledTimes(2)
     expect('_updateHashes' in (host as unknown as Record<string, unknown>)).toBe(false)
+    host.quiesce()
+    host.update(update)
+    expect(listener).toHaveBeenCalledTimes(2)
     host.destroy()
+  })
+
+  it('quiesces the whole tree from parent to child before child-first destruction', async () => {
+    const parent = executeQuery(10)
+    const child = executeQuery(11, {}, parent)
+    const order: string[] = []
+    const quiesced = new Set<string>()
+
+    for (const host of [parent, child]) {
+      const quiesce = host.quiesce.bind(host)
+      vi.spyOn(host, 'quiesce').mockImplementation(() => {
+        if (!quiesced.has(host.id)) {
+          quiesced.add(host.id)
+          order.push(`quiesce:${host.id}`)
+        }
+        quiesce()
+      })
+      const destroy = host.destroy.bind(host)
+      vi.spyOn(host, 'destroy').mockImplementation(() => {
+        order.push(`destroy:${host.id}`)
+        destroy()
+      })
+    }
+
+    await Endge.runtime.destroyRuntimeTreeAsync(parent.id)
+
+    expect(order).toEqual([
+      'quiesce:query-runtime-10',
+      'quiesce:query-runtime-11',
+      'destroy:query-runtime-11',
+      'destroy:query-runtime-10',
+    ])
   })
 
   it('keeps destroyed snapshots disabled by default', async () => {
@@ -110,7 +145,7 @@ class TestQueryHost extends RuntimeHostBase<'query', RuntimeHostContext<'query'>
   }
 }
 
-function executeQuery(id: number, meta: Record<string, unknown> = {}) {
+function executeQuery(id: number, meta: Record<string, unknown> = {}, parent: RuntimeHost<any, any> | null = null) {
   const model = queryModel(id)
   const artifact = queryArtifact(id)
   const host = Endge.runtime.execute(model, {
@@ -118,6 +153,7 @@ function executeQuery(id: number, meta: Record<string, unknown> = {}) {
     persistence: 'disabled',
     artifactReader: { getArtifact: () => artifact as any },
     meta,
+    parent,
   })
   if (!host)
     throw new Error('query runtime was not created')

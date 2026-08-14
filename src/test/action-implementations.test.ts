@@ -25,9 +25,13 @@ describe('Action implementation pipeline', () => {
     await Endge.actions.execute(BUILTIN_ACTION_IDS.consoleLog, {
       input: { message: 'Проверка console Action' },
     })
+    const retained = { rows: Array.from({ length: 100 }, (_, id) => ({ id })) }
+    await Endge.actions.execute(BUILTIN_ACTION_IDS.consoleLog, { input: retained })
 
     expect(consoleLog).toHaveBeenCalledWith('[Endge] built-in-console-log executed')
     expect(consoleLog).toHaveBeenCalledWith('Проверка console Action')
+    expect(consoleLog).toHaveBeenCalledWith('[Endge] Object omitted from Console to avoid retaining runtime data.')
+    expect(consoleLog.mock.calls.flat()).not.toContain(retained)
     consoleLog.mockRestore()
   })
 

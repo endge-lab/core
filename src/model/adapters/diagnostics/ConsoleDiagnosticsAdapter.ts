@@ -11,6 +11,13 @@ import type {
 } from '@/domain/types/diagnostics/diagnostics.types'
 
 type ConsoleFormat = 'pretty' | 'json'
+const MAX_CONSOLE_TEXT_LENGTH = 2_000
+
+function boundedConsoleText(value: string): string {
+  return value.length <= MAX_CONSOLE_TEXT_LENGTH
+    ? value
+    : `${value.slice(0, MAX_CONSOLE_TEXT_LENGTH)}… [truncated ${value.length - MAX_CONSOLE_TEXT_LENGTH} chars]`
+}
 
 /** Системный adapter вывода diagnostics records и snapshots в console API. */
 export class ConsoleDiagnosticsAdapter implements DiagnosticsAdapter {
@@ -36,7 +43,19 @@ export class ConsoleDiagnosticsAdapter implements DiagnosticsAdapter {
   /** Выводит одну routed record в pretty или JSON формате. */
   public acceptRecord(record: DiagnosticsRecord, context: DiagnosticsAdapterRecordContext): void {
     if (this._format === 'json') {
-      console.log(JSON.stringify({ output: context.output, resource: context.resource, routeIds: context.routeIds, record }))
+      console.log(JSON.stringify({
+        outputId: context.output.id,
+        routeIds: context.routeIds,
+        record: {
+          id: record.id,
+          signal: record.signal,
+          scope: record.scope.name,
+          phase: record.phase,
+          traceId: record.traceId,
+          attributeKeys: Object.keys(record.attributes),
+          text: boundedConsoleText(record.signal === 'log' ? record.body : record.name),
+        },
+      }))
       return
     }
 
@@ -51,9 +70,16 @@ export class ConsoleDiagnosticsAdapter implements DiagnosticsAdapter {
       console.groupEnd()
   }
 
-  /** Выводит полный snapshot одной JSON-записью, пригодной для копирования. */
+  /** Выводит bounded summary снимка, не сериализуя telemetry history целиком. */
   public acceptSnapshot(snapshot: DiagnosticsSnapshot, context: DiagnosticsAdapterSnapshotContext): void {
-    console.log(JSON.stringify({ output: context.output, snapshot }))
+    console.log(JSON.stringify({
+      outputId: context.output.id,
+      generatedAt: snapshot.generatedAt,
+      trigger: snapshot.trigger,
+      telemetryRecords: snapshot.telemetry?.records.length ?? 0,
+      problems: snapshot.problems?.total ?? 0,
+      hasConfiguration: Boolean(snapshot.configuration),
+    }))
   }
 
   /** Пишет безопасную тестовую строку без добавления record в diagnostics history. */
@@ -62,7 +88,7 @@ export class ConsoleDiagnosticsAdapter implements DiagnosticsAdapter {
   }
 
   /** Формирует компактное сообщение и optional structured details. */
-  private _formatRecord(record: DiagnosticsRecord): { message: string, details?: object } {
+  private _formatRecord(record: DiagnosticsRecord): { message: string, details?: string } {
     const prefix: string[] = []
     if (this._includeTimestamp) {
       const timestamp = record.signal === 'log' ? record.timestamp : record.endTimestamp
@@ -75,30 +101,30 @@ export class ConsoleDiagnosticsAdapter implements DiagnosticsAdapter {
       prefix.push(record.scope.name)
 
     const text = record.signal === 'log'
-      ? record.body
+      ? boundedConsoleText(record.body)
       : `${record.name} ${record.durationMs}ms (${record.status.code})`
     const details = this._includeAttributes && Object.keys(record.attributes).length
-      ? { attributes: record.attributes, traceId: record.traceId, spanId: record.spanId }
+      ? `attributes=[${Object.keys(record.attributes).join(', ')}]${record.traceId ? ` trace=${record.traceId}` : ''}${record.spanId ? ` span=${record.spanId}` : ''}`
       : undefined
     return { message: `[${prefix.join(' · ')}] ${text}`, ...(details ? { details } : {}) }
   }
 
   /** Выбирает подходящий console method по severity или span status. */
-  private _writeRecord(record: DiagnosticsRecord, message: string, details?: object): void {
-    const args: [string, ...unknown[]] = details ? [message, details] : [message]
+  private _writeRecord(record: DiagnosticsRecord, message: string, details?: string): void {
+    const text = details ? `${message} ${details}` : message
     if (record.signal === 'span') {
       const writer = record.status.code === 'error' ? console.error : console.info
-      writer(...args)
+      writer(text)
       return
     }
     if (record.severityNumber >= 17)
-      console.error(...args)
+      console.error(text)
     else if (record.severityNumber >= 13)
-      console.warn(...args)
+      console.warn(text)
     else if (record.severityNumber <= 5)
-      console.debug(...args)
+      console.debug(text)
     else
-      console.info(...args)
+      console.info(text)
   }
 }
 

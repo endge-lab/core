@@ -77,7 +77,7 @@ export function ReflectComponentFromPlain(
     return table
   }
 
-  console.error('ReflectComponentFromPlain: Unknown component type:', json.type)
+  console.error(`ReflectComponentFromPlain: Unknown component type: ${String(json.type)}`)
   return null
 }
 
@@ -114,10 +114,7 @@ export function ReflectComponentToPlain(
     }
   }
 
-  console.error(
-    'ReflectComponentToPlain: Unknown component type:',
-    component.type,
-  )
+  console.error(`ReflectComponentToPlain: Unknown component type: ${String(component.type)}`)
   return null
 }
 

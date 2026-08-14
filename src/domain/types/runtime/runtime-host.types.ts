@@ -234,6 +234,9 @@ export interface RuntimeHostLifecycle {
   stop: () => Promise<void> | void
   unmount: () => Promise<void> | void
 
+  /** Синхронно запрещает новые updates перед освобождением runtime tree. */
+  quiesce: () => Promise<void> | void
+
   /** Корректно остановить host и освободить ресурсы. */
   destroy: () => Promise<void> | void
 

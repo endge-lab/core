@@ -290,9 +290,14 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     await this.run()
   }
 
-  public override destroy(): void {
+  public override quiesce(): void {
     this._runSequence += 1
     this._abortController?.abort()
+    super.quiesce()
+  }
+
+  public override destroy(): void {
+    this.quiesce()
     this._abortController = null
     this._contextOff?.()
     this._contextOff = null

@@ -32,7 +32,7 @@ export class EndgeModuleController {
         mod.init?.()
       }
       catch (error) {
-        console.warn(`[EndgeModuleController] Failed to init module "${key}":`, error)
+        console.warn(`[EndgeModuleController] Failed to init module "${key}": ${error instanceof Error ? error.message : String(error)}`)
       }
     }
 
@@ -48,7 +48,7 @@ export class EndgeModuleController {
         mod.reset?.()
       }
       catch (error) {
-        console.warn(`[EndgeModuleController] Failed to reset module "${key}":`, error)
+        console.warn(`[EndgeModuleController] Failed to reset module "${key}": ${error instanceof Error ? error.message : String(error)}`)
       }
     }
 

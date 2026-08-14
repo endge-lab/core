@@ -155,8 +155,8 @@ export class EndgeContext extends EndgeModule {
     try {
       this.resolveAdapter(this._contextPersistence).write(CONTEXT_STORAGE_KEY, this.serialize())
     }
-    catch(err) {
-      console.warn(err)
+    catch (error) {
+      console.warn(`[EndgeContext] Failed to persist context: ${error instanceof Error ? error.message : String(error)}`)
       /* Ошибка storage не должна прерывать работу контекста. */
     }
   }
