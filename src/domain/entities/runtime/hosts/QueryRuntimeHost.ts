@@ -3,6 +3,7 @@ import type { RFilter } from '@/domain/entities/reflect/RFilter'
 import type { FilterProgramPayload } from '@/domain/types/source/filter-source.types'
 import type { ProgramArtifact, QueryProgramPayload } from '@/domain/types/program/program.types'
 import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext, RuntimeHostUpdateContext } from '@/domain/types/runtime/runtime-host.types'
+import type { PhaseEvent } from '@endge/raph'
 
 import {
   Raph,
@@ -31,13 +32,14 @@ function defaultContext(): RuntimeHostContext<'query'> {
 export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContext<'query'>, QueryProgramPayload> {
   private _props: Record<string, unknown> = {}
   private _outputs: Record<string, unknown> = {}
-  private _outputHashes = new Map<string, string>()
+  private _outputGeneration = 0
   private _runSequence = 0
   private _abortController: AbortController | null = null
   private _filterChildIds = new Set<string>()
   private _derivedHandles: RaphDerivedHandle[] = []
   private _outputWatchers: Array<() => void> = []
   private _outputPaths = new Map<string, string>()
+  private _outputDependents = new Map<string, Set<string>>()
   private _responseInputPaths = new Map<string, string>()
   private readonly _internalBase: string
   private _derivedErrorActive = false
@@ -237,23 +239,22 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
         this._outputs = response && typeof response === 'object' && !Array.isArray(response)
           ? response as Record<string, unknown>
           : { result: response }
+        this._publishOutputs(Object.keys(this._outputs))
       }
       else {
-        try {
-          Raph.transaction(() => {
-            for (const output of payload.outputs) {
-              if (output.source.type !== 'response')
-                continue
-              const path = output.materialization.kind === 'source'
-                ? this._requireOutputPath(output.key)
-                : this._requireResponseInputPath(output.key)
-              Raph.set(path, Endge.runtime.query.readResponseOutput(output, response))
-            }
-          })
-        }
-        finally {
-          this._syncOutputs(true)
-        }
+        Raph.transaction(() => {
+          for (const output of payload.outputs) {
+            if (output.source.type !== 'response')
+              continue
+            const path = output.materialization.kind === 'source'
+              ? this._requireOutputPath(output.key)
+              : this._requireResponseInputPath(output.key)
+            Raph.set(path, Endge.runtime.query.readResponseOutput(output, response))
+          }
+          // A response is a new data generation even when its values are
+          // referentially or structurally equal to the previous generation.
+          Raph.set(`${this._internalBase}.outputGeneration`, ++this._outputGeneration)
+        })
       }
       const updatedAt = new Date().toISOString()
       this.setContext({ status: 'success', updatedAt })
@@ -290,7 +291,9 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
   }
 
   public override destroy(): void {
+    this._runSequence += 1
     this._abortController?.abort()
+    this._abortController = null
     this._contextOff?.()
     this._contextOff = null
     for (const dispose of this._outputWatchers)
@@ -300,7 +303,11 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
       handle.dispose()
     this._derivedHandles = []
     this._outputPaths.clear()
+    this._outputDependents.clear()
     this._responseInputPaths.clear()
+    this._outputs = {}
+    this._props = {}
+    this._outputGeneration = 0
     this._derivedErrorActive = false
     if (Raph.get(this._internalBase) !== undefined)
       Raph.delete(this._internalBase)
@@ -322,6 +329,13 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     const payload = artifact.payload
     for (const output of payload.outputs)
       this._outputPaths.set(output.key, this._resolveOutputPath(output))
+    for (const output of payload.outputs) {
+      if (output.source.type === 'output') {
+        const dependents = this._outputDependents.get(output.source.key) ?? new Set<string>()
+        dependents.add(output.key)
+        this._outputDependents.set(output.source.key, dependents)
+      }
+    }
 
     for (const output of payload.outputs) {
       if (output.materialization.kind === 'source')
@@ -365,9 +379,12 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
       }
     }
 
-    for (const path of new Set(this._outputPaths.values()))
-      this._outputWatchers.push(Raph.watch(`${path}.*`, () => this._syncOutputs(true)))
-    this._syncOutputs(false)
+    const masks = [
+      `${this._internalBase}.outputs.*`,
+      `${this._internalBase}.outputGeneration`,
+    ]
+    this._outputWatchers.push(Raph.watch(masks, ({ events }) => this._syncOutputs(events, true)))
+    this._syncOutputs([], false)
   }
 
   private _resolveOutputPath(output: QueryProgramPayload['outputs'][number]): string {
@@ -388,11 +405,9 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     return path
   }
 
-  private _syncOutputs(emit: boolean): void {
+  private _syncOutputs(events: PhaseEvent[], emit: boolean): void {
     const outputs = Object.fromEntries([...this._outputPaths].map(([key, path]) => [key, Raph.get(path)]))
-    const changed = Object.entries(outputs).filter(([key, value]) => this._outputHashes.get(key) !== structuralHash(value))
     this._outputs = outputs
-    this._outputHashes = new Map(Object.entries(outputs).map(([key, value]) => [key, structuralHash(value)]))
     const derivedError = this._derivedHandles.find(handle => handle.status === 'error')?.lastError ?? null
     if (derivedError && !this._derivedErrorActive) {
       this._derivedErrorActive = true
@@ -403,11 +418,39 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
       this._derivedErrorActive = false
       this.setContext({ status: 'success', updatedAt: new Date().toISOString() })
     }
-    if (!emit || !changed.length)
+    if (!emit)
       return
-    for (const [key, output] of changed)
-      this.emit('output:change', { key, output })
-    this.emit('outputs:change', this.getOutputs())
+    const generationPath = `${this._internalBase}.outputGeneration`
+    const isNewGeneration = events.some(event => event.canonical === generationPath)
+    const directKeys = isNewGeneration
+      ? [...this._outputPaths.keys()]
+      : [...this._outputPaths].filter(([, path]) =>
+          events.some(event => pathAffects(path, event.canonical)),
+        ).map(([key]) => key)
+    this._publishOutputs(this._expandDependentOutputKeys(directKeys))
+  }
+
+  private _expandDependentOutputKeys(keys: string[]): string[] {
+    const expanded = new Set(keys)
+    const queue = [...keys]
+    while (queue.length) {
+      const source = queue.shift()!
+      for (const dependent of this._outputDependents.get(source) ?? []) {
+        if (expanded.has(dependent))
+          continue
+        expanded.add(dependent)
+        queue.push(dependent)
+      }
+    }
+    return [...expanded]
+  }
+
+  private _publishOutputs(changedKeys: string[]): void {
+    if (!changedKeys.length)
+      return
+    for (const key of new Set(changedKeys))
+      this.emit('output:change', { key, output: this._outputs[key] })
+    this.emit('outputs:change', this._outputs)
   }
 
   private _literalDefaults(payload: QueryProgramPayload): Record<string, unknown> {
@@ -431,29 +474,12 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
   }
 }
 
-function structuralHash(value: unknown): string {
-  if (value === undefined)
-    return 'undefined'
-  try {
-    return JSON.stringify(normalizeStructuralValue(value)) ?? String(value)
-  }
-  catch {
-    return String(value)
-  }
-}
-
-function normalizeStructuralValue(value: unknown): unknown {
-  if (value instanceof Date)
-    return { $date: value.toISOString() }
-  if (Array.isArray(value))
-    return value.map(normalizeStructuralValue)
-  if (!value || typeof value !== 'object')
-    return value
-  return Object.fromEntries(
-    Object.keys(value as Record<string, unknown>)
-      .sort()
-      .map(key => [key, normalizeStructuralValue((value as Record<string, unknown>)[key])]),
-  )
+function pathAffects(sourcePath: string, eventPath: string): boolean {
+  return eventPath === sourcePath
+    || eventPath.startsWith(`${sourcePath}.`)
+    || eventPath.startsWith(`${sourcePath}[`)
+    || sourcePath.startsWith(`${eventPath}.`)
+    || sourcePath.startsWith(`${eventPath}[`)
 }
 
 function encodePathPart(value: string): string {

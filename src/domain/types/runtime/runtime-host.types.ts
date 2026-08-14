@@ -200,6 +200,29 @@ export interface RuntimeHostSnapshot {
   context: Record<string, unknown>
 }
 
+/** Lightweight archived descriptor. It deliberately excludes runtime data. */
+export interface DestroyedRuntimeHostSnapshot {
+  id: string
+  basePath: string
+  parentId: string | null
+  runtimeType: string
+  capabilities: RuntimeHostCapability[]
+  entityType: RuntimeEntityType
+  entityIdentity: string
+  title: string
+  previousStatus: RuntimeHostStatus
+  status: 'destroyed'
+  createdAt: number
+  updatedAt: number
+  removedAt: number
+  resources: Array<Omit<RuntimeHostResource, 'payload'>>
+  channels: RuntimeHostChannel[]
+}
+
+export interface RuntimeInspectionLease {
+  release(): void
+}
+
 export interface RuntimeHostLifecycle {
   /** Compatibility entrypoint: mount + start. */
   create: () => Promise<void> | void
@@ -252,7 +275,6 @@ export interface RuntimeHostUpdateBinding {
   }
   policy?: {
     debounceMs?: number
-    distinct?: 'none' | 'structural'
   }
 }
 

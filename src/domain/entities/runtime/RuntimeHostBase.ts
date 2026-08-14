@@ -35,7 +35,7 @@ export abstract class RuntimeHostBase<
   public readonly id: string
 
   /** Родительский runtime-host для отладки вложенных запусков. */
-  public readonly parent: RuntimeHost<any, any> | null
+  public parent: RuntimeHost<any, any> | null
 
   /** Канонический runtime kind host. */
   public readonly kind: RuntimeKind | 'runtime'
@@ -94,14 +94,13 @@ export abstract class RuntimeHostBase<
   private _inputBindings = new Map<string, RuntimeHostInputBinding>()
   private _updateBindings = new Map<string, RuntimeHostUpdateBinding>()
   private _updateDisposers = new Map<string, Array<() => void>>()
-  private _updateHashes = new Map<string, string>()
   private _updateTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
   /** Read-only доступ к compiled artifacts, если host связан с program artifact. */
-  private readonly _artifactReader: RuntimeArtifactReader | null
+  private _artifactReader: RuntimeArtifactReader | null
 
   /** Ссылка на compiled artifact, связанный с host. */
-  private readonly _artifactRef: RuntimeHostArtifactRef | null
+  private _artifactRef: RuntimeHostArtifactRef | null
 
   constructor(input: {
 
@@ -234,15 +233,22 @@ export abstract class RuntimeHostBase<
     }
     this._updateDisposers.clear()
     this._updateBindings.clear()
-    this._updateHashes.clear()
     this._inputBindings.clear()
     for (const node of this._raphNodes.values())
       Raph.app.removeNode(node)
     this._raphNodes.clear()
+    this.node = null
     if (Raph.get(this.basePath) !== undefined)
       Raph.delete(this.basePath)
     this.resources.splice(0)
     this.channels.splice(0)
+    this.runtimeState = null
+    this.parent = null
+    this._artifactReader = null
+    this._artifactRef = null
+    for (const key of Object.keys(this.meta))
+      delete this.meta[key]
+    this.context = {} as TContext
     ;(this as any).offAll?.()
   }
 
@@ -261,12 +267,6 @@ export abstract class RuntimeHostBase<
       if (!ctx.events.some(event => pathAffects(binding.sourcePath, event.canonical)))
         continue
       matchedBinding = true
-
-      const distinct = binding.policy?.distinct ?? 'structural'
-      const nextHash = structuralHash(Raph.get(binding.sourcePath))
-      if (distinct === 'structural' && this._updateHashes.get(binding.id) === nextHash)
-        continue
-      this._updateHashes.set(binding.id, nextHash)
 
       const update: RuntimeHostResolvedUpdate = {
         bindingId: binding.id,
@@ -339,7 +339,6 @@ export abstract class RuntimeHostBase<
     this.unbindUpdate(id)
     const normalized: RuntimeHostUpdateBinding = { ...binding, id, sourcePath }
     this._updateBindings.set(id, normalized)
-    this._updateHashes.set(id, structuralHash(Raph.get(sourcePath)))
     const disposers = [sourcePath, `${sourcePath}.*`].map(mask => Raph.app.observeData(
       this.node!,
       mask,
@@ -354,7 +353,6 @@ export abstract class RuntimeHostBase<
       dispose()
     this._updateDisposers.delete(id)
     this._updateBindings.delete(id)
-    this._updateHashes.delete(id)
     const timer = this._updateTimers.get(id)
     if (timer)
       clearTimeout(timer)
@@ -522,30 +520,7 @@ function encodePathPart(value: string): string {
 function pathAffects(sourcePath: string, eventPath: string): boolean {
   return eventPath === sourcePath
     || eventPath.startsWith(`${sourcePath}.`)
+    || eventPath.startsWith(`${sourcePath}[`)
     || sourcePath.startsWith(`${eventPath}.`)
-}
-
-function structuralHash(value: unknown): string {
-  if (value === undefined)
-    return 'undefined'
-  try {
-    return JSON.stringify(normalizeStructuralValue(value)) ?? String(value)
-  }
-  catch {
-    return String(value)
-  }
-}
-
-function normalizeStructuralValue(value: unknown): unknown {
-  if (value instanceof Date)
-    return { $date: value.toISOString() }
-  if (Array.isArray(value))
-    return value.map(normalizeStructuralValue)
-  if (!value || typeof value !== 'object')
-    return value
-  return Object.fromEntries(
-    Object.keys(value as Record<string, unknown>)
-      .sort()
-      .map(key => [key, normalizeStructuralValue((value as Record<string, unknown>)[key])]),
-  )
+    || sourcePath.startsWith(`${eventPath}[`)
 }

@@ -27,7 +27,6 @@ function defaultContext(instance: string): RuntimeHostContext<'filter'> {
 /** Runtime-владелец Filter state, outputs и Actions. */
 export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostContext<'filter'>, FilterProgramPayload> {
   private _outputs = new Map<string, FilterRuntimeOutput>()
-  private _outputHashes = new Map<string, string>()
 
   public constructor(input: {
     id: string
@@ -143,6 +142,11 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
     return [...this._outputs.values()]
   }
 
+  public override destroy(): void {
+    this._outputs.clear()
+    super.destroy()
+  }
+
   /** Возвращает вызываемый Action изменения Filter state. */
   public action(id: FilterRuntimeActionId): FilterRuntimeActionHandle {
     if (!['patch', 'set', 'reset', 'clear'].includes(id))
@@ -225,10 +229,8 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
     }
 
     for (const [key, output] of next) {
-      const hash = this._outputHash(output)
-      if (emit && this._outputHashes.get(key) !== hash)
+      if (emit)
         changed.push({ key, output })
-      this._outputHashes.set(key, hash)
       Raph.set(this.outputPath(key), output.kind === 'json' ? output.value : output.test)
     }
     this._outputs = next
@@ -273,11 +275,5 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
     if (field.type === 'Object')
       return typeof value === 'object' && !Array.isArray(value)
     return typeof value === 'string'
-  }
-
-  private _outputHash(output: FilterRuntimeOutput): string {
-    if (output.kind === 'predicate')
-      return JSON.stringify(this.getState())
-    return JSON.stringify(output.value)
   }
 }

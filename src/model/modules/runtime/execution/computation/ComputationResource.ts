@@ -34,7 +34,7 @@ export class ComputationResourceState<T = unknown> implements ComputationResourc
   get error() { return this._error }
 
   updateInput(input: unknown): void {
-    if (structuralHash(input) === structuralHash(this._input))
+    if (Object.is(input, this._input))
       return
     this._input = input
     if (this.syncRunner) this.runSync()
@@ -109,25 +109,4 @@ function normalizeError(error: unknown): ComputationRuntimeErrorShape {
     computationIdentity: 'unknown',
     kind: 'runtime',
   }
-}
-
-function structuralHash(value: unknown): string {
-  if (value === undefined)
-    return 'undefined'
-  try { return JSON.stringify(normalizeStructuralValue(value)) ?? String(value) }
-  catch { return String(value) }
-}
-
-function normalizeStructuralValue(value: unknown): unknown {
-  if (value instanceof Date)
-    return { $date: value.toISOString() }
-  if (Array.isArray(value))
-    return value.map(normalizeStructuralValue)
-  if (!value || typeof value !== 'object')
-    return value
-  return Object.fromEntries(
-    Object.keys(value as Record<string, unknown>)
-      .sort()
-      .map(key => [key, normalizeStructuralValue((value as Record<string, unknown>)[key])]),
-  )
 }

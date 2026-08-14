@@ -55,7 +55,7 @@ export class EndgeQuery {
       return await host.run()
     }
     finally {
-      Endge.runtime.destroyRuntimeTree(host.id)
+      await Endge.runtime.destroyRuntimeTreeAsync(host.id)
     }
   }
 

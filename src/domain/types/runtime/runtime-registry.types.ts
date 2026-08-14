@@ -1,5 +1,5 @@
 import type { RuntimeEntityType } from '@/domain/types/runtime/runtime-entity-map.types'
-import type { RuntimeHost, RuntimeHostSnapshot } from '@/domain/types/runtime/runtime-host.types'
+import type { DestroyedRuntimeHostSnapshot, RuntimeHost, RuntimeHostSnapshot } from '@/domain/types/runtime/runtime-host.types'
 
 export interface RuntimeHostRegistrySnapshot {
   /** Общее количество зарегистрированных host. */
@@ -11,7 +11,7 @@ export interface RuntimeHostRegistrySnapshot {
   /** Общее количество удалённых host, сохранённых в debug-архиве. */
   deletedTotal: number
   /** Снимки удалённых host из debug-архива. */
-  deletedHosts: RuntimeHostSnapshot[]
+  deletedHosts: DestroyedRuntimeHostSnapshot[]
 }
 
 export interface RuntimeHostRegistryLike {
@@ -28,11 +28,13 @@ export interface RuntimeHostRegistryLike {
   /** Очистить registry и разрушить все host. */
   clear(): void
   /** Сохранить snapshot удалённого host в debug-архив. */
-  rememberDeletedSnapshot(snapshot: RuntimeHostSnapshot): void
+  rememberDeletedSnapshot(snapshot: DestroyedRuntimeHostSnapshot): void
   /** Получить снимки удалённых host из debug-архива. */
-  getDeletedSnapshots(): RuntimeHostSnapshot[]
+  getDeletedSnapshots(): DestroyedRuntimeHostSnapshot[]
   /** Удалить один snapshot из debug-архива по runtime-id. */
-  removeDeletedSnapshot(id: string): RuntimeHostSnapshot | null
+  removeDeletedSnapshot(id: string): DestroyedRuntimeHostSnapshot | null
+  /** Apply the effective bounded inspection capacity immediately. */
+  setDeletedSnapshotLimit(limit: number): void
   /** Очистить debug-архив удалённых host. */
   clearDeleted(): void
   /** Получить сериализованный snapshot registry. */

@@ -1,7 +1,7 @@
 import type { RuntimeEntityType } from '@/domain/types/runtime/runtime-entity-map.types'
 import type { AnyRuntimeStrategy } from '@/domain/types/runtime/runtime-strategy.types'
 import type { RuntimeExecuteOptions } from '@/domain/types/runtime/runtime-execute.type'
-import type { RuntimeArtifactReader, RuntimeHost } from '@/domain/types/runtime/runtime-host.types'
+import type { DestroyedRuntimeHostSnapshot, RuntimeArtifactReader, RuntimeHost, RuntimeInspectionLease } from '@/domain/types/runtime/runtime-host.types'
 import type { EndgeRuntimeSnapshot, RuntimeExecutableModel } from '@/domain/types/runtime/runtime.types'
 import type { EndgeDataMode } from '@/domain/types/document/workspace.types'
 import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
@@ -59,18 +59,24 @@ export class EndgeRuntime extends EndgeModule {
   private _appScopes = new Map<string, RuntimeAppScope>()
   private _defaultAppScope: RuntimeAppScope
   private _unsubscribeWorkspace: (() => void) | null = null
-  private _retainDestroyedHostSnapshots = true
+  private _destroyedSnapshotLeases = new Map<symbol, number>()
+  private _destroyingRuntimeIds = new Set<string>()
 
-  /** Показывает, сохраняются ли snapshots уничтоженных hosts для runtime inspection. */
-  public get retainDestroyedHostSnapshots(): boolean {
-    return this._retainDestroyedHostSnapshots
-  }
-
-  /** Включает или отключает сохранение snapshots уничтоженных runtime hosts. */
-  public set retainDestroyedHostSnapshots(value: boolean) {
-    this._retainDestroyedHostSnapshots = value === true
-    if (!this._retainDestroyedHostSnapshots)
-      this.clearDeletedRuntimeHostSnapshots()
+  /** Retain only bounded lightweight descriptors for an explicit inspector. */
+  public acquireDestroyedHostSnapshots(limit: number): RuntimeInspectionLease {
+    const token = Symbol('destroyed-runtime-host-snapshots')
+    this._destroyedSnapshotLeases.set(token, normalizeInspectionLimit(limit))
+    this.syncDestroyedSnapshotLimit()
+    let released = false
+    return {
+      release: () => {
+        if (released)
+          return
+        released = true
+        this._destroyedSnapshotLeases.delete(token)
+        this.syncDestroyedSnapshotLimit()
+      },
+    }
   }
 
   /** Создаёт default app scope и регистрирует runtime strategies. */
@@ -89,7 +95,6 @@ export class EndgeRuntime extends EndgeModule {
    * Настраивает Raph runtime до загрузки и сборки домена.
    */
   public override setup(): void {
-    Raph.options({ debug: true })
   }
 
   /**
@@ -387,6 +392,10 @@ export class EndgeRuntime extends EndgeModule {
    */
   public override async reset(): Promise<void> {
     const hostIds = this._hosts.getAll().map(host => host.id)
+    // Detach the old scope registry synchronously. Existing callers that do
+    // not await reset can no longer attach a new runtime to a scope being
+    // disposed by this reset generation.
+    const scopesReset = this.scopes.reset()
     for (const runtimeId of hostIds) {
       await this.destroyRuntimeInternal(runtimeId, false)
     }
@@ -397,13 +406,15 @@ export class EndgeRuntime extends EndgeModule {
     this._scopeNodes.clear()
     for (const scope of this._appScopes.values())
       scope.reset()
-    await this.scopes.reset()
     this._appNode = null
     this._inited = false
     this._unsubscribeWorkspace?.()
     this._unsubscribeWorkspace = null
     this.flowRegistry.reset()
     this.actions.reset()
+    this._hosts.clearDeleted()
+
+    await scopesReset
 
     // Единый notify после batch-reset.
     this.notify()
@@ -458,39 +469,72 @@ export class EndgeRuntime extends EndgeModule {
     shouldNotify: boolean,
   ): Promise<void> {
     const id = String(runtimeId ?? '').trim()
-    if (!id) {
+    if (!id || this._destroyingRuntimeIds.has(id)) {
       return
     }
 
-    const host = this._hosts.removeById(id)
+    const host = this._hosts.getById(id)
     if (!host) {
       return
     }
+    this._destroyingRuntimeIds.add(id)
+    const destroyedSnapshot = this.createDestroyedSnapshot(host)
 
-    if (this._retainDestroyedHostSnapshots) {
-      const snapshot = host.snapshot()
-      this._hosts.rememberDeletedSnapshot({
-        ...snapshot,
-        removedAt: Date.now(),
-        status: 'destroyed',
-        meta: {
-          ...snapshot.meta,
-          inspectionArchived: true,
-          inspectionPreviousStatus: snapshot.status,
-        },
-      })
+    let cleanupError: unknown = null
+    try {
+      try {
+        const strategyCleanup = this._strategies.resolve(host.model)?.destroy?.({ host })
+        if (strategyCleanup)
+          await strategyCleanup
+      }
+      catch (error) {
+        cleanupError = error
+      }
+      this.scopes.detachRuntime(id)
+      Endge.context.destroyRuntimeStateController(id)
+      try {
+        const hostCleanup = host.destroy()
+        if (hostCleanup)
+          await hostCleanup
+      }
+      catch (error) {
+        cleanupError ??= error
+      }
+      this._hosts.removeById(id)
+      this._hosts.rememberDeletedSnapshot(destroyedSnapshot)
     }
+    finally {
+      this._destroyingRuntimeIds.delete(id)
+      if (shouldNotify)
+        this.notify()
+    }
+    if (cleanupError)
+      throw cleanupError
+  }
 
-    const strategyCleanup = this._strategies.resolve(host.model)?.destroy?.({ host })
-    if (strategyCleanup)
-      await strategyCleanup
-    this.scopes.detachRuntime(id)
-    Endge.context.destroyRuntimeStateController(id)
-    const hostCleanup = host.destroy()
-    if (hostCleanup)
-      await hostCleanup
-    if (shouldNotify) {
-      this.notify()
+  private syncDestroyedSnapshotLimit(): void {
+    const effectiveLimit = Math.max(0, ...this._destroyedSnapshotLeases.values())
+    this._hosts.setDeletedSnapshotLimit(effectiveLimit)
+    this.notify()
+  }
+
+  private createDestroyedSnapshot(host: RuntimeHost<any, any>): DestroyedRuntimeHostSnapshot {
+    return {
+      id: host.id,
+      basePath: host.basePath,
+      parentId: host.parent?.id ?? null,
+      runtimeType: host.runtimeType,
+      capabilities: [...host.capabilities],
+      entityType: host.entityType,
+      entityIdentity: host.entityIdentity,
+      title: host.title,
+      previousStatus: host.status,
+      status: 'destroyed',
+      createdAt: host.createdAt,
+      updatedAt: host.updatedAt,
+      removedAt: Date.now(),
+      resources: host.resources.map(({ payload: _payload, ...descriptor }) => ({ ...descriptor })),
+      channels: host.channels.map(channel => ({ ...channel })),
     }
   }
 
@@ -660,4 +704,8 @@ function isRuntimeArtifactReader(value: unknown): value is RuntimeArtifactReader
     && typeof value === 'object'
     && typeof (value as { getArtifact?: unknown }).getArtifact === 'function',
   )
+}
+
+function normalizeInspectionLimit(limit: number): number {
+  return Math.max(0, Math.floor(Number.isFinite(limit) ? limit : 0))
 }

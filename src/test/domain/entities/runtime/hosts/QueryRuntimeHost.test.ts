@@ -53,6 +53,25 @@ describe('QueryRuntimeHost', () => {
     expect(success).toHaveBeenCalledWith({ outputs: { raw: 'new' } })
   })
 
+  it('publishes one batched output generation for every response without content hashing', async () => {
+    const rows = Array.from({ length: 10_000 }, (_, id) => ({ id, value: `row-${id}` }))
+    vi.spyOn(Endge.runtime.query, 'executeArtifact').mockResolvedValue(rows)
+    const host = createHost({}, true)
+    const outputChanges = vi.fn()
+    const outputsChanges = vi.fn()
+    host.on('output:change', outputChanges)
+    host.on('outputs:change', outputsChanges)
+
+    await host.run()
+    await host.run()
+
+    expect(outputChanges).toHaveBeenCalledTimes(2)
+    expect(outputsChanges).toHaveBeenCalledTimes(2)
+    expect(outputChanges).toHaveBeenNthCalledWith(1, { key: 'raw', output: rows })
+    expect(host.getOutput('raw')).toBe(rows)
+    expect('_outputHashes' in (host as unknown as Record<string, unknown>)).toBe(false)
+  })
+
   it('updates declared props without store-key remount restrictions', () => {
     const host = createHost({ filterPayload: { active: true } })
     expect(host.getProps()).toEqual({ filterPayload: { active: true } })
@@ -138,7 +157,7 @@ defineFilter({
   })
 })
 
-function createHost(props: Record<string, unknown> = {}): QueryRuntimeHost {
+function createHost(props: Record<string, unknown> = {}, declaredOutput = false): QueryRuntimeHost {
   const payload: QueryProgramPayload = {
     type: 'query-rest',
     sourceVersion: 2,
@@ -146,7 +165,9 @@ function createHost(props: Record<string, unknown> = {}): QueryRuntimeHost {
     query: '/search',
     props: [{ key: 'filterPayload', type: 'Object', optional: true, array: false }],
     requestBody: null,
-    outputs: [],
+    outputs: declaredOutput
+      ? [{ key: 'raw', source: { type: 'response', path: null }, dataViews: [], materialization: { kind: 'source' } }]
+      : [],
   }
   const artifact: ProgramArtifact<QueryProgramPayload> = {
     ref: { entityType: 'query', id: 1, identity: 'test-query' },

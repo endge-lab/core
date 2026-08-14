@@ -49,6 +49,38 @@ describe('SFCRenderInspectionSession', () => {
     session.clearRuntime('runtime-1')
     expect(session.getTree()).toEqual([])
   })
+
+  it('stores only bounded JSON-safe projections and releases raw values', () => {
+    const session = new SFCRenderInspectionSession()
+    const circular: Record<string, unknown> = {}
+    circular.self = circular
+    const raw = {
+      long: 'x'.repeat(3_000),
+      rows: Array.from({ length: 30 }, (_, index) => ({ index })),
+      fields: Object.fromEntries(Array.from({ length: 60 }, (_, index) => [`field${index}`, index])),
+      deep: { one: { two: { three: { four: { retained: false } } } } },
+      circular,
+      callable: () => 'raw',
+    }
+    const id = session.registerNode(createNode({
+      props: raw,
+      locals: { raw },
+      bindings: { value: { kind: 'expression', reads: [], value: raw } },
+    }))
+    raw.rows.length = 0
+    raw.long = 'mutated'
+
+    const node = session.getNode(id)!
+    expect((node.props.long as string)).toMatch(/\[truncated\]$/)
+    expect(node.props.rows).toHaveLength(21)
+    expect((node.props.fields as Record<string, unknown>).$truncated).toEqual({ omitted: 10 })
+    expect(JSON.stringify(node)).toContain('"$truncated"')
+    expect(JSON.stringify(node)).not.toContain('mutated')
+    expect(() => JSON.stringify(node)).not.toThrow()
+
+    session.unregisterNode(id)
+    expect(session.getNode(id)).toBeNull()
+  })
 })
 
 function createNode(overrides: Record<string, unknown> = {}) {

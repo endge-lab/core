@@ -1,5 +1,5 @@
 import type { RuntimeEntityType } from '@/domain/types/runtime/runtime-entity-map.types'
-import type { RuntimeHost, RuntimeHostSnapshot } from '@/domain/types/runtime/runtime-host.types'
+import type { DestroyedRuntimeHostSnapshot, RuntimeHost } from '@/domain/types/runtime/runtime-host.types'
 import type {
   RuntimeHostRegistryLike,
   RuntimeHostRegistrySnapshot,
@@ -9,7 +9,9 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
   private _hosts = new Map<string, RuntimeHost<any, any>>()
   private _indexByEntity = new Map<string, Set<string>>()
   private _childrenByParent = new Map<string, Set<string>>()
-  private _deletedSnapshots = new Map<string, RuntimeHostSnapshot>()
+  private _parentByChild = new Map<string, string>()
+  private _deletedSnapshots = new Map<string, DestroyedRuntimeHostSnapshot>()
+  private _deletedSnapshotLimit = 0
 
   /**
    * ACCESS
@@ -33,6 +35,7 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
       const children = this._childrenByParent.get(parentId) ?? new Set<string>()
       children.add(runtimeId)
       this._childrenByParent.set(parentId, children)
+      this._parentByChild.set(runtimeId, parentId)
     }
     return host
   }
@@ -107,11 +110,12 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
       this._indexByEntity.delete(entityKey)
 
     this._hosts.delete(key)
-    const parentId = String(host.parent?.id ?? '').trim()
+    const parentId = this._parentByChild.get(key) ?? ''
     const siblings = parentId ? this._childrenByParent.get(parentId) : null
     siblings?.delete(key)
     if (parentId && siblings?.size === 0)
       this._childrenByParent.delete(parentId)
+    this._parentByChild.delete(key)
     this._childrenByParent.delete(key)
     return host
   }
@@ -125,30 +129,35 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
     this._hosts.clear()
     this._indexByEntity.clear()
     this._childrenByParent.clear()
+    this._parentByChild.clear()
   }
 
   /**
    * ACCESS
    */
-  public rememberDeletedSnapshot(snapshot: RuntimeHostSnapshot): void {
+  public rememberDeletedSnapshot(snapshot: DestroyedRuntimeHostSnapshot): void {
+    if (this._deletedSnapshotLimit === 0)
+      return
     const key = String(snapshot.id ?? '').trim()
     if (!key)
       return
 
+    this._deletedSnapshots.delete(key)
     this._deletedSnapshots.set(key, snapshot)
+    this.trimDeletedSnapshots()
   }
 
   /**
    * ACCESS
    */
-  public getDeletedSnapshots(): RuntimeHostSnapshot[] {
+  public getDeletedSnapshots(): DestroyedRuntimeHostSnapshot[] {
     return Array.from(this._deletedSnapshots.values())
   }
 
   /**
    * ACCESS
    */
-  public removeDeletedSnapshot(id: string): RuntimeHostSnapshot | null {
+  public removeDeletedSnapshot(id: string): DestroyedRuntimeHostSnapshot | null {
     const key = String(id ?? '').trim()
     if (!key)
       return null
@@ -166,6 +175,20 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
    */
   public clearDeleted(): void {
     this._deletedSnapshots.clear()
+  }
+
+  public setDeletedSnapshotLimit(limit: number): void {
+    this._deletedSnapshotLimit = Math.max(0, Math.floor(Number.isFinite(limit) ? limit : 0))
+    this.trimDeletedSnapshots()
+  }
+
+  private trimDeletedSnapshots(): void {
+    while (this._deletedSnapshots.size > this._deletedSnapshotLimit) {
+      const oldest = this._deletedSnapshots.keys().next().value
+      if (oldest === undefined)
+        break
+      this._deletedSnapshots.delete(oldest)
+    }
   }
 
   /**

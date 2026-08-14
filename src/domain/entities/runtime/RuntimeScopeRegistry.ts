@@ -99,13 +99,13 @@ export class RuntimeScopeRegistry {
 
   public async reset(): Promise<void> {
     const roots = this.getAll().filter(scope => !scope.parent)
-    for (const scope of roots.reverse())
-      await scope.dispose()
     this._scopes.clear()
     this._scopeByRuntime.clear()
     for (const dispose of this._scopeDisposers.values()) dispose()
     this._scopeDisposers.clear()
     this._changed()
+    for (const scope of roots.reverse())
+      await scope.dispose()
   }
 
   private _changed(): void {

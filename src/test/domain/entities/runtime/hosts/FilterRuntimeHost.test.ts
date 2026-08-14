@@ -14,7 +14,7 @@ describe('FilterRuntimeHost', () => {
     Raph.app.reset()
   })
 
-  it('shares one state through Actions and emits only structurally changed outputs', async () => {
+  it('shares one state through Actions and treats every action as a new output generation', async () => {
     const host = createHost()
     const changed: string[] = []
     const eventOrder: string[] = []
@@ -31,7 +31,7 @@ describe('FilterRuntimeHost', () => {
 
     changed.length = 0
     await host.action('set').run({ key: 'search', value: 'SU' })
-    expect(changed).toEqual([])
+    expect(changed).toEqual(['request'])
 
     await host.action('clear').run()
     expect(host.getState()).toEqual({})

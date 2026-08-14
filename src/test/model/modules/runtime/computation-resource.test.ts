@@ -33,7 +33,7 @@ describe('ComputationResourceState', () => {
     resource.dispose()
   })
 
-  it('detects nested input changes independently of object key order', () => {
+  it('processes each new input reference without serializing content', () => {
     const run = vi.fn((input: any) => input.process.point.value)
     const resource = new ComputationResourceState(
       { process: { point: { value: 1, code: 'value' } } },
@@ -41,9 +41,9 @@ describe('ComputationResourceState', () => {
       input => run(input),
     )
     resource.updateInput({ process: { point: { code: 'value', value: 1 } } })
-    expect(run).toHaveBeenCalledTimes(1)
-    resource.updateInput({ process: { point: { code: 'value', value: 2 } } })
     expect(run).toHaveBeenCalledTimes(2)
+    resource.updateInput({ process: { point: { code: 'value', value: 2 } } })
+    expect(run).toHaveBeenCalledTimes(3)
     expect(resource.value).toBe(2)
   })
 

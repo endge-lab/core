@@ -36,7 +36,7 @@ export class EndgeComposition {
       await host.mountGraph()
     }
     catch (error) {
-      Endge.runtime.destroyRuntimeTree(host.id)
+      await Endge.runtime.destroyRuntimeTreeAsync(host.id)
       throw error
     }
 
@@ -51,7 +51,7 @@ export class EndgeComposition {
           return
         mounted = false
         await host.getScope('scope_default')?.dispose()
-        Endge.runtime.destroyRuntimeTree(host.id)
+        await Endge.runtime.destroyRuntimeTreeAsync(host.id)
       },
     }
   }

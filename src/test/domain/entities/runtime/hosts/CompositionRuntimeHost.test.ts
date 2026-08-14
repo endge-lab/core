@@ -536,7 +536,7 @@ defineComposition({
 
     await filterRuntime.action('set').run({ key: 'search', value: 'SU' })
     await vi.advanceTimersByTimeAsync(20)
-    expect(run).toHaveBeenCalledTimes(2)
+    expect(run).toHaveBeenCalledTimes(3)
 
     await session.unmount()
   })

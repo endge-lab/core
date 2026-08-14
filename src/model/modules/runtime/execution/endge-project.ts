@@ -54,7 +54,7 @@ class ProjectCompositionHandleImpl implements ProjectCompositionHandle {
         throw new Error(`[EndgeProject] Composition "${this.identity}" cannot be created.`)
       try { await host.mountGraph() }
       catch (error) {
-        Endge.runtime.destroyRuntimeTree(host.id)
+        await Endge.runtime.destroyRuntimeTreeAsync(host.id)
         throw error
       }
       this._host = host
@@ -87,7 +87,7 @@ class ProjectCompositionHandleImpl implements ProjectCompositionHandle {
     const host = this._host
     if (!host) return
     await host.getScope('scope_default')?.dispose()
-    Endge.runtime.destroyRuntimeTree(host.id)
+    await Endge.runtime.destroyRuntimeTreeAsync(host.id)
     this._host = null
   }
 
@@ -131,7 +131,7 @@ export class EndgeProject {
       throw new Error(`[EndgeProject] Project "${normalized}" cannot be mounted.`)
     const ownerScope = Endge.runtime.getRuntimeScopeByHost(host.id)
     if (!ownerScope) {
-      Endge.runtime.destroyRuntimeTree(host.id)
+      await Endge.runtime.destroyRuntimeTreeAsync(host.id)
       throw new Error(`[EndgeProject] Runtime owner scope for "${normalized}" is missing.`)
     }
     const projectScope = Endge.runtime.scopes.register(new RuntimeScope({
@@ -140,7 +140,7 @@ export class EndgeProject {
       boundaryId: `${host.id}:scope:project`,
       parent: ownerScope,
       ownerRuntimeId: host.id,
-      hooks: { destroyRuntime: runtimeId => Endge.runtime.destroyRuntimeTree(runtimeId) },
+      hooks: { destroyRuntime: runtimeId => Endge.runtime.destroyRuntimeTreeAsync(runtimeId) },
     }))
     await projectScope.activate()
 
@@ -168,7 +168,7 @@ export class EndgeProject {
     catch (error) {
       for (const handle of [...handles.values()].reverse()) await handle.dispose()
       await Endge.runtime.scopes.remove(projectScope.id)
-      Endge.runtime.destroyRuntimeTree(host.id)
+      await Endge.runtime.destroyRuntimeTreeAsync(host.id)
       throw error
     }
 
@@ -202,7 +202,7 @@ export class EndgeProject {
         mounted = false
         for (const handle of [...handles.values()].reverse()) await handle.dispose()
         await Endge.runtime.scopes.remove(projectScope.id)
-        Endge.runtime.destroyRuntimeTree(host.id)
+        await Endge.runtime.destroyRuntimeTreeAsync(host.id)
       },
     }
   }

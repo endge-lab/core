@@ -23,9 +23,8 @@ export class SFCRenderInspectionSession implements SFCRenderInspectionSessionLik
     this._idsByStableKey.set(stableKey, id)
     this._stableKeysById.set(id, stableKey)
     this._nodes.set(id, {
-      ...input,
+      ...projectNodeInput(input),
       id,
-      componentStack: [...input.componentStack],
       updatedAt: Date.now(),
     })
     this._scheduleNotify()
@@ -118,4 +117,73 @@ export class SFCRenderInspectionSession implements SFCRenderInspectionSessionLik
       for (const listener of this._listeners) listener()
     })
   }
+}
+
+const INSPECTION_MAX_DEPTH = 4
+const INSPECTION_MAX_ARRAY = 20
+const INSPECTION_MAX_FIELDS = 50
+const INSPECTION_MAX_STRING = 2_000
+
+function projectNodeInput(input: SFCRenderInspectionNodeInput): SFCRenderInspectionNodeInput {
+  return {
+    ...input,
+    componentStack: input.componentStack.map(value => truncateString(value)),
+    props: projectRecord(input.props),
+    componentProps: projectRecord(input.componentProps),
+    locals: projectRecord(input.locals),
+    bindings: Object.fromEntries(Object.entries(input.bindings).map(([key, binding]) => [key, {
+      ...binding,
+      source: binding.source === undefined ? undefined : truncateString(binding.source),
+      reads: binding.reads.slice(0, INSPECTION_MAX_ARRAY).map(value => truncateString(value)),
+      value: projectInspectionValue(binding.value),
+    }])),
+    meta: input.meta ? projectRecord(input.meta) : undefined,
+  }
+}
+
+function projectRecord(value: Record<string, unknown>): Record<string, unknown> {
+  const projected = projectInspectionValue(value)
+  return projected && typeof projected === 'object' && !Array.isArray(projected)
+    ? projected as Record<string, unknown>
+    : {}
+}
+
+function projectInspectionValue(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
+  if (typeof value === 'string') return truncateString(value)
+  if (value == null || typeof value === 'number' || typeof value === 'boolean') return value
+  if (typeof value === 'bigint') return String(value)
+  if (typeof value === 'function') return '[Function]'
+  if (typeof value === 'symbol') return String(value)
+  if (value instanceof Date) return value.toISOString()
+  if (typeof value !== 'object') return String(value)
+  if (seen.has(value)) return { $truncated: true, reason: 'circular' }
+  if (depth >= INSPECTION_MAX_DEPTH)
+    return { $truncated: true, reason: 'depth' }
+  seen.add(value)
+  try {
+    if (Array.isArray(value)) {
+      const projected = value.slice(0, INSPECTION_MAX_ARRAY)
+        .map(item => projectInspectionValue(item, depth + 1, seen))
+      if (value.length > INSPECTION_MAX_ARRAY)
+        projected.push({ $truncated: true, omitted: value.length - INSPECTION_MAX_ARRAY })
+      return projected
+    }
+    const entries = Object.entries(value as Record<string, unknown>)
+    const out = Object.fromEntries(entries.slice(0, INSPECTION_MAX_FIELDS).map(([key, item]) => [
+      key,
+      projectInspectionValue(item, depth + 1, seen),
+    ]))
+    if (entries.length > INSPECTION_MAX_FIELDS)
+      out.$truncated = { omitted: entries.length - INSPECTION_MAX_FIELDS }
+    return out
+  }
+  finally {
+    seen.delete(value)
+  }
+}
+
+function truncateString(value: string): string {
+  return value.length <= INSPECTION_MAX_STRING
+    ? value
+    : `${value.slice(0, INSPECTION_MAX_STRING)}…[truncated]`
 }

@@ -1174,7 +1174,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         id: connection.id,
         sourcePath,
         update: { kind: connection.updateKind },
-        policy: { debounceMs: connection.debounceMs, distinct: 'structural' },
+        policy: { debounceMs: connection.debounceMs },
       }))
     }
 
@@ -1208,7 +1208,6 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         id: publication.id,
         sourcePath: this._requireOutputBridge(publication.sourceRuntime, publication.sourceOutput),
         update: { kind: 'publish', payload: publication },
-        policy: { distinct: 'structural' },
       }))
     }
 
