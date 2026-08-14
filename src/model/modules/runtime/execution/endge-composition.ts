@@ -1,4 +1,5 @@
 import type { CompositionMountOptions, CompositionPreviewProps, CompositionSession } from '@/domain/types/source/composition-source.types'
+import type { EndgeDataMode } from '@/domain/types/document/workspace.types'
 
 import type { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
 import { Endge } from '@/model/kernel/endge'
@@ -59,11 +60,12 @@ export class EndgeComposition {
 /** Materializes preview-only literals and RMock references into regular Composition props. */
 export function materializeCompositionPreviewProps(
   previewProps: CompositionPreviewProps | null | undefined,
+  dataMode: EndgeDataMode = Endge.context.dataMode,
 ): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(previewProps ?? {}).flatMap(([key, value]) => {
       if (value.kind === 'mock') {
-        return Endge.context.isMockEnabled
+        return dataMode === 'mock'
           ? [[key, Endge.mock.get(value.identity)] as const]
           : []
       }

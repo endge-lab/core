@@ -7,6 +7,7 @@ import { Endge } from '@/model/kernel/endge'
 import { QueryExecutor } from '@/model/services/query/QueryExecutor'
 import type { QueryProgramPayload } from '@/domain/types/program/program.types'
 import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
+import type { RuntimeParentRef } from '@/domain/types/runtime/runtime-execute.type'
 
 /**
  * Модуль выполнения доменных query: custom executor, mock data и REST.
@@ -28,7 +29,11 @@ export class EndgeQuery {
   /**
    * Выполняет query через compiled artifact и сохраняет результат в Raph.
    */
-  async run(query: RQuery, params: Record<string, unknown> = {}): Promise<any> {
+  async run(
+    query: RQuery,
+    params: Record<string, unknown> = {},
+    parent?: RuntimeParentRef | null,
+  ): Promise<any> {
     const idOrIdentity = query.id ?? query.identity
     const artifact = idOrIdentity != null
       ? Endge.program.getQueryArtifact(idOrIdentity)
@@ -39,6 +44,7 @@ export class EndgeQuery {
       throw new Error(`Query artifact has compile errors for "${query.identity ?? query.name ?? query.id}".`)
 
     const host = Endge.runtime.execute(query, {
+      parent,
       persistence: 'disabled',
       meta: { props: params },
     }) as QueryRuntimeHost | null

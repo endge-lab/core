@@ -25,6 +25,7 @@ type CompositionDependencySection = 'data' | 'resources' | 'runtimes'
 
 const ROOT_SECTION_ORDER = [
   'metadata',
+  'dataMode',
   'activateOn',
   'props',
   'previewProps',

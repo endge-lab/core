@@ -350,7 +350,7 @@ export class EndgeFlow {
               const paramsFromIncomingEdge = this._getParamsFromIncomingEdge(compiled, node.id, state)
               const mergedParams = { ...paramsFromIncomingEdge, ...resolvedParams }
               const queryInput = this._buildQueryInput(mergedParams, targetQuery)
-              const result = await targetQuery.run(queryInput)
+              const result = await Endge.runtime.query.run(targetQuery, queryInput, host)
               stepOutput = result != null && typeof result === 'object' && !Array.isArray(result)
                 ? { ...(result as Record<string, unknown>) }
                 : (result != null ? { output: result } : undefined)

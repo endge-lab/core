@@ -10,6 +10,7 @@ import type { EndgeMockReference } from '@/domain/types/mock/mock-data.type'
 import type { I18nCompiledLocales } from '@/domain/types/i18n.types'
 import type { ComponentSFCEventInputValue } from '@/domain/types/component/sfc/ports.types'
 import type { UpdateMutationStrategy } from '@/domain/types/source/update-source.types'
+import type { EndgeDataMode } from '@/domain/types/document/workspace.types'
 
 export type CompositionRuntimeKind = 'filter' | 'query' | 'component' | 'composition' | 'stream' | 'filter-view'
 
@@ -213,6 +214,8 @@ export type CompositionPreviewPropValue
 export type CompositionPreviewProps = Record<string, CompositionPreviewPropValue>
 
 export interface CompositionSourceDocument {
+  /** Локальный override режима данных; отсутствие значения наследует runtime ancestry. */
+  dataMode?: EndgeDataMode | null
   activation: CompositionActivationDescriptor | null
   /** Публичный props contract Composition. */
   props: SourceFieldDefinition[]

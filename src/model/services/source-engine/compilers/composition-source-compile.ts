@@ -23,6 +23,7 @@ import type { SourceFieldDefinition } from '@/domain/types/source/source-express
 import type { VocabLoadPolicy } from '@/domain/types/runtime/vocab-cache.types'
 import type { ComponentSFCEventInputValue } from '@/domain/types/component/sfc/ports.types'
 import type { UpdateMutationStrategy } from '@/domain/types/source/update-source.types'
+import type { EndgeDataMode } from '@/domain/types/document/workspace.types'
 
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
@@ -63,6 +64,7 @@ export function compileCompositionSource(source: string, sourceVersion = 1): Com
 
     validateRootProperties(definition, diagnostics)
     const metadata = compileProgramMetadataProperty(definition, diagnostics)
+    const dataModeValue = propertyValue(definition, 'dataMode')
     const activationValue = propertyValue(definition, 'activateOn')
     const propsValue = propertyValue(definition, 'props')
     const previewPropsValue = propertyValue(definition, 'previewProps')
@@ -71,6 +73,7 @@ export function compileCompositionSource(source: string, sourceVersion = 1): Com
     const runtimesValue = propertyValue(definition, 'runtimes')
     const hooksValue = propertyValue(definition, 'hooks')
     const outputsValue = propertyValue(definition, 'outputs')
+    const dataMode = dataModeValue ? readDataMode(dataModeValue, diagnostics) : null
     const activation = activationValue ? readActivation(activationValue, diagnostics, 'activateOn') : null
     const dataNode = dataValue && t.isObjectExpression(dataValue) ? dataValue : null
     const resourcesNode = resourcesValue && t.isObjectExpression(resourcesValue) ? resourcesValue : null
@@ -141,7 +144,7 @@ export function compileCompositionSource(source: string, sourceVersion = 1): Com
     validateBindingReferences(props, data, runtimes, diagnostics)
     validateRuntimeCycles(runtimes, hooks, diagnostics)
 
-    const document: CompositionSourceDocument = { activation, props, previewProps, data, resources, scopes, runtimes, hooks, outputs }
+    const document: CompositionSourceDocument = { dataMode, activation, props, previewProps, data, resources, scopes, runtimes, hooks, outputs }
     const hasErrors = diagnostics.some(item => item.severity === 'error')
     return {
       ast,
@@ -228,9 +231,28 @@ function validateRootProperties(node: t.ObjectExpression, diagnostics: Diagnosti
       continue
     }
     const name = propertyName(property.key)
-    if (name !== 'metadata' && name !== 'activateOn' && name !== 'props' && name !== 'previewProps' && name !== 'data' && name !== 'resources' && name !== 'runtimes' && name !== 'hooks' && name !== 'outputs')
+    if (name !== 'metadata' && name !== 'dataMode' && name !== 'activateOn' && name !== 'props' && name !== 'previewProps' && name !== 'data' && name !== 'resources' && name !== 'runtimes' && name !== 'hooks' && name !== 'outputs')
       diagnostics.push(diagnostic('error', 'composition-source-property-unsupported', `Свойство "${name ?? ''}" не поддерживается Composition v1.`, name ?? 'defineComposition', property))
   }
+}
+
+/** Читает статический Composition data mode override. */
+function readDataMode(
+  raw: t.Expression,
+  diagnostics: DiagnosticDraft[],
+): EndgeDataMode | null {
+  const value = unwrapExpression(raw)
+  if (!t.isStringLiteral(value) || (value.value !== 'mock' && value.value !== 'live')) {
+    diagnostics.push(diagnostic(
+      'error',
+      'composition-source-data-mode',
+      'dataMode должен быть строкой "mock" или "live".',
+      'dataMode',
+      value,
+    ))
+    return null
+  }
+  return value.value
 }
 
 function readProps(

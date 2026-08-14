@@ -201,7 +201,7 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
     const initialValues = new Map<string, unknown>()
     for (const field of artifact.data) {
       if (field.kind === 'value')
-        initialValues.set(field.key, resolveStoreInitialValue(field))
+        initialValues.set(field.key, resolveStoreInitialValue(field, this))
     }
 
     Raph.transaction(() => {
@@ -323,10 +323,10 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
   }
 }
 
-function resolveStoreInitialValue(field: StoreValueDescriptor): unknown {
+function resolveStoreInitialValue(field: StoreValueDescriptor, host: RuntimeHost<any, any>): unknown {
   if (field.initial.kind !== 'mock')
     return field.initial.value
-  return Endge.context.isMockEnabled
+  return Endge.runtime.resolveDataMode(host) === 'mock'
     ? Endge.mock.get(field.initial.identity)
     : undefined
 }

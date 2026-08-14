@@ -42,6 +42,7 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
   private readonly _internalBase: string
   private _derivedErrorActive = false
   private _contextOff: (() => void) | null = null
+  private _isMockEnabled = false
 
   public constructor(input: {
     id: string
@@ -102,8 +103,13 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     host._props = host._literalDefaults(artifact.payload)
     host._applyProps(host._props, true)
     host._applyProps(input.meta?.props ?? {}, true)
+    host._isMockEnabled = Endge.runtime.resolveDataMode(host) === 'mock'
     host._contextOff = Endge.context.subscribe(() => {
-      if (!Endge.context.isMockEnabled)
+      const isMockEnabled = Endge.runtime.resolveDataMode(host) === 'mock'
+      if (isMockEnabled === host._isMockEnabled)
+        return
+      host._isMockEnabled = isMockEnabled
+      if (!isMockEnabled)
         return
       host._runSequence += 1
       host._abortController?.abort()
@@ -197,7 +203,8 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     if (propsPatch)
       this._applyProps(propsPatch, false)
 
-    if (Endge.context.isMockEnabled) {
+    this._isMockEnabled = Endge.runtime.resolveDataMode(this) === 'mock'
+    if (this._isMockEnabled) {
       this._runSequence += 1
       this._abortController?.abort()
       const updatedAt = new Date().toISOString()

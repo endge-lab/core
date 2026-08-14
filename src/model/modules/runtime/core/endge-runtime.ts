@@ -1,8 +1,10 @@
 import type { RuntimeEntityType } from '@/domain/types/runtime/runtime-entity-map.types'
 import type { AnyRuntimeStrategy } from '@/domain/types/runtime/runtime-strategy.types'
 import type { RuntimeExecuteOptions } from '@/domain/types/runtime/runtime-execute.type'
-import type { RuntimeArtifactReader } from '@/domain/types/runtime/runtime-host.types'
+import type { RuntimeArtifactReader, RuntimeHost } from '@/domain/types/runtime/runtime-host.types'
 import type { EndgeRuntimeSnapshot, RuntimeExecutableModel } from '@/domain/types/runtime/runtime.types'
+import type { EndgeDataMode } from '@/domain/types/document/workspace.types'
+import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
 
 import { Raph, RaphNode } from '@endge/raph'
 
@@ -193,6 +195,20 @@ export class EndgeRuntime extends EndgeModule {
 
     this.notify()
     return host
+  }
+
+  /** Разрешает data mode по ближайшему Composition override с fallback на общий Endge context. */
+  public resolveDataMode(host: RuntimeHost<any, any> | null | undefined): EndgeDataMode {
+    let current = host ?? null
+    while (current) {
+      if (current.entityType === 'composition') {
+        const mode = (current.getArtifactPayload() as CompositionProgramPayload | null)?.dataMode
+        if (mode === 'mock' || mode === 'live')
+          return mode
+      }
+      current = current.parent
+    }
+    return Endge.context.dataMode
   }
 
   /**

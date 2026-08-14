@@ -615,7 +615,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     if (!isRecord(input))
       throw new Error(`Event Query input must be an object: ${identity}.`)
 
-    await query.run(input)
+    await Endge.runtime.query.run(query, input, this)
   }
 
   private _reportComputationError(

@@ -26,7 +26,7 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
     functions: [
       'activateOn', 'applyUpdate', 'batch', 'component', 'contextual', 'controls', 'debounce', 'dispatchTo', 'executeAction', 'fields', 'fromRuntime', 'fromScope', 'injected', 'isolated', 'mutate', 'persist', 'policy', 'run', 'select', 'slot', 'store', 'storeTo', 'vocab', 'withData', 'withProps', ...VALUE_EXPRESSION_METHOD_NAMES,
     ],
-    properties: ['activateOn', 'data', 'hooks', 'key', 'metadata', 'outputs', 'previewProps', 'props', 'resources', 'runtimes'],
+    properties: ['activateOn', 'data', 'dataMode', 'hooks', 'key', 'metadata', 'outputs', 'previewProps', 'props', 'resources', 'runtimes'],
   })
 
   public supports(sourceKind: SourceKind | string): boolean {
@@ -79,6 +79,7 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
 const COMPOSITION_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'defineComposition', kind: 'snippet', insertText: COMPOSITION_DEFAULT_SOURCE.trimEnd(), detail: 'Создать Composition source' },
   { label: 'metadata', kind: 'property', insertText: `metadata: {\n  'namespace.feature': {},\n},`, detail: 'Статическая metadata Composition' },
+  { label: 'dataMode', kind: 'property', insertText: `dataMode: 'mock',`, detail: 'Override runtime data mode for this Composition subtree' },
   { label: 'props', kind: 'property', insertText: `props: defineProps({\n  value: field('Object'),\n}),`, detail: 'Typed public Composition props' },
   { label: 'previewProps', kind: 'property', insertText: `previewProps: definePreviewProps({\n  propName: {},\n}),`, detail: 'Preview-only props: static JSON values or mock(identity)' },
   { label: 'mock', kind: 'function', insertText: `mock('identity')`, detail: 'RMock value for one preview prop' },

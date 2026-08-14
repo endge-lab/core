@@ -2792,6 +2792,7 @@ export class EndgeCompiler extends EndgeModule {
     return {
       type: 'composition',
       sourceVersion,
+      dataMode: null,
       activation: null,
       props: [],
       previewProps: null,
