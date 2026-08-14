@@ -1,6 +1,6 @@
 {
   "name": "@endge/core",
-  "version": "1.2.10",
+  "version": "1.2.11",
   "private": false,
   "license": "Apache-2.0",
   "type": "module",
@@ -44,7 +44,7 @@
     "yaml": "^2.8.1"
   },
   "peerDependencies": {
-    "@endge/raph": "^3.0.4",
+    "@endge/raph": "^3.0.5",
     "@endge/utils": "^0.24.6",
     "@primevue/themes": "^4.0.0-rc.1",
     "class-transformer": "^0.5.1",

@@ -15,8 +15,8 @@ importers:
         specifier: ^7.27.1
         version: 7.29.7
       '@endge/raph':
-        specifier: ^3.0.4
-        version: 3.0.4
+        specifier: ^3.0.5
+        version: 3.0.5
       '@endge/utils':
         specifier: ^0.24.6
         version: 0.24.6(pinia@3.0.4)(vue@3.5.39)
@@ -373,8 +373,8 @@ packages:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
 
-  /@endge/raph@3.0.4:
-    resolution: {integrity: sha512-bw9QBMSLfZD/D9e+ipx6twekhXBj+jBgD/gMkKhPsG8v96xaaxCFxx74ZMabK9bBFeJZofOCXO65rOEKbD0dqA==}
+  /@endge/raph@3.0.5:
+    resolution: {integrity: sha512-aiujCX1NCGv6Uuaa4mY70hxKZMCZuS8dKU+rtDbG2xpN2Pk5E7PsBBoqUEuY32I3GygRfU0+5HU0uAsfzvtYyw==}
     dev: false
 
   /@endge/utils@0.24.6(pinia@3.0.4)(vue@3.5.39):
