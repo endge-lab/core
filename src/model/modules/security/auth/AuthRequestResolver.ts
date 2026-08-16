@@ -7,7 +7,7 @@ import type {
 import type { AuthProfileRegistry } from '@/model/modules/security/auth/AuthProfileRegistry'
 import type { AuthSessionManager } from '@/model/modules/security/auth/AuthSessionManager'
 
-/** Разрешает auth policy запроса без изменения application session identity. */
+/** Разрешает auth policy запроса без изменения sessions других profiles. */
 export class AuthRequestResolver {
   public constructor(
     private readonly _profiles: AuthProfileRegistry,
@@ -25,7 +25,7 @@ export class AuthRequestResolver {
     }
 
     const profile = policy.mode === 'inherit'
-      ? this._sessions.getApplicationProfile()
+      ? this._profiles.getDefault()
       : this._profiles.requireActive(policy.profileIdentity)
     if (!profile) {
       return {

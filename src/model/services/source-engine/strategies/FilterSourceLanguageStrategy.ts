@@ -90,6 +90,7 @@ const FILTER_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'field', kind: 'function', insertText: `field('String').optional().default('')`, detail: 'Описание Filter field' },
   { label: 'options', kind: 'function', insertText: `.options([{ value: '', label: '' }])`, detail: 'Статические варианты поля' },
   { label: 'vocab', kind: 'function', insertText: `.vocab('', { valuePath: 'code', labelPath: 'name' })`, detail: 'Внешний vocab поля' },
+  { label: 'meta', kind: 'function', insertText: `.meta({\n  'endge.ui.select': { searchable: true },\n})`, detail: 'Presentation metadata поля' },
   { label: 'output.json', kind: 'function', insertText: `output().json(({ value }) => compact({}))`, detail: 'JSON output' },
   { label: 'output.predicate', kind: 'function', insertText: `output().predicate(({ row, value }) => and())`, detail: 'Predicate output' },
   { label: 'relativeDate', kind: 'function', insertText: `relativeDate('-1d')`, detail: 'Относительная дата' },

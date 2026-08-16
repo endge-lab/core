@@ -12,7 +12,7 @@ import { AuthSessionStore } from '@/model/modules/security/auth/AuthSessionStore
 import { BearerAuthAdapter } from '@/model/modules/security/auth/adapters/BearerAuthAdapter'
 import { KeycloakAuthAdapter } from '@/model/modules/security/auth/adapters/KeycloakAuthAdapter'
 
-/** Единый lifecycle owner application session и request authentication. */
+/** Единый lifecycle owner runtime auth profile sessions и request authentication. */
 export class EndgeAuth extends EndgeModule {
   public readonly adapters: AuthAdapterRegistry
   public readonly profiles: AuthProfileRegistry
@@ -43,7 +43,7 @@ export class EndgeAuth extends EndgeModule {
     this._store = new AuthSessionStore()
     this.session = new AuthSessionManager(this.profiles, this.adapters, this._store, {
       getWorkspaceIdentity: () => Endge.context.getCurrentWorkspace() ?? '',
-      onApplicationSessionChange: () => this.notify(),
+      onSessionChange: () => this.notify(),
     })
     this.requests = new AuthRequestResolver(this.profiles, this.session)
   }
@@ -77,7 +77,7 @@ export class EndgeAuth extends EndgeModule {
     })
   }
 
-  /** Валидирует Domain profiles и восстанавливает default application session. */
+  /** Валидирует Domain profiles и восстанавливает session default runtime profile. */
   public override build(): void {
     this.profiles.validateAll()
     this.session.configureDefault(this.profiles.getDefault())

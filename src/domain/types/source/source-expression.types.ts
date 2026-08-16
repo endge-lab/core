@@ -1,3 +1,4 @@
+import type { ProgramMetadataMap } from '@/domain/types/program/program-metadata.types'
 import type { TypeSourceExpression } from '@/domain/types/source/type-source.types'
 
 /** Type Registry identity used by Query/Filter field contracts. */
@@ -205,6 +206,8 @@ export interface SourceFieldDefinition {
   defaultValue?: SourceExpressionIR
   options?: SourceFieldOption[]
   vocab?: SourceFieldVocab
+  /** Статическая presentation metadata поля, не влияющая на Filter state. */
+  metadata?: ProgramMetadataMap
 }
 
 /** Default value prop, вычисляемый через output внешнего или локального Filter. */

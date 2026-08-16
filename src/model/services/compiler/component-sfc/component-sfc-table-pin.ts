@@ -3,9 +3,10 @@ import type {
   RComponentSFC_IR_ElementNode,
   RComponentSFC_IR_Value,
 } from '@/domain/types/component/sfc/ir.types'
+import { ENDGE_SFC_TABLE_COLUMN_PIN_MODES } from '@/domain/types/component/sfc/tag-attribute-contract.types'
 import type { TableColumnPinSide } from '@/domain/types/runtime/action.types'
 
-export const SFC_TABLE_COLUMN_PIN_MODES = ['enabled', 'disabled'] as const
+export const SFC_TABLE_COLUMN_PIN_MODES = ENDGE_SFC_TABLE_COLUMN_PIN_MODES
 export const SFC_TABLE_COLUMN_PIN_SIDES = ['left', 'right'] as const
 
 export type ComponentSFCTableColumnPinMode = typeof SFC_TABLE_COLUMN_PIN_MODES[number]

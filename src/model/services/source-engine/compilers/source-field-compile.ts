@@ -15,6 +15,7 @@ import {
   readStringArgument,
   unwrapExpression,
 } from '@/model/services/source-engine/compilers/source-expression-compile'
+import { compileProgramMetadataExpression } from '@/model/services/source-engine/compilers/source-metadata-compile'
 import { compileTypeSourceExpression } from '@/model/services/source-engine/compilers/type-source-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
@@ -108,6 +109,19 @@ export function compileSourceField(
     }
     if (modifier.name === 'vocab') {
       field.vocab = readVocab(modifier.call, diagnostics, `${sourcePath}.vocab`) ?? undefined
+      continue
+    }
+    if (modifier.name === 'meta') {
+      const argument = modifier.call.arguments[0]
+      if (field.metadata) {
+        diagnostics.push(diagnostic('error', 'source-field-meta-duplicate', '.meta(...) объявлена повторно.', `${sourcePath}.meta`, modifier.call))
+      }
+      else if (argument && t.isExpression(argument)) {
+        field.metadata = compileProgramMetadataExpression(argument, diagnostics, `${sourcePath}.meta`)
+      }
+      else {
+        diagnostics.push(diagnostic('error', 'source-field-meta-shape', '.meta(...) требует статический object literal.', `${sourcePath}.meta`, modifier.call))
+      }
       continue
     }
     if (modifier.name === 'from') {

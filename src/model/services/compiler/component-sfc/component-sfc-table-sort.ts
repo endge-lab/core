@@ -3,9 +3,13 @@ import type {
   RComponentSFC_IR_ElementNode,
   RComponentSFC_IR_Value,
 } from '@/domain/types/component/sfc/ir.types'
+import {
+  ENDGE_SFC_TABLE_SORT_COMPARATORS,
+  ENDGE_SFC_TABLE_SORT_MODES,
+} from '@/domain/types/component/sfc/tag-attribute-contract.types'
 
-export const SFC_TABLE_SORT_MODES = ['multiple', 'single', 'fixed', 'disabled'] as const
-export const SFC_TABLE_SORT_COMPARATORS = ['natural', 'text', 'number', 'date', 'time', 'boolean'] as const
+export const SFC_TABLE_SORT_MODES = ENDGE_SFC_TABLE_SORT_MODES
+export const SFC_TABLE_SORT_COMPARATORS = ENDGE_SFC_TABLE_SORT_COMPARATORS
 export const SFC_TABLE_SORT_DIRECTIONS = ['asc', 'desc'] as const
 
 export type ComponentSFCTableSortMode = typeof SFC_TABLE_SORT_MODES[number]

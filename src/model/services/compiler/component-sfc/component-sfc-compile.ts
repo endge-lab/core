@@ -27,6 +27,7 @@ import { analyzeComponentSFCScript } from '@/model/services/compiler/component-s
 import { analyzeComponentSFCRuntimeDependencies } from '@/model/services/compiler/component-sfc/component-sfc-dependencies'
 import { compileComponentSFCStyle } from '@/model/services/compiler/component-sfc/component-sfc-style'
 import { compileComponentSFCTemplate } from '@/model/services/compiler/component-sfc/component-sfc-template'
+import { validateComponentSFCAttributeValues } from '@/model/services/compiler/component-sfc/component-sfc-attributes'
 import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component/sfc/dependencies.types'
 import { createEmptyProgramMetadata } from '@/domain/types/program/program-metadata.types'
 import { analyzeComponentSFCPorts } from '@/model/services/compiler/component-sfc/component-sfc-ports'
@@ -125,6 +126,7 @@ export function compileComponentSFC(
   const scriptResult = analyzeComponentSFCScript(parseResult.ast.script, {
     resolveTypeDefinition: options.resolveTypeDefinition,
   })
+  diagnostics.push(...validateComponentSFCAttributeValues(source, parseResult.ast))
   const portResult = analyzeComponentSFCPorts(
     parseResult.ast.script,
     createEmptyComponentDependencies(),

@@ -15,16 +15,16 @@ import type { AuthSessionStore } from '@/model/modules/security/auth/AuthSession
 
 interface AuthSessionManagerDependencies {
   getWorkspaceIdentity: () => string
-  onApplicationSessionChange: () => void
+  onSessionChange: () => void
   now?: () => number
 }
 
-/** Владеет application session и изолированными sessions профильных запросов. */
+/** Владеет изолированными sessions runtime auth profiles. */
 export class AuthSessionManager {
   private readonly _states = new Map<string, AuthSessionState>()
   private readonly _operations = new Map<string, Promise<AuthTokenSet | null>>()
   private readonly _now: () => number
-  private _applicationProfile: AuthProfileSchema | null = null
+  private _defaultProfile: AuthProfileSchema | null = null
 
   public constructor(
     private readonly _profiles: AuthProfileRegistry,
@@ -35,84 +35,79 @@ export class AuthSessionManager {
     this._now = _dependencies.now ?? (() => Date.now())
   }
 
-  /** Identity текущего application profile. */
+  /** Identity default runtime profile. */
   public get profileIdentity(): string | null {
-    return this._applicationProfile?.identity ?? null
+    return this._defaultProfile?.identity ?? null
   }
 
-  /** Возвращает выбранный application profile для request mode=inherit. */
-  public getApplicationProfile(): AuthProfileSchema | null {
-    return this._applicationProfile
-  }
-
-  /** Показывает наличие действующей application session. */
+  /** Показывает наличие действующей session default runtime profile. */
   public get isAuthenticated(): boolean {
-    const state = this._applicationState()
+    const state = this._defaultState()
     return Boolean(state && this._isAccessTokenUsable(state.token))
   }
 
   /** Безопасный actor/session context без tokens. */
   public get context(): EndgeAuthContext {
-    const state = this._applicationState()
-    if (!state || !this._applicationProfile || !this._isAccessTokenUsable(state.token))
+    const state = this._defaultState()
+    if (!state || !this._defaultProfile || !this._isAccessTokenUsable(state.token))
       return { authenticated: false }
     return createEndgeAuthContext({
       authenticated: true,
       accessToken: state.token.accessToken,
       idToken: state.token.idToken,
       sessionState: state.token.sessionState,
-      profileIdentity: this._applicationProfile.identity,
+      profileIdentity: this._defaultProfile.identity,
       userInfo: state.userInfo,
     })
   }
 
-  /** Claims application session только для presentation, не для authorization decisions. */
+  /** Claims default profile session только для presentation, не для authorization decisions. */
   public get claims(): Record<string, unknown> {
-    const token = this._applicationState()?.token
+    const token = this._defaultState()?.token
     return decodeJwtClaims(token?.idToken) ?? decodeJwtClaims(token?.accessToken) ?? {}
   }
 
-  /** Загруженный OIDC userinfo application session. */
+  /** Загруженный OIDC userinfo default profile session. */
   public get userInfo(): Record<string, unknown> | null {
-    return this._applicationState()?.userInfo ?? null
+    return this._defaultState()?.userInfo ?? null
   }
 
-  /** Выбирает default application profile и восстанавливает его snapshot. */
+  /** Выбирает default runtime profile и восстанавливает его snapshot. */
   public configureDefault(profile: AuthProfileSchema | null): void {
-    this._applicationProfile = profile
+    this._defaultProfile = profile
     if (!profile) {
-      this._dependencies.onApplicationSessionChange()
+      this._dependencies.onSessionChange()
       return
     }
     const snapshot = this._store.read(this._workspaceIdentity(), profile)
     if (!snapshot) {
-      this._dependencies.onApplicationSessionChange()
+      this._dependencies.onSessionChange()
       return
     }
     if (this._isRefreshExpired(snapshot.token)) {
       this._store.remove(this._workspaceIdentity(), profile.identity)
-      this._dependencies.onApplicationSessionChange()
+      this._dependencies.onSessionChange()
       return
     }
     this._states.set(profile.identity, { token: snapshot.token, userInfo: null })
-    this._dependencies.onApplicationSessionChange()
+    this._dependencies.onSessionChange()
   }
 
-  /** Выполняет interactive login application profile. */
+  /** Выполняет interactive login default runtime profile. */
   public async login(credentials: AuthLoginCredentials): Promise<void> {
-    const profile = this._applicationProfile
+    const profile = this._defaultProfile
     if (!profile)
-      throw new Error('[EndgeAuth] Default application auth profile is not configured')
+      throw new Error('[EndgeAuth] Default auth profile is not configured')
     if (profile.adapterId !== 'keycloak' || profile.config.loginMode !== 'interactive')
-      throw new Error(`[EndgeAuth] Application profile does not support interactive login: ${profile.identity}`)
+      throw new Error(`[EndgeAuth] Default profile does not support interactive login: ${profile.identity}`)
     await this._loginWithProfile(profile, credentials)
   }
 
-  /** Входит в указанный Keycloak profile по переданным credentials и делает его application session. */
+  /** Входит в указанный Keycloak profile, не меняя default profile. */
   public async loginWithProfile(profileIdentity: string, credentials: AuthLoginCredentials): Promise<void> {
     const profile = this._profiles.requireActive(profileIdentity)
     if (profile.adapterId !== 'keycloak')
-      throw new Error(`[EndgeAuth] Application profile does not support credential login: ${profile.identity}`)
+      throw new Error(`[EndgeAuth] Auth profile does not support credential login: ${profile.identity}`)
     await this._loginWithProfile(profile, credentials)
   }
 
@@ -127,22 +122,21 @@ export class AuthSessionManager {
     )
     if (!token)
       throw new Error(`[EndgeAuth] Credential login returned no session: ${profile.identity}`)
-    this._applicationProfile = profile
     this._setState(profile, token)
   }
 
-  /** Гарантирует действующую application session. */
+  /** Гарантирует действующую session default runtime profile. */
   public async ensureValid(options: AuthEnsureOptions = {}): Promise<boolean> {
-    const profile = this._applicationProfile
+    const profile = this._defaultProfile
     if (!profile)
       return false
     const token = await this.ensureProfile(profile, options)
     return Boolean(token && this._isAccessTokenUsable(token))
   }
 
-  /** Загружает userinfo для действующей application session. */
+  /** Загружает userinfo для session default runtime profile. */
   public async ensureUserInfo(): Promise<Record<string, unknown> | null> {
-    const profile = this._applicationProfile
+    const profile = this._defaultProfile
     if (!profile)
       return null
     const token = await this.ensureProfile(profile)
@@ -159,13 +153,13 @@ export class AuthSessionManager {
       token,
     })
     this._states.set(profile.identity, { token, userInfo })
-    this._dependencies.onApplicationSessionChange()
+    this._dependencies.onSessionChange()
     return userInfo
   }
 
-  /** Завершает application session и всегда очищает local snapshot. */
+  /** Завершает session default runtime profile и всегда очищает local snapshot. */
   public async logout(): Promise<void> {
-    const profile = this._applicationProfile
+    const profile = this._defaultProfile
     if (!profile)
       return
     const state = this._states.get(profile.identity)
@@ -185,7 +179,7 @@ export class AuthSessionManager {
     }
   }
 
-  /** Гарантирует session указанного profile, не меняя application context. */
+  /** Гарантирует session указанного profile, не меняя default profile. */
   public async ensureProfile(profileInput: AuthProfileSchema, options: AuthEnsureOptions = {}): Promise<AuthTokenSet | null> {
     const profile = this._profiles.requireActive(profileInput)
     if (profile.adapterId === 'bearer') {
@@ -260,9 +254,9 @@ export class AuthSessionManager {
   public resetRuntime(): void {
     this._states.clear()
     this._operations.clear()
-    this._applicationProfile = null
+    this._defaultProfile = null
     this._store.resetRuntime()
-    this._dependencies.onApplicationSessionChange()
+    this._dependencies.onSessionChange()
   }
 
   private async _authenticateWhenAllowed(
@@ -297,20 +291,20 @@ export class AuthSessionManager {
       token,
       updatedAt: new Date(this._now()).toISOString(),
     })
-    if (profile.identity === this._applicationProfile?.identity)
-      this._dependencies.onApplicationSessionChange()
+    if (profile.identity === this._defaultProfile?.identity)
+      this._dependencies.onSessionChange()
   }
 
   private _clearState(profile: AuthProfileSchema): void {
     this._states.delete(profile.identity)
     this._store.remove(this._workspaceIdentity(), profile.identity)
-    if (profile.identity === this._applicationProfile?.identity)
-      this._dependencies.onApplicationSessionChange()
+    if (profile.identity === this._defaultProfile?.identity)
+      this._dependencies.onSessionChange()
   }
 
-  private _applicationState(): AuthSessionState | null {
-    return this._applicationProfile
-      ? this._states.get(this._applicationProfile.identity) ?? null
+  private _defaultState(): AuthSessionState | null {
+    return this._defaultProfile
+      ? this._states.get(this._defaultProfile.identity) ?? null
       : null
   }
 

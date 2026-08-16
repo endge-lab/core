@@ -114,6 +114,7 @@ function projectTable(
     kind: 'table',
     ref: readProp(ir, 'ref'),
     selectionMode: readProp(ir, 'selection-mode', 'selectionMode'),
+    selectionTrigger: readProp(ir, 'selection-trigger', 'selectionTrigger'),
     rows: readProp(ir, 'rows'),
     rowKey: readProp(ir, 'row-key', 'rowKey'),
     paging: readProp(ir, 'paging'),

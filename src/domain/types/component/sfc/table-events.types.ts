@@ -1,4 +1,5 @@
 export type TableSelectionMode = 'none' | 'single' | 'multiple'
+export type TableSelectionTrigger = 'auto' | 'control' | 'row' | 'both'
 export type TableRowActivationKind = 'pointer' | 'keyboard'
 
 export interface TableEventBase {

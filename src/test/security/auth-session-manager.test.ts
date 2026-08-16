@@ -63,7 +63,7 @@ describe('AuthSessionManager lifecycle and request policies', () => {
     expect(localStorage.length).toBe(0)
   })
 
-  it('logs in by profile identity and makes that profile the inherited application session', async () => {
+  it('logs in by profile identity without changing the inherited default profile', async () => {
     const defaultProfile = authProfile({ identity: 'default-auth' })
     const runtimeProfile = serviceProfile({ identity: 'aodb-auth' })
     const authenticate = vi.fn(async (context: AuthAdapterContext) => tokenSet({
@@ -76,17 +76,21 @@ describe('AuthSessionManager lifecycle and request policies', () => {
       () => now,
     )
     runtime.sessions.configureDefault(defaultProfile)
+    await runtime.sessions.loginWithProfile(defaultProfile.identity, {
+      username: 'alice',
+      password: 'secret',
+    })
 
     await runtime.sessions.loginWithProfile(runtimeProfile.identity, {
       username: 'alice',
       password: 'secret',
     })
 
-    expect(runtime.sessions.profileIdentity).toBe(runtimeProfile.identity)
-    expect(runtime.sessions.context.subject).toBe(runtimeProfile.identity)
+    expect(runtime.sessions.profileIdentity).toBe(defaultProfile.identity)
+    expect(runtime.sessions.context.subject).toBe(defaultProfile.identity)
     expect(await runtime.requests.resolve({ mode: 'inherit' })).toEqual(expect.objectContaining({
-      profileIdentity: runtimeProfile.identity,
-      subject: runtimeProfile.identity,
+      profileIdentity: defaultProfile.identity,
+      subject: defaultProfile.identity,
     }))
     expect(authenticate).toHaveBeenCalledWith(expect.objectContaining({
       profile: runtimeProfile,
@@ -124,7 +128,7 @@ describe('AuthSessionManager lifecycle and request policies', () => {
     expect(authenticate).not.toHaveBeenCalled()
   })
 
-  it('resolves inherit as anonymous when no default application profile exists', async () => {
+  it('resolves inherit as anonymous when no default profile exists', async () => {
     const runtime = createRuntime([], fakeAdapter(), () => now)
 
     expect(await runtime.requests.resolve({ mode: 'inherit' })).toEqual({
@@ -224,7 +228,7 @@ describe('AuthSessionManager lifecycle and request policies', () => {
     expect(authenticate).toHaveBeenCalledTimes(2)
   })
 
-  it('restores persisted application session after reset but drops memory-only sessions', async () => {
+  it('restores persisted default profile session after reset but drops memory-only sessions', async () => {
     const profile = authProfile()
     const adapter = fakeAdapter({
       authenticate: async () => tokenSet({ accessExpiresAt: now + 60_000 }),
@@ -314,7 +318,7 @@ function createRuntime(
   })
   const sessions = new AuthSessionManager(registry, adapters, store, {
     getWorkspaceIdentity: () => 'workspace',
-    onApplicationSessionChange: vi.fn(),
+    onSessionChange: vi.fn(),
     now: readNow,
   })
   return {
