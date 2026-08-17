@@ -62,6 +62,13 @@ export type CompositionBindingValue
     | { kind: 'data', data: string, path: string }
     | { kind: 'runtime-metadata', runtime: string, namespace?: string }
     | { kind: 'filter-fields', runtime: string, fields: string[] }
+    | {
+      kind: 'data-view'
+      data: string
+      path: string
+      identity: string
+      props: Record<string, CompositionBindingValue>
+    }
     | { kind: 'expression', expression: SourceExpressionIR }
 
 export interface CompositionDataDescriptor {

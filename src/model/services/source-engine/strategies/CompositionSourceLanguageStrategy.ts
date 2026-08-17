@@ -20,11 +20,11 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
     alias: 'Endge Composition Source',
     extension: '.endge-composition.ts',
     keywords: [
-      'component', 'composition', 'control', 'data', 'defineComposition', 'definePreviewProps', 'defineProps', 'filter', 'filterView', 'fromData', 'fromFilter', 'fromOutput', 'fromStore', 'manual', 'mock', 'onChange',
+      'component', 'composition', 'control', 'data', 'dataView', 'defineComposition', 'definePreviewProps', 'defineProps', 'filter', 'filterView', 'fromData', 'fromFilter', 'fromOutput', 'fromStore', 'manual', 'mock', 'onChange',
       'onMount', 'onSuccess', 'onEvent', 'event', 'action', 'update', 'output', 'policy', 'query', 'metadata', 'resources', 'scope', 'startup', 'stream', 'style', 'vocab', ...VALUE_EXPRESSION_FUNCTION_NAMES,
     ],
     functions: [
-      'activateOn', 'applyUpdate', 'batch', 'component', 'contextual', 'controls', 'debounce', 'dispatchTo', 'executeAction', 'fields', 'fromRuntime', 'fromScope', 'injected', 'isolated', 'mutate', 'persist', 'policy', 'run', 'select', 'slot', 'store', 'storeTo', 'vocab', 'withData', 'withProps', ...VALUE_EXPRESSION_METHOD_NAMES,
+      'activateOn', 'applyUpdate', 'batch', 'component', 'contextual', 'controls', 'dataView', 'debounce', 'dispatchTo', 'executeAction', 'fields', 'fromRuntime', 'fromScope', 'injected', 'isolated', 'mutate', 'persist', 'policy', 'run', 'select', 'slot', 'store', 'storeTo', 'vocab', 'withData', 'withProps', ...VALUE_EXPRESSION_METHOD_NAMES,
     ],
     properties: ['activateOn', 'data', 'dataMode', 'hooks', 'key', 'metadata', 'outputs', 'previewProps', 'props', 'resources', 'runtimes'],
   })
@@ -67,6 +67,7 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
       },
       methods: {
         component: 'component',
+        dataView: 'data-view',
       },
     })
   }
@@ -95,6 +96,9 @@ const COMPOSITION_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'injected', kind: 'function', insertText: `.injected()`, detail: 'Require an ancestor or explicit Store provider' },
   { label: 'slot', kind: 'function', insertText: `.slot('name')`, detail: 'Select a named Store provider slot' },
   { label: 'fromData', kind: 'function', insertText: `fromData('store.field')`, detail: 'Composition data binding' },
+  { label: 'fromData.dataView', kind: 'function', insertText: `fromData('store.field').dataView('data-view-identity', {
+  search: fromOutput('filter', 'search'),
+})`, detail: 'Parameterized materialized DataView binding' },
   { label: 'storeTo', kind: 'function', insertText: `.storeTo(data('store'), {
   raw: output('raw'),
 })`, detail: 'Atomic Query output publication to Store data' },

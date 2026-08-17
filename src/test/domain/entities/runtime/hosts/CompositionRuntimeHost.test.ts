@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
+import { RDataView } from '@/domain/entities/reflect/RDataView'
 import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RMock } from '@/domain/entities/reflect/RMock'
@@ -20,6 +21,7 @@ import { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/Composit
 import { StoreRuntimeHost } from '@/domain/entities/runtime/hosts/StoreRuntimeHost'
 import { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentSFCRuntimeHost'
 import { compileFilterSource } from '@/model/services/source-engine/compilers/filter-source-compile'
+import { compileDataViewSource } from '@/model/services/source-engine/compilers/data-view-source-compile'
 import { buildRuntimeGraph, compileCompositionSource } from '@/model/services/source-engine/compilers/composition-source-compile'
 import { Endge } from '@/model/kernel/endge'
 import { materializeCompositionPreviewProps } from '@/model/modules/runtime/execution/endge-composition'
@@ -138,6 +140,109 @@ describe('Composition runtime session', () => {
     await vi.advanceTimersByTimeAsync(20)
     expect(run).toHaveBeenCalledTimes(2)
     expect(Endge.runtime.getRuntimeHosts()).toEqual([])
+    await session.unmount()
+  })
+
+  it('materializes a parameterized local-filter DataView and keeps keyed Store updates incremental', async () => {
+    const store = new RStore()
+    store.id = 90
+    store.identity = 'schedule-store'
+    store.name = 'Schedule Store'
+    store.source = `defineStore({
+      data: {
+        flights: value([
+          { id: 1, flightNumber: 'SU101' },
+          { id: 2, flightNumber: 'S7202' },
+        ]),
+      },
+    })`
+    const filter = new RFilter()
+    filter.id = 91
+    filter.identity = 'schedule-filter'
+    filter.name = 'Schedule Filter'
+    filter.source = `defineFilter({
+      fields: { search: field('String').default('') },
+      outputs: {
+        search: output().json(({ value }) => lowerCase(trim(value('search')))),
+        request: output().json(() => ({})),
+      },
+    })`
+    const dataView = new RDataView()
+    dataView.id = 92
+    dataView.identity = 'schedule-local-filter'
+    dataView.name = 'Schedule Local Filter'
+    dataView.source = `defineDataView({
+      mode: 'pipeline',
+      props: defineProps({ search: field('String').default('') }),
+      incremental: filterByKey('id'),
+      steps: [from('').as('row')],
+      filter: ({ row, prop }) => or(
+        isEmpty(prop('search')),
+        includes(lowerCase(toString(row('flightNumber'))), prop('search')),
+      ),
+    })`
+    const component = RComponentSFC.fromPlain({
+      id: 93,
+      identity: 'schedule-table',
+      name: 'Schedule Table',
+      source: `<script setup lang="ts">
+defineProps<{ rows: Array<{ id: number, flightNumber: string }> }>()
+</script>
+<template>
+  <Table :rows="rows" row-key="id"><Column key="flightNumber" /></Table>
+</template>`,
+    })
+    const composition = new RComposition()
+    composition.id = 94
+    composition.identity = 'schedule-page-local-filter'
+    composition.name = 'Schedule Page Local Filter'
+    composition.source = `defineComposition({
+      data: { schedule: store('schedule-store') },
+      runtimes: {
+        filter: filter('schedule-filter'),
+        table: component('schedule-table').withProps({
+          rows: fromData('schedule.flights').dataView('schedule-local-filter', {
+            search: fromOutput('filter', 'search'),
+          }),
+        }),
+      },
+    })`
+
+    Endge.domain.addStore(store)
+    Endge.domain.addFilter(filter)
+    Endge.domain.addDataView(dataView)
+    Endge.domain.addComponentSFC(component)
+    Endge.domain.addComposition(composition)
+    const componentPayload = compileComponentSFC(component.source)
+    Endge.program.beginCompile('test')
+    Endge.program.addArtifact(artifact('store', store.id, store.identity, Endge.source.compile('store', store.source).artifact as StoreSourceArtifact))
+    Endge.program.addArtifact(artifact('filter', filter.id, filter.identity, compileFilterSource(filter.source).artifact!))
+    Endge.program.addArtifact(artifact('data-view', dataView.id, dataView.identity, compileDataViewSource(dataView.source).artifact!))
+    Endge.program.addArtifact(artifact('component-sfc', component.id, component.identity, componentPayload))
+    Endge.program.addArtifact(artifact('composition', composition.id, composition.identity, compileCompositionSource(composition.source).artifact!))
+
+    const session = await Endge.runtime.composition.mount(composition.identity)
+    const table = session.host.getChild('table') as ComponentSFCRuntimeHost
+    const filterRuntime = session.host.getChild('filter') as FilterRuntimeHost
+    const storeRuntime = Endge.runtime.getRuntimeHosts()
+      .find(host => host.entityIdentity === store.identity) as StoreRuntimeHost
+    const tableInput = table.getInputSource()
+    const rowsPath = tableInput?.kind === 'raph'
+      ? tableInput.bindings.rows?.path
+      : undefined
+
+    expect(rowsPath && Raph.get(rowsPath)).toEqual([
+      { id: 1, flightNumber: 'SU101' },
+      { id: 2, flightNumber: 'S7202' },
+    ])
+    await filterRuntime.action('set').run({ key: 'search', value: ' su ' })
+    expect(rowsPath && Raph.get(rowsPath)).toEqual([{ id: 1, flightNumber: 'SU101' }])
+
+    Raph.set(`${storeRuntime.getDataPath('flights')}[id=2].flightNumber`, 'SU202')
+    expect(rowsPath && Raph.get(rowsPath)).toEqual([
+      { id: 1, flightNumber: 'SU101' },
+      { id: 2, flightNumber: 'SU202' },
+    ])
     await session.unmount()
   })
 
@@ -984,7 +1089,7 @@ function installContextualStoreCompositions(input: {
 }
 
 function artifact<T>(
-  entityType: 'filter' | 'query' | 'composition' | 'store' | 'component-sfc' | 'update',
+  entityType: 'filter' | 'query' | 'composition' | 'store' | 'component-sfc' | 'data-view' | 'update',
   id: number,
   identity: string,
   payload: T,

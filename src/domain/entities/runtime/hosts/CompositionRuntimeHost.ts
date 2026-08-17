@@ -1,5 +1,6 @@
 import type { RComposition } from '@/domain/entities/reflect/RComposition'
 import type { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentSFCRuntimeHost'
+import type { RaphDerivedHandle } from '@endge/raph'
 import type { FilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
 import type { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
 import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
@@ -26,7 +27,7 @@ import type {
 } from '@/domain/types/component/sfc/ports.types'
 import type { CompositionComponentEventEffect } from '@/domain/types/source/composition-source.types'
 
-import { Raph, RaphNode } from '@endge/raph'
+import { collectionByKey, filterByKey, full, Raph, RaphNode } from '@endge/raph'
 
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 import { RuntimeScope } from '@/domain/entities/runtime/RuntimeScope'
@@ -70,6 +71,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   private _publicationDisposers = new Map<string, () => void>()
   private _disposers: Array<() => void> = []
   private _bridgePaths = new Set<string>()
+  private _bindingDerivedHandles: RaphDerivedHandle[] = []
   private _dataPaths = new Map<string, string>()
   private _storeRuntimeIds = new Map<string, string>()
   private _storeProviderRuntimeIds = new Map<string, Set<string>>()
@@ -468,14 +470,15 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
 
   private _prepareOutputBridges(payload: CompositionProgramPayload): void {
     for (const connection of payload.graph.inputs) {
-      if (connection.source.kind === 'output')
-        this._requireOutputBridge(connection.source.runtime, connection.source.output)
-      else if (connection.source.kind === 'outputs') {
-        for (const output of this._requireResolvedOutputs(connection.source.runtime, connection.source.outputs))
-          this._requireOutputBridge(connection.source.runtime, output)
-      }
-      else if (connection.source.kind === 'expression') {
-        for (const read of this._collectExpressionReads(connection.source.expression)) {
+      for (const binding of this._flattenBindings(connection.source)) {
+        if (binding.kind === 'output')
+          this._requireOutputBridge(binding.runtime, binding.output)
+        else if (binding.kind === 'outputs') {
+          for (const output of this._requireResolvedOutputs(binding.runtime, binding.outputs))
+            this._requireOutputBridge(binding.runtime, output)
+        }
+        else if (binding.kind === 'expression') {
+          for (const read of this._collectExpressionReads(binding.expression)) {
           if (read.source === 'composition-output')
             this._requireOutputBridge(read.parameters?.[0] ?? '', read.parameters?.[1] ?? '')
           else if (read.source === 'composition-outputs') {
@@ -483,6 +486,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
             for (const output of outputs)
               this._requireOutputBridge(runtime, output)
           }
+        }
         }
       }
     }
@@ -552,6 +556,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       clearTimeout(timer)
     this._streamBatchTimers.clear()
     this._streamBatches.clear()
+    for (const handle of [...this._bindingDerivedHandles].reverse())
+      handle.dispose()
+    this._bindingDerivedHandles = []
     for (const dispose of this._disposers)
       dispose()
     this._disposers = []
@@ -1013,11 +1020,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
           literals[prop] = binding.value
           continue
         }
-        const path = binding.kind === 'store'
-          ? binding.key
-          : binding.kind === 'data'
-            ? this._requireDataPath(binding.data, binding.path)
-          : this._materializeBinding(descriptor.name, prop, binding)
+        const path = this._bindingPath(descriptor.name, prop, binding)
         bindings[prop] = { path }
       }
       const input: RuntimeHostInputSource = Object.keys(bindings).length
@@ -1326,6 +1329,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       return this._readRuntimeMetadata(binding.runtime, binding.namespace)
     if (binding.kind === 'filter-fields')
       return this._readFilterFieldsBinding(binding)
+    if (binding.kind === 'data-view')
+      return undefined
     if (binding.kind === 'outputs')
       return this._readRuntimeOutputs(binding.runtime, this._requireResolvedOutputs(binding.runtime, binding.outputs))
     if (binding.kind === 'expression') {
@@ -1385,6 +1390,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }
     if (binding.kind === 'runtime-metadata')
       return
+    if (binding.kind === 'data-view')
+      return
     if (binding.kind === 'filter-fields') {
       const runtime = this._children.get(binding.runtime)
       if (!runtime)
@@ -1429,6 +1436,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       return binding.key
     if (binding.kind === 'data')
       return this._requireDataPath(binding.data, binding.path)
+    if (binding.kind === 'data-view')
+      return this._materializeDataViewBinding(runtimeName, prop, binding)
     if (binding.kind === 'output')
       return this._requireOutputBridge(binding.runtime, binding.output)
     return this._materializeBinding(runtimeName, prop, binding)
@@ -1445,6 +1454,44 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     this._subscribeBinding(binding, sync)
     this._bridgePaths.add(path)
     return path
+  }
+
+  /** Материализует parameterized DataView binding без отдельного runtime host. */
+  private _materializeDataViewBinding(
+    runtimeName: string,
+    prop: string,
+    binding: Extract<CompositionBindingValue, { kind: 'data-view' }>,
+  ): string {
+    const artifact = Endge.program.getDataViewArtifact(binding.identity)
+    if (!artifact || artifact.status === 'error')
+      throw new Error(`[CompositionRuntimeHost] DataView "${binding.identity}" is missing or invalid.`)
+
+    const from = this._requireDataPath(binding.data, binding.path)
+    const to = `${this.basePath}.bindings.${encodePathPart(runtimeName)}.${encodePathPart(prop)}`
+    const strategy = artifact.payload.materializationStrategy.kind === 'filter-by-key'
+      ? filterByKey(artifact.payload.materializationStrategy.key)
+      : artifact.payload.materializationStrategy.kind === 'collection-by-key'
+        ? collectionByKey(artifact.payload.materializationStrategy.key)
+        : full()
+    const readProps = () => Object.fromEntries(
+      Object.entries(binding.props).map(([key, value]) => [key, this._readBinding(value)]),
+    )
+    const handle = Raph.derive({
+      id: `${this.id}:${runtimeName}:${prop}:data-view`,
+      from,
+      to,
+      strategy,
+      disposeTarget: 'delete',
+      compute: input => Endge.runtime.dataView.runArtifact(artifact, input, undefined, {
+        props: readProps(),
+      }),
+    })
+    this.node?.addChild(handle.node, { invalidate: false })
+    this._bindingDerivedHandles.push(handle)
+    for (const propBinding of Object.values(binding.props))
+      this._subscribeBinding(propBinding, () => handle.recompute())
+    this._bridgePaths.add(to)
+    return to
   }
 
   /** Гарантирует, что список outputs для fromOutput(runtime) был связан до запуска runtime. */
@@ -1534,6 +1581,12 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     if (expression.type === 'object')
       return Object.values(expression.properties).flatMap(argument => this._collectExpressionReads(argument))
     return []
+  }
+
+  private _flattenBindings(binding: CompositionBindingValue): CompositionBindingValue[] {
+    return binding.kind === 'data-view'
+      ? [binding, ...Object.values(binding.props).flatMap(item => this._flattenBindings(item))]
+      : [binding]
   }
 
   private _subscribeExpressionRead(

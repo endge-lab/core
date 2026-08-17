@@ -17,7 +17,7 @@ import type { DataViewProgramPayload, ProgramDiagnostic } from '@/domain/types/p
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
 import { compileProgramMetadataProperty } from '@/model/services/source-engine/compilers/source-metadata-compile'
-import { compileSourceExpression } from '@/model/services/source-engine/compilers/source-expression-compile'
+import { compileSourceCallback, compileSourceExpression } from '@/model/services/source-engine/compilers/source-expression-compile'
 import { compileSourceField } from '@/model/services/source-engine/compilers/source-field-compile'
 import { readSourceModelIdentity, readSourceModelReference } from '@/model/services/source-engine/compilers/source-model-reference-compile'
 
@@ -99,7 +99,9 @@ function parseDocument(
 ): DataViewSourceDocument {
   const declaredMode = readStringProperty(definition, 'mode')
   const incremental = readIncrementalRequest(definition, diagnostics)
+  const props = readDataViewProps(definition, source, diagnostics)
   const contract = readDataViewContract(definition, source, diagnostics)
+  const filter = readDataViewFilter(definition, diagnostics)
   const transformNode = readObjectProperty(definition, 'transform')
   const stepsNode = readArrayProperty(definition, 'steps')
   const outputValue = readPropertyValue(definition, 'output')
@@ -145,7 +147,7 @@ function parseDocument(
         'output',
       ))
     }
-    if (incremental.mode === 'collection-by-key') {
+    if (incremental.mode === 'collection-by-key' || incremental.mode === 'filter-by-key') {
       diagnostics.push(createDiagnostic(
         'error',
         'data-view-source-incremental-projection',
@@ -153,7 +155,9 @@ function parseDocument(
         'incremental',
       ))
     }
-    return { mode, incremental, contract, output }
+    if (filter)
+      diagnostics.push(createDiagnostic('error', 'data-view-source-filter-mode', 'filter поддерживается только в pipeline DataView.', 'filter'))
+    return { mode, incremental, props, contract, filter, output }
   }
 
   if (mode === 'expression') {
@@ -168,7 +172,7 @@ function parseDocument(
         'output',
       ))
     }
-    if (incremental.mode === 'collection-by-key') {
+    if (incremental.mode === 'collection-by-key' || incremental.mode === 'filter-by-key') {
       diagnostics.push(createDiagnostic(
         'error',
         'data-view-source-incremental-expression',
@@ -176,7 +180,9 @@ function parseDocument(
         'incremental',
       ))
     }
-    return { mode, incremental, contract, expression: expression ?? undefined }
+    if (filter)
+      diagnostics.push(createDiagnostic('error', 'data-view-source-filter-mode', 'filter поддерживается только в pipeline DataView.', 'filter'))
+    return { mode, incremental, props, contract, filter, expression: expression ?? undefined }
   }
 
   if (mode === 'manual') {
@@ -189,7 +195,7 @@ function parseDocument(
         'transform',
       ))
     }
-    if (incremental.mode === 'collection-by-key') {
+    if (incremental.mode === 'collection-by-key' || incremental.mode === 'filter-by-key') {
       diagnostics.push(createDiagnostic(
         'error',
         'data-view-source-incremental-manual',
@@ -197,7 +203,9 @@ function parseDocument(
         'incremental',
       ))
     }
-    return { mode, incremental, contract, transform: transform ?? undefined }
+    if (filter)
+      diagnostics.push(createDiagnostic('error', 'data-view-source-filter-mode', 'filter поддерживается только в pipeline DataView.', 'filter'))
+    return { mode, incremental, props, contract, filter, transform: transform ?? undefined }
   }
 
   const steps = stepsNode ? readPipelineSteps(stepsNode, source, diagnostics) : []
@@ -211,6 +219,31 @@ function parseDocument(
   }
   validatePipelineStepKinds(steps, diagnostics)
 
+  if (filter && steps.some(step => step.type === 'select')) {
+    diagnostics.push(createDiagnostic(
+      'error',
+      'data-view-source-filter-select',
+      'filter нельзя сочетать с select(...); используйте row-local from/map pipeline.',
+      'filter',
+    ))
+  }
+
+  if (filter && incremental.mode === 'collection-by-key') {
+    diagnostics.push(createDiagnostic(
+      'error',
+      'data-view-source-filter-strategy',
+      'DataView с filter должен использовать filterByKey(key) или full().',
+      'incremental',
+    ))
+  }
+  if (!filter && incremental.mode === 'filter-by-key') {
+    diagnostics.push(createDiagnostic(
+      'error',
+      'data-view-source-filter-missing',
+      'filterByKey(key) требует top-level filter predicate.',
+      'filter',
+    ))
+  }
   if (incremental.mode === 'collection-by-key' && !isRowLocalPipeline(steps, incremental.key)) {
     diagnostics.push(createDiagnostic(
       'error',
@@ -219,8 +252,77 @@ function parseDocument(
       'incremental',
     ))
   }
+  if (incremental.mode === 'filter-by-key' && (!isFilterRowLocalPipeline(steps, incremental.key) || !isDataViewFilterExpression(filter, new Set(props.map(prop => prop.key))))) {
+    diagnostics.push(createDiagnostic(
+      'error',
+      'data-view-source-filter-not-row-local',
+      `DataView не доказывает row-local семантику для filterByKey("${incremental.key}").`,
+      'incremental',
+    ))
+  }
 
-  return { mode, incremental, contract, steps }
+  return { mode, incremental, props, contract, filter, steps }
+}
+
+function readDataViewProps(
+  definition: t.ObjectExpression,
+  source: string,
+  diagnostics: DiagnosticDraft[],
+): import('@/domain/types/source/source-expression.types').SourceFieldDefinition[] {
+  const raw = readPropertyValue(definition, 'props')
+  if (!raw)
+    return []
+  if (!t.isCallExpression(raw) || !t.isIdentifier(raw.callee, { name: 'defineProps' })) {
+    diagnostics.push(createDiagnostic('error', 'data-view-source-props-shape', 'props должен быть defineProps({...}).', 'props'))
+    return []
+  }
+  const object = raw.arguments[0]
+  if (!object || !t.isObjectExpression(object)) {
+    diagnostics.push(createDiagnostic('error', 'data-view-source-props-object', 'defineProps принимает object literal.', 'props'))
+    return []
+  }
+
+  const props: import('@/domain/types/source/source-expression.types').SourceFieldDefinition[] = []
+  const declared = new Set<string>()
+  for (const property of object.properties) {
+    if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
+      diagnostics.push(createDiagnostic('error', 'data-view-source-prop-property', 'defineProps допускает обычные properties.', 'props'))
+      continue
+    }
+    const key = getPropertyName(property.key)
+    if (!key || declared.has(key)) {
+      if (key)
+        diagnostics.push(createDiagnostic('error', 'data-view-source-prop-duplicate', `Prop "${key}" объявлен повторно.`, `props.${key}`))
+      continue
+    }
+    const compiled = compileSourceField(key, property.value, source, diagnostics, `props.${key}`, {
+      allowInlineTypeExpressions: true,
+    })
+    if (compiled) {
+      props.push(compiled.field)
+      declared.add(key)
+    }
+  }
+  return props
+}
+
+function readDataViewFilter(
+  definition: t.ObjectExpression,
+  diagnostics: DiagnosticDraft[],
+): SourceExpressionIR | null {
+  const property = readObjectProperty(definition, 'filter')
+  if (!property || !t.isObjectProperty(property))
+    return null
+  if (!t.isExpression(property.value)) {
+    diagnostics.push(createDiagnostic(
+      'error',
+      'data-view-source-filter-callback',
+      'filter должен быть callback expression.',
+      'filter',
+    ))
+    return null
+  }
+  return compileSourceCallback(property.value, diagnostics, 'filter')
 }
 
 function readDataViewContract(
@@ -302,7 +404,7 @@ function readIncrementalRequest(
     return { mode: 'auto' }
   const expression = unwrapExpression(node)
   if (!t.isCallExpression(expression) || !t.isIdentifier(expression.callee)) {
-    diagnostics.push(createDiagnostic('error', 'data-view-source-incremental-shape', 'incremental должен быть auto(), full() или collectionByKey(key).', 'incremental'))
+    diagnostics.push(createDiagnostic('error', 'data-view-source-incremental-shape', 'incremental должен быть auto(), full(), collectionByKey(key) или filterByKey(key).', 'incremental'))
     return { mode: 'auto' }
   }
   if (expression.callee.name === 'auto' && expression.arguments.length === 0)
@@ -316,7 +418,14 @@ function readIncrementalRequest(
     diagnostics.push(createDiagnostic('error', 'data-view-source-incremental-key', 'collectionByKey требует непустой строковый key.', 'incremental'))
     return { mode: 'auto' }
   }
-  diagnostics.push(createDiagnostic('error', 'data-view-source-incremental-unsupported', 'incremental поддерживает только auto(), full() и collectionByKey(key).', 'incremental'))
+  if (expression.callee.name === 'filterByKey') {
+    const key = expression.arguments[0]
+    if (t.isStringLiteral(key) && key.value.trim())
+      return { mode: 'filter-by-key', key: key.value.trim() }
+    diagnostics.push(createDiagnostic('error', 'data-view-source-incremental-key', 'filterByKey требует непустой строковый key.', 'incremental'))
+    return { mode: 'auto' }
+  }
+  diagnostics.push(createDiagnostic('error', 'data-view-source-incremental-unsupported', 'incremental поддерживает только auto(), full(), collectionByKey(key) и filterByKey(key).', 'incremental'))
   return { mode: 'auto' }
 }
 
@@ -678,6 +787,8 @@ function createDataViewArtifact(document: DataViewSourceDocument): DataViewProgr
     materializationStrategy: resolveMaterializationStrategy(document),
     sourceDocument: document,
     contract: document.contract,
+    props: document.props,
+    filter: document.filter ?? null,
     transform: document.transform ?? null,
     steps: document.steps ?? [],
     output: document.output ?? {},
@@ -690,9 +801,39 @@ function resolveMaterializationStrategy(document: DataViewSourceDocument): DataV
     return { kind: 'full' }
   if (document.incremental.mode === 'collection-by-key')
     return { kind: 'collection-by-key', key: document.incremental.key }
+  if (document.incremental.mode === 'filter-by-key')
+    return { kind: 'filter-by-key', key: document.incremental.key }
+  if (document.filter)
+    return { kind: 'full' }
   return isRowLocalPipeline(document.steps ?? [], 'id')
     ? { kind: 'collection-by-key', key: 'id' }
     : { kind: 'full' }
+}
+
+function isFilterRowLocalPipeline(steps: DataViewPipelineStep[], key: string): boolean {
+  if (steps.length === 1 && steps[0]?.type === 'from')
+    return steps[0].source === '' && !steps[0].dataViews?.length
+  return isRowLocalPipeline(steps, key)
+}
+
+function isDataViewFilterExpression(
+  expression: SourceExpressionIR | null,
+  propKeys: ReadonlySet<string>,
+): boolean {
+  if (!expression)
+    return false
+  if (expression.type === 'read') {
+    if (expression.source === 'row')
+      return true
+    return expression.source === 'prop' && propKeys.has(expression.path)
+  }
+  if (expression.type === 'operation')
+    return expression.arguments.every(argument => isDataViewFilterExpression(argument, propKeys))
+  if (expression.type === 'array')
+    return expression.items.every(argument => isDataViewFilterExpression(argument, propKeys))
+  if (expression.type === 'object')
+    return Object.values(expression.properties).every(argument => isDataViewFilterExpression(argument, propKeys))
+  return true
 }
 
 function isRowLocalPipeline(steps: DataViewPipelineStep[], key: string): boolean {

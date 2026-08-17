@@ -20,12 +20,12 @@ export class DataViewSourceLanguageStrategy implements SourceLanguageStrategy {
     alias: 'Endge DataView Source',
     extension: '.endge-data-view.ts',
     keywords: [
-      'auto', 'collectionByKey', 'contract', 'convert', 'converter', 'dataView', 'defineDataView', 'field',
-      'from', 'full', 'incremental', 'join', 'map', 'output', 'path', 'pick', 'select', 'spread',
+      'auto', 'collectionByKey', 'contract', 'convert', 'converter', 'dataView', 'defineDataView', 'defineProps', 'field',
+      'filter', 'filterByKey', 'from', 'full', 'incremental', 'join', 'map', 'output', 'path', 'pick', 'prop', 'select', 'spread',
       'template', 'transform', ...VALUE_EXPRESSION_FUNCTION_NAMES,
     ],
-    functions: ['as', 'auto', 'by', 'collectionByKey', 'convert', 'converter', 'dataView', 'find', 'from', 'full', 'join', 'map', 'pick', 'select', ...VALUE_EXPRESSION_METHOD_NAMES],
-    properties: ['contract', 'incremental', 'input', 'left', 'manual', 'metadata', 'mode', 'output', 'pipeline', 'right', 'steps', 'tools'],
+    functions: ['as', 'auto', 'by', 'collectionByKey', 'convert', 'converter', 'dataView', 'filterByKey', 'find', 'from', 'full', 'join', 'map', 'pick', 'prop', 'select', ...VALUE_EXPRESSION_METHOD_NAMES],
+    properties: ['contract', 'filter', 'incremental', 'input', 'left', 'manual', 'metadata', 'mode', 'output', 'pipeline', 'props', 'right', 'steps', 'tools'],
   })
 
   /** Проверяет, что strategy обслуживает DataView source. */
@@ -145,6 +145,9 @@ const DATA_VIEW_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'incremental.auto', kind: 'property', insertText: 'incremental: auto(),', detail: 'Автоматический выбор full/byKey (default)' },
   { label: 'incremental.full', kind: 'property', insertText: 'incremental: full(),', detail: 'Всегда полный пересчет' },
   { label: 'incremental.collectionByKey', kind: 'property', insertText: `incremental: collectionByKey('id'),`, detail: 'Явный row-local incremental contract' },
+  { label: 'incremental.filterByKey', kind: 'property', insertText: `incremental: filterByKey('id'),`, detail: 'Row-local zero-or-one filtering contract' },
+  { label: 'props', kind: 'property', insertText: `props: defineProps({\n  search: field('String').default(''),\n}),`, detail: 'Параметры одного вызова DataView' },
+  { label: 'filter', kind: 'property', insertText: `filter: ({ row, prop }) => or(\n  isEmpty(prop('search')),\n),`, detail: 'Predicate над итоговой строкой pipeline' },
   { label: 'from', kind: 'function', insertText: `from('items').as('item')`, detail: 'Берет input array' },
   { label: 'from.dataView', kind: 'function', insertText: `from('items').dataView('normalize').as('item')`, detail: 'Применяет DataView перед map' },
   { label: 'dataView', kind: 'function', insertText: `dataView('data-view-identity')`, detail: 'Ссылка на доменный DataView' },

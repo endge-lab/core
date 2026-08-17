@@ -4,7 +4,7 @@ import type { StoreDataDescriptor, StoreSourceArtifact, StoreValueDescriptor } f
 import type { StoreMutationPlan, UpdateSourceArtifact } from '@/domain/types/source/update-source.types'
 import type { StreamEventEnvelope } from '@/domain/types/source/stream-source.types'
 
-import { Raph, RaphNode, full, type RaphDerivedHandle } from '@endge/raph'
+import { collectionByKey, filterByKey, Raph, RaphNode, full, type RaphDerivedHandle } from '@endge/raph'
 
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 import { Endge } from '@/model/kernel/endge'
@@ -231,11 +231,17 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
       if (field.kind !== 'derived')
         continue
 
+      const materialization = field.materializationStrategy ?? { kind: 'full' as const }
+      const strategy = materialization.kind === 'collection-by-key'
+        ? collectionByKey(materialization.key)
+        : materialization.kind === 'filter-by-key'
+          ? filterByKey(materialization.key)
+          : full()
       const handle = Raph.derive({
         id: `${this.id}:derived:${field.key}`,
         from: this.getDataPath(field.source),
         to: this.getDataPath(field.key),
-        strategy: full(),
+        strategy,
         immediate: true,
         disposeTarget: 'delete',
         compute: input => input === undefined

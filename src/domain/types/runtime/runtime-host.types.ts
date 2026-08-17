@@ -379,8 +379,37 @@ export interface RuntimeCollectionProjectionUpdatePatch {
   node: RaphNode
 }
 
+/** Одно keyed изменение строки внутри пакетного patch коллекции. */
+export interface RuntimeCollectionItemPatch {
+  /** Текущий индекс строки; null означает, что строка удалена из результата. */
+  itemIndex: number | null
+
+  /** Стабильный ключ строки из selector или актуального snapshot. */
+  itemKey: unknown
+
+  /** Актуальный snapshot строки; null/undefined означает удаление. */
+  itemSnapshot: unknown
+
+  /** Измененные относительные paths внутри строки. */
+  changedPaths: string[][]
+}
+
+/** Пакет keyed изменений одной коллекции за один Raph frame. */
+export interface RuntimeCollectionProjectionBatchPatch {
+  kind: 'collection-projection-batch'
+  boundaryId: string
+  boundaryType: 'table'
+  sourcePath: string
+  items: RuntimeCollectionItemPatch[]
+  affectedProjections: RuntimeCollectionProjectionPatch[]
+  events: PhaseEvent[]
+  node: RaphNode
+}
+
 /** Нейтральный patch runtime boundary для render adapter-а. */
-export type RuntimeBoundaryPatch = RuntimeCollectionProjectionUpdatePatch
+export type RuntimeBoundaryPatch
+  = RuntimeCollectionProjectionUpdatePatch
+    | RuntimeCollectionProjectionBatchPatch
 
 export interface RuntimeHost<
   TType extends RuntimeEntityType = RuntimeEntityType,

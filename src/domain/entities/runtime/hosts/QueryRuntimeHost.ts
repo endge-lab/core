@@ -9,6 +9,7 @@ import {
   Raph,
   RaphNode,
   collectionByKey,
+  filterByKey,
   full,
   type RaphDerivedHandle,
 } from '@endge/raph'
@@ -353,7 +354,9 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
       const to = this._requireOutputPath(output.key)
       const strategy = output.materialization.strategy.kind === 'collection-by-key'
         ? collectionByKey(output.materialization.strategy.key)
-        : full()
+        : output.materialization.strategy.kind === 'filter-by-key'
+          ? filterByKey(output.materialization.strategy.key)
+          : full()
       try {
         const handle = Raph.derive({
           id: `${this.id}:${output.key}`,

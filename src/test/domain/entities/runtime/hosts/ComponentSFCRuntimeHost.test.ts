@@ -186,6 +186,28 @@ defineProps<{
         number: 'SSE-2',
       }),
     })
+
+    Raph.set('test.sfc.flights', [
+      { id: 'flight-1', number: 'SSE-2', counter: 1 },
+      { id: 'flight-2', number: 'S7 101', counter: 0 },
+    ])
+    patches.length = 0
+    propsUpdates.length = 0
+    Raph.transaction(() => {
+      Raph.set('test.sfc.flights[id="flight-1"].counter', 2)
+      Raph.set('test.sfc.flights[id="flight-2"].counter', 1)
+    })
+
+    expect(propsUpdates).toHaveLength(0)
+    expect(patches).toHaveLength(1)
+    expect(patches[0]).toMatchObject({
+      kind: 'collection-projection-batch',
+      sourcePath: 'test.sfc.flights',
+      items: [
+        expect.objectContaining({ itemIndex: 0, itemKey: 'flight-1', changedPaths: [['counter']] }),
+        expect.objectContaining({ itemIndex: 1, itemKey: 'flight-2', changedPaths: [['counter']] }),
+      ],
+    })
   })
 
   it('publishes declared Event ports through the host API', async () => {

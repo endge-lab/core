@@ -168,7 +168,12 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
   private _patch(payload: unknown): void {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload))
       throw new Error('[FilterRuntimeHost] patch payload must be an object.')
-    this._replaceState({ ...this.getState(), ...this._normalizePatch(payload as Record<string, unknown>, true) }, true)
+    const patch = this._normalizePatch(payload as Record<string, unknown>, true)
+    this._replaceState(
+      { ...this.getState(), ...patch },
+      true,
+      new Set(Object.keys(patch)),
+    )
   }
 
   private _set(payload: unknown): void {
@@ -189,11 +194,20 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
     this._replaceState(state, emit)
   }
 
-  private _replaceState(state: Record<string, unknown>, emit: boolean): void {
+  private _replaceState(
+    state: Record<string, unknown>,
+    emit: boolean,
+    invalidatedFields?: ReadonlySet<string>,
+  ): void {
+    const previous = this.getState()
+    const changedFields = new Set(
+      [...new Set([...Object.keys(previous), ...Object.keys(state)])]
+        .filter(key => !filterValuesEqual(previous[key], state[key])),
+    )
     let changedOutputs: Array<{ key: string, output: FilterRuntimeOutput }> = []
     Raph.transaction(() => {
       Raph.set(this.statePath(), state)
-      changedOutputs = this._recomputeOutputs(emit)
+      changedOutputs = this._recomputeOutputs(emit ? (invalidatedFields ?? changedFields) : null, emit)
     })
     if (this.runtimeState)
       this.runtimeState.set(`filter:${this.entityIdentity}`, 'state', this.getState())
@@ -207,31 +221,39 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
     }
   }
 
-  private _recomputeOutputs(emit: boolean): Array<{ key: string, output: FilterRuntimeOutput }> {
+  private _recomputeOutputs(
+    changedFields: ReadonlySet<string> | null,
+    emit: boolean,
+  ): Array<{ key: string, output: FilterRuntimeOutput }> {
     const payload = this.getArtifactPayload()
-    const next = new Map<string, FilterRuntimeOutput>()
+    const next = new Map(this._outputs)
     const changed: Array<{ key: string, output: FilterRuntimeOutput }> = []
     for (const output of payload?.outputs ?? []) {
-      if (output.kind === 'json') {
-        next.set(output.key, {
+      if (
+        changedFields
+        && output.dependencies
+        && !output.dependencies.some(key => changedFields.has(key))
+      ) {
+        continue
+      }
+      const runtimeOutput: FilterRuntimeOutput = output.kind === 'json'
+        ? {
           key: output.key,
           kind: 'json',
           value: evaluateSourceExpression(output.expression, { values: this.getState() }),
-        })
-      }
-      else {
-        next.set(output.key, {
+        }
+        : {
           key: output.key,
           kind: 'predicate',
           test: row => Boolean(evaluateSourceExpression(output.expression, { row, values: this.getState() })),
-        })
-      }
-    }
-
-    for (const [key, output] of next) {
+        }
+      next.set(output.key, runtimeOutput)
       if (emit)
-        changed.push({ key, output })
-      Raph.set(this.outputPath(key), output.kind === 'json' ? output.value : output.test)
+        changed.push({ key: output.key, output: runtimeOutput })
+      Raph.set(
+        this.outputPath(output.key),
+        runtimeOutput.kind === 'json' ? runtimeOutput.value : runtimeOutput.test,
+      )
     }
     this._outputs = next
     return changed
@@ -275,5 +297,16 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
     if (field.type === 'Object')
       return typeof value === 'object' && !Array.isArray(value)
     return typeof value === 'string'
+  }
+}
+
+function filterValuesEqual(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right))
+    return true
+  try {
+    return JSON.stringify(left) === JSON.stringify(right)
+  }
+  catch {
+    return false
   }
 }

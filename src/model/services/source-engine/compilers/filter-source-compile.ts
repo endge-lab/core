@@ -170,9 +170,10 @@ function readOutput(
     if (!compiled)
       return null
     validateOutputExpression(method, compiled, diagnostics, `outputs.${key}`)
+    const dependencies = collectValueDependencies(compiled)
     return method === 'json'
-      ? { key, kind: 'json', expression: compiled }
-      : { key, kind: 'predicate', expression: compiled }
+      ? { key, kind: 'json', expression: compiled, dependencies }
+      : { key, kind: 'predicate', expression: compiled, dependencies }
   }
 
   diagnostics.push(diagnostic('error', 'filter-source-output-method', `output().${method}(...) не поддерживается.`, `outputs.${key}`, expression))
@@ -186,7 +187,7 @@ function validateOutputExpression(
   sourcePath: string,
 ): void {
   const allowedOperations = kind === 'json'
-    ? new Set(['merge', 'compact', 'in-list'])
+    ? new Set(['merge', 'compact', 'in-list', 'trim', 'lower-case', 'upper-case', 'to-string'])
     : new Set(['and', 'between', 'in-array'])
   const allowedReads = kind === 'json'
     ? new Set(['value'])
@@ -222,6 +223,25 @@ function validateOutputExpression(
     }
   }
   visit(expression)
+}
+
+function collectValueDependencies(expression: SourceExpressionIR): string[] {
+  const dependencies = new Set<string>()
+  const visit = (node: SourceExpressionIR) => {
+    if (node.type === 'read') {
+      if (node.source === 'value' && node.path)
+        dependencies.add(node.path)
+      return
+    }
+    if (node.type === 'operation')
+      node.arguments.forEach(visit)
+    else if (node.type === 'array')
+      node.items.forEach(visit)
+    else if (node.type === 'object')
+      Object.values(node.properties).forEach(visit)
+  }
+  visit(expression)
+  return [...dependencies]
 }
 
 function unsupportedOutput(key: string, node: t.Node, diagnostics: DiagnosticDraft[]): null {

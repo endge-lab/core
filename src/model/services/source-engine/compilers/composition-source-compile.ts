@@ -992,6 +992,11 @@ function readBindings(
     if (!key)
       continue
     const expression = unwrapExpression(property.value)
+    const dataViewBinding = readCompositionDataViewBinding(expression, diagnostics, `${sourcePath}.${key}`)
+    if (dataViewBinding) {
+      bindings[key] = dataViewBinding
+      continue
+    }
     if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'fromOutput' })) {
       const runtime = readStringArgument(expression, 0)
       const output = readStringArgument(expression, 1)
@@ -1069,6 +1074,18 @@ function resolveVisibleDataBindings(
         return [key, binding]
       }
       return [key, { ...binding, data: resolved }]
+    }
+    if (binding.kind === 'data-view') {
+      const resolved = visibleData.get(binding.data)
+      if (!resolved) {
+        diagnostics.push(diagnostic('error', 'composition-binding-data-missing', `fromData(...) ссылается на недоступный data alias "${binding.data}".`, `${sourcePath}.${key}`))
+        return [key, binding]
+      }
+      return [key, {
+        ...binding,
+        data: resolved,
+        props: resolveVisibleDataBindings(binding.props, visibleData, diagnostics, `${sourcePath}.${key}.dataView`),
+      }]
     }
     if (binding.kind === 'expression') {
       return [key, {
@@ -1496,8 +1513,9 @@ function validateBindingReferences(
       }
     }
     for (const [prop, binding] of Object.entries(runtime.props)) {
-      if (binding.kind === 'expression') {
-        for (const read of collectExpressionReads(binding.expression)) {
+      for (const nestedBinding of flattenCompositionBindings(binding)) {
+      if (nestedBinding.kind === 'expression') {
+        for (const read of collectExpressionReads(nestedBinding.expression)) {
           const runtimeRef = read.source === 'composition-output' || read.source === 'composition-outputs' || read.source === 'composition-filter-fields' || read.source === 'composition-runtime-metadata'
             ? read.parameters?.[0]
             : undefined
@@ -1517,37 +1535,38 @@ function validateBindingReferences(
             diagnostics.push(diagnostic('error', 'composition-binding-prop-missing', `prop(...) ссылается на необъявленный Composition prop "${propRef}".`, `runtimes.${runtime.name}.withProps.${prop}`))
         }
       }
-      if ((binding.kind === 'output' || binding.kind === 'outputs' || binding.kind === 'filter-fields') && !runtimeByName.has(binding.runtime)) {
+      if ((nestedBinding.kind === 'output' || nestedBinding.kind === 'outputs' || nestedBinding.kind === 'filter-fields') && !runtimeByName.has(nestedBinding.runtime)) {
         diagnostics.push(diagnostic(
           'error',
           'composition-binding-runtime-missing',
-          `Binding ссылается на отсутствующий runtime "${binding.runtime}".`,
+          `Binding ссылается на отсутствующий runtime "${nestedBinding.runtime}".`,
           `runtimes.${runtime.name}.withProps.${prop}`,
         ))
       }
-      if (binding.kind === 'runtime-metadata' && !runtimeByName.has(binding.runtime)) {
+      if (nestedBinding.kind === 'runtime-metadata' && !runtimeByName.has(nestedBinding.runtime)) {
         diagnostics.push(diagnostic(
           'error',
           'composition-binding-runtime-missing',
-          `metadataOf(...) ссылается на отсутствующий runtime "${binding.runtime}".`,
+          `metadataOf(...) ссылается на отсутствующий runtime "${nestedBinding.runtime}".`,
           `runtimes.${runtime.name}.withProps.${prop}`,
         ))
       }
-      if (binding.kind === 'filter-fields' && runtimeByName.get(binding.runtime)?.kind !== 'filter') {
+      if (nestedBinding.kind === 'filter-fields' && runtimeByName.get(nestedBinding.runtime)?.kind !== 'filter') {
         diagnostics.push(diagnostic(
           'error',
           'composition-binding-filter-runtime-kind',
-          `fromFilter(...) должен ссылаться на Filter runtime, получен "${runtimeByName.get(binding.runtime)?.kind ?? ''}".`,
+          `fromFilter(...) должен ссылаться на Filter runtime, получен "${runtimeByName.get(nestedBinding.runtime)?.kind ?? ''}".`,
           `runtimes.${runtime.name}.withProps.${prop}`,
         ))
       }
-      if (binding.kind === 'data' && !dataByName.has(binding.data)) {
+      if ((nestedBinding.kind === 'data' || nestedBinding.kind === 'data-view') && !dataByName.has(nestedBinding.data)) {
         diagnostics.push(diagnostic(
           'error',
           'composition-binding-data-missing',
-          `fromData(...) ссылается на отсутствующий data alias "${binding.data}".`,
+          `fromData(...) ссылается на отсутствующий data alias "${nestedBinding.data}".`,
           `runtimes.${runtime.name}.withProps.${prop}`,
         ))
+      }
       }
     }
     for (const publication of runtime.storeTo) {
@@ -1580,6 +1599,7 @@ function validateRuntimeCycles(
   const edges = new Map<string, string[]>()
   for (const runtime of runtimes) {
     const propEdges = Object.values(runtime.props)
+      .flatMap(binding => flattenCompositionBindings(binding))
       .flatMap((binding) => {
         if (binding.kind === 'output' || binding.kind === 'outputs' || binding.kind === 'filter-fields')
           return [binding.runtime]
@@ -1619,6 +1639,12 @@ function validateRuntimeCycles(
       return
     }
   }
+}
+
+function flattenCompositionBindings(binding: CompositionBindingValue): CompositionBindingValue[] {
+  return binding.kind === 'data-view'
+    ? [binding, ...Object.values(binding.props).flatMap(flattenCompositionBindings)]
+    : [binding]
 }
 
 function collectExpressionReads(expression: import('@/domain/types/source/source-expression.types').SourceExpressionIR): Array<Extract<import('@/domain/types/source/source-expression.types').SourceExpressionIR, { type: 'read' }>> {
@@ -1671,6 +1697,56 @@ function readOutputReference(raw: t.Expression): string | null {
   return t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'output' })
     ? readStringArgument(expression, 0)
     : null
+}
+
+function readCompositionDataViewBinding(
+  expression: t.Expression,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+): Extract<CompositionBindingValue, { kind: 'data-view' }> | null {
+  if (!t.isCallExpression(expression) || !t.isMemberExpression(expression.callee))
+    return null
+  if (propertyName(expression.callee.property) !== 'dataView' || !t.isExpression(expression.callee.object))
+    return null
+
+  const sourceCall = unwrapExpression(expression.callee.object)
+  if (!t.isCallExpression(sourceCall) || !t.isIdentifier(sourceCall.callee, { name: 'fromData' }))
+    return null
+
+  const sourceRef = readStringArgument(sourceCall, 0) ?? ''
+  const dot = sourceRef.indexOf('.')
+  const data = dot > 0 ? sourceRef.slice(0, dot) : sourceRef
+  const path = dot > 0 ? sourceRef.slice(dot + 1) : ''
+  const identity = readStringArgument(expression, 0)
+  const propsNode = expression.arguments[1]
+  if (!data || !identity || expression.arguments.length < 1 || expression.arguments.length > 2) {
+    diagnostics.push(diagnostic(
+      'error',
+      'composition-binding-data-view-shape',
+      'fromData(...).dataView(identity[, props]) требует data path и непустую DataView identity.',
+      sourcePath,
+      expression,
+    ))
+    return null
+  }
+  if (propsNode && !t.isObjectExpression(propsNode)) {
+    diagnostics.push(diagnostic(
+      'error',
+      'composition-binding-data-view-props',
+      'Второй аргумент .dataView(...) должен быть object literal props.',
+      sourcePath,
+      expression,
+    ))
+    return null
+  }
+
+  return {
+    kind: 'data-view',
+    data,
+    path,
+    identity,
+    props: propsNode ? readBindings(propsNode, diagnostics, `${sourcePath}.dataView`) : {},
+  }
 }
 
 function readFilterFieldsBinding(

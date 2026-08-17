@@ -2,7 +2,7 @@ import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 import type { DiagnosticsSpanHandle } from '@/domain/types/diagnostics/diagnostics.types'
 import type { DataViewMaterializationStrategy, DataViewRef, DataViewPipelineStep } from '@/domain/types/source/data-view-source.types'
 import type { FilterProgramPayload } from '@/domain/types/source/filter-source.types'
-import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
+import type { CompositionBindingValue, CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
 import type { SourceExpressionIR, SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 import type { StoreSourceArtifact } from '@/domain/types/source/store-source.types'
 import type { StreamSourceArtifact } from '@/domain/types/source/stream-source.types'
@@ -874,6 +874,7 @@ export class EndgeCompiler extends EndgeModule {
           }
           if (field.kind !== 'derived')
             continue
+          field.materializationStrategy = this._resolveDataViewChainStrategy(field.dataViews, [])
           for (const ref of field.dataViews) {
             if (ref.kind !== 'external')
               continue
@@ -1644,21 +1645,21 @@ export class EndgeCompiler extends EndgeModule {
     refs: DataViewRef[],
     localChildren: ProgramArtifact[],
   ): DataViewMaterializationStrategy {
-    let key: string | null = null
+    let strategy: Exclude<DataViewMaterializationStrategy, { kind: 'full' }> | null = null
     for (const ref of refs) {
       let artifact: ProgramArtifact<DataViewProgramPayload> | null = null
       if (ref.kind === 'local')
         artifact = this._findDataViewChild(localChildren, ref.ref.id, ref.ref.identity)
       else if (ref.kind === 'external')
         artifact = Endge.program.getDataViewArtifact(ref.identity)
-      if (!artifact || artifact.status === 'error' || artifact.payload.materializationStrategy.kind !== 'collection-by-key')
+      if (!artifact || artifact.status === 'error' || artifact.payload.materializationStrategy.kind === 'full')
         return { kind: 'full' }
-      const currentKey = artifact.payload.materializationStrategy.key
-      if (key != null && key !== currentKey)
+      const current = artifact.payload.materializationStrategy
+      if (strategy != null && (strategy.kind !== current.kind || strategy.key !== current.key))
         return { kind: 'full' }
-      key = currentKey
+      strategy = current
     }
-    return key == null ? { kind: 'full' } : { kind: 'collection-by-key', key }
+    return strategy ?? { kind: 'full' }
   }
 
   /** Рекурсивно ищет локальный DataView artifact среди дочерних artifacts. */
@@ -2387,13 +2388,55 @@ export class EndgeCompiler extends EndgeModule {
       }
     }
 
-    for (const target of payload.runtimes) {
-      for (const [propName, binding] of Object.entries(target.props)) {
-        if (binding.kind === 'expression') {
+    const linkedDataViews = new Set<string>()
+    const validateBinding = (
+      binding: CompositionBindingValue,
+      sourcePath: string,
+    ): void => {
+      if (binding.kind === 'data-view') {
+          const model = Endge.domain.getDataView(binding.identity)
+          const artifact = Endge.program.getDataViewArtifact(binding.identity)
+          if (!model || !artifact || artifact.status === 'error') {
+            diagnostics.push({
+              severity: 'error',
+              code: 'composition-binding-data-view-missing',
+              message: `DataView "${binding.identity}" не найден или содержит compile errors.`,
+              sourcePath,
+            })
+          }
+          else if (!linkedDataViews.has(binding.identity)) {
+            linkedDataViews.add(binding.identity)
+            dependencies.push({ entityType: 'data-view', id: model.id, identity: model.identity, role: 'composition-binding' })
+          }
+          const declaredProps = new Map((artifact?.payload.props ?? []).map(prop => [prop.key, prop]))
+          for (const propName of Object.keys(binding.props)) {
+            if (!declaredProps.has(propName)) {
+              diagnostics.push({
+                severity: 'error',
+                code: 'composition-binding-data-view-prop-missing',
+                message: `DataView "${binding.identity}" не объявляет prop "${propName}".`,
+                sourcePath: `${sourcePath}.${propName}`,
+              })
+            }
+          }
+          for (const field of declaredProps.values()) {
+            if (!field.optional && !field.defaultValue && !(field.key in binding.props)) {
+              diagnostics.push({
+                severity: 'error',
+                code: 'composition-binding-data-view-prop-required',
+                message: `DataView "${binding.identity}" требует prop "${field.key}".`,
+                sourcePath,
+              })
+            }
+          }
+          for (const [propName, propBinding] of Object.entries(binding.props))
+            validateBinding(propBinding, `${sourcePath}.${propName}`)
+          return
+      }
+      if (binding.kind === 'expression') {
           for (const read of collectCompositionOutputReads(binding.expression)) {
             const runtimeName = read.parameters?.[0] ?? ''
             const source = payload.runtimes.find(item => item.name === runtimeName)
-            const sourcePath = `runtimes.${target.name}.withProps.${propName}`
             if (read.source === 'composition-outputs') {
               const outputNames = runtimeOutputNames(source)
               if (outputNames != null)
@@ -2410,29 +2453,34 @@ export class EndgeCompiler extends EndgeModule {
               })
             }
           }
-          continue
-        }
-        if (binding.kind === 'outputs') {
+          return
+      }
+      if (binding.kind === 'outputs') {
           const source = payload.runtimes.find(item => item.name === binding.runtime)
           const outputNames = runtimeOutputNames(source)
           if (outputNames != null)
             binding.outputs = outputNames
-          continue
-        }
-        if (binding.kind !== 'output')
-          continue
-        const source = payload.runtimes.find(item => item.name === binding.runtime)
-        if (!source)
-          continue
-        const outputExists = runtimeHasOutput(source, binding.output)
-        if (!outputExists) {
-          diagnostics.push({
-            severity: 'error',
-            code: 'composition-binding-output-missing',
-            message: `Runtime "${binding.runtime}" не содержит output "${binding.output}".`,
-            sourcePath: `runtimes.${target.name}.withProps.${propName}`,
-          })
-        }
+          return
+      }
+      if (binding.kind !== 'output')
+        return
+      const source = payload.runtimes.find(item => item.name === binding.runtime)
+      if (!source)
+        return
+      const outputExists = runtimeHasOutput(source, binding.output)
+      if (!outputExists) {
+        diagnostics.push({
+          severity: 'error',
+          code: 'composition-binding-output-missing',
+          message: `Runtime "${binding.runtime}" не содержит output "${binding.output}".`,
+          sourcePath,
+        })
+      }
+    }
+
+    for (const target of payload.runtimes) {
+      for (const [propName, binding] of Object.entries(target.props)) {
+        validateBinding(binding, `runtimes.${target.name}.withProps.${propName}`)
       }
     }
 

@@ -823,4 +823,33 @@ defineComposition({
 	      },
     })
   })
+
+  it('compiles canonical parameterized DataView binding on fromData', () => {
+    const result = compileCompositionSource(`
+defineComposition({
+  data: {
+    schedule: store('schedule'),
+  },
+  runtimes: {
+    filter: filter('schedule'),
+    table: component('schedule-table').withProps({
+      rows: fromData('schedule.sandboxFlights').dataView('schedule-local-filter', {
+        search: fromOutput('filter', 'search'),
+      }),
+    }),
+  },
+})
+`)
+
+    expect(result.diagnostics).toEqual([])
+    expect(result.artifact?.runtimes.find(runtime => runtime.name === 'table')?.props.rows).toEqual({
+      kind: 'data-view',
+      data: 'schedule',
+      path: 'sandboxFlights',
+      identity: 'schedule-local-filter',
+      props: {
+        search: { kind: 'output', runtime: 'filter', output: 'search' },
+      },
+    })
+  })
 })

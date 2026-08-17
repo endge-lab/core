@@ -21,6 +21,7 @@ export interface StoreDerivedDescriptor {
   kind: 'derived'
   source: string
   dataViews: DataViewRef[]
+  materializationStrategy?: import('@/domain/types/source/data-view-source.types').DataViewMaterializationStrategy
   contract?: SourceFieldDefinition | null
 }
 

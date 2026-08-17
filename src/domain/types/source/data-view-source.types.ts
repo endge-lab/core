@@ -8,10 +8,12 @@ export type DataViewIncrementalRequest
   = | { mode: 'auto' }
     | { mode: 'full' }
     | { mode: 'collection-by-key', key: string }
+    | { mode: 'filter-by-key', key: string }
 
 export type DataViewMaterializationStrategy
   = | { kind: 'full' }
     | { kind: 'collection-by-key', key: string }
+    | { kind: 'filter-by-key', key: string }
 
 export interface DataViewSourceContract {
   input: SourceFieldDefinition
@@ -21,11 +23,18 @@ export interface DataViewSourceContract {
 export interface DataViewSourceDocument {
   mode: DataViewSourceMode
   incremental: DataViewIncrementalRequest
+  props: SourceFieldDefinition[]
   contract?: DataViewSourceContract | null
+  filter?: SourceExpressionIR | null
   transform?: DataViewManualTransform
   steps?: DataViewPipelineStep[]
   output?: Record<string, SourceExpressionIR>
   expression?: SourceExpressionIR
+}
+
+/** Runtime-контекст одного вызова parameterized DataView. */
+export interface DataViewRunContext {
+  props?: Record<string, unknown>
 }
 
 export interface DataViewManualTransform {

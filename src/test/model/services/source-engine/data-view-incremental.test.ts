@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { compileDataViewSource } from '@/model/services/source-engine/compilers/data-view-source-compile'
 import type { DataViewProgramPayload } from '@/domain/types/program/program.types'
+import { EndgeDataView } from '@/model/modules/runtime/execution/endge-data-view'
 
 describe('DataView incremental compiler', () => {
   it('defaults to auto and proves a root row-local id projection', () => {
@@ -27,6 +28,42 @@ defineDataView({
 `)
     expect(byCode.diagnostics).toEqual([])
     expect((byCode.artifact as DataViewProgramPayload).materializationStrategy).toEqual({ kind: 'collection-by-key', key: 'code' })
+  })
+
+  it('compiles and executes parameterized row-local filtering with filterByKey', () => {
+    const result = compileDataViewSource(`
+defineDataView({
+  mode: 'pipeline',
+  props: defineProps({
+    search: field('String').default(''),
+  }),
+  incremental: filterByKey('id'),
+  steps: [
+    from('').as('row'),
+  ],
+  filter: ({ row, prop }) =>
+    or(
+      isEmpty(prop('search')),
+      includes(lowerCase(toString(row('flightNumber'))), prop('search')),
+      includes(lowerCase(toString(row('airline.code'))), prop('search')),
+    ),
+})
+`)
+
+    expect(result.diagnostics).toEqual([])
+    expect((result.artifact as DataViewProgramPayload).materializationStrategy).toEqual({ kind: 'filter-by-key', key: 'id' })
+    expect((result.artifact as DataViewProgramPayload).props).toEqual([
+      expect.objectContaining({ key: 'search', defaultValue: { type: 'literal', value: '' } }),
+    ])
+
+    const rows = [
+      { id: 1, flightNumber: 101, airline: { code: 'SU' } },
+      { id: 2, flightNumber: 202, airline: { code: 'S7' } },
+    ]
+    const runtime = new EndgeDataView()
+    const payload = result.artifact as DataViewProgramPayload
+    expect(runtime.runPayload(payload, rows, undefined, { props: { search: 'su' } })).toEqual([rows[0]])
+    expect(runtime.runPayload(payload, rows, undefined, { props: { search: '' } })).toEqual(rows)
   })
 
   it('falls back to full for joins and nested DataViews in auto mode', () => {

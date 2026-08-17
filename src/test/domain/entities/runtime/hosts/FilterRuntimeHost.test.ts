@@ -101,6 +101,28 @@ defineFilter({
     expect(host.getState()).toEqual({ departureTime: '12:45' })
     await expect(host.action('set').run({ key: 'departureTime', value: 1245 })).rejects.toThrow('invalid value')
   })
+
+  it('invalidates only outputs that depend on changed fields', async () => {
+    const host = createHost(`
+defineFilter({
+  fields: {
+    search: field('String').default(''),
+    from: field('DateTime').optional(),
+  },
+  outputs: {
+    search: output().json(({ value }) => lowerCase(trim(value('search')))),
+    request: output().json(({ value }) => compact({ from: value('from') })),
+  },
+})
+`)
+    const changed: string[] = []
+    host.on('output:change', (event: any) => changed.push(event.key))
+
+    await host.action('set').run({ key: 'search', value: '  SU  ' })
+
+    expect(changed).toEqual(['search'])
+    expect((host.getOutput('search') as any).value).toBe('su')
+  })
 })
 
 function createHost(source = `

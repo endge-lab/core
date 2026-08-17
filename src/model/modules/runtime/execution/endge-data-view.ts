@@ -1,6 +1,7 @@
 import type {
   DataViewExpression,
   DataViewRef,
+  DataViewRunContext,
   DataViewPathOperation,
   DataViewRunTools,
 } from '@/domain/types/source/data-view-source.types'
@@ -18,11 +19,13 @@ export class EndgeDataView {
     dataViewOrId: RDataView | string | number,
     input: unknown,
     tools?: Partial<DataViewRunTools>,
+    context: DataViewRunContext = {},
   ): unknown {
     const dataView = this._resolveDataView(dataViewOrId)
     const artifact = this._resolveArtifact(dataView)
     return this.runPayload(artifact.payload, input, tools, {
       children: artifact.children ?? [],
+      props: context.props,
     })
   }
 
@@ -31,6 +34,7 @@ export class EndgeDataView {
     artifact: ProgramArtifact<DataViewProgramPayload>,
     input: unknown,
     tools?: Partial<DataViewRunTools>,
+    context: DataViewRunContext = {},
   ): unknown {
     if (artifact.status === 'error') {
       const message = artifact.diagnostics[0]?.message ?? `DataView artifact has compile errors for "${artifact.ref.identity}".`
@@ -39,6 +43,7 @@ export class EndgeDataView {
 
     return this.runPayload(artifact.payload, input, tools, {
       children: artifact.children ?? [],
+      props: context.props,
     })
   }
 
@@ -47,27 +52,33 @@ export class EndgeDataView {
     artifact: DataViewProgramPayload,
     input: unknown,
     tools?: Partial<DataViewRunTools>,
-    context: { children?: ProgramArtifact[] } = {},
+    context: DataViewRunContext & { children?: ProgramArtifact[] } = {},
   ): unknown {
     const runTools = this._createTools(tools)
+    const props = this._resolveProps(artifact, context.props)
 
     if (artifact.mode === 'manual')
       return this._runManual(artifact, input, runTools)
     if (artifact.mode === 'projection')
-      return this._runProjection(artifact, input)
+      return this._runProjection(artifact, input, props)
     if (artifact.mode === 'expression')
-      return this._runExpression(artifact, input)
+      return this._runExpression(artifact, input, props)
 
-    return this._runPipeline(artifact, input, runTools, context)
+    return this._runPipeline(artifact, input, runTools, context, props)
   }
 
   /** Вычисляет object projection один раз над целым DataView input. */
-  private _runProjection(artifact: DataViewProgramPayload, input: unknown): Record<string, unknown> {
+  private _runProjection(
+    artifact: DataViewProgramPayload,
+    input: unknown,
+    props: Record<string, unknown>,
+  ): Record<string, unknown> {
     return Object.fromEntries(
       Object.entries(artifact.output ?? {}).map(([key, expression]) => [
         key,
         evaluateSourceExpression(expression, {
           scope: input,
+          props,
           onWarning: Endge.isConfigured
             ? warning => Endge.diagnostics.warn(`[DataView] ${warning.message}`, {
                 scope: { name: 'endge.runtime.data-view' },
@@ -81,11 +92,16 @@ export class EndgeDataView {
   }
 
   /** Вычисляет root ValueExpression без object projection wrapper. */
-  private _runExpression(artifact: DataViewProgramPayload, input: unknown): unknown {
+  private _runExpression(
+    artifact: DataViewProgramPayload,
+    input: unknown,
+    props: Record<string, unknown>,
+  ): unknown {
     if (!artifact.expression)
       return undefined
     return evaluateSourceExpression(artifact.expression, {
       scope: input,
+      props,
       onWarning: Endge.isConfigured
         ? warning => Endge.diagnostics.warn(`[DataView] ${warning.message}`, {
             scope: { name: 'endge.runtime.data-view' },
@@ -101,19 +117,19 @@ export class EndgeDataView {
     ref: DataViewRef,
     input: unknown,
     tools?: Partial<DataViewRunTools>,
-    context: { children?: ProgramArtifact[] } = {},
+    context: DataViewRunContext & { children?: ProgramArtifact[] } = {},
   ): unknown {
     if (ref.kind === 'external')
-      return this.run(ref.identity, input, tools)
+      return this.run(ref.identity, input, tools, context)
 
     if (ref.kind === 'inline')
-      return this.runSource(ref.source, input, tools)
+      return this.runSource(ref.source, input, tools, context)
 
     const artifact = this._findLocalDataViewArtifact(ref, context.children ?? [])
     if (!artifact)
       throw new Error(`Local DataView artifact not found: "${ref.ref.identity}".`)
 
-    return this.runArtifact(artifact, input, tools)
+    return this.runArtifact(artifact, input, tools, context)
   }
 
   /** Выполняет DataView source без записи artifact в `Endge.program`. */
@@ -121,6 +137,7 @@ export class EndgeDataView {
     source: string,
     input: unknown,
     tools?: Partial<DataViewRunTools>,
+    context: DataViewRunContext = {},
   ): unknown {
     const result = compileDataViewSource(source)
     const error = result.diagnostics.find(diagnostic => diagnostic.severity === 'error')
@@ -129,7 +146,7 @@ export class EndgeDataView {
     if (!result.artifact)
       throw new Error('DataView source не создал artifact.')
 
-    return this.runPayload(result.artifact as DataViewProgramPayload, input, tools)
+    return this.runPayload(result.artifact as DataViewProgramPayload, input, tools, context)
   }
 
   /** Возвращает DataView model из домена или входного экземпляра. */
@@ -177,7 +194,8 @@ export class EndgeDataView {
     artifact: DataViewProgramPayload,
     input: unknown,
     tools: DataViewRunTools,
-    context: { children?: ProgramArtifact[] },
+    context: DataViewRunContext & { children?: ProgramArtifact[] },
+    props: Record<string, unknown>,
   ): unknown {
     if (artifact.steps.some(step => step.type === 'select'))
       return this._runSelectPipeline(artifact, input)
@@ -200,7 +218,7 @@ export class EndgeDataView {
       }
 
       if (step.type === 'map') {
-        return rows.map(row => {
+        rows = rows.map(row => {
           const scope: Record<string, unknown> = {
             input,
             [alias]: row,
@@ -214,10 +232,37 @@ export class EndgeDataView {
 
           return output
         })
+        break
       }
     }
 
-    return rows
+    if (!artifact.filter)
+      return rows
+
+    return rows.filter(row => Boolean(evaluateSourceExpression(artifact.filter!, {
+      row,
+      props,
+      onWarning: Endge.isConfigured
+        ? warning => Endge.diagnostics.warn(`[DataView] ${warning.message}`, {
+            scope: { name: 'endge.runtime.data-view' },
+            phase: 'runtime',
+            eventName: 'endge.expression.warning',
+          })
+        : undefined,
+    })))
+  }
+
+  /** Заполняет отсутствующие props декларативными defaults DataView artifact. */
+  private _resolveProps(
+    artifact: DataViewProgramPayload,
+    input: Record<string, unknown> | undefined,
+  ): Record<string, unknown> {
+    const props = { ...(input ?? {}) }
+    for (const field of artifact.props ?? []) {
+      if (props[field.key] === undefined && field.defaultValue)
+        props[field.key] = evaluateSourceExpression(field.defaultValue)
+    }
+    return props
   }
 
   /** Последовательно вычисляет whole-value steps; каждый select получает результат предыдущего. */

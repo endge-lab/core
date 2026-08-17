@@ -880,36 +880,18 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     if (!sourcePath)
       return null
 
-    const itemIndex = this._extractCollectionItemIndex(sourcePath, ctx.events)
-    if (itemIndex == null)
-      return null
-
-    const itemPath = `${sourcePath}[${itemIndex}]`
     const rowKey = typeof meta.rowKey === 'string' ? meta.rowKey : null
     const boundaryId = String(meta.boundaryId ?? '')
     const boundary = this.getRuntimeDependencies().boundaries.find(item => item.id === boundaryId)
     if (!boundary)
       return null
 
-    return {
-      kind: 'collection-projection-update',
-      boundaryId,
-      boundaryType: 'table',
-      sourcePath,
-      itemIndex,
-      itemKey: rowKey ? Raph.get(`${itemPath}.${rowKey}`) : null,
-      itemSnapshot: Raph.get(itemPath),
-      changedPaths: ctx.events
-        .map(event => this._extractChangedPath(sourcePath, event.canonical))
-        .filter((path): path is string[] => Array.isArray(path)),
-      affectedProjections: boundary.columns.map(column => ({
+    const affectedProjections = boundary.columns.map(column => ({
         boundaryId: column.id,
         key: column.key,
         index: column.index,
-      })),
-      events: ctx.events,
-      node: ctx.node,
-    }
+      }))
+    return this._makeCollectionPatch(ctx, sourcePath, boundaryId, rowKey, affectedProjections)
   }
 
   private _makeTableColumnPatch(ctx: RuntimeHostUpdateContext): RuntimeBoundaryPatch | null {
@@ -918,31 +900,86 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     if (!sourcePath)
       return null
 
-    const itemIndex = this._extractCollectionItemIndex(sourcePath, ctx.events)
-    const itemPath = itemIndex == null ? null : `${sourcePath}[${itemIndex}]`
     const rowKey = typeof meta.rowKey === 'string' ? meta.rowKey : null
-    const itemSnapshot = itemPath ? Raph.get(itemPath) : null
-    const itemKey = itemPath && rowKey ? Raph.get(`${itemPath}.${rowKey}`) : null
-    const changedPaths = ctx.events
-      .map(event => this._extractChangedPath(sourcePath, event.canonical))
-      .filter((path): path is string[] => Array.isArray(path))
-
     const projection = this._makeColumnProjection(ctx.node)
-    const patch = {
-      kind: 'collection-projection-update',
-      boundaryId: String(meta.tableBoundaryId ?? ''),
+    const boundaryId = String(meta.tableBoundaryId ?? '')
+    if (!boundaryId)
+      return null
+    return this._makeCollectionPatch(ctx, sourcePath, boundaryId, rowKey, projection ? [projection] : [])
+  }
+
+  /** Собирает все keyed события frame-а, не теряя соседние SSE-изменения. */
+  private _makeCollectionPatch(
+    ctx: RuntimeHostUpdateContext,
+    sourcePath: string,
+    boundaryId: string,
+    rowKey: string | null,
+    affectedProjections: RuntimeCollectionProjectionPatch[],
+  ): RuntimeBoundaryPatch | null {
+    const sourceSegmentCount = DataPath.from(sourcePath).segments().length
+    const collection = Raph.get(sourcePath)
+    if (!Array.isArray(collection))
+      return null
+
+    const groups = new Map<string, { events: typeof ctx.events, selectorKey: string | null, selectorValue: unknown }>()
+    for (const event of ctx.events) {
+      const selector = DataPath.from(event.canonical).segments()[sourceSegmentCount]
+      if (selector?.index == null && !selector?.pkey)
+        return null
+      const selectorKey = selector.pkey ?? null
+      const selectorValue = selectorKey ? selector.pval : selector.index
+      const groupKey = selectorKey
+        ? `key:${selectorKey}:${typeof selectorValue}:${String(selectorValue)}`
+        : `index:${String(selector.index)}`
+      const group = groups.get(groupKey) ?? { events: [], selectorKey, selectorValue }
+      group.events.push(event)
+      groups.set(groupKey, group)
+    }
+
+    const items = [...groups.values()].map((group) => {
+      const itemIndex = group.selectorKey
+        ? collection.findIndex(item => isRecord(item) && Object.is(item[group.selectorKey!], group.selectorValue))
+        : Number(group.selectorValue)
+      const resolvedIndex = itemIndex >= 0 && itemIndex < collection.length ? itemIndex : null
+      const itemSnapshot = resolvedIndex == null ? null : collection[resolvedIndex]
+      const itemKey = group.selectorKey
+        ? group.selectorValue
+        : rowKey && isRecord(itemSnapshot)
+          ? itemSnapshot[rowKey]
+          : null
+      return {
+        itemIndex: resolvedIndex,
+        itemKey,
+        itemSnapshot,
+        changedPaths: group.events
+          .map(event => this._extractChangedPath(sourcePath, event.canonical))
+          .filter((path): path is string[] => Array.isArray(path)),
+      }
+    })
+    if (items.length === 0)
+      return null
+    if (items.length === 1) {
+      return {
+        kind: 'collection-projection-update',
+        boundaryId,
+        boundaryType: 'table',
+        sourcePath,
+        ...items[0]!,
+        affectedProjections,
+        events: ctx.events,
+        node: ctx.node,
+      }
+    }
+    return {
+      kind: 'collection-projection-batch',
+      boundaryId,
       boundaryType: 'table',
       sourcePath,
-      itemIndex,
-      itemKey,
-      itemSnapshot,
-      changedPaths,
-      affectedProjections: projection ? [projection] : [],
+      items,
+      affectedProjections,
       events: ctx.events,
       node: ctx.node,
-    } satisfies RuntimeBoundaryPatch
-
-    return patch.boundaryId ? patch : null
+    }
   }
 
   private _resolveBoundarySourcePath(meta: Record<string, unknown>): string {
@@ -959,28 +996,6 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
       : []
 
     return this._joinRaphPath(binding.path, sourcePath)
-  }
-
-  private _extractCollectionItemIndex(sourcePath: string, events: RuntimeHostUpdateContext['events']): number | null {
-    const sourceSegmentCount = DataPath.from(sourcePath).segments().length
-    const collection = Raph.get(sourcePath)
-
-    for (const event of events) {
-      const selector = DataPath.from(event.canonical).segments()[sourceSegmentCount]
-      if (Number.isInteger(selector?.index))
-        return selector?.index ?? null
-
-      if (!Array.isArray(collection) || !selector?.pkey || selector.pval == null)
-        continue
-
-      const index = collection.findIndex((item) => {
-        return isRecord(item) && Object.is(item[selector.pkey!], selector.pval)
-      })
-      if (index >= 0)
-        return index
-    }
-
-    return null
   }
 
   private _extractChangedPath(sourcePath: string, canonical: string): string[] | null {

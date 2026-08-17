@@ -54,6 +54,7 @@ export interface FilterProgramJsonOutput {
   key: string
   kind: 'json'
   expression: SourceExpressionIR
+  dependencies?: string[]
 }
 
 /** Локальный predicate, вычисляемый над строкой и state фильтра. */
@@ -61,6 +62,7 @@ export interface FilterProgramPredicateOutput {
   key: string
   kind: 'predicate'
   expression: SourceExpressionIR
+  dependencies?: string[]
 }
 
 export type FilterProgramOutput

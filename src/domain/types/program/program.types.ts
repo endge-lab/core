@@ -234,6 +234,12 @@ export interface DataViewProgramPayload {
   /** Декларативный входной и выходной тип DataView. */
   contract?: DataViewSourceDocument['contract']
 
+  /** Контракт внешних параметров одного materialized DataView instance. */
+  props?: SourceFieldDefinition[]
+
+  /** Row-local predicate, применяемый после pipeline steps. */
+  filter?: SourceExpressionIR | null
+
   /** Compiled manual transform. Используется только в mode=manual. */
   transform: DataViewManualTransform | null
 
