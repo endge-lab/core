@@ -177,8 +177,12 @@ export class EndgeDomainRepository extends EndgeModule {
       identity,
       expectedRevision: state.revision,
     })
+    if (!result.document.state.deletedAt)
+      throw new Error('[EndgeDomainRepository] Delete response does not contain a tombstone')
     this._domainETag = result.etag
-    this._applyServiceDocument(documentType, result.document, documentIdOrIdentity)
+    this._removeDomainDocumentByType(documentType, documentIdOrIdentity)
+    this._documentServerState.set(this._serverStateKey(collection, identity), { ...result.document.state })
+    this._notifyDomainChanged()
   }
 
   public async restoreDocument(
@@ -307,8 +311,13 @@ export class EndgeDomainRepository extends EndgeModule {
       identity,
       expectedRevision: state.revision,
     })
+    if (!result.document.state.deletedAt)
+      throw new Error('[EndgeDomainRepository] Delete response does not contain a folder tombstone')
     this._domainETag = result.etag
-    this._applyServiceFolder(result.document, folderIdentity)
+    if (folder)
+      Endge.domain.removeFolderById(folder.id)
+    this._documentServerState.set(this._serverStateKey('folders', identity), { ...result.document.state })
+    this._notifyDomainChanged()
   }
 
   public async restoreFolder(folderIdentity: string): Promise<void> {
