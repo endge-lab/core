@@ -4,113 +4,111 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-importers:
+dependencies:
+  '@babel/parser':
+    specifier: ^7.27.2
+    version: 7.29.7
+  '@babel/types':
+    specifier: ^7.27.1
+    version: 7.29.7
+  '@endge/raph':
+    specifier: ^3.0.6
+    version: 3.0.6
+  '@endge/utils':
+    specifier: ^0.24.8
+    version: 0.24.8(pinia@3.0.4)(vue@3.5.39)
+  '@primevue/themes':
+    specifier: ^4.0.0-rc.1
+    version: 4.5.4
+  '@vue/compiler-dom':
+    specifier: ^3.5.24
+    version: 3.5.39
+  '@vue/compiler-sfc':
+    specifier: ^3.5.24
+    version: 3.5.39
+  axios:
+    specifier: ^1.13.2
+    version: 1.18.1
+  class-transformer:
+    specifier: ^0.5.1
+    version: 0.5.1
+  class-validator:
+    specifier: ^0.14.1
+    version: 0.14.4
+  date-fns:
+    specifier: ^4.1.0
+    version: 4.4.0
+  graphql:
+    specifier: ^16.12.0
+    version: 16.14.2
+  lodash:
+    specifier: ^4.17.21
+    version: 4.18.1
+  mitt:
+    specifier: ^3.0.1
+    version: 3.0.1
+  pinia:
+    specifier: ^3.0.4
+    version: 3.0.4(typescript@5.9.3)(vue@3.5.39)
+  postcss:
+    specifier: ^8.5.6
+    version: 8.5.19
+  postcss-scss:
+    specifier: ^4.0.9
+    version: 4.0.9(postcss@8.5.19)
+  postcss-selector-parser:
+    specifier: ^7.1.0
+    version: 7.1.4
+  postcss-value-parser:
+    specifier: ^4.2.0
+    version: 4.2.0
+  primeicons:
+    specifier: ^6.0.1
+    version: 6.0.1
+  primevue:
+    specifier: ^4.0.0-rc.1
+    version: 4.5.5(vue@3.5.39)
+  reflect-metadata:
+    specifier: ^0.2.2
+    version: 0.2.2
+  uuid:
+    specifier: ^11.1.0
+    version: 11.1.1
+  vue:
+    specifier: ^3.3.0
+    version: 3.5.39(typescript@5.9.3)
+  yaml:
+    specifier: ^2.8.1
+    version: 2.9.0
 
-  .:
-    dependencies:
-      '@babel/parser':
-        specifier: ^7.27.2
-        version: 7.29.7
-      '@babel/types':
-        specifier: ^7.27.1
-        version: 7.29.7
-      '@endge/raph':
-        specifier: ^3.0.5
-        version: 3.0.5
-      '@endge/utils':
-        specifier: ^0.24.7
-        version: 0.24.7(pinia@3.0.4)(vue@3.5.39)
-      '@primevue/themes':
-        specifier: ^4.0.0-rc.1
-        version: 4.5.4
-      '@vue/compiler-dom':
-        specifier: ^3.5.24
-        version: 3.5.39
-      '@vue/compiler-sfc':
-        specifier: ^3.5.24
-        version: 3.5.39
-      axios:
-        specifier: ^1.13.2
-        version: 1.18.1
-      class-transformer:
-        specifier: ^0.5.1
-        version: 0.5.1
-      class-validator:
-        specifier: ^0.14.1
-        version: 0.14.4
-      date-fns:
-        specifier: ^4.1.0
-        version: 4.4.0
-      graphql:
-        specifier: ^16.12.0
-        version: 16.14.2
-      lodash:
-        specifier: ^4.17.21
-        version: 4.18.1
-      mitt:
-        specifier: ^3.0.1
-        version: 3.0.1
-      pinia:
-        specifier: ^3.0.4
-        version: 3.0.4(typescript@5.9.3)(vue@3.5.39)
-      postcss:
-        specifier: ^8.5.6
-        version: 8.5.19
-      postcss-scss:
-        specifier: ^4.0.9
-        version: 4.0.9(postcss@8.5.19)
-      postcss-selector-parser:
-        specifier: ^7.1.0
-        version: 7.1.4
-      postcss-value-parser:
-        specifier: ^4.2.0
-        version: 4.2.0
-      primeicons:
-        specifier: ^6.0.1
-        version: 6.0.1
-      primevue:
-        specifier: ^4.0.0-rc.1
-        version: 4.5.5(vue@3.5.39)
-      reflect-metadata:
-        specifier: ^0.2.2
-        version: 0.2.2
-      uuid:
-        specifier: ^11.1.0
-        version: 11.1.1
-      vue:
-        specifier: ^3.3.0
-        version: 3.5.39(typescript@5.9.3)
-      yaml:
-        specifier: ^2.8.1
-        version: 2.9.0
-    devDependencies:
-      '@types/lodash':
-        specifier: ^4.14.202
-        version: 4.17.24
-      '@vitejs/plugin-vue':
-        specifier: ^4.5.2
-        version: 4.6.2(vite@6.4.3)(vue@3.5.39)
-      '@vitejs/plugin-vue-jsx':
-        specifier: ^3.1.0
-        version: 3.1.0(vite@6.4.3)(vue@3.5.39)
-      rimraf:
-        specifier: ^6.0.1
-        version: 6.1.3
-      typescript:
-        specifier: ^5.5.4
-        version: 5.9.3
-      vite:
-        specifier: ^6.1.0
-        version: 6.4.3(yaml@2.9.0)
-      vite-plugin-dts:
-        specifier: ^4.5.0
-        version: 4.5.4(typescript@5.9.3)(vite@6.4.3)
-      vitest:
-        specifier: ^2.1.9
-        version: 2.1.9
-      vue-tsc:
-        specifier: ^2.2.0
-        version: 2.2.12(typescript@5.9.3)
+devDependencies:
+  '@types/lodash':
+    specifier: ^4.14.202
+    version: 4.17.24
+  '@vitejs/plugin-vue':
+    specifier: ^4.5.2
+    version: 4.6.2(vite@6.4.3)(vue@3.5.39)
+  '@vitejs/plugin-vue-jsx':
+    specifier: ^3.1.0
+    version: 3.1.0(vite@6.4.3)(vue@3.5.39)
+  rimraf:
+    specifier: ^6.0.1
+    version: 6.1.3
+  typescript:
+    specifier: ^5.5.4
+    version: 5.9.3
+  vite:
+    specifier: ^6.1.0
+    version: 6.4.3(yaml@2.9.0)
+  vite-plugin-dts:
+    specifier: ^4.5.0
+    version: 4.5.4(typescript@5.9.3)(vite@6.4.3)
+  vitest:
+    specifier: ^2.1.9
+    version: 2.1.9
+  vue-tsc:
+    specifier: ^2.2.0
+    version: 2.2.12(typescript@5.9.3)
 
 packages:
 
@@ -373,12 +371,12 @@ packages:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
 
-  /@endge/raph@3.0.5:
-    resolution: {integrity: sha512-aiujCX1NCGv6Uuaa4mY70hxKZMCZuS8dKU+rtDbG2xpN2Pk5E7PsBBoqUEuY32I3GygRfU0+5HU0uAsfzvtYyw==}
+  /@endge/raph@3.0.6:
+    resolution: {integrity: sha512-MCNfvtLrtDBTt6yRvXrWEGpnNTe3P1oj3Nace4MKmB4EBitk8h7N/F0aEKJjbRVUp4M50GCMfvFalpQZ85a9ZA==}
     dev: false
 
-  /@endge/utils@0.24.7(pinia@3.0.4)(vue@3.5.39):
-    resolution: {integrity: sha512-0sbGOQ6/tS0N8PQE5A3G7DYWvP1OgRI/SVQARUH+qSTSKwaEWw0tSU9fFHXB+HFZxb4qn1DEreOSPMzB36I8lA==}
+  /@endge/utils@0.24.8(pinia@3.0.4)(vue@3.5.39):
+    resolution: {integrity: sha512-Pqy+Va6vCsAmx7c7rSvC/yQtYzNJtajafa80eihtjUMEha7jHx0z+zQeLTu3kOC2ZX0ZzqvdwPG1ZRTEj/R/ZQ==}
     peerDependencies:
       pinia: ^2.1.7 || ^3.0.0
       vue: ^3.5.13
