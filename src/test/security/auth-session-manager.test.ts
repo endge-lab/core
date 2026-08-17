@@ -98,6 +98,42 @@ describe('AuthSessionManager lifecycle and request policies', () => {
     }))
   })
 
+  it('uses a host-owned session source without persisting or refreshing its tokens through the profile adapter', async () => {
+    const profile = authProfile()
+    const adapter = fakeAdapter()
+    const runtime = createRuntime([profile], adapter, () => now)
+    runtime.sessions.configureDefault(profile)
+    await runtime.sessions.login({ username: 'alice', password: 'secret' })
+    expect(localStorage.length).toBe(1)
+
+    const resolveToken = vi.fn(async () => tokenSet({
+      accessToken: jwt({ sub: 'external-user' }),
+      accessExpiresAt: now + 60_000,
+    }))
+    const logout = vi.fn(async () => undefined)
+    runtime.sessions.connect(profile.identity, {
+      resolveToken,
+      logout,
+      loadUserInfo: async () => ({ sub: 'external-user', name: 'External User' }),
+    })
+
+    expect(localStorage.length).toBe(0)
+    const [first, second] = await Promise.all([
+      runtime.requests.resolve({ mode: 'inherit' }),
+      runtime.requests.resolve({ mode: 'inherit' }),
+    ])
+    expect(first.headers).toEqual({ Authorization: expect.stringContaining('.') })
+    expect(second.subject).toBe('external-user')
+    expect(resolveToken).toHaveBeenCalledTimes(1)
+    expect(resolveToken).toHaveBeenCalledWith({ forceRefresh: false, minValiditySeconds: 30 })
+    expect(await runtime.sessions.ensureUserInfo()).toEqual({ sub: 'external-user', name: 'External User' })
+    expect(localStorage.length).toBe(0)
+
+    await runtime.sessions.logout()
+    expect(logout).toHaveBeenCalledTimes(1)
+    expect(runtime.sessions.isAuthenticated).toBe(false)
+  })
+
   it('auto-authenticates a service profile once for parallel inherited requests', async () => {
     const profile = serviceProfile()
     const authenticate = vi.fn(async () => tokenSet({ accessExpiresAt: now + 60_000 }))

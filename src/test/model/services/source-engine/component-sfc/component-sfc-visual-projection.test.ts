@@ -176,4 +176,34 @@ defineProps<{ rows: unknown[] }>()
       { identity: 'table.sort.clearAll', source: 'intrinsic' },
     ]))
   })
+
+  it('keeps a declared Action port reference visual-managed and exposes direct Actions', () => {
+    const result = inspectComponentSFCVisual(`<script setup lang="ts">
+const ports = definePorts({
+  require: {
+    publishSchedule: action<unknown, void>({ default: 'aodb.schedule.open-publish-dialog' }),
+  },
+})
+</script>
+<template>
+  <Table :rows="[]">
+    <RowMenu><MenuItem :action="publishSchedule" label="Опубликовать" /></RowMenu>
+  </Table>
+</template>`, {
+      actionIdentities: ['aodb.schedule.open-publish-dialog'],
+    })
+
+    expect(result.projection?.menus.row).toMatchObject({
+      sourceOwned: false,
+      items: [{
+        kind: 'item',
+        action: { kind: 'expression', source: 'publishSchedule' },
+        sourceOwned: false,
+      }],
+    })
+    expect(result.projection?.menuActions).toEqual(expect.arrayContaining([
+      { identity: 'publishSchedule', source: 'required' },
+      { identity: 'aodb.schedule.open-publish-dialog', source: 'external' },
+    ]))
+  })
 })

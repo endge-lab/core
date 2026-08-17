@@ -22,6 +22,7 @@ import type {
 import type { ComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
 import { BUILTIN_ACTION_IDS, TABLE_RUNTIME_ACTION_IDS } from '@/domain/types/runtime/action.types'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
+import { readComponentSFCTableMenuActionPortReference } from '@/model/services/compiler/component-sfc/component-sfc-table-menu'
 import { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sfc/component-sfc-template'
 
 const NON_VISUAL_CELL_TAGS = new Set([
@@ -86,7 +87,7 @@ export function inspectComponentSFCVisual(
 
   return {
     support: { kind: 'table' },
-    projection: projectTable(source, root, irRoot, compileResult.ir?.script.ports ?? null),
+    projection: projectTable(source, root, irRoot, compileResult.ir?.script.ports ?? null, options.actionIdentities),
     diagnostics: compileResult.diagnostics,
   }
 }
@@ -100,6 +101,7 @@ function projectTable(
   ast: RComponentSFC_AST_ElementNode,
   ir: RComponentSFC_IR_ElementNode | null,
   ports: ComponentSFCPortManifest | null,
+  actionIdentities: Iterable<string> | undefined,
 ): ComponentSFCTableVisualProjection {
   const astColumns = ast.children.filter(
     (node): node is RComponentSFC_AST_ElementNode => node.kind === 'element' && node.tag === 'Column',
@@ -107,8 +109,8 @@ function projectTable(
   const irColumns = ir?.children.filter(
     (node): node is RComponentSFC_IR_ElementNode => node.kind === 'element' && node.tag === 'Column',
   ) ?? []
-  const columnMenu = projectMenu(source, ast, ir, 'column')
-  const rowMenu = projectMenu(source, ast, ir, 'row')
+  const columnMenu = projectMenu(source, ast, ir, ports, 'column')
+  const rowMenu = projectMenu(source, ast, ir, ports, 'row')
 
   return {
     kind: 'table',
@@ -127,7 +129,7 @@ function projectTable(
     defaultHidden: readProp(ir, 'default-hidden', 'defaultHidden'),
     columnMenu: readProp(ir, 'column-menu', 'columnMenu'),
     menus: { column: columnMenu, row: rowMenu },
-    menuActions: projectMenuActions(ir, ports),
+    menuActions: projectMenuActions(ir, ports, actionIdentities),
     attributes: projectAttributes(source, ast, ir),
     columns: astColumns.map((column, index) => projectColumn(source, column, irColumns[index] ?? null, index)),
     sourceRange: ast.range,
@@ -138,6 +140,7 @@ function projectMenu(
   source: string,
   table: RComponentSFC_AST_ElementNode,
   irTable: RComponentSFC_IR_ElementNode | null,
+  ports: ComponentSFCPortManifest | null,
   kind: 'column' | 'row',
 ): ComponentSFCTableMenuProjection {
   const tag = kind === 'column' ? 'ColumnMenu' : 'RowMenu'
@@ -171,7 +174,7 @@ function projectMenu(
       if (node.tag !== 'MenuItem') return []
       const action = visualAttribute(node, 'action')
       const itemSourceOwned = sourceOwned
-        || action?.kind === 'expression'
+        || (action?.kind === 'expression' && !isActionPortReference(action.source, ports))
         || node.attributes.some(attribute => !['id', 'label', 'action', 'input', 'icon'].includes(attribute.name))
         || node.directives.length > 0
       return [{
@@ -188,11 +191,32 @@ function projectMenu(
   }
 }
 
+function isActionPortReference(
+  source: string,
+  ports: ComponentSFCPortManifest | null,
+): boolean {
+  const reference = readComponentSFCTableMenuActionPortReference(source)
+  if (!reference)
+    return false
+
+  const candidates = reference.role === 'require'
+    ? ports?.require.actions
+    : reference.role === 'provides'
+      ? ports?.provides.actions
+      : [...(ports?.require.actions ?? []), ...(ports?.provides.actions ?? [])]
+  return Boolean(candidates?.some(port => port.name === reference.name))
+}
+
 function projectMenuActions(
   table: RComponentSFC_IR_ElementNode | null,
   ports: ComponentSFCPortManifest | null,
+  actionIdentities: Iterable<string> | undefined,
 ): ComponentSFCTableMenuActionOption[] {
   const result = new Map<string, ComponentSFCTableMenuActionOption>()
+  for (const rawIdentity of actionIdentities ?? []) {
+    const identity = String(rawIdentity ?? '').trim()
+    if (identity) result.set(identity, { identity, source: 'external' })
+  }
   for (const identity of Object.values(TABLE_RUNTIME_ACTION_IDS))
     result.set(identity, { identity, source: 'intrinsic' })
   for (const identity of Object.values(BUILTIN_ACTION_IDS))

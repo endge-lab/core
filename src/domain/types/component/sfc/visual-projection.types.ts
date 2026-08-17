@@ -45,6 +45,8 @@ export type ComponentSFCTableCellProjection
 export interface ComponentSFCVisualInspectionOptions {
   resolveComponentTag?: (tag: string) => string | null
   resolveTypeDefinition?: (identity: string) => TypeSourceDefinition | null
+  /** Direct Action identities available to source-authored MenuItem bindings. */
+  actionIdentities?: Iterable<string>
 }
 
 /** Visual read-model одной прямой Column внутри корневого Table. */
@@ -70,7 +72,7 @@ export type ComponentSFCTableVisualMenuMode = 'default' | 'disabled' | 'none' | 
 
 export interface ComponentSFCTableMenuActionOption {
   identity: string
-  source: 'intrinsic' | 'built-in' | 'required' | 'provided' | 'forwarded'
+  source: 'intrinsic' | 'built-in' | 'external' | 'required' | 'provided' | 'forwarded'
 }
 
 export type ComponentSFCTableMenuNodeProjection

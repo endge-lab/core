@@ -9,7 +9,6 @@ import type {
 } from '@/domain/types/component/sfc/ir.types'
 import type { ComponentSFCActionPort } from '@/domain/types/component/sfc/ports.types'
 import { ENDGE_SFC_TABLE_COLUMN_MENU_MODES } from '@/domain/types/component/sfc/tag-attribute-contract.types'
-import { BUILTIN_ACTION_IDS, TABLE_RUNTIME_ACTION_IDS } from '@/domain/types/runtime/action.types'
 import { parseExpression } from '@babel/parser'
 import * as t from '@babel/types'
 
@@ -31,9 +30,6 @@ interface NormalizeMenuOptions {
 }
 
 const COLUMN_MENU_MODE_SET = new Set<string>(SFC_TABLE_COLUMN_MENU_MODES)
-const INTRINSIC_ACTIONS = new Set<string>(Object.values(TABLE_RUNTIME_ACTION_IDS))
-const BUILTIN_ACTIONS = new Set<string>(Object.values(BUILTIN_ACTION_IDS))
-
 /** Normalizes declarative column context menu without evaluating SFC expressions. */
 export function normalizeComponentSFCTableColumnMenu(
   tableNode: RComponentSFC_IR_ElementNode,
@@ -145,7 +141,7 @@ function createItemDescriptor(
   if (!actionAlias) diagnostics.push(menuDiagnostic(
     node,
     `sfc-table-${menuCode(menuTag)}-item-action-missing`,
-    'MenuItem должен содержать literal action или совместимый static :action object.',
+    'MenuItem должен содержать literal Action identity, ссылку на Action port или совместимый static :action object.',
     menuTag,
     'action',
   ))
@@ -164,14 +160,16 @@ function createItemDescriptor(
     'input',
   ))
 
+  const explicitPortReference = actionBinding?.kind === 'port'
   const port = actionAlias && options.availableActions
-    ? options.availableActions.find(candidate => candidate.name === actionAlias)
+    ? options.availableActions.find(candidate => candidate.name === actionAlias
+      && (!actionBinding?.portRole || candidate.role === actionBinding.portRole))
     : undefined
-  if (actionAlias && options.availableActions && !INTRINSIC_ACTIONS.has(actionAlias) && !BUILTIN_ACTIONS.has(actionAlias) && !port) {
+  if (actionAlias && explicitPortReference && options.availableActions && !port) {
     diagnostics.push(menuDiagnostic(
       node,
-      `sfc-table-${menuCode(menuTag)}-item-action-not-provided`,
-      `Action "${actionAlias}" не является intrinsic/built-in и не объявлен в definePorts.require/provides.`,
+      `sfc-table-${menuCode(menuTag)}-item-action-port-missing`,
+      `Action port "${actionAlias}" не объявлен в definePorts${actionBinding.portRole ? `.${actionBinding.portRole}` : '.require/provides'}.`,
       menuTag,
       'action',
     ))
@@ -186,7 +184,7 @@ function createItemDescriptor(
     ))
   }
 
-  if (!actionAlias || !label || legacyCommand || (actionBinding?.hasInput && explicitInput)) return null
+  if (!actionAlias || !label || legacyCommand || (actionBinding?.hasInput && explicitInput) || (explicitPortReference && !port)) return null
 
   const forwardedFrom = port?.forwardedFrom?.nodeId === tableNode.id ? port.forwardedFrom : undefined
   const action = forwardedFrom?.portName ?? port?.defaultIdentity ?? actionAlias
@@ -203,7 +201,9 @@ function createItemDescriptor(
 }
 
 interface NormalizedMenuActionBinding {
+  kind: 'identity' | 'port'
   identity: string
+  portRole?: 'require' | 'provides'
   input?: RComponentSFC_IR_Value
   hasInput: boolean
 }
@@ -218,14 +218,23 @@ function readActionBinding(
   const value = node.props.action
   if (value?.kind === 'literal') {
     const identity = typeof value.value === 'string' ? value.value.trim() : ''
-    return identity ? { identity, hasInput: false } : null
+    return identity ? { kind: 'identity', identity, hasInput: false } : null
   }
   if (value?.kind !== 'expression') return null
 
   try {
     const expression = unwrapExpression(parseExpression(value.source, { sourceType: 'module', plugins: ['typescript'] }))
+    const portReference = readActionPortReference(expression)
+    if (portReference) {
+      return {
+        kind: 'port',
+        identity: portReference.name,
+        ...(portReference.role ? { portRole: portReference.role } : {}),
+        hasInput: false,
+      }
+    }
     if (!t.isObjectExpression(expression)) {
-      pushActionBindingDiagnostic(diagnostics, node, menuTag, 'action-object-required', 'Dynamic :action должен быть static object literal { identity, input? }. Для основного синтаксиса используйте action="..." + :input="...".')
+      pushActionBindingDiagnostic(diagnostics, node, menuTag, 'action-reference-required', 'Dynamic :action должен ссылаться на port key (`:action="openDetails"`) или быть static object literal `{ identity, input? }`. Прямую Action identity задавайте строкой `action="..."`.')
       return null
     }
     const properties = new Map<string, t.Expression>()
@@ -254,18 +263,64 @@ function readActionBinding(
       return null
     }
     const inputExpression = properties.get('input')
-    if (!inputExpression) return { identity, hasInput: false }
+    if (!inputExpression) return { kind: 'identity', identity, hasInput: false }
     const input = readStaticExpression(inputExpression)
     if (input === STATIC_VALUE_UNSUPPORTED) {
       pushActionBindingDiagnostic(diagnostics, node, menuTag, 'action-input-dynamic', 'Dynamic input в legacy :action object не поддерживается. Используйте отдельный :input expression.')
       return null
     }
-    return { identity, input: { kind: 'literal', value: input }, hasInput: true }
+    return { kind: 'identity', identity, input: { kind: 'literal', value: input }, hasInput: true }
   }
   catch {
-    pushActionBindingDiagnostic(diagnostics, node, menuTag, 'action-object-invalid', 'Не удалось разобрать object literal в MenuItem :action.')
+    pushActionBindingDiagnostic(diagnostics, node, menuTag, 'action-binding-invalid', 'Не удалось разобрать MenuItem :action.')
     return null
   }
+}
+
+/** Reads a compile-time MenuItem reference to one Action port. */
+export function readComponentSFCTableMenuActionPortReference(
+  source: string,
+): { name: string, role?: 'require' | 'provides' } | null {
+  try {
+    const expression = unwrapExpression(parseExpression(source, { sourceType: 'module', plugins: ['typescript'] }))
+    return readActionPortReference(expression)
+  }
+  catch {
+    return null
+  }
+}
+
+function readActionPortReference(
+  expression: t.Expression,
+): { name: string, role?: 'require' | 'provides' } | null {
+  if (t.isIdentifier(expression))
+    return { name: expression.name }
+
+  if (!t.isMemberExpression(expression))
+    return null
+
+  const owner = unwrapExpression(expression.object as t.Expression)
+  if (!t.isMemberExpression(owner))
+    return null
+
+  const root = unwrapExpression(owner.object as t.Expression)
+  if (!t.isIdentifier(root, { name: 'ports' }))
+    return null
+
+  const role = readStaticMemberName(owner)
+  if (role !== 'require' && role !== 'provides')
+    return null
+
+  const name = readStaticMemberName(expression)?.trim() ?? ''
+  return name ? { name, role } : null
+}
+
+function readStaticMemberName(expression: t.MemberExpression): string | null {
+  if (!expression.computed && t.isIdentifier(expression.property))
+    return expression.property.name
+  if (expression.computed && t.isStringLiteral(expression.property))
+    return expression.property.value
+  return null
 }
 
 function readStaticExpression(node: t.Expression): unknown | typeof STATIC_VALUE_UNSUPPORTED {

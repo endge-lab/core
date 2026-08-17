@@ -3,6 +3,7 @@ import type {
   AuthLoginCredentials,
   AuthProfileSchema,
   AuthResolvedSession,
+  AuthSessionSource,
   AuthTokenSet,
   EndgeAuthContext,
 } from '@/domain/types/auth/auth-profile.types'
@@ -23,6 +24,7 @@ interface AuthSessionManagerDependencies {
 export class AuthSessionManager {
   private readonly _states = new Map<string, AuthSessionState>()
   private readonly _operations = new Map<string, Promise<AuthTokenSet | null>>()
+  private readonly _sources = new Map<string, AuthSessionSource>()
   private readonly _now: () => number
   private _defaultProfile: AuthProfileSchema | null = null
 
@@ -93,6 +95,17 @@ export class AuthSessionManager {
     this._dependencies.onSessionChange()
   }
 
+  /** Подключает host-owned session source и запрещает смешивание с persisted snapshot profile. */
+  public connect(profileIdentity: string, source: AuthSessionSource): void {
+    const profile = this._profiles.requireActive(profileIdentity)
+    this._sources.set(profile.identity, source)
+    this._states.delete(profile.identity)
+    this._operations.delete(profile.identity)
+    this._store.remove(this._workspaceIdentity(), profile.identity)
+    if (profile.identity === this._defaultProfile?.identity)
+      this._dependencies.onSessionChange()
+  }
+
   /** Выполняет interactive login default runtime profile. */
   public async login(credentials: AuthLoginCredentials): Promise<void> {
     const profile = this._defaultProfile
@@ -145,6 +158,13 @@ export class AuthSessionManager {
     const state = this._states.get(profile.identity)
     if (state?.userInfo)
       return state.userInfo
+    const source = this._sources.get(profile.identity)
+    if (source?.loadUserInfo) {
+      const userInfo = await source.loadUserInfo()
+      this._states.set(profile.identity, { token, userInfo })
+      this._dependencies.onSessionChange()
+      return userInfo
+    }
     const adapter = this._adapters.require(profile)
     if (!adapter.loadUserInfo)
       return null
@@ -163,6 +183,12 @@ export class AuthSessionManager {
     if (!profile)
       return
     const state = this._states.get(profile.identity)
+    const source = this._sources.get(profile.identity)
+    if (source) {
+      this._clearState(profile)
+      await source.logout?.()
+      return
+    }
     try {
       if (state) {
         await this._adapters.require(profile).logout?.({
@@ -182,6 +208,21 @@ export class AuthSessionManager {
   /** Гарантирует session указанного profile, не меняя default profile. */
   public async ensureProfile(profileInput: AuthProfileSchema, options: AuthEnsureOptions = {}): Promise<AuthTokenSet | null> {
     const profile = this._profiles.requireActive(profileInput)
+    const source = this._sources.get(profile.identity)
+    if (source) {
+      return this._singleFlight(profile.identity, async () => {
+        const token = await source.resolveToken({
+          forceRefresh: options.forceRefresh === true,
+          minValiditySeconds: Math.ceil(this._refreshSkewMs(profile) / 1000),
+        })
+        if (!token || !this._isAccessTokenUsable(token)) {
+          this._clearState(profile)
+          return null
+        }
+        this._setState(profile, token, false)
+        return token
+      })
+    }
     if (profile.adapterId === 'bearer') {
       return this._singleFlight(profile.identity, async () => {
         const token = await this._authenticate(profile)
@@ -254,6 +295,7 @@ export class AuthSessionManager {
   public resetRuntime(): void {
     this._states.clear()
     this._operations.clear()
+    this._sources.clear()
     this._defaultProfile = null
     this._store.resetRuntime()
     this._dependencies.onSessionChange()
@@ -281,16 +323,18 @@ export class AuthSessionManager {
     return adapter.authenticate(this._profiles.createAdapterContext(profile, credentials))
   }
 
-  private _setState(profile: AuthProfileSchema, token: AuthTokenSet): void {
+  private _setState(profile: AuthProfileSchema, token: AuthTokenSet, persist: boolean = true): void {
     const previous = this._states.get(profile.identity)
     this._states.set(profile.identity, { token, userInfo: previous?.userInfo ?? null })
-    this._store.write(this._workspaceIdentity(), profile, {
-      version: 1,
-      profileIdentity: profile.identity,
-      adapterId: profile.adapterId,
-      token,
-      updatedAt: new Date(this._now()).toISOString(),
-    })
+    if (persist) {
+      this._store.write(this._workspaceIdentity(), profile, {
+        version: 1,
+        profileIdentity: profile.identity,
+        adapterId: profile.adapterId,
+        token,
+        updatedAt: new Date(this._now()).toISOString(),
+      })
+    }
     if (profile.identity === this._defaultProfile?.identity)
       this._dependencies.onSessionChange()
   }
@@ -318,10 +362,14 @@ export class AuthSessionManager {
       return false
     if (token.accessExpiresAt == null)
       return true
-    const skew = profile.adapterId === 'keycloak'
+    const skew = this._refreshSkewMs(profile)
+    return token.accessExpiresAt - Math.max(0, skew) > this._now()
+  }
+
+  private _refreshSkewMs(profile: AuthProfileSchema): number {
+    return profile.adapterId === 'keycloak'
       ? Number(profile.config.refreshSkewMs ?? 30_000)
       : 0
-    return token.accessExpiresAt - Math.max(0, skew) > this._now()
   }
 
   private _isRefreshExpired(token: AuthTokenSet): boolean {

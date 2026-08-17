@@ -36,6 +36,33 @@ export interface EndgeDocumentMutationResult {
   etag: string | null
 }
 
+/** Документ с optimistic revision для атомарного перемещения. */
+export interface EndgeDocumentMoveRequestItem {
+  collection: EndgeDomainCollection
+  identity: string
+  expectedRevision: number
+}
+
+/** Запрос атомарного перемещения документов в одну папку. */
+export interface EndgeDocumentsMoveRequest {
+  workspaceIdentity: string
+  documents: EndgeDocumentMoveRequestItem[]
+  folderIdentity: string
+  signal?: AbortSignal
+}
+
+/** Актуальный документ и его transport-коллекция после перемещения. */
+export interface EndgeMovedDocument {
+  collection: EndgeDomainCollection
+  document: EndgeLiveDomainDocument
+}
+
+/** Результат атомарного перемещения документов. */
+export interface EndgeDocumentsMoveResult {
+  documents: EndgeMovedDocument[]
+  moved: number
+}
+
 export interface EndgeWorkspaceMutationRequest {
   workspaceIdentity: string
   document: Record<string, unknown>
@@ -59,6 +86,7 @@ export interface EndgeDomainProvider {
   updateDocument(request: EndgeDocumentMutationRequest): Promise<EndgeDocumentMutationResult>
   softDeleteDocument(request: EndgeDocumentMutationRequest): Promise<EndgeDocumentMutationResult>
   restoreDocument(request: EndgeDocumentMutationRequest): Promise<EndgeDocumentMutationResult>
+  moveDocuments?(request: EndgeDocumentsMoveRequest): Promise<EndgeDocumentsMoveResult>
   updateWorkspace(request: EndgeWorkspaceMutationRequest): Promise<EndgeWorkspaceMutationResult>
 }
 

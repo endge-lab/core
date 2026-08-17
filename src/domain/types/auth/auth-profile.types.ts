@@ -66,6 +66,18 @@ export interface AuthEnsureOptions {
   allowServiceLogin?: boolean
 }
 
+export interface AuthSessionSourceResolveOptions {
+  forceRefresh: boolean
+  minValiditySeconds: number
+}
+
+/** Host-owned источник session для внешнего Authorization Code/PKCE flow. */
+export interface AuthSessionSource {
+  resolveToken: (options: AuthSessionSourceResolveOptions) => Promise<AuthTokenSet | null>
+  logout?: () => Promise<void>
+  loadUserInfo?: () => Promise<Record<string, unknown> | null>
+}
+
 /** Минимальный синхронный auth context без tokens и полного claims payload. */
 export interface EndgeAuthContext {
   authenticated: boolean

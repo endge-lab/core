@@ -1,5 +1,6 @@
 import type { DomainDocumentType } from '@/domain/types/document/document.types'
 import type { DocumentCreateRequest, DocumentCreateResult } from '@/domain/types/document/document-create.type'
+import type { EndgeDomainDocumentMove } from '@/domain/types/document/document-move.type'
 import type {
   EndgeDomainCollection,
   EndgeDomainProvider,
@@ -217,7 +218,54 @@ export class EndgeDomainRepository extends EndgeModule {
     document.folderIdentity = folderIdOrIdentity == null
       ? null
       : String((folder as any)?.identity ?? folderIdOrIdentity).trim()
-    await this._saveServiceDocument(documentId, documentType, { model: document })
+    await this._saveServiceDocument(documentId, documentType, { serializedDocument: document })
+  }
+
+  /** Атомарно переносит несколько persisted-документов в одну папку. */
+  public async changeDocumentsFolder(
+    documents: readonly EndgeDomainDocumentMove[],
+    folderIdOrIdentity: string | number,
+  ): Promise<number> {
+    this._assertMutationsSupported()
+    if (documents.length === 0)
+      return 0
+
+    const provider = this._requireServiceProvider()
+    if (!provider.moveDocuments)
+      throw new Error('[EndgeDomainRepository] Domain provider does not support atomic document moves')
+    const folder = Endge.domain.getFolder(folderIdOrIdentity)
+    const folderIdentity = String((folder as any)?.identity ?? folderIdOrIdentity).trim()
+    if (!folderIdentity)
+      throw new Error('Папка назначения не найдена')
+
+    const requests = documents.map(({ documentId, documentType }) => {
+      const model = this.getDomainDocumentByType(documentType, documentId)
+      if (!model)
+        throw new Error(`Документ не найден: ${String(documentId)}`)
+      const collection = resolveEndgeServiceCollection(documentType)
+      const identity = this.resolveDocumentIdentity(documentId, documentType)
+      const state = this._requireDocumentServerState(collection, identity)
+      return { collection, identity, expectedRevision: state.revision }
+    })
+    const result = await provider.moveDocuments({
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      documents: requests,
+      folderIdentity,
+    })
+    if (result.documents.length !== documents.length)
+      throw new Error('[EndgeDomainRepository] Bulk move response does not match request')
+
+    result.documents.forEach((item, index) => {
+      const expected = requests[index]!
+      const responseIdentity = String(item.document.identity ?? '').trim()
+      if (item.collection !== expected.collection || responseIdentity !== expected.identity)
+        throw new Error('[EndgeDomainRepository] Bulk move response document does not match request')
+    })
+    result.documents.forEach((item, index) => {
+      const source = documents[index]!
+      this._applyServiceDocument(source.documentType, item.document, source.documentId)
+    })
+    return result.moved
   }
 
   public async saveFolder(folderId: string): Promise<void> {
@@ -365,7 +413,7 @@ export class EndgeDomainRepository extends EndgeModule {
   private async _saveServiceDocument(
     documentId: string | number,
     documentType: DomainDocumentType,
-    opts?: { model?: unknown, previousIdentity?: string },
+    opts?: { model?: unknown, previousIdentity?: string, serializedDocument?: Record<string, unknown> },
   ): Promise<void> {
     const provider = this._requireServiceProvider()
 
@@ -398,7 +446,7 @@ export class EndgeDomainRepository extends EndgeModule {
     const model = opts?.model ?? this.getDomainDocumentByType(documentType, documentId)
     if (!model)
       throw new Error(`Документ не найден: ${String(documentId)}`)
-    const document = serializeServiceDocument(documentType, model)
+    const document = opts?.serializedDocument ?? serializeServiceDocument(documentType, model)
     const identity = String(document.identity ?? '').trim()
     const collection = resolveEndgeServiceCollection(documentType)
     const persistedIdentity = String(opts?.previousIdentity ?? '').trim()

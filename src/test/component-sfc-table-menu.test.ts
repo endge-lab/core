@@ -119,14 +119,14 @@ describe('Component SFC table column menu', () => {
     ]))
   })
 
-  it('rejects removed command syntax and undeclared Actions', () => {
+  it('rejects removed command syntax and resolves a direct Action identity without a port', () => {
     const legacy = compileComponentSFC(createTableSource(`
       <ColumnMenu>
         <MenuItem command="table.sort.clearAll" label="Сбросить" />
       </ColumnMenu>
       <Column key="number" title="Flight" sortable />
     `))
-    const undeclared = compileComponentSFC(createTableSource(`
+    const direct = compileComponentSFC(createTableSource(`
       <ColumnMenu>
         <MenuItem action="flight.open" label="Открыть" />
       </ColumnMenu>
@@ -136,8 +136,49 @@ describe('Component SFC table column menu', () => {
     expect(legacy.diagnostics).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'sfc-table-column-menu-item-command-removed' }),
     ]))
-    expect(undeclared.diagnostics).toEqual(expect.arrayContaining([
-      expect.objectContaining({ code: 'sfc-table-column-menu-item-action-not-provided' }),
+    expect(direct.diagnostics.filter(item => item.severity === 'error')).toEqual([])
+    expect(readTable(direct).tableMenus?.column.menu?.items[0]).toMatchObject({
+      kind: 'item',
+      action: 'flight.open',
+    })
+    expect(direct.dependencies.actions).toContain('flight.open')
+  })
+
+  it('resolves an expression Action port reference and preserves the legacy string alias', () => {
+    const source = (action: string) => `<script setup lang="ts">
+const ports = definePorts({
+  require: {
+    publishSchedule: action<{ rowId: string }, void>({ default: 'aodb.schedule.open-publish-dialog' }),
+  },
+})
+</script>
+<template>
+  <Table :rows="[]">
+    <RowMenu><MenuItem ${action} label="Опубликовать" :input="{ rowId }" /></RowMenu>
+  </Table>
+</template>`
+
+    const expression = compileComponentSFC(source(':action="publishSchedule"'))
+    const qualified = compileComponentSFC(source(':action="ports.require.publishSchedule"'))
+    const legacy = compileComponentSFC(source('action="publishSchedule"'))
+
+    for (const result of [expression, qualified, legacy]) {
+      expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
+      expect(readTable(result).tableMenus?.row.menu?.items[0]).toMatchObject({
+        kind: 'item',
+        action: 'aodb.schedule.open-publish-dialog',
+      })
+      expect(result.dependencies.actions).toContain('aodb.schedule.open-publish-dialog')
+    }
+  })
+
+  it('rejects an expression Action reference that is not declared as a port', () => {
+    const result = compileComponentSFC(createTableSource(`
+      <RowMenu><MenuItem :action="missingActionPort" label="Открыть" /></RowMenu>
+    `))
+
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'sfc-table-row-menu-item-action-port-missing' }),
     ]))
   })
 
@@ -222,7 +263,7 @@ const ports = definePorts({
 </script>
 <template>
   <Table ref="schedule" :rows="[]">
-    <ColumnMenu><MenuItem action="schedule.table.sort.clearAll" label="Сбросить" /></ColumnMenu>
+    <ColumnMenu><MenuItem :action="ports.provides['schedule.table.sort.clearAll']" label="Сбросить" /></ColumnMenu>
   </Table>
 </template>`)
     const menu = readTable(result).tableMenus?.column
@@ -247,7 +288,7 @@ const ports = definePorts({
 </script>
 <template>
   <Table ref="schedule" :rows="[]">
-    <ColumnMenu><MenuItem action="other.table.sort.clearAll" label="Сбросить" /></ColumnMenu>
+    <ColumnMenu><MenuItem :action="ports.provides['other.table.sort.clearAll']" label="Сбросить" /></ColumnMenu>
   </Table>
   <Table ref="other" :rows="[]" />
 </template>`)

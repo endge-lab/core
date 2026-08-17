@@ -97,6 +97,28 @@ const ports = definePorts({
     })
   })
 
+  it('records a direct MenuItem Action as a component dependency', () => {
+    const openDetails = new RAction()
+    openDetails.id = 9
+    openDetails.identity = 'flight.open-details'
+    openDetails.name = 'Open details'
+    Endge.domain.addAction(openDetails)
+    Endge.domain.addComponentSFC(component(10, 'flight-menu', `<template>
+  <Table :rows="[]">
+    <RowMenu><MenuItem action="flight.open-details" label="Открыть" /></RowMenu>
+  </Table>
+</template>`))
+
+    Endge.compiler.build({} as any)
+
+    expect(Endge.program.getArtifact('component-sfc', 'flight-menu')?.dependencies).toContainEqual({
+      entityType: 'action',
+      id: 'flight.open-details',
+      identity: 'flight.open-details',
+      role: 'component-action',
+    })
+  })
+
   it('records direct Event Query reactions as program dependencies', () => {
     const query = new RQuery()
     query.id = 8

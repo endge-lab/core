@@ -135,7 +135,7 @@ describe('service-backend Core provider', () => {
       capabilities: { snapshot: true, mutations: false, softDelete: false, restore: false },
       etag: '"generation-id:4"',
       loadWorkspace,
-      createDocument: vi.fn(), updateDocument: vi.fn(), softDeleteDocument: vi.fn(), restoreDocument: vi.fn(), updateWorkspace: vi.fn(),
+      createDocument: vi.fn(), updateDocument: vi.fn(), softDeleteDocument: vi.fn(), restoreDocument: vi.fn(), moveDocuments: vi.fn(), updateWorkspace: vi.fn(),
     }
     const repository = new EndgeDomainRepository()
 
@@ -229,6 +229,7 @@ describe('service-backend Core provider', () => {
       updateDocument: vi.fn(),
       softDeleteDocument: vi.fn(),
       restoreDocument: vi.fn(),
+      moveDocuments: vi.fn(),
       updateWorkspace: vi.fn(),
     }
     const repository = new EndgeDomainRepository()
@@ -260,13 +261,103 @@ describe('service-backend Core provider', () => {
     })
   })
 
+  it('keeps folderIdentity when a single document is serialized for update', async () => {
+    Endge.domain.reset()
+    const snapshot = liveSnapshot()
+    snapshot.documents.folders.push(liveDocument('folder-target', { parentIdentity: 'folder-root' }))
+    const updateDocument = vi.fn().mockResolvedValue({
+      document: liveDocument('queries-item', {
+        folderIdentity: 'folder-target',
+        source: '',
+        sourceVersion: 2,
+      }),
+      etag: '"8"',
+    })
+    const provider: EndgeDomainProvider = {
+      id: 'service-backend',
+      capabilities: { snapshot: true, mutations: true, softDelete: true, restore: true },
+      etag: null,
+      loadWorkspace: vi.fn().mockResolvedValue(snapshot),
+      createDocument: vi.fn(),
+      updateDocument,
+      softDeleteDocument: vi.fn(),
+      restoreDocument: vi.fn(),
+      moveDocuments: vi.fn(),
+      updateWorkspace: vi.fn(),
+    }
+    const repository = new EndgeDomainRepository()
+    const context = defaultContext(provider)
+    await repository.setup(context)
+    await repository.loadSnapshot(context)
+
+    await repository.changeDocumentFolder('queries-item', 'query-rest' as never, 'folder-target')
+
+    expect(updateDocument).toHaveBeenCalledWith(expect.objectContaining({
+      collection: 'queries',
+      identity: 'queries-item',
+      expectedRevision: 7,
+      document: expect.objectContaining({ folderIdentity: 'folder-target' }),
+    }))
+  })
+
+  it('moves several documents through one provider call and applies every response', async () => {
+    Endge.domain.reset()
+    const snapshot = liveSnapshot()
+    snapshot.documents.folders.push(liveDocument('folder-target', { parentIdentity: 'folder-root' }))
+    snapshot.documents.actions = [liveDocument('action-a'), liveDocument('action-b')]
+    const movedAction = (identity: string): EndgeLiveDomainDocument => {
+      const document = liveDocument(identity, { folderIdentity: 'folder-target' })
+      return { ...document, state: { ...document.state, revision: 8 } }
+    }
+    const moveDocuments = vi.fn().mockResolvedValue({
+      documents: [
+        { collection: 'actions', document: movedAction('action-a') },
+        { collection: 'actions', document: movedAction('action-b') },
+      ],
+      moved: 2,
+    })
+    const provider: EndgeDomainProvider = {
+      id: 'service-backend',
+      capabilities: { snapshot: true, mutations: true, softDelete: true, restore: true },
+      etag: null,
+      loadWorkspace: vi.fn().mockResolvedValue(snapshot),
+      createDocument: vi.fn(),
+      updateDocument: vi.fn(),
+      softDeleteDocument: vi.fn(),
+      restoreDocument: vi.fn(),
+      moveDocuments,
+      updateWorkspace: vi.fn(),
+    }
+    const repository = new EndgeDomainRepository()
+    const context = defaultContext(provider)
+    await repository.setup(context)
+    await repository.loadSnapshot(context)
+
+    await expect(repository.changeDocumentsFolder([
+      { documentId: 'action-a', documentType: 'action' },
+      { documentId: 'action-b', documentType: 'action' },
+    ], 'folder-target')).resolves.toBe(2)
+
+    expect(moveDocuments).toHaveBeenCalledOnce()
+    expect(moveDocuments).toHaveBeenCalledWith({
+      workspaceIdentity: 'workspace-a',
+      folderIdentity: 'folder-target',
+      documents: [
+        { collection: 'actions', identity: 'action-a', expectedRevision: 7 },
+        { collection: 'actions', identity: 'action-b', expectedRevision: 7 },
+      ],
+    })
+    expect(repository.getDocumentServerState('actions', 'action-a')?.revision).toBe(8)
+    expect(repository.getDocumentServerState('actions', 'action-b')?.revision).toBe(8)
+  })
+
   it('blocks every public mutation when service-backend is read-only', async () => {
     const provider: EndgeDomainProvider = {
       id: 'service-backend',
       capabilities: { snapshot: true, mutations: false, softDelete: false, restore: false },
       etag: null,
       loadWorkspace: vi.fn().mockResolvedValue(liveSnapshot()),
-      createDocument: vi.fn(), updateDocument: vi.fn(), softDeleteDocument: vi.fn(), restoreDocument: vi.fn(), updateWorkspace: vi.fn(),
+      createDocument: vi.fn(), updateDocument: vi.fn(), softDeleteDocument: vi.fn(), restoreDocument: vi.fn(), moveDocuments: vi.fn(), updateWorkspace: vi.fn(),
     }
     const repository = new EndgeDomainRepository()
     await repository.setup(defaultContext(provider))
@@ -277,6 +368,7 @@ describe('service-backend Core provider', () => {
       () => repository.deleteDocument('item', 'query-rest' as never),
       () => repository.restoreDocument('item', 'query-rest' as never),
       () => repository.changeDocumentFolder('item', 'query-rest' as never, null),
+      () => repository.changeDocumentsFolder([{ documentId: 'item', documentType: 'query-rest' as never }], 'folder-root'),
       () => repository.saveFolder('folder-root'),
       () => repository.deleteFolder('folder-root'),
     ]

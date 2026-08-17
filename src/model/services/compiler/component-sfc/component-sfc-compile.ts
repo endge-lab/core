@@ -174,7 +174,7 @@ export function compileComponentSFC(
     ...portResult.manifest.require.actions,
     ...portResult.manifest.provides.actions,
   ]
-  const menuDiagnostics = collectTableMenuDiagnostics(templateResult.template, availableMenuActions)
+  const menuResult = collectTableMenus(templateResult.template, availableMenuActions)
   const styleResult = compileComponentSFCStyle(parseResult.ast.style, { identity: options.identity })
 
   diagnostics.push(
@@ -182,7 +182,7 @@ export function compileComponentSFC(
     ...portResult.diagnostics,
     ...templateResult.diagnostics,
     ...forwardResult.diagnostics,
-    ...menuDiagnostics,
+    ...menuResult.diagnostics,
     ...styleResult.diagnostics,
   )
 
@@ -191,7 +191,12 @@ export function compileComponentSFC(
     portResult.dependencies,
     forwardResult.dependencies,
     templateResult.dependencies,
+    {
+      ...createEmptyComponentDependencies(),
+      actions: menuResult.actions,
+    },
   )
+  dependencies.actions = [...new Set(dependencies.actions)]
 
   const ir: RComponentSFC_IR | null = templateResult.template
     ? {
@@ -234,11 +239,12 @@ export function compileComponentSFC(
   }
 }
 
-function collectTableMenuDiagnostics(
+function collectTableMenus(
   template: RComponentSFC_IR_Template | null,
   availableActions: ComponentSFCActionPort[],
-): RComponentDiagnostic[] {
+): { diagnostics: RComponentDiagnostic[], actions: string[] } {
   const diagnostics: RComponentDiagnostic[] = []
+  const actions = new Set<string>()
   const visit = (node: RComponentSFC_IR_Node): void => {
     if (node.kind !== 'element') return
     if (node.tag === 'Table') {
@@ -246,11 +252,16 @@ function collectTableMenuDiagnostics(
       const row = normalizeComponentSFCTableRowMenu(node, { availableActions })
       node.tableMenus = { column, row }
       diagnostics.push(...column.diagnostics, ...row.diagnostics)
+      for (const menu of [column.menu, row.menu]) {
+        for (const item of menu?.items ?? []) {
+          if (item.kind === 'item') actions.add(item.action)
+        }
+      }
     }
     for (const child of node.children) visit(child)
   }
   for (const root of template?.roots ?? []) visit(root)
-  return diagnostics
+  return { diagnostics, actions: [...actions] }
 }
 
 function sectionStatuses(diagnostics: RComponentDiagnostic[]): Record<'script' | 'template' | 'style', 'valid' | 'warning' | 'error'> {

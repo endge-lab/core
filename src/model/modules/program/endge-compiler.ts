@@ -599,7 +599,9 @@ export class EndgeCompiler extends EndgeModule {
               entityType: 'action',
               id: identity,
               identity,
-              role: 'port-default-action',
+              role: result.ir?.script.ports.require.actions.some(port => port.defaultIdentity === identity)
+                ? 'port-default-action'
+                : 'component-action',
             })),
             ...result.dependencies.queries.map(identity => ({
               entityType: 'query',
