@@ -19,6 +19,40 @@ export interface ComponentSFCVisualAttribute {
 /** Редактируемый prop binding единственного управляемого элемента колонки Table. */
 export type ComponentSFCTableCellBindingProjection = ComponentSFCVisualAttribute
 
+export type ComponentSFCTableCellInteractionModifier
+  = 'ctrl' | 'shift' | 'alt' | 'meta' | 'mod' | 'altGraph' | 'exact'
+
+export type ComponentSFCTableCellInteractionFlag
+  = 'stop' | 'prevent' | 'self' | 'once' | 'capture' | 'passive'
+
+/** Visual-editor-safe projection of one static Cell `:on` rule. */
+export interface ComponentSFCTableCellInteractionRuleProjection {
+  event: string
+  key: string[]
+  code: string[]
+  held: {
+    key: string[]
+    code: string[]
+    match: 'all' | 'any'
+    exact: boolean
+  } | null
+  modifiers: Partial<Record<ComponentSFCTableCellInteractionModifier, boolean>>
+  repeat: boolean | null
+  composing: boolean | null
+  button: number | null
+  flags: Partial<Record<ComponentSFCTableCellInteractionFlag, boolean>>
+  reactionSource: string
+}
+
+/** Source-preserving Cell interaction read-model used by the Table visual editor. */
+export interface ComponentSFCTableCellInteractionsProjection {
+  editable: boolean
+  rules: ComponentSFCTableCellInteractionRuleProjection[]
+  suffixes: ComponentSFCTableCellInteractionFlag[]
+  sourceRange?: RComponentSFC_SourceRange
+  message?: string
+}
+
 /** Способ, которым содержимое ячейки представлено в простом visual editor. */
 export type ComponentSFCTableVisualCellTag = Exclude<
   RComponentSFC_IR_Tag,
@@ -62,6 +96,7 @@ export interface ComponentSFCTableColumnProjection {
   pinnable: ComponentSFCVisualSourceValue | null
   attributes: ComponentSFCVisualAttribute[]
   cell: ComponentSFCTableCellProjection
+  interactions: ComponentSFCTableCellInteractionsProjection
   hasCustomCell: boolean
   cellSource: string | null
   sourceRange: RComponentSFC_SourceRange
@@ -145,6 +180,12 @@ export type ComponentSFCTableSourcePatch
       name: string
       value: string | null
       valueKind: 'expression' | 'literal'
+    }
+    | {
+      type: 'set-column-cell-on'
+      columnIndex: number
+      /** Complete object/array expression, or null to remove the annotation. */
+      value: string | null
     }
     | {
       type: 'set-menu-mode'

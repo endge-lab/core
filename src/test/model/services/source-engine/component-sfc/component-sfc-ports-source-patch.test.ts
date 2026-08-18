@@ -42,6 +42,29 @@ ${template}`
     expect(result.projection.manifest.emits.events[0]?.action).toBeUndefined()
   })
 
+  it('inserts emits after a forward section that already has a trailing comma', () => {
+    const source = `<script setup lang="ts">
+const ports = definePorts({
+  forward: {
+    from: 'table',
+    ports: { emits: '*' },
+  },
+})
+</script>
+${template}`
+    const result = patchComponentSFCPortsSource(source, {
+      type: 'set-event',
+      name: 'rowActivated',
+      payloadType: 'TableRowActivatedEvent',
+      from: { ref: 'table', event: 'rowActivated' },
+    })
+
+    expect(result.ok, result.message).toBe(true)
+    expect(result.source).toContain('  },\n  emits: {')
+    expect(result.source).not.toMatch(/\n\s*,\s*\n\s*emits:/)
+    expect(result.projection.diagnostics).not.toContainEqual(expect.objectContaining({ code: 'sfc-parse-error' }))
+  })
+
   it('round-trips CRUD for require, provides, emits and forward without rewriting unrelated source', () => {
     const original = `<script setup lang="ts">
 // этот комментарий не принадлежит definePorts

@@ -1,4 +1,10 @@
+import { parseExpression } from '@babel/parser'
+
 import type {
+  ComponentSFCTableCellInteractionFlag,
+  ComponentSFCTableCellInteractionModifier,
+  ComponentSFCTableCellInteractionRuleProjection,
+  ComponentSFCTableCellInteractionsProjection,
   ComponentSFCVisualAttribute,
   ComponentSFCVisualInspection,
   ComponentSFCVisualInspectionOptions,
@@ -279,10 +285,192 @@ function projectColumn(
     pinnable: readProp(ir, 'pinnable'),
     attributes: projectAttributes(source, ast, ir),
     cell: cell.projection,
+    interactions: projectColumnCellInteractions(cellNode),
     hasCustomCell: cell.hasCustomCell,
     cellSource: cell.source,
     sourceRange: ast.range,
   }
+}
+
+const CELL_INTERACTION_FLAGS = new Set<ComponentSFCTableCellInteractionFlag>([
+  'stop', 'prevent', 'self', 'once', 'capture', 'passive',
+])
+const CELL_INTERACTION_MODIFIERS = new Set<ComponentSFCTableCellInteractionModifier>([
+  'ctrl', 'shift', 'alt', 'meta', 'mod', 'altGraph', 'exact',
+])
+
+function projectColumnCellInteractions(
+  cell: RComponentSFC_AST_ElementNode | null,
+): ComponentSFCTableCellInteractionsProjection {
+  const attribute = cell?.attributes.find(item => item.name === 'on') ?? null
+  if (!attribute) return { editable: true, rules: [], suffixes: [] }
+
+  const suffixes = attribute.modifiers.filter(
+    (modifier): modifier is ComponentSFCTableCellInteractionFlag => CELL_INTERACTION_FLAGS.has(modifier as ComponentSFCTableCellInteractionFlag),
+  )
+  if (!attribute.dynamic || !attribute.value?.trim()) {
+    return sourceOwnedInteractions(attribute.range, suffixes, ':on должен быть динамическим object или array binding.')
+  }
+
+  try {
+    const source = attribute.value.trim()
+    const expression: any = parseExpression(source, { sourceType: 'module', plugins: ['typescript'] })
+    const nodes = expression.type === 'ArrayExpression' ? expression.elements : [expression]
+    const rules: Array<ComponentSFCTableCellInteractionRuleProjection | null> = (nodes as any[])
+      .map((node: any) => projectCellInteractionRule(node, source))
+    if (!rules.length || rules.some(rule => !rule))
+      return sourceOwnedInteractions(attribute.range, suffixes, 'Сложная :on-аннотация редактируется во вкладке Source.')
+    return {
+      editable: true,
+      rules: rules as ComponentSFCTableCellInteractionRuleProjection[],
+      suffixes,
+      sourceRange: attribute.range,
+    }
+  }
+  catch {
+    return sourceOwnedInteractions(attribute.range, suffixes, 'Не удалось разобрать :on. Исправьте выражение во вкладке Source.')
+  }
+}
+
+function sourceOwnedInteractions(
+  sourceRange: RComponentSFC_AST_ElementNode['range'],
+  suffixes: ComponentSFCTableCellInteractionFlag[],
+  message: string,
+): ComponentSFCTableCellInteractionsProjection {
+  return { editable: false, rules: [], suffixes, sourceRange, message }
+}
+
+function projectCellInteractionRule(
+  node: any,
+  source: string,
+): ComponentSFCTableCellInteractionRuleProjection | null {
+  if (node?.type !== 'ObjectExpression') return null
+  const properties = new Map<string, any>()
+  for (const property of node.properties ?? []) {
+    if (property?.type !== 'ObjectProperty' || property.computed) return null
+    const name = babelPropertyName(property)
+    if (!name || properties.has(name)) return null
+    properties.set(name, property.value)
+  }
+
+  const event = babelLiteralString(properties.get('event'))
+  const reaction = properties.get('reaction')
+  if (!event || !reaction) return null
+  const key = babelStringList(properties.get('key'))
+  const code = babelStringList(properties.get('code'))
+  if (key === null || code === null) return null
+  const held = projectHeldKeys(properties.get('held'))
+  const modifiers = projectInteractionModifiers(properties.get('modifiers'))
+  if (held === undefined || modifiers === null) return null
+
+  const flags: ComponentSFCTableCellInteractionRuleProjection['flags'] = {}
+  for (const flag of CELL_INTERACTION_FLAGS) {
+    const value = babelOptionalBoolean(properties.get(flag))
+    if (value === undefined && properties.has(flag)) return null
+    if (value != null) flags[flag] = value
+  }
+  const repeat = babelNullableBoolean(properties.get('repeat'))
+  const composing = babelNullableBoolean(properties.get('composing'))
+  const button = babelNullableNumber(properties.get('button'))
+  if (repeat === undefined || composing === undefined || button === undefined) return null
+
+  const supported = new Set([
+    'event', 'key', 'code', 'held', 'modifiers', 'repeat', 'composing', 'button',
+    ...CELL_INTERACTION_FLAGS, 'reaction',
+  ])
+  if ([...properties.keys()].some(name => !supported.has(name))) return null
+
+  return {
+    event,
+    key: key ?? [],
+    code: code ?? [],
+    held: held ?? null,
+    modifiers,
+    repeat,
+    composing,
+    button,
+    flags,
+    reactionSource: source.slice(reaction.start ?? 0, reaction.end ?? source.length),
+  }
+}
+
+function projectHeldKeys(node: any): ComponentSFCTableCellInteractionRuleProjection['held'] | null | undefined {
+  if (node == null) return null
+  if (node.type !== 'ObjectExpression') return undefined
+  const values = babelObjectProperties(node)
+  if (!values) return undefined
+  const key = babelStringList(values.get('key'))
+  const code = babelStringList(values.get('code'))
+  const match = values.has('match') ? babelLiteralString(values.get('match')) : 'all'
+  const exact = values.has('exact') ? babelOptionalBoolean(values.get('exact')) : false
+  if (key === null || code === null || (match !== 'all' && match !== 'any') || exact == null) return undefined
+  if ([...values.keys()].some(name => !['key', 'code', 'match', 'exact'].includes(name))) return undefined
+  return { key: key ?? [], code: code ?? [], match, exact }
+}
+
+function projectInteractionModifiers(
+  node: any,
+): ComponentSFCTableCellInteractionRuleProjection['modifiers'] | null {
+  if (node == null) return {}
+  if (node.type !== 'ObjectExpression') return null
+  const values = babelObjectProperties(node)
+  if (!values) return null
+  const result: ComponentSFCTableCellInteractionRuleProjection['modifiers'] = {}
+  for (const [name, valueNode] of values) {
+    if (!CELL_INTERACTION_MODIFIERS.has(name as ComponentSFCTableCellInteractionModifier)) return null
+    const value = babelOptionalBoolean(valueNode)
+    if (value == null) return null
+    result[name as ComponentSFCTableCellInteractionModifier] = value
+  }
+  return result
+}
+
+function babelObjectProperties(node: any): Map<string, any> | null {
+  const result = new Map<string, any>()
+  for (const property of node.properties ?? []) {
+    if (property?.type !== 'ObjectProperty' || property.computed) return null
+    const name = babelPropertyName(property)
+    if (!name || result.has(name)) return null
+    result.set(name, property.value)
+  }
+  return result
+}
+
+function babelPropertyName(property: any): string | null {
+  if (property?.key?.type === 'Identifier') return property.key.name
+  if (property?.key?.type === 'StringLiteral') return String(property.key.value)
+  return null
+}
+
+function babelLiteralString(node: any): string | null {
+  if (node?.type === 'StringLiteral') return String(node.value)
+  if (node?.type === 'TemplateLiteral' && node.expressions?.length === 0)
+    return String(node.quasis?.[0]?.value?.cooked ?? '')
+  return null
+}
+
+function babelStringList(node: any): string[] | null | undefined {
+  if (node == null) return undefined
+  const single = babelLiteralString(node)
+  if (single != null) return [single]
+  if (node.type !== 'ArrayExpression') return null
+  const result = node.elements.map((item: any) => babelLiteralString(item))
+  return result.some((item: string | null) => item == null) ? null : result as string[]
+}
+
+function babelOptionalBoolean(node: any): boolean | null | undefined {
+  if (node == null) return null
+  return node.type === 'BooleanLiteral' ? node.value === true : undefined
+}
+
+function babelNullableBoolean(node: any): boolean | null | undefined {
+  if (node == null) return null
+  return babelOptionalBoolean(node)
+}
+
+function babelNullableNumber(node: any): number | null | undefined {
+  if (node == null) return null
+  return node.type === 'NumericLiteral' && Number.isFinite(node.value) ? Number(node.value) : undefined
 }
 
 interface ProjectedColumnCell {

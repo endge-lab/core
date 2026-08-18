@@ -95,7 +95,7 @@ export const COMPONENT_SFC_FORM_EVENT_DEFINITIONS = [
 
 const EVENT_CAPABLE_TAGS = [
   'Text', 'DateTime', 'Number', 'Icon', 'Badge', 'Dot', 'Box', 'Flex', 'Grid', 'Divider',
-  'Input', 'Textarea', 'Checkbox', 'Select', 'Table',
+  'Input', 'Textarea', 'Checkbox', 'Select', 'Table', 'Cell',
 ] as const satisfies readonly RComponentSFC_IR_Tag[]
 
 const FORM_TAGS = new Set<RComponentSFC_IR_Tag>(['Input', 'Textarea', 'Checkbox', 'Select'])

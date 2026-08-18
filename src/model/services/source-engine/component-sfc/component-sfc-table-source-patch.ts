@@ -58,13 +58,32 @@ export function patchComponentSFCTableSource(
     const nextSource = applyTablePatch(source, context, patch)
     const inspection = inspectComponentSFCVisual(nextSource)
     if (inspection.support.kind !== 'table' || !inspection.projection) {
+      const firstError = inspection.diagnostics.find(diagnostic => diagnostic.severity === 'error')
       return {
         ok: false,
         source,
         changed: false,
         projection: null,
         diagnostics: inspection.diagnostics,
-        message: 'Изменение нарушило структуру корневого Table.',
+        message: patch.type === 'set-column-cell-on'
+          ? `Некорректный :on: ${firstError?.message ?? 'выражение нарушило структуру template.'}`
+          : 'Изменение нарушило структуру корневого Table.',
+      }
+    }
+    if (patch.type === 'set-column-cell-on') {
+      const interactionError = inspection.diagnostics.find(diagnostic => (
+        diagnostic.severity === 'error'
+        && (diagnostic.code.startsWith('sfc-template-on') || diagnostic.sourcePath === 'template.on')
+      ))
+      if (interactionError) {
+        return {
+          ok: false,
+          source,
+          changed: false,
+          projection: inspectComponentSFCVisual(source).projection,
+          diagnostics: inspection.diagnostics,
+          message: interactionError.message,
+        }
       }
     }
 
@@ -135,6 +154,12 @@ function applyTablePatch(
         patch.name,
         patch.value,
         patch.valueKind,
+      )
+    case 'set-column-cell-on':
+      return setColumnCellOn(
+        source,
+        requireColumn(context, patch.columnIndex),
+        patch.value,
       )
     case 'set-menu-mode':
       return setMenuMode(source, context, patch.menu, patch.mode)
@@ -513,6 +538,53 @@ function setColumnCellAttribute(
   }
 
   return setNodeAttributeValue(source, child, name, value, valueKind)
+}
+
+function setColumnCellOn(
+  source: string,
+  column: RComponentSFC_AST_ElementNode,
+  rawValue: string | null,
+): string {
+  const value = rawValue?.trim() || null
+  const cell = column.children.find(
+    (node): node is RComponentSFC_AST_ElementNode => node.kind === 'element' && node.tag === 'Cell',
+  ) ?? null
+
+  if (cell) {
+    const declarations = cell.attributes.filter(attribute => attribute.name === 'on')
+    if (declarations.length > 1)
+      throw new Error(':on объявлен на Cell несколько раз. Измените его во вкладке Source.')
+    const declaration = declarations[0] ?? null
+    if (!value)
+      return declaration ? removeRangeWithWhitespace(source, declaration.range.start, declaration.range.end) : source
+    if (declaration) {
+      const suffix = declaration.modifiers.map(modifier => `.${modifier}`).join('')
+      return replaceRange(
+        source,
+        declaration.range.start,
+        declaration.range.end,
+        serializeAttributeValue(`on${suffix}`, value, 'expression'),
+      )
+    }
+    return insertAttribute(source, cell, serializeAttributeValue('on', value, 'expression'))
+  }
+
+  if (!value) return source
+  const attribute = serializeAttributeValue('on', value, 'expression')
+  const children = column.children.filter(isSemanticNode)
+  if (children.length === 0)
+    return insertChild(source, column, `<Cell ${attribute}>{{ value }}</Cell>`)
+
+  const first = children[0]!
+  const last = children.at(-1)!
+  const indent = lineIndent(source, first.range.start)
+  const original = source.slice(first.range.start, last.range.end)
+  return replaceRange(
+    source,
+    first.range.start,
+    last.range.end,
+    `<Cell ${attribute}>\n${indent}  ${original}\n${indent}</Cell>`,
+  )
 }
 
 function requireManagedColumnCellElement(

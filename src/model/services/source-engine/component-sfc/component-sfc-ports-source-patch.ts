@@ -83,14 +83,17 @@ export function patchComponentSFCPortsSource(
   try {
     const nextSource = applyPortsPatch(source, patch, current)
     const projection = inspectComponentSFCPortsSource(nextSource, options)
-    const hasPortErrors = projection.diagnostics.some(item => item.severity === 'error' && item.sourcePath?.startsWith('script.definePorts'))
-    if (hasPortErrors) {
+    const blockingError = projection.diagnostics.find(item => (
+      item.severity === 'error'
+      && (item.code === 'sfc-parse-error' || item.sourcePath?.startsWith('script.definePorts'))
+    ))
+    if (blockingError) {
       return {
         ok: false,
         changed: false,
         source,
         projection: current,
-        message: projection.diagnostics.find(item => item.severity === 'error' && item.sourcePath?.startsWith('script.definePorts'))?.message,
+        message: blockingError.message,
       }
     }
     return { ok: true, changed: nextSource !== source, source: nextSource, projection }
@@ -206,10 +209,25 @@ function ensureDefinePorts(source: string, projection: ComponentSFCPortsSourcePr
 }
 
 function insertObjectProperty(source: string, base: number, object: any, text: string, indent: number): string {
-  const offset = base + object.end - 1
-  const hasItems = object.properties.length > 0
-  const insertion = `${hasItems ? ',' : ''}\n${' '.repeat(indent)}${text}\n${' '.repeat(Math.max(0, indent - 2))}`
-  return `${source.slice(0, offset)}${insertion}${source.slice(offset)}`
+  const objectEnd = base + object.end - 1
+  const lastProperty = object.properties.at(-1)
+  const propertyIndent = ' '.repeat(indent)
+  const closingIndent = ' '.repeat(Math.max(0, indent - 2))
+  if (!lastProperty) {
+    const insertion = `\n${propertyIndent}${text}\n${closingIndent}`
+    return `${source.slice(0, objectEnd)}${insertion}${source.slice(objectEnd)}`
+  }
+
+  const lastPropertyEnd = base + lastProperty.end
+  let insertionOffset = objectEnd
+  while (insertionOffset > lastPropertyEnd && /\s/.test(source[insertionOffset - 1]!))
+    insertionOffset--
+
+  const separator = source.slice(lastPropertyEnd, insertionOffset)
+  const needsComma = removeStructuralComma(separator) === separator
+  const closingWhitespace = source.slice(insertionOffset, objectEnd) || `\n${closingIndent}`
+  const insertion = `${needsComma ? ',' : ''}\n${propertyIndent}${text}${closingWhitespace}`
+  return `${source.slice(0, insertionOffset)}${insertion}${source.slice(objectEnd)}`
 }
 
 function removeObjectProperty(source: string, base: number, object: any, property: any): string {

@@ -283,6 +283,80 @@ describe('Component SFC Table source patch', () => {
     expect(result.message).toContain('Source')
   })
 
+  it('materializes Cell interactions without replacing existing direct column source', () => {
+    const source = `<template>
+  <Table>
+    <Column key="status">
+      <!-- preserved -->
+      <Badge>{{ row.status }}</Badge>
+    </Column>
+    <Column key="flight" />
+  </Table>
+</template>`
+    const interaction = `{ event: 'click', modifiers: { shift: true }, reaction: action({ identity: 'cell.open', input: { row, columnKey } }) }`
+
+    const wrapped = patchComponentSFCTableSource(source, {
+      type: 'set-column-cell-on',
+      columnIndex: 0,
+      value: interaction,
+    })
+    const materialized = patchComponentSFCTableSource(wrapped.source, {
+      type: 'set-column-cell-on',
+      columnIndex: 1,
+      value: interaction,
+    })
+
+    expect(wrapped.ok).toBe(true)
+    expect(wrapped.source).toContain('<!-- preserved -->')
+    expect(wrapped.source).toContain('<Badge>{{ row.status }}</Badge>')
+    expect(wrapped.source).toContain('<Cell :on="{ event: \'click\'')
+    expect(materialized.ok).toBe(true)
+    expect(materialized.source).toMatch(/<Column key="flight"\s*>/)
+    expect(materialized.source).toContain('{{ value }}</Cell>')
+    expect(materialized.projection?.columns[0]?.interactions).toMatchObject({
+      editable: true,
+      rules: [expect.objectContaining({
+        event: 'click',
+        modifiers: { shift: true },
+      })],
+    })
+    expect(materialized.projection?.columns[1]?.interactions.rules[0]?.event).toBe('click')
+  })
+
+  it('preserves Cell suffix modifiers while editing and removes only the annotation', () => {
+    const source = `<template><Table><Column key="status"><Cell :on.stop="{ event: 'click', reaction: action({ identity: 'old' }) }"><Text>{{ value }}</Text></Cell></Column></Table></template>`
+    const updated = patchComponentSFCTableSource(source, {
+      type: 'set-column-cell-on',
+      columnIndex: 0,
+      value: `{ event: 'dblclick', reaction: action({ identity: 'next' }) }`,
+    })
+    const removed = patchComponentSFCTableSource(updated.source, {
+      type: 'set-column-cell-on',
+      columnIndex: 0,
+      value: null,
+    })
+
+    expect(updated.ok).toBe(true)
+    expect(updated.source).toContain(':on.stop=')
+    expect(updated.projection?.columns[0]?.interactions.suffixes).toEqual(['stop'])
+    expect(removed.ok).toBe(true)
+    expect(removed.source).not.toContain(':on')
+    expect(removed.source).toContain('<Text>{{ value }}</Text>')
+  })
+
+  it('does not commit an invalid visual Cell interaction', () => {
+    const source = '<template><Table><Column key="status" /></Table></template>'
+    const result = patchComponentSFCTableSource(source, {
+      type: 'set-column-cell-on',
+      columnIndex: 0,
+      value: `{ event: 'click', reaction: broken( }`,
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.source).toBe(source)
+    expect(result.message).toContain(':on')
+  })
+
   it('replaces and removes a direct component while preserving its bindings', () => {
     const source = `<template>
   <Table>
