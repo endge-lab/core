@@ -76,6 +76,7 @@ export type EndgePortableWorkspace = Omit<EndgeWorkspaceExport, 'installedIntegr
 export interface EndgeDomainBundle {
   schemaVersion: number
   kind: 'workspace-snapshot'
+  domainVersion?: string
   workspace: EndgePortableWorkspace
   installedIntegrations: EndgeInstalledIntegrationExport[]
   documents: EndgePortableDocuments
