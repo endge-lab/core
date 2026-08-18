@@ -85,13 +85,70 @@ export interface ComponentSFCVariant {
 }
 
 /** Декларативный триггер входа в edit-вариант. */
+export interface ComponentSFCEditTriggerModifiers {
+  /** Физическая клавиша Control на любой платформе. */
+  ctrl?: boolean
+  /** Физическая клавиша Shift. */
+  shift?: boolean
+  /** Физическая клавиша Alt/Option. */
+  alt?: boolean
+  /** Физическая клавиша Meta: Command на macOS, Windows/Super на других платформах. */
+  meta?: boolean
+  /** Основной shortcut modifier: Command на macOS, Control на Windows/Linux. */
+  mod?: boolean
+  /** AltGraph, когда браузер предоставляет его через getModifierState(). */
+  altGraph?: boolean
+  /** Запрещает дополнительные физические ctrl/shift/alt/meta modifiers. */
+  exact?: boolean
+}
+
+/** Обычные немодификаторные клавиши, удерживаемые во время trigger event. */
+export interface ComponentSFCEditTriggerHeldKeys {
+  /** Логические KeyboardEvent.key с учётом раскладки. */
+  key?: string[]
+  /** Физические KeyboardEvent.code без зависимости от раскладки. */
+  code?: string[]
+  /** all требует все перечисленные клавиши, any — хотя бы одну. */
+  match?: 'all' | 'any'
+  /** Запрещает другие удерживаемые обычные клавиши. */
+  exact?: boolean
+}
+
 export interface ComponentSFCEditTrigger {
   event: string
   key?: string[]
+  code?: string[]
+  held?: ComponentSFCEditTriggerHeldKeys
+  modifiers?: ComponentSFCEditTriggerModifiers
+  repeat?: boolean
+  composing?: boolean
   button?: number
   stop?: boolean
   prevent?: boolean
   self?: boolean
+}
+
+export type ComponentSFCEditTriggerPlatform = 'macos' | 'windows' | 'linux' | 'unknown'
+
+/** Renderer-neutral snapshot нативного события для проверки edit trigger. */
+export interface ComponentSFCEditTriggerEvent {
+  key?: string
+  code?: string
+  repeat?: boolean
+  composing?: boolean
+  button?: number
+  targetIsCurrentTarget: boolean
+  held?: {
+    key: string[]
+    code: string[]
+  }
+  modifiers: {
+    ctrl: boolean
+    shift: boolean
+    alt: boolean
+    meta: boolean
+    altGraph: boolean
+  }
 }
 
 /** Renderer-neutral поведение редактируемого template-узла. */

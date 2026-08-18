@@ -175,6 +175,7 @@ export * from '@/domain/entities/action-flow/REndgeFlow'
 export * from '@/tools/openapi-parser'
 export * from '@/tools/graphql-parser'
 export * from '@/tools/ScheduleUpdate-sse-generator'
+export * from '@/tools/component-sfc-edit-trigger'
 
 export * from '@/model/config/diagnostics.config'
 export * from '@/model/adapters/diagnostics/ConsoleDiagnosticsAdapter'
