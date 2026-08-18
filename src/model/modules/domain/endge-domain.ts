@@ -55,6 +55,10 @@ function snapshotIdentityToServerID(
   const result = new Map<string, string>()
 
   for (const document of documents) {
+    if (document.state.deletedAt != null) {
+      continue
+    }
+
     const identity = String(document.identity ?? '').trim()
     const id = String(document.state.id ?? '').trim()
     if (identity && id)
@@ -141,65 +145,71 @@ function normalizeBundleFolders(
   })
 }
 
+/** Материализует только активные документы; tombstones остаются в repository server state. */
 export function normalizeSnapshotDocuments(
   documents: readonly EndgeLiveDomainDocument[],
   folderIds: ReadonlyMap<string, string>,
 ): Record<string, unknown>[] {
-  return documents.map((document) => {
-    const { state, folderIdentity, ...domainDocument } = document
-    const identity = String(domainDocument.identity ?? '').trim()
-    const displayName = String(
-      domainDocument.displayName
-      ?? domainDocument.name
-      ?? identity,
-    )
-    const normalizedFolderIdentity = String(folderIdentity ?? '').trim()
+  return documents
+    .filter(document => document.state.deletedAt == null)
+    .map((document) => {
+      const { state, folderIdentity, ...domainDocument } = document
+      const identity = String(domainDocument.identity ?? '').trim()
+      const displayName = String(
+        domainDocument.displayName
+        ?? domainDocument.name
+        ?? identity,
+      )
+      const normalizedFolderIdentity = String(folderIdentity ?? '').trim()
 
-    return {
-      ...domainDocument,
-      id: state.id,
-      identity,
-      name: displayName,
-      displayName,
-      folderId: normalizedFolderIdentity
-        ? folderIds.get(normalizedFolderIdentity) ?? normalizedFolderIdentity
-        : null,
-      createdAt: state.createdAt,
-      updatedAt: state.updatedAt,
-      deletedAt: state.deletedAt ?? null,
-    }
-  })
+      return {
+        ...domainDocument,
+        id: state.id,
+        identity,
+        name: displayName,
+        displayName,
+        folderId: normalizedFolderIdentity
+          ? folderIds.get(normalizedFolderIdentity) ?? normalizedFolderIdentity
+          : null,
+        createdAt: state.createdAt,
+        updatedAt: state.updatedAt,
+        deletedAt: state.deletedAt ?? null,
+      }
+    })
 }
 
+/** Материализует только активные папки; tombstones остаются в repository server state. */
 export function normalizeSnapshotFolders(
   folders: readonly EndgeLiveDomainDocument[],
   folderIds: ReadonlyMap<string, string>,
 ): Record<string, unknown>[] {
-  return folders.map((folder) => {
-    const { state, parentIdentity, ...domainFolder } = folder
-    const identity = String(domainFolder.identity ?? '').trim()
-    const displayName = String(
-      domainFolder.displayName
-      ?? domainFolder.name
-      ?? identity,
-    )
-    const normalizedParentIdentity = String(parentIdentity ?? '').trim()
+  return folders
+    .filter(folder => folder.state.deletedAt == null)
+    .map((folder) => {
+      const { state, parentIdentity, ...domainFolder } = folder
+      const identity = String(domainFolder.identity ?? '').trim()
+      const displayName = String(
+        domainFolder.displayName
+        ?? domainFolder.name
+        ?? identity,
+      )
+      const normalizedParentIdentity = String(parentIdentity ?? '').trim()
 
-    return {
-      ...domainFolder,
-      id: state.id,
-      identity,
-      name: displayName,
-      displayName,
-      parent: normalizedParentIdentity
-        ? folderIds.get(normalizedParentIdentity) ?? normalizedParentIdentity
-        : null,
-      folderId: null,
-      createdAt: state.createdAt,
-      updatedAt: state.updatedAt,
-      deletedAt: state.deletedAt ?? null,
-    }
-  })
+      return {
+        ...domainFolder,
+        id: state.id,
+        identity,
+        name: displayName,
+        displayName,
+        parent: normalizedParentIdentity
+          ? folderIds.get(normalizedParentIdentity) ?? normalizedParentIdentity
+          : null,
+        folderId: null,
+        createdAt: state.createdAt,
+        updatedAt: state.updatedAt,
+        deletedAt: state.deletedAt ?? null,
+      }
+    })
 }
 
 /**

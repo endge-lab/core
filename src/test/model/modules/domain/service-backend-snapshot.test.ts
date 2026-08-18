@@ -193,6 +193,46 @@ describe('service-backend Core provider', () => {
       expect(plain[collection]).toHaveLength(1)
   })
 
+  it('keeps tombstones in repository state without materializing them in the live domain', async () => {
+    const snapshot = liveSnapshot()
+    const deletedAction = liveDocument('deleted-action')
+    const deletedFolder = liveDocument('deleted-folder', { parentIdentity: 'folder-root' })
+    const deletedEnvironment = liveDocument('deleted-environment')
+    const deletedAt = '2026-08-18T08:00:00Z'
+
+    deletedAction.state.deletedAt = deletedAt
+    deletedFolder.state.deletedAt = deletedAt
+    deletedEnvironment.state.deletedAt = deletedAt
+    snapshot.documents.actions.push(deletedAction)
+    snapshot.documents.folders.push(deletedFolder)
+    snapshot.documents.environments.push(deletedEnvironment)
+
+    const provider: EndgeDomainProvider = {
+      id: 'service-backend',
+      capabilities: { snapshot: true, mutations: false, softDelete: false, restore: false },
+      etag: '"generation-id:4"',
+      loadWorkspace: vi.fn().mockResolvedValue(snapshot),
+      createDocument: vi.fn(),
+      updateDocument: vi.fn(),
+      softDeleteDocument: vi.fn(),
+      restoreDocument: vi.fn(),
+      moveDocuments: vi.fn(),
+      updateWorkspace: vi.fn(),
+    }
+    const repository = new EndgeDomainRepository()
+    const context = defaultContext(provider)
+    await repository.setup(context)
+    await repository.loadSnapshot(context)
+
+    const domain = new EndgeDomain()
+    domain.mergeFromSnapshot(snapshot)
+
+    expect(repository.getDocumentServerState('actions', 'deleted-action')).toMatchObject({ deletedAt })
+    expect(domain.getActionByIdentity('deleted-action')).toBeNull()
+    expect(domain.getFolderByIdentity('deleted-folder')).toBeNull()
+    expect(domain.getEnvironmentByIdentity('deleted-environment')).toBeNull()
+  })
+
   it('uses the server UUID as the live document id without copying revision into domain data', () => {
     const snapshot = liveSnapshot()
     for (const key of DOCUMENT_KEYS)
