@@ -1,8 +1,8 @@
 import type {
   AuthProfileAdapterId,
   AuthProfileConfig,
-  AuthProfileCredentialRefs,
-  AuthProfilePersist,
+  AuthProfileCredentials,
+  AuthSessionPolicy,
 } from '@/domain/types/auth/auth-profile.types'
 
 import { Serialize } from '@endge/utils'
@@ -25,10 +25,10 @@ export class RAuthProfile extends REntity {
   config: AuthProfileConfig = {}
 
   @Expose()
-  credentialRefs: AuthProfileCredentialRefs = {}
+  credentials: AuthProfileCredentials = {}
 
   @Expose()
-  persist: AuthProfilePersist = 'memory'
+  session: AuthSessionPolicy | undefined = undefined
 
   @Expose()
   override active: boolean = true
@@ -42,8 +42,8 @@ export class RAuthProfile extends REntity {
     profile.description = raw.description ?? null
     profile.adapterId = normalizeAdapterId(raw.adapterId)
     profile.config = normalizeObject(raw.config)
-    profile.credentialRefs = normalizeStringObject(raw.credentialRefs)
-    profile.persist = normalizePersist(raw.persist)
+    profile.credentials = normalizeStringObject(raw.credentials)
+    profile.session = normalizeSession(raw.session)
     profile.folderId = raw.folderId ?? raw.folder ?? null
     profile.active = raw.active !== false
     profile.deletedAt = raw.deletedAt ?? null
@@ -60,8 +60,8 @@ export class RAuthProfile extends REntity {
       description: this.description ?? null,
       adapterId: this.adapterId,
       config: this.config ?? {},
-      credentialRefs: this.credentialRefs ?? {},
-      persist: this.persist ?? 'localStorage',
+      credentials: this.credentials ?? {},
+      ...(this.session ? { session: this.session } : {}),
       folderId: this.folderId ?? null,
       active: this.active !== false,
       deletedAt: this.deletedAt ?? null,
@@ -87,11 +87,16 @@ function normalizeAdapterId(value: unknown): AuthProfileAdapterId {
   return id
 }
 
-function normalizePersist(value: unknown): AuthProfilePersist {
-  const persist = String(value ?? '').trim()
-  if (persist === 'localStorage' || persist === 'sessionStorage' || persist === 'memory')
-    return persist
-  throw new Error(`[RAuthProfile] Unsupported persist policy: ${persist || '<empty>'}`)
+function normalizeSession(value: unknown): AuthSessionPolicy | undefined {
+  if (value == null)
+    return undefined
+  const raw = normalizeObject(value)
+  const storage = String(raw.storage ?? '').trim()
+  if (storage !== 'localStorage' && storage !== 'sessionStorage' && storage !== 'memory')
+    throw new Error(`[RAuthProfile] Unsupported session storage: ${storage || '<empty>'}`)
+  if (typeof raw.persistRefreshToken !== 'boolean')
+    throw new TypeError('[RAuthProfile] session.persistRefreshToken must be boolean')
+  return { storage, persistRefreshToken: raw.persistRefreshToken }
 }
 
 function normalizeObject(value: unknown): Record<string, unknown> {
@@ -100,11 +105,11 @@ function normalizeObject(value: unknown): Record<string, unknown> {
     : {}
 }
 
-function normalizeStringObject(value: unknown): Record<string, string | undefined> {
+function normalizeStringObject(value: unknown): Record<string, string> {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     return {}
-  const out: Record<string, string | undefined> = {}
+  const out: Record<string, string> = {}
   for (const [key, raw] of Object.entries(value as Record<string, unknown>))
-    out[key] = raw == null ? undefined : String(raw)
+    out[key] = raw == null ? '' : String(raw)
   return out
 }

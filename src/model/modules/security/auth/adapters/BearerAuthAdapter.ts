@@ -5,7 +5,7 @@ import type {
   AuthTokenSet,
 } from '@/domain/types/auth/auth-profile.types'
 
-/** Разрешает opaque bearer token исключительно через host credential resolver. */
+/** Материализует Bearer header из literal или Workspace variable. */
 export class BearerAuthAdapter implements AuthProfileAdapter {
   public readonly id = 'bearer'
   public readonly label = 'Bearer token'
@@ -14,10 +14,11 @@ export class BearerAuthAdapter implements AuthProfileAdapter {
   public validate(profile: AuthProfileSchema): void {
     if (Object.keys(profile.config ?? {}).length > 0)
       throw new Error(`[EndgeAuth] Bearer profile "${profile.identity}" config must be empty`)
-    if (profile.persist !== 'memory')
-      throw new Error(`[EndgeAuth] Bearer profile "${profile.identity}" must use persist=memory`)
-    if (!String(profile.credentialRefs?.token ?? '').trim())
-      throw new Error(`[EndgeAuth] Bearer profile "${profile.identity}" requires credentialRefs.token`)
+    if (profile.session)
+      throw new Error(`[EndgeAuth] Bearer profile "${profile.identity}" must not define session`)
+    const keys = Object.keys(profile.credentials ?? {})
+    if (keys.length !== 1 || keys[0] !== 'token' || !String(profile.credentials.token ?? '').trim())
+      throw new Error(`[EndgeAuth] Bearer profile "${profile.identity}" requires only credentials.token`)
   }
 
   /** Получает token у host и не сохраняет его в browser storage. */
@@ -25,6 +26,10 @@ export class BearerAuthAdapter implements AuthProfileAdapter {
     const accessToken = (await context.resolveCredential('token')).trim()
     if (!accessToken)
       throw new Error(`[EndgeAuth] Bearer credential is empty: ${context.profile.identity}`)
-    return { accessToken, accessExpiresAt: null }
+    return {
+      accessToken,
+      accessExpiresAt: null,
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
   }
 }

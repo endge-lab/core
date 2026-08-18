@@ -1,6 +1,6 @@
 import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 import type { DiagnosticsAttributes } from '@/domain/types/diagnostics/diagnostics.types'
-import type { EndgeAuthCredentialResolver } from '@/domain/types/auth/auth-profile.types'
+import type { AuthProfileSchema, OidcBrowserSessionOptions } from '@/domain/types/auth/auth-profile.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { Endge } from '@/model/kernel/endge'
@@ -9,8 +9,14 @@ import { AuthProfileRegistry } from '@/model/modules/security/auth/AuthProfileRe
 import { AuthRequestResolver } from '@/model/modules/security/auth/AuthRequestResolver'
 import { AuthSessionManager } from '@/model/modules/security/auth/AuthSessionManager'
 import { AuthSessionStore } from '@/model/modules/security/auth/AuthSessionStore'
+import { BasicAuthAdapter } from '@/model/modules/security/auth/adapters/BasicAuthAdapter'
 import { BearerAuthAdapter } from '@/model/modules/security/auth/adapters/BearerAuthAdapter'
-import { KeycloakAuthAdapter } from '@/model/modules/security/auth/adapters/KeycloakAuthAdapter'
+import { OAuth2ClientCredentialsAuthAdapter } from '@/model/modules/security/auth/adapters/OAuth2ClientCredentialsAuthAdapter'
+import { OidcAuthAdapter } from '@/model/modules/security/auth/adapters/OidcAuthAdapter'
+import { OidcBrowserSession_Service } from '@/model/services/auth/OidcBrowserSession_Service'
+import type { AuthInteractionRequiredError } from '@/model/modules/security/auth/AuthInteractionRequiredError'
+
+export type AuthInteractionRequiredListener = (error: AuthInteractionRequiredError) => void
 
 /** Единый lifecycle owner runtime auth profile sessions и request authentication. */
 export class EndgeAuth extends EndgeModule {
@@ -19,24 +25,27 @@ export class EndgeAuth extends EndgeModule {
   public readonly session: AuthSessionManager
   public readonly requests: AuthRequestResolver
 
-  private _credentialResolver: EndgeAuthCredentialResolver | undefined
   private _signal: AbortSignal | undefined
+  private _storageNamespace = 'default'
   private _abortController: AbortController | null = null
   private _detachHostAbort: (() => void) | null = null
   private _unregisterDiagnosticsContext: (() => void) | null = null
   private readonly _store: AuthSessionStore
+  private readonly _interactionRequiredListeners = new Set<AuthInteractionRequiredListener>()
 
   /** Собирает auth subsystem и регистрирует встроенные adapters один раз. */
   public constructor() {
     super()
     this.adapters = new AuthAdapterRegistry()
+    this.adapters.register(new OidcAuthAdapter())
+    this.adapters.register(new OAuth2ClientCredentialsAuthAdapter())
+    this.adapters.register(new BasicAuthAdapter())
     this.adapters.register(new BearerAuthAdapter())
-    this.adapters.register(new KeycloakAuthAdapter(raw => this._resolvePublicValue(raw)))
 
     this.profiles = new AuthProfileRegistry(this.adapters, {
       listProfiles: () => Endge.domain.getAuthProfiles(),
       getDefaultIdentity: () => Endge.workspace.defaultAuthProfileIdentity,
-      getCredentialResolver: () => this._credentialResolver,
+      resolveValue: value => this._resolvePublicValue(value),
       getSignal: () => this._signal,
     })
 
@@ -45,13 +54,23 @@ export class EndgeAuth extends EndgeModule {
       getWorkspaceIdentity: () => Endge.context.getCurrentWorkspace() ?? '',
       onSessionChange: () => this.notify(),
     })
-    this.requests = new AuthRequestResolver(this.profiles, this.session)
+    this.requests = new AuthRequestResolver(
+      this.profiles,
+      this.session,
+      error => this._publishInteractionRequired(error),
+    )
   }
 
-  /** Подключает host credential port и безопасные context providers. */
+  /** Subscribes a host application to requests that require an interactive OIDC flow. */
+  public onInteractionRequired(listener: AuthInteractionRequiredListener): () => void {
+    this._interactionRequiredListeners.add(listener)
+    return () => this._interactionRequiredListeners.delete(listener)
+  }
+
+  /** Подключает storage namespace и безопасные context providers. */
   public override setup(ctx: EndgeBootContext): void {
-    this._credentialResolver = ctx.auth?.resolveCredential
-    this._store.setNamespace(ctx.auth?.storageNamespace)
+    this._storageNamespace = String(ctx.auth?.storageNamespace ?? '').trim() || 'default'
+    this._store.setNamespace(this._storageNamespace)
     this._abortController?.abort()
     this._detachHostAbort?.()
     const controller = new AbortController()
@@ -92,7 +111,7 @@ export class EndgeAuth extends EndgeModule {
     this._detachHostAbort = null
     this.session.resetRuntime()
     this._store.setNamespace(undefined)
-    this._credentialResolver = undefined
+    this._storageNamespace = 'default'
     this._signal = undefined
     this._unregisterDiagnosticsContext?.()
     this._unregisterDiagnosticsContext = null
@@ -100,14 +119,43 @@ export class EndgeAuth extends EndgeModule {
     this.notify()
   }
 
+  /** Создаёт OIDC browser source из resolved persisted profile. */
+  public createOidcSessionSource(
+    profileInput: AuthProfileSchema | string,
+    options: Pick<OidcBrowserSessionOptions, 'redirectUri' | 'popupRedirectUri' | 'postLogoutRedirectUri' | 'flow'>,
+  ): OidcBrowserSession_Service {
+    const profile = this.profiles.requireActive(profileInput)
+    if (profile.adapterId !== 'oidc' || !profile.session)
+      throw new Error(`[EndgeAuth] Profile does not support OIDC browser flow: ${profile.identity}`)
+    const issuer = this._resolvePublicValue(profile.config.issuer)
+    const clientId = this._resolvePublicValue(profile.config.clientId)
+    const scopes = Array.isArray(profile.config.scopes)
+      ? profile.config.scopes.map(scope => this._resolvePublicValue(scope)).filter(Boolean)
+      : []
+    if (!issuer || !clientId || scopes.length === 0)
+      throw new Error(`[EndgeAuth] OIDC public config is unresolved: ${profile.identity}`)
+    return new OidcBrowserSession_Service({
+      issuer,
+      clientId,
+      scopes,
+      session: profile.session,
+      storageNamespace: `${this._storageNamespace}:${Endge.context.getCurrentWorkspace() ?? 'workspace'}`,
+      profileIdentity: profile.identity,
+      ...options,
+    })
+  }
+
   private _resolvePublicValue(raw: unknown): string {
     const value = String(raw ?? '').trim()
     if (!value)
       return ''
-    return String(Endge.workspace.variables.resolve(value, {
+    const resolved = String(Endge.workspace.variables.resolve(value, {
       fallback: value,
       onInvalid: 'as-is',
     }) ?? value).trim()
+    if (isVariableReference(value) && (!resolved || resolved === value))
+      throw new Error(`[EndgeAuth] Workspace variable is unavailable: ${value}`)
+    return resolved
   }
 
   private _diagnosticsAttributes(): DiagnosticsAttributes {
@@ -120,4 +168,19 @@ export class EndgeAuth extends EndgeModule {
       ...(context.profileIdentity ? { 'endge.auth.profile.id': context.profileIdentity } : {}),
     }
   }
+
+  private _publishInteractionRequired(error: AuthInteractionRequiredError): void {
+    for (const listener of [...this._interactionRequiredListeners]) {
+      try {
+        listener(error)
+      }
+      catch {
+        // A host listener must not replace the original typed request error.
+      }
+    }
+  }
+}
+
+function isVariableReference(value: string): boolean {
+  return /^\{[A-Za-z_][A-Za-z0-9_.-]*\}$/.test(value)
 }

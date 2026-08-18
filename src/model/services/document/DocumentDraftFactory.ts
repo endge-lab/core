@@ -328,8 +328,8 @@ export class DocumentDraftFactory {
         item.displayName = title
         item.adapterId = 'bearer'
         item.config = {}
-        item.credentialRefs = {}
-        item.persist = 'memory'
+        item.credentials = { token: '{TOKEN}' }
+        item.session = undefined
         item.active = true
         if (folderId != null)
           item.folderId = folderId

@@ -1,17 +1,77 @@
-export type AuthProfileAdapterId = 'keycloak' | 'bearer' | (string & {})
+export type AuthProfileAdapterId
+  = | 'oidc'
+    | 'oauth2-client-credentials'
+    | 'basic'
+    | 'bearer'
+    | (string & {})
 
-export type AuthProfilePersist = 'localStorage' | 'sessionStorage' | 'memory'
+export type AuthSessionStorage = 'localStorage' | 'sessionStorage' | 'memory'
 
-export type AuthLoginMode = 'interactive' | 'service'
+export interface AuthSessionPolicy {
+  storage: AuthSessionStorage
+  persistRefreshToken: boolean
+}
 
 export interface AuthProfileConfig {
   [key: string]: unknown
 }
 
-export interface AuthProfileCredentialRefs {
-  [key: string]: string | undefined
+export interface AuthProfileCredentials {
+  [key: string]: string
 }
 
+/** Persisted discriminated contract of the four built-in adapters. */
+export interface AuthProfileBase {
+  id: string
+  identity: string
+  name: string
+  description?: string
+  active: boolean
+  adapterId: string
+  config: Record<string, unknown>
+  credentials: Record<string, string>
+}
+
+export interface OidcAuthProfile extends AuthProfileBase {
+  adapterId: 'oidc'
+  config: { issuer: string, clientId: string, scopes: string[] }
+  credentials: Record<string, never>
+  session: AuthSessionPolicy
+}
+
+export interface OAuth2ClientCredentialsProfile extends AuthProfileBase {
+  adapterId: 'oauth2-client-credentials'
+  config: {
+    tokenEndpoint: string
+    clientId: string
+    scopes: string[]
+    clientAuthentication: 'client_secret_basic' | 'client_secret_post'
+  }
+  credentials: { clientSecret: string }
+  session: AuthSessionPolicy
+}
+
+export interface BasicAuthProfile extends AuthProfileBase {
+  adapterId: 'basic'
+  config: Record<string, never>
+  credentials: { username: string, password: string }
+  session?: never
+}
+
+export interface BearerAuthProfile extends AuthProfileBase {
+  adapterId: 'bearer'
+  config: Record<string, never>
+  credentials: { token: string }
+  session?: never
+}
+
+export type AuthProfile
+  = | OidcAuthProfile
+    | OAuth2ClientCredentialsProfile
+    | BasicAuthProfile
+    | BearerAuthProfile
+
+/** Runtime projection also accepts structurally validated registry extensions and legacy numeric IDs. */
 export interface AuthProfileSchema {
   id: string | number
   identity: string
@@ -20,8 +80,8 @@ export interface AuthProfileSchema {
   description?: string | null
   adapterId: AuthProfileAdapterId
   config: AuthProfileConfig
-  credentialRefs: AuthProfileCredentialRefs
-  persist: AuthProfilePersist
+  credentials: AuthProfileCredentials
+  session?: AuthSessionPolicy
   folderId?: string | number | null
   active: boolean
   deletedAt?: string | null
@@ -35,6 +95,7 @@ export interface AuthTokenSet {
   sessionState?: string
   accessExpiresAt: number | null
   refreshExpiresAt?: number | null
+  headers?: Record<string, string>
 }
 
 export interface AuthResolvedSession {
@@ -55,15 +116,8 @@ export interface AuthResolveOptions {
   forceRefresh?: boolean
 }
 
-export interface AuthLoginCredentials {
-  username: string
-  password: string
-}
-
 export interface AuthEnsureOptions {
   forceRefresh?: boolean
-  /** Запрещает первичный auto-login service-профиля, сохраняя restore и refresh. */
-  allowServiceLogin?: boolean
 }
 
 export interface AuthSessionSourceResolveOptions {
@@ -71,7 +125,7 @@ export interface AuthSessionSourceResolveOptions {
   minValiditySeconds: number
 }
 
-/** Host-owned источник session для внешнего Authorization Code/PKCE flow. */
+/** Host-owned источник session для внешнего Authorization Code + PKCE flow. */
 export interface AuthSessionSource {
   resolveToken: (options: AuthSessionSourceResolveOptions) => Promise<AuthTokenSet | null>
   logout?: () => Promise<void>
@@ -86,28 +140,16 @@ export interface EndgeAuthContext {
   profileIdentity?: string
 }
 
-export interface AuthCredentialResolveInput {
-  ref: string
-  profileIdentity: string
-  credential: string
-  signal?: AbortSignal
-}
-
-export type EndgeAuthCredentialResolver = (
-  input: AuthCredentialResolveInput,
-) => string | undefined | Promise<string | undefined>
-
 export interface EndgeAuthBootOptions {
-  resolveCredential?: EndgeAuthCredentialResolver
-  /** Host-owned namespace isolates persisted sessions of identical Workspaces across backends. */
+  /** Host-owned namespace isolates sessions одинаковых Workspaces across backends. */
   storageNamespace?: string
 }
 
 export interface AuthAdapterContext {
   profile: AuthProfileSchema
-  credentials?: Record<string, string>
   token?: AuthTokenSet
   signal?: AbortSignal
+  resolveValue: (value: unknown) => string
   resolveCredential: (credential: string) => Promise<string>
 }
 
@@ -122,14 +164,23 @@ export interface AuthProfileAdapter {
   loadUserInfo?(context: AuthAdapterContext): Promise<Record<string, unknown> | null>
 }
 
-export interface AuthProfileTestOptions {
-  credentials?: Record<string, string>
-}
-
 export interface AuthProfileTestResult {
   authenticated: boolean
   profileIdentity: string
   expiresAt: number | null
   context: EndgeAuthContext
   userInfo: Record<string, unknown> | null
+}
+
+export interface OidcBrowserSessionOptions {
+  issuer: string
+  clientId: string
+  scopes: string[]
+  redirectUri: string
+  popupRedirectUri?: string
+  postLogoutRedirectUri?: string
+  session: AuthSessionPolicy
+  storageNamespace: string
+  profileIdentity: string
+  flow: 'popup' | 'redirect'
 }

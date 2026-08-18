@@ -2,9 +2,7 @@ import type { RAuthProfile } from '@/domain/entities/reflect/RAuthProfile'
 import type {
   AuthAdapterContext,
   AuthProfileSchema,
-  AuthProfileTestOptions,
   AuthProfileTestResult,
-  EndgeAuthCredentialResolver,
 } from '@/domain/types/auth/auth-profile.types'
 
 import { createEndgeAuthContext } from '@/model/services/auth/auth-context'
@@ -13,7 +11,7 @@ import type { AuthAdapterRegistry } from '@/model/modules/security/auth/AuthAdap
 interface AuthProfileRegistryDependencies {
   listProfiles: () => RAuthProfile[]
   getDefaultIdentity: () => string | null
-  getCredentialResolver: () => EndgeAuthCredentialResolver | undefined
+  resolveValue: (value: unknown) => string
   getSignal: () => AbortSignal | undefined
 }
 
@@ -60,18 +58,18 @@ export class AuthProfileRegistry {
   }
 
   /** Проверяет profile в изолированной session без записи token в storage. */
-  public async test(profile: AuthProfileSchema, options: AuthProfileTestOptions = {}): Promise<AuthProfileTestResult> {
+  public async test(profile: AuthProfileSchema): Promise<AuthProfileTestResult> {
     this._validateCommon(profile)
     const adapter = this._adapters.require(profile)
     adapter.validate(profile)
-    const context = this._adapterContext(profile, options.credentials)
+    const context = this._adapterContext(profile)
     let token = await adapter.authenticate(context)
     let userInfo: Record<string, unknown> | null = null
     try {
       if (adapter.loadUserInfo)
         userInfo = await adapter.loadUserInfo({ ...context, token })
       const authContext = createEndgeAuthContext({
-        authenticated: Boolean(token.accessToken),
+        authenticated: Boolean(token.accessToken) || Object.keys(token.headers ?? {}).length > 0,
         accessToken: token.accessToken,
         idToken: token.idToken,
         sessionState: token.sessionState,
@@ -79,7 +77,7 @@ export class AuthProfileRegistry {
         userInfo,
       })
       return {
-        authenticated: Boolean(token.accessToken),
+        authenticated: Boolean(token.accessToken) || Object.keys(token.headers ?? {}).length > 0,
         profileIdentity: profile.identity,
         expiresAt: token.accessExpiresAt,
         context: authContext,
@@ -112,29 +110,21 @@ export class AuthProfileRegistry {
   }
 
   /** Создаёт adapter context с opaque host credential resolver. */
-  public createAdapterContext(profile: AuthProfileSchema, credentials?: Record<string, string>): AuthAdapterContext {
-    return this._adapterContext(profile, credentials)
+  public createAdapterContext(profile: AuthProfileSchema): AuthAdapterContext {
+    return this._adapterContext(profile)
   }
 
-  private _adapterContext(profile: AuthProfileSchema, credentials?: Record<string, string>): AuthAdapterContext {
+  private _adapterContext(profile: AuthProfileSchema): AuthAdapterContext {
     return {
       profile,
-      credentials,
       signal: this._dependencies.getSignal(),
+      resolveValue: value => this._dependencies.resolveValue(value),
       resolveCredential: async (credential: string): Promise<string> => {
-        const ref = String(profile.credentialRefs?.[credential] ?? '').trim()
-        if (!ref)
-          throw new Error(`[EndgeAuth] credentialRefs.${credential} is required: ${profile.identity}`)
-        const resolver = this._dependencies.getCredentialResolver()
-        if (!resolver)
-          throw new Error(`[EndgeAuth] Host credential resolver is unavailable: ${profile.identity}.${credential}`)
-        const value = String(await resolver({
-          ref,
-          profileIdentity: profile.identity,
-          credential,
-          signal: this._dependencies.getSignal(),
-        }) ?? '').trim()
-        if (!value)
+        const raw = String(profile.credentials?.[credential] ?? '').trim()
+        if (!raw)
+          throw new Error(`[EndgeAuth] credentials.${credential} is required: ${profile.identity}`)
+        const value = this._dependencies.resolveValue(raw)
+        if (!value || (isVariableReference(raw) && value === raw))
           throw new Error(`[EndgeAuth] Credential is unavailable: ${profile.identity}.${credential}`)
         return value
       },
@@ -146,7 +136,11 @@ export class AuthProfileRegistry {
       throw new Error('[EndgeAuth] Auth profile identity is required')
     if (!String(profile.adapterId ?? '').trim())
       throw new Error(`[EndgeAuth] Auth profile adapterId is required: ${profile.identity}`)
-    if (!['localStorage', 'sessionStorage', 'memory'].includes(profile.persist))
-      throw new Error(`[EndgeAuth] Auth profile persist is invalid: ${profile.identity}`)
+    if (profile.session && !['localStorage', 'sessionStorage', 'memory'].includes(profile.session.storage))
+      throw new Error(`[EndgeAuth] Auth profile session storage is invalid: ${profile.identity}`)
   }
+}
+
+function isVariableReference(value: string): boolean {
+  return /^\{[A-Za-z_][A-Za-z0-9_.-]*\}$/.test(value)
 }

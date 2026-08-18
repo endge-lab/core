@@ -94,8 +94,9 @@ export function serializeServiceDocument(
   if (documentType === 'i18n-bundles')
     return withFields(common, value, ['locales'], { locales: objectValue(value.locales) })
   if (documentType === 'auth-profile') {
-    return withFields(common, value, ['adapterId', 'config', 'credentialRefs', 'persist'], {
-      config: objectValue(value.config), credentialRefs: objectValue(value.credentialRefs),
+    return withFields(common, value, ['adapterId', 'config', 'credentials', 'session'], {
+      config: objectValue(value.config), credentials: objectValue(value.credentials),
+      session: value.session ? objectValue(value.session) : null,
     })
   }
   if (documentType === 'navigation')

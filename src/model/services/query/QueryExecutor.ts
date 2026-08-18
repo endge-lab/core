@@ -254,19 +254,21 @@ export class QueryExecutor {
         : { mode: 'inherit' },
     )
     const token = session.accessToken
-
-    if (!token)
-      return
-
-    const scheme = current.scheme ?? 'Bearer'
     if (current.sendAs === 'query') {
-      if (qs) {
+      if (token && qs) {
         const paramName = current.queryParamName ?? 'access_token'
         qs[paramName] = token
       }
       return
     }
 
+    if (!current.headerName && !current.scheme) {
+      Object.assign(headers, session.headers)
+      return
+    }
+    if (!token)
+      throw new Error(`[EndgeAuth] Profile "${session.profileIdentity}" does not expose a token for custom Query auth mapping`)
+    const scheme = current.scheme ?? 'Bearer'
     const headerName = current.headerName ?? 'Authorization'
     headers[headerName] = `${scheme} ${token}`
   }

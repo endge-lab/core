@@ -19,10 +19,11 @@ export class AuthSessionStore {
   /** Восстанавливает snapshot и удаляет повреждённое значение. */
   public read(workspaceIdentity: string, profile: AuthProfileSchema): AuthSessionSnapshot | null {
     const key = this.getKey(workspaceIdentity, profile.identity)
-    if (profile.persist === 'memory')
+    const storagePolicy = profile.session?.storage ?? 'memory'
+    if (storagePolicy === 'memory')
       return this._memory.get(key) ?? null
 
-    const storage = this._storage(profile.persist)
+    const storage = this._storage(storagePolicy)
     if (!storage)
       return null
     try {
@@ -49,15 +50,19 @@ export class AuthSessionStore {
   /** Сохраняет token snapshot без credentials и userinfo. */
   public write(workspaceIdentity: string, profile: AuthProfileSchema, snapshot: AuthSessionSnapshot): void {
     const key = this.getKey(workspaceIdentity, profile.identity)
-    if (profile.persist === 'memory') {
-      this._memory.set(key, snapshot)
+    const sanitized = profile.session?.persistRefreshToken === true
+      ? snapshot
+      : { ...snapshot, token: { ...snapshot.token, refreshToken: undefined } }
+    const storagePolicy = profile.session?.storage ?? 'memory'
+    if (storagePolicy === 'memory') {
+      this._memory.set(key, sanitized)
       return
     }
-    const storage = this._storage(profile.persist)
+    const storage = this._storage(storagePolicy)
     if (!storage)
       return
     try {
-      storage.setItem(key, JSON.stringify(snapshot))
+      storage.setItem(key, JSON.stringify(sanitized))
     }
     catch {
       // Storage quota/privacy restrictions не должны ломать полученную session.

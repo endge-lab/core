@@ -50,7 +50,7 @@ export interface EndgeBootContext {
   /** Host-local UI policy; it does not mutate persisted Workspace configuration. */
   ui?: EndgeUIBootOptions
 
-  /** Host-owned resolver credential material for AuthProfile references. */
+  /** Host-owned browser session namespace. */
   auth?: EndgeAuthBootOptions
 
   /**

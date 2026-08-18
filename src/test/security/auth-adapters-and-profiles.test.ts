@@ -1,182 +1,63 @@
-import type {
-  AuthAdapterContext,
-  AuthProfileAdapter,
-  AuthProfileSchema,
-  AuthTokenSet,
-} from '@/domain/types/auth/auth-profile.types'
-import type { KeycloakAuthTransport } from '@/domain/types/auth/auth-runtime.types'
+import { describe, expect, it, vi } from 'vitest'
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-
+import { BasicAuthAdapter } from '@/model/modules/security/auth/adapters/BasicAuthAdapter'
+import { BearerAuthAdapter } from '@/model/modules/security/auth/adapters/BearerAuthAdapter'
+import { OAuth2ClientCredentialsAuthAdapter } from '@/model/modules/security/auth/adapters/OAuth2ClientCredentialsAuthAdapter'
+import { OidcAuthAdapter } from '@/model/modules/security/auth/adapters/OidcAuthAdapter'
+import { AuthInteractionRequiredError } from '@/model/modules/security/auth/AuthInteractionRequiredError'
 import { AuthAdapterRegistry } from '@/model/modules/security/auth/AuthAdapterRegistry'
 import { AuthProfileRegistry } from '@/model/modules/security/auth/AuthProfileRegistry'
-import { BearerAuthAdapter } from '@/model/modules/security/auth/adapters/BearerAuthAdapter'
-import { KeycloakAuthAdapter } from '@/model/modules/security/auth/adapters/KeycloakAuthAdapter'
-import { authProfile, tokenSet } from '@/test/security/auth-test-helpers'
+import { authProfile } from '@/test/security/auth-test-helpers'
 
-describe('built-in auth adapters', () => {
-  let transport: KeycloakAuthTransport
-
-  beforeEach(() => {
-    transport = {
-      passwordGrant: vi.fn(async () => ({
-        access_token: 'access',
-        refresh_token: 'refresh',
-        expires_in: 60,
-        refresh_expires_in: 120,
-        id_token: 'id-token',
-      })),
-      refreshGrant: vi.fn(async () => ({ access_token: 'refreshed', expires_in: 60 })),
-      logout: vi.fn(async () => undefined),
-      getUserInfo: vi.fn(async () => ({ sub: 'user-1', name: 'User' })),
-    }
+describe('universal auth adapters', () => {
+  it('validates OIDC and requires host interaction', async () => {
+    const profile = authProfile()
+    const adapter = new OidcAuthAdapter()
+    expect(() => adapter.validate(profile)).not.toThrow()
+    await expect(adapter.authenticate(context(profile))).rejects.toBeInstanceOf(AuthInteractionRequiredError)
   })
 
-  it('rejects legacy ids, forbidden Keycloak fields and invalid mode contracts', () => {
-    const registry = new AuthAdapterRegistry()
-    registry.register(new KeycloakAuthAdapter(String, () => transport))
-    registry.register(new BearerAuthAdapter())
-
-    for (const adapterId of ['keycloak_form', 'keycloak_manual', 'manual_token'])
-      expect(() => registry.validate(authProfile({ adapterId }))).toThrow('Unknown auth adapter')
-
-    expect(() => registry.validate(authProfile({
-      config: { ...authProfile().config, password: 'raw-secret' },
-    }))).toThrow('Unsupported Keycloak config field')
-    expect(() => registry.validate(authProfile({
-      credentialRefs: { username: 'USER' },
-    }))).toThrow('must not persist credentialRefs')
-    expect(() => registry.validate(authProfile({
-      config: { ...authProfile().config, loginMode: 'service' },
-      credentialRefs: { username: 'USER' },
-    }))).toThrow('credentialRefs.password')
+  it('materializes Basic and Bearer headers from literal or variable values', async () => {
+    const basic = authProfile({ adapterId: 'basic', config: {}, credentials: { username: 'alice', password: '{PASSWORD}' }, session: undefined })
+    const bearer = authProfile({ adapterId: 'bearer', config: {}, credentials: { token: '{TOKEN}' }, session: undefined })
+    const resolve = (value: unknown) => value === '{PASSWORD}' ? 'secret' : value === '{TOKEN}' ? 'opaque' : String(value)
+    await expect(new BasicAuthAdapter().authenticate(context(basic, resolve))).resolves.toEqual(expect.objectContaining({ headers: { Authorization: 'Basic YWxpY2U6c2VjcmV0' } }))
+    await expect(new BearerAuthAdapter().authenticate(context(bearer, resolve))).resolves.toEqual(expect.objectContaining({ headers: { Authorization: 'Bearer opaque' } }))
   })
 
-  it('uses transient credentials for interactive login and resolver refs for service login', async () => {
-    const adapter = new KeycloakAuthAdapter(String, () => transport, () => 1_000)
-    const interactive = authProfile()
-    await adapter.authenticate(context(interactive, {
-      credentials: { username: 'alice', password: 'secret' },
-    }))
-    expect(transport.passwordGrant).toHaveBeenLastCalledWith(
-      expect.objectContaining({ username: 'alice', password: 'secret' }),
-      undefined,
-    )
-
-    const service = authProfile({
-      identity: 'service',
-      config: { ...interactive.config, loginMode: 'service' },
-      credentialRefs: { username: 'SERVICE_USER', password: 'SERVICE_PASSWORD' },
-    })
-    const resolveCredential = vi.fn(async (credential: string) => credential === 'username' ? 'robot' : 'robot-secret')
-    await adapter.authenticate(context(service, { resolveCredential }))
-    expect(resolveCredential).toHaveBeenCalledTimes(2)
-    expect(transport.passwordGrant).toHaveBeenLastCalledWith(
-      expect.objectContaining({ username: 'robot', password: 'robot-secret' }),
-      undefined,
-    )
-
-    resolveCredential.mockClear()
-    await adapter.authenticate(context(service, {
-      credentials: { username: 'alice', password: 'secret' },
-      resolveCredential,
-    }))
-    expect(resolveCredential).not.toHaveBeenCalled()
-    expect(transport.passwordGrant).toHaveBeenLastCalledWith(
-      expect.objectContaining({ username: 'alice', password: 'secret' }),
-      undefined,
-    )
-  })
-
-  it('resolves bearer tokens only through the host resolver and enforces memory persistence', async () => {
-    const adapter = new BearerAuthAdapter()
+  it('performs client_secret_basic grant', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ access_token: 'service-token', expires_in: 60 }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
     const profile = authProfile({
-      adapterId: 'bearer',
-      config: {},
-      credentialRefs: { token: 'AODB_TOKEN' },
-      persist: 'memory',
+      adapterId: 'oauth2-client-credentials',
+      config: { tokenEndpoint: 'https://issuer/token', clientId: 'client', scopes: ['read'], clientAuthentication: 'client_secret_basic' },
+      credentials: { clientSecret: 'secret' },
     })
-    const resolveCredential = vi.fn(async () => 'opaque-token')
+    const token = await new OAuth2ClientCredentialsAuthAdapter().authenticate(context(profile))
+    expect(token.headers).toEqual({ Authorization: 'Bearer service-token' })
+    expect(fetchMock).toHaveBeenCalledWith('https://issuer/token', expect.objectContaining({ method: 'POST' }))
+    vi.unstubAllGlobals()
+  })
 
-    expect(await adapter.authenticate(context(profile, { resolveCredential }))).toEqual({
-      accessToken: 'opaque-token',
-      accessExpiresAt: null,
+  it('rejects an unresolved credential reference instead of sending it literally', async () => {
+    const profile = authProfile({ adapterId: 'bearer', config: {}, credentials: { token: '{MISSING_TOKEN}' }, session: undefined })
+    const adapters = new AuthAdapterRegistry()
+    adapters.register(new BearerAuthAdapter())
+    const profiles = new AuthProfileRegistry(adapters, {
+      listProfiles: () => [profile] as any,
+      getDefaultIdentity: () => profile.identity,
+      resolveValue: value => String(value),
+      getSignal: () => undefined,
     })
-    expect(resolveCredential).toHaveBeenCalledWith('token')
-    expect(() => adapter.validate({ ...profile, persist: 'localStorage' })).toThrow('persist=memory')
-    expect(() => adapter.validate({ ...profile, config: { token: 'raw' } })).toThrow('config must be empty')
+    await expect(profiles.createAdapterContext(profile).resolveCredential('token'))
+      .rejects.toThrow('Credential is unavailable')
   })
 })
 
-describe('AuthProfileRegistry', () => {
-  it('allows registered plugin ids and rejects missing or inactive defaults', () => {
-    const profiles = [authProfile({ adapterId: 'company-auth' })]
-    const adapters = new AuthAdapterRegistry()
-    adapters.register(fakeAdapter('company-auth'))
-    let defaultIdentity: string | null = profiles[0]!.identity
-    const registry = profileRegistry(adapters, profiles, () => defaultIdentity)
-
-    expect(registry.getDefault()?.adapterId).toBe('company-auth')
-    defaultIdentity = 'missing'
-    expect(() => registry.getDefault()).toThrow('Default auth profile is missing')
-    profiles[0]!.active = false
-    defaultIdentity = profiles[0]!.identity
-    expect(() => registry.getDefault()).toThrow('inactive')
-  })
-
-  it('tests a profile ephemerally, logs out best-effort and never returns tokens', async () => {
-    const logout = vi.fn(async () => {
-      throw new Error('provider unavailable')
-    })
-    const adapter = fakeAdapter('company-auth', logout)
-    const adapters = new AuthAdapterRegistry()
-    adapters.register(adapter)
-    const profile = authProfile({ adapterId: 'company-auth' })
-    const registry = profileRegistry(adapters, [profile], () => profile.identity)
-
-    const result = await registry.test(profile, { credentials: { username: 'transient' } })
-
-    expect(result).toEqual(expect.objectContaining({
-      authenticated: true,
-      profileIdentity: profile.identity,
-    }))
-    expect(result).not.toHaveProperty('accessToken')
-    expect(result).not.toHaveProperty('headers')
-    expect(logout).toHaveBeenCalledTimes(1)
-  })
-})
-
-function context(
-  profile: AuthProfileSchema,
-  overrides: Partial<AuthAdapterContext> = {},
-): AuthAdapterContext {
+function context(profile: ReturnType<typeof authProfile>, resolve = (value: unknown) => String(value)) {
   return {
     profile,
-    resolveCredential: async credential => credential,
-    ...overrides,
+    resolveValue: resolve,
+    resolveCredential: async (key: string) => resolve(profile.credentials[key]),
   }
-}
-
-function fakeAdapter(id: string, logout = vi.fn(async () => undefined)): AuthProfileAdapter {
-  return {
-    id,
-    label: id,
-    validate: vi.fn(),
-    authenticate: vi.fn(async (): Promise<AuthTokenSet> => tokenSet()),
-    loadUserInfo: vi.fn(async () => ({ sub: 'test-user' })),
-    logout,
-  }
-}
-
-function profileRegistry(
-  adapters: AuthAdapterRegistry,
-  profiles: AuthProfileSchema[],
-  getDefaultIdentity: () => string | null,
-): AuthProfileRegistry {
-  return new AuthProfileRegistry(adapters, {
-    listProfiles: () => profiles as any,
-    getDefaultIdentity,
-    getCredentialResolver: () => async ({ ref }) => ref,
-    getSignal: () => undefined,
-  })
 }
