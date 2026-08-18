@@ -1,15 +1,15 @@
 import type {
-  ComponentSFCEditTrigger,
-  ComponentSFCEditTriggerEvent,
-  ComponentSFCEditTriggerHeldKeys,
-  ComponentSFCEditTriggerModifiers,
-  ComponentSFCEditTriggerPlatform,
+  ComponentSFCInteractionTrigger,
+  ComponentSFCInteractionTriggerEvent,
+  ComponentSFCInteractionTriggerHeldKeys,
+  ComponentSFCInteractionTriggerModifiers,
+  ComponentSFCInteractionTriggerPlatform,
 } from '@/domain/types/component/sfc/ir.types'
 
-/** Нормализует публичное значение edit-on в список валидных trigger descriptors. */
-export function normalizeComponentSFCEditTriggers(value: unknown): ComponentSFCEditTrigger[] {
+/** Normalizes the shared `edit-on` / `on` trigger value. */
+export function normalizeComponentSFCInteractionTriggers(value: unknown): ComponentSFCInteractionTrigger[] {
   const values = Array.isArray(value) ? value : [value]
-  return values.flatMap((item): ComponentSFCEditTrigger[] => {
+  return values.flatMap((item): ComponentSFCInteractionTrigger[] => {
     if (typeof item === 'string' && item.trim()) return [{ event: item.trim() }]
     if (!item || typeof item !== 'object' || Array.isArray(item)) return []
 
@@ -33,15 +33,18 @@ export function normalizeComponentSFCEditTriggers(value: unknown): ComponentSFCE
       stop: source.stop === true,
       prevent: source.prevent === true,
       self: source.self === true,
+      ...(source.once === true ? { once: true } : {}),
+      ...(source.capture === true ? { capture: true } : {}),
+      ...(source.passive === true ? { passive: true } : {}),
     }]
   })
 }
 
 /** Проверяет один нормализованный trigger без зависимости от DOM и конкретного renderer-а. */
-export function matchesComponentSFCEditTrigger(
-  trigger: ComponentSFCEditTrigger,
-  event: ComponentSFCEditTriggerEvent,
-  platform: ComponentSFCEditTriggerPlatform,
+export function matchesComponentSFCInteractionTrigger(
+  trigger: ComponentSFCInteractionTrigger,
+  event: ComponentSFCInteractionTriggerEvent,
+  platform: ComponentSFCInteractionTriggerPlatform,
 ): boolean {
   if (trigger.self && !event.targetIsCurrentTarget) return false
   if (trigger.key?.length && !matchesKey(trigger.key, event.key)) return false
@@ -54,7 +57,7 @@ export function matchesComponentSFCEditTrigger(
 }
 
 /** Приводит browser platform label к стабильным значениям edit-on контракта. */
-export function resolveComponentSFCEditTriggerPlatform(value: unknown): ComponentSFCEditTriggerPlatform {
+export function resolveComponentSFCInteractionTriggerPlatform(value: unknown): ComponentSFCInteractionTriggerPlatform {
   const platform = String(value ?? '').toLowerCase()
   if (platform.includes('mac') || platform.includes('darwin') || platform.includes('iphone') || platform.includes('ipad')) return 'macos'
   if (platform.includes('win')) return 'windows'
@@ -68,13 +71,13 @@ function normalizeStringList(value: unknown): string[] | undefined {
   return result.length ? result : undefined
 }
 
-function normalizeHeldKeys(value: unknown): ComponentSFCEditTriggerHeldKeys | undefined {
+function normalizeHeldKeys(value: unknown): ComponentSFCInteractionTriggerHeldKeys | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
   const source = value as Record<string, unknown>
   const key = normalizeStringList(source.key)
   const code = normalizeStringList(source.code)
   const match = source.match === 'any' ? 'any' : source.match === 'all' ? 'all' : undefined
-  const result: ComponentSFCEditTriggerHeldKeys = {
+  const result: ComponentSFCInteractionTriggerHeldKeys = {
     ...(key ? { key } : {}),
     ...(code ? { code } : {}),
     ...(match ? { match } : {}),
@@ -83,10 +86,10 @@ function normalizeHeldKeys(value: unknown): ComponentSFCEditTriggerHeldKeys | un
   return Object.keys(result).length ? result : undefined
 }
 
-function normalizeModifiers(value: unknown): ComponentSFCEditTriggerModifiers | undefined {
+function normalizeModifiers(value: unknown): ComponentSFCInteractionTriggerModifiers | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
   const source = value as Record<string, unknown>
-  const result: ComponentSFCEditTriggerModifiers = {}
+  const result: ComponentSFCInteractionTriggerModifiers = {}
   for (const name of ['ctrl', 'shift', 'alt', 'meta', 'mod', 'altGraph', 'exact'] as const) {
     if (typeof source[name] === 'boolean') result[name] = source[name]
   }
@@ -100,8 +103,8 @@ function matchesKey(expected: string[], actual: string | undefined): boolean {
 }
 
 function matchesHeldKeys(
-  expected: ComponentSFCEditTriggerHeldKeys | undefined,
-  actual: ComponentSFCEditTriggerEvent['held'],
+  expected: ComponentSFCInteractionTriggerHeldKeys | undefined,
+  actual: ComponentSFCInteractionTriggerEvent['held'],
 ): boolean {
   if (!expected) return true
   const held = actual ?? { key: [], code: [] }
@@ -139,9 +142,9 @@ function hasUnexpectedHeldKey(
 }
 
 function matchesModifiers(
-  expected: ComponentSFCEditTriggerModifiers | undefined,
-  event: ComponentSFCEditTriggerEvent,
-  platform: ComponentSFCEditTriggerPlatform,
+  expected: ComponentSFCInteractionTriggerModifiers | undefined,
+  event: ComponentSFCInteractionTriggerEvent,
+  platform: ComponentSFCInteractionTriggerPlatform,
 ): boolean {
   if (!expected) return true
   const actual = event.modifiers
@@ -164,10 +167,15 @@ function matchesModifiers(
 }
 
 function primaryModifierActive(
-  modifiers: ComponentSFCEditTriggerEvent['modifiers'],
-  platform: ComponentSFCEditTriggerPlatform,
+  modifiers: ComponentSFCInteractionTriggerEvent['modifiers'],
+  platform: ComponentSFCInteractionTriggerPlatform,
 ): boolean {
   if (platform === 'macos') return modifiers.meta
   if (platform === 'windows' || platform === 'linux') return modifiers.ctrl
   return modifiers.ctrl || modifiers.meta
 }
+
+/** Backward-compatible editable wrappers. */
+export const normalizeComponentSFCEditTriggers = normalizeComponentSFCInteractionTriggers
+export const matchesComponentSFCEditTrigger = matchesComponentSFCInteractionTrigger
+export const resolveComponentSFCEditTriggerPlatform = resolveComponentSFCInteractionTriggerPlatform

@@ -35,6 +35,13 @@ export class ComponentSFCEventBoundary {
     return this.manifest.emits.events.some(port => matchesSource(port, source, event))
   }
 
+  /** Claims a mount-scoped logical `.once` rule after it has matched. */
+  public claimLocalOnce(key: string): boolean {
+    if (this.consumedLocalOnce.has(key)) return false
+    this.consumedLocalOnce.add(key)
+    return true
+  }
+
   /** Runs local `@event` reactions, then routes the occurrence unless `.stop` is present. */
   public async routeChild(
     source: ComponentSFCEventRuntimeSource,
@@ -49,26 +56,30 @@ export class ComponentSFCEventBoundary {
       if (binding.name !== event) return []
       if (!binding.modifiers.includes('once')) return [binding]
       const key = `${source.nodeId}:${event}:${binding.sourceRange?.start ?? index}`
-      if (this.consumedLocalOnce.has(key)) return []
-      this.consumedLocalOnce.add(key)
+      if (!this.claimLocalOnce(key)) return []
       return [binding]
     })
-    const reactions = local.map(binding => this.host?.executeEventPortAction(
-      this.componentIdentity,
-      {
-        kind: 'event',
-        role: 'emits',
-        name: `${source.nodeId}:${event}`,
-        payloadType: 'unknown',
-        action: binding.action,
-      },
-      payload,
-      source,
-      (name, nextPayload, nextTrace, nextDepth) => this.emitOwn(name, nextPayload, nextTrace, nextDepth),
-      trace,
-      depth,
-      scope,
-    ))
+    const reactions = local.map(async (binding) => {
+      for (const action of binding.actions?.length ? binding.actions : [binding.action]) {
+        const succeeded = await this.host?.executeEventPortAction(
+          this.componentIdentity,
+          {
+            kind: 'event',
+            role: 'emits',
+            name: `${source.nodeId}:${event}`,
+            payloadType: 'unknown',
+            action,
+          },
+          payload,
+          source,
+          (name, nextPayload, nextTrace, nextDepth) => this.emitOwn(name, nextPayload, nextTrace, nextDepth),
+          trace,
+          depth,
+          scope,
+        )
+        if (succeeded === false) break
+      }
+    })
     const routed = local.some(binding => binding.modifiers.includes('stop'))
       ? Promise.resolve()
       : this.emitChild(source, event, payload, trace, depth)

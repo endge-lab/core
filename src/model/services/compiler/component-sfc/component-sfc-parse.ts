@@ -240,6 +240,7 @@ function mapElementNode(node: ElementNode, baseOffset: number): RComponentSFC_AS
           name: prop.name,
           value: prop.value?.content ?? null,
           dynamic: false,
+          modifiers: [],
           range: rangeFromLoc(prop.loc, baseOffset),
         })
       }
@@ -255,6 +256,7 @@ function mapElementNode(node: ElementNode, baseOffset: number): RComponentSFC_AS
         name: arg,
         value: expression ?? null,
         dynamic: true,
+        modifiers: (directive.modifiers ?? []).map((modifier: any) => typeof modifier === 'string' ? modifier : modifier.content),
         range: rangeFromLoc(directive.loc, baseOffset),
       })
     }

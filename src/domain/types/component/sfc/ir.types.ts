@@ -85,7 +85,7 @@ export interface ComponentSFCVariant {
 }
 
 /** Декларативный триггер входа в edit-вариант. */
-export interface ComponentSFCEditTriggerModifiers {
+export interface ComponentSFCInteractionTriggerModifiers {
   /** Физическая клавиша Control на любой платформе. */
   ctrl?: boolean
   /** Физическая клавиша Shift. */
@@ -103,7 +103,7 @@ export interface ComponentSFCEditTriggerModifiers {
 }
 
 /** Обычные немодификаторные клавиши, удерживаемые во время trigger event. */
-export interface ComponentSFCEditTriggerHeldKeys {
+export interface ComponentSFCInteractionTriggerHeldKeys {
   /** Логические KeyboardEvent.key с учётом раскладки. */
   key?: string[]
   /** Физические KeyboardEvent.code без зависимости от раскладки. */
@@ -114,24 +114,27 @@ export interface ComponentSFCEditTriggerHeldKeys {
   exact?: boolean
 }
 
-export interface ComponentSFCEditTrigger {
+export interface ComponentSFCInteractionTrigger {
   event: string
   key?: string[]
   code?: string[]
-  held?: ComponentSFCEditTriggerHeldKeys
-  modifiers?: ComponentSFCEditTriggerModifiers
+  held?: ComponentSFCInteractionTriggerHeldKeys
+  modifiers?: ComponentSFCInteractionTriggerModifiers
   repeat?: boolean
   composing?: boolean
   button?: number
   stop?: boolean
   prevent?: boolean
   self?: boolean
+  once?: boolean
+  capture?: boolean
+  passive?: boolean
 }
 
-export type ComponentSFCEditTriggerPlatform = 'macos' | 'windows' | 'linux' | 'unknown'
+export type ComponentSFCInteractionTriggerPlatform = 'macos' | 'windows' | 'linux' | 'unknown'
 
 /** Renderer-neutral snapshot нативного события для проверки edit trigger. */
-export interface ComponentSFCEditTriggerEvent {
+export interface ComponentSFCInteractionTriggerEvent {
   key?: string
   code?: string
   repeat?: boolean
@@ -151,10 +154,19 @@ export interface ComponentSFCEditTriggerEvent {
   }
 }
 
+/** Backward-compatible editable names for the shared interaction contract. */
+export type ComponentSFCEditTriggerModifiers = ComponentSFCInteractionTriggerModifiers
+export type ComponentSFCEditTriggerHeldKeys = ComponentSFCInteractionTriggerHeldKeys
+export type ComponentSFCEditTrigger = ComponentSFCInteractionTrigger
+export type ComponentSFCEditTriggerPlatform = ComponentSFCInteractionTriggerPlatform
+export type ComponentSFCEditTriggerEvent = ComponentSFCInteractionTriggerEvent
+
 /** Renderer-neutral поведение редактируемого template-узла. */
 export interface ComponentSFCEditableBehavior {
   value: RComponentSFC_IR_Value
   triggers: RComponentSFC_IR_Value
+  /** Static suffix modifiers declared on `:edit-on`. */
+  modifiers?: RComponentSFC_IR_EventModifier[]
 }
 
 /** Нормализованное публичное событие завершённого редактирования. */
@@ -218,6 +230,9 @@ export interface RComponentSFC_IR_ElementNode {
 
   /** Local renderer Event reactions declared through `@event` attributes. */
   events?: RComponentSFC_IR_EventBinding[]
+
+  /** Conditional local reactions declared through the renderer-neutral `:on` annotation. */
+  interactions?: RComponentSFC_IR_InteractionGroup[]
 
   /** Compiler-owned edit behavior; editable/edit-on не передаются visual adapter-у как props. */
   editable?: ComponentSFCEditableBehavior
@@ -288,6 +303,28 @@ export interface RComponentSFC_IR_EventBinding {
   name: string
   modifiers: RComponentSFC_IR_EventModifier[]
   action: ComponentSFCEventAction
+  /** Ordered reactions. `action` remains as a compatibility view of the first item. */
+  actions?: ComponentSFCEventAction[]
+  sourceRange?: RComponentSFC_SourceRange
+}
+
+export interface RComponentSFC_IR_InteractionRule {
+  /** Static event name required to install the adapter listener. */
+  event: string
+  /** Runtime-evaluated trigger descriptor without `reaction`. */
+  trigger: RComponentSFC_IR_Value
+  /** Suffix modifiers applied to this rule after evaluating `trigger`. */
+  modifiers: RComponentSFC_IR_EventModifier[]
+  /** Listener options known at compile time. */
+  listener: { capture: boolean, passive: boolean }
+  /** Reactions executed sequentially in Source order. */
+  reactions: ComponentSFCEventAction[]
+  sourceRange?: RComponentSFC_SourceRange
+}
+
+/** One `:on` annotation. Rules inside the group use first-match-wins semantics. */
+export interface RComponentSFC_IR_InteractionGroup {
+  rules: RComponentSFC_IR_InteractionRule[]
   sourceRange?: RComponentSFC_SourceRange
 }
 

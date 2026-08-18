@@ -2,6 +2,7 @@ import type { RComponentSFC_IR_Tag } from './ir.types'
 
 export interface ComponentSFCEventModifiersState {
   alt: boolean
+  altGraph: boolean
   ctrl: boolean
   meta: boolean
   shift: boolean
@@ -10,6 +11,7 @@ export interface ComponentSFCEventModifiersState {
 export interface ComponentSFCInteractionEventPayload {
   type: string
   modifiers: ComponentSFCEventModifiersState
+  held: { key: string[], code: string[] }
 }
 
 export interface ComponentSFCPointerEventPayload extends ComponentSFCInteractionEventPayload {
@@ -24,6 +26,7 @@ export interface ComponentSFCKeyboardEventPayload extends ComponentSFCInteractio
   key: string
   code: string
   repeat: boolean
+  composing: boolean
 }
 
 export interface ComponentSFCInputEventPayload extends ComponentSFCInteractionEventPayload {

@@ -59,6 +59,12 @@ function collectNodeDependencies(
     collectValueDependencies(value, props, result, seen, seenVocabs)
 
   collectDirectiveDependencies(node.directives, props, result, seen, seenVocabs)
+  collectValueDependencies(node.editable?.value, props, result, seen, seenVocabs)
+  collectValueDependencies(node.editable?.triggers, props, result, seen, seenVocabs)
+  for (const group of node.interactions ?? []) {
+    for (const rule of group.rules)
+      collectValueDependencies(rule.trigger, props, result, seen, seenVocabs)
+  }
 
   for (const child of node.children)
     collectNodeDependencies(child, props, result, seen, seenVocabs)

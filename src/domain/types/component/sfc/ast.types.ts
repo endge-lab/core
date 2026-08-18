@@ -161,6 +161,9 @@ export interface RComponentSFC_AST_Attribute {
   /** Флаг динамического binding через :name. */
   dynamic: boolean
 
+  /** Static modifiers of a dynamic binding, for example `:on.stop.capture`. */
+  modifiers: string[]
+
   /** Позиция атрибута в полном source. */
   range: RComponentSFC_SourceRange
 }

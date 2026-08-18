@@ -350,12 +350,12 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     trace: string[] = [],
     depth = 0,
     scope: Record<string, unknown> = {},
-  ): Promise<void> {
-    if (!port.action) return
+  ): Promise<boolean> {
+    if (!port.action) return true
     const traceKey = `${ownerIdentity}.${port.name}`
     if (depth >= 32 || trace.includes(traceKey)) {
       this.emit('event:error', { code: 'event-cycle', ownerIdentity, event: port.name, trace })
-      return
+      return false
     }
     const nextTrace = [...trace, traceKey]
     try {
@@ -366,20 +366,20 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
           nextTrace,
           depth + 1,
         )
-        return
+        return true
       }
       if (port.action.kind === 'action') {
         await this._executeEventActionEffect(port.action.identity, port.action.input
           ? evaluateEventInput(port.action.input, payload, scope)
           : payload, source, ownerIdentity, port.name)
-        return
+        return true
       }
       if (port.action.kind === 'query') {
         await this._executeEventQueryEffect(
           port.action.identity,
           port.action.input ? evaluateEventInput(port.action.input, payload, scope) : {},
         )
-        return
+        return true
       }
 
       const inputs = Object.fromEntries(Object.entries(port.action.inputs).map(([key, read]) => [
@@ -411,10 +411,12 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
         }
         throw new Error(`Unsupported Event reaction effect: ${String(effect.kind ?? '')}.`)
       }
+      return true
     }
     catch (error) {
       console.error(`[ComponentSFCRuntimeHost] Event reaction failed for "${ownerIdentity}.${port.name}": ${error instanceof Error ? error.message : String(error)}`)
       this.emit('event:error', { code: 'event-reaction-failed', ownerIdentity, event: port.name, error })
+      return false
     }
   }
 

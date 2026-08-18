@@ -13,6 +13,7 @@ import type {
   RComponentSFC_IR_Directives,
   RComponentSFC_IR_EventBinding,
   RComponentSFC_IR_EventModifier,
+  RComponentSFC_IR_InteractionGroup,
   RComponentSFC_IR_ElementNode,
   RComponentSFC_IR_Node,
   RComponentSFC_IR_Tag,
@@ -27,6 +28,10 @@ import type {
 import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
 import type { ProgramNodeMetadata } from '@/domain/types/program/program-metadata.types'
 import { compileComponentSFCExpression } from '@/model/services/compiler/component-sfc/component-sfc-expression'
+import {
+  compileComponentSFCInteractionAnnotation,
+  hasComponentSFCPassivePreventConflict,
+} from '@/model/services/compiler/component-sfc/component-sfc-interactions'
 import { compileComponentSFCLocalEventAction } from '@/model/services/compiler/component-sfc/component-sfc-ports'
 import { createBuiltInComponentPortManifest } from '@/model/services/compiler/component-sfc/component-sfc-forward'
 import { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sfc/component-sfc-built-in-tags'
@@ -206,7 +211,7 @@ function compileElementNode(
   const nodeMetadata = compileNodeMetadata(node.attributes, diagnostics, `template.${id}.metadata`)
   validateSemanticStyleAttributes(node.attributes, diagnostics, `template.${id}`)
   const props = compileAttributes(
-    node.attributes.filter(attribute => !['metadata', 'editable', 'edit-on'].includes(attribute.name)),
+    node.attributes.filter(attribute => !['metadata', 'editable', 'edit-on', 'on'].includes(attribute.name)),
     context,
     diagnostics,
   )
@@ -220,6 +225,7 @@ function compileElementNode(
     ? withEditableEventManifest(baseEventManifest)
     : baseEventManifest
   const events = compileEventBindings(node.directives, eventManifest, dependencies, diagnostics)
+  const interactions = compileInteractionBindings(node.attributes, eventManifest, context, dependencies, diagnostics)
 
   if (directComponentIdentity) {
     if (props.is) {
@@ -246,6 +252,7 @@ function compileElementNode(
     props,
     directives,
     events,
+    ...(interactions.length ? { interactions } : {}),
     children: node.children
       .map((child, index) => compileTemplateNode(child, `${id}-${index}`, context, dependencies, metadata, diagnostics))
       .filter((child): child is RComponentSFC_IR_Node => child != null),
@@ -388,7 +395,43 @@ function compileEditableBehavior(
     else triggers = { kind: 'literal', value: event }
   }
 
-  return { value, triggers }
+  const triggerModifiers: RComponentSFC_IR_EventModifier[] = []
+  for (const modifier of triggerAttribute?.modifiers ?? []) {
+    if (!LOCAL_EVENT_MODIFIERS.has(modifier as RComponentSFC_IR_EventModifier)) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'sfc-edit-on-modifier',
+        message: `:edit-on не поддерживает modifier ".${modifier}".`,
+        sourcePath: 'template.edit-on',
+        start: triggerAttribute?.range.start,
+        end: triggerAttribute?.range.end,
+      })
+      continue
+    }
+    triggerModifiers.push(modifier as RComponentSFC_IR_EventModifier)
+  }
+  if (triggerModifiers.includes('passive') && triggerModifiers.includes('prevent')) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-edit-on-passive-prevent',
+      message: ':edit-on.passive нельзя объединять с .prevent.',
+      sourcePath: 'template.edit-on',
+      start: triggerAttribute?.range.start,
+      end: triggerAttribute?.range.end,
+    })
+  }
+  else if (triggerAttribute?.dynamic && hasComponentSFCPassivePreventConflict(triggerAttribute.value ?? '', triggerModifiers)) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-edit-on-passive-prevent',
+      message: ':edit-on не может одновременно использовать passive и prevent.',
+      sourcePath: 'template.edit-on',
+      start: triggerAttribute.range.start,
+      end: triggerAttribute.range.end,
+    })
+  }
+
+  return { value, triggers, ...(triggerModifiers.length ? { modifiers: triggerModifiers } : {}) }
 }
 
 function withEditableEventManifest(manifest: ComponentSFCPortManifest | null): ComponentSFCPortManifest {
@@ -473,11 +516,36 @@ function collectTemplateEmittedEvents(nodes: RComponentSFC_IR_Node[]): string[] 
     if (node.editable) result.add('edited')
     for (const binding of node.events ?? []) {
       if (binding.action.kind === 'emit') result.add(binding.action.event)
+      for (const action of binding.actions ?? []) {
+        if (action.kind === 'emit') result.add(action.event)
+      }
+    }
+    for (const group of node.interactions ?? []) {
+      for (const rule of group.rules) {
+        for (const reaction of rule.reactions) {
+          if (reaction.kind === 'emit') result.add(reaction.event)
+        }
+      }
     }
     node.children.forEach(visit)
   }
   nodes.forEach(visit)
   return [...result]
+}
+
+function compileInteractionBindings(
+  attributes: RComponentSFC_AST_Attribute[],
+  manifest: ComponentSFCPortManifest | null,
+  context: ComponentSFCTemplateCompileContext,
+  dependencies: RComponentDependencies,
+  diagnostics: RComponentDiagnostic[],
+): RComponentSFC_IR_InteractionGroup[] {
+  return attributes
+    .filter(attribute => attribute.name === 'on')
+    .flatMap((attribute) => {
+      const group = compileComponentSFCInteractionAnnotation(attribute, manifest, context, dependencies, diagnostics)
+      return group ? [group] : []
+    })
 }
 
 const LOCAL_EVENT_MODIFIERS = new Set<RComponentSFC_IR_EventModifier>([
