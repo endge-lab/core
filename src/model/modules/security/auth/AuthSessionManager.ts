@@ -327,7 +327,9 @@ export class AuthSessionManager {
   }
 
   private _refreshSkewMs(profile: AuthProfileSchema): number {
-    return profile.adapterId === 'oidc' || profile.adapterId === 'oauth2-client-credentials'
+    return profile.adapterId === 'oidc'
+      || profile.adapterId === 'oauth2-client-credentials'
+      || profile.adapterId === 'oauth2-password'
       ? 30_000
       : 0
   }

@@ -12,6 +12,7 @@ import { AuthSessionStore } from '@/model/modules/security/auth/AuthSessionStore
 import { BasicAuthAdapter } from '@/model/modules/security/auth/adapters/BasicAuthAdapter'
 import { BearerAuthAdapter } from '@/model/modules/security/auth/adapters/BearerAuthAdapter'
 import { OAuth2ClientCredentialsAuthAdapter } from '@/model/modules/security/auth/adapters/OAuth2ClientCredentialsAuthAdapter'
+import { OAuth2PasswordAuthAdapter } from '@/model/modules/security/auth/adapters/OAuth2PasswordAuthAdapter'
 import { OidcAuthAdapter } from '@/model/modules/security/auth/adapters/OidcAuthAdapter'
 import { OidcBrowserSession_Service } from '@/model/services/auth/OidcBrowserSession_Service'
 import type { AuthInteractionRequiredError } from '@/model/modules/security/auth/AuthInteractionRequiredError'
@@ -39,6 +40,7 @@ export class EndgeAuth extends EndgeModule {
     this.adapters = new AuthAdapterRegistry()
     this.adapters.register(new OidcAuthAdapter())
     this.adapters.register(new OAuth2ClientCredentialsAuthAdapter())
+    this.adapters.register(new OAuth2PasswordAuthAdapter())
     this.adapters.register(new BasicAuthAdapter())
     this.adapters.register(new BearerAuthAdapter())
 

@@ -1,6 +1,7 @@
 export type AuthProfileAdapterId
   = | 'oidc'
     | 'oauth2-client-credentials'
+    | 'oauth2-password'
     | 'basic'
     | 'bearer'
     | (string & {})
@@ -20,7 +21,7 @@ export interface AuthProfileCredentials {
   [key: string]: string
 }
 
-/** Persisted discriminated contract of the four built-in adapters. */
+/** Persisted discriminated contract of the built-in adapters. */
 export interface AuthProfileBase {
   id: string
   identity: string
@@ -51,6 +52,17 @@ export interface OAuth2ClientCredentialsProfile extends AuthProfileBase {
   session: AuthSessionPolicy
 }
 
+export interface OAuth2PasswordProfile extends AuthProfileBase {
+  adapterId: 'oauth2-password'
+  config: {
+    tokenEndpoint: string
+    clientId: string
+    scopes: string[]
+  }
+  credentials: { username: string, password: string }
+  session: AuthSessionPolicy
+}
+
 export interface BasicAuthProfile extends AuthProfileBase {
   adapterId: 'basic'
   config: Record<string, never>
@@ -68,6 +80,7 @@ export interface BearerAuthProfile extends AuthProfileBase {
 export type AuthProfile
   = | OidcAuthProfile
     | OAuth2ClientCredentialsProfile
+    | OAuth2PasswordProfile
     | BasicAuthProfile
     | BearerAuthProfile
 

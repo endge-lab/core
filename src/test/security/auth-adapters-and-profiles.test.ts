@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { BasicAuthAdapter } from '@/model/modules/security/auth/adapters/BasicAuthAdapter'
 import { BearerAuthAdapter } from '@/model/modules/security/auth/adapters/BearerAuthAdapter'
 import { OAuth2ClientCredentialsAuthAdapter } from '@/model/modules/security/auth/adapters/OAuth2ClientCredentialsAuthAdapter'
+import { OAuth2PasswordAuthAdapter } from '@/model/modules/security/auth/adapters/OAuth2PasswordAuthAdapter'
 import { OidcAuthAdapter } from '@/model/modules/security/auth/adapters/OidcAuthAdapter'
 import { AuthInteractionRequiredError } from '@/model/modules/security/auth/AuthInteractionRequiredError'
 import { AuthAdapterRegistry } from '@/model/modules/security/auth/AuthAdapterRegistry'
@@ -36,6 +37,31 @@ describe('universal auth adapters', () => {
     const token = await new OAuth2ClientCredentialsAuthAdapter().authenticate(context(profile))
     expect(token.headers).toEqual({ Authorization: 'Bearer service-token' })
     expect(fetchMock).toHaveBeenCalledWith('https://issuer/token', expect.objectContaining({ method: 'POST' }))
+    vi.unstubAllGlobals()
+  })
+
+  it('performs password grant and refreshes its token', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: 'user-token', refresh_token: 'refresh-token', id_token: 'id-token', expires_in: 60 }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: 'refreshed-token', expires_in: 60 }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const profile = authProfile({
+      adapterId: 'oauth2-password',
+      config: { tokenEndpoint: 'https://issuer/token', clientId: 'public-client', scopes: ['openid', 'email'] },
+      credentials: { username: 'alice', password: 'secret' },
+    })
+    const adapter = new OAuth2PasswordAuthAdapter()
+    const token = await adapter.authenticate(context(profile))
+    const initialBody = fetchMock.mock.calls[0][1].body as URLSearchParams
+    expect(initialBody.get('grant_type')).toBe('password')
+    expect(initialBody.get('username')).toBe('alice')
+    expect(token).toEqual(expect.objectContaining({ accessToken: 'user-token', refreshToken: 'refresh-token', idToken: 'id-token' }))
+
+    const refreshed = await adapter.refresh({ ...context(profile), token })
+    const refreshBody = fetchMock.mock.calls[1][1].body as URLSearchParams
+    expect(refreshBody.get('grant_type')).toBe('refresh_token')
+    expect(refreshBody.get('refresh_token')).toBe('refresh-token')
+    expect(refreshed).toEqual(expect.objectContaining({ accessToken: 'refreshed-token', refreshToken: 'refresh-token' }))
     vi.unstubAllGlobals()
   })
 
