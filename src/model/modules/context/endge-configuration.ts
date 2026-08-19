@@ -58,6 +58,7 @@ export class EndgeConfigurationModule extends EndgeModule {
     }
     Endge.context.reconcileCurrentLocaleWithWorkspace(configuration)
     Endge.context.reconcileCurrentThemeWithWorkspace(configuration)
+    Endge.context.reconcileCurrentTimezoneWithWorkspace(configuration)
     this.notify()
   }
 
@@ -97,6 +98,12 @@ export class EndgeConfigurationModule extends EndgeModule {
   normalizeTheme(theme: string | null | undefined): string {
     const value = String(theme ?? '').trim()
     return this.current.themes.some(item => item.identity === value) ? value : this.current.defaultTheme
+  }
+
+  /** Нормализует timezone относительно effective configuration. */
+  normalizeTimezone(timezone: string | null | undefined): string {
+    const value = String(timezone ?? '').trim()
+    return this.current.timezones.some(item => item.identity === value) ? value : this.current.defaultTimezone
   }
 
   /** Вычисляет upstream snapshot для общего редактора указанного слоя. */

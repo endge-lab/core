@@ -59,6 +59,7 @@ export class EndgeRuntime extends EndgeModule {
   private _appScopes = new Map<string, RuntimeAppScope>()
   private _defaultAppScope: RuntimeAppScope
   private _unsubscribeWorkspace: (() => void) | null = null
+  private _unsubscribeContext: (() => void) | null = null
   private _destroyedSnapshotLeases = new Map<symbol, number>()
   private _destroyingRuntimeIds = new Set<string>()
 
@@ -117,6 +118,9 @@ export class EndgeRuntime extends EndgeModule {
     this.hydrateRuntimeFilters()
     this._unsubscribeWorkspace = Endge.workspace.subscribe(() => {
       this.syncWorkspaceVariablesToRaph()
+    })
+    this._unsubscribeContext = Endge.context.subscribe(() => {
+      this.invalidateApplicationScopes()
     })
   }
 
@@ -272,8 +276,8 @@ export class EndgeRuntime extends EndgeModule {
 
   /**
    * Инвалидирует все renderable roots активных application scopes.
-   * Операция намеренно coarse-grained: locale меняется редко, поэтому отдельный
-   * dependency graph переводов на этом этапе не нужен.
+   * Операция намеренно coarse-grained: context preferences меняются редко,
+   * поэтому отдельный dependency graph на этом этапе не нужен.
    */
   public invalidateApplicationScopes(): void {
     if (!this._inited)
@@ -418,6 +422,8 @@ export class EndgeRuntime extends EndgeModule {
     this._inited = false
     this._unsubscribeWorkspace?.()
     this._unsubscribeWorkspace = null
+    this._unsubscribeContext?.()
+    this._unsubscribeContext = null
     this.flowRegistry.reset()
     this.actions.reset()
     this._hosts.clearDeleted()

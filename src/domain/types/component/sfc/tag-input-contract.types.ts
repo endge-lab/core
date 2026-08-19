@@ -72,6 +72,12 @@ export const ENDGE_SFC_TAG_INPUT_CONTRACTS = {
     { name: 'readonly', type: 'boolean', optional: true },
     { name: 'disabled', type: 'boolean', optional: true },
   ],
+  Tooltip: [
+    { name: 'text', type: 'string', optional: true },
+    { name: 'markdown', type: 'string', optional: true },
+    { name: 'openDelay', type: 'number', optional: true },
+    { name: 'closeDelay', type: 'number', optional: true },
+  ],
 } as const satisfies Partial<Record<RComponentSFC_IR_Tag, readonly ComponentSFCTagInputContract[]>>
 
 /** Возвращает публичные data-входы встроенного SFC tag. */

@@ -118,6 +118,7 @@ export function compileComponentSFCTemplate(
   const roots = template.roots
     .map((node, index) => compileTemplateNode(node, `root-${index}`, context, dependencies, metadata, diagnostics))
     .filter((node): node is RComponentSFC_IR_Node => node != null)
+  validateTooltipTree(roots, diagnostics)
   const variants = validateVariantContainer(roots, diagnostics, 'template', false)
   const emittedEvents = collectTemplateEmittedEvents(roots)
 
@@ -315,6 +316,101 @@ function compileElementNode(
   }
 
   return element
+}
+
+/** Validates the lazy Tooltip compound shape after whitespace-only nodes have been removed. */
+function validateTooltipTree(
+  roots: RComponentSFC_IR_Node[],
+  diagnostics: RComponentDiagnostic[],
+): void {
+  const visit = (
+    node: RComponentSFC_IR_Node,
+    parent: RComponentSFC_IR_ElementNode | null,
+    insideTooltipContent: boolean,
+  ): void => {
+    if (node.kind !== 'element') return
+
+    if ((node.tag === 'TooltipTrigger' || node.tag === 'TooltipContent') && parent?.tag !== 'Tooltip') {
+      diagnostics.push({
+        severity: 'error',
+        code: 'sfc-tooltip-structural-parent',
+        message: `${node.tag} допускается только как прямой дочерний узел Tooltip.`,
+        sourcePath: `template.${node.id}`,
+        start: node.sourceRange?.start,
+        end: node.sourceRange?.end,
+      })
+    }
+
+    if (node.tag === 'Tooltip') {
+      if (insideTooltipContent) {
+        diagnostics.push({
+          severity: 'error',
+          code: 'sfc-tooltip-nested',
+          message: 'Tooltip нельзя вкладывать в TooltipContent: один Shell управляет одним активным overlay.',
+          sourcePath: `template.${node.id}`,
+          start: node.sourceRange?.start,
+          end: node.sourceRange?.end,
+        })
+      }
+      validateTooltipNode(node, diagnostics)
+    }
+
+    for (const child of node.children) {
+      visit(child, node, insideTooltipContent || node.tag === 'TooltipContent')
+    }
+  }
+  roots.forEach(root => visit(root, null, false))
+}
+
+function validateTooltipNode(
+  node: RComponentSFC_IR_ElementNode,
+  diagnostics: RComponentDiagnostic[],
+): void {
+  const hasText = Object.prototype.hasOwnProperty.call(node.props, 'text')
+  const hasMarkdown = Object.prototype.hasOwnProperty.call(node.props, 'markdown')
+  const triggerNodes = node.children.filter((child): child is RComponentSFC_IR_ElementNode => (
+    child.kind === 'element' && child.tag === 'TooltipTrigger'
+  ))
+  const contentNodes = node.children.filter((child): child is RComponentSFC_IR_ElementNode => (
+    child.kind === 'element' && child.tag === 'TooltipContent'
+  ))
+  const usesCompound = triggerNodes.length > 0 || contentNodes.length > 0
+
+  const report = (code: string, message: string): void => {
+    diagnostics.push({
+      severity: 'error',
+      code,
+      message,
+      sourcePath: `template.${node.id}`,
+      start: node.sourceRange?.start,
+      end: node.sourceRange?.end,
+    })
+  }
+
+  if (Number(hasText) + Number(hasMarkdown) + Number(usesCompound) !== 1) {
+    report(
+      'sfc-tooltip-mode',
+      'Tooltip требует ровно один режим: text, markdown или TooltipTrigger + TooltipContent.',
+    )
+    return
+  }
+
+  if (hasText || hasMarkdown) {
+    if (node.children.length === 0)
+      report('sfc-tooltip-trigger-required', 'Tooltip text/markdown требует trigger-содержимое.')
+    return
+  }
+
+  if (triggerNodes.length !== 1 || contentNodes.length !== 1 || node.children.length !== 2) {
+    report(
+      'sfc-tooltip-compound-shape',
+      'Rich Tooltip требует ровно один TooltipTrigger и один TooltipContent без соседних узлов.',
+    )
+  }
+  if (triggerNodes[0]?.children.length === 0)
+    report('sfc-tooltip-trigger-required', 'TooltipTrigger не может быть пустым.')
+  if (contentNodes[0]?.children.length === 0)
+    report('sfc-tooltip-content-required', 'TooltipContent не может быть пустым.')
 }
 
 function compileEditableBehavior(

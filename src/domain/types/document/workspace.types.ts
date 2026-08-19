@@ -2,6 +2,7 @@ import type {
   EndgeConfiguration,
   EndgeLocaleDefinition,
   EndgeThemeDefinition,
+  EndgeTimezoneDefinition,
   EndgeVariableDefinition,
 } from '@/domain/types/configuration/configuration.type'
 import type { EntityManagement } from './entity-management.type'
@@ -12,6 +13,7 @@ export type EndgeDataMode = 'live' | 'mock'
 export type EndgeWorkspaceLocaleLabelMode = keyof Pick<EndgeWorkspaceLocale, 'displayName' | 'shortLabel'>
 
 export type EndgeWorkspaceTheme = EndgeThemeDefinition
+export type EndgeWorkspaceTimezone = EndgeTimezoneDefinition
 export type EndgeWorkspaceVar = EndgeVariableDefinition
 
 export interface WorkspaceIntegrationReference {

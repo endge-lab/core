@@ -220,6 +220,8 @@ function resolveReadSource(
 ): RComponentSFC_IR_Read['source'] | null {
   if (root === 'raph' || root === 'Raph')
     return 'raph'
+  if (root === '$context')
+    return 'context'
   if (props.has(root) || root === 'props')
     return 'props'
   if (locals.has(root))

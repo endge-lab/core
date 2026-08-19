@@ -5,7 +5,9 @@ import type {
   EndgeConfigurationPatch,
   EndgeLocaleDefinition,
   EndgeSFCEditingConfiguration,
+  EndgeTooltipConfiguration,
   EndgeThemeDefinition,
+  EndgeTimezoneDefinition,
   EndgeVariableDefinition,
 } from '@/domain/types/configuration/configuration.type'
 import type {
@@ -20,8 +22,9 @@ import type {
   EndgeDiagnosticsRoute,
 } from '@/domain/types/diagnostics/diagnostics.types'
 import { DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION } from '@/model/config/diagnostics.config'
-import { DEFAULT_FALLBACK_LOCALE, DEFAULT_LOCALE, DEFAULT_THEME } from '@/model/config/kernel.config'
+import { DEFAULT_FALLBACK_LOCALE, DEFAULT_LOCALE, DEFAULT_THEME, DEFAULT_TIMEZONE } from '@/model/config/kernel.config'
 import { DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION } from '@/model/config/sfc-editing.config'
+import { DEFAULT_ENDGE_TOOLTIP_CONFIGURATION } from '@/model/config/tooltip.config'
 import { normalizeComponentSFCInteractionTriggers } from '@/tools/component-sfc-edit-trigger'
 
 const LEGACY_SFC_ADAPTER_IDS: Readonly<Record<string, string>> = {
@@ -42,10 +45,16 @@ const DEFAULT_CONFIGURATION_VALUE: EndgeConfiguration = {
     { identity: 'dark', displayName: 'Тёмная' },
   ],
   defaultTheme: DEFAULT_THEME,
+  timezones: [
+    { identity: 'local', displayName: 'Локальное время' },
+    { identity: 'UTC', displayName: 'UTC' },
+  ],
+  defaultTimezone: DEFAULT_TIMEZONE,
   defaultAuthProfileIdentity: null,
   sfcAdapterIds: ['vue-native'],
   defaultSfcAdapterId: 'vue-native',
   sfcEditing: structuredCloneSafe(DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION),
+  tooltips: structuredCloneSafe(DEFAULT_ENDGE_TOOLTIP_CONFIGURATION),
   diagnostics: structuredCloneSafe(DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION),
 }
 
@@ -63,6 +72,7 @@ export function normalizeEndgeConfiguration(input: unknown): EndgeConfiguration 
 
   const locales = normalizeLocales(input.locales)
   const themes = normalizeThemes(input.themes)
+  const timezones = normalizeTimezones(input.timezones)
   const sfcAdapterIds = normalizeSfcAdapterIds(input.sfcAdapterIds)
   const localeCodes = locales.map(item => item.code)
   const defaultLocale = requireMember(
@@ -80,6 +90,11 @@ export function normalizeEndgeConfiguration(input: unknown): EndgeConfiguration 
     themes.map(item => item.identity),
     'defaultTheme',
   )
+  const defaultTimezone = requireMember(
+    normalizeText(input.defaultTimezone) || DEFAULT_TIMEZONE,
+    timezones.map(item => item.identity),
+    'defaultTimezone',
+  )
   const defaultSfcAdapterId = requireMember(
     normalizeSfcAdapterId(input.defaultSfcAdapterId),
     sfcAdapterIds,
@@ -93,10 +108,13 @@ export function normalizeEndgeConfiguration(input: unknown): EndgeConfiguration 
     fallbackLocale,
     themes,
     defaultTheme,
+    timezones,
+    defaultTimezone,
     defaultAuthProfileIdentity: normalizeNullableText(input.defaultAuthProfileIdentity),
     sfcAdapterIds,
     defaultSfcAdapterId,
     sfcEditing: normalizeSFCEditingConfiguration(input.sfcEditing),
+    tooltips: normalizeTooltipConfiguration(input.tooltips),
     diagnostics: normalizeDiagnosticsConfiguration(input.diagnostics),
   }
 }
@@ -148,16 +166,21 @@ export function applyEndgeConfigurationContribution(
     next.locales = applyCollectionPatch(next.locales, patch.locales, item => item.code)
   if (patch.themes)
     next.themes = applyCollectionPatch(next.themes, patch.themes, item => item.identity)
+  if (patch.timezones)
+    next.timezones = applyCollectionPatch(next.timezones, patch.timezones, item => item.identity)
   if (patch.sfcAdapterIds)
     next.sfcAdapterIds = applyCollectionPatch(next.sfcAdapterIds, patch.sfcAdapterIds, item => item)
   if (patch.diagnostics)
     next.diagnostics = applyDiagnosticsPatch(next.diagnostics, patch.diagnostics)
   if (patch.sfcEditing)
     applySFCEditingPatch(next.sfcEditing, patch.sfcEditing)
+  if (patch.tooltips)
+    applyTooltipPatch(next.tooltips, patch.tooltips)
 
   applyRequiredValue(next, 'defaultLocale', patch.defaultLocale)
   applyRequiredValue(next, 'fallbackLocale', patch.fallbackLocale)
   applyRequiredValue(next, 'defaultTheme', patch.defaultTheme)
+  applyRequiredValue(next, 'defaultTimezone', patch.defaultTimezone)
   applyNullableValue(next, 'defaultAuthProfileIdentity', patch.defaultAuthProfileIdentity)
   applyRequiredValue(next, 'defaultSfcAdapterId', patch.defaultSfcAdapterId)
 
@@ -252,6 +275,42 @@ function applySFCEditingPatch(
   }
 }
 
+function normalizeTooltipConfiguration(input: unknown): EndgeTooltipConfiguration {
+  const source = isRecord(input) ? input : {}
+  const side = source.side ?? DEFAULT_ENDGE_TOOLTIP_CONFIGURATION.side
+  const align = source.align ?? DEFAULT_ENDGE_TOOLTIP_CONFIGURATION.align
+  if (!['top', 'right', 'bottom', 'left'].includes(String(side)))
+    throw new Error('[EndgeConfiguration] tooltips.side must be top, right, bottom or left')
+  if (!['start', 'center', 'end'].includes(String(align)))
+    throw new Error('[EndgeConfiguration] tooltips.align must be start, center or end')
+  return {
+    side: side as EndgeTooltipConfiguration['side'],
+    align: align as EndgeTooltipConfiguration['align'],
+    openDelay: normalizeTooltipDelay(source.openDelay, DEFAULT_ENDGE_TOOLTIP_CONFIGURATION.openDelay, 'openDelay'),
+    closeDelay: normalizeTooltipDelay(source.closeDelay, DEFAULT_ENDGE_TOOLTIP_CONFIGURATION.closeDelay, 'closeDelay'),
+  }
+}
+
+function normalizeTooltipDelay(input: unknown, fallback: number, name: string): number {
+  const value = input == null ? fallback : Number(input)
+  if (!Number.isFinite(value) || value < 0 || value > 60_000)
+    throw new Error(`[EndgeConfiguration] tooltips.${name} must be between 0 and 60000 ms`)
+  return Math.round(value)
+}
+
+function applyTooltipPatch(
+  target: EndgeTooltipConfiguration,
+  patch: NonNullable<EndgeConfigurationPatch['tooltips']>,
+): void {
+  for (const key of ['side', 'align', 'openDelay', 'closeDelay'] as const) {
+    const override = patch[key]
+    if (!override) continue
+    if (override.op === 'remove')
+      throw new Error(`[EndgeConfiguration] Required field "tooltips.${key}" cannot be removed`)
+    ;(target as unknown as Record<string, unknown>)[key] = override.value
+  }
+}
+
 /** Применяет diagnostics patch без замены остальных configuration fields. */
 function applyDiagnosticsPatch(
   upstream: EndgeDiagnosticsConfiguration,
@@ -341,7 +400,7 @@ function applyCollectionPatch<T>(
   return [...result.values()]
 }
 
-function applyRequiredValue<K extends 'defaultLocale' | 'fallbackLocale' | 'defaultTheme' | 'defaultSfcAdapterId'>(
+function applyRequiredValue<K extends 'defaultLocale' | 'fallbackLocale' | 'defaultTheme' | 'defaultTimezone' | 'defaultSfcAdapterId'>(
   target: EndgeConfiguration,
   key: K,
   override: EndgeConfigurationPatch[K],
@@ -419,6 +478,38 @@ function normalizeThemes(input: unknown): EndgeThemeDefinition[] {
   if (!result.length)
     throw new Error('[EndgeConfiguration] themes must contain at least one theme')
   return result
+}
+
+function normalizeTimezones(input: unknown): EndgeTimezoneDefinition[] {
+  const source = Array.isArray(input)
+    ? input
+    : DEFAULT_CONFIGURATION_VALUE.timezones
+  const result: EndgeTimezoneDefinition[] = []
+  const used = new Set<string>()
+  for (const raw of source) {
+    if (!isRecord(raw))
+      continue
+    const identity = normalizeText(raw.identity)
+    if (!identity || used.has(identity) || !isValidTimezone(identity))
+      continue
+    used.add(identity)
+    result.push({ identity, displayName: normalizeText(raw.displayName) || identity })
+  }
+  if (!result.length)
+    throw new Error('[EndgeConfiguration] timezones must contain at least one valid timezone')
+  return result
+}
+
+function isValidTimezone(identity: string): boolean {
+  if (identity === 'local')
+    return true
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: identity }).format()
+    return true
+  }
+  catch {
+    return false
+  }
 }
 
 function normalizeStringCollection(input: unknown, field: string): string[] {

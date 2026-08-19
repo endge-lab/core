@@ -203,6 +203,9 @@ export type RComponentSFC_IR_Tag
     | 'Textarea'
     | 'Checkbox'
     | 'Select'
+    | 'Tooltip'
+    | 'TooltipTrigger'
+    | 'TooltipContent'
     | 'Component'
     | 'Table'
     | 'Column'
@@ -410,8 +413,8 @@ export interface RComponentSFC_IR_VocabRead {
 
 /** Реактивное чтение, найденное внутри выражения. */
 export interface RComponentSFC_IR_Read {
-  /** Источник чтения: props, Raph/store или локальный binding. */
-  source: 'props' | 'raph' | 'local'
+  /** Источник чтения: props, Raph/store, context или локальный binding. */
+  source: 'props' | 'raph' | 'context' | 'local'
 
   /** Нормализованный путь чтения. */
   path: string[]

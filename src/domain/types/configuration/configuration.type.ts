@@ -20,6 +20,11 @@ export interface EndgeThemeDefinition {
   displayName: string
 }
 
+export interface EndgeTimezoneDefinition {
+  identity: string
+  displayName: string
+}
+
 export interface EndgeVariableDefinition {
   name: string
   defaultValue: string
@@ -31,6 +36,17 @@ export interface EndgeSFCEditingConfiguration {
   commitOn: ComponentSFCInteractionTrigger[]
 }
 
+export type EndgeTooltipSide = 'top' | 'right' | 'bottom' | 'left'
+export type EndgeTooltipAlign = 'start' | 'center' | 'end'
+
+/** Effective behavioral defaults of the single Shell-owned tooltip overlay. */
+export interface EndgeTooltipConfiguration {
+  side: EndgeTooltipSide
+  align: EndgeTooltipAlign
+  openDelay: number
+  closeDelay: number
+}
+
 /** Полная конфигурация, с которой компилируется один Endge context. */
 export interface EndgeConfiguration {
   vars: EndgeVariableDefinition[]
@@ -39,11 +55,15 @@ export interface EndgeConfiguration {
   fallbackLocale: string
   themes: EndgeThemeDefinition[]
   defaultTheme: string
+  timezones: EndgeTimezoneDefinition[]
+  defaultTimezone: string
   defaultAuthProfileIdentity: string | null
   sfcAdapterIds: string[]
   defaultSfcAdapterId: string
   /** Effective triggers, которые наследуют editable-узлы без локальных атрибутов. */
   sfcEditing: EndgeSFCEditingConfiguration
+  /** Effective tooltip behavior. Visual styling is owned by CSS and adapter hooks. */
+  tooltips: EndgeTooltipConfiguration
   /** Настройки telemetry, output adapters, routing и snapshots. */
   diagnostics: EndgeDiagnosticsConfiguration
 }
@@ -56,6 +76,14 @@ export type EndgeValueOverride<T> =
 export interface EndgeSFCEditingConfigurationPatch {
   cancelOn?: EndgeValueOverride<ComponentSFCInteractionTrigger[]>
   commitOn?: EndgeValueOverride<ComponentSFCInteractionTrigger[]>
+}
+
+/** Field-level tooltip overrides for one configuration cascade layer. */
+export interface EndgeTooltipConfigurationPatch {
+  side?: EndgeValueOverride<EndgeTooltipSide>
+  align?: EndgeValueOverride<EndgeTooltipAlign>
+  openDelay?: EndgeValueOverride<number>
+  closeDelay?: EndgeValueOverride<number>
 }
 
 export type EndgeCollectionPatchEntry<T> =
@@ -74,10 +102,13 @@ export interface EndgeConfigurationPatch {
   fallbackLocale?: EndgeValueOverride<string>
   themes?: EndgeCollectionPatch<EndgeThemeDefinition>
   defaultTheme?: EndgeValueOverride<string>
+  timezones?: EndgeCollectionPatch<EndgeTimezoneDefinition>
+  defaultTimezone?: EndgeValueOverride<string>
   defaultAuthProfileIdentity?: EndgeValueOverride<string>
   sfcAdapterIds?: EndgeCollectionPatch<string>
   defaultSfcAdapterId?: EndgeValueOverride<string>
   sfcEditing?: EndgeSFCEditingConfigurationPatch
+  tooltips?: EndgeTooltipConfigurationPatch
   /** Локальный contribution diagnostics для текущего configuration layer. */
   diagnostics?: EndgeDiagnosticsConfigurationPatch
 }

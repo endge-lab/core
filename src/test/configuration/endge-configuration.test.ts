@@ -148,4 +148,47 @@ describe('Endge configuration cascade', () => {
   it('creates a deterministic context hash', () => {
     expect(createEndgeContextHash({ b: 2, a: 1 })).toBe(createEndgeContextHash({ a: 1, b: 2 }))
   })
+
+  it('adds tooltip defaults to legacy configuration documents', () => {
+    const configuration = createDefaultEndgeConfiguration()
+    const result = normalizeEndgeConfiguration({ ...configuration, tooltips: undefined })
+
+    expect(result.tooltips).toEqual({
+      side: 'right',
+      align: 'start',
+      openDelay: 250,
+      closeDelay: 100,
+    })
+  })
+
+  it('merges tooltip fields independently across cascade layers', () => {
+    const workspace = createDefaultEndgeConfiguration()
+    const tenant = applyEndgeConfigurationContribution(workspace, {
+      mode: 'inherit',
+      patch: { tooltips: { side: { op: 'set', value: 'bottom' } } },
+    })
+    const project = applyEndgeConfigurationContribution(tenant, {
+      mode: 'inherit',
+      patch: { tooltips: { openDelay: { op: 'set', value: 500 } } },
+    })
+    const environment = applyEndgeConfigurationContribution(project, {
+      mode: 'inherit',
+      patch: { tooltips: { align: { op: 'set', value: 'center' }, closeDelay: { op: 'set', value: 0 } } },
+    })
+
+    expect(environment.tooltips).toEqual({ side: 'bottom', align: 'center', openDelay: 500, closeDelay: 0 })
+    expect(workspace.tooltips.side).toBe('right')
+  })
+
+  it('rejects invalid tooltip behavior', () => {
+    const configuration = createDefaultEndgeConfiguration()
+    expect(() => normalizeEndgeConfiguration({
+      ...configuration,
+      tooltips: { ...configuration.tooltips, openDelay: -1 },
+    })).toThrow('tooltips.openDelay')
+    expect(() => normalizeEndgeConfiguration({
+      ...configuration,
+      tooltips: { ...configuration.tooltips, side: 'diagonal' },
+    })).toThrow('tooltips.side')
+  })
 })

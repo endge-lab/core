@@ -20,10 +20,12 @@ export const ENDGE_COMPUTATION_MAX_CALLS = 256
 export const CONTEXT_STORAGE_KEY = 'endge:context:v1'
 export const LEGACY_CONTEXT_STORAGE_KEY = 'endge-context'
 export const LEGACY_THEME_STORAGE_KEY = 'endge:theme'
+export const LEGACY_TIMEZONE_STORAGE_KEY = 'endge:isLocalTime'
 
 export const DEFAULT_LOCALE = 'en'
 export const DEFAULT_FALLBACK_LOCALE = 'en'
 export const DEFAULT_THEME = 'dark'
+export const DEFAULT_TIMEZONE = 'local'
 
 export const DEFAULT_SCOPE = {
   tenantId: 'default',

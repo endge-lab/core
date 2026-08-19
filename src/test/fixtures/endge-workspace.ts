@@ -21,6 +21,11 @@ export const TEST_ENDGE_WORKSPACE: EndgeWorkspaceDefinition = {
       { identity: 'dark', displayName: 'Тёмная' },
     ],
     defaultTheme: 'light',
+    timezones: [
+      { identity: 'local', displayName: 'Local time' },
+      { identity: 'UTC', displayName: 'UTC' },
+    ],
+    defaultTimezone: 'local',
     defaultAuthProfileIdentity: null,
     sfcAdapterIds: ['vue-native'],
     defaultSfcAdapterId: 'vue-native',
@@ -31,6 +36,7 @@ export const TEST_ENDGE_WORKSPACE: EndgeWorkspaceDefinition = {
       ],
       commitOn: [{ event: 'keydown', key: ['Enter'], prevent: true }],
     },
+    tooltips: { side: 'right', align: 'start', openDelay: 250, closeDelay: 100 },
     diagnostics: {
       telemetry: {
         collection: {

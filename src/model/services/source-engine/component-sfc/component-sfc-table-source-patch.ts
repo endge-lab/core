@@ -719,7 +719,7 @@ function setColumnCellEditable(
       source,
       node.range.start,
       node.range.end,
-      source.slice(structure.defaultChild.range.start, structure.defaultChild.range.end),
+      unwrapCompositeEditable(source, structure),
     )
   }
   if (!EDITABLE_PRIMITIVE_TAGS.has(node.tag))
@@ -885,6 +885,17 @@ function setColumnCellEditorTag(
 ): string {
   if (!isVisualCellTag(tag))
     throw new Error(`Tag ${tag} нельзя использовать как editor-вариант.`)
+  const root = requireColumnCellRootElement(source, column)
+  if (root.tag === 'Editable') {
+    const structure = requireCanonicalEditableStructure(source, root)
+    if (supportsIntrinsicEditor(structure.defaultChild, tag)) {
+      const intrinsic = collapseCompositeEditable(source, structure)
+      if (intrinsic) return replaceRange(source, root.range.start, root.range.end, intrinsic)
+    }
+    return replaceEditableVariantElement(source, column, 'edit', tagMarkup(tag))
+  }
+  if (supportsIntrinsicEditor(root, tag))
+    return setStaticBooleanAttribute(source, root, 'editable', true)
   return setColumnCellEditorMarkup(source, column, tagMarkup(tag))
 }
 
@@ -896,12 +907,7 @@ function setColumnCellEditorMarkup(
   const root = requireColumnCellRootElement(source, column)
   if (root.tag === 'Editable')
     return replaceEditableVariantElement(source, column, 'edit', markup)
-  if (!EDITABLE_PRIMITIVE_TAGS.has(root.tag))
-    throw new Error('Произвольный editor можно создать только для editable-примитива или составного Editable.')
-  const editable = root.attributes.find(attribute => attribute.name === 'editable') ?? null
-  if (!editable || editable.dynamic || editable.value != null)
-    throw new Error('Сначала включите статический editable для выбранного элемента.')
-  return convertPrimitiveToCompositeEditable(source, root, markup)
+  return convertElementToCompositeEditable(source, root, markup)
 }
 
 function setColumnCellEditorAttribute(
@@ -1081,14 +1087,21 @@ function replaceEditableVariantElement(
   return replaceRange(source, child.range.start, child.range.end, markup)
 }
 
-function convertPrimitiveToCompositeEditable(
+function convertElementToCompositeEditable(
   source: string,
   root: RComponentSFC_AST_ElementNode,
   rawEditorMarkup: string,
 ): string {
-  const editable = root.attributes.find(attribute => attribute.name === 'editable')
-  if (!editable || editable.dynamic || editable.value != null)
+  const editable = root.attributes.find(attribute => attribute.name === 'editable') ?? null
+  if (editable && (editable.dynamic || editable.value != null))
     throw new Error('editable должен быть статическим boolean-атрибутом.')
+  if (root.directives.some(directive => (
+    directive.name === 'if'
+    || directive.name === 'else-if'
+    || directive.name === 'else'
+    || directive.name === 'for'
+  )))
+    throw new Error('Элемент со структурной директивой можно обернуть в Editable только во вкладке Source.')
   const editOn = root.attributes.filter(attribute => attribute.name === 'edit-on')
   const cancelOn = root.attributes.filter(attribute => attribute.name === 'cancel-on')
   const commitOn = root.attributes.filter(attribute => attribute.name === 'commit-on')
@@ -1098,7 +1111,10 @@ function convertPrimitiveToCompositeEditable(
   if (editOn.length > 1 || cancelOn.length > 1 || commitOn.length > 1 || edited.length > 1)
     throw new Error('Дублирующиеся edit-on, cancel-on, commit-on или @edited редактируются только во вкладке Source.')
 
-  const value = root.attributes.find(attribute => attribute.name === 'value') ?? null
+  const intrinsicDisplay = EDITABLE_PRIMITIVE_TAGS.has(root.tag)
+  const value = intrinsicDisplay
+    ? root.attributes.find(attribute => attribute.name === 'value') ?? null
+    : null
   const wrapperDeclarations = [
     value,
     editOn[0] ?? null,
@@ -1143,6 +1159,102 @@ function convertPrimitiveToCompositeEditable(
   const opening = `<Editable\n${wrapperDeclarations.map(declaration => indentMarkup(declaration, attributeIndent)).join('\n')}\n${baseIndent}>`
   const markup = `${opening}\n${baseIndent}  <Variant name="default">\n${indentMarkup(displayMarkup, childIndent)}\n${baseIndent}  </Variant>\n\n${baseIndent}  <Variant name="edit">\n${indentMarkup(editorMarkup, childIndent)}\n${baseIndent}  </Variant>\n${baseIndent}</Editable>`
   return replaceRange(source, root.range.start, root.range.end, markup)
+}
+
+function supportsIntrinsicEditor(
+  display: RComponentSFC_AST_ElementNode,
+  editorTag: ComponentSFCTableVisualCellTag,
+): boolean {
+  return EDITABLE_PRIMITIVE_TAGS.has(display.tag) && display.tag === editorTag
+}
+
+function unwrapCompositeEditable(
+  source: string,
+  structure: CanonicalEditableStructure,
+): string {
+  const displayMarkup = source.slice(
+    structure.defaultChild.range.start,
+    structure.defaultChild.range.end,
+  )
+  if (!EDITABLE_PRIMITIVE_TAGS.has(structure.defaultChild.tag)) return displayMarkup
+  const value = structure.root.attributes.find(attribute => attribute.name === 'value') ?? null
+  if (!value || structure.defaultChild.attributes.some(attribute => attribute.name === 'value'))
+    return displayMarkup
+  return insertDeclarationsIntoElementMarkup(
+    source,
+    structure.defaultChild,
+    displayMarkup,
+    [source.slice(value.range.start, value.range.end).trim()],
+  )
+}
+
+function collapseCompositeEditable(
+  source: string,
+  structure: CanonicalEditableStructure,
+): string | null {
+  const allowedAttributes = new Set(['value', 'edit-on', 'cancel-on', 'commit-on'])
+  if (structure.root.attributes.some(attribute => !allowedAttributes.has(attribute.name)))
+    return null
+  if (structure.root.directives.some(directive => (
+    directive.name !== 'on' || directive.argument?.trim() !== 'edited'
+  )))
+    return null
+
+  const displayEditable = structure.defaultChild.attributes.filter(attribute => attribute.name === 'editable')
+  if (displayEditable.length > 1) return null
+  if (displayEditable[0] && (displayEditable[0].dynamic || displayEditable[0].value != null))
+    return null
+  const declarations = displayEditable.length ? [] : ['editable']
+  for (const name of allowedAttributes) {
+    const wrapperDeclarations = structure.root.attributes.filter(attribute => attribute.name === name)
+    if (wrapperDeclarations.length > 1) return null
+    const declaration = wrapperDeclarations[0]
+    if (declaration && !structure.defaultChild.attributes.some(attribute => attribute.name === name)) {
+      declarations.push(source.slice(declaration.range.start, declaration.range.end).trim())
+    }
+  }
+  const edited = structure.root.directives.filter(directive => (
+    directive.name === 'on' && directive.argument?.trim() === 'edited'
+  ))
+  if (edited.length > 1) return null
+  if (edited[0] && !structure.defaultChild.directives.some(directive => (
+    directive.name === 'on' && directive.argument?.trim() === 'edited'
+  ))) {
+    declarations.push(source.slice(edited[0].range.start, edited[0].range.end).trim())
+  }
+
+  return insertDeclarationsIntoElementMarkup(
+    source,
+    structure.defaultChild,
+    source.slice(structure.defaultChild.range.start, structure.defaultChild.range.end),
+    declarations,
+  )
+}
+
+function insertDeclarationsIntoElementMarkup(
+  source: string,
+  node: RComponentSFC_AST_ElementNode,
+  markup: string,
+  declarations: string[],
+): string {
+  if (!declarations.length) return markup
+  const openingEnd = findOpeningTagEnd(source, node)
+  let insertOffset = openingEnd
+  while (insertOffset > node.range.start && /\s/.test(source[insertOffset - 1]!))
+    insertOffset -= 1
+  if (source[insertOffset - 1] === '/') insertOffset -= 1
+  const openingSource = source.slice(node.range.start, insertOffset)
+  const lineStart = source.lastIndexOf('\n', insertOffset - 1) + 1
+  const closePrefix = source.slice(lineStart, insertOffset)
+  if (openingSource.includes('\n') && !closePrefix.trim()) {
+    const indent = inferAttributeIndent(source, node)
+    const block = declarations.map(declaration => `${indent}${declaration}\n`).join('')
+    return replaceRange(markup, lineStart - node.range.start, lineStart - node.range.start, block)
+  }
+  while (insertOffset > node.range.start && /[ \t]/.test(source[insertOffset - 1]!))
+    insertOffset -= 1
+  const relativeOffset = insertOffset - node.range.start
+  return replaceRange(markup, relativeOffset, relativeOffset, ` ${declarations.join(' ')}`)
 }
 
 function normalizeMarkupIndent(markup: string): string {

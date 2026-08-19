@@ -6,6 +6,7 @@ import type {
   EndgeWorkspaceLocale,
   EndgeWorkspaceLocaleLabelMode,
   EndgeWorkspaceTheme,
+  EndgeWorkspaceTimezone,
   EndgeWorkspaceVar,
 } from '@/domain/types/document/workspace.types'
 
@@ -125,6 +126,23 @@ export class EndgeWorkspace extends EndgeModule {
     return this.themes.find(item => item.identity === theme)?.displayName ?? theme
   }
 
+  /** Проверяет, поддерживает ли workspace указанную временную зону. */
+  supportsTimezone(timezone: string | null | undefined): boolean {
+    const identity = String(timezone ?? '').trim()
+    return this.timezones.some(item => item.identity === identity)
+  }
+
+  /** Нормализует временную зону по правилам активного workspace. */
+  normalizeTimezone(timezone: string | null | undefined): string {
+    const identity = String(timezone ?? '').trim()
+    return this.supportsTimezone(identity) ? identity : this.defaultTimezone
+  }
+
+  /** Возвращает пользовательское имя временной зоны. */
+  getTimezoneLabel(timezone: string): string {
+    return this.timezones.find(item => item.identity === timezone)?.displayName ?? timezone
+  }
+
   /** Применяет и публикует новую workspace-конфигурацию. */
   public apply(input: unknown): void {
     const next = normalizeEndgeWorkspaceDefinition(input)
@@ -219,6 +237,16 @@ export class EndgeWorkspace extends EndgeModule {
   /** Возвращает тему по умолчанию. */
   get defaultTheme(): string {
     return this._configuration().defaultTheme
+  }
+
+  /** Возвращает доступные workspace timezones. */
+  get timezones(): EndgeWorkspaceTimezone[] {
+    return this._configuration().timezones
+  }
+
+  /** Возвращает временную зону по умолчанию. */
+  get defaultTimezone(): string {
+    return this._configuration().defaultTimezone
   }
 
   /** Возвращает identity auth profile по умолчанию. */

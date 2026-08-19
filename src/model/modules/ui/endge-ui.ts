@@ -25,17 +25,9 @@ export class EndgeUI extends EndgeModule {
   private readonly DEFAULT_ZOOM: number = 100
   private readonly LS_KEY_ZOOM: string = 'zoom'
 
-  //
-  // Настройки времени
-  // true означает локальное время (LT)
-  // false означает UTC
-  private readonly DEFAULT_IS_LOCAL_TIME: boolean = true
-  private readonly LS_KEY_IS_LOCAL_TIME: string = 'endge:isLocalTime'
-
   // Состояние
   private _zoom: number
   private _theme: string
-  private _isLocalTime: boolean
 
   /**
    * Восстанавливает UI-настройки из localStorage и применяет тему к document.
@@ -45,7 +37,6 @@ export class EndgeUI extends EndgeModule {
 
     this._zoom = this.readZoomFromLS()
     this._theme = themeConfig.defaultTheme
-    this._isLocalTime = this.readIsLocalTimeFromLS()
 
     // сразу применим (как immediate watch)
     this.applyThemeToDocument(this._theme)
@@ -55,7 +46,10 @@ export class EndgeUI extends EndgeModule {
   public override start(): void {
     this._offContext?.()
     this._offWorkspace?.()
-    this._offContext = Endge.context.subscribe(() => this.syncThemeFromContext())
+    this._offContext = Endge.context.subscribe(() => {
+      if (!this.syncThemeFromContext())
+        this.notify()
+    })
     this._offWorkspace = Endge.workspace.subscribe(() => {
       if (!this.syncThemeFromContext())
         this.notify()
@@ -84,7 +78,7 @@ export class EndgeUI extends EndgeModule {
       theme: this._theme,
       isDark: this.isDark,
 
-      isLocalTime: this._isLocalTime,
+      isLocalTime: this.isLocalTime,
       timeZone: this.timeZone,
     }
   }
@@ -246,63 +240,33 @@ export class EndgeUI extends EndgeModule {
    * Показывает, используется ли локальное время вместо UTC.
    */
   public get isLocalTime(): boolean {
-    return this._isLocalTime
+    return Endge.context.currentTimezone !== 'UTC'
   }
 
   /**
    * Возвращает текущий режим времени для UI.
    */
   public get timeZone(): TimeZoneMode {
-    return this._isLocalTime ? 'LT' : 'UTC'
+    return this.isLocalTime ? 'LT' : 'UTC'
   }
 
   /**
    * Явно выставить режим.
    */
   public setLocalTime(value: boolean): void {
-    const next: boolean = Boolean(value)
-    if (next === this._isLocalTime)
-      return
-
-    this._isLocalTime = next
-    this.writeIsLocalTimeToLS(next)
-    this.notify()
+    const timezone = value
+      ? Endge.workspace.timezones.find(item => item.identity !== 'UTC')?.identity
+        ?? Endge.workspace.defaultTimezone
+      : Endge.workspace.supportsTimezone('UTC')
+        ? 'UTC'
+        : Endge.workspace.defaultTimezone
+    Endge.context.setCurrentTimezone(timezone)
   }
 
   /**
    * Переключатель LT <-> UTC.
    */
   public switchTime(): void {
-    this.setLocalTime(!this._isLocalTime)
-  }
-
-  /**
-   * Считывает Is Local Time From LS.
-   */
-  private readIsLocalTimeFromLS(): boolean {
-    if (typeof localStorage === 'undefined')
-      return this.DEFAULT_IS_LOCAL_TIME
-
-    const raw: string | null = localStorage.getItem(this.LS_KEY_IS_LOCAL_TIME)
-    if (raw == null)
-      return this.DEFAULT_IS_LOCAL_TIME
-
-    // поддержим разные форматы ("true"/"false"/"1"/"0")
-    const s: string = raw.trim().toLowerCase()
-    if (s === 'true' || s === '1')
-      return true
-    if (s === 'false' || s === '0')
-      return false
-
-    return this.DEFAULT_IS_LOCAL_TIME
-  }
-
-  /**
-   * Записывает Is Local Time To LS.
-   */
-  private writeIsLocalTimeToLS(value: boolean): void {
-    if (typeof localStorage === 'undefined')
-      return
-    localStorage.setItem(this.LS_KEY_IS_LOCAL_TIME, value ? 'true' : 'false')
+    this.setLocalTime(!this.isLocalTime)
   }
 }

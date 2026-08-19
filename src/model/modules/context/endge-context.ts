@@ -20,8 +20,10 @@ import {
   DEFAULT_LOCALE,
   DEFAULT_SCOPE,
   DEFAULT_THEME,
+  DEFAULT_TIMEZONE,
   LEGACY_CONTEXT_STORAGE_KEY,
   LEGACY_THEME_STORAGE_KEY,
+  LEGACY_TIMEZONE_STORAGE_KEY,
 } from '@/model/config/kernel.config'
 import { Endge } from '@/model/kernel/endge'
 import {
@@ -51,6 +53,8 @@ export class EndgeContext extends EndgeModule {
   private _pendingLocale: string | null = null
   private _currentTheme = DEFAULT_THEME
   private _pendingTheme: string | null = null
+  private _currentTimezone = DEFAULT_TIMEZONE
+  private _pendingTimezone: string | null = null
   private _workspaceDataMode: EndgeDataMode = 'live'
   private _dataModeOverride: EndgeDataMode | null = null
   private _sessionProvider: EndgeSessionIdentityProvider | null = null
@@ -127,6 +131,7 @@ export class EndgeContext extends EndgeModule {
       user: this._currentUser,
       locale: this._currentLocale || null,
       theme: this._currentTheme || null,
+      timezone: this._currentTimezone || null,
     }
   }
 
@@ -139,11 +144,14 @@ export class EndgeContext extends EndgeModule {
     this._currentUser = normalizeScopePart(payload?.user, DEFAULT_SCOPE.userId)
     const rawLocale = normalizeOptionalText(payload?.locale)
     const rawTheme = normalizeOptionalText(payload?.theme) ?? readLegacyThemePreference()
+    const rawTimezone = normalizeOptionalText(payload?.timezone) ?? readLegacyTimezonePreference()
     this._dataModeOverride = null
     this._currentLocale = rawLocale ?? DEFAULT_LOCALE
     this._pendingLocale = rawLocale ?? DEFAULT_LOCALE
     this._currentTheme = rawTheme ?? DEFAULT_THEME
     this._pendingTheme = rawTheme ?? DEFAULT_THEME
+    this._currentTimezone = rawTimezone ?? DEFAULT_TIMEZONE
+    this._pendingTimezone = rawTimezone ?? DEFAULT_TIMEZONE
   }
 
   /** Сохраняет текущий context snapshot через выбранный adapter. */
@@ -487,6 +495,47 @@ export class EndgeContext extends EndgeModule {
     this.notify()
   }
 
+  /** Возвращает текущую временную зону контекста. */
+  get currentTimezone(): string {
+    return this._currentTimezone || DEFAULT_TIMEZONE
+  }
+
+  /** Нормализует, сохраняет и публикует новую временную зону. */
+  set currentTimezone(value: string) {
+    const configuration = this._activeConfiguration()
+    const raw = normalizeOptionalText(value) ?? DEFAULT_TIMEZONE
+    const next = this._normalizeTimezone(raw, configuration)
+    this._pendingTimezone = configuration ? null : raw
+    if (next === this._currentTimezone)
+      return
+
+    this._currentTimezone = next
+    this.saveToStorage()
+    this.notify()
+  }
+
+  /** Устанавливает текущую временную зону через публичный method API. */
+  public setCurrentTimezone(timezone: string | null): void {
+    this.currentTimezone = normalizeOptionalText(timezone) ?? DEFAULT_TIMEZONE
+  }
+
+  /** Согласует сохранённую временную зону с effective configuration. */
+  public reconcileCurrentTimezoneWithWorkspace(configuration?: EndgeConfiguration): void {
+    const activeConfiguration = configuration ?? this._activeConfiguration()
+    if (!activeConfiguration)
+      return
+
+    const pending = this._pendingTimezone
+    const next = this._normalizeTimezone(pending ?? this._currentTimezone, activeConfiguration)
+    this._pendingTimezone = null
+    if (next === this._currentTimezone)
+      return
+
+    this._currentTimezone = next
+    this.saveToStorage()
+    this.notify()
+  }
+
   /** Возвращает effective configuration либо persisted workspace configuration до resolution. */
   private _activeConfiguration(): EndgeConfiguration | null {
     try {
@@ -511,6 +560,12 @@ export class EndgeContext extends EndgeModule {
     if (!configuration)
       return value
     return configuration.themes.some(item => item.identity === value) ? value : configuration.defaultTheme
+  }
+
+  private _normalizeTimezone(value: string, configuration: EndgeConfiguration | null): string {
+    if (!configuration)
+      return value
+    return configuration.timezones.some(item => item.identity === value) ? value : configuration.defaultTimezone
   }
 
   /** Выбирает storage adapter для заданной persistence policy. */
@@ -644,6 +699,23 @@ function readLegacyThemePreference(): string | null {
 
   try {
     return normalizeOptionalText(localStorage.getItem(LEGACY_THEME_STORAGE_KEY))
+  }
+  catch {
+    return null
+  }
+}
+
+function readLegacyTimezonePreference(): string | null {
+  if (typeof localStorage === 'undefined')
+    return null
+
+  try {
+    const value = normalizeOptionalText(localStorage.getItem(LEGACY_TIMEZONE_STORAGE_KEY))?.toLowerCase()
+    if (value === 'false' || value === '0')
+      return 'UTC'
+    if (value === 'true' || value === '1')
+      return 'local'
+    return null
   }
   catch {
     return null

@@ -27,7 +27,6 @@ export class EndgeI18n extends EndgeModule {
       const locale = Endge.context.currentLocale
       if (locale !== this._lastLocale) {
         this._lastLocale = locale
-        Endge.runtime.invalidateApplicationScopes()
       }
       this.notify()
     })

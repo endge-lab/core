@@ -45,6 +45,8 @@ export const ENDGE_SFC_GRID_ALIGNMENTS = ['start', 'center', 'end', 'stretch'] a
 export const ENDGE_SFC_FLEX_DIRECTIONS = ['row', 'column'] as const
 export const ENDGE_SFC_DIVIDER_ORIENTATIONS = ['horizontal', 'vertical'] as const
 export const ENDGE_SFC_INPUT_TYPES = ['String', 'Number', 'Date', 'Time', 'DateTime'] as const
+export const ENDGE_SFC_TOOLTIP_SIDES = ['top', 'right', 'bottom', 'left'] as const
+export const ENDGE_SFC_TOOLTIP_ALIGNS = ['start', 'center', 'end'] as const
 
 /** Конечные значения встроенных SFC tags. Свободные string/number props сюда не входят. */
 export const ENDGE_SFC_TAG_ATTRIBUTE_CONTRACTS = {
@@ -159,6 +161,18 @@ export const ENDGE_SFC_TAG_ATTRIBUTE_CONTRACTS = {
       values: ENDGE_SFC_INPUT_TYPES,
       defaultValue: 'String',
       description: 'Семантический тип значения Input.',
+    },
+  ],
+  Tooltip: [
+    {
+      name: 'side',
+      values: ENDGE_SFC_TOOLTIP_SIDES,
+      description: 'Предпочтительная сторона; adapter может перевернуть её при collision с viewport.',
+    },
+    {
+      name: 'align',
+      values: ENDGE_SFC_TOOLTIP_ALIGNS,
+      description: 'Выравнивание tooltip относительно trigger.',
     },
   ],
 } as const satisfies Partial<Record<RComponentSFC_IR_Tag, readonly ComponentSFCTagAttributeContract[]>>

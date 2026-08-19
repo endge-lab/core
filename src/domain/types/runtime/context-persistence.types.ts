@@ -16,6 +16,7 @@ export interface EndgeContextSnapshot {
   user: string | null
   locale: string | null
   theme: string | null
+  timezone: string | null
 }
 
 export interface EndgePersistenceScope {

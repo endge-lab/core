@@ -397,7 +397,52 @@ function projectColumnCellEditing(
     }
   }
 
+  const nestedEditableCount = countNestedEditableElements(node)
+  if (!enabled && nestedEditableCount > 0) {
+    return sourceOwnedCellEditing(
+      true,
+      'source',
+      node.tag,
+      node.range,
+      `${nestedEditableSummary(nestedEditableCount)} Настройки отдельных editor-ов доступны во вкладке Source.`,
+    )
+  }
+
   if (!EDITABLE_PRIMITIVE_TAGS.has(node.tag)) {
+    const hasLocalEditingBehavior = node.attributes.some(attribute => (
+      attribute.name === 'edit-on'
+      || attribute.name === 'cancel-on'
+      || attribute.name === 'commit-on'
+    )) || node.directives.some(directive => (
+      directive.name === 'on' && directive.argument?.trim() === 'edited'
+    ))
+    const hasStructuralDirective = node.directives.some(directive => (
+      directive.name === 'if'
+      || directive.name === 'else-if'
+      || directive.name === 'else'
+      || directive.name === 'for'
+    ))
+    if (!enabled && !hasLocalEditingBehavior && !hasStructuralDirective) {
+      const reaction = projectEventReaction(node, 'edited')
+      const projectedTriggers = projectEditTriggers(null)
+      const outcomes = projectEditOutcomes(node, irNode?.editable ?? null)
+      return {
+        editable: true,
+        enabled: false,
+        mode: sourceMode,
+        tag: node.tag,
+        triggers: projectedTriggers.triggers,
+        usesDefaultTrigger: projectedTriggers.usesDefaultTrigger,
+        suffixes: projectedTriggers.suffixes,
+        reaction,
+        cancel: outcomes.cancel,
+        commit: outcomes.commit,
+        editor: null,
+        editorImplicit: false,
+        sourceRange: node.range,
+        message: 'Выберите editor, чтобы создать составной Editable с вариантами отображения и редактирования.',
+      }
+    }
     return sourceOwnedCellEditing(
       enabled,
       sourceMode,
@@ -490,6 +535,32 @@ function sourceOwnedCellEditing(
     sourceRange,
     message,
   }
+}
+
+function countNestedEditableElements(root: RComponentSFC_AST_ElementNode): number {
+  let count = 0
+  for (const child of root.children) {
+    if (child.kind !== 'element') continue
+    if (child.tag === 'Editable' || child.attributes.some(attribute => attribute.name === 'editable')) {
+      count += 1
+    }
+    count += countNestedEditableElements(child)
+  }
+  return count
+}
+
+function nestedEditableSummary(count: number): string {
+  const modulo100 = count % 100
+  const modulo10 = count % 10
+  const suffix = modulo100 >= 11 && modulo100 <= 14
+    ? 'элементов'
+    : modulo10 === 1
+      ? 'элемент'
+      : modulo10 >= 2 && modulo10 <= 4
+        ? 'элемента'
+        : 'элементов'
+  const predicate = modulo10 === 1 && modulo100 !== 11 ? 'найден' : 'найдено'
+  return `Внутри ячейки ${predicate} ${count} editable-${suffix}.`
 }
 
 function sourceOwnedEditOutcome(message: string): ComponentSFCEditOutcomeProjection {

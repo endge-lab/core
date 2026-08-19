@@ -117,6 +117,7 @@ export * from '@/domain/types/ui/filter-view.type'
 export * from '@/domain/types/ui/jsx.types'
 export * from '@/domain/types/ui/ui-composition.types'
 export * from '@/domain/types/ui/ui-render-adapter.type'
+export * from '@/domain/types/ui/tooltip-markdown.types'
 export * from '@/domain/types/ui/ui.types'
 export * from '@/domain/types/i18n.types'
 
@@ -186,6 +187,7 @@ export * from '@/model/adapters/diagnostics/SentryDiagnosticsAdapter'
 export * from '@/model/adapters/diagnostics/SentryDiagnosticsAdapter.types'
 export * from '@/model/config/kernel.config'
 export * from '@/model/config/ui-composition.config'
+export * from '@/model/config/tooltip.config'
 export { default as Config } from '@/model/config/kernel.config'
 
 export * from '@/model/modules/context/persistence/EndgeStorageAdapterRegistry'
@@ -198,6 +200,7 @@ export * from '@/model/seed/converters/date/weekdays-range'
 
 export * from '@/model/services/document/DocumentDraftFactory'
 export * from '@/model/services/configuration/endge-configuration'
+export * from '@/model/services/tooltip/endge-tooltip-markdown'
 export * from '@/model/services/i18n/composition-i18n-catalog-projection'
 
 export * from '@/domain/entities/runtime/RuntimeHostBase'
