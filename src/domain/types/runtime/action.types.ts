@@ -6,6 +6,7 @@ export type RuntimeActionSurface = string
 /** Stable identities of targetless Actions provided by Endge itself. */
 export const BUILTIN_ACTION_IDS = {
   consoleLog: 'built-in-console-log',
+  testAlert: 'built-in-test-alert',
   vocabAcquire: 'built-in-vocabs-acquire',
   vocabRefresh: 'built-in-vocabs-refresh',
   vocabInvalidate: 'built-in-vocabs-invalidate',

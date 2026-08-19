@@ -19,23 +19,14 @@ export interface EndgeThemeDefinition {
   displayName: string
 }
 
-export type EndgeSSEAuthMode = 'inherit' | 'profile' | 'none'
-
 export interface EndgeVariableDefinition {
   name: string
   defaultValue: string
 }
 
-export interface EndgeSSEConfiguration {
-  url: string
-  authMode?: EndgeSSEAuthMode
-  authProfileIdentity?: string | null
-}
-
 /** Полная конфигурация, с которой компилируется один Endge context. */
 export interface EndgeConfiguration {
   vars: EndgeVariableDefinition[]
-  sse?: EndgeSSEConfiguration
   locales: EndgeLocaleDefinition[]
   defaultLocale: string
   fallbackLocale: string
@@ -63,7 +54,6 @@ export interface EndgeCollectionPatch<T> {
 /** Локальные операции inherit-слоя. Отсутствующее поле наследуется без изменений. */
 export interface EndgeConfigurationPatch {
   vars?: EndgeCollectionPatch<EndgeVariableDefinition>
-  sse?: EndgeValueOverride<EndgeSSEConfiguration>
   locales?: EndgeCollectionPatch<EndgeLocaleDefinition>
   defaultLocale?: EndgeValueOverride<string>
   fallbackLocale?: EndgeValueOverride<string>

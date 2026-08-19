@@ -76,7 +76,7 @@ defineQuery({
     endpoint: 'https://payload.example.test',
     path: '/items',
     method: 'GET',
-    auth: { mode: 'profile', profileIdentity: 'payload-auth' },
+    auth: { mode: 'profile', profile: 'payload-auth' },
   },
   outputs: { raw: output().from(response()) },
 })
@@ -84,7 +84,7 @@ defineQuery({
 
     await executor.execute({ payload })
 
-    expect(resolve).toHaveBeenCalledWith({ mode: 'profile', profileIdentity: 'payload-auth' })
+    expect(resolve).toHaveBeenCalledWith({ mode: 'profile', profile: 'payload-auth' })
     expect(request).toHaveBeenCalledWith(expect.objectContaining({
       headers: { Authorization: 'Bearer resolved-token' },
     }))

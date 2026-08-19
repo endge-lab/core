@@ -616,7 +616,7 @@ export class EndgeVocabs extends EndgeModule {
     const mode = cfg.authMode ?? 'inherit'
     const session = await Endge.auth.requests.resolve(
       mode === 'profile'
-        ? { mode: 'profile', profileIdentity: String(cfg.authProfileIdentity ?? '').trim() }
+        ? { mode: 'profile', profile: String(cfg.authProfileIdentity ?? '').trim() }
         : { mode },
     )
     return session.headers

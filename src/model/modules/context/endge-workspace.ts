@@ -5,7 +5,6 @@ import type {
   EndgeWorkspaceDefinition,
   EndgeWorkspaceLocale,
   EndgeWorkspaceLocaleLabelMode,
-  EndgeWorkspaceSSEConfig,
   EndgeWorkspaceTheme,
   EndgeWorkspaceVar,
 } from '@/domain/types/document/workspace.types'
@@ -200,11 +199,6 @@ export class EndgeWorkspace extends EndgeModule {
   /** Explicit name for the persisted variable definitions. */
   get variableDefinitions(): EndgeWorkspaceVar[] {
     return this.vars
-  }
-
-  /** Возвращает workspace SSE config. */
-  get sse(): EndgeWorkspaceSSEConfig | undefined {
-    return this._configuration().sse
   }
 
   /** Возвращает locale по умолчанию. */

@@ -130,10 +130,6 @@ describe('Endge domain export', () => {
       configuration: {
         ...TEST_ENDGE_WORKSPACE.configuration,
         vars: [{ name: 'apiBaseUrl', defaultValue: '/api/test' }],
-        sse: {
-          url: '/api/events',
-          authMode: 'none' as const,
-        },
       },
     }
     Endge.workspace.apply(workspace)
@@ -143,7 +139,6 @@ describe('Endge domain export', () => {
     expect(bundle.schemaVersion).toBe(1)
     expect(bundle.kind).toBe('workspace-snapshot')
     expect(bundle.workspace.identity).toBe('workspace-export-test')
-    expect(bundle.workspace.configuration.sse).toEqual({ url: '/api/events', authMode: 'none' })
     expect(bundle.documents.queries).toEqual([expect.objectContaining({ identity: 'bundle-query' })])
   })
 

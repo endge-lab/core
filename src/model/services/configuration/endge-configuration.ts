@@ -4,8 +4,6 @@ import type {
   EndgeConfigurationContribution,
   EndgeConfigurationPatch,
   EndgeLocaleDefinition,
-  EndgeSSEAuthMode,
-  EndgeSSEConfiguration,
   EndgeThemeDefinition,
   EndgeVariableDefinition,
 } from '@/domain/types/configuration/configuration.type'
@@ -86,7 +84,6 @@ export function normalizeEndgeConfiguration(input: unknown): EndgeConfiguration 
 
   return {
     vars: normalizeVars(input.vars),
-    ...(normalizeSSE(input.sse) ? { sse: normalizeSSE(input.sse) } : {}),
     locales,
     defaultLocale,
     fallbackLocale,
@@ -151,7 +148,6 @@ export function applyEndgeConfigurationContribution(
   if (patch.diagnostics)
     next.diagnostics = applyDiagnosticsPatch(next.diagnostics, patch.diagnostics)
 
-  applyOptionalValue(next, 'sse', patch.sse)
   applyRequiredValue(next, 'defaultLocale', patch.defaultLocale)
   applyRequiredValue(next, 'fallbackLocale', patch.fallbackLocale)
   applyRequiredValue(next, 'defaultTheme', patch.defaultTheme)
@@ -268,19 +264,6 @@ function applyCollectionPatch<T>(
   return [...result.values()]
 }
 
-function applyOptionalValue<K extends 'sse'>(
-  target: EndgeConfiguration,
-  key: K,
-  override: EndgeConfigurationPatch[K],
-): void {
-  if (!override)
-    return
-  if (override.op === 'remove')
-    delete target[key]
-  else
-    target[key] = structuredCloneSafe(override.value)
-}
-
 function applyRequiredValue<K extends 'defaultLocale' | 'fallbackLocale' | 'defaultTheme' | 'defaultSfcAdapterId'>(
   target: EndgeConfiguration,
   key: K,
@@ -366,27 +349,6 @@ function normalizeStringCollection(input: unknown, field: string): string[] {
   if (!result.length)
     throw new Error(`[EndgeConfiguration] ${field} must contain at least one item`)
   return result
-}
-
-function normalizeSSE(input: unknown): EndgeSSEConfiguration | undefined {
-  if (!isRecord(input))
-    return undefined
-  const url = normalizeText(input.url)
-  const authProfileIdentity = normalizeNullableText(input.authProfileIdentity)
-  const authMode = normalizeSSEAuthMode(input.authMode)
-  if (!url && !authProfileIdentity && authMode === 'inherit')
-    return undefined
-  return {
-    url,
-    authMode,
-    ...(authProfileIdentity ? { authProfileIdentity } : {}),
-  }
-}
-
-function normalizeSSEAuthMode(input: unknown): EndgeSSEAuthMode {
-  if (input === 'profile' || input === 'none' || input == null || input === 'inherit')
-    return input === 'profile' || input === 'none' ? input : 'inherit'
-  throw new Error(`[EndgeConfiguration] Unsupported SSE authMode: ${String(input)}`)
 }
 
 /** Нормализует полную diagnostics configuration и добавляет системные defaults. */

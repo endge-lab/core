@@ -5,7 +5,7 @@ export type RQueryAuthMode = 'none' | 'inherit' | 'profile'
 export interface RQueryAuth {
   mode: RQueryAuthMode
   /** Identity auth-profile для mode=profile. */
-  profileIdentity?: string
+  profile?: string
 
   /** Схема для заголовка (по умолчанию "Bearer"). */
   scheme?: string

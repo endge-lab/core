@@ -123,7 +123,7 @@ export interface AuthResolvedSession {
 export type AuthRequestPolicy
   = | { mode: 'none' }
     | { mode: 'inherit' }
-    | { mode: 'profile', profileIdentity: string }
+    | { mode: 'profile', profile: string }
 
 export interface AuthResolveOptions {
   forceRefresh?: boolean

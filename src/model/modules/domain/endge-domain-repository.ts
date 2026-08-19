@@ -21,7 +21,7 @@ import { normalizeEntityMeta } from '@/domain/entities/reflect/REntity'
 import { normalizeEndgeWorkspaceDefinition } from '@/domain/entities/reflect/RWorkspace'
 import { ComponentType, FilterType, ParameterType, QueryType } from '@/domain/types/document/document.types'
 import { Endge } from '@/model/kernel/endge'
-import { normalizeSnapshotDocuments, normalizeSnapshotFolders } from '@/model/modules/domain/endge-domain'
+import { EndgeDomain, normalizeSnapshotDocuments, normalizeSnapshotFolders } from '@/model/modules/domain/endge-domain'
 import { serializeServiceDocument, serializeServiceFolder } from '@/model/services/document/endge-service-document-serializer'
 import { resolveEndgeServiceCollection, resolveEndgeServiceStateCollection } from '@/model/services/document/domain-provider'
 
@@ -472,28 +472,36 @@ export class EndgeDomainRepository extends EndgeModule {
       ? await provider.updateDocument({ ...request, expectedRevision: state.revision })
       : await provider.createDocument(request)
     this._domainETag = result.etag
-    this._applyServiceDocument(documentType, result.document, documentId)
+    this._applyServiceDocument(documentType, result.document, documentId, state ? persistedIdentity : undefined)
   }
 
   private _applyServiceDocument(
     documentType: DomainDocumentType,
     document: EndgeLiveDomainDocument,
     replaceRef?: string | number,
+    previousIdentity?: string,
   ): void {
     const collection = resolveEndgeServiceCollection(documentType)
     const identity = String(document.identity ?? '').trim()
-    const previousIdentity = replaceRef == null
-      ? ''
-      : String((this.getDomainDocumentByType(documentType, replaceRef) as any)?.identity ?? replaceRef).trim()
+    const current = replaceRef == null
+      ? null
+      : this.getDomainDocumentByType(documentType, replaceRef)
+        ?? (previousIdentity ? this.getDomainDocumentByType(documentType, previousIdentity) : null)
+    const persistedIdentity = String((current as any)?.identity ?? previousIdentity ?? replaceRef ?? '').trim()
 
-    if (replaceRef != null)
-      this._removeDomainDocumentByType(documentType, replaceRef)
-    if (previousIdentity && previousIdentity !== identity)
-      this._documentServerState.delete(this._serverStateKey(collection, previousIdentity))
+    if (persistedIdentity && persistedIdentity !== identity)
+      this._documentServerState.delete(this._serverStateKey(collection, persistedIdentity))
 
     const key = this._getDomainCollectionKey(documentType)
     const plain = normalizeSnapshotDocuments([document], this._serviceFolderIds())[0]
-    Endge.domain.merge({ [key]: [plain] })
+    const parsed = EndgeDomain.parsePlain({ [key]: [plain] })
+    const next = parsed[key][0]
+    if (!next)
+      throw new Error(`[EndgeDomainRepository] Failed to materialize ${collection}/${identity}`)
+    if (current)
+      Endge.domain.replacePersistedEntity(current, next)
+    else
+      Endge.domain.importFromSchema(parsed)
     this._documentServerState.set(this._serverStateKey(collection, identity), { ...document.state })
     this._notifyDomainChanged()
   }

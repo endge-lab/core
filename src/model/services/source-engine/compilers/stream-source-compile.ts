@@ -51,14 +51,12 @@ export function compileStreamSource(source: string, sourceVersion = 1): StreamSo
             diagnostics.push(diagnostic('error', 'stream-transport-url', 'SSE transport требует непустой url или env(...).', 'transport.url', value))
           continue
         }
-        const authMode = config.auth === 'none' ? 'none' : 'inherit'
-        if (config.auth != null && config.auth !== 'none' && config.auth !== 'inherit')
-          diagnostics.push(diagnostic('error', 'stream-transport-auth', 'transport.auth должен быть inherit или none.', 'transport.auth', value))
+        const auth = readTransportAuth(transportDefinition, diagnostics)
         transport = {
           kind: 'sse',
           url,
           withCredentials: config.withCredentials === true,
-          authMode,
+          ...auth,
         }
         continue
       }
@@ -129,6 +127,61 @@ function readEvents(node: t.ObjectExpression, diagnostics: DiagnosticDraft[]): S
     events.push({ sourceEvent, type, typePath, payloadPath })
   }
   return events
+}
+
+function readTransportAuth(
+  node: t.ObjectExpression,
+  diagnostics: DiagnosticDraft[],
+): Pick<StreamTransportDescriptor, 'authMode' | 'authProfileIdentity'> {
+  const property = node.properties.find(item =>
+    t.isObjectProperty(item)
+    && !item.computed
+    && propertyName(item.key) === 'auth',
+  )
+  if (!property || !t.isObjectProperty(property) || !t.isExpression(property.value))
+    return { authMode: 'inherit', authProfileIdentity: null }
+
+  const value = unwrapExpression(property.value)
+  if (t.isStringLiteral(value)) {
+    if (value.value === 'inherit' || value.value === 'none')
+      return { authMode: value.value, authProfileIdentity: null }
+    diagnostics.push(diagnostic(
+      'error',
+      'stream-transport-auth',
+      "transport.auth должен быть 'inherit', 'none' или { mode: 'profile', profile: '...' }.",
+      'transport.auth',
+      value,
+    ))
+    return { authMode: 'inherit', authProfileIdentity: null }
+  }
+
+  if (t.isObjectExpression(value)) {
+    const config = readObject(value)
+    if (config.mode === 'inherit' || config.mode === 'none')
+      return { authMode: config.mode, authProfileIdentity: null }
+    if (config.mode === 'profile') {
+      const profile = typeof config.profile === 'string' ? config.profile.trim() : ''
+      if (profile)
+        return { authMode: 'profile', authProfileIdentity: profile }
+      diagnostics.push(diagnostic(
+        'error',
+        'stream-transport-auth-profile',
+        "transport.auth.profile обязателен для mode: 'profile'.",
+        'transport.auth.profile',
+        value,
+      ))
+      return { authMode: 'profile', authProfileIdentity: null }
+    }
+  }
+
+  diagnostics.push(diagnostic(
+    'error',
+    'stream-transport-auth',
+    "transport.auth должен быть 'inherit', 'none' или { mode: 'profile', profile: '...' }.",
+    'transport.auth',
+    value,
+  ))
+  return { authMode: 'inherit', authProfileIdentity: null }
 }
 
 function readObject(node: t.ObjectExpression): Record<string, unknown> {

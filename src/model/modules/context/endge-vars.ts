@@ -137,8 +137,8 @@ export class WorkspaceVariables {
   }
 
   /**
-   * Резолвит строку вида `{{ VAR }}` или legacy `{VAR}` в значение переменной
-   * и применяет optional coercion.
+   * Резолвит одиночные токены и интерполирует несколько переменных в строке,
+   * затем применяет optional coercion.
    */
   resolve<T = string>(
     raw: unknown,
@@ -166,9 +166,15 @@ export class WorkspaceVariables {
       return val == null ? fallback : coerce(val)
     }
 
-    if (parsed.reason === 'not-a-braced-endgeToken') {
-      return coerce(trimmed)
+    const interpolated = this._interpolate(trimmed)
+    if (interpolated.hasTokens) {
+      if (interpolated.hasMissingValues)
+        return fallback
+      return coerce(interpolated.value)
     }
+
+    if (parsed.reason === 'not-a-braced-endgeToken')
+      return coerce(trimmed)
 
     switch (onInvalid) {
       case 'as-is':
@@ -209,6 +215,31 @@ export class WorkspaceVariables {
       return v
     const s: string = String(v).trim().toLowerCase()
     return s === 'true' || s === '1'
+  }
+
+  /** Интерполирует все корректные `{{ VAR }}` и legacy `{VAR}` токены в строке. */
+  private _interpolate(template: string): {
+    value: string
+    hasTokens: boolean
+    hasMissingValues: boolean
+  } {
+    let hasTokens = false
+    let hasMissingValues = false
+    const value = template.replace(/\{\{[^{}]*\}\}|\{[^{}]*\}/g, (token) => {
+      const parsed = WorkspaceVariables.parseVarToken(token)
+      if (!parsed.ok)
+        return token
+
+      hasTokens = true
+      const resolved = this.getValue(parsed.name)
+      if (resolved == null) {
+        hasMissingValues = true
+        return token
+      }
+      return resolved
+    })
+
+    return { value, hasTokens, hasMissingValues }
   }
 
   /**

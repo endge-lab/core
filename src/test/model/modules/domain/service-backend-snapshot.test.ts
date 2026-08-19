@@ -301,6 +301,60 @@ describe('service-backend Core provider', () => {
     })
   })
 
+  it('keeps project order when an updated document is applied to the live domain', async () => {
+    Endge.domain.reset()
+    const snapshot = liveSnapshot()
+    for (const key of DOCUMENT_KEYS)
+      snapshot.documents[key] = []
+    snapshot.documents.folders = [liveDocument('folder-root', { parentIdentity: null })]
+    snapshot.documents.environments = [liveDocument('environment-dev')]
+    snapshot.documents.projects = ['project-a', 'project-b', 'project-c'].map(identity =>
+      liveDocument(identity, {
+        folderIdentity: 'folder-root',
+        allowedEnvironments: ['environment-dev'],
+      }),
+    )
+    const updatedProject = liveDocument('project-b', {
+      displayName: 'Project B updated',
+      folderIdentity: 'folder-root',
+      allowedEnvironments: ['environment-dev'],
+    })
+    updatedProject.state.revision = 8
+    const updateDocument = vi.fn().mockResolvedValue({
+      document: updatedProject,
+      etag: '"generation-id:5"',
+    })
+    const provider: EndgeDomainProvider = {
+      id: 'service-backend',
+      capabilities: { snapshot: true, mutations: true, softDelete: true, restore: true },
+      etag: '"generation-id:4"',
+      loadWorkspace: vi.fn().mockResolvedValue(snapshot),
+      createDocument: vi.fn(),
+      updateDocument,
+      softDeleteDocument: vi.fn(),
+      restoreDocument: vi.fn(),
+      moveDocuments: vi.fn(),
+      updateWorkspace: vi.fn(),
+    }
+    const repository = new EndgeDomainRepository()
+    const context = defaultContext(provider)
+    await repository.setup(context)
+    await repository.loadSnapshot(context)
+    Endge.domain.mergeFromSnapshot(snapshot)
+
+    await repository.saveDocument('project-b', 'project', {
+      model: Endge.domain.getProject('project-b'),
+    })
+
+    expect(Endge.domain.getProjects().map(project => project.identity)).toEqual([
+      'project-a',
+      'project-b',
+      'project-c',
+    ])
+    expect(Endge.domain.getProject('project-b')?.displayName).toBe('Project B updated')
+    expect(repository.getDocumentServerState('projects', 'project-b')?.revision).toBe(8)
+  })
+
   it('keeps folderIdentity when a single document is serialized for update', async () => {
     Endge.domain.reset()
     const snapshot = liveSnapshot()

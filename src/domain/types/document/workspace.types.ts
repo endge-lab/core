@@ -1,8 +1,6 @@
 import type {
   EndgeConfiguration,
   EndgeLocaleDefinition,
-  EndgeSSEAuthMode,
-  EndgeSSEConfiguration,
   EndgeThemeDefinition,
   EndgeVariableDefinition,
 } from '@/domain/types/configuration/configuration.type'
@@ -14,9 +12,7 @@ export type EndgeDataMode = 'live' | 'mock'
 export type EndgeWorkspaceLocaleLabelMode = keyof Pick<EndgeWorkspaceLocale, 'displayName' | 'shortLabel'>
 
 export type EndgeWorkspaceTheme = EndgeThemeDefinition
-export type EndgeWorkspaceSSEAuthMode = EndgeSSEAuthMode
 export type EndgeWorkspaceVar = EndgeVariableDefinition
-export type EndgeWorkspaceSSEConfig = EndgeSSEConfiguration
 
 export interface WorkspaceIntegrationReference {
   integrationId: string | number

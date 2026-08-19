@@ -8,6 +8,8 @@ import { ComputationResourceState } from './ComputationResource'
 export class ComputationResourceRegistry {
   private readonly resources = new Map<string, ComputationResourceState>()
   private readonly disposers = new Map<string, VoidFunction>()
+  /** Resource inputs currently pulled by the active renderer pass. */
+  private readonly _updatingInputs = new Set<string>()
 
   getOrCreate(
     key: string,
@@ -17,12 +19,25 @@ export class ComputationResourceRegistry {
   ): ComputationResourceContract {
     const existing = this.resources.get(key)
     if (existing) {
-      existing.updateInput(input)
+      const alreadyUpdating = this._updatingInputs.has(key)
+      this._updatingInputs.add(key)
+      try {
+        existing.updateInput(input)
+      }
+      finally {
+        if (!alreadyUpdating)
+          this._updatingInputs.delete(key)
+      }
       return existing
     }
     const resource = create()
     this.resources.set(key, resource)
-    if (onChange) this.disposers.set(key, resource.subscribe(onChange))
+    if (onChange) {
+      this.disposers.set(key, resource.subscribe(() => {
+        if (!this._updatingInputs.has(key))
+          onChange()
+      }))
+    }
     return resource
   }
 
@@ -31,5 +46,6 @@ export class ComputationResourceRegistry {
     for (const resource of this.resources.values()) resource.dispose()
     this.disposers.clear()
     this.resources.clear()
+    this._updatingInputs.clear()
   }
 }

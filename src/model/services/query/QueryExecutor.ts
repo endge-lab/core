@@ -248,9 +248,12 @@ export class QueryExecutor {
       return
     }
 
+    const profile = String(current.profile ?? '').trim()
+    if (current.mode === 'profile' && !profile)
+      throw new Error('[EndgeAuth] Auth profile is required for profile mode.')
     const session = await Endge.auth.requests.resolve(
       current.mode === 'profile'
-        ? { mode: 'profile', profileIdentity: String(current.profileIdentity ?? '').trim() }
+        ? { mode: 'profile', profile }
         : { mode: 'inherit' },
     )
     const token = session.accessToken

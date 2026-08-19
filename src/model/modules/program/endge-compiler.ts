@@ -919,7 +919,13 @@ export class EndgeCompiler extends EndgeModule {
           payload: payload ?? {
             type: 'stream',
             sourceVersion: Number(entity.sourceVersion ?? 1) || 1,
-            transport: { kind: 'sse', url: '', withCredentials: false, authMode: 'inherit' },
+            transport: {
+              kind: 'sse',
+              url: '',
+              withCredentials: false,
+              authMode: 'inherit',
+              authProfileIdentity: null,
+            },
             events: [],
           },
           diagnostics: (result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[],
@@ -1119,7 +1125,7 @@ export class EndgeCompiler extends EndgeModule {
       return []
     }
     const record = auth as Record<string, unknown>
-    const identity = String(record.profileIdentity ?? '').trim()
+    const identity = String(record.profile ?? '').trim()
     if (!identity) {
       return []
     }

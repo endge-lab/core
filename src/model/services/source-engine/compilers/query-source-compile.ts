@@ -643,8 +643,10 @@ function readAuthRequestValue(value: unknown): RQueryAuth | undefined {
   const auth = value as Partial<RQueryAuth>
   if (auth.mode === 'none')
     return { ...auth, mode: 'none' }
-  if (auth.mode === 'profile')
-    return { ...auth, mode: 'profile', profileIdentity: auth.profileIdentity }
+  if (auth.mode === 'profile') {
+    const profile = typeof auth.profile === 'string' ? auth.profile.trim() : ''
+    return profile ? { ...auth, mode: 'profile', profile } : undefined
+  }
   if (auth.mode === 'inherit' || auth.mode == null)
     return { ...auth, mode: 'inherit' }
   return undefined

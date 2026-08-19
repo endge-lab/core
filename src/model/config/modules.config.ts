@@ -15,7 +15,6 @@ import { EndgeProgram } from '@/model/modules/program/endge-program'
 import { EndgeRuntime } from '@/model/modules/runtime/core/endge-runtime'
 import { EndgeRuntimeDebugger } from '@/model/modules/diagnostics/endge-runtime-debugger'
 import { EndgeSource } from '@/model/modules/program/endge-source'
-import { EndgeSSE } from '@/model/modules/runtime/input/endge-sse'
 import { EndgeStyles } from '@/model/modules/ui/endge-styles'
 import { EndgeUI } from '@/model/modules/ui/endge-ui'
 import { EndgeUIRegistry } from '@/model/modules/ui/endge-ui-registry'
@@ -43,7 +42,6 @@ export const ENDGE_CORE_MODULES: EndgeModuleDefinition[] = [
   { key: 'events', module: EndgeEvents, after: 'context' },
   { key: 'runtime', module: EndgeRuntime, after: ['compiler', 'workspace', 'context'] },
   { key: 'updates', module: EndgeUpdates, after: 'runtime' },
-  { key: 'sse', module: EndgeSSE, after: ['configuration', 'auth', 'events'] },
   { key: 'ui', module: EndgeUI, after: ['configuration', 'context'] },
   { key: 'uiRegistry', module: EndgeUIRegistry, after: 'ui' },
   { key: 'bind', module: EndgeBind, after: ['compiler', 'runtime'] },

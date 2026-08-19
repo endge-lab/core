@@ -466,6 +466,17 @@ export class EndgeActions extends Subscribable {
         console.log(formatConsoleActionValue(value))
       },
     }, { kind: 'builtin', owner: '@endge/core' })
+    this._defineCodeAction({
+      identity: BUILTIN_ACTION_IDS.testAlert,
+      displayName: 'Test alert',
+      description: 'Показывает фиксированное тестовое сообщение в браузере.',
+      owner: '@endge/core',
+      catalogPath: ['Debug'],
+      execute: () => {
+        if (typeof globalThis.alert === 'function')
+          globalThis.alert('Test alert')
+      },
+    }, { kind: 'builtin', owner: '@endge/core' })
     const vocabActions: Array<CodeActionDefinition> = [
       {
         identity: BUILTIN_ACTION_IDS.vocabAcquire,

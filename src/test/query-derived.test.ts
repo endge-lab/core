@@ -239,7 +239,7 @@ defineQuery({
       Accept: 'application/json',
       'Content-Type': 'application/json',
     },
-    auth: { mode: 'profile', profileIdentity: 'keycloak-dev' },
+    auth: { mode: 'profile', profile: 'keycloak-dev' },
     body: body(({ prop }) => merge({}, prop('filterPayload'))),
   },
   outputs: {

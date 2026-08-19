@@ -28,7 +28,7 @@ export class AuthRequestResolver {
 
     const profile = policy.mode === 'inherit'
       ? this._profiles.getDefault()
-      : this._profiles.requireActive(policy.profileIdentity)
+      : this._profiles.requireActive(policy.profile)
     if (!profile) {
       return {
         profileIdentity: null,

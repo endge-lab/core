@@ -4,6 +4,7 @@ import type { ComputationProgramPayload } from '@/domain/types/computation/compu
 import type { ProgramArtifact } from '@/domain/types/program/program.types'
 import { Endge } from '@/model/kernel/endge'
 import { ComputationResourceState } from '@/model/modules/runtime/execution/computation/ComputationResource'
+import { ComputationResourceRegistry } from '@/model/modules/runtime/execution/computation/ComputationResourceRegistry'
 import { compileComputation } from '@/model/services/compiler/computation/computation-compile'
 
 describe('ComputationResourceState', () => {
@@ -45,6 +46,39 @@ describe('ComputationResourceState', () => {
     resource.updateInput({ process: { point: { code: 'value', value: 2 } } })
     expect(run).toHaveBeenCalledTimes(3)
     expect(resource.value).toBe(2)
+  })
+
+  it('does not invalidate the renderer for a sync input update pulled by the current render', () => {
+    const onChange = vi.fn()
+    const registry = new ComputationResourceRegistry()
+    const create = () => new ComputationResourceState(
+      { value: 1 },
+      async input => input,
+      input => input,
+    )
+
+    registry.getOrCreate('cell', { value: 1 }, create, onChange)
+    const resource = registry.getOrCreate('cell', { value: 2 }, create, onChange)
+
+    expect(resource.value).toEqual({ value: 2 })
+    expect(onChange).not.toHaveBeenCalled()
+    registry.dispose()
+  })
+
+  it('invalidates the renderer when an async resource settles after the render', async () => {
+    let resolve = (_value: number): void => undefined
+    const onChange = vi.fn()
+    const registry = new ComputationResourceRegistry()
+
+    registry.getOrCreate('cell', 1, () => new ComputationResourceState<number>(
+      1,
+      () => new Promise<number>((done) => { resolve = done }),
+    ), onChange)
+    resolve(2)
+    await Promise.resolve()
+
+    expect(onChange).toHaveBeenCalledOnce()
+    registry.dispose()
   })
 
   it('uses a local identity override as a full replacement without fallback', () => {

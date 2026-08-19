@@ -154,8 +154,6 @@ export function runUpdates(): () => void {
       },
     }
 
-    Endge.events.emitEvent('sse:message', { type: 'ScheduleUpdated', message })
-
     Endge.updates.applyUpdateForProfile(PROFILE_IDENTITY, message, {
       vars: { store: STORE_PATH },
     })

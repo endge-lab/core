@@ -10,7 +10,6 @@ export const ENDGE_COMPILER_SPAN_GROUPS = {
   ACTIONS: 'actions',
   CONVERTERS: 'converters',
   QUERIES: 'queries',
-  SSE: 'sse',
   RAPH: 'raph',
 } as const
 

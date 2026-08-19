@@ -35,6 +35,32 @@ describe('Action implementation pipeline', () => {
     consoleLog.mockRestore()
   })
 
+  it('executes the built-in test alert without input', async () => {
+    const alertMock = vi.fn()
+    vi.stubGlobal('alert', alertMock)
+
+    try {
+      const descriptor = Endge.actions.listResolved()
+        .find(action => action.identity === BUILTIN_ACTION_IDS.testAlert)
+
+      expect(descriptor).toMatchObject({
+        identity: 'built-in-test-alert',
+        origin: { kind: 'builtin', owner: '@endge/core' },
+        catalogPath: ['Debug'],
+        input: null,
+        defaultImplementation: { kind: 'provider' },
+      })
+
+      await Endge.actions.execute(BUILTIN_ACTION_IDS.testAlert)
+
+      expect(alertMock).toHaveBeenCalledOnce()
+      expect(alertMock).toHaveBeenCalledWith('Test alert')
+    }
+    finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('resolves scope precedence and restores the default after dispose', async () => {
     const implementations = new EndgeImplementations()
     implementations.registerProvider(provider('default', 'default'))

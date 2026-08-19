@@ -36,7 +36,7 @@ describe('EndgeCompiler Query auth dependencies', () => {
         path: '/flights',
         method: 'GET',
         headers: {},
-        auth: { mode: 'profile', profileIdentity: 'payload-auth' },
+        auth: { mode: 'profile', profile: 'payload-auth' },
       },
       outputs: { raw: output().from(response('items')) },
       mock: { enabled: false, data: null },

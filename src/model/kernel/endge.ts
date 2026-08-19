@@ -23,7 +23,6 @@ import { EndgeRuntime } from '@/model/modules/runtime/core/endge-runtime'
 import { EndgeRuntimeDebugger } from '@/model/modules/diagnostics/endge-runtime-debugger'
 import { EndgeDomainRepository } from '@/model/modules/domain/endge-domain-repository'
 import { EndgeSource } from '@/model/modules/program/endge-source'
-import { EndgeSSE } from '@/model/modules/runtime/input/endge-sse'
 import { EndgeStyles } from '@/model/modules/ui/endge-styles'
 import { EndgeUI } from '@/model/modules/ui/endge-ui'
 import { EndgeUpdates } from '@/model/modules/runtime/core/endge-updates'
@@ -502,13 +501,6 @@ export class Endge extends EndgeFederation {
    */
   static get events(): EndgeEvents {
     return this.getModule<EndgeEvents>('events')
-  }
-
-  /**
-   * Доступ к SSE-модулю.
-   */
-  static get sse(): EndgeSSE {
-    return this.getModule<EndgeSSE>('sse')
   }
 
   /**

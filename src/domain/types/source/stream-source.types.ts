@@ -4,7 +4,8 @@ export interface StreamSseTransportDescriptor {
   kind: 'sse'
   url: string
   withCredentials: boolean
-  authMode: 'inherit' | 'none'
+  authMode: 'inherit' | 'profile' | 'none'
+  authProfileIdentity: string | null
 }
 
 export type StreamTransportDescriptor = StreamSseTransportDescriptor

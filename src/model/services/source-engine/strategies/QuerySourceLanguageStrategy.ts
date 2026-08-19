@@ -32,7 +32,7 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
     properties: [
       'auth', 'body', 'data', 'enabled', 'endpoint', 'formUrlencoded',
       'headers', 'incremental', 'items', 'kind', 'method', 'mock', 'mode', 'outputs', 'path',
-      'metadata', 'props', 'request', 'timeoutMs',
+      'metadata', 'profile', 'props', 'request', 'timeoutMs',
     ],
   })
 
@@ -96,7 +96,7 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
         convert: 'converter',
         dataView: 'data-view',
       },
-      properties: [{ property: 'profileIdentity', parentProperty: 'auth', target: 'auth-profile' }],
+      properties: [{ property: 'profile', parentProperty: 'auth', target: 'auth-profile' }],
     })
   }
 
@@ -259,11 +259,11 @@ const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
     detail: 'Ссылка на environment variable',
   },
   {
-    label: 'auth.profileIdentity',
+    label: 'auth.profile',
     kind: 'value',
     insertText: `auth: {
   mode: 'profile',
-  profileIdentity: 'auth-profile-identity',
+  profile: 'auth-profile-identity',
 },`,
     detail: 'Auth profile config',
   },

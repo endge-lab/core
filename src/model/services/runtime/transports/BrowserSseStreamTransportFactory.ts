@@ -21,14 +21,19 @@ export class BrowserSseStreamTransportFactory implements StreamTransportFactory 
         url: artifact.transport.url,
         retryInterval: 5000,
         getToken: async () => {
+          const profileIdentity = String(artifact.transport.authProfileIdentity ?? '').trim()
+          if (artifact.transport.authMode === 'profile' && !profileIdentity)
+            throw new Error('[BrowserSseStreamTransportFactory] Auth profile is required for profile mode.')
           const session = await Endge.auth.requests.resolve(
-            { mode: 'inherit' },
+            artifact.transport.authMode === 'profile'
+              ? { mode: 'profile', profile: profileIdentity }
+              : { mode: 'inherit' },
             { forceRefresh: forceRefreshOnReconnect },
           )
           forceRefreshOnReconnect = false
           const token = String(session.accessToken ?? '').trim()
           if (!token)
-            throw new Error('[BrowserSseStreamTransportFactory] Default auth profile did not provide an access token.')
+            throw new Error(`[BrowserSseStreamTransportFactory] Auth profile "${session.profileIdentity ?? profileIdentity}" did not provide an access token.`)
           return token
         },
         onOpen: callbacks.open,

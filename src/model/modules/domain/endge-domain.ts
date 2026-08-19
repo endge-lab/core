@@ -251,6 +251,55 @@ export interface EndgeDomainParsed {
   folders: RFolder[]
 }
 
+type DomainEntityId = string | number
+
+interface IndexedDomainEntity {
+  id: DomainEntityId
+  identity?: string
+}
+
+interface DomainEntityIndex {
+  kind?: 'update'
+  byId: Map<DomainEntityId, IndexedDomainEntity>
+  byIdentity: Map<DomainEntityId, IndexedDomainEntity>
+}
+
+function domainEntityIndex<TId, TEntity>(
+  byId: Map<TId, TEntity>,
+  byIdentity: Map<string, TEntity>,
+  kind?: DomainEntityIndex['kind'],
+): DomainEntityIndex {
+  return {
+    kind,
+    byId: byId as unknown as DomainEntityIndex['byId'],
+    byIdentity: byIdentity as unknown as DomainEntityIndex['byIdentity'],
+  }
+}
+
+/** Replaces one Map entry without changing its iteration position. */
+function replaceMapEntry<K, V>(
+  map: Map<K, V>,
+  previousKey: K,
+  nextKey: K,
+  previousValue: V,
+  nextValue: V,
+): void {
+  const collision = map.get(nextKey)
+  if (nextKey !== previousKey && collision != null && collision !== previousValue)
+    throw new Error(`[EndgeDomain] Entity index key already exists: ${String(nextKey)}`)
+
+  if (nextKey === previousKey) {
+    map.set(nextKey, nextValue)
+    return
+  }
+
+  const entries = Array.from(map.entries(), ([key, value]): [K, V] =>
+    key === previousKey ? [nextKey, nextValue] : [key, value],
+  )
+  map.clear()
+  entries.forEach(([key, value]) => map.set(key, value))
+}
+
 /** Модуль хранения, индексации и изменения документов домена. */
 export class EndgeDomain extends EndgeModule {
   /** Non-persisted descriptors materialized by core, plugins and compiler. */
@@ -486,6 +535,79 @@ export class EndgeDomain extends EndgeModule {
     this.importFromSchema(parsed)
 
     this.notify()
+  }
+
+  /** Заменяет сохранённую сущность, не меняя её позицию в коллекции домена. */
+  public replacePersistedEntity(currentEntity: object, nextEntity: object): void {
+    const current = currentEntity as IndexedDomainEntity
+    const next = nextEntity as IndexedDomainEntity
+    const currentIdentity = String(current.identity ?? current.id)
+    const nextIdentity = String(next.identity ?? next.id)
+    const index = this._entityIndexes().find(candidate =>
+      candidate.byId.get(current.id) === currentEntity
+      || candidate.byIdentity.get(currentIdentity) === currentEntity,
+    )
+
+    if (!index)
+      throw new Error('[EndgeDomain] Persisted entity is not indexed')
+
+    replaceMapEntry(index.byId, current.id, next.id, current, next)
+    replaceMapEntry(index.byIdentity, currentIdentity, nextIdentity, current, next)
+
+    if (index.kind === 'update')
+      this._replaceUpdateOwnerIndex(currentEntity as RUpdate, nextEntity as RUpdate)
+
+    this.notify()
+  }
+
+  private _entityIndexes(): DomainEntityIndex[] {
+    return [
+      domainEntityIndex(this._projectsById, this._projectsByIdentity),
+      domainEntityIndex(this._typesById, this._typesByIdentity),
+      domainEntityIndex(this._queriesById, this._queriesByIdentity),
+      domainEntityIndex(this._dataViewsById, this._dataViewsByIdentity),
+      domainEntityIndex(this._compositionsById, this._compositionsByIdentity),
+      domainEntityIndex(this._storesById, this._storesByIdentity),
+      domainEntityIndex(this._streamsById, this._streamsByIdentity),
+      domainEntityIndex(this._updatesById, this._updatesByIdentity, 'update'),
+      domainEntityIndex(this._mocksById, this._mocksByIdentity),
+      domainEntityIndex(this._computationsById, this._computationsByIdentity),
+      domainEntityIndex(this._componentsById, this._componentsByIdentity),
+      domainEntityIndex(this._componentSFCsById, this._componentSFCsByIdentity),
+      domainEntityIndex(this._actionsById, this._actionsByIdentity),
+      domainEntityIndex(this._convertersById, this._convertersByIdentity),
+      domainEntityIndex(this._integrationsById, this._integrationsByIdentity),
+      domainEntityIndex(this._foldersById, this._foldersByIdentity),
+      domainEntityIndex(this._parametersById, this._parametersByIdentity),
+      domainEntityIndex(this._filtersById, this._filtersByIdentity),
+      domainEntityIndex(this._versionsById, this._versionsByIdentity),
+      domainEntityIndex(this._environmentsById, this._environmentsByIdentity),
+      domainEntityIndex(this._tenantsById, this._tenantsByIdentity),
+      domainEntityIndex(this._policiesById, this._policiesByIdentity),
+      domainEntityIndex(this._stylesById, this._stylesByIdentity),
+      domainEntityIndex(this._vocabsById, this._vocabsByIdentity),
+      domainEntityIndex(this._authProfilesById, this._authProfilesByIdentity),
+      domainEntityIndex(this._i18nBundlesById, this._i18nBundlesByIdentity),
+      domainEntityIndex(this._pageTemplatesById, this._pageTemplatesByIdentity),
+      domainEntityIndex(this._pagesById, this._pagesByIdentity),
+      domainEntityIndex(this._navigationsById, this._navigationsByIdentity),
+    ]
+  }
+
+  private _replaceUpdateOwnerIndex(current: RUpdate, next: RUpdate): void {
+    const currentOwner = this._updatesByStoreIdentity.get(current.storeIdentity)
+    if (current.storeIdentity === next.storeIdentity && currentOwner) {
+      replaceMapEntry(currentOwner, current.identity, next.identity, current, next)
+      return
+    }
+
+    currentOwner?.delete(current.identity)
+    if (currentOwner?.size === 0)
+      this._updatesByStoreIdentity.delete(current.storeIdentity)
+
+    const nextOwner = this._updatesByStoreIdentity.get(next.storeIdentity) ?? new Map<string, RUpdate>()
+    nextOwner.set(next.identity, next)
+    this._updatesByStoreIdentity.set(next.storeIdentity, nextOwner)
   }
 
   /** Нормализует live workspace snapshot нового backend и объединяет его с доменом. */
