@@ -24,6 +24,13 @@ export const TEST_ENDGE_WORKSPACE: EndgeWorkspaceDefinition = {
     defaultAuthProfileIdentity: null,
     sfcAdapterIds: ['vue-native'],
     defaultSfcAdapterId: 'vue-native',
+    sfcEditing: {
+      cancelOn: [
+        { event: 'keydown', key: ['Escape'], prevent: true, stop: true },
+        { event: 'focusout' },
+      ],
+      commitOn: [{ event: 'keydown', key: ['Enter'], prevent: true }],
+    },
     diagnostics: {
       telemetry: {
         collection: {

@@ -27,6 +27,8 @@ import type {
 } from '@/domain/types/component/sfc/ports.types'
 import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
 import type { ProgramNodeMetadata } from '@/domain/types/program/program-metadata.types'
+import type { EndgeSFCEditingConfiguration } from '@/domain/types/configuration/configuration.type'
+import { DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION } from '@/model/config/sfc-editing.config'
 import { compileComponentSFCExpression } from '@/model/services/compiler/component-sfc/component-sfc-expression'
 import {
   compileComponentSFCInteractionAnnotation,
@@ -62,6 +64,9 @@ export interface ComponentSFCTemplateCompileContext {
 
   /** Resolves explicit root Variant names of a nested custom component. */
   resolveComponentVariants?: (identity: string) => string[] | null
+
+  /** Effective defaults завершения edit session для текущего build context. */
+  sfcEditing?: EndgeSFCEditingConfiguration
 }
 
 /** Результат компиляции template в IR. */
@@ -211,7 +216,7 @@ function compileElementNode(
   const nodeMetadata = compileNodeMetadata(node.attributes, diagnostics, `template.${id}.metadata`)
   validateSemanticStyleAttributes(node.attributes, diagnostics, `template.${id}`)
   const props = compileAttributes(
-    node.attributes.filter(attribute => !['metadata', 'editable', 'edit-on', 'on'].includes(attribute.name)),
+    node.attributes.filter(attribute => !['metadata', 'editable', 'edit-on', 'cancel-on', 'commit-on', 'on'].includes(attribute.name)),
     context,
     diagnostics,
   )
@@ -431,7 +436,94 @@ function compileEditableBehavior(
     })
   }
 
-  return { value, triggers, ...(triggerModifiers.length ? { modifiers: triggerModifiers } : {}) }
+  const cancel = compileEditableOutcomeTriggers(
+    node,
+    'cancel-on',
+    context.sfcEditing?.cancelOn ?? DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION.cancelOn,
+    context,
+    diagnostics,
+  )
+  const commit = compileEditableOutcomeTriggers(
+    node,
+    'commit-on',
+    context.sfcEditing?.commitOn ?? DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION.commitOn,
+    context,
+    diagnostics,
+  )
+
+  return {
+    value,
+    triggers,
+    cancelTriggers: cancel.triggers,
+    commitTriggers: commit.triggers,
+    ...(triggerModifiers.length ? { modifiers: triggerModifiers } : {}),
+    ...(cancel.modifiers.length ? { cancelModifiers: cancel.modifiers } : {}),
+    ...(commit.modifiers.length ? { commitModifiers: commit.modifiers } : {}),
+  }
+}
+
+function compileEditableOutcomeTriggers(
+  node: RComponentSFC_AST_ElementNode,
+  name: 'cancel-on' | 'commit-on',
+  defaultValue: unknown,
+  context: ComponentSFCTemplateCompileContext,
+  diagnostics: RComponentDiagnostic[],
+): { triggers: RComponentSFC_IR_Value, modifiers: RComponentSFC_IR_EventModifier[] } {
+  const attribute = node.attributes.find(item => item.name === name)
+  let triggers: RComponentSFC_IR_Value = { kind: 'literal', value: defaultValue }
+  if (attribute?.dynamic) {
+    const compiled = compileComponentSFCExpression(attribute.value ?? '', {
+      props: context.props,
+      locals: context.locals,
+      sourcePath: `template.${name}`,
+    })
+    diagnostics.push(...compiled.diagnostics)
+    triggers = compiled.value
+  }
+  else if (attribute) {
+    const event = String(attribute.value ?? '').trim()
+    if (!event) {
+      diagnostics.push({
+        severity: 'error',
+        code: `sfc-${name}-empty`,
+        message: `${name} требует непустое имя события.`,
+        sourcePath: `template.${name}`,
+        start: attribute.range.start,
+        end: attribute.range.end,
+      })
+    }
+    else triggers = { kind: 'literal', value: event }
+  }
+
+  const modifiers: RComponentSFC_IR_EventModifier[] = []
+  for (const modifier of attribute?.modifiers ?? []) {
+    if (!LOCAL_EVENT_MODIFIERS.has(modifier as RComponentSFC_IR_EventModifier)) {
+      diagnostics.push({
+        severity: 'error',
+        code: `sfc-${name}-modifier`,
+        message: `:${name} не поддерживает modifier ".${modifier}".`,
+        sourcePath: `template.${name}`,
+        start: attribute?.range.start,
+        end: attribute?.range.end,
+      })
+      continue
+    }
+    modifiers.push(modifier as RComponentSFC_IR_EventModifier)
+  }
+  if (
+    (modifiers.includes('passive') && modifiers.includes('prevent'))
+    || (attribute?.dynamic && hasComponentSFCPassivePreventConflict(attribute.value ?? '', modifiers))
+  ) {
+    diagnostics.push({
+      severity: 'error',
+      code: `sfc-${name}-passive-prevent`,
+      message: `:${name} не может одновременно использовать passive и prevent.`,
+      sourcePath: `template.${name}`,
+      start: attribute?.range.start,
+      end: attribute?.range.end,
+    })
+  }
+  return { triggers, modifiers }
 }
 
 function withEditableEventManifest(manifest: ComponentSFCPortManifest | null): ComponentSFCPortManifest {

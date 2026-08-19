@@ -165,8 +165,14 @@ export type ComponentSFCEditTriggerEvent = ComponentSFCInteractionTriggerEvent
 export interface ComponentSFCEditableBehavior {
   value: RComponentSFC_IR_Value
   triggers: RComponentSFC_IR_Value
+  /** Triggers that discard the active draft. Defaults to Escape and focus leaving Editable. */
+  cancelTriggers: RComponentSFC_IR_Value
+  /** Triggers that commit the active draft. Defaults to Enter. */
+  commitTriggers: RComponentSFC_IR_Value
   /** Static suffix modifiers declared on `:edit-on`. */
   modifiers?: RComponentSFC_IR_EventModifier[]
+  cancelModifiers?: RComponentSFC_IR_EventModifier[]
+  commitModifiers?: RComponentSFC_IR_EventModifier[]
 }
 
 /** Нормализованное публичное событие завершённого редактирования. */

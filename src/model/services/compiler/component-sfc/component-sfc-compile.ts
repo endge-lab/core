@@ -22,6 +22,7 @@ import type {
 } from '@/domain/types/component/sfc/ports.types'
 import type { ProgramMetadata } from '@/domain/types/program/program-metadata.types'
 import type { TypeSourceDefinition } from '@/domain/types/source/type-source.types'
+import type { EndgeSFCEditingConfiguration } from '@/domain/types/configuration/configuration.type'
 import { parseComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-parse'
 import { analyzeComponentSFCScript } from '@/model/services/compiler/component-sfc/component-sfc-script'
 import { analyzeComponentSFCRuntimeDependencies } from '@/model/services/compiler/component-sfc/component-sfc-dependencies'
@@ -97,6 +98,9 @@ export interface ComponentSFCCompileOptions {
 
   /** Resolves an external Type Registry definition used by a named SFC contract. */
   resolveTypeDefinition?: (identity: string) => TypeSourceDefinition | null
+
+  /** Effective edit-session defaults из immutable build context. */
+  sfcEditing?: EndgeSFCEditingConfiguration
 }
 
 /** Компилирует Endge SFC source до target-neutral artifact для Endge.program. */
@@ -145,6 +149,7 @@ export function compileComponentSFC(
     hasComponentIdentity: options.hasComponentIdentity,
     resolveComponentPortManifest: options.resolveComponentPortManifest,
     resolveComponentVariants: options.resolveComponentVariants,
+    sfcEditing: options.sfcEditing,
   })
   for (const eventName of templateResult.emittedEvents) {
     if (portResult.manifest.emits.events.some(event => event.name === eventName))

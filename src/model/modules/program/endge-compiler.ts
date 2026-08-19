@@ -26,6 +26,7 @@ import type {
   EndgeStyleProgramPayload,
 } from '@/domain/types/program/program.types'
 import type { EndgeStyleSheetArtifact } from '@/domain/types/style/style.types'
+import type { EndgeSFCEditingConfiguration } from '@/domain/types/configuration/configuration.type'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
@@ -541,7 +542,7 @@ export class EndgeCompiler extends EndgeModule {
     this.registerHandler<RComponentSFC, ComponentSFCProgramPayload>({
       entityType: 'component-sfc',
       compile: (entity, context) => {
-        const result = this._compileComponentSFCSource(entity)
+        const result = this._compileComponentSFCSource(entity, context.buildContext.configuration.sfcEditing)
         const knownComponentTypes = new Set([
           ...collectLocalTypeDeclarations(entity.source),
           ...COMPONENT_SFC_BUILTIN_EVENT_PAYLOAD_TYPES,
@@ -1343,7 +1344,10 @@ export class EndgeCompiler extends EndgeModule {
   }
 
   /** Compiles one SFC source and caches its resolved public port manifest for parent forwarding. */
-  private _compileComponentSFCSource(entity: RComponentSFC): ComponentSFCCompileResult {
+  private _compileComponentSFCSource(
+    entity: RComponentSFC,
+    sfcEditing: EndgeSFCEditingConfiguration,
+  ): ComponentSFCCompileResult {
     const ownsResolvingMarker = !this._componentPortManifestResolving.has(entity.identity)
     if (ownsResolvingMarker)
       this._componentPortManifestResolving.add(entity.identity)
@@ -1353,9 +1357,10 @@ export class EndgeCompiler extends EndgeModule {
         resolveComponentTag: tag => Endge.program.resolveComponentTag(tag),
         hasComponentIdentity: identity => Endge.domain.getComponentSFC(identity) != null,
         resolvePortProvider: (identity, expectedKind) => this._resolvePortProvider(identity, expectedKind),
-        resolveComponentPortManifest: identity => this._resolveComponentPortManifest(identity),
+        resolveComponentPortManifest: identity => this._resolveComponentPortManifest(identity, sfcEditing),
         resolveComponentVariants: identity => this._resolveComponentVariantNames(identity),
         resolveTypeDefinition: identity => this._resolveTypeDefinition(identity),
+        sfcEditing,
       })
       if (result.ir)
         this._componentPortManifestCache.set(entity.identity, result.ir.script.ports)
@@ -1383,13 +1388,16 @@ export class EndgeCompiler extends EndgeModule {
   }
 
   /** Resolves child public ports independently from the domain component compile order. */
-  private _resolveComponentPortManifest(identity: string): ComponentSFCPortManifest | null {
+  private _resolveComponentPortManifest(
+    identity: string,
+    sfcEditing: EndgeSFCEditingConfiguration,
+  ): ComponentSFCPortManifest | null {
     const cached = this._componentPortManifestCache.get(identity)
     if (cached) return cached
     if (this._componentPortManifestResolving.has(identity)) return null
     const component = Endge.domain.getComponentSFC(identity)
     if (!component) return null
-    return this._compileComponentSFCSource(component).ir?.script.ports ?? null
+    return this._compileComponentSFCSource(component, sfcEditing).ir?.script.ports ?? null
   }
 
   /** Resolves Type Source independently from type/component compilation order. */

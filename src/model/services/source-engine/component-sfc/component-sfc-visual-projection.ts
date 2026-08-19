@@ -2,6 +2,7 @@ import { parseExpression } from '@babel/parser'
 
 import type {
   ComponentSFCEventReactionProjection,
+  ComponentSFCEditOutcomeProjection,
   ComponentSFCTableCellInteractionFlag,
   ComponentSFCTableCellInteractionModifier,
   ComponentSFCTableCellInteractionRuleProjection,
@@ -28,6 +29,7 @@ import type {
 } from '@/domain/types/component/sfc/ast.types'
 import type {
   RComponentSFC_IR_ElementNode,
+  ComponentSFCInteractionTrigger,
   RComponentSFC_IR_Value,
 } from '@/domain/types/component/sfc/ir.types'
 import type { ComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
@@ -35,6 +37,7 @@ import { BUILTIN_ACTION_IDS, TABLE_RUNTIME_ACTION_IDS } from '@/domain/types/run
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import { readComponentSFCTableMenuActionPortReference } from '@/model/services/compiler/component-sfc/component-sfc-table-menu'
 import { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sfc/component-sfc-template'
+import { normalizeComponentSFCInteractionTriggers } from '@/tools/component-sfc-edit-trigger'
 
 const NON_VISUAL_CELL_TAGS = new Set([
   'Component',
@@ -59,6 +62,7 @@ export function inspectComponentSFCVisual(
   const compileResult = compileComponentSFC(source, {
     resolveComponentTag: options.resolveComponentTag,
     resolveTypeDefinition: options.resolveTypeDefinition,
+    sfcEditing: options.sfcEditing,
   })
   const template = compileResult.ast?.template
 
@@ -341,6 +345,7 @@ function projectColumnCellEditing(
 
   const editableDeclarations = node.attributes.filter(attribute => attribute.name === 'editable')
   const enabled = node.tag === 'Editable' || editableDeclarations.length > 0
+  const irNode = findIrElementBySourceStart(irColumn, node.range.start)
   const sourceMode: ComponentSFCTableCellEditingProjection['mode'] = node.tag === 'Editable'
     ? 'custom'
     : node.tag === 'Component' || !isComponentSFCBuiltInTag(node.tag)
@@ -364,6 +369,10 @@ function projectColumnCellEditing(
     }
     const reaction = projectEventReaction(node, 'edited')
     const projectedTriggers = projectEditTriggers(editOnDeclarations[0] ?? null)
+    const outcomes = projectEditOutcomes(node, irNode?.editable ?? null)
+    if (!outcomes.editable) {
+      return sourceOwnedCellEditing(true, 'custom', node.tag, node.range, outcomes.message ?? 'Настройки выхода управляются Source.')
+    }
     const editor = projectEditableVariantElement(
       source,
       irColumn,
@@ -379,6 +388,8 @@ function projectColumnCellEditing(
       usesDefaultTrigger: projectedTriggers.usesDefaultTrigger,
       suffixes: projectedTriggers.suffixes,
       reaction,
+      cancel: outcomes.cancel,
+      commit: outcomes.commit,
       editor,
       editorImplicit: false,
       sourceRange: node.range,
@@ -414,6 +425,10 @@ function projectColumnCellEditing(
   }
   const reaction = projectEventReaction(node, 'edited')
   const projectedTriggers = projectEditTriggers(editOnDeclarations[0] ?? null)
+  const outcomes = projectEditOutcomes(node, irNode?.editable ?? null)
+  if (!outcomes.editable) {
+    return sourceOwnedCellEditing(enabled, 'primitive', node.tag, node.range, outcomes.message ?? 'Настройки выхода управляются Source.')
+  }
   if (!projectedTriggers.editable) {
     return {
       ...projectedTriggers,
@@ -421,6 +436,8 @@ function projectColumnCellEditing(
       mode: 'primitive',
       tag: node.tag,
       reaction,
+      cancel: outcomes.cancel,
+      commit: outcomes.commit,
       editor: projectPrimitiveEditorElement(node),
       editorImplicit: true,
       sourceRange: node.range,
@@ -436,6 +453,8 @@ function projectColumnCellEditing(
     usesDefaultTrigger: projectedTriggers.usesDefaultTrigger,
     suffixes: projectedTriggers.suffixes,
     reaction,
+    cancel: outcomes.cancel,
+    commit: outcomes.commit,
     editor: projectPrimitiveEditorElement(node),
     editorImplicit: true,
     sourceRange: node.range,
@@ -464,10 +483,117 @@ function sourceOwnedCellEditing(
       sourceRange,
       message,
     },
+    cancel: sourceOwnedEditOutcome(message),
+    commit: sourceOwnedEditOutcome(message),
     editor: null,
     editorImplicit: false,
     sourceRange,
     message,
+  }
+}
+
+function sourceOwnedEditOutcome(message: string): ComponentSFCEditOutcomeProjection {
+  return {
+    editable: false,
+    triggers: [],
+    usesDefault: false,
+    suffixes: [],
+    message,
+  }
+}
+
+function projectEditOutcomes(
+  node: RComponentSFC_AST_ElementNode,
+  editable: RComponentSFC_IR_ElementNode['editable'] | null,
+): {
+  editable: boolean
+  cancel: ComponentSFCEditOutcomeProjection
+  commit: ComponentSFCEditOutcomeProjection
+  message?: string
+} {
+  const cancelDeclarations = node.attributes.filter(attribute => attribute.name === 'cancel-on')
+  const commitDeclarations = node.attributes.filter(attribute => attribute.name === 'commit-on')
+  if (cancelDeclarations.length > 1 || commitDeclarations.length > 1) {
+    const message = cancelDeclarations.length > 1 ? 'cancel-on объявлен несколько раз.' : 'commit-on объявлен несколько раз.'
+    return {
+      editable: false,
+      cancel: sourceOwnedEditOutcome(message),
+      commit: sourceOwnedEditOutcome(message),
+      message,
+    }
+  }
+  const cancel = projectOutcomeTriggers(
+    cancelDeclarations[0] ?? null,
+    'cancel-on',
+    projectInheritedOutcomeTriggers(editable?.cancelTriggers, [
+      { event: 'keydown', key: ['Escape'], prevent: true, stop: true },
+      { event: 'focusout' },
+    ]),
+  )
+  const commit = projectOutcomeTriggers(
+    commitDeclarations[0] ?? null,
+    'commit-on',
+    projectInheritedOutcomeTriggers(editable?.commitTriggers, [
+      { event: 'keydown', key: ['Enter'], prevent: true },
+    ]),
+  )
+  return {
+    editable: cancel.editable && commit.editable,
+    cancel,
+    commit,
+    message: cancel.message ?? commit.message,
+  }
+}
+
+function projectInheritedOutcomeTriggers(
+  value: RComponentSFC_IR_Value | undefined,
+  fallback: ComponentSFCInteractionTrigger[],
+): ComponentSFCInteractionTriggerProjection[] {
+  const source = value?.kind === 'literal' ? value.value : fallback
+  const triggers = normalizeComponentSFCInteractionTriggers(source)
+  return triggers.map(projectNormalizedInteractionTrigger)
+}
+
+function projectNormalizedInteractionTrigger(
+  trigger: ComponentSFCInteractionTrigger,
+): ComponentSFCInteractionTriggerProjection {
+  const flags: ComponentSFCInteractionTriggerProjection['flags'] = {}
+  for (const flag of CELL_INTERACTION_FLAGS) {
+    if (trigger[flag] === true)
+      flags[flag] = true
+  }
+  return {
+    event: trigger.event,
+    key: [...(trigger.key ?? [])],
+    code: [...(trigger.code ?? [])],
+    held: trigger.held
+      ? {
+          key: [...(trigger.held.key ?? [])],
+          code: [...(trigger.held.code ?? [])],
+          match: trigger.held.match ?? 'all',
+          exact: trigger.held.exact ?? false,
+        }
+      : null,
+    modifiers: { ...(trigger.modifiers ?? {}) },
+    repeat: trigger.repeat ?? null,
+    composing: trigger.composing ?? null,
+    button: trigger.button ?? null,
+    flags,
+  }
+}
+
+function projectOutcomeTriggers(
+  attribute: RComponentSFC_AST_ElementNode['attributes'][number] | null,
+  name: 'cancel-on' | 'commit-on',
+  defaults: ComponentSFCInteractionTriggerProjection[],
+): ComponentSFCEditOutcomeProjection {
+  const projected = projectEditTriggers(attribute, defaults, name)
+  return {
+    editable: projected.editable,
+    triggers: projected.triggers,
+    usesDefault: projected.usesDefaultTrigger,
+    suffixes: projected.suffixes,
+    message: projected.message,
   }
 }
 
@@ -526,7 +652,7 @@ function projectPrimitiveEditorElement(
     kind: 'tag',
     tag: node.tag,
     syntax: 'direct',
-    bindings: projectCellBindings(node, new Set(['editable', 'edit-on'])),
+    bindings: projectCellBindings(node, new Set(['editable', 'edit-on', 'cancel-on', 'commit-on'])),
   }
 }
 
@@ -600,11 +726,13 @@ function projectEventReaction(
 
 function projectEditTriggers(
   attribute: RComponentSFC_AST_ElementNode['attributes'][number] | null,
+  defaults: ComponentSFCInteractionTriggerProjection[] = [createInteractionTrigger('click')],
+  attributeName = 'edit-on',
 ): Pick<ComponentSFCTableCellEditingProjection, 'editable' | 'triggers' | 'usesDefaultTrigger' | 'suffixes' | 'message'> {
   if (!attribute) {
     return {
       editable: true,
-      triggers: [createInteractionTrigger('click')],
+      triggers: defaults,
       usesDefaultTrigger: true,
       suffixes: [],
     }
@@ -622,12 +750,12 @@ function projectEditTriggers(
       triggers: [],
       usesDefaultTrigger: false,
       suffixes,
-      message: `Modifier .${unsupportedSuffix} не поддерживается visual editor-ом edit-on.`,
+      message: `Modifier .${unsupportedSuffix} не поддерживается visual editor-ом ${attributeName}.`,
     }
   }
   const raw = attribute.value?.trim() ?? ''
   if (!raw) {
-    return { editable: false, triggers: [], usesDefaultTrigger: false, suffixes, message: 'edit-on требует непустое событие.' }
+    return { editable: false, triggers: [], usesDefaultTrigger: false, suffixes, message: `${attributeName} требует непустое событие.` }
   }
   if (!attribute.dynamic) {
     return {
@@ -643,7 +771,7 @@ function projectEditTriggers(
     const nodes = expression.type === 'ArrayExpression' ? expression.elements : [expression]
     const triggers = (nodes as any[]).map(node => projectInteractionTrigger(node))
     if (!triggers.length || triggers.some(trigger => !trigger)) {
-      return { editable: false, triggers: [], usesDefaultTrigger: false, suffixes, message: 'Сложный edit-on редактируется во вкладке Source.' }
+      return { editable: false, triggers: [], usesDefaultTrigger: false, suffixes, message: `Сложный ${attributeName} редактируется во вкладке Source.` }
     }
     return {
       editable: true,
@@ -653,7 +781,7 @@ function projectEditTriggers(
     }
   }
   catch {
-    return { editable: false, triggers: [], usesDefaultTrigger: false, suffixes, message: 'Не удалось разобрать edit-on. Исправьте выражение во вкладке Source.' }
+    return { editable: false, triggers: [], usesDefaultTrigger: false, suffixes, message: `Не удалось разобрать ${attributeName}. Исправьте выражение во вкладке Source.` }
   }
 }
 

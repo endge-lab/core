@@ -5,6 +5,7 @@ import type {
   ComponentSFCTableVisualCellSyntax,
   ComponentSFCTableVisualMenuKind,
   ComponentSFCInteractionTriggerProjection,
+  ComponentSFCVisualInspectionOptions,
 } from '@/domain/types/component/sfc/visual-projection.types'
 import type {
   RComponentSFC_AST_ElementNode,
@@ -46,10 +47,11 @@ const EDITABLE_PRIMITIVE_TAGS = new Set(['Text', 'Number', 'DateTime'])
 export function patchComponentSFCTableSource(
   source: string,
   patch: ComponentSFCTableSourcePatch,
+  options: ComponentSFCVisualInspectionOptions = {},
 ): ComponentSFCTableSourcePatchResult {
   const context = resolveTableContext(source)
   if (!context) {
-    const inspection = inspectComponentSFCVisual(source)
+    const inspection = inspectComponentSFCVisual(source, options)
     return {
       ok: false,
       source,
@@ -62,7 +64,7 @@ export function patchComponentSFCTableSource(
 
   try {
     const nextSource = applyTablePatch(source, context, patch)
-    const inspection = inspectComponentSFCVisual(nextSource)
+    const inspection = inspectComponentSFCVisual(nextSource, options)
     if (inspection.support.kind !== 'table' || !inspection.projection) {
       const firstError = inspection.diagnostics.find(diagnostic => diagnostic.severity === 'error')
       return {
@@ -77,6 +79,8 @@ export function patchComponentSFCTableSource(
             ? `Некорректный @edited: ${firstError?.message ?? 'reaction нарушила структуру template.'}`
           : patch.type === 'set-column-cell-editable'
               || patch.type === 'set-column-cell-edit-triggers'
+              || patch.type === 'set-column-cell-cancel-triggers'
+              || patch.type === 'set-column-cell-commit-triggers'
               || patch.type === 'set-column-cell-editor-component'
               || patch.type === 'set-column-cell-editor-tag'
               || patch.type === 'set-column-cell-editor-attribute'
@@ -94,7 +98,7 @@ export function patchComponentSFCTableSource(
           ok: false,
           source,
           changed: false,
-          projection: inspectComponentSFCVisual(source).projection,
+          projection: inspectComponentSFCVisual(source, options).projection,
           diagnostics: inspection.diagnostics,
           message: interactionError.message,
         }
@@ -102,19 +106,24 @@ export function patchComponentSFCTableSource(
     }
     if (patch.type === 'set-column-cell-editable'
       || patch.type === 'set-column-cell-edit-triggers'
+      || patch.type === 'set-column-cell-cancel-triggers'
+      || patch.type === 'set-column-cell-commit-triggers'
       || patch.type === 'set-column-cell-editor-component'
       || patch.type === 'set-column-cell-editor-tag'
       || patch.type === 'set-column-cell-editor-attribute') {
       const editableError = inspection.diagnostics.find(diagnostic => (
         diagnostic.severity === 'error'
-        && (diagnostic.code.startsWith('sfc-editable') || diagnostic.code.startsWith('sfc-edit-on'))
+        && (diagnostic.code.startsWith('sfc-editable')
+          || diagnostic.code.startsWith('sfc-edit-on')
+          || diagnostic.code.startsWith('sfc-cancel-on')
+          || diagnostic.code.startsWith('sfc-commit-on'))
       ))
       if (editableError) {
         return {
           ok: false,
           source,
           changed: false,
-          projection: inspectComponentSFCVisual(source).projection,
+          projection: inspectComponentSFCVisual(source, options).projection,
           diagnostics: inspection.diagnostics,
           message: editableError.message,
         }
@@ -130,7 +139,7 @@ export function patchComponentSFCTableSource(
           ok: false,
           source,
           changed: false,
-          projection: inspectComponentSFCVisual(source).projection,
+          projection: inspectComponentSFCVisual(source, options).projection,
           diagnostics: inspection.diagnostics,
           message: reactionError.message,
         }
@@ -150,7 +159,7 @@ export function patchComponentSFCTableSource(
       ok: false,
       source,
       changed: false,
-      projection: inspectComponentSFCVisual(source).projection,
+      projection: inspectComponentSFCVisual(source, options).projection,
       diagnostics: context.diagnostics,
       message: error instanceof Error ? error.message : String(error),
     }
@@ -221,6 +230,20 @@ function applyTablePatch(
       return setColumnCellEditTriggers(
         source,
         requireColumn(context, patch.columnIndex),
+        patch.triggers,
+      )
+    case 'set-column-cell-cancel-triggers':
+      return setColumnCellOutcomeTriggers(
+        source,
+        requireColumn(context, patch.columnIndex),
+        'cancel-on',
+        patch.triggers,
+      )
+    case 'set-column-cell-commit-triggers':
+      return setColumnCellOutcomeTriggers(
+        source,
+        requireColumn(context, patch.columnIndex),
+        'commit-on',
         patch.triggers,
       )
     case 'set-column-cell-edited-reaction':
@@ -706,7 +729,12 @@ function setColumnCellEditable(
 
   // Удаляем с конца, чтобы первая правка не сдвигала диапазоны следующей.
   const declarations = [
-    ...node.attributes.filter(attribute => attribute.name === 'editable' || attribute.name === 'edit-on'),
+    ...node.attributes.filter(attribute => (
+      attribute.name === 'editable'
+      || attribute.name === 'edit-on'
+      || attribute.name === 'cancel-on'
+      || attribute.name === 'commit-on'
+    )),
     ...node.directives.filter(directive => directive.name === 'on' && directive.argument?.trim() === 'edited'),
   ]
     .sort((left, right) => right.range.start - left.range.start)
@@ -755,6 +783,45 @@ function setColumnCellEditTriggers(
     return replaceRange(source, declaration.range.start, declaration.range.end, attribute)
   }
   return insertAttribute(source, node, attribute)
+}
+
+function setColumnCellOutcomeTriggers(
+  source: string,
+  column: RComponentSFC_AST_ElementNode,
+  name: 'cancel-on' | 'commit-on',
+  triggers: ComponentSFCInteractionTriggerProjection[] | null,
+): string {
+  const node = requireEditableBehaviorElement(source, column)
+  const declarations = node.attributes.filter(attribute => attribute.name === name)
+  if (declarations.length > 1)
+    throw new Error(`${name} объявлен несколько раз. Измените его во вкладке Source.`)
+  const declaration = declarations[0] ?? null
+  if (triggers == null) {
+    return declaration
+      ? removeRangeWithWhitespace(source, declaration.range.start, declaration.range.end)
+      : source
+  }
+  for (const trigger of triggers) {
+    if (!trigger.event.trim())
+      throw new Error(`${name} требует непустое событие.`)
+    if (trigger.flags.prevent && trigger.flags.passive)
+      throw new Error(`${name} trigger не может одновременно использовать prevent и passive.`)
+  }
+  const suffix = declaration?.modifiers.map(modifier => `.${modifier}`).join('') ?? ''
+  const attribute = triggers.length === 0
+    ? serializeAttributeValue(name, '[]', 'expression')
+    : !suffix && triggers.length === 1 && isPlainInteractionTrigger(triggers[0]!)
+    ? serializeAttribute(name, triggers[0]!.event.trim())
+    : serializeAttributeValue(
+        `${name}${suffix}`,
+        triggers.length === 1
+          ? serializeInteractionTrigger(triggers[0]!)
+          : `[${triggers.map(serializeInteractionTrigger).join(', ')}]`,
+        'expression',
+      )
+  return declaration
+    ? replaceRange(source, declaration.range.start, declaration.range.end, attribute)
+    : insertAttribute(source, node, attribute)
 }
 
 function setColumnCellEditedReaction(
@@ -1023,19 +1090,33 @@ function convertPrimitiveToCompositeEditable(
   if (!editable || editable.dynamic || editable.value != null)
     throw new Error('editable должен быть статическим boolean-атрибутом.')
   const editOn = root.attributes.filter(attribute => attribute.name === 'edit-on')
+  const cancelOn = root.attributes.filter(attribute => attribute.name === 'cancel-on')
+  const commitOn = root.attributes.filter(attribute => attribute.name === 'commit-on')
   const edited = root.directives.filter(
     directive => directive.name === 'on' && directive.argument?.trim() === 'edited',
   )
-  if (editOn.length > 1 || edited.length > 1)
-    throw new Error('Дублирующиеся edit-on или @edited редактируются только во вкладке Source.')
+  if (editOn.length > 1 || cancelOn.length > 1 || commitOn.length > 1 || edited.length > 1)
+    throw new Error('Дублирующиеся edit-on, cancel-on, commit-on или @edited редактируются только во вкладке Source.')
 
   const value = root.attributes.find(attribute => attribute.name === 'value') ?? null
-  const wrapperDeclarations = [value, editOn[0] ?? null, edited[0] ?? null]
+  const wrapperDeclarations = [
+    value,
+    editOn[0] ?? null,
+    cancelOn[0] ?? null,
+    commitOn[0] ?? null,
+    edited[0] ?? null,
+  ]
     .filter((declaration): declaration is NonNullable<typeof declaration> => Boolean(declaration))
     .map(declaration => source.slice(declaration.range.start, declaration.range.end).trim())
   if (!value) wrapperDeclarations.unshift(':value="value"')
 
-  const removed = [editable, editOn[0] ?? null, edited[0] ?? null]
+  const removed = [
+    editable,
+    editOn[0] ?? null,
+    cancelOn[0] ?? null,
+    commitOn[0] ?? null,
+    edited[0] ?? null,
+  ]
     .filter((declaration): declaration is NonNullable<typeof declaration> => Boolean(declaration))
     .sort((left, right) => right.range.start - left.range.start)
   let displayMarkup = source.slice(root.range.start, root.range.end)

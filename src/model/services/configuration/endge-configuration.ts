@@ -4,6 +4,7 @@ import type {
   EndgeConfigurationContribution,
   EndgeConfigurationPatch,
   EndgeLocaleDefinition,
+  EndgeSFCEditingConfiguration,
   EndgeThemeDefinition,
   EndgeVariableDefinition,
 } from '@/domain/types/configuration/configuration.type'
@@ -20,6 +21,8 @@ import type {
 } from '@/domain/types/diagnostics/diagnostics.types'
 import { DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION } from '@/model/config/diagnostics.config'
 import { DEFAULT_FALLBACK_LOCALE, DEFAULT_LOCALE, DEFAULT_THEME } from '@/model/config/kernel.config'
+import { DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION } from '@/model/config/sfc-editing.config'
+import { normalizeComponentSFCInteractionTriggers } from '@/tools/component-sfc-edit-trigger'
 
 const LEGACY_SFC_ADAPTER_IDS: Readonly<Record<string, string>> = {
   'native-vue': 'vue-native',
@@ -42,6 +45,7 @@ const DEFAULT_CONFIGURATION_VALUE: EndgeConfiguration = {
   defaultAuthProfileIdentity: null,
   sfcAdapterIds: ['vue-native'],
   defaultSfcAdapterId: 'vue-native',
+  sfcEditing: structuredCloneSafe(DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION),
   diagnostics: structuredCloneSafe(DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION),
 }
 
@@ -92,6 +96,7 @@ export function normalizeEndgeConfiguration(input: unknown): EndgeConfiguration 
     defaultAuthProfileIdentity: normalizeNullableText(input.defaultAuthProfileIdentity),
     sfcAdapterIds,
     defaultSfcAdapterId,
+    sfcEditing: normalizeSFCEditingConfiguration(input.sfcEditing),
     diagnostics: normalizeDiagnosticsConfiguration(input.diagnostics),
   }
 }
@@ -147,6 +152,8 @@ export function applyEndgeConfigurationContribution(
     next.sfcAdapterIds = applyCollectionPatch(next.sfcAdapterIds, patch.sfcAdapterIds, item => item)
   if (patch.diagnostics)
     next.diagnostics = applyDiagnosticsPatch(next.diagnostics, patch.diagnostics)
+  if (patch.sfcEditing)
+    applySFCEditingPatch(next.sfcEditing, patch.sfcEditing)
 
   applyRequiredValue(next, 'defaultLocale', patch.defaultLocale)
   applyRequiredValue(next, 'fallbackLocale', patch.fallbackLocale)
@@ -173,6 +180,76 @@ function normalizePatch(input: unknown): EndgeConfigurationPatch {
     return {}
 
   return structuredCloneSafe(input) as EndgeConfigurationPatch
+}
+
+/** Нормализует persisted literal triggers и поддерживает документы до появления sfcEditing. */
+function normalizeSFCEditingConfiguration(input: unknown): EndgeSFCEditingConfiguration {
+  const source = isRecord(input) ? input : {}
+  return {
+    cancelOn: normalizeSFCEditingTriggers(
+      source.cancelOn,
+      DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION.cancelOn,
+      'sfcEditing.cancelOn',
+    ),
+    commitOn: normalizeSFCEditingTriggers(
+      source.commitOn,
+      DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION.commitOn,
+      'sfcEditing.commitOn',
+    ),
+  }
+}
+
+function normalizeSFCEditingTriggers(
+  input: unknown,
+  fallback: readonly EndgeSFCEditingConfiguration['cancelOn'][number][],
+  path: string,
+): EndgeSFCEditingConfiguration['cancelOn'] {
+  if (input == null)
+    return structuredCloneSafe(fallback) as EndgeSFCEditingConfiguration['cancelOn']
+
+  const normalized = normalizeComponentSFCInteractionTriggers(input)
+  if ((Array.isArray(input) ? input.length > 0 : true) && normalized.length === 0)
+    throw new Error(`[EndgeConfiguration] ${path} contains no valid triggers`)
+  if (normalized.some(trigger => trigger.passive && trigger.prevent))
+    throw new Error(`[EndgeConfiguration] ${path} cannot combine passive and prevent`)
+
+  return normalized.map(trigger => ({
+    event: trigger.event,
+    ...(trigger.key?.length ? { key: [...trigger.key] } : {}),
+    ...(trigger.code?.length ? { code: [...trigger.code] } : {}),
+    ...(trigger.held ? {
+      held: {
+        ...(trigger.held.key?.length ? { key: [...trigger.held.key] } : {}),
+        ...(trigger.held.code?.length ? { code: [...trigger.held.code] } : {}),
+        ...(trigger.held.match ? { match: trigger.held.match } : {}),
+        ...(trigger.held.exact != null ? { exact: trigger.held.exact } : {}),
+      },
+    } : {}),
+    ...(trigger.modifiers ? { modifiers: { ...trigger.modifiers } } : {}),
+    ...(trigger.repeat != null ? { repeat: trigger.repeat } : {}),
+    ...(trigger.composing != null ? { composing: trigger.composing } : {}),
+    ...(trigger.button != null ? { button: trigger.button } : {}),
+    ...(trigger.stop ? { stop: true } : {}),
+    ...(trigger.prevent ? { prevent: true } : {}),
+    ...(trigger.self ? { self: true } : {}),
+    ...(trigger.once ? { once: true } : {}),
+    ...(trigger.capture ? { capture: true } : {}),
+    ...(trigger.passive ? { passive: true } : {}),
+  }))
+}
+
+function applySFCEditingPatch(
+  target: EndgeSFCEditingConfiguration,
+  patch: NonNullable<EndgeConfigurationPatch['sfcEditing']>,
+): void {
+  for (const key of ['cancelOn', 'commitOn'] as const) {
+    const override = patch[key]
+    if (!override)
+      continue
+    if (override.op === 'remove')
+      throw new Error(`[EndgeConfiguration] Required field "sfcEditing.${key}" cannot be removed`)
+    target[key] = structuredCloneSafe(override.value)
+  }
 }
 
 /** Применяет diagnostics patch без замены остальных configuration fields. */

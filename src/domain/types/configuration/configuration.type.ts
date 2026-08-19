@@ -1,3 +1,4 @@
+import type { ComponentSFCInteractionTrigger } from '@/domain/types/component/sfc/ir.types'
 import type {
   DiagnosticsSeverityNumber,
   DiagnosticsSignal,
@@ -24,6 +25,12 @@ export interface EndgeVariableDefinition {
   defaultValue: string
 }
 
+/** Effective defaults завершения одной SFC edit session. */
+export interface EndgeSFCEditingConfiguration {
+  cancelOn: ComponentSFCInteractionTrigger[]
+  commitOn: ComponentSFCInteractionTrigger[]
+}
+
 /** Полная конфигурация, с которой компилируется один Endge context. */
 export interface EndgeConfiguration {
   vars: EndgeVariableDefinition[]
@@ -35,6 +42,8 @@ export interface EndgeConfiguration {
   defaultAuthProfileIdentity: string | null
   sfcAdapterIds: string[]
   defaultSfcAdapterId: string
+  /** Effective triggers, которые наследуют editable-узлы без локальных атрибутов. */
+  sfcEditing: EndgeSFCEditingConfiguration
   /** Настройки telemetry, output adapters, routing и snapshots. */
   diagnostics: EndgeDiagnosticsConfiguration
 }
@@ -42,6 +51,12 @@ export interface EndgeConfiguration {
 export type EndgeValueOverride<T> =
   | { op: 'set', value: T }
   | { op: 'remove' }
+
+/** Независимые override-операции SFC editing для одного configuration layer. */
+export interface EndgeSFCEditingConfigurationPatch {
+  cancelOn?: EndgeValueOverride<ComponentSFCInteractionTrigger[]>
+  commitOn?: EndgeValueOverride<ComponentSFCInteractionTrigger[]>
+}
 
 export type EndgeCollectionPatchEntry<T> =
   | { key: string, op: 'upsert', value: T }
@@ -62,6 +77,7 @@ export interface EndgeConfigurationPatch {
   defaultAuthProfileIdentity?: EndgeValueOverride<string>
   sfcAdapterIds?: EndgeCollectionPatch<string>
   defaultSfcAdapterId?: EndgeValueOverride<string>
+  sfcEditing?: EndgeSFCEditingConfigurationPatch
   /** Локальный contribution diagnostics для текущего configuration layer. */
   diagnostics?: EndgeDiagnosticsConfigurationPatch
 }

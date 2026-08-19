@@ -1,5 +1,6 @@
 import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
 import type { TypeSourceDefinition } from '@/domain/types/source/type-source.types'
+import type { EndgeSFCEditingConfiguration } from '@/domain/types/configuration/configuration.type'
 import type { RComponentSFC_IR_Tag } from './ir.types'
 import type { RComponentSFC_SourceRange } from './location.types'
 
@@ -66,6 +67,14 @@ export interface ComponentSFCEventReactionProjection {
   message?: string
 }
 
+export interface ComponentSFCEditOutcomeProjection {
+  editable: boolean
+  triggers: ComponentSFCInteractionTriggerProjection[]
+  usesDefault: boolean
+  suffixes: ComponentSFCTableCellInteractionFlag[]
+  message?: string
+}
+
 export type ComponentSFCTableVisualCellSyntax = 'cell' | 'direct' | 'editable-default' | 'editable-edit'
 
 export type ComponentSFCTableEditableElementProjection
@@ -93,6 +102,8 @@ export interface ComponentSFCTableCellEditingProjection {
   usesDefaultTrigger: boolean
   suffixes: ComponentSFCTableCellInteractionFlag[]
   reaction: ComponentSFCEventReactionProjection
+  cancel: ComponentSFCEditOutcomeProjection
+  commit: ComponentSFCEditOutcomeProjection
   editor: ComponentSFCTableEditableElementProjection | null
   editorImplicit: boolean
   sourceRange?: RComponentSFC_SourceRange
@@ -127,6 +138,8 @@ export interface ComponentSFCVisualInspectionOptions {
   resolveTypeDefinition?: (identity: string) => TypeSourceDefinition | null
   /** Direct Action identities available to source-authored MenuItem bindings. */
   actionIdentities?: Iterable<string>
+  /** Effective editing defaults текущего compiler context. */
+  sfcEditing?: EndgeSFCEditingConfiguration
 }
 
 /** Visual read-model одной прямой Column внутри корневого Table. */
@@ -250,6 +263,18 @@ export type ComponentSFCTableSourcePatch
       columnIndex: number
       /** Complete local reaction expression, or null to remove @edited. */
       value: string | null
+    }
+    | {
+      type: 'set-column-cell-cancel-triggers'
+      columnIndex: number
+      /** Null inherits effective configuration; an empty list explicitly disables automatic cancellation. */
+      triggers: ComponentSFCInteractionTriggerProjection[] | null
+    }
+    | {
+      type: 'set-column-cell-commit-triggers'
+      columnIndex: number
+      /** Null inherits effective configuration; an empty list explicitly disables automatic commit. */
+      triggers: ComponentSFCInteractionTriggerProjection[] | null
     }
     | {
       type: 'set-column-cell-editor-component'
