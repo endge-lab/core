@@ -2,6 +2,7 @@ import type {
   ComponentSFCTableSourcePatch,
   ComponentSFCTableSourcePatchResult,
   ComponentSFCTableVisualCellTag,
+  ComponentSFCTableVisualCellSyntax,
   ComponentSFCTableVisualMenuKind,
   ComponentSFCInteractionTriggerProjection,
 } from '@/domain/types/component/sfc/visual-projection.types'
@@ -72,7 +73,13 @@ export function patchComponentSFCTableSource(
         diagnostics: inspection.diagnostics,
         message: patch.type === 'set-column-cell-on'
           ? `Некорректный :on: ${firstError?.message ?? 'выражение нарушило структуру template.'}`
-          : patch.type === 'set-column-cell-editable' || patch.type === 'set-column-cell-edit-triggers'
+          : patch.type === 'set-column-cell-edited-reaction'
+            ? `Некорректный @edited: ${firstError?.message ?? 'reaction нарушила структуру template.'}`
+          : patch.type === 'set-column-cell-editable'
+              || patch.type === 'set-column-cell-edit-triggers'
+              || patch.type === 'set-column-cell-editor-component'
+              || patch.type === 'set-column-cell-editor-tag'
+              || patch.type === 'set-column-cell-editor-attribute'
             ? `Некорректный editable: ${firstError?.message ?? 'изменение нарушило структуру template.'}`
           : 'Изменение нарушило структуру корневого Table.',
       }
@@ -93,7 +100,11 @@ export function patchComponentSFCTableSource(
         }
       }
     }
-    if (patch.type === 'set-column-cell-editable' || patch.type === 'set-column-cell-edit-triggers') {
+    if (patch.type === 'set-column-cell-editable'
+      || patch.type === 'set-column-cell-edit-triggers'
+      || patch.type === 'set-column-cell-editor-component'
+      || patch.type === 'set-column-cell-editor-tag'
+      || patch.type === 'set-column-cell-editor-attribute') {
       const editableError = inspection.diagnostics.find(diagnostic => (
         diagnostic.severity === 'error'
         && (diagnostic.code.startsWith('sfc-editable') || diagnostic.code.startsWith('sfc-edit-on'))
@@ -106,6 +117,22 @@ export function patchComponentSFCTableSource(
           projection: inspectComponentSFCVisual(source).projection,
           diagnostics: inspection.diagnostics,
           message: editableError.message,
+        }
+      }
+    }
+    if (patch.type === 'set-column-cell-edited-reaction') {
+      const reactionError = inspection.diagnostics.find(diagnostic => (
+        diagnostic.severity === 'error'
+        && diagnostic.sourcePath === 'template.on.edited'
+      ))
+      if (reactionError) {
+        return {
+          ok: false,
+          source,
+          changed: false,
+          projection: inspectComponentSFCVisual(source).projection,
+          diagnostics: inspection.diagnostics,
+          message: reactionError.message,
         }
       }
     }
@@ -195,6 +222,32 @@ function applyTablePatch(
         source,
         requireColumn(context, patch.columnIndex),
         patch.triggers,
+      )
+    case 'set-column-cell-edited-reaction':
+      return setColumnCellEditedReaction(
+        source,
+        requireColumn(context, patch.columnIndex),
+        patch.value,
+      )
+    case 'set-column-cell-editor-component':
+      return setColumnCellEditorComponent(
+        source,
+        requireColumn(context, patch.columnIndex),
+        patch.identity,
+      )
+    case 'set-column-cell-editor-tag':
+      return setColumnCellEditorTag(
+        source,
+        requireColumn(context, patch.columnIndex),
+        patch.tag,
+      )
+    case 'set-column-cell-editor-attribute':
+      return setColumnCellEditorAttribute(
+        source,
+        requireColumn(context, patch.columnIndex),
+        patch.name,
+        patch.value,
+        patch.valueKind,
       )
     case 'set-menu-mode':
       return setMenuMode(source, context, patch.menu, patch.mode)
@@ -420,9 +473,13 @@ function setColumnComponent(
   source: string,
   column: RComponentSFC_AST_ElementNode,
   rawIdentity: string | null,
-  syntax: 'cell' | 'direct' | undefined,
+  syntax: ComponentSFCTableVisualCellSyntax | undefined,
 ): string {
   const identity = rawIdentity?.trim() || null
+  if (syntax === 'editable-default') {
+    if (!identity) throw new Error('Variant default требует Component или Tag.')
+    return replaceEditableVariantElement(source, column, 'default', componentMarkup(identity))
+  }
   const cell = column.children.find(
     (node): node is RComponentSFC_AST_ElementNode => node.kind === 'element' && node.tag === 'Cell',
   ) ?? null
@@ -471,10 +528,14 @@ function setColumnTag(
   source: string,
   column: RComponentSFC_AST_ElementNode,
   tag: ComponentSFCTableVisualCellTag | null,
-  syntax: 'cell' | 'direct' | undefined,
+  syntax: ComponentSFCTableVisualCellSyntax | undefined,
 ): string {
   if (tag && !isVisualCellTag(tag))
     throw new Error(`Tag ${tag} нельзя использовать как простой Table Cell.`)
+  if (syntax === 'editable-default') {
+    if (!tag) throw new Error('Variant default требует Component или Tag.')
+    return replaceEditableVariantElement(source, column, 'default', tagMarkup(tag))
+  }
 
   const cell = column.children.find(
     (node): node is RComponentSFC_AST_ElementNode => node.kind === 'element' && node.tag === 'Cell',
@@ -627,13 +688,27 @@ function setColumnCellEditable(
   column: RComponentSFC_AST_ElementNode,
   enabled: boolean,
 ): string {
-  const node = requireEditablePrimitiveColumnCellElement(source, column)
+  const node = requireColumnCellRootElement(source, column)
+  if (node.tag === 'Editable') {
+    if (enabled) return source
+    const structure = requireCanonicalEditableStructure(source, node)
+    return replaceRange(
+      source,
+      node.range.start,
+      node.range.end,
+      source.slice(structure.defaultChild.range.start, structure.defaultChild.range.end),
+    )
+  }
+  if (!EDITABLE_PRIMITIVE_TAGS.has(node.tag))
+    throw new Error('Встроенный visual editor поддерживает editable только для Text, Number и DateTime.')
   if (enabled)
     return setStaticBooleanAttribute(source, node, 'editable', true)
 
   // Удаляем с конца, чтобы первая правка не сдвигала диапазоны следующей.
-  const declarations = node.attributes
-    .filter(attribute => attribute.name === 'editable' || attribute.name === 'edit-on')
+  const declarations = [
+    ...node.attributes.filter(attribute => attribute.name === 'editable' || attribute.name === 'edit-on'),
+    ...node.directives.filter(directive => directive.name === 'on' && directive.argument?.trim() === 'edited'),
+  ]
     .sort((left, right) => right.range.start - left.range.start)
   return declarations.reduce(
     (nextSource, declaration) => removeRangeWithWhitespace(nextSource, declaration.range.start, declaration.range.end),
@@ -646,10 +721,7 @@ function setColumnCellEditTriggers(
   column: RComponentSFC_AST_ElementNode,
   triggers: ComponentSFCInteractionTriggerProjection[],
 ): string {
-  const node = requireEditablePrimitiveColumnCellElement(source, column)
-  const editable = node.attributes.find(attribute => attribute.name === 'editable') ?? null
-  if (!editable || editable.dynamic || editable.value != null)
-    throw new Error('Сначала включите статический editable для выбранного элемента.')
+  const node = requireEditableBehaviorElement(source, column)
 
   const declarations = node.attributes.filter(attribute => attribute.name === 'edit-on')
   if (declarations.length > 1)
@@ -685,14 +757,110 @@ function setColumnCellEditTriggers(
   return insertAttribute(source, node, attribute)
 }
 
-function requireEditablePrimitiveColumnCellElement(
+function setColumnCellEditedReaction(
+  source: string,
+  column: RComponentSFC_AST_ElementNode,
+  rawValue: string | null,
+): string {
+  const node = requireEditableBehaviorElement(source, column)
+
+  const declarations = node.directives.filter(
+    directive => directive.name === 'on' && directive.argument?.trim() === 'edited',
+  )
+  if (declarations.length > 1)
+    throw new Error('@edited объявлен несколько раз. Измените его во вкладке Source.')
+  const declaration = declarations[0] ?? null
+  const value = rawValue?.trim() || null
+  if (!value) {
+    return declaration
+      ? removeRangeWithWhitespace(source, declaration.range.start, declaration.range.end)
+      : source
+  }
+
+  const suffix = declaration?.modifiers.map(modifier => `.${modifier}`).join('') ?? ''
+  const attribute = `@edited${suffix}="${escapeAttribute(value)}"`
+  return declaration
+    ? replaceRange(source, declaration.range.start, declaration.range.end, attribute)
+    : insertAttribute(source, node, attribute)
+}
+
+function requireEditableBehaviorElement(
   source: string,
   column: RComponentSFC_AST_ElementNode,
 ): RComponentSFC_AST_ElementNode {
-  const node = requireManagedColumnCellElement(source, column)
+  const node = requireColumnCellRootElement(source, column)
+  if (node.tag === 'Editable') {
+    requireCanonicalEditableStructure(source, node)
+    return node
+  }
   if (!EDITABLE_PRIMITIVE_TAGS.has(node.tag))
     throw new Error('Встроенный visual editor поддерживает editable только для Text, Number и DateTime.')
+  const editable = node.attributes.find(attribute => attribute.name === 'editable') ?? null
+  if (!editable || editable.dynamic || editable.value != null)
+    throw new Error('Сначала включите статический editable для выбранного элемента.')
   return node
+}
+
+function setColumnCellEditorComponent(
+  source: string,
+  column: RComponentSFC_AST_ElementNode,
+  rawIdentity: string,
+): string {
+  const identity = rawIdentity.trim()
+  if (!identity) throw new Error('Выберите Component для editor-варианта.')
+  return setColumnCellEditorMarkup(source, column, componentMarkup(identity))
+}
+
+function setColumnCellEditorTag(
+  source: string,
+  column: RComponentSFC_AST_ElementNode,
+  tag: ComponentSFCTableVisualCellTag,
+): string {
+  if (!isVisualCellTag(tag))
+    throw new Error(`Tag ${tag} нельзя использовать как editor-вариант.`)
+  return setColumnCellEditorMarkup(source, column, tagMarkup(tag))
+}
+
+function setColumnCellEditorMarkup(
+  source: string,
+  column: RComponentSFC_AST_ElementNode,
+  markup: string,
+): string {
+  const root = requireColumnCellRootElement(source, column)
+  if (root.tag === 'Editable')
+    return replaceEditableVariantElement(source, column, 'edit', markup)
+  if (!EDITABLE_PRIMITIVE_TAGS.has(root.tag))
+    throw new Error('Произвольный editor можно создать только для editable-примитива или составного Editable.')
+  const editable = root.attributes.find(attribute => attribute.name === 'editable') ?? null
+  if (!editable || editable.dynamic || editable.value != null)
+    throw new Error('Сначала включите статический editable для выбранного элемента.')
+  return convertPrimitiveToCompositeEditable(source, root, markup)
+}
+
+function setColumnCellEditorAttribute(
+  source: string,
+  column: RComponentSFC_AST_ElementNode,
+  rawName: string,
+  value: string | null,
+  valueKind: 'expression' | 'literal',
+): string {
+  const name = rawName.trim()
+  if (!/^[A-Za-z_$][\w$.-]*$/.test(name))
+    throw new Error(`Некорректное имя входного параметра "${rawName}".`)
+  if (name === 'is')
+    throw new Error('Параметр is управляется выбором компонента.')
+  if (valueKind === 'expression' && value != null) {
+    const result = compileComponentSFCExpression(value, {
+      sourcePath: `template.Table.Column.Editable.Variant.edit.${name}`,
+    })
+    const error = result.diagnostics.find(item => item.severity === 'error')
+    if (error) throw new Error(error.message)
+  }
+  const root = requireColumnCellRootElement(source, column)
+  if (root.tag !== 'Editable')
+    throw new Error('Сначала выберите отдельный editor; встроенный editor использует параметры отображения.')
+  const structure = requireCanonicalEditableStructure(source, root)
+  return setNodeAttributeValue(source, structure.editChild, name, value, valueKind)
 }
 
 function setStaticBooleanAttribute(
@@ -760,7 +928,15 @@ function quoteExpressionString(value: string): string {
   return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
 }
 
-function requireManagedColumnCellElement(
+interface CanonicalEditableStructure {
+  root: RComponentSFC_AST_ElementNode
+  defaultVariant: RComponentSFC_AST_ElementNode
+  defaultChild: RComponentSFC_AST_ElementNode
+  editVariant: RComponentSFC_AST_ElementNode
+  editChild: RComponentSFC_AST_ElementNode
+}
+
+function requireColumnCellRootElement(
   source: string,
   column: RComponentSFC_AST_ElementNode,
 ): RComponentSFC_AST_ElementNode {
@@ -775,6 +951,130 @@ function requireManagedColumnCellElement(
     throw new Error('Для visual bindings нужен один Component или Tag внутри колонки.')
 
   return children[0]
+}
+
+function requireManagedColumnCellElement(
+  source: string,
+  column: RComponentSFC_AST_ElementNode,
+): RComponentSFC_AST_ElementNode {
+  const root = requireColumnCellRootElement(source, column)
+  return root.tag === 'Editable'
+    ? requireCanonicalEditableStructure(source, root).defaultChild
+    : root
+}
+
+function requireCanonicalEditableStructure(
+  source: string,
+  root: RComponentSFC_AST_ElementNode,
+): CanonicalEditableStructure {
+  if (root.tag !== 'Editable')
+    throw new Error('Ожидался составной Editable.')
+  if (source.slice(root.range.start, root.range.end).includes('<!--'))
+    throw new Error('Editable с комментариями редактируется только во вкладке Source.')
+  const variants = root.children.filter(isSemanticNode)
+  if (variants.length !== 2 || variants.some(node => node.kind !== 'element' || node.tag !== 'Variant'))
+    throw new Error('Editable должен содержать ровно Variant default и Variant edit.')
+
+  const resolved = new Map<string, { variant: RComponentSFC_AST_ElementNode, child: RComponentSFC_AST_ElementNode }>()
+  for (const rawVariant of variants) {
+    if (rawVariant.kind !== 'element') continue
+    const names = rawVariant.attributes.filter(attribute => attribute.name === 'name')
+    const name = names.length === 1 && !names[0]!.dynamic ? names[0]!.value?.trim() : null
+    if (name !== 'default' && name !== 'edit')
+      throw new Error('Variant внутри Editable должен иметь статическое name="default" или name="edit".')
+    const children = rawVariant.children.filter(isSemanticNode)
+    if (children.length !== 1 || children[0]!.kind !== 'element')
+      throw new Error(`Variant ${name} должен содержать ровно один Component или Tag.`)
+    if (resolved.has(name))
+      throw new Error(`Variant ${name} объявлен несколько раз.`)
+    resolved.set(name, { variant: rawVariant, child: children[0]! })
+  }
+  const defaultVariant = resolved.get('default')
+  const editVariant = resolved.get('edit')
+  if (!defaultVariant || !editVariant)
+    throw new Error('Editable должен содержать Variant default и Variant edit.')
+  return {
+    root,
+    defaultVariant: defaultVariant.variant,
+    defaultChild: defaultVariant.child,
+    editVariant: editVariant.variant,
+    editChild: editVariant.child,
+  }
+}
+
+function replaceEditableVariantElement(
+  source: string,
+  column: RComponentSFC_AST_ElementNode,
+  variant: 'default' | 'edit',
+  markup: string,
+): string {
+  const root = requireColumnCellRootElement(source, column)
+  const structure = requireCanonicalEditableStructure(source, root)
+  const child = variant === 'default' ? structure.defaultChild : structure.editChild
+  return replaceRange(source, child.range.start, child.range.end, markup)
+}
+
+function convertPrimitiveToCompositeEditable(
+  source: string,
+  root: RComponentSFC_AST_ElementNode,
+  rawEditorMarkup: string,
+): string {
+  const editable = root.attributes.find(attribute => attribute.name === 'editable')
+  if (!editable || editable.dynamic || editable.value != null)
+    throw new Error('editable должен быть статическим boolean-атрибутом.')
+  const editOn = root.attributes.filter(attribute => attribute.name === 'edit-on')
+  const edited = root.directives.filter(
+    directive => directive.name === 'on' && directive.argument?.trim() === 'edited',
+  )
+  if (editOn.length > 1 || edited.length > 1)
+    throw new Error('Дублирующиеся edit-on или @edited редактируются только во вкладке Source.')
+
+  const value = root.attributes.find(attribute => attribute.name === 'value') ?? null
+  const wrapperDeclarations = [value, editOn[0] ?? null, edited[0] ?? null]
+    .filter((declaration): declaration is NonNullable<typeof declaration> => Boolean(declaration))
+    .map(declaration => source.slice(declaration.range.start, declaration.range.end).trim())
+  if (!value) wrapperDeclarations.unshift(':value="value"')
+
+  const removed = [editable, editOn[0] ?? null, edited[0] ?? null]
+    .filter((declaration): declaration is NonNullable<typeof declaration> => Boolean(declaration))
+    .sort((left, right) => right.range.start - left.range.start)
+  let displayMarkup = source.slice(root.range.start, root.range.end)
+  for (const declaration of removed) {
+    displayMarkup = removeRangeWithWhitespace(
+      displayMarkup,
+      declaration.range.start - root.range.start,
+      declaration.range.end - root.range.start,
+    )
+  }
+  displayMarkup = normalizeMarkupIndent(displayMarkup).trim()
+
+  const valueDeclaration = value
+    ? source.slice(value.range.start, value.range.end).trim()
+    : ':value="value"'
+  const editorMarkup = normalizeMarkupIndent(
+    rawEditorMarkup.includes(':value="value"')
+      ? rawEditorMarkup.replace(':value="value"', valueDeclaration)
+      : rawEditorMarkup.replace(/\s*\/>$/, ` ${valueDeclaration} />`),
+  ).trim()
+  const baseIndent = lineIndent(source, root.range.start)
+  const attributeIndent = `${baseIndent}  `
+  const childIndent = `${baseIndent}    `
+  const opening = `<Editable\n${wrapperDeclarations.map(declaration => indentMarkup(declaration, attributeIndent)).join('\n')}\n${baseIndent}>`
+  const markup = `${opening}\n${baseIndent}  <Variant name="default">\n${indentMarkup(displayMarkup, childIndent)}\n${baseIndent}  </Variant>\n\n${baseIndent}  <Variant name="edit">\n${indentMarkup(editorMarkup, childIndent)}\n${baseIndent}  </Variant>\n${baseIndent}</Editable>`
+  return replaceRange(source, root.range.start, root.range.end, markup)
+}
+
+function normalizeMarkupIndent(markup: string): string {
+  const lines = markup.split('\n')
+  const indents = lines.slice(1)
+    .filter(line => line.trim())
+    .map(line => line.match(/^\s*/)?.[0].length ?? 0)
+  const remove = indents.length ? Math.min(...indents) : 0
+  return lines.map((line, index) => index === 0 ? line : line.slice(Math.min(remove, line.length))).join('\n')
+}
+
+function indentMarkup(markup: string, indent: string): string {
+  return markup.split('\n').map(line => `${indent}${line}`).join('\n')
 }
 
 function renameElementTag(
@@ -806,6 +1106,10 @@ function renameElementTag(
 
 function componentCellMarkup(identity: string): string {
   return `<Cell>\n  <Component is="${escapeAttribute(identity)}" />\n</Cell>`
+}
+
+function componentMarkup(identity: string): string {
+  return `<Component is="${escapeAttribute(identity)}" />`
 }
 
 function tagCellMarkup(tag: ComponentSFCTableVisualCellTag): string {

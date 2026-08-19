@@ -1,11 +1,13 @@
 import { parseExpression } from '@babel/parser'
 
 import type {
+  ComponentSFCEventReactionProjection,
   ComponentSFCTableCellInteractionFlag,
   ComponentSFCTableCellInteractionModifier,
   ComponentSFCTableCellInteractionRuleProjection,
   ComponentSFCTableCellInteractionsProjection,
   ComponentSFCTableCellEditingProjection,
+  ComponentSFCTableEditableElementProjection,
   ComponentSFCInteractionTriggerProjection,
   ComponentSFCVisualAttribute,
   ComponentSFCVisualInspection,
@@ -16,6 +18,7 @@ import type {
   ComponentSFCTableMenuProjection,
   ComponentSFCTableMenuNodeProjection,
   ComponentSFCTableVisualCellTag,
+  ComponentSFCTableVisualCellSyntax,
   ComponentSFCTableVisualProjection,
 } from '@/domain/types/component/sfc/visual-projection.types'
 import type {
@@ -291,7 +294,7 @@ function projectColumn(
     pinnable: readProp(ir, 'pinnable'),
     attributes: projectAttributes(source, ast, ir),
     cell: cell.projection,
-    editing: projectColumnCellEditing(source, ast, cellNode),
+    editing: projectColumnCellEditing(source, ast, ir, cellNode),
     interactions: projectColumnCellInteractions(cellNode),
     hasCustomCell: cell.hasCustomCell,
     cellSource: cell.source,
@@ -309,6 +312,7 @@ const CELL_INTERACTION_MODIFIERS = new Set<ComponentSFCTableCellInteractionModif
 function projectColumnCellEditing(
   source: string,
   column: RComponentSFC_AST_ElementNode,
+  irColumn: RComponentSFC_IR_ElementNode | null,
   cell: RComponentSFC_AST_ElementNode | null,
 ): ComponentSFCTableCellEditingProjection {
   if (source.slice(column.range.start, column.range.end).includes('<!--')) {
@@ -343,6 +347,45 @@ function projectColumnCellEditing(
       ? 'component'
       : 'source'
 
+  if (node.tag === 'Editable') {
+    const variants = readCanonicalEditableVariants(source, node)
+    if (!variants) {
+      return sourceOwnedCellEditing(
+        true,
+        'custom',
+        node.tag,
+        node.range,
+        'Visual editor поддерживает Editable с одним Variant default и одним Variant edit, содержащими по одному элементу.',
+      )
+    }
+    const editOnDeclarations = node.attributes.filter(attribute => attribute.name === 'edit-on')
+    if (editOnDeclarations.length > 1) {
+      return sourceOwnedCellEditing(true, 'custom', node.tag, node.range, 'edit-on объявлен несколько раз.')
+    }
+    const reaction = projectEventReaction(node, 'edited')
+    const projectedTriggers = projectEditTriggers(editOnDeclarations[0] ?? null)
+    const editor = projectEditableVariantElement(
+      source,
+      irColumn,
+      variants.edit,
+      'editable-edit',
+    )
+    return {
+      editable: projectedTriggers.editable,
+      enabled: true,
+      mode: 'custom',
+      tag: node.tag,
+      triggers: projectedTriggers.triggers,
+      usesDefaultTrigger: projectedTriggers.usesDefaultTrigger,
+      suffixes: projectedTriggers.suffixes,
+      reaction,
+      editor,
+      editorImplicit: false,
+      sourceRange: node.range,
+      message: projectedTriggers.message,
+    }
+  }
+
   if (!EDITABLE_PRIMITIVE_TAGS.has(node.tag)) {
     return sourceOwnedCellEditing(
       enabled,
@@ -369,6 +412,7 @@ function projectColumnCellEditing(
   if (editOnDeclarations.length > 1) {
     return sourceOwnedCellEditing(enabled, 'primitive', node.tag, node.range, 'edit-on объявлен несколько раз.')
   }
+  const reaction = projectEventReaction(node, 'edited')
   const projectedTriggers = projectEditTriggers(editOnDeclarations[0] ?? null)
   if (!projectedTriggers.editable) {
     return {
@@ -376,6 +420,9 @@ function projectColumnCellEditing(
       enabled,
       mode: 'primitive',
       tag: node.tag,
+      reaction,
+      editor: projectPrimitiveEditorElement(node),
+      editorImplicit: true,
       sourceRange: node.range,
     }
   }
@@ -388,6 +435,9 @@ function projectColumnCellEditing(
     triggers: projectedTriggers.triggers,
     usesDefaultTrigger: projectedTriggers.usesDefaultTrigger,
     suffixes: projectedTriggers.suffixes,
+    reaction,
+    editor: projectPrimitiveEditorElement(node),
+    editorImplicit: true,
     sourceRange: node.range,
   }
 }
@@ -407,8 +457,144 @@ function sourceOwnedCellEditing(
     triggers: [],
     usesDefaultTrigger: false,
     suffixes: [],
+    reaction: {
+      editable: false,
+      source: null,
+      suffixes: [],
+      sourceRange,
+      message,
+    },
+    editor: null,
+    editorImplicit: false,
     sourceRange,
     message,
+  }
+}
+
+interface CanonicalEditableVariants {
+  default: RComponentSFC_AST_ElementNode
+  edit: RComponentSFC_AST_ElementNode
+}
+
+function readCanonicalEditableVariants(
+  source: string,
+  editable: RComponentSFC_AST_ElementNode,
+): CanonicalEditableVariants | null {
+  if (source.slice(editable.range.start, editable.range.end).includes('<!--'))
+    return null
+  const variants = editable.children.filter(isSemanticRoot)
+  if (variants.length !== 2 || variants.some(node => node.kind !== 'element' || node.tag !== 'Variant'))
+    return null
+
+  const result: Partial<CanonicalEditableVariants> = {}
+  for (const rawVariant of variants) {
+    if (rawVariant.kind !== 'element') return null
+    const names = rawVariant.attributes.filter(attribute => attribute.name === 'name')
+    const name = names.length === 1 && !names[0]!.dynamic ? names[0]!.value?.trim() : null
+    if (name !== 'default' && name !== 'edit') return null
+    const children = rawVariant.children.filter(isSemanticRoot)
+    if (children.length !== 1 || children[0]!.kind !== 'element') return null
+    if (result[name]) return null
+    result[name] = children[0]!
+  }
+  return result.default && result.edit
+    ? result as CanonicalEditableVariants
+    : null
+}
+
+function projectEditableVariantElement(
+  source: string,
+  irColumn: RComponentSFC_IR_ElementNode | null,
+  node: RComponentSFC_AST_ElementNode,
+  syntax: 'editable-default' | 'editable-edit',
+): ComponentSFCTableEditableElementProjection {
+  const irNode = findIrElementBySourceStart(irColumn, node.range.start)
+  const identity = node.tag === 'Component'
+    ? staticAttribute(node, 'is') || null
+    : irNode?.tag === 'Component'
+      ? readLiteralString(irNode.props.is)
+      : null
+  const projection = projectSingleCellElement(source, node, node, identity, syntax)
+  return projection.kind === 'default' ? { kind: 'source' } : projection
+}
+
+function projectPrimitiveEditorElement(
+  node: RComponentSFC_AST_ElementNode,
+): ComponentSFCTableEditableElementProjection {
+  if (!isVisualCellTag(node.tag)) return { kind: 'source' }
+  return {
+    kind: 'tag',
+    tag: node.tag,
+    syntax: 'direct',
+    bindings: projectCellBindings(node, new Set(['editable', 'edit-on'])),
+  }
+}
+
+function findIrElementBySourceStart(
+  node: RComponentSFC_IR_ElementNode | null,
+  start: number,
+): RComponentSFC_IR_ElementNode | null {
+  if (!node) return null
+  if (node.sourceRange?.start === start) return node
+  for (const child of node.children) {
+    if (child.kind !== 'element') continue
+    const match = findIrElementBySourceStart(child, start)
+    if (match) return match
+  }
+  return null
+}
+
+function projectEventReaction(
+  node: RComponentSFC_AST_ElementNode,
+  eventName: string,
+): ComponentSFCEventReactionProjection {
+  const declarations = node.directives.filter(
+    directive => directive.name === 'on' && directive.argument?.trim() === eventName,
+  )
+  if (declarations.length > 1) {
+    return {
+      editable: false,
+      source: null,
+      suffixes: [],
+      sourceRange: node.range,
+      message: `@${eventName} объявлен несколько раз. Измените его во вкладке Source.`,
+    }
+  }
+
+  const declaration = declarations[0] ?? null
+  if (!declaration) {
+    return { editable: true, source: null, suffixes: [] }
+  }
+  const suffixes = declaration.modifiers.filter(
+    (modifier): modifier is ComponentSFCTableCellInteractionFlag => CELL_INTERACTION_FLAGS.has(modifier as ComponentSFCTableCellInteractionFlag),
+  )
+  const unsupportedSuffix = declaration.modifiers.find(
+    modifier => !CELL_INTERACTION_FLAGS.has(modifier as ComponentSFCTableCellInteractionFlag),
+  )
+  if (unsupportedSuffix) {
+    return {
+      editable: false,
+      source: declaration.expression?.trim() || null,
+      suffixes,
+      sourceRange: declaration.range,
+      message: `Modifier .${unsupportedSuffix} не поддерживается visual editor-ом @${eventName}.`,
+    }
+  }
+  const source = declaration.expression?.trim() ?? ''
+  if (!source) {
+    return {
+      editable: false,
+      source: null,
+      suffixes,
+      sourceRange: declaration.range,
+      message: `@${eventName} требует локальную reaction.`,
+    }
+  }
+  return {
+    editable: true,
+    source,
+    suffixes,
+    sourceRange: declaration.range,
   }
 }
 
@@ -683,8 +869,13 @@ function projectColumnCell(
   cell: RComponentSFC_AST_ElementNode | null,
 ): ProjectedColumnCell {
   if (cell) {
+    const roots = cell.children.filter(isSemanticRoot)
+    const root = roots.length === 1 && roots[0]?.kind === 'element' ? roots[0] : null
+    const variants = root?.tag === 'Editable' ? readCanonicalEditableVariants(source, root) : null
     return {
-      projection: projectManagedCell(source, cell),
+      projection: variants
+        ? projectEditableVariantElement(source, irColumn, variants.default, 'editable-default')
+        : projectManagedCell(source, cell),
       hasCustomCell: true,
       source: source.slice(cell.range.start, cell.range.end),
     }
@@ -810,7 +1001,7 @@ function projectSingleCellElement(
   owner: RComponentSFC_AST_ElementNode,
   child: RComponentSFC_AST_ElementNode | null,
   componentIdentity: string | null,
-  syntax: 'cell' | 'direct',
+  syntax: ComponentSFCTableVisualCellSyntax,
 ): ComponentSFCTableColumnProjection['cell'] {
   if (!child || source.slice(owner.range.start, owner.range.end).includes('<!--'))
     return { kind: 'source' }

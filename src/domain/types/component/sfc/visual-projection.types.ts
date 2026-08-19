@@ -57,6 +57,32 @@ export interface ComponentSFCTableCellInteractionsProjection {
   message?: string
 }
 
+/** Source-backed локальная reaction одного semantic Event. */
+export interface ComponentSFCEventReactionProjection {
+  editable: boolean
+  source: string | null
+  suffixes: ComponentSFCTableCellInteractionFlag[]
+  sourceRange?: RComponentSFC_SourceRange
+  message?: string
+}
+
+export type ComponentSFCTableVisualCellSyntax = 'cell' | 'direct' | 'editable-default' | 'editable-edit'
+
+export type ComponentSFCTableEditableElementProjection
+  = | {
+    kind: 'component'
+    identity: string | null
+    syntax: ComponentSFCTableVisualCellSyntax
+    bindings: ComponentSFCTableCellBindingProjection[]
+  }
+    | {
+      kind: 'tag'
+      tag: ComponentSFCTableVisualCellTag
+      syntax: ComponentSFCTableVisualCellSyntax
+      bindings: ComponentSFCTableCellBindingProjection[]
+    }
+    | { kind: 'source' }
+
 /** Source-backed editable-поведение единственного управляемого корня ячейки Table. */
 export interface ComponentSFCTableCellEditingProjection {
   editable: boolean
@@ -66,6 +92,9 @@ export interface ComponentSFCTableCellEditingProjection {
   triggers: ComponentSFCInteractionTriggerProjection[]
   usesDefaultTrigger: boolean
   suffixes: ComponentSFCTableCellInteractionFlag[]
+  reaction: ComponentSFCEventReactionProjection
+  editor: ComponentSFCTableEditableElementProjection | null
+  editorImplicit: boolean
   sourceRange?: RComponentSFC_SourceRange
   message?: string
 }
@@ -81,13 +110,13 @@ export type ComponentSFCTableCellProjection
     | {
       kind: 'component'
       identity: string | null
-      syntax: 'cell' | 'direct'
+      syntax: ComponentSFCTableVisualCellSyntax
       bindings: ComponentSFCTableCellBindingProjection[]
     }
     | {
       kind: 'tag'
       tag: ComponentSFCTableVisualCellTag
-      syntax: 'cell' | 'direct'
+      syntax: ComponentSFCTableVisualCellSyntax
       bindings: ComponentSFCTableCellBindingProjection[]
     }
     | { kind: 'source' }
@@ -184,13 +213,13 @@ export type ComponentSFCTableSourcePatch
       type: 'set-column-component'
       columnIndex: number
       identity: string | null
-      syntax?: 'cell' | 'direct'
+      syntax?: ComponentSFCTableVisualCellSyntax
     }
     | {
       type: 'set-column-tag'
       columnIndex: number
       tag: ComponentSFCTableVisualCellTag | null
-      syntax?: 'cell' | 'direct'
+      syntax?: ComponentSFCTableVisualCellSyntax
     }
     | {
       type: 'set-column-cell-attribute'
@@ -215,6 +244,29 @@ export type ComponentSFCTableSourcePatch
       columnIndex: number
       /** Empty list restores the implicit click trigger and removes edit-on from Source. */
       triggers: ComponentSFCInteractionTriggerProjection[]
+    }
+    | {
+      type: 'set-column-cell-edited-reaction'
+      columnIndex: number
+      /** Complete local reaction expression, or null to remove @edited. */
+      value: string | null
+    }
+    | {
+      type: 'set-column-cell-editor-component'
+      columnIndex: number
+      identity: string
+    }
+    | {
+      type: 'set-column-cell-editor-tag'
+      columnIndex: number
+      tag: ComponentSFCTableVisualCellTag
+    }
+    | {
+      type: 'set-column-cell-editor-attribute'
+      columnIndex: number
+      name: string
+      value: string | null
+      valueKind: 'expression' | 'literal'
     }
     | {
       type: 'set-menu-mode'
