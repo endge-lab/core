@@ -198,6 +198,7 @@ export * from '@/model/seed/converters/date/weekdays-range'
 
 export * from '@/model/services/document/DocumentDraftFactory'
 export * from '@/model/services/configuration/endge-configuration'
+export * from '@/model/services/i18n/composition-i18n-catalog-projection'
 
 export * from '@/domain/entities/runtime/RuntimeHostBase'
 export * from '@/domain/entities/runtime/RuntimeHostRegistry'

@@ -5,6 +5,8 @@ import type {
   ComponentSFCTableCellInteractionModifier,
   ComponentSFCTableCellInteractionRuleProjection,
   ComponentSFCTableCellInteractionsProjection,
+  ComponentSFCTableCellEditingProjection,
+  ComponentSFCInteractionTriggerProjection,
   ComponentSFCVisualAttribute,
   ComponentSFCVisualInspection,
   ComponentSFCVisualInspectionOptions,
@@ -40,7 +42,11 @@ const NON_VISUAL_CELL_TAGS = new Set([
   'RowMenu',
   'MenuItem',
   'MenuSeparator',
+  'Editable',
+  'Variant',
 ])
+
+const EDITABLE_PRIMITIVE_TAGS = new Set(['Text', 'Number', 'DateTime'])
 
 /** Строит UI-neutral visual projection только для SFC с одним корневым Table. */
 export function inspectComponentSFCVisual(
@@ -285,6 +291,7 @@ function projectColumn(
     pinnable: readProp(ir, 'pinnable'),
     attributes: projectAttributes(source, ast, ir),
     cell: cell.projection,
+    editing: projectColumnCellEditing(source, ast, cellNode),
     interactions: projectColumnCellInteractions(cellNode),
     hasCustomCell: cell.hasCustomCell,
     cellSource: cell.source,
@@ -298,6 +305,185 @@ const CELL_INTERACTION_FLAGS = new Set<ComponentSFCTableCellInteractionFlag>([
 const CELL_INTERACTION_MODIFIERS = new Set<ComponentSFCTableCellInteractionModifier>([
   'ctrl', 'shift', 'alt', 'meta', 'mod', 'altGraph', 'exact',
 ])
+
+function projectColumnCellEditing(
+  source: string,
+  column: RComponentSFC_AST_ElementNode,
+  cell: RComponentSFC_AST_ElementNode | null,
+): ComponentSFCTableCellEditingProjection {
+  if (source.slice(column.range.start, column.range.end).includes('<!--')) {
+    return sourceOwnedCellEditing(
+      false,
+      'source',
+      null,
+      column.range,
+      'Колонка содержит комментарии или произвольную разметку. Редактирование настраивается во вкладке Source.',
+    )
+  }
+
+  const children = (cell?.children ?? column.children).filter(isSemanticRoot)
+  const node = children.length === 1 && children[0]?.kind === 'element' ? children[0] : null
+  if (!node) {
+    return sourceOwnedCellEditing(
+      false,
+      children.length ? 'source' : 'unavailable',
+      null,
+      cell?.range ?? column.range,
+      children.length
+        ? 'Для визуальной настройки нужен один корневой Tag или Component внутри колонки.'
+        : 'Сначала выберите Tag или Component во вкладке «Данные».',
+    )
+  }
+
+  const editableDeclarations = node.attributes.filter(attribute => attribute.name === 'editable')
+  const enabled = node.tag === 'Editable' || editableDeclarations.length > 0
+  const sourceMode: ComponentSFCTableCellEditingProjection['mode'] = node.tag === 'Editable'
+    ? 'custom'
+    : node.tag === 'Component' || !isComponentSFCBuiltInTag(node.tag)
+      ? 'component'
+      : 'source'
+
+  if (!EDITABLE_PRIMITIVE_TAGS.has(node.tag)) {
+    return sourceOwnedCellEditing(
+      enabled,
+      sourceMode,
+      node.tag,
+      node.range,
+      node.tag === 'Editable'
+        ? 'Составной Editable с Variant сохраняется без преобразований и настраивается во вкладке Source.'
+        : enabled
+          ? `Editable-поведение ${node.tag} сохраняется без преобразований и настраивается во вкладке Source.`
+          : 'Встроенный визуальный editor доступен только для Text, Number и DateTime.',
+    )
+  }
+
+  if (editableDeclarations.length > 1) {
+    return sourceOwnedCellEditing(enabled, 'primitive', node.tag, node.range, 'Атрибут editable объявлен несколько раз.')
+  }
+  const editableAttribute = editableDeclarations[0] ?? null
+  if (editableAttribute && (editableAttribute.dynamic || editableAttribute.value != null)) {
+    return sourceOwnedCellEditing(enabled, 'primitive', node.tag, node.range, 'editable должен быть статическим boolean-атрибутом.')
+  }
+
+  const editOnDeclarations = node.attributes.filter(attribute => attribute.name === 'edit-on')
+  if (editOnDeclarations.length > 1) {
+    return sourceOwnedCellEditing(enabled, 'primitive', node.tag, node.range, 'edit-on объявлен несколько раз.')
+  }
+  const projectedTriggers = projectEditTriggers(editOnDeclarations[0] ?? null)
+  if (!projectedTriggers.editable) {
+    return {
+      ...projectedTriggers,
+      enabled,
+      mode: 'primitive',
+      tag: node.tag,
+      sourceRange: node.range,
+    }
+  }
+
+  return {
+    editable: true,
+    enabled,
+    mode: 'primitive',
+    tag: node.tag,
+    triggers: projectedTriggers.triggers,
+    usesDefaultTrigger: projectedTriggers.usesDefaultTrigger,
+    suffixes: projectedTriggers.suffixes,
+    sourceRange: node.range,
+  }
+}
+
+function sourceOwnedCellEditing(
+  enabled: boolean,
+  mode: ComponentSFCTableCellEditingProjection['mode'],
+  tag: string | null,
+  sourceRange: RComponentSFC_AST_ElementNode['range'],
+  message: string,
+): ComponentSFCTableCellEditingProjection {
+  return {
+    editable: false,
+    enabled,
+    mode,
+    tag,
+    triggers: [],
+    usesDefaultTrigger: false,
+    suffixes: [],
+    sourceRange,
+    message,
+  }
+}
+
+function projectEditTriggers(
+  attribute: RComponentSFC_AST_ElementNode['attributes'][number] | null,
+): Pick<ComponentSFCTableCellEditingProjection, 'editable' | 'triggers' | 'usesDefaultTrigger' | 'suffixes' | 'message'> {
+  if (!attribute) {
+    return {
+      editable: true,
+      triggers: [createInteractionTrigger('click')],
+      usesDefaultTrigger: true,
+      suffixes: [],
+    }
+  }
+
+  const suffixes = attribute.modifiers.filter(
+    (modifier): modifier is ComponentSFCTableCellInteractionFlag => CELL_INTERACTION_FLAGS.has(modifier as ComponentSFCTableCellInteractionFlag),
+  )
+  const unsupportedSuffix = attribute.modifiers.find(
+    modifier => !CELL_INTERACTION_FLAGS.has(modifier as ComponentSFCTableCellInteractionFlag),
+  )
+  if (unsupportedSuffix) {
+    return {
+      editable: false,
+      triggers: [],
+      usesDefaultTrigger: false,
+      suffixes,
+      message: `Modifier .${unsupportedSuffix} не поддерживается visual editor-ом edit-on.`,
+    }
+  }
+  const raw = attribute.value?.trim() ?? ''
+  if (!raw) {
+    return { editable: false, triggers: [], usesDefaultTrigger: false, suffixes, message: 'edit-on требует непустое событие.' }
+  }
+  if (!attribute.dynamic) {
+    return {
+      editable: true,
+      triggers: [createInteractionTrigger(raw)],
+      usesDefaultTrigger: false,
+      suffixes,
+    }
+  }
+
+  try {
+    const expression: any = parseExpression(raw, { sourceType: 'module', plugins: ['typescript'] })
+    const nodes = expression.type === 'ArrayExpression' ? expression.elements : [expression]
+    const triggers = (nodes as any[]).map(node => projectInteractionTrigger(node))
+    if (!triggers.length || triggers.some(trigger => !trigger)) {
+      return { editable: false, triggers: [], usesDefaultTrigger: false, suffixes, message: 'Сложный edit-on редактируется во вкладке Source.' }
+    }
+    return {
+      editable: true,
+      triggers: triggers as ComponentSFCInteractionTriggerProjection[],
+      usesDefaultTrigger: false,
+      suffixes,
+    }
+  }
+  catch {
+    return { editable: false, triggers: [], usesDefaultTrigger: false, suffixes, message: 'Не удалось разобрать edit-on. Исправьте выражение во вкладке Source.' }
+  }
+}
+
+function createInteractionTrigger(event: string): ComponentSFCInteractionTriggerProjection {
+  return {
+    event,
+    key: [],
+    code: [],
+    held: null,
+    modifiers: {},
+    repeat: null,
+    composing: null,
+    button: null,
+    flags: {},
+  }
+}
 
 function projectColumnCellInteractions(
   cell: RComponentSFC_AST_ElementNode | null,
@@ -344,18 +530,34 @@ function projectCellInteractionRule(
   node: any,
   source: string,
 ): ComponentSFCTableCellInteractionRuleProjection | null {
-  if (node?.type !== 'ObjectExpression') return null
-  const properties = new Map<string, any>()
-  for (const property of node.properties ?? []) {
-    if (property?.type !== 'ObjectProperty' || property.computed) return null
-    const name = babelPropertyName(property)
-    if (!name || properties.has(name)) return null
-    properties.set(name, property.value)
+  const trigger = projectInteractionTrigger(node, true)
+  if (!trigger || node?.type !== 'ObjectExpression') return null
+  const properties = babelObjectProperties(node)
+  if (!properties) return null
+  const reaction = properties.get('reaction')
+  if (!reaction) return null
+  if ([...properties.keys()].some(name => !INTERACTION_TRIGGER_FIELDS.has(name) && name !== 'reaction')) return null
+
+  return {
+    ...trigger,
+    reactionSource: source.slice(reaction.start ?? 0, reaction.end ?? source.length),
   }
+}
+
+const INTERACTION_TRIGGER_FIELDS = new Set([
+  'event', 'key', 'code', 'held', 'modifiers', 'repeat', 'composing', 'button',
+  ...CELL_INTERACTION_FLAGS,
+])
+
+function projectInteractionTrigger(node: any, allowReaction = false): ComponentSFCInteractionTriggerProjection | null {
+  const literalEvent = babelLiteralString(node)
+  if (literalEvent) return createInteractionTrigger(literalEvent)
+  if (node?.type !== 'ObjectExpression') return null
+  const properties = babelObjectProperties(node)
+  if (!properties) return null
 
   const event = babelLiteralString(properties.get('event'))
-  const reaction = properties.get('reaction')
-  if (!event || !reaction) return null
+  if (!event) return null
   const key = babelStringList(properties.get('key'))
   const code = babelStringList(properties.get('code'))
   if (key === null || code === null) return null
@@ -374,11 +576,7 @@ function projectCellInteractionRule(
   const button = babelNullableNumber(properties.get('button'))
   if (repeat === undefined || composing === undefined || button === undefined) return null
 
-  const supported = new Set([
-    'event', 'key', 'code', 'held', 'modifiers', 'repeat', 'composing', 'button',
-    ...CELL_INTERACTION_FLAGS, 'reaction',
-  ])
-  if ([...properties.keys()].some(name => !supported.has(name))) return null
+  if ([...properties.keys()].some(name => !INTERACTION_TRIGGER_FIELDS.has(name) && (!allowReaction || name !== 'reaction'))) return null
 
   return {
     event,
@@ -390,7 +588,6 @@ function projectCellInteractionRule(
     composing,
     button,
     flags,
-    reactionSource: source.slice(reaction.start ?? 0, reaction.end ?? source.length),
   }
 }
 

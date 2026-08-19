@@ -34,7 +34,7 @@ import { RuntimeScope } from '@/domain/entities/runtime/RuntimeScope'
 import { FilterViewRuntimeHost as EndgeFilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
 import { Endge } from '@/model/kernel/endge'
 import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
-import { cloneI18nRuntimeCatalog, extendI18nRuntimeCatalog } from '@/model/services/i18n/i18n-catalog'
+import { buildCompositionI18nCatalogs, cloneI18nRuntimeCatalog } from '@/model/services/i18n/i18n-catalog'
 
 function defaultContext(): RuntimeHostContext<'composition'> {
   return {
@@ -610,17 +610,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
 
   /** Строит effective catalogs по той же иерархии, что и lifecycle scopes. */
   private _buildI18nCatalogs(payload: CompositionProgramPayload): void {
-    this._i18nCatalogs.clear()
     const inherited = (this.meta.i18nCatalog ?? {}) as I18nRuntimeCatalog
-    for (const scope of [...payload.scopes].sort((left, right) => left.sourceOrder - right.sourceOrder)) {
-      const parent = scope.parentPath
-        ? this._i18nCatalogs.get(scope.parentPath) ?? inherited
-        : inherited
-      const resources = (payload.i18nResources ?? [])
-        .filter(resource => resource.scopePath === scope.path)
-        .sort((left, right) => left.sourceOrder - right.sourceOrder)
-      this._i18nCatalogs.set(scope.path, extendI18nRuntimeCatalog(parent, resources))
-    }
+    this._i18nCatalogs = buildCompositionI18nCatalogs(payload, inherited)
   }
 
   /** Строит nearest-scope catalog публичных Vocab aliases поверх shared cache paths. */

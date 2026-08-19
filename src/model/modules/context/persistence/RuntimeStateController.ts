@@ -1,5 +1,6 @@
 import type {
   EndgePersistenceScope,
+  EndgePersistenceScopeResolver,
   EndgeStorageAdapter,
   RuntimeStateControllerLike,
   RuntimeStateDocument,
@@ -25,22 +26,33 @@ export function buildRuntimeStateStorageKey(
 export class RuntimeStateController implements RuntimeStateControllerLike {
   public readonly runtimeId: string
   public readonly storageId: string
-  public readonly storageKey: string
-  public readonly scope: EndgePersistenceScope
 
   private readonly _adapter: EndgeStorageAdapter
+  private readonly _resolveScope: EndgePersistenceScopeResolver
 
   public constructor(input: {
     runtimeId: string
     storageId?: string
-    scope: EndgePersistenceScope
+    scope: EndgePersistenceScope | EndgePersistenceScopeResolver
     adapter: EndgeStorageAdapter
   }) {
     this.runtimeId = normalizeRequiredId(input.runtimeId, 'runtimeId')
     this.storageId = normalizeRequiredId(input.storageId ?? input.runtimeId, 'storageId')
-    this.scope = { ...input.scope }
+    const scope = input.scope
+    this._resolveScope = typeof scope === 'function'
+      ? scope
+      : () => scope
     this._adapter = input.adapter
-    this.storageKey = buildRuntimeStateStorageKey(this.scope, this.storageId)
+  }
+
+  /** Возвращает актуальный persistence scope, включая текущую session identity. */
+  public get scope(): EndgePersistenceScope {
+    return { ...this._resolveScope() }
+  }
+
+  /** Строит storage key из актуального scope, чтобы переавторизация не сохраняла данные прежнему пользователю. */
+  public get storageKey(): string {
+    return buildRuntimeStateStorageKey(this.scope, this.storageId)
   }
 
   public get<T>(entityKey: string, section: string, fallback: T): T {

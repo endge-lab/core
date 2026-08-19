@@ -3,6 +3,7 @@ import type {
   ComponentSFCTableSourcePatchResult,
   ComponentSFCTableVisualCellTag,
   ComponentSFCTableVisualMenuKind,
+  ComponentSFCInteractionTriggerProjection,
 } from '@/domain/types/component/sfc/visual-projection.types'
 import type {
   RComponentSFC_AST_ElementNode,
@@ -34,7 +35,11 @@ const NON_VISUAL_CELL_TAGS = new Set([
   'RowMenu',
   'MenuItem',
   'MenuSeparator',
+  'Editable',
+  'Variant',
 ])
+
+const EDITABLE_PRIMITIVE_TAGS = new Set(['Text', 'Number', 'DateTime'])
 
 /** Применяет одну узкую visual-editor операцию, не перепечатывая остальной SFC source. */
 export function patchComponentSFCTableSource(
@@ -67,6 +72,8 @@ export function patchComponentSFCTableSource(
         diagnostics: inspection.diagnostics,
         message: patch.type === 'set-column-cell-on'
           ? `Некорректный :on: ${firstError?.message ?? 'выражение нарушило структуру template.'}`
+          : patch.type === 'set-column-cell-editable' || patch.type === 'set-column-cell-edit-triggers'
+            ? `Некорректный editable: ${firstError?.message ?? 'изменение нарушило структуру template.'}`
           : 'Изменение нарушило структуру корневого Table.',
       }
     }
@@ -83,6 +90,22 @@ export function patchComponentSFCTableSource(
           projection: inspectComponentSFCVisual(source).projection,
           diagnostics: inspection.diagnostics,
           message: interactionError.message,
+        }
+      }
+    }
+    if (patch.type === 'set-column-cell-editable' || patch.type === 'set-column-cell-edit-triggers') {
+      const editableError = inspection.diagnostics.find(diagnostic => (
+        diagnostic.severity === 'error'
+        && (diagnostic.code.startsWith('sfc-editable') || diagnostic.code.startsWith('sfc-edit-on'))
+      ))
+      if (editableError) {
+        return {
+          ok: false,
+          source,
+          changed: false,
+          projection: inspectComponentSFCVisual(source).projection,
+          diagnostics: inspection.diagnostics,
+          message: editableError.message,
         }
       }
     }
@@ -160,6 +183,18 @@ function applyTablePatch(
         source,
         requireColumn(context, patch.columnIndex),
         patch.value,
+      )
+    case 'set-column-cell-editable':
+      return setColumnCellEditable(
+        source,
+        requireColumn(context, patch.columnIndex),
+        patch.enabled,
+      )
+    case 'set-column-cell-edit-triggers':
+      return setColumnCellEditTriggers(
+        source,
+        requireColumn(context, patch.columnIndex),
+        patch.triggers,
       )
     case 'set-menu-mode':
       return setMenuMode(source, context, patch.menu, patch.mode)
@@ -585,6 +620,144 @@ function setColumnCellOn(
     last.range.end,
     `<Cell ${attribute}>\n${indent}  ${original}\n${indent}</Cell>`,
   )
+}
+
+function setColumnCellEditable(
+  source: string,
+  column: RComponentSFC_AST_ElementNode,
+  enabled: boolean,
+): string {
+  const node = requireEditablePrimitiveColumnCellElement(source, column)
+  if (enabled)
+    return setStaticBooleanAttribute(source, node, 'editable', true)
+
+  // Удаляем с конца, чтобы первая правка не сдвигала диапазоны следующей.
+  const declarations = node.attributes
+    .filter(attribute => attribute.name === 'editable' || attribute.name === 'edit-on')
+    .sort((left, right) => right.range.start - left.range.start)
+  return declarations.reduce(
+    (nextSource, declaration) => removeRangeWithWhitespace(nextSource, declaration.range.start, declaration.range.end),
+    source,
+  )
+}
+
+function setColumnCellEditTriggers(
+  source: string,
+  column: RComponentSFC_AST_ElementNode,
+  triggers: ComponentSFCInteractionTriggerProjection[],
+): string {
+  const node = requireEditablePrimitiveColumnCellElement(source, column)
+  const editable = node.attributes.find(attribute => attribute.name === 'editable') ?? null
+  if (!editable || editable.dynamic || editable.value != null)
+    throw new Error('Сначала включите статический editable для выбранного элемента.')
+
+  const declarations = node.attributes.filter(attribute => attribute.name === 'edit-on')
+  if (declarations.length > 1)
+    throw new Error('edit-on объявлен несколько раз. Измените его во вкладке Source.')
+  const declaration = declarations[0] ?? null
+  if (!triggers.length) {
+    return declaration
+      ? removeRangeWithWhitespace(source, declaration.range.start, declaration.range.end)
+      : source
+  }
+
+  for (const trigger of triggers) {
+    if (!trigger.event.trim())
+      throw new Error('Trigger входа в редактирование требует непустое событие.')
+    if (trigger.flags.prevent && trigger.flags.passive)
+      throw new Error('Trigger не может одновременно использовать prevent и passive.')
+  }
+
+  const suffix = declaration?.modifiers.map(modifier => `.${modifier}`).join('') ?? ''
+  const attribute = !suffix && triggers.length === 1 && isPlainInteractionTrigger(triggers[0]!)
+    ? serializeAttribute(`edit-on${suffix}`, triggers[0]!.event.trim())
+    : serializeAttributeValue(
+        `edit-on${suffix}`,
+        triggers.length === 1
+          ? serializeInteractionTrigger(triggers[0]!)
+          : `[${triggers.map(serializeInteractionTrigger).join(', ')}]`,
+        'expression',
+      )
+
+  if (declaration) {
+    return replaceRange(source, declaration.range.start, declaration.range.end, attribute)
+  }
+  return insertAttribute(source, node, attribute)
+}
+
+function requireEditablePrimitiveColumnCellElement(
+  source: string,
+  column: RComponentSFC_AST_ElementNode,
+): RComponentSFC_AST_ElementNode {
+  const node = requireManagedColumnCellElement(source, column)
+  if (!EDITABLE_PRIMITIVE_TAGS.has(node.tag))
+    throw new Error('Встроенный visual editor поддерживает editable только для Text, Number и DateTime.')
+  return node
+}
+
+function setStaticBooleanAttribute(
+  source: string,
+  node: RComponentSFC_AST_ElementNode,
+  name: string,
+  enabled: boolean,
+): string {
+  const declarations = node.attributes.filter(attribute => attribute.name === name)
+  if (declarations.length > 1)
+    throw new Error(`${name} объявлен несколько раз. Измените его во вкладке Source.`)
+  const declaration = declarations[0] ?? null
+  if (declaration && (declaration.dynamic || declaration.value != null))
+    throw new Error(`${name} должен быть статическим boolean-атрибутом.`)
+  if (enabled)
+    return declaration ? source : insertAttribute(source, node, name)
+  return declaration
+    ? removeRangeWithWhitespace(source, declaration.range.start, declaration.range.end)
+    : source
+}
+
+function isPlainInteractionTrigger(trigger: ComponentSFCInteractionTriggerProjection): boolean {
+  return !trigger.key.length
+    && !trigger.code.length
+    && !trigger.held
+    && Object.keys(trigger.modifiers).length === 0
+    && trigger.repeat == null
+    && trigger.composing == null
+    && trigger.button == null
+    && !Object.values(trigger.flags).some(value => value != null)
+}
+
+function serializeInteractionTrigger(trigger: ComponentSFCInteractionTriggerProjection): string {
+  const fields = [`event: ${quoteExpressionString(trigger.event.trim())}`]
+  if (trigger.key.length) fields.push(`key: ${serializeExpressionStringList(trigger.key)}`)
+  if (trigger.code.length) fields.push(`code: ${serializeExpressionStringList(trigger.code)}`)
+  if (trigger.held) {
+    const held = []
+    if (trigger.held.key.length) held.push(`key: ${serializeExpressionStringList(trigger.held.key)}`)
+    if (trigger.held.code.length) held.push(`code: ${serializeExpressionStringList(trigger.held.code)}`)
+    if (trigger.held.match === 'any') held.push(`match: 'any'`)
+    if (trigger.held.exact) held.push('exact: true')
+    if (held.length) fields.push(`held: { ${held.join(', ')} }`)
+  }
+  const modifiers = Object.entries(trigger.modifiers)
+    .filter(([, value]) => value != null)
+    .map(([name, value]) => `${name}: ${value}`)
+  if (modifiers.length) fields.push(`modifiers: { ${modifiers.join(', ')} }`)
+  if (trigger.repeat != null) fields.push(`repeat: ${trigger.repeat}`)
+  if (trigger.composing != null) fields.push(`composing: ${trigger.composing}`)
+  if (trigger.button != null) fields.push(`button: ${trigger.button}`)
+  for (const flag of ['stop', 'prevent', 'self', 'once', 'capture', 'passive'] as const) {
+    if (trigger.flags[flag] === true) fields.push(`${flag}: true`)
+  }
+  return `{ ${fields.join(', ')} }`
+}
+
+function serializeExpressionStringList(values: string[]): string {
+  return values.length === 1
+    ? quoteExpressionString(values[0]!)
+    : `[${values.map(quoteExpressionString).join(', ')}]`
+}
+
+function quoteExpressionString(value: string): string {
+  return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
 }
 
 function requireManagedColumnCellElement(

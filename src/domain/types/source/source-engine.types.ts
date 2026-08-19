@@ -1,3 +1,5 @@
+import type { I18nCatalogProvenance, I18nRuntimeCatalog } from '@/domain/types/i18n.types'
+
 /** Канонический тип source-документа, для которого выбирается source strategy. */
 export type SourceKind = 'query' | 'data-view' | 'filter' | 'composition' | 'store' | 'stream' | 'update' | 'computation' | 'style' | 'type'
 
@@ -35,6 +37,23 @@ export interface SourceLanguageContext {
 
   /** Identity of the document that owns current source diagnostics. */
   ownerIdentity?: string
+
+  /** Effective translation catalogs for all current Project occurrences. */
+  i18n?: SourceLanguageI18nContext
+}
+
+/** One statically projected Composition occurrence in the current Project. */
+export interface SourceLanguageI18nOccurrence {
+  id: string
+  catalogsByScope: Readonly<Record<string, I18nRuntimeCatalog>>
+  provenanceByScope: Readonly<Record<string, I18nCatalogProvenance>>
+}
+
+/** Translation input prepared by the application without mounting Runtime. */
+export interface SourceLanguageI18nContext {
+  locale: string
+  fallbackLocale: string
+  occurrences: readonly SourceLanguageI18nOccurrence[]
 }
 
 /** Нейтральная completion item, которую editor adapter мапит в свой формат. */
@@ -64,6 +83,7 @@ export type SourceDocumentReferenceTarget
     | 'converter'
     | 'data-view'
     | 'filter'
+    | 'i18n-bundles'
     | 'mock'
     | 'query'
     | 'store'
@@ -93,6 +113,15 @@ export interface SourceLanguageSemanticHighlight {
   kind: 'type-reference'
   status: 'resolved' | 'unresolved'
   identity: string
+  range: SourceDocumentReference['range']
+}
+
+/** Renderer-neutral inline annotation shown after one source range. */
+export interface SourceLanguageInlineHint {
+  kind: 'translation'
+  status: 'resolved' | 'ambiguous'
+  text: string
+  tooltip?: string
   range: SourceDocumentReference['range']
 }
 
@@ -259,4 +288,7 @@ export interface SourceLanguageStrategy {
 
   /** Возвращает semantic highlights без привязки к конкретному editor adapter. */
   semanticHighlights?: (context: SourceLanguageContext) => SourceLanguageSemanticHighlight[]
+
+  /** Возвращает inline annotations без привязки к конкретному editor adapter. */
+  inlineHints?: (context: SourceLanguageContext) => SourceLanguageInlineHint[]
 }

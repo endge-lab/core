@@ -4,6 +4,7 @@ import type {
   SourceEngineStrategy,
   SourceLanguageCompletion,
   SourceLanguageContext,
+  SourceLanguageInlineHint,
   SourceLanguageSemanticHighlight,
   SourceDocumentReference,
   SourceLanguageStrategy,
@@ -174,6 +175,11 @@ export class EndgeSource extends EndgeModule {
   /** Возвращает renderer-neutral semantic highlights для source-документа. */
   public semanticHighlights(sourceKind: SourceKind | string, context: SourceLanguageContext): SourceLanguageSemanticHighlight[] {
     return this._resolveRequiredLanguageStrategy(sourceKind).semanticHighlights?.(context) ?? []
+  }
+
+  /** Возвращает renderer-neutral inline annotations для source-документа. */
+  public inlineHints(sourceKind: SourceKind | string, context: SourceLanguageContext): SourceLanguageInlineHint[] {
+    return this._resolveRequiredLanguageStrategy(sourceKind).inlineHints?.(context) ?? []
   }
 
   /** Регистрирует встроенные strategies ядра. */

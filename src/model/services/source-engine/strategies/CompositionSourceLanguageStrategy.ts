@@ -7,6 +7,10 @@ import type {
 } from '@/domain/types/source/source-engine.types'
 
 import { compileCompositionSource } from '@/model/services/source-engine/compilers/composition-source-compile'
+import {
+  compositionSourceI18nHints,
+  compositionSourceI18nReferenceAt,
+} from '@/model/services/source-engine/composition-source-i18n-hints'
 import { normalizeCompositionSourceTypeReferences } from '@/model/services/source-engine/composition-source-normalize'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
 import { resolveTypedSourceDocumentReference, typedSourceTypeReferenceHighlights } from '@/model/services/source-engine/source-document-reference'
@@ -58,6 +62,7 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
         composition: 'composition',
         filter: 'filter',
         filterView: 'filter',
+        i18n: 'i18n-bundles',
         mock: 'mock',
         query: 'query',
         stream: 'stream',
@@ -69,11 +74,15 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
         component: 'component',
         dataView: 'data-view',
       },
-    })
+    }) ?? compositionSourceI18nReferenceAt(context)
   }
 
   public semanticHighlights(context: SourceLanguageContext) {
     return typedSourceTypeReferenceHighlights(context)
+  }
+
+  public inlineHints(context: SourceLanguageContext) {
+    return compositionSourceI18nHints(context)
   }
 }
 

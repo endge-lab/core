@@ -26,6 +26,8 @@ export interface EndgePersistenceScope {
   userId: string
 }
 
+export type EndgePersistenceScopeResolver = () => EndgePersistenceScope
+
 export interface EndgeSessionIdentity {
   userId?: string | null
   tenantId?: string | null

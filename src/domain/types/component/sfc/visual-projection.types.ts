@@ -25,8 +25,8 @@ export type ComponentSFCTableCellInteractionModifier
 export type ComponentSFCTableCellInteractionFlag
   = 'stop' | 'prevent' | 'self' | 'once' | 'capture' | 'passive'
 
-/** Visual-editor-safe projection of one static Cell `:on` rule. */
-export interface ComponentSFCTableCellInteractionRuleProjection {
+/** UI-neutral projection одного статически разбираемого trigger взаимодействия. */
+export interface ComponentSFCInteractionTriggerProjection {
   event: string
   key: string[]
   code: string[]
@@ -41,10 +41,14 @@ export interface ComponentSFCTableCellInteractionRuleProjection {
   composing: boolean | null
   button: number | null
   flags: Partial<Record<ComponentSFCTableCellInteractionFlag, boolean>>
+}
+
+/** UI-neutral projection одного статически разбираемого правила Cell `:on`. */
+export interface ComponentSFCTableCellInteractionRuleProjection extends ComponentSFCInteractionTriggerProjection {
   reactionSource: string
 }
 
-/** Source-preserving Cell interaction read-model used by the Table visual editor. */
+/** Source-preserving read-model взаимодействий Cell для visual editor таблицы. */
 export interface ComponentSFCTableCellInteractionsProjection {
   editable: boolean
   rules: ComponentSFCTableCellInteractionRuleProjection[]
@@ -53,10 +57,23 @@ export interface ComponentSFCTableCellInteractionsProjection {
   message?: string
 }
 
+/** Source-backed editable-поведение единственного управляемого корня ячейки Table. */
+export interface ComponentSFCTableCellEditingProjection {
+  editable: boolean
+  enabled: boolean
+  mode: 'primitive' | 'custom' | 'component' | 'source' | 'unavailable'
+  tag: string | null
+  triggers: ComponentSFCInteractionTriggerProjection[]
+  usesDefaultTrigger: boolean
+  suffixes: ComponentSFCTableCellInteractionFlag[]
+  sourceRange?: RComponentSFC_SourceRange
+  message?: string
+}
+
 /** Способ, которым содержимое ячейки представлено в простом visual editor. */
 export type ComponentSFCTableVisualCellTag = Exclude<
   RComponentSFC_IR_Tag,
-  'Component' | 'Table' | 'Column' | 'Cell' | 'ColumnMenu' | 'RowMenu' | 'MenuItem' | 'MenuSeparator'
+  'Component' | 'Table' | 'Column' | 'Cell' | 'ColumnMenu' | 'RowMenu' | 'MenuItem' | 'MenuSeparator' | 'Editable' | 'Variant'
 >
 
 export type ComponentSFCTableCellProjection
@@ -96,6 +113,7 @@ export interface ComponentSFCTableColumnProjection {
   pinnable: ComponentSFCVisualSourceValue | null
   attributes: ComponentSFCVisualAttribute[]
   cell: ComponentSFCTableCellProjection
+  editing: ComponentSFCTableCellEditingProjection
   interactions: ComponentSFCTableCellInteractionsProjection
   hasCustomCell: boolean
   cellSource: string | null
@@ -186,6 +204,17 @@ export type ComponentSFCTableSourcePatch
       columnIndex: number
       /** Complete object/array expression, or null to remove the annotation. */
       value: string | null
+    }
+    | {
+      type: 'set-column-cell-editable'
+      columnIndex: number
+      enabled: boolean
+    }
+    | {
+      type: 'set-column-cell-edit-triggers'
+      columnIndex: number
+      /** Empty list restores the implicit click trigger and removes edit-on from Source. */
+      triggers: ComponentSFCInteractionTriggerProjection[]
     }
     | {
       type: 'set-menu-mode'

@@ -212,7 +212,7 @@ export class EndgeContext extends EndgeModule {
     const controller = new RuntimeStateController({
       runtimeId,
       storageId: input.storageId,
-      scope: persistence.driver === 'disabled'
+      scope: () => persistence.driver === 'disabled'
         ? this.getDisabledPersistenceScope()
         : this.getPersistenceScope(),
       adapter: this.resolveAdapter(persistence),

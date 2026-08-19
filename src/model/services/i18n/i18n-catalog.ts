@@ -5,6 +5,7 @@ import type {
   I18nRuntimeCatalog,
 } from '@/domain/types/i18n.types'
 import type { CompositionI18nResourceArtifact } from '@/domain/types/source/composition-source.types'
+import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
 
 /** Материализует authored locale trees в плоские dot-path индексы. */
 export function compileI18nLocales(locales: I18nLocales): I18nCompiledLocales {
@@ -41,6 +42,24 @@ export function extendI18nRuntimeCatalog(
     catalog[resource.name] = { messages }
   }
   return catalog
+}
+
+/** Строит effective translation catalogs всех lifecycle scopes Composition. */
+export function buildCompositionI18nCatalogs(
+  payload: CompositionProgramPayload,
+  inherited: I18nRuntimeCatalog = {},
+): Map<string, I18nRuntimeCatalog> {
+  const catalogs = new Map<string, I18nRuntimeCatalog>()
+  for (const scope of [...payload.scopes].sort((left, right) => left.sourceOrder - right.sourceOrder)) {
+    const parent = scope.parentPath
+      ? catalogs.get(scope.parentPath) ?? inherited
+      : inherited
+    const resources = (payload.i18nResources ?? [])
+      .filter(resource => resource.scopePath === scope.path)
+      .sort((left, right) => left.sourceOrder - right.sourceOrder)
+    catalogs.set(scope.path, extendI18nRuntimeCatalog(parent, resources))
+  }
+  return catalogs
 }
 
 /** Создаёт независимый snapshot runtime catalog для передачи дочернему host. */
