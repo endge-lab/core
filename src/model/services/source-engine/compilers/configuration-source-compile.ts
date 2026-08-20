@@ -53,9 +53,11 @@ export function compileConfigurationSource(
       if (value) values.push(value)
     }
 
+    const draftDocument = { values }
     return {
       ast,
-      document: diagnostics.some(item => item.severity === 'error') ? null : { values },
+      document: diagnostics.some(item => item.severity === 'error') ? null : draftDocument,
+      draftDocument,
       diagnostics,
     }
   }
@@ -217,4 +219,3 @@ function humanize(value: string): string {
 function isReservedKey(key: string): boolean {
   return key === '__proto__' || key === 'prototype' || key === 'constructor'
 }
-

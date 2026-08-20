@@ -270,6 +270,7 @@ const ports = definePorts({ emits: { opened: event<{ id: string }>() } })
                 kind: 'object',
                 entries: [
                   { key: 'aircraftType', value: { kind: 'event', path: 'value' } },
+                  { key: 'updatedAt', value: { kind: 'now' } },
                 ],
               },
             },
@@ -289,7 +290,13 @@ const ports = definePorts({ emits: { opened: event<{ id: string }>() } })
       { rowKey: 15 },
     )
 
-    expect(run).toHaveBeenCalledWith({ id: 15, payload: { aircraftType: 'A320' } })
+    expect(run).toHaveBeenCalledWith({
+      id: 15,
+      payload: {
+        aircraftType: 'A320',
+        updatedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T.*Z$/),
+      },
+    })
     host.destroy()
   })
 

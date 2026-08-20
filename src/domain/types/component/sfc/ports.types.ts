@@ -111,9 +111,10 @@ export interface ComponentSFCEventSource {
   event: string
 }
 
-/** Renderer-neutral value mapped from an Event payload into Action input. */
+/** Renderer-neutral safe expression mapped into an Event reaction input. */
 export type ComponentSFCEventInputValue
   = | { kind: 'event', path: string | null }
+    | { kind: 'now' }
     | { kind: 'scope', path: string }
     | { kind: 'literal', value: unknown }
     | { kind: 'array', items: ComponentSFCEventInputValue[] }

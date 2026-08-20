@@ -88,6 +88,46 @@ describe('Component SFC :on interactions', () => {
     }
   })
 
+  it('compiles a context-backed TriggerSet with one shared Query reaction', () => {
+    const result = compileComponentSFC(`<template>
+  <Cell :on="{
+    triggers: $context.config.groundHandling.actualTimeTriggers,
+    reaction: query({
+      identity: 'groundHandling.actualTime.update',
+      input: {
+        legId: row.arrivalLeg.id,
+        station: row.arrivalLeg.latestArrivalStationIataCode,
+        code: 'Bridge On',
+        point: 'value',
+        value: now(),
+        comment: null,
+      },
+    }),
+  }"><Text value="Bridge" /></Cell>
+</template>`)
+
+    expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
+    const root = result.ir?.template?.roots[0]
+    if (!root || root.kind !== 'element') throw new Error('Cell root was not compiled')
+    const group = root.interactions?.[0]
+    expect(group?.rules).toEqual([])
+    expect(group?.triggerSet?.events).toEqual(expect.arrayContaining(['contextmenu', 'keydown']))
+    expect(group?.triggerSet?.triggers).toMatchObject({
+      kind: 'expression',
+      source: '$context.config.groundHandling.actualTimeTriggers',
+    })
+    expect(group?.triggerSet?.reactions).toEqual([
+      expect.objectContaining({
+        kind: 'query',
+        identity: 'groundHandling.actualTime.update',
+        input: expect.objectContaining({
+          value: { kind: 'now' },
+        }),
+      }),
+    ])
+    expect(result.dependencies.queries).toContain('groundHandling.actualTime.update')
+  })
+
   it('executes a reaction list sequentially and stops after a failed reaction', async () => {
     const calls: string[] = []
     const host = {

@@ -18,6 +18,7 @@ const TRIGGER_KEYS = new Set([
   'event', 'key', 'code', 'held', 'modifiers', 'repeat', 'composing', 'button',
   'stop', 'prevent', 'self', 'once', 'capture', 'passive', 'reaction',
 ])
+const TRIGGER_SET_KEYS = new Set(['triggers', 'reaction'])
 
 export interface ComponentSFCInteractionCompileContext {
   props: string[]
@@ -88,6 +89,19 @@ export function compileComponentSFCInteractionAnnotation(
     return null
   }
 
+  if (isTriggerSetRule(expression)) {
+    return compileTriggerSetRule(
+      expression,
+      source,
+      suffixes,
+      attribute,
+      manifest,
+      context,
+      dependencies,
+      diagnostics,
+    )
+  }
+
   const nodes = expression.type === 'ArrayExpression' ? expression.elements : [expression]
   if (nodes.length === 0) {
     pushDiagnostic(diagnostics, attribute, 'sfc-template-on-empty', ':on требует хотя бы одно правило.')
@@ -102,6 +116,97 @@ export function compileComponentSFCInteractionAnnotation(
   }
   if (invalid || rules.length === 0) return null
   return { rules, sourceRange: attribute.range }
+}
+
+/** Compiles `{ triggers, reaction }` by retaining one runtime TriggerSet expression. */
+function compileTriggerSetRule(
+  node: any,
+  source: string,
+  suffixes: RComponentSFC_IR_EventModifier[],
+  attribute: RComponentSFC_AST_Attribute,
+  manifest: ComponentSFCPortManifest | null,
+  context: ComponentSFCInteractionCompileContext,
+  dependencies: RComponentDependencies,
+  diagnostics: RComponentDiagnostic[],
+): RComponentSFC_IR_InteractionGroup | null {
+  const properties = node.properties ?? []
+  if (properties.some((property: any) => property?.type !== 'ObjectProperty' || property.computed)) {
+    pushDiagnostic(diagnostics, attribute, 'sfc-template-on-trigger-set-shape', 'Ссылочная форма :on не поддерживает spread, methods и computed properties.')
+    return null
+  }
+
+  const byName = new Map<string, any>()
+  for (const property of properties) {
+    const name = propertyName(property)
+    if (!name || !TRIGGER_SET_KEYS.has(name) || byName.has(name)) {
+      pushDiagnostic(diagnostics, attribute, 'sfc-template-on-trigger-set-property', `Ссылочная форма :on содержит недопустимое или повторное поле "${name || '<computed>'}".`)
+      return null
+    }
+    byName.set(name, property)
+  }
+
+  const triggersNode = byName.get('triggers')?.value
+  if (!triggersNode) {
+    pushDiagnostic(diagnostics, attribute, 'sfc-template-on-triggers-missing', 'Ссылочная форма :on требует поле triggers.')
+    return null
+  }
+  const reactionNode = byName.get('reaction')?.value
+  if (!reactionNode) {
+    pushDiagnostic(diagnostics, attribute, 'sfc-template-on-reaction-missing', 'Ссылочная форма :on требует reaction.')
+    return null
+  }
+
+  const trigger = compileComponentSFCExpression(sliceNode(source, triggersNode), {
+    props: context.props,
+    locals: context.locals,
+    sourcePath: 'template.on.triggers',
+  })
+  diagnostics.push(...trigger.diagnostics)
+
+  const eventNames = [...new Set(manifest?.emits.events.map(event => event.name).filter(Boolean) ?? [])]
+  if (eventNames.length === 0) {
+    pushDiagnostic(diagnostics, attribute, 'sfc-template-on-event-unknown', 'Тег не имеет event-поверхности для ссылочного TriggerSet.')
+    return null
+  }
+
+  const reactionNodes = reactionNode.type === 'ArrayExpression' ? reactionNode.elements : [reactionNode]
+  if (reactionNodes.length === 0 || reactionNodes.some((item: any) => !item || item.type === 'SpreadElement')) {
+    pushDiagnostic(diagnostics, attribute, 'sfc-template-on-reaction-shape', 'reaction требует одну реакцию или непустой массив реакций.')
+    return null
+  }
+  const reactions = reactionNodes.flatMap((item: any) => {
+    const reactionSource = sliceNode(source, item)
+    const compiled = compileComponentSFCLocalEventAction(
+      eventNames[0]!,
+      reactionSource,
+      attribute.range.start + (item.start ?? 0),
+      dependencies,
+      diagnostics,
+    )
+    return compiled ? [compiled] : []
+  })
+  if (reactions.length !== reactionNodes.length) return null
+
+  const sourceRange = {
+    start: attribute.range.start + (node.start ?? 0),
+    end: attribute.range.start + (node.end ?? source.length),
+  }
+  return {
+    rules: [],
+    triggerSet: {
+      triggers: trigger.value,
+      events: eventNames,
+      modifiers: suffixes,
+      reactions,
+      sourceRange,
+    },
+    sourceRange: attribute.range,
+  }
+}
+
+function isTriggerSetRule(node: any): boolean {
+  if (node?.type !== 'ObjectExpression') return false
+  return (node.properties ?? []).some((property: any) => propertyName(property) === 'triggers')
 }
 
 function compileRule(

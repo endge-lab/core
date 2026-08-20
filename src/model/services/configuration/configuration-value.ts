@@ -137,9 +137,10 @@ function validateExpression(
     if (!type)
       return [error(path, `Unknown Type "${identity}"`)]
     if (type.category === 'reference') {
-      return typeof value === 'string' || typeof value === 'number'
-        ? []
-        : [error(path, `Expected ${identity} identity`)]
+      const valid = type.entityReference?.storage === 'identity'
+        ? typeof value === 'string' && value.trim().length > 0
+        : (typeof value === 'string' && value.trim().length > 0) || (typeof value === 'number' && Number.isFinite(value))
+      return valid ? [] : [error(path, `Expected non-empty ${identity} reference`)]
     }
     if (!type.definition || visiting.has(identity))
       return []
@@ -196,4 +197,3 @@ function isRecord(value: unknown): value is Record<string, EndgeJSONValue> {
 function isSafeKey(key: string): boolean {
   return key !== '__proto__' && key !== 'prototype' && key !== 'constructor'
 }
-

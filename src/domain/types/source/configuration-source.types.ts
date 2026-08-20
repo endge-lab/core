@@ -40,6 +40,8 @@ export interface ConfigurationProgramPayload {
 export interface ConfigurationSourceCompileResult {
   ast: unknown | null
   document: ConfigurationSourceDocument | null
+  /** Best-effort AST projection for visual repair when semantic diagnostics block compilation. */
+  draftDocument?: ConfigurationSourceDocument | null
   diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
 }
 

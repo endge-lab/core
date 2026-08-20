@@ -46,14 +46,19 @@ function defaultContext(): RuntimeHostContext<'composition'> {
   }
 }
 
-function evaluateComponentEventInput(value: ComponentSFCEventInputValue, payload: unknown): unknown {
+function evaluateComponentEventInput(
+  value: ComponentSFCEventInputValue,
+  payload: unknown,
+  evaluatedAt = new Date().toISOString(),
+): unknown {
   if (value.kind === 'event') return value.path == null ? payload : readValuePath(payload, value.path)
+  if (value.kind === 'now') return evaluatedAt
   if (value.kind === 'literal') return value.value
   if (value.kind === 'scope') return undefined
-  if (value.kind === 'array') return value.items.map(item => evaluateComponentEventInput(item, payload))
+  if (value.kind === 'array') return value.items.map(item => evaluateComponentEventInput(item, payload, evaluatedAt))
   return Object.fromEntries(value.entries.map(entry => [
-    typeof entry.key === 'string' ? entry.key : String(evaluateComponentEventInput(entry.key, payload)),
-    evaluateComponentEventInput(entry.value, payload),
+    typeof entry.key === 'string' ? entry.key : String(evaluateComponentEventInput(entry.key, payload, evaluatedAt)),
+    evaluateComponentEventInput(entry.value, payload, evaluatedAt),
   ]))
 }
 
@@ -1223,12 +1228,13 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     occurrence: ComponentSFCEventOccurrence,
     runtimeAlias: string,
   ): Promise<void> {
+    const evaluatedAt = new Date().toISOString()
     try {
       if (effect.kind === 'apply-update') {
         this.applyStoreUpdate(
           effect.data,
           effect.update,
-          effect.input ? evaluateComponentEventInput(effect.input, occurrence.payload) : occurrence.payload,
+          effect.input ? evaluateComponentEventInput(effect.input, occurrence.payload, evaluatedAt) : occurrence.payload,
         )
         return
       }
@@ -1236,15 +1242,15 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         this.mutateStore(effect.data, {
           strategy: effect.mutation.strategy,
           path: effect.mutation.path,
-          ...(effect.mutation.value ? { value: evaluateComponentEventInput(effect.mutation.value, occurrence.payload) } : {}),
+          ...(effect.mutation.value ? { value: evaluateComponentEventInput(effect.mutation.value, occurrence.payload, evaluatedAt) } : {}),
           ...(effect.mutation.vars
-            ? { vars: Object.fromEntries(Object.entries(effect.mutation.vars).map(([key, value]) => [key, evaluateComponentEventInput(value, occurrence.payload)])) }
+            ? { vars: Object.fromEntries(Object.entries(effect.mutation.vars).map(([key, value]) => [key, evaluateComponentEventInput(value, occurrence.payload, evaluatedAt)])) }
             : {}),
         })
         return
       }
       await Endge.actions.execute(effect.action, {
-        input: effect.input ? evaluateComponentEventInput(effect.input, occurrence.payload) : occurrence.payload,
+        input: effect.input ? evaluateComponentEventInput(effect.input, occurrence.payload, evaluatedAt) : occurrence.payload,
         target: occurrence.source?.target,
         context: {
           surface: 'composition-event',

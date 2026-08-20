@@ -709,6 +709,9 @@ function collectTemplateEmittedEvents(nodes: RComponentSFC_IR_Node[]): string[] 
       }
     }
     for (const group of node.interactions ?? []) {
+      for (const reaction of group.triggerSet?.reactions ?? []) {
+        if (reaction.kind === 'emit') result.add(reaction.event)
+      }
       for (const rule of group.rules) {
         for (const reaction of rule.reactions) {
           if (reaction.kind === 'emit') result.add(reaction.event)

@@ -63,6 +63,17 @@ describe('Configuration Source v1', () => {
     expect(compileConfigurationSource(removed).document?.values.map(item => item.key)).toEqual(['first'])
   })
 
+  it('renames one key in place and rejects duplicates', () => {
+    const source = `defineConfig({
+  first: value(String, 'keep'),
+  second: value(Number, 1).label('Second'),
+})`
+    const renamed = patchConfigurationSource(source, { op: 'rename', key: 'second', nextKey: 'rowHeight' })
+    expect(compileConfigurationSource(renamed).document?.values.map(item => item.key)).toEqual(['first', 'rowHeight'])
+    expect(renamed).toContain(`rowHeight: value(Number, 1).label('Second')`)
+    expect(() => patchConfigurationSource(renamed, { op: 'rename', key: 'rowHeight', nextKey: 'first' })).toThrow('already exists')
+  })
+
   it('validates full TriggerSet semantics', () => {
     const type = { kind: 'reference' as const, identity: 'TriggerSet' }
     expect(validateConfigurationValue(type, [], []).ok).toBe(true)
@@ -84,6 +95,24 @@ describe('Configuration Source v1', () => {
     expect(inferConfigurationDefault({ kind: 'reference', identity: 'FlightRef' }, catalog).ok).toBe(false)
     expect(inferConfigurationDefault({ kind: 'enum', values: [] }, catalog).ok).toBe(false)
     expect(inferConfigurationDefault({ kind: 'object', fields: [] }, catalog)).toEqual({ ok: true, value: {} })
+    expect(validateConfigurationValue({ kind: 'reference', identity: 'FlightRef' }, '', catalog).ok).toBe(false)
+    expect(validateConfigurationValue({ kind: 'reference', identity: 'FlightRef' }, 'flight-1', catalog).ok).toBe(true)
+  })
+
+  it('keeps a draft projection available when a value has semantic diagnostics', () => {
+    const catalog = [{
+      id: 1,
+      identity: 'FolderRef',
+      displayName: 'Folder',
+      category: 'reference' as const,
+      sourceVersion: 1,
+      definition: null,
+      entityReference: { target: 'folders', storage: 'identity' as const },
+      status: 'valid' as const,
+    }]
+    const result = compileConfigurationSource(`defineConfig({ folder: value(FolderRef, '') })`, catalog)
+    expect(result.document).toBeNull()
+    expect(result.draftDocument?.values.map(item => item.key)).toEqual(['folder'])
   })
 })
 

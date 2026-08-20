@@ -63,14 +63,20 @@ function createDefaultSFCContext(target: RComponentRenderTarget | null): Runtime
   }
 }
 
-function evaluateEventInput(value: ComponentSFCEventInputValue, payload: unknown, scope: Record<string, unknown> = {}): unknown {
+function evaluateEventInput(
+  value: ComponentSFCEventInputValue,
+  payload: unknown,
+  scope: Record<string, unknown> = {},
+  evaluatedAt = new Date().toISOString(),
+): unknown {
   if (value.kind === 'event') return value.path == null ? payload : readPath(payload, value.path)
+  if (value.kind === 'now') return evaluatedAt
   if (value.kind === 'scope') return readPath(scope, value.path)
   if (value.kind === 'literal') return value.value
-  if (value.kind === 'array') return value.items.map(item => evaluateEventInput(item, payload, scope))
+  if (value.kind === 'array') return value.items.map(item => evaluateEventInput(item, payload, scope, evaluatedAt))
   return Object.fromEntries(value.entries.map(entry => [
-    typeof entry.key === 'string' ? entry.key : String(evaluateEventInput(entry.key, payload, scope)),
-    evaluateEventInput(entry.value, payload, scope),
+    typeof entry.key === 'string' ? entry.key : String(evaluateEventInput(entry.key, payload, scope, evaluatedAt)),
+    evaluateEventInput(entry.value, payload, scope, evaluatedAt),
   ]))
 }
 
@@ -364,11 +370,12 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
       return false
     }
     const nextTrace = [...trace, traceKey]
+    const evaluatedAt = new Date().toISOString()
     try {
       if (port.action.kind === 'emit') {
         await emitOwn(
           port.action.event,
-          port.action.payload ? evaluateEventInput(port.action.payload, payload, scope) : payload,
+          port.action.payload ? evaluateEventInput(port.action.payload, payload, scope, evaluatedAt) : payload,
           nextTrace,
           depth + 1,
         )
@@ -376,14 +383,14 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
       }
       if (port.action.kind === 'action') {
         await this._executeEventActionEffect(port.action.identity, port.action.input
-          ? evaluateEventInput(port.action.input, payload, scope)
+          ? evaluateEventInput(port.action.input, payload, scope, evaluatedAt)
           : payload, source, ownerIdentity, port.name)
         return true
       }
       if (port.action.kind === 'query') {
         await this._executeEventQueryEffect(
           port.action.identity,
-          port.action.input ? evaluateEventInput(port.action.input, payload, scope) : {},
+          port.action.input ? evaluateEventInput(port.action.input, payload, scope, evaluatedAt) : {},
         )
         return true
       }

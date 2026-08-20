@@ -632,6 +632,7 @@ function parseEventAction(
 function parseEventInput(node: any, script: RComponentSFC_AST_Script, diagnostics: RComponentDiagnostic[]): ComponentSFCEventInputValue | null {
   const eventRead = parseEventRead(node)
   if (eventRead) return eventRead
+  if (isCall(node, 'now') && (node.arguments?.length ?? 0) === 0) return { kind: 'now' }
   const scopeRead = parseScopeRead(node)
   if (scopeRead) return scopeRead
   if (node?.type === 'StringLiteral' || node?.type === 'NumericLiteral' || node?.type === 'BooleanLiteral')
@@ -661,7 +662,7 @@ function parseEventInput(node: any, script: RComponentSFC_AST_Script, diagnostic
     }
     return { kind: 'object', entries }
   }
-  diagnostics.push(makeDiagnostic('sfc-event-action-input', 'Event payload поддерживает literals, arrays, objects, event(path) и lexical SFC scope.', node, script))
+  diagnostics.push(makeDiagnostic('sfc-event-action-input', 'Input поддерживает literals, arrays, objects, event(path), now() и lexical SFC scope.', node, script))
   return null
 }
 

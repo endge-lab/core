@@ -335,9 +335,21 @@ export interface RComponentSFC_IR_InteractionRule {
   sourceRange?: RComponentSFC_SourceRange
 }
 
+/** One referenced TriggerSet paired with reactions that stay stable across context layers. */
+export interface RComponentSFC_IR_InteractionTriggerSet {
+  triggers: RComponentSFC_IR_Value
+  /** Event names supported by the source tag's compiled event surface. */
+  events: string[]
+  modifiers: RComponentSFC_IR_EventModifier[]
+  reactions: ComponentSFCEventAction[]
+  sourceRange?: RComponentSFC_SourceRange
+}
+
 /** One `:on` annotation. Rules inside the group use first-match-wins semantics. */
 export interface RComponentSFC_IR_InteractionGroup {
   rules: RComponentSFC_IR_InteractionRule[]
+  /** Optional context-backed TriggerSet form `{ triggers, reaction }`. */
+  triggerSet?: RComponentSFC_IR_InteractionTriggerSet
   sourceRange?: RComponentSFC_SourceRange
 }
 

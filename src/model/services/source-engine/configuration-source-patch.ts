@@ -9,6 +9,7 @@ import { serializeTypeSourceExpression } from '@/model/services/source-engine/ty
 export type ConfigurationSourcePatch
   = { op: 'upsert', value: ConfigurationSourceValueDefinition }
     | { op: 'remove', key: string }
+    | { op: 'rename', key: string, nextKey: string }
 
 /** Applies a narrow property-level patch to canonical defineConfig source. */
 export function patchConfigurationSource(source: string, patch: ConfigurationSourcePatch): string {
@@ -23,9 +24,26 @@ export function patchConfigurationSource(source: string, patch: ConfigurationSou
   if (!object || !t.isObjectExpression(object) || object.start == null || object.end == null)
     throw new Error('defineConfig argument must be an object literal.')
 
-  const key = patch.op === 'remove' ? patch.key : patch.value.key
+  const key = patch.op === 'upsert' ? patch.value.key : patch.key
   const property = object.properties.find((candidate): candidate is t.ObjectProperty =>
     t.isObjectProperty(candidate) && !candidate.computed && readPropertyName(candidate.key) === key)
+
+  if (patch.op === 'rename') {
+    const nextKey = patch.nextKey.trim()
+    if (!nextKey)
+      throw new Error('Configuration key cannot be empty.')
+    if (isReservedKey(nextKey))
+      throw new Error(`Configuration key "${nextKey}" is reserved.`)
+    if (nextKey === key)
+      return source
+    const duplicate = object.properties.some(candidate =>
+      t.isObjectProperty(candidate) && !candidate.computed && readPropertyName(candidate.key) === nextKey)
+    if (duplicate)
+      throw new Error(`Configuration key "${nextKey}" already exists.`)
+    if (!property || property.key.start == null || property.key.end == null)
+      throw new Error(`Configuration key "${key}" was not found.`)
+    return source.slice(0, property.key.start) + sourceProperty(nextKey) + source.slice(property.key.end)
+  }
 
   if (patch.op === 'remove') {
     if (!property || property.start == null || property.end == null) return source
@@ -70,6 +88,10 @@ function sourceProperty(value: string): string {
 
 function sourceString(value: string): string {
   return JSON.stringify(value)
+}
+
+function isReservedKey(value: string): boolean {
+  return value === '__proto__' || value === 'prototype' || value === 'constructor'
 }
 
 function indentationAt(source: string, offset: number): number {
