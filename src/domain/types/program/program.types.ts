@@ -189,7 +189,13 @@ export interface QueryProgramPayload {
   /** Тело запроса, GraphQL document или custom query expression. */
   query: QueryProgramRequestValue<string>
 
-  /** Заголовки REST query. */
+  /** GraphQL operation name, если artifact использует query-gql transport. */
+  operationName?: string
+
+  /** Политика GraphQL errors в HTTP 2xx response. */
+  errorPolicy?: 'throw' | 'ignore'
+
+  /** HTTP headers Query transport. */
   headers?: QueryProgramRequestValue<Record<string, string>>
 
   /** Auth config, подготовленный для runtime query layer. */
@@ -206,6 +212,9 @@ export interface QueryProgramPayload {
 
   /** Безопасный request.body IR. При null отправляется пустой object payload. */
   requestBody: SourceExpressionIR | null
+
+  /** Безопасный GraphQL variables IR. */
+  requestVariables?: SourceExpressionIR | null
 
   /** Включены ли mock data для query. */
   mockDataEnabled?: boolean

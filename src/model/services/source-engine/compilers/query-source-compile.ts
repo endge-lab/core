@@ -12,6 +12,7 @@ import type { QueryProgramProp, SourceExpressionIR } from '@/domain/types/source
 
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
+import { Kind, parse as parseGraphQL } from 'graphql'
 
 import { QueryType } from '@/domain/types/document/document.types'
 import { compileSourceCallback, compileSourceExpression } from '@/model/services/source-engine/compilers/source-expression-compile'
@@ -105,11 +106,11 @@ function parseDocument(
   diagnostics: DiagnosticDraft[],
 ): QuerySourceDocument {
   const kind = readStringProperty(node, 'kind') ?? 'rest'
-  if (kind !== 'rest') {
+  if (kind !== 'rest' && kind !== 'graphql') {
     diagnostics.push(createDiagnostic(
       'error',
       'query-source-kind-unsupported',
-      `Query source kind "${kind}" не поддерживается в v1.`,
+      `Query source kind "${kind}" не поддерживается.`,
       'kind',
     ))
   }
@@ -143,15 +144,10 @@ function parseDocument(
   }
 
   const props = propsNode ? readProps(propsNode, source, diagnostics) : []
-  const requestBodyNode = requestNode ? readPropertyValue(requestNode, 'body') : null
-  const requestBody = requestBodyNode ? readRequestBody(requestBodyNode, diagnostics) : null
   const endpoint = requestNode ? readRequestValue(requestNode, 'endpoint', '', diagnostics, readStringRequestValue) : ''
-  const path = requestNode ? readRequestValue(requestNode, 'path', '', diagnostics, readStringRequestValue) : ''
-  const method = requestNode ? readRequestValue(requestNode, 'method', 'POST', diagnostics, readStringRequestValue) : 'POST'
   const headers = requestNode ? readRequestValue(requestNode, 'headers', {}, diagnostics, readHeadersRequestValue) : {}
   const auth = requestNode ? readRequestValue(requestNode, 'auth', { mode: 'inherit' }, diagnostics, readAuthRequestValue) : { mode: 'inherit' as const }
   const timeoutMs = requestNode ? readOptionalRequestValue(requestNode, 'timeoutMs', diagnostics, readNumberRequestValue) : undefined
-  const formUrlencoded = requestNode ? readOptionalRequestValue(requestNode, 'formUrlencoded', diagnostics, readBooleanRequestValue) : undefined
   const propKeys = new Set(props.map(prop => prop.key))
   if (propsNode && requestNode && (propsNode.start ?? 0) > (requestNode.start ?? 0)) {
     diagnostics.push(createDiagnostic(
@@ -162,37 +158,79 @@ function parseDocument(
       propsNode,
     ))
   }
-  validateRequestPropReferences(requestBody, propKeys, diagnostics, 'request.body')
   validateRequestPropReferences(endpoint, propKeys, diagnostics, 'request.endpoint')
-  validateRequestPropReferences(path, propKeys, diagnostics, 'request.path')
-  validateRequestPropReferences(method, propKeys, diagnostics, 'request.method')
   validateRequestPropReferences(headers, propKeys, diagnostics, 'request.headers')
   validateRequestPropReferences(auth, propKeys, diagnostics, 'request.auth')
   validateRequestPropReferences(timeoutMs, propKeys, diagnostics, 'request.timeoutMs')
-  validateRequestPropReferences(formUrlencoded, propKeys, diagnostics, 'request.formUrlencoded')
-
-  return {
-    kind: 'rest',
-    request: {
-      endpoint,
-      path,
-      method,
-      headers,
-      auth,
-      timeoutMs,
-      formUrlencoded,
-      body: requestBody,
-    },
+  const common = {
     props,
-    outputs: outputsNode ? readOutputs(outputsNode, source, diagnostics) : [],
+    outputs: outputsNode ? readOutputs(outputsNode, source, diagnostics, kind) : [],
     mock: {
       enabled: mockNode ? readBooleanProperty(mockNode, 'enabled') ?? false : false,
       data: mockNode ? readUnknownProperty(mockNode, 'data', diagnostics) ?? null : null,
     },
   }
+
+  if (kind === 'graphql') {
+    rejectRequestProperties(requestNode, ['path', 'method', 'formUrlencoded', 'body'], diagnostics, 'graphql')
+    const graphQL = requestNode
+      ? readGraphQLRequest(requestNode, diagnostics)
+      : { document: '', operationName: undefined, variables: null, errorPolicy: 'throw' as const }
+    validateRequestPropReferences(graphQL.variables, propKeys, diagnostics, 'request.variables')
+    return {
+      kind: 'graphql',
+      request: {
+        endpoint,
+        document: graphQL.document,
+        operationName: graphQL.operationName,
+        variables: graphQL.variables,
+        headers,
+        auth,
+        timeoutMs,
+        errorPolicy: graphQL.errorPolicy,
+      },
+      ...common,
+    }
+  }
+
+  rejectRequestProperties(requestNode, ['document', 'operationName', 'variables', 'errorPolicy'], diagnostics, 'rest')
+  const requestBodyNode = requestNode ? readPropertyValue(requestNode, 'body') : null
+  const requestBody = requestBodyNode ? readRequestBody(requestBodyNode, diagnostics) : null
+  const path = requestNode ? readRequestValue(requestNode, 'path', '', diagnostics, readStringRequestValue) : ''
+  const method = requestNode ? readRequestValue(requestNode, 'method', 'POST', diagnostics, readStringRequestValue) : 'POST'
+  const formUrlencoded = requestNode ? readOptionalRequestValue(requestNode, 'formUrlencoded', diagnostics, readBooleanRequestValue) : undefined
+  validateRequestPropReferences(requestBody, propKeys, diagnostics, 'request.body')
+  validateRequestPropReferences(path, propKeys, diagnostics, 'request.path')
+  validateRequestPropReferences(method, propKeys, diagnostics, 'request.method')
+  validateRequestPropReferences(formUrlencoded, propKeys, diagnostics, 'request.formUrlencoded')
+  return {
+    kind: 'rest',
+    request: { endpoint, path, method, headers, auth, timeoutMs, formUrlencoded, body: requestBody },
+    ...common,
+  }
 }
 
 function createQueryArtifact(document: QuerySourceDocument): QueryProgramPayload {
+  if (document.kind === 'graphql') {
+    return {
+      type: QueryType.GraphQL,
+      sourceVersion: 2,
+      endpoint: document.request.endpoint,
+      query: document.request.document,
+      operationName: document.request.operationName,
+      errorPolicy: document.request.errorPolicy,
+      headers: document.request.headers,
+      auth: document.request.auth,
+      timeoutMs: document.request.timeoutMs,
+      props: document.props,
+      requestBody: null,
+      requestVariables: document.request.variables ?? null,
+      mockDataEnabled: document.mock.enabled,
+      mockData: document.mock.data,
+      outputs: createQueryOutputs(document),
+    }
+  }
+
   return {
     type: QueryType.REST,
     sourceVersion: 2,
@@ -207,16 +245,20 @@ function createQueryArtifact(document: QuerySourceDocument): QueryProgramPayload
     requestBody: document.request.body ?? null,
     mockDataEnabled: document.mock.enabled,
     mockData: document.mock.data,
-    outputs: document.outputs.map(output => ({
-      key: output.key,
-      source: output.source,
-      dataViews: output.dataViews,
-      contract: output.contract,
-      materialization: output.source.type === 'response' && output.dataViews.length === 0
-        ? { kind: 'source' as const }
-        : { kind: 'derived' as const, strategy: { kind: 'full' as const } },
-    })),
+    outputs: createQueryOutputs(document),
   }
+}
+
+function createQueryOutputs(document: QuerySourceDocument): QueryProgramPayload['outputs'] {
+  return document.outputs.map(output => ({
+    key: output.key,
+    source: output.source,
+    dataViews: output.dataViews,
+    contract: output.contract,
+    materialization: output.source.type === 'response' && output.dataViews.length === 0
+      ? { kind: 'source' as const }
+      : { kind: 'derived' as const, strategy: { kind: 'full' as const } },
+  }))
 }
 
 function readRequestBody(
@@ -229,6 +271,216 @@ function readRequestBody(
     return null
   }
   return compileSourceCallback(expression.arguments[0], diagnostics, 'request.body')
+}
+
+function readGraphQLRequest(
+  node: t.ObjectExpression,
+  diagnostics: DiagnosticDraft[],
+): {
+    document: string
+    operationName: string | undefined
+    variables: SourceExpressionIR | null
+    errorPolicy: 'throw' | 'ignore'
+  } {
+  const documentNode = readPropertyValue(node, 'document')
+  const document = documentNode ? readGraphQLDocument(documentNode, diagnostics) : ''
+  if (!documentNode) {
+    diagnostics.push(createDiagnostic(
+      'error',
+      'query-source-graphql-document-missing',
+      'GraphQL request должен содержать document: gql`...`.',
+      'request.document',
+    ))
+  }
+
+  const operationNameNode = readPropertyValue(node, 'operationName')
+  const operationName = operationNameNode
+    ? readStaticString(operationNameNode, diagnostics, 'request.operationName')
+    : undefined
+  const variablesNode = readPropertyValue(node, 'variables')
+  const variables = variablesNode ? readGraphQLVariables(variablesNode, diagnostics) : null
+  const errorPolicyNode = readPropertyValue(node, 'errorPolicy')
+  const rawErrorPolicy = errorPolicyNode
+    ? readStaticString(errorPolicyNode, diagnostics, 'request.errorPolicy')
+    : 'throw'
+  const errorPolicy = rawErrorPolicy === 'ignore' ? 'ignore' : 'throw'
+  if (rawErrorPolicy && rawErrorPolicy !== 'throw' && rawErrorPolicy !== 'ignore') {
+    diagnostics.push(createDiagnostic(
+      'error',
+      'query-source-graphql-error-policy',
+      'request.errorPolicy поддерживает только "throw" или "ignore".',
+      'request.errorPolicy',
+      errorPolicyNode ?? undefined,
+    ))
+  }
+
+  return {
+    document,
+    operationName: validateGraphQLDocument(document, operationName, diagnostics, documentNode ?? undefined),
+    variables,
+    errorPolicy,
+  }
+}
+
+function readGraphQLDocument(
+  node: t.Expression,
+  diagnostics: DiagnosticDraft[],
+): string {
+  const expression = unwrapExpression(node)
+  if (
+    t.isTaggedTemplateExpression(expression)
+    && t.isIdentifier(expression.tag, { name: 'gql' })
+    && expression.quasi.expressions.length === 0
+  ) {
+    return expression.quasi.quasis[0]?.value.cooked ?? ''
+  }
+
+  if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'gql' })) {
+    const value = expression.arguments[0]
+    if (value && t.isExpression(value)) {
+      const parsed = readStaticString(value, diagnostics, 'request.document')
+      if (parsed !== undefined)
+        return parsed
+    }
+  }
+
+  diagnostics.push(createDiagnostic(
+    'error',
+    'query-source-graphql-document-shape',
+    'request.document должен быть статическим gql`...` без JavaScript interpolation.',
+    'request.document',
+    expression,
+  ))
+  return ''
+}
+
+function readGraphQLVariables(
+  node: t.Expression,
+  diagnostics: DiagnosticDraft[],
+): SourceExpressionIR | null {
+  const expression = unwrapExpression(node)
+  if (!t.isCallExpression(expression) || !t.isIdentifier(expression.callee, { name: 'variables' })) {
+    diagnostics.push(createDiagnostic(
+      'error',
+      'query-source-graphql-variables-shape',
+      'request.variables должен быть variables(callback).',
+      'request.variables',
+      expression,
+    ))
+    return null
+  }
+  return compileSourceCallback(expression.arguments[0], diagnostics, 'request.variables')
+}
+
+function validateGraphQLDocument(
+  document: string,
+  requestedOperationName: string | undefined,
+  diagnostics: DiagnosticDraft[],
+  node?: t.Node,
+): string | undefined {
+  if (!document.trim())
+    return requestedOperationName
+
+  try {
+    const parsed = parseGraphQL(document)
+    const operations = parsed.definitions.filter(definition => definition.kind === Kind.OPERATION_DEFINITION)
+    if (operations.length === 0) {
+      diagnostics.push(createDiagnostic(
+        'error',
+        'query-source-graphql-operation-missing',
+        'GraphQL document должен содержать query или mutation operation.',
+        'request.document',
+        node,
+      ))
+      return requestedOperationName
+    }
+    if (operations.some(operation => operation.operation === 'subscription')) {
+      diagnostics.push(createDiagnostic(
+        'error',
+        'query-source-graphql-subscription-unsupported',
+        'GraphQL subscriptions не поддерживаются Query executor.',
+        'request.document',
+        node,
+      ))
+    }
+
+    if (requestedOperationName) {
+      if (!operations.some(operation => operation.name?.value === requestedOperationName)) {
+        diagnostics.push(createDiagnostic(
+          'error',
+          'query-source-graphql-operation-unknown',
+          `Operation "${requestedOperationName}" не найдена в GraphQL document.`,
+          'request.operationName',
+          node,
+        ))
+      }
+      return requestedOperationName
+    }
+
+    if (operations.length > 1) {
+      diagnostics.push(createDiagnostic(
+        'error',
+        'query-source-graphql-operation-name-required',
+        'Для GraphQL document с несколькими operations укажите request.operationName.',
+        'request.operationName',
+        node,
+      ))
+      return undefined
+    }
+    return operations[0]?.name?.value
+  }
+  catch (error: any) {
+    diagnostics.push(createDiagnostic(
+      'error',
+      'query-source-graphql-document-invalid',
+      `Некорректный GraphQL document: ${error?.message ?? error}`,
+      'request.document',
+      node,
+    ))
+    return requestedOperationName
+  }
+}
+
+function readStaticString(
+  node: t.Expression,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+): string | undefined {
+  const expression = unwrapExpression(node)
+  if (t.isStringLiteral(expression))
+    return expression.value
+  if (t.isTemplateLiteral(expression) && expression.expressions.length === 0)
+    return expression.quasis[0]?.value.cooked ?? ''
+  diagnostics.push(createDiagnostic(
+    'error',
+    'query-source-static-string-required',
+    `${sourcePath} должен быть статической строкой.`,
+    sourcePath,
+    expression,
+  ))
+  return undefined
+}
+
+function rejectRequestProperties(
+  node: t.ObjectExpression | null,
+  keys: string[],
+  diagnostics: DiagnosticDraft[],
+  kind: 'rest' | 'graphql',
+): void {
+  if (!node)
+    return
+  for (const key of keys) {
+    const value = readPropertyValue(node, key)
+    if (!value)
+      continue
+    diagnostics.push(createDiagnostic(
+      'error',
+      'query-source-request-property-unsupported',
+      `request.${key} не поддерживается для kind: "${kind}".`,
+      `request.${key}`,
+      value,
+    ))
+  }
 }
 
 function readProps(
@@ -275,6 +527,7 @@ function readOutputs(
   node: t.ObjectExpression,
   source: string,
   diagnostics: DiagnosticDraft[],
+  kind: string,
 ): QuerySourceOutput[] {
   const outputs: QuerySourceOutput[] = []
   const declared = new Set<string>()
@@ -304,7 +557,7 @@ function readOutputs(
       continue
     }
 
-    const output = readOutput(key, unwrapExpression(property.value), source, diagnostics)
+    const output = readOutput(key, unwrapExpression(property.value), source, diagnostics, kind)
     if (output) {
       if (output.source.type === 'output' && !declared.has(output.source.key)) {
         diagnostics.push(createDiagnostic(
@@ -361,6 +614,7 @@ function readOutput(
   node: t.Expression,
   source: string,
   diagnostics: DiagnosticDraft[],
+  kind: string,
 ): QuerySourceOutput | null {
   const calls = collectMemberCallChain(node)
   if (!calls)
@@ -372,7 +626,7 @@ function readOutput(
 
   for (const call of calls.modifiers) {
     if (call.name === 'from') {
-      outputSource = readOutputSource(call.arguments[0], diagnostics, `outputs.${key}.from`)
+      outputSource = readOutputSource(call.arguments[0], diagnostics, `outputs.${key}.from`, kind)
       continue
     }
 
@@ -471,6 +725,7 @@ function readOutputSource(
   node: t.CallExpression['arguments'][number] | undefined,
   diagnostics: DiagnosticDraft[],
   sourcePath: string,
+  kind: string,
 ): QueryOutputSource | null {
   if (!node || !t.isExpression(node)) {
     diagnostics.push(createDiagnostic('error', 'query-source-output-source-missing', '.from(...) должен получить источник.', sourcePath))
@@ -481,7 +736,22 @@ function readOutputSource(
   if (t.isStringLiteral(expression))
     return { type: 'output', key: expression.value }
 
-  if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'response' })) {
+  const isDataCall = t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'data' })
+  if (isDataCall && kind !== 'graphql') {
+    diagnostics.push(createDiagnostic(
+      'error',
+      'query-source-graphql-data-rest',
+      'data(...) доступен только для kind: "graphql". Для REST используйте response(...).',
+      sourcePath,
+      expression,
+    ))
+    return null
+  }
+
+  if (
+    t.isCallExpression(expression)
+    && (t.isIdentifier(expression.callee, { name: 'response' }) || isDataCall)
+  ) {
     const path = expression.arguments[0]
     if (!path)
       return { type: 'response', path: null }
@@ -489,7 +759,22 @@ function readOutputSource(
       return { type: 'response', path: path.value }
   }
 
-  const compiled = compileSourceExpression(expression, diagnostics, sourcePath)
+  if (kind !== 'graphql' && containsCallNamed(expression, 'data')) {
+    diagnostics.push(createDiagnostic(
+      'error',
+      'query-source-graphql-data-rest',
+      'data(...) доступен только для kind: "graphql". Для REST используйте response(...).',
+      sourcePath,
+      expression,
+    ))
+    return null
+  }
+
+  const compiled = compileSourceExpression(
+    kind === 'graphql' ? normalizeGraphQLDataReads(expression) : expression,
+    diagnostics,
+    sourcePath,
+  )
   if (compiled && containsOnlyReads(compiled, new Set(['response', 'current'])))
     return { type: 'response', path: null, expression: compiled }
   if (compiled)
@@ -503,6 +788,24 @@ function readOutputSource(
     expression,
   ))
   return null
+}
+
+function containsCallNamed(node: t.Node, name: string): boolean {
+  let found = false
+  t.traverseFast(node, (child) => {
+    if (t.isCallExpression(child) && t.isIdentifier(child.callee, { name }))
+      found = true
+  })
+  return found
+}
+
+function normalizeGraphQLDataReads(node: t.Expression): t.Expression {
+  const normalized = t.cloneNode(node, true)
+  t.traverseFast(normalized, (child) => {
+    if (t.isCallExpression(child) && t.isIdentifier(child.callee, { name: 'data' }))
+      child.callee.name = 'response'
+  })
+  return normalized
 }
 
 function containsOnlyReads(

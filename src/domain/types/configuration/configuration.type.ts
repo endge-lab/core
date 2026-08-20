@@ -1,4 +1,4 @@
-import type { ComponentSFCInteractionTrigger } from '@/domain/types/component/sfc/ir.types'
+import type { ComponentSFCInteractionKeyboardCondition, ComponentSFCInteractionTrigger } from '@/domain/types/component/sfc/ir.types'
 import type {
   DiagnosticsSeverityNumber,
   DiagnosticsSignal,
@@ -45,6 +45,8 @@ export interface EndgeTooltipConfiguration {
   align: EndgeTooltipAlign
   openDelay: number
   closeDelay: number
+  /** Optional keyboard state required while the pointer or focus activates a tooltip. */
+  keyboard?: ComponentSFCInteractionKeyboardCondition
 }
 
 /** Полная конфигурация, с которой компилируется один Endge context. */
@@ -84,6 +86,7 @@ export interface EndgeTooltipConfigurationPatch {
   align?: EndgeValueOverride<EndgeTooltipAlign>
   openDelay?: EndgeValueOverride<number>
   closeDelay?: EndgeValueOverride<number>
+  keyboard?: EndgeValueOverride<ComponentSFCInteractionKeyboardCondition>
 }
 
 export type EndgeCollectionPatchEntry<T> =

@@ -46,6 +46,9 @@ export const AUTH_STORAGE_KEY = 'endge:auth'
 
 /** Ключ в Raph-хранилище для глобальных переменных. */
 export const STORAGE_VARS_KEY = 'vars'
+/** Raph namespace containing persistent and volatile Endge context values. */
+export const ENDGE_CONTEXT_RAPH_PATH = 'context'
+export const ENDGE_KEYBOARD_CONTEXT_RAPH_PATH = `${ENDGE_CONTEXT_RAPH_PATH}.input.keyboard`
 
 /** Обратная совместимость публичного API `Config`. */
 export default {

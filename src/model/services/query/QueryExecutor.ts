@@ -47,8 +47,63 @@ export class QueryExecutor {
   ): Promise<any> {
     if (payload.type === 'query-rest')
       return this._runRest(payload, vars, signal)
+    if (payload.type === 'query-gql')
+      return this._runGraphQL(payload, vars, signal)
 
     throw new Error(`Unsupported query artifact type: ${payload.type}`)
+  }
+
+  /** Выполняет GraphQL operation и возвращает ее data, отделяя transport errors от GraphQL errors. */
+  private async _runGraphQL(
+    payload: QueryProgramPayload,
+    vars: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<any> {
+    const endpointSource = String(this._evaluateRequestValue(payload.endpoint, vars) ?? '')
+    const url = Endge.workspace.variables.resolve(endpointSource) || endpointSource
+    const headers = {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      ...this._asHeaders(this._evaluateRequestValue(payload.headers, vars)),
+    }
+    const requestVariables = payload.requestVariables
+      ? this._asRecord(this._evaluateRequestValue(payload.requestVariables, vars))
+      : {}
+    const timeoutMs = this._asOptionalNumber(this._evaluateRequestValue(payload.timeoutMs, vars))
+    const auth = this._evaluateRequestValue(payload.auth, vars) as RQueryAuth | undefined
+    const params: Record<string, unknown> = {}
+    await this._applyAuth(auth, headers, params)
+
+    try {
+      const response = await this.http.request({
+        url,
+        method: 'POST',
+        headers,
+        params,
+        data: {
+          query: String(payload.query ?? ''),
+          ...(payload.operationName ? { operationName: payload.operationName } : {}),
+          variables: requestVariables,
+        },
+        timeout: timeoutMs,
+        signal,
+      })
+      const envelope = this._asRecord(response.data)
+      const errors = Array.isArray(envelope.errors) ? envelope.errors : []
+      if (errors.length > 0 && (payload.errorPolicy ?? 'throw') === 'throw') {
+        const messages = errors.map((error) => {
+          const entry = this._asRecord(error)
+          return typeof entry.message === 'string' ? entry.message : JSON.stringify(error)
+        })
+        throw new Error(`[GraphQL] ${messages.join('; ')}`)
+      }
+      return envelope.data ?? null
+    }
+    catch (error: any) {
+      if (String(error?.message ?? '').startsWith('[GraphQL]'))
+        throw error
+      this._throwHttpError(error, url, signal)
+    }
   }
 
   /** Выполняет REST artifact. */
@@ -116,20 +171,24 @@ export class QueryExecutor {
       return response.data
     }
     catch (error: any) {
-      if (signal?.aborted || error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError' || error?.name === 'AbortError')
-        throw error
-      const status = error?.response?.status
-      const statusText = error?.response?.statusText
-      const responsePayload = error?.response?.data
-      const message = status
-        ? `HTTP ${status} ${statusText || ''} at ${url}`
-        : `HTTP error at ${url}`
-      const details = typeof responsePayload === 'string'
-        ? responsePayload
-        : JSON.stringify(responsePayload ?? {})
-
-      throw new Error(`${message}\n${details}`)
+      this._throwHttpError(error, url, signal)
     }
+  }
+
+  private _throwHttpError(error: any, url: string, signal?: AbortSignal): never {
+    if (signal?.aborted || error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError' || error?.name === 'AbortError')
+      throw error
+    const status = error?.response?.status
+    const statusText = error?.response?.statusText
+    const responsePayload = error?.response?.data
+    const message = status
+      ? `HTTP ${status} ${statusText || ''} at ${url}`
+      : `HTTP error at ${url}`
+    const details = typeof responsePayload === 'string'
+      ? responsePayload
+      : JSON.stringify(responsePayload ?? {})
+
+    throw new Error(`${message}\n${details}`)
   }
 
   /** Публикует runtime warning безопасного expression evaluator. */

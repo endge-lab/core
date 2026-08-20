@@ -9,7 +9,7 @@ import type {
 import { compileQuerySource } from '@/model/services/source-engine/compilers/query-source-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
 import { resolveTypedSourceDocumentReference, typedSourceTypeReferenceHighlights } from '@/model/services/source-engine/source-document-reference'
-import { QUERY_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/query.default.source'
+import { QUERY_DEFAULT_SOURCE, QUERY_GRAPHQL_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/query.default.source'
 import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/model/services/source-engine/value-expression-language'
 import { validateTypeExpressionUsage, validateTypeSourceExpressionUsage } from '@/model/services/compiler/type/type-program-validation'
 
@@ -21,18 +21,18 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
     alias: 'Endge Query Source',
     extension: '.endge-query.ts',
     keywords: [
-      'auto', 'body', 'collectionByKey', 'compact', 'contract', 'converter', 'dataView', 'defineDataView', 'defineFilter', 'defineProps',
-      'defineQuery', 'endgeVar', 'env', 'field', 'filter', 'merge', 'objectOf', 'output', 'prop', 'recordOf',
-      'full', 'incremental', 'response', ...VALUE_EXPRESSION_FUNCTION_NAMES,
+      'auto', 'body', 'collectionByKey', 'compact', 'contract', 'converter', 'data', 'dataView', 'defineDataView', 'defineFilter', 'defineProps',
+      'defineQuery', 'endgeVar', 'env', 'field', 'filter', 'full', 'gql', 'graphql', 'ignore', 'incremental', 'merge', 'objectOf', 'output', 'prop', 'recordOf',
+      'response', 'throw', 'variables', ...VALUE_EXPRESSION_FUNCTION_NAMES,
     ],
     functions: [
       'array', 'as', 'auto', 'by', 'collectionByKey', 'contract', 'converter', 'dataView', 'default', 'from', 'full', 'map', 'optional',
       'options', 'vocab', ...VALUE_EXPRESSION_METHOD_NAMES,
     ],
     properties: [
-      'auth', 'body', 'data', 'enabled', 'endpoint', 'formUrlencoded',
+      'auth', 'body', 'data', 'document', 'enabled', 'endpoint', 'errorPolicy', 'formUrlencoded',
       'headers', 'incremental', 'items', 'kind', 'method', 'mock', 'mode', 'outputs', 'path',
-      'metadata', 'profile', 'props', 'request', 'timeoutMs',
+      'metadata', 'operationName', 'profile', 'props', 'request', 'timeoutMs', 'variables',
     ],
   })
 
@@ -42,8 +42,10 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
   }
 
   /** Возвращает базовый source новой RQuery. */
-  public createDefaultSource(): string {
-    return QUERY_DEFAULT_SOURCE
+  public createDefaultSource(variant?: string): string {
+    return variant === 'graphql' || variant === 'query-gql'
+      ? QUERY_GRAPHQL_DEFAULT_SOURCE
+      : QUERY_DEFAULT_SOURCE
   }
 
   /** Валидирует query source через текущий compiler pass. */
@@ -124,6 +126,13 @@ const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
     documentation: 'Минимальный валидный source для RQuery v2.',
   },
   {
+    label: 'defineGraphQLQuery',
+    kind: 'snippet',
+    insertText: QUERY_GRAPHQL_DEFAULT_SOURCE.trimEnd(),
+    detail: 'Создать GraphQL query source',
+    documentation: 'GraphQL document, variables и data outputs в source RQuery v2.',
+  },
+  {
     label: 'metadata',
     kind: 'property',
     insertText: `metadata: {
@@ -146,6 +155,26 @@ const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
   merge({}, prop('filterPayload')),
 ),`,
     detail: 'Static request body IR',
+  },
+  {
+    label: 'request.graphql',
+    kind: 'property',
+    insertText: `request: {
+  endpoint: '',
+  operationName: 'OperationName',
+  document: gql\`
+    query OperationName {
+      items {
+        id
+      }
+    }
+  \`,
+  variables: variables(() => ({})),
+  headers: {},
+  auth: { mode: 'inherit' },
+  errorPolicy: 'throw',
+},`,
+    detail: 'GraphQL operation config',
   },
   {
     label: 'field.from.filter',
@@ -202,6 +231,12 @@ const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
     kind: 'function',
     insertText: `response('items')`,
     detail: 'Selector backend response',
+  },
+  {
+    label: 'data',
+    kind: 'function',
+    insertText: `data('items')`,
+    detail: 'Selector GraphQL data',
   },
   {
     label: 'dataView',

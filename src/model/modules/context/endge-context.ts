@@ -1,8 +1,10 @@
 import type {
   EndgeContextPersistenceConfig,
+  EndgeKeyboardContextSnapshot,
   EndgeContextSnapshot,
   EndgePersistenceOptions,
   EndgePersistenceScope,
+  EndgeRuntimeContextSnapshot,
   EndgeSessionIdentityProvider,
   EndgeStorageAdapter,
 } from '@/domain/types/runtime/context-persistence.types'
@@ -15,12 +17,15 @@ import type {
 } from '@/domain/types/runtime/execution-context.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
+import { Raph } from '@endge/raph'
 import {
   CONTEXT_STORAGE_KEY,
   DEFAULT_LOCALE,
   DEFAULT_SCOPE,
   DEFAULT_THEME,
   DEFAULT_TIMEZONE,
+  ENDGE_CONTEXT_RAPH_PATH,
+  ENDGE_KEYBOARD_CONTEXT_RAPH_PATH,
   LEGACY_CONTEXT_STORAGE_KEY,
   LEGACY_THEME_STORAGE_KEY,
   LEGACY_TIMEZONE_STORAGE_KEY,
@@ -82,6 +87,7 @@ export class EndgeContext extends EndgeModule {
         this._currentEnvironment = normalizeScopePart(input.environmentIdentity, DEFAULT_SCOPE.environmentId)
     }
     this._executionContextLocked = true
+    this._syncPersistentContextToRaph()
   }
 
   /** Разрешает выбрать новый structural context только перед следующим boot. */
@@ -135,6 +141,45 @@ export class EndgeContext extends EndgeModule {
     }
   }
 
+  /** Returns the full SFC-visible context without adding volatile values to persistence. */
+  public runtimeSnapshot(): EndgeRuntimeContextSnapshot {
+    return {
+      ...this.serialize(),
+      input: {
+        keyboard: this.getKeyboardState(),
+      },
+    }
+  }
+
+  /** Returns the current volatile keyboard state from the shared Raph context namespace. */
+  public getKeyboardState(): EndgeKeyboardContextSnapshot {
+    return normalizeKeyboardContextSnapshot(Raph.get(ENDGE_KEYBOARD_CONTEXT_RAPH_PATH))
+  }
+
+  /** Publishes UI-adapter keyboard state as narrow, non-persisted Raph mutations. */
+  public setKeyboardState(input: EndgeKeyboardContextSnapshot): void {
+    const next = normalizeKeyboardContextSnapshot(input)
+    const current = this.getKeyboardState()
+    Raph.transaction(() => {
+      this._setRaphValueIfChanged(`${ENDGE_KEYBOARD_CONTEXT_RAPH_PATH}.platform`, current.platform, next.platform)
+      for (const key of ['ctrl', 'shift', 'alt', 'meta', 'mod', 'altGraph'] as const) {
+        this._setRaphValueIfChanged(
+          `${ENDGE_KEYBOARD_CONTEXT_RAPH_PATH}.modifiers.${key}`,
+          current.modifiers[key],
+          next.modifiers[key],
+        )
+      }
+      this._setRaphValueIfChanged(`${ENDGE_KEYBOARD_CONTEXT_RAPH_PATH}.held.key`, current.held.key, next.held.key)
+      this._setRaphValueIfChanged(`${ENDGE_KEYBOARD_CONTEXT_RAPH_PATH}.held.code`, current.held.code, next.held.code)
+    })
+  }
+
+  /** Keeps legacy module subscribers while projecting persistent context fields into Raph. */
+  public override notify(): void {
+    this._syncPersistentContextToRaph()
+    super.notify()
+  }
+
   /** Восстанавливает execution scope из snapshot с безопасными defaults. */
   public override deserialize(payload: Partial<EndgeContextSnapshot> | undefined): void {
     this._currentWorkspace = normalizeOptionalText(payload?.workspace)
@@ -152,6 +197,7 @@ export class EndgeContext extends EndgeModule {
     this._pendingTheme = rawTheme ?? DEFAULT_THEME
     this._currentTimezone = rawTimezone ?? DEFAULT_TIMEZONE
     this._pendingTimezone = rawTimezone ?? DEFAULT_TIMEZONE
+    this._syncPersistentContextToRaph()
   }
 
   /** Сохраняет текущий context snapshot через выбранный adapter. */
@@ -573,6 +619,22 @@ export class EndgeContext extends EndgeModule {
     return this._adapters.resolve(persistence)
   }
 
+  private _syncPersistentContextToRaph(): void {
+    const snapshot = this.serialize()
+    Raph.transaction(() => {
+      for (const [key, value] of Object.entries(snapshot)) {
+        const path = `${ENDGE_CONTEXT_RAPH_PATH}.${key}`
+        this._setRaphValueIfChanged(path, Raph.get(path), value)
+      }
+    })
+  }
+
+  private _setRaphValueIfChanged(path: string, current: unknown, next: unknown): void {
+    if (sameContextValue(current, next))
+      return
+    Raph.set(path, Array.isArray(next) ? [...next] : next)
+  }
+
   /** Возвращает identity активного workspace для persistence scope. */
   private _requireCurrentWorkspace(): string {
     if (!this._currentWorkspace)
@@ -633,6 +695,47 @@ export class EndgeContext extends EndgeModule {
 
 function normalizeDataMode(value: unknown): EndgeDataMode {
   return value === 'mock' ? 'mock' : 'live'
+}
+
+function normalizeKeyboardContextSnapshot(input: unknown): EndgeKeyboardContextSnapshot {
+  const source = input && typeof input === 'object' && !Array.isArray(input)
+    ? input as Record<string, unknown>
+    : {}
+  const rawModifiers = source.modifiers && typeof source.modifiers === 'object' && !Array.isArray(source.modifiers)
+    ? source.modifiers as Record<string, unknown>
+    : {}
+  const rawHeld = source.held && typeof source.held === 'object' && !Array.isArray(source.held)
+    ? source.held as Record<string, unknown>
+    : {}
+  const platform = ['macos', 'windows', 'linux'].includes(String(source.platform))
+    ? source.platform as EndgeKeyboardContextSnapshot['platform']
+    : 'unknown'
+  return {
+    platform,
+    modifiers: {
+      ctrl: rawModifiers.ctrl === true,
+      shift: rawModifiers.shift === true,
+      alt: rawModifiers.alt === true,
+      meta: rawModifiers.meta === true,
+      mod: rawModifiers.mod === true,
+      altGraph: rawModifiers.altGraph === true,
+    },
+    held: {
+      key: normalizeKeyboardStrings(rawHeld.key, value => value.toLowerCase()),
+      code: normalizeKeyboardStrings(rawHeld.code, value => value),
+    },
+  }
+}
+
+function normalizeKeyboardStrings(input: unknown, normalize: (value: string) => string): string[] {
+  const values = Array.isArray(input) ? input : []
+  return [...new Set(values.map(value => normalize(String(value).trim())).filter(Boolean))].sort()
+}
+
+function sameContextValue(left: unknown, right: unknown): boolean {
+  if (Array.isArray(left) && Array.isArray(right))
+    return left.length === right.length && left.every((value, index) => Object.is(value, right[index]))
+  return Object.is(left, right)
 }
 
 function normalizeScopePart(value: unknown, fallback: string): string {

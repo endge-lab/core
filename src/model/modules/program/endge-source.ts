@@ -144,8 +144,8 @@ export class EndgeSource extends EndgeModule {
   }
 
   /** Возвращает базовый source для новой сущности указанного source-kind. */
-  public createDefault(sourceKind: SourceKind | string): string {
-    return this._resolveRequiredLanguageStrategy(sourceKind).createDefaultSource()
+  public createDefault(sourceKind: SourceKind | string, variant?: string): string {
+    return this._resolveRequiredLanguageStrategy(sourceKind).createDefaultSource(variant)
   }
 
   /** Нормализует source через language strategy без изменения semantic document. */

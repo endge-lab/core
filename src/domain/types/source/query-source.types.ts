@@ -4,14 +4,17 @@ import type { DataViewRef } from '@/domain/types/source/data-view-source.types'
 import type { ProgramMetadataMap } from '@/domain/types/program/program-metadata.types'
 import type { QueryProgramProp, SourceExpressionIR, SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 
-/** Поддерживаемые kind query source v1. */
-export type QuerySourceKind = 'rest'
+/** Поддерживаемые transport-kind Query source. */
+export type QuerySourceKind = 'rest' | 'graphql'
+
+/** Политика GraphQL errors в HTTP 2xx response. */
+export type QueryGraphQLErrorPolicy = 'throw' | 'ignore'
 
 /** Static request value or a safe expression evaluated from Query props at runtime. */
 export type QuerySourceRequestValue<T> = T | SourceExpressionIR
 
 /** Source-описание HTTP request части REST-запроса. */
-export interface QuerySourceRequest {
+export interface QuerySourceRestRequest {
   /** Endpoint или Endge var-token вида {API_URL}. */
   endpoint: QuerySourceRequestValue<string>
 
@@ -35,6 +38,33 @@ export interface QuerySourceRequest {
 
   /** Безопасный body expression для query source v2. */
   body?: SourceExpressionIR | null
+}
+
+/** Source-описание GraphQL operation и variables. */
+export interface QuerySourceGraphQLRequest {
+  /** GraphQL endpoint или Endge var-token вида {API_URL}. */
+  endpoint: QuerySourceRequestValue<string>
+
+  /** Статический GraphQL document из gql template. */
+  document: string
+
+  /** Operation name для document с несколькими operations. */
+  operationName?: string
+
+  /** Безопасное variables expression, построенное через variables(...). */
+  variables?: SourceExpressionIR | null
+
+  /** Дополнительные HTTP headers. */
+  headers: QuerySourceRequestValue<Record<string, string>>
+
+  /** Auth config. */
+  auth: QuerySourceRequestValue<RQueryAuth>
+
+  /** Request timeout. */
+  timeoutMs?: QuerySourceRequestValue<number>
+
+  /** Обработка GraphQL errors в HTTP 2xx response. */
+  errorPolicy: QueryGraphQLErrorPolicy
 }
 
 /** Source-описание mock-режима запроса. */
@@ -66,14 +96,7 @@ export interface QuerySourceOutput {
 
 export type QuerySourceOutputs = QuerySourceOutput[]
 
-/** Canonical authoring-модель source-only Query v2. */
-export interface QuerySourceDocument {
-  /** Тип source query. */
-  kind: QuerySourceKind
-
-  /** Request config. */
-  request: QuerySourceRequest
-
+interface QuerySourceDocumentBase {
   /** Единственный runtime input contract Query. */
   props: QueryProgramProp[]
 
@@ -83,6 +106,19 @@ export interface QuerySourceDocument {
   /** Mock config. */
   mock: QuerySourceMock
 }
+
+export interface QuerySourceRestDocument extends QuerySourceDocumentBase {
+  kind: 'rest'
+  request: QuerySourceRestRequest
+}
+
+export interface QuerySourceGraphQLDocument extends QuerySourceDocumentBase {
+  kind: 'graphql'
+  request: QuerySourceGraphQLRequest
+}
+
+/** Canonical authoring-модель source-only Query v2. */
+export type QuerySourceDocument = QuerySourceRestDocument | QuerySourceGraphQLDocument
 
 /** Публичные editor-slots, которые query source patcher умеет менять точечно. */
 export type QuerySourcePatchPath

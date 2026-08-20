@@ -2168,7 +2168,7 @@ export class EndgeCompiler extends EndgeModule {
         }
         const propNames = new Set(artifact.payload.props.map(prop => prop.key))
         for (const propName of Object.keys(runtime.props)) {
-          if (artifact.payload.requestBody && !propNames.has(propName)) {
+          if ((artifact.payload.requestBody || artifact.payload.requestVariables) && !propNames.has(propName)) {
             diagnostics.push({
               severity: 'error',
               code: 'composition-query-prop-missing',

@@ -8,6 +8,7 @@ import type {
 } from '@/domain/types/component/sfc/ir.types'
 import type {
   RComponentSFC_RuntimeBoundaryDependency,
+  RComponentSFC_RuntimeContextDependency,
   RComponentSFC_RuntimeDependencies,
   RComponentSFC_RuntimeDependency,
   RComponentSFC_RuntimeTableColumnDependency,
@@ -25,19 +26,83 @@ export function analyzeComponentSFCRuntimeDependencies(
 
   const props = new Set(ir.script.props.map(prop => prop.name))
   const seen = new Set<string>()
+  const seenContext = new Set<string>()
   const seenVocabs = new Set<string>()
 
-  for (const call of ir.script.portCalls)
+  for (const call of ir.script.portCalls) {
     collectValueDependencies(call.input, props, result, seen, seenVocabs)
+    collectContextValueDependency(call.input, result.context, seenContext)
+  }
 
   for (const node of ir.template.roots) {
     collectNodeDependencies(node, props, result, seen, seenVocabs)
+    collectRootContextDependencies(node, props, result.context, seenContext)
     collectBoundaryDependencies(node, props, result)
   }
 
   result.props = prunePrefixDependencies(result.props)
+  result.context = pruneContextPrefixDependencies(result.context)
 
   return result
+}
+
+function collectRootContextDependencies(
+  node: RComponentSFC_IR_Node,
+  props: Set<string>,
+  result: RComponentSFC_RuntimeContextDependency[],
+  seen: Set<string>,
+): void {
+  if (node.kind === 'expression') {
+    collectContextValueDependency(node.value, result, seen)
+    return
+  }
+  if (node.kind !== 'element')
+    return
+
+  if (node.tag === 'Table' && normalizePropBinding(node.props.rows, props))
+    return
+
+  collectElementContextValues(node, value => collectContextValueDependency(value, result, seen))
+  for (const child of node.children)
+    collectRootContextDependencies(child, props, result, seen)
+}
+
+function collectContextValueDependency(
+  value: RComponentSFC_IR_Value | undefined,
+  result: RComponentSFC_RuntimeContextDependency[],
+  seen: Set<string>,
+): void {
+  if (!value || value.kind !== 'expression')
+    return
+
+  for (const read of value.reads) {
+    if (read.source !== 'context')
+      continue
+    const path = read.path[0] === '$context' ? read.path.slice(1) : [...read.path]
+    const key = path.join('.')
+    if (seen.has(key))
+      continue
+    seen.add(key)
+    result.push({ source: 'context', path, raw: read.raw, read })
+  }
+}
+
+function collectElementContextValues(
+  node: RComponentSFC_IR_ElementNode,
+  collect: (value: RComponentSFC_IR_Value | undefined) => void,
+): void {
+  for (const value of Object.values(node.props))
+    collect(value)
+  collect(node.directives.if)
+  collect(node.directives.elseIf)
+  collect(node.directives.key)
+  collect(node.directives.for?.source)
+  collect(node.editable?.value)
+  collect(node.editable?.triggers)
+  for (const group of node.interactions ?? []) {
+    for (const rule of group.rules)
+      collect(rule.trigger)
+  }
 }
 
 function collectNodeDependencies(
@@ -156,6 +221,19 @@ function prunePrefixDependencies(
   })
 }
 
+function pruneContextPrefixDependencies(
+  dependencies: RComponentSFC_RuntimeContextDependency[],
+): RComponentSFC_RuntimeContextDependency[] {
+  return dependencies.filter((candidate) => {
+    return !dependencies.some(other => {
+      if (candidate === other)
+        return false
+      return candidate.path.length < other.path.length
+        && candidate.path.every((part, index) => part === other.path[index])
+    })
+  })
+}
+
 function collectBoundaryDependencies(
   node: RComponentSFC_IR_Node,
   props: Set<string>,
@@ -188,8 +266,29 @@ function createTableBoundaryDependency(
     sourceProp: rows.prop,
     sourcePath: rows.path,
     rowKey: normalizeLiteralString(node.props['row-key'] ?? node.props.rowKey),
+    contextReads: collectBoundaryContextReads(node),
     columns: collectTableColumnDependencies(node),
   }
+}
+
+function collectBoundaryContextReads(tableNode: RComponentSFC_IR_ElementNode): string[][] {
+  const dependencies: RComponentSFC_RuntimeContextDependency[] = []
+  const seen = new Set<string>()
+  const visit = (node: RComponentSFC_IR_Node, isRoot = false): void => {
+    if (node.kind === 'expression') {
+      collectContextValueDependency(node.value, dependencies, seen)
+      return
+    }
+    if (node.kind !== 'element')
+      return
+    if (!isRoot && node.tag === 'Table')
+      return
+    collectElementContextValues(node, value => collectContextValueDependency(value, dependencies, seen))
+    for (const child of node.children)
+      visit(child)
+  }
+  visit(tableNode, true)
+  return pruneContextPrefixDependencies(dependencies).map(dependency => dependency.path)
 }
 
 function collectTableColumnDependencies(

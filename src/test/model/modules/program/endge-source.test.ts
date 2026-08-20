@@ -39,6 +39,17 @@ describe('EndgeSource', () => {
     expect(validation.diagnostics).toEqual([])
   })
 
+  it('creates and validates the GraphQL query source variant', () => {
+    const source = Endge.source.createDefault('query', 'graphql')
+    const validation = Endge.source.validate('query', source)
+
+    expect(source).toContain("kind: 'graphql'")
+    expect(source).toContain('document: gql`')
+    expect(source).toContain("data('item')")
+    expect(validation.ok).toBe(true)
+    expect(validation.diagnostics).toEqual([])
+  })
+
   it('registers and validates computation source strategies', () => {
     const source = Endge.source.createDefault('computation')
     const validation = Endge.source.validate('computation', source)
@@ -130,17 +141,60 @@ defineQuery({
   it('returns diagnostics for unsupported query source kind', () => {
     const result = Endge.source.compile('query', `
 defineQuery({
-  kind: 'graphql',
+  kind: 'soap',
 })
 `)
 
     expect(result.ok).toBe(false)
-    expect(result.diagnostics).toEqual([
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
       expect.objectContaining({
         severity: 'error',
         code: 'query-source-kind-unsupported',
       }),
-    ])
+    ]))
+  })
+
+  it('compiles a GraphQL document, variables and data output', () => {
+    const result = Endge.source.compile('query', `
+defineQuery({
+  kind: 'graphql',
+  props: defineProps({
+    id: field('String'),
+  }),
+  request: {
+    endpoint: env('ENDPOINT_GRAPHQL'),
+    operationName: 'UpdateItem',
+    document: gql\`
+      mutation UpdateItem($id: ID!) {
+        updateItem(id: $id) { id }
+      }
+    \`,
+    variables: variables(({ prop }) => ({ id: prop('id') })),
+    errorPolicy: 'throw',
+  },
+  outputs: {
+    updated: output().from(data('updateItem')),
+  },
+})
+`)
+
+    expect(result.ok).toBe(true)
+    expect(result.diagnostics).toEqual([])
+    expect(result.document).toMatchObject({
+      kind: 'graphql',
+      request: {
+        endpoint: '{ENDPOINT_GRAPHQL}',
+        operationName: 'UpdateItem',
+        errorPolicy: 'throw',
+      },
+    })
+    expect(result.artifact).toMatchObject({
+      type: 'query-gql',
+      endpoint: '{ENDPOINT_GRAPHQL}',
+      operationName: 'UpdateItem',
+      requestVariables: expect.any(Object),
+      outputs: [{ key: 'updated', source: { type: 'response', path: 'updateItem' } }],
+    })
   })
 
   it('compiles env macro and legacy endgeVar macro into variable tokens', () => {

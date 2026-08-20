@@ -90,4 +90,61 @@ defineQuery({
     }))
     resolve.mockRestore()
   })
+
+  it('executes GraphQL with a standard envelope and returns data', async () => {
+    const request = vi.fn().mockResolvedValue({
+      data: { data: { updateItem: { id: 'item-1' } } },
+    })
+    const executor = new QueryExecutor({ request } as any)
+    const payload = compileQuerySource(`
+defineQuery({
+  kind: 'graphql',
+  props: defineProps({ id: field('String') }),
+  request: {
+    endpoint: 'https://graphql.example.test',
+    operationName: 'UpdateItem',
+    document: gql\`
+      mutation UpdateItem($id: ID!) {
+        updateItem(id: $id) { id }
+      }
+    \`,
+    variables: variables(({ prop }) => ({ id: prop('id') })),
+    auth: { mode: 'none' },
+  },
+  outputs: { updated: output().from(data('updateItem')) },
+})
+`).artifact!
+
+    await expect(executor.execute({ payload, vars: { id: 'item-1' } })).resolves.toEqual({
+      updateItem: { id: 'item-1' },
+    })
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({
+      url: 'https://graphql.example.test',
+      method: 'POST',
+      data: expect.objectContaining({
+        operationName: 'UpdateItem',
+        variables: { id: 'item-1' },
+      }),
+    }))
+  })
+
+  it('throws GraphQL errors returned with HTTP 2xx by default', async () => {
+    const request = vi.fn().mockResolvedValue({
+      data: { data: null, errors: [{ message: 'Mutation rejected' }] },
+    })
+    const executor = new QueryExecutor({ request } as any)
+    const payload = compileQuerySource(`
+defineQuery({
+  kind: 'graphql',
+  request: {
+    endpoint: 'https://graphql.example.test',
+    document: gql\`mutation UpdateItem { updateItem { id } }\`,
+    auth: { mode: 'none' },
+  },
+  outputs: { updated: output().from(data('updateItem')) },
+})
+`).artifact!
+
+    await expect(executor.execute({ payload })).rejects.toThrow('[GraphQL] Mutation rejected')
+  })
 })

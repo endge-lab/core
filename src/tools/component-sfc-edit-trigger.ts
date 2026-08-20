@@ -2,6 +2,7 @@ import type {
   ComponentSFCInteractionTrigger,
   ComponentSFCInteractionTriggerEvent,
   ComponentSFCInteractionTriggerHeldKeys,
+  ComponentSFCInteractionKeyboardCondition,
   ComponentSFCInteractionTriggerModifiers,
   ComponentSFCInteractionTriggerPlatform,
 } from '@/domain/types/component/sfc/ir.types'
@@ -19,14 +20,12 @@ export function normalizeComponentSFCInteractionTriggers(value: unknown): Compon
 
     const key = normalizeStringList(source.key)
     const code = normalizeStringList(source.code)
-    const held = normalizeHeldKeys(source.held)
-    const modifiers = normalizeModifiers(source.modifiers)
+    const keyboard = normalizeComponentSFCInteractionKeyboardCondition(source)
     return [{
       event,
       ...(key ? { key } : {}),
       ...(code ? { code } : {}),
-      ...(held ? { held } : {}),
-      ...(modifiers ? { modifiers } : {}),
+      ...keyboard,
       ...(typeof source.repeat === 'boolean' ? { repeat: source.repeat } : {}),
       ...(typeof source.composing === 'boolean' ? { composing: source.composing } : {}),
       ...(Number.isInteger(source.button) ? { button: Number(source.button) } : {}),
@@ -52,8 +51,7 @@ export function matchesComponentSFCInteractionTrigger(
   if (trigger.repeat !== undefined && trigger.repeat !== event.repeat) return false
   if (trigger.composing !== undefined && trigger.composing !== event.composing) return false
   if (trigger.button != null && trigger.button !== event.button) return false
-  if (!matchesHeldKeys(trigger.held, event.held)) return false
-  return matchesModifiers(trigger.modifiers, event, platform)
+  return matchesComponentSFCInteractionKeyboardCondition(trigger, event, platform)
 }
 
 /** Приводит browser platform label к стабильным значениям edit-on контракта. */
@@ -71,7 +69,7 @@ function normalizeStringList(value: unknown): string[] | undefined {
   return result.length ? result : undefined
 }
 
-function normalizeHeldKeys(value: unknown): ComponentSFCInteractionTriggerHeldKeys | undefined {
+export function normalizeComponentSFCInteractionHeldKeys(value: unknown): ComponentSFCInteractionTriggerHeldKeys | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
   const source = value as Record<string, unknown>
   const key = normalizeStringList(source.key)
@@ -86,7 +84,20 @@ function normalizeHeldKeys(value: unknown): ComponentSFCInteractionTriggerHeldKe
   return Object.keys(result).length ? result : undefined
 }
 
-function normalizeModifiers(value: unknown): ComponentSFCInteractionTriggerModifiers | undefined {
+/** Normalizes a reusable condition on the current keyboard state. */
+export function normalizeComponentSFCInteractionKeyboardCondition(value: unknown): ComponentSFCInteractionKeyboardCondition | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const source = value as Record<string, unknown>
+  const modifiers = normalizeComponentSFCInteractionModifiers(source.modifiers)
+  const held = normalizeComponentSFCInteractionHeldKeys(source.held)
+  if (!modifiers && !held) return undefined
+  return {
+    ...(modifiers ? { modifiers } : {}),
+    ...(held ? { held } : {}),
+  }
+}
+
+export function normalizeComponentSFCInteractionModifiers(value: unknown): ComponentSFCInteractionTriggerModifiers | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
   const source = value as Record<string, unknown>
   const result: ComponentSFCInteractionTriggerModifiers = {}
@@ -102,7 +113,7 @@ function matchesKey(expected: string[], actual: string | undefined): boolean {
   return expected.some(key => key.toLowerCase() === normalized)
 }
 
-function matchesHeldKeys(
+export function matchesComponentSFCInteractionHeldKeys(
   expected: ComponentSFCInteractionTriggerHeldKeys | undefined,
   actual: ComponentSFCInteractionTriggerEvent['held'],
 ): boolean {
@@ -118,6 +129,17 @@ function matchesHeldKeys(
   if (expected.code?.length && hasUnexpectedHeldKey(expected.code, held.code, value => value)) return false
   if (!expected.key?.length && !expected.code?.length && (held.key.length > 0 || held.code.length > 0)) return false
   return true
+}
+
+/** Checks modifiers and ordinary held keys against one keyboard snapshot. */
+export function matchesComponentSFCInteractionKeyboardCondition(
+  expected: ComponentSFCInteractionKeyboardCondition | undefined,
+  actual: Pick<ComponentSFCInteractionTriggerEvent, 'held' | 'modifiers'>,
+  platform: ComponentSFCInteractionTriggerPlatform,
+): boolean {
+  if (!expected) return true
+  return matchesComponentSFCInteractionHeldKeys(expected.held, actual.held)
+    && matchesComponentSFCInteractionModifiers(expected.modifiers, actual.modifiers, platform)
 }
 
 function matchesHeldList(
@@ -141,13 +163,12 @@ function hasUnexpectedHeldKey(
   return actual.some(value => !allowed.has(normalize(value)))
 }
 
-function matchesModifiers(
+export function matchesComponentSFCInteractionModifiers(
   expected: ComponentSFCInteractionTriggerModifiers | undefined,
-  event: ComponentSFCInteractionTriggerEvent,
+  actual: ComponentSFCInteractionTriggerEvent['modifiers'],
   platform: ComponentSFCInteractionTriggerPlatform,
 ): boolean {
   if (!expected) return true
-  const actual = event.modifiers
 
   for (const name of ['ctrl', 'shift', 'alt', 'meta'] as const) {
     if (expected[name] !== undefined && expected[name] !== actual[name]) return false

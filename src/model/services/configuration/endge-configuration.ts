@@ -25,7 +25,7 @@ import { DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION } from '@/model/config/diagnost
 import { DEFAULT_FALLBACK_LOCALE, DEFAULT_LOCALE, DEFAULT_THEME, DEFAULT_TIMEZONE } from '@/model/config/kernel.config'
 import { DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION } from '@/model/config/sfc-editing.config'
 import { DEFAULT_ENDGE_TOOLTIP_CONFIGURATION } from '@/model/config/tooltip.config'
-import { normalizeComponentSFCInteractionTriggers } from '@/tools/component-sfc-edit-trigger'
+import { normalizeComponentSFCInteractionKeyboardCondition, normalizeComponentSFCInteractionTriggers } from '@/tools/component-sfc-edit-trigger'
 
 const LEGACY_SFC_ADAPTER_IDS: Readonly<Record<string, string>> = {
   'native-vue': 'vue-native',
@@ -283,11 +283,13 @@ function normalizeTooltipConfiguration(input: unknown): EndgeTooltipConfiguratio
     throw new Error('[EndgeConfiguration] tooltips.side must be top, right, bottom or left')
   if (!['start', 'center', 'end'].includes(String(align)))
     throw new Error('[EndgeConfiguration] tooltips.align must be start, center or end')
+  const keyboard = normalizeComponentSFCInteractionKeyboardCondition(source.keyboard)
   return {
     side: side as EndgeTooltipConfiguration['side'],
     align: align as EndgeTooltipConfiguration['align'],
     openDelay: normalizeTooltipDelay(source.openDelay, DEFAULT_ENDGE_TOOLTIP_CONFIGURATION.openDelay, 'openDelay'),
     closeDelay: normalizeTooltipDelay(source.closeDelay, DEFAULT_ENDGE_TOOLTIP_CONFIGURATION.closeDelay, 'closeDelay'),
+    ...(keyboard ? { keyboard } : {}),
   }
 }
 
@@ -302,9 +304,13 @@ function applyTooltipPatch(
   target: EndgeTooltipConfiguration,
   patch: NonNullable<EndgeConfigurationPatch['tooltips']>,
 ): void {
-  for (const key of ['side', 'align', 'openDelay', 'closeDelay'] as const) {
+  for (const key of ['side', 'align', 'openDelay', 'closeDelay', 'keyboard'] as const) {
     const override = patch[key]
     if (!override) continue
+    if (override.op === 'remove' && key === 'keyboard') {
+      delete target.keyboard
+      continue
+    }
     if (override.op === 'remove')
       throw new Error(`[EndgeConfiguration] Required field "tooltips.${key}" cannot be removed`)
     ;(target as unknown as Record<string, unknown>)[key] = override.value

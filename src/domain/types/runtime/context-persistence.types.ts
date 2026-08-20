@@ -19,6 +19,30 @@ export interface EndgeContextSnapshot {
   timezone: string | null
 }
 
+/** Volatile keyboard state supplied by the active UI adapter. */
+export interface EndgeKeyboardContextSnapshot {
+  platform: 'macos' | 'windows' | 'linux' | 'unknown'
+  modifiers: {
+    ctrl: boolean
+    shift: boolean
+    alt: boolean
+    meta: boolean
+    mod: boolean
+    altGraph: boolean
+  }
+  held: {
+    key: string[]
+    code: string[]
+  }
+}
+
+/** Full read-only SFC context. Volatile input state is deliberately not serializable. */
+export interface EndgeRuntimeContextSnapshot extends EndgeContextSnapshot {
+  input: {
+    keyboard: EndgeKeyboardContextSnapshot
+  }
+}
+
 export interface EndgePersistenceScope {
   workspaceId: string
   tenantId: string

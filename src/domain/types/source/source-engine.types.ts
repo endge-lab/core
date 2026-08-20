@@ -272,7 +272,7 @@ export interface SourceLanguageStrategy {
   syntax: SourceLanguageSyntaxDefinition
 
   /** Возвращает базовый source для новой сущности. */
-  createDefaultSource: () => string
+  createDefaultSource: (variant?: string) => string
 
   /** Нормализует поддержанный syntax, сохраняя остальной авторский source. */
   normalize?: (source: string) => string

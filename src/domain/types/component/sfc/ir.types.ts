@@ -114,12 +114,16 @@ export interface ComponentSFCInteractionTriggerHeldKeys {
   exact?: boolean
 }
 
-export interface ComponentSFCInteractionTrigger {
+/** Условие на текущее состояние клавиатуры без привязки к конкретному событию. */
+export interface ComponentSFCInteractionKeyboardCondition {
+  modifiers?: ComponentSFCInteractionTriggerModifiers
+  held?: ComponentSFCInteractionTriggerHeldKeys
+}
+
+export interface ComponentSFCInteractionTrigger extends ComponentSFCInteractionKeyboardCondition {
   event: string
   key?: string[]
   code?: string[]
-  held?: ComponentSFCInteractionTriggerHeldKeys
-  modifiers?: ComponentSFCInteractionTriggerModifiers
   repeat?: boolean
   composing?: boolean
   button?: number

@@ -1,12 +1,12 @@
 import type { RComponentSFC_IR_Read } from './ir.types'
 
 /** Источник runtime-зависимости SFC v1. */
-export type RComponentSFC_RuntimeDependencySource = 'props'
+export type RComponentSFC_RuntimeDependencySource = 'props' | 'context'
 
 /** Runtime-зависимость SFC template от входного prop. */
 export interface RComponentSFC_RuntimeDependency {
   /** Источник зависимости. В v1 поддерживаем только props. */
-  source: RComponentSFC_RuntimeDependencySource
+  source: 'props'
 
   /** Имя входного prop, например `flight`. */
   prop: string
@@ -18,6 +18,15 @@ export interface RComponentSFC_RuntimeDependency {
   raw: string
 
   /** Нормализованный read из IR. */
+  read: RComponentSFC_IR_Read
+}
+
+/** Runtime-зависимость SFC template от глобального Endge context. */
+export interface RComponentSFC_RuntimeContextDependency {
+  source: 'context'
+  /** Путь после `$context`, например `['input', 'keyboard', 'modifiers', 'shift']`. */
+  path: string[]
+  raw: string
   read: RComponentSFC_IR_Read
 }
 
@@ -56,6 +65,9 @@ export interface RComponentSFC_RuntimeBoundaryDependency {
   /** Поле ключа строки из `row-key`. */
   rowKey: string | null
 
+  /** Context paths used inside this boundary; they invalidate the whole boundary. */
+  contextReads: string[][]
+
   /** Колонки таблицы, которые можно обновлять точечно. */
   columns: RComponentSFC_RuntimeTableColumnDependency[]
 }
@@ -80,6 +92,9 @@ export interface RComponentSFC_RuntimeDependencies {
   /** Зависимости от props, которые можно связать с внешним input source. */
   props: RComponentSFC_RuntimeDependency[]
 
+  /** Context dependencies outside patchable boundaries. */
+  context: RComponentSFC_RuntimeContextDependency[]
+
   /** Patchable boundaries, для которых runtime строит отдельные Raph-ноды. */
   boundaries: RComponentSFC_RuntimeBoundaryDependency[]
 
@@ -91,6 +106,7 @@ export interface RComponentSFC_RuntimeDependencies {
 export function createEmptyComponentSFCRuntimeDependencies(): RComponentSFC_RuntimeDependencies {
   return {
     props: [],
+    context: [],
     boundaries: [],
     vocabs: [],
   }

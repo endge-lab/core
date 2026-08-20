@@ -87,7 +87,7 @@ export class DocumentDraftFactory {
         item.name = title
         item.displayName = title
         item.type = type
-        item.source = Endge.source.createDefault('query')
+        item.source = Endge.source.createDefault('query', type === QueryType.GraphQL ? 'graphql' : 'rest')
         item.sourceVersion = 2
         if (folderId != null)
           item.folderId = folderId

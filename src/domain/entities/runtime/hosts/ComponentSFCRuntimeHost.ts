@@ -45,6 +45,7 @@ import type {
 import { DataPath, Raph, RaphNode } from '@endge/raph'
 
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
+import { ENDGE_CONTEXT_RAPH_PATH } from '@/model/config/kernel.config'
 import { Endge } from '@/model/kernel/endge'
 import { ComputationResourceRegistry } from '@/model/modules/runtime/execution/computation/ComputationResourceRegistry'
 import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component/sfc/dependencies.types'
@@ -298,6 +299,11 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
       ?? createEmptyComponentSFCRuntimeDependencies()
     return {
       ...dependencies,
+      context: dependencies.context ?? [],
+      boundaries: dependencies.boundaries.map(boundary => ({
+        ...boundary,
+        contextReads: boundary.contextReads ?? [],
+      })),
       vocabs: dependencies.vocabs ?? [],
     }
   }
@@ -507,6 +513,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
 
     if (this._inputSource?.kind === 'raph')
       this._bindRaphInputSource(this._inputSource)
+    this._bindRaphContextSources()
   }
 
   /** Возвращает текущий input source host-а. */
@@ -794,6 +801,38 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     this._bindRaphBoundaryInputSource(input, deps.boundaries)
   }
 
+  /** Context dependencies are Raph-backed and do not depend on the component props input kind. */
+  private _bindRaphContextSources(): void {
+    if (!this.node)
+      return
+
+    const dependencies = this.getRuntimeDependencies()
+    for (const dependency of dependencies.context)
+      this._observeContextPath(this.node, dependency.path)
+
+    for (const boundary of dependencies.boundaries) {
+      if (!boundary.contextReads.length)
+        continue
+      const boundaryNode = this._findRuntimeNodeByMeta('boundaryId', boundary.id)
+      if (!boundaryNode)
+        continue
+      for (const path of boundary.contextReads)
+        this._observeContextPath(boundaryNode, path)
+    }
+  }
+
+  private _observeContextPath(node: RaphNode, path: string[]): void {
+    const observedPath = this._joinRaphPath(ENDGE_CONTEXT_RAPH_PATH, path)
+    if (!observedPath)
+      return
+    for (const mask of [observedPath, `${observedPath}.*`]) {
+      this._raphInputDisposers.push(Raph.app.observeData(node, mask, {
+        phase: RUNTIME_BOUNDARY_UPDATE_PHASE_NAME,
+        wildcardDynamic: true,
+      }))
+    }
+  }
+
   private _bindRaphBoundaryInputSource(
     input: Extract<RuntimeHostInputSource, { kind: 'raph' }>,
     boundaries: RComponentSFC_RuntimeBoundaryDependency[],
@@ -925,6 +964,8 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
 
     const groups = new Map<string, { events: typeof ctx.events, selectorKey: string | null, selectorValue: unknown }>()
     for (const event of ctx.events) {
+      if (!isCollectionEventPath(sourcePath, event.canonical))
+        return null
       const selector = DataPath.from(event.canonical).segments()[sourceSegmentCount]
       if (selector?.index == null && !selector?.pkey)
         return null
@@ -1059,6 +1100,12 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
 
     return `${base}.${child}`
   }
+}
+
+function isCollectionEventPath(sourcePath: string, canonical: string): boolean {
+  return canonical === sourcePath
+    || canonical.startsWith(`${sourcePath}.`)
+    || canonical.startsWith(`${sourcePath}[`)
 }
 
 /** Нормализует target из runtime meta. */
