@@ -12,11 +12,11 @@ dependencies:
     specifier: ^7.27.1
     version: 7.29.7
   '@endge/raph':
-    specifier: ^3.0.8
-    version: 3.0.8
+    specifier: ^3.0.9
+    version: 3.0.9
   '@endge/utils':
-    specifier: ^0.24.10
-    version: 0.24.10(pinia@3.0.4)(vue@3.5.39)
+    specifier: ^0.24.11
+    version: 0.24.11(pinia@3.0.4)(vue@3.5.39)
   '@primevue/themes':
     specifier: ^4.0.0-rc.1
     version: 4.5.4
@@ -374,12 +374,12 @@ packages:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
 
-  /@endge/raph@3.0.8:
-    resolution: {integrity: sha512-rNNbI3rmknYm/nkA86KGWTGcuwUZotrCfdgk1qPfsbohGw+NrYEbQ64Z0NOWZlWY8xUJWE+Jo4nl3B42mZjv8Q==}
+  /@endge/raph@3.0.9:
+    resolution: {integrity: sha512-sALExIKRh48g4EmZ3AEGFuEAcoks1or7Q06dJ8cX9mpn80mhJSl1b2qObtWISmZdpBWIX8fiwMsHB7rLxFX3zA==}
     dev: false
 
-  /@endge/utils@0.24.10(pinia@3.0.4)(vue@3.5.39):
-    resolution: {integrity: sha512-8eqq9D/S1mLNv4Khpla2Cq2c2739504oHvVNDBmDmMHb6h8RxEPPQSljy8xE/UKUGZG7oGtQucc2L9cYypS2lw==}
+  /@endge/utils@0.24.11(pinia@3.0.4)(vue@3.5.39):
+    resolution: {integrity: sha512-TwT/p+rXVGkdidOki2G5H6R9MArQn8P96ssVFqJUMjrJ9c+7tfc0d89fAORBP715+9ukTdxx3ipxmwjdKnz5uw==}
     peerDependencies:
       pinia: ^2.1.7 || ^3.0.0
       vue: ^3.5.13
