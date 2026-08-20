@@ -23,6 +23,7 @@ import { RUpdate } from '@/domain/entities/reflect/RUpdate'
 import { RMock } from '@/domain/entities/reflect/RMock'
 import { RComputation } from '@/domain/entities/reflect/RComputation'
 import { RStyle } from '@/domain/entities/reflect/RStyle'
+import { RConfiguration } from '@/domain/entities/reflect/RConfiguration'
 import { RTenant } from '@/domain/entities/reflect/RTenant'
 import { RType } from '@/domain/entities/reflect/RType'
 import { RVocabs } from '@/domain/entities/reflect/RVocabs'
@@ -267,6 +268,17 @@ export class DocumentDraftFactory {
         item.sourceVersion = 1
         if (folderId != null)
           item.folderId = folderId
+        return item
+      }
+
+      case 'configuration': {
+        const item = new RConfiguration()
+        item.identity = identity
+        item.name = title
+        item.displayName = title
+        item.source = Endge.source.createDefault('configuration')
+        item.sourceVersion = 1
+        item.folderId = null
         return item
       }
 

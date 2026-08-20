@@ -1,7 +1,8 @@
 import type { I18nCatalogProvenance, I18nRuntimeCatalog } from '@/domain/types/i18n.types'
+import type { TypeSourceDefinition } from '@/domain/types/source/type-source.types'
 
 /** Канонический тип source-документа, для которого выбирается source strategy. */
-export type SourceKind = 'query' | 'data-view' | 'filter' | 'composition' | 'store' | 'stream' | 'update' | 'computation' | 'style' | 'type'
+export type SourceKind = 'query' | 'data-view' | 'filter' | 'composition' | 'store' | 'stream' | 'update' | 'computation' | 'style' | 'type' | 'configuration'
 
 /** Тип нейтральной source completion без привязки к Monaco или другому editor API. */
 export type SourceLanguageCompletionKind
@@ -33,6 +34,8 @@ export interface SourceLanguageContext {
     identity: string
     displayName?: string
     category?: 'primitive' | 'reference' | 'user'
+    definition?: TypeSourceDefinition | null
+    entityReference?: { target: string, storage: 'id' | 'identity' }
   }>
 
   /** Identity of the document that owns current source diagnostics. */

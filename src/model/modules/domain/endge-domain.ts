@@ -38,6 +38,7 @@ import { RPolicy } from '@/domain/entities/reflect/RPolicy'
 import { RProject } from '@/domain/entities/reflect/RProject'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RStyle } from '@/domain/entities/reflect/RStyle'
+import { RConfiguration } from '@/domain/entities/reflect/RConfiguration'
 import { RTenant } from '@/domain/entities/reflect/RTenant'
 import { RType } from '@/domain/entities/reflect/RType'
 import { RVocabs } from '@/domain/entities/reflect/RVocabs'
@@ -240,6 +241,7 @@ export interface EndgeDomainParsed {
   tenants: RTenant[]
   policies: RPolicy[]
   styles: RStyle[]
+  configurations: RConfiguration[]
   vocabs: RVocabs[]
   i18nBundles: RI18nBundle[]
   authProfiles: RAuthProfile[]
@@ -373,6 +375,9 @@ export class EndgeDomain extends EndgeModule {
 
   private _stylesById: Map<string | number, RStyle> = new Map()
   private _stylesByIdentity: Map<string, RStyle> = new Map()
+
+  private _configurationsById: Map<string | number, RConfiguration> = new Map()
+  private _configurationsByIdentity: Map<string, RConfiguration> = new Map()
 
   private _vocabsById: Map<string | number, RVocabs> = new Map()
   private _vocabsByIdentity: Map<string, RVocabs> = new Map()
@@ -511,6 +516,8 @@ export class EndgeDomain extends EndgeModule {
     this._policiesByIdentity.clear()
     this._stylesById.clear()
     this._stylesByIdentity.clear()
+    this._configurationsById.clear()
+    this._configurationsByIdentity.clear()
     this._vocabsById.clear()
     this._vocabsByIdentity.clear()
     this._authProfilesById.clear()
@@ -585,6 +592,7 @@ export class EndgeDomain extends EndgeModule {
       domainEntityIndex(this._tenantsById, this._tenantsByIdentity),
       domainEntityIndex(this._policiesById, this._policiesByIdentity),
       domainEntityIndex(this._stylesById, this._stylesByIdentity),
+      domainEntityIndex(this._configurationsById, this._configurationsByIdentity),
       domainEntityIndex(this._vocabsById, this._vocabsByIdentity),
       domainEntityIndex(this._authProfilesById, this._authProfilesByIdentity),
       domainEntityIndex(this._i18nBundlesById, this._i18nBundlesByIdentity),
@@ -645,6 +653,7 @@ export class EndgeDomain extends EndgeModule {
       tenants: normalizeSnapshotDocuments(documents.tenants, folderIds),
       policies: [],
       styles: normalizeSnapshotDocuments(documents.styles, folderIds),
+      configurations: normalizeSnapshotDocuments(documents.configurations ?? [], folderIds),
       vocabs: normalizeSnapshotDocuments(documents.vocabs, folderIds),
       authProfiles: normalizeSnapshotDocuments(documents['auth-profiles'], folderIds),
       i18nBundles: normalizeSnapshotDocuments(documents['i18n-bundles'], folderIds),
@@ -683,6 +692,7 @@ export class EndgeDomain extends EndgeModule {
       authProfiles: bundleDocuments(documents['auth-profiles'], 'auth-profiles'),
       navigations: bundleDocuments(documents.navigations, 'navigations'),
       styles: bundleDocuments(documents.styles, 'styles'),
+      configurations: bundleDocuments(documents.configurations ?? [], 'configurations'),
     }
     const folderIds = bundleIdentityToRuntimeID(normalized.folders)
     const environmentIds = bundleIdentityToRuntimeID(normalized.environments)
@@ -715,6 +725,7 @@ export class EndgeDomain extends EndgeModule {
       tenants: normalizeBundleDocuments(normalized.tenants, folderIds),
       policies: [],
       styles: normalizeBundleDocuments(normalized.styles, folderIds),
+      configurations: normalizeBundleDocuments(normalized.configurations, folderIds),
       vocabs: normalizeBundleDocuments(normalized.vocabs, folderIds),
       authProfiles: normalizeBundleDocuments(normalized.authProfiles, folderIds),
       i18nBundles: normalizeBundleDocuments(normalized.i18nBundles, folderIds),
@@ -2284,6 +2295,65 @@ export class EndgeDomain extends EndgeModule {
     return this.hasStyleByIdentity(identity)
   }
 
+  /** Workspace-owned Configuration source documents. */
+  getConfigurations(): RConfiguration[] {
+    return Array.from(this._configurationsById.values())
+  }
+
+  getConfigurationById(id: string | number): RConfiguration | null {
+    return this._configurationsById.get(id) ?? null
+  }
+
+  getConfigurationByIdentity(identity: string): RConfiguration | null {
+    return this._configurationsByIdentity.get(identity) ?? null
+  }
+
+  getConfiguration(idOrIdentity: string | number): RConfiguration | null {
+    return this.getConfigurationById(idOrIdentity)
+      || this.getConfigurationById(Number(idOrIdentity))
+      || this.getConfigurationByIdentity(String(idOrIdentity))
+  }
+
+  addConfiguration(configuration: RConfiguration): void {
+    if (this._configurationsByIdentity.has(configuration.identity) || this._configurationsById.has(configuration.id))
+      return
+    this._configurationsById.set(configuration.id, configuration)
+    this._configurationsByIdentity.set(configuration.identity, configuration)
+    this.notify()
+  }
+
+  removeConfigurationById(id: string | number): void {
+    const configuration = this._configurationsById.get(id)
+    if (!configuration) return
+    this._configurationsById.delete(configuration.id)
+    this._configurationsByIdentity.delete(configuration.identity)
+    this.notify()
+  }
+
+  removeConfigurationByIdentity(identity: string): void {
+    const configuration = this._configurationsByIdentity.get(identity)
+    if (!configuration) return
+    this._configurationsById.delete(configuration.id)
+    this._configurationsByIdentity.delete(configuration.identity)
+    this.notify()
+  }
+
+  removeConfiguration(identity: string): void {
+    this.removeConfigurationByIdentity(identity)
+  }
+
+  hasConfigurationById(id: string | number): boolean {
+    return this._configurationsById.has(id)
+  }
+
+  hasConfigurationByIdentity(identity: string): boolean {
+    return this._configurationsByIdentity.has(identity)
+  }
+
+  hasConfiguration(identity: string): boolean {
+    return this.hasConfigurationByIdentity(identity)
+  }
+
   /**
    * Методы для работы со словарями
    */
@@ -3257,6 +3327,7 @@ export class EndgeDomain extends EndgeModule {
       tenants: persisted(this.getTenants()).map(x => x.toPlain()),
       policies: persisted(this.getPolicies()).map(x => Serialize.toPlain(x)),
       styles: persisted(this.getStyles()).map(x => x.toPlain()),
+      configurations: persisted(this.getConfigurations()).map(x => x.toPlain()),
       vocabs: persisted(this.getVocabs()).map(x => x.toPlain()),
       authProfiles: persisted(this.getAuthProfiles()).map(x => x.toPlain()),
       i18nBundles: persisted(this.getI18nBundles()).map(x => x.toPlain()),
@@ -3340,6 +3411,7 @@ export class EndgeDomain extends EndgeModule {
       tenants: [],
       policies: [],
       styles: [],
+      configurations: [],
       vocabs: [],
       authProfiles: [],
       i18nBundles: [],
@@ -3423,6 +3495,9 @@ export class EndgeDomain extends EndgeModule {
     if (json.styles && Array.isArray(json.styles)) {
       json.styles.forEach((styleJson: any) => out.styles.push(RStyle.fromPlain(styleJson)))
     }
+    if (json.configurations && Array.isArray(json.configurations)) {
+      json.configurations.forEach((configurationJson: any) => out.configurations.push(RConfiguration.fromPlain(configurationJson)))
+    }
     if (json.vocabs && Array.isArray(json.vocabs)) {
       json.vocabs.forEach((vocabJson: any) => out.vocabs.push(Serialize.fromJSON(RVocabs, vocabJson)))
     }
@@ -3483,6 +3558,7 @@ export class EndgeDomain extends EndgeModule {
     parsed.tenants.forEach(t => this.addTenant(t))
     parsed.policies.forEach(p => this.addPolicy(p))
     parsed.styles.forEach(s => this.addStyle(s))
+    parsed.configurations.forEach(configuration => this.addConfiguration(configuration))
     parsed.vocabs.forEach(v => this.addVocabs(v))
     parsed.authProfiles.forEach(p => this.addAuthProfile(p))
     parsed.i18nBundles.forEach(b => this.addI18nBundles(b))

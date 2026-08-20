@@ -39,6 +39,7 @@ import {
 import { RuntimeStateController } from '@/model/modules/context/persistence/RuntimeStateController'
 import { DisabledContextAdapter } from '@/model/modules/context/persistence/adapters/DisabledContextAdapter'
 import { LocalStorageContextAdapter } from '@/model/modules/context/persistence/adapters/LocalStorageContextAdapter'
+import { createEndgePublicConfigurationSnapshot } from '@/model/services/configuration/endge-configuration'
 
 /**
  * Контекст выполнения Endge: текущий workspace/project/environment/user scope
@@ -145,6 +146,7 @@ export class EndgeContext extends EndgeModule {
   public runtimeSnapshot(): EndgeRuntimeContextSnapshot {
     return {
       ...this.serialize(),
+      config: createEndgePublicConfigurationSnapshot(Endge.configuration.current),
       input: {
         keyboard: this.getKeyboardState(),
       },

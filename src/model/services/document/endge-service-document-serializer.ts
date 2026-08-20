@@ -40,7 +40,7 @@ export function serializeServiceDocument(
       source: text(value.source), sourceVersion: 2,
     })
   }
-  if (documentType === 'data-view' || documentType === 'store' || documentType === 'stream' || documentType === 'style') {
+  if (documentType === 'data-view' || documentType === 'store' || documentType === 'stream' || documentType === 'style' || documentType === 'configuration') {
     return withFields(common, value, ['source', 'sourceVersion'], {
       source: text(value.source), sourceVersion: positiveInteger(value.sourceVersion, 1),
     })

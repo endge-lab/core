@@ -29,6 +29,7 @@ export const ENDGE_SERVICE_COLLECTION_BY_DOCUMENT_TYPE: Partial<Record<DomainDoc
   'auth-profile': 'auth-profiles',
   'navigation': 'navigations',
   'style': 'styles',
+  'configuration': 'configurations',
   'environment': 'environments',
   'tenant': 'tenants',
   'project': 'projects',

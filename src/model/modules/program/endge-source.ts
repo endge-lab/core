@@ -42,6 +42,8 @@ import { StyleSourceEngineStrategy } from '@/model/services/source-engine/strate
 import { StyleSourceLanguageStrategy } from '@/model/services/source-engine/strategies/StyleSourceLanguageStrategy'
 import { TypeSourceEngineStrategy } from '@/model/services/source-engine/strategies/TypeSourceEngineStrategy'
 import { TypeSourceLanguageStrategy } from '@/model/services/source-engine/strategies/TypeSourceLanguageStrategy'
+import { ConfigurationSourceEngineStrategy } from '@/model/services/source-engine/strategies/ConfigurationSourceEngineStrategy'
+import { ConfigurationSourceLanguageStrategy } from '@/model/services/source-engine/strategies/ConfigurationSourceLanguageStrategy'
 
 /** Модуль authoring-операций над source-документами Endge. */
 export class EndgeSource extends EndgeModule {
@@ -194,6 +196,7 @@ export class EndgeSource extends EndgeModule {
     this._strategies.register(new ComputationSourceEngineStrategy())
     this._strategies.register(new StyleSourceEngineStrategy())
     this._strategies.register(new TypeSourceEngineStrategy())
+    this._strategies.register(new ConfigurationSourceEngineStrategy())
     this._languageStrategies.register(new QuerySourceLanguageStrategy())
     this._languageStrategies.register(new DataViewSourceLanguageStrategy())
     this._languageStrategies.register(new FilterSourceLanguageStrategy())
@@ -204,6 +207,7 @@ export class EndgeSource extends EndgeModule {
     this._languageStrategies.register(new ComputationSourceLanguageStrategy())
     this._languageStrategies.register(new StyleSourceLanguageStrategy())
     this._languageStrategies.register(new TypeSourceLanguageStrategy())
+    this._languageStrategies.register(new ConfigurationSourceLanguageStrategy())
     this._patchStrategies.register(new CompositionSourcePatchStrategy())
     this._patchStrategies.register(new FilterSourcePatchStrategy())
     this._patchStrategies.register(new QuerySourcePatchStrategy())

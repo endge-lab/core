@@ -15,7 +15,7 @@ export function serializeTypeSourceDocument(document: TypeSourceDocument): strin
 function serializeDefinition(definition: TypeSourceDefinition): string {
   return definition.kind === 'object'
     ? serializeObject(definition, 0)
-    : serializeExpression(definition, 0)
+    : serializeTypeSourceExpression(definition, 0)
 }
 
 function serializeObject(definition: Extract<TypeSourceDefinition, { kind: 'object' }>, indent: number): string {
@@ -24,7 +24,7 @@ function serializeObject(definition: Extract<TypeSourceDefinition, { kind: 'obje
   return `{\n${fields},\n${' '.repeat(indent)}}`
 }
 
-function serializeExpression(expression: TypeSourceExpression, indent: number): string {
+export function serializeTypeSourceExpression(expression: TypeSourceExpression, indent = 0): string {
   if (expression.kind === 'reference') return serializeTypeSourceReference(expression.identity)
   if (expression.kind === 'object') return `objectOf(${serializeObject(expression, indent)})`
   if (expression.kind === 'enum') {
@@ -35,13 +35,13 @@ function serializeExpression(expression: TypeSourceExpression, indent: number): 
   }
   if (expression.kind === 'union') {
     const variants = expression.variants
-      .map(value => `${' '.repeat(indent + 2)}${serializeExpression(value, indent + 2)},`)
+      .map(value => `${' '.repeat(indent + 2)}${serializeTypeSourceExpression(value, indent + 2)},`)
       .join('\n')
     return `unionOf(\n${variants}\n${' '.repeat(indent)})`
   }
   if (expression.kind === 'record')
-    return `recordOf(${serializeExpression(expression.values, indent)})`
-  return `arrayOf(\n${' '.repeat(indent + 2)}${serializeExpression(expression.items, indent + 2)},\n${' '.repeat(indent)})`
+    return `recordOf(${serializeTypeSourceExpression(expression.values, indent)})`
+  return `arrayOf(\n${' '.repeat(indent + 2)}${serializeTypeSourceExpression(expression.items, indent + 2)},\n${' '.repeat(indent)})`
 }
 
 function serializeField(field: TypeSourceField, indent: number): string {
@@ -49,7 +49,7 @@ function serializeField(field: TypeSourceField, indent: number): string {
   const modifierPrefix = ' '.repeat(indent + 2)
   const type = field.type.kind === 'reference'
     ? serializeTypeSourceReference(field.type.identity)
-    : serializeExpression(field.type, indent)
+    : serializeTypeSourceExpression(field.type, indent)
   const lines = [`${prefix}${propertyName(field.key)}: field(${type})`]
   if (field.description) lines.push(`${modifierPrefix}.description(${sourceString(field.description)})`)
   if (field.min != null) lines.push(`${modifierPrefix}.min(${field.min})`)

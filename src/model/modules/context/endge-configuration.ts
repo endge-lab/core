@@ -44,9 +44,13 @@ export class EndgeConfigurationModule extends EndgeModule {
     }
 
     let configuration = normalizeEndgeConfiguration(Endge.workspace.current.configuration)
+    configuration.values = Endge.configurationSchema.resolveValues(configuration.values)
     configuration = applyEndgeConfigurationContribution(configuration, tenant?.configuration ?? EMPTY_CONTRIBUTION)
+    configuration.values = Endge.configurationSchema.resolveValues(configuration.values)
     configuration = applyEndgeConfigurationContribution(configuration, project?.configuration ?? EMPTY_CONTRIBUTION)
+    configuration.values = Endge.configurationSchema.resolveValues(configuration.values)
     configuration = applyEndgeConfigurationContribution(configuration, environment?.configuration ?? EMPTY_CONTRIBUTION)
+    configuration.values = Endge.configurationSchema.resolveValues(configuration.values)
 
     const workspaceIdentity = Endge.workspace.current.identity
     this._current = configuration
@@ -109,6 +113,7 @@ export class EndgeConfigurationModule extends EndgeModule {
   /** Вычисляет upstream snapshot для общего редактора указанного слоя. */
   resolveUpstream(layer: EndgeConfigurationLayer): EndgeConfiguration {
     let configuration = normalizeEndgeConfiguration(Endge.workspace.current.configuration)
+    configuration.values = Endge.configurationSchema.resolveValues(configuration.values)
     if (layer === 'workspace' || layer === 'tenant')
       return configuration
 
@@ -117,6 +122,7 @@ export class EndgeConfigurationModule extends EndgeModule {
       configuration,
       Endge.domain.getTenant(execution.tenantIdentity)?.configuration ?? EMPTY_CONTRIBUTION,
     )
+    configuration.values = Endge.configurationSchema.resolveValues(configuration.values)
     if (layer === 'project')
       return configuration
 
@@ -124,12 +130,15 @@ export class EndgeConfigurationModule extends EndgeModule {
       configuration,
       Endge.domain.getProject(execution.projectIdentity)?.configuration ?? EMPTY_CONTRIBUTION,
     )
+    configuration.values = Endge.configurationSchema.resolveValues(configuration.values)
     return configuration
   }
 
   /** Builds a preview without mutating active boot configuration. */
   preview(upstream: EndgeConfiguration, contribution: EndgeConfigurationContribution): EndgeConfiguration {
-    return applyEndgeConfigurationContribution(upstream, contribution)
+    const result = applyEndgeConfigurationContribution(upstream, contribution)
+    result.values = Endge.configurationSchema.resolveValues(result.values)
+    return result
   }
 
   private _resolveEntity<TEntity>(

@@ -7,6 +7,7 @@ import { EndgeBind } from '@/model/modules/runtime/core/endge-bind'
 import { EndgeActions } from '@/model/modules/runtime/core/endge-actions'
 import { EndgeContext } from '@/model/modules/context/endge-context'
 import { EndgeConfigurationModule } from '@/model/modules/context/endge-configuration'
+import { EndgeConfigurationSchemaModule } from '@/model/modules/context/endge-configuration-schema'
 import { EndgeDataView } from '@/model/modules/runtime/execution/endge-data-view'
 import { EndgeCompiler } from '@/model/modules/program/endge-compiler'
 import { EndgeDiagnostics } from '@/model/modules/diagnostics/endge-diagnostics'
@@ -163,6 +164,7 @@ export class Endge extends EndgeFederation {
       'auth-profiles': Endge._portableDocuments(domain.authProfiles, folders),
       navigations: Endge._portableDocuments(domain.navigations, folders),
       styles: Endge._portableDocuments(domain.styles, folders),
+      configurations: Endge._portableDocuments(domain.configurations, folders),
     }
 
     const { installedIntegrations, ...workspaceContent } = workspace
@@ -348,6 +350,8 @@ export class Endge extends EndgeFederation {
         return 'policies'
       case DomainSectionType.Style:
         return 'styles'
+      case DomainSectionType.Configuration:
+        return 'configurations'
       case DomainSectionType.PageTemplate:
         return 'pageTemplates'
       case DomainSectionType.Page:
@@ -553,6 +557,10 @@ export class Endge extends EndgeFederation {
   /** Доступ к effective configuration и immutable compiler build context. */
   static get configuration(): EndgeConfigurationModule {
     return this.getModule<EndgeConfigurationModule>('configuration')
+  }
+
+  static get configurationSchema(): EndgeConfigurationSchemaModule {
+    return this.getModule<EndgeConfigurationSchemaModule>('configurationSchema')
   }
 
   /**

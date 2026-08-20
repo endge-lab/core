@@ -1,3 +1,5 @@
+import type { EndgePublicConfigurationSnapshot } from '@/domain/types/configuration/configuration.type'
+
 export type EndgePersistenceDriver = 'local' | 'disabled'
 
 export interface EndgePersistenceOptions {
@@ -38,6 +40,8 @@ export interface EndgeKeyboardContextSnapshot {
 
 /** Full read-only SFC context. Volatile input state is deliberately not serializable. */
 export interface EndgeRuntimeContextSnapshot extends EndgeContextSnapshot {
+  /** Static effective configuration of the current build; never persisted or Raph-backed. */
+  config: EndgePublicConfigurationSnapshot
   input: {
     keyboard: EndgeKeyboardContextSnapshot
   }

@@ -9,7 +9,11 @@ import type {
   EndgeThemeDefinition,
   EndgeTimezoneDefinition,
   EndgeVariableDefinition,
+  EndgeConfigurationValues,
+  EndgePublicConfigurationSnapshot,
 } from '@/domain/types/configuration/configuration.type'
+import type { EndgeJSONValue } from '@/domain/types/source/configuration-source.types'
+import { isEndgeJSONValue } from '@/model/services/configuration/configuration-value'
 import type {
   DiagnosticsAttributes,
   DiagnosticsAdapterOptionValue,
@@ -56,6 +60,7 @@ const DEFAULT_CONFIGURATION_VALUE: EndgeConfiguration = {
   sfcEditing: structuredCloneSafe(DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION),
   tooltips: structuredCloneSafe(DEFAULT_ENDGE_TOOLTIP_CONFIGURATION),
   diagnostics: structuredCloneSafe(DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION),
+  values: {},
 }
 
 export const DEFAULT_ENDGE_CONFIGURATION: Readonly<EndgeConfiguration> = Object.freeze(DEFAULT_CONFIGURATION_VALUE)
@@ -116,6 +121,7 @@ export function normalizeEndgeConfiguration(input: unknown): EndgeConfiguration 
     sfcEditing: normalizeSFCEditingConfiguration(input.sfcEditing),
     tooltips: normalizeTooltipConfiguration(input.tooltips),
     diagnostics: normalizeDiagnosticsConfiguration(input.diagnostics),
+    values: normalizeConfigurationValues(input.values),
   }
 }
 
@@ -176,6 +182,8 @@ export function applyEndgeConfigurationContribution(
     applySFCEditingPatch(next.sfcEditing, patch.sfcEditing)
   if (patch.tooltips)
     applyTooltipPatch(next.tooltips, patch.tooltips)
+  if (patch.values)
+    next.values = applyConfigurationValuePatch(next.values, patch.values)
 
   applyRequiredValue(next, 'defaultLocale', patch.defaultLocale)
   applyRequiredValue(next, 'fallbackLocale', patch.fallbackLocale)
@@ -198,11 +206,72 @@ export function createEndgeContextHash(input: unknown): string {
   return `ctx-${(hash >>> 0).toString(16).padStart(8, '0')}`
 }
 
+/** Builds the stable public SFC projection without internal vars/diagnostics/storage namespace. */
+export function createEndgePublicConfigurationSnapshot(
+  configuration: EndgeConfiguration,
+): EndgePublicConfigurationSnapshot {
+  const {
+    vars: _vars,
+    diagnostics: _diagnostics,
+    values,
+    ...publicSystemConfiguration
+  } = cloneConfiguration(configuration)
+  const result: Record<string, unknown> = { ...publicSystemConfiguration }
+  for (const [identity, category] of Object.entries(values))
+    result[identity] = structuredCloneSafe(category)
+  return deepFreeze(result) as EndgePublicConfigurationSnapshot
+}
+
 function normalizePatch(input: unknown): EndgeConfigurationPatch {
   if (!isRecord(input))
     return {}
 
   return structuredCloneSafe(input) as EndgeConfigurationPatch
+}
+
+function normalizeConfigurationValues(input: unknown): EndgeConfigurationValues {
+  if (!isRecord(input))
+    return {}
+  const result: EndgeConfigurationValues = {}
+  for (const [configurationIdentity, rawValues] of Object.entries(input)) {
+    if (!isSafeConfigurationKey(configurationIdentity) || !isRecord(rawValues))
+      continue
+    const values: Record<string, EndgeJSONValue> = {}
+    for (const [field, value] of Object.entries(rawValues)) {
+      if (isSafeConfigurationKey(field) && isEndgeJSONValue(value))
+        values[field] = structuredCloneSafe(value)
+    }
+    result[configurationIdentity] = values
+  }
+  return result
+}
+
+function applyConfigurationValuePatch(
+  upstream: EndgeConfigurationValues,
+  patch: NonNullable<EndgeConfigurationPatch['values']>,
+): EndgeConfigurationValues {
+  const result = structuredCloneSafe(upstream)
+  for (const [configurationIdentity, fields] of Object.entries(patch)) {
+    if (!isSafeConfigurationKey(configurationIdentity) || !isRecord(fields))
+      continue
+    const category = result[configurationIdentity] ?? {}
+    for (const [field, operation] of Object.entries(fields)) {
+      if (!isSafeConfigurationKey(field) || !isRecord(operation))
+        continue
+      if (operation.op === 'remove') {
+        // A remove operation removes this layer's override and therefore keeps upstream.
+        continue
+      }
+      if (operation.op === 'set' && isEndgeJSONValue(operation.value))
+        category[field] = structuredCloneSafe(operation.value)
+    }
+    result[configurationIdentity] = category
+  }
+  return result
+}
+
+function isSafeConfigurationKey(value: string): boolean {
+  return value.length > 0 && value !== '__proto__' && value !== 'prototype' && value !== 'constructor'
 }
 
 /** Нормализует persisted literal triggers и поддерживает документы до появления sfcEditing. */
@@ -778,6 +847,15 @@ function isRecord(input: unknown): input is Record<string, unknown> {
 
 function structuredCloneSafe<T>(input: T): T {
   return JSON.parse(JSON.stringify(input)) as T
+}
+
+function deepFreeze<T>(value: T): T {
+  if (value != null && typeof value === 'object') {
+    for (const nested of Object.values(value as Record<string, unknown>))
+      deepFreeze(nested)
+    Object.freeze(value)
+  }
+  return value
 }
 
 function stableStringify(input: unknown): string {

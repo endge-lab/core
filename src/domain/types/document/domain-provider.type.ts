@@ -6,7 +6,7 @@ export type EndgeDomainCollection
   = | 'projects' | 'tenants' | 'environments' | 'folders' | 'types' | 'queries'
     | 'data-views' | 'compositions' | 'stores' | 'streams' | 'updates' | 'mocks'
     | 'components' | 'actions' | 'filters' | 'converters' | 'computations' | 'vocabs'
-    | 'i18n-bundles' | 'auth-profiles' | 'navigations' | 'styles'
+    | 'i18n-bundles' | 'auth-profiles' | 'navigations' | 'styles' | 'configurations'
 
 /** Возможности выбранного источника домена. */
 export interface EndgeDomainProviderCapabilities {

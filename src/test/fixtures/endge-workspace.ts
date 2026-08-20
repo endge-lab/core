@@ -9,6 +9,7 @@ export const TEST_ENDGE_WORKSPACE: EndgeWorkspaceDefinition = {
   meta: {},
   installedIntegrations: [],
   configuration: {
+    values: {},
     vars: [],
     locales: [
       { code: 'en', displayName: 'English', shortLabel: 'EN', direction: 'ltr' },

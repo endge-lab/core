@@ -24,6 +24,7 @@ import type { RStream } from '@/domain/entities/reflect/RStream'
 import type { RUpdate } from '@/domain/entities/reflect/RUpdate'
 import type { RMock } from '@/domain/entities/reflect/RMock'
 import type { RComputation } from '@/domain/entities/reflect/RComputation'
+import type { RConfiguration } from '@/domain/entities/reflect/RConfiguration'
 
 /**
  * Разновидности типов компонентов
@@ -80,6 +81,7 @@ export enum DomainSectionType {
   Tenant = 'tenant',
   Policy = 'policy',
   Style = 'style',
+  Configuration = 'configuration',
   PageTemplate = 'page-template',
   Page = 'page',
   Navigation = 'navigation',
@@ -111,6 +113,7 @@ export type DomainDocumentType
     | 'environment'
     | 'policy'
     | 'style'
+    | 'configuration'
     | 'vocabs'
     | 'i18n-bundles'
     | 'auth-profile'
@@ -139,4 +142,4 @@ export interface Document {
 /**
  * Описывает любой документ рефлекцию
  */
-export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RComposition | RStore | RStream | RUpdate | RMock | RAction | RConverter | RComputation | RIntegration | RParameter | RFilter | RPolicy | RStyle | RType | RVocabs | RI18nBundle | RAuthProfile | RWorkspace | RTenant | RPageTemplate | RPage | RNavigation
+export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RComposition | RStore | RStream | RUpdate | RMock | RAction | RConverter | RComputation | RIntegration | RParameter | RFilter | RPolicy | RStyle | RConfiguration | RType | RVocabs | RI18nBundle | RAuthProfile | RWorkspace | RTenant | RPageTemplate | RPage | RNavigation

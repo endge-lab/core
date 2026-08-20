@@ -7,6 +7,10 @@ import type {
   EndgeDiagnosticsRoute,
 } from '@/domain/types/diagnostics/diagnostics.types'
 import type { EndgeExecutionContext } from '@/domain/types/runtime/execution-context.types'
+import type { EndgeJSONValue } from '@/domain/types/source/configuration-source.types'
+
+export type EndgeConfigurationValues = Record<string, Record<string, EndgeJSONValue>>
+export type EndgeConfigurationValuePatch = Record<string, Record<string, EndgeValueOverride<EndgeJSONValue>>>
 
 export interface EndgeLocaleDefinition {
   code: string
@@ -68,7 +72,15 @@ export interface EndgeConfiguration {
   tooltips: EndgeTooltipConfiguration
   /** Настройки telemetry, output adapters, routing и snapshots. */
   diagnostics: EndgeDiagnosticsConfiguration
+  /** Persisted/effective values grouped by Configuration document identity. */
+  values: EndgeConfigurationValues
 }
+
+/** Deep-readonly, SFC-visible effective configuration projection. */
+export type EndgePublicConfigurationSnapshot = Readonly<
+  Omit<EndgeConfiguration, 'vars' | 'diagnostics' | 'values'>
+  & Record<string, unknown>
+>
 
 export type EndgeValueOverride<T> =
   | { op: 'set', value: T }
@@ -114,6 +126,8 @@ export interface EndgeConfigurationPatch {
   tooltips?: EndgeTooltipConfigurationPatch
   /** Локальный contribution diagnostics для текущего configuration layer. */
   diagnostics?: EndgeDiagnosticsConfigurationPatch
+  /** Field-level overrides of source-backed Configuration values. */
+  values?: EndgeConfigurationValuePatch
 }
 
 /** Patch локальной collection policy модуля диагностики. */

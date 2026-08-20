@@ -18,6 +18,8 @@ const CORE_TYPES: readonly BuiltinTypeDefinition[] = [
   { identity: 'Boolean', displayName: 'Boolean', category: 'primitive', runtimeType: 'Boolean' },
   { identity: 'Null', displayName: 'Null', category: 'primitive', runtimeType: 'Null' },
   { identity: 'Object', displayName: 'Object', category: 'primitive', runtimeType: 'Object' },
+  { identity: 'JSON', displayName: 'JSON', category: 'primitive', runtimeType: 'JSON' },
+  { identity: 'TriggerSet', displayName: 'Набор триггеров', category: 'primitive', runtimeType: 'TriggerSet' },
   { identity: 'DateTime', displayName: 'DateTime', category: 'primitive', runtimeType: 'DateTime' },
   { identity: 'Time', displayName: 'Time', category: 'primitive', runtimeType: 'Time' },
   { identity: 'RefAction', displayName: 'Ссылка на действие', category: 'reference', target: 'actions' },

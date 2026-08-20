@@ -26,6 +26,23 @@ defineProps<{ status: string }>()
     ]))
   })
 
+  it('accepts a Configuration TriggerSet through $context.config', () => {
+    const result = compileComponentSFC(`<template>
+  <DateTime
+    value="2026-08-20T12:00:00Z"
+    editable
+    :edit-on="$context.config.groundHandling.actualTimeTriggers"
+  />
+</template>`)
+
+    expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
+    const node = result.ir?.template.roots[0]
+    expect(node?.kind === 'element' ? node.editable?.triggers : null).toMatchObject({
+      kind: 'expression',
+      source: '$context.config.groundHandling.actualTimeTriggers',
+    })
+  })
+
   it('compiles lexical row scope and a computed patch key in emit()', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 defineProps<{ rows: Array<{ id: number, status: string }> }>()

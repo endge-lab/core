@@ -15,6 +15,7 @@ import type { ProgramMetadata } from '@/domain/types/program/program-metadata.ty
 import type { ComputationProgramPayload } from '@/domain/types/computation/computation-program.types'
 import type { EndgeStyleSheetArtifact } from '@/domain/types/style/style.types'
 import type { ActionImplementation, ActionTargetSelector } from '@/domain/types/runtime/action.types'
+export type { ConfigurationProgramPayload } from '@/domain/types/source/configuration-source.types'
 
 export type ProgramArtifactKey = string
 
@@ -32,6 +33,7 @@ export type ProgramEntityType
     | 'filter'
     | 'composition'
     | 'style'
+    | 'configuration'
 
 /** Итоговый статус artifact после компиляции и валидации. */
 export type ProgramArtifactStatus = 'valid' | 'warning' | 'error'

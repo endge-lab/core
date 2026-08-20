@@ -28,6 +28,7 @@ export interface EndgeDomainPlain {
   tenants: unknown[]
   policies: unknown[]
   styles: unknown[]
+  configurations: unknown[]
   vocabs: unknown[]
   authProfiles: unknown[]
   i18nBundles: unknown[]
@@ -60,6 +61,7 @@ export interface EndgePortableDocuments {
   'auth-profiles': unknown[]
   navigations: unknown[]
   styles: unknown[]
+  configurations: unknown[]
 }
 
 export interface EndgeInstalledIntegrationExport {

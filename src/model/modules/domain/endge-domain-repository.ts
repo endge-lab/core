@@ -28,7 +28,7 @@ import { resolveEndgeServiceCollection, resolveEndgeServiceStateCollection } fro
 type DomainCollectionKey
   = | 'projects' | 'types' | 'queries' | 'dataViews' | 'compositions' | 'stores'
     | 'streams' | 'updates' | 'mocks' | 'componentSFCs' | 'actions' | 'filters'
-    | 'converters' | 'computations' | 'environments' | 'tenants' | 'styles'
+    | 'converters' | 'computations' | 'environments' | 'tenants' | 'styles' | 'configurations'
     | 'vocabs' | 'authProfiles' | 'i18nBundles' | 'navigations'
 
 /** Persistence boundary for live service-backend and read-only local sources. */
@@ -556,6 +556,7 @@ export class EndgeDomainRepository extends EndgeModule {
     if (documentType === 'tenant') return domain.getTenant(documentIdOrIdentity)
     if (documentType === 'policy') return domain.getPolicy(documentIdOrIdentity)
     if (documentType === 'style') return domain.getStyle(documentIdOrIdentity)
+    if (documentType === 'configuration') return domain.getConfiguration(documentIdOrIdentity)
     if (documentType === 'page-template') return domain.getPageTemplate(documentIdOrIdentity)
     if (documentType === 'page') return domain.getPage(documentIdOrIdentity)
     if (documentType === 'navigation') return domain.getNavigation(documentIdOrIdentity)
@@ -602,6 +603,7 @@ export class EndgeDomainRepository extends EndgeModule {
     if (documentType === 'tenant') return remove(x => domain.removeTenantById(x), x => domain.removeTenant(x))
     if (documentType === 'policy') return remove(x => domain.removePolicyById(x), x => domain.removePolicy(x))
     if (documentType === 'style') return remove(x => domain.removeStyleById(x), x => domain.removeStyle(x))
+    if (documentType === 'configuration') return remove(x => domain.removeConfigurationById(x), x => domain.removeConfiguration(x))
     if (documentType === 'page-template') return remove(x => domain.removePageTemplateById(x), x => domain.removePageTemplate(x))
     if (documentType === 'page') return remove(x => domain.removePageById(x), x => domain.removePage(x))
     if (documentType === 'navigation') return remove(x => domain.removeNavigationById(x), x => domain.removeNavigation(x))
@@ -628,6 +630,7 @@ export class EndgeDomainRepository extends EndgeModule {
     if (documentType === 'environment') return 'environments'
     if (documentType === 'tenant') return 'tenants'
     if (documentType === 'style') return 'styles'
+    if (documentType === 'configuration') return 'configurations'
     if (documentType === 'vocabs') return 'vocabs'
     if (documentType === 'auth-profile') return 'authProfiles'
     if (documentType === 'i18n-bundles') return 'i18nBundles'

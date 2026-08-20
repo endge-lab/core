@@ -4,6 +4,7 @@ import { EndgeBind } from '@/model/modules/runtime/core/endge-bind'
 import { EndgeCompiler } from '@/model/modules/program/endge-compiler'
 import { EndgeContext } from '@/model/modules/context/endge-context'
 import { EndgeConfigurationModule } from '@/model/modules/context/endge-configuration'
+import { EndgeConfigurationSchemaModule } from '@/model/modules/context/endge-configuration-schema'
 import { EndgeDiagnostics } from '@/model/modules/diagnostics/endge-diagnostics'
 import { EndgeDomain } from '@/model/modules/domain/endge-domain'
 import { EndgeDomainRepository } from '@/model/modules/domain/endge-domain-repository'
@@ -31,7 +32,8 @@ export const ENDGE_CORE_MODULES: EndgeModuleDefinition[] = [
   { key: 'workspace', module: EndgeWorkspace, after: ['context', 'domainRepository'] },
   { key: 'domain', module: EndgeDomain, after: 'domainRepository' },
   { key: 'types', module: EndgeTypes, after: 'domain' },
-  { key: 'configuration', module: EndgeConfigurationModule, after: ['workspace', 'domain', 'context'] },
+  { key: 'configurationSchema', module: EndgeConfigurationSchemaModule, after: ['workspace', 'domain', 'types', 'source'] },
+  { key: 'configuration', module: EndgeConfigurationModule, after: ['workspace', 'domain', 'context', 'configurationSchema'] },
   { key: 'diagnostics', module: EndgeDiagnostics, after: 'configuration' },
   { key: 'source', module: EndgeSource, after: 'domain' },
   { key: 'program', module: EndgeProgram, after: 'domain' },

@@ -33,6 +33,34 @@ export function collectTypeSourceReferences(source: string): TypeSourceReference
   }
 }
 
+/** Collects Type Registry references from value(Type, ...) calls in Configuration Source. */
+export function collectConfigurationTypeSourceReferences(source: string): TypeSourceReferenceLocation[] {
+  try {
+    const ast = parseTS(source, { sourceType: 'module', plugins: ['typescript'], errorRecovery: true })
+    const references: TypeSourceReferenceLocation[] = []
+    for (const statement of ast.program.body) {
+      if (!t.isExpressionStatement(statement)) continue
+      const expression = unwrapExpression(statement.expression)
+      if (!t.isCallExpression(expression) || !t.isIdentifier(expression.callee, { name: 'defineConfig' })) continue
+      const object = expression.arguments[0]
+      if (!object || !t.isObjectExpression(object)) continue
+      for (const property of object.properties) {
+        if (!t.isObjectProperty(property) || !t.isExpression(property.value)) continue
+        let cursor = unwrapExpression(property.value)
+        while (t.isCallExpression(cursor) && t.isMemberExpression(cursor.callee) && t.isExpression(cursor.callee.object))
+          cursor = unwrapExpression(cursor.callee.object)
+        if (!t.isCallExpression(cursor) || !t.isIdentifier(cursor.callee, { name: 'value' })) continue
+        const type = cursor.arguments[0]
+        if (type && t.isExpression(type)) collectTypeExpression(type, references)
+      }
+    }
+    return references
+  }
+  catch {
+    return []
+  }
+}
+
 /** Переводит ссылки на типы в канонический синтаксис без кавычек. */
 export function normalizeTypeSourceReferences(source: string): string {
   return collectTypeSourceReferences(source)
@@ -50,9 +78,17 @@ export function normalizeTypeSourceReferences(source: string): string {
 
 /** Находит ссылку Type Source в позиции редактора. */
 export function resolveTypeSourceReference(context: SourceLanguageContext): SourceDocumentReference | null {
+  return resolveReference(context, collectTypeSourceReferences(context.source))
+}
+
+export function resolveConfigurationTypeSourceReference(context: SourceLanguageContext): SourceDocumentReference | null {
+  return resolveReference(context, collectConfigurationTypeSourceReferences(context.source))
+}
+
+function resolveReference(context: SourceLanguageContext, references: TypeSourceReferenceLocation[]): SourceDocumentReference | null {
   const offset = positionToOffset(context.source, context.position)
   if (offset == null) return null
-  return collectTypeSourceReferences(context.source)
+  return references
     .filter(reference => offset >= reference.range.start && offset < reference.range.end)
     .sort((left, right) => rangeLength(left) - rangeLength(right))[0] ?? null
 }

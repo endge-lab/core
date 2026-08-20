@@ -822,6 +822,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   }
 
   private _observeContextPath(node: RaphNode, path: string[]): void {
+    // Configuration is immutable for one build and deliberately not published to Raph.
+    if (path[0] === 'config')
+      return
     const observedPath = this._joinRaphPath(ENDGE_CONTEXT_RAPH_PATH, path)
     if (!observedPath)
       return

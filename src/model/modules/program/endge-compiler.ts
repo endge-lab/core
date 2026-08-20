@@ -24,6 +24,7 @@ import type {
   QueryProgramPayload,
   QueryProgramOutput,
   EndgeStyleProgramPayload,
+  ConfigurationProgramPayload,
 } from '@/domain/types/program/program.types'
 import type { EndgeStyleSheetArtifact } from '@/domain/types/style/style.types'
 import type { EndgeSFCEditingConfiguration } from '@/domain/types/configuration/configuration.type'
@@ -41,6 +42,7 @@ import { RStore } from '@/domain/entities/reflect/RStore'
 import { RStream } from '@/domain/entities/reflect/RStream'
 import { RUpdate } from '@/domain/entities/reflect/RUpdate'
 import { RStyle } from '@/domain/entities/reflect/RStyle'
+import { RConfiguration } from '@/domain/entities/reflect/RConfiguration'
 import { RType } from '@/domain/entities/reflect/RType'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sfc/component-sfc-template'
@@ -136,6 +138,9 @@ export class EndgeCompiler extends EndgeModule {
 
     try {
       if (!this.compilePhase('type', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'types', Endge.types.listResolved(), context))
+        return
+
+      if (!this.compilePhase('configuration', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'configurations', Endge.domain.getConfigurations(), context))
         return
 
       if (!this.compilePhase('computation', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'computations', Endge.domain.getComputations(), context))
@@ -491,6 +496,42 @@ export class EndgeCompiler extends EndgeModule {
           },
           dependencies,
           diagnostics,
+        })
+      },
+    })
+
+    this.registerHandler<RConfiguration, ConfigurationProgramPayload>({
+      entityType: 'configuration',
+      compile: (entity, context) => {
+        const schema = Endge.configurationSchema.get(entity.identity)
+        const values = schema?.document?.values ?? []
+        const dependencies = [...new Set(values.flatMap(value => collectTypeSourceExpressionReferences(value.type)))]
+          .filter(identity => identity !== 'Any')
+          .map((identity) => {
+            const target = Endge.types.getDefinition(identity)
+            return {
+              entityType: 'type' as const,
+              id: target?.id ?? identity,
+              identity,
+              role: 'configuration-value-type',
+            }
+          })
+        return this._makeArtifact(entity, 'configuration', context, {
+          capabilities: ['compilable', 'configuration'],
+          payload: {
+            type: 'configuration',
+            identity: entity.identity,
+            displayName: entity.displayName || entity.name || entity.identity,
+            sourceVersion: 1,
+            values,
+          },
+          diagnostics: schema?.diagnostics ?? [{
+            severity: 'error',
+            code: 'configuration-schema-missing',
+            message: `Configuration schema "${entity.identity}" was not prepared.`,
+            sourcePath: 'source',
+          }],
+          dependencies,
         })
       },
     })
