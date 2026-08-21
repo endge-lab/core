@@ -72,7 +72,7 @@ export class EndgeBind extends EndgeModule {
    * @param handler - функция (value) => convertedValue
    * @returns true, если конвертер найден и обработчик установлен
    */
-  converter(identity: string, handler: (v: any) => any): boolean {
+  converter(identity: string, handler: (v: any, options?: Record<string, unknown>) => any): boolean {
     const c = Endge.domain.getConverter(identity)
     if (!c) { return false }
     c.setCustom(handler)

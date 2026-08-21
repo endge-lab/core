@@ -216,6 +216,7 @@ export type RComponentSFC_IR_Tag
     | 'Column'
     | 'Cell'
     | 'ColumnMenu'
+    | 'CellMenu'
     | 'RowMenu'
     | 'MenuItem'
     | 'MenuSeparator'
@@ -263,17 +264,22 @@ export interface RComponentSFC_IR_ElementNode {
   /** Compiler-resolved Table menus, including forwarded Action identities and targets. */
   tableMenus?: RComponentSFC_IR_TableMenus
 
+  /** Compiler-resolved CellMenu override for one Column. */
+  cellMenu?: ComponentSFCTableCellMenuDescriptor
+
   /** Позиция исходного AST-узла. */
   sourceRange?: RComponentSFC_SourceRange
 }
 
 export interface RComponentSFC_IR_TableMenus {
   column: ComponentSFCTableColumnMenuDescriptor
-  row: ComponentSFCTableRowMenuDescriptor
+  /** Default data-cell menu. `row` is retained as the compatibility field name. */
+  row: ComponentSFCTableCellMenuDescriptor
 }
 
 export type ComponentSFCTableColumnMenuMode = 'default' | 'disabled' | 'inline'
 export type ComponentSFCTableRowMenuMode = 'none' | 'inline'
+export type ComponentSFCTableCellMenuMode = 'none' | 'inline'
 
 /** Renderer-neutral menu retained in compiled SFC form until a concrete row/column context exists. */
 export interface ComponentSFCTableMenuDescriptor {
@@ -289,6 +295,10 @@ export interface ComponentSFCTableMenuItemDescriptor {
   kind: 'item'
   id: string
   label: RComponentSFC_IR_Value
+  /** `v-if` expression evaluated against the concrete table/cell context. */
+  visible?: RComponentSFC_IR_Value
+  /** Static or dynamic disabled state evaluated against the same context as the Action. */
+  disabled?: RComponentSFC_IR_Value
   action: string
   /** Required Action port whose mounted provider may replace `action`. */
   requiredPort?: string
@@ -314,6 +324,9 @@ export interface ComponentSFCTableRowMenuDescriptor {
   menu: ComponentSFCTableMenuDescriptor | null
   diagnostics: RComponentDiagnostic[]
 }
+
+/** Canonical cell menu descriptor. RowMenu uses the same shape as a legacy alias. */
+export type ComponentSFCTableCellMenuDescriptor = ComponentSFCTableRowMenuDescriptor
 
 export type RComponentSFC_IR_EventModifier
   = 'stop' | 'prevent' | 'self' | 'once' | 'capture' | 'passive'

@@ -383,7 +383,7 @@ export class EndgeDataView {
     // циклической загрузки Endge modules; в полноценном runtime она уже собрана.
     const converter = Endge.isConfigured ? Endge.domain.getConverter(identity) : null
     if (converter?.customHandler) {
-      const converted = converter.convert(value)
+      const converted = converter.convert(value, options)
       if (converted && (typeof converted === 'object' || typeof converted === 'function') && typeof (converted as any).then === 'function')
         throw new Error(`[DataView] Async converter "${identity}" is not supported.`)
       return converted
@@ -400,6 +400,11 @@ export class EndgeDataView {
     }
 
     return value
+  }
+
+  /** Applies one registered Converter to the current value as a whole. */
+  public convert(identity: string, value: unknown, options?: Record<string, unknown>): unknown {
+    return this._convert(identity, value, options)
   }
 
   /** Читает dot-path из object/array без выбрасывания ошибок. */

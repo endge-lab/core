@@ -15,15 +15,18 @@ export class RConverter extends REntity {
   description: string | null = null
 
   @Exclude()
-  customHandler: ((v: any) => any) | undefined = undefined
+  customHandler: ((v: any, options?: Record<string, unknown>) => any) | undefined = undefined
 
-  setCustom(fn: ((v: any) => any) | undefined): void {
+  setCustom(fn: ((v: any, options?: Record<string, unknown>) => any) | undefined): void {
     this.customHandler = fn
   }
 
-  convert(v: any): any {
+  convert(v: any, options?: Record<string, unknown>): any {
     if (this.customHandler) {
-      return this.customHandler(v)
+      const result = this.customHandler(v, options)
+      if (result && typeof result.then === 'function')
+        throw new Error(`Async converter "${this.identity || this.id}" is not supported`)
+      return result
     }
     return null
   }

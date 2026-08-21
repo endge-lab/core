@@ -182,8 +182,7 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
     if (!config)
       return field.options ?? []
 
-    const vocab = Endge.domain.getVocab(config.identity)
-    const rows = Endge.vocabs.getValues(vocab?.collectionSlug ?? config.identity)
+    const rows = Endge.vocabs.getValues(config.identity)
     return rows.map((row) => {
       const rawValue = this._readPath(row, config.valuePath)
       const value = typeof rawValue === 'string' || typeof rawValue === 'number' || typeof rawValue === 'boolean'
@@ -203,9 +202,7 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
     const identity = String(field.vocab?.identity ?? '').trim()
     if (!identity)
       return null
-    const vocab = Endge.domain.getVocab(identity)
-    const slug = String(vocab?.collectionSlug ?? identity).trim()
-    return slug ? `vocabs.${slug}` : null
+    return `vocabs.${identity}`
   }
 
   /**

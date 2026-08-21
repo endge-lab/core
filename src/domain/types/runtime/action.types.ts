@@ -169,9 +169,37 @@ export interface TableColumnActionContext extends RuntimeActionContext {
   activeSortCount: number
 }
 
-/** Renderer-neutral row/cell context shared by every Table menu adapter. */
+export interface TableActionTableContext {
+  id: string
+  runtimeId: string
+  state: Readonly<Record<string, unknown>>
+}
+
+export interface TableActionRowContext {
+  id: string
+  index: number
+  data: Record<string, unknown>
+}
+
+export interface TableActionColumnContext {
+  key: string
+  index: number
+  title: string
+  metadata: Readonly<Record<string, unknown>>
+}
+
+export interface TableActionCellContext {
+  value: unknown
+}
+
+/** Renderer-neutral cell context shared by every Table menu adapter. */
 export interface TableRowActionContext extends RuntimeActionContext {
+  /** Compatibility surface value retained for existing Action providers. */
   surface: 'table-row'
+  table: TableActionTableContext
+  rowContext: TableActionRowContext
+  column: TableActionColumnContext
+  cell: TableActionCellContext
   tableRuntimeId: string
   tableId: string
   target: TableRuntimeActionTarget
@@ -181,3 +209,6 @@ export interface TableRowActionContext extends RuntimeActionContext {
   columnKey: string
   value: unknown
 }
+
+/** Canonical name for new consumers; TableRowActionContext remains source-compatible. */
+export type TableCellActionContext = TableRowActionContext

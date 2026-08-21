@@ -82,6 +82,12 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
   public override start(): void {
     if (this._connection)
       return
+    if (Endge.runtime.resolveDataMode(this) === 'mock') {
+      const updatedAt = new Date().toISOString()
+      this.setContext({ status: 'success', startedAt: updatedAt, updatedAt })
+      this.emit('start:skipped', { reason: 'mock-mode' })
+      return
+    }
     const artifact = this.getArtifactPayload()
     if (!artifact)
       throw new Error(`[StreamRuntimeHost] Artifact is unavailable for "${this.entityIdentity}".`)

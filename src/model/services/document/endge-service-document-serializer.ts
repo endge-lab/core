@@ -89,7 +89,9 @@ export function serializeServiceDocument(
     })
   }
   if (documentType === 'vocabs') {
-    return withFields(common, value, ['mode', 'baseApiUrl', 'collectionSlug', 'authMode', 'authProfileIdentity'])
+    return withFields(common, value, ['source', 'sourceVersion', 'mode', 'baseApiUrl', 'collectionSlug', 'authMode', 'authProfileIdentity'], {
+      source: text(value.source), sourceVersion: positiveInteger(value.sourceVersion, 1),
+    })
   }
   if (documentType === 'i18n-bundles')
     return withFields(common, value, ['locales'], { locales: objectValue(value.locales) })

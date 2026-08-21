@@ -113,7 +113,7 @@ export interface ComponentSFCTableCellEditingProjection {
 /** Способ, которым содержимое ячейки представлено в простом visual editor. */
 export type ComponentSFCTableVisualCellTag = Exclude<
   RComponentSFC_IR_Tag,
-  'Component' | 'Table' | 'Column' | 'Cell' | 'ColumnMenu' | 'RowMenu' | 'MenuItem' | 'MenuSeparator' | 'Editable' | 'Variant'
+  'Component' | 'Table' | 'Column' | 'Cell' | 'ColumnMenu' | 'CellMenu' | 'RowMenu' | 'MenuItem' | 'MenuSeparator' | 'Editable' | 'Variant'
 >
 
 export type ComponentSFCTableCellProjection
@@ -157,6 +157,8 @@ export interface ComponentSFCTableColumnProjection {
   cell: ComponentSFCTableCellProjection
   editing: ComponentSFCTableCellEditingProjection
   interactions: ComponentSFCTableCellInteractionsProjection
+  /** Column-level CellMenu override; default mode inherits Table > CellMenu. */
+  cellMenu: ComponentSFCTableMenuProjection
   hasCustomCell: boolean
   cellSource: string | null
   sourceRange: RComponentSFC_SourceRange
@@ -183,6 +185,8 @@ export type ComponentSFCTableMenuNodeProjection
       action: ComponentSFCVisualSourceValue | null
       input: ComponentSFCVisualSourceValue | null
       icon: ComponentSFCVisualSourceValue | null
+      visible: ComponentSFCVisualSourceValue | null
+      disabled: ComponentSFCVisualSourceValue | null
       sourceOwned: boolean
       sourceRange: RComponentSFC_SourceRange
     }
@@ -294,31 +298,36 @@ export type ComponentSFCTableSourcePatch
       valueKind: 'expression' | 'literal'
     }
     | {
-      type: 'set-menu-mode'
-      menu: ComponentSFCTableVisualMenuKind
+    type: 'set-menu-mode'
+    menu: ComponentSFCTableVisualMenuKind
+    columnIndex?: number
       mode: 'default' | 'disabled' | 'none' | 'custom'
     }
     | {
-      type: 'add-menu-node'
-      menu: ComponentSFCTableVisualMenuKind
+    type: 'add-menu-node'
+    menu: ComponentSFCTableVisualMenuKind
+    columnIndex?: number
       node: 'item' | 'separator'
     }
     | {
-      type: 'remove-menu-node'
-      menu: ComponentSFCTableVisualMenuKind
+    type: 'remove-menu-node'
+    menu: ComponentSFCTableVisualMenuKind
+    columnIndex?: number
       nodeIndex: number
     }
     | {
-      type: 'move-menu-node'
-      menu: ComponentSFCTableVisualMenuKind
+    type: 'move-menu-node'
+    menu: ComponentSFCTableVisualMenuKind
+    columnIndex?: number
       fromIndex: number
       toIndex: number
     }
     | {
-      type: 'set-menu-item-attribute'
-      menu: ComponentSFCTableVisualMenuKind
-      nodeIndex: number
-      name: 'label' | 'action' | 'input' | 'icon'
+    type: 'set-menu-item-attribute'
+    menu: ComponentSFCTableVisualMenuKind
+    columnIndex?: number
+    nodeIndex: number
+    name: 'label' | 'action' | 'input' | 'icon' | 'visible' | 'disabled'
       value: string | null
       valueKind: 'expression' | 'literal'
     }

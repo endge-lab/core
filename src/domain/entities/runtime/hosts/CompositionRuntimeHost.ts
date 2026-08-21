@@ -55,6 +55,10 @@ function evaluateComponentEventInput(
   if (value.kind === 'now') return evaluatedAt
   if (value.kind === 'literal') return value.value
   if (value.kind === 'scope') return undefined
+  if (value.kind === 'coalesce') {
+    const left = evaluateComponentEventInput(value.left, payload, evaluatedAt)
+    return left ?? evaluateComponentEventInput(value.right, payload, evaluatedAt)
+  }
   if (value.kind === 'array') return value.items.map(item => evaluateComponentEventInput(item, payload, evaluatedAt))
   return Object.fromEntries(value.entries.map(entry => [
     typeof entry.key === 'string' ? entry.key : String(evaluateComponentEventInput(entry.key, payload, evaluatedAt)),
@@ -346,6 +350,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     payload: CompositionProgramPayload,
   ): Promise<void> {
     const scope = this._requireScope(descriptor.path)
+    const dataMode = Endge.runtime.resolveDataMode(this) === 'mock' ? 'mock' : 'live'
     const scopeData = descriptor.data ?? payload.data
       .filter(data => (data.scopePath ?? 'scope_default') === descriptor.path)
       .map(data => data.path ?? data.name)
@@ -353,7 +358,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       const data = payload.data.find(item => (item.path ?? item.name) === dataPath)
       if (!data || data.kind !== 'vocab')
         return
-      await Endge.vocabs.acquire([data.identity], data.policy)
+      await Endge.vocabs.acquire([data.identity], data.policy, { dataMode })
     }))
 
     Endge.styles.transaction(() => {
@@ -654,15 +659,11 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         ? this.meta.dataRuntimes
         : {}
     ) as Record<string, unknown>
-
     for (const descriptor of payload.data) {
       const descriptorPath = descriptor.path ?? descriptor.name
 
       if (descriptor.kind === 'vocab') {
-        const vocab = Endge.domain.getVocab(descriptor.identity)
-        if (!vocab)
-          throw new Error(`[CompositionRuntimeHost] Vocab data "${descriptor.identity}" is missing.`)
-        const vocabPath = `vocabs.${String(vocab.collectionSlug ?? '').trim()}`
+        const vocabPath = `vocabs.${descriptor.identity}`
         this._dataPaths.set(descriptorPath, vocabPath)
         this.addResource({
           id: `data:${descriptorPath}`,

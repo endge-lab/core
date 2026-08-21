@@ -34,6 +34,7 @@ const NON_VISUAL_CELL_TAGS = new Set([
   'Column',
   'Cell',
   'ColumnMenu',
+  'CellMenu',
   'RowMenu',
   'MenuItem',
   'MenuSeparator',
@@ -273,15 +274,15 @@ function applyTablePatch(
         patch.valueKind,
       )
     case 'set-menu-mode':
-      return setMenuMode(source, context, patch.menu, patch.mode)
+      return setMenuMode(source, context, patch.menu, patch.mode, patch.columnIndex)
     case 'add-menu-node':
-      return addMenuNode(source, context, patch.menu, patch.node)
+      return addMenuNode(source, context, patch.menu, patch.node, patch.columnIndex)
     case 'remove-menu-node':
-      return removeNode(source, requireMenuNode(context, patch.menu, patch.nodeIndex))
+      return removeNode(source, requireMenuNode(context, patch.menu, patch.nodeIndex, patch.columnIndex))
     case 'move-menu-node':
-      return moveMenuNode(source, context, patch.menu, patch.fromIndex, patch.toIndex)
+      return moveMenuNode(source, context, patch.menu, patch.fromIndex, patch.toIndex, patch.columnIndex)
     case 'set-menu-item-attribute':
-      return setMenuItemAttribute(source, context, patch.menu, patch.nodeIndex, patch.name, patch.value, patch.valueKind)
+      return setMenuItemAttribute(source, context, patch.menu, patch.nodeIndex, patch.name, patch.value, patch.valueKind, patch.columnIndex)
   }
 }
 
@@ -296,19 +297,35 @@ function resolveTableContext(source: string): TableSourceContext | null {
     columns: roots[0].children.filter(
       (node): node is RComponentSFC_AST_ElementNode => node.kind === 'element' && node.tag === 'Column',
     ),
-    menus: Object.fromEntries(roots[0].children.flatMap((node) => {
-      if (node.kind !== 'element') return []
-      if (node.tag === 'ColumnMenu') return [['column', node]]
-      if (node.tag === 'RowMenu') return [['row', node]]
-      return []
-    })) as TableSourceContext['menus'],
+    menus: resolveTableMenus(roots[0]),
     diagnostics: result.diagnostics,
   }
 }
 
-function requireMenu(context: TableSourceContext, kind: ComponentSFCTableVisualMenuKind): RComponentSFC_AST_ElementNode {
-  const menu = context.menus[kind]
-  if (!menu) throw new Error(`${kind === 'column' ? 'ColumnMenu' : 'RowMenu'} не найден.`)
+function resolveTableMenus(table: RComponentSFC_AST_ElementNode): TableSourceContext['menus'] {
+  const children = table.children.filter(
+    (node): node is RComponentSFC_AST_ElementNode => node.kind === 'element',
+  )
+  const column = children.find(node => node.tag === 'ColumnMenu')
+  const row = children.find(node => node.tag === 'CellMenu')
+    ?? children.find(node => node.tag === 'RowMenu')
+  return {
+    ...(column ? { column } : {}),
+    ...(row ? { row } : {}),
+  }
+}
+
+function requireMenu(
+  context: TableSourceContext,
+  kind: ComponentSFCTableVisualMenuKind,
+  columnIndex?: number,
+): RComponentSFC_AST_ElementNode {
+  const owner = columnIndex == null ? context.table : requireColumn(context, columnIndex)
+  if (columnIndex != null && kind !== 'row') throw new Error('На уровне Column поддерживается только CellMenu.')
+  const menu = columnIndex == null
+    ? context.menus[kind]
+    : owner.children.find((node): node is RComponentSFC_AST_ElementNode => node.kind === 'element' && node.tag === 'CellMenu')
+  if (!menu) throw new Error(`${kind === 'column' ? 'ColumnMenu' : 'CellMenu'} не найден.`)
   return menu
 }
 
@@ -322,8 +339,9 @@ function requireMenuNode(
   context: TableSourceContext,
   kind: ComponentSFCTableVisualMenuKind,
   index: number,
+  columnIndex?: number,
 ): RComponentSFC_AST_ElementNode {
-  const node = menuNodes(requireMenu(context, kind))[index]
+  const node = menuNodes(requireMenu(context, kind, columnIndex))[index]
   if (!node) throw new Error(`Пункт меню с индексом ${index} не найден.`)
   return node
 }
@@ -340,8 +358,13 @@ function setMenuMode(
   context: TableSourceContext,
   kind: ComponentSFCTableVisualMenuKind,
   mode: 'default' | 'disabled' | 'none' | 'custom',
+  columnIndex?: number,
 ): string {
-  const menu = context.menus[kind]
+  const owner = columnIndex == null ? context.table : requireColumn(context, columnIndex)
+  if (columnIndex != null && kind !== 'row') throw new Error('На уровне Column поддерживается только CellMenu.')
+  const menu = columnIndex == null
+    ? context.menus[kind]
+    : owner.children.find((node): node is RComponentSFC_AST_ElementNode => node.kind === 'element' && node.tag === 'CellMenu')
   if (menu) assertManagedMenu(source, menu)
   if (kind === 'column') {
     if (mode === 'none') throw new Error('ColumnMenu поддерживает режимы default, custom и disabled.')
@@ -352,9 +375,17 @@ function setMenuMode(
     const withoutMenu = menu ? removeNode(source, menu) : source
     return setNodeAttribute(withoutMenu, context.table, 'column-menu', mode === 'disabled' ? 'disabled' : null)
   }
-  if (mode === 'default' || mode === 'disabled') throw new Error('RowMenu поддерживает режимы none и custom.')
+  if (columnIndex != null) {
+    if (mode === 'disabled') throw new Error('Column CellMenu поддерживает inherit, custom и none.')
+    const withoutMenu = menu ? removeNode(source, menu) : source
+    if (mode === 'default') return setNodeAttribute(withoutMenu, owner, 'cell-menu', null)
+    if (mode === 'none') return setNodeAttribute(withoutMenu, owner, 'cell-menu', 'none')
+    const withoutMode = setNodeAttribute(source, owner, 'cell-menu', null)
+    return menu ? withoutMode : insertChild(withoutMode, owner, '<CellMenu></CellMenu>')
+  }
+  if (mode === 'default' || mode === 'disabled') throw new Error('CellMenu поддерживает режимы none и custom.')
   if (mode === 'none') return menu ? removeNode(source, menu) : source
-  return menu ? source : insertChild(source, context.table, '<RowMenu></RowMenu>')
+  return menu ? source : insertChild(source, context.table, '<CellMenu></CellMenu>')
 }
 
 function addMenuNode(
@@ -362,8 +393,9 @@ function addMenuNode(
   context: TableSourceContext,
   kind: ComponentSFCTableVisualMenuKind,
   node: 'item' | 'separator',
+  columnIndex?: number,
 ): string {
-  const menu = requireMenu(context, kind)
+  const menu = requireMenu(context, kind, columnIndex)
   assertManagedMenu(source, menu)
   const markup = node === 'separator'
     ? '<MenuSeparator />'
@@ -377,8 +409,9 @@ function moveMenuNode(
   kind: ComponentSFCTableVisualMenuKind,
   fromIndex: number,
   toIndex: number,
+  columnIndex?: number,
 ): string {
-  const menu = requireMenu(context, kind)
+  const menu = requireMenu(context, kind, columnIndex)
   assertManagedMenu(source, menu)
   const nodes = menuNodes(menu)
   if (!nodes[fromIndex] || !nodes[toIndex]) throw new Error('Пункт меню не найден.')
@@ -396,13 +429,14 @@ function setMenuItemAttribute(
   context: TableSourceContext,
   kind: ComponentSFCTableVisualMenuKind,
   nodeIndex: number,
-  name: 'label' | 'action' | 'input' | 'icon',
+  name: 'label' | 'action' | 'input' | 'icon' | 'visible' | 'disabled',
   value: string | null,
   valueKind: 'expression' | 'literal',
+  columnIndex?: number,
 ): string {
-  const menu = requireMenu(context, kind)
+  const menu = requireMenu(context, kind, columnIndex)
   assertManagedMenu(source, menu)
-  const item = requireMenuNode(context, kind, nodeIndex)
+  const item = requireMenuNode(context, kind, nodeIndex, columnIndex)
   if (item.tag !== 'MenuItem') throw new Error('MenuSeparator не содержит attributes.')
   if (source.slice(item.range.start, item.range.end).includes('<!--'))
     throw new Error('Пункт меню управляется во вкладке Source.')
@@ -412,17 +446,24 @@ function setMenuItemAttribute(
     throw new Error('Legacy :action object управляется во вкладке Source.')
   if (labelAttribute?.dynamic && readComponentSFCTranslationFallback(labelAttribute.value ?? '') == null)
     throw new Error('Неизвестное label expression управляется во вкладке Source.')
-  if (item.attributes.some(attribute => !['id', 'label', 'action', 'input', 'icon'].includes(attribute.name)) || item.directives.length)
+  if (item.attributes.some(attribute => !['id', 'label', 'action', 'input', 'icon', 'disabled'].includes(attribute.name))
+    || item.directives.some(directive => directive.name !== 'if'))
     throw new Error('Пункт меню содержит неизвестные конструкции и управляется во вкладке Source.')
   if (name === 'action' && valueKind !== 'literal')
     throw new Error('Visual editor поддерживает literal action="...". Legacy :action object остаётся Source-owned.')
   if (valueKind === 'expression' && value) {
     const result = compileComponentSFCExpression(value, {
-      locals: kind === 'row' ? ['row', 'rowId', 'rowIndex', 'columnKey', 'value'] : [],
-      sourcePath: `template.Table.${kind === 'row' ? 'RowMenu' : 'ColumnMenu'}.MenuItem.${name}`,
+      locals: kind === 'row'
+        ? ['$table', '$row', '$column', '$cell', 'row', 'rowId', 'rowIndex', 'columnKey', 'columnMeta', 'value']
+        : ['$table', '$column'],
+      sourcePath: `template.Table.${kind === 'row' ? 'CellMenu' : 'ColumnMenu'}.MenuItem.${name}`,
     })
     const error = result.diagnostics.find(item => item.severity === 'error')
     if (error) throw new Error(error.message)
+  }
+  if (name === 'visible') {
+    if (valueKind !== 'expression' && value) throw new Error('Условие видимости должно быть expression.')
+    return setNodeDirectiveExpression(source, item, 'if', value)
   }
   return setNodeAttributeValue(source, item, name, value, valueKind)
 }
@@ -1389,6 +1430,24 @@ function setNodeAttributeValue(
   if (value == null)
     return source
   return insertAttribute(source, node, serializeAttributeValue(name, value, valueKind))
+}
+
+function setNodeDirectiveExpression(
+  source: string,
+  node: RComponentSFC_AST_ElementNode,
+  name: string,
+  value: string | null,
+): string {
+  const declarations = node.directives.filter(item => item.name === name)
+  if (declarations.length > 1)
+    throw new Error(`Директива v-${name} объявлена несколько раз. Измените её во вкладке Source.`)
+  const declaration = declarations[0] ?? null
+  if (declaration) {
+    if (value == null) return removeRangeWithWhitespace(source, declaration.range.start, declaration.range.end)
+    return replaceRange(source, declaration.range.start, declaration.range.end, `v-${name}="${escapeAttribute(value)}"`)
+  }
+  if (value == null) return source
+  return insertAttribute(source, node, `v-${name}="${escapeAttribute(value)}"`)
 }
 
 function serializeAttribute(name: string, value: string): string {

@@ -7,6 +7,8 @@ import type {
   RComponentSFC_IR_VocabRead,
 } from '@/domain/types/component/sfc/ir.types'
 
+const SFC_PLATFORM_LOCALS = new Set(['$table', '$row', '$column', '$cell'])
+
 /** Контекст анализа выражения SFC template/script. */
 export interface ComponentSFCExpressionContext {
   /** Имена props, доступные выражению. */
@@ -222,6 +224,8 @@ function resolveReadSource(
     return 'raph'
   if (root === '$context')
     return 'context'
+  if (SFC_PLATFORM_LOCALS.has(root))
+    return 'local'
   if (props.has(root) || root === 'props')
     return 'props'
   if (locals.has(root))

@@ -4,16 +4,21 @@ import { Expose } from 'class-transformer'
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
 import type { DiagnosticsProblemInput } from '@/domain/types/diagnostics/diagnostics.types'
 import { REntity } from '@/domain/entities/reflect/REntity'
+import { compileVocabSource } from '@/model/services/source-engine/compilers/vocab-source-compile'
+import { VOCAB_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/vocab.default.source'
 
 export type RVocabMode = 'external_payload' | 'internal'
 
 /** Сущность словаря (коллекция vocabs). Один документ = один словарь. */
 export class RVocabs extends REntity {
   @Expose()
-  displayName!: string
+  sourceVersion: number = 1
 
   @Expose()
-  description?: string | null = null
+  source: string = VOCAB_DEFAULT_SOURCE
+
+  @Expose()
+  override description: string | null = null
 
   @Expose()
   mode: RVocabMode = 'internal'
@@ -45,6 +50,14 @@ export class RVocabs extends REntity {
     v.collectionSlug = json.collectionSlug ?? null
     v.authMode = normalizeVocabAuthMode(json.authMode)
     v.authProfileIdentity = json.authProfileIdentity ?? null
+    v.sourceVersion = Number(json.sourceVersion ?? 1) || 1
+    v.source = String(json.source ?? '').trim() || createLegacyVocabSource({
+      mode: v.mode,
+      baseApiUrl: v.baseApiUrl,
+      collectionSlug: v.collectionSlug,
+      authMode: v.authMode,
+      authProfileIdentity: v.authProfileIdentity,
+    })
     v.folderId = json.folderId ?? json.folder ?? null
     v.active = json.active !== false
     v.applyEntityMeta(json)
@@ -58,6 +71,8 @@ export class RVocabs extends REntity {
       name: this.name,
       displayName: this.displayName,
       description: this.description ?? null,
+      sourceVersion: this.sourceVersion,
+      source: this.source,
       mode: this.mode,
       baseApiUrl: this.baseApiUrl ?? null,
       collectionSlug: this.collectionSlug ?? null,
@@ -77,11 +92,17 @@ export class RVocabs extends REntity {
     if (!String(this.displayName ?? '').trim())
       problems.push({ severity: 'warning', code: 'vocab.display-name.required', message: 'Vocabs.displayName не задан' })
 
-    if (this.mode === 'external_payload') {
-      if (!String(this.baseApiUrl ?? '').trim())
-        problems.push({ severity: 'warning', code: 'vocab.base-api-url.required', message: 'Vocabs.baseApiUrl не задан для mode=external_payload' })
-      if (!String(this.collectionSlug ?? '').trim())
-        problems.push({ severity: 'warning', code: 'vocab.collection-slug.required', message: 'Vocabs.collectionSlug не задан для mode=external_payload' })
+    if (this.sourceVersion !== 1)
+      problems.push({ severity: 'error', code: 'vocab.source-version.unsupported', message: `Vocab sourceVersion=${this.sourceVersion} не поддерживается` })
+    for (const diagnostic of compileVocabSource(this.source).diagnostics) {
+      problems.push({
+        severity: diagnostic.severity,
+        code: diagnostic.code,
+        message: diagnostic.message,
+        sourcePath: diagnostic.sourcePath,
+        start: diagnostic.start,
+        end: diagnostic.end,
+      })
     }
     return problems
   }
@@ -95,6 +116,43 @@ export class RVocabs extends REntity {
     plain.folderId = null
     return Serialize.fromJSON(RVocabs, plain)
   }
+}
+
+export function createLegacyVocabSource(input: {
+  mode: RVocabMode
+  baseApiUrl?: string | null
+  collectionSlug?: string | null
+  authMode?: 'inherit' | 'profile' | 'none'
+  authProfileIdentity?: string | null
+}): string {
+  if (input.mode !== 'external_payload')
+    return VOCAB_DEFAULT_SOURCE
+
+  const rawBaseUrl = String(input.baseApiUrl ?? '').trim()
+  const environment = rawBaseUrl.match(/^\{([A-Za-z_][A-Za-z0-9_]*)\}$/)?.[1]
+  const baseUrl = environment ? `env(${quote(environment)})` : quote(rawBaseUrl)
+  const collection = quote(String(input.collectionSlug ?? '').trim())
+  const auth = input.authMode === 'profile'
+    ? `{ mode: 'profile', profile: ${quote(String(input.authProfileIdentity ?? '').trim())} }`
+    : `{ mode: '${input.authMode === 'none' ? 'none' : 'inherit'}' }`
+
+  return `defineVocab({
+  provider: payload({
+    baseUrl: ${baseUrl},
+    collection: ${collection},
+    auth: ${auth},
+  }),
+
+  outputs: {
+    items: output()
+      .from(response()),
+  },
+})
+`
+}
+
+function quote(value: string): string {
+  return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
 }
 
 function normalizeVocabAuthMode(value: unknown): 'inherit' | 'profile' | 'none' {

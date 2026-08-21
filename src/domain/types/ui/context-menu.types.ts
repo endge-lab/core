@@ -18,6 +18,7 @@ export interface ContextMenuItemDescriptor {
   action: RuntimeActionId
   input?: unknown
   icon?: string
+  disabled?: boolean
 }
 
 export interface ContextMenuSeparatorDescriptor {
