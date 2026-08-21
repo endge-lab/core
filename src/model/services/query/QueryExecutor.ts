@@ -90,19 +90,33 @@ export class QueryExecutor {
       })
       const envelope = this._asRecord(response.data)
       const errors = Array.isArray(envelope.errors) ? envelope.errors : []
-      if (errors.length > 0 && (payload.errorPolicy ?? 'throw') === 'throw') {
+      if (errors.length > 0) {
         const messages = errors.map((error) => {
           const entry = this._asRecord(error)
           return typeof entry.message === 'string' ? entry.message : JSON.stringify(error)
         })
-        throw new Error(`[GraphQL] ${messages.join('; ')}`)
+        this._writeRequestError({
+          protocol: 'GraphQL',
+          method: 'POST',
+          url,
+          operationName: payload.operationName,
+          status: response.status,
+          message: messages.join('; '),
+        })
+        if ((payload.errorPolicy ?? 'throw') === 'throw')
+          throw new Error(`[GraphQL] ${messages.join('; ')}`)
       }
       return envelope.data ?? null
     }
     catch (error: any) {
       if (String(error?.message ?? '').startsWith('[GraphQL]'))
         throw error
-      this._throwHttpError(error, url, signal)
+      this._throwHttpError(error, {
+        protocol: 'GraphQL',
+        method: 'POST',
+        url,
+        operationName: payload.operationName,
+      }, signal)
     }
   }
 
@@ -171,24 +185,64 @@ export class QueryExecutor {
       return response.data
     }
     catch (error: any) {
-      this._throwHttpError(error, url, signal)
+      this._throwHttpError(error, {
+        protocol: 'REST',
+        method,
+        url,
+      }, signal)
     }
   }
 
-  private _throwHttpError(error: any, url: string, signal?: AbortSignal): never {
+  private _throwHttpError(
+    error: any,
+    request: {
+      protocol: 'REST' | 'GraphQL'
+      method: string
+      url: string
+      operationName?: string
+    },
+    signal?: AbortSignal,
+  ): never {
     if (signal?.aborted || error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError' || error?.name === 'AbortError')
       throw error
     const status = error?.response?.status
     const statusText = error?.response?.statusText
     const responsePayload = error?.response?.data
     const message = status
-      ? `HTTP ${status} ${statusText || ''} at ${url}`
-      : `HTTP error at ${url}`
+      ? `HTTP ${status} ${statusText || ''} at ${request.url}`
+      : `HTTP error at ${request.url}`
     const details = typeof responsePayload === 'string'
       ? responsePayload
       : JSON.stringify(responsePayload ?? {})
 
+    this._writeRequestError({
+      ...request,
+      status,
+      statusText,
+      message: status ? undefined : String(error?.message ?? 'Network error'),
+    })
     throw new Error(`${message}\n${details}`)
+  }
+
+  /** Пишет краткую transport-индикацию без request body, headers и response payload. */
+  private _writeRequestError(input: {
+    protocol: 'REST' | 'GraphQL'
+    method: string
+    url: string
+    operationName?: string
+    status?: number
+    statusText?: string
+    message?: string
+  }): void {
+    const operation = input.protocol === 'GraphQL' && input.operationName
+      ? ` ${input.operationName}`
+      : ''
+    const status = input.status
+      ? `HTTP ${input.status}${input.statusText ? ` ${input.statusText}` : ''}`
+      : null
+    const reason = [status, input.message].filter(Boolean).join(': ') || 'Request failed'
+
+    console.error(`[QueryExecutor] ${input.protocol}${operation} ${input.method} ${input.url} failed: ${reason}`)
   }
 
   /** Публикует runtime warning безопасного expression evaluator. */

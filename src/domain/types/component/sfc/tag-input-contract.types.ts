@@ -2,7 +2,10 @@ import type { RComponentContractInput } from '@/domain/types/component/component
 import type { RComponentSFC_IR_Tag } from './ir.types'
 
 /** Публичный входной параметр renderer-neutral встроенного SFC tag. */
-export type ComponentSFCTagInputContract = Readonly<RComponentContractInput>
+export type ComponentSFCTagInputContract = Readonly<RComponentContractInput> & {
+  /** Допустимые SFC spelling aliases для одного renderer-facing параметра. */
+  aliases?: readonly string[]
+}
 
 /**
  * Data-facing входы встроенных tags для source-aware visual editors.
@@ -11,16 +14,19 @@ export type ComponentSFCTagInputContract = Readonly<RComponentContractInput>
 export const ENDGE_SFC_TAG_INPUT_CONTRACTS = {
   Text: [
     { name: 'value', type: 'string', optional: true },
+    { name: 'editorVariant', aliases: ['editor-variant'], type: "'default' | 'compact'", optional: true },
   ],
   DateTime: [
     { name: 'value', type: 'Date | string', optional: false },
     { name: 'format', type: 'string', optional: true },
     { name: 'timezone', type: 'string', optional: true },
     { name: 'editMode', aliases: ['edit-mode'], type: "'datetime' | 'time'", optional: true },
+    { name: 'editorVariant', aliases: ['editor-variant'], type: "'default' | 'compact'", optional: true },
     { name: 'empty', type: 'string', optional: true },
   ],
   Number: [
     { name: 'value', type: 'number', optional: false },
+    { name: 'editorVariant', aliases: ['editor-variant'], type: "'default' | 'compact'", optional: true },
     { name: 'decimals', type: 'number', optional: true },
     { name: 'prefix', type: 'string', optional: true },
     { name: 'suffix', type: 'string', optional: true },
