@@ -80,9 +80,7 @@ export class EndgeFlowRegistry {
       evaluate(_ctx, params): boolean {
         const vocabId = params?.vocab ?? params?.vocabId
         if (vocabId == null || vocabId === '') return false
-        const vocab = Endge.domain.getVocab(String(vocabId))
-        if (!vocab?.collectionSlug) return false
-        const values = Endge.vocabs.getValues(vocab.collectionSlug)
+        const values = Endge.vocabs.getValues(String(vocabId))
         return Array.isArray(values) && values.length > 0
       },
     })

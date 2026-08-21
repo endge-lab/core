@@ -350,17 +350,16 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     payload: CompositionProgramPayload,
   ): Promise<void> {
     const scope = this._requireScope(descriptor.path)
-    if (Endge.runtime.resolveDataMode(this) !== 'mock') {
-      const scopeData = descriptor.data ?? payload.data
-        .filter(data => (data.scopePath ?? 'scope_default') === descriptor.path)
-        .map(data => data.path ?? data.name)
-      await Promise.all(scopeData.map(async (dataPath) => {
-        const data = payload.data.find(item => (item.path ?? item.name) === dataPath)
-        if (!data || data.kind !== 'vocab')
-          return
-        await Endge.vocabs.acquire([data.identity], data.policy)
-      }))
-    }
+    const dataMode = Endge.runtime.resolveDataMode(this) === 'mock' ? 'mock' : 'live'
+    const scopeData = descriptor.data ?? payload.data
+      .filter(data => (data.scopePath ?? 'scope_default') === descriptor.path)
+      .map(data => data.path ?? data.name)
+    await Promise.all(scopeData.map(async (dataPath) => {
+      const data = payload.data.find(item => (item.path ?? item.name) === dataPath)
+      if (!data || data.kind !== 'vocab')
+        return
+      await Endge.vocabs.acquire([data.identity], data.policy, { dataMode })
+    }))
 
     Endge.styles.transaction(() => {
       for (const resourcePath of descriptor.resources) {
@@ -660,20 +659,11 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         ? this.meta.dataRuntimes
         : {}
     ) as Record<string, unknown>
-    const mockMode = Endge.runtime.resolveDataMode(this) === 'mock'
-
     for (const descriptor of payload.data) {
       const descriptorPath = descriptor.path ?? descriptor.name
 
       if (descriptor.kind === 'vocab') {
-        const vocab = Endge.domain.getVocab(descriptor.identity)
-        if (!vocab)
-          throw new Error(`[CompositionRuntimeHost] Vocab data "${descriptor.identity}" is missing.`)
-        const vocabPath = mockMode
-          ? `${this.basePath}.data.${encodePathPart(descriptorPath)}`
-          : `vocabs.${String(vocab.collectionSlug ?? '').trim()}`
-        if (mockMode)
-          Raph.set(vocabPath, [])
+        const vocabPath = `vocabs.${descriptor.identity}`
         this._dataPaths.set(descriptorPath, vocabPath)
         this.addResource({
           id: `data:${descriptorPath}`,
@@ -684,7 +674,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
             path: vocabPath,
             kind: descriptor.kind,
             identity: descriptor.identity,
-            ownership: mockMode ? 'local' : 'shared',
+            ownership: 'shared',
             scopePath: descriptor.scopePath ?? 'scope_default',
             policy: descriptor.policy,
           },

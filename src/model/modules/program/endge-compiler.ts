@@ -29,6 +29,7 @@ import type {
 import type { EndgeStyleSheetArtifact } from '@/domain/types/style/style.types'
 import type { EndgeSFCEditingConfiguration } from '@/domain/types/configuration/configuration.type'
 import type { ResponseOutputTransform } from '@/domain/types/source/response-output.types'
+import type { VocabProgramPayload } from '@/domain/types/source/vocab-source.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
@@ -36,6 +37,7 @@ import { RAction } from '@/domain/entities/reflect/RAction'
 import { RComputation } from '@/domain/entities/reflect/RComputation'
 import { RDataView } from '@/domain/entities/reflect/RDataView'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
+import { RVocabs } from '@/domain/entities/reflect/RVocabs'
 import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { RField } from '@/domain/entities/reflect/RField'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
@@ -75,6 +77,8 @@ import {
   validateTypeExpressionUsage,
   validateTypeSourceExpressionUsage,
 } from '@/model/services/compiler/type/type-program-validation'
+
+const MISSING_STATIC_PATH = Symbol('missing-static-path')
 
 type ComputationArtifact = ProgramArtifact<ComputationProgramPayload>
 
@@ -161,6 +165,9 @@ export class EndgeCompiler extends EndgeModule {
       if (!this.compilePhase('data-view', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'data views', Endge.domain.getDataViews(), context))
         return
 
+      if (!this.compilePhase('vocab', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'vocab source', Endge.domain.getVocabs(), context))
+        return
+
       if (!this.compilePhase('update', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'updates', Endge.domain.getUpdates(), context))
         return
 
@@ -213,6 +220,11 @@ export class EndgeCompiler extends EndgeModule {
   public buildQuery(entity: RQuery): ProgramArtifact<QueryProgramPayload> {
     const context = this._createCompileContext()
     return this.compileEntity('query', entity, context) as ProgramArtifact<QueryProgramPayload>
+  }
+
+  /** Компилирует один Vocab source в Endge.program. */
+  public buildVocab(entity: RVocabs): ProgramArtifact<VocabProgramPayload> {
+    return this.compileEntity('vocab', entity, this._createCompileContext()) as ProgramArtifact<VocabProgramPayload>
   }
 
   /** Компилирует одну Computation в безопасный runtime artifact. */
@@ -716,7 +728,7 @@ export class EndgeCompiler extends EndgeModule {
         const result = Endge.source.compile('query', source)
         const artifact = result.artifact as QueryProgramPayload | undefined
         const localDataViews = artifact
-          ? this._materializeQueryLocalDataViews(artifact, entity, context)
+          ? this._materializeResponseOutputDataViews(artifact, entity, context, 'query')
           : { payload: undefined, children: [], diagnostics: [], dependencies: [] }
         const local = localDataViews.payload
           ? this._materializeQueryLocalFilters(localDataViews.payload, entity, context, localDataViews)
@@ -753,6 +765,94 @@ export class EndgeCompiler extends EndgeModule {
             ]) ?? []),
             ...this._queryAuthDependencies(local.payload ?? artifact),
           ],
+          children: local.children,
+        })
+      },
+    })
+
+    this.registerHandler<RVocabs, VocabProgramPayload>({
+      entityType: 'vocab',
+      compile: (entity, context) => {
+        const result = Endge.source.compile('vocab', entity.source)
+        const artifact = result.artifact as VocabProgramPayload | undefined
+        const local = artifact
+          ? this._materializeResponseOutputDataViews(artifact, entity, context, 'vocab')
+          : { payload: undefined, children: [], diagnostics: [], dependencies: [] }
+        const payload = local.payload ?? artifact
+        const dependencies = [...local.dependencies]
+        const diagnostics = [
+          ...((result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]),
+          ...local.diagnostics,
+        ]
+
+        if (payload?.provider?.auth.mode === 'profile') {
+          const identity = String(payload.provider.auth.profile ?? '').trim()
+          dependencies.push({ entityType: 'auth-profile', id: identity, identity, role: 'vocab-provider-auth' })
+          if (!identity || !Endge.domain.getAuthProfile(identity)) {
+            diagnostics.push({
+              severity: 'error',
+              code: 'vocab-auth-profile-missing',
+              message: `Auth profile "${identity}" не найден.`,
+              sourcePath: 'provider.auth.profile',
+            })
+          }
+        }
+        if (payload?.mock) {
+          const mock = Endge.domain.getMock(payload.mock.identity)
+          dependencies.push({ entityType: 'mock', id: mock?.id ?? payload.mock.identity, identity: payload.mock.identity, role: 'vocab-mock' })
+          if (!mock || mock.active === false || mock.deletedAt) {
+            diagnostics.push({
+              severity: 'error',
+              code: 'vocab-mock-missing',
+              message: `Mock "${payload.mock.identity}" не найден или неактивен.`,
+              sourcePath: 'mock',
+            })
+          }
+          else if (mock.contentType !== 'application/json') {
+            diagnostics.push({
+              severity: 'error',
+              code: 'vocab-mock-content-type',
+              message: `Mock "${payload.mock.identity}" должен иметь contentType application/json.`,
+              sourcePath: 'mock',
+            })
+          }
+          else if (payload.mock.path && mock.contentSource === 'document') {
+            try {
+              const value = readStaticDotPath(JSON.parse(mock.source), payload.mock.path)
+              if (value === MISSING_STATIC_PATH) {
+                diagnostics.push({
+                  severity: 'error',
+                  code: 'vocab-mock-path-missing',
+                  message: `Путь "${payload.mock.path}" отсутствует в Mock "${payload.mock.identity}".`,
+                  sourcePath: 'mock.path',
+                })
+              }
+            }
+            catch {
+              diagnostics.push({
+                severity: 'error',
+                code: 'vocab-mock-json-invalid',
+                message: `Mock "${payload.mock.identity}" содержит некорректный JSON.`,
+                sourcePath: 'mock',
+              })
+            }
+          }
+        }
+
+        return this._makeArtifact(entity, 'vocab', context, {
+          capabilities: ['compilable', 'runnable', 'data-provider'],
+          metadata: { self: result.metadata ?? {}, nodes: [] },
+          payload: {
+            sourceVersion: 1,
+            provider: null,
+            mock: null,
+            outputs: [],
+            ...(payload ?? {}),
+            ast: result.ast ?? null,
+            sourceDocument: (result.document as VocabProgramPayload['sourceDocument']) ?? null,
+          },
+          diagnostics,
+          dependencies,
           children: local.children,
         })
       },
@@ -997,7 +1097,7 @@ export class EndgeCompiler extends EndgeModule {
         for (const field of payload?.fields ?? []) {
           if (field.vocab) {
             dependencies.push({
-              entityType: 'vocabs',
+              entityType: 'vocab',
               id: field.vocab.identity,
               identity: field.vocab.identity,
               role: 'vocab',
@@ -1668,17 +1768,18 @@ export class EndgeCompiler extends EndgeModule {
   }
 
   /** Материализует локальные DataView внутри query output graph в child artifacts. */
-  private _materializeQueryLocalDataViews(
-    payload: QueryProgramPayload,
-    entity: RQuery,
+  private _materializeResponseOutputDataViews<TPayload extends { outputs: QueryProgramOutput[] }>(
+    payload: TPayload,
+    entity: RQuery | RVocabs,
     context: ProgramCompileContext,
+    entityType: 'query' | 'vocab',
   ): {
-      payload: QueryProgramPayload
+      payload: TPayload
       children: ProgramArtifact[]
       diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
       dependencies: ProgramArtifact['dependencies']
     } {
-    const ownerRef = this._makeRef(entity, 'query')
+    const ownerRef = this._makeRef(entity, entityType)
     const children: ProgramArtifact[] = []
     const diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[] = []
     const dependencies: ProgramArtifact['dependencies'] = []
@@ -1955,7 +2056,7 @@ export class EndgeCompiler extends EndgeModule {
       dependencies: (payload?.fields ?? [])
         .filter(field => field.vocab)
         .map(field => ({
-          entityType: 'vocabs',
+          entityType: 'vocab',
           id: field.vocab!.identity,
           identity: field.vocab!.identity,
           role: 'vocab',
@@ -2144,7 +2245,7 @@ export class EndgeCompiler extends EndgeModule {
         if (!vocab)
           diagnostics.push({ severity: 'error', code: 'composition-vocab-missing', message: `Vocab "${data.identity}" не найден.`, sourcePath: `data.${dataPath}` })
         else
-          dependencies.push({ entityType: 'vocabs', id: vocab.id, identity: vocab.identity, role: 'composition-data' })
+          dependencies.push({ entityType: 'vocab', id: vocab.id, identity: vocab.identity, role: 'composition-data' })
       }
     }
 
@@ -3178,4 +3279,14 @@ function statusFromDiagnostics(diagnostics: ProgramDiagnostic[]): ProgramArtifac
   if (diagnostics.some(item => item.severity === 'error'))
     return 'error'
   return diagnostics.length ? 'warning' : 'valid'
+}
+
+function readStaticDotPath(source: unknown, path: string): unknown | typeof MISSING_STATIC_PATH {
+  let current = source
+  for (const segment of path.split('.')) {
+    if (current == null || typeof current !== 'object' || !Object.prototype.hasOwnProperty.call(current, segment))
+      return MISSING_STATIC_PATH
+    current = (current as Record<string, unknown>)[segment]
+  }
+  return current
 }

@@ -23,7 +23,10 @@ export class RConverter extends REntity {
 
   convert(v: any, options?: Record<string, unknown>): any {
     if (this.customHandler) {
-      return this.customHandler(v, options)
+      const result = this.customHandler(v, options)
+      if (result && typeof result.then === 'function')
+        throw new Error(`Async converter "${this.identity || this.id}" is not supported`)
+      return result
     }
     return null
   }

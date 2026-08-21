@@ -5,6 +5,7 @@ import type { StoreSourceArtifact } from '@/domain/types/source/store-source.typ
 import type { StreamSourceArtifact } from '@/domain/types/source/stream-source.types'
 import type { UpdateSourceArtifact } from '@/domain/types/source/update-source.types'
 import type { TypeProgramCatalogEntry, TypeProgramPayload } from '@/domain/types/source/type-source.types'
+import type { VocabProgramPayload } from '@/domain/types/source/vocab-source.types'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import type {
   DataViewProgramPayload,
@@ -137,6 +138,11 @@ export class EndgeProgram extends EndgeModule {
   /** Возвращает compiled query artifact по id или identity. */
   public getQueryArtifact(idOrIdentity: string | number): ProgramArtifact<QueryProgramPayload> | null {
     return this.getArtifact<QueryProgramPayload>('query', idOrIdentity)
+  }
+
+  /** Возвращает compiled Vocab artifact по id или identity. */
+  public getVocabArtifact(idOrIdentity: string | number): ProgramArtifact<VocabProgramPayload> | null {
+    return this.getArtifact<VocabProgramPayload>('vocab', idOrIdentity)
   }
 
   /** Returns a compiled Computation artifact by id or identity. */

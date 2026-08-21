@@ -30,6 +30,9 @@ import { CompositionSourcePatchStrategy } from '@/model/services/source-engine/s
 import { QuerySourceEngineStrategy } from '@/model/services/source-engine/strategies/QuerySourceEngineStrategy'
 import { QuerySourceLanguageStrategy } from '@/model/services/source-engine/strategies/QuerySourceLanguageStrategy'
 import { QuerySourcePatchStrategy } from '@/model/services/source-engine/strategies/QuerySourcePatchStrategy'
+import { VocabSourceEngineStrategy } from '@/model/services/source-engine/strategies/VocabSourceEngineStrategy'
+import { VocabSourceLanguageStrategy } from '@/model/services/source-engine/strategies/VocabSourceLanguageStrategy'
+import { VocabSourcePatchStrategy } from '@/model/services/source-engine/strategies/VocabSourcePatchStrategy'
 import { StoreSourceEngineStrategy } from '@/model/services/source-engine/strategies/StoreSourceEngineStrategy'
 import { StoreSourceLanguageStrategy } from '@/model/services/source-engine/strategies/StoreSourceLanguageStrategy'
 import { StreamSourceEngineStrategy } from '@/model/services/source-engine/strategies/StreamSourceEngineStrategy'
@@ -187,6 +190,7 @@ export class EndgeSource extends EndgeModule {
   /** Регистрирует встроенные strategies ядра. */
   private _registerDefaultStrategies(): void {
     this._strategies.register(new QuerySourceEngineStrategy())
+    this._strategies.register(new VocabSourceEngineStrategy())
     this._strategies.register(new DataViewSourceEngineStrategy())
     this._strategies.register(new FilterSourceEngineStrategy())
     this._strategies.register(new CompositionSourceEngineStrategy())
@@ -198,6 +202,7 @@ export class EndgeSource extends EndgeModule {
     this._strategies.register(new TypeSourceEngineStrategy())
     this._strategies.register(new ConfigurationSourceEngineStrategy())
     this._languageStrategies.register(new QuerySourceLanguageStrategy())
+    this._languageStrategies.register(new VocabSourceLanguageStrategy())
     this._languageStrategies.register(new DataViewSourceLanguageStrategy())
     this._languageStrategies.register(new FilterSourceLanguageStrategy())
     this._languageStrategies.register(new CompositionSourceLanguageStrategy())
@@ -211,6 +216,7 @@ export class EndgeSource extends EndgeModule {
     this._patchStrategies.register(new CompositionSourcePatchStrategy())
     this._patchStrategies.register(new FilterSourcePatchStrategy())
     this._patchStrategies.register(new QuerySourcePatchStrategy())
+    this._patchStrategies.register(new VocabSourcePatchStrategy())
   }
 
   /** Возвращает strategy или бросает явную ошибку для некорректного source-kind. */
