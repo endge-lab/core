@@ -16,14 +16,14 @@ export interface RComponentRef {
   id: string | number
 
   /** Semantic dependency role in the compiled artifact. */
-  role?: 'child-component' | 'port-default-component'
+  role?: 'child-component' | 'port-default-component' | 'port-override-component'
 }
 
 /** Ссылка SFC-компонента на computation provider. */
 export interface RComputationRef {
   source: 'computation'
   id: string | number
-  role: 'port-default-computation'
+  role: 'port-default-computation' | 'port-override-computation'
 }
 
 /** Описание одного сообщения компилятора или валидатора. */

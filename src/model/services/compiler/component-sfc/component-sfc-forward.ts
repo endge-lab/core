@@ -4,6 +4,7 @@ import type {
   ComponentSFCComponentPort,
   ComponentSFCComputationPort,
   ComponentSFCEventPort,
+  ComponentSFCQueryPort,
   ComponentSFCPortForwardOrigin,
   ComponentSFCPortForwardRule,
   ComponentSFCPortForwardSelector,
@@ -23,7 +24,7 @@ import {
 import { TABLE_EVENT_DEFINITIONS } from '@/domain/types/component/sfc/table-events.types'
 import { TABLE_RUNTIME_ACTION_IDS } from '@/domain/types/runtime/action.types'
 
-type ForwardablePort = ComponentSFCComputationPort | ComponentSFCComponentPort | ComponentSFCActionPort | ComponentSFCEventPort
+type ForwardablePort = ComponentSFCComputationPort | ComponentSFCComponentPort | ComponentSFCActionPort | ComponentSFCQueryPort | ComponentSFCEventPort
 
 interface LocalComponentBinding {
   nodeId: string
@@ -314,7 +315,7 @@ function normalizeType(value: string): string {
 
 function portsForRole(manifest: ComponentSFCPortManifest, role: ComponentSFCPortRole): ForwardablePort[] {
   if (role === 'require')
-    return [...manifest.require.computations, ...manifest.require.components, ...manifest.require.actions]
+    return [...manifest.require.computations, ...manifest.require.components, ...manifest.require.actions, ...manifest.require.queries]
   if (role === 'provides')
     return [...manifest.provides.actions]
   return [...manifest.emits.events]
@@ -333,6 +334,7 @@ function appendPort(manifest: ComponentSFCPortManifest, role: ComponentSFCPortRo
   if (port.kind === 'computation') manifest.require.computations.push(port)
   else if (port.kind === 'component') manifest.require.components.push(port)
   else if (port.kind === 'action') manifest.require.actions.push({ ...port, role: 'require' })
+  else if (port.kind === 'query') manifest.require.queries.push(port)
 }
 
 function appendDependency(dependencies: RComponentDependencies, port: ForwardablePort): void {
@@ -343,7 +345,7 @@ function appendDependency(dependencies: RComponentDependencies, port: Forwardabl
   else if (port.kind === 'component')
     dependencies.components.push({ source: 'component-sfc', id: port.defaultIdentity, role: 'port-default-component' })
   else if (port.defaultIdentity)
-    dependencies.actions.push(port.defaultIdentity)
+    (port.kind === 'query' ? dependencies.queries : dependencies.actions).push(port.defaultIdentity)
 }
 
 function collectManifestNames(manifest: ComponentSFCPortManifest): Map<string, ForwardablePort> {

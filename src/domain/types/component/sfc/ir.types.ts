@@ -2,6 +2,7 @@ import type { RComponentSFC_SourceRange } from './location.types'
 import type { RComponentDiagnostic } from '../component-core.types'
 import type {
   ComponentSFCEventAction,
+  ComponentSFCRequiredPortBinding,
   ComponentSFCPortForwardOrigin,
   ComponentSFCPortManifest,
   RComponentSFC_IR_ComponentPortMarker,
@@ -256,6 +257,9 @@ export interface RComponentSFC_IR_ElementNode {
   /** Local component port marker retained for future provider overrides. */
   port?: RComponentSFC_IR_ComponentPortMarker
 
+  /** Static per-instance bindings for required ports of this child component. */
+  portBindings?: ComponentSFCRequiredPortBinding[]
+
   /** Compiler-resolved Table menus, including forwarded Action identities and targets. */
   tableMenus?: RComponentSFC_IR_TableMenus
 
@@ -286,6 +290,8 @@ export interface ComponentSFCTableMenuItemDescriptor {
   id: string
   label: RComponentSFC_IR_Value
   action: string
+  /** Required Action port whose mounted provider may replace `action`. */
+  requiredPort?: string
   input?: RComponentSFC_IR_Value
   icon?: string
   /** Set only for a provided alias forwarded from this exact Table node. */

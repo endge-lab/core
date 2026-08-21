@@ -16,6 +16,7 @@ export const ENDGE_SFC_TAG_INPUT_CONTRACTS = {
     { name: 'value', type: 'Date | string', optional: false },
     { name: 'format', type: 'string', optional: true },
     { name: 'timezone', type: 'string', optional: true },
+    { name: 'editMode', aliases: ['edit-mode'], type: "'datetime' | 'time'", optional: true },
     { name: 'empty', type: 'string', optional: true },
   ],
   Number: [

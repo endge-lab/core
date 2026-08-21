@@ -6,6 +6,54 @@ import { listComponentSFCEventCapableTags } from '@/domain/types/component/sfc/i
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 
 describe('Component SFC :on interactions', () => {
+  it('resolves a required Query reaction through the mounted instance binding', async () => {
+    const manifest = createEmptyComponentSFCPortManifest()
+    manifest.require.queries.push({
+      kind: 'query',
+      name: 'updateActualTime',
+      defaultIdentity: 'groundhandling-update-default',
+      inputType: 'UpdateInput',
+      outputType: 'void',
+      inputs: [],
+      outputs: [],
+    })
+    const calls: string[] = []
+    const host = {
+      publishEventPort: vi.fn(),
+      executeEventPortAction: vi.fn(async (_owner: string, port: any) => {
+        calls.push(port.action.identity)
+        return true
+      }),
+      emit: vi.fn(),
+    }
+    const boundary = new ComponentSFCEventBoundary(
+      host as any,
+      'groundhandling-process',
+      manifest,
+      null,
+      undefined,
+      [],
+      undefined,
+      [{ port: 'updateActualTime', kind: 'query', identity: 'groundhandling-update-special' }],
+    )
+    await boundary.routeChild(
+      { nodeId: 'actual', componentTag: 'DateTime' },
+      'edited',
+      { value: '2026-08-21T10:00' },
+      [{
+        name: 'edited',
+        modifiers: [],
+        action: {
+          kind: 'required-port',
+          portKind: 'query',
+          port: 'updateActualTime',
+          input: { kind: 'event', path: null },
+        },
+      }],
+    )
+    expect(calls).toEqual(['groundhandling-update-special'])
+  })
+
   it('compiles ordered reactions and keeps the trigger expression reaction-free', () => {
     const result = compileComponentSFC(`<template>
   <Text

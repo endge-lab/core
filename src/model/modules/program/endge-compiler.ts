@@ -615,6 +615,10 @@ export class EndgeCompiler extends EndgeModule {
               ...this._typeContractDiagnostics(port.inputType, `script.ports.require.${port.name}.input`, knownComponentTypes),
               ...this._typeContractDiagnostics(port.outputType, `script.ports.require.${port.name}.output`, knownComponentTypes),
             ]) ?? []),
+            ...(result.ir?.script.ports.require.queries.flatMap(port => [
+              ...this._typeContractDiagnostics(port.inputType, `script.ports.require.${port.name}.input`, knownComponentTypes),
+              ...this._typeContractDiagnostics(port.outputType, `script.ports.require.${port.name}.output`, knownComponentTypes),
+            ]) ?? []),
             ...(result.ir?.script.ports.require.components.flatMap(port =>
               this._typeContractDiagnostics(port.propsType, `script.ports.require.${port.name}.props`, knownComponentTypes)) ?? []),
             ...(result.ir?.script.ports.provides.actions.flatMap(port => [
@@ -649,13 +653,18 @@ export class EndgeCompiler extends EndgeModule {
               entityType: 'query',
               id: identity,
               identity,
-              role: 'event-query',
+              role: result.ir?.script.ports.require.queries.some(port => port.defaultIdentity === identity)
+                ? 'port-default-query'
+                : result.ir?.template.roots.some(node => node.kind === 'element' && node.portBindings?.some(binding => binding.kind === 'query' && binding.identity === identity))
+                  ? 'port-override-query'
+                  : 'event-query',
             })),
             ...this._typeDependencies([
               result.ast?.script?.props?.source,
               ...result.contract.inputs.map(input => input.type),
               ...(result.ir?.script.ports.require.computations.flatMap(port => [port.inputType, port.outputType]) ?? []),
               ...(result.ir?.script.ports.require.actions.flatMap(port => [port.inputType, port.outputType]) ?? []),
+              ...(result.ir?.script.ports.require.queries.flatMap(port => [port.inputType, port.outputType]) ?? []),
               ...(result.ir?.script.ports.require.components.map(port => port.propsType) ?? []),
               ...(result.ir?.script.ports.provides.actions.flatMap(port => [port.inputType, port.outputType]) ?? []),
               ...(result.ir?.script.ports.emits.events.map(port => port.payloadType) ?? []),
@@ -1492,16 +1501,19 @@ export class EndgeCompiler extends EndgeModule {
   /** Resolves a domain provider descriptor without requiring compile order among SFCs. */
   private _resolvePortProvider(
     identity: string,
-    expectedKind: 'computation' | 'component' | 'action',
+    expectedKind: 'computation' | 'component' | 'action' | 'query',
   ) {
     const computation = Endge.domain.getComputation(identity)
     const component = Endge.domain.getComponentSFC(identity)
     const action = Endge.domain.getAction(identity)
+    const query = Endge.domain.getQuery(identity)
     const target = expectedKind === 'computation'
-      ? computation ?? component ?? action
+      ? computation ?? component ?? action ?? query
       : expectedKind === 'component'
-        ? component ?? computation ?? action
-        : action ?? computation ?? component
+        ? component ?? computation ?? action ?? query
+        : expectedKind === 'action'
+          ? action ?? computation ?? component ?? query
+          : query ?? action ?? computation ?? component
 
     if (target instanceof RComputation) {
       const contract = compileComputation({ source: target.source }).payload
@@ -1532,6 +1544,17 @@ export class EndgeCompiler extends EndgeModule {
         active: target.active !== false && !target.deletedAt,
         input: fieldContract(target.input),
         output: fieldContract(target.output),
+      }
+    }
+    if (target instanceof RQuery) {
+      const result = Endge.source.compile('query', this._resolveQuerySource(target))
+      const payload = result.artifact as QueryProgramPayload | undefined
+      return {
+        kind: 'query' as const,
+        identity: target.identity,
+        active: target.active !== false && !target.deletedAt,
+        inputs: payload?.props.map(field => queryFieldContract(field)) ?? [],
+        outputs: payload?.outputs.map(output => queryFieldContract(output.contract, output.key)) ?? [],
       }
     }
     return null
@@ -3100,6 +3123,18 @@ function fieldContract(field: { type: string, isArray?: boolean, optional?: bool
     type: field.type,
     isArray: field.isArray === true,
     optional: field.optional === true,
+  }
+}
+
+function queryFieldContract(
+  field: { key?: string, type: string, array?: boolean, optional?: boolean } | null | undefined,
+  fallbackName?: string,
+) {
+  return {
+    name: String(field?.key ?? fallbackName ?? '').trim(),
+    type: field?.type ?? 'Any',
+    isArray: field?.array === true,
+    optional: field?.optional === true,
   }
 }
 

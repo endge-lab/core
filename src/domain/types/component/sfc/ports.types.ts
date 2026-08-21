@@ -4,7 +4,8 @@ import type { RComponentSFC_IR_Value } from './ir.types'
 import type { RComponentSFC_SourceRange } from './location.types'
 
 export type ComponentSFCPortRole = 'require' | 'provides' | 'emits'
-export type ComponentSFCPortKind = 'computation' | 'component' | 'action' | 'event'
+export type ComponentSFCPortKind = 'computation' | 'component' | 'action' | 'query' | 'event'
+export type ComponentSFCRequiredPortKind = Exclude<ComponentSFCPortKind, 'event'>
 
 /** Public child port selected by a compile-time `definePorts.forward` rule. */
 export interface ComponentSFCPortForwardOrigin {
@@ -53,6 +54,13 @@ export type ComponentSFCPortProviderDescriptor
       input: { type: string, isArray?: boolean, optional?: boolean } | null
       output: { type: string, isArray?: boolean, optional?: boolean } | null
     }
+    | {
+      kind: 'query'
+      identity: string
+      active: boolean
+      inputs: RComponentContractInput[]
+      outputs: RComponentContractInput[]
+    }
 
 /** Computation port declared by `computation<Input, Output>`. */
 export interface ComponentSFCComputationPort {
@@ -86,6 +94,27 @@ export interface ComponentSFCActionPort {
   outputType: string
   defaultIdentity?: string
   forwardedFrom?: ComponentSFCPortForwardOrigin
+  sourceRange?: RComponentSFC_SourceRange
+}
+
+/** Callable Query required by a component. */
+export interface ComponentSFCQueryPort {
+  kind: 'query'
+  name: string
+  defaultIdentity: string
+  inputType: string
+  outputType: string
+  inputs: RComponentContractInput[]
+  outputs: RComponentContractInput[]
+  forwardedFrom?: ComponentSFCPortForwardOrigin
+  sourceRange?: RComponentSFC_SourceRange
+}
+
+/** One static provider override attached to a mounted child Component SFC call. */
+export interface ComponentSFCRequiredPortBinding {
+  port: string
+  kind: ComponentSFCRequiredPortKind
+  identity: string
   sourceRange?: RComponentSFC_SourceRange
 }
 
@@ -156,11 +185,20 @@ export interface ComponentSFCEventEmitAction {
   payload?: ComponentSFCEventInputValue
 }
 
+/** Calls one required executable port through its effective per-instance provider. */
+export interface ComponentSFCEventRequiredPortAction {
+  kind: 'required-port'
+  portKind: 'action' | 'query'
+  port: string
+  input?: ComponentSFCEventInputValue
+}
+
 export type ComponentSFCEventAction
   = ComponentSFCEventDirectAction
     | ComponentSFCEventDirectQuery
     | ComponentSFCEventTypescriptAction
     | ComponentSFCEventEmitAction
+    | ComponentSFCEventRequiredPortAction
 
 export interface ComponentSFCEventRuntimeSource {
   nodeId: string
@@ -185,6 +223,7 @@ export interface ComponentSFCRequiredPorts {
   computations: ComponentSFCComputationPort[]
   components: ComponentSFCComponentPort[]
   actions: ComponentSFCActionPort[]
+  queries: ComponentSFCQueryPort[]
 }
 
 export interface ComponentSFCProvidedPorts {
@@ -228,6 +267,7 @@ export function createEmptyComponentSFCPortManifest(): ComponentSFCPortManifest 
       computations: [],
       components: [],
       actions: [],
+      queries: [],
     },
     provides: {
       actions: [],

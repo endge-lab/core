@@ -87,7 +87,7 @@ export interface ComponentSFCCompileOptions {
   /** Resolves and describes a default port provider for build-time validation. */
   resolvePortProvider?: (
     identity: string,
-    expectedKind: 'computation' | 'component' | 'action',
+    expectedKind: 'computation' | 'component' | 'action' | 'query',
   ) => ComponentSFCPortProviderDescriptor | null
 
   /** Resolves the compiled public port manifest of a nested SFC component. */
@@ -145,9 +145,11 @@ export function compileComponentSFC(
     props: scriptResult.props.map(prop => prop.name),
     locals: templateLocals.map(local => local.name),
     componentPorts: portResult.manifest.require.components,
+    ownerPorts: portResult.manifest,
     resolveComponentTag: options.resolveComponentTag,
     hasComponentIdentity: options.hasComponentIdentity,
     resolveComponentPortManifest: options.resolveComponentPortManifest,
+    resolvePortProvider: options.resolvePortProvider,
     resolveComponentVariants: options.resolveComponentVariants,
     sfcEditing: options.sfcEditing,
   })
@@ -181,6 +183,19 @@ export function compileComponentSFC(
   ]
   const menuResult = collectTableMenus(templateResult.template, availableMenuActions)
   const styleResult = compileComponentSFCStyle(parseResult.ast.style, { identity: options.identity })
+
+  const propNames = new Set(scriptResult.props.map(prop => prop.name))
+  for (const port of allComponentSFCPorts(portResult.manifest)) {
+    if (!propNames.has(port.name)) continue
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-prop-port-name-conflict',
+      message: `Имя "${port.name}" объявлено одновременно как prop и port. Public props и ports должны иметь уникальные имена.`,
+      sourcePath: `script.ports.${'role' in port ? port.role : 'require'}.${port.name}`,
+      start: port.sourceRange?.start,
+      end: port.sourceRange?.end,
+    })
+  }
 
   diagnostics.push(
     ...scriptResult.diagnostics,
@@ -242,6 +257,17 @@ export function compileComponentSFC(
     diagnostics,
     sections: sectionStatuses(diagnostics),
   }
+}
+
+function allComponentSFCPorts(manifest: ComponentSFCPortManifest) {
+  return [
+    ...manifest.require.computations,
+    ...manifest.require.components,
+    ...manifest.require.actions,
+    ...manifest.require.queries,
+    ...manifest.provides.actions,
+    ...manifest.emits.events,
+  ]
 }
 
 function collectTableMenus(

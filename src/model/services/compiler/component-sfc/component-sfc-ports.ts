@@ -6,6 +6,7 @@ import type {
   ComponentSFCComponentPort,
   ComponentSFCComputationPort,
   ComponentSFCActionPort,
+  ComponentSFCQueryPort,
   ComponentSFCEventPort,
   ComponentSFCEventAction,
   ComponentSFCEventInputValue,
@@ -25,7 +26,7 @@ import { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sf
 export interface ComponentSFCPortAnalysisOptions {
   resolveProvider?: (
     identity: string,
-    expectedKind: 'computation' | 'component' | 'action',
+    expectedKind: 'computation' | 'component' | 'action' | 'query',
   ) => ComponentSFCPortProviderDescriptor | null
   resolveTypeDefinition?: (identity: string) => TypeSourceDefinition | null
 }
@@ -37,6 +38,7 @@ export function compileComponentSFCLocalEventAction(
   sourceOffset: number,
   dependencies: RComponentDependencies,
   diagnostics: RComponentDiagnostic[],
+  ownerPorts?: ComponentSFCPortManifest | null,
 ): ComponentSFCEventAction | null {
   let expression: any
   try {
@@ -52,12 +54,54 @@ export function compileComponentSFCLocalEventAction(
     diagnostics.push({
       severity: 'error',
       code: 'sfc-template-event-action-syntax',
-      message: `@${eventName} должен содержать emit(...), action({...}), query({...}) или typescript({...}).`,
+      message: `@${eventName} должен содержать ports.require.<name>({...}), emit(...), action({...}), query({...}) или typescript({...}).`,
       sourcePath: `template.on.${eventName}`,
       start: sourceOffset,
       end: sourceOffset + source.length,
     })
     return null
+  }
+  const requiredPortName = readRequiredPortCallName(expression, 'ports')
+  if (requiredPortName) {
+    const requiredPort = [
+      ...(ownerPorts?.require.actions ?? []),
+      ...(ownerPorts?.require.queries ?? []),
+    ].find(port => port.name === requiredPortName)
+    if (!requiredPort) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'sfc-template-required-port-missing',
+        message: `Required executable port "${requiredPortName}" не объявлен в definePorts.require.`,
+        sourcePath: `template.on.${eventName}`,
+        start: sourceOffset,
+        end: sourceOffset + source.length,
+      })
+      return null
+    }
+    const inputNode = expression.arguments?.[0]
+    if (expression.arguments?.length !== 1 || inputNode?.type !== 'ObjectExpression') {
+      diagnostics.push({
+        severity: 'error',
+        code: 'sfc-template-required-port-input',
+        message: `Required port "${requiredPortName}" принимает ровно один input object.`,
+        sourcePath: `template.on.${eventName}`,
+        start: sourceOffset,
+        end: sourceOffset + source.length,
+      })
+      return null
+    }
+    const script = {
+      content: source,
+      range: { start: sourceOffset, end: sourceOffset + source.length },
+    } as RComponentSFC_AST_Script
+    const input = parseEventInput(inputNode, script, diagnostics)
+    if (!input) return null
+    return {
+      kind: 'required-port',
+      portKind: requiredPort.kind,
+      port: requiredPort.name,
+      input,
+    }
   }
   if (isCall(expression, 'emit')) {
     const emittedEvent = expression.arguments?.length >= 1
@@ -305,11 +349,13 @@ function parsePortManifest(
           ? 'component'
           : isCall(definition, 'action')
             ? 'action'
-            : isCall(definition, 'event')
-              ? 'event'
-              : null
+            : isCall(definition, 'query')
+              ? 'query'
+              : isCall(definition, 'event')
+                ? 'event'
+                : null
       const allowed = role === 'require'
-        ? ['computation', 'component', 'action']
+        ? ['computation', 'component', 'action', 'query']
         : role === 'provides'
           ? ['action']
           : ['event']
@@ -451,6 +497,27 @@ function parsePortManifest(
         }
         manifest.require.components.push(port)
         dependencies.components.push({ source: 'component-sfc', id: defaultIdentity, role: 'port-default-component' })
+        validateProvider(port, options, diagnostics, property, script)
+        continue
+      }
+
+      if (kind === 'query') {
+        if (typeSources.length !== 2) {
+          diagnostics.push(makeDiagnostic('sfc-query-port-types', `Query port "${name}" требует <Input, Output>.`, definition, script))
+          continue
+        }
+        const port: ComponentSFCQueryPort = {
+          kind,
+          name,
+          defaultIdentity,
+          inputType: typeSources[0]!,
+          outputType: typeSources[1]!,
+          inputs: parsePortContractFields(typeSources[0]!, script, options),
+          outputs: parsePortContractFields(typeSources[1]!, script, options),
+          sourceRange: toRange(property, script),
+        }
+        manifest.require.queries.push(port)
+        dependencies.queries.push(defaultIdentity)
         validateProvider(port, options, diagnostics, property, script)
         continue
       }
@@ -1065,7 +1132,7 @@ function parsePortCalls(
 }
 
 function validateProvider(
-  port: ComponentSFCComputationPort | ComponentSFCComponentPort | ComponentSFCActionPort,
+  port: ComponentSFCComputationPort | ComponentSFCComponentPort | ComponentSFCActionPort | ComponentSFCQueryPort,
   options: ComponentSFCPortAnalysisOptions,
   diagnostics: RComponentDiagnostic[],
   node: any,
@@ -1120,6 +1187,42 @@ function validateProvider(
       ))
     }
   }
+  if (port.kind === 'query' && provider.kind === 'query') {
+    const inputMismatch = hasFieldContractMismatch(port.inputs, provider.inputs)
+    const outputMismatch = port.outputs.length > 0 && hasFieldContractMismatch(port.outputs, provider.outputs)
+    if (inputMismatch || outputMismatch) {
+      diagnostics.push(makeDiagnostic(
+        'sfc-query-port-contract',
+        `Query "${provider.identity}" не соответствует contract port "${port.name}".`,
+        node,
+        script,
+      ))
+    }
+  }
+}
+
+function parsePortContractFields(
+  source: string,
+  script: RComponentSFC_AST_Script,
+  options: ComponentSFCPortAnalysisOptions,
+) {
+  if (['void', 'unknown', 'never'].includes(normalizeType(source))) return []
+  return parseComponentSFCTypeFields(source, script.content, options)
+}
+
+function hasFieldContractMismatch(
+  expectedFields: ReturnType<typeof parseComponentSFCTypeFields>,
+  actualFields: ReturnType<typeof parseComponentSFCTypeFields>,
+): boolean {
+  const expected = new Map(expectedFields.map(field => [field.name, field]))
+  const actual = new Map(actualFields.map(field => [field.name, field]))
+  return expectedFields.some((field) => {
+    const candidate = actual.get(field.name)
+    return !candidate
+      || normalizeType(candidate.type) !== normalizeType(field.type)
+      || Boolean(candidate.isArray) !== Boolean(field.isArray)
+      || Boolean(candidate.optional) !== Boolean(field.optional)
+  }) || actualFields.some(field => !field.optional && !expected.has(field.name))
 }
 
 function normalizeType(value: string): string {

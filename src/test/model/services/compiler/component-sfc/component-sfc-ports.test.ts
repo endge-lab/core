@@ -43,6 +43,78 @@ const state = ports.require.state({ process: props.process })
 </template>`
 
 describe('ComponentSFC ports compiler', () => {
+  it('compiles required Query ports and flat per-instance provider bindings', () => {
+    const child = compileComponentSFC(`<script setup lang="ts">
+interface UpdateInput { legId: String; utcTime: DateTime }
+const ports = definePorts({
+  require: {
+    updateActualTime: query<UpdateInput, void>({ default: 'groundhandling-update-default' }),
+  },
+})
+</script>
+<template>
+  <DateTime
+    value="2026-08-21T10:00:00Z"
+    editable
+    @edited="ports.require.updateActualTime({ legId: 'leg-1', utcTime: event('value') })"
+  />
+</template>`, {
+      resolvePortProvider: identity => ({
+        kind: 'query', identity, active: true, outputs: [],
+        inputs: [
+          { name: 'legId', type: 'String', optional: false },
+          { name: 'utcTime', type: 'DateTime', optional: false },
+        ],
+      }),
+    })
+    expect(child.diagnostics.filter(item => item.severity === 'error')).toEqual([])
+    expect(child.ir?.script.ports.require.queries).toEqual([
+      expect.objectContaining({ name: 'updateActualTime', defaultIdentity: 'groundhandling-update-default' }),
+    ])
+    expect(child.ir?.template.roots[0]).toMatchObject({
+      events: [{ action: { kind: 'required-port', portKind: 'query', port: 'updateActualTime' } }],
+    })
+
+    const parent = compileComponentSFC(`<template>
+  <GroundHandling.Process :update-actual-time="query('groundhandling-update-special')" />
+</template>`, {
+      resolveComponentTag: () => 'groundhandling-process',
+      resolveComponentPortManifest: () => child.ir!.script.ports,
+      resolvePortProvider: identity => ({
+        kind: 'query', identity, active: true, outputs: [],
+        inputs: [
+          { name: 'legId', type: 'String', optional: false },
+          { name: 'utcTime', type: 'DateTime', optional: false },
+        ],
+      }),
+    })
+    expect(parent.diagnostics.filter(item => item.severity === 'error')).toEqual([])
+    expect(parent.ir?.template.roots[0]).toMatchObject({
+      props: { is: { kind: 'literal', value: 'groundhandling-process' } },
+      portBindings: [{
+        port: 'updateActualTime',
+        kind: 'query',
+        identity: 'groundhandling-update-special',
+      }],
+    })
+    expect((parent.ir?.template.roots[0] as any).props['update-actual-time']).toBeUndefined()
+  })
+
+  it('rejects prop and port name collisions', () => {
+    const result = compileComponentSFC(`<script setup lang="ts">
+defineProps<{ updateActualTime: String }>()
+const ports = definePorts({
+  require: {
+    updateActualTime: query<{ value: DateTime }, void>({ default: 'groundhandling-update' }),
+  },
+})
+</script>
+<template><Text>{{ updateActualTime }}</Text></template>`)
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'sfc-prop-port-name-conflict', severity: 'error' }),
+    ]))
+  })
+
   it('compiles sourced Events with direct Action input mappings', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 const ports = definePorts({

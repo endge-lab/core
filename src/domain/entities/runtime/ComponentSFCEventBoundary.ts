@@ -1,7 +1,9 @@
 import type { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentSFCRuntimeHost'
 import type {
   ComponentSFCEventPort,
+  ComponentSFCEventAction,
   ComponentSFCEventRuntimeSource,
+  ComponentSFCRequiredPortBinding,
   ComponentSFCPortManifest,
 } from '@/domain/types/component/sfc/ports.types'
 import type { RComponentSFC_IR_EventBinding } from '@/domain/types/component/sfc/ir.types'
@@ -18,6 +20,7 @@ export class ComponentSFCEventBoundary {
     private readonly parentSource?: ComponentSFCEventRuntimeSource,
     private readonly parentBindings: readonly RComponentSFC_IR_EventBinding[] = [],
     private readonly parentEventTransform?: (event: string, payload: unknown) => { event: string, payload: unknown } | null,
+    private readonly requiredPortBindings: readonly ComponentSFCRequiredPortBinding[] = [],
   ) {}
 
   public createChild(
@@ -26,8 +29,9 @@ export class ComponentSFCEventBoundary {
     source: ComponentSFCEventRuntimeSource,
     bindings: readonly RComponentSFC_IR_EventBinding[] = [],
     transform?: (event: string, payload: unknown) => { event: string, payload: unknown } | null,
+    requiredPortBindings: readonly ComponentSFCRequiredPortBinding[] = [],
   ): ComponentSFCEventBoundary {
-    return new ComponentSFCEventBoundary(this.host, componentIdentity, manifest, this, source, bindings, transform)
+    return new ComponentSFCEventBoundary(this.host, componentIdentity, manifest, this, source, bindings, transform, requiredPortBindings)
   }
 
   /** True when the current public manifest observes one Event of this child source. */
@@ -68,7 +72,7 @@ export class ComponentSFCEventBoundary {
             role: 'emits',
             name: `${source.nodeId}:${event}`,
             payloadType: 'unknown',
-            action,
+            action: this.resolveRequiredPortAction(action),
           },
           payload,
           source,
@@ -132,13 +136,33 @@ export class ComponentSFCEventBoundary {
 
     await this.host?.executeEventPortAction(
       this.componentIdentity,
-      port,
+      port.action?.kind === 'required-port'
+        ? { ...port, action: this.resolveRequiredPortAction(port.action) }
+        : port,
       payload,
       source,
       (event, nextPayload, nextTrace, nextDepth) => this.emitOwn(event, nextPayload, nextTrace, nextDepth),
       trace,
       depth,
     )
+  }
+
+  private resolveRequiredPortAction(action: ComponentSFCEventAction): ComponentSFCEventAction {
+    if (action.kind !== 'required-port') return action
+    const declared = action.portKind === 'query'
+      ? this.manifest.require.queries.find(port => port.name === action.port)
+      : this.manifest.require.actions.find(port => port.name === action.port)
+    if (!declared)
+      throw new Error(`Required ${action.portKind} port is not declared: ${this.componentIdentity}.${action.port}.`)
+    const binding = this.requiredPortBindings.find(candidate => candidate.port === action.port)
+    const identity = binding?.identity ?? declared.defaultIdentity
+    if (!identity)
+      throw new Error(`Required ${action.portKind} port has no provider: ${this.componentIdentity}.${action.port}.`)
+    return {
+      kind: action.portKind,
+      identity,
+      ...(action.input ? { input: action.input } : {}),
+    }
   }
 
   private reportError(port: ComponentSFCEventPort, error: unknown): void {

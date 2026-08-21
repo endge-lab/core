@@ -394,6 +394,8 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
         )
         return true
       }
+      if (port.action.kind === 'required-port')
+        throw new Error(`Required port "${port.action.port}" was not resolved by the component boundary.`)
 
       const inputs = Object.fromEntries(Object.entries(port.action.inputs).map(([key, read]) => [
         key,

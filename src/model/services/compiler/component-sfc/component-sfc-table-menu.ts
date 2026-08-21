@@ -188,12 +188,14 @@ function createItemDescriptor(
 
   const forwardedFrom = port?.forwardedFrom?.nodeId === tableNode.id ? port.forwardedFrom : undefined
   const action = forwardedFrom?.portName ?? port?.defaultIdentity ?? actionAlias
+  const requiredPort = port?.role === 'require' ? port.name : undefined
   const input = explicitInput ?? actionBinding?.input
   return {
     kind: 'item',
     id: readLiteralStringProp(node, 'id') || actionAlias || `item-${index}`,
     label,
     action,
+    ...(requiredPort ? { requiredPort } : {}),
     ...(input ? { input } : {}),
     ...(icon ? { icon } : {}),
     ...(forwardedFrom ? { forwardedFrom } : {}),

@@ -23,6 +23,9 @@ import type {
 } from '@/domain/types/component/sfc/ir.types'
 import type {
   ComponentSFCComponentPort,
+  ComponentSFCRequiredPortBinding,
+  ComponentSFCPortProviderDescriptor,
+  ComponentSFCRequiredPortKind,
   ComponentSFCPortManifest,
 } from '@/domain/types/component/sfc/ports.types'
 import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
@@ -53,6 +56,9 @@ export interface ComponentSFCTemplateCompileContext {
   /** Local component ports have priority over the global user tag registry. */
   componentPorts?: ComponentSFCComponentPort[]
 
+  /** Required ports owned by the Component SFC currently being compiled. */
+  ownerPorts?: ComponentSFCPortManifest | null
+
   /** Разрешает зарегистрированный пользовательский tag в identity компонента. */
   resolveComponentTag?: (tag: string) => string | null
 
@@ -61,6 +67,12 @@ export interface ComponentSFCTemplateCompileContext {
 
   /** Resolves public Events of a nested user Component for local `@event` bindings. */
   resolveComponentPortManifest?: (identity: string) => ComponentSFCPortManifest | null
+
+  /** Resolves static providers used by flat child port bindings. */
+  resolvePortProvider?: (
+    identity: string,
+    expectedKind: ComponentSFCRequiredPortKind,
+  ) => ComponentSFCPortProviderDescriptor | null
 
   /** Resolves explicit root Variant names of a nested custom component. */
   resolveComponentVariants?: (identity: string) => string[] | null
@@ -214,23 +226,33 @@ function compileElementNode(
     return null
   }
 
+  const componentManifest = directComponentIdentity
+    ? context.resolveComponentPortManifest?.(directComponentIdentity) ?? null
+    : null
+  const portBindings = directComponentIdentity
+    ? compileRequiredPortBindings(node, componentManifest, context, dependencies, diagnostics)
+    : []
+  const portBindingRanges = new Set(portBindings.map(binding => `${binding.sourceRange?.start}:${binding.sourceRange?.end}`))
   const nodeMetadata = compileNodeMetadata(node.attributes, diagnostics, `template.${id}.metadata`)
   validateSemanticStyleAttributes(node.attributes, diagnostics, `template.${id}`)
   const props = compileAttributes(
-    node.attributes.filter(attribute => !['metadata', 'editable', 'edit-on', 'cancel-on', 'commit-on', 'on'].includes(attribute.name)),
+    node.attributes.filter(attribute => (
+      !['metadata', 'editable', 'edit-on', 'cancel-on', 'commit-on', 'on'].includes(attribute.name)
+      && !portBindingRanges.has(`${attribute.range.start}:${attribute.range.end}`)
+    )),
     context,
     diagnostics,
   )
   const directives = compileDirectives(node.directives.filter(directive => directive.name !== 'on'), context, diagnostics)
   const tag: RComponentSFC_IR_Tag = directComponentIdentity ? 'Component' : node.tag as RComponentSFC_IR_Tag
   const baseEventManifest = directComponentIdentity
-    ? context.resolveComponentPortManifest?.(directComponentIdentity) ?? null
+    ? componentManifest
     : createBuiltInComponentPortManifest(tag)
   const editable = compileEditableBehavior(node, tag, props, context, diagnostics)
   const eventManifest = editable
     ? withEditableEventManifest(baseEventManifest)
     : baseEventManifest
-  const events = compileEventBindings(node.directives, eventManifest, dependencies, diagnostics)
+  const events = compileEventBindings(node.directives, eventManifest, context.ownerPorts, dependencies, diagnostics)
   const interactions = compileInteractionBindings(node.attributes, eventManifest, context, dependencies, diagnostics)
 
   if (directComponentIdentity) {
@@ -270,6 +292,7 @@ function compileElementNode(
           defaultIdentity: localComponentPort.defaultIdentity,
         }
       : undefined,
+    ...(portBindings.length ? { portBindings } : {}),
     editable,
   }
 
@@ -316,6 +339,183 @@ function compileElementNode(
   }
 
   return element
+}
+
+function compileRequiredPortBindings(
+  node: RComponentSFC_AST_ElementNode,
+  manifest: ComponentSFCPortManifest | null,
+  context: ComponentSFCTemplateCompileContext,
+  dependencies: RComponentDependencies,
+  diagnostics: RComponentDiagnostic[],
+): ComponentSFCRequiredPortBinding[] {
+  if (!manifest) return []
+  const ports = [
+    ...manifest.require.computations,
+    ...manifest.require.components,
+    ...manifest.require.actions,
+    ...manifest.require.queries,
+  ]
+  const byName = new Map(ports.map(port => [port.name, port]))
+  const result: ComponentSFCRequiredPortBinding[] = []
+  const seen = new Set<string>()
+
+  for (const attribute of node.attributes) {
+    const portName = normalizePublicBindingName(attribute.name)
+    const port = byName.get(portName)
+    if (!port) continue
+    if (seen.has(portName)) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'sfc-template-port-binding-duplicate',
+        message: `Required port "${portName}" переопределён на одном component call повторно.`,
+        sourcePath: `template.ports.${portName}`,
+        start: attribute.range.start,
+        end: attribute.range.end,
+      })
+      continue
+    }
+    seen.add(portName)
+
+    const binding = parseRequiredPortBinding(attribute, port.kind, diagnostics)
+    if (!binding) continue
+    const provider = context.resolvePortProvider?.(binding.identity, binding.kind)
+    if (context.resolvePortProvider && !provider) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'sfc-template-port-provider-missing',
+        message: `Provider "${binding.identity}" для required port "${portName}" не найден.`,
+        sourcePath: `template.ports.${portName}`,
+        start: attribute.range.start,
+        end: attribute.range.end,
+      })
+      continue
+    }
+    if (provider && provider.kind !== port.kind) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'sfc-template-port-provider-kind',
+        message: `Provider "${binding.identity}" имеет kind "${provider.kind}", required port "${portName}" ожидает "${port.kind}".`,
+        sourcePath: `template.ports.${portName}`,
+        start: attribute.range.start,
+        end: attribute.range.end,
+      })
+      continue
+    }
+    if (provider && !provider.active) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'sfc-template-port-provider-inactive',
+        message: `Provider "${binding.identity}" для required port "${portName}" неактивен.`,
+        sourcePath: `template.ports.${portName}`,
+        start: attribute.range.start,
+        end: attribute.range.end,
+      })
+    }
+    if (
+      provider?.kind === 'query'
+      && port.kind === 'query'
+      && (
+        hasTemplatePortFieldMismatch(port.inputs, provider.inputs)
+        || (port.outputs.length > 0 && hasTemplatePortFieldMismatch(port.outputs, provider.outputs))
+      )
+    ) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'sfc-template-query-port-contract',
+        message: `Query "${binding.identity}" не соответствует contract required port "${portName}".`,
+        sourcePath: `template.ports.${portName}`,
+        start: attribute.range.start,
+        end: attribute.range.end,
+      })
+      continue
+    }
+
+    appendRequiredPortBindingDependency(binding, dependencies)
+    result.push({ ...binding, port: portName, sourceRange: attribute.range })
+  }
+  return result
+}
+
+function parseRequiredPortBinding(
+  attribute: RComponentSFC_AST_Attribute,
+  expectedKind: ComponentSFCRequiredPortKind,
+  diagnostics: RComponentDiagnostic[],
+): Omit<ComponentSFCRequiredPortBinding, 'port'> | null {
+  let expression: any
+  try {
+    expression = attribute.dynamic
+      ? parseExpression(String(attribute.value ?? '').trim(), { sourceType: 'module', plugins: ['typescript'] })
+      : null
+  }
+  catch {
+    expression = null
+  }
+  const kind = expression?.type === 'CallExpression' && expression.callee?.type === 'Identifier'
+    ? expression.callee.name as ComponentSFCRequiredPortKind
+    : null
+  const identity = expression?.arguments?.length === 1 && expression.arguments[0]?.type === 'StringLiteral'
+    ? String(expression.arguments[0].value ?? '').trim()
+    : ''
+  if (!attribute.dynamic || !kind || !['action', 'component', 'computation', 'query'].includes(kind) || !identity) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-template-port-binding-shape',
+      message: `Required port "${normalizePublicBindingName(attribute.name)}" переопределяется как ${expectedKind}('provider-identity').`,
+      sourcePath: `template.ports.${normalizePublicBindingName(attribute.name)}`,
+      start: attribute.range.start,
+      end: attribute.range.end,
+    })
+    return null
+  }
+  if (kind !== expectedKind) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-template-port-binding-kind',
+      message: `Required port "${normalizePublicBindingName(attribute.name)}" имеет kind "${expectedKind}" и не может быть связан через ${kind}(...).`,
+      sourcePath: `template.ports.${normalizePublicBindingName(attribute.name)}`,
+      start: attribute.range.start,
+      end: attribute.range.end,
+    })
+    return null
+  }
+  return { kind, identity, sourceRange: attribute.range }
+}
+
+function appendRequiredPortBindingDependency(
+  binding: Omit<ComponentSFCRequiredPortBinding, 'port'>,
+  dependencies: RComponentDependencies,
+): void {
+  if (binding.kind === 'query') dependencies.queries.push(binding.identity)
+  else if (binding.kind === 'action') dependencies.actions.push(binding.identity)
+  else if (binding.kind === 'component') dependencies.components.push({
+    source: 'component-sfc',
+    id: binding.identity,
+    role: 'port-override-component',
+  })
+  else dependencies.computations.push({
+    source: 'computation',
+    id: binding.identity,
+    role: 'port-override-computation',
+  })
+}
+
+function normalizePublicBindingName(value: string): string {
+  return String(value ?? '').replace(/-([a-z0-9])/g, (_match, letter: string) => letter.toUpperCase())
+}
+
+function hasTemplatePortFieldMismatch(
+  expectedFields: Array<{ name: string, type: string, isArray?: boolean, optional?: boolean }>,
+  actualFields: Array<{ name: string, type: string, isArray?: boolean, optional?: boolean }>,
+): boolean {
+  const expected = new Map(expectedFields.map(field => [field.name, field]))
+  const actual = new Map(actualFields.map(field => [field.name, field]))
+  return expectedFields.some((field) => {
+    const candidate = actual.get(field.name)
+    return !candidate
+      || candidate.type.replace(/\s+/g, '') !== field.type.replace(/\s+/g, '')
+      || Boolean(candidate.isArray) !== Boolean(field.isArray)
+      || Boolean(candidate.optional) !== Boolean(field.optional)
+  }) || actualFields.some(field => !field.optional && !expected.has(field.name))
 }
 
 /** Validates the lazy Tooltip compound shape after whitespace-only nodes have been removed. */
@@ -435,7 +635,7 @@ function compileEditableBehavior(
     })
   }
 
-  let value = props.value
+  let value = tag === 'Checkbox' ? props.checked : props.value
   if (!value && tag === 'Text') {
     const meaningful = node.children.filter(child => child.kind !== 'text' || child.content.trim())
     if (meaningful.length === 1 && meaningful[0]?.kind === 'interpolation') {
@@ -462,7 +662,7 @@ function compileEditableBehavior(
     diagnostics.push({
       severity: 'error',
       code: 'sfc-editable-value-required',
-      message: `${tag} editable требует value.`,
+      message: `${tag} editable требует ${tag === 'Checkbox' ? 'checked' : 'value'}.`,
       sourcePath: 'template.editable.value',
       start: node.range.start,
       end: node.range.end,
@@ -734,7 +934,7 @@ function compileInteractionBindings(
   return attributes
     .filter(attribute => attribute.name === 'on')
     .flatMap((attribute) => {
-      const group = compileComponentSFCInteractionAnnotation(attribute, manifest, context, dependencies, diagnostics)
+      const group = compileComponentSFCInteractionAnnotation(attribute, manifest, context, dependencies, diagnostics, context.ownerPorts)
       return group ? [group] : []
     })
 }
@@ -746,6 +946,7 @@ const LOCAL_EVENT_MODIFIERS = new Set<RComponentSFC_IR_EventModifier>([
 function compileEventBindings(
   directives: RComponentSFC_AST_Directive[],
   manifest: ComponentSFCPortManifest | null,
+  ownerPorts: ComponentSFCPortManifest | null | undefined,
   dependencies: RComponentDependencies,
   diagnostics: RComponentDiagnostic[],
 ): RComponentSFC_IR_EventBinding[] {
@@ -807,7 +1008,7 @@ function compileEventBindings(
       })
       continue
     }
-    const action = compileComponentSFCLocalEventAction(name, expression, directive.range.start, dependencies, diagnostics)
+    const action = compileComponentSFCLocalEventAction(name, expression, directive.range.start, dependencies, diagnostics, ownerPorts)
     if (!action) continue
     result.push({ name, modifiers, action, sourceRange: directive.range })
   }
@@ -1023,3 +1224,4 @@ function collectComponentDependency(value: RComponentSFC_IR_Value | undefined, d
     id: value.value,
   })
 }
+import { parseExpression } from '@babel/parser'

@@ -57,6 +57,7 @@ export function compileComponentSFCInteractionAnnotation(
   context: ComponentSFCInteractionCompileContext,
   dependencies: RComponentDependencies,
   diagnostics: RComponentDiagnostic[],
+  ownerPorts?: ComponentSFCPortManifest | null,
 ): RComponentSFC_IR_InteractionGroup | null {
   const source = String(attribute.value ?? '').trim()
   if (!attribute.dynamic || !source) {
@@ -99,6 +100,7 @@ export function compileComponentSFCInteractionAnnotation(
       context,
       dependencies,
       diagnostics,
+      ownerPorts,
     )
   }
 
@@ -110,7 +112,7 @@ export function compileComponentSFCInteractionAnnotation(
 
   const rules: RComponentSFC_IR_InteractionRule[] = []
   for (const node of nodes) {
-    const rule = compileRule(node, source, suffixes, attribute, manifest, context, dependencies, diagnostics)
+    const rule = compileRule(node, source, suffixes, attribute, manifest, context, dependencies, diagnostics, ownerPorts)
     if (rule) rules.push(rule)
     else invalid = true
   }
@@ -128,6 +130,7 @@ function compileTriggerSetRule(
   context: ComponentSFCInteractionCompileContext,
   dependencies: RComponentDependencies,
   diagnostics: RComponentDiagnostic[],
+  ownerPorts?: ComponentSFCPortManifest | null,
 ): RComponentSFC_IR_InteractionGroup | null {
   const properties = node.properties ?? []
   if (properties.some((property: any) => property?.type !== 'ObjectProperty' || property.computed)) {
@@ -182,6 +185,7 @@ function compileTriggerSetRule(
       attribute.range.start + (item.start ?? 0),
       dependencies,
       diagnostics,
+      ownerPorts,
     )
     return compiled ? [compiled] : []
   })
@@ -218,6 +222,7 @@ function compileRule(
   context: ComponentSFCInteractionCompileContext,
   dependencies: RComponentDependencies,
   diagnostics: RComponentDiagnostic[],
+  ownerPorts?: ComponentSFCPortManifest | null,
 ): RComponentSFC_IR_InteractionRule | null {
   if (!node || node.type !== 'ObjectExpression') {
     pushDiagnostic(diagnostics, attribute, 'sfc-template-on-rule-shape', 'Каждое правило :on должно быть object literal.')
@@ -272,6 +277,7 @@ function compileRule(
       attribute.range.start + (item.start ?? 0),
       dependencies,
       diagnostics,
+      ownerPorts,
     )
     return compiled ? [compiled] : []
   })
