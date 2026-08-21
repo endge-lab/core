@@ -28,6 +28,7 @@ import type {
 } from '@/domain/types/program/program.types'
 import type { EndgeStyleSheetArtifact } from '@/domain/types/style/style.types'
 import type { EndgeSFCEditingConfiguration } from '@/domain/types/configuration/configuration.type'
+import type { ResponseOutputTransform } from '@/domain/types/source/response-output.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
@@ -1694,12 +1695,41 @@ export class EndgeCompiler extends EndgeModule {
         diagnostics,
         dependencies,
       )
+      let dataViewIndex = 0
+      const sourceTransforms = output.transforms
+        ?? output.dataViews.map(ref => ({ kind: 'data-view' as const, ref }))
+      const transforms: ResponseOutputTransform[] = sourceTransforms.map((transform) => {
+        if (transform.kind === 'data-view')
+          return { ...transform, ref: dataViews[dataViewIndex++] ?? transform.ref }
+
+        const converter = Endge.domain.getConverter(transform.identity)
+        if (!converter) {
+          diagnostics.push({
+            severity: 'error',
+            code: 'response-output-converter-missing',
+            message: `Converter "${transform.identity}" не найден.`,
+            sourcePath: `outputs.${output.key}.convert`,
+          })
+        }
+        else {
+          dependencies.push({
+            entityType: 'converter',
+            id: converter.id ?? converter.identity,
+            identity: converter.identity,
+            role: 'output-converter',
+          })
+        }
+        return transform
+      })
       let materialization: QueryProgramOutput['materialization']
-      if (output.source.type === 'response' && dataViews.length === 0) {
+      if (output.source.type === 'response' && transforms.length === 0) {
         materialization = { kind: 'source' }
       }
       else {
-        const strategy: DataViewMaterializationStrategy = dataViews.length
+        const hasConverter = transforms.some(transform => transform.kind === 'converter')
+        const strategy: DataViewMaterializationStrategy = hasConverter
+          ? { kind: 'full' }
+          : dataViews.length
           ? this._resolveDataViewChainStrategy(dataViews, children)
           : output.source.type === 'output'
             ? strategies.get(output.source.key) ?? { kind: 'full' }
@@ -1707,7 +1737,7 @@ export class EndgeCompiler extends EndgeModule {
         materialization = { kind: 'derived', strategy }
         strategies.set(output.key, strategy)
       }
-      outputs.push({ ...output, dataViews, materialization })
+      outputs.push({ ...output, transforms, dataViews, materialization })
     }
 
     return {

@@ -21,6 +21,11 @@ export interface EndgeContextSnapshot {
   timezone: string | null
 }
 
+/** Storage payload that distinguishes an explicit theme choice from an effective default. */
+export interface EndgePersistedContextSnapshot extends EndgeContextSnapshot {
+  themePreferenceVersion?: 1
+}
+
 /** Volatile keyboard state supplied by the active UI adapter. */
 export interface EndgeKeyboardContextSnapshot {
   platform: 'macos' | 'windows' | 'linux' | 'unknown'

@@ -146,6 +146,7 @@ export type ComponentSFCEventInputValue
     | { kind: 'now' }
     | { kind: 'scope', path: string }
     | { kind: 'literal', value: unknown }
+    | { kind: 'coalesce', left: ComponentSFCEventInputValue, right: ComponentSFCEventInputValue }
     | { kind: 'array', items: ComponentSFCEventInputValue[] }
     | { kind: 'object', entries: ComponentSFCEventInputEntry[] }
 

@@ -73,6 +73,10 @@ function evaluateEventInput(
   if (value.kind === 'now') return evaluatedAt
   if (value.kind === 'scope') return readPath(scope, value.path)
   if (value.kind === 'literal') return value.value
+  if (value.kind === 'coalesce') {
+    const left = evaluateEventInput(value.left, payload, scope, evaluatedAt)
+    return left ?? evaluateEventInput(value.right, payload, scope, evaluatedAt)
+  }
   if (value.kind === 'array') return value.items.map(item => evaluateEventInput(item, payload, scope, evaluatedAt))
   return Object.fromEntries(value.entries.map(entry => [
     typeof entry.key === 'string' ? entry.key : String(evaluateEventInput(entry.key, payload, scope, evaluatedAt)),

@@ -2,6 +2,7 @@ import type {
   EndgeContextPersistenceConfig,
   EndgeKeyboardContextSnapshot,
   EndgeContextSnapshot,
+  EndgePersistedContextSnapshot,
   EndgePersistenceOptions,
   EndgePersistenceScope,
   EndgeRuntimeContextSnapshot,
@@ -41,6 +42,8 @@ import { DisabledContextAdapter } from '@/model/modules/context/persistence/adap
 import { LocalStorageContextAdapter } from '@/model/modules/context/persistence/adapters/LocalStorageContextAdapter'
 import { createEndgePublicConfigurationSnapshot } from '@/model/services/configuration/endge-configuration'
 
+const THEME_PREFERENCE_VERSION = 1 as const
+
 /**
  * Контекст выполнения Endge: текущий workspace/project/environment/user scope
  * и координатор persistence-инфраструктуры приложения.
@@ -58,7 +61,7 @@ export class EndgeContext extends EndgeModule {
   private _currentLocale = DEFAULT_LOCALE
   private _pendingLocale: string | null = null
   private _currentTheme = DEFAULT_THEME
-  private _pendingTheme: string | null = null
+  private _themePreference: string | null = null
   private _currentTimezone = DEFAULT_TIMEZONE
   private _pendingTimezone: string | null = null
   private _workspaceDataMode: EndgeDataMode = 'live'
@@ -196,7 +199,7 @@ export class EndgeContext extends EndgeModule {
     this._currentLocale = rawLocale ?? DEFAULT_LOCALE
     this._pendingLocale = rawLocale ?? DEFAULT_LOCALE
     this._currentTheme = rawTheme ?? DEFAULT_THEME
-    this._pendingTheme = rawTheme ?? DEFAULT_THEME
+    this._themePreference = rawTheme
     this._currentTimezone = rawTimezone ?? DEFAULT_TIMEZONE
     this._pendingTimezone = rawTimezone ?? DEFAULT_TIMEZONE
     this._syncPersistentContextToRaph()
@@ -209,7 +212,7 @@ export class EndgeContext extends EndgeModule {
     }
 
     try {
-      this.resolveAdapter(this._contextPersistence).write(CONTEXT_STORAGE_KEY, this.serialize())
+      this.resolveAdapter(this._contextPersistence).write(CONTEXT_STORAGE_KEY, this._serializeForPersistence())
     }
     catch (error) {
       console.warn(`[EndgeContext] Failed to persist context: ${error instanceof Error ? error.message : String(error)}`)
@@ -219,13 +222,23 @@ export class EndgeContext extends EndgeModule {
 
   /** Загружает context snapshot из нового или legacy storage key. */
   public loadFromStorage(): EndgeContextSnapshot | undefined {
+    let shouldPersistThemeMigration = false
     this._isHydrating = true
     try {
       const adapter = this.resolveAdapter(this._contextPersistence)
-      const snapshot = adapter.read<EndgeContextSnapshot>(CONTEXT_STORAGE_KEY)
-        ?? adapter.read<Partial<EndgeContextSnapshot>>(LEGACY_CONTEXT_STORAGE_KEY)
+      const snapshot = adapter.read<EndgePersistedContextSnapshot>(CONTEXT_STORAGE_KEY)
+        ?? adapter.read<EndgePersistedContextSnapshot>(LEGACY_CONTEXT_STORAGE_KEY)
 
-      this.deserialize(snapshot)
+      // Older context snapshots persisted the bootstrap fallback as if it were
+      // selected by the user. Only the older dedicated theme key can prove an
+      // explicit legacy selection; otherwise effective configuration owns it.
+      shouldPersistThemeMigration = snapshot != null
+        && snapshot.themePreferenceVersion !== THEME_PREFERENCE_VERSION
+      const migratedSnapshot = shouldPersistThemeMigration && snapshot
+        ? { ...snapshot, theme: readLegacyThemePreference() }
+        : snapshot
+
+      this.deserialize(migratedSnapshot)
       return this.serialize()
     }
     catch {
@@ -235,6 +248,8 @@ export class EndgeContext extends EndgeModule {
     finally {
       queueMicrotask(() => {
         this._isHydrating = false
+        if (shouldPersistThemeMigration)
+          this.saveToStorage()
       })
     }
   }
@@ -512,13 +527,17 @@ export class EndgeContext extends EndgeModule {
     const configuration = this._activeConfiguration()
     const raw = normalizeOptionalText(value) ?? DEFAULT_THEME
     const next = this._normalizeTheme(raw, configuration)
-    this._pendingTheme = configuration ? null : raw
-    if (next === this._currentTheme)
+    const preference = configuration && next !== raw ? null : raw
+    const preferenceChanged = preference !== this._themePreference
+    const themeChanged = next !== this._currentTheme
+    this._themePreference = preference
+    if (!preferenceChanged && !themeChanged)
       return
 
     this._currentTheme = next
     this.saveToStorage()
-    this.notify()
+    if (themeChanged)
+      this.notify()
   }
 
   /** Устанавливает текущую пользовательскую тему. */
@@ -532,15 +551,24 @@ export class EndgeContext extends EndgeModule {
     if (!activeConfiguration)
       return
 
-    const pending = this._pendingTheme
-    const next = this._normalizeTheme(pending ?? this._currentTheme, activeConfiguration)
-    this._pendingTheme = null
-    if (next === this._currentTheme)
+    const preference = this._themePreference
+    const normalizedPreference = preference == null
+      ? null
+      : this._normalizeTheme(preference, activeConfiguration)
+    const next = normalizedPreference == null || normalizedPreference !== preference
+      ? activeConfiguration.defaultTheme
+      : normalizedPreference
+    const preferenceChanged = preference != null && normalizedPreference !== preference
+    const themeChanged = next !== this._currentTheme
+    if (preferenceChanged)
+      this._themePreference = null
+    if (!preferenceChanged && !themeChanged)
       return
 
     this._currentTheme = next
     this.saveToStorage()
-    this.notify()
+    if (themeChanged)
+      this.notify()
   }
 
   /** Возвращает текущую временную зону контекста. */
@@ -614,6 +642,15 @@ export class EndgeContext extends EndgeModule {
     if (!configuration)
       return value
     return configuration.timezones.some(item => item.identity === value) ? value : configuration.defaultTimezone
+  }
+
+  /** Persists only an explicit preference; the effective default remains configuration-owned. */
+  private _serializeForPersistence(): EndgePersistedContextSnapshot {
+    return {
+      ...this.serialize(),
+      theme: this._themePreference,
+      themePreferenceVersion: THEME_PREFERENCE_VERSION,
+    }
   }
 
   /** Выбирает storage adapter для заданной persistence policy. */

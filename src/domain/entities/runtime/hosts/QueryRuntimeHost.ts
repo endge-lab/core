@@ -19,6 +19,7 @@ import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
 import { Endge } from '@/model/kernel/endge'
 import type { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
+import { runResponseOutputTransforms } from '@/model/modules/runtime/execution/endge-response-output'
 
 function defaultContext(): RuntimeHostContext<'query'> {
   return {
@@ -365,12 +366,7 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
           strategy,
           immediate: false,
           disposeTarget: 'delete',
-          compute: (source) => {
-            let value = source
-            for (const ref of output.dataViews)
-              value = Endge.runtime.dataView.runRef(ref, value, undefined, { children: artifact.children ?? [] })
-            return value
-          },
+          compute: source => runResponseOutputTransforms(output.transforms, output.dataViews, source, artifact.children ?? []),
         })
         this.node?.addChild(handle.node, { invalidate: false })
         this._derivedHandles.push(handle)

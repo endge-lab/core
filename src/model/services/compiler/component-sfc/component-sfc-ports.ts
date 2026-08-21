@@ -700,6 +700,11 @@ function parseEventInput(node: any, script: RComponentSFC_AST_Script, diagnostic
   const eventRead = parseEventRead(node)
   if (eventRead) return eventRead
   if (isCall(node, 'now') && (node.arguments?.length ?? 0) === 0) return { kind: 'now' }
+  if (node?.type === 'LogicalExpression' && node.operator === '??') {
+    const left = parseEventInput(node.left, script, diagnostics)
+    const right = parseEventInput(node.right, script, diagnostics)
+    return left && right ? { kind: 'coalesce', left, right } : null
+  }
   const scopeRead = parseScopeRead(node)
   if (scopeRead) return scopeRead
   if (node?.type === 'StringLiteral' || node?.type === 'NumericLiteral' || node?.type === 'BooleanLiteral')
@@ -729,7 +734,7 @@ function parseEventInput(node: any, script: RComponentSFC_AST_Script, diagnostic
     }
     return { kind: 'object', entries }
   }
-  diagnostics.push(makeDiagnostic('sfc-event-action-input', 'Input поддерживает literals, arrays, objects, event(path), now() и lexical SFC scope.', node, script))
+  diagnostics.push(makeDiagnostic('sfc-event-action-input', 'Input поддерживает literals, arrays, objects, event(path), now(), nullish coalescing и lexical SFC scope.', node, script))
   return null
 }
 

@@ -35,7 +35,8 @@ import { analyzeComponentSFCPorts } from '@/model/services/compiler/component-sf
 import { resolveComponentSFCPortForwards } from '@/model/services/compiler/component-sfc/component-sfc-forward'
 import {
   normalizeComponentSFCTableColumnMenu,
-  normalizeComponentSFCTableRowMenu,
+  normalizeComponentSFCColumnCellMenu,
+  normalizeComponentSFCTableCellMenu,
 } from '@/model/services/compiler/component-sfc/component-sfc-table-menu'
 
 /** Результат полного SFC compiler pipeline в core. */
@@ -185,7 +186,26 @@ export function compileComponentSFC(
   const styleResult = compileComponentSFCStyle(parseResult.ast.style, { identity: options.identity })
 
   const propNames = new Set(scriptResult.props.map(prop => prop.name))
+  for (const binding of [...scriptResult.props, ...scriptResult.locals]) {
+    if (!binding.name.startsWith('$')) continue
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-platform-binding-name-reserved',
+      message: `Имя "${binding.name}" зарезервировано для runtime-контекста платформы. Пользовательские props и bindings не должны начинаться с $.`,
+      sourcePath: `script.binding.${binding.name}`,
+      start: binding.sourceRange?.start,
+      end: binding.sourceRange?.end,
+    })
+  }
   for (const port of allComponentSFCPorts(portResult.manifest)) {
+    if (port.name.startsWith('$')) diagnostics.push({
+      severity: 'error',
+      code: 'sfc-platform-port-name-reserved',
+      message: `Имя port "${port.name}" зарезервировано для runtime-контекста платформы.`,
+      sourcePath: `script.ports.${'role' in port ? port.role : 'require'}.${port.name}`,
+      start: port.sourceRange?.start,
+      end: port.sourceRange?.end,
+    })
     if (!propNames.has(port.name)) continue
     diagnostics.push({
       severity: 'error',
@@ -280,11 +300,21 @@ function collectTableMenus(
     if (node.kind !== 'element') return
     if (node.tag === 'Table') {
       const column = normalizeComponentSFCTableColumnMenu(node, { availableActions })
-      const row = normalizeComponentSFCTableRowMenu(node, { availableActions })
+      const row = normalizeComponentSFCTableCellMenu(node, { availableActions })
       node.tableMenus = { column, row }
       diagnostics.push(...column.diagnostics, ...row.diagnostics)
       for (const menu of [column.menu, row.menu]) {
         for (const item of menu?.items ?? []) {
+          if (item.kind === 'item') actions.add(item.action)
+        }
+      }
+      for (const columnNode of node.children) {
+        if (columnNode.kind !== 'element' || columnNode.tag !== 'Column') continue
+        const cellMenu = normalizeComponentSFCColumnCellMenu(node, columnNode, { availableActions })
+        if (!cellMenu) continue
+        columnNode.cellMenu = cellMenu
+        diagnostics.push(...cellMenu.diagnostics)
+        for (const item of cellMenu.menu?.items ?? []) {
           if (item.kind === 'item') actions.add(item.action)
         }
       }

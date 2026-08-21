@@ -15,15 +15,15 @@ export class RConverter extends REntity {
   description: string | null = null
 
   @Exclude()
-  customHandler: ((v: any) => any) | undefined = undefined
+  customHandler: ((v: any, options?: Record<string, unknown>) => any) | undefined = undefined
 
-  setCustom(fn: ((v: any) => any) | undefined): void {
+  setCustom(fn: ((v: any, options?: Record<string, unknown>) => any) | undefined): void {
     this.customHandler = fn
   }
 
-  convert(v: any): any {
+  convert(v: any, options?: Record<string, unknown>): any {
     if (this.customHandler) {
-      return this.customHandler(v)
+      return this.customHandler(v, options)
     }
     return null
   }

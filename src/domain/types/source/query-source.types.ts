@@ -3,6 +3,7 @@ import type { ProgramDiagnostic, QueryProgramPayload } from '@/domain/types/prog
 import type { DataViewRef } from '@/domain/types/source/data-view-source.types'
 import type { ProgramMetadataMap } from '@/domain/types/program/program-metadata.types'
 import type { QueryProgramProp, SourceExpressionIR, SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
+import type { ResponseOutputTransform } from '@/domain/types/source/response-output.types'
 
 /** Поддерживаемые transport-kind Query source. */
 export type QuerySourceKind = 'rest' | 'graphql'
@@ -90,6 +91,9 @@ export type QueryOutputSource
 export interface QuerySourceOutput {
   key: string
   source: QueryOutputSource
+  /** Ordered transform chain. */
+  transforms: ResponseOutputTransform[]
+  /** Compatibility projection containing only DataView transforms. */
   dataViews: DataViewRef[]
   contract?: SourceFieldDefinition | null
 }

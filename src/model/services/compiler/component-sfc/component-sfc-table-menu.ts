@@ -1,6 +1,7 @@
 import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
 import type {
   ComponentSFCTableColumnMenuDescriptor,
+  ComponentSFCTableCellMenuDescriptor,
   ComponentSFCTableMenuItemDescriptor,
   ComponentSFCTableMenuNodeDescriptor,
   ComponentSFCTableRowMenuDescriptor,
@@ -15,6 +16,8 @@ import * as t from '@babel/types'
 export const SFC_TABLE_COLUMN_MENU_MODES = ENDGE_SFC_TABLE_COLUMN_MENU_MODES
 
 export type {
+  ComponentSFCTableCellMenuDescriptor,
+  ComponentSFCTableCellMenuMode,
   ComponentSFCTableColumnMenuDescriptor,
   ComponentSFCTableColumnMenuMode,
   ComponentSFCTableMenuDescriptor,
@@ -30,6 +33,7 @@ interface NormalizeMenuOptions {
 }
 
 const COLUMN_MENU_MODE_SET = new Set<string>(SFC_TABLE_COLUMN_MENU_MODES)
+type TableMenuTag = 'ColumnMenu' | 'CellMenu' | 'RowMenu'
 /** Normalizes declarative column context menu without evaluating SFC expressions. */
 export function normalizeComponentSFCTableColumnMenu(
   tableNode: RComponentSFC_IR_ElementNode,
@@ -80,10 +84,81 @@ export function normalizeComponentSFCTableRowMenu(
   }
 }
 
+/** Normalizes the canonical Table > CellMenu, falling back to legacy Table > RowMenu. */
+export function normalizeComponentSFCTableCellMenu(
+  tableNode: RComponentSFC_IR_ElementNode,
+  actionsOrOptions?: ComponentSFCActionPort[] | NormalizeMenuOptions,
+): ComponentSFCTableCellMenuDescriptor {
+  const diagnostics: RComponentDiagnostic[] = []
+  const options = normalizeOptions(actionsOrOptions)
+  const cellMenus = directMenuNodes(tableNode, 'CellMenu')
+  const rowMenus = directMenuNodes(tableNode, 'RowMenu')
+
+  if (cellMenus.length && rowMenus.length) diagnostics.push(menuDiagnostic(
+    rowMenus[0],
+    'sfc-table-cell-menu-legacy-conflict',
+    'Используйте только CellMenu. RowMenu является deprecated compatibility alias.',
+    'CellMenu',
+  ))
+
+  const menuTag: 'CellMenu' | 'RowMenu' = cellMenus.length ? 'CellMenu' : 'RowMenu'
+  const menuNodes = cellMenus.length ? cellMenus : rowMenus
+  if (menuNodes.length === 0) return { mode: 'none', menu: null, diagnostics }
+  reportDuplicateMenu(menuNodes, menuTag, diagnostics)
+
+  return {
+    mode: 'inline',
+    menu: {
+      kind: 'sfc-table-menu',
+      items: collectMenuItems(tableNode, menuNodes[0], menuTag, diagnostics, options),
+    },
+    diagnostics,
+  }
+}
+
+/** Normalizes an optional Column > CellMenu override; `cell-menu="none"` disables the default. */
+export function normalizeComponentSFCColumnCellMenu(
+  tableNode: RComponentSFC_IR_ElementNode,
+  columnNode: RComponentSFC_IR_ElementNode,
+  actionsOrOptions?: ComponentSFCActionPort[] | NormalizeMenuOptions,
+): ComponentSFCTableCellMenuDescriptor | undefined {
+  const diagnostics: RComponentDiagnostic[] = []
+  const options = normalizeOptions(actionsOrOptions)
+  const mode = readLiteralProp(columnNode, 'cell-menu') ?? readLiteralProp(columnNode, 'cellMenu')
+  const menuNodes = directMenuNodes(columnNode, 'CellMenu')
+
+  if (mode === 'none') {
+    if (menuNodes.length) diagnostics.push(menuDiagnostic(
+      menuNodes[0],
+      'sfc-table-column-cell-menu-conflict',
+      'Column cell-menu="none" нельзя использовать одновременно с Column > CellMenu.',
+      'CellMenu',
+    ))
+    return { mode: 'none', menu: null, diagnostics }
+  }
+  if (mode != null && mode !== '') diagnostics.push(menuDiagnostic(
+    columnNode,
+    'sfc-table-column-cell-menu-mode-invalid',
+    `Column cell-menu поддерживает только значение "none", получено "${String(mode)}".`,
+    'CellMenu',
+  ))
+  if (!menuNodes.length && !diagnostics.length) return undefined
+  if (!menuNodes.length) return { mode: 'none', menu: null, diagnostics }
+  reportDuplicateMenu(menuNodes, 'CellMenu', diagnostics)
+  return {
+    mode: 'inline',
+    menu: {
+      kind: 'sfc-table-menu',
+      items: collectMenuItems(tableNode, menuNodes[0], 'CellMenu', diagnostics, options),
+    },
+    diagnostics,
+  }
+}
+
 function collectMenuItems(
   tableNode: RComponentSFC_IR_ElementNode,
   menuNode: RComponentSFC_IR_ElementNode,
-  menuTag: 'ColumnMenu' | 'RowMenu',
+  menuTag: TableMenuTag,
   diagnostics: RComponentDiagnostic[],
   options: NormalizeMenuOptions,
 ): ComponentSFCTableMenuNodeDescriptor[] {
@@ -120,7 +195,7 @@ function createItemDescriptor(
   tableNode: RComponentSFC_IR_ElementNode,
   node: RComponentSFC_IR_ElementNode,
   index: number,
-  menuTag: 'ColumnMenu' | 'RowMenu',
+  menuTag: TableMenuTag,
   diagnostics: RComponentDiagnostic[],
   options: NormalizeMenuOptions,
 ): ComponentSFCTableMenuItemDescriptor | null {
@@ -194,6 +269,8 @@ function createItemDescriptor(
     kind: 'item',
     id: readLiteralStringProp(node, 'id') || actionAlias || `item-${index}`,
     label,
+    ...(node.directives.if ? { visible: node.directives.if } : {}),
+    ...(node.props.disabled ? { disabled: node.props.disabled } : {}),
     action,
     ...(requiredPort ? { requiredPort } : {}),
     ...(input ? { input } : {}),
@@ -214,7 +291,7 @@ const STATIC_VALUE_UNSUPPORTED = Symbol('static-value-unsupported')
 
 function readActionBinding(
   node: RComponentSFC_IR_ElementNode,
-  menuTag: 'ColumnMenu' | 'RowMenu',
+  menuTag: TableMenuTag,
   diagnostics: RComponentDiagnostic[],
 ): NormalizedMenuActionBinding | null {
   const value = node.props.action
@@ -362,7 +439,7 @@ function collectUnsupportedMenuPlacements(tableNode: RComponentSFC_IR_ElementNod
     if (child.tag === 'MenuItem' || child.tag === 'MenuSeparator') diagnostics.push(menuDiagnostic(
       child,
       'sfc-table-menu-placement-invalid',
-      `${child.tag} должен находиться внутри Table > ColumnMenu или Table > RowMenu.`,
+      `${child.tag} должен находиться внутри Table > ColumnMenu или Table/Column > CellMenu.`,
       'ColumnMenu',
     ))
     if (child.tag !== 'Column') continue
@@ -373,7 +450,7 @@ function collectUnsupportedMenuPlacements(tableNode: RComponentSFC_IR_ElementNod
         columnChild.tag === 'ColumnMenu'
           ? 'sfc-table-column-menu-placement-unsupported'
           : 'sfc-table-row-menu-placement-unsupported',
-        `Column > ${columnChild.tag} не поддерживается. Используйте прямой Table > ${columnChild.tag}.`,
+        `Column > ${columnChild.tag} не поддерживается. Для меню ячейки используйте Column > CellMenu.`,
         columnChild.tag,
       ))
       if (columnChild.tag === 'MenuItem' || columnChild.tag === 'MenuSeparator') diagnostics.push(menuDiagnostic(
@@ -400,7 +477,7 @@ function normalizeColumnMenuMode(value: unknown, diagnostics: RComponentDiagnost
   return 'default'
 }
 
-function reportDuplicateMenu(nodes: RComponentSFC_IR_ElementNode[], tag: 'ColumnMenu' | 'RowMenu', diagnostics: RComponentDiagnostic[]): void {
+function reportDuplicateMenu(nodes: RComponentSFC_IR_ElementNode[], tag: TableMenuTag, diagnostics: RComponentDiagnostic[]): void {
   if (nodes.length < 2) return
   diagnostics.push(menuDiagnostic(
     nodes[1],
@@ -413,7 +490,7 @@ function reportDuplicateMenu(nodes: RComponentSFC_IR_ElementNode[], tag: 'Column
 function pushActionBindingDiagnostic(
   diagnostics: RComponentDiagnostic[],
   node: RComponentSFC_IR_ElementNode,
-  menuTag: 'ColumnMenu' | 'RowMenu',
+  menuTag: TableMenuTag,
   suffix: string,
   message: string,
 ): void {
@@ -424,7 +501,7 @@ function menuDiagnostic(
   node: RComponentSFC_IR_ElementNode,
   code: string,
   message: string,
-  menuTag: 'ColumnMenu' | 'RowMenu',
+  menuTag: TableMenuTag,
   prop?: string,
 ): RComponentDiagnostic {
   return {
@@ -441,12 +518,12 @@ function normalizeOptions(input?: ComponentSFCActionPort[] | NormalizeMenuOption
   return Array.isArray(input) ? { availableActions: input } : input ?? {}
 }
 
-function directMenuNodes(tableNode: RComponentSFC_IR_ElementNode, tag: 'ColumnMenu' | 'RowMenu'): RComponentSFC_IR_ElementNode[] {
+function directMenuNodes(tableNode: RComponentSFC_IR_ElementNode, tag: TableMenuTag): RComponentSFC_IR_ElementNode[] {
   return tableNode.children.filter(isElementNode).filter(node => node.tag === tag)
 }
 
-function menuCode(tag: 'ColumnMenu' | 'RowMenu'): 'column-menu' | 'row-menu' {
-  return tag === 'ColumnMenu' ? 'column-menu' : 'row-menu'
+function menuCode(tag: TableMenuTag): 'column-menu' | 'cell-menu' | 'row-menu' {
+  return tag === 'ColumnMenu' ? 'column-menu' : tag === 'CellMenu' ? 'cell-menu' : 'row-menu'
 }
 
 function unwrapExpression(node: t.Expression): t.Expression {

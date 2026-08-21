@@ -9,6 +9,7 @@ import type { ProgramDiagnostic, QueryProgramPayload } from '@/domain/types/prog
 import type { RQueryAuth } from '@/domain/types/document/query.types'
 import type { DataViewRef } from '@/domain/types/source/data-view-source.types'
 import type { QueryProgramProp, SourceExpressionIR } from '@/domain/types/source/source-expression.types'
+import type { ResponseOutputTransform } from '@/domain/types/source/response-output.types'
 
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
@@ -253,9 +254,10 @@ function createQueryOutputs(document: QuerySourceDocument): QueryProgramPayload[
   return document.outputs.map(output => ({
     key: output.key,
     source: output.source,
+    transforms: output.transforms,
     dataViews: output.dataViews,
     contract: output.contract,
-    materialization: output.source.type === 'response' && output.dataViews.length === 0
+    materialization: output.source.type === 'response' && output.transforms.length === 0
       ? { kind: 'source' as const }
       : { kind: 'derived' as const, strategy: { kind: 'full' as const } },
   }))
@@ -622,6 +624,7 @@ function readOutput(
 
   let outputSource: QueryOutputSource | null = null
   const dataViews: DataViewRef[] = []
+  const transforms: ResponseOutputTransform[] = []
   let contract: QuerySourceOutput['contract'] = null
 
   for (const call of calls.modifiers) {
@@ -632,8 +635,17 @@ function readOutput(
 
     if (call.name === 'dataView') {
       const dataViewRef = readDataViewRef(call.arguments[0], source, diagnostics, `outputs.${key}.dataView`)
-      if (dataViewRef)
+      if (dataViewRef) {
         dataViews.push(dataViewRef)
+        transforms.push({ kind: 'data-view', ref: dataViewRef })
+      }
+      continue
+    }
+
+    if (call.name === 'convert') {
+      const transform = readConverterTransform(call.arguments, diagnostics, `outputs.${key}.convert`)
+      if (transform)
+        transforms.push(transform)
       continue
     }
 
@@ -682,7 +694,46 @@ function readOutput(
     return null
   }
 
-  return { key, source: outputSource, dataViews, contract }
+  return { key, source: outputSource, transforms, dataViews, contract }
+}
+
+function readConverterTransform(
+  args: t.CallExpression['arguments'],
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+): Extract<ResponseOutputTransform, { kind: 'converter' }> | null {
+  const raw = args[0]
+  let identity = ''
+  if (t.isStringLiteral(raw)) {
+    identity = raw.value.trim()
+  }
+  else if (t.isCallExpression(raw) && t.isIdentifier(raw.callee, { name: 'converter' }) && t.isStringLiteral(raw.arguments[0])) {
+    identity = raw.arguments[0].value.trim()
+  }
+  if (!identity) {
+    diagnostics.push(createDiagnostic(
+      'error',
+      'query-source-output-converter-invalid',
+      '.convert(...) требует identity Converter строкой или converter("identity").',
+      sourcePath,
+      raw && t.isNode(raw) ? raw : undefined,
+    ))
+    return null
+  }
+
+  const optionsNode = args[1]
+  if (!optionsNode)
+    return { kind: 'converter', identity }
+  if (!t.isExpression(optionsNode)) {
+    diagnostics.push(createDiagnostic('error', 'query-source-output-converter-options-invalid', 'Converter options должны быть объектом.', sourcePath))
+    return null
+  }
+  const options = expressionToUnknown(optionsNode, diagnostics, `${sourcePath}.options`)
+  if (!options || typeof options !== 'object' || Array.isArray(options)) {
+    diagnostics.push(createDiagnostic('error', 'query-source-output-converter-options-invalid', 'Converter options должны быть статическим объектом.', sourcePath, optionsNode))
+    return null
+  }
+  return { kind: 'converter', identity, options: options as Record<string, unknown> }
 }
 
 function unsupportedOutput(

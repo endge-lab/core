@@ -45,6 +45,7 @@ const NON_VISUAL_CELL_TAGS = new Set([
   'Column',
   'Cell',
   'ColumnMenu',
+  'CellMenu',
   'RowMenu',
   'MenuItem',
   'MenuSeparator',
@@ -150,7 +151,7 @@ function projectTable(
     menus: { column: columnMenu, row: rowMenu },
     menuActions: projectMenuActions(ir, ports, actionIdentities),
     attributes: projectAttributes(source, ast, ir),
-    columns: astColumns.map((column, index) => projectColumn(source, column, irColumns[index] ?? null, index)),
+    columns: astColumns.map((column, index) => projectColumn(source, column, irColumns[index] ?? null, ports, index)),
     sourceRange: ast.range,
   }
 }
@@ -162,10 +163,14 @@ function projectMenu(
   ports: ComponentSFCPortManifest | null,
   kind: 'column' | 'row',
 ): ComponentSFCTableMenuProjection {
-  const tag = kind === 'column' ? 'ColumnMenu' : 'RowMenu'
+  const tag = kind === 'column' ? 'ColumnMenu' : 'CellMenu'
   const menu = table.children.find(
     (node): node is RComponentSFC_AST_ElementNode => node.kind === 'element' && node.tag === tag,
-  ) ?? null
+  ) ?? (kind === 'row'
+    ? table.children.find(
+        (node): node is RComponentSFC_AST_ElementNode => node.kind === 'element' && node.tag === 'RowMenu',
+      ) ?? null
+    : null)
   const tableMode = kind === 'column' ? readProp(irTable, 'column-menu', 'columnMenu') : null
   const mode = kind === 'column'
     ? tableMode?.kind === 'expression'
@@ -194,8 +199,8 @@ function projectMenu(
       const action = visualAttribute(node, 'action')
       const itemSourceOwned = sourceOwned
         || (action?.kind === 'expression' && !isActionPortReference(action.source, ports))
-        || node.attributes.some(attribute => !['id', 'label', 'action', 'input', 'icon'].includes(attribute.name))
-        || node.directives.length > 0
+        || node.attributes.some(attribute => !['id', 'label', 'action', 'input', 'icon', 'disabled'].includes(attribute.name))
+        || node.directives.some(directive => directive.name !== 'if')
       return [{
         kind: 'item',
         id: staticAttribute(node, 'id') || staticAttribute(node, 'action') || `item-${index}`,
@@ -203,6 +208,8 @@ function projectMenu(
         action,
         input: visualAttribute(node, 'input'),
         icon: visualAttribute(node, 'icon'),
+        visible: visualDirective(node, 'if'),
+        disabled: visualAttribute(node, 'disabled'),
         sourceOwned: itemSourceOwned,
         sourceRange: node.range,
       }]
@@ -260,6 +267,11 @@ function visualAttribute(node: RComponentSFC_AST_ElementNode, name: string): Com
   return { kind: 'literal', value: attribute.value }
 }
 
+function visualDirective(node: RComponentSFC_AST_ElementNode, name: string): ComponentSFCVisualSourceValue | null {
+  const directive = node.directives.find(item => item.name === name)
+  return directive?.expression != null ? { kind: 'expression', source: directive.expression } : null
+}
+
 function staticAttribute(node: RComponentSFC_AST_ElementNode, name: string): string {
   const value = visualAttribute(node, name)
   return value?.kind === 'literal' ? String(value.value ?? '').trim() : ''
@@ -274,6 +286,7 @@ function projectColumn(
   source: string,
   ast: RComponentSFC_AST_ElementNode,
   ir: RComponentSFC_IR_ElementNode | null,
+  ports: ComponentSFCPortManifest | null,
   index: number,
 ): ComponentSFCTableColumnProjection {
   const keyDirective = ast.directives.find(directive => directive.name === 'key')
@@ -300,10 +313,32 @@ function projectColumn(
     cell: cell.projection,
     editing: projectColumnCellEditing(source, ast, ir, cellNode),
     interactions: projectColumnCellInteractions(cellNode),
+    cellMenu: projectColumnCellMenu(source, ast, ir, ports),
     hasCustomCell: cell.hasCustomCell,
     cellSource: cell.source,
     sourceRange: ast.range,
   }
+}
+
+function projectColumnCellMenu(
+  source: string,
+  column: RComponentSFC_AST_ElementNode,
+  irColumn: RComponentSFC_IR_ElementNode | null,
+  ports: ComponentSFCPortManifest | null,
+): ComponentSFCTableMenuProjection {
+  const menu = column.children.find(
+    (node): node is RComponentSFC_AST_ElementNode => node.kind === 'element' && node.tag === 'CellMenu',
+  ) ?? null
+  const modeValue = readProp(irColumn, 'cell-menu', 'cellMenu')
+  if (!menu) {
+    return {
+      kind: 'row',
+      mode: sourceValueText(modeValue) === 'none' ? 'none' : 'default',
+      sourceOwned: modeValue?.kind === 'expression',
+      items: [],
+    }
+  }
+  return projectMenu(source, column, irColumn, ports, 'row')
 }
 
 const CELL_INTERACTION_FLAGS = new Set<ComponentSFCTableCellInteractionFlag>([

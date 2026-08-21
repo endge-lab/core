@@ -1322,6 +1322,11 @@ function readCompositionEventInput(
   }
   if (t.isCallExpression(node) && t.isIdentifier(node.callee, { name: 'now' }) && node.arguments.length === 0)
     return { kind: 'now' }
+  if (t.isLogicalExpression(node, { operator: '??' })) {
+    const left = readCompositionEventInput(node.left, diagnostics, sourcePath)
+    const right = readCompositionEventInput(node.right, diagnostics, sourcePath)
+    return left && right ? { kind: 'coalesce', left, right } : null
+  }
   if (t.isStringLiteral(node) || t.isNumericLiteral(node) || t.isBooleanLiteral(node)) return { kind: 'literal', value: node.value }
   if (t.isNullLiteral(node)) return { kind: 'literal', value: null }
   if (t.isUnaryExpression(node, { operator: '-' }) && t.isNumericLiteral(node.argument)) return { kind: 'literal', value: -node.argument.value }
@@ -1347,7 +1352,7 @@ function readCompositionEventInput(
     }
     return { kind: 'object', entries }
   }
-  diagnostics.push(diagnostic('error', 'composition-event-input', 'Event input поддерживает event(path), now(), literals, arrays и objects.', sourcePath, node))
+  diagnostics.push(diagnostic('error', 'composition-event-input', 'Event input поддерживает event(path), now(), nullish coalescing, literals, arrays и objects.', sourcePath, node))
   return null
 }
 

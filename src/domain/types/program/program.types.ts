@@ -11,6 +11,7 @@ import type { RComponentSFC_IR } from '@/domain/types/component/sfc/ir.types'
 import type { RComponentSFC_RuntimeDependencies } from '@/domain/types/component/sfc/dependencies.types'
 import type { RComponentSFCSource_Parts } from '@/domain/types/component/sfc/source.types'
 import type { QueryProgramProp, SourceExpressionIR, SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
+import type { ResponseOutputTransform } from '@/domain/types/source/response-output.types'
 import type { ProgramMetadata } from '@/domain/types/program/program-metadata.types'
 import type { ComputationProgramPayload } from '@/domain/types/computation/computation-program.types'
 import type { EndgeStyleSheetArtifact } from '@/domain/types/style/style.types'
@@ -158,6 +159,9 @@ export type QueryProgramOutputSource
 export interface QueryProgramOutput {
   key: string
   source: QueryProgramOutputSource
+  /** Ordered transform chain used by new runtimes. */
+  transforms?: ResponseOutputTransform[]
+  /** Compatibility projection for runtimes compiled before ordered transforms. */
   dataViews: DataViewRef[]
   contract?: SourceFieldDefinition | null
   materialization:
