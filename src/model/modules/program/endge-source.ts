@@ -5,6 +5,7 @@ import type {
   SourceLanguageCompletion,
   SourceLanguageContext,
   SourceLanguageInlineHint,
+  SourceLanguageSignatureHelp,
   SourceLanguageSemanticHighlight,
   SourceDocumentReference,
   SourceLanguageStrategy,
@@ -172,6 +173,10 @@ export class EndgeSource extends EndgeModule {
   /** Возвращает editor-facing completion items для указанного source-kind. */
   public completions(sourceKind: SourceKind | string, context: SourceLanguageContext): SourceLanguageCompletion[] {
     return this._resolveRequiredLanguageStrategy(sourceKind).completions(context)
+  }
+
+  public signatureHelp(sourceKind: SourceKind | string, context: SourceLanguageContext): SourceLanguageSignatureHelp | null {
+    return this._resolveRequiredLanguageStrategy(sourceKind).signatureHelp?.(context) ?? null
   }
 
   /** Возвращает семантическую ссылку на внешний документ под курсором. */

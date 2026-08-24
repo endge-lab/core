@@ -8,6 +8,13 @@ export class ActionSourceEngineStrategy implements SourceEngineStrategy {
   public compile(source: string): SourceEngineCompileResult {
     const result = compileActionSource({ source })
     const ok = !result.diagnostics.some(item => item.severity === 'error')
-    return { ok, document: result.payload.sourceDocument ?? undefined, artifact: result.payload, diagnostics: result.diagnostics, message: ok ? undefined : 'Action source contains compilation errors.' }
+    return {
+      ok,
+      document: result.payload.sourceDocument ?? undefined,
+      artifact: result.payload,
+      diagnostics: result.diagnostics,
+      dependencies: result.dependencies,
+      message: ok ? undefined : 'Action source contains compilation errors.',
+    }
   }
 }

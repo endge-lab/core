@@ -73,8 +73,8 @@ describe('Composition Operation History integration', () => {
   })
 
   it('dispatches a custom TriggerSet and prevents the browser default', async () => {
-    let listener: ((event: Event) => void) | null = null
-    vi.stubGlobal('addEventListener', vi.fn((_name: string, next: (event: Event) => void) => { listener = next }))
+    const listeners: Record<string, (event: Event) => void> = {}
+    vi.stubGlobal('addEventListener', vi.fn((name: string, next: (event: Event) => void) => { listeners[name] = next }))
     vi.stubGlobal('removeEventListener', vi.fn())
     const scope = new RuntimeScope({ id: 'scope', path: 'scope' })
     const undo = vi.fn(async () => undefined)
@@ -89,7 +89,9 @@ describe('Composition Operation History integration', () => {
     const operations = new EndgeOperations()
     const remove = operations.register(scope, history)
     const preventDefault = vi.fn()
-    listener?.({
+    const dispatch = listeners.keydown
+    expect(dispatch).toBeTypeOf('function')
+    dispatch!({
       type: 'keydown',
       key: 'u',
       code: 'KeyU',

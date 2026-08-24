@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { RConverter } from '@/domain/entities/reflect/RConverter'
 import { Endge } from '@/model/kernel/endge'
 import { EndgeDataView } from '@/model/modules/runtime/execution/endge-data-view'
 
+const disposers: VoidFunction[] = []
+
 describe('EndgeDataView domain converters', () => {
-  afterEach(() => Endge.domain.reset())
+  afterEach(() => {
+    while (disposers.length) disposers.pop()?.()
+  })
 
   it('uses a registered RConverter handler', () => {
     register('upper', value => String(value).toUpperCase())
@@ -21,12 +24,18 @@ describe('EndgeDataView domain converters', () => {
 })
 
 function register(identity: string, handler: (value: unknown) => unknown): void {
-  const converter = new RConverter()
-  converter.id = identity === 'upper' ? 1 : 2
-  converter.identity = identity
-  converter.name = identity
-  converter.setCustom(handler)
-  Endge.domain.addConverter(converter)
+  const providerKey = `test.converter.${identity}`
+  disposers.push(Endge.converters.define({
+    identity,
+    origin: { kind: 'local', owner: 'core-test' },
+    defaultProviderKey: providerKey,
+  }))
+  disposers.push(Endge.converters.provide({
+    identity,
+    key: providerKey,
+    origin: { kind: 'local', owner: 'core-test' },
+    convert: handler,
+  }))
 }
 
 function source(converter: string): string {

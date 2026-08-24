@@ -331,7 +331,8 @@ function compileActionExpression(
   available: Set<string>,
   inputRead: BlockContext['inputRead'],
 ): SourceExpressionIR | null {
-  const node = t.cloneNode(raw, true)
+  // The compiler owns this parsed AST. Transform it in place so diagnostics retain exact source offsets.
+  const node = raw
   walk(node, (current) => {
     if (!t.isCallExpression(current) || !t.isIdentifier(current.callee)) return
     if (current.callee.name === 'input') {

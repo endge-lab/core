@@ -379,10 +379,10 @@ export class EndgeDataView {
 
   /** Минимальные built-in converters для preview v1. */
   private _convert(identity: string, value: unknown, options?: Record<string, unknown>): unknown {
-    // Не инициируем federation configuration из standalone DataView во время
-    // циклической загрузки Endge modules; в полноценном runtime она уже собрана.
-    const converter = Endge.isConfigured ? Endge.domain.getConverter(identity) : null
-    if (converter) return Endge.converters.execute(identity, value, options)
+    // Converter resolution is owned by the shared definition/provider facade.
+    // This also keeps standalone DataView execution compatible with code-owned
+    // definitions which intentionally have no persisted RConverter document.
+    if (Endge.converters.has(identity)) return Endge.converters.execute(identity, value, options)
 
     if (identity === 'date.iso_to_time') {
       const date = new Date(String(value ?? ''))

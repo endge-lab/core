@@ -5,6 +5,22 @@ import { resolveTypedSourceDocumentReference, typedSourceTypeReferenceHighlights
 import { ACTION_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/action.default.source'
 import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/model/services/source-engine/value-expression-language'
 
+const ACTION_SIGNATURES: Record<string, { label: string, documentation: string, parameters: string[] }> = {
+  defineAction: { label: 'defineAction(definition)', documentation: 'Определяет контракт, последовательные именованные steps и явный output Action.', parameters: ['definition — { contract?, steps, output? }'] },
+  action: { label: 'action({ identity, input })', documentation: 'Вызывает другую Action по identity и ожидает её output.', parameters: ['definition — Action identity и input'] },
+  query: { label: 'query({ identity, input })', documentation: 'Выполняет Query как явный effect-step.', parameters: ['definition — Query identity и input'] },
+  update: { label: 'update({ identity, input })', documentation: 'Применяет Update текущей Composition.', parameters: ['definition — Update identity и input'] },
+  computation: { label: 'computation(identity, input)', documentation: 'Выполняет Computation и возвращает её result.', parameters: ['identity — static Computation identity', 'input — вычисляемое входное значение'] },
+  operation: { label: 'operation({ input, run, undo, redo? })', documentation: 'Выполняет отменяемый блок. undo обязателен; input snapshot вычисляется один раз.', parameters: ['definition — Operation snapshot и алгоритмы'] },
+  typescript: { label: 'typescript({ inputs, compute })', documentation: 'Чистое синхронное sandbox-преобразование без сети, DOM, timers и Endge.', parameters: ['definition — explicit inputs и compute'] },
+  input: { label: 'input(path?)', documentation: 'Читает Action input или Operation snapshot.', parameters: ['path — optional data path'] },
+  output: { label: 'output(stepName)', documentation: 'Читает результат уже выполненного именованного step.', parameters: ['stepName — имя предыдущего step'] },
+  runOutput: { label: 'runOutput()', documentation: 'Читает сохранённый result Operation.run внутри undo/redo.', parameters: [] },
+  undoOutput: { label: 'undoOutput()', documentation: 'Читает сохранённый result Operation.undo внутри custom redo.', parameters: [] },
+  dataView: { label: 'value.dataView(identity, props?)', documentation: 'Применяет DataView к текущему ValueExpression.', parameters: ['identity — DataView identity', 'props — optional props'] },
+  convert: { label: 'value.convert(identity, options?)', documentation: 'Синхронно применяет Converter.', parameters: ['identity — Converter identity', 'options — optional converter options'] },
+}
+
 export class ActionSourceLanguageStrategy implements SourceLanguageStrategy {
   public readonly id = 'source-language:action'
   public readonly sourceKind: SourceKind = 'action'
@@ -46,5 +62,48 @@ export class ActionSourceLanguageStrategy implements SourceLanguageStrategy {
   public resolveReference(context: SourceLanguageContext) {
     return resolveTypedSourceDocumentReference(context, { functions: { action: 'action', query: 'query', update: 'update', computation: 'computation' } })
   }
+  public signatureHelp(context: SourceLanguageContext) {
+    const call = activeCallAt(context)
+    if (!call) return null
+    const signature = ACTION_SIGNATURES[call.name]
+    if (!signature) return null
+    return {
+      activeSignature: 0,
+      activeParameter: Math.min(call.parameter, Math.max(0, signature.parameters.length - 1)),
+      signatures: [{
+        label: signature.label,
+        documentation: signature.documentation,
+        parameters: signature.parameters.map(label => ({ label })),
+      }],
+    }
+  }
   public semanticHighlights(context: SourceLanguageContext) { return typedSourceTypeReferenceHighlights(context) }
+}
+
+function activeCallAt(context: SourceLanguageContext): { name: string, parameter: number } | null {
+  if (!context.position) return null
+  const lines = context.source.split('\n')
+  const offset = lines.slice(0, context.position.lineNumber - 1).reduce((sum, line) => sum + line.length + 1, 0)
+    + context.position.column - 1
+  let depth = 0
+  let open = -1
+  for (let index = Math.min(offset - 1, context.source.length - 1); index >= 0; index -= 1) {
+    const char = context.source[index]
+    if (char === ')') depth += 1
+    else if (char === '(') {
+      if (depth === 0) { open = index; break }
+      depth -= 1
+    }
+  }
+  if (open < 0) return null
+  const callee = context.source.slice(0, open).match(/([A-Za-z_$][\w$]*)\s*$/)?.[1]
+  if (!callee) return null
+  let parameter = 0
+  let nested = 0
+  for (const char of context.source.slice(open + 1, offset)) {
+    if ('([{'.includes(char)) nested += 1
+    else if (')]}'.includes(char)) nested = Math.max(0, nested - 1)
+    else if (char === ',' && nested === 0) parameter += 1
+  }
+  return { name: callee, parameter }
 }

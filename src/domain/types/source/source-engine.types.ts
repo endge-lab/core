@@ -85,6 +85,16 @@ export interface SourceLanguageCompletion {
   documentation?: string
 }
 
+export interface SourceLanguageSignatureHelp {
+  activeSignature: number
+  activeParameter: number
+  signatures: Array<{
+    label: string
+    documentation?: string
+    parameters: Array<{ label: string, documentation?: string }>
+  }>
+}
+
 /** Логический тип внешнего доменного документа, на который ссылается source. */
 export type SourceDocumentReferenceTarget
   = | 'action'
@@ -186,6 +196,9 @@ export interface SourceEngineCompileResult extends SourceEngineResult {
 
   /** Diagnostics, найденные source compiler-ом. */
   diagnostics?: unknown[]
+
+  /** Static Program dependencies discovered by the source compiler. */
+  dependencies?: import('@/domain/types/program/program.types').ProgramDependency[]
 }
 
 /** Результат parse source без обязательной runtime-компиляции. */
@@ -294,6 +307,9 @@ export interface SourceLanguageStrategy {
 
   /** Возвращает доступные подсказки языка в нейтральном формате. */
   completions: (context: SourceLanguageContext) => SourceLanguageCompletion[]
+
+  /** Returns call signature information at the current cursor position. */
+  signatureHelp?: (context: SourceLanguageContext) => SourceLanguageSignatureHelp | null
 
   /** Возвращает внешнюю document reference под курсором, если язык её поддерживает. */
   resolveReference?: (context: SourceLanguageContext) => SourceDocumentReference | null
