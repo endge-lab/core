@@ -503,7 +503,7 @@ describe('Component SFC Table source patch', () => {
     expect(result.source).toContain('key="second"')
   })
 
-  it('round-trips RowMenu t() label and dynamic row input through narrow patches', () => {
+  it('round-trips CellMenu t() label and dynamic row input through narrow patches', () => {
     const source = '<template><Table><Column key="flight" /></Table></template>'
     const custom = patchComponentSFCTableSource(source, { type: 'set-menu-mode', menu: 'row', mode: 'custom' })
     const added = patchComponentSFCTableSource(custom.source, { type: 'add-menu-node', menu: 'row', node: 'item' })
@@ -525,7 +525,7 @@ describe('Component SFC Table source patch', () => {
     })
 
     expect(input.ok).toBe(true)
-    expect(input.source).toContain('<RowMenu>')
+    expect(input.source).toContain('<CellMenu>')
     expect(input.source).toContain(`:label="t('schedule:menu.open', 'Открыть')"`)
     expect(input.source).toContain(':input="{ rowId, columnKey, value }"')
     expect(input.projection?.menus.row.items[0]).toMatchObject({
