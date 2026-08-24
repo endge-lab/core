@@ -1,6 +1,5 @@
 import type { EndgeModuleDefinition } from '@/domain/types/kernel/endge-modules.types'
 import { EndgeAuth } from '@/model/modules/security/endge-auth'
-import { EndgeBind } from '@/model/modules/runtime/core/endge-bind'
 import { EndgeCompiler } from '@/model/modules/program/endge-compiler'
 import { EndgeContext } from '@/model/modules/context/endge-context'
 import { EndgeConfigurationModule } from '@/model/modules/context/endge-configuration'
@@ -46,7 +45,6 @@ export const ENDGE_CORE_MODULES: EndgeModuleDefinition[] = [
   { key: 'updates', module: EndgeUpdates, after: 'runtime' },
   { key: 'ui', module: EndgeUI, after: ['configuration', 'context'] },
   { key: 'uiRegistry', module: EndgeUIRegistry, after: 'ui' },
-  { key: 'bind', module: EndgeBind, after: ['compiler', 'runtime'] },
   { key: 'runtimeDebugger', module: EndgeRuntimeDebugger, after: ['diagnostics', 'runtime'] },
   { key: 'styles', module: EndgeStyles, after: ['ui', 'domain', 'program', 'compiler'] },
 ]

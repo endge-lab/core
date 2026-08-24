@@ -11,6 +11,7 @@ import type { I18nCompiledLocales } from '@/domain/types/i18n.types'
 import type { ComponentSFCEventInputValue } from '@/domain/types/component/sfc/ports.types'
 import type { UpdateMutationStrategy } from '@/domain/types/source/update-source.types'
 import type { EndgeDataMode } from '@/domain/types/document/workspace.types'
+import type { ComponentSFCInteractionTrigger } from '@/domain/types/component/sfc/ir.types'
 
 export type CompositionRuntimeKind = 'filter' | 'query' | 'component' | 'composition' | 'stream' | 'filter-view'
 
@@ -20,13 +21,29 @@ export interface CompositionActivationDescriptor {
   mode: CompositionActivationMode
 }
 
-export interface CompositionResourceDescriptor {
+interface CompositionResourceDescriptorBase {
   name: string
   path: string
   scopePath: string
-  kind: 'style' | 'i18n'
-  identity: string
   sourceOrder: number
+}
+
+export type CompositionResourceDescriptor
+  = | CompositionResourceDescriptorBase & { kind: 'style' | 'i18n', identity: string }
+    | CompositionResourceDescriptorBase & {
+      kind: 'operation-history'
+      operationHistory: {
+        limit: number
+        limitConfigurationPath: string | null
+        shortcuts: OperationHistoryShortcutDescriptor[] | null
+      }
+    }
+
+export interface OperationHistoryShortcutDescriptor {
+  command: 'undo' | 'redo'
+  triggerSet:
+    | { kind: 'configuration', path: string }
+    | { kind: 'literal', value: ComponentSFCInteractionTrigger[] }
 }
 
 /** Материализованный i18n-resource внутри Composition program artifact. */
@@ -249,7 +266,7 @@ export interface CompositionSourceAddResourcePatch {
   type: 'add-resource'
   name: string
   kind: CompositionResourceDescriptor['kind']
-  identity: string
+  identity?: string
 }
 
 /** Добавление runtime dependency в canonical Composition source. */

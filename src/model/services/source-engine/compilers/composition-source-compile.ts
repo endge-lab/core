@@ -13,6 +13,7 @@ import type {
   CompositionScopeDescriptor,
   CompositionSourceCompileResult,
   CompositionSourceDocument,
+  OperationHistoryShortcutDescriptor,
 } from '@/domain/types/source/composition-source.types'
 import type {
   FilterViewControlDefinition,
@@ -38,6 +39,7 @@ import {
 import { compileSourceField } from '@/model/services/source-engine/compilers/source-field-compile'
 import { compileProgramMetadataProperty } from '@/model/services/source-engine/compilers/source-metadata-compile'
 import { DEFAULT_VOCAB_LOAD_POLICY } from '@/domain/types/runtime/vocab-cache.types'
+import { normalizeComponentSFCInteractionTriggers } from '@/tools/component-sfc-edit-trigger'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
@@ -395,6 +397,7 @@ function readResources(
 ): CompositionResourceDescriptor[] {
   const resources: CompositionResourceDescriptor[] = []
   const declared = new Set<string>()
+  let hasOperationHistory = false
   for (const property of node.properties) {
     if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
       diagnostics.push(diagnostic('error', 'composition-resource-property', 'resources допускает только обычные properties.', 'resources', property))
@@ -411,12 +414,47 @@ function readResources(
     if (
       !t.isCallExpression(expression)
       || !t.isIdentifier(expression.callee)
-      || (expression.callee.name !== 'style' && expression.callee.name !== 'i18n')
+      || (expression.callee.name !== 'style' && expression.callee.name !== 'i18n' && expression.callee.name !== 'operationHistory')
     ) {
-      diagnostics.push(diagnostic('error', 'composition-resource-kind', `Resource "${path}" должен иметь вид style(identity) или i18n(identity).`, `resources.${path}`, expression))
+      diagnostics.push(diagnostic('error', 'composition-resource-kind', `Resource "${path}" должен иметь вид style(identity), i18n(identity) или operationHistory(options).`, `resources.${path}`, expression))
       continue
     }
     const kind = expression.callee.name
+    if (kind === 'operationHistory') {
+      if (hasOperationHistory) {
+        diagnostics.push(diagnostic('error', 'composition-operation-history-conflict', `В scope "${scopePath}" разрешена только одна operationHistory.`, `resources.${path}`, expression))
+        continue
+      }
+      hasOperationHistory = true
+      const options = expression.arguments[0]
+      let limit = 20
+      let limitConfigurationPath: string | null = null
+      let shortcuts: OperationHistoryShortcutDescriptor[] | null = null
+      if (options != null) {
+        if (!t.isObjectExpression(options)) diagnostics.push(diagnostic('error', 'composition-operation-history-options', 'operationHistory принимает options object.', `resources.${path}`, expression))
+        else {
+          const limitNode = propertyValue(options, 'limit')
+          if (limitNode) {
+            const value = unwrapExpression(limitNode)
+            if (t.isNumericLiteral(value) && Number.isFinite(value.value) && value.value > 0) limit = Math.floor(value.value)
+            else if (readConfigurationValuePath(value)) limitConfigurationPath = readConfigurationValuePath(value)
+            else diagnostics.push(diagnostic('error', 'composition-operation-history-limit', 'operationHistory.limit должен быть положительным числом.', `resources.${path}.limit`, value))
+          }
+          const shortcutsNode = propertyValue(options, 'shortcuts')
+          if (shortcutsNode)
+            shortcuts = readOperationHistoryShortcuts(shortcutsNode, `resources.${path}.shortcuts`, diagnostics)
+        }
+      }
+      resources.push({
+        name,
+        path,
+        scopePath,
+        kind: 'operation-history',
+        operationHistory: { limit, limitConfigurationPath, shortcuts },
+        sourceOrder: order.value++,
+      })
+      continue
+    }
     const identity = readStringArgument(expression, 0)
     if (!identity || expression.arguments.length !== 1) {
       diagnostics.push(diagnostic('error', `composition-resource-${kind}-identity`, `${kind === 'style' ? 'Style' : 'I18n'} resource "${path}" требует один identity.`, `resources.${path}`, expression))
@@ -432,6 +470,100 @@ function readResources(
     })
   }
   return resources
+}
+
+function readOperationHistoryShortcuts(
+  node: t.Expression,
+  path: string,
+  diagnostics: DiagnosticDraft[],
+): OperationHistoryShortcutDescriptor[] | null {
+  const expression = unwrapExpression(node)
+  if (!t.isArrayExpression(expression)) {
+    diagnostics.push(diagnostic('error', 'composition-operation-history-shortcuts', 'operationHistory.shortcuts должен быть массивом onShortcut(...).undo()/redo().', path, expression))
+    return null
+  }
+  const result: OperationHistoryShortcutDescriptor[] = []
+  for (let index = 0; index < expression.elements.length; index += 1) {
+    const item = expression.elements[index]
+    const itemPath = `${path}.${index}`
+    if (!item || t.isSpreadElement(item)) {
+      diagnostics.push(diagnostic('error', 'composition-operation-history-shortcut', 'Shortcut должен иметь вид onShortcut(triggerSet).undo() или .redo().', itemPath, item ?? expression))
+      continue
+    }
+    const call = unwrapExpression(item)
+    const commandMember = t.isCallExpression(call) ? unwrapExpression(call.callee as t.Expression) : null
+    const command = commandMember && t.isMemberExpression(commandMember) && !commandMember.computed && t.isIdentifier(commandMember.property)
+      ? commandMember.property.name
+      : null
+    const onShortcutCall = commandMember && t.isMemberExpression(commandMember)
+      ? unwrapExpression(commandMember.object as t.Expression)
+      : null
+    if (
+      (command !== 'undo' && command !== 'redo')
+      || !t.isCallExpression(onShortcutCall)
+      || !t.isIdentifier(onShortcutCall.callee, { name: 'onShortcut' })
+      || onShortcutCall.arguments.length !== 1
+      || !t.isExpression(onShortcutCall.arguments[0])
+    ) {
+      diagnostics.push(diagnostic('error', 'composition-operation-history-shortcut', 'Shortcut должен иметь вид onShortcut(triggerSet).undo() или .redo().', itemPath, call))
+      continue
+    }
+    const triggerSetNode = unwrapExpression(onShortcutCall.arguments[0])
+    const configurationPath = readConfigurationValuePath(triggerSetNode)
+    if (configurationPath) {
+      result.push({ command, triggerSet: { kind: 'configuration', path: configurationPath } })
+      continue
+    }
+    const literal = readStaticJSON(triggerSetNode)
+    const normalized = normalizeComponentSFCInteractionTriggers(literal)
+    if (!Array.isArray(literal) || normalized.length !== literal.length) {
+      diagnostics.push(diagnostic('error', 'composition-operation-history-trigger-set', 'onShortcut принимает ссылку $configuration.path или статический TriggerSet.', itemPath, triggerSetNode))
+      continue
+    }
+    result.push({ command, triggerSet: { kind: 'literal', value: normalized } })
+  }
+  return result
+}
+
+function readConfigurationValuePath(node: t.Expression): string | null {
+  const segments: string[] = []
+  let current: t.Expression = node
+  while (t.isMemberExpression(current) && !current.computed && t.isIdentifier(current.property)) {
+    segments.unshift(current.property.name)
+    current = unwrapExpression(current.object as t.Expression)
+  }
+  if (!t.isIdentifier(current) || !current.name.startsWith('$') || current.name.length < 2)
+    return null
+  segments.unshift(current.name.slice(1))
+  return segments.join('.')
+}
+
+function readStaticJSON(node: t.Expression): unknown {
+  if (t.isStringLiteral(node) || t.isNumericLiteral(node) || t.isBooleanLiteral(node)) return node.value
+  if (t.isNullLiteral(node)) return null
+  if (t.isArrayExpression(node)) {
+    const result: unknown[] = []
+    for (const element of node.elements) {
+      if (!element || t.isSpreadElement(element)) return undefined
+      const value = readStaticJSON(unwrapExpression(element))
+      if (value === undefined) return undefined
+      result.push(value)
+    }
+    return result
+  }
+  if (t.isObjectExpression(node)) {
+    const result: Record<string, unknown> = {}
+    for (const property of node.properties) {
+      if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) return undefined
+      const key = propertyName(property.key)
+      if (!key) return undefined
+      const value = readStaticJSON(unwrapExpression(property.value))
+      if (value === undefined) return undefined
+      result[key] = value
+    }
+    return result
+  }
+  return undefined
 }
 
 function readData(

@@ -437,11 +437,11 @@ function nextExternalNodeName(context: ExternalComputationCompileContext): strin
   return name
 }
 
-function validateSandboxBody(node: t.Node, diagnostics: DiagnosticDraft[], sourcePath: string): void {
+export function validateSandboxBody(node: t.Node, diagnostics: DiagnosticDraft[], sourcePath: string): void {
   const forbidden = new Set([
     'eval', 'Function', 'Promise', 'fetch', 'XMLHttpRequest', 'WebSocket',
     'Worker', 'SharedWorker', 'setTimeout', 'setInterval', 'require', 'process',
-    'Deno', 'Bun', 'globalThis', 'self', 'window', 'document', 'navigator',
+    'Deno', 'Bun', 'Endge', 'globalThis', 'self', 'window', 'document', 'navigator',
   ])
   const bindings = collectBindingNames(node)
   walkWithParent(node, null, (current, parent) => {
@@ -493,7 +493,7 @@ function isNonComputedPropertyName(node: t.Identifier, parent: t.Node | null): b
   return t.isMemberExpression(parent) && parent.property === node && !parent.computed
 }
 
-function functionSource(node: t.ObjectMethod | t.FunctionExpression | t.ArrowFunctionExpression, source: string): string {
+export function functionSource(node: t.ObjectMethod | t.FunctionExpression | t.ArrowFunctionExpression, source: string): string {
   const params = node.params.map(param => source.slice(param.start ?? 0, param.end ?? 0)).join(', ')
   if (t.isBlockStatement(node.body))
     return `function(${params}) ${source.slice(node.body.start ?? 0, node.body.end ?? 0)}`

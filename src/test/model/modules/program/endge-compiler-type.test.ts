@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { RAction } from '@/domain/entities/reflect/RAction'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { REnvironment } from '@/domain/entities/reflect/REnvironment'
-import { RField } from '@/domain/entities/reflect/RField'
 import { RProject } from '@/domain/entities/reflect/RProject'
 import { RTenant } from '@/domain/entities/reflect/RTenant'
 import { RType } from '@/domain/entities/reflect/RType'
@@ -54,7 +53,11 @@ describe('EndgeCompiler Type Program', () => {
     action.id = 10
     action.identity = 'save-order'
     action.name = action.identity
-    action.input = new RField('input', 'Any')
+    action.source = `defineAction({
+      contract: { input: field('Any') },
+      steps: { result: input() },
+      output: output('result'),
+    })`
 
     const artifact = Endge.compiler.buildAction(action)
 
@@ -62,7 +65,7 @@ describe('EndgeCompiler Type Program', () => {
     expect(artifact.diagnostics).toContainEqual(expect.objectContaining({
       code: 'type-any-usage',
       severity: 'warning',
-      sourcePath: 'input.type',
+      sourcePath: 'contract.input.type',
     }))
   })
 

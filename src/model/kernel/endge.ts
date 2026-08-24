@@ -3,7 +3,6 @@ import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 import type { EndgeDomainBundle, EndgeDomainPlain, EndgeDomainSelection, EndgePortableDocuments } from '@/domain/types/document/domain-export.type'
 import { DomainSectionType } from '@/domain/types/document/document.types'
 import type { EndgeAuth } from '@/model/modules/security/endge-auth'
-import { EndgeBind } from '@/model/modules/runtime/core/endge-bind'
 import { EndgeActions } from '@/model/modules/runtime/core/endge-actions'
 import { EndgeContext } from '@/model/modules/context/endge-context'
 import { EndgeConfigurationModule } from '@/model/modules/context/endge-configuration'
@@ -14,8 +13,6 @@ import { EndgeDiagnostics } from '@/model/modules/diagnostics/endge-diagnostics'
 import { EndgeDomain } from '@/model/modules/domain/endge-domain'
 import { EndgeTypes } from '@/model/modules/domain/endge-types'
 import { EndgeEvents } from '@/model/modules/events/endge-events'
-import { EndgeFlow } from '@/model/modules/runtime/flow/endge-flow'
-import { EndgeFlowRegistry } from '@/model/modules/runtime/flow/endge-flow-registry'
 import { EndgeI18n } from '@/model/modules/context/endge-i18n'
 import type { EndgeMock } from '@/model/modules/mock/EndgeMock'
 import { EndgeProgram } from '@/model/modules/program/endge-program'
@@ -35,6 +32,8 @@ import { EndgeUIRegistry } from '@/model/modules/ui/endge-ui-registry'
 import { ENDGE_DOMAIN_BUNDLE_VERSION } from '@/model/config/domain.config'
 import { ENDGE_CORE_MODULES } from '@/model/config/modules.config'
 import type { EndgeComposition } from '@/model/modules/runtime/execution/endge-composition'
+import type { EndgeComputation } from '@/model/modules/runtime/execution/endge-computation'
+import type { EndgeConverters } from '@/model/modules/runtime/execution/endge-converters'
 
 /**
  * Единая статическая федерация Endge.
@@ -433,20 +432,6 @@ export class Endge extends EndgeFederation {
   }
 
   /**
-   * @deprecated Используйте Endge.runtime.flowRegistry.
-   */
-  static get flowRegistry(): EndgeFlowRegistry {
-    return this.runtime.flowRegistry
-  }
-
-  /**
-   * @deprecated Используйте Endge.runtime.flow.
-   */
-  static get flow(): EndgeFlow {
-    return this.runtime.flow
-  }
-
-  /**
    * Доступ к runtime host manager.
    */
   static get runtime(): EndgeRuntime {
@@ -521,16 +506,17 @@ export class Endge extends EndgeFederation {
     return this.getModule<EndgeUIRegistry>('uiRegistry')
   }
 
-  /**
-   * Доступ к registry runtime bindings.
-   */
-  static get bind(): EndgeBind {
-    return this.getModule<EndgeBind>('bind')
-  }
-
   /** Доступ к единому registry вызываемых runtime Actions. */
   static get actions(): EndgeActions {
     return this.runtime.actions
+  }
+
+  static get computations(): EndgeComputation {
+    return this.runtime.computation
+  }
+
+  static get converters(): EndgeConverters {
+    return this.runtime.converters
   }
 
   /**

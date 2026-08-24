@@ -37,7 +37,7 @@ import {
   compileComponentSFCInteractionAnnotation,
   hasComponentSFCPassivePreventConflict,
 } from '@/model/services/compiler/component-sfc/component-sfc-interactions'
-import { compileComponentSFCLocalEventAction } from '@/model/services/compiler/component-sfc/component-sfc-ports'
+import { compileComponentSFCLocalEventActions } from '@/model/services/compiler/component-sfc/component-sfc-ports'
 import { createBuiltInComponentPortManifest } from '@/model/services/compiler/component-sfc/component-sfc-forward'
 import { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sfc/component-sfc-built-in-tags'
 import { normalizeComponentSFCTableColumnPin } from '@/model/services/compiler/component-sfc/component-sfc-table-pin'
@@ -1008,9 +1008,15 @@ function compileEventBindings(
       })
       continue
     }
-    const action = compileComponentSFCLocalEventAction(name, expression, directive.range.start, dependencies, diagnostics, ownerPorts)
-    if (!action) continue
-    result.push({ name, modifiers, action, sourceRange: directive.range })
+    const actions = compileComponentSFCLocalEventActions(name, expression, directive.range.start, dependencies, diagnostics, ownerPorts)
+    if (!actions.length) continue
+    result.push({
+      name,
+      modifiers,
+      action: actions[0]!,
+      ...(actions.length > 1 ? { actions } : {}),
+      sourceRange: directive.range,
+    })
   }
   return result
 }

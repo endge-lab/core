@@ -1,13 +1,15 @@
 import type { RAction } from '@/domain/entities/reflect/RAction'
-import type { ActionProgramPayload, ProgramDiagnostic } from '@/domain/types/program/program.types'
+import type { ActionProgramPayload, ProgramDependency, ProgramDiagnostic } from '@/domain/types/program/program.types'
 import { normalizeActionTargets } from '@/model/services/compiler/action/action-target-validation'
+import { compileActionSource } from '@/model/services/source-engine/compilers/action-source-compile'
 
 export interface ActionCompileResult {
   payload: ActionProgramPayload
   diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
+  dependencies: ProgramDependency[]
 }
 
-/** Compiles persisted Flow source and the semantic Action contract into Program. */
+/** Compiles persisted Action Source into Program. */
 export function compileAction(entity: RAction): ActionCompileResult {
   const diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[] = []
   let target = entity.target
@@ -23,32 +25,10 @@ export function compileAction(entity: RAction): ActionCompileResult {
     })
   }
 
-  const compiledFlow = entity.buildCompiledFlow()
-  diagnostics.push(...compiledFlow.issues.map(issue => ({
-    severity: 'error' as const,
-    code: issue.code,
-    message: issue.message,
-    sourcePath: issue.nodeId ? `definition.nodes.${issue.nodeId}` : 'definition',
-  })))
-
+  const source = compileActionSource({ source: entity.source, sourceVersion: entity.sourceVersion, target })
   return {
-    payload: {
-      compiledFlow,
-      target,
-      input: entity.input ? {
-        type: entity.input.type,
-        name: entity.input.name,
-        isArray: entity.input.isArray === true,
-        optional: entity.input.optional === true,
-      } : null,
-      output: entity.output ? {
-        type: entity.output.type,
-        name: entity.output.name,
-        isArray: entity.output.isArray === true,
-        optional: entity.output.optional === true,
-      } : null,
-      implementation: entity.defaultImplementation,
-    },
-    diagnostics,
+    payload: source.payload,
+    diagnostics: [...diagnostics, ...source.diagnostics],
+    dependencies: source.dependencies,
   }
 }

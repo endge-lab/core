@@ -17,16 +17,16 @@ describe('Endge module ownership', () => {
   })
 
   it('owns execution services through EndgeRuntime', () => {
-    for (const key of ['query', 'dataView', 'composition', 'flowRegistry', 'flow', 'actions']) {
+    for (const key of ['query', 'dataView', 'composition', 'actions', 'computations', 'converters']) {
       expect(Endge.hasModule(key)).toBe(false)
     }
 
     expect(Endge.query).toBe(Endge.runtime.query)
     expect(Endge.dataView).toBe(Endge.runtime.dataView)
     expect(Endge.composition).toBe(Endge.runtime.composition)
-    expect(Endge.flow).toBe(Endge.runtime.flow)
-    expect(Endge.flowRegistry).toBe(Endge.runtime.flow.conditions)
     expect(Endge.actions).toBe(Endge.runtime.actions)
+    expect(Endge.computations).toBe(Endge.runtime.computation)
+    expect(Endge.converters).toBe(Endge.runtime.converters)
   })
 
   it('owns effective variables through EndgeWorkspace', () => {

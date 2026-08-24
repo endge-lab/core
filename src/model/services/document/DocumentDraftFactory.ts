@@ -211,12 +211,8 @@ export class DocumentDraftFactory {
         item.identity = identity
         item.name = title
         item.displayName = title
-        item.definition = {
-          version: 1,
-          entrypoint: 'flow-entry',
-          nodes: [],
-          edges: [],
-        }
+        item.source = Endge.source.createDefault('action')
+        item.sourceVersion = 1
         if (folderId != null)
           item.folderId = folderId
         return item

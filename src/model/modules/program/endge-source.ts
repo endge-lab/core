@@ -47,6 +47,8 @@ import { TypeSourceEngineStrategy } from '@/model/services/source-engine/strateg
 import { TypeSourceLanguageStrategy } from '@/model/services/source-engine/strategies/TypeSourceLanguageStrategy'
 import { ConfigurationSourceEngineStrategy } from '@/model/services/source-engine/strategies/ConfigurationSourceEngineStrategy'
 import { ConfigurationSourceLanguageStrategy } from '@/model/services/source-engine/strategies/ConfigurationSourceLanguageStrategy'
+import { ActionSourceEngineStrategy } from '@/model/services/source-engine/strategies/ActionSourceEngineStrategy'
+import { ActionSourceLanguageStrategy } from '@/model/services/source-engine/strategies/ActionSourceLanguageStrategy'
 
 /** Модуль authoring-операций над source-документами Endge. */
 export class EndgeSource extends EndgeModule {
@@ -189,6 +191,7 @@ export class EndgeSource extends EndgeModule {
 
   /** Регистрирует встроенные strategies ядра. */
   private _registerDefaultStrategies(): void {
+    this._strategies.register(new ActionSourceEngineStrategy())
     this._strategies.register(new QuerySourceEngineStrategy())
     this._strategies.register(new VocabSourceEngineStrategy())
     this._strategies.register(new DataViewSourceEngineStrategy())
@@ -201,6 +204,7 @@ export class EndgeSource extends EndgeModule {
     this._strategies.register(new StyleSourceEngineStrategy())
     this._strategies.register(new TypeSourceEngineStrategy())
     this._strategies.register(new ConfigurationSourceEngineStrategy())
+    this._languageStrategies.register(new ActionSourceLanguageStrategy())
     this._languageStrategies.register(new QuerySourceLanguageStrategy())
     this._languageStrategies.register(new VocabSourceLanguageStrategy())
     this._languageStrategies.register(new DataViewSourceLanguageStrategy())

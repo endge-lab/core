@@ -42,19 +42,15 @@ describe('DocumentDraftFactory', () => {
     expect((draft as RComponentSFC).source).toContain('<Text>')
   })
 
-  it('creates an empty action flow', () => {
+  it('creates a canonical Source Action', () => {
     const draft = DocumentDraftFactory.create('action', {
       identity: 'refresh-data',
       name: 'Refresh data',
     })
 
     expect(draft).toBeInstanceOf(RAction)
-    expect((draft as RAction).definition).toEqual({
-      version: 1,
-      entrypoint: 'flow-entry',
-      nodes: [],
-      edges: [],
-    })
+    expect((draft as RAction).source).toContain('defineAction')
+    expect((draft as RAction).sourceVersion).toBe(1)
   })
 
   it('creates a persisted JSON mock draft', () => {

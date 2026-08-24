@@ -184,7 +184,9 @@ function getOperationSection(operation: CompositionSourcePatchOperation): Compos
 }
 
 function printOperationExpression(operation: CompositionSourcePatchOperation): string {
-  const base = `${operation.kind}(${quote(operation.identity)})`
+  const base = operation.kind === 'operation-history'
+    ? 'operationHistory({ limit: 20 })'
+    : `${operation.kind}(${quote(operation.identity ?? '')})`
   if (operation.type !== 'add-runtime')
     return base
 

@@ -98,23 +98,29 @@ describe('ComputationResourceState', () => {
       payload: compiled.payload,
     } satisfies ProgramArtifact<ComputationProgramPayload>)
 
-    const unbind = Endge.bind.computation('override-demo', {
-      execution: 'sync',
-      run: () => 5,
+    const removeProvider = Endge.computations.provide({
+      identity: 'override-demo',
+      key: 'test.override-demo',
+      implementation: { execution: 'sync', run: () => 5 },
     })
+    const unbind = Endge.computations.override({ identity: 'override-demo', providerKey: 'test.override-demo' })
     expect(Endge.runtime.computation.runSync(17, {})).toBe(5)
     unbind()
+    removeProvider()
     expect(Endge.runtime.computation.runSync(17, {})).toBe(1)
 
-    const removeThrowing = Endge.bind.computation('override-demo', {
-      execution: 'sync',
-      run: () => { throw new Error('override failed') },
+    const removeThrowingProvider = Endge.computations.provide({
+      identity: 'override-demo',
+      key: 'test.override-demo.throwing',
+      implementation: { execution: 'sync', run: () => { throw new Error('override failed') } },
     })
+    const removeThrowing = Endge.computations.override({ identity: 'override-demo', providerKey: 'test.override-demo.throwing' })
     expect(() => Endge.runtime.computation.runSync('override-demo', {})).toThrow('override failed')
     expect(Endge.runtime.computation.createResource('override-demo', {}, 'test').error).toEqual(expect.objectContaining({
       computationIdentity: 'override-demo',
       kind: 'override-execution',
     }))
     removeThrowing()
+    removeThrowingProvider()
   })
 })

@@ -1,0 +1,10 @@
+import type { ActionSourceDocument } from '@/domain/types/source/action-source.types'
+import type { ActionTargetSelector } from '@/domain/types/runtime/action.types'
+
+export interface ActionProgramPayload {
+  type: 'action'
+  sourceVersion: number
+  sourceDocument: ActionSourceDocument | null
+  target: ActionTargetSelector[] | null
+}
+

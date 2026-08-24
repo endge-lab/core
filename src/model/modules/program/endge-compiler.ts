@@ -20,6 +20,7 @@ import type {
   ProgramCapability,
   ProgramCompileContext,
   ProgramDiagnostic,
+  ProgramDependency,
   ProgramEntityType,
   QueryProgramPayload,
   QueryProgramOutput,
@@ -554,8 +555,9 @@ export class EndgeCompiler extends EndgeModule {
       compile: (entity, context) => {
         const result = compileAction(entity)
         const codeCollision = Endge.actions.getCodeDefinition(entity.identity)
+        const linkedDependencies = this._linkActionDependencies(result.dependencies)
         return this._makeArtifact(entity, 'action', context, {
-          capabilities: result.payload.compiledFlow ? ['compilable', 'runnable', 'executable'] : ['compilable'],
+          capabilities: result.payload.sourceDocument ? ['compilable', 'runnable', 'executable'] : ['compilable'],
           payload: result.payload,
           diagnostics: [
             ...result.diagnostics,
@@ -565,10 +567,17 @@ export class EndgeCompiler extends EndgeModule {
               message: `Persisted Action "${entity.identity}" collides with ${codeCollision.origin.kind} Action from code.`,
               sourcePath: 'identity',
             }] : []),
-            ...this._typeContractDiagnostics(entity.input?.type, 'input.type'),
-            ...this._typeContractDiagnostics(entity.output?.type, 'output.type'),
+            ...linkedDependencies.diagnostics,
+            ...this._typeContractDiagnostics(result.payload.sourceDocument?.contract.input?.type, 'contract.input.type'),
+            ...this._typeContractDiagnostics(result.payload.sourceDocument?.contract.output?.type, 'contract.output.type'),
           ],
-          dependencies: this._typeDependencies([entity.input?.type, entity.output?.type]),
+          dependencies: [
+            ...linkedDependencies.dependencies,
+            ...this._typeDependencies([
+              result.payload.sourceDocument?.contract.input?.type,
+              result.payload.sourceDocument?.contract.output?.type,
+            ]),
+          ],
         })
       },
     })
@@ -1589,8 +1598,10 @@ export class EndgeCompiler extends EndgeModule {
         action.owner = { type: 'component-sfc', identity: component.identity }
         action.managedBy = component.managedBy
         action.target = [{ type: 'component-sfc', identity: component.identity }]
-        action.input = new RField('input', port.inputType)
-        action.output = new RField('output', port.outputType)
+        action.contract = {
+          input: new RField('input', port.inputType),
+          output: new RField('output', port.outputType),
+        }
         action.defaultImplementation = { kind: 'component-port', portName: port.name }
         action.active = component.active !== false
         Endge.domain.resolved.set('action', action)
@@ -1643,8 +1654,8 @@ export class EndgeCompiler extends EndgeModule {
         kind: 'action' as const,
         identity: target.identity,
         active: target.active !== false && !target.deletedAt,
-        input: fieldContract(target.input),
-        output: fieldContract(target.output),
+        input: fieldContract(target.contract.input as RField | null),
+        output: fieldContract(target.contract.output as RField | null),
       }
     }
     if (target instanceof RQuery) {
@@ -1720,6 +1731,52 @@ export class EndgeCompiler extends EndgeModule {
     const diagnostics = this._componentTagDiagnosticsByIdentity.get(identity) ?? []
     diagnostics.push(diagnostic)
     this._componentTagDiagnosticsByIdentity.set(identity, diagnostics)
+  }
+
+  /** Links every external Action step against storage or installed code catalogs. */
+  private _linkActionDependencies(seed: ProgramDependency[]): {
+    dependencies: ProgramDependency[]
+    diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
+  } {
+    const dependencies: ProgramDependency[] = []
+    const diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[] = []
+    for (const dependency of seed) {
+      const identity = String(dependency.identity ?? dependency.id)
+      const entity = dependency.entityType === 'action'
+        ? Endge.actions.getDefinition(identity)
+        : dependency.entityType === 'query'
+          ? Endge.domain.getQuery(identity)
+          : dependency.entityType === 'update'
+            ? Endge.domain.getUpdate(identity)
+            : dependency.entityType === 'computation'
+              ? Endge.domain.getComputation(identity)
+              : dependency.entityType === 'data-view'
+                ? Endge.domain.getDataView(identity)
+                : dependency.entityType === 'converter'
+                  ? Endge.domain.getConverter(identity)
+                  : null
+      const codeDefinitionExists = dependency.entityType === 'computation'
+        ? Endge.computations.hasDefinition(identity)
+        : dependency.entityType === 'converter'
+          ? Endge.converters.has(identity)
+          : false
+      if (!entity && !codeDefinitionExists) {
+        diagnostics.push({
+          severity: 'error',
+          code: `action-${dependency.entityType}-missing`,
+          message: `${dependency.entityType} "${identity}" referenced by Action is not installed.`,
+          sourcePath: dependency.sourcePath ?? 'steps',
+          start: dependency.start,
+          end: dependency.end,
+        })
+        continue
+      }
+      dependencies.push({
+        ...dependency,
+        id: entity && 'id' in entity ? entity.id ?? identity : identity,
+      })
+    }
+    return { dependencies, diagnostics }
   }
 
   /**

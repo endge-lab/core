@@ -368,6 +368,25 @@ export function compileSourceExpression(
 
   if (t.isCallExpression(node) && t.isMemberExpression(node.callee) && t.isExpression(node.callee.object)) {
     const method = propertyName(node.callee.property)
+    if (method === 'dataView' || method === 'convert') {
+      const base = compileSourceExpression(node.callee.object, diagnostics, `${sourcePath}.source`)
+      const identity = readStringArgument(node, 0)
+      const optionsNode = node.arguments[1]
+      const options = optionsNode && t.isExpression(optionsNode)
+        ? compileSourceExpression(optionsNode, diagnostics, `${sourcePath}.options`)
+        : undefined
+      if (!base || !identity || node.arguments.length < 1 || node.arguments.length > 2) {
+        diagnostics.push(diagnostic('error', 'source-expression-transform', `.${method}(identity, options?) требует static identity.`, sourcePath, node))
+        return null
+      }
+      return {
+        type: 'transform',
+        transform: method === 'dataView' ? 'data-view' : 'converter',
+        identity,
+        input: base,
+        ...(options ? { options } : {}),
+      }
+    }
     const operation = method ? OPERATION_FUNCTIONS[method] : undefined
     if (!operation || !CHAIN_OPERATIONS.has(operation)) {
       diagnostics.push(diagnostic('error', 'source-expression-unsupported', `Метод ".${method ?? ''}" не входит в whitelist value DSL.`, sourcePath, node))

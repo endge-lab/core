@@ -42,6 +42,13 @@ export function evaluateSourceExpression(
       return readPath(source, node.path)
     }
 
+    if (node.type === 'transform') {
+      const input = evaluate(node.input, current)
+      const options = node.options ? evaluate(node.options, current) : undefined
+      if (!context.transform) throw new Error(`ValueExpression transform is not available: ${node.transform}:${node.identity}.`)
+      return context.transform(node, input, options)
+    }
+
     const operation = VALUE_EXPRESSION_OPERATIONS[node.operation]
     return operation(node.arguments, {
       evaluate: (argument, nestedCurrent = current) => evaluate(argument, nestedCurrent),

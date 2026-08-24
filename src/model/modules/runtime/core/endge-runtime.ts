@@ -35,20 +35,20 @@ import { EndgeProject } from '@/model/modules/runtime/execution/endge-project'
 import { EndgeDataView } from '@/model/modules/runtime/execution/endge-data-view'
 import { EndgeQuery } from '@/model/modules/runtime/execution/endge-query'
 import { EndgeComputation } from '@/model/modules/runtime/execution/endge-computation'
-import { EndgeFlow } from '@/model/modules/runtime/flow/endge-flow'
-import { EndgeFlowRegistry } from '@/model/modules/runtime/flow/endge-flow-registry'
+import { EndgeConverters } from '@/model/modules/runtime/execution/endge-converters'
+import { EndgeOperations } from '@/model/modules/runtime/operation/endge-operations'
 
 /** Модуль создания, регистрации и уничтожения runtime hosts и app scopes. */
 export class EndgeRuntime extends EndgeModule {
-  public readonly computation = new EndgeComputation()
+  public readonly implementations = new EndgeImplementations()
+  public readonly computation = new EndgeComputation(this.implementations)
+  public readonly converters = new EndgeConverters(this.implementations)
   public readonly query = new EndgeQuery()
   public readonly dataView = new EndgeDataView()
   public readonly composition = new EndgeComposition()
   public readonly project = new EndgeProject()
-  public readonly flowRegistry = new EndgeFlowRegistry()
-  public readonly flow = new EndgeFlow(this.flowRegistry)
-  public readonly implementations = new EndgeImplementations()
   public readonly actions = new EndgeActions(this.implementations)
+  public readonly operations = new EndgeOperations()
   public readonly scopes = new RuntimeScopeRegistry()
 
   private _hosts = new RuntimeHostRegistry()
@@ -106,6 +106,7 @@ export class EndgeRuntime extends EndgeModule {
       return
     }
     this._inited = true
+    this.converters.start()
 
     this._appNode = new RaphNode(Raph.app, {
       id: '__endge.runtime.app',
@@ -424,7 +425,9 @@ export class EndgeRuntime extends EndgeModule {
     this._unsubscribeWorkspace = null
     this._unsubscribeContext?.()
     this._unsubscribeContext = null
-    this.flowRegistry.reset()
+    this.computation.reset()
+    this.converters.reset()
+    this.implementations.clear()
     this.actions.reset()
     this._hosts.clearDeleted()
 

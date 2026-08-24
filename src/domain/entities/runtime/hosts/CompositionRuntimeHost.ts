@@ -34,6 +34,10 @@ import { RuntimeScope } from '@/domain/entities/runtime/RuntimeScope'
 import { FilterViewRuntimeHost as EndgeFilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
 import { Endge } from '@/model/kernel/endge'
 import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
+import { OperationHistory } from '@/model/modules/runtime/operation/operation-history'
+import type { OperationHistoryShortcutBinding } from '@/model/modules/runtime/operation/operation-history'
+import type { OperationHistoryShortcutDescriptor } from '@/domain/types/source/composition-source.types'
+import { normalizeComponentSFCInteractionTriggers } from '@/tools/component-sfc-edit-trigger'
 import { buildCompositionI18nCatalogs, cloneI18nRuntimeCatalog } from '@/model/services/i18n/i18n-catalog'
 
 function defaultContext(): RuntimeHostContext<'composition'> {
@@ -263,6 +267,15 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     this._requireStoreRuntime(dataAlias).applyUpdate(updateIdentity, payload)
   }
 
+  /** Resolves an Update artifact to the Store data alias owned by this Composition. */
+  public applyUpdateByIdentity(updateIdentity: string, payload: unknown): void {
+    const update = Endge.program.getUpdateArtifact(updateIdentity)
+    if (!update) throw new Error(`[CompositionRuntimeHost] Update artifact is missing: ${updateIdentity}.`)
+    const data = this.getArtifactPayload()?.data.find(item => item.kind === 'store' && item.identity === update.payload.storeIdentity)
+    if (!data) throw new Error(`[CompositionRuntimeHost] Store "${update.payload.storeIdentity}" is not mounted for Update "${updateIdentity}".`)
+    this.applyStoreUpdate(data.path ?? data.name, updateIdentity, payload)
+  }
+
   /** Устанавливает literal/Raph-backed источник публичных Composition props. */
   public setInputSource(input: RuntimeHostInputSource | null | undefined): void {
     const payload = this.getArtifactPayload()
@@ -373,6 +386,27 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         }))
       }
     })
+
+    for (const resourcePath of descriptor.resources) {
+      const resource = payload.resources.find(item => item.path === resourcePath)
+      if (!resource || resource.kind !== 'operation-history') continue
+      const history = new OperationHistory({
+        id: `${scope.id}:operation-history`,
+        limit: resolveOperationHistoryLimit(resource.operationHistory),
+        shortcuts: resolveOperationHistoryShortcuts(resource.operationHistory?.shortcuts ?? null),
+      })
+      const unregister = Endge.runtime.operations.register(scope, history)
+      scope.resources.add({
+        id: history.id,
+        kind: history.kind,
+        pause: () => history.pause(),
+        resume: () => history.resume(),
+        dispose: () => {
+          unregister()
+          history.dispose()
+        },
+      })
+    }
 
     const runtimeDescriptors = this._dependencyOrder(
       payload.runtimes.filter(item => item.scopePath === descriptor.path && item.effectiveActivation.mode === 'startup'),
@@ -1701,6 +1735,43 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       visit(runtime.name)
     return ordered
   }
+}
+
+function resolveOperationHistoryLimit(options: {
+  limit: number
+  limitConfigurationPath: string | null
+} | undefined): number {
+  if (!options?.limitConfigurationPath) return options?.limit ?? 20
+  const value = resolveConfigurationValue(options.limitConfigurationPath)
+  const limit = Number(value)
+  if (!Number.isFinite(limit) || limit <= 0)
+    throw new Error(`[OperationHistory] Configuration value "${options.limitConfigurationPath}" must be a positive number.`)
+  return Math.floor(limit)
+}
+
+function resolveOperationHistoryShortcuts(
+  descriptors: OperationHistoryShortcutDescriptor[] | null,
+): OperationHistoryShortcutBinding[] | null {
+  if (descriptors == null) return null
+  return descriptors.map(descriptor => {
+    const value = descriptor.triggerSet.kind === 'literal'
+      ? descriptor.triggerSet.value
+      : resolveConfigurationValue(descriptor.triggerSet.path)
+    const triggers = normalizeComponentSFCInteractionTriggers(value)
+    if (!triggers.length)
+      throw new Error(`[OperationHistory] TriggerSet for ${descriptor.command} is empty or invalid.`)
+    return { command: descriptor.command, triggers }
+  })
+}
+
+function resolveConfigurationValue(path: string): unknown {
+  let value: unknown = Endge.configuration.current.values
+  for (const segment of path.split('.').filter(Boolean)) {
+    if (!value || typeof value !== 'object' || Array.isArray(value) || !(segment in value))
+      throw new Error(`[OperationHistory] Configuration value is not resolved: ${path}.`)
+    value = (value as Record<string, unknown>)[segment]
+  }
+  return value
 }
 
 function storeProviderKey(identity: string, slot: string | null | undefined): string {

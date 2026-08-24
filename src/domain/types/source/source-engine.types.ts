@@ -2,7 +2,7 @@ import type { I18nCatalogProvenance, I18nRuntimeCatalog } from '@/domain/types/i
 import type { TypeSourceDefinition } from '@/domain/types/source/type-source.types'
 
 /** Канонический тип source-документа, для которого выбирается source strategy. */
-export type SourceKind = 'query' | 'vocab' | 'data-view' | 'filter' | 'composition' | 'store' | 'stream' | 'update' | 'computation' | 'style' | 'type' | 'configuration'
+export type SourceKind = 'action' | 'query' | 'vocab' | 'data-view' | 'filter' | 'composition' | 'store' | 'stream' | 'update' | 'computation' | 'style' | 'type' | 'configuration'
 
 /** Тип нейтральной source completion без привязки к Monaco или другому editor API. */
 export type SourceLanguageCompletionKind
@@ -36,6 +36,14 @@ export interface SourceLanguageContext {
     category?: 'primitive' | 'reference' | 'user'
     definition?: TypeSourceDefinition | null
     entityReference?: { target: string, storage: 'id' | 'identity' }
+  }>
+
+  /** Installed storage and code definition catalog used by identity completions. */
+  documentSymbols?: Array<{
+    target: SourceDocumentReferenceTarget
+    identity: string
+    displayName?: string
+    description?: string | null
   }>
 
   /** Identity of the document that owns current source diagnostics. */
@@ -79,7 +87,8 @@ export interface SourceLanguageCompletion {
 
 /** Логический тип внешнего доменного документа, на который ссылается source. */
 export type SourceDocumentReferenceTarget
-  = | 'auth-profile'
+  = | 'action'
+    | 'auth-profile'
     | 'component'
     | 'composition'
     | 'computation'

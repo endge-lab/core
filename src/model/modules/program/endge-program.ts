@@ -1,4 +1,3 @@
-import type { ActionCompiledFlow } from '@/domain/types/flow/action.types'
 import type { FilterProgramPayload } from '@/domain/types/source/filter-source.types'
 import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
 import type { StoreSourceArtifact } from '@/domain/types/source/store-source.types'
@@ -15,6 +14,7 @@ import type {
   ProgramArtifactStatus,
   ComponentSFCTagRegistryEntry,
   ComputationProgramPayload,
+  ActionProgramPayload,
   ProgramDiagnostic,
   ProgramEntityType,
   QueryProgramPayload,
@@ -127,12 +127,9 @@ export class EndgeProgram extends EndgeModule {
     return this.getArtifact<TPayload>(ref.entityType, idOrIdentity)
   }
 
-  /**
-   * Возвращает compiled flow для action.
-   */
-  public getActionFlow(idOrIdentity: string | number): ActionCompiledFlow | null {
-    const artifact = this.getArtifact<{ compiledFlow: ActionCompiledFlow | null }>('action', idOrIdentity)
-    return artifact?.payload.compiledFlow ?? null
+  /** Returns a compiled Action artifact by id or identity. */
+  public getActionArtifact(idOrIdentity: string | number): ProgramArtifact<ActionProgramPayload> | null {
+    return this.getArtifact<ActionProgramPayload>('action', idOrIdentity)
   }
 
   /** Возвращает compiled query artifact по id или identity. */

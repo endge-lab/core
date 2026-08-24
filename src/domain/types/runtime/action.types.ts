@@ -33,7 +33,7 @@ export interface ActionExecutionTarget<TValue = unknown> {
 
 /** How an Action is executed when there is no higher-priority runtime binding. */
 export type ActionImplementation
-  = | { kind: 'flow' }
+  = | { kind: 'source' }
     | { kind: 'provider', providerKey: string }
     | { kind: 'component-port', portName: string }
 
@@ -43,8 +43,8 @@ export interface ActionDefinitionInput {
   description?: string | null
   active?: boolean
   target?: ActionTargetSelector[] | null
-  input?: unknown
-  output?: unknown
+  contract?: { input?: unknown, output?: unknown }
+  defaultProviderKey?: string
   defaultImplementation?: ActionImplementation
   owner?: EntityRef
 }

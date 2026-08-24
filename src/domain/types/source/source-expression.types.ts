@@ -177,6 +177,13 @@ export type SourceExpressionIR
     | { type: 'array', items: SourceExpressionIR[] }
     | { type: 'read', source: SourceExpressionReadKind, path: string, parameters?: string[] }
     | {
+      type: 'transform'
+      transform: 'data-view' | 'converter'
+      identity: string
+      input: SourceExpressionIR
+      options?: SourceExpressionIR
+    }
+    | {
       type: 'operation'
       operation: SourceExpressionOperation
       arguments: SourceExpressionIR[]
@@ -237,6 +244,7 @@ export interface SourceExpressionContext {
   current?: unknown
   scope?: unknown
   read?: (expression: Extract<SourceExpressionIR, { type: 'read' }>) => unknown
+  transform?: (expression: Extract<SourceExpressionIR, { type: 'transform' }>, input: unknown, options: unknown) => unknown
   onWarning?: (warning: SourceExpressionWarning) => void
 }
 

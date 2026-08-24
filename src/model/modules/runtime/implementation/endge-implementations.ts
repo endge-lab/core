@@ -21,6 +21,10 @@ export class EndgeImplementations {
     return this._providers.register(provider)
   }
 
+  public hasProvider(key: string): boolean {
+    return this._providers.get(key) != null
+  }
+
   /** Registers an explicit binding and returns its disposer. */
   public bind(binding: ImplementationBinding): () => void {
     return this._bindings.register(binding)
@@ -52,6 +56,14 @@ export class EndgeImplementations {
       binding,
       scope: binding?.scope ?? 'default',
     }
+  }
+
+  /** Returns null only when neither a binding nor a default provider is declared. */
+  public resolveOptional(request: ImplementationResolutionRequest): ResolvedImplementation | null {
+    const binding = this._bindings.resolve(request)
+    if (!binding && !request.invocationProviderKey && !request.defaultProviderKey)
+      return null
+    return this.resolve(request)
   }
 
   /** Resolves and executes one invocation through its effective provider. */

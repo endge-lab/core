@@ -1,336 +1,105 @@
-import type { ActionCompiledFlow, ActionDefinition, ActionStepHandler, FlowValidationIssue } from '@/domain/types/flow/action.types'
-import type { ActionFlowDefinition } from '@/domain/types/flow/endge-flow.types'
 import type { EntityRef } from '@/domain/types/document/entity-management.type'
 import type { ActionImplementation, ActionTargetSelector } from '@/domain/types/runtime/action.types'
 
 import { Serialize } from '@endge/utils'
-import { Exclude, Expose, Type } from 'class-transformer'
+import { Expose } from 'class-transformer'
 
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
 import { REntity } from '@/domain/entities/reflect/REntity'
-import { RField } from '@/domain/entities/reflect/RField'
 import { Endge } from '@/model/kernel/endge'
 
-/**
- * Действие хранится как flow-описание.
- * Атомарное действие = flow из одного шага.
- */
+/** Canonical source-backed Action definition. Executable code is supplied by a provider. */
 export class RAction extends REntity {
   @Expose()
-  definition: ActionDefinition = {
-    version: 1,
-    entrypoint: 'flow-entry',
-    nodes: [],
-    edges: [],
-  }
+  override displayName: string = ''
 
   @Expose()
-  @Type(() => RField)
-  input: RField | null = null
+  override description: string | null = null
 
   @Expose()
-  @Type(() => RField)
-  output: RField | null = null
+  source: string = ''
 
-  /** Optional alternatives for the one runtime target accepted by this Action. */
+  @Expose()
+  sourceVersion: number = 1
+
   @Expose()
   target: ActionTargetSelector[] | null = null
 
-  /** Default route used when runtime has no explicit override binding. */
   @Expose()
-  defaultImplementation: ActionImplementation = { kind: 'flow' }
+  contract: { input: unknown | null, output: unknown | null } = { input: null, output: null }
 
-  /** Definition that owns a derived/component-provided Action. */
+  @Expose()
+  defaultImplementation: ActionImplementation = { kind: 'source' }
+
   @Expose()
   owner?: EntityRef
 
-  @Exclude()
-  private readonly stepHandlers = new Map<string, ActionStepHandler>()
-
-  setStepHandler(runtimeId: string, fn: ActionStepHandler | undefined): void {
-    const id = String(runtimeId).trim()
-    if (!id) { return }
-
-    if (!fn) {
-      this.stepHandlers.delete(id)
-      return
+  static fromPlain(json: any, storageMeta?: any): RAction {
+    const action = new RAction()
+    action.id = json?.id
+    action.identity = String(json?.identity ?? '').trim()
+    action.name = String(json?.name ?? json?.displayName ?? action.identity)
+    action.displayName = String(json?.displayName ?? action.name)
+    action.description = json?.description ?? null
+    action.source = typeof json?.source === 'string' ? json.source : ''
+    action.sourceVersion = Math.max(1, Number(json?.sourceVersion ?? 1) || 1)
+    action.target = Array.isArray(json?.target) ? json.target.map((selector: any) => ({ ...selector })) : null
+    action.contract = {
+      input: json?.contract?.input ?? null,
+      output: json?.contract?.output ?? null,
     }
-
-    this.stepHandlers.set(id, fn)
+    action.defaultImplementation = json?.defaultImplementation?.kind
+      ? { ...json.defaultImplementation }
+      : { kind: 'source' }
+    action.owner = json?.owner
+    action.folderId = json?.folderId ?? relationToId(json?.folder) ?? null
+    action.applyEntityMeta(json)
+    action.active = json?.active !== false
+    action.deletedAt = json?.deletedAt ?? null
+    action.author = json?.author ?? null
+    if (storageMeta) action.applyStorageMeta(storageMeta)
+    return action
   }
 
-  getStepHandler(runtimeId: string): ActionStepHandler | undefined {
-    return this.stepHandlers.get(String(runtimeId).trim())
-  }
-
-  hasStepHandler(runtimeId: string): boolean {
-    return this.stepHandlers.has(String(runtimeId).trim())
-  }
-
-  clearStepHandlers(): void {
-    this.stepHandlers.clear()
-  }
-
-  private _normalizeDefinition(rawDefinition: unknown): ActionFlowDefinition {
-    const definition = rawDefinition != null && typeof rawDefinition === 'object' && !Array.isArray(rawDefinition)
-      ? rawDefinition as Record<string, unknown>
-      : {}
-    const version = Number(definition.version ?? 1) || 1
-    const nodesRaw = Array.isArray(definition.nodes) ? definition.nodes : []
-    const edgesRaw = Array.isArray(definition.edges) ? definition.edges : []
-
-    const nodes: ActionFlowDefinition['nodes'] = nodesRaw.map((rawNode, index) => {
-      const node = rawNode != null && typeof rawNode === 'object' && !Array.isArray(rawNode)
-        ? rawNode as Record<string, unknown>
-        : {}
-      const rawMeta = node.meta != null && typeof node.meta === 'object' && !Array.isArray(node.meta)
-        ? node.meta as Record<string, unknown>
-        : {}
-      const meta: Record<string, unknown> = { ...rawMeta }
-      const rawKind = String(node.kind ?? '').trim()
-      const rawBlockId = String(node.blockId ?? '').trim()
-      const stepKind = String(meta.stepKind ?? '').trim()
-
-      const kind = rawKind
-        || (rawBlockId === 'core.query'
-          ? 'query'
-          : (stepKind === 'runtime' ? 'runtimeAction' : (rawBlockId === 'core.runtime-action' ? 'runtimeAction' : 'action')))
-      const normalizedBlockId = rawBlockId || (kind === 'runtimeAction' ? 'core.runtime-action' : (kind === 'query' ? 'core.query' : 'core.action'))
-      const runtimeId = String(meta.runtimeId ?? meta.actionId ?? '').trim()
-      if (kind === 'runtimeAction' || normalizedBlockId === 'core.runtime-action') {
-        if (runtimeId) { meta.runtimeId = runtimeId }
-        meta.stepKind = 'runtime'
-      }
-
-      if ((kind === 'action' || normalizedBlockId === 'core.action') && meta.actionId == null && meta.runtimeId != null) {
-        const actionId = String(meta.runtimeId).trim()
-        if (actionId) { meta.actionId = actionId }
-      }
-
-      return {
-        id: String(node.id ?? '').trim() || `node-${index + 1}`,
-        title: String(node.title ?? node.name ?? '').trim() || `Step ${index + 1}`,
-        blockId: normalizedBlockId,
-        kind: kind as ActionFlowDefinition['nodes'][number]['kind'],
-        params: (
-          node.params != null && typeof node.params === 'object' && !Array.isArray(node.params)
-            ? { ...(node.params as Record<string, unknown>) }
-            : {}
-        ) as ActionFlowDefinition['nodes'][number]['params'],
-        meta,
-      }
-    })
-
-    const edges: ActionFlowDefinition['edges'] = []
-    edgesRaw.forEach((rawEdge, index) => {
-      const edge = rawEdge != null && typeof rawEdge === 'object' && !Array.isArray(rawEdge)
-        ? rawEdge as Record<string, unknown>
-        : {}
-      const sourceNodeId = String(edge.sourceNodeId ?? edge.source ?? '').trim()
-      const targetNodeId = String(edge.targetNodeId ?? edge.target ?? '').trim()
-      if (!sourceNodeId || !targetNodeId) {
-        return
-      }
-
-      edges.push({
-        id: String(edge.id ?? '').trim() || `edge-${index + 1}-${sourceNodeId}-${targetNodeId}`,
-        sourceNodeId,
-        sourcePortId: String(edge.sourcePortId ?? edge.sourceHandle ?? 'out').trim() || 'out',
-        targetNodeId,
-        targetPortId: String(edge.targetPortId ?? edge.targetHandle ?? 'in').trim() || 'in',
-        label: edge.label != null ? String(edge.label) : null,
-      })
-    })
-
-    let entrypoint = String(definition.entrypoint ?? 'flow-entry').trim() || 'flow-entry'
-    if (
-      entrypoint === 'start'
-      && !edges.some(edge => edge.sourceNodeId === 'start')
-      && edges.some(edge => edge.sourceNodeId === 'flow-entry')
-    ) {
-      entrypoint = 'flow-entry'
-    }
-
-    return {
-      version,
-      entrypoint,
-      nodes,
-      edges,
-    }
-  }
-
-  private _buildCompiledFlow(flow: ActionFlowDefinition): ActionCompiledFlow {
-    const nodesById = new Map<string, ActionFlowDefinition['nodes'][number]>()
-    const nodeIdByBlockId = new Map<string, string>()
-    const outgoingByNodeId = new Map<string, ActionFlowDefinition['edges']>()
-    const runtimeNodeIdByRuntimeId = new Map<string, string>()
-
-    for (const node of flow.nodes) {
-      nodesById.set(node.id, node)
-      const blockId = String(node.blockId ?? '').trim()
-      if (blockId && !nodeIdByBlockId.has(blockId)) {
-        nodeIdByBlockId.set(blockId, node.id)
-      }
-      const meta = node.meta != null && typeof node.meta === 'object' && !Array.isArray(node.meta)
-        ? node.meta as Record<string, unknown>
-        : {}
-      const stepKind = String(meta.stepKind ?? '').trim()
-      const rawRuntimeId = String(meta.runtimeId ?? meta.actionId ?? '').trim()
-      const isRuntimeNode = node.kind === 'runtimeAction' || stepKind === 'runtime' || String(node.blockId ?? '').trim() === 'core.runtime-action'
-      if (isRuntimeNode && rawRuntimeId) { runtimeNodeIdByRuntimeId.set(rawRuntimeId, node.id) }
-    }
-
-    const incomingByNodeId = new Map<string, ActionFlowDefinition['edges']>()
-    for (const edge of flow.edges) {
-      const source = String(edge.sourceNodeId ?? '').trim()
-      if (!source) { continue }
-      outgoingByNodeId.set(source, [...(outgoingByNodeId.get(source) ?? []), edge])
-      const target = String(edge.targetNodeId ?? '').trim()
-      if (target) {
-        incomingByNodeId.set(target, [...(incomingByNodeId.get(target) ?? []), edge])
-      }
-    }
-
-    const reachableNodeIds: string[] = []
-    const visited = new Set<string>()
-    const queue: string[] = (outgoingByNodeId.get(flow.entrypoint) ?? [])
-      .map(edge => String(edge.targetNodeId ?? '').trim())
-      .filter(Boolean)
-
-    while (queue.length > 0) {
-      const nodeId = String(queue.shift() ?? '').trim()
-      if (!nodeId || visited.has(nodeId)) { continue }
-      visited.add(nodeId)
-      reachableNodeIds.push(nodeId)
-      for (const edge of outgoingByNodeId.get(nodeId) ?? []) {
-        const nextId = String(edge.targetNodeId ?? '').trim()
-        if (nextId && !visited.has(nextId)) { queue.push(nextId) }
-      }
-    }
-
-    return {
-      flow,
-      nodesById,
-      nodeIdByBlockId,
-      outgoingByNodeId,
-      incomingByNodeId,
-      runtimeNodeIdByRuntimeId,
-      reachableNodeIds,
-      issues: this._validateFlow(flow),
-    }
-  }
-
-  private _validateFlow(flow: ActionFlowDefinition): FlowValidationIssue[] {
-    const issues: FlowValidationIssue[] = []
-    const nodeIds = new Set(flow.nodes.map(node => node.id))
-
-    if (!String(flow.entrypoint ?? '').trim()) {
-      issues.push({
-        code: 'flow.entrypoint.required',
-        message: 'Flow must define entrypoint',
-      })
-    }
-
-    for (const edge of flow.edges) {
-      if (!nodeIds.has(edge.sourceNodeId) && edge.sourceNodeId !== flow.entrypoint) {
-        issues.push({
-          code: 'flow.edge.source.missing',
-          message: `Edge source node not found: ${edge.sourceNodeId}`,
-          edgeId: edge.id,
-        })
-      }
-      if (!nodeIds.has(edge.targetNodeId)) {
-        issues.push({
-          code: 'flow.edge.target.missing',
-          message: `Edge target node not found: ${edge.targetNodeId}`,
-          edgeId: edge.id,
-        })
-      }
-    }
-
-    return issues
-  }
-
-  private _fieldToPlain(field: RField | null): Record<string, unknown> | null {
-    if (!field) { return null }
-
-    return {
-      name: field.name,
-      type: field.type,
-      isArray: field.isArray === true,
-      optional: field.optional === true,
-    }
-  }
-
-  get compiledFlow(): ActionCompiledFlow | null {
-    return null
-  }
-
-  getValidationIssues(): FlowValidationIssue[] {
-    return this.buildCompiledFlow().issues
-  }
-
-  validate(): FlowValidationIssue[] {
-    return this.getValidationIssues()
-  }
-
-  getCompiledRuntimeNodeId(runtimeId: string): string | null {
-    const id = String(runtimeId).trim()
-    if (!id) { return null }
-    return this.buildCompiledFlow().runtimeNodeIdByRuntimeId.get(id) ?? null
-  }
-
-  /** Builds an immutable compiler payload without retaining compiled state on the entity. */
-  buildCompiledFlow(): ActionCompiledFlow {
-    return this._buildCompiledFlow(this._normalizeDefinition(this.definition))
-  }
-
-  override compile(): void {
-    super.compile()
-    const normalized = this._normalizeDefinition(this.definition)
-    this.definition = {
-      version: normalized.version,
-      entrypoint: normalized.entrypoint,
-      nodes: [...normalized.nodes],
-      edges: [...normalized.edges],
-    }
-  }
-
-  run(): Promise<unknown> {
-    return Endge.actions.execute(this.identity)
+  run(input?: unknown): Promise<unknown> {
+    return Endge.actions.execute(this.identity, { input })
   }
 
   toPlain(): Record<string, unknown> {
-    const rawDefinition = this.definition && typeof this.definition === 'object'
-      ? { ...(this.definition as unknown as Record<string, unknown>) }
-      : { version: 1, entrypoint: 'flow-entry', nodes: [], edges: [] }
-
     return {
       id: this.id,
       identity: this.identity,
       name: this.name,
-      displayName: this.displayName ?? this.name,
-      description: this.description ?? null,
-      folderId: this.folderId ?? null,
-      managedBy: this.managedBy,
-      managedById: this.managedById,
-      meta: { ...this.meta },
-      definition: rawDefinition,
+      displayName: this.displayName,
+      description: this.description,
+      source: this.source,
+      sourceVersion: this.sourceVersion,
       target: this.target?.map(selector => ({ ...selector })) ?? null,
-      input: this._fieldToPlain(this.input),
-      output: this._fieldToPlain(this.output),
+      contract: { ...this.contract },
       defaultImplementation: { ...this.defaultImplementation },
       ...(this.owner ? { owner: { ...this.owner } } : {}),
+      folderId: this.folderId ?? null,
+      meta: this.meta ?? {},
+      active: this.active !== false,
+      deletedAt: this.deletedAt ?? null,
+      author: this.author ?? null,
     }
   }
 
   override duplicate(options: DuplicateOptions): RAction {
     const plain = Serialize.toPlain(this) as Record<string, any>
     const name = (options.name ?? options.identity).trim() || options.identity
+    plain.id = undefined
     plain.identity = options.identity
     plain.name = name
     plain.displayName = name
     plain.folderId = null
-    return Serialize.fromJSON(RAction, plain)
+    return RAction.fromPlain(plain)
   }
+}
+
+function relationToId(value: any): string | number | null {
+  if (value == null) return null
+  if (typeof value === 'object') return relationToId(value.id ?? value.value)
+  return value
 }

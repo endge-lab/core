@@ -1,4 +1,3 @@
-import type { FlowExecutionResult, FlowExecutionState } from '@/domain/types/flow/endge-flow-runtime.types'
 import type { RuntimeStateControllerLike } from '@/domain/types/runtime/context-persistence.types'
 import type { ProgramArtifact, ProgramEntityType } from '@/domain/types/program/program.types'
 import type { RuntimeEntityModelMap, RuntimeEntityType } from '@/domain/types/runtime/runtime-entity-map.types'
@@ -69,22 +68,9 @@ export interface RuntimeHostContextBase {
 }
 
 export interface ActionRuntimeHostContext extends RuntimeHostContextBase {
-  /** Нормализованный input последнего запуска action-flow. */
+  /** Immutable input of the current Source Action invocation. */
   input: Record<string, unknown>
-
-  /** Каноническое runtime-state action-flow внутри этого host. */
-  flowState: FlowExecutionState
-
-  /** Текущий node-id, который считается активным в host. */
-  currentNodeId: string | null
-
-  /** Стек вызовов вложенных action-run'ов. */
-  callStack: string[]
-
-  /** Последний результат исполнения action-flow. */
-  lastFlowResult: FlowExecutionResult | null
-
-  /** Контекст родительского action-host, если этот action вызван из другого flow (иерархия без мутации). */
+  result: unknown
   parent?: ActionRuntimeHostContext | null
 }
 

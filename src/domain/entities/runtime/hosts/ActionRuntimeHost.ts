@@ -6,29 +6,18 @@ import { Raph, RaphNode } from '@endge/raph'
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 
 function createDefaultActionContext(): RuntimeHostContext<'action'> {
-  const flowState = {
-    input: {},
-    steps: {},
-    locals: {},
-    globals: {},
-    lastStep: null,
-  }
-
   return {
     status: 'idle',
     startedAt: null,
     updatedAt: null,
     input: {},
-    flowState,
-    currentNodeId: null,
-    callStack: [],
-    lastFlowResult: null,
+    result: undefined,
   }
 }
 
 /**
  * Создаёт контекст action-runtime с опциональной ссылкой на родительский контекст.
- * Всегда создаёт новый flowState (изоляция), при необходимости задаёт parent для иерархии.
+ * Создаёт изолированный invocation context и optional parent link.
  */
 export function createActionContext(options: {
   input?: Record<string, unknown> | unknown
@@ -82,26 +71,7 @@ export class ActionRuntimeHost extends RuntimeHostBase<'action'> {
       ? meta.watchPaths.map((path: unknown) => String(path ?? '').trim()).filter(Boolean)
       : []
 
-    const watchPathsFromDefinition = Array.isArray(model.definition?.nodes)
-      ? model.definition.nodes.flatMap((node: any) => {
-          if (String(node?.blockId ?? '').trim() !== 'core.watch') {
-            return []
-          }
-
-          const params = node?.params && typeof node.params === 'object' && !Array.isArray(node.params)
-            ? node.params as Record<string, unknown>
-            : {}
-
-          const raw = Array.isArray(params.watchPaths)
-            ? params.watchPaths
-            : (Array.isArray(params.paths) ? params.paths : [])
-
-          return raw.map(path => String(path ?? '').trim()).filter(Boolean)
-        })
-      : []
-
     const watchPaths = Array.from(new Set([
-      ...watchPathsFromDefinition,
       ...watchPathsFromMeta,
     ]))
 

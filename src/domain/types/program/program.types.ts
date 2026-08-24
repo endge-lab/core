@@ -1,4 +1,3 @@
-import type { ActionCompiledFlow } from '@/domain/types/flow/action.types'
 import type { RComponentContract, RComponentDependencies } from '@/domain/types/component/component-core.types'
 import type {
   DataViewManualTransform,
@@ -16,7 +15,7 @@ import type { VocabProgramPayload } from '@/domain/types/source/vocab-source.typ
 import type { ProgramMetadata } from '@/domain/types/program/program-metadata.types'
 import type { ComputationProgramPayload } from '@/domain/types/computation/computation-program.types'
 import type { EndgeStyleSheetArtifact } from '@/domain/types/style/style.types'
-import type { ActionImplementation, ActionTargetSelector } from '@/domain/types/runtime/action.types'
+export type { ActionProgramPayload } from '@/domain/types/program/action-program.types'
 export type { ConfigurationProgramPayload } from '@/domain/types/source/configuration-source.types'
 
 export type ProgramArtifactKey = string
@@ -99,6 +98,11 @@ export interface ProgramDependency {
 
   /** Роль зависимости: child-component, renderer, data-source и т.п. */
   role?: string
+
+  /** Optional source location of the dependency reference for linker diagnostics. */
+  sourcePath?: string
+  start?: number
+  end?: number
 }
 
 /** Единица compiled program: результат компиляции одной доменной сущности. */
@@ -135,16 +139,6 @@ export interface ProgramArtifact<TPayload = unknown> {
 
   /** Локальные compiled artifacts, принадлежащие только этому artifact. */
   children?: ProgramArtifact[]
-}
-
-/** Payload artifact для action: скомпилированный flow или null при ошибке компиляции. */
-export interface ActionProgramPayload {
-  /** Нормализованный action-flow с индексами и runtime-ready структурой. */
-  compiledFlow: ActionCompiledFlow | null
-  target: ActionTargetSelector[] | null
-  input: { type: string, name?: string, isArray?: boolean, optional?: boolean } | null
-  output: { type: string, name?: string, isArray?: boolean, optional?: boolean } | null
-  implementation: ActionImplementation
 }
 
 export type QueryProgramOutputSource

@@ -9,6 +9,7 @@ import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RTenant } from '@/domain/entities/reflect/RTenant'
 import { Endge } from '@/model/kernel/endge'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
+import type { ComponentSFCProgramPayload } from '@/domain/types/program/program.types'
 
 describe('EndgeCompiler ComponentSFC ports', () => {
   beforeEach(() => prepareCompilerContext())
@@ -217,7 +218,7 @@ const ports = definePorts({
 
     Endge.compiler.build({} as any)
 
-    const parentArtifact = Endge.program.getArtifact('component-sfc', 'parent-public')
+    const parentArtifact = Endge.program.getArtifact<ComponentSFCProgramPayload>('component-sfc', 'parent-public')
     expect(parentArtifact?.status).toBe('valid')
     expect(parentArtifact?.payload.ir?.script.ports).toMatchObject({
       provides: { actions: [{ name: 'refresh', forwardedFrom: { ref: 'child' } }] },

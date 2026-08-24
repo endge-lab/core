@@ -14,13 +14,15 @@ import type {
 } from '@/domain/types/runtime/action.types'
 import { BUILTIN_ACTION_IDS } from '@/domain/types/runtime/action.types'
 import type { ImplementationInvocation, ImplementationProvider } from '@/domain/types/runtime/implementation.types'
+import type { EntityOrigin } from '@/domain/types/document/entity-management.type'
 import { Subscribable } from '@endge/utils'
 import { Endge } from '@/model/kernel/endge'
 import { EndgeImplementations } from '@/model/modules/runtime/implementation/endge-implementations'
 import { normalizeActionTargets, validateActionTarget } from '@/model/services/compiler/action/action-target-validation'
 import { createTableRuntimeActions } from '@/model/services/runtime/table-actions'
+import { ActionProgramExecutor } from '@/model/modules/runtime/execution/action/action-program-executor'
 
-const FLOW_PROVIDER_KEY = 'core.action.flow'
+const SOURCE_PROVIDER_KEY = 'core.action.source'
 const COMPONENT_PORT_PROVIDER_KEY = 'core.action.component-port'
 
 export interface CodeActionDefinition extends Omit<ActionDefinitionInput, 'owner'> {
@@ -32,13 +34,20 @@ export interface CodeActionDefinition extends Omit<ActionDefinitionInput, 'owner
 }
 
 export interface ActionOverrideInput {
-  owner: string
-  providerKey?: string
-  execute?: ImplementationProvider['execute']
-  canExecute?: ImplementationProvider['canExecute']
+  identity: string
+  providerKey: string
   scope?: Exclude<ImplementationBindingScope, 'default' | 'invocation'>
   scopeIdentity?: string
   priority?: number
+}
+
+export interface ActionDefinitionDescriptor extends ActionDefinitionInput {
+  origin: EntityOrigin
+  catalogPath?: readonly string[]
+}
+
+export interface ActionProviderDescriptor extends Omit<ImplementationProvider, 'contract'> {
+  identity: string
 }
 
 /** Action-specific facade over semantic definitions and generic implementations. */
@@ -48,6 +57,7 @@ export class EndgeActions extends Subscribable {
   private readonly _codeActionDisposers = new Map<string, () => void>()
   private readonly _providerDisposers: Array<() => void> = []
   private _hasSynchronizedResolvedIndex = false
+  private readonly _sourceExecutor = new ActionProgramExecutor()
 
   public constructor(
     private readonly _implementations: EndgeImplementations,
@@ -62,51 +72,54 @@ export class EndgeActions extends Subscribable {
       for (const identity of this._codeActions.keys())
         Endge.domain.resolved.delete('action', identity)
     }
+    for (const dispose of [...this._codeActionDisposers.values()]) dispose()
+    this._providerDisposers.splice(0).forEach(dispose => dispose())
     this._codeActions.clear()
     this._catalogPaths.clear()
     this._codeActionDisposers.clear()
-    this._implementations.clear()
-    this._providerDisposers.splice(0).forEach(dispose => dispose())
     this._registerCoreProviders()
     this._registerCoreActions()
     this._registerTableActions()
     this.notify()
   }
 
-  /** Defines a core/plugin Action that has no Payload record. */
-  public defineBuiltin(definition: CodeActionDefinition): () => void {
+  /** Installs a serializable code-owned semantic definition without executable code. */
+  public define(definition: ActionDefinitionDescriptor): () => void {
     if (this._findAction(definition.identity))
       throw new Error(`Action identity collision: ${definition.identity}. Use Endge.actions.override() explicitly.`)
-    return this._defineCodeAction(definition, { kind: 'builtin', owner: definition.owner })
+    const owner = definition.origin.kind === 'derived'
+      ? definition.origin.source.identity
+      : definition.origin.kind === 'storage'
+        ? 'storage'
+        : definition.origin.owner
+    return this._defineCodeAction({ ...definition, owner }, definition.origin)
   }
 
-  /** Defines a session-local Action. Identity collisions must use explicit override(). */
-  public defineLocal(definition: CodeActionDefinition): () => void {
-    if (this._findAction(definition.identity))
-      throw new Error(`Action identity collision: ${definition.identity}. Use Endge.actions.override() explicitly.`)
-    return this._defineCodeAction(definition, { kind: 'local', owner: definition.owner })
+  /** Installs executable code separately from its semantic definition. */
+  public provide(provider: ActionProviderDescriptor): () => void {
+    const action = this._findAction(provider.identity)
+    if (!action) throw new Error(`Action provider requires an existing definition: ${provider.identity}.`)
+    return this._implementations.registerProvider({
+      key: provider.key,
+      origin: provider.origin,
+      active: provider.active,
+      contract: this._contractOf(action),
+      execute: provider.execute,
+      canExecute: provider.canExecute,
+    })
   }
 
   /** Binds local code over an existing Action without mutating its definition. */
-  public override(identity: string, override: ActionOverrideInput): () => void {
-    const action = this._findAction(identity)
+  public override(override: ActionOverrideInput): () => void {
+    const action = this._findAction(override.identity)
     if (!action)
-      throw new Error(`Action cannot be overridden because it does not exist: ${identity}.`)
-
-    const providerKey = override.providerKey ?? `local.override.${override.owner}.${identity}`
-    const disposeProvider = override.execute
-      ? this._implementations.registerProvider({
-          key: providerKey,
-          origin: { kind: 'local', owner: override.owner },
-          contract: this._contractOf(action),
-          execute: override.execute,
-          canExecute: override.canExecute,
-        })
-      : () => {}
+      throw new Error(`Action cannot be overridden because it does not exist: ${override.identity}.`)
+    if (!this._implementations.hasProvider(override.providerKey))
+      throw new Error(`Action provider is not registered: ${override.providerKey}.`)
     const disposeBinding = this._implementations.bind({
       executableType: 'action',
-      executableIdentity: identity,
-      providerKey,
+      executableIdentity: override.identity,
+      providerKey: override.providerKey,
       scope: override.scope ?? 'application',
       scopeIdentity: override.scopeIdentity,
       priority: override.priority,
@@ -114,7 +127,6 @@ export class EndgeActions extends Subscribable {
     this.notify()
     return () => {
       disposeBinding()
-      disposeProvider()
       this.notify()
     }
   }
@@ -218,24 +230,6 @@ export class EndgeActions extends Subscribable {
     }
   }
 
-  /** @deprecated Use defineLocal(), defineBuiltin() or override(). */
-  public register(action: RuntimeAction): () => void {
-    return this.defineLocal({
-      identity: action.id,
-      displayName: action.label ?? action.id,
-      description: action.description,
-      owner: 'legacy-runtime-action',
-      execute: invocation => action.execute(invocation.context as unknown as RuntimeActionContext, invocation.input),
-      canExecute: action.canExecute
-        ? invocation => action.canExecute!(invocation.context as unknown as RuntimeActionContext, invocation.input)
-        : undefined,
-    })
-  }
-
-  public unregister(id: RuntimeActionId): void {
-    this._codeActionDisposers.get(id)?.()
-  }
-
   public serialize(): RuntimeActionRegistrySnapshot {
     return {
       actions: this.listResolved().map(action => ({
@@ -253,7 +247,7 @@ export class EndgeActions extends Subscribable {
     if (this._codeActions.has(identity))
       throw new Error(`Action identity collision: ${identity}. Use Endge.actions.override() explicitly.`)
 
-    const providerKey = definition.providerKey ?? `${origin.kind}.${definition.owner}.${identity}`
+    const providerKey = definition.defaultProviderKey ?? definition.providerKey ?? `${origin.kind}.${definition.owner}.${identity}`
     const action = new RAction()
     action.identity = identity
     action.name = definition.displayName ?? identity
@@ -264,8 +258,10 @@ export class EndgeActions extends Subscribable {
     action.managedBy = origin.kind === 'builtin' ? 'system' : 'user'
     action.owner = { type: 'module', identity: definition.owner }
     action.target = normalizeActionTargets(definition.target ?? null)
-    action.input = (definition.input ?? null) as RField | null
-    action.output = (definition.output ?? null) as RField | null
+    action.contract = {
+      input: definition.contract?.input ?? null,
+      output: definition.contract?.output ?? null,
+    }
     action.defaultImplementation = definition.defaultImplementation
       ?? { kind: 'provider', providerKey }
 
@@ -308,16 +304,16 @@ export class EndgeActions extends Subscribable {
   }
 
   private _defaultProviderKey(action: RAction): string | null {
-    if (action.defaultImplementation.kind === 'flow') return FLOW_PROVIDER_KEY
+    if (action.defaultImplementation.kind === 'source') return SOURCE_PROVIDER_KEY
     if (action.defaultImplementation.kind === 'component-port') return COMPONENT_PORT_PROVIDER_KEY
-    return action.defaultImplementation.providerKey
+    return action.defaultImplementation.kind === 'provider' ? action.defaultImplementation.providerKey : null
   }
 
   private _contractOf(action: RAction) {
     return {
       target: normalizeActionTargets(action.target),
-      input: action.input,
-      output: action.output,
+      input: action.contract.input,
+      output: action.contract.output,
     }
   }
 
@@ -345,8 +341,8 @@ export class EndgeActions extends Subscribable {
       catalogPath: [...(this._catalogPaths.get(action.identity) ?? [])],
       owner: action.owner,
       target: action.target,
-      input: action.input,
-      output: action.output,
+      input: action.contract.input,
+      output: action.contract.output,
       defaultImplementation: action.defaultImplementation,
       overridden: bindingScope != null && bindingScope !== 'default',
       effectiveProviderKey,
@@ -357,23 +353,15 @@ export class EndgeActions extends Subscribable {
 
   private _registerCoreProviders(): void {
     this._providerDisposers.push(this._implementations.registerProvider({
-      key: FLOW_PROVIDER_KEY,
+      key: SOURCE_PROVIDER_KEY,
       origin: { kind: 'builtin', owner: '@endge/core' },
       execute: async (invocation) => {
         const action = invocation.executable.value as RAction
         const parentRuntimeId = String(invocation.context?.parentRuntimeId ?? '').trim()
         const parent = parentRuntimeId ? Endge.runtime.getRuntimeById(parentRuntimeId) : null
-        const host = Endge.runtime.execute(action, { parent })
-        if (!host || host.kind !== 'action')
-          throw new Error(`Action runtime was not created: ${action.identity}.`)
-        host.replaceContext({
-          ...host.context,
-          input: invocation.input != null && typeof invocation.input === 'object'
-            ? invocation.input as Record<string, unknown>
-            : (invocation.input === undefined ? {} : { input: invocation.input }),
-        })
-        await Endge.runtime.flow.run(host)
-        return host.context.lastFlowResult
+        const artifact = Endge.program.getActionArtifact(action.identity)
+        if (!artifact || artifact.status === 'error') throw new Error(`Action artifact is not executable: ${action.identity}.`)
+        return await this._sourceExecutor.run(artifact.payload, invocation.input, parent)
       },
     }))
     this._providerDisposers.push(this._implementations.registerProvider({
@@ -484,7 +472,7 @@ export class EndgeActions extends Subscribable {
         description: 'Загружает только отсутствующие в runtime cache справочники.',
         owner: '@endge/core',
         catalogPath: ['Справочники'],
-        input: new RField('vocabs', 'RefVocab', true),
+        contract: { input: new RField('vocabs', 'RefVocab', true) },
         execute: invocation => Endge.vocabs.acquire(this._vocabReferences(invocation.input)),
       },
       {
@@ -493,7 +481,7 @@ export class EndgeActions extends Subscribable {
         description: 'Принудительно загружает свежие значения справочников.',
         owner: '@endge/core',
         catalogPath: ['Справочники'],
-        input: new RField('vocabs', 'RefVocab', true),
+        contract: { input: new RField('vocabs', 'RefVocab', true) },
         execute: invocation => Endge.vocabs.refresh(this._vocabReferences(invocation.input)),
       },
       {
@@ -502,7 +490,7 @@ export class EndgeActions extends Subscribable {
         description: 'Удаляет значения справочников из runtime cache без сетевого запроса.',
         owner: '@endge/core',
         catalogPath: ['Справочники'],
-        input: new RField('vocabs', 'RefVocab', true),
+        contract: { input: new RField('vocabs', 'RefVocab', true) },
         execute: invocation => Endge.vocabs.invalidate(this._vocabReferences(invocation.input)),
       },
     ]

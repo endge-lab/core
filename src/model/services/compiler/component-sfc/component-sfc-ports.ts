@@ -31,6 +31,53 @@ export interface ComponentSFCPortAnalysisOptions {
   resolveTypeDefinition?: (identity: string) => TypeSourceDefinition | null
 }
 
+/** Compiles one direct reaction or a non-empty ordered reaction array. */
+export function compileComponentSFCLocalEventActions(
+  eventName: string,
+  source: string,
+  sourceOffset: number,
+  dependencies: RComponentDependencies,
+  diagnostics: RComponentDiagnostic[],
+  ownerPorts?: ComponentSFCPortManifest | null,
+): ComponentSFCEventAction[] {
+  let expression: any
+  try {
+    const program = parseTS(source, { sourceType: 'module', plugins: ['typescript'] }).program
+    expression = program.body.length === 1 && program.body[0]?.type === 'ExpressionStatement'
+      ? program.body[0].expression
+      : null
+  }
+  catch { expression = null }
+  if (expression?.type !== 'ArrayExpression') {
+    const action = compileComponentSFCLocalEventAction(eventName, source, sourceOffset, dependencies, diagnostics, ownerPorts)
+    return action ? [action] : []
+  }
+  if (!expression.elements?.length || expression.elements.some((item: any) => !item || item.type === 'SpreadElement')) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-template-event-actions-shape',
+      message: `@${eventName} требует непустой массив реакций без spread.`,
+      sourcePath: `template.on.${eventName}`,
+      start: sourceOffset,
+      end: sourceOffset + source.length,
+    })
+    return []
+  }
+  const actions = expression.elements.flatMap((item: any) => {
+    const itemSource = source.slice(item.start ?? 0, item.end ?? 0)
+    const action = compileComponentSFCLocalEventAction(
+      eventName,
+      itemSource,
+      sourceOffset + (item.start ?? 0),
+      dependencies,
+      diagnostics,
+      ownerPorts,
+    )
+    return action ? [action] : []
+  })
+  return actions.length === expression.elements.length ? actions : []
+}
+
 /** Compiles the safe reaction grammar used by local `@event` template bindings. */
 export function compileComponentSFCLocalEventAction(
   eventName: string,

@@ -1,0 +1,75 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import { Endge } from '@/model/kernel/endge'
+import { ActionProgramExecutor } from '@/model/modules/runtime/execution/action/action-program-executor'
+import { OperationHistory } from '@/model/modules/runtime/operation/operation-history'
+import { compileActionSource } from '@/model/services/source-engine/compilers/action-source-compile'
+
+describe('ActionProgramExecutor', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it('executes named steps sequentially and publishes only explicit output', async () => {
+    const compiled = compileActionSource({ source: `defineAction({
+      steps: {
+        normalized: input('value').trim(),
+        upper: output('normalized').upperCase(),
+      },
+      output: { value: output('upper') },
+    })` })
+    expect(compiled.diagnostics.filter(item => item.severity === 'error')).toEqual([])
+    const result = await new ActionProgramExecutor().run(compiled.payload, { value: '  abc  ' }, null)
+    expect(result).toEqual({ value: 'ABC' })
+  })
+
+  it('freezes operation input and reuses it for undo and default redo', async () => {
+    const compiled = compileActionSource({ source: `defineAction({
+      steps: {
+        edit: operation({
+          input: { id: input('id'), value: input('value'), previousValue: input('previousValue') },
+          run: { steps: {}, output: input('value') },
+          undo: { steps: {}, output: input('previousValue') },
+        }),
+      },
+      output: output('edit'),
+    })` })
+    const history = new OperationHistory({ id: 'test' })
+    vi.spyOn(Endge.runtime.operations, 'resolveForHost').mockReturnValue(history)
+    const external = { id: '42', value: 'NEW', previousValue: 'OLD' }
+    const result = await new ActionProgramExecutor().run(compiled.payload, external, {} as any)
+    external.value = 'MUTATED'
+    external.previousValue = 'MUTATED'
+    expect(result).toBe('NEW')
+    expect(await history.undo()).toBe('OLD')
+    expect(await history.redo()).toBe('NEW')
+  })
+
+  it('does not commit an operation when run fails', async () => {
+    const compiled = compileActionSource({ source: `defineAction({ steps: {
+      edit: operation({
+        input: {},
+        run: { steps: { missing: query({ identity: 'missing-query', input: {} }) } },
+        undo: { steps: {} },
+      }),
+    } })` })
+    const history = new OperationHistory({ id: 'test' })
+    vi.spyOn(Endge.runtime.operations, 'resolveForHost').mockReturnValue(history)
+    await expect(new ActionProgramExecutor().run(compiled.payload, {}, {} as any)).rejects.toThrow('Action Query is missing')
+    expect(history.snapshot()).toMatchObject({ size: 0, cursor: 0 })
+  })
+
+  it('passes runOutput and undoOutput to custom redo', async () => {
+    const compiled = compileActionSource({ source: `defineAction({ steps: {
+      edit: operation({
+        input: { value: input('value'), previousValue: input('previousValue') },
+        run: { steps: {}, output: input('value') },
+        undo: { steps: {}, output: input('previousValue') },
+        redo: { steps: {}, output: { run: runOutput(), undo: undoOutput() } },
+      }),
+    }, output: output('edit') })` })
+    const history = new OperationHistory({ id: 'test' })
+    vi.spyOn(Endge.runtime.operations, 'resolveForHost').mockReturnValue(history)
+    await new ActionProgramExecutor().run(compiled.payload, { value: 'NEW', previousValue: 'OLD' }, {} as any)
+    await history.undo()
+    await expect(history.redo()).resolves.toEqual({ run: 'NEW', undo: 'OLD' })
+  })
+})
