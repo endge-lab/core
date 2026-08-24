@@ -1,4 +1,5 @@
 export type TableSelectionMode = 'none' | 'single' | 'multiple'
+export type TableCellSelectionMode = 'none' | 'single'
 export type TableSelectionTrigger = 'auto' | 'control' | 'row' | 'both'
 export type TableRowActivationKind = 'pointer' | 'keyboard'
 
@@ -28,6 +29,19 @@ export interface TableSelectionChangedEvent<TRow extends Record<string, unknown>
   selectedRows: TRow[]
   addedRowIds: string[]
   removedRowIds: string[]
+}
+
+export interface TableSelectedCell<TRow extends Record<string, unknown> = Record<string, unknown>> {
+  rowId: string
+  rowIndex: number
+  row: TRow
+  columnKey: string
+  value: unknown
+}
+
+export interface TableCellSelectionChangedEvent<TRow extends Record<string, unknown> = Record<string, unknown>> extends TableEventBase {
+  selectedCell: TableSelectedCell<TRow> | null
+  previousCell: TableSelectedCell<TRow> | null
 }
 
 export interface TableSortChangedEvent extends TableEventBase {
@@ -63,6 +77,7 @@ export interface TableEventMap {
   rowActivated: TableRowActivatedEvent
   rowContextMenuRequested: TableRowContextMenuRequestedEvent
   selectionChanged: TableSelectionChangedEvent
+  cellSelectionChanged: TableCellSelectionChangedEvent
   sortChanged: TableSortChangedEvent
   columnVisibilityChanged: TableColumnVisibilityChangedEvent
   columnPinChanged: TableColumnPinChangedEvent
@@ -85,6 +100,7 @@ export const TABLE_EVENT_DEFINITIONS: readonly TableEventDefinition[] = [
   { name: 'rowActivated', displayName: 'Активация строки', payloadType: 'TableRowActivatedEvent', description: 'Строка активирована указателем или клавиатурой.' },
   { name: 'rowContextMenuRequested', displayName: 'Контекстное меню строки', payloadType: 'TableRowContextMenuRequestedEvent', description: 'Для строки запрошено контекстное меню.' },
   { name: 'selectionChanged', displayName: 'Изменение выбора строк', payloadType: 'TableSelectionChangedEvent', description: 'Изменился выбор строк.' },
+  { name: 'cellSelectionChanged', displayName: 'Изменение выбора ячейки', payloadType: 'TableCellSelectionChangedEvent', description: 'Изменилась выбранная ячейка.' },
   { name: 'sortChanged', displayName: 'Изменение сортировки', payloadType: 'TableSortChangedEvent', description: 'Изменилась сортировка.' },
   { name: 'columnVisibilityChanged', displayName: 'Изменение видимости колонок', payloadType: 'TableColumnVisibilityChangedEvent', description: 'Изменилась видимость колонок.' },
   { name: 'columnPinChanged', displayName: 'Изменение закрепления колонок', payloadType: 'TableColumnPinChangedEvent', description: 'Изменилось закрепление колонок.' },

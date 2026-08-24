@@ -32,6 +32,7 @@ export interface ComponentSFCAttributeAnalysisOptions {
 }
 
 export const ENDGE_SFC_TABLE_SELECTION_MODES = ['none', 'single', 'multiple'] as const
+export const ENDGE_SFC_TABLE_CELL_SELECTION_MODES = ['none', 'single'] as const
 export const ENDGE_SFC_TABLE_SELECTION_TRIGGERS = ['auto', 'control', 'row', 'both'] as const
 export const ENDGE_SFC_TABLE_PAGING_MODES = ['pages', 'virtual'] as const
 export const ENDGE_SFC_TABLE_SORT_MODES = ['multiple', 'single', 'fixed', 'disabled'] as const
@@ -64,6 +65,13 @@ export const ENDGE_SFC_TAG_ATTRIBUTE_CONTRACTS = {
       values: ENDGE_SFC_TABLE_SELECTION_TRIGGERS,
       defaultValue: 'auto',
       description: 'Действие, которое меняет состояние выбора строки.',
+    },
+    {
+      name: 'cell-selection-mode',
+      aliases: ['cellSelectionMode'],
+      values: ENDGE_SFC_TABLE_CELL_SELECTION_MODES,
+      defaultValue: 'none',
+      description: 'Режим выбора одной конкретной ячейки, независимый от выбора строк.',
     },
     {
       name: 'paging',

@@ -223,7 +223,7 @@ export type ComponentSFCTableSourcePatch
     }
     | {
       type: 'set-table-attribute'
-      name: 'ref' | 'selection-mode' | 'selection-trigger' | 'paging' | 'page-size' | 'page-sizes' | 'default-pin' | 'default-sort' | 'default-hidden'
+      name: 'ref' | 'selection-mode' | 'selection-trigger' | 'cell-selection-mode' | 'paging' | 'page-size' | 'page-sizes' | 'default-pin' | 'default-sort' | 'default-hidden'
       value: string | null
     }
     | {
@@ -348,6 +348,7 @@ export interface ComponentSFCTableVisualProjection {
   ref: ComponentSFCVisualSourceValue | null
   selectionMode: ComponentSFCVisualSourceValue | null
   selectionTrigger: ComponentSFCVisualSourceValue | null
+  cellSelectionMode: ComponentSFCVisualSourceValue | null
   rows: ComponentSFCVisualSourceValue | null
   rowKey: ComponentSFCVisualSourceValue | null
   paging: ComponentSFCVisualSourceValue | null
