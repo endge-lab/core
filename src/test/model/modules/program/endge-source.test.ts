@@ -94,6 +94,26 @@ describe('EndgeSource', () => {
     }
   })
 
+  it('highlights every Composition functional block', () => {
+    const rootPatterns = Endge.source.resolveLanguageStrategy('composition')?.syntax.tokenizer.root ?? []
+    const keywordPattern = rootPatterns.find(rule => rule.token === 'keyword')?.pattern
+
+    expect(keywordPattern).toBeDefined()
+    expect([
+      'component',
+      'composition',
+      'filter',
+      'filterView',
+      'i18n',
+      'operationHistory',
+      'query',
+      'store',
+      'stream',
+      'style',
+      'vocab',
+    ].every(keyword => keywordPattern?.test(keyword))).toBe(true)
+  })
+
   it('compiles query source into query program artifact payload', () => {
     const result = Endge.source.compile('query', createQuerySource())
 

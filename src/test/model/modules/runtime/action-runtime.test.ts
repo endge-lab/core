@@ -43,6 +43,25 @@ describe('ActionProgramExecutor', () => {
     expect(await history.redo()).toBe('NEW')
   })
 
+  it('uses the parent Action input when operation input is omitted', async () => {
+    const compiled = compileActionSource({ source: `defineAction({
+      steps: {
+        edit: operation({
+          run: { steps: {}, output: input('value') },
+          undo: { steps: {}, output: input('previousValue') },
+        }),
+      },
+      output: output('edit'),
+    })` })
+    const history = new OperationHistory({ id: 'test' })
+    vi.spyOn(Endge.runtime.operations, 'resolveForHost').mockReturnValue(history)
+    const external = { value: 'NEW', previousValue: 'OLD' }
+    await expect(new ActionProgramExecutor().run(compiled.payload, external, {} as any)).resolves.toBe('NEW')
+    external.previousValue = 'MUTATED'
+    await expect(history.undo()).resolves.toBe('OLD')
+    await expect(history.redo()).resolves.toBe('NEW')
+  })
+
   it('does not commit an operation when run fails', async () => {
     const compiled = compileActionSource({ source: `defineAction({ steps: {
       edit: operation({

@@ -143,6 +143,7 @@ export interface ComponentSFCEventSource {
 /** Renderer-neutral safe expression mapped into an Event reaction input. */
 export type ComponentSFCEventInputValue
   = | { kind: 'event', path: string | null }
+    | { kind: 'operation-input', path: string | null }
     | { kind: 'now' }
     | { kind: 'scope', path: string }
     | { kind: 'literal', value: unknown }
@@ -186,6 +187,25 @@ export interface ComponentSFCEventEmitAction {
   payload?: ComponentSFCEventInputValue
 }
 
+export interface ComponentSFCEventOperationBlockStep {
+  name: string
+  action: ComponentSFCEventAction
+}
+
+export interface ComponentSFCEventOperationBlock {
+  steps: ComponentSFCEventOperationBlockStep[]
+  output: string | null
+}
+
+/** Inline undoable algorithm compiled from one Component SFC reaction. */
+export interface ComponentSFCEventOperationAction {
+  kind: 'operation'
+  input?: ComponentSFCEventInputValue
+  run: ComponentSFCEventOperationBlock
+  undo: ComponentSFCEventOperationBlock
+  redo: ComponentSFCEventOperationBlock | null
+}
+
 /** Calls one required executable port through its effective per-instance provider. */
 export interface ComponentSFCEventRequiredPortAction {
   kind: 'required-port'
@@ -197,6 +217,7 @@ export interface ComponentSFCEventRequiredPortAction {
 export type ComponentSFCEventAction
   = ComponentSFCEventDirectAction
     | ComponentSFCEventDirectQuery
+    | ComponentSFCEventOperationAction
     | ComponentSFCEventTypescriptAction
     | ComponentSFCEventEmitAction
     | ComponentSFCEventRequiredPortAction

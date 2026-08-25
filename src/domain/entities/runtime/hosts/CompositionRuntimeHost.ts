@@ -56,6 +56,7 @@ function evaluateComponentEventInput(
   evaluatedAt = new Date().toISOString(),
 ): unknown {
   if (value.kind === 'event') return value.path == null ? payload : readValuePath(payload, value.path)
+  if (value.kind === 'operation-input') return undefined
   if (value.kind === 'now') return evaluatedAt
   if (value.kind === 'literal') return value.value
   if (value.kind === 'scope') return undefined

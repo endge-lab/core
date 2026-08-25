@@ -1,6 +1,8 @@
 import { parseExpression } from '@babel/parser'
 
 import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
+import type { EndgeRuntimeContextSnapshot } from '@/domain/types/runtime/context-persistence.types'
+import type { EndgeConfigurationSchemaEntry } from '@/domain/types/source/configuration-source.types'
 import type {
   RComponentSFC_IR_Read,
   RComponentSFC_IR_Value,
@@ -28,6 +30,226 @@ export interface ComponentSFCExpressionCompileResult {
 
   /** Diagnostics, найденные при анализе expression. */
   diagnostics: RComponentDiagnostic[]
+}
+
+export type ComponentSFCExpressionCompletionScope = 'table-row-menu' | 'table-column-menu'
+
+export interface ComponentSFCExpressionCompletionRequest {
+  source: string
+  cursor: number
+  scope: ComponentSFCExpressionCompletionScope
+  context?: Readonly<EndgeRuntimeContextSnapshot> | Record<string, unknown>
+  configurations?: Iterable<EndgeConfigurationSchemaEntry>
+}
+
+export interface ComponentSFCExpressionCompletion {
+  label: string
+  insertText: string
+  kind: 'variable' | 'property' | 'configuration'
+  detail: string
+  documentation?: string
+  replace: {
+    start: number
+    end: number
+  }
+}
+
+interface ExpressionCompletionCandidate {
+  label: string
+  kind: ComponentSFCExpressionCompletion['kind']
+  detail: string
+  documentation?: string
+}
+
+const TABLE_ROW_MENU_EXPRESSION_ROOTS: readonly ExpressionCompletionCandidate[] = [
+  { label: '$row', kind: 'variable', detail: 'Строка таблицы: id, index и data' },
+  { label: '$cell', kind: 'variable', detail: 'Текущая ячейка: value' },
+  { label: '$column', kind: 'variable', detail: 'Колонка: key, index, title и metadata' },
+  { label: '$table', kind: 'variable', detail: 'Таблица и её runtime state' },
+  { label: '$context', kind: 'variable', detail: 'Read-only Endge runtime context' },
+  { label: 'props', kind: 'variable', detail: 'Входные параметры Component SFC' },
+  { label: 'row', kind: 'variable', detail: 'Исходные данные строки' },
+  { label: 'rowId', kind: 'variable', detail: 'Identity текущей строки' },
+  { label: 'rowIndex', kind: 'variable', detail: 'Индекс текущей строки' },
+  { label: 'columnKey', kind: 'variable', detail: 'Key текущей колонки' },
+  { label: 'columnMeta', kind: 'variable', detail: 'Metadata текущей колонки' },
+  { label: 'value', kind: 'variable', detail: 'Значение текущей ячейки' },
+]
+
+const TABLE_COLUMN_MENU_EXPRESSION_ROOTS: readonly ExpressionCompletionCandidate[] = [
+  { label: '$table', kind: 'variable', detail: 'Таблица и её runtime state' },
+  { label: '$context', kind: 'variable', detail: 'Read-only Endge runtime context' },
+  { label: 'props', kind: 'variable', detail: 'Входные параметры Component SFC' },
+]
+
+const STATIC_MEMBER_CANDIDATES: Readonly<Record<string, readonly ExpressionCompletionCandidate[]>> = {
+  '$row': [
+    { label: 'id', kind: 'property', detail: 'Identity строки' },
+    { label: 'index', kind: 'property', detail: 'Индекс строки' },
+    { label: 'data', kind: 'property', detail: 'Исходные данные строки' },
+  ],
+  '$cell': [
+    { label: 'value', kind: 'property', detail: 'Значение ячейки' },
+  ],
+  '$column': [
+    { label: 'key', kind: 'property', detail: 'Key колонки' },
+    { label: 'index', kind: 'property', detail: 'Индекс колонки' },
+    { label: 'title', kind: 'property', detail: 'Заголовок колонки' },
+    { label: 'metadata', kind: 'property', detail: 'Metadata колонки' },
+  ],
+  '$table': [
+    { label: 'id', kind: 'property', detail: 'Identity таблицы' },
+    { label: 'runtimeId', kind: 'property', detail: 'Runtime identity таблицы' },
+    { label: 'state', kind: 'property', detail: 'Runtime state таблицы' },
+  ],
+  '$table.state': [
+    { label: 'selectedRowIds', kind: 'property', detail: 'Identity выбранных строк' },
+  ],
+}
+
+/**
+ * Возвращает renderer-neutral подсказки для SFC expression в точной lexical
+ * области. UI отвечает только за отображение и применение replacement range.
+ */
+export function resolveComponentSFCExpressionCompletions(
+  request: ComponentSFCExpressionCompletionRequest,
+): ComponentSFCExpressionCompletion[] {
+  const source = String(request.source ?? '')
+  const cursor = Math.max(0, Math.min(source.length, Number(request.cursor) || 0))
+  if (isInsideQuotedExpression(source, cursor)) return []
+
+  const token = source.slice(0, cursor).match(/[$A-Za-z_][\w$]*(?:\.[\w$]*)*$/)?.[0] ?? ''
+  if (!token) return []
+  const replacementEnd = cursor + (source.slice(cursor).match(/^[\w$]*/)?.[0].length ?? 0)
+
+  const memberSeparator = token.lastIndexOf('.')
+  if (memberSeparator < 0) {
+    if (!token.startsWith('$')) return []
+    return filterExpressionCompletionCandidates(
+      request.scope === 'table-row-menu'
+        ? TABLE_ROW_MENU_EXPRESSION_ROOTS
+        : TABLE_COLUMN_MENU_EXPRESSION_ROOTS,
+      token,
+      cursor - token.length,
+      replacementEnd,
+    )
+  }
+
+  const parentPath = token.slice(0, memberSeparator)
+  const prefix = token.slice(memberSeparator + 1)
+  if (!expressionRootIsAvailable(parentPath, request.scope)) return []
+
+  const candidates = resolveMemberCompletionCandidates(parentPath, request)
+  return filterExpressionCompletionCandidates(candidates, prefix, cursor - prefix.length, replacementEnd)
+}
+
+function expressionRootIsAvailable(path: string, scope: ComponentSFCExpressionCompletionScope): boolean {
+  const root = path.split('.')[0] ?? ''
+  const candidates = scope === 'table-row-menu'
+    ? TABLE_ROW_MENU_EXPRESSION_ROOTS
+    : TABLE_COLUMN_MENU_EXPRESSION_ROOTS
+  return candidates.some(candidate => candidate.label === root)
+}
+
+function resolveMemberCompletionCandidates(
+  parentPath: string,
+  request: ComponentSFCExpressionCompletionRequest,
+): ExpressionCompletionCandidate[] {
+  const staticCandidates = STATIC_MEMBER_CANDIDATES[parentPath]
+  if (staticCandidates) {
+    if (parentPath === '$table.state' && request.scope !== 'table-row-menu') return []
+    return [...staticCandidates]
+  }
+
+  if (!parentPath.startsWith('$context')) return []
+  const runtimeCandidates = objectMemberCompletionCandidates(readContextPath(request.context, parentPath))
+  if (!parentPath.startsWith('$context.config')) return runtimeCandidates
+
+  const configurations = [...(request.configurations ?? [])].filter(entry => entry.document)
+  if (parentPath === '$context.config') {
+    const byIdentity = new Map(configurations.map(entry => [entry.identity, entry]))
+    return runtimeCandidates.map((candidate) => {
+      const configuration = byIdentity.get(candidate.label)
+      return configuration
+        ? {
+            ...candidate,
+            kind: 'configuration',
+            detail: configuration.displayName,
+            ...(configuration.description ? { documentation: configuration.description } : {}),
+          }
+        : { ...candidate, detail: 'System configuration' }
+    })
+  }
+
+  const identity = parentPath.slice('$context.config.'.length).split('.')[0] ?? ''
+  const configuration = configurations.find(entry => entry.identity === identity)
+  if (parentPath !== `$context.config.${identity}` || !configuration?.document) return runtimeCandidates
+  const byKey = new Map(configuration.document.values.map(field => [field.key, field]))
+  return runtimeCandidates.map((candidate) => {
+    const field = byKey.get(candidate.label)
+    if (!field) return candidate
+    const type = field.type.kind === 'reference' ? field.type.identity : field.type.kind
+    return {
+      ...candidate,
+      detail: `${field.label} · ${type}`,
+      ...(field.description ? { documentation: field.description } : {}),
+    }
+  })
+}
+
+function readContextPath(
+  context: ComponentSFCExpressionCompletionRequest['context'],
+  path: string,
+): unknown {
+  if (!context) return undefined
+  return path.split('.').slice(1).reduce<unknown>((current, segment) => {
+    if (!current || typeof current !== 'object') return undefined
+    return (current as Record<string, unknown>)[segment]
+  }, context)
+}
+
+function objectMemberCompletionCandidates(value: unknown): ExpressionCompletionCandidate[] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return []
+  return Object.keys(value)
+    .filter(isExpressionIdentifier)
+    .map(label => ({ label, kind: 'property', detail: 'Context property' }))
+}
+
+function filterExpressionCompletionCandidates(
+  candidates: readonly ExpressionCompletionCandidate[],
+  prefix: string,
+  start: number,
+  end: number,
+): ComponentSFCExpressionCompletion[] {
+  const normalizedPrefix = prefix.toLocaleLowerCase()
+  return candidates
+    .filter(candidate => candidate.label.toLocaleLowerCase().startsWith(normalizedPrefix))
+    .map(candidate => ({
+      ...candidate,
+      insertText: candidate.label,
+      replace: { start, end },
+    }))
+}
+
+function isExpressionIdentifier(value: string): boolean {
+  return /^[A-Za-z_$][\w$]*$/.test(value)
+}
+
+function isInsideQuotedExpression(source: string, cursor: number): boolean {
+  let quote: "'" | '"' | '`' | null = null
+  for (let index = 0; index < cursor; index += 1) {
+    const character = source[index]
+    if (character === '\\') {
+      index += 1
+      continue
+    }
+    if (quote) {
+      if (character === quote) quote = null
+      continue
+    }
+    if (character === "'" || character === '"' || character === '`') quote = character
+  }
+  return quote != null
 }
 
 /** Возвращает статический fallback из `t(key, fallback)` без i18n/runtime-контекста. */

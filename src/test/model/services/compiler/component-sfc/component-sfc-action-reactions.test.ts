@@ -40,8 +40,38 @@ describe('Component SFC Action reactions', () => {
     expect(root.events?.[0]?.actions?.map(action => 'identity' in action ? action.identity : null)).toEqual(['first', 'second'])
   })
 
-  it('does not expose Operation DSL inline', () => {
-    const result = compileComponentSFC(`<template><Text editable @edited="operation({ input: {}, run: {}, undo: {} })" /></template>`)
-    expect(result.diagnostics.some(item => item.severity === 'error')).toBe(true)
+  it('compiles an inline Operation with implicit input and shorthand blocks', () => {
+    const result = compileComponentSFC(`<template><Text value="OLD" editable @edited="operation({
+      run: query({ identity: 'schedule-update', input: { id: rowKey, value: input('value') } }),
+      undo: query({ identity: 'schedule-update', input: { id: rowKey, value: input('previousValue') } }),
+    })" /></template>`)
+    expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
+    const root = result.ir?.template?.roots[0]
+    if (!root || root.kind !== 'element') throw new Error('Text root was not compiled')
+    expect(root.events?.[0]?.action).toMatchObject({
+      kind: 'operation',
+      run: { output: null, steps: [{ name: 'default', action: { kind: 'query', identity: 'schedule-update' } }] },
+      undo: { output: null, steps: [{ name: 'default', action: { kind: 'query', identity: 'schedule-update' } }] },
+      redo: null,
+    })
+    expect(JSON.stringify(root.events?.[0]?.action)).toContain('"kind":"operation-input"')
+    expect(result.dependencies.queries).toContain('schedule-update')
+  })
+
+  it('compiles explicit operation input and an optional full-block output', () => {
+    const result = compileComponentSFC(`<template><Text value="OLD" editable @edited="operation({
+      input: { id: rowKey, value: event('value'), previousValue: event('previousValue') },
+      run: { steps: { request: query({ identity: 'schedule-update', input: { id: input('id'), value: input('value') } }) }, output: output('request') },
+      undo: { steps: { request: query({ identity: 'schedule-update', input: { id: input('id'), value: input('previousValue') } }) } },
+      redo: query({ identity: 'schedule-update', input: { id: input('id'), value: input('value') } }),
+    })" /></template>`)
+    expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
+    const root = result.ir?.template?.roots[0]
+    if (!root || root.kind !== 'element') throw new Error('Text root was not compiled')
+    expect(root.events?.[0]?.action).toMatchObject({
+      kind: 'operation',
+      run: { output: 'request' },
+      redo: { steps: [{ name: 'default', action: { kind: 'query', identity: 'schedule-update' } }] },
+    })
   })
 })

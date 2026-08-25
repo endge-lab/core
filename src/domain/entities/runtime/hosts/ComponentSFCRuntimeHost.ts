@@ -19,6 +19,8 @@ import type {
 } from '@/domain/types/program/program.types'
 import type {
   ComponentSFCEventInputValue,
+  ComponentSFCEventOperationAction,
+  ComponentSFCEventOperationBlock,
   ComponentSFCEventOccurrence,
   ComponentSFCEventPort,
   ComponentSFCEventRuntimeSource,
@@ -48,6 +50,7 @@ import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 import { ENDGE_CONTEXT_RAPH_PATH } from '@/model/config/kernel.config'
 import { Endge } from '@/model/kernel/endge'
 import { ComputationResourceRegistry } from '@/model/modules/runtime/execution/computation/ComputationResourceRegistry'
+import { executeRuntimeOperation } from '@/model/modules/runtime/operation/operation-executor'
 import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component/sfc/dependencies.types'
 import { RUNTIME_BOUNDARY_UPDATE_PHASE_NAME } from '@/domain/types/runtime/runtime-host.types'
 
@@ -68,20 +71,41 @@ function evaluateEventInput(
   payload: unknown,
   scope: Record<string, unknown> = {},
   evaluatedAt = new Date().toISOString(),
+  operationInput?: unknown,
 ): unknown {
   if (value.kind === 'event') return value.path == null ? payload : readPath(payload, value.path)
+  if (value.kind === 'operation-input') return value.path == null ? operationInput : readPath(operationInput, value.path)
   if (value.kind === 'now') return evaluatedAt
   if (value.kind === 'scope') return readPath(scope, value.path)
   if (value.kind === 'literal') return value.value
   if (value.kind === 'coalesce') {
-    const left = evaluateEventInput(value.left, payload, scope, evaluatedAt)
-    return left ?? evaluateEventInput(value.right, payload, scope, evaluatedAt)
+    const left = evaluateEventInput(value.left, payload, scope, evaluatedAt, operationInput)
+    return left ?? evaluateEventInput(value.right, payload, scope, evaluatedAt, operationInput)
   }
-  if (value.kind === 'array') return value.items.map(item => evaluateEventInput(item, payload, scope, evaluatedAt))
+  if (value.kind === 'array') return value.items.map(item => evaluateEventInput(item, payload, scope, evaluatedAt, operationInput))
   return Object.fromEntries(value.entries.map(entry => [
-    typeof entry.key === 'string' ? entry.key : String(evaluateEventInput(entry.key, payload, scope, evaluatedAt)),
-    evaluateEventInput(entry.value, payload, scope, evaluatedAt),
+    typeof entry.key === 'string' ? entry.key : String(evaluateEventInput(entry.key, payload, scope, evaluatedAt, operationInput)),
+    evaluateEventInput(entry.value, payload, scope, evaluatedAt, operationInput),
   ]))
+}
+
+type MaterializedOperationEffect = {
+  name: string
+  kind: 'action' | 'query'
+  identity: string
+  input: unknown
+}
+
+type MaterializedOperationBlock = {
+  steps: MaterializedOperationEffect[]
+  output: string | null
+}
+
+type MaterializedInlineOperation = {
+  input: unknown
+  run: MaterializedOperationBlock
+  undo: MaterializedOperationBlock
+  redo: MaterializedOperationBlock | null
 }
 
 function readPath(value: unknown, path: string): unknown {
@@ -398,6 +422,10 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
         )
         return true
       }
+      if (port.action.kind === 'operation') {
+        await this._executeInlineOperation(port.action, payload, scope, evaluatedAt, source, ownerIdentity, port.name)
+        return true
+      }
       if (port.action.kind === 'required-port')
         throw new Error(`Required port "${port.action.port}" was not resolved by the component boundary.`)
 
@@ -611,8 +639,8 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     source: ComponentSFCEventRuntimeSource | undefined,
     ownerIdentity: string,
     eventName: string,
-  ): Promise<void> {
-    await Endge.actions.execute(identity, {
+  ): Promise<unknown> {
+    return await Endge.actions.execute(identity, {
       input,
       target: source?.target,
       context: {
@@ -626,14 +654,100 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     })
   }
 
-  private async _executeEventQueryEffect(identity: string, input: unknown): Promise<void> {
+  private async _executeEventQueryEffect(identity: string, input: unknown): Promise<unknown> {
     const query = Endge.domain.getQuery(identity)
     if (!query)
       throw new Error(`Event Query is missing: ${identity}.`)
     if (!isRecord(input))
       throw new Error(`Event Query input must be an object: ${identity}.`)
 
-    await Endge.runtime.query.run(query, input, this)
+    return await Endge.runtime.query.run(query, input, this)
+  }
+
+  private async _executeInlineOperation(
+    operation: ComponentSFCEventOperationAction,
+    payload: unknown,
+    scope: Record<string, unknown>,
+    evaluatedAt: string,
+    source: ComponentSFCEventRuntimeSource | undefined,
+    ownerIdentity: string,
+    eventName: string,
+  ): Promise<unknown> {
+    const operationInput = operation.input
+      ? evaluateEventInput(operation.input, payload, scope, evaluatedAt)
+      : payload
+    const materialized: MaterializedInlineOperation = {
+      input: operationInput,
+      run: this._materializeOperationBlock(operation.run, payload, scope, evaluatedAt, operationInput),
+      undo: this._materializeOperationBlock(operation.undo, payload, scope, evaluatedAt, operationInput),
+      redo: operation.redo
+        ? this._materializeOperationBlock(operation.redo, payload, scope, evaluatedAt, operationInput)
+        : null,
+    }
+    return await executeRuntimeOperation({
+      id: `${ownerIdentity}.${eventName}:${Date.now()}`,
+      input: materialized,
+      history: Endge.runtime.operations.resolveForHost(this),
+      recordHistory: true,
+      run: async context => await this._executeMaterializedOperationBlock(
+        (context.input as MaterializedInlineOperation).run,
+        source,
+        ownerIdentity,
+        eventName,
+      ),
+      undo: async context => await this._executeMaterializedOperationBlock(
+        (context.input as MaterializedInlineOperation).undo,
+        source,
+        ownerIdentity,
+        eventName,
+      ),
+      redo: materialized.redo ? async context => await this._executeMaterializedOperationBlock(
+        (context.input as MaterializedInlineOperation).redo!,
+        source,
+        ownerIdentity,
+        eventName,
+      ) : null,
+    })
+  }
+
+  private _materializeOperationBlock(
+    block: ComponentSFCEventOperationBlock,
+    payload: unknown,
+    scope: Record<string, unknown>,
+    evaluatedAt: string,
+    operationInput: unknown,
+  ): MaterializedOperationBlock {
+    return {
+      output: block.output,
+      steps: block.steps.map((step) => {
+        if (step.action.kind !== 'action' && step.action.kind !== 'query')
+          throw new Error(`Unsupported inline Operation effect: ${step.action.kind}.`)
+        return {
+          name: step.name,
+          kind: step.action.kind,
+          identity: step.action.identity,
+          input: step.action.input
+            ? evaluateEventInput(step.action.input, payload, scope, evaluatedAt, operationInput)
+            : step.action.kind === 'action' ? payload : {},
+        }
+      }),
+    }
+  }
+
+  private async _executeMaterializedOperationBlock(
+    block: MaterializedOperationBlock,
+    source: ComponentSFCEventRuntimeSource | undefined,
+    ownerIdentity: string,
+    eventName: string,
+  ): Promise<unknown> {
+    const outputs = new Map<string, unknown>()
+    for (const step of block.steps) {
+      const result = step.kind === 'query'
+        ? await this._executeEventQueryEffect(step.identity, step.input)
+        : await this._executeEventActionEffect(step.identity, step.input, source, ownerIdentity, eventName)
+      outputs.set(step.name, result)
+    }
+    return block.output ? outputs.get(block.output) : undefined
   }
 
   private _reportComputationError(

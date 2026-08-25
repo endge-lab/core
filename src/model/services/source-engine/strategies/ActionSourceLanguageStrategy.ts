@@ -11,7 +11,7 @@ const ACTION_SIGNATURES: Record<string, { label: string, documentation: string, 
   query: { label: 'query({ identity, input })', documentation: 'Выполняет Query как явный effect-step.', parameters: ['definition — Query identity и input'] },
   update: { label: 'update({ identity, input })', documentation: 'Применяет Update текущей Composition.', parameters: ['definition — Update identity и input'] },
   computation: { label: 'computation(identity, input)', documentation: 'Выполняет Computation и возвращает её result.', parameters: ['identity — static Computation identity', 'input — вычисляемое входное значение'] },
-  operation: { label: 'operation({ input, run, undo, redo? })', documentation: 'Выполняет отменяемый блок. undo обязателен; input snapshot вычисляется один раз.', parameters: ['definition — Operation snapshot и алгоритмы'] },
+  operation: { label: 'operation({ input?, run, undo, redo? })', documentation: 'Выполняет отменяемый блок. undo обязателен; без input сохраняется текущий Action input.', parameters: ['definition — Operation snapshot и алгоритмы'] },
   typescript: { label: 'typescript({ inputs, compute })', documentation: 'Чистое синхронное sandbox-преобразование без сети, DOM, timers и Endge.', parameters: ['definition — explicit inputs и compute'] },
   input: { label: 'input(path?)', documentation: 'Читает Action input или Operation snapshot.', parameters: ['path — optional data path'] },
   output: { label: 'output(stepName)', documentation: 'Читает результат уже выполненного именованного step.', parameters: ['stepName — имя предыдущего step'] },
@@ -41,7 +41,7 @@ export class ActionSourceLanguageStrategy implements SourceLanguageStrategy {
   public completions(_context: SourceLanguageContext): SourceLanguageCompletion[] {
     return [
       { label: 'defineAction', kind: 'snippet', insertText: ACTION_DEFAULT_SOURCE.trimEnd(), detail: 'Создать Source Action' },
-      { label: 'operation', kind: 'snippet', insertText: "operation({\n  input: {},\n  run: { steps: {} },\n  undo: { steps: {} },\n})", detail: 'Отменяемая операция; undo обязателен' },
+      { label: 'operation', kind: 'snippet', insertText: "operation({\n  run: query({ identity: 'query-identity', input: {} }),\n  undo: query({ identity: 'query-identity', input: {} }),\n})", detail: 'Отменяемая операция; input optional, undo обязателен' },
       { label: 'query', kind: 'snippet', insertText: "query({ identity: 'query-identity', input: {} })", detail: 'Выполнить Query' },
       { label: 'update', kind: 'snippet', insertText: "update({ identity: 'update-identity', input: {} })", detail: 'Выполнить Update' },
       { label: 'action', kind: 'snippet', insertText: "action({ identity: 'action-identity', input: {} })", detail: 'Выполнить вложенный Action' },

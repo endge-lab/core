@@ -3,6 +3,7 @@ import type { ActionProgramPayload } from '@/domain/types/program/action-program
 import type { ActionSourceBlock, ActionSourceOperationStep, ActionSourceStep } from '@/domain/types/source/action-source.types'
 import type { SourceExpressionIR } from '@/domain/types/source/source-expression.types'
 import { Endge } from '@/model/kernel/endge'
+import { executeRuntimeOperation } from '@/model/modules/runtime/operation/operation-executor'
 import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
 
 interface ExecutionContext {
@@ -62,33 +63,31 @@ export class ActionProgramExecutor {
   }
 
   private async runOperation(step: ActionSourceOperationStep, outer: ExecutionContext): Promise<unknown> {
-    const snapshot = cloneAndFreeze(this.evaluate(step.input, outer))
-    const runContext = (): ExecutionContext => ({ input: snapshot, parent: outer.parent, outputs: new Map(), recordHistory: false })
-    const runOutput = await this.runBlock(step.run, runContext())
-    if (!outer.recordHistory) return runOutput
     const history = Endge.runtime.operations.resolveForHost(outer.parent)
-    let undoOutput: unknown
-    history?.commit({
+    return await executeRuntimeOperation({
       id: `${step.name}:${Date.now()}`,
-      input: snapshot,
-      runOutput,
-      undo: async () => {
-        undoOutput = await this.runBlock(step.undo, {
-          input: withOperationOutputs(snapshot, runOutput, undefined),
-          parent: outer.parent,
-          outputs: new Map(),
-          recordHistory: false,
-        })
-        return undoOutput
-      },
-      redo: async () => await this.runBlock(step.redo ?? step.run, {
-        input: withOperationOutputs(snapshot, runOutput, undoOutput),
+      input: step.input ? this.evaluate(step.input, outer) : outer.input,
+      history,
+      recordHistory: outer.recordHistory,
+      run: async context => await this.runBlock(step.run, {
+        input: context.input,
         parent: outer.parent,
         outputs: new Map(),
         recordHistory: false,
       }),
+      undo: async context => await this.runBlock(step.undo, {
+        input: withOperationOutputs(context.input, context.runOutput, undefined),
+        parent: outer.parent,
+        outputs: new Map(),
+        recordHistory: false,
+      }),
+      redo: step.redo ? async context => await this.runBlock(step.redo!, {
+        input: withOperationOutputs(context.input, context.runOutput, context.undoOutput),
+        parent: outer.parent,
+        outputs: new Map(),
+        recordHistory: false,
+      }) : null,
     })
-    return runOutput
   }
 
   private evaluate(expression: SourceExpressionIR, context: ExecutionContext): unknown {
@@ -119,19 +118,6 @@ export class ActionProgramExecutor {
   private optionalObject(value: unknown): Record<string, unknown> | undefined {
     return value != null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : undefined
   }
-}
-
-function cloneAndFreeze<T>(value: T): T {
-  const clone = typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value))
-  return deepFreeze(clone)
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value && typeof value === 'object') {
-    Object.freeze(value)
-    for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child)
-  }
-  return value
 }
 
 function withOperationOutputs(snapshot: unknown, runOutput: unknown, undoOutput: unknown): unknown {

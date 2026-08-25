@@ -25,7 +25,7 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
     extension: '.endge-composition.ts',
     keywords: [
       'component', 'composition', 'control', 'data', 'dataView', 'defineComposition', 'definePreviewProps', 'defineProps', 'filter', 'filterView', 'fromData', 'fromFilter', 'fromOutput', 'fromStore', 'manual', 'mock', 'onChange',
-      'onMount', 'onSuccess', 'onEvent', 'event', 'action', 'update', 'output', 'policy', 'query', 'metadata', 'resources', 'scope', 'startup', 'stream', 'style', 'vocab', ...VALUE_EXPRESSION_FUNCTION_NAMES,
+      'onMount', 'onSuccess', 'onEvent', 'event', 'action', 'update', 'output', 'policy', 'query', 'metadata', 'resources', 'scope', 'startup', 'stream', 'store', 'style', 'i18n', 'operationHistory', 'vocab', ...VALUE_EXPRESSION_FUNCTION_NAMES,
     ],
     functions: [
       'activateOn', 'applyUpdate', 'batch', 'component', 'contextual', 'controls', 'dataView', 'debounce', 'dispatchTo', 'executeAction', 'fields', 'fromRuntime', 'fromScope', 'injected', 'isolated', 'mutate', 'persist', 'policy', 'run', 'select', 'slot', 'store', 'storeTo', 'vocab', 'withData', 'withProps', ...VALUE_EXPRESSION_METHOD_NAMES,

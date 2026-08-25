@@ -14,9 +14,11 @@ import type {
 } from '@/domain/types/runtime/runtime-host.types'
 import { RuntimeBoundaryUpdatePhase } from '@/model/helpers/raph-phases/runtime-boundary-update-phase'
 import { Endge } from '@/model/kernel/endge'
+import { OperationHistory } from '@/model/modules/runtime/operation/operation-history'
 
 describe('ComponentSFCRuntimeHost', () => {
   afterEach(() => {
+    vi.restoreAllMocks()
     Endge.styles.reset()
     Endge.domain.reset()
     Raph.app.reset()
@@ -245,7 +247,7 @@ const ports = definePorts({ emits: { opened: event<{ id: string }>() } })
     query.id = 4
     query.identity = 'schedule-sandbox-update-leg'
     query.name = 'Update schedule leg'
-    const run = vi.spyOn(query, 'run').mockResolvedValue({})
+    const run = vi.spyOn(Endge.runtime.query, 'run').mockResolvedValue({} as any)
     Endge.domain.addQuery(query)
     const host = ComponentSFCRuntimeHost.createRuntime({
       id: 'query-owner-runtime',
@@ -290,13 +292,73 @@ const ports = definePorts({ emits: { opened: event<{ id: string }>() } })
       { rowKey: 15 },
     )
 
-    expect(run).toHaveBeenCalledWith({
+    expect(run).toHaveBeenCalledWith(query, {
       id: 15,
       payload: {
         aircraftType: 'A320',
         updatedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T.*Z$/),
       },
+    }, host)
+    host.destroy()
+  })
+
+  it('captures inline Operation event and lexical values for undo and default redo', async () => {
+    const source = '<template><Text>Inline operation</Text></template>'
+    const artifact = createSFCArtifact(compileComponentSFC(source))
+    const model = RComponentSFC.fromPlain({ id: 31, identity: 'inline-operation-owner', name: 'Inline operation owner', source })
+    const query = new RQuery()
+    query.id = 32
+    query.identity = 'schedule-sandbox-update-leg'
+    query.name = 'Update schedule leg'
+    const run = vi.spyOn(Endge.runtime.query, 'run').mockResolvedValue({} as any)
+    Endge.domain.addQuery(query)
+    const host = ComponentSFCRuntimeHost.createRuntime({
+      id: 'inline-operation-runtime',
+      model,
+      artifactReader: { getArtifact: <TPayload>() => artifact as unknown as ProgramArtifact<TPayload> },
     })
+    const history = new OperationHistory({ id: 'inline-history' })
+    const resolve = vi.spyOn(Endge.runtime.operations, 'resolveForHost').mockReturnValue(history)
+    const port: ComponentSFCEventPort = {
+      kind: 'event',
+      role: 'emits',
+      name: 'edited',
+      payloadType: 'unknown',
+      action: {
+        kind: 'operation',
+        run: {
+          output: null,
+          steps: [{
+            name: 'default',
+            action: { kind: 'query', identity: query.identity, input: { kind: 'object', entries: [
+              { key: 'id', value: { kind: 'scope', path: 'rowKey' } },
+              { key: 'value', value: { kind: 'operation-input', path: 'value' } },
+            ] } },
+          }],
+        },
+        undo: {
+          output: null,
+          steps: [{
+            name: 'default',
+            action: { kind: 'query', identity: query.identity, input: { kind: 'object', entries: [
+              { key: 'id', value: { kind: 'scope', path: 'rowKey' } },
+              { key: 'value', value: { kind: 'operation-input', path: 'previousValue' } },
+            ] } },
+          }],
+        },
+        redo: null,
+      },
+    }
+
+    await host.executeEventPortAction(model.identity, port, { value: 'SU', previousValue: 'FV' }, undefined, async () => undefined, [], 0, { rowKey: 'leg-1' })
+    await history.undo()
+    await history.redo()
+
+    expect(run).toHaveBeenNthCalledWith(1, query, { id: 'leg-1', value: 'SU' }, host)
+    expect(run).toHaveBeenNthCalledWith(2, query, { id: 'leg-1', value: 'FV' }, host)
+    expect(run).toHaveBeenNthCalledWith(3, query, { id: 'leg-1', value: 'SU' }, host)
+    resolve.mockRestore()
+    history.dispose()
     host.destroy()
   })
 

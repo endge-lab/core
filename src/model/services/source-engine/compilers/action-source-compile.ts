@@ -252,7 +252,6 @@ function compileOperation(
   const runNode = objectProperty(definition, 'run')
   const undoNode = objectProperty(definition, 'undo')
   const redoNode = objectProperty(definition, 'redo')
-  if (!inputNode) context.diagnostics.push(diagnostic('error', 'action-operation-input-required', 'operation.input обязателен.', `${sourcePath}.input`, definition))
   if (!runNode) context.diagnostics.push(diagnostic('error', 'action-operation-run-required', 'operation.run обязателен.', `${sourcePath}.run`, definition))
   if (!undoNode) context.diagnostics.push(diagnostic('error', 'action-operation-undo-required', 'Operation без undo не допускается.', `${sourcePath}.undo`, definition))
   const operationInput = inputNode
@@ -261,7 +260,7 @@ function compileOperation(
   const run = runNode ? compileNestedBlock(runNode, `${sourcePath}.run`, context, 'operation-run') : null
   const undo = undoNode ? compileNestedBlock(undoNode, `${sourcePath}.undo`, context, 'operation-undo') : null
   const redo = redoNode ? compileNestedBlock(redoNode, `${sourcePath}.redo`, context, 'operation-redo') : null
-  if (!operationInput || !run || !undo) return null
+  if ((inputNode && !operationInput) || !run || !undo) return null
   return { kind: 'operation', name, input: operationInput, run, undo, redo }
 }
 
@@ -273,8 +272,8 @@ function compileNestedBlock(
 ): ActionSourceBlock | null {
   const definition = unwrapExpression(raw)
   if (!t.isObjectExpression(definition)) {
-    parent.diagnostics.push(diagnostic('error', 'action-operation-block-object', `${sourcePath} должен быть object literal.`, sourcePath, definition))
-    return null
+    const step = compileStep('default', definition, `${sourcePath}.default`, new Set(), { ...parent, inputRead })
+    return step ? { steps: [step], output: null } : null
   }
   const steps = objectProperty(definition, 'steps')
   const output = expressionProperty(definition, 'output')
@@ -414,7 +413,7 @@ function collectDocumentTransforms(document: ActionSourceDocument, dependencies:
       if (step.kind === 'expression') visitExpression(step.expression)
       else if (step.kind === 'typescript') Object.values(step.inputs).forEach(visitExpression)
       else if (step.kind === 'operation') {
-        visitExpression(step.input)
+        if (step.input) visitExpression(step.input)
         visitBlock(step.run)
         visitBlock(step.undo)
         if (step.redo) visitBlock(step.redo)

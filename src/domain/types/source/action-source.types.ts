@@ -31,7 +31,7 @@ export interface ActionSourceTypescriptStep {
 export interface ActionSourceOperationStep {
   kind: 'operation'
   name: string
-  input: SourceExpressionIR
+  input: SourceExpressionIR | null
   run: ActionSourceBlock
   undo: ActionSourceBlock
   redo: ActionSourceBlock | null
@@ -51,4 +51,3 @@ export interface ActionSourceBlock {
 export interface ActionSourceDocument extends ActionSourceBlock {
   contract: ActionSourceContract
 }
-

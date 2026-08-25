@@ -25,6 +25,21 @@ describe('Action Source compiler', () => {
     expect(result.diagnostics).toContainEqual(expect.objectContaining({ code: 'action-operation-undo-required', severity: 'error' }))
   })
 
+  it('supports implicit input and one-step operation block shorthand', () => {
+    const result = compileActionSource({ source: `defineAction({ steps: {
+      edit: operation({
+        run: query({ identity: 'schedule-update', input: { value: input('value') } }),
+        undo: query({ identity: 'schedule-update', input: { value: input('previousValue') } }),
+      }),
+    } })` })
+    expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
+    const operation = result.payload.sourceDocument?.steps[0]
+    expect(operation).toMatchObject({ kind: 'operation', input: null })
+    if (operation?.kind !== 'operation') throw new Error('Operation was not compiled')
+    expect(operation.run).toMatchObject({ output: null, steps: [{ name: 'default', kind: 'query' }] })
+    expect(operation.undo).toMatchObject({ output: null, steps: [{ name: 'default', kind: 'query' }] })
+  })
+
   it('keeps operation outputs scoped to undo and redo', () => {
     const result = compileActionSource({ source: `defineAction({
       steps: {

@@ -10,6 +10,8 @@ import type {
   ComponentSFCEventPort,
   ComponentSFCEventAction,
   ComponentSFCEventInputValue,
+  ComponentSFCEventOperationAction,
+  ComponentSFCEventOperationBlock,
   ComponentSFCPortForwardRule,
   ComponentSFCPortForwardSelector,
   ComponentSFCPortRole,
@@ -101,7 +103,7 @@ export function compileComponentSFCLocalEventAction(
     diagnostics.push({
       severity: 'error',
       code: 'sfc-template-event-action-syntax',
-      message: `@${eventName} должен содержать ports.require.<name>({...}), emit(...), action({...}), query({...}) или typescript({...}).`,
+      message: `@${eventName} должен содержать ports.require.<name>({...}), emit(...), action({...}), query({...}), operation({...}) или typescript({...}).`,
       sourcePath: `template.on.${eventName}`,
       start: sourceOffset,
       end: sourceOffset + source.length,
@@ -181,6 +183,12 @@ export function compileComponentSFCLocalEventAction(
     range: { start: sourceOffset, end: sourceOffset + source.length },
   } as RComponentSFC_AST_Script
   const diagnosticsStart = diagnostics.length
+  if (isCall(expression, 'operation')) {
+    const result = parseEventOperation(eventName, expression, script, dependencies, diagnostics)
+    for (const diagnostic of diagnostics.slice(diagnosticsStart))
+      diagnostic.sourcePath = `template.on.${eventName}`
+    return result
+  }
   const result = parseEventAction(eventName, expression, script, dependencies, diagnostics)
   for (const diagnostic of diagnostics.slice(diagnosticsStart))
     diagnostic.sourcePath = `template.on.${eventName}`
@@ -639,6 +647,7 @@ function parseEventAction(
   script: RComponentSFC_AST_Script,
   dependencies: RComponentDependencies,
   diagnostics: RComponentDiagnostic[],
+  allowOperationInput = false,
 ): ComponentSFCEventAction | null {
   const directKind = node?.type === 'ObjectExpression'
     ? 'action'
@@ -664,7 +673,7 @@ function parseEventAction(
       return null
     }
     const inputNode = readObjectPropertyValue(directNode, 'input')
-    const input = inputNode ? parseEventInput(inputNode, script, diagnostics) : undefined
+    const input = inputNode ? parseEventInput(inputNode, script, diagnostics, allowOperationInput) : undefined
     if (inputNode && !input) return null
     const identities = directKind === 'query' ? dependencies.queries : dependencies.actions
     if (!identities.includes(identity)) identities.push(identity)
@@ -743,13 +752,122 @@ function parseEventAction(
   }
 }
 
-function parseEventInput(node: any, script: RComponentSFC_AST_Script, diagnostics: RComponentDiagnostic[]): ComponentSFCEventInputValue | null {
+function parseEventOperation(
+  eventName: string,
+  call: any,
+  script: RComponentSFC_AST_Script,
+  dependencies: RComponentDependencies,
+  diagnostics: RComponentDiagnostic[],
+): ComponentSFCEventOperationAction | null {
+  const definition = call.arguments?.[0]
+  if (call.arguments?.length !== 1 || definition?.type !== 'ObjectExpression') {
+    diagnostics.push(makeDiagnostic('sfc-event-operation-shape', 'operation(...) принимает один object literal.', call, script))
+    return null
+  }
+  const allowed = new Set(['input', 'run', 'undo', 'redo'])
+  const unsupported = (definition.properties ?? []).find((property: any) =>
+    property.type !== 'ObjectProperty' || property.computed || !allowed.has(readKey(property.key) ?? ''),
+  )
+  if (unsupported) {
+    diagnostics.push(makeDiagnostic('sfc-event-operation-property', 'operation поддерживает только input, run, undo и redo.', unsupported, script))
+    return null
+  }
+  const inputNode = readObjectPropertyValue(definition, 'input')
+  const runNode = readObjectPropertyValue(definition, 'run')
+  const undoNode = readObjectPropertyValue(definition, 'undo')
+  const redoNode = readObjectPropertyValue(definition, 'redo')
+  if (!runNode || !undoNode) {
+    diagnostics.push(makeDiagnostic('sfc-event-operation-block-required', 'operation требует обязательные run и undo.', definition, script))
+    return null
+  }
+  const input = inputNode ? parseEventInput(inputNode, script, diagnostics) : undefined
+  const run = parseEventOperationBlock(eventName, runNode, 'run', script, dependencies, diagnostics)
+  const undo = parseEventOperationBlock(eventName, undoNode, 'undo', script, dependencies, diagnostics)
+  const redo = redoNode ? parseEventOperationBlock(eventName, redoNode, 'redo', script, dependencies, diagnostics) : null
+  if ((inputNode && !input) || !run || !undo || (redoNode && !redo)) return null
+  return { kind: 'operation', ...(input ? { input } : {}), run, undo, redo }
+}
+
+function parseEventOperationBlock(
+  eventName: string,
+  node: any,
+  blockName: string,
+  script: RComponentSFC_AST_Script,
+  dependencies: RComponentDependencies,
+  diagnostics: RComponentDiagnostic[],
+): ComponentSFCEventOperationBlock | null {
+  if (node?.type !== 'ObjectExpression') {
+    const action = parseEventOperationStep(eventName, node, script, dependencies, diagnostics)
+    return action ? { steps: [{ name: 'default', action }], output: null } : null
+  }
+  const stepsNode = readObjectPropertyValue(node, 'steps')
+  const outputNode = readObjectPropertyValue(node, 'output')
+  if (!stepsNode) {
+    const action = parseEventOperationStep(eventName, node, script, dependencies, diagnostics)
+    return action ? { steps: [{ name: 'default', action }], output: null } : null
+  }
+  if (stepsNode.type !== 'ObjectExpression') {
+    diagnostics.push(makeDiagnostic('sfc-event-operation-steps-shape', `operation.${blockName}.steps должен быть object literal.`, stepsNode, script))
+    return null
+  }
+  const steps: ComponentSFCEventOperationBlock['steps'] = []
+  for (const property of stepsNode.properties ?? []) {
+    const name = property.type === 'ObjectProperty' && !property.computed ? readKey(property.key) : null
+    const action = property.type === 'ObjectProperty'
+      ? parseEventOperationStep(eventName, property.value, script, dependencies, diagnostics)
+      : null
+    if (!name || !action) {
+      diagnostics.push(makeDiagnostic('sfc-event-operation-step-shape', `operation.${blockName}.steps допускает только именованные reactions.`, property, script))
+      return null
+    }
+    if (steps.some(step => step.name === name)) {
+      diagnostics.push(makeDiagnostic('sfc-event-operation-step-duplicate', `Operation step "${name}" объявлен повторно.`, property, script))
+      return null
+    }
+    steps.push({ name, action })
+  }
+  if (!steps.length) {
+    diagnostics.push(makeDiagnostic('sfc-event-operation-steps-empty', `operation.${blockName}.steps не может быть пустым.`, stepsNode, script))
+    return null
+  }
+  let output: string | null = null
+  if (outputNode) {
+    output = isCall(outputNode, 'output') && outputNode.arguments?.length === 1
+      ? readLiteralString(outputNode.arguments[0])
+      : null
+    if (!output || !steps.some(step => step.name === output)) {
+      diagnostics.push(makeDiagnostic('sfc-event-operation-output', `operation.${blockName}.output должен ссылаться на выполненный step через output('name').`, outputNode, script))
+      return null
+    }
+  }
+  return { steps, output }
+}
+
+function parseEventOperationStep(
+  eventName: string,
+  raw: any,
+  script: RComponentSFC_AST_Script,
+  dependencies: RComponentDependencies,
+  diagnostics: RComponentDiagnostic[],
+): ComponentSFCEventAction | null {
+  const node = isCall(raw, 'action') && raw.arguments?.length === 1 ? raw.arguments[0] : raw
+  const action = parseEventAction(eventName, node, script, dependencies, diagnostics, true)
+  if (action && action.kind !== 'action' && action.kind !== 'query') {
+    diagnostics.push(makeDiagnostic('sfc-event-operation-step-kind', 'Inline operation block поддерживает query(...) и action(...).', raw, script))
+    return null
+  }
+  return action
+}
+
+function parseEventInput(node: any, script: RComponentSFC_AST_Script, diagnostics: RComponentDiagnostic[], allowOperationInput = false): ComponentSFCEventInputValue | null {
   const eventRead = parseEventRead(node)
   if (eventRead) return eventRead
+  const operationInputRead = allowOperationInput ? parseOperationInputRead(node) : null
+  if (operationInputRead) return operationInputRead
   if (isCall(node, 'now') && (node.arguments?.length ?? 0) === 0) return { kind: 'now' }
   if (node?.type === 'LogicalExpression' && node.operator === '??') {
-    const left = parseEventInput(node.left, script, diagnostics)
-    const right = parseEventInput(node.right, script, diagnostics)
+    const left = parseEventInput(node.left, script, diagnostics, allowOperationInput)
+    const right = parseEventInput(node.right, script, diagnostics, allowOperationInput)
     return left && right ? { kind: 'coalesce', left, right } : null
   }
   const scopeRead = parseScopeRead(node)
@@ -762,7 +880,7 @@ function parseEventInput(node: any, script: RComponentSFC_AST_Script, diagnostic
   if (node?.type === 'ArrayExpression') {
     const items: ComponentSFCEventInputValue[] = []
     for (const item of node.elements ?? []) {
-      const parsed = parseEventInput(item, script, diagnostics)
+      const parsed = parseEventInput(item, script, diagnostics, allowOperationInput)
       if (!parsed) return null
       items.push(parsed)
     }
@@ -773,9 +891,9 @@ function parseEventInput(node: any, script: RComponentSFC_AST_Script, diagnostic
     for (const property of node.properties ?? []) {
       const staticKey = property.type === 'ObjectProperty' && !property.computed ? readKey(property.key) : null
       const dynamicKey = property.type === 'ObjectProperty' && property.computed
-        ? parseEventInput(property.key, script, diagnostics)
+        ? parseEventInput(property.key, script, diagnostics, allowOperationInput)
         : null
-      const parsed = property.type === 'ObjectProperty' ? parseEventInput(property.value, script, diagnostics) : null
+      const parsed = property.type === 'ObjectProperty' ? parseEventInput(property.value, script, diagnostics, allowOperationInput) : null
       if ((!staticKey && !dynamicKey) || !parsed) return null
       entries.push({ key: staticKey ?? dynamicKey!, value: parsed })
     }
@@ -783,6 +901,13 @@ function parseEventInput(node: any, script: RComponentSFC_AST_Script, diagnostic
   }
   diagnostics.push(makeDiagnostic('sfc-event-action-input', 'Input поддерживает literals, arrays, objects, event(path), now(), nullish coalescing и lexical SFC scope.', node, script))
   return null
+}
+
+function parseOperationInputRead(node: any): { kind: 'operation-input', path: string | null } | null {
+  if (!isCall(node, 'input')) return null
+  if ((node.arguments?.length ?? 0) === 0) return { kind: 'operation-input', path: null }
+  const path = node.arguments?.length === 1 ? readLiteralString(node.arguments[0]) : null
+  return path ? { kind: 'operation-input', path } : null
 }
 
 function parseScopeRead(node: any): { kind: 'scope', path: string } | null {
