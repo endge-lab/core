@@ -1,5 +1,9 @@
 /* eslint-disable */
 
+//
+// MODEL
+//
+
 export * from '@/model/kernel/endge'
 export * from '@/model/modules/domain/endge-domain'
 export { EndgeDomainRepository, EndgeDomainRepositoryReadOnlyError } from '@/model/modules/domain/endge-domain-repository'
@@ -39,6 +43,10 @@ export * from '@/model/modules/ui/endge-styles'
 export * from '@/model/config/domain.config'
 export * from '@/domain/entities/diagnostics/DiagnosticsRecordStore'
 export * from '@/domain/entities/diagnostics/DiagnosticsSpan'
+
+//
+// TYPES
+//
 
 export * from '@/domain/types/types'
 export * from '@/domain/types/api.types'
@@ -127,10 +135,9 @@ export * from '@/domain/types/ui/tooltip-markdown.types'
 export * from '@/domain/types/ui/ui.types'
 export * from '@/domain/types/i18n.types'
 
-// export * from '@/modules/endge-themes'
-// export * from '@/modules/endge-themes/app/EndgeThemes'
-// export * from '@/modules/endge-themes/app/EndgeTheme'
-// export * from '@/modules/endge-themes/app/EndgeThemesEvents'
+//
+// ENTITIES
+//
 
 export * from '@/domain/entities/endge/EndgeModuleController'
 export * from '@/domain/entities/endge/EndgeFederation'

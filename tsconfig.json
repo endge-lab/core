@@ -15,7 +15,7 @@
     // Модули/таргет
     "target": "esnext",
     "module": "esnext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
 
     // Полезные флаги
     "esModuleInterop": true,

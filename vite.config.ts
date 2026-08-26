@@ -1,7 +1,7 @@
 import path from 'node:path'
 
 import { defineConfig } from 'vite'
-import dts from 'vite-plugin-dts'
+import dts from 'unplugin-dts/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -22,7 +22,7 @@ export default defineConfig({
       ],
     },
   },
-  plugins: [dts({ rollupTypes: false, tsconfigPath: './tsconfig.json' })],
+  plugins: [dts({ bundleTypes: false, tsconfigPath: './tsconfig.json' })],
   worker: {
     format: 'es',
   },
