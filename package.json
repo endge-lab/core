@@ -1,6 +1,6 @@
 {
   "name": "@endge/core",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "private": false,
   "license": "Apache-2.0",
   "type": "module",
@@ -24,7 +24,9 @@
     "preview": "vite preview",
     "test": "vitest",
     "bench:interactions": "vitest bench src/test/component-sfc-interactions.bench.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint-check": "eslint . --cache",
+    "lint-fix": "eslint . --fix --cache"
   },
   "dependencies": {
     "@babel/parser": "^7.27.2",
@@ -52,7 +54,9 @@
     "reflect-metadata": "^0.2.2"
   },
   "devDependencies": {
+    "@antfu/eslint-config": "9.3.0",
     "@types/lodash": "^4.14.202",
+    "eslint": "10.9.1",
     "rimraf": "^6.0.1",
     "typescript": "~6.0.3",
     "unplugin-dts": "^1.0.3",
