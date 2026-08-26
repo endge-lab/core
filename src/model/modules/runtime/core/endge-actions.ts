@@ -15,7 +15,7 @@ import type {
 import { BUILTIN_ACTION_IDS } from '@/domain/types/runtime/action.types'
 import type { ImplementationInvocation, ImplementationProvider } from '@/domain/types/runtime/implementation.types'
 import type { EntityOrigin } from '@/domain/types/document/entity-management.type'
-import { Subscribable } from '@endge/utils'
+import { Subscribable } from '@/domain/entities/endge/Subscribable'
 import { Endge } from '@/model/kernel/endge'
 import { EndgeImplementations } from '@/model/modules/runtime/implementation/endge-implementations'
 import { normalizeActionTargets, validateActionTarget } from '@/model/services/compiler/action/action-target-validation'
@@ -50,7 +50,7 @@ export interface ActionProviderDescriptor extends Omit<ImplementationProvider, '
   identity: string
 }
 
-/** Action-specific facade over semantic definitions and generic implementations. */
+/** Координирует semantic definitions и generic implementations для Actions. */
 export class EndgeActions extends Subscribable {
   private readonly _codeActions = new Map<string, RAction>()
   private readonly _catalogPaths = new Map<string, string[]>()

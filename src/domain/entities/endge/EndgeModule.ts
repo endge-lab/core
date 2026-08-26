@@ -1,6 +1,5 @@
 import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
-
-import { Subscribable } from '@endge/utils'
+import { Subscribable } from '@/domain/entities/endge/Subscribable'
 
 /**
  * Базовый модуль федерации.

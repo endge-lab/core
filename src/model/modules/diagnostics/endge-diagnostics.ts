@@ -30,7 +30,7 @@ import { EndgeProblems } from '@/model/modules/diagnostics/endge-problems'
 import { EndgeTelemetry } from '@/model/modules/diagnostics/endge-telemetry'
 
 /**
- * Единый diagnostics facade ядра.
+ * Родительский diagnostics-модуль ядра.
  * Объединяет append-only telemetry history и replaceable registry актуальных problems.
  */
 export class EndgeDiagnostics extends EndgeModule {
@@ -43,11 +43,18 @@ export class EndgeDiagnostics extends EndgeModule {
   /** Подмодуль актуальных authoring/build/runtime problems. */
   public readonly problems: EndgeProblems
 
+  /** Состояние automatic snapshot policy и её внутренней подписки. */
   private _automaticErrorTimestamps: number[] = []
   private _automaticCooldownUntil = 0
   private _unsubscribeAutomaticRecords: (() => void) | null = null
 
-  /** Связывает независимые уведомления подмодулей с общим diagnostics facade. */
+  /**
+   * ----------------------------------------
+   * PUBLIC
+   * ----------------------------------------
+   */
+
+  /** Связывает независимые уведомления подмодулей с родительским diagnostics-модулем. */
   public constructor() {
     super()
     this.adapters = new DiagnosticsAdapterRegistry()
@@ -60,30 +67,34 @@ export class EndgeDiagnostics extends EndgeModule {
     this._subscribeAutomaticSnapshots()
   }
 
-  /** Возвращает идентификатор текущей telemetry session. */
-  public get sessionId(): string {
-    return this.telemetry.sessionId
+  /** Передаёт setup lifecycle подмодулям в порядке их зависимостей. */
+  public override async setup(ctx: EndgeBootContext): Promise<void> {
+    await this.telemetry.setup(ctx)
+    await this.problems.setup(ctx)
   }
 
-  /** Возвращает effective telemetry configuration. */
-  public get configuration(): EndgeDiagnosticsConfiguration {
-    return this.telemetry.configuration
+  /** Передаёт load lifecycle подмодулям в порядке их зависимостей. */
+  public override async load(ctx: EndgeBootContext): Promise<void> {
+    await this.telemetry.load(ctx)
+    await this.problems.load(ctx)
   }
 
-  /** Возвращает resource текущей telemetry session. */
-  public get resource(): DiagnosticsResource {
-    return this.telemetry.resource
+  /** Передаёт build lifecycle подмодулям в порядке их зависимостей. */
+  public override async build(ctx: EndgeBootContext): Promise<void> {
+    await this.telemetry.build(ctx)
+    await this.problems.build(ctx)
   }
 
-  /** Применяет effective diagnostics configuration в build lifecycle. */
-  public override build(ctx: EndgeBootContext): void {
-    this.telemetry.build(ctx)
+  /** Передаёт start lifecycle подмодулям в порядке их зависимостей. */
+  public override async start(ctx: EndgeBootContext): Promise<void> {
+    await this.telemetry.start(ctx)
+    await this.problems.start(ctx)
   }
 
-  /** Сбрасывает оба diagnostics submodules для следующего boot lifecycle. */
+  /** Сбрасывает подмодули в обратном порядке их запуска. */
   public override async reset(): Promise<void> {
+    await this.problems.reset()
     await this.telemetry.reset()
-    this.problems.reset()
     this._automaticErrorTimestamps = []
     this._automaticCooldownUntil = 0
     this._subscribeAutomaticSnapshots()
@@ -146,13 +157,13 @@ export class EndgeDiagnostics extends EndgeModule {
     return this.telemetry.finishSpan(input)
   }
 
-  /** Подписывает listener на любое изменение diagnostics facade. */
+  /** Подписывает listener на любое изменение родительского diagnostics-модуля. */
   public override subscribe(listener: () => void): () => void
 
   /** Подписывает listener на отфильтрованный telemetry stream. */
   public subscribe(filter: DiagnosticsFilter, listener: DiagnosticsListener, options?: DiagnosticsSubscribeOptions): () => void
 
-  /** Реализует facade-level и telemetry record subscriptions. */
+  /** Реализует общую и telemetry record subscriptions. */
   public subscribe(
     filterOrListener: DiagnosticsFilter | (() => void),
     listener?: DiagnosticsListener,
@@ -233,6 +244,12 @@ export class EndgeDiagnostics extends EndgeModule {
     return this.telemetry.flush()
   }
 
+  /**
+   * ----------------------------------------
+   * PRIVATE
+   * ----------------------------------------
+   */
+
   /** Восстанавливает внутреннюю подписку на ERROR/FATAL records после reset. */
   private _subscribeAutomaticSnapshots(): void {
     this._unsubscribeAutomaticRecords?.()
@@ -263,5 +280,26 @@ export class EndgeDiagnostics extends EndgeModule {
     this._automaticErrorTimestamps = []
     this._automaticCooldownUntil = now + policy.cooldownSeconds * 1_000
     this.sendSnapshot(policy.outputIds, { trigger: 'automatic' })
+  }
+
+  /**
+   * ----------------------------------------
+   * ACCESS
+   * ----------------------------------------
+   */
+
+  /** Возвращает идентификатор текущей telemetry session. */
+  public get sessionId(): string {
+    return this.telemetry.sessionId
+  }
+
+  /** Возвращает effective telemetry configuration. */
+  public get configuration(): EndgeDiagnosticsConfiguration {
+    return this.telemetry.configuration
+  }
+
+  /** Возвращает resource текущей telemetry session. */
+  public get resource(): DiagnosticsResource {
+    return this.telemetry.resource
   }
 }

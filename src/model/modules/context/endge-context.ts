@@ -477,14 +477,14 @@ export class EndgeContext extends EndgeModule {
   }
 
   /** Возвращает текущую locale контекста. */
-  get currentLocale(): string {
+  public get currentLocale(): string {
     return this._currentLocale || DEFAULT_LOCALE
   }
 
   /** Нормализует, сохраняет и публикует новую locale. */
-  set currentLocale(value: string) {
+  public setCurrentLocale(locale: string | null): void {
     const configuration = this._activeConfiguration()
-    const raw = normalizeOptionalText(value) ?? DEFAULT_LOCALE
+    const raw = normalizeOptionalText(locale) ?? DEFAULT_LOCALE
     const next = this._normalizeLocale(raw, configuration)
     this._pendingLocale = configuration ? null : raw
     if (next === this._currentLocale)
@@ -493,11 +493,6 @@ export class EndgeContext extends EndgeModule {
     this._currentLocale = next
     this.saveToStorage()
     this.notify()
-  }
-
-  /** Устанавливает текущую locale через публичный method API. */
-  public setCurrentLocale(locale: string | null): void {
-    this.currentLocale = normalizeOptionalText(locale) ?? DEFAULT_LOCALE
   }
 
   /** Согласует текущую locale с effective configuration после workspace resolution. */
@@ -518,14 +513,14 @@ export class EndgeContext extends EndgeModule {
   }
 
   /** Возвращает текущую тему контекста. */
-  get currentTheme(): string {
+  public get currentTheme(): string {
     return this._currentTheme || DEFAULT_THEME
   }
 
   /** Нормализует, сохраняет и публикует пользовательскую тему. */
-  set currentTheme(value: string) {
+  public setCurrentTheme(theme: string | null): void {
     const configuration = this._activeConfiguration()
-    const raw = normalizeOptionalText(value) ?? DEFAULT_THEME
+    const raw = normalizeOptionalText(theme) ?? DEFAULT_THEME
     const next = this._normalizeTheme(raw, configuration)
     const preference = configuration && next !== raw ? null : raw
     const preferenceChanged = preference !== this._themePreference
@@ -538,11 +533,6 @@ export class EndgeContext extends EndgeModule {
     this.saveToStorage()
     if (themeChanged)
       this.notify()
-  }
-
-  /** Устанавливает текущую пользовательскую тему. */
-  public setCurrentTheme(theme: string | null): void {
-    this.currentTheme = normalizeOptionalText(theme) ?? DEFAULT_THEME
   }
 
   /** Согласует сохранённую тему с effective configuration после workspace resolution. */
@@ -572,14 +562,14 @@ export class EndgeContext extends EndgeModule {
   }
 
   /** Возвращает текущую временную зону контекста. */
-  get currentTimezone(): string {
+  public get currentTimezone(): string {
     return this._currentTimezone || DEFAULT_TIMEZONE
   }
 
   /** Нормализует, сохраняет и публикует новую временную зону. */
-  set currentTimezone(value: string) {
+  public setCurrentTimezone(timezone: string | null): void {
     const configuration = this._activeConfiguration()
-    const raw = normalizeOptionalText(value) ?? DEFAULT_TIMEZONE
+    const raw = normalizeOptionalText(timezone) ?? DEFAULT_TIMEZONE
     const next = this._normalizeTimezone(raw, configuration)
     this._pendingTimezone = configuration ? null : raw
     if (next === this._currentTimezone)
@@ -588,11 +578,6 @@ export class EndgeContext extends EndgeModule {
     this._currentTimezone = next
     this.saveToStorage()
     this.notify()
-  }
-
-  /** Устанавливает текущую временную зону через публичный method API. */
-  public setCurrentTimezone(timezone: string | null): void {
-    this.currentTimezone = normalizeOptionalText(timezone) ?? DEFAULT_TIMEZONE
   }
 
   /** Согласует сохранённую временную зону с effective configuration. */

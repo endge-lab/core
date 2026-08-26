@@ -47,7 +47,7 @@ const BUILTIN_CONVERTERS: Record<string, (...args: any[]) => unknown> = {
   'json-stringify': jsonStringify,
 }
 
-/** Synchronous Converter facade with separate definitions, providers and bindings. */
+/** Синхронно координирует definitions, providers и bindings конвертеров. */
 export class EndgeConverters {
   private readonly definitions = new Map<string, { identity: string, origin: EntityOrigin, defaultProviderKey?: string }>()
   private readonly providerDisposers = new Set<VoidFunction>()

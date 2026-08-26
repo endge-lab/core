@@ -323,7 +323,7 @@ export interface DiagnosticsTelemetrySnapshot {
   records: readonly DiagnosticsRecord[]
 }
 
-/** JSON-safe snapshot текущего состояния diagnostics facade. */
+/** JSON-safe snapshot текущего состояния diagnostics-модуля. */
 export interface DiagnosticsSnapshot {
   generatedAt: number
   trigger: 'manual' | 'automatic'

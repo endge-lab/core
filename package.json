@@ -1,6 +1,6 @@
 {
   "name": "@endge/core",
-  "version": "3.2.1",
+  "version": "4.0.0",
   "private": false,
   "license": "Apache-2.0",
   "type": "module",
@@ -24,12 +24,12 @@
     "preview": "vite preview",
     "test": "vitest",
     "bench:interactions": "vitest bench src/test/component-sfc-interactions.bench.ts",
-    "typecheck": "vue-tsc --noEmit"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@babel/parser": "^7.27.2",
     "@babel/types": "^7.27.1",
-    "@endge/utils": "^0.24.13",
+    "@endge/utils": "^0.25.0",
     "@vue/compiler-dom": "^3.5.24",
     "@vue/compiler-sfc": "^3.5.24",
     "axios": "^1.13.2",
@@ -47,27 +47,17 @@
   },
   "peerDependencies": {
     "@endge/raph": "^3.0.11",
-    "@endge/utils": "^0.24.13",
-    "@primevue/themes": "^4.0.0-rc.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
-    "pinia": "^3.0.4",
-    "primeicons": "^6.0.1",
-    "primevue": "^4.0.0-rc.1",
-    "reflect-metadata": "^0.2.2",
-    "vue": "^3.3.0"
+    "reflect-metadata": "^0.2.2"
   },
   "devDependencies": {
     "@types/lodash": "^4.14.202",
-    "@vitejs/plugin-vue": "^4.5.2",
-    "@vitejs/plugin-vue-jsx": "^3.1.0",
-    "@vue/language-core": "^3.3.11",
     "rimraf": "^6.0.1",
     "typescript": "~6.0.3",
     "unplugin-dts": "^1.0.3",
     "vite": "^6.1.0",
-    "vitest": "^2.1.9",
-    "vue-tsc": "^3.3.11"
+    "vitest": "^2.1.9"
   },
   "packageManager": "pnpm@8.8.0"
 }

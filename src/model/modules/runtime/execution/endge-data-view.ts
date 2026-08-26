@@ -379,7 +379,7 @@ export class EndgeDataView {
 
   /** Минимальные built-in converters для preview v1. */
   private _convert(identity: string, value: unknown, options?: Record<string, unknown>): unknown {
-    // Converter resolution is owned by the shared definition/provider facade.
+    // Converter resolution принадлежит общему definition/provider owner.
     // This also keeps standalone DataView execution compatible with code-owned
     // definitions which intentionally have no persisted RConverter document.
     if (Endge.converters.has(identity)) return Endge.converters.execute(identity, value, options)

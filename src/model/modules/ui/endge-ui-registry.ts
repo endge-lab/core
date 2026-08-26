@@ -16,8 +16,6 @@ import type {
   UIPresentationSurface,
 } from '@/domain/types/ui/ui-composition.types'
 
-import { markRaw } from 'vue'
-
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import {
   ENDGE_UI_DEFAULT_CONFIG_DEFINITIONS,
@@ -365,7 +363,7 @@ export class EndgeUIRegistry extends EndgeModule {
       definitionRef: input.definitionRef,
       surface: input.surface,
       role: String(input.role ?? 'main').trim() || 'main',
-      component: markRaw(input.component),
+      component: input.component,
       label: input.label,
     }
 

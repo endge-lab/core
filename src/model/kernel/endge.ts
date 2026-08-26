@@ -44,7 +44,7 @@ export class Endge extends EndgeFederation {
 
   /**
    * Запрещает создание экземпляров `Endge`.
-   * Федерация используется только через статический facade.
+   * Федерация используется только через статический public API.
    */
   private constructor() {
     super()
