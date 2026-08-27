@@ -38,8 +38,8 @@ export class ComputationRuntimeError extends Error {
 /** Executes compiler-ordered computation graphs without evaluating authored JS in core. */
 export class ComputationGraphExecutor {
   constructor(
-    private readonly sandbox: () => ComputationSandboxAdapter | null,
-    private readonly dependencies: ComputationDependencyRunner | null = null,
+    private readonly _sandbox: () => ComputationSandboxAdapter | null,
+    private readonly _dependencies: ComputationDependencyRunner | null = null,
   ) {}
 
   runSync(
@@ -57,16 +57,16 @@ export class ComputationGraphExecutor {
         throw new ComputationRuntimeError(`Output "${node.name}" requires a sandbox.`, identity, 'async-output', node.name)
       }
       if (node.kind === 'computation') {
-        if (!this.dependencies || !scope) {
+        if (!this._dependencies || !scope) {
           throw new ComputationRuntimeError(`Output "${node.name}" requires a computation dependency runner.`, identity, 'dependency-runner-missing', node.name)
         }
-        const nestedInput = this.evaluateNode(node.input, input, outputs, identity, node.name)
-        outputs.set(node.name, this.dependencies.runSync(node.identity, nestedInput, scope))
+        const nestedInput = this._evaluateNode(node.input, input, outputs, identity, node.name)
+        outputs.set(node.name, this._dependencies.runSync(node.identity, nestedInput, scope))
         continue
       }
-      outputs.set(node.name, this.evaluateNode(node.expression, input, outputs, identity, node.name))
+      outputs.set(node.name, this._evaluateNode(node.expression, input, outputs, identity, node.name))
     }
-    return this.evaluateResult(payload, input, outputs, identity)
+    return this._evaluateResult(payload, input, outputs, identity)
   }
 
   async run(
@@ -88,17 +88,17 @@ export class ComputationGraphExecutor {
       }
       const values = await Promise.all(ready.map(async node => [
         node.name,
-        await this.executeNode(node, input, outputs, identity, scope),
+        await this._executeNode(node, input, outputs, identity, scope),
       ] as const))
       for (const [name, value] of values) {
         outputs.set(name, value)
         pending.delete(name)
       }
     }
-    return this.evaluateResult(payload, input, outputs, identity)
+    return this._evaluateResult(payload, input, outputs, identity)
   }
 
-  private async executeNode(
+  private async _executeNode(
     node: ComputationProgramNode,
     input: unknown,
     outputs: Map<string, unknown>,
@@ -106,20 +106,20 @@ export class ComputationGraphExecutor {
     scope?: ComputationExecutionScope,
   ): Promise<unknown> {
     if (node.kind === 'expression') {
-      return this.evaluateNode(node.expression, input, outputs, identity, node.name)
+      return this._evaluateNode(node.expression, input, outputs, identity, node.name)
     }
     if (node.kind === 'computation') {
-      if (!this.dependencies || !scope) {
+      if (!this._dependencies || !scope) {
         throw new ComputationRuntimeError(`Output "${node.name}" requires a computation dependency runner.`, identity, 'dependency-runner-missing', node.name)
       }
-      const nestedInput = this.evaluateNode(node.input, input, outputs, identity, node.name)
-      return this.dependencies.run(node.identity, nestedInput, scope)
+      const nestedInput = this._evaluateNode(node.input, input, outputs, identity, node.name)
+      return this._dependencies.run(node.identity, nestedInput, scope)
     }
-    const sandbox = this.sandbox()
+    const sandbox = this._sandbox()
     if (!sandbox) {
       throw new ComputationRuntimeError('Computation sandbox adapter is not installed.', identity, 'sandbox-missing', node.name)
     }
-    const inputs = Object.fromEntries(Object.entries(node.inputs).map(([name, expression]) => [name, this.evaluate(expression, input, outputs)]))
+    const inputs = Object.fromEntries(Object.entries(node.inputs).map(([name, expression]) => [name, this._evaluate(expression, input, outputs)]))
     try {
       return await sandbox.execute({
         computationIdentity: identity,
@@ -143,14 +143,14 @@ export class ComputationGraphExecutor {
     }
   }
 
-  private evaluate(expression: SourceExpressionIR, input: unknown, outputs: Map<string, unknown>): unknown {
+  private _evaluate(expression: SourceExpressionIR, input: unknown, outputs: Map<string, unknown>): unknown {
     return evaluateSourceExpression(expression, {
       scope: input,
       read: read => read.source === 'computation-output' ? outputs.get(read.path) : undefined,
     })
   }
 
-  private evaluateResult(
+  private _evaluateResult(
     payload: ComputationProgramPayload,
     input: unknown,
     outputs: Map<string, unknown>,
@@ -160,7 +160,7 @@ export class ComputationGraphExecutor {
       throw new ComputationRuntimeError(`Computation "${identity}" has no compiled result.`, identity, 'result-missing')
     }
     try {
-      return this.evaluate(payload.result, input, outputs)
+      return this._evaluate(payload.result, input, outputs)
     }
     catch (error) {
       if (error instanceof ComputationRuntimeError) {
@@ -176,7 +176,7 @@ export class ComputationGraphExecutor {
     }
   }
 
-  private evaluateNode(
+  private _evaluateNode(
     expression: SourceExpressionIR,
     input: unknown,
     outputs: Map<string, unknown>,
@@ -184,7 +184,7 @@ export class ComputationGraphExecutor {
     outputName: string,
   ): unknown {
     try {
-      return this.evaluate(expression, input, outputs)
+      return this._evaluate(expression, input, outputs)
     }
     catch (error) {
       if (error instanceof ComputationRuntimeError) {

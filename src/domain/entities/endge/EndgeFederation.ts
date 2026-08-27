@@ -28,7 +28,7 @@ export abstract class EndgeFederation {
   }
 
   public static get isConfigured(): boolean {
-    return this.getOrCreateHost().isConfigured
+    return this._getOrCreateHost().isConfigured
   }
 
   /**
@@ -60,7 +60,7 @@ export abstract class EndgeFederation {
    * Plugin устанавливается во время конфигурации федерации, до boot.
    */
   public static use(plugin: EndgePlugin): void {
-    const host = this.getOrCreateHost()
+    const host = this._getOrCreateHost()
 
     if (host.isConfigured || host.isInitialized) {
       throw new Error(`[${this.name}] plugins must be registered before federation configuration`)
@@ -86,7 +86,7 @@ export abstract class EndgeFederation {
    * Итоговый порядок строится после установки plugin-модулей.
    */
   public static defineModule<T extends EndgeModule>(descriptor: EndgeModuleDescriptor<T>): T {
-    const host = this.getOrCreateHost()
+    const host = this._getOrCreateHost()
     if (!host.isConfiguring) {
       throw new Error(`[${this.name}] defineModule() can be used only during federation configuration`)
     }
@@ -145,7 +145,7 @@ export abstract class EndgeFederation {
   /**
    * Выполняет `setup()` для всех модулей один раз до первого `start()`.
    */
-  public static async setup(ctx: EndgeBootContext = this.requireBootContext()): Promise<void> {
+  public static async setup(ctx: EndgeBootContext = this._requireBootContext()): Promise<void> {
     const host = this.host
     if (host.isSetup) {
       return
@@ -163,7 +163,7 @@ export abstract class EndgeFederation {
     host.isSetup = true
   }
 
-  public static async load(ctx: EndgeBootContext = this.requireBootContext()): Promise<void> {
+  public static async load(ctx: EndgeBootContext = this._requireBootContext()): Promise<void> {
     for (const [key, module] of this.host.modules.entries()) {
       try {
         await module.load(ctx)
@@ -174,7 +174,7 @@ export abstract class EndgeFederation {
     }
   }
 
-  public static async build(ctx: EndgeBootContext = this.requireBootContext()): Promise<void> {
+  public static async build(ctx: EndgeBootContext = this._requireBootContext()): Promise<void> {
     for (const [key, module] of this.host.modules.entries()) {
       try {
         await module.build(ctx)
@@ -185,7 +185,7 @@ export abstract class EndgeFederation {
     }
   }
 
-  public static async start(ctx: EndgeBootContext = this.requireBootContext()): Promise<void> {
+  public static async start(ctx: EndgeBootContext = this._requireBootContext()): Promise<void> {
     for (const [key, module] of this.host.modules.entries()) {
       try {
         await module.start(ctx)
@@ -310,7 +310,7 @@ export abstract class EndgeFederation {
   }
 
   protected static get host(): EndgeFederationHost {
-    const host = this.getOrCreateHost()
+    const host = this._getOrCreateHost()
 
     if (!host.isConfigured) {
       host.isConfiguring = true
@@ -318,8 +318,8 @@ export abstract class EndgeFederation {
       host.modules.clear()
       try {
         this.configureFederation()
-        this.installPlugins()
-        this.finalizeModules()
+        this._installPlugins()
+        this._finalizeModules()
         host.isConfigured = true
       }
       catch (error) {
@@ -335,11 +335,11 @@ export abstract class EndgeFederation {
     return host
   }
 
-  private static getFederationId(): string {
+  private static _getFederationId(): string {
     return String(this.federationId || this.name || 'default')
   }
 
-  private static createHost(): EndgeFederationHost {
+  private static _createHost(): EndgeFederationHost {
     return {
       isConfigured: false,
       isConfiguring: false,
@@ -353,20 +353,20 @@ export abstract class EndgeFederation {
     }
   }
 
-  private static getOrCreateHost(): EndgeFederationHost {
-    const registry = EndgeFederation.registry()
-    const federationId = this.getFederationId()
+  private static _getOrCreateHost(): EndgeFederationHost {
+    const registry = EndgeFederation._registry()
+    const federationId = this._getFederationId()
 
     let host = registry.get(federationId)
     if (!host) {
-      host = EndgeFederation.createHost()
+      host = EndgeFederation._createHost()
       registry.set(federationId, host)
     }
 
     return host
   }
 
-  private static requireBootContext(): EndgeBootContext {
+  private static _requireBootContext(): EndgeBootContext {
     const ctx = this.host.bootContext
     if (!ctx) {
       throw new Error(`[${this.name}] boot context is not available`)
@@ -375,8 +375,8 @@ export abstract class EndgeFederation {
     return ctx
   }
 
-  private static installPlugins(): void {
-    const host = this.getOrCreateHost()
+  private static _installPlugins(): void {
+    const host = this._getOrCreateHost()
 
     for (const plugin of host.plugins) {
       if (host.installedPluginIds.has(plugin.id)) {
@@ -388,8 +388,8 @@ export abstract class EndgeFederation {
     }
   }
 
-  private static finalizeModules(): void {
-    const host = this.getOrCreateHost()
+  private static _finalizeModules(): void {
+    const host = this._getOrCreateHost()
     const descriptors = sortEndgeModuleDescriptors(host.moduleDescriptors)
 
     host.modules.clear()
@@ -398,7 +398,7 @@ export abstract class EndgeFederation {
     }
   }
 
-  private static registry(): Map<string, EndgeFederationHost> {
+  private static _registry(): Map<string, EndgeFederationHost> {
     const globalRegistry = globalThis as typeof globalThis & Record<string | symbol, unknown>
 
     if (!(ENDGE_FEDERATION_REGISTRY_KEY in globalRegistry)) {

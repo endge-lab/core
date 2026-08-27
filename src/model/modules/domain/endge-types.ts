@@ -44,35 +44,35 @@ const CORE_TYPES: readonly BuiltinTypeDefinition[] = [
 
 /** Effective Type Registry: code-owned built-ins plus persisted user Types. */
 export class EndgeTypes extends EndgeModule {
-  private readonly builtins = new Map<string, RType>()
+  private readonly _builtins = new Map<string, RType>()
 
   public constructor() {
     super()
     for (const definition of CORE_TYPES) {
-      this.builtins.set(definition.identity, this.createBuiltin(definition))
+      this._builtins.set(definition.identity, this._createBuiltin(definition))
     }
   }
 
   public listBuiltins(): RType[] {
-    return [...this.builtins.values()]
+    return [...this._builtins.values()]
   }
 
   public listResolved(): RType[] {
     return [
       ...this.listBuiltins(),
-      ...Endge.domain.getTypes().filter(type => !this.builtins.has(type.identity)),
+      ...Endge.domain.getTypes().filter(type => !this._builtins.has(type.identity)),
     ]
   }
 
   public getCodeDefinition(identity: string): RType | null {
-    return this.builtins.get(String(identity ?? '').trim()) ?? null
+    return this._builtins.get(String(identity ?? '').trim()) ?? null
   }
 
   public getDefinition(identity: string): RType | null {
     return this.getCodeDefinition(identity) ?? Endge.domain.getType(identity)
   }
 
-  private createBuiltin(definition: BuiltinTypeDefinition): RType {
+  private _createBuiltin(definition: BuiltinTypeDefinition): RType {
     const type = new RType(definition.identity)
     type.identity = definition.identity
     type.displayName = definition.displayName

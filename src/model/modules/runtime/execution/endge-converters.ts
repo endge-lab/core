@@ -49,16 +49,16 @@ const BUILTIN_CONVERTERS: Record<string, (...args: any[]) => unknown> = {
 
 /** Синхронно координирует definitions, providers и bindings конвертеров. */
 export class EndgeConverters {
-  private readonly definitions = new Map<string, { identity: string, origin: EntityOrigin, defaultProviderKey?: string }>()
-  private readonly providerDisposers = new Set<VoidFunction>()
-  private readonly definitionDisposers = new Set<VoidFunction>()
-  private started = false
+  private readonly _definitions = new Map<string, { identity: string, origin: EntityOrigin, defaultProviderKey?: string }>()
+  private readonly _providerDisposers = new Set<VoidFunction>()
+  private readonly _definitionDisposers = new Set<VoidFunction>()
+  private _started = false
 
-  public constructor(private readonly implementations: EndgeImplementations) {}
+  public constructor(private readonly _implementations: EndgeImplementations) {}
 
   public has(identity: string): boolean {
     return Endge.domain.getConverter(identity) != null
-      || this.definitions.has(identity)
+      || this._definitions.has(identity)
       || identity in BUILTIN_CONVERTERS
   }
 
@@ -67,35 +67,35 @@ export class EndgeConverters {
     if (!identity) {
       throw new Error('Converter identity is required.')
     }
-    if (Endge.domain.getConverter(identity) || this.definitions.has(identity)) {
+    if (Endge.domain.getConverter(identity) || this._definitions.has(identity)) {
       throw new Error(`Converter identity collision: ${identity}.`)
     }
     const stored = { ...definition, identity }
-    this.definitions.set(identity, stored)
+    this._definitions.set(identity, stored)
     const dispose = () => {
-      if (this.definitions.get(identity) === stored) {
-        this.definitions.delete(identity)
+      if (this._definitions.get(identity) === stored) {
+        this._definitions.delete(identity)
       }
-      this.definitionDisposers.delete(dispose)
+      this._definitionDisposers.delete(dispose)
     }
-    this.definitionDisposers.add(dispose)
+    this._definitionDisposers.add(dispose)
     return dispose
   }
 
   public provide(provider: { identity: string, key: string, origin: EntityOrigin, convert: ConverterProvider }): VoidFunction {
-    if (!Endge.domain.getConverter(provider.identity) && !this.definitions.has(provider.identity)) {
+    if (!Endge.domain.getConverter(provider.identity) && !this._definitions.has(provider.identity)) {
       throw new Error(`Converter provider requires an existing definition: ${provider.identity}.`)
     }
-    const disposeProvider = this.implementations.registerProvider({
+    const disposeProvider = this._implementations.registerProvider({
       key: provider.key,
       origin: provider.origin,
       execute: invocation => provider.convert(invocation.input, invocation.context),
     })
     const dispose = () => {
       disposeProvider()
-      this.providerDisposers.delete(dispose)
+      this._providerDisposers.delete(dispose)
     }
-    this.providerDisposers.add(dispose)
+    this._providerDisposers.add(dispose)
     return dispose
   }
 
@@ -106,13 +106,13 @@ export class EndgeConverters {
     scopeIdentity?: string
     priority?: number
   }): VoidFunction {
-    if (!Endge.domain.getConverter(binding.identity) && !this.definitions.has(binding.identity)) {
+    if (!Endge.domain.getConverter(binding.identity) && !this._definitions.has(binding.identity)) {
       throw new Error(`Converter cannot be overridden because it does not exist: ${binding.identity}.`)
     }
-    if (!this.implementations.hasProvider(binding.providerKey)) {
+    if (!this._implementations.hasProvider(binding.providerKey)) {
       throw new Error(`Converter provider is not registered: ${binding.providerKey}.`)
     }
-    return this.implementations.bind({
+    return this._implementations.bind({
       executableType: 'converter',
       executableIdentity: binding.identity,
       providerKey: binding.providerKey,
@@ -123,10 +123,10 @@ export class EndgeConverters {
   }
 
   public execute(identity: string, value: unknown, options?: Record<string, unknown>): unknown {
-    const definition = this.definitions.get(identity)
+    const definition = this._definitions.get(identity)
     let provider: ImplementationProvider
     try {
-      provider = this.implementations.resolve({
+      provider = this._implementations.resolve({
         executable: { type: 'converter', identity },
         defaultProviderKey: definition?.defaultProviderKey ?? `core.converter.${identity}`,
       }).provider
@@ -140,31 +140,31 @@ export class EndgeConverters {
   }
 
   public start(): void {
-    if (this.started) {
+    if (this._started) {
       return
     }
-    this.started = true
+    this._started = true
     for (const [identity, convert] of Object.entries(BUILTIN_CONVERTERS)) {
-      const disposeProvider = this.implementations.registerProvider({
+      const disposeProvider = this._implementations.registerProvider({
         key: `core.converter.${identity}`,
         origin: { kind: 'builtin', owner: '@endge/core' },
         execute: invocation => convert(invocation.input, invocation.context),
       })
       const dispose = () => {
         disposeProvider()
-        this.providerDisposers.delete(dispose)
+        this._providerDisposers.delete(dispose)
       }
-      this.providerDisposers.add(dispose)
+      this._providerDisposers.add(dispose)
     }
   }
 
   public reset(): void {
-    for (const dispose of [...this.providerDisposers]) {
+    for (const dispose of [...this._providerDisposers]) {
       dispose()
     }
-    for (const dispose of [...this.definitionDisposers]) {
+    for (const dispose of [...this._definitionDisposers]) {
       dispose()
     }
-    this.started = false
+    this._started = false
   }
 }

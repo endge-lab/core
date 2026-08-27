@@ -25,7 +25,7 @@ function pad2(n: number): string {
   return n < 10 ? `0${n}` : String(n)
 }
 
-function randomLocalTime(): string {
+function _randomLocalTime(): string {
   const h = randInt(0, 23)
   const m = randInt(0, 59)
   const s = randInt(0, 59)
@@ -41,36 +41,36 @@ function randomDaysOfWeek(): string {
   return [...set].sort((a, b) => a - b).join(',')
 }
 
-function randomBool(): boolean {
+function _randomBool(): boolean {
   return Math.random() < 0.5
 }
 
-function randomCarrier(): string {
+function _randomCarrier(): string {
   const carriers = ['SU', 'S7', 'UT', 'DP', 'FV', 'U6', 'N4']
   return pick(carriers)
 }
 
-function randomStation(): string {
+function _randomStation(): string {
   const stations = ['SVO', 'DME', 'VKO', 'LED', 'KZN', 'AER', 'SVX', 'OVB']
   return pick(stations)
 }
 
-function randomTerminal(): string {
+function _randomTerminal(): string {
   const terms = ['A', 'B', 'C', 'D', '1', '2', '3']
   return pick(terms)
 }
 
-function randomServiceType(): string {
+function _randomServiceType(): string {
   const t = ['S', 'C', 'G']
   return pick(t)
 }
 
-function randomAircraftType(): string {
+function _randomAircraftType(): string {
   const t = ['32B', 'A320', 'B738', 'SU9', 'E190']
   return pick(t)
 }
 
-function randomFlightNumber(cur: unknown): string {
+function _randomFlightNumber(cur: unknown): string {
   const base
     = typeof cur === 'string' && cur.trim()
       ? cur.trim()

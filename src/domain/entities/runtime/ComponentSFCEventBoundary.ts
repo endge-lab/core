@@ -10,17 +10,17 @@ import type {
 
 /** Mount-scoped Event router for one Component SFC artifact boundary. */
 export class ComponentSFCEventBoundary {
-  private readonly consumedLocalOnce = new Set<string>()
+  private readonly _consumedLocalOnce = new Set<string>()
 
   public constructor(
-    private readonly host: ComponentSFCRuntimeHost | null,
+    private readonly _host: ComponentSFCRuntimeHost | null,
     public readonly componentIdentity: string,
-    private readonly manifest: ComponentSFCPortManifest,
-    private readonly parent: ComponentSFCEventBoundary | null = null,
-    private readonly parentSource?: ComponentSFCEventRuntimeSource,
-    private readonly parentBindings: readonly RComponentSFC_IR_EventBinding[] = [],
-    private readonly parentEventTransform?: (event: string, payload: unknown) => { event: string, payload: unknown } | null,
-    private readonly requiredPortBindings: readonly ComponentSFCRequiredPortBinding[] = [],
+    private readonly _manifest: ComponentSFCPortManifest,
+    private readonly _parent: ComponentSFCEventBoundary | null = null,
+    private readonly _parentSource?: ComponentSFCEventRuntimeSource,
+    private readonly _parentBindings: readonly RComponentSFC_IR_EventBinding[] = [],
+    private readonly _parentEventTransform?: (event: string, payload: unknown) => { event: string, payload: unknown } | null,
+    private readonly _requiredPortBindings: readonly ComponentSFCRequiredPortBinding[] = [],
   ) {}
 
   public createChild(
@@ -31,20 +31,20 @@ export class ComponentSFCEventBoundary {
     transform?: (event: string, payload: unknown) => { event: string, payload: unknown } | null,
     requiredPortBindings: readonly ComponentSFCRequiredPortBinding[] = [],
   ): ComponentSFCEventBoundary {
-    return new ComponentSFCEventBoundary(this.host, componentIdentity, manifest, this, source, bindings, transform, requiredPortBindings)
+    return new ComponentSFCEventBoundary(this._host, componentIdentity, manifest, this, source, bindings, transform, requiredPortBindings)
   }
 
   /** True when the current public manifest observes one Event of this child source. */
   public observesChild(source: ComponentSFCEventRuntimeSource, event: string): boolean {
-    return this.manifest.emits.events.some(port => matchesSource(port, source, event))
+    return this._manifest.emits.events.some(port => matchesSource(port, source, event))
   }
 
   /** Claims a mount-scoped logical `.once` rule after it has matched. */
   public claimLocalOnce(key: string): boolean {
-    if (this.consumedLocalOnce.has(key)) {
+    if (this._consumedLocalOnce.has(key)) {
       return false
     }
-    this.consumedLocalOnce.add(key)
+    this._consumedLocalOnce.add(key)
     return true
   }
 
@@ -73,14 +73,14 @@ export class ComponentSFCEventBoundary {
     })
     const reactions = local.map(async (binding) => {
       for (const action of binding.actions?.length ? binding.actions : [binding.action]) {
-        const succeeded = await this.host?.executeEventPortAction(
+        const succeeded = await this._host?.executeEventPortAction(
           this.componentIdentity,
           {
             kind: 'event',
             role: 'emits',
             name: `${source.nodeId}:${event}`,
             payloadType: 'unknown',
-            action: this.resolveRequiredPortAction(action),
+            action: this._resolveRequiredPortAction(action),
           },
           payload,
           source,
@@ -108,20 +108,20 @@ export class ComponentSFCEventBoundary {
     trace: string[] = [],
     depth = 0,
   ): Promise<void> {
-    const ports = this.manifest.emits.events.filter(port => matchesSource(port, source, event))
-    await Promise.all(ports.map(port => this.dispatch(port, payload, source, trace, depth)))
+    const ports = this._manifest.emits.events.filter(port => matchesSource(port, source, event))
+    await Promise.all(ports.map(port => this._dispatch(port, payload, source, trace, depth)))
   }
 
   /** Emits an Event declared as own by this component. */
   public async emitOwn(name: string, payload: unknown, trace: string[] = [], depth = 0): Promise<void> {
-    const port = this.manifest.emits.events.find(candidate => candidate.name === name && !candidate.from && !candidate.forwardedFrom)
+    const port = this._manifest.emits.events.find(candidate => candidate.name === name && !candidate.from && !candidate.forwardedFrom)
     if (!port) {
       throw new Error(`Own Component Event is not declared: ${this.componentIdentity}.${name}.`)
     }
-    await this.dispatch(port, payload, undefined, trace, depth)
+    await this._dispatch(port, payload, undefined, trace, depth)
   }
 
-  private async dispatch(
+  private async _dispatch(
     port: ComponentSFCEventPort,
     payload: unknown,
     source: ComponentSFCEventRuntimeSource | undefined,
@@ -129,29 +129,29 @@ export class ComponentSFCEventBoundary {
     depth: number,
   ): Promise<void> {
     if (depth >= 32) {
-      this.host?.emit('event:error', { code: 'event-depth-limit', componentIdentity: this.componentIdentity, event: port.name })
+      this._host?.emit('event:error', { code: 'event-depth-limit', componentIdentity: this.componentIdentity, event: port.name })
       return
     }
 
-    const forwardedSource = this.parentSource
-      ? { ...this.parentSource, target: source?.target ?? this.parentSource.target }
+    const forwardedSource = this._parentSource
+      ? { ...this._parentSource, target: source?.target ?? this._parentSource.target }
       : source
-    if (this.parent && this.parentSource) {
-      const transformed = this.parentEventTransform
-        ? this.parentEventTransform(port.name, payload)
+    if (this._parent && this._parentSource) {
+      const transformed = this._parentEventTransform
+        ? this._parentEventTransform(port.name, payload)
         : { event: port.name, payload }
       if (transformed) {
-        void this.parent.routeChild(forwardedSource!, transformed.event, transformed.payload, this.parentBindings, trace, depth + 1).catch(error => this.reportError(port, error))
+        void this._parent.routeChild(forwardedSource!, transformed.event, transformed.payload, this._parentBindings, trace, depth + 1).catch(error => this._reportError(port, error))
       }
     }
     else {
-      this.host?.publishEventPort(port.name, payload, source)
+      this._host?.publishEventPort(port.name, payload, source)
     }
 
-    await this.host?.executeEventPortAction(
+    await this._host?.executeEventPortAction(
       this.componentIdentity,
       port.action?.kind === 'required-port'
-        ? { ...port, action: this.resolveRequiredPortAction(port.action) }
+        ? { ...port, action: this._resolveRequiredPortAction(port.action) }
         : port,
       payload,
       source,
@@ -161,17 +161,17 @@ export class ComponentSFCEventBoundary {
     )
   }
 
-  private resolveRequiredPortAction(action: ComponentSFCEventAction): ComponentSFCEventAction {
+  private _resolveRequiredPortAction(action: ComponentSFCEventAction): ComponentSFCEventAction {
     if (action.kind !== 'required-port') {
       return action
     }
     const declared = action.portKind === 'query'
-      ? this.manifest.require.queries.find(port => port.name === action.port)
-      : this.manifest.require.actions.find(port => port.name === action.port)
+      ? this._manifest.require.queries.find(port => port.name === action.port)
+      : this._manifest.require.actions.find(port => port.name === action.port)
     if (!declared) {
       throw new Error(`Required ${action.portKind} port is not declared: ${this.componentIdentity}.${action.port}.`)
     }
-    const binding = this.requiredPortBindings.find(candidate => candidate.port === action.port)
+    const binding = this._requiredPortBindings.find(candidate => candidate.port === action.port)
     const identity = binding?.identity ?? declared.defaultIdentity
     if (!identity) {
       throw new Error(`Required ${action.portKind} port has no provider: ${this.componentIdentity}.${action.port}.`)
@@ -183,8 +183,8 @@ export class ComponentSFCEventBoundary {
     }
   }
 
-  private reportError(port: ComponentSFCEventPort, error: unknown): void {
-    this.host?.emit('event:error', {
+  private _reportError(port: ComponentSFCEventPort, error: unknown): void {
+    this._host?.emit('event:error', {
       code: 'event-forward-error',
       componentIdentity: this.componentIdentity,
       event: port.name,

@@ -139,7 +139,7 @@ export class EndgeDomainRepository extends EndgeModule {
   ): Promise<boolean> {
     const normalizedIdentity = identity.trim()
     return normalizedIdentity.length > 0
-      && this.getDomainDocumentByType(documentType, normalizedIdentity) == null
+      && this._getDomainDocumentByType(documentType, normalizedIdentity) == null
   }
 
   public async createDocument(request: DocumentCreateRequest): Promise<DocumentCreateResult> {
@@ -176,7 +176,7 @@ export class EndgeDomainRepository extends EndgeModule {
     }
 
     const provider = this._requireServiceProvider()
-    const identity = this.resolveDocumentIdentity(documentIdOrIdentity, documentType)
+    const identity = this._resolveDocumentIdentity(documentIdOrIdentity, documentType)
     const collection = resolveEndgeServiceCollection(documentType)
     const state = this._requireDocumentServerState(collection, identity)
     const result = await provider.softDeleteDocument({
@@ -204,7 +204,7 @@ export class EndgeDomainRepository extends EndgeModule {
     }
 
     const provider = this._requireServiceProvider()
-    const identity = this.resolveDocumentIdentity(documentIdOrIdentity, documentType)
+    const identity = this._resolveDocumentIdentity(documentIdOrIdentity, documentType)
     const collection = resolveEndgeServiceCollection(documentType)
     const state = this._requireDocumentServerState(collection, identity)
     const result = await provider.restoreDocument({
@@ -223,7 +223,7 @@ export class EndgeDomainRepository extends EndgeModule {
     folderIdOrIdentity: string | number | null,
   ): Promise<void> {
     this._assertMutationsSupported()
-    const model = this.getDomainDocumentByType(documentType, documentId)
+    const model = this._getDomainDocumentByType(documentType, documentId)
     if (!model) {
       throw new Error(`Документ не найден: ${String(documentId)}`)
     }
@@ -257,12 +257,12 @@ export class EndgeDomainRepository extends EndgeModule {
     }
 
     const requests = documents.map(({ documentId, documentType }) => {
-      const model = this.getDomainDocumentByType(documentType, documentId)
+      const model = this._getDomainDocumentByType(documentType, documentId)
       if (!model) {
         throw new Error(`Документ не найден: ${String(documentId)}`)
       }
       const collection = resolveEndgeServiceCollection(documentType)
-      const identity = this.resolveDocumentIdentity(documentId, documentType)
+      const identity = this._resolveDocumentIdentity(documentId, documentType)
       const state = this._requireDocumentServerState(collection, identity)
       return { collection, identity, expectedRevision: state.revision }
     })
@@ -482,7 +482,7 @@ export class EndgeDomainRepository extends EndgeModule {
       return
     }
 
-    const model = opts?.model ?? this.getDomainDocumentByType(documentType, documentId)
+    const model = opts?.model ?? this._getDomainDocumentByType(documentType, documentId)
     if (!model) {
       throw new Error(`Документ не найден: ${String(documentId)}`)
     }
@@ -491,7 +491,7 @@ export class EndgeDomainRepository extends EndgeModule {
     const collection = resolveEndgeServiceCollection(documentType)
     const persistedIdentity = String(opts?.previousIdentity ?? '').trim()
       || this._findServerIdentity(collection, documentId)
-      || String((this.getDomainDocumentByType(documentType, documentId) as any)?.identity ?? identity).trim()
+      || String((this._getDomainDocumentByType(documentType, documentId) as any)?.identity ?? identity).trim()
     const state = this._documentServerState.get(this._serverStateKey(collection, persistedIdentity))
     const request = {
       workspaceIdentity: this._serviceWorkspaceIdentity(),
@@ -516,8 +516,8 @@ export class EndgeDomainRepository extends EndgeModule {
     const identity = String(document.identity ?? '').trim()
     const current = replaceRef == null
       ? null
-      : this.getDomainDocumentByType(documentType, replaceRef)
-        ?? (previousIdentity ? this.getDomainDocumentByType(documentType, previousIdentity) : null)
+      : this._getDomainDocumentByType(documentType, replaceRef)
+        ?? (previousIdentity ? this._getDomainDocumentByType(documentType, previousIdentity) : null)
     const persistedIdentity = String((current as any)?.identity ?? previousIdentity ?? replaceRef ?? '').trim()
 
     if (persistedIdentity && persistedIdentity !== identity) {
@@ -558,15 +558,15 @@ export class EndgeDomainRepository extends EndgeModule {
     this._notifyDomainChanged()
   }
 
-  private resolveDocumentIdentity(
+  private _resolveDocumentIdentity(
     documentIdOrIdentity: string | number,
     documentType: DomainDocumentType,
   ): string {
-    const document = this.getDomainDocumentByType(documentType, documentIdOrIdentity)
+    const document = this._getDomainDocumentByType(documentType, documentIdOrIdentity)
     return String((document as any)?.identity ?? documentIdOrIdentity)
   }
 
-  private getDomainDocumentByType(
+  private _getDomainDocumentByType(
     documentType: DomainDocumentType,
     documentIdOrIdentity: string | number,
   ): any | null {
@@ -662,7 +662,7 @@ export class EndgeDomainRepository extends EndgeModule {
     documentType: DomainDocumentType,
     documentIdOrIdentity: string | number,
   ): void {
-    const existing = this.getDomainDocumentByType(documentType, documentIdOrIdentity)
+    const existing = this._getDomainDocumentByType(documentType, documentIdOrIdentity)
     if (!existing) {
       return
     }

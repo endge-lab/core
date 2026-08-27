@@ -60,13 +60,13 @@ export class EndgeVocabs extends EndgeModule {
    * slug -> namespace
    * Можно оставить для getNamespaceValues (чтобы понимать какие slugs в пространстве)
    */
-  private index: Record<string, string> = {}
-  private byIdCache: Record<string, any[]> = {}
-  private readonly loadedIdentities = new Set<string>()
-  private readonly loadedAtByIdentity = new Map<string, number>()
-  private readonly loadedModeByIdentity = new Map<string, 'live' | 'mock'>()
-  private readonly inFlight = new Map<string, Promise<any[]>>()
-  private readonly cacheVersions = new Map<string, number>()
+  private _index: Record<string, string> = {}
+  private _byIdCache: Record<string, any[]> = {}
+  private readonly _loadedIdentities = new Set<string>()
+  private readonly _loadedAtByIdentity = new Map<string, number>()
+  private readonly _loadedModeByIdentity = new Map<string, 'live' | 'mock'>()
+  private readonly _inFlight = new Map<string, Promise<any[]>>()
+  private readonly _cacheVersions = new Map<string, number>()
   private _loadingRequests: number = 0
   loading: boolean = false
 
@@ -88,7 +88,7 @@ export class EndgeVocabs extends EndgeModule {
       }
     }
 
-    this.index = nextIndex
+    this._index = nextIndex
   }
 
   /**
@@ -101,26 +101,26 @@ export class EndgeVocabs extends EndgeModule {
       return
     }
 
-    const cfg = this.resolveVocabConfigByIdentityOrSlug(ns, ns)
+    const cfg = this._resolveVocabConfigByIdentityOrSlug(ns, ns)
     if (!cfg) {
       console.warn(`Vocab с identity или collectionSlug="${ns}" не найден`)
       return
     }
 
-    const base = this.resolveBaseUrl(cfg.baseApiUrl)
+    const base = this._resolveBaseUrl(cfg.baseApiUrl)
     if (!base) {
       return
     }
 
-    const headers = await this.resolveAuthHeaders(cfg)
+    const headers = await this._resolveAuthHeaders(cfg)
 
     try {
       const res = await fetch(`${base}/${cfg.slug}?limit=10000`, { headers })
       const json = await res.json()
-      const docs = this.extractDocs(json)
+      const docs = this._extractDocs(json)
 
-      this.setCache(cfg, docs)
-      this.markLoaded(cfg.identity)
+      this._setCache(cfg, docs)
+      this._markLoaded(cfg.identity)
     }
     catch (e: any) {
       const msg = e?.message ?? String(e)
@@ -141,7 +141,7 @@ export class EndgeVocabs extends EndgeModule {
       return this.getVocabsValues(ns, vocabs)
     }
 
-    const cfg = this.resolveVocabConfigByIdentityOrSlug(ns, ns)
+    const cfg = this._resolveVocabConfigByIdentityOrSlug(ns, ns)
     if (!cfg) {
       return []
     }
@@ -160,8 +160,8 @@ export class EndgeVocabs extends EndgeModule {
       return []
     }
 
-    const cfg = this.resolveVocabConfigByIdentityOrSlug(vb, vb)
-    const data = cfg ? this.getCache(cfg) : Raph.get(`vocabs.${vb}`)
+    const cfg = this._resolveVocabConfigByIdentityOrSlug(vb, vb)
+    const data = cfg ? this._getCache(cfg) : Raph.get(`vocabs.${vb}`)
     return Array.isArray(data) ? data : []
   }
 
@@ -177,8 +177,8 @@ export class EndgeVocabs extends EndgeModule {
       return []
     }
 
-    const cfg = this.resolveVocabConfigByIdentityOrSlug(vb, vb)
-    const data = cfg ? this.getCache(cfg) : Raph.get(`vocabs.${vb}`)
+    const cfg = this._resolveVocabConfigByIdentityOrSlug(vb, vb)
+    const data = cfg ? this._getCache(cfg) : Raph.get(`vocabs.${vb}`)
     return Array.isArray(data) ? data : []
   }
 
@@ -197,29 +197,29 @@ export class EndgeVocabs extends EndgeModule {
       return []
     }
 
-    const cachedCfg = this.resolveVocabConfigByIdentityOrSlug(ns, slug)
-    const cached = cachedCfg ? this.getCache(cachedCfg) : Raph.get(`vocabs.${slug}`)
+    const cachedCfg = this._resolveVocabConfigByIdentityOrSlug(ns, slug)
+    const cached = cachedCfg ? this._getCache(cachedCfg) : Raph.get(`vocabs.${slug}`)
     if (Array.isArray(cached) && cached.length > 0) {
       return cached.slice(0, limit)
     }
 
-    const cfg = this.resolveVocabConfigByIdentityOrSlug(ns, slug)
+    const cfg = this._resolveVocabConfigByIdentityOrSlug(ns, slug)
     if (!cfg) {
       return []
     }
 
-    const base = this.resolveBaseUrl(cfg.baseApiUrl)
+    const base = this._resolveBaseUrl(cfg.baseApiUrl)
     if (!base) {
       return []
     }
 
-    const headers = await this.resolveAuthHeaders(cfg)
+    const headers = await this._resolveAuthHeaders(cfg)
 
     try {
       const url = `${base}/${cfg.slug}?limit=${Math.max(1, limit)}`
       const res = await fetch(url, { headers })
       const json = await res.json()
-      const docs = this.extractDocs(json)
+      const docs = this._extractDocs(json)
       return docs.slice(0, limit)
     }
     catch (e: any) {
@@ -232,7 +232,7 @@ export class EndgeVocabs extends EndgeModule {
    * Возвращает значения словаря по id, используя Raph cache и локальный fallback cache.
    */
   getValuesById(vocabId: string | number): Array<any> {
-    const cfg = this.resolveVocabConfigById(vocabId)
+    const cfg = this._resolveVocabConfigById(vocabId)
     if (!cfg) {
       return []
     }
@@ -242,17 +242,17 @@ export class EndgeVocabs extends EndgeModule {
       return byIdData
     }
 
-    const fallback = this.byIdCache[cfg.identity]
+    const fallback = this._byIdCache[cfg.identity]
     if (Array.isArray(fallback)) {
       return fallback
     }
 
-    const bySlug = this.getCache(cfg)
+    const bySlug = this._getCache(cfg)
     if (!Array.isArray(bySlug)) {
       return []
     }
 
-    this.setByIdentityCache(cfg.identity, bySlug)
+    this._setByIdentityCache(cfg.identity, bySlug)
     return bySlug
   }
 
@@ -267,16 +267,16 @@ export class EndgeVocabs extends EndgeModule {
    * Очищает cache словаря по id.
    */
   clearCacheById(vocabId: string | number): void {
-    const cfg = this.resolveVocabConfigByIdOrIdentity(vocabId)
+    const cfg = this._resolveVocabConfigByIdOrIdentity(vocabId)
     if (!cfg) {
       return
     }
 
-    this.bumpCacheVersion(cfg.identity)
-    this.loadedIdentities.delete(cfg.identity)
-    this.loadedAtByIdentity.delete(cfg.identity)
-    this.loadedModeByIdentity.delete(cfg.identity)
-    delete this.byIdCache[cfg.identity]
+    this._bumpCacheVersion(cfg.identity)
+    this._loadedIdentities.delete(cfg.identity)
+    this._loadedAtByIdentity.delete(cfg.identity)
+    this._loadedModeByIdentity.delete(cfg.identity)
+    delete this._byIdCache[cfg.identity]
     Raph.delete(`vocabsByIdentity.${cfg.identity}`)
     Raph.delete(`vocabs.${cfg.identity}`)
     if (cfg.slug) {
@@ -292,13 +292,13 @@ export class EndgeVocabs extends EndgeModule {
     policy: Partial<VocabLoadPolicy> = {},
     options: VocabAcquireOptions = {},
   ): Promise<VocabCacheOperationResult[]> {
-    const effectivePolicy = this.normalizePolicy(policy)
+    const effectivePolicy = this._normalizePolicy(policy)
     const dataMode = options.dataMode ?? 'live'
-    return await Promise.all(this.normalizeReferences(vocabs).map(async (reference) => {
-      const cfg = this.requireVocabConfig(reference)
-      const cached = this.getCache(cfg)
-      const hasCache = this.loadedModeByIdentity.get(cfg.identity) === dataMode && Array.isArray(cached)
-      const isFresh = hasCache && this.isFresh(cfg.identity, effectivePolicy.maxAgeMs)
+    return await Promise.all(this._normalizeReferences(vocabs).map(async (reference) => {
+      const cfg = this._requireVocabConfig(reference)
+      const cached = this._getCache(cfg)
+      const hasCache = this._loadedModeByIdentity.get(cfg.identity) === dataMode && Array.isArray(cached)
+      const isFresh = hasCache && this._isFresh(cfg.identity, effectivePolicy.maxAgeMs)
 
       if (effectivePolicy.strategy === 'cache-first' && isFresh) {
         return {
@@ -316,7 +316,7 @@ export class EndgeVocabs extends EndgeModule {
             count: cached.length,
           }
         }
-        void this.loadShared(cfg, true, dataMode).catch((error: any) => {
+        void this._loadShared(cfg, true, dataMode).catch((error: any) => {
           console.warn(`[EndgeVocabs.acquire] background refresh ${cfg.identity}: ${error instanceof Error ? error.message : String(error)}`)
         })
         return {
@@ -327,7 +327,7 @@ export class EndgeVocabs extends EndgeModule {
       }
 
       try {
-        const docs = await this.loadShared(cfg, hasCache || effectivePolicy.strategy === 'network-first', dataMode)
+        const docs = await this._loadShared(cfg, hasCache || effectivePolicy.strategy === 'network-first', dataMode)
         return {
           identity: cfg.identity,
           status: hasCache ? 'refreshed' : 'loaded',
@@ -335,7 +335,7 @@ export class EndgeVocabs extends EndgeModule {
         }
       }
       catch (error) {
-        const fallback = this.getCache(cfg)
+        const fallback = this._getCache(cfg)
         if (effectivePolicy.onError === 'use-cache' && Array.isArray(fallback)) {
           return {
             identity: cfg.identity,
@@ -352,9 +352,9 @@ export class EndgeVocabs extends EndgeModule {
    * Принудительно обновляет справочники параллельно, сохраняя дедупликацию одновременных запросов.
    */
   async refresh(vocabs: readonly VocabReference[]): Promise<VocabCacheOperationResult[]> {
-    return await Promise.all(this.normalizeReferences(vocabs).map(async (reference) => {
-      const cfg = this.requireVocabConfig(reference)
-      const docs = await this.loadShared(cfg, true)
+    return await Promise.all(this._normalizeReferences(vocabs).map(async (reference) => {
+      const cfg = this._requireVocabConfig(reference)
+      const docs = await this._loadShared(cfg, true)
       return {
         identity: cfg.identity,
         status: 'refreshed',
@@ -367,9 +367,9 @@ export class EndgeVocabs extends EndgeModule {
    * Удаляет справочники только из runtime cache, не выполняя сетевых запросов.
    */
   invalidate(vocabs: readonly VocabReference[]): VocabCacheOperationResult[] {
-    return this.normalizeReferences(vocabs).map((reference) => {
-      const cfg = this.requireVocabConfig(reference)
-      const cached = this.getCache(cfg)
+    return this._normalizeReferences(vocabs).map((reference) => {
+      const cfg = this._requireVocabConfig(reference)
+      const cached = this._getCache(cfg)
       const count = Array.isArray(cached) ? cached.length : 0
       this.clearCacheById(reference)
       return {
@@ -384,14 +384,14 @@ export class EndgeVocabs extends EndgeModule {
    * Загружает словарь по id и кладет результат в Raph cache.
    */
   async loadById(vocabId: string | number, limit: number = 10000): Promise<void> {
-    const cfg = this.resolveVocabConfigById(vocabId)
+    const cfg = this._resolveVocabConfigById(vocabId)
     if (!cfg) {
       return
     }
-    const headers = await this.resolveAuthHeaders(cfg)
+    const headers = await this._resolveAuthHeaders(cfg)
 
     const maxLimit = Math.max(1, Number(limit) || 10000)
-    const baseUrl = this.resolveBaseUrl(cfg.baseApiUrl)
+    const baseUrl = this._resolveBaseUrl(cfg.baseApiUrl)
     if (!baseUrl) {
       return
     }
@@ -400,9 +400,9 @@ export class EndgeVocabs extends EndgeModule {
     try {
       const res = await fetch(url, { headers })
       const json = await res.json()
-      const docs = this.extractDocs(json)
-      this.setCache(cfg, docs)
-      this.markLoaded(cfg.identity)
+      const docs = this._extractDocs(json)
+      this._setCache(cfg, docs)
+      this._markLoaded(cfg.identity)
     }
     catch (e: any) {
       console.warn(`[EndgeVocabs.loadById] ${cfg.idKey}/${cfg.slug}: ${e instanceof Error ? e.message : String(e)}`)
@@ -414,7 +414,7 @@ export class EndgeVocabs extends EndgeModule {
    */
   async getSampleById(vocabId: string | number, limit: number = 1): Promise<any[]> {
     const maxLimit = Math.max(1, Number(limit) || 1)
-    const cfg = this.resolveVocabConfigById(vocabId)
+    const cfg = this._resolveVocabConfigById(vocabId)
     if (!cfg) {
       return []
     }
@@ -424,15 +424,15 @@ export class EndgeVocabs extends EndgeModule {
       return byIdCached.slice(0, maxLimit)
     }
 
-    const bySlugCached = this.getCache(cfg)
+    const bySlugCached = this._getCache(cfg)
     if (Array.isArray(bySlugCached) && bySlugCached.length > 0) {
-      this.setByIdentityCache(cfg.identity, bySlugCached)
+      this._setByIdentityCache(cfg.identity, bySlugCached)
       return bySlugCached.slice(0, maxLimit)
     }
 
-    const headers = await this.resolveAuthHeaders(cfg)
+    const headers = await this._resolveAuthHeaders(cfg)
 
-    const baseUrl = this.resolveBaseUrl(cfg.baseApiUrl)
+    const baseUrl = this._resolveBaseUrl(cfg.baseApiUrl)
     if (!baseUrl) {
       return []
     }
@@ -441,8 +441,8 @@ export class EndgeVocabs extends EndgeModule {
       const url = `${baseUrl}/${cfg.slug}?limit=${maxLimit}`
       const res = await fetch(url, { headers })
       const json = await res.json()
-      const docs = this.extractDocs(json)
-      this.setCache(cfg, docs)
+      const docs = this._extractDocs(json)
+      this._setCache(cfg, docs)
       return docs.slice(0, maxLimit)
     }
     catch (e: any) {
@@ -458,21 +458,21 @@ export class EndgeVocabs extends EndgeModule {
     idOrIdentity: string | number,
     options: { throwOnError?: boolean, dataMode?: 'live' | 'mock' } = {},
   ): Promise<any[]> {
-    const cfg = this.resolveVocabConfigByIdOrIdentity(idOrIdentity)
+    const cfg = this._resolveVocabConfigByIdOrIdentity(idOrIdentity)
     if (!cfg) {
       if (options.throwOnError) {
         throw new Error(`Vocab "${String(idOrIdentity)}" не найден.`)
       }
       return []
     }
-    this.setLoadingState(true)
+    this._setLoadingState(true)
     try {
       const raw = options.dataMode === 'mock'
-        ? this.resolveMockValue(cfg)
+        ? this._resolveMockValue(cfg)
         : await this.loadRawVocab(cfg.identity, { throwOnError: true })
-      const items = this.applyOutputs(cfg, raw)
-      this.setCache(cfg, items)
-      this.markLoaded(cfg.identity, options.dataMode ?? 'live')
+      const items = this._applyOutputs(cfg, raw)
+      this._setCache(cfg, items)
+      this._markLoaded(cfg.identity, options.dataMode ?? 'live')
       return items
     }
     catch (e: any) {
@@ -483,7 +483,7 @@ export class EndgeVocabs extends EndgeModule {
       return []
     }
     finally {
-      this.setLoadingState(false)
+      this._setLoadingState(false)
     }
   }
 
@@ -492,7 +492,7 @@ export class EndgeVocabs extends EndgeModule {
     idOrIdentity: string | number,
     options: { limit?: number, throwOnError?: boolean } = {},
   ): Promise<unknown> {
-    const cfg = this.resolveVocabConfigByIdOrIdentity(idOrIdentity)
+    const cfg = this._resolveVocabConfigByIdOrIdentity(idOrIdentity)
     if (!cfg) {
       if (options.throwOnError) {
         throw new Error(`Vocab "${String(idOrIdentity)}" не найден.`)
@@ -505,7 +505,7 @@ export class EndgeVocabs extends EndgeModule {
       }
       return []
     }
-    const baseUrl = this.resolveBaseUrl(cfg.baseApiUrl)
+    const baseUrl = this._resolveBaseUrl(cfg.baseApiUrl)
     if (!baseUrl) {
       if (options.throwOnError) {
         throw new Error(`Vocab "${cfg.identity}" не содержит доступный provider.baseUrl.`)
@@ -513,7 +513,7 @@ export class EndgeVocabs extends EndgeModule {
       return []
     }
 
-    const headers = await this.resolveAuthHeaders(cfg)
+    const headers = await this._resolveAuthHeaders(cfg)
     const requestedLimit = options.limit == null ? null : Math.max(1, Math.floor(options.limit))
     const pageSize = requestedLimit == null ? 1000 : Math.min(1000, requestedLimit)
     const allDocs: unknown[] = []
@@ -526,7 +526,7 @@ export class EndgeVocabs extends EndgeModule {
           throw new Error(`HTTP ${response.status} ${response.statusText}`.trim())
         }
         const json = await response.json()
-        const docs = this.extractDocs(json)
+        const docs = this._extractDocs(json)
         allDocs.push(...docs)
         if (requestedLimit != null && allDocs.length >= requestedLimit) {
           return allDocs.slice(0, requestedLimit)
@@ -561,7 +561,7 @@ export class EndgeVocabs extends EndgeModule {
   }
 
   /** Применяет pipeline source-outputs и проверяет обязательный массив items. */
-  private applyOutputs(cfg: VocabRuntimeConfig, raw: unknown): any[] {
+  private _applyOutputs(cfg: VocabRuntimeConfig, raw: unknown): any[] {
     const values: Record<string, unknown> = {}
     for (const output of cfg.outputs) {
       const input = output.source.type === 'response'
@@ -582,7 +582,7 @@ export class EndgeVocabs extends EndgeModule {
   }
 
   /** Читает explicit Mock JSON; отсутствие ссылки штатно означает пустой Vocab. */
-  private resolveMockValue(cfg: VocabRuntimeConfig): unknown {
+  private _resolveMockValue(cfg: VocabRuntimeConfig): unknown {
     if (!cfg.mock) {
       return []
     }
@@ -600,46 +600,46 @@ export class EndgeVocabs extends EndgeModule {
   /**
    * Нормализует Vocab Id.
    */
-  private normalizeVocabId(vocabId: string | number): string {
+  private _normalizeVocabId(vocabId: string | number): string {
     return String(vocabId ?? '').trim()
   }
 
-  private normalizeReferences(vocabs: readonly VocabReference[]): VocabReference[] {
+  private _normalizeReferences(vocabs: readonly VocabReference[]): VocabReference[] {
     return [...new Map(vocabs
-      .map(reference => [this.normalizeVocabId(reference), reference] as const)
+      .map(reference => [this._normalizeVocabId(reference), reference] as const)
       .filter(([key]) => Boolean(key))).values()]
   }
 
-  private requireVocabConfig(reference: VocabReference): VocabRuntimeConfig {
-    const cfg = this.resolveVocabConfigByIdOrIdentity(reference)
+  private _requireVocabConfig(reference: VocabReference): VocabRuntimeConfig {
+    const cfg = this._resolveVocabConfigByIdOrIdentity(reference)
     if (!cfg) {
       throw new Error(`Vocab "${String(reference)}" не найден.`)
     }
     return cfg
   }
 
-  private async loadShared(cfg: VocabRuntimeConfig, force: boolean, dataMode: 'live' | 'mock' = 'live'): Promise<any[]> {
+  private async _loadShared(cfg: VocabRuntimeConfig, force: boolean, dataMode: 'live' | 'mock' = 'live'): Promise<any[]> {
     const requestKey = `${dataMode}:${cfg.identity}`
-    const existing = this.inFlight.get(requestKey)
+    const existing = this._inFlight.get(requestKey)
     if (existing) {
       return await existing
     }
 
     if (!force) {
-      const cached = this.getCache(cfg)
+      const cached = this._getCache(cfg)
       if (Array.isArray(cached)) {
         return cached
       }
     }
 
-    const version = this.cacheVersions.get(cfg.identity) ?? 0
+    const version = this._cacheVersions.get(cfg.identity) ?? 0
     const request = this.loadVocab(cfg.identity, { throwOnError: true, dataMode })
       .then((docs) => {
-        if ((this.cacheVersions.get(cfg.identity) ?? 0) !== version) {
-          delete this.byIdCache[cfg.identity]
-          this.loadedIdentities.delete(cfg.identity)
-          this.loadedAtByIdentity.delete(cfg.identity)
-          this.loadedModeByIdentity.delete(cfg.identity)
+        if ((this._cacheVersions.get(cfg.identity) ?? 0) !== version) {
+          delete this._byIdCache[cfg.identity]
+          this._loadedIdentities.delete(cfg.identity)
+          this._loadedAtByIdentity.delete(cfg.identity)
+          this._loadedModeByIdentity.delete(cfg.identity)
           Raph.delete(`vocabsByIdentity.${cfg.identity}`)
           Raph.delete(`vocabs.${cfg.identity}`)
           if (cfg.slug) {
@@ -649,20 +649,20 @@ export class EndgeVocabs extends EndgeModule {
         return docs
       })
       .finally(() => {
-        if (this.inFlight.get(requestKey) === request) {
-          this.inFlight.delete(requestKey)
+        if (this._inFlight.get(requestKey) === request) {
+          this._inFlight.delete(requestKey)
         }
       })
 
-    this.inFlight.set(requestKey, request)
+    this._inFlight.set(requestKey, request)
     return await request
   }
 
-  private bumpCacheVersion(identity: string): void {
-    this.cacheVersions.set(identity, (this.cacheVersions.get(identity) ?? 0) + 1)
+  private _bumpCacheVersion(identity: string): void {
+    this._cacheVersions.set(identity, (this._cacheVersions.get(identity) ?? 0) + 1)
   }
 
-  private normalizePolicy(policy: Partial<VocabLoadPolicy>): VocabLoadPolicy {
+  private _normalizePolicy(policy: Partial<VocabLoadPolicy>): VocabLoadPolicy {
     return {
       strategy: policy.strategy ?? DEFAULT_VOCAB_LOAD_POLICY.strategy,
       maxAgeMs: policy.maxAgeMs === undefined
@@ -672,32 +672,32 @@ export class EndgeVocabs extends EndgeModule {
     }
   }
 
-  private isFresh(identity: string, maxAgeMs: number | null): boolean {
+  private _isFresh(identity: string, maxAgeMs: number | null): boolean {
     if (maxAgeMs === null) {
       return true
     }
-    const loadedAt = this.loadedAtByIdentity.get(identity)
+    const loadedAt = this._loadedAtByIdentity.get(identity)
     return typeof loadedAt === 'number' && Date.now() - loadedAt <= maxAgeMs
   }
 
-  private markLoaded(identity: string, dataMode: 'live' | 'mock' = 'live'): void {
-    this.loadedAtByIdentity.set(identity, Date.now())
-    this.loadedModeByIdentity.set(identity, dataMode)
+  private _markLoaded(identity: string, dataMode: 'live' | 'mock' = 'live'): void {
+    this._loadedAtByIdentity.set(identity, Date.now())
+    this._loadedModeByIdentity.set(identity, dataMode)
   }
 
   /**
    * Устанавливает By Identity Cache.
    */
-  private setByIdentityCache(identity: string, docs: any[]): void {
-    this.byIdCache[identity] = Array.isArray(docs) ? docs : []
-    Raph.set(`vocabsByIdentity.${identity}`, this.byIdCache[identity])
-    this.loadedIdentities.add(identity)
+  private _setByIdentityCache(identity: string, docs: any[]): void {
+    this._byIdCache[identity] = Array.isArray(docs) ? docs : []
+    Raph.set(`vocabsByIdentity.${identity}`, this._byIdCache[identity])
+    this._loadedIdentities.add(identity)
   }
 
   /** Пишет canonical identity cache и переходный alias provider.collection. */
-  private setCache(cfg: VocabRuntimeConfig, docs: any[]): void {
+  private _setCache(cfg: VocabRuntimeConfig, docs: any[]): void {
     const values = Array.isArray(docs) ? docs : []
-    this.setByIdentityCache(cfg.identity, values)
+    this._setByIdentityCache(cfg.identity, values)
     Raph.set(`vocabs.${cfg.identity}`, values)
     if (cfg.slug && cfg.slug !== cfg.identity) {
       Raph.set(`vocabs.${cfg.slug}`, values)
@@ -705,7 +705,7 @@ export class EndgeVocabs extends EndgeModule {
   }
 
   /** Читает canonical identity cache с переходным fallback на collection alias. */
-  private getCache(cfg: VocabRuntimeConfig): unknown {
+  private _getCache(cfg: VocabRuntimeConfig): unknown {
     const canonical = Raph.get(`vocabs.${cfg.identity}`)
     return canonical !== undefined ? canonical : cfg.slug ? Raph.get(`vocabs.${cfg.slug}`) : undefined
   }
@@ -713,22 +713,22 @@ export class EndgeVocabs extends EndgeModule {
   /**
    * Разрешает Vocab Config By Id.
    */
-  private resolveVocabConfigById(vocabId: string | number): VocabRuntimeConfig | null {
+  private _resolveVocabConfigById(vocabId: string | number): VocabRuntimeConfig | null {
     const artifact = Endge.program.getVocabArtifact(vocabId)
       ?? Endge.program.getVocabArtifact(Number(vocabId))
-    return artifact ? this.createRuntimeConfig(artifact) : null
+    return artifact ? this._createRuntimeConfig(artifact) : null
   }
 
   /**
    * Разрешает Vocab Config By Id Or Identity.
    */
-  private resolveVocabConfigByIdOrIdentity(idOrIdentity: string | number): VocabRuntimeConfig | null {
+  private _resolveVocabConfigByIdOrIdentity(idOrIdentity: string | number): VocabRuntimeConfig | null {
     const artifact = Endge.program.getVocabArtifact(idOrIdentity)
-    return artifact ? this.createRuntimeConfig(artifact) : null
+    return artifact ? this._createRuntimeConfig(artifact) : null
   }
 
-  private createRuntimeConfig(artifact: ProgramArtifact<VocabProgramPayload>): VocabRuntimeConfig | null {
-    const idKey = this.normalizeVocabId(artifact.ref.id)
+  private _createRuntimeConfig(artifact: ProgramArtifact<VocabProgramPayload>): VocabRuntimeConfig | null {
+    const idKey = this._normalizeVocabId(artifact.ref.id)
     const identity = String(artifact.ref.identity ?? '').trim()
     if (!idKey || !identity) {
       return null
@@ -762,12 +762,12 @@ export class EndgeVocabs extends EndgeModule {
   }
 
   /** Находит runtime config справочника по identity или collection slug. */
-  private resolveVocabConfigByIdentityOrSlug(identity: string, collectionSlug: string): VocabRuntimeConfig | null {
+  private _resolveVocabConfigByIdentityOrSlug(identity: string, collectionSlug: string): VocabRuntimeConfig | null {
     const normalizedIdentity = String(identity ?? '').trim()
     const normalizedSlug = String(collectionSlug ?? '').trim()
 
     const direct = normalizedIdentity ? Endge.program.getVocabArtifact(normalizedIdentity) : null
-    const indexedIdentity = normalizedSlug ? this.index[normalizedSlug] : undefined
+    const indexedIdentity = normalizedSlug ? this._index[normalizedSlug] : undefined
     const indexed = indexedIdentity ? Endge.program.getVocabArtifact(indexedIdentity) : null
     const fallback = direct ?? indexed
 
@@ -775,11 +775,11 @@ export class EndgeVocabs extends EndgeModule {
       return null
     }
 
-    return this.createRuntimeConfig(fallback)
+    return this._createRuntimeConfig(fallback)
   }
 
   /** Собирает auth headers для обращения к внешнему справочнику. */
-  private async resolveAuthHeaders(cfg: { authMode?: 'inherit' | 'profile' | 'none', authProfileIdentity?: string | null }): Promise<Record<string, string>> {
+  private async _resolveAuthHeaders(cfg: { authMode?: 'inherit' | 'profile' | 'none', authProfileIdentity?: string | null }): Promise<Record<string, string>> {
     const mode = cfg.authMode ?? 'inherit'
     const session = await Endge.auth.requests.resolve(
       mode === 'profile'
@@ -792,7 +792,7 @@ export class EndgeVocabs extends EndgeModule {
   /**
    * Разрешает Base Url.
    */
-  private resolveBaseUrl(rawUrl: string): string {
+  private _resolveBaseUrl(rawUrl: string): string {
     const raw = String(rawUrl ?? '').trim()
     if (!raw) {
       return ''
@@ -822,7 +822,7 @@ export class EndgeVocabs extends EndgeModule {
   /**
    * Внутренний helper модуля: extract Docs.
    */
-  private extractDocs(json: any): any[] {
+  private _extractDocs(json: any): any[] {
     if (Array.isArray(json?.docs)) {
       return json.docs
     }
@@ -835,7 +835,7 @@ export class EndgeVocabs extends EndgeModule {
   /**
    * Устанавливает Loading State.
    */
-  private setLoadingState(next: boolean): void {
+  private _setLoadingState(next: boolean): void {
     if (next) {
       this._loadingRequests += 1
     }

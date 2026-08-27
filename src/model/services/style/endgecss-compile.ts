@@ -51,14 +51,24 @@ function emptyCompound(): EndgeStyleCompoundSelector {
   return { ids: [], classes: [], attributes: [], pseudos: [] }
 }
 
-function addSpecificity(target: EndgeStyleSpecificity, source: EndgeStyleSpecificity): void {
+function addSpecificity(
+  target: EndgeStyleSpecificity,
+  source: EndgeStyleSpecificity,
+): void {
   target.ids += source.ids
   target.classes += source.classes
   target.types += source.types
 }
 
-function compareSpecificity(left: EndgeStyleSpecificity, right: EndgeStyleSpecificity): number {
-  return left.ids - right.ids || left.classes - right.classes || left.types - right.types
+function compareSpecificity(
+  left: EndgeStyleSpecificity,
+  right: EndgeStyleSpecificity,
+): number {
+  return (
+    left.ids - right.ids
+    || left.classes - right.classes
+    || left.types - right.types
+  )
 }
 
 function parseSelectorNode(selectorNode: any): EndgeStyleSelector {
@@ -68,12 +78,21 @@ function parseSelectorNode(selectorNode: any): EndgeStyleSelector {
   const specificity: EndgeStyleSpecificity = { ids: 0, classes: 0, types: 0 }
 
   const flush = () => {
-    const hasValues = compound.universal || compound.tag || compound.ids.length > 0
-      || compound.classes.length > 0 || compound.attributes.length > 0 || compound.pseudos.length > 0
+    const hasValues
+      = compound.universal
+        || compound.tag
+        || compound.ids.length > 0
+        || compound.classes.length > 0
+        || compound.attributes.length > 0
+        || compound.pseudos.length > 0
     if (!hasValues) {
       return
     }
-    segments.push({ combinator: segments.length === 0 ? null : pendingCombinator ?? 'descendant', compound })
+    segments.push({
+      combinator:
+        segments.length === 0 ? null : (pendingCombinator ?? 'descendant'),
+      compound,
+    })
     compound = emptyCompound()
     pendingCombinator = null
   }
@@ -82,7 +101,14 @@ function parseSelectorNode(selectorNode: any): EndgeStyleSelector {
     if (node.type === 'combinator') {
       flush()
       const value = node.value.trim()
-      pendingCombinator = value === '>' ? 'child' : value === '+' ? 'adjacent' : value === '~' ? 'sibling' : 'descendant'
+      pendingCombinator
+        = value === '>'
+          ? 'child'
+          : value === '+'
+            ? 'adjacent'
+            : value === '~'
+              ? 'sibling'
+              : 'descendant'
       return
     }
 
@@ -120,7 +146,11 @@ function parseSelectorNode(selectorNode: any): EndgeStyleSelector {
     }
 
     const name = node.value.replace(/^:+/, '').toLowerCase()
-    const argument = node.nodes?.map((child: any) => child.toString()).join(',').trim() ?? ''
+    const argument
+      = node.nodes
+        ?.map((child: any) => child.toString())
+        .join(',')
+        .trim() ?? ''
     if (name === 'part' && node.value.startsWith('::')) {
       compound.pseudos.push({ name: 'part', value: argument, element: true })
       specificity.types += 1
@@ -142,11 +172,18 @@ function parseSelectorNode(selectorNode: any): EndgeStyleSelector {
       return
     }
     if (name === 'not' || name === 'is' || name === 'where') {
-      const selectors: EndgeStyleSelector[] = (node.nodes ?? []).map((child: any) => parseSelectorNode(child))
+      const selectors: EndgeStyleSelector[] = (node.nodes ?? []).map(
+        (child: any) => parseSelectorNode(child),
+      )
       compound.pseudos.push({ name, selectors })
       if (name !== 'where') {
-        const maximum = selectors.reduce((current: EndgeStyleSpecificity, selector: EndgeStyleSelector) =>
-          compareSpecificity(selector.specificity, current) > 0 ? selector.specificity : current, { ids: 0, classes: 0, types: 0 })
+        const maximum = selectors.reduce(
+          (current: EndgeStyleSpecificity, selector: EndgeStyleSelector) =>
+            compareSpecificity(selector.specificity, current) > 0
+              ? selector.specificity
+              : current,
+          { ids: 0, classes: 0, types: 0 },
+        )
         addSpecificity(specificity, maximum)
       }
       return
@@ -159,7 +196,9 @@ function parseSelectorNode(selectorNode: any): EndgeStyleSelector {
   return { source: selectorNode.toString(), segments, specificity }
 }
 
-export function parseEndgeStyleSelectorList(source: string): EndgeStyleSelector[] {
+export function parseEndgeStyleSelectorList(
+  source: string,
+): EndgeStyleSelector[] {
   const root = selectorParser().astSync(source)
   return root.nodes.map(selector => parseSelectorNode(selector))
 }
@@ -173,12 +212,16 @@ function parseValueTokens(source: string): EndgeStyleValueToken[] {
   return valueParser(source).nodes.map(convert)
 }
 
-function parseDeclaration(node: any, diagnostics: EndgeStyleDiagnostic[]): EndgeStyleDeclaration | null {
+function parseDeclaration(
+  node: any,
+  diagnostics: EndgeStyleDiagnostic[],
+): EndgeStyleDeclaration | null {
   if (node.prop.startsWith('$')) {
     diagnostics.push({
       severity: 'error',
       code: 'ENDGECSS_SCSS_VARIABLE_UNSUPPORTED',
-      message: 'SCSS $variables are not supported. Use CSS custom properties and var().',
+      message:
+        'SCSS $variables are not supported. Use CSS custom properties and var().',
       range: sourceRange(node),
     })
     return null
@@ -193,7 +236,10 @@ function parseDeclaration(node: any, diagnostics: EndgeStyleDiagnostic[]): Endge
   }
 }
 
-function splitTopLevelBoolean(source: string, operator: 'and' | 'or'): string[] {
+function splitTopLevelBoolean(
+  source: string,
+  operator: 'and' | 'or',
+): string[] {
   const result: string[] = []
   let depth = 0
   let start = 0
@@ -205,7 +251,10 @@ function splitTopLevelBoolean(source: string, operator: 'and' | 'or'): string[] 
     if (source[index] === ')') {
       depth -= 1
     }
-    if (depth === 0 && source.slice(index, index + pattern.length).toLowerCase() === pattern) {
+    if (
+      depth === 0
+      && source.slice(index, index + pattern.length).toLowerCase() === pattern
+    ) {
       result.push(source.slice(start, index).trim())
       start = index + pattern.length
       index = start - 1
@@ -240,18 +289,31 @@ function unwrapParentheses(source: string): string {
   return result
 }
 
-export function parseEndgeStyleSupportCondition(source: string): EndgeStyleSupportCondition {
+export function parseEndgeStyleSupportCondition(
+  source: string,
+): EndgeStyleSupportCondition {
   const normalized = unwrapParentheses(source)
   const orParts = splitTopLevelBoolean(normalized, 'or')
   if (orParts.length > 1) {
-    return { type: 'or', operands: orParts.map(parseEndgeStyleSupportCondition) }
+    return {
+      type: 'or',
+      operands: orParts.map(parseEndgeStyleSupportCondition),
+    }
   }
   const andParts = splitTopLevelBoolean(normalized, 'and')
   if (andParts.length > 1) {
-    return { type: 'and', operands: andParts.map(parseEndgeStyleSupportCondition) }
+    return {
+      type: 'and',
+      operands: andParts.map(parseEndgeStyleSupportCondition),
+    }
   }
   if (/^not\s+/i.test(normalized)) {
-    return { type: 'not', operand: parseEndgeStyleSupportCondition(normalized.replace(/^not\s+/i, '')) }
+    return {
+      type: 'not',
+      operand: parseEndgeStyleSupportCondition(
+        normalized.replace(/^not\s+/i, ''),
+      ),
+    }
   }
   const renderer = normalized.match(/^renderer\(\s*([\w-]+)\s*\)$/i)
   if (renderer) {
@@ -261,13 +323,17 @@ export function parseEndgeStyleSupportCondition(source: string): EndgeStyleSuppo
   if (capability) {
     return { type: 'capability', capability: capability[1] }
   }
-  throw new Error(`Expected renderer(name) or capability(name), received: ${source}`)
+  throw new Error(
+    `Expected renderer(name) or capability(name), received: ${source}`,
+  )
 }
 
 function parseScope(source: string): EndgeStyleScope {
   const match = source.trim().match(/^\((.+?)\)(?:\s+to\s+\((.+)\))?$/s)
   if (!match) {
-    throw new Error('Expected @scope (<selector>) or @scope (<selector>) to (<selector>)')
+    throw new Error(
+      'Expected @scope (<selector>) or @scope (<selector>) to (<selector>)',
+    )
   }
   return {
     root: parseEndgeStyleSelectorList(match[1]),
@@ -276,30 +342,56 @@ function parseScope(source: string): EndgeStyleScope {
 }
 
 function selectorsFromRule(rule: Rule): string[] {
-  return selectorParser().astSync(rule.selector).nodes.map(selector => selector.toString())
+  return selectorParser()
+    .astSync(rule.selector)
+    .nodes
+    .map(selector => selector.toString())
 }
 
-function expandNestedSelectors(parents: string[], children: string[], maximum: number): string[] {
+function expandNestedSelectors(
+  parents: string[],
+  children: string[],
+  maximum: number,
+): string[] {
   if (parents.length === 0) {
     return children
   }
   if (parents.length * children.length > maximum) {
-    throw new Error(`Nested selector expansion exceeds the limit of ${maximum}`)
+    throw new Error(
+      `Nested selector expansion exceeds the limit of ${maximum}`,
+    )
   }
   const result: string[] = []
   for (const parent of parents) {
     for (const child of children) {
-      result.push(child.includes('&') ? child.replaceAll('&', parent) : `${parent} ${child}`)
+      result.push(
+        child.includes('&')
+          ? child.replaceAll('&', parent)
+          : `${parent} ${child}`,
+      )
     }
   }
   return result
 }
 
 function createEmptyIndex(): EndgeStyleRuleIndex {
-  return { universal: [], tags: {}, classes: {}, ids: {}, components: {}, identities: {}, states: {}, parts: {} }
+  return {
+    universal: [],
+    tags: {},
+    classes: {},
+    ids: {},
+    components: {},
+    identities: {},
+    states: {},
+    parts: {},
+  }
 }
 
-function appendIndex(index: Record<string, string[]>, key: string, ruleId: string): void {
+function appendIndex(
+  index: Record<string, string[]>,
+  key: string,
+  ruleId: string,
+): void {
   const values = index[key] ?? (index[key] = [])
   if (!values.includes(ruleId)) {
     values.push(ruleId)
@@ -313,14 +405,35 @@ function indexRules(rules: EndgeStyleRule[]): EndgeStyleRuleIndex {
     for (const selector of rule.selectors) {
       for (const segment of selector.segments) {
         const compound = segment.compound
-        if (compound.tag) { appendIndex(index.tags, compound.tag, rule.id); indexed = true }
-        for (const value of compound.classes) { appendIndex(index.classes, value, rule.id); indexed = true }
-        for (const value of compound.ids) { appendIndex(index.ids, value, rule.id); indexed = true }
+        if (compound.tag) {
+          appendIndex(index.tags, compound.tag, rule.id)
+          indexed = true
+        }
+        for (const value of compound.classes) {
+          appendIndex(index.classes, value, rule.id)
+          indexed = true
+        }
+        for (const value of compound.ids) {
+          appendIndex(index.ids, value, rule.id)
+          indexed = true
+        }
         for (const pseudo of compound.pseudos) {
-          if (pseudo.name === 'component') { appendIndex(index.components, pseudo.value, rule.id); indexed = true }
-          if (pseudo.name === 'identity') { appendIndex(index.identities, pseudo.value, rule.id); indexed = true }
-          if (pseudo.name === 'state') { appendIndex(index.states, pseudo.value, rule.id); indexed = true }
-          if (pseudo.name === 'part') { appendIndex(index.parts, pseudo.value, rule.id); indexed = true }
+          if (pseudo.name === 'component') {
+            appendIndex(index.components, pseudo.value, rule.id)
+            indexed = true
+          }
+          if (pseudo.name === 'identity') {
+            appendIndex(index.identities, pseudo.value, rule.id)
+            indexed = true
+          }
+          if (pseudo.name === 'state') {
+            appendIndex(index.states, pseudo.value, rule.id)
+            indexed = true
+          }
+          if (pseudo.name === 'part') {
+            appendIndex(index.parts, pseudo.value, rule.id)
+            indexed = true
+          }
         }
       }
     }
@@ -331,7 +444,10 @@ function indexRules(rules: EndgeStyleRule[]): EndgeStyleRuleIndex {
   return index
 }
 
-export function compileEndgeCSS(source: string, options: CompileEndgeCSSOptions = {}): CompileEndgeCSSResult {
+export function compileEndgeCSS(
+  source: string,
+  options: CompileEndgeCSSOptions = {},
+): CompileEndgeCSSResult {
   const diagnostics: EndgeStyleDiagnostic[] = []
   const rules: EndgeStyleRule[] = []
   const themes: EndgeStyleTheme[] = []
@@ -346,7 +462,14 @@ export function compileEndgeCSS(source: string, options: CompileEndgeCSSOptions 
       severity: 'error',
       code: 'ENDGECSS_SYNTAX',
       message: error.reason ?? error.message ?? String(error),
-      range: error.line ? { start: error.input?.column ?? 0, end: error.input?.column ?? 0, line: error.line, column: error.column } : undefined,
+      range: error.line
+        ? {
+            start: error.input?.column ?? 0,
+            end: error.input?.column ?? 0,
+            line: error.line,
+            column: error.column,
+          }
+        : undefined,
     })
     return { ast: null, artifact: null, diagnostics }
   }
@@ -354,7 +477,11 @@ export function compileEndgeCSS(source: string, options: CompileEndgeCSSOptions 
   const visit = (
     container: Container,
     parentSelectors: string[] = [],
-    context: { theme?: string, scope?: EndgeStyleScope, supports?: EndgeStyleSupportCondition } = {},
+    context: {
+      theme?: string
+      scope?: EndgeStyleScope
+      supports?: EndgeStyleSupportCondition
+    } = {},
   ) => {
     for (const node of container.nodes ?? []) {
       if (node.type === 'comment' || node.type === 'decl') {
@@ -363,13 +490,26 @@ export function compileEndgeCSS(source: string, options: CompileEndgeCSSOptions 
 
       if (node.type === 'rule') {
         try {
-          const expanded = expandNestedSelectors(parentSelectors, selectorsFromRule(node), maximum)
+          const expanded = expandNestedSelectors(
+            parentSelectors,
+            selectorsFromRule(node),
+            maximum,
+          )
           const declarations = (node.nodes ?? [])
             .filter(child => child.type === 'decl')
             .map(child => parseDeclaration(child, diagnostics))
-            .filter((declaration): declaration is EndgeStyleDeclaration => declaration !== null)
+            .filter(
+              (declaration): declaration is EndgeStyleDeclaration =>
+                declaration !== null,
+            )
           if (expanded.some(selector => selector.includes('::slot('))) {
-            diagnostics.push({ severity: 'error', code: 'ENDGECSS_SLOT_RESERVED', message: '::slot() is reserved for a future structural slot contract.', range: sourceRange(node) })
+            diagnostics.push({
+              severity: 'error',
+              code: 'ENDGECSS_SLOT_RESERVED',
+              message:
+                '::slot() is reserved for a future structural slot contract.',
+              range: sourceRange(node),
+            })
           }
           if (declarations.length > 0) {
             const selectors = parseEndgeStyleSelectorList(expanded.join(', '))
@@ -388,7 +528,12 @@ export function compileEndgeCSS(source: string, options: CompileEndgeCSSOptions 
           visit(node, expanded, context)
         }
         catch (error: any) {
-          diagnostics.push({ severity: 'error', code: 'ENDGECSS_SELECTOR', message: error.message ?? String(error), range: sourceRange(node) })
+          diagnostics.push({
+            severity: 'error',
+            code: 'ENDGECSS_SELECTOR',
+            message: error.message ?? String(error),
+            range: sourceRange(node),
+          })
         }
         continue
       }
@@ -401,7 +546,8 @@ export function compileEndgeCSS(source: string, options: CompileEndgeCSSOptions 
         diagnostics.push({
           severity: 'error',
           code: 'ENDGECSS_LAYER_FORBIDDEN',
-          message: '@layer is not part of EndgeCSS. Source selection and Specific Override bindings are separate from stylesheet cascade layers.',
+          message:
+            '@layer is not part of EndgeCSS. Source selection and Specific Override bindings are separate from stylesheet cascade layers.',
           range: sourceRange(node),
         })
         continue
@@ -409,53 +555,86 @@ export function compileEndgeCSS(source: string, options: CompileEndgeCSSOptions 
       if (name === 'theme') {
         const id = node.params.trim()
         if (!id || !/^[a-z][\w-]*$/i.test(id)) {
-          diagnostics.push({ severity: 'error', code: 'ENDGECSS_THEME_ID', message: '@theme requires a stable identifier.', range: sourceRange(node) })
+          diagnostics.push({
+            severity: 'error',
+            code: 'ENDGECSS_THEME_ID',
+            message: '@theme requires a stable identifier.',
+            range: sourceRange(node),
+          })
           continue
         }
         const declarations = (node.nodes ?? [])
           .filter(child => child.type === 'decl')
           .map(child => parseDeclaration(child, diagnostics))
-          .filter((declaration): declaration is EndgeStyleDeclaration => declaration !== null)
+          .filter(
+            (declaration): declaration is EndgeStyleDeclaration =>
+              declaration !== null,
+          )
         const existing = themes.find(theme => theme.id === id)
         if (existing) {
           existing.declarations.push(...declarations)
         }
-        else { themes.push({ id, declarations, range: sourceRange(node) }) }
+        else {
+          themes.push({ id, declarations, range: sourceRange(node) })
+        }
         visit(node, parentSelectors, { ...context, theme: id })
         continue
       }
       if (name === 'scope') {
         try {
-          visit(node, parentSelectors, { ...context, scope: parseScope(node.params) })
+          visit(node, parentSelectors, {
+            ...context,
+            scope: parseScope(node.params),
+          })
         }
         catch (error: any) {
-          diagnostics.push({ severity: 'error', code: 'ENDGECSS_SCOPE', message: error.message ?? String(error), range: sourceRange(node) })
+          diagnostics.push({
+            severity: 'error',
+            code: 'ENDGECSS_SCOPE',
+            message: error.message ?? String(error),
+            range: sourceRange(node),
+          })
         }
         continue
       }
       if (name === 'supports') {
         try {
-          visit(node, parentSelectors, { ...context, supports: parseEndgeStyleSupportCondition(node.params) })
+          visit(node, parentSelectors, {
+            ...context,
+            supports: parseEndgeStyleSupportCondition(node.params),
+          })
         }
         catch (error: any) {
-          diagnostics.push({ severity: 'error', code: 'ENDGECSS_SUPPORTS', message: error.message ?? String(error), range: sourceRange(node) })
+          diagnostics.push({
+            severity: 'error',
+            code: 'ENDGECSS_SUPPORTS',
+            message: error.message ?? String(error),
+            range: sourceRange(node),
+          })
         }
         continue
       }
-      diagnostics.push({ severity: 'error', code: 'ENDGECSS_AT_RULE_UNSUPPORTED', message: `@${node.name} is not supported by EndgeCSS.`, range: sourceRange(node) })
+      diagnostics.push({
+        severity: 'error',
+        code: 'ENDGECSS_AT_RULE_UNSUPPORTED',
+        message: `@${node.name} is not supported by EndgeCSS.`,
+        range: sourceRange(node),
+      })
     }
   }
 
   visit(root)
   const identity = options.identity ?? 'anonymous-style'
-  const artifact = diagnostics.some(diagnostic => diagnostic.severity === 'error')
+  const artifact = diagnostics.some(
+    diagnostic => diagnostic.severity === 'error',
+  )
     ? null
     : {
         language: 'endgecss' as const,
         version: 1 as const,
         identity,
         sourceHash: hashSource(source),
-        scope: options.scope ?? 'global' as const,
+        scope: options.scope ?? ('global' as const),
         scopeId: options.scopeId,
         rules,
         themes,

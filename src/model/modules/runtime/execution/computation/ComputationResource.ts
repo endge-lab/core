@@ -20,12 +20,12 @@ export class ComputationResourceState<T = unknown> implements ComputationResourc
 
   constructor(
     input: unknown,
-    private readonly asyncRunner: AsyncRunner<T>,
-    private readonly syncRunner: SyncRunner<T> | null = null,
+    private readonly _asyncRunner: AsyncRunner<T>,
+    private readonly _syncRunner: SyncRunner<T> | null = null,
   ) {
     this._input = input
-    if (syncRunner) {
-      this.runSync()
+    if (_syncRunner) {
+      this._runSync()
     }
     else { void this.refresh() }
   }
@@ -40,8 +40,8 @@ export class ComputationResourceState<T = unknown> implements ComputationResourc
       return
     }
     this._input = input
-    if (this.syncRunner) {
-      this.runSync()
+    if (this._syncRunner) {
+      this._runSync()
     }
     else { void this.refresh() }
   }
@@ -50,22 +50,22 @@ export class ComputationResourceState<T = unknown> implements ComputationResourc
     if (this._disposed) {
       return
     }
-    if (this.syncRunner) {
-      this.runSync()
+    if (this._syncRunner) {
+      this._runSync()
       return
     }
     const revision = ++this._revision
     this._status = 'pending'
     this._error = null
-    this.notify()
+    this._notify()
     try {
-      const value = await this.asyncRunner(this._input)
+      const value = await this._asyncRunner(this._input)
       if (this._disposed || revision !== this._revision) {
         return
       }
       this._value = value
       this._status = 'success'
-      this.notify()
+      this._notify()
     }
     catch (error) {
       if (this._disposed || revision !== this._revision) {
@@ -73,7 +73,7 @@ export class ComputationResourceState<T = unknown> implements ComputationResourc
       }
       this._error = normalizeError(error)
       this._status = 'error'
-      this.notify()
+      this._notify()
     }
   }
 
@@ -88,12 +88,12 @@ export class ComputationResourceState<T = unknown> implements ComputationResourc
     this._listeners.clear()
   }
 
-  private runSync(): void {
-    if (!this.syncRunner || this._disposed) {
+  private _runSync(): void {
+    if (!this._syncRunner || this._disposed) {
       return
     }
     try {
-      this._value = this.syncRunner(this._input)
+      this._value = this._syncRunner(this._input)
       this._error = null
       this._status = 'success'
     }
@@ -101,10 +101,10 @@ export class ComputationResourceState<T = unknown> implements ComputationResourc
       this._error = normalizeError(error)
       this._status = 'error'
     }
-    this.notify()
+    this._notify()
   }
 
-  private notify(): void {
+  private _notify(): void {
     for (const listener of this._listeners) {
       listener()
     }

@@ -58,7 +58,7 @@ export class RuntimeStateController implements RuntimeStateControllerLike {
   public get<T>(entityKey: string, section: string, fallback: T): T {
     const normalizedEntityKey = normalizeRequiredId(entityKey, 'entityKey')
     const normalizedSection = normalizeRequiredId(section, 'section')
-    const value = this.readDocument().state[normalizedEntityKey]?.[normalizedSection]
+    const value = this._readDocument().state[normalizedEntityKey]?.[normalizedSection]
 
     return value === undefined ? fallback : value as T
   }
@@ -66,7 +66,7 @@ export class RuntimeStateController implements RuntimeStateControllerLike {
   public set<T>(entityKey: string, section: string, value: T): void {
     const normalizedEntityKey = normalizeRequiredId(entityKey, 'entityKey')
     const normalizedSection = normalizeRequiredId(section, 'section')
-    const document = this.readDocument()
+    const document = this._readDocument()
 
     document.state[normalizedEntityKey] ??= {}
     document.state[normalizedEntityKey][normalizedSection] = value
@@ -76,7 +76,7 @@ export class RuntimeStateController implements RuntimeStateControllerLike {
 
   public remove(entityKey: string, section?: string): void {
     const normalizedEntityKey = normalizeRequiredId(entityKey, 'entityKey')
-    const document = this.readDocument()
+    const document = this._readDocument()
 
     if (section == null) {
       delete document.state[normalizedEntityKey]
@@ -100,16 +100,16 @@ export class RuntimeStateController implements RuntimeStateControllerLike {
     this._adapter.remove(this.storageKey)
   }
 
-  private readDocument(): RuntimeStateDocument {
+  private _readDocument(): RuntimeStateDocument {
     try {
-      return this._adapter.read<RuntimeStateDocument>(this.storageKey) ?? this.createDefaultDocument()
+      return this._adapter.read<RuntimeStateDocument>(this.storageKey) ?? this._createDefaultDocument()
     }
     catch {
-      return this.createDefaultDocument()
+      return this._createDefaultDocument()
     }
   }
 
-  private createDefaultDocument(): RuntimeStateDocument {
+  private _createDefaultDocument(): RuntimeStateDocument {
     return {
       version: 1,
       scope: { ...this.scope },

@@ -261,7 +261,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
       kind: 'meta',
       title: 'Compiled SFC artifact',
       subtitle: host.getArtifact()?.status ?? 'missing',
-      payload: host.makeArtifactResourcePayload(),
+      payload: host._makeArtifactResourcePayload(),
     })
     host.addChannel({
       id: 'channel:event-bus',
@@ -839,7 +839,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     this.syncArtifactState(target)
   }
 
-  private makeArtifactResourcePayload(): Record<string, unknown> {
+  private _makeArtifactResourcePayload(): Record<string, unknown> {
     const artifact = this.getArtifact()
     if (!artifact) {
       return {

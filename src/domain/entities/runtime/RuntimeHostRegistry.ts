@@ -25,7 +25,7 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
       throw new Error(`[RuntimeHostRegistry] Runtime host "${runtimeId}" is already registered.`)
     }
 
-    const key = this.entityKey(host.entityType, host.entityIdentity)
+    const key = this._entityKey(host.entityType, host.entityIdentity)
     const set = this._indexByEntity.get(key) ?? new Set<string>()
     set.add(runtimeId)
     this._indexByEntity.set(key, set)
@@ -80,7 +80,7 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
    * ACCESS
    */
   public getByEntity(entityType: RuntimeEntityType, entityIdentity: string): RuntimeHost<any, any>[] {
-    const key = this.entityKey(entityType, entityIdentity)
+    const key = this._entityKey(entityType, entityIdentity)
     const ids = this._indexByEntity.get(key)
     if (!ids?.size) {
       return []
@@ -110,7 +110,7 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
       return null
     }
 
-    const entityKey = this.entityKey(host.entityType, host.entityIdentity)
+    const entityKey = this._entityKey(host.entityType, host.entityIdentity)
     const set = this._indexByEntity.get(entityKey)
     set?.delete(key)
     if (set && set.size === 0) {
@@ -156,7 +156,7 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
 
     this._deletedSnapshots.delete(key)
     this._deletedSnapshots.set(key, snapshot)
-    this.trimDeletedSnapshots()
+    this._trimDeletedSnapshots()
   }
 
   /**
@@ -193,10 +193,10 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
 
   public setDeletedSnapshotLimit(limit: number): void {
     this._deletedSnapshotLimit = Math.max(0, Math.floor(Number.isFinite(limit) ? limit : 0))
-    this.trimDeletedSnapshots()
+    this._trimDeletedSnapshots()
   }
 
-  private trimDeletedSnapshots(): void {
+  private _trimDeletedSnapshots(): void {
     while (this._deletedSnapshots.size > this._deletedSnapshotLimit) {
       const oldest = this._deletedSnapshots.keys().next().value
       if (oldest === undefined) {
@@ -229,7 +229,7 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
   /**
    * ACCESS
    */
-  private entityKey(entityType: RuntimeEntityType, entityIdentity: string): string {
+  private _entityKey(entityType: RuntimeEntityType, entityIdentity: string): string {
     return `${entityType}:${String(entityIdentity ?? '').trim()}`
   }
 }

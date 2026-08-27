@@ -1,42 +1,42 @@
 import type { VoidFunction } from '@endge/utils'
 
 export class EndgeSlotRegistry<T extends { id?: string }> {
-  private items: T[] = []
-  private byId = new Map<string, T>()
-  private listeners = new Set<() => void>()
+  private _items: T[] = []
+  private _byId = new Map<string, T>()
+  private _listeners = new Set<() => void>()
 
   add(item: T): VoidFunction {
-    this.items.push(item)
+    this._items.push(item)
     if (item.id) {
-      this.byId.set(item.id, item)
+      this._byId.set(item.id, item)
     }
-    this.emit()
+    this._emit()
     return () => this.remove(item)
   }
 
   remove(item: T): void {
-    this.items = this.items.filter(i => i !== item)
+    this._items = this._items.filter(i => i !== item)
     if (item.id) {
-      this.byId.delete(item.id)
+      this._byId.delete(item.id)
     }
-    this.emit()
+    this._emit()
   }
 
   list(): readonly T[] {
-    return this.items
+    return this._items
   }
 
   get(id: string): T | undefined {
-    return this.byId.get(id)
+    return this._byId.get(id)
   }
 
   subscribe(cb: () => void): VoidFunction {
-    this.listeners.add(cb)
-    return () => this.listeners.delete(cb)
+    this._listeners.add(cb)
+    return () => this._listeners.delete(cb)
   }
 
-  private emit(): void {
-    for (const l of this.listeners) {
+  private _emit(): void {
+    for (const l of this._listeners) {
       l()
     }
   }

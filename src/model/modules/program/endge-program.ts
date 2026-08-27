@@ -77,9 +77,9 @@ export class EndgeProgram extends EndgeModule {
    * Добавляет compiled artifact и индексирует его по id и identity.
    */
   public addArtifact<TPayload>(artifact: ProgramArtifact<TPayload>): ProgramArtifact<TPayload> {
-    const key = this.keyFor(artifact.ref.entityType, artifact.ref.id)
+    const key = this._keyFor(artifact.ref.entityType, artifact.ref.id)
     this._artifacts.set(key, artifact as ProgramArtifact)
-    this._indexByIdentity.set(this.keyFor(artifact.ref.entityType, artifact.ref.identity), key)
+    this._indexByIdentity.set(this._keyFor(artifact.ref.entityType, artifact.ref.identity), key)
     this.setStatus(artifact.status)
     this.notify()
     return artifact
@@ -111,7 +111,7 @@ export class EndgeProgram extends EndgeModule {
     entityType: ProgramEntityType,
     idOrIdentity: string | number,
   ): ProgramArtifact<TPayload> | null {
-    const key = this.keyFor(entityType, idOrIdentity)
+    const key = this._keyFor(entityType, idOrIdentity)
     const resolvedKey = this._artifacts.has(key)
       ? key
       : this._indexByIdentity.get(key)
@@ -293,7 +293,7 @@ export class EndgeProgram extends EndgeModule {
   /**
    * Внутренний helper модуля: key For.
    */
-  private keyFor(entityType: ProgramEntityType, idOrIdentity: string | number): ProgramArtifactKey {
+  private _keyFor(entityType: ProgramEntityType, idOrIdentity: string | number): ProgramArtifactKey {
     return `${entityType}:${String(idOrIdentity ?? '').trim()}`
   }
 }

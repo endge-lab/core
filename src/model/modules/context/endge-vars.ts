@@ -22,7 +22,7 @@ export class WorkspaceVariables {
   private _envyRecord: EnvRecord = {}
 
   public constructor(
-    private readonly getDefinitions: () => EndgeWorkspaceVar[],
+    private readonly _getDefinitions: () => EndgeWorkspaceVar[],
   ) {}
 
   /**
@@ -39,7 +39,7 @@ export class WorkspaceVariables {
 
   /** Workspace-owned persisted variable definitions. */
   get definitions(): EndgeWorkspaceVar[] {
-    return [...this.getDefinitions()]
+    return [...this._getDefinitions()]
   }
 
   // ========================================================================
@@ -49,13 +49,13 @@ export class WorkspaceVariables {
   /**
    * Возвращает Domain Vars.
    */
-  private getDomainVars(): EndgeGlobalVar[] {
+  private _getDomainVars(): EndgeGlobalVar[] {
     try {
-      const workspaceVars = this.getDefinitions()
+      const workspaceVars = this._getDefinitions()
       if (workspaceVars.length > 0) {
         return workspaceVars.map((item) => {
           const name = String(item.name ?? '').trim()
-          const val = this.getExternalValue(name) ?? item.defaultValue
+          const val = this._getExternalValue(name) ?? item.defaultValue
           return {
             name,
             defaultValue: String(item.defaultValue ?? ''),
@@ -88,12 +88,12 @@ export class WorkspaceVariables {
       return undefined
     }
 
-    const external = this.getExternalValue(key)
+    const external = this._getExternalValue(key)
     if (external != null) {
       return String(external)
     }
 
-    const vars: EndgeGlobalVar[] = this.getDomainVars()
+    const vars: EndgeGlobalVar[] = this._getDomainVars()
     const v: EndgeGlobalVar | undefined = vars.find((x: EndgeGlobalVar) => x.name === key)
     if (v) {
       return v.currentValue ?? v.defaultValue
@@ -106,7 +106,7 @@ export class WorkspaceVariables {
    * Возвращает все доменные переменные с учетом overrides.
    */
   getAll(): EndgeGlobalVar[] {
-    const vars = this.getDomainVars()
+    const vars = this._getDomainVars()
     const used = new Set(vars.map(item => item.name))
     for (const [name, value] of Object.entries(this._envyRecord)) {
       const key = String(name ?? '').trim()
@@ -128,7 +128,7 @@ export class WorkspaceVariables {
    */
   toRecord(): Record<string, { defaultValue: string, currentValue: string }> {
     const out: Record<string, { defaultValue: string, currentValue: string }> = {}
-    for (const v of this.getDomainVars()) {
+    for (const v of this._getDomainVars()) {
       if (!v.name) {
         continue
       }
@@ -163,7 +163,7 @@ export class WorkspaceVariables {
     }
 
     const trimmed: string = raw.trim()
-    const parsed = WorkspaceVariables.parseVarToken(trimmed)
+    const parsed = WorkspaceVariables._parseVarToken(trimmed)
 
     if (parsed.ok) {
       const val: string | undefined = this.getValue(parsed.name)
@@ -235,7 +235,7 @@ export class WorkspaceVariables {
     let hasTokens = false
     let hasMissingValues = false
     const value = template.replace(/\{\{[^{}]*\}\}|\{[^{}]*\}/g, (token) => {
-      const parsed = WorkspaceVariables.parseVarToken(token)
+      const parsed = WorkspaceVariables._parseVarToken(token)
       if (!parsed.ok) {
         return token
       }
@@ -255,7 +255,7 @@ export class WorkspaceVariables {
   /**
    * Внутренний helper модуля: parse Var Token.
    */
-  private static parseVarToken(
+  private static _parseVarToken(
     token: string,
   ): { ok: true, name: string } | { ok: false, reason: string } {
     const s: string = token.trim()
@@ -293,7 +293,7 @@ export class WorkspaceVariables {
   }
 
   /** Читает variable из внешнего environment без изменения module state. */
-  private getExternalValue(name: string): unknown {
+  private _getExternalValue(name: string): unknown {
     const key = String(name ?? '').trim()
     if (!key) {
       return undefined

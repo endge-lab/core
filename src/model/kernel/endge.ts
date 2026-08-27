@@ -87,8 +87,8 @@ export class Endge extends EndgeFederation {
   static download(selection?: readonly EndgeDomainSelection[]): void {
     const domain = selection === undefined
       ? Endge.domain.toPlain()
-      : Endge.selectDomain(selection)
-    const bundle = Endge.createDomainBundle(domain)
+      : Endge._selectDomain(selection)
+    const bundle = Endge._createDomainBundle(domain)
     const filenamePrefix = selection === undefined ? 'endge-domain' : 'endge-domain-selected'
     const timestamp = new Date().toISOString().replace(/:/g, '-').replace(/\..+/, '')
     const blob = new Blob([JSON.stringify(bundle)], { type: 'application/json' })
@@ -106,10 +106,10 @@ export class Endge extends EndgeFederation {
    * Возвращает domain только с перечисленными документами, сохраняя полную структуру коллекций.
    * Тип секции обязателен, потому что id сущностей уникален только внутри своей коллекции.
    */
-  private static selectDomain(selection: readonly EndgeDomainSelection[]): EndgeDomainPlain {
+  private static _selectDomain(selection: readonly EndgeDomainSelection[]): EndgeDomainPlain {
     const selectedKeys = new Map<keyof EndgeDomainPlain, Set<string>>()
     for (const item of selection) {
-      const collection = Endge.resolveSelectionCollection(item)
+      const collection = Endge._resolveSelectionCollection(item)
       if (!collection) {
         continue
       }
@@ -142,7 +142,7 @@ export class Endge extends EndgeFederation {
     ) as unknown as EndgeDomainPlain
   }
 
-  private static createDomainBundle(domain: EndgeDomainPlain): EndgeDomainBundle {
+  private static _createDomainBundle(domain: EndgeDomainPlain): EndgeDomainBundle {
     const workspace = Endge.workspace.serialize()
 
     const folders = Endge._portableIdentityIndex(domain.folders)
@@ -335,7 +335,7 @@ export class Endge extends EndgeFederation {
     return index.get(String(value)) ?? null
   }
 
-  private static resolveSelectionCollection(selection: EndgeDomainSelection): (keyof EndgeDomainPlain) | null {
+  private static _resolveSelectionCollection(selection: EndgeDomainSelection): (keyof EndgeDomainPlain) | null {
     switch (selection.sectionType) {
       case DomainSectionType.Primitive:
       case DomainSectionType.Type:

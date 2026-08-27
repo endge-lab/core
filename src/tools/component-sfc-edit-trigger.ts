@@ -239,10 +239,10 @@ export function matchesComponentSFCInteractionModifiers(
     return true
   }
 
-  const primary = platform === 'macos' ? 'meta' : platform === 'windows' || platform === 'linux' ? 'ctrl' : null
+  const primary = platform === 'macos' ? 'meta' : (platform === 'windows' || platform === 'linux') ? 'ctrl' : null
   const altGraphCoversCtrlAlt = expected.altGraph === true && actual.altGraph
   for (const name of ['ctrl', 'shift', 'alt', 'meta'] as const) {
-    const coveredByMod = expected.mod !== undefined && (primary === name || primary === null && (name === 'ctrl' || name === 'meta'))
+    const coveredByMod = expected.mod !== undefined && (primary === name || (primary === null && (name === 'ctrl' || name === 'meta')))
     const coveredByAltGraph = altGraphCoversCtrlAlt && (name === 'ctrl' || name === 'alt')
     if (expected[name] === undefined && !coveredByMod && !coveredByAltGraph && actual[name]) {
       return false

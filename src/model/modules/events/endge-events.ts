@@ -30,7 +30,7 @@ export class EndgeEvents extends EndgeModule {
     this._bus = new EventBus<EndgeCoreEventMap, EndgeCustomEventMap>(
       predefinedEvents as (keyof EndgeCoreEventMap)[],
     )
-    this._cache = this.makeCache(EndgeEvents.EVENTS_CACHE_SIZE)
+    this._cache = this._makeCache(EndgeEvents.EVENTS_CACHE_SIZE)
   }
 
   /**
@@ -65,7 +65,7 @@ export class EndgeEvents extends EndgeModule {
   /**
    * Внутренний helper модуля: make Cache.
    */
-  private makeCache(n: number): RingBuffer<CachedEvent> | null {
+  private _makeCache(n: number): RingBuffer<CachedEvent> | null {
     const size = Math.max(0, Math.floor(Number(n) || 0))
     return size > 0 ? new RingBuffer<CachedEvent>(size) : null
   }

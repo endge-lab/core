@@ -26,104 +26,104 @@ export interface OperationHistoryOptions {
 export class OperationHistory implements RuntimeOwnedResource {
   public readonly kind = 'operation-history'
   public readonly id: string
-  private entries: OperationHistoryEntry[] = []
-  private cursor = 0
-  private paused = false
-  private disposed = false
-  private queue: Promise<unknown> = Promise.resolve()
+  private _entries: OperationHistoryEntry[] = []
+  private _cursor = 0
+  private _paused = false
+  private _disposed = false
+  private _queue: Promise<unknown> = Promise.resolve()
   private _limit: number
 
-  public constructor(private readonly options: OperationHistoryOptions) {
-    this.id = options.id
-    this._limit = normalizeLimit(options.limit)
+  public constructor(private readonly _options: OperationHistoryOptions) {
+    this.id = _options.id
+    this._limit = normalizeLimit(_options.limit)
   }
 
   public get limit(): number { return this._limit }
   public get shortcuts(): OperationHistoryShortcutBinding[] {
-    return this.options.shortcuts ?? defaultOperationHistoryShortcuts()
+    return this._options.shortcuts ?? defaultOperationHistoryShortcuts()
   }
 
-  public get active(): boolean { return !this.paused && !this.disposed }
-  public canUndo(): boolean { return this.active && this.cursor > 0 }
-  public canRedo(): boolean { return this.active && this.cursor < this.entries.length }
+  public get active(): boolean { return !this._paused && !this._disposed }
+  public canUndo(): boolean { return this.active && this._cursor > 0 }
+  public canRedo(): boolean { return this.active && this._cursor < this._entries.length }
 
   public setLimit(value: number): void {
     this._limit = normalizeLimit(value)
-    this.trim()
-    this.options.onChange?.()
+    this._trim()
+    this._options.onChange?.()
   }
 
   public commit(entry: OperationHistoryEntry): void {
     if (!this.active) {
       return
     }
-    if (this.cursor < this.entries.length) {
-      this.entries.splice(this.cursor)
+    if (this._cursor < this._entries.length) {
+      this._entries.splice(this._cursor)
     }
-    this.entries.push(entry)
-    this.cursor = this.entries.length
-    this.trim()
-    this.options.onChange?.()
+    this._entries.push(entry)
+    this._cursor = this._entries.length
+    this._trim()
+    this._options.onChange?.()
   }
 
   public undo(): Promise<unknown> {
-    return this.enqueue(async () => {
+    return this._enqueue(async () => {
       if (!this.canUndo()) {
         return undefined
       }
-      const entry = this.entries[this.cursor - 1]!
+      const entry = this._entries[this._cursor - 1]!
       const result = await entry.undo()
       entry.undoOutput = result
-      this.cursor -= 1
-      this.options.onChange?.()
+      this._cursor -= 1
+      this._options.onChange?.()
       return result
     })
   }
 
   public redo(): Promise<unknown> {
-    return this.enqueue(async () => {
+    return this._enqueue(async () => {
       if (!this.canRedo()) {
         return undefined
       }
-      const entry = this.entries[this.cursor]!
+      const entry = this._entries[this._cursor]!
       const result = await entry.redo()
-      this.cursor += 1
-      this.options.onChange?.()
+      this._cursor += 1
+      this._options.onChange?.()
       return result
     })
   }
 
-  public pause(): void { this.paused = true }
+  public pause(): void { this._paused = true }
   public resume(): void {
-    if (!this.disposed) {
-      this.paused = false
+    if (!this._disposed) {
+      this._paused = false
     }
   }
 
   public dispose(): void {
-    this.disposed = true
-    this.entries = []
-    this.cursor = 0
-    this.options.onChange?.()
+    this._disposed = true
+    this._entries = []
+    this._cursor = 0
+    this._options.onChange?.()
   }
 
   public snapshot(): { limit: number, cursor: number, size: number, paused: boolean } {
-    return { limit: this._limit, cursor: this.cursor, size: this.entries.length, paused: this.paused }
+    return { limit: this._limit, cursor: this._cursor, size: this._entries.length, paused: this._paused }
   }
 
-  private enqueue<T>(task: () => Promise<T>): Promise<T> {
-    const result = this.queue.then(task, task)
-    this.queue = result.then(() => undefined, () => undefined)
+  private _enqueue<T>(task: () => Promise<T>): Promise<T> {
+    const result = this._queue.then(task, task)
+    this._queue = result.then(() => undefined, () => undefined)
     return result
   }
 
-  private trim(): void {
-    const overflow = Math.max(0, this.entries.length - this._limit)
+  private _trim(): void {
+    const overflow = Math.max(0, this._entries.length - this._limit)
     if (!overflow) {
       return
     }
-    this.entries.splice(0, overflow)
-    this.cursor = Math.max(0, this.cursor - overflow)
+    this._entries.splice(0, overflow)
+    this._cursor = Math.max(0, this._cursor - overflow)
   }
 }
 

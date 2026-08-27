@@ -99,7 +99,7 @@ const COMPONENT_SFC_BUILTIN_EVENT_PAYLOAD_TYPES = new Set([
  * Компилятор persisted domain model в compiled program artifacts.
  */
 export class EndgeCompiler extends EndgeModule {
-  private readonly handlers = new Map<ProgramEntityType, EntityCompilerHandler<any, any>>()
+  private readonly _handlers = new Map<ProgramEntityType, EntityCompilerHandler<any, any>>()
   private _localDataViewCounter = 0
   private _localFilterCounter = 0
   private _componentTagDiagnosticsByIdentity = new Map<string, Omit<ProgramDiagnostic, 'entityRef'>[]>()
@@ -115,7 +115,7 @@ export class EndgeCompiler extends EndgeModule {
    */
   constructor() {
     super()
-    this.registerDefaultHandlers()
+    this._registerDefaultHandlers()
   }
 
   /**
@@ -134,7 +134,7 @@ export class EndgeCompiler extends EndgeModule {
     this._componentPortManifestResolving.clear()
     Endge.diagnostics.problems.clear({
       phases: ['build'],
-      entityTypes: [...this.handlers.keys()],
+      entityTypes: [...this._handlers.keys()],
     })
     this._prepareComponentTagRegistry(componentSFCs)
     this._compileSpan = Endge.diagnostics.startSpan('domain.compile', {
@@ -143,61 +143,61 @@ export class EndgeCompiler extends EndgeModule {
     })
 
     try {
-      if (!this.compilePhase('type', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'types', Endge.types.listResolved(), context)) {
+      if (!this._compilePhase('type', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'types', Endge.types.listResolved(), context)) {
         return
       }
 
-      if (!this.compilePhase('configuration', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'configurations', Endge.domain.getConfigurations(), context)) {
+      if (!this._compilePhase('configuration', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'configurations', Endge.domain.getConfigurations(), context)) {
         return
       }
 
-      if (!this.compilePhase('computation', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'computations', Endge.domain.getComputations(), context)) {
+      if (!this._compilePhase('computation', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'computations', Endge.domain.getComputations(), context)) {
         return
       }
       this._linkComputations()
 
-      if (!this.compilePhase('action', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'actions', Endge.domain.getActions(), context)) {
+      if (!this._compilePhase('action', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'actions', Endge.domain.getActions(), context)) {
         return
       }
 
-      if (!this.compilePhase('component-sfc', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'SFC-компонентов', componentSFCs, context)) {
+      if (!this._compilePhase('component-sfc', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'SFC-компонентов', componentSFCs, context)) {
         return
       }
       this._materializeProvidedActions(componentSFCs)
 
-      if (!this.compilePhase('style', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'EndgeCSS styles', this._orderedStyles(), context)) {
+      if (!this._compilePhase('style', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'EndgeCSS styles', this._orderedStyles(), context)) {
         return
       }
 
-      if (!this.compilePhase('data-view', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'data views', Endge.domain.getDataViews(), context)) {
+      if (!this._compilePhase('data-view', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'data views', Endge.domain.getDataViews(), context)) {
         return
       }
 
-      if (!this.compilePhase('vocab', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'vocab source', Endge.domain.getVocabs(), context)) {
+      if (!this._compilePhase('vocab', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'vocab source', Endge.domain.getVocabs(), context)) {
         return
       }
 
-      if (!this.compilePhase('update', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'updates', Endge.domain.getUpdates(), context)) {
+      if (!this._compilePhase('update', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'updates', Endge.domain.getUpdates(), context)) {
         return
       }
 
-      if (!this.compilePhase('store', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'stores', Endge.domain.getStores(), context)) {
+      if (!this._compilePhase('store', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'stores', Endge.domain.getStores(), context)) {
         return
       }
 
-      if (!this.compilePhase('stream', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'streams', Endge.domain.getStreams(), context)) {
+      if (!this._compilePhase('stream', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'streams', Endge.domain.getStreams(), context)) {
         return
       }
 
-      if (!this.compilePhase('filter', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'filter source', Endge.domain.getFilters(), context)) {
+      if (!this._compilePhase('filter', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'filter source', Endge.domain.getFilters(), context)) {
         return
       }
 
-      if (!this.compilePhase('query', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'query source', Endge.domain.getQueries(), context)) {
+      if (!this._compilePhase('query', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'query source', Endge.domain.getQueries(), context)) {
         return
       }
 
-      if (!this.compilePhase(
+      if (!this._compilePhase(
         'composition',
         ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS,
         'compositions',
@@ -234,71 +234,71 @@ export class EndgeCompiler extends EndgeModule {
   /** Компилирует один query source в Endge.program без запуска остальных compiler-фаз. */
   public buildQuery(entity: RQuery): ProgramArtifact<QueryProgramPayload> {
     const context = this._createCompileContext()
-    return this.compileEntity('query', entity, context) as ProgramArtifact<QueryProgramPayload>
+    return this._compileEntity('query', entity, context) as ProgramArtifact<QueryProgramPayload>
   }
 
   /** Компилирует один Vocab source в Endge.program. */
   public buildVocab(entity: RVocabs): ProgramArtifact<VocabProgramPayload> {
-    return this.compileEntity('vocab', entity, this._createCompileContext()) as ProgramArtifact<VocabProgramPayload>
+    return this._compileEntity('vocab', entity, this._createCompileContext()) as ProgramArtifact<VocabProgramPayload>
   }
 
   /** Компилирует одну Computation в безопасный runtime artifact. */
   public buildComputation(entity: RComputation): ProgramArtifact<ComputationProgramPayload> {
     const context = this._createCompileContext()
-    const artifact = this.compileEntity('computation', entity, context) as ProgramArtifact<ComputationProgramPayload>
+    const artifact = this._compileEntity('computation', entity, context) as ProgramArtifact<ComputationProgramPayload>
     this._linkComputations()
     return artifact
   }
 
   /** Compiles one Type Source into the shared Type Registry. */
   public buildType(entity: RType): ProgramArtifact<TypeProgramPayload> {
-    return this.compileEntity('type', entity, this._createCompileContext()) as ProgramArtifact<TypeProgramPayload>
+    return this._compileEntity('type', entity, this._createCompileContext()) as ProgramArtifact<TypeProgramPayload>
   }
 
   /** Compiles one persisted Action into an immutable Program artifact. */
   public buildAction(entity: RAction): ProgramArtifact<ActionProgramPayload> {
-    return this.compileEntity('action', entity, this._createCompileContext()) as ProgramArtifact<ActionProgramPayload>
+    return this._compileEntity('action', entity, this._createCompileContext()) as ProgramArtifact<ActionProgramPayload>
   }
 
   /** Компилирует один ComponentSFC без запуска полного domain build. */
   public buildComponentSFC(entity: RComponentSFC): ProgramArtifact<ComponentSFCProgramPayload> {
     const context = this._createCompileContext()
     this._prepareComponentTagRegistry(Endge.domain.getComponentSFCs())
-    return this.compileEntity('component-sfc', entity, context) as ProgramArtifact<ComponentSFCProgramPayload>
+    return this._compileEntity('component-sfc', entity, context) as ProgramArtifact<ComponentSFCProgramPayload>
   }
 
   /** Компилирует один DataView source в Endge.program без запуска остальных compiler-фаз. */
   public buildDataView(entity: RDataView): ProgramArtifact<DataViewProgramPayload> {
     const context = this._createCompileContext()
-    return this.compileEntity('data-view', entity, context) as ProgramArtifact<DataViewProgramPayload>
+    return this._compileEntity('data-view', entity, context) as ProgramArtifact<DataViewProgramPayload>
   }
 
   /** Компилирует один Store source в Endge.program. */
   public buildStore(entity: RStore): ProgramArtifact<StoreSourceArtifact> {
     const context = this._createCompileContext()
-    return this.compileEntity('store', entity, context) as ProgramArtifact<StoreSourceArtifact>
+    return this._compileEntity('store', entity, context) as ProgramArtifact<StoreSourceArtifact>
   }
 
   /** Компилирует один Stream source в Endge.program. */
   public buildStream(entity: RStream): ProgramArtifact<StreamSourceArtifact> {
-    return this.compileEntity('stream', entity, this._createCompileContext()) as ProgramArtifact<StreamSourceArtifact>
+    return this._compileEntity('stream', entity, this._createCompileContext()) as ProgramArtifact<StreamSourceArtifact>
   }
 
   /** Компилирует один дочерний Update source в Endge.program. */
   public buildUpdate(entity: RUpdate): ProgramArtifact<UpdateSourceArtifact> {
-    return this.compileEntity('update', entity, this._createCompileContext()) as ProgramArtifact<UpdateSourceArtifact>
+    return this._compileEntity('update', entity, this._createCompileContext()) as ProgramArtifact<UpdateSourceArtifact>
   }
 
   /** Компилирует один Filter source в Endge.program. */
   public buildFilter(entity: RFilter): ProgramArtifact<FilterProgramPayload> {
     const context = this._createCompileContext()
-    return this.compileEntity('filter', entity, context) as ProgramArtifact<FilterProgramPayload>
+    return this._compileEntity('filter', entity, context) as ProgramArtifact<FilterProgramPayload>
   }
 
   /** Компилирует один Composition source в Endge.program. */
   public buildComposition(entity: RComposition): ProgramArtifact<CompositionProgramPayload> {
     const context = this._createCompileContext()
-    return this.compileEntity('composition', entity, context) as ProgramArtifact<CompositionProgramPayload>
+    return this._compileEntity('composition', entity, context) as ProgramArtifact<CompositionProgramPayload>
   }
 
   /**
@@ -306,7 +306,7 @@ export class EndgeCompiler extends EndgeModule {
    * Используется runtime session overlays, которым нельзя менять общий build.
    */
   public compileCompositionArtifact(entity: RComposition): ProgramArtifact<CompositionProgramPayload> {
-    const handler = this.handlers.get('composition') as EntityCompilerHandler<RComposition, CompositionProgramPayload> | undefined
+    const handler = this._handlers.get('composition') as EntityCompilerHandler<RComposition, CompositionProgramPayload> | undefined
     if (!handler) {
       throw new Error('Compiler handler is not registered for "composition"')
     }
@@ -316,7 +316,7 @@ export class EndgeCompiler extends EndgeModule {
   /** Compiles one global source-first EndgeCSS document. */
   public buildStyle(entity: RStyle): ProgramArtifact<EndgeStyleProgramPayload> {
     const context = this._createCompileContext()
-    return this.compileEntity('style', entity, context) as ProgramArtifact<EndgeStyleProgramPayload>
+    return this._compileEntity('style', entity, context) as ProgramArtifact<EndgeStyleProgramPayload>
   }
 
   /**
@@ -324,8 +324,8 @@ export class EndgeCompiler extends EndgeModule {
    *
    * Сейчас используется только для встроенной SFC-регистрации.
    */
-  private registerHandler<TEntity, TPayload>(handler: EntityCompilerHandler<TEntity, TPayload>): void {
-    this.handlers.set(handler.entityType, handler as EntityCompilerHandler<any, any>)
+  private _registerHandler<TEntity, TPayload>(handler: EntityCompilerHandler<TEntity, TPayload>): void {
+    this._handlers.set(handler.entityType, handler as EntityCompilerHandler<any, any>)
   }
 
   /** Создаёт единый immutable context для полного и точечного compiler entry points. */
@@ -342,7 +342,7 @@ export class EndgeCompiler extends EndgeModule {
    * Метод отвечает за единый diagnostics span, обработку ошибок и перевод
    * `Endge.program` в error status при неуспешной фазе.
    */
-  private compilePhase<TEntity>(
+  private _compilePhase<TEntity>(
     entityType: ProgramEntityType,
     lane: string,
     title: string,
@@ -368,7 +368,7 @@ export class EndgeCompiler extends EndgeModule {
 
     try {
       for (const entity of entities) {
-        this.compileEntity(entityType, entity, context)
+        this._compileEntity(entityType, entity, context)
       }
 
       span.log({
@@ -397,12 +397,12 @@ export class EndgeCompiler extends EndgeModule {
    * Само преобразование делегируется handler-у, зарегистрированному для
    * конкретного `ProgramEntityType`.
    */
-  private compileEntity<TEntity>(
+  private _compileEntity<TEntity>(
     entityType: ProgramEntityType,
     entity: TEntity,
     context: ProgramCompileContext,
   ): ProgramArtifact {
-    const handler = this.handlers.get(entityType)
+    const handler = this._handlers.get(entityType)
     if (!handler) {
       throw new Error(`Compiler handler is not registered for "${entityType}"`)
     }
@@ -446,8 +446,8 @@ export class EndgeCompiler extends EndgeModule {
    * Сейчас compiler сознательно строит program artifacts только для новой
    * source-first ветки `component-sfc`.
    */
-  private registerDefaultHandlers(): void {
-    this.registerHandler<RType, TypeProgramPayload>({
+  private _registerDefaultHandlers(): void {
+    this._registerHandler<RType, TypeProgramPayload>({
       entityType: 'type',
       compile: (entity, context) => {
         const primitiveKind = String(entity.meta?.primitiveKind ?? '').trim()
@@ -531,7 +531,7 @@ export class EndgeCompiler extends EndgeModule {
       },
     })
 
-    this.registerHandler<RConfiguration, ConfigurationProgramPayload>({
+    this._registerHandler<RConfiguration, ConfigurationProgramPayload>({
       entityType: 'configuration',
       compile: (entity, context) => {
         const schema = Endge.configurationSchema.get(entity.identity)
@@ -567,7 +567,7 @@ export class EndgeCompiler extends EndgeModule {
       },
     })
 
-    this.registerHandler<RAction, ActionProgramPayload>({
+    this._registerHandler<RAction, ActionProgramPayload>({
       entityType: 'action',
       compile: (entity, context) => {
         const result = compileAction(entity)
@@ -601,7 +601,7 @@ export class EndgeCompiler extends EndgeModule {
       },
     })
 
-    this.registerHandler<RComputation, ComputationProgramPayload>({
+    this._registerHandler<RComputation, ComputationProgramPayload>({
       entityType: 'computation',
       compile: (entity, context) => {
         const result = compileComputation({ source: entity.source })
@@ -621,7 +621,7 @@ export class EndgeCompiler extends EndgeModule {
       },
     })
 
-    this.registerHandler<RComponentSFC, ComponentSFCProgramPayload>({
+    this._registerHandler<RComponentSFC, ComponentSFCProgramPayload>({
       entityType: 'component-sfc',
       compile: (entity, context) => {
         const result = this._compileComponentSFCSource(entity, context.buildContext.configuration.sfcEditing)
@@ -716,7 +716,7 @@ export class EndgeCompiler extends EndgeModule {
       },
     })
 
-    this.registerHandler<RStyle, EndgeStyleProgramPayload>({
+    this._registerHandler<RStyle, EndgeStyleProgramPayload>({
       entityType: 'style',
       compile: (entity, context) => {
         const result = compileEndgeCSS(entity.source, { identity: entity.identity, scope: 'global' })
@@ -749,7 +749,7 @@ export class EndgeCompiler extends EndgeModule {
       },
     })
 
-    this.registerHandler<RQuery, QueryProgramPayload>({
+    this._registerHandler<RQuery, QueryProgramPayload>({
       entityType: 'query',
       compile: (entity, context) => {
         const source = this._resolveQuerySource(entity)
@@ -798,7 +798,7 @@ export class EndgeCompiler extends EndgeModule {
       },
     })
 
-    this.registerHandler<RVocabs, VocabProgramPayload>({
+    this._registerHandler<RVocabs, VocabProgramPayload>({
       entityType: 'vocab',
       compile: (entity, context) => {
         const result = Endge.source.compile('vocab', entity.source)
@@ -886,7 +886,7 @@ export class EndgeCompiler extends EndgeModule {
       },
     })
 
-    this.registerHandler<RDataView, DataViewProgramPayload>({
+    this._registerHandler<RDataView, DataViewProgramPayload>({
       entityType: 'data-view',
       compile: (entity, context) => {
         const source = this._resolveDataViewSource(entity)
@@ -926,7 +926,7 @@ export class EndgeCompiler extends EndgeModule {
       },
     })
 
-    this.registerHandler<RUpdate, UpdateSourceArtifact>({
+    this._registerHandler<RUpdate, UpdateSourceArtifact>({
       entityType: 'update',
       compile: (entity, context) => {
         const result = Endge.source.compile('update', entity.source)
@@ -960,7 +960,7 @@ export class EndgeCompiler extends EndgeModule {
       },
     })
 
-    this.registerHandler<RStore, StoreSourceArtifact>({
+    this._registerHandler<RStore, StoreSourceArtifact>({
       entityType: 'store',
       compile: (entity, context) => {
         const result = Endge.source.compile('store', entity.source)
@@ -1090,7 +1090,7 @@ export class EndgeCompiler extends EndgeModule {
       },
     })
 
-    this.registerHandler<RStream, StreamSourceArtifact>({
+    this._registerHandler<RStream, StreamSourceArtifact>({
       entityType: 'stream',
       compile: (entity, context) => {
         const result = Endge.source.compile('stream', entity.source)
@@ -1115,7 +1115,7 @@ export class EndgeCompiler extends EndgeModule {
       },
     })
 
-    this.registerHandler<RFilter, FilterProgramPayload>({
+    this._registerHandler<RFilter, FilterProgramPayload>({
       entityType: 'filter',
       compile: (entity, context) => {
         const result = Endge.source.compile('filter', this._resolveFilterSource(entity))
@@ -1159,7 +1159,7 @@ export class EndgeCompiler extends EndgeModule {
       },
     })
 
-    this.registerHandler<RComposition, CompositionProgramPayload>({
+    this._registerHandler<RComposition, CompositionProgramPayload>({
       entityType: 'composition',
       compile: (entity, context) => {
         const result = Endge.source.compile('composition', this._resolveCompositionSource(entity))

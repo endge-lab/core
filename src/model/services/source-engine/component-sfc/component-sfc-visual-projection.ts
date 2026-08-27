@@ -1360,7 +1360,7 @@ function projectManagedCell(
 
   const hasDynamicIs = child.directives.some((directive) => {
     const raw = source.slice(directive.range.start, directive.range.end).trim()
-    return directive.name === 'bind' && directive.argument === 'is'
+    return (directive.name === 'bind' && directive.argument === 'is')
       || raw.startsWith(':is')
       || raw.startsWith('v-bind:is')
   })

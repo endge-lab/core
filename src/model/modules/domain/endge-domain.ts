@@ -3428,7 +3428,7 @@ export class EndgeDomain extends EndgeModule {
    * Нормализует блоки областей страницы: из формата Payload (entity: { relationTo, value }) в entityType/entityIdentity.
    * Если блок уже имеет entityType/entityIdentity (после normalizePage в exportAll), не перезаписываем их.
    */
-  private static normalizePageBlocksFromPayload(pageJson: any): any {
+  private static _normalizePageBlocksFromPayload(pageJson: any): any {
     const templateId
       = pageJson?.templateId
         ?? pageJson?.template?.id
@@ -3601,7 +3601,7 @@ export class EndgeDomain extends EndgeModule {
     }
     if (json.pages && Array.isArray(json.pages)) {
       json.pages.forEach((pageJson: any) => {
-        const normalized = EndgeDomain.normalizePageBlocksFromPayload(pageJson)
+        const normalized = EndgeDomain._normalizePageBlocksFromPayload(pageJson)
         out.pages.push(Serialize.fromJSON(RPage, normalized))
       })
     }

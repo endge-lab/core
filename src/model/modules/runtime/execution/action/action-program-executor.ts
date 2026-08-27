@@ -19,32 +19,32 @@ export class ActionProgramExecutor {
     if (!payload.sourceDocument) {
       throw new Error('Action artifact has no executable source document.')
     }
-    return await this.runBlock(payload.sourceDocument, { input, parent, outputs: new Map(), recordHistory: true })
+    return await this._runBlock(payload.sourceDocument, { input, parent, outputs: new Map(), recordHistory: true })
   }
 
-  private async runBlock(block: ActionSourceBlock, context: ExecutionContext): Promise<unknown> {
+  private async _runBlock(block: ActionSourceBlock, context: ExecutionContext): Promise<unknown> {
     for (const step of block.steps) {
-      context.outputs.set(step.name, await this.runStep(step, context))
+      context.outputs.set(step.name, await this._runStep(step, context))
     }
-    return block.output ? this.evaluate(block.output, context) : undefined
+    return block.output ? this._evaluate(block.output, context) : undefined
   }
 
-  private async runStep(step: ActionSourceStep, context: ExecutionContext): Promise<unknown> {
+  private async _runStep(step: ActionSourceStep, context: ExecutionContext): Promise<unknown> {
     if (step.kind === 'expression') {
-      return this.evaluate(step.expression, context)
+      return this._evaluate(step.expression, context)
     }
     if (step.kind === 'query') {
       const query = Endge.domain.getQuery(step.identity)
       if (!query) {
         throw new Error(`Action Query is missing: ${step.identity}.`)
       }
-      const input = this.requireObject(this.evaluate(step.input, context), `Query ${step.identity}`)
+      const input = this._requireObject(this._evaluate(step.input, context), `Query ${step.identity}`)
       const host = await Endge.runtime.query.run(query, input, context.parent)
       return host
     }
     if (step.kind === 'update') {
-      const input = this.evaluate(step.input, context)
-      const composition = this.findComposition(context.parent)
+      const input = this._evaluate(step.input, context)
+      const composition = this._findComposition(context.parent)
       if (!composition) {
         throw new Error(`Action Update requires a Composition runtime: ${step.identity}.`)
       }
@@ -53,15 +53,15 @@ export class ActionProgramExecutor {
     }
     if (step.kind === 'action') {
       return await Endge.actions.execute(step.identity, {
-        input: this.evaluate(step.input, context),
+        input: this._evaluate(step.input, context),
         context: { parentRuntimeId: context.parent?.id },
       })
     }
     if (step.kind === 'computation') {
-      return await Endge.runtime.computation.run(step.identity, this.evaluate(step.input, context))
+      return await Endge.runtime.computation.run(step.identity, this._evaluate(step.input, context))
     }
     if (step.kind === 'typescript') {
-      const inputs = Object.fromEntries(Object.entries(step.inputs).map(([name, expression]) => [name, this.evaluate(expression, context)]))
+      const inputs = Object.fromEntries(Object.entries(step.inputs).map(([name, expression]) => [name, this._evaluate(expression, context)]))
       return await Endge.runtime.computation.executeSandbox({
         computationIdentity: 'action',
         outputName: step.name,
@@ -71,32 +71,32 @@ export class ActionProgramExecutor {
       })
     }
     if (step.kind === 'operation') {
-      return await this.runOperation(step, context)
+      return await this._runOperation(step, context)
     }
     throw new Error(`Unsupported Action step: ${(step as { kind: string }).kind}.`)
   }
 
-  private async runOperation(step: ActionSourceOperationStep, outer: ExecutionContext): Promise<unknown> {
+  private async _runOperation(step: ActionSourceOperationStep, outer: ExecutionContext): Promise<unknown> {
     const history = Endge.runtime.operations.resolveForHost(outer.parent)
     return await executeRuntimeOperation({
       id: `${step.name}:${Date.now()}`,
-      input: step.input ? this.evaluate(step.input, outer) : outer.input,
+      input: step.input ? this._evaluate(step.input, outer) : outer.input,
       history,
       recordHistory: outer.recordHistory,
-      run: async context => await this.runBlock(step.run, {
+      run: async context => await this._runBlock(step.run, {
         input: context.input,
         parent: outer.parent,
         outputs: new Map(),
         recordHistory: false,
       }),
-      undo: async context => await this.runBlock(step.undo, {
+      undo: async context => await this._runBlock(step.undo, {
         input: withOperationOutputs(context.input, context.runOutput, undefined),
         parent: outer.parent,
         outputs: new Map(),
         recordHistory: false,
       }),
       redo: step.redo
-        ? async context => await this.runBlock(step.redo!, {
+        ? async context => await this._runBlock(step.redo!, {
           input: withOperationOutputs(context.input, context.runOutput, context.undoOutput),
           parent: outer.parent,
           outputs: new Map(),
@@ -106,17 +106,17 @@ export class ActionProgramExecutor {
     })
   }
 
-  private evaluate(expression: SourceExpressionIR, context: ExecutionContext): unknown {
+  private _evaluate(expression: SourceExpressionIR, context: ExecutionContext): unknown {
     return evaluateSourceExpression(expression, {
       scope: context.input,
       read: read => read.source === 'computation-output' ? context.outputs.get(read.path) : undefined,
       transform: (transform, value, options) => transform.transform === 'data-view'
-        ? Endge.runtime.dataView.run(transform.identity, value, undefined, { props: this.optionalObject(options) })
-        : Endge.converters.execute(transform.identity, value, this.optionalObject(options)),
+        ? Endge.runtime.dataView.run(transform.identity, value, undefined, { props: this._optionalObject(options) })
+        : Endge.converters.execute(transform.identity, value, this._optionalObject(options)),
     })
   }
 
-  private findComposition(host: RuntimeHost<any, any> | null): any | null {
+  private _findComposition(host: RuntimeHost<any, any> | null): any | null {
     let current = host
     while (current) {
       if (current.entityType === 'composition') {
@@ -127,7 +127,7 @@ export class ActionProgramExecutor {
     return null
   }
 
-  private requireObject(value: unknown, owner: string): Record<string, unknown> {
+  private _requireObject(value: unknown, owner: string): Record<string, unknown> {
     if (value == null) {
       return {}
     }
@@ -137,7 +137,7 @@ export class ActionProgramExecutor {
     return value as Record<string, unknown>
   }
 
-  private optionalObject(value: unknown): Record<string, unknown> | undefined {
+  private _optionalObject(value: unknown): Record<string, unknown> | undefined {
     return value != null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : undefined
   }
 }

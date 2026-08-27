@@ -368,7 +368,7 @@ export abstract class RuntimeHostBase<
       throw new Error('[RuntimeHostBase] Update binding requires id and sourcePath.')
     }
 
-    this.unbindUpdate(id)
+    this._unbindUpdate(id)
     const normalized: RuntimeHostUpdateBinding = { ...binding, id, sourcePath }
     this._updateBindings.set(id, normalized)
     const disposers = [sourcePath, `${sourcePath}.*`].map(mask => Raph.app.observeData(
@@ -377,10 +377,10 @@ export abstract class RuntimeHostBase<
       { phase: RUNTIME_NODE_UPDATE_PHASE_NAME },
     ))
     this._updateDisposers.set(id, disposers)
-    return () => this.unbindUpdate(id)
+    return () => this._unbindUpdate(id)
   }
 
-  private unbindUpdate(id: string): void {
+  private _unbindUpdate(id: string): void {
     for (const dispose of this._updateDisposers.get(id) ?? []) {
       dispose()
     }
@@ -514,7 +514,7 @@ export abstract class RuntimeHostBase<
       resources: [...this.resources],
       channels: [...this.channels],
       meta: { ...this.meta },
-      context: this.serializeContext(),
+      context: this._serializeContext(),
     }
   }
 
@@ -525,7 +525,7 @@ export abstract class RuntimeHostBase<
     this.updatedAt = Date.now()
   }
 
-  private serializeContext(): Record<string, unknown> {
+  private _serializeContext(): Record<string, unknown> {
     const value = this.context
     if (!value || typeof value !== 'object') {
       return {}

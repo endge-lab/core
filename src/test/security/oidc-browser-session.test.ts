@@ -12,18 +12,18 @@ const oidc = vi.hoisted(() => ({ popupCallbackCalls: 0 }))
 vi.mock('oidc-client-ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('oidc-client-ts')>()
   class FakeUserManager {
-    public constructor(private readonly settings: UserManagerSettings) {}
+    public constructor(private readonly _settings: UserManagerSettings) {}
 
-    private get key(): string { return `user:${this.settings.authority}:${this.settings.client_id}` }
+    private get _key(): string { return `user:${this._settings.authority}:${this._settings.client_id}` }
 
     public async getUser(): Promise<User | null> {
-      const raw = await (this.settings.userStore as StateStore).get(this.key)
+      const raw = await (this._settings.userStore as StateStore).get(this._key)
       return raw ? User.fromStorageString(raw) : null
     }
 
     public async signinPopup(): Promise<User> {
       const user = createUser()
-      await (this.settings.userStore as StateStore).set(this.key, user.toStorageString())
+      await (this._settings.userStore as StateStore).set(this._key, user.toStorageString())
       return user
     }
 
@@ -31,7 +31,7 @@ vi.mock('oidc-client-ts', async (importOriginal) => {
 
     public async signinRedirectCallback(): Promise<User> {
       const user = createUser()
-      await (this.settings.userStore as StateStore).set(this.key, user.toStorageString())
+      await (this._settings.userStore as StateStore).set(this._key, user.toStorageString())
       return user
     }
 
@@ -39,7 +39,7 @@ vi.mock('oidc-client-ts', async (importOriginal) => {
     public async signinSilent(): Promise<User | null> { return this.getUser() }
     public async signoutPopup(): Promise<void> {}
     public async signoutRedirect(): Promise<void> {}
-    public async removeUser(): Promise<void> { await (this.settings.userStore as StateStore).remove(this.key) }
+    public async removeUser(): Promise<void> { await (this._settings.userStore as StateStore).remove(this._key) }
   }
   return { ...actual, UserManager: FakeUserManager }
 })

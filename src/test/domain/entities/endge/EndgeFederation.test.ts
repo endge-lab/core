@@ -21,24 +21,24 @@ describe('endgeFederation stages', () => {
     const calls: string[] = []
 
     class TestModule extends EndgeModule {
-      constructor(private readonly key: string) {
+      constructor(private readonly _key: string) {
         super()
       }
 
       public override setup(): void {
-        calls.push(`${this.key}:setup`)
+        calls.push(`${this._key}:setup`)
       }
 
       public override load(): void {
-        calls.push(`${this.key}:load`)
+        calls.push(`${this._key}:load`)
       }
 
       public override build(): void {
-        calls.push(`${this.key}:build`)
+        calls.push(`${this._key}:build`)
       }
 
       public override start(): void {
-        calls.push(`${this.key}:start`)
+        calls.push(`${this._key}:start`)
       }
     }
 
@@ -75,15 +75,15 @@ describe('endgeFederation stages', () => {
 
     class ResetModule extends EndgeModule {
       constructor(
-        private readonly key: string,
-        private readonly shouldThrow: boolean = false,
+        private readonly _key: string,
+        private readonly _shouldThrow: boolean = false,
       ) {
         super()
       }
 
       public override reset(): void {
-        calls.push(`${this.key}:reset`)
-        if (this.shouldThrow) {
+        calls.push(`${this._key}:reset`)
+        if (this._shouldThrow) {
           throw new Error('reset failed')
         }
       }
@@ -138,12 +138,12 @@ describe('endgeFederation stages', () => {
     const calls: string[] = []
 
     class TestModule extends EndgeModule {
-      constructor(private readonly key: string) {
+      constructor(private readonly _key: string) {
         super()
       }
 
       public override start(): void {
-        calls.push(this.key)
+        calls.push(this._key)
       }
     }
 
@@ -175,12 +175,12 @@ describe('endgeFederation stages', () => {
     const calls: string[] = []
 
     class TestModule extends EndgeModule {
-      constructor(private readonly key: string) {
+      constructor(private readonly _key: string) {
         super()
       }
 
       public override start(): void {
-        calls.push(this.key)
+        calls.push(this._key)
       }
     }
 

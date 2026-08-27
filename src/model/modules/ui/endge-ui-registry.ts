@@ -459,7 +459,7 @@ export class EndgeUIRegistry extends EndgeModule {
 
     pushRef(roleContract?.defaultRendererRefs?.[input.surface])
 
-    for (const fallbackSurface of this.getFallbackSurfaces(input.surface)) {
+    for (const fallbackSurface of this._getFallbackSurfaces(input.surface)) {
       pushRef(roleContract?.defaultRendererRefs?.[fallbackSurface])
     }
 
@@ -482,7 +482,7 @@ export class EndgeUIRegistry extends EndgeModule {
       }
     }
 
-    for (const fallbackSurface of this.getFallbackSurfaces(input.surface)) {
+    for (const fallbackSurface of this._getFallbackSurfaces(input.surface)) {
       const fallbackIndexed = this._rendererRefsByIndex.get(rendererIndexKey({
         definitionRef: input.definitionRef,
         role,
@@ -502,7 +502,7 @@ export class EndgeUIRegistry extends EndgeModule {
   /**
    * Возвращает Fallback Surfaces.
    */
-  private getFallbackSurfaces(surface: UIPresentationSurface): UIPresentationSurface[] {
+  private _getFallbackSurfaces(surface: UIPresentationSurface): UIPresentationSurface[] {
     if (surface === 'admin') {
       return ['canvas', 'runtime']
     }

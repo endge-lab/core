@@ -19,11 +19,11 @@ export class EndgeUI extends EndgeModule {
   private _offWorkspace: (() => void) | null = null
   //
   // Настройки zoom
-  private readonly MIN_ZOOM: number = 50
-  private readonly MAX_ZOOM: number = 150
-  private readonly STEP_ZOOM: number = 25
-  private readonly DEFAULT_ZOOM: number = 100
-  private readonly LS_KEY_ZOOM: string = 'zoom'
+  private readonly _MIN_ZOOM: number = 50
+  private readonly _MAX_ZOOM: number = 150
+  private readonly _STEP_ZOOM: number = 25
+  private readonly _DEFAULT_ZOOM: number = 100
+  private readonly _LS_KEY_ZOOM: string = 'zoom'
 
   // Состояние
   private _zoom: number
@@ -35,11 +35,11 @@ export class EndgeUI extends EndgeModule {
   constructor() {
     super()
 
-    this._zoom = this.readZoomFromLS()
+    this._zoom = this._readZoomFromLS()
     this._theme = themeConfig.defaultTheme
 
     // сразу применим (как immediate watch)
-    this.applyThemeToDocument(this._theme)
+    this._applyThemeToDocument(this._theme)
   }
 
   /** Подключает UI projection к пользовательскому контексту после загрузки workspace. */
@@ -47,16 +47,16 @@ export class EndgeUI extends EndgeModule {
     this._offContext?.()
     this._offWorkspace?.()
     this._offContext = Endge.context.subscribe(() => {
-      if (!this.syncThemeFromContext()) {
+      if (!this._syncThemeFromContext()) {
         this.notify()
       }
     })
     this._offWorkspace = Endge.workspace.subscribe(() => {
-      if (!this.syncThemeFromContext()) {
+      if (!this._syncThemeFromContext()) {
         this.notify()
       }
     })
-    this.syncThemeFromContext()
+    this._syncThemeFromContext()
   }
 
   /** Отключает runtime subscription; пользовательское значение остаётся в EndgeContext. */
@@ -106,13 +106,13 @@ export class EndgeUI extends EndgeModule {
    * Устанавливает zoom с ограничением допустимого диапазона.
    */
   public setZoom(value: number): void {
-    const next: number = this.clampZoom(value)
+    const next: number = this._clampZoom(value)
     if (next === this._zoom) {
       return
     }
 
     this._zoom = next
-    this.writeZoomToLS(next)
+    this._writeZoomToLS(next)
     this.notify()
   }
 
@@ -120,15 +120,15 @@ export class EndgeUI extends EndgeModule {
    * Возвращает zoom к значению по умолчанию.
    */
   public resetZoom(): void {
-    this.setZoom(this.DEFAULT_ZOOM)
+    this.setZoom(this._DEFAULT_ZOOM)
   }
 
   /**
    * Увеличивает zoom на один шаг.
    */
   public zoomUp(): void {
-    if (this._zoom < this.MAX_ZOOM) {
-      this.setZoom(this._zoom + this.STEP_ZOOM)
+    if (this._zoom < this._MAX_ZOOM) {
+      this.setZoom(this._zoom + this._STEP_ZOOM)
     }
   }
 
@@ -136,42 +136,42 @@ export class EndgeUI extends EndgeModule {
    * Уменьшает zoom на один шаг.
    */
   public zoomDown(): void {
-    if (this._zoom > this.MIN_ZOOM) {
-      this.setZoom(this._zoom - this.STEP_ZOOM)
+    if (this._zoom > this._MIN_ZOOM) {
+      this.setZoom(this._zoom - this._STEP_ZOOM)
     }
   }
 
   /**
    * Внутренний helper модуля: clamp Zoom.
    */
-  private clampZoom(value: number): number {
+  private _clampZoom(value: number): number {
     const n: number = Math.round(Number(value))
     if (!Number.isFinite(n)) {
-      return this.DEFAULT_ZOOM
+      return this._DEFAULT_ZOOM
     }
-    return Math.min(this.MAX_ZOOM, Math.max(this.MIN_ZOOM, n))
+    return Math.min(this._MAX_ZOOM, Math.max(this._MIN_ZOOM, n))
   }
 
   /**
    * Считывает Zoom From LS.
    */
-  private readZoomFromLS(): number {
+  private _readZoomFromLS(): number {
     if (typeof localStorage === 'undefined') {
-      return this.DEFAULT_ZOOM
+      return this._DEFAULT_ZOOM
     }
-    const raw: string | null = localStorage.getItem(this.LS_KEY_ZOOM)
-    const n: number = raw == null ? this.DEFAULT_ZOOM : Number(raw)
-    return this.clampZoom(n)
+    const raw: string | null = localStorage.getItem(this._LS_KEY_ZOOM)
+    const n: number = raw == null ? this._DEFAULT_ZOOM : Number(raw)
+    return this._clampZoom(n)
   }
 
   /**
    * Записывает Zoom To LS.
    */
-  private writeZoomToLS(value: number): void {
+  private _writeZoomToLS(value: number): void {
     if (typeof localStorage === 'undefined') {
       return
     }
-    localStorage.setItem(this.LS_KEY_ZOOM, String(value))
+    localStorage.setItem(this._LS_KEY_ZOOM, String(value))
   }
 
   //
@@ -209,10 +209,10 @@ export class EndgeUI extends EndgeModule {
     }
 
     Endge.context.setCurrentTheme(identity)
-    this.syncThemeFromContext()
+    this._syncThemeFromContext()
   }
 
-  private syncThemeFromContext(): boolean {
+  private _syncThemeFromContext(): boolean {
     if (!Endge.workspace.isLoaded) {
       return false
     }
@@ -223,7 +223,7 @@ export class EndgeUI extends EndgeModule {
     }
 
     this._theme = next
-    this.applyThemeToDocument(next)
+    this._applyThemeToDocument(next)
     this.notify()
     return true
   }
@@ -231,7 +231,7 @@ export class EndgeUI extends EndgeModule {
   /**
    * Применяет Theme To Document.
    */
-  private applyThemeToDocument(theme: string): void {
+  private _applyThemeToDocument(theme: string): void {
     if (typeof document === 'undefined') {
       return
     }

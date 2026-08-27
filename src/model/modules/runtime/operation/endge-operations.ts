@@ -9,26 +9,26 @@ import {
 
 /** Resolves the nearest active Operation History along runtime-scope ancestry. */
 export class EndgeOperations {
-  private readonly histories = new Map<string, { scope: RuntimeScope, history: OperationHistory }>()
-  private latestScopeId: string | null = null
-  private keydownDisposer: (() => void) | null = null
+  private readonly _histories = new Map<string, { scope: RuntimeScope, history: OperationHistory }>()
+  private _latestScopeId: string | null = null
+  private _keydownDisposer: (() => void) | null = null
 
   public register(scope: RuntimeScope, history: OperationHistory): () => void {
-    if (this.histories.has(scope.id)) {
+    if (this._histories.has(scope.id)) {
       throw new Error(`Composition scope "${scope.path}" already owns operationHistory.`)
     }
-    this.histories.set(scope.id, { scope, history })
-    this.latestScopeId = scope.id
-    this.ensureShortcuts()
+    this._histories.set(scope.id, { scope, history })
+    this._latestScopeId = scope.id
+    this._ensureShortcuts()
     return () => {
-      if (this.histories.get(scope.id)?.history === history) {
-        this.histories.delete(scope.id)
+      if (this._histories.get(scope.id)?.history === history) {
+        this._histories.delete(scope.id)
       }
-      if (this.latestScopeId === scope.id) {
-        this.latestScopeId = [...this.histories.keys()].at(-1) ?? null
+      if (this._latestScopeId === scope.id) {
+        this._latestScopeId = [...this._histories.keys()].at(-1) ?? null
       }
-      if (!this.histories.size) {
-        this.disposeShortcuts()
+      if (!this._histories.size) {
+        this._disposeShortcuts()
       }
     }
   }
@@ -36,7 +36,7 @@ export class EndgeOperations {
   public resolveForHost(host: RuntimeHost<any, any> | null | undefined): OperationHistory | null {
     let scope = host ? Endge.runtime.getRuntimeScopeByHost(host.id) : null
     while (scope) {
-      const candidate = this.histories.get(scope.id)?.history
+      const candidate = this._histories.get(scope.id)?.history
       if (candidate?.active) {
         return candidate
       }
@@ -46,13 +46,13 @@ export class EndgeOperations {
   }
 
   public getActiveHistory(): OperationHistory | null {
-    if (this.latestScopeId) {
-      const latest = this.histories.get(this.latestScopeId)?.history
+    if (this._latestScopeId) {
+      const latest = this._histories.get(this._latestScopeId)?.history
       if (latest?.active) {
         return latest
       }
     }
-    return [...this.histories.values()].reverse().find(item => item.history.active)?.history ?? null
+    return [...this._histories.values()].reverse().find(item => item.history.active)?.history ?? null
   }
 
   public undo(): Promise<unknown> { return this.getActiveHistory()?.undo() ?? Promise.resolve(undefined) }
@@ -60,8 +60,8 @@ export class EndgeOperations {
   public canUndo(): boolean { return this.getActiveHistory()?.canUndo() ?? false }
   public canRedo(): boolean { return this.getActiveHistory()?.canRedo() ?? false }
 
-  private ensureShortcuts(): void {
-    if (this.keydownDisposer || typeof globalThis.addEventListener !== 'function') {
+  private _ensureShortcuts(): void {
+    if (this._keydownDisposer || typeof globalThis.addEventListener !== 'function') {
       return
     }
     const listener = (event: Event) => {
@@ -104,11 +104,11 @@ export class EndgeOperations {
       }
     }
     globalThis.addEventListener('keydown', listener)
-    this.keydownDisposer = () => globalThis.removeEventListener('keydown', listener)
+    this._keydownDisposer = () => globalThis.removeEventListener('keydown', listener)
   }
 
-  private disposeShortcuts(): void {
-    this.keydownDisposer?.()
-    this.keydownDisposer = null
+  private _disposeShortcuts(): void {
+    this._keydownDisposer?.()
+    this._keydownDisposer = null
   }
 }

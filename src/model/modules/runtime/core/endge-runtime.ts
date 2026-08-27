@@ -67,7 +67,7 @@ export class EndgeRuntime extends EndgeModule {
   public acquireDestroyedHostSnapshots(limit: number): RuntimeInspectionLease {
     const token = Symbol('destroyed-runtime-host-snapshots')
     this._destroyedSnapshotLeases.set(token, normalizeInspectionLimit(limit))
-    this.syncDestroyedSnapshotLimit()
+    this._syncDestroyedSnapshotLimit()
     let released = false
     return {
       release: () => {
@@ -76,7 +76,7 @@ export class EndgeRuntime extends EndgeModule {
         }
         released = true
         this._destroyedSnapshotLeases.delete(token)
-        this.syncDestroyedSnapshotLimit()
+        this._syncDestroyedSnapshotLimit()
       },
     }
   }
@@ -90,7 +90,7 @@ export class EndgeRuntime extends EndgeModule {
       collisionPolicy: 'multi',
       persistence: 'disabled',
     })
-    this.registerDefaultStrategies()
+    this._registerDefaultStrategies()
   }
 
   /**
@@ -116,10 +116,10 @@ export class EndgeRuntime extends EndgeModule {
     Raph.app.addNode(this._appNode)
     Raph.addPhase(RuntimeNodeUpdatePhase.make())
     Raph.addPhase(RuntimeBoundaryUpdatePhase.make())
-    this.syncWorkspaceVariablesToRaph()
-    this.hydrateRuntimeFilters()
+    this._syncWorkspaceVariablesToRaph()
+    this._hydrateRuntimeFilters()
     this._unsubscribeWorkspace = Endge.workspace.subscribe(() => {
-      this.syncWorkspaceVariablesToRaph()
+      this._syncWorkspaceVariablesToRaph()
     })
     this._unsubscribeContext = Endge.context.subscribe(() => {
       this.invalidateApplicationScopes()
@@ -151,9 +151,9 @@ export class EndgeRuntime extends EndgeModule {
       persistenceKey,
       meta,
     } = options
-    const parent = this.resolveParentHost(parentRef)
-    const appScope = this.resolveAppScope(appScopeRef, parent)
-    this.ensureLifecycleAppScope(appScope)
+    const parent = this._resolveParentHost(parentRef)
+    const appScope = this._resolveAppScope(appScopeRef, parent)
+    this._ensureLifecycleAppScope(appScope)
     const artifactReader = this._resolveArtifactReader(artifactReaderRef)
     const hostMeta: Record<string, any> = { ...(meta ?? {}) }
 
@@ -199,7 +199,7 @@ export class EndgeRuntime extends EndgeModule {
       return null
     }
 
-    if (!this.registerAndActivateHost(host, parent)) {
+    if (!this._registerAndActivateHost(host, parent)) {
       host.destroy()
       return null
     }
@@ -239,7 +239,7 @@ export class EndgeRuntime extends EndgeModule {
     }
     const scope = new RuntimeAppScope(this, options)
     this._appScopes.set(scope.id, scope)
-    this.ensureLifecycleAppScope(scope)
+    this._ensureLifecycleAppScope(scope)
     return scope
   }
 
@@ -299,7 +299,7 @@ export class EndgeRuntime extends EndgeModule {
   /** Регистрирует host, созданный владельцем составной runtime-сущности. */
   public registerRuntimeHost(host: AnyRuntimeHost): boolean {
     this.start()
-    const registered = this.registerAndActivateHost(host, host.parent)
+    const registered = this._registerAndActivateHost(host, host.parent)
     if (registered) {
       this.notify()
     }
@@ -360,7 +360,7 @@ export class EndgeRuntime extends EndgeModule {
    * Корректно разрушает runtime-host по runtime-id.
    */
   public destroyRuntime(runtimeId: string): void {
-    void this.destroyRuntimeInternal(runtimeId, true)
+    void this._destroyRuntimeInternal(runtimeId, true)
   }
 
   /**
@@ -382,7 +382,7 @@ export class EndgeRuntime extends EndgeModule {
     }
 
     for (const id of postOrder) {
-      void this.destroyRuntimeInternal(id, false)
+      void this._destroyRuntimeInternal(id, false)
     }
 
     this.notify()
@@ -401,7 +401,7 @@ export class EndgeRuntime extends EndgeModule {
     }
 
     for (const id of postOrder) {
-      await this.destroyRuntimeInternal(id, false)
+      await this._destroyRuntimeInternal(id, false)
     }
 
     this.notify()
@@ -417,7 +417,7 @@ export class EndgeRuntime extends EndgeModule {
     // disposed by this reset generation.
     const scopesReset = this.scopes.reset()
     for (const runtimeId of hostIds) {
-      await this.destroyRuntimeInternal(runtimeId, false)
+      await this._destroyRuntimeInternal(runtimeId, false)
     }
 
     Raph.clearPhases()
@@ -447,7 +447,7 @@ export class EndgeRuntime extends EndgeModule {
   }
 
   /** Projects effective workspace variables into the runtime Raph namespace. */
-  private syncWorkspaceVariablesToRaph(): void {
+  private _syncWorkspaceVariablesToRaph(): void {
     if (!Endge.workspace.isLoaded) {
       return
     }
@@ -462,7 +462,7 @@ export class EndgeRuntime extends EndgeModule {
   }
 
   /** Restores persisted runtime filter values independently of workspace variables. */
-  private hydrateRuntimeFilters(): void {
+  private _hydrateRuntimeFilters(): void {
     if (typeof localStorage === 'undefined') {
       return
     }
@@ -496,7 +496,7 @@ export class EndgeRuntime extends EndgeModule {
   /**
    * Внутренний destroy для host с контролем уведомления подписчиков.
    */
-  private async destroyRuntimeInternal(
+  private async _destroyRuntimeInternal(
     runtimeId: string,
     shouldNotify: boolean,
   ): Promise<void> {
@@ -510,7 +510,7 @@ export class EndgeRuntime extends EndgeModule {
       return
     }
     this._destroyingRuntimeIds.add(id)
-    const destroyedSnapshot = this.createDestroyedSnapshot(host)
+    const destroyedSnapshot = this._createDestroyedSnapshot(host)
 
     let cleanupError: unknown = null
     try {
@@ -552,13 +552,13 @@ export class EndgeRuntime extends EndgeModule {
     }
   }
 
-  private syncDestroyedSnapshotLimit(): void {
+  private _syncDestroyedSnapshotLimit(): void {
     const effectiveLimit = Math.max(0, ...this._destroyedSnapshotLeases.values())
     this._hosts.setDeletedSnapshotLimit(effectiveLimit)
     this.notify()
   }
 
-  private createDestroyedSnapshot(host: RuntimeHost<any, any>): DestroyedRuntimeHostSnapshot {
+  private _createDestroyedSnapshot(host: RuntimeHost<any, any>): DestroyedRuntimeHostSnapshot {
     return {
       id: host.id,
       basePath: host.basePath,
@@ -579,7 +579,7 @@ export class EndgeRuntime extends EndgeModule {
   }
 
   /** Регистрирует host, подключает infrastructure и только затем активирует его. */
-  private registerAndActivateHost(host: AnyRuntimeHost, parent: AnyRuntimeHost | null): boolean {
+  private _registerAndActivateHost(host: AnyRuntimeHost, parent: AnyRuntimeHost | null): boolean {
     if (this._hosts.getById(host.id)) {
       console.error(`[EndgeRuntime] Runtime host "${host.id}" is already active.`)
       return false
@@ -595,7 +595,7 @@ export class EndgeRuntime extends EndgeModule {
           parentRuntimeId: parent?.id ?? null,
         },
       })
-      ;(parent?.node ?? this.ensureScopeNode(String(host.meta.appScopeId ?? 'app')))?.addChild(host.node, { invalidate: false })
+      ;(parent?.node ?? this._ensureScopeNode(String(host.meta.appScopeId ?? 'app')))?.addChild(host.node, { invalidate: false })
     }
     try {
       this._hosts.register(host)
@@ -623,7 +623,7 @@ export class EndgeRuntime extends EndgeModule {
   }
 
   /** Creates the lifecycle root lazily again after a full Endge.reset(). */
-  private ensureLifecycleAppScope(appScope: RuntimeAppScope): RuntimeScope {
+  private _ensureLifecycleAppScope(appScope: RuntimeAppScope): RuntimeScope {
     const id = `runtime-scope:${appScope.id}`
     const existing = this.scopes.get(id)
     if (existing) {
@@ -644,7 +644,7 @@ export class EndgeRuntime extends EndgeModule {
   /**
    * Регистрирует встроенные стратегии в порядке от специальных к общим.
    */
-  private registerDefaultStrategies(): void {
+  private _registerDefaultStrategies(): void {
     this.registerStrategy(new CompositionRuntimeStrategy())
     this.registerStrategy(new StoreRuntimeStrategy())
     this.registerStrategy(new StreamRuntimeStrategy())
@@ -657,7 +657,7 @@ export class EndgeRuntime extends EndgeModule {
   }
 
   /** Разрешает scope запуска: explicit -> parent -> default app. */
-  private resolveAppScope(rawScope: unknown, parent: AnyRuntimeHost | null): RuntimeAppScope {
+  private _resolveAppScope(rawScope: unknown, parent: AnyRuntimeHost | null): RuntimeAppScope {
     if (rawScope instanceof RuntimeAppScope) {
       return rawScope
     }
@@ -674,7 +674,7 @@ export class EndgeRuntime extends EndgeModule {
   }
 
   /** Создаёт Raph graph node для AppScope независимо от data namespace. */
-  private ensureScopeNode(scopeId: string): RaphNode | null {
+  private _ensureScopeNode(scopeId: string): RaphNode | null {
     const scope = this.getAppScope(scopeId) ?? this._defaultAppScope
     const existing = this._scopeNodes.get(scope.id)
     if (existing) {
@@ -699,7 +699,7 @@ export class EndgeRuntime extends EndgeModule {
   }
 
   /** Разрешает и проверяет явно переданный parent host. */
-  private resolveParentHost(rawParent: unknown): AnyRuntimeHost | null {
+  private _resolveParentHost(rawParent: unknown): AnyRuntimeHost | null {
     if (rawParent === undefined || rawParent === null) {
       return null
     }

@@ -217,7 +217,7 @@ export class EndgeContext extends EndgeModule {
     }
 
     try {
-      this.resolveAdapter(this._contextPersistence).write(CONTEXT_STORAGE_KEY, this._serializeForPersistence())
+      this._resolveAdapter(this._contextPersistence).write(CONTEXT_STORAGE_KEY, this._serializeForPersistence())
     }
     catch (error) {
       console.warn(`[EndgeContext] Failed to persist context: ${error instanceof Error ? error.message : String(error)}`)
@@ -230,7 +230,7 @@ export class EndgeContext extends EndgeModule {
     let shouldPersistThemeMigration = false
     this._isHydrating = true
     try {
-      const adapter = this.resolveAdapter(this._contextPersistence)
+      const adapter = this._resolveAdapter(this._contextPersistence)
       const snapshot = adapter.read<EndgePersistedContextSnapshot>(CONTEXT_STORAGE_KEY)
         ?? adapter.read<EndgePersistedContextSnapshot>(LEGACY_CONTEXT_STORAGE_KEY)
 
@@ -262,7 +262,7 @@ export class EndgeContext extends EndgeModule {
 
   /** Возвращает полный persistence scope текущей сессии. */
   public getPersistenceScope(): EndgePersistenceScope {
-    const session = this.resolveSessionIdentity()
+    const session = this._resolveSessionIdentity()
 
     return {
       workspaceId: this._requireCurrentWorkspace(),
@@ -290,9 +290,9 @@ export class EndgeContext extends EndgeModule {
       runtimeId,
       storageId: input.storageId,
       scope: () => persistence.driver === 'disabled'
-        ? this.getDisabledPersistenceScope()
+        ? this._getDisabledPersistenceScope()
         : this.getPersistenceScope(),
-      adapter: this.resolveAdapter(persistence),
+      adapter: this._resolveAdapter(persistence),
     })
     this._runtimeControllers.set(runtimeId, controller)
     return controller
@@ -328,13 +328,13 @@ export class EndgeContext extends EndgeModule {
 
   /** Возвращает identity текущего tenant с учётом session provider. */
   public getCurrentTenant(): string {
-    return this.resolveSessionIdentity().tenantId
+    return this._resolveSessionIdentity().tenantId
   }
 
   /** Устанавливает fallback identity текущего tenant. */
   public setCurrentTenant(identity: string | null): void {
-    this.assertStructuralContextMutable('_currentTenant', identity, DEFAULT_SCOPE.tenantId)
-    this.setScopeValue('_currentTenant', identity, DEFAULT_SCOPE.tenantId)
+    this._assertStructuralContextMutable('_currentTenant', identity, DEFAULT_SCOPE.tenantId)
+    this._setScopeValue('_currentTenant', identity, DEFAULT_SCOPE.tenantId)
   }
 
   /** Возвращает identity текущего project. */
@@ -344,8 +344,8 @@ export class EndgeContext extends EndgeModule {
 
   /** Устанавливает текущий project и сохраняет контекст. */
   public setCurrentProject(identity: string | null): void {
-    this.assertStructuralContextMutable('_currentProject', identity, DEFAULT_SCOPE.projectId)
-    this.setScopeValue('_currentProject', identity, DEFAULT_SCOPE.projectId)
+    this._assertStructuralContextMutable('_currentProject', identity, DEFAULT_SCOPE.projectId)
+    this._setScopeValue('_currentProject', identity, DEFAULT_SCOPE.projectId)
   }
 
   /** Возвращает identity текущего environment. */
@@ -418,18 +418,18 @@ export class EndgeContext extends EndgeModule {
 
   /** Устанавливает текущий environment и сохраняет контекст. */
   public setCurrentEnvironment(identity: string | null): void {
-    this.assertStructuralContextMutable('_currentEnvironment', identity, DEFAULT_SCOPE.environmentId)
-    this.setScopeValue('_currentEnvironment', identity, DEFAULT_SCOPE.environmentId)
+    this._assertStructuralContextMutable('_currentEnvironment', identity, DEFAULT_SCOPE.environmentId)
+    this._setScopeValue('_currentEnvironment', identity, DEFAULT_SCOPE.environmentId)
   }
 
   /** Возвращает identity текущего user с учётом session provider. */
   public getCurrentUser(): string {
-    return this.resolveSessionIdentity().userId
+    return this._resolveSessionIdentity().userId
   }
 
   /** Устанавливает fallback identity текущего user. */
   public setCurrentUser(identity: string | null): void {
-    this.setScopeValue('_currentUser', identity, DEFAULT_SCOPE.userId)
+    this._setScopeValue('_currentUser', identity, DEFAULT_SCOPE.userId)
   }
 
   /** Returns the current data execution mode for Store fixtures and external Query runs. */
@@ -667,7 +667,7 @@ export class EndgeContext extends EndgeModule {
   }
 
   /** Выбирает storage adapter для заданной persistence policy. */
-  private resolveAdapter(persistence: EndgePersistenceInput): EndgeStorageAdapter {
+  private _resolveAdapter(persistence: EndgePersistenceInput): EndgeStorageAdapter {
     return this._adapters.resolve(persistence)
   }
 
@@ -697,8 +697,8 @@ export class EndgeContext extends EndgeModule {
   }
 
   /** Builds a harmless scope for a controller that never reads or writes state. */
-  private getDisabledPersistenceScope(): EndgePersistenceScope {
-    const session = this.resolveSessionIdentity()
+  private _getDisabledPersistenceScope(): EndgePersistenceScope {
+    const session = this._resolveSessionIdentity()
 
     return {
       workspaceId: this._currentWorkspace ?? 'detached',
@@ -710,7 +710,7 @@ export class EndgeContext extends EndgeModule {
   }
 
   /** Вычисляет tenant и user identity текущей сессии. */
-  private resolveSessionIdentity(): { tenantId: string, userId: string } {
+  private _resolveSessionIdentity(): { tenantId: string, userId: string } {
     const external = this._sessionProvider?.getCurrentIdentity() ?? null
 
     return {
@@ -720,7 +720,7 @@ export class EndgeContext extends EndgeModule {
   }
 
   /** Обновляет одно поле scope и публикует изменение контекста. */
-  private setScopeValue(
+  private _setScopeValue(
     field: '_currentTenant' | '_currentProject' | '_currentEnvironment' | '_currentUser',
     identity: string | null,
     fallback: string,
@@ -735,7 +735,7 @@ export class EndgeContext extends EndgeModule {
     this.notify()
   }
 
-  private assertStructuralContextMutable(
+  private _assertStructuralContextMutable(
     field: '_currentTenant' | '_currentProject' | '_currentEnvironment',
     identity: string | null,
     fallback: string,
