@@ -103,7 +103,7 @@ export class EndgeVocabs extends EndgeModule {
 
     const cfg = this.resolveVocabConfigByIdentityOrSlug(ns, ns)
     if (!cfg) {
-      console.log(`Vocab с identity или collectionSlug="${ns}" не найден`)
+      console.warn(`Vocab с identity или collectionSlug="${ns}" не найден`)
       return
     }
 
