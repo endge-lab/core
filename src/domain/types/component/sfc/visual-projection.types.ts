@@ -303,34 +303,34 @@ export type ComponentSFCTableSourcePatch
     columnIndex?: number
     mode: 'default' | 'disabled' | 'none' | 'custom'
   }
-    | {
-      type: 'add-menu-node'
-      menu: ComponentSFCTableVisualMenuKind
-      columnIndex?: number
-      node: 'item' | 'separator'
-    }
-    | {
-      type: 'remove-menu-node'
-      menu: ComponentSFCTableVisualMenuKind
-      columnIndex?: number
-      nodeIndex: number
-    }
-    | {
-      type: 'move-menu-node'
-      menu: ComponentSFCTableVisualMenuKind
-      columnIndex?: number
-      fromIndex: number
-      toIndex: number
-    }
-    | {
-      type: 'set-menu-item-attribute'
-      menu: ComponentSFCTableVisualMenuKind
-      columnIndex?: number
-      nodeIndex: number
-      name: 'label' | 'action' | 'input' | 'icon' | 'visible' | 'disabled'
-      value: string | null
-      valueKind: 'expression' | 'literal'
-    }
+  | {
+    type: 'add-menu-node'
+    menu: ComponentSFCTableVisualMenuKind
+    columnIndex?: number
+    node: 'item' | 'separator'
+  }
+  | {
+    type: 'remove-menu-node'
+    menu: ComponentSFCTableVisualMenuKind
+    columnIndex?: number
+    nodeIndex: number
+  }
+  | {
+    type: 'move-menu-node'
+    menu: ComponentSFCTableVisualMenuKind
+    columnIndex?: number
+    fromIndex: number
+    toIndex: number
+  }
+  | {
+    type: 'set-menu-item-attribute'
+    menu: ComponentSFCTableVisualMenuKind
+    columnIndex?: number
+    nodeIndex: number
+    name: 'label' | 'action' | 'input' | 'icon' | 'visible' | 'disabled'
+    value: string | null
+    valueKind: 'expression' | 'literal'
+  }
 
 /** Результат точечного изменения SFC Table source. */
 export interface ComponentSFCTableSourcePatchResult {

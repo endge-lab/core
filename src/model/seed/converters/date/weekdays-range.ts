@@ -3,7 +3,7 @@
  * День 1 = index 0, день 7 = index 6.
  */
 export function weekdaysRange(str: any): boolean[] {
-  const result = Array(7).fill(false)
+  const result = [false, false, false, false, false, false, false]
   const s = str != null ? String(str).trim() : ''
   if (!s) {
     return result

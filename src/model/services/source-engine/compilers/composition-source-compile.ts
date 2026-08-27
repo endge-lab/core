@@ -1,5 +1,9 @@
 import type { ComponentSFCEventInputValue } from '@/domain/types/component/sfc/ports.types'
 import type { EndgeDataMode } from '@/domain/types/document/workspace.types'
+import type {
+  FilterViewControlDefinition,
+  FilterViewControlType,
+} from '@/domain/types/presentation/filter-view.type'
 import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
 import type { VocabLoadPolicy } from '@/domain/types/runtime/vocab-cache.types'
 import type {
@@ -21,10 +25,6 @@ import type {
 } from '@/domain/types/source/composition-source.types'
 import type { SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 import type { UpdateMutationStrategy } from '@/domain/types/source/update-source.types'
-import type {
-  FilterViewControlDefinition,
-  FilterViewControlType,
-} from '@/domain/types/presentation/filter-view.type'
 
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'

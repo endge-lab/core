@@ -4,6 +4,7 @@ import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 
 import type { AuthInteractionRequiredError } from '@/model/modules/security/auth/AuthInteractionRequiredError'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
+import { OidcBrowserSession_Adapter } from '@/model/adapters/auth/OidcBrowserSession_Adapter'
 import { Endge } from '@/model/kernel/endge'
 import { BasicAuthAdapter } from '@/model/modules/security/auth/adapters/BasicAuthAdapter'
 import { BearerAuthAdapter } from '@/model/modules/security/auth/adapters/BearerAuthAdapter'
@@ -15,7 +16,6 @@ import { AuthProfileRegistry } from '@/model/modules/security/auth/AuthProfileRe
 import { AuthRequestResolver } from '@/model/modules/security/auth/AuthRequestResolver'
 import { AuthSessionManager } from '@/model/modules/security/auth/AuthSessionManager'
 import { AuthSessionStore } from '@/model/modules/security/auth/AuthSessionStore'
-import { OidcBrowserSession_Adapter } from '@/model/adapters/auth/OidcBrowserSession_Adapter'
 
 export type AuthInteractionRequiredListener = (error: AuthInteractionRequiredError) => void
 

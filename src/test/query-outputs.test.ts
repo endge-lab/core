@@ -5,9 +5,9 @@ import { Raph } from '@endge/raph'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { RDataView } from '@/domain/entities/reflect/RDataView'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
+import { QueryExecutor_Adapter } from '@/model/adapters/query/QueryExecutor_Adapter'
 import { Endge } from '@/model/kernel/endge'
 import { EndgeDataView } from '@/model/modules/runtime/execution/endge-data-view'
-import { QueryExecutor_Adapter } from '@/model/adapters/query/QueryExecutor_Adapter'
 
 describe('query output source compiler', () => {
   it('rejects legacy response block', () => {

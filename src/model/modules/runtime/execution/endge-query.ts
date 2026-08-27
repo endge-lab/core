@@ -4,8 +4,8 @@ import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRunt
 
 import type { QueryProgramPayload } from '@/domain/types/program/program.types'
 import type { RuntimeParentRef } from '@/domain/types/runtime/runtime-execute.type'
-import { Endge } from '@/model/kernel/endge'
 import { QueryExecutor_Adapter } from '@/model/adapters/query/QueryExecutor_Adapter'
+import { Endge } from '@/model/kernel/endge'
 
 /**
  * Модуль выполнения доменных query: custom executor, mock data и REST.

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { Endge } from '@/model/kernel/endge'
 import { QueryExecutor_Adapter } from '@/model/adapters/query/QueryExecutor_Adapter'
+import { Endge } from '@/model/kernel/endge'
 import { compileQuerySource } from '@/model/services/source-engine/compilers/query-source-compile'
 
 describe('queryExecutor dynamic request fields', () => {
