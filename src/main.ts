@@ -1,4 +1,4 @@
-/* eslint-disable */
+/* eslint-disable perfectionist/sort-exports -- Публичный API сгруппирован вручную по архитектурным разделам. */
 
 //
 // MODEL

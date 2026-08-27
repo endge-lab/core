@@ -28,16 +28,21 @@ interface CompositionResourceDescriptorBase {
   sourceOrder: number
 }
 
-export type CompositionResourceDescriptor
-  = | CompositionResourceDescriptorBase & { kind: 'style' | 'i18n', identity: string }
-    | CompositionResourceDescriptorBase & {
-    kind: 'operation-history'
-    operationHistory: {
-      limit: number
-      limitConfigurationPath: string | null
-      shortcuts: OperationHistoryShortcutDescriptor[] | null
-    }
+type CompositionSourceAssetResourceDescriptor = CompositionResourceDescriptorBase & {
+  kind: 'style' | 'i18n'
+  identity: string
+}
+
+type CompositionOperationHistoryResourceDescriptor = CompositionResourceDescriptorBase & {
+  kind: 'operation-history'
+  operationHistory: {
+    limit: number
+    limitConfigurationPath: string | null
+    shortcuts: OperationHistoryShortcutDescriptor[] | null
   }
+}
+
+export type CompositionResourceDescriptor = CompositionSourceAssetResourceDescriptor | CompositionOperationHistoryResourceDescriptor
 
 export interface OperationHistoryShortcutDescriptor {
   command: 'undo' | 'redo'

@@ -72,5 +72,5 @@ function wordPattern(words: string[]): RegExp {
   const alternatives = [...new Set(words.filter(Boolean))]
     .map(word => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
     .join('|')
-  return alternatives ? new RegExp(`\\b(?:${alternatives})\\b`) : /(?!)/
+  return alternatives ? new RegExp(`\\b(?:${alternatives})\\b`) : /\uFFFF/u
 }

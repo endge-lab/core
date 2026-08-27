@@ -7,7 +7,7 @@ export function timeStringToDate(value: unknown): Date | null {
   if (!s) {
     return null
   }
-  if (!/^\d{1,2}:\d{2}(:\d{2})?$/.test(s)) {
+  if (!/^\d{1,2}:\d{2}(?::\d{2})?$/.test(s)) {
     return null
   }
   const [h, m, sec = '0'] = s.split(':').map(Number)

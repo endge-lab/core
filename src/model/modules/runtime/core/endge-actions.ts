@@ -489,6 +489,7 @@ export class EndgeActions extends Subscribable {
       catalogPath: ['Debug'],
       execute: () => {
         if (typeof globalThis.alert === 'function') {
+          // eslint-disable-next-line no-alert -- Встроенное debug-action намеренно проверяет браузерный alert.
           globalThis.alert('Test alert')
         }
       },

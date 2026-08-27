@@ -9,6 +9,8 @@ import type {
 import { ENDGE_STYLE_DEFAULT_SOURCE } from '@/domain/entities/reflect/RStyle'
 import { compileEndgeCSS } from '@/model/services/style/endgecss-compile'
 
+const MONACO_SNIPPET_PREFIX = '$'
+
 export class StyleSourceLanguageStrategy implements SourceLanguageStrategy {
   public readonly id = 'source-language:style'
   public readonly sourceKind: SourceKind = 'style'
@@ -63,11 +65,11 @@ export class StyleSourceLanguageStrategy implements SourceLanguageStrategy {
       { label: '@theme', kind: 'snippet', insertText: '@theme dark {\n  --surface: #111827;\n\n  & {\n    color: var(--text);\n  }\n}', detail: 'Theme tokens and rules' },
       { label: '@scope', kind: 'snippet', insertText: '@scope (:component(FlightBoard)) {\n  $0\n}', detail: 'Limit rules to an abstract subtree' },
       { label: '@supports renderer', kind: 'snippet', insertText: '@supports renderer(dom) {\n  $0\n}', detail: 'Renderer-specific optional styles' },
-      { label: ':component()', kind: 'function', insertText: ':component(${1:FlightBoard})', detail: 'Public component tag' },
-      { label: ':identity()', kind: 'function', insertText: ':identity(${1:flight-board})', detail: 'Stable component identity' },
-      { label: ':state()', kind: 'function', insertText: ':state(${1:selected})', detail: 'Semantic runtime state' },
-      { label: '::part()', kind: 'function', insertText: '::part(${1:status})', detail: 'Public visual surface' },
-      { label: 'var()', kind: 'function', insertText: 'var(--${1:token})', detail: 'Read an EndgeCSS custom property' },
+      { label: ':component()', kind: 'function', insertText: `:component(${MONACO_SNIPPET_PREFIX}{1:FlightBoard})`, detail: 'Public component tag' },
+      { label: ':identity()', kind: 'function', insertText: `:identity(${MONACO_SNIPPET_PREFIX}{1:flight-board})`, detail: 'Stable component identity' },
+      { label: ':state()', kind: 'function', insertText: `:state(${MONACO_SNIPPET_PREFIX}{1:selected})`, detail: 'Semantic runtime state' },
+      { label: '::part()', kind: 'function', insertText: `::part(${MONACO_SNIPPET_PREFIX}{1:status})`, detail: 'Public visual surface' },
+      { label: 'var()', kind: 'function', insertText: `var(--${MONACO_SNIPPET_PREFIX}{1:token})`, detail: 'Read an EndgeCSS custom property' },
     ]
   }
 }

@@ -19,7 +19,7 @@ export class DiagnosticsRecordStore {
   /** Создаёт store с указанной максимальной ёмкостью. */
   public constructor(capacity: number) {
     this._capacity = this._normalizeCapacity(capacity)
-    this._slots = new Array<DiagnosticsRecord | undefined>(this._capacity)
+    this._slots = Array.from({ length: this._capacity })
   }
 
   /** Возвращает количество сохранённых records. */
@@ -37,7 +37,7 @@ export class DiagnosticsRecordStore {
     const tail = this.toArray().slice(-next)
     this._capacity = next
     this._clearState()
-    this._slots = new Array<DiagnosticsRecord | undefined>(next)
+    this._slots = Array.from({ length: next })
 
     for (const record of tail) {
       this.append(record)
@@ -69,7 +69,7 @@ export class DiagnosticsRecordStore {
   /** Полностью очищает records и индексы. */
   public clear(): void {
     this._clearState()
-    this._slots = new Array<DiagnosticsRecord | undefined>(this._capacity)
+    this._slots = Array.from({ length: this._capacity })
   }
 
   /** Возвращает records от старых к новым с необязательным ограничением хвоста. */

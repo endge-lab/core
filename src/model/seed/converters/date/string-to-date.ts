@@ -11,7 +11,7 @@ export function stringToDate(input: string | Date | null | undefined): Date | nu
     return null
   }
 
-  if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(dateStr)) {
+  if (/^\d{1,2}:\d{2}(?::\d{2})?$/.test(dateStr)) {
     const [h, m, s = '0'] = dateStr.split(':').map(Number)
     const d = new Date()
     d.setHours(h, m, Number(s), 0)

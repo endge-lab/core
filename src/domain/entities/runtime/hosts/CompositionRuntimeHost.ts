@@ -503,59 +503,59 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     descriptor: CompositionProgramPayload['runtimes'][number],
   ): CompositionRuntimeActivationHandle {
     let disposed = false
-    const owner = this
+    const getRuntime = (): RuntimeHost<any, any> | null => this._children.get(descriptor.path) ?? null
     return {
       path: descriptor.path,
       get state() {
         if (disposed) {
           return 'disposed'
         }
-        const runtime = owner._children.get(descriptor.path)
+        const runtime = getRuntime()
         if (!runtime) {
           return 'inactive'
         }
         return runtime.status === 'paused' ? 'paused' : 'active'
       },
-      get runtime() { return owner._children.get(descriptor.path) ?? null },
+      get runtime() { return getRuntime() },
       activate: async () => {
         if (disposed) {
           throw new Error(`[CompositionRuntimeHost] Runtime handle "${descriptor.path}" is disposed.`)
         }
-        const scope = owner._requireScope(descriptor.scopePath)
+        const scope = this._requireScope(descriptor.scopePath)
         if (scope.state !== 'active') {
           await scope.activate()
         }
-        let runtime = owner._children.get(descriptor.path)
+        let runtime = getRuntime()
         if (!runtime) {
-          await owner._createChild(descriptor)
-          owner._bindChild(descriptor)
-          const payload = owner.getArtifactPayload()
+          await this._createChild(descriptor)
+          this._bindChild(descriptor)
+          const payload = this.getArtifactPayload()
           if (payload) {
-            owner._bindHooks(payload)
+            this._bindHooks(payload)
           }
-          runtime = owner._children.get(descriptor.path)
+          runtime = getRuntime()
         }
         if (!runtime) {
           throw new Error(`[CompositionRuntimeHost] Runtime "${descriptor.path}" cannot be activated.`)
         }
         return runtime
       },
-      pause: async () => { await owner._children.get(descriptor.path)?.pause?.() },
-      resume: async () => { await owner._children.get(descriptor.path)?.resume?.() },
+      pause: async () => { await getRuntime()?.pause?.() },
+      resume: async () => { await getRuntime()?.resume?.() },
       deactivate: async () => {
-        const runtime = owner._children.get(descriptor.path)
+        const runtime = getRuntime()
         if (!runtime) {
           return
         }
         await Endge.runtime.destroyRuntimeTreeAsync(runtime.id)
-        owner._forgetRuntime(descriptor.path)
+        this._forgetRuntime(descriptor.path)
       },
       dispose: async () => {
-        await owner._runtimeHandles.get(descriptor.path)?.deactivate()
+        await this._runtimeHandles.get(descriptor.path)?.deactivate()
         disposed = true
       },
       getOutput: (name) => {
-        const runtime = owner._children.get(descriptor.path) as any
+        const runtime = getRuntime() as any
         if (!runtime) {
           return undefined
         }
@@ -1321,7 +1321,10 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
 
   /** Не допускает прямые и транзитивные циклы Composition runtime tree. */
   private _assertCompositionCycle(identity: string): void {
-    let current: RuntimeHost<any, any> | null = this
+    if (this.entityIdentity === identity) {
+      throw new Error(`[CompositionRuntimeHost] composition cycle detected for "${identity}".`)
+    }
+    let current: RuntimeHost<any, any> | null = this.parent
     while (current) {
       if (current.entityType === 'composition' && current.entityIdentity === identity) {
         throw new Error(`[CompositionRuntimeHost] composition cycle detected for "${identity}".`)

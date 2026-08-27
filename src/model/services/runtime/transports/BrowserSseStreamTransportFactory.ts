@@ -93,7 +93,7 @@ export class BrowserSseStreamTransportFactory implements StreamTransportFactory 
 }
 
 function isUnauthorizedSseError(error: unknown): boolean {
-  return /unexpected response:\s*(401|403)\b/i.test(String((error as Error | undefined)?.message ?? error))
+  return /unexpected response:\s*(?:401|403)\b/i.test(String((error as Error | undefined)?.message ?? error))
 }
 
 function parseEventData(value: unknown): unknown {

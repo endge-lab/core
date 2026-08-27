@@ -29,7 +29,7 @@ export function parseEndgeTooltipMarkdown(source: unknown): EndgeTooltipMarkdown
       continue
     }
 
-    const heading = line.match(/^\s{0,3}(#{1,3})\s+(.+)$/)
+    const heading = line.match(/^\s{0,3}(#{1,3})\s+(\S.*)$/)
     if (heading) {
       blocks.push({
         kind: 'heading',
@@ -40,12 +40,12 @@ export function parseEndgeTooltipMarkdown(source: unknown): EndgeTooltipMarkdown
       continue
     }
 
-    const list = line.match(/^\s*(?:([-+*])|(\d+)\.)\s+(.+)$/)
+    const list = line.match(/^\s*(?:([-+*])|(\d+)\.)\s+(\S.*)$/)
     if (list) {
       const ordered = Boolean(list[2])
       const items: EndgeTooltipMarkdownInline[][] = []
       while (index < lines.length) {
-        const item = (lines[index] ?? '').match(/^\s*(?:([-+*])|(\d+)\.)\s+(.+)$/)
+        const item = (lines[index] ?? '').match(/^\s*(?:([-+*])|(\d+)\.)\s+(\S.*)$/)
         if (!item || Boolean(item[2]) !== ordered) {
           break
         }

@@ -60,9 +60,10 @@ export class Endge extends EndgeFederation {
    */
   protected static override configureFederation(): void {
     for (const item of ENDGE_CORE_MODULES) {
+      const Module = item.module
       this.defineModule({
         key: item.key,
-        module: new item.module(),
+        module: new Module(),
         before: item.before,
         after: item.after,
       })

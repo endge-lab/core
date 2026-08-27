@@ -1271,7 +1271,7 @@ function parseForDirective(
   source: RComponentSFC_IR_Value,
 ): RComponentSFC_IR_Directives['for'] {
   const expression = directive.expression ?? ''
-  const match = expression.match(/^\s*(?:\(([^,\s]+)\s*,\s*([^)]+)\)|(\S+))\s+in\s+(.+)$/)
+  const match = expression.match(/^\s*(?:\(([^,\s]+)\s*,\s*(\S[^)]*)\)|(\S+))\s+in\s+(\S.*)$/)
 
   if (!match) {
     return {
