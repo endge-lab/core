@@ -1,14 +1,14 @@
+import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
+
 import type {
   AuthProfileAdapterId,
   AuthProfileConfig,
   AuthProfileCredentials,
   AuthSessionPolicy,
 } from '@/domain/types/auth/auth-profile.types'
-
 import { Serialize } from '@endge/utils'
-import { Expose } from 'class-transformer'
 
-import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
+import { Expose } from 'class-transformer'
 import { REntity } from '@/domain/entities/reflect/REntity'
 
 export class RAuthProfile extends REntity {
@@ -82,20 +82,24 @@ export class RAuthProfile extends REntity {
 
 function normalizeAdapterId(value: unknown): AuthProfileAdapterId {
   const id = String(value ?? '').trim()
-  if (!id)
+  if (!id) {
     throw new Error('[RAuthProfile] adapterId is required')
+  }
   return id
 }
 
 function normalizeSession(value: unknown): AuthSessionPolicy | undefined {
-  if (value == null)
+  if (value == null) {
     return undefined
+  }
   const raw = normalizeObject(value)
   const storage = String(raw.storage ?? '').trim()
-  if (storage !== 'localStorage' && storage !== 'sessionStorage' && storage !== 'memory')
+  if (storage !== 'localStorage' && storage !== 'sessionStorage' && storage !== 'memory') {
     throw new Error(`[RAuthProfile] Unsupported session storage: ${storage || '<empty>'}`)
-  if (typeof raw.persistRefreshToken !== 'boolean')
+  }
+  if (typeof raw.persistRefreshToken !== 'boolean') {
     throw new TypeError('[RAuthProfile] session.persistRefreshToken must be boolean')
+  }
   return { storage, persistRefreshToken: raw.persistRefreshToken }
 }
 
@@ -106,10 +110,12 @@ function normalizeObject(value: unknown): Record<string, unknown> {
 }
 
 function normalizeStringObject(value: unknown): Record<string, string> {
-  if (!value || typeof value !== 'object' || Array.isArray(value))
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return {}
+  }
   const out: Record<string, string> = {}
-  for (const [key, raw] of Object.entries(value as Record<string, unknown>))
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
     out[key] = raw == null ? '' : String(raw)
+  }
   return out
 }

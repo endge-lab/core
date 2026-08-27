@@ -4,7 +4,7 @@ import { Endge } from '@/model/kernel/endge'
 import { EndgeContext } from '@/model/modules/context/endge-context'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
-describe('EndgeContext locale and theme', () => {
+describe('endgeContext locale and theme', () => {
   beforeEach(() => {
     Endge.workspace.apply(TEST_ENDGE_WORKSPACE)
   })
@@ -141,7 +141,7 @@ describe('EndgeContext locale and theme', () => {
   })
 })
 
-describe('EndgeContext execution context resolution', () => {
+describe('endgeContext execution context resolution', () => {
   const candidates = {
     tenants: ['tenant-a', 'tenant-b'],
     projects: [

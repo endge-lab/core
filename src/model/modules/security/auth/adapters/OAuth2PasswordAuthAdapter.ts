@@ -9,21 +9,28 @@ export class OAuth2PasswordAuthAdapter implements AuthProfileAdapter {
 
   public validate(profile: AuthProfileSchema): void {
     const unexpected = Object.keys(profile.config ?? {}).find(key => !CONFIG_KEYS.includes(key))
-    if (unexpected)
+    if (unexpected) {
       throw new Error(`[EndgeAuth] Unsupported OAuth2 Password config field "${unexpected}"`)
-    if (!String(profile.config.tokenEndpoint ?? '').trim() || !String(profile.config.clientId ?? '').trim())
+    }
+    if (!String(profile.config.tokenEndpoint ?? '').trim() || !String(profile.config.clientId ?? '').trim()) {
       throw new Error(`[EndgeAuth] OAuth2 Password profile "${profile.identity}" requires tokenEndpoint and clientId`)
-    if (!Array.isArray(profile.config.scopes) || profile.config.scopes.some(scope => !String(scope ?? '').trim()))
+    }
+    if (!Array.isArray(profile.config.scopes) || profile.config.scopes.some(scope => !String(scope ?? '').trim())) {
       throw new Error(`[EndgeAuth] OAuth2 Password profile "${profile.identity}" has invalid scopes`)
+    }
     const keys = Object.keys(profile.credentials ?? {}).sort()
-    if (keys.length !== 2 || keys[0] !== 'password' || keys[1] !== 'username')
+    if (keys.length !== 2 || keys[0] !== 'password' || keys[1] !== 'username') {
       throw new Error(`[EndgeAuth] OAuth2 Password profile "${profile.identity}" requires only credentials.username and credentials.password`)
-    if (!String(profile.credentials.username ?? '').trim() || !String(profile.credentials.password ?? '').trim())
+    }
+    if (!String(profile.credentials.username ?? '').trim() || !String(profile.credentials.password ?? '').trim()) {
       throw new Error(`[EndgeAuth] OAuth2 Password profile "${profile.identity}" requires username and password`)
-    if (!profile.session || !['memory', 'sessionStorage', 'localStorage'].includes(profile.session.storage))
+    }
+    if (!profile.session || !['memory', 'sessionStorage', 'localStorage'].includes(profile.session.storage)) {
       throw new Error(`[EndgeAuth] OAuth2 Password profile "${profile.identity}" requires session policy`)
-    if (typeof profile.session.persistRefreshToken !== 'boolean')
+    }
+    if (typeof profile.session.persistRefreshToken !== 'boolean') {
       throw new TypeError(`[EndgeAuth] Invalid refresh token policy: ${profile.identity}`)
+    }
   }
 
   public async authenticate(context: AuthAdapterContext): Promise<AuthTokenSet> {
@@ -39,8 +46,9 @@ export class OAuth2PasswordAuthAdapter implements AuthProfileAdapter {
 
   public async refresh(context: AuthAdapterContext): Promise<AuthTokenSet> {
     const refreshToken = String(context.token?.refreshToken ?? '').trim()
-    if (!refreshToken)
+    if (!refreshToken) {
       throw new Error(`[EndgeAuth] OAuth2 Password refresh token is unavailable: ${context.profile.identity}`)
+    }
     const body = new URLSearchParams({
       grant_type: 'refresh_token',
       client_id: context.resolveValue(context.profile.config.clientId),
@@ -54,8 +62,9 @@ export class OAuth2PasswordAuthAdapter implements AuthProfileAdapter {
     const scopes = (context.profile.config.scopes as unknown[])
       .map(scope => context.resolveValue(scope))
       .filter(Boolean)
-    if (scopes.length)
+    if (scopes.length) {
       body.set('scope', scopes.join(' '))
+    }
   }
 
   private async _requestToken(context: AuthAdapterContext, body: URLSearchParams, previousRefreshToken?: string): Promise<AuthTokenSet> {
@@ -67,11 +76,13 @@ export class OAuth2PasswordAuthAdapter implements AuthProfileAdapter {
       signal: context.signal,
     })
     const payload = await readPayload(response)
-    if (!response.ok)
+    if (!response.ok) {
       throw tokenRequestError(payload, response.status)
+    }
     const accessToken = String(payload.access_token ?? '').trim()
-    if (!accessToken)
+    if (!accessToken) {
       throw new Error(`[EndgeAuth] OAuth2 Password returned an empty access token: ${context.profile.identity}`)
+    }
     const expiresIn = Number(payload.expires_in)
     const refreshExpiresIn = Number(payload.refresh_expires_in)
     const refreshToken = String(payload.refresh_token ?? '').trim() || previousRefreshToken

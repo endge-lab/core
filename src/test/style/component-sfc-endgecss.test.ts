@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import { compileEndgeCSS } from '@/model/services/style/endgecss-compile'
 
-describe('SFC EndgeCSS compilation', () => {
+describe('sFC EndgeCSS compilation', () => {
   it('uses the shared artifact and derives a stable identity scope', () => {
     const source = `<template><Text id="status">Ready</Text></template>
 <style scoped lang="endgecss">#status { color: green; }</style>`

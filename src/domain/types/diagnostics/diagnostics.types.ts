@@ -153,13 +153,13 @@ export interface EndgeDiagnosticsCollectionConfiguration {
 }
 
 /** JSON-safe значение persisted options конкретного adapter. */
-export type DiagnosticsAdapterOptionValue =
-  | string
-  | number
-  | boolean
-  | null
-  | DiagnosticsAdapterOptionValue[]
-  | { [key: string]: DiagnosticsAdapterOptionValue }
+export type DiagnosticsAdapterOptionValue
+  = | string
+    | number
+    | boolean
+    | null
+    | DiagnosticsAdapterOptionValue[]
+    | { [key: string]: DiagnosticsAdapterOptionValue }
 
 /** Именованный канал вывода, создаваемый через adapter registry. */
 export interface EndgeDiagnosticsOutputConfiguration {
@@ -280,15 +280,15 @@ export interface DiagnosticsSpanHandle {
   readonly isEnded: boolean
 
   /** Добавляет или переопределяет структурированные атрибуты активного span. */
-  setAttributes(attributes: DiagnosticsAttributes): void
+  setAttributes: (attributes: DiagnosticsAttributes) => void
   /** Создаёт child span с унаследованными trace id и parent span id. */
-  startChild(name: string, options?: Omit<DiagnosticsSpanOptions, 'traceId' | 'parentSpanId'>): DiagnosticsSpanHandle
+  startChild: (name: string, options?: Omit<DiagnosticsSpanOptions, 'traceId' | 'parentSpanId'>) => DiagnosticsSpanHandle
   /** Записывает log, автоматически связанный с текущим span. */
-  log(input: Omit<DiagnosticsLogInput, 'traceId' | 'spanId'>): DiagnosticsLogRecord | null
+  log: (input: Omit<DiagnosticsLogInput, 'traceId' | 'spanId'>) => DiagnosticsLogRecord | null
   /** Записывает exception log, автоматически связанный с текущим span. */
-  recordException(error: unknown, options?: DiagnosticsExceptionOptions): DiagnosticsLogRecord | null
+  recordException: (error: unknown, options?: DiagnosticsExceptionOptions) => DiagnosticsLogRecord | null
   /** Завершает span и сохраняет единственный итоговый span record. */
-  end(options?: DiagnosticsSpanEndOptions): DiagnosticsSpanRecord | null
+  end: (options?: DiagnosticsSpanEndOptions) => DiagnosticsSpanRecord | null
 }
 
 /** Счётчики текущей diagnostics session. */
@@ -343,13 +343,13 @@ export interface DiagnosticsSubscribeOptions {
 /** Внутренний port, через который span пишет records в модуль. */
 export interface DiagnosticsSpanOwner {
   /** Создаёт root или child span от имени handle. */
-  startSpan(name: string, options?: DiagnosticsSpanOptions): DiagnosticsSpanHandle
+  startSpan: (name: string, options?: DiagnosticsSpanOptions) => DiagnosticsSpanHandle
   /** Записывает нормализованный log от имени handle. */
-  log(input: DiagnosticsLogInput): DiagnosticsLogRecord | null
+  log: (input: DiagnosticsLogInput) => DiagnosticsLogRecord | null
   /** Записывает нормализованное исключение от имени handle. */
-  recordException(error: unknown, options?: DiagnosticsExceptionOptions): DiagnosticsLogRecord | null
+  recordException: (error: unknown, options?: DiagnosticsExceptionOptions) => DiagnosticsLogRecord | null
   /** Финализирует активный span и создаёт итоговый record. */
-  finishSpan(input: {
+  finishSpan: (input: {
     traceId: string
     spanId: string
     parentSpanId?: string
@@ -360,5 +360,5 @@ export interface DiagnosticsSpanOwner {
     startTimestamp: number
     attributes: DiagnosticsAttributes
     options?: DiagnosticsSpanEndOptions
-  }): DiagnosticsSpanRecord | null
+  }) => DiagnosticsSpanRecord | null
 }

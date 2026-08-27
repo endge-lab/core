@@ -28,8 +28,9 @@ export function compileComponentSFCStyle(
   style: RComponentSFC_AST_Style | null,
   options: ComponentSFCStyleCompileOptions = {},
 ): ComponentSFCStyleCompileResult {
-  if (!style)
+  if (!style) {
     return { style: null, diagnostics: [] }
+  }
 
   if (style.lang && style.lang.toLowerCase() !== 'endgecss') {
     return {

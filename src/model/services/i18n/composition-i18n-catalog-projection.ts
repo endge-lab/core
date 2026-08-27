@@ -26,8 +26,9 @@ export function projectCompositionI18nCatalogs(
   input: CompositionI18nCatalogProjectionInput,
 ): CompositionI18nCatalogProjectionOccurrence[] {
   const targetIdentity = String(input.targetIdentity ?? '').trim()
-  if (!targetIdentity)
+  if (!targetIdentity) {
     return []
+  }
 
   const occurrences: CompositionI18nCatalogProjectionOccurrence[] = []
   for (const rootIdentity of input.rootIdentities) {
@@ -60,12 +61,14 @@ interface VisitCompositionInput {
 
 function visitComposition(input: VisitCompositionInput): void {
   const identity = String(input.identity ?? '').trim()
-  if (!identity || input.ancestors.has(identity))
+  if (!identity || input.ancestors.has(identity)) {
     return
+  }
 
   const artifact = input.artifacts.getArtifact<CompositionProgramPayload>('composition', identity)
-  if (!artifact)
+  if (!artifact) {
     return
+  }
 
   const catalogs = buildCompositionI18nCatalogs(artifact.payload, input.inherited)
   const provenance = buildCompositionI18nProvenance(artifact.payload, input.inheritedProvenance)
@@ -81,8 +84,9 @@ function visitComposition(input: VisitCompositionInput): void {
 
   const ancestors = new Set(input.ancestors).add(identity)
   for (const runtime of artifact.payload.runtimes) {
-    if (runtime.kind !== 'composition')
+    if (runtime.kind !== 'composition') {
       continue
+    }
 
     visitComposition({
       ...input,
@@ -112,8 +116,9 @@ function buildCompositionI18nProvenance(
       const locales = catalog[resource.name] ?? {}
       for (const [locale, messages] of Object.entries(resource.messages)) {
         const keys = { ...(locales[locale] ?? {}) }
-        for (const key of Object.keys(messages))
+        for (const key of Object.keys(messages)) {
           keys[key] = resource.identity
+        }
         locales[locale] = keys
       }
       catalog[resource.name] = locales

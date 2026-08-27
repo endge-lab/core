@@ -290,7 +290,7 @@ defineProps<{
 </template>
 `, {
       resolveComponentTag: tag => ({
-        Tail: 'aircraft-tail',
+        'Tail': 'aircraft-tail',
         'Module.SomeTag': 'aircraft-type',
       })[tag] ?? null,
       hasComponentIdentity: identity => identities.has(identity),

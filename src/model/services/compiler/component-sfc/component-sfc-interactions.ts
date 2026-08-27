@@ -1,6 +1,5 @@
-import { parseExpression } from '@babel/parser'
-
 import type { RComponentDependencies, RComponentDiagnostic } from '@/domain/types/component/component-core.types'
+
 import type { RComponentSFC_AST_Attribute } from '@/domain/types/component/sfc/ast.types'
 import type {
   RComponentSFC_IR_EventModifier,
@@ -8,15 +7,34 @@ import type {
   RComponentSFC_IR_InteractionRule,
 } from '@/domain/types/component/sfc/ir.types'
 import type { ComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
+import { parseExpression } from '@babel/parser'
 import { compileComponentSFCExpression } from '@/model/services/compiler/component-sfc/component-sfc-expression'
 import { compileComponentSFCLocalEventAction } from '@/model/services/compiler/component-sfc/component-sfc-ports'
 
 const INTERACTION_MODIFIERS = new Set<RComponentSFC_IR_EventModifier>([
-  'stop', 'prevent', 'self', 'once', 'capture', 'passive',
+  'stop',
+  'prevent',
+  'self',
+  'once',
+  'capture',
+  'passive',
 ])
 const TRIGGER_KEYS = new Set([
-  'event', 'key', 'code', 'held', 'modifiers', 'repeat', 'composing', 'button',
-  'stop', 'prevent', 'self', 'once', 'capture', 'passive', 'reaction',
+  'event',
+  'key',
+  'code',
+  'held',
+  'modifiers',
+  'repeat',
+  'composing',
+  'button',
+  'stop',
+  'prevent',
+  'self',
+  'once',
+  'capture',
+  'passive',
+  'reaction',
 ])
 const TRIGGER_SET_KEYS = new Set(['triggers', 'reaction'])
 
@@ -34,11 +52,15 @@ export function hasComponentSFCPassivePreventConflict(
     const expression: any = parseExpression(String(source ?? '').trim(), { sourceType: 'module', plugins: ['typescript'] })
     const nodes = expression.type === 'ArrayExpression' ? expression.elements : [expression]
     return nodes.some((node: any) => {
-      if (node?.type !== 'ObjectExpression') return false
+      if (node?.type !== 'ObjectExpression') {
+        return false
+      }
       const properties = new Map<string, any>()
       for (const property of node.properties ?? []) {
         const name = propertyName(property)
-        if (name) properties.set(name, property)
+        if (name) {
+          properties.set(name, property)
+        }
       }
       const passive = suffixes.includes('passive') || booleanProperty(properties.get('passive')) === true
       const prevent = suffixes.includes('prevent') || booleanProperty(properties.get('prevent')) === true
@@ -73,8 +95,9 @@ export function compileComponentSFCInteractionAnnotation(
       invalid = true
       continue
     }
-    if (!suffixes.includes(modifier as RComponentSFC_IR_EventModifier))
+    if (!suffixes.includes(modifier as RComponentSFC_IR_EventModifier)) {
       suffixes.push(modifier as RComponentSFC_IR_EventModifier)
+    }
   }
   if (suffixes.includes('passive') && suffixes.includes('prevent')) {
     pushDiagnostic(diagnostics, attribute, 'sfc-template-on-passive-prevent', ':on.passive нельзя объединять с .prevent.')
@@ -113,10 +136,14 @@ export function compileComponentSFCInteractionAnnotation(
   const rules: RComponentSFC_IR_InteractionRule[] = []
   for (const node of nodes) {
     const rule = compileRule(node, source, suffixes, attribute, manifest, context, dependencies, diagnostics, ownerPorts)
-    if (rule) rules.push(rule)
-    else invalid = true
+    if (rule) {
+      rules.push(rule)
+    }
+    else { invalid = true }
   }
-  if (invalid || rules.length === 0) return null
+  if (invalid || rules.length === 0) {
+    return null
+  }
   return { rules, sourceRange: attribute.range }
 }
 
@@ -189,7 +216,9 @@ function compileTriggerSetRule(
     )
     return compiled ? [compiled] : []
   })
-  if (reactions.length !== reactionNodes.length) return null
+  if (reactions.length !== reactionNodes.length) {
+    return null
+  }
 
   const sourceRange = {
     start: attribute.range.start + (node.start ?? 0),
@@ -209,7 +238,9 @@ function compileTriggerSetRule(
 }
 
 function isTriggerSetRule(node: any): boolean {
-  if (node?.type !== 'ObjectExpression') return false
+  if (node?.type !== 'ObjectExpression') {
+    return false
+  }
   return (node.properties ?? []).some((property: any) => propertyName(property) === 'triggers')
 }
 
@@ -281,7 +312,9 @@ function compileRule(
     )
     return compiled ? [compiled] : []
   })
-  if (reactions.length !== reactionNodes.length) return null
+  if (reactions.length !== reactionNodes.length) {
+    return null
+  }
 
   const triggerProperties = properties.filter((property: any) => propertyName(property) !== 'reaction')
   const triggerSource = `{ ${triggerProperties.map((property: any) => sliceNode(source, property)).join(', ')} }`
@@ -325,21 +358,30 @@ function compileRule(
 }
 
 function propertyName(property: any): string | null {
-  if (property?.key?.type === 'Identifier') return property.key.name
-  if (property?.key?.type === 'StringLiteral') return String(property.key.value)
+  if (property?.key?.type === 'Identifier') {
+    return property.key.name
+  }
+  if (property?.key?.type === 'StringLiteral') {
+    return String(property.key.value)
+  }
   return null
 }
 
 function literalString(node: any): string | null {
-  if (node?.type === 'StringLiteral') return String(node.value ?? '').trim() || null
-  if (node?.type === 'TemplateLiteral' && node.expressions?.length === 0)
+  if (node?.type === 'StringLiteral') {
+    return String(node.value ?? '').trim() || null
+  }
+  if (node?.type === 'TemplateLiteral' && node.expressions?.length === 0) {
     return String(node.quasis?.[0]?.value?.cooked ?? '').trim() || null
+  }
   return null
 }
 
 /** undefined means absent, null means present but not static boolean. */
 function booleanProperty(property: any): boolean | null | undefined {
-  if (!property) return undefined
+  if (!property) {
+    return undefined
+  }
   return property.value?.type === 'BooleanLiteral' ? property.value.value === true : null
 }
 

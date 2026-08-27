@@ -1,8 +1,8 @@
+import type { ComputationResourceState } from './ComputationResource'
+
 import type {
   ComputationResource as ComputationResourceContract,
 } from '@/domain/types/computation/computation-runtime.types'
-
-import { ComputationResourceState } from './ComputationResource'
 
 /** Host-owned registry that isolates resources by call site and row consumer key. */
 export class ComputationResourceRegistry {
@@ -25,8 +25,9 @@ export class ComputationResourceRegistry {
         existing.updateInput(input)
       }
       finally {
-        if (!alreadyUpdating)
+        if (!alreadyUpdating) {
           this._updatingInputs.delete(key)
+        }
       }
       return existing
     }
@@ -34,16 +35,21 @@ export class ComputationResourceRegistry {
     this.resources.set(key, resource)
     if (onChange) {
       this.disposers.set(key, resource.subscribe(() => {
-        if (!this._updatingInputs.has(key))
+        if (!this._updatingInputs.has(key)) {
           onChange()
+        }
       }))
     }
     return resource
   }
 
   dispose(): void {
-    for (const dispose of this.disposers.values()) dispose()
-    for (const resource of this.resources.values()) resource.dispose()
+    for (const dispose of this.disposers.values()) {
+      dispose()
+    }
+    for (const resource of this.resources.values()) {
+      resource.dispose()
+    }
     this.disposers.clear()
     this.resources.clear()
     this._updatingInputs.clear()

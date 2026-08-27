@@ -7,9 +7,9 @@ export interface ContextMenuDescriptor {
   items: ContextMenuNodeDescriptor[]
 }
 
-export type ContextMenuNodeDescriptor =
-  | ContextMenuItemDescriptor
-  | ContextMenuSeparatorDescriptor
+export type ContextMenuNodeDescriptor
+  = | ContextMenuItemDescriptor
+    | ContextMenuSeparatorDescriptor
 
 export interface ContextMenuItemDescriptor {
   kind: 'item'

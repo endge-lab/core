@@ -96,8 +96,22 @@ export const COMPONENT_SFC_FORM_EVENT_DEFINITIONS = [
 ] as const
 
 const EVENT_CAPABLE_TAGS = [
-  'Text', 'DateTime', 'Number', 'Icon', 'Badge', 'Dot', 'Box', 'Flex', 'Grid', 'Divider',
-  'Input', 'Textarea', 'Checkbox', 'Select', 'Table', 'Cell',
+  'Text',
+  'DateTime',
+  'Number',
+  'Icon',
+  'Badge',
+  'Dot',
+  'Box',
+  'Flex',
+  'Grid',
+  'Divider',
+  'Input',
+  'Textarea',
+  'Checkbox',
+  'Select',
+  'Table',
+  'Cell',
 ] as const satisfies readonly RComponentSFC_IR_Tag[]
 
 const FORM_TAGS = new Set<RComponentSFC_IR_Tag>(['Input', 'Textarea', 'Checkbox', 'Select'])
@@ -109,7 +123,9 @@ export function listComponentSFCEventCapableTags(): readonly RComponentSFC_IR_Ta
 export function getComponentSFCIntrinsicEventDefinitions(
   tag: RComponentSFC_IR_Tag,
 ): readonly ComponentSFCIntrinsicEventDefinition[] {
-  if (!EVENT_CAPABLE_TAGS.includes(tag as typeof EVENT_CAPABLE_TAGS[number])) return []
+  if (!EVENT_CAPABLE_TAGS.includes(tag as typeof EVENT_CAPABLE_TAGS[number])) {
+    return []
+  }
   return FORM_TAGS.has(tag)
     ? [...COMPONENT_SFC_INTERACTION_EVENT_DEFINITIONS, ...COMPONENT_SFC_FORM_EVENT_DEFINITIONS]
     : COMPONENT_SFC_INTERACTION_EVENT_DEFINITIONS

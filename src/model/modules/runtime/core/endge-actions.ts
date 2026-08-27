@@ -1,5 +1,4 @@
-import { RField } from '@/domain/entities/reflect/RField'
-import { RAction } from '@/domain/entities/reflect/RAction'
+import type { EntityOrigin } from '@/domain/types/document/entity-management.type'
 import type {
   ActionDefinitionInput,
   ActionExecuteOptions,
@@ -12,15 +11,16 @@ import type {
   RuntimeActionRegistrySnapshot,
   TableColumnActionContext,
 } from '@/domain/types/runtime/action.types'
-import { BUILTIN_ACTION_IDS } from '@/domain/types/runtime/action.types'
 import type { ImplementationInvocation, ImplementationProvider } from '@/domain/types/runtime/implementation.types'
-import type { EntityOrigin } from '@/domain/types/document/entity-management.type'
+import type { EndgeImplementations } from '@/model/modules/runtime/implementation/endge-implementations'
 import { Subscribable } from '@/domain/entities/endge/Subscribable'
+import { RAction } from '@/domain/entities/reflect/RAction'
+import { RField } from '@/domain/entities/reflect/RField'
+import { BUILTIN_ACTION_IDS } from '@/domain/types/runtime/action.types'
 import { Endge } from '@/model/kernel/endge'
-import { EndgeImplementations } from '@/model/modules/runtime/implementation/endge-implementations'
+import { ActionProgramExecutor } from '@/model/modules/runtime/execution/action/action-program-executor'
 import { normalizeActionTargets, validateActionTarget } from '@/model/services/compiler/action/action-target-validation'
 import { createTableRuntimeActions } from '@/model/services/runtime/table-actions'
-import { ActionProgramExecutor } from '@/model/modules/runtime/execution/action/action-program-executor'
 
 const SOURCE_PROVIDER_KEY = 'core.action.source'
 const COMPONENT_PORT_PROVIDER_KEY = 'core.action.component-port'
@@ -69,10 +69,13 @@ export class EndgeActions extends Subscribable {
   /** Rebuilds code-owned defaults. Local application code registers again after reset. */
   public reset(): void {
     if (this._hasSynchronizedResolvedIndex) {
-      for (const identity of this._codeActions.keys())
+      for (const identity of this._codeActions.keys()) {
         Endge.domain.resolved.delete('action', identity)
+      }
     }
-    for (const dispose of [...this._codeActionDisposers.values()]) dispose()
+    for (const dispose of [...this._codeActionDisposers.values()]) {
+      dispose()
+    }
     this._providerDisposers.splice(0).forEach(dispose => dispose())
     this._codeActions.clear()
     this._catalogPaths.clear()
@@ -85,8 +88,9 @@ export class EndgeActions extends Subscribable {
 
   /** Installs a serializable code-owned semantic definition without executable code. */
   public define(definition: ActionDefinitionDescriptor): () => void {
-    if (this._findAction(definition.identity))
+    if (this._findAction(definition.identity)) {
       throw new Error(`Action identity collision: ${definition.identity}. Use Endge.actions.override() explicitly.`)
+    }
     const owner = definition.origin.kind === 'derived'
       ? definition.origin.source.identity
       : definition.origin.kind === 'storage'
@@ -98,7 +102,9 @@ export class EndgeActions extends Subscribable {
   /** Installs executable code separately from its semantic definition. */
   public provide(provider: ActionProviderDescriptor): () => void {
     const action = this._findAction(provider.identity)
-    if (!action) throw new Error(`Action provider requires an existing definition: ${provider.identity}.`)
+    if (!action) {
+      throw new Error(`Action provider requires an existing definition: ${provider.identity}.`)
+    }
     return this._implementations.registerProvider({
       key: provider.key,
       origin: provider.origin,
@@ -112,10 +118,12 @@ export class EndgeActions extends Subscribable {
   /** Binds local code over an existing Action without mutating its definition. */
   public override(override: ActionOverrideInput): () => void {
     const action = this._findAction(override.identity)
-    if (!action)
+    if (!action) {
       throw new Error(`Action cannot be overridden because it does not exist: ${override.identity}.`)
-    if (!this._implementations.hasProvider(override.providerKey))
+    }
+    if (!this._implementations.hasProvider(override.providerKey)) {
       throw new Error(`Action provider is not registered: ${override.providerKey}.`)
+    }
     const disposeBinding = this._implementations.bind({
       executableType: 'action',
       executableIdentity: override.identity,
@@ -138,10 +146,12 @@ export class EndgeActions extends Subscribable {
     legacyPayload?: unknown,
   ): Promise<TResult | undefined> {
     const action = this._findAction(identity)
-    if (!action)
+    if (!action) {
       throw new Error(`Action is not defined: ${identity}.`)
-    if (action.active === false)
+    }
+    if (action.active === false) {
       throw new Error(`Action is inactive: ${identity}.`)
+    }
 
     const legacy = this._isLegacyContext(optionsOrContext)
     const options: ActionExecuteOptions = legacy
@@ -174,11 +184,11 @@ export class EndgeActions extends Subscribable {
     const all = [...Endge.domain.getActions(), ...Endge.domain.resolved.list<RAction>('action')]
     const unique = new Map<string, RAction>()
     for (const action of all) {
-      if (!unique.has(action.identity))
+      if (!unique.has(action.identity)) {
         unique.set(action.identity, action)
+      }
     }
-    return [...unique.values()].map(action => this._describe(action))
-      .sort((left, right) => left.identity.localeCompare(right.identity))
+    return [...unique.values()].map(action => this._describe(action)).sort((left, right) => left.identity.localeCompare(right.identity))
   }
 
   /** Compatibility projection for existing context-menu code. */
@@ -208,8 +218,9 @@ export class EndgeActions extends Subscribable {
 
   public canExecute(id: RuntimeActionId, context: RuntimeActionContext, payload?: unknown): boolean {
     const action = this._findAction(id)
-    if (!action || action.active === false)
+    if (!action || action.active === false) {
       return false
+    }
     try {
       const target = this._legacyTarget(context)
       validateActionTarget(normalizeActionTargets(action.target), target)
@@ -242,10 +253,12 @@ export class EndgeActions extends Subscribable {
 
   private _defineCodeAction(definition: CodeActionDefinition, origin: RAction['origin']): () => void {
     const identity = String(definition.identity ?? '').trim()
-    if (!identity)
+    if (!identity) {
       throw new Error('Action identity is required.')
-    if (this._codeActions.has(identity))
+    }
+    if (this._codeActions.has(identity)) {
       throw new Error(`Action identity collision: ${identity}. Use Endge.actions.override() explicitly.`)
+    }
 
     const providerKey = definition.defaultProviderKey ?? definition.providerKey ?? `${origin.kind}.${definition.owner}.${identity}`
     const action = new RAction()
@@ -282,14 +295,18 @@ export class EndgeActions extends Subscribable {
 
     let disposed = false
     const dispose = () => {
-      if (disposed) return
+      if (disposed) {
+        return
+      }
       disposed = true
       disposeProvider()
-      if (this._codeActions.get(identity) === action)
+      if (this._codeActions.get(identity) === action) {
         this._codeActions.delete(identity)
+      }
       this._catalogPaths.delete(identity)
-      if (this._codeActionDisposers.get(identity) === dispose)
+      if (this._codeActionDisposers.get(identity) === dispose) {
         this._codeActionDisposers.delete(identity)
+      }
       Endge.domain.resolved.delete('action', identity)
       this.notify()
     }
@@ -304,8 +321,12 @@ export class EndgeActions extends Subscribable {
   }
 
   private _defaultProviderKey(action: RAction): string | null {
-    if (action.defaultImplementation.kind === 'source') return SOURCE_PROVIDER_KEY
-    if (action.defaultImplementation.kind === 'component-port') return COMPONENT_PORT_PROVIDER_KEY
+    if (action.defaultImplementation.kind === 'source') {
+      return SOURCE_PROVIDER_KEY
+    }
+    if (action.defaultImplementation.kind === 'component-port') {
+      return COMPONENT_PORT_PROVIDER_KEY
+    }
     return action.defaultImplementation.kind === 'provider' ? action.defaultImplementation.providerKey : null
   }
 
@@ -360,7 +381,9 @@ export class EndgeActions extends Subscribable {
         const parentRuntimeId = String(invocation.context?.parentRuntimeId ?? '').trim()
         const parent = parentRuntimeId ? Endge.runtime.getRuntimeById(parentRuntimeId) : null
         const artifact = Endge.program.getActionArtifact(action.identity)
-        if (!artifact || artifact.status === 'error') throw new Error(`Action artifact is not executable: ${action.identity}.`)
+        if (!artifact || artifact.status === 'error') {
+          throw new Error(`Action artifact is not executable: ${action.identity}.`)
+        }
         return await this._sourceExecutor.run(artifact.payload, invocation.input, parent)
       },
     }))
@@ -373,10 +396,12 @@ export class EndgeActions extends Subscribable {
           ? action.defaultImplementation.portName
           : action.identity
         const target = invocation.target?.value as Record<string, unknown> | undefined
-        if (typeof target?.invokeAction === 'function')
+        if (typeof target?.invokeAction === 'function') {
           return await (target.invokeAction as Function)(portName, invocation.input)
-        if (typeof target?.[portName] === 'function')
+        }
+        if (typeof target?.[portName] === 'function') {
           return await (target[portName] as Function)(invocation.input)
+        }
         throw new Error(`Component target does not provide Action port: ${portName}.`)
       },
     }))
@@ -461,8 +486,9 @@ export class EndgeActions extends Subscribable {
       owner: '@endge/core',
       catalogPath: ['Debug'],
       execute: () => {
-        if (typeof globalThis.alert === 'function')
+        if (typeof globalThis.alert === 'function') {
           globalThis.alert('Test alert')
+        }
       },
     }, { kind: 'builtin', owner: '@endge/core' })
     const vocabActions: Array<CodeActionDefinition> = [
@@ -494,8 +520,9 @@ export class EndgeActions extends Subscribable {
         execute: invocation => Endge.vocabs.invalidate(this._vocabReferences(invocation.input)),
       },
     ]
-    for (const definition of vocabActions)
+    for (const definition of vocabActions) {
       this._defineCodeAction(definition, { kind: 'builtin', owner: '@endge/core' })
+    }
   }
 
   private _vocabReferences(input: unknown): Array<string | number> {
@@ -512,8 +539,9 @@ export class EndgeActions extends Subscribable {
   }
 
   private _syncResolvedIndex(): void {
-    for (const action of this._codeActions.values())
+    for (const action of this._codeActions.values()) {
       Endge.domain.resolved.set('action', action)
+    }
     this._hasSynchronizedResolvedIndex = true
   }
 
@@ -531,8 +559,9 @@ export class EndgeActions extends Subscribable {
   }
 
   private _legacyTarget(context: RuntimeActionContext): ActionExecutionTarget | undefined {
-    if (context.target == null)
+    if (context.target == null) {
       return undefined
+    }
     return {
       type: context.surface.startsWith('table') ? 'component.table' : 'runtime',
       identity: String((context as unknown as Record<string, unknown>).tableRuntimeId ?? context.runtimeId ?? 'target'),
@@ -542,13 +571,17 @@ export class EndgeActions extends Subscribable {
 }
 
 function formatConsoleActionValue(value: unknown): string {
-  if (value == null)
+  if (value == null) {
     return '[Endge] built-in-console-log executed'
-  if (typeof value === 'string')
+  }
+  if (typeof value === 'string') {
     return value
-  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint')
+  }
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
     return String(value)
-  if (Array.isArray(value))
+  }
+  if (Array.isArray(value)) {
     return `[Endge] Array(${value.length}) omitted from Console to avoid retaining runtime data.`
+  }
   return `[Endge] ${typeof value === 'object' ? 'Object' : typeof value} omitted from Console to avoid retaining runtime data.`
 }

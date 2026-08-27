@@ -1,8 +1,8 @@
 import type { SourceKind, SourceLanguageCompletion, SourceLanguageContext, SourceLanguageStrategy, SourceLanguageValidationResult } from '@/domain/types/source/source-engine.types'
 
 import { compileStoreSource } from '@/model/services/source-engine/compilers/store-source-compile'
-import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
 import { resolveTypedSourceDocumentReference, typedSourceTypeReferenceHighlights } from '@/model/services/source-engine/source-document-reference'
+import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
 import { STORE_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/store.default.source'
 import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/model/services/source-engine/value-expression-language'
 
@@ -37,13 +37,13 @@ export class StoreSourceLanguageStrategy implements SourceLanguageStrategy {
       {
         label: 'mock',
         kind: 'function',
-        insertText: "mock('identity')",
+        insertText: 'mock(\'identity\')',
         detail: 'Получить initial value из Endge.mock registry',
       },
       {
         label: 'dataView',
         kind: 'function',
-        insertText: ".dataView('data-view-identity')",
+        insertText: '.dataView(\'data-view-identity\')',
         detail: 'Применить внешний DataView',
       },
       {

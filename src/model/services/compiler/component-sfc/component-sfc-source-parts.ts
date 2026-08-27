@@ -78,7 +78,9 @@ function extractBlock(source: string, tag: string): string | null {
 function extractBlockWithAttrs(source: string, tag: string): { attrs: string, content: string } | null {
   const pattern = new RegExp(`<${tag}([^>]*)>([\\s\\S]*?)<\\/${tag}>`, 'i')
   const match = source.match(pattern)
-  if (!match) return null
+  if (!match) {
+    return null
+  }
 
   return {
     attrs: match[1] ?? '',

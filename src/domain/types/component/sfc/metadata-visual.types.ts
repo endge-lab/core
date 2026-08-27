@@ -1,6 +1,6 @@
+import type { RComponentSFC_SourceRange } from './location.types'
 import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
 import type { ProgramMetadataMap } from '@/domain/types/program/program-metadata.types'
-import type { RComponentSFC_SourceRange } from './location.types'
 
 /** Source-backed read model of component-level defineMetadata. */
 export interface ComponentSFCMetadataVisualProjection {

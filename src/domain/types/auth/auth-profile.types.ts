@@ -170,11 +170,11 @@ export interface AuthAdapterContext {
 export interface AuthProfileAdapter {
   id: AuthProfileAdapterId
   label: string
-  validate(profile: AuthProfileSchema): void
-  authenticate(context: AuthAdapterContext): Promise<AuthTokenSet>
-  refresh?(context: AuthAdapterContext): Promise<AuthTokenSet>
-  logout?(context: AuthAdapterContext): Promise<void>
-  loadUserInfo?(context: AuthAdapterContext): Promise<Record<string, unknown> | null>
+  validate: (profile: AuthProfileSchema) => void
+  authenticate: (context: AuthAdapterContext) => Promise<AuthTokenSet>
+  refresh?: (context: AuthAdapterContext) => Promise<AuthTokenSet>
+  logout?: (context: AuthAdapterContext) => Promise<void>
+  loadUserInfo?: (context: AuthAdapterContext) => Promise<Record<string, unknown> | null>
 }
 
 export interface AuthProfileTestResult {

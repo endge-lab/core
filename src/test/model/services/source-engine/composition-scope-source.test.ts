@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { compileCompositionSource } from '@/model/services/source-engine/compilers/composition-source-compile'
 
-describe('Composition scope source', () => {
+describe('composition scope source', () => {
   it('flattens resources, nested scopes and activation overrides deterministically', () => {
     const result = compileCompositionSource(`
 defineComposition({

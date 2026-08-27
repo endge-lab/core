@@ -1,13 +1,13 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-
 import type { ComputationProgramPayload } from '@/domain/types/computation/computation-program.types'
+
 import type { ProgramArtifact } from '@/domain/types/program/program.types'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Endge } from '@/model/kernel/endge'
 import { ComputationResourceState } from '@/model/modules/runtime/execution/computation/ComputationResource'
 import { ComputationResourceRegistry } from '@/model/modules/runtime/execution/computation/ComputationResourceRegistry'
 import { compileComputation } from '@/model/services/compiler/computation/computation-compile'
 
-describe('ComputationResourceState', () => {
+describe('computationResourceState', () => {
   afterEach(() => Endge.program.clear())
 
   it('creates an immediate success resource for sync execution', () => {

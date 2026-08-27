@@ -58,8 +58,9 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
     transportFactory: StreamTransportFactory
   }): StreamRuntimeHost | null {
     const artifact = input.artifacts.getArtifact<StreamSourceArtifact>('stream', input.model.id ?? input.model.identity)
-    if (!artifact || artifact.status === 'error')
+    if (!artifact || artifact.status === 'error') {
       return null
+    }
     const host = new StreamRuntimeHost({
       id: input.id,
       model: input.model,
@@ -80,8 +81,9 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
   }
 
   public override start(): void {
-    if (this._connection)
+    if (this._connection) {
       return
+    }
     if (Endge.runtime.resolveDataMode(this) === 'mock') {
       const updatedAt = new Date().toISOString()
       this.setContext({ status: 'success', startedAt: updatedAt, updatedAt })
@@ -89,22 +91,24 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
       return
     }
     const artifact = this.getArtifactPayload()
-    if (!artifact)
+    if (!artifact) {
       throw new Error(`[StreamRuntimeHost] Artifact is unavailable for "${this.entityIdentity}".`)
+    }
     this.setContext({ status: 'running', startedAt: new Date().toISOString() })
     const resolvedUrl = String(
       Endge.workspace.variables.resolve(artifact.transport.url)
       ?? artifact.transport.url,
     ).trim()
-    if (!resolvedUrl || /^\{\{?\s*[A-Z_][A-Z0-9_]*\s*\}?\}$/.test(resolvedUrl))
+    if (!resolvedUrl || /^\{\{?\s*[A-Z_][A-Z0-9_]*\s*\}?\}$/.test(resolvedUrl)) {
       throw new Error(`[StreamRuntimeHost] SSE url "${artifact.transport.url}" is not resolved.`)
+    }
     const runtimeArtifact: StreamSourceArtifact = {
       ...artifact,
       transport: { ...artifact.transport, url: resolvedUrl },
     }
     this._connection = this._transportFactory.open(runtimeArtifact, {
       open: () => this.setContext({ status: 'running', updatedAt: new Date().toISOString() }),
-      error: error => {
+      error: (error) => {
         this.setContext({ status: 'error', updatedAt: new Date().toISOString() })
         this.emit('transport:error', error)
       },
@@ -131,8 +135,9 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
 
   private _receive(message: StreamTransportMessage, artifact: StreamSourceArtifact): void {
     const descriptor = artifact.events.find(item => item.sourceEvent === message.sourceEvent)
-    if (!descriptor)
+    if (!descriptor) {
       return
+    }
     const now = new Date().toISOString()
     const type = descriptor.type ?? String(readPayloadPath(message.data, descriptor.typePath) ?? '').trim()
     if (!type) {
@@ -161,11 +166,13 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
 }
 
 function readPayloadPath(value: unknown, path: string | null): unknown {
-  if (!path)
+  if (!path) {
     return value
+  }
   return path.split('.').reduce<unknown>((current, key) => {
-    if (current == null || typeof current !== 'object')
+    if (current == null || typeof current !== 'object') {
       return undefined
+    }
     return (current as Record<string, unknown>)[key]
   }, value)
 }

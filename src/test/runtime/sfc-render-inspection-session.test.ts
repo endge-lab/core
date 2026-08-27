@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { SFCRenderInspectionSession } from '@/model/services/runtime/SFCRenderInspectionSession'
 
-describe('SFCRenderInspectionSession', () => {
+describe('sFCRenderInspectionSession', () => {
   it('keeps stable instance ids and builds a live hierarchy', async () => {
     const session = new SFCRenderInspectionSession()
     const listener = vi.fn()

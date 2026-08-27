@@ -1,7 +1,7 @@
+import type { TypeSourceExpression, TypeSourceField } from '@/domain/types/source/type-source.types'
 import { parse as parseYaml } from 'yaml'
 import { RType } from '@/domain/entities/reflect/RType'
 import { Endge } from '@/model/kernel/endge'
-import type { TypeSourceExpression, TypeSourceField } from '@/domain/types/source/type-source.types'
 import { serializeTypeSourceDocument } from '@/model/services/source-engine/type-source-serialize'
 
 /**
@@ -14,7 +14,9 @@ export function importOpenApiSchemaToDomain(yamlText: string): void {
   const schemas = parsed?.components?.schemas
   if (schemas && typeof schemas === 'object') {
     for (const [name, schema] of Object.entries<any>(schemas)) {
-      if (schema.type !== 'object') continue
+      if (schema.type !== 'object') {
+        continue
+      }
 
       const rtype = new RType(name)
       const required = new Set<string>(Array.isArray(schema.required) ? schema.required : [])
@@ -50,8 +52,9 @@ export function importOpenApiSchemaToDomain(yamlText: string): void {
 }
 
 function resolveOpenApiExpression(schema: any): TypeSourceExpression {
-  if (schema?.$ref)
+  if (schema?.$ref) {
     return { kind: 'reference', identity: resolveOpenApiType(schema) }
+  }
   if (schema?.type === 'object' || schema?.properties) {
     const required = new Set<string>(Array.isArray(schema.required) ? schema.required : [])
     return {
@@ -76,7 +79,9 @@ function resolveOpenApiExpression(schema: any): TypeSourceExpression {
 function resolveOpenApiType(prop: any): string {
   if (prop.$ref) {
     const match = prop.$ref.match(/#\/components\/schemas\/(.+)/)
-    if (match?.[1] === 'UUID') return 'ID'
+    if (match?.[1] === 'UUID') {
+      return 'ID'
+    }
     return match ? match[1] : 'Unknown'
   }
 
@@ -85,11 +90,21 @@ function resolveOpenApiType(prop: any): string {
     return itemType
   }
 
-  if (prop.type === 'integer') return 'Number'
-  if (prop.type === 'number') return 'Number'
-  if (prop.type === 'string') return 'String'
-  if (prop.type === 'boolean') return 'Boolean'
-  if (prop.type === 'null') return 'Null'
+  if (prop.type === 'integer') {
+    return 'Number'
+  }
+  if (prop.type === 'number') {
+    return 'Number'
+  }
+  if (prop.type === 'string') {
+    return 'String'
+  }
+  if (prop.type === 'boolean') {
+    return 'Boolean'
+  }
+  if (prop.type === 'null') {
+    return 'Null'
+  }
 
   return 'Any'
 }

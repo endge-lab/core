@@ -1,15 +1,15 @@
 import type {
   EndgeUISnapshot,
   TimeZoneMode,
-} from '@/domain/types/ui/ui.types'
+} from '@/domain/types/presentation/ui.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
-import { Endge } from '@/model/kernel/endge'
 import {
   ALL_THEME_CLASSES,
   THEME_CLASS_BY_NAME,
   themeConfig,
-} from '@/domain/types/ui/ui.types'
+} from '@/domain/types/presentation/ui.types'
+import { Endge } from '@/model/kernel/endge'
 
 /**
  * UI-состояние ядра: zoom, theme и режим отображения времени.
@@ -47,12 +47,14 @@ export class EndgeUI extends EndgeModule {
     this._offContext?.()
     this._offWorkspace?.()
     this._offContext = Endge.context.subscribe(() => {
-      if (!this.syncThemeFromContext())
+      if (!this.syncThemeFromContext()) {
         this.notify()
+      }
     })
     this._offWorkspace = Endge.workspace.subscribe(() => {
-      if (!this.syncThemeFromContext())
+      if (!this.syncThemeFromContext()) {
         this.notify()
+      }
     })
     this.syncThemeFromContext()
   }
@@ -105,8 +107,9 @@ export class EndgeUI extends EndgeModule {
    */
   public setZoom(value: number): void {
     const next: number = this.clampZoom(value)
-    if (next === this._zoom)
+    if (next === this._zoom) {
       return
+    }
 
     this._zoom = next
     this.writeZoomToLS(next)
@@ -124,16 +127,18 @@ export class EndgeUI extends EndgeModule {
    * Увеличивает zoom на один шаг.
    */
   public zoomUp(): void {
-    if (this._zoom < this.MAX_ZOOM)
+    if (this._zoom < this.MAX_ZOOM) {
       this.setZoom(this._zoom + this.STEP_ZOOM)
+    }
   }
 
   /**
    * Уменьшает zoom на один шаг.
    */
   public zoomDown(): void {
-    if (this._zoom > this.MIN_ZOOM)
+    if (this._zoom > this.MIN_ZOOM) {
       this.setZoom(this._zoom - this.STEP_ZOOM)
+    }
   }
 
   /**
@@ -141,8 +146,9 @@ export class EndgeUI extends EndgeModule {
    */
   private clampZoom(value: number): number {
     const n: number = Math.round(Number(value))
-    if (!Number.isFinite(n))
+    if (!Number.isFinite(n)) {
       return this.DEFAULT_ZOOM
+    }
     return Math.min(this.MAX_ZOOM, Math.max(this.MIN_ZOOM, n))
   }
 
@@ -150,8 +156,9 @@ export class EndgeUI extends EndgeModule {
    * Считывает Zoom From LS.
    */
   private readZoomFromLS(): number {
-    if (typeof localStorage === 'undefined')
+    if (typeof localStorage === 'undefined') {
       return this.DEFAULT_ZOOM
+    }
     const raw: string | null = localStorage.getItem(this.LS_KEY_ZOOM)
     const n: number = raw == null ? this.DEFAULT_ZOOM : Number(raw)
     return this.clampZoom(n)
@@ -161,8 +168,9 @@ export class EndgeUI extends EndgeModule {
    * Записывает Zoom To LS.
    */
   private writeZoomToLS(value: number): void {
-    if (typeof localStorage === 'undefined')
+    if (typeof localStorage === 'undefined') {
       return
+    }
     localStorage.setItem(this.LS_KEY_ZOOM, String(value))
   }
 
@@ -178,8 +186,9 @@ export class EndgeUI extends EndgeModule {
 
   /** Возвращает workspace theme catalog; до boot используется безопасный bootstrap fallback. */
   public get availableThemes(): string[] {
-    if (!Endge.workspace.isLoaded)
+    if (!Endge.workspace.isLoaded) {
       return [...themeConfig.availableThemes]
+    }
     return Endge.workspace.themes.map(theme => theme.identity)
   }
 
@@ -195,20 +204,23 @@ export class EndgeUI extends EndgeModule {
    */
   public setTheme(next: string): void {
     const identity = String(next ?? '').trim()
-    if (!this.availableThemes.includes(identity))
+    if (!this.availableThemes.includes(identity)) {
       return
+    }
 
     Endge.context.setCurrentTheme(identity)
     this.syncThemeFromContext()
   }
 
   private syncThemeFromContext(): boolean {
-    if (!Endge.workspace.isLoaded)
+    if (!Endge.workspace.isLoaded) {
       return false
+    }
 
     const next = Endge.context.currentTheme
-    if (next === this._theme)
+    if (next === this._theme) {
       return false
+    }
 
     this._theme = next
     this.applyThemeToDocument(next)
@@ -220,8 +232,9 @@ export class EndgeUI extends EndgeModule {
    * Применяет Theme To Document.
    */
   private applyThemeToDocument(theme: string): void {
-    if (typeof document === 'undefined')
+    if (typeof document === 'undefined') {
       return
+    }
 
     const root: HTMLElement = document.documentElement
     root.dataset.endgeTheme = theme
@@ -229,8 +242,9 @@ export class EndgeUI extends EndgeModule {
 
     // на всякий случай: если theme сломан, не кидаем
     const cls: string[] | undefined = THEME_CLASS_BY_NAME[theme]
-    if (cls?.length)
+    if (cls?.length) {
       root.classList.add(...cls)
+    }
   }
 
   //
@@ -256,7 +270,7 @@ export class EndgeUI extends EndgeModule {
   public setLocalTime(value: boolean): void {
     const timezone = value
       ? Endge.workspace.timezones.find(item => item.identity !== 'UTC')?.identity
-        ?? Endge.workspace.defaultTimezone
+      ?? Endge.workspace.defaultTimezone
       : Endge.workspace.supportsTimezone('UTC')
         ? 'UTC'
         : Endge.workspace.defaultTimezone

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { DATA_VIEW_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/data-view.default.source'
 import { EndgeDataView } from '@/model/modules/runtime/execution/endge-data-view'
+import { DATA_VIEW_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/data-view.default.source'
 
 const dataView = new EndgeDataView()
 
@@ -62,7 +62,7 @@ const INPUT = {
   ],
 }
 
-describe('EndgeDataView pipeline transform', () => {
+describe('endgeDataView pipeline transform', () => {
   it('passes each select result to the next step and returns the last result', () => {
     const output = dataView.runSource(`
 defineDataView({
@@ -312,7 +312,7 @@ defineDataView({
   })
 })
 
-describe('EndgeDataView manual transform', () => {
+describe('endgeDataView manual transform', () => {
   it('runs transform source with input and built-in tools', () => {
     const output = dataView.runSource(`
 defineDataView({

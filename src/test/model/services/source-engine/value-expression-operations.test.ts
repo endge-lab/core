@@ -36,7 +36,7 @@ function collectOperations(expression: SourceExpressionIR): void {
   }
 }
 
-describe('ValueExpression operation registry', () => {
+describe('valueExpression operation registry', () => {
   it('evaluates object, path and conversion operations immutably', () => {
     const source = { nested: { value: 2 }, keep: true, remove: 1 }
 

@@ -2,16 +2,16 @@ import { describe, expect, it } from 'vitest'
 
 import { RAction } from '@/domain/entities/reflect/RAction'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
-import { RQuery } from '@/domain/entities/reflect/RQuery'
-import { RMock } from '@/domain/entities/reflect/RMock'
-import { RComputation } from '@/domain/entities/reflect/RComputation'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
+import { RComputation } from '@/domain/entities/reflect/RComputation'
+import { RMock } from '@/domain/entities/reflect/RMock'
+import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { ENDGE_STYLE_DEFAULT_SOURCE, RStyle } from '@/domain/entities/reflect/RStyle'
 import { RType } from '@/domain/entities/reflect/RType'
 import { ComponentType, QueryType } from '@/domain/types/document/document.types'
 import { DocumentDraftFactory } from '@/model/services/document/DocumentDraftFactory'
 
-describe('DocumentDraftFactory', () => {
+describe('documentDraftFactory', () => {
   it('creates a source-first query draft without a persisted id', () => {
     const draft = DocumentDraftFactory.create(QueryType.REST, {
       identity: 'flight-list',

@@ -22,8 +22,9 @@ export function compileProgramMetadataProperty(
   let metadataNode: t.Expression | null = null
 
   for (const property of definition.properties) {
-    if (!t.isObjectProperty(property) || property.computed || propertyName(property.key) !== 'metadata')
+    if (!t.isObjectProperty(property) || property.computed || propertyName(property.key) !== 'metadata') {
       continue
+    }
 
     if (metadataNode) {
       diagnostics.push(createDiagnostic(
@@ -174,20 +175,25 @@ function readValue(
   diagnostics: ProgramMetadataCompileDiagnostic[],
   sourcePath: string,
 ): { ok: true, value: ProgramMetadataValue } | { ok: false } {
-  if (t.isStringLiteral(node) || t.isNumericLiteral(node) || t.isBooleanLiteral(node))
+  if (t.isStringLiteral(node) || t.isNumericLiteral(node) || t.isBooleanLiteral(node)) {
     return { ok: true, value: node.value }
+  }
 
-  if (t.isNullLiteral(node))
+  if (t.isNullLiteral(node)) {
     return { ok: true, value: null }
+  }
 
-  if (t.isUnaryExpression(node, { operator: '-' }) && t.isNumericLiteral(node.argument))
+  if (t.isUnaryExpression(node, { operator: '-' }) && t.isNumericLiteral(node.argument)) {
     return { ok: true, value: -node.argument.value }
+  }
 
-  if (t.isTemplateLiteral(node) && node.expressions.length === 0)
+  if (t.isTemplateLiteral(node) && node.expressions.length === 0) {
     return { ok: true, value: node.quasis[0]?.value.cooked ?? '' }
+  }
 
-  if (t.isObjectExpression(node))
+  if (t.isObjectExpression(node)) {
     return readObject(node, diagnostics, sourcePath)
+  }
 
   if (t.isArrayExpression(node)) {
     const value: ProgramMetadataValue[] = []
@@ -205,10 +211,10 @@ function readValue(
       }
 
       const item = readValue(unwrapExpression(element), diagnostics, `${sourcePath}.${index}`)
-      if (item.ok)
+      if (item.ok) {
         value.push(item.value)
-      else
-        valid = false
+      }
+      else { valid = false }
     })
     return valid ? { ok: true, value } : { ok: false }
   }
@@ -236,10 +242,12 @@ function unwrapExpression(node: t.Expression): t.Expression {
 }
 
 function propertyName(node: t.Node): string | null {
-  if (t.isIdentifier(node))
+  if (t.isIdentifier(node)) {
     return node.name
-  if (t.isStringLiteral(node) || t.isNumericLiteral(node))
+  }
+  if (t.isStringLiteral(node) || t.isNumericLiteral(node)) {
     return String(node.value)
+  }
   return null
 }
 

@@ -8,7 +8,7 @@ const sourceHead = `defineComposition({
     table: component('telegraph').withProps({ rows: fromData('telegraph.rows') }),
   },`
 
-describe('Composition Component event source', () => {
+describe('composition Component event source', () => {
   it('allows automatic Component dispatchTo without Stream batching', () => {
     const result = compileCompositionSource(`defineComposition({
       data: { telegraph: store('telegraph') },

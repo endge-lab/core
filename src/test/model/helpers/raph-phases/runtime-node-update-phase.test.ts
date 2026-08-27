@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import { RuntimeNodeUpdatePhase } from '@/model/helpers/raph-phases/runtime-node-update-phase'
 
-describe('RuntimeNodeUpdatePhase', () => {
+describe('runtimeNodeUpdatePhase', () => {
   it('routes observed data only to the logical runtime root', () => {
     const kernel = new RaphKernel()
     const runtime = kernel.createRuntime({ id: 'runtime-node-phase', scheduler: RaphSchedulerType.Sync })

@@ -10,24 +10,31 @@ export function evaluateSourceExpression(
   const evaluationCache = new WeakMap<object, Map<string, unknown>>()
 
   const evaluate = (node: SourceExpressionIR, current: unknown = context.current): unknown => {
-    if (node.type === 'literal')
+    if (node.type === 'literal') {
       return cloneValue(node.value)
+    }
 
-    if (node.type === 'array')
+    if (node.type === 'array') {
       return node.items.map(item => evaluate(item, current))
+    }
 
-    if (node.type === 'object')
+    if (node.type === 'object') {
       return Object.fromEntries(Object.entries(node.properties).map(([key, value]) => [key, evaluate(value, current)]))
+    }
 
     if (node.type === 'read') {
-      if (node.source === 'env')
+      if (node.source === 'env') {
         return context.environment?.(node.path)
-      if (node.source === 'current')
+      }
+      if (node.source === 'current') {
         return readPath(current, node.path)
-      if (node.source === 'scope')
+      }
+      if (node.source === 'scope') {
         return readPath(context.scope, node.path)
-      if (context.read)
+      }
+      if (context.read) {
         return context.read(node)
+      }
       const source = node.source === 'prop'
         ? context.props
         : node.source === 'value'
@@ -45,7 +52,9 @@ export function evaluateSourceExpression(
     if (node.type === 'transform') {
       const input = evaluate(node.input, current)
       const options = node.options ? evaluate(node.options, current) : undefined
-      if (!context.transform) throw new Error(`ValueExpression transform is not available: ${node.transform}:${node.identity}.`)
+      if (!context.transform) {
+        throw new Error(`ValueExpression transform is not available: ${node.transform}:${node.identity}.`)
+      }
       return context.transform(node, input, options)
     }
 
@@ -58,8 +67,9 @@ export function evaluateSourceExpression(
           ownerCache = new Map()
           evaluationCache.set(owner, ownerCache)
         }
-        if (!ownerCache.has(key))
+        if (!ownerCache.has(key)) {
           ownerCache.set(key, create())
+        }
         return ownerCache.get(key) as ReturnType<typeof create>
       },
       warn: warning => context.onWarning?.(warning),
@@ -73,8 +83,9 @@ export function evaluateSourceExpression(
 export const evaluateValueExpression = evaluateSourceExpression
 
 function cloneValue<T>(value: T): T {
-  if (value === undefined)
+  if (value === undefined) {
     return value
+  }
   try {
     return structuredClone(value)
   }

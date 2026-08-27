@@ -1,11 +1,11 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Raph, RaphNode } from '@endge/raph'
+import type { ProgramArtifact, QueryProgramPayload } from '@/domain/types/program/program.types'
+import type { RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime/runtime-host.types'
 
+import { Raph, RaphNode } from '@endge/raph'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 import { RuntimeHostRegistry } from '@/domain/entities/runtime/RuntimeHostRegistry'
-import type { ProgramArtifact, QueryProgramPayload } from '@/domain/types/program/program.types'
-import type { RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime/runtime-host.types'
 import { Endge } from '@/model/kernel/endge'
 
 describe('runtime memory lifecycle', () => {
@@ -108,7 +108,10 @@ describe('runtime memory lifecycle', () => {
 
       const snapshots = Endge.runtime.getDeletedRuntimeHostSnapshots()
       expect(snapshots.map(snapshot => snapshot.id)).toEqual([
-        'query-runtime-2', 'query-runtime-3', 'query-runtime-4', 'query-runtime-5',
+        'query-runtime-2',
+        'query-runtime-3',
+        'query-runtime-4',
+        'query-runtime-5',
       ])
       expect(snapshots[0]).toMatchObject({
         previousStatus: 'active',
@@ -122,7 +125,8 @@ describe('runtime memory lifecycle', () => {
 
       large.release()
       expect(Endge.runtime.getDeletedRuntimeHostSnapshots().map(snapshot => snapshot.id)).toEqual([
-        'query-runtime-4', 'query-runtime-5',
+        'query-runtime-4',
+        'query-runtime-5',
       ])
       large.release()
       small.release()
@@ -138,8 +142,13 @@ describe('runtime memory lifecycle', () => {
 class TestQueryHost extends RuntimeHostBase<'query', RuntimeHostContext<'query'>> {
   constructor(model: RQuery, id = 'test-host', parent: TestQueryHost | null = null) {
     super({
-      id, kind: 'query', runtimeType: 'test-query', entityType: 'query',
-      entityIdentity: model.identity, model, parent,
+      id,
+      kind: 'query',
+      runtimeType: 'test-query',
+      entityType: 'query',
+      entityIdentity: model.identity,
+      model,
+      parent,
       context: { status: 'idle', startedAt: null, updatedAt: null, lastFilterChangeAt: null },
     })
   }
@@ -155,8 +164,9 @@ function executeQuery(id: number, meta: Record<string, unknown> = {}, parent: Ru
     meta,
     parent,
   })
-  if (!host)
+  if (!host) {
     throw new Error('query runtime was not created')
+  }
   return host
 }
 
@@ -171,12 +181,21 @@ function queryModel(id: number): RQuery {
 function queryArtifact(id: number): ProgramArtifact<QueryProgramPayload> {
   return {
     ref: { entityType: 'query', id, identity: `query-${id}` },
-    sourceHash: 'test', compilerVersion: 'test', status: 'valid', diagnostics: [],
-    dependencies: [], capabilities: ['compilable', 'runnable', 'data-provider'],
+    sourceHash: 'test',
+    compilerVersion: 'test',
+    status: 'valid',
+    diagnostics: [],
+    dependencies: [],
+    capabilities: ['compilable', 'runnable', 'data-provider'],
     metadata: { self: {}, nodes: [] },
     payload: {
-      type: 'query-rest', sourceVersion: 2, endpoint: '', query: '', props: [],
-      requestBody: null, outputs: [],
+      type: 'query-rest',
+      sourceVersion: 2,
+      endpoint: '',
+      query: '',
+      props: [],
+      requestBody: null,
+      outputs: [],
     },
   }
 }

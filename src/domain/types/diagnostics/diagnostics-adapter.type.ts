@@ -38,19 +38,19 @@ export interface DiagnosticsAdapter {
   readonly id: string
 
   /** Принимает record, прошедший маршрутизацию в текущий output. */
-  acceptRecord(record: DiagnosticsRecord, context: DiagnosticsAdapterRecordContext): void | Promise<void>
+  acceptRecord: (record: DiagnosticsRecord, context: DiagnosticsAdapterRecordContext) => void | Promise<void>
 
   /** Принимает полный JSON-safe snapshot, если adapter поддерживает snapshots. */
-  acceptSnapshot?(snapshot: DiagnosticsSnapshot, context: DiagnosticsAdapterSnapshotContext): void | Promise<void>
+  acceptSnapshot?: (snapshot: DiagnosticsSnapshot, context: DiagnosticsAdapterSnapshotContext) => void | Promise<void>
 
   /** Проверяет доступность output без изменения diagnostics history. */
-  test?(): void | Promise<void>
+  test?: () => void | Promise<void>
 
   /** Доставляет накопленный adapter buffer без завершения session. */
-  flush?(): void | Promise<void>
+  flush?: () => void | Promise<void>
 
   /** Освобождает внешние ресурсы adapter при пересборке или reset. */
-  dispose?(): void | Promise<void>
+  dispose?: () => void | Promise<void>
 }
 
 /** Фабрика одного расширяемого типа diagnostics adapter. */
@@ -59,10 +59,10 @@ export interface DiagnosticsAdapterFactory {
   readonly capabilities: DiagnosticsAdapterCapabilities
 
   /** Создаёт runtime adapter для конкретного output из effective configuration. */
-  create(
+  create: (
     output: EndgeDiagnosticsOutputConfiguration,
     context: DiagnosticsAdapterCreateContext,
-  ): DiagnosticsAdapter
+  ) => DiagnosticsAdapter
 }
 
 /** Результат best-effort flush всех активных output adapters. */

@@ -1,5 +1,5 @@
-import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import type { DiagnosticsRecord } from '@/domain/types/diagnostics/diagnostics.types'
+import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { Endge } from '@/model/kernel/endge'
 
 const CHANNEL_NAME = 'endge-runtime-debug'
@@ -54,8 +54,9 @@ export class EndgeRuntimeDebugger extends EndgeModule {
       this._channel.close()
       this._channel = null
     }
-    if (this._autoRegisterTimer != null && typeof window !== 'undefined')
+    if (this._autoRegisterTimer != null && typeof window !== 'undefined') {
       window.clearInterval(this._autoRegisterTimer)
+    }
     this._autoRegisterTimer = null
     this._unsubscribeDiagnostics?.()
     this._unsubscribeDiagnostics = null
@@ -85,8 +86,9 @@ export class EndgeRuntimeDebugger extends EndgeModule {
    */
   public getAnalysis(tabId: string): string[] {
     const key = String(tabId ?? '')
-    if (!key)
+    if (!key) {
       return []
+    }
     return this._analysisByTabId[key] ?? []
   }
 
@@ -95,8 +97,9 @@ export class EndgeRuntimeDebugger extends EndgeModule {
    * Используется админкой для запуска анализа по текущей вкладке.
    */
   public sendCommand(command: string, payload?: Record<string, unknown>): void {
-    if (typeof BroadcastChannel === 'undefined')
+    if (typeof BroadcastChannel === 'undefined') {
       return
+    }
     const ch = this._getChannel()
     ch.postMessage({
       type: 'command',
@@ -110,8 +113,9 @@ export class EndgeRuntimeDebugger extends EndgeModule {
    * Запустить прослушку канала (создать канал и накапливать вкладки). Вызывать из админки при init.
    */
   public startListening(): void {
-    if (typeof BroadcastChannel === 'undefined' || this._listenerChannel != null)
+    if (typeof BroadcastChannel === 'undefined' || this._listenerChannel != null) {
       return
+    }
     this._listenerChannel = new BroadcastChannel(CHANNEL_NAME)
     this._listenerChannel.addEventListener('message', this._onMessage)
     this.notify()
@@ -132,12 +136,14 @@ export class EndgeRuntimeDebugger extends EndgeModule {
 
   private _onMessage = (e: MessageEvent): void => {
     const data = e.data
-    if (!data?.type)
+    if (!data?.type) {
       return
+    }
 
     if (data.type === 'register') {
-      if (!data.id)
+      if (!data.id) {
         return
+      }
       const tab: RuntimeDebugTab = {
         id: data.id,
         url: data.url ?? '',
@@ -157,8 +163,9 @@ export class EndgeRuntimeDebugger extends EndgeModule {
 
     if (data.type === 'analysis-result') {
       const tabId = String(data.tabId ?? '')
-      if (!tabId)
+      if (!tabId) {
         return
+      }
       const rawTargets = Array.isArray(data.targets) ? data.targets : []
       const targets = rawTargets
         .map((t: unknown) => String(t ?? '').trim())
@@ -183,8 +190,9 @@ export class EndgeRuntimeDebugger extends EndgeModule {
    * Возвращает Tab Id.
    */
   private _getTabId(): string {
-    if (this._tabId)
+    if (this._tabId) {
       return this._tabId
+    }
     try {
       let id = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(STORAGE_KEY_TAB_ID) : null
       if (!id) {
@@ -204,8 +212,9 @@ export class EndgeRuntimeDebugger extends EndgeModule {
    * Внутренний helper модуля: post Register.
    */
   private _postRegister(): void {
-    if (typeof BroadcastChannel === 'undefined')
+    if (typeof BroadcastChannel === 'undefined') {
       return
+    }
     const ch = this._getChannel()
     const id = this._getTabId()
     ch.postMessage({
@@ -223,18 +232,21 @@ export class EndgeRuntimeDebugger extends EndgeModule {
    */
   private _onClientMessage = (e: MessageEvent): void => {
     const data = e.data
-    if (data?.type !== 'command')
+    if (data?.type !== 'command') {
       return
+    }
 
     // В админке команды не обрабатываем как клиентские
-    if (typeof location !== 'undefined' && isAdminUrl(location.href))
+    if (typeof location !== 'undefined' && isAdminUrl(location.href)) {
       return
+    }
 
     const currentTabId = this._getTabId()
     const targetTabId = data.payload?.tabId as string | undefined
 
-    if (targetTabId && targetTabId !== currentTabId)
+    if (targetTabId && targetTabId !== currentTabId) {
       return
+    }
 
     if (data.command === 'template-analysis') {
       if (typeof document !== 'undefined') {
@@ -242,8 +254,9 @@ export class EndgeRuntimeDebugger extends EndgeModule {
         const targetsSet = new Set<string>()
         nodes.forEach((el) => {
           const value = el.getAttribute('data-target')?.trim()
-          if (value)
+          if (value) {
             targetsSet.add(value)
+          }
         })
         const targets = Array.from(targetsSet)
 
@@ -263,10 +276,12 @@ export class EndgeRuntimeDebugger extends EndgeModule {
    * Гарантирует Auto Register.
    */
   private _ensureAutoRegister(): void {
-    if (this._autoRegisterTimer != null)
+    if (this._autoRegisterTimer != null) {
       return
-    if (typeof window === 'undefined')
+    }
+    if (typeof window === 'undefined') {
       return
+    }
     this._autoRegisterTimer = window.setInterval(() => {
       try {
         this._postRegister()
@@ -292,13 +307,16 @@ export class EndgeRuntimeDebugger extends EndgeModule {
    * Гарантирует Diagnostics Forwarding.
    */
   private _ensureDiagnosticsForwarding(): void {
-    if (this._diagnosticsListener != null)
+    if (this._diagnosticsListener != null) {
       return
-    if (typeof location !== 'undefined' && isAdminUrl(location.href))
+    }
+    if (typeof location !== 'undefined' && isAdminUrl(location.href)) {
       return
+    }
     const listener = (record: DiagnosticsRecord): void => {
-      if (typeof BroadcastChannel === 'undefined')
+      if (typeof BroadcastChannel === 'undefined') {
         return
+      }
       try {
         const ch = this._getChannel()
         const payload = {

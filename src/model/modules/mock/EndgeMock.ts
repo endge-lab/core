@@ -22,8 +22,9 @@ export class EndgeMock extends EndgeModule {
   /** Регистрирует provider по namespaced ref и запрещает неявную замену. */
   public registerProvider(provider: EndgeMockProvider): void {
     const normalized = normalizeProvider(provider)
-    if (this._providers.has(normalized.ref))
+    if (this._providers.has(normalized.ref)) {
       throw new Error(`[EndgeMock] Provider "${normalized.ref}" is already registered.`)
+    }
 
     this._providers.set(normalized.ref, normalized)
     this.notify()
@@ -46,10 +47,12 @@ export class EndgeMock extends EndgeModule {
   /** Возвращает состояние binding persisted mock и code provider. */
   public getBindingStatus(identity: string): EndgeMockBindingStatus {
     const mock = Endge.domain.getMock(normalizeIdentity(identity))
-    if (!mock)
+    if (!mock) {
       return 'missing-document'
-    if (mock.contentSource === 'code-provider')
+    }
+    if (mock.contentSource === 'code-provider') {
       return mock.codeRef && this._providers.has(mock.codeRef) ? 'connected' : 'missing-provider'
+    }
     if (mock.contentType === 'application/json') {
       try {
         JSON.parse(mock.source)
@@ -71,22 +74,26 @@ export class EndgeMock extends EndgeModule {
   public get<T = unknown>(identity: string): T {
     const normalizedIdentity = normalizeIdentity(identity)
     const mock = Endge.domain.getMock(normalizedIdentity)
-    if (!mock)
+    if (!mock) {
       throw new Error(`[EndgeMock] Persisted mock document "${normalizedIdentity}" is not loaded.`)
+    }
 
     if (mock.contentSource === 'code-provider') {
       const ref = normalizeRef(mock.codeRef)
       const provider = this._providers.get(ref)
-      if (!provider)
+      if (!provider) {
         throw new Error(`[EndgeMock] Provider "${ref}" for mock "${normalizedIdentity}" is not registered.`)
+      }
       const value = provider.provide({ mock })
-      if (value && typeof (value as { then?: unknown }).then === 'function')
+      if (value && typeof (value as { then?: unknown }).then === 'function') {
         throw new Error(`[EndgeMock] Provider "${ref}" must be synchronous.`)
+      }
       return cloneMockValue(value) as T
     }
 
-    if (mock.contentType === 'text/plain')
+    if (mock.contentType === 'text/plain') {
       return mock.source as T
+    }
 
     try {
       return cloneMockValue(JSON.parse(mock.source)) as T
@@ -123,8 +130,9 @@ export class EndgeMock extends EndgeModule {
 }
 
 function normalizeProvider(provider: EndgeMockProvider): EndgeMockProvider {
-  if (typeof provider?.provide !== 'function')
-    throw new Error('[EndgeMock] Provider.provide must be a function.')
+  if (typeof provider?.provide !== 'function') {
+    throw new TypeError('[EndgeMock] Provider.provide must be a function.')
+  }
   return {
     ref: normalizeRef(provider.ref),
     provide: provider.provide,
@@ -134,23 +142,26 @@ function normalizeProvider(provider: EndgeMockProvider): EndgeMockProvider {
 
 function normalizeIdentity(identity: unknown): string {
   const normalized = String(identity ?? '').trim()
-  if (!normalized)
+  if (!normalized) {
     throw new Error('[EndgeMock] Mock identity is required.')
+  }
   return normalized
 }
 
 function normalizeRef(ref: unknown): string {
   const normalized = String(ref ?? '').trim()
-  if (!normalized)
+  if (!normalized) {
     throw new Error('[EndgeMock] Provider ref is required.')
+  }
   return normalized
 }
 
 function cloneMockValue<T>(value: T): T {
   try {
     const json = JSON.stringify(value)
-    if (json === undefined)
+    if (json === undefined) {
       throw new Error('not JSON-compatible')
+    }
     return JSON.parse(json) as T
   }
   catch {

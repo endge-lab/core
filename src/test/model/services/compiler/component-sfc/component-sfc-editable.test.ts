@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 
-describe('Component SFC editable compiler', () => {
+describe('component SFC editable compiler', () => {
   it('compiles primitive editable behavior and synthesizes the edited port', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 defineProps<{ status: string }>()

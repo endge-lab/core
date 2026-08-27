@@ -7,8 +7,8 @@ import type {
 } from '@/domain/types/source/source-engine.types'
 
 import { compileVocabSource } from '@/model/services/source-engine/compilers/vocab-source-compile'
-import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
 import { resolveSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
+import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
 import { VOCAB_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/vocab.default.source'
 
 export class VocabSourceLanguageStrategy implements SourceLanguageStrategy {

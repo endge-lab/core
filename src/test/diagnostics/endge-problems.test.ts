@@ -1,11 +1,11 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest'
 
+import { RMock } from '@/domain/entities/reflect/RMock'
 import { EndgeDiagnostics } from '@/model/modules/diagnostics/endge-diagnostics'
 import { createDiagnosticsEntityOwner, EndgeProblems } from '@/model/modules/diagnostics/endge-problems'
-import { RMock } from '@/domain/entities/reflect/RMock'
 
-describe('EndgeProblems', () => {
+describe('endgeProblems', () => {
   it('атомарно заменяет problems одного entity owner', () => {
     const problems = new EndgeProblems()
     const owner = createDiagnosticsEntityOwner({

@@ -20,19 +20,23 @@ export class AuthSessionStore {
   public read(workspaceIdentity: string, profile: AuthProfileSchema): AuthSessionSnapshot | null {
     const key = this.getKey(workspaceIdentity, profile.identity)
     const storagePolicy = profile.session?.storage ?? 'memory'
-    if (storagePolicy === 'memory')
+    if (storagePolicy === 'memory') {
       return this._memory.get(key) ?? null
+    }
 
     const storage = this._storage(storagePolicy)
-    if (!storage)
+    if (!storage) {
       return null
+    }
     try {
       const raw = storage.getItem(key)
-      if (!raw)
+      if (!raw) {
         return null
+      }
       const snapshot = JSON.parse(raw)
-      if (isAuthSessionSnapshot(snapshot, profile))
+      if (isAuthSessionSnapshot(snapshot, profile)) {
         return snapshot
+      }
       storage.removeItem(key)
       return null
     }
@@ -59,8 +63,9 @@ export class AuthSessionStore {
       return
     }
     const storage = this._storage(storagePolicy)
-    if (!storage)
+    if (!storage) {
       return
+    }
     try {
       storage.setItem(key, JSON.stringify(sanitized))
     }
@@ -90,8 +95,9 @@ export class AuthSessionStore {
 
   private _storage(persist: 'localStorage' | 'sessionStorage'): Storage | null {
     try {
-      if (persist === 'localStorage')
+      if (persist === 'localStorage') {
         return typeof globalThis.localStorage === 'undefined' ? null : globalThis.localStorage
+      }
       return typeof globalThis.sessionStorage === 'undefined' ? null : globalThis.sessionStorage
     }
     catch {
@@ -101,8 +107,9 @@ export class AuthSessionStore {
 }
 
 function isAuthSessionSnapshot(value: unknown, profile: AuthProfileSchema): value is AuthSessionSnapshot {
-  if (!value || typeof value !== 'object' || Array.isArray(value))
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return false
+  }
   const snapshot = value as Record<string, any>
   const token = snapshot.token
   return snapshot.version === 1

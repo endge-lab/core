@@ -5,8 +5,8 @@ import type {
   AuthProfileTestResult,
 } from '@/domain/types/auth/auth-profile.types'
 
-import { createEndgeAuthContext } from '@/model/services/auth/auth-context'
 import type { AuthAdapterRegistry } from '@/model/modules/security/auth/AuthAdapterRegistry'
+import { createEndgeAuthContext } from '@/model/services/auth/auth-context'
 
 interface AuthProfileRegistryDependencies {
   listProfiles: () => RAuthProfile[]
@@ -38,11 +38,13 @@ export class AuthProfileRegistry {
   /** Возвращает активный default profile или сообщает о повреждённой configuration. */
   public getDefault(): AuthProfileSchema | null {
     const identity = String(this._dependencies.getDefaultIdentity() ?? '').trim()
-    if (!identity)
+    if (!identity) {
       return null
+    }
     const profile = this.get(identity)
-    if (!profile)
+    if (!profile) {
       throw new Error(`[EndgeAuth] Default auth profile is missing: ${identity}`)
+    }
     this.requireActive(profile)
     return profile
   }
@@ -50,8 +52,9 @@ export class AuthProfileRegistry {
   /** Проверяет все не удалённые profiles текущего Domain. */
   public validateAll(): void {
     for (const profile of this.list()) {
-      if (profile.deletedAt)
+      if (profile.deletedAt) {
         continue
+      }
       this._validateCommon(profile)
       this._adapters.validate(profile)
     }
@@ -66,8 +69,9 @@ export class AuthProfileRegistry {
     let token = await adapter.authenticate(context)
     let userInfo: Record<string, unknown> | null = null
     try {
-      if (adapter.loadUserInfo)
+      if (adapter.loadUserInfo) {
         userInfo = await adapter.loadUserInfo({ ...context, token })
+      }
       const authContext = createEndgeAuthContext({
         authenticated: Boolean(token.accessToken) || Object.keys(token.headers ?? {}).length > 0,
         accessToken: token.accessToken,
@@ -100,10 +104,12 @@ export class AuthProfileRegistry {
     const profile = typeof profileOrIdentity === 'string'
       ? this.get(profileOrIdentity)
       : profileOrIdentity
-    if (!profile)
+    if (!profile) {
       throw new Error(`[EndgeAuth] Auth profile is missing: ${String(profileOrIdentity)}`)
-    if (profile.active === false || profile.deletedAt)
+    }
+    if (profile.active === false || profile.deletedAt) {
       throw new Error(`[EndgeAuth] Auth profile is inactive: ${profile.identity}`)
+    }
     this._validateCommon(profile)
     this._adapters.validate(profile)
     return profile
@@ -121,26 +127,31 @@ export class AuthProfileRegistry {
       resolveValue: value => this._dependencies.resolveValue(value),
       resolveCredential: async (credential: string): Promise<string> => {
         const raw = String(profile.credentials?.[credential] ?? '').trim()
-        if (!raw)
+        if (!raw) {
           throw new Error(`[EndgeAuth] credentials.${credential} is required: ${profile.identity}`)
+        }
         const value = this._dependencies.resolveValue(raw)
-        if (!value || (isVariableReference(raw) && value === raw))
+        if (!value || (isVariableReference(raw) && value === raw)) {
           throw new Error(`[EndgeAuth] Credential is unavailable: ${profile.identity}.${credential}`)
+        }
         return value
       },
     }
   }
 
   private _validateCommon(profile: AuthProfileSchema): void {
-    if (!String(profile.identity ?? '').trim())
+    if (!String(profile.identity ?? '').trim()) {
       throw new Error('[EndgeAuth] Auth profile identity is required')
-    if (!String(profile.adapterId ?? '').trim())
+    }
+    if (!String(profile.adapterId ?? '').trim()) {
       throw new Error(`[EndgeAuth] Auth profile adapterId is required: ${profile.identity}`)
-    if (profile.session && !['localStorage', 'sessionStorage', 'memory'].includes(profile.session.storage))
+    }
+    if (profile.session && !['localStorage', 'sessionStorage', 'memory'].includes(profile.session.storage)) {
       throw new Error(`[EndgeAuth] Auth profile session storage is invalid: ${profile.identity}`)
+    }
   }
 }
 
 function isVariableReference(value: string): boolean {
-  return /^\{[A-Za-z_][A-Za-z0-9_.-]*\}$/.test(value)
+  return /^\{[A-Z_][\w.-]*\}$/i.test(value)
 }

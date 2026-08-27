@@ -5,27 +5,28 @@ import type {
   RComponentRenderTarget,
 } from '@/domain/types/component/component-core.types'
 import type { RComponentSFC_AST } from '@/domain/types/component/sfc/ast.types'
-import type { RComponentSFC_IR } from '@/domain/types/component/sfc/ir.types'
 import type {
   RComponentSFC_RuntimeBoundaryDependency,
   RComponentSFC_RuntimeDependencies,
   RComponentSFC_RuntimeTableColumnDependency,
 } from '@/domain/types/component/sfc/dependencies.types'
+import type { ComponentSFCEditedEventPayload, RComponentSFC_IR } from '@/domain/types/component/sfc/ir.types'
+import type {
+  ComponentSFCEventInputValue,
+  ComponentSFCEventOccurrence,
+  ComponentSFCEventOperationAction,
+  ComponentSFCEventOperationBlock,
+  ComponentSFCEventPort,
+  ComponentSFCEventRuntimeSource,
+} from '@/domain/types/component/sfc/ports.types'
 import type { RComponentSFCSource_Parts } from '@/domain/types/component/sfc/source.types'
+import type { ComputationResource } from '@/domain/types/computation/computation-runtime.types'
+import type { I18nRuntimeCatalog } from '@/domain/types/i18n.types'
 import type {
   ComponentSFCPreviewOptions,
   ComponentSFCProgramPayload,
   ProgramDiagnostic,
 } from '@/domain/types/program/program.types'
-import type {
-  ComponentSFCEventInputValue,
-  ComponentSFCEventOperationAction,
-  ComponentSFCEventOperationBlock,
-  ComponentSFCEventOccurrence,
-  ComponentSFCEventPort,
-  ComponentSFCEventRuntimeSource,
-} from '@/domain/types/component/sfc/ports.types'
-import type { ComponentSFCEditedEventPayload } from '@/domain/types/component/sfc/ir.types'
 import type {
   RuntimeArtifactReader,
   RuntimeBoundaryPatch,
@@ -35,24 +36,22 @@ import type {
   RuntimeHostInputSource,
   RuntimeHostUpdateContext,
 } from '@/domain/types/runtime/runtime-host.types'
-import type { ComputationResource } from '@/domain/types/computation/computation-runtime.types'
-import type { EndgeStyleLease } from '@/domain/types/style/style.types'
-import type { I18nRuntimeCatalog } from '@/domain/types/i18n.types'
-import type { SourceFieldOption } from '@/domain/types/source/source-expression.types'
 import type {
   VocabOptionMapping,
   VocabRuntimeCatalog,
 } from '@/domain/types/runtime/vocab-cache.types'
+import type { SourceFieldOption } from '@/domain/types/source/source-expression.types'
+import type { EndgeStyleLease } from '@/domain/types/style/style.types'
 
 import { DataPath, Raph, RaphNode } from '@endge/raph'
 
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
+import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component/sfc/dependencies.types'
+import { RUNTIME_BOUNDARY_UPDATE_PHASE_NAME } from '@/domain/types/runtime/runtime-host.types'
 import { ENDGE_CONTEXT_RAPH_PATH } from '@/model/config/kernel.config'
 import { Endge } from '@/model/kernel/endge'
 import { ComputationResourceRegistry } from '@/model/modules/runtime/execution/computation/ComputationResourceRegistry'
 import { executeRuntimeOperation } from '@/model/modules/runtime/operation/operation-executor'
-import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component/sfc/dependencies.types'
-import { RUNTIME_BOUNDARY_UPDATE_PHASE_NAME } from '@/domain/types/runtime/runtime-host.types'
 
 function createDefaultSFCContext(target: RComponentRenderTarget | null): RuntimeHostContext<'component-sfc'> {
   return {
@@ -73,35 +72,47 @@ function evaluateEventInput(
   evaluatedAt = new Date().toISOString(),
   operationInput?: unknown,
 ): unknown {
-  if (value.kind === 'event') return value.path == null ? payload : readPath(payload, value.path)
-  if (value.kind === 'operation-input') return value.path == null ? operationInput : readPath(operationInput, value.path)
-  if (value.kind === 'now') return evaluatedAt
-  if (value.kind === 'scope') return readPath(scope, value.path)
-  if (value.kind === 'literal') return value.value
+  if (value.kind === 'event') {
+    return value.path == null ? payload : readPath(payload, value.path)
+  }
+  if (value.kind === 'operation-input') {
+    return value.path == null ? operationInput : readPath(operationInput, value.path)
+  }
+  if (value.kind === 'now') {
+    return evaluatedAt
+  }
+  if (value.kind === 'scope') {
+    return readPath(scope, value.path)
+  }
+  if (value.kind === 'literal') {
+    return value.value
+  }
   if (value.kind === 'coalesce') {
     const left = evaluateEventInput(value.left, payload, scope, evaluatedAt, operationInput)
     return left ?? evaluateEventInput(value.right, payload, scope, evaluatedAt, operationInput)
   }
-  if (value.kind === 'array') return value.items.map(item => evaluateEventInput(item, payload, scope, evaluatedAt, operationInput))
+  if (value.kind === 'array') {
+    return value.items.map(item => evaluateEventInput(item, payload, scope, evaluatedAt, operationInput))
+  }
   return Object.fromEntries(value.entries.map(entry => [
     typeof entry.key === 'string' ? entry.key : String(evaluateEventInput(entry.key, payload, scope, evaluatedAt, operationInput)),
     evaluateEventInput(entry.value, payload, scope, evaluatedAt, operationInput),
   ]))
 }
 
-type MaterializedOperationEffect = {
+interface MaterializedOperationEffect {
   name: string
   kind: 'action' | 'query'
   identity: string
   input: unknown
 }
 
-type MaterializedOperationBlock = {
+interface MaterializedOperationBlock {
   steps: MaterializedOperationEffect[]
   output: string | null
 }
 
-type MaterializedInlineOperation = {
+interface MaterializedInlineOperation {
   input: unknown
   run: MaterializedOperationBlock
   undo: MaterializedOperationBlock
@@ -297,18 +308,21 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
 
     this._ensureVocabSubscription(key, entry.path)
     const values = Raph.get(entry.path)
-    if (!Array.isArray(values))
+    if (!Array.isArray(values)) {
       return []
+    }
 
     const valuePath = String(mapping?.valuePath ?? 'value').trim()
     const labelPath = String(mapping?.labelPath ?? 'label').trim()
-    if (!valuePath || !labelPath)
+    if (!valuePath || !labelPath) {
       throw new Error(`[ComponentSFCRuntimeHost] Vocab alias "${key}" requires non-empty valuePath and labelPath.`)
+    }
 
     return values.flatMap((item): SourceFieldOption[] => {
       const value = readPath(item, valuePath)
-      if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean')
+      if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
         return []
+      }
       const label = readPath(item, labelPath)
       return [{
         value,
@@ -365,13 +379,17 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   /** Subscribes to one public Event port of this mounted component instance. */
   public onEventPort(name: string, listener: (occurrence: ComponentSFCEventOccurrence) => void): () => void {
     const key = String(name ?? '').trim()
-    if (!key) throw new Error('Event port name is required.')
+    if (!key) {
+      throw new Error('Event port name is required.')
+    }
     const listeners = this._eventPortListeners.get(key) ?? new Set()
     listeners.add(listener)
     this._eventPortListeners.set(key, listeners)
     return () => {
       listeners.delete(listener)
-      if (listeners.size === 0) this._eventPortListeners.delete(key)
+      if (listeners.size === 0) {
+        this._eventPortListeners.delete(key)
+      }
     }
   }
 
@@ -391,7 +409,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     depth = 0,
     scope: Record<string, unknown> = {},
   ): Promise<boolean> {
-    if (!port.action) return true
+    if (!port.action) {
+      return true
+    }
     const traceKey = `${ownerIdentity}.${port.name}`
     if (depth >= 32 || trace.includes(traceKey)) {
       this.emit('event:error', { code: 'event-cycle', ownerIdentity, event: port.name, trace })
@@ -426,8 +446,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
         await this._executeInlineOperation(port.action, payload, scope, evaluatedAt, source, ownerIdentity, port.name)
         return true
       }
-      if (port.action.kind === 'required-port')
+      if (port.action.kind === 'required-port') {
         throw new Error(`Required port "${port.action.port}" was not resolved by the component boundary.`)
+      }
 
       const inputs = Object.fromEntries(Object.entries(port.action.inputs).map(([key, read]) => [
         key,
@@ -441,18 +462,26 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
         inputs,
       })
       const effects = Array.isArray(result) ? result : result == null ? [] : [result]
-      if (effects.length > 32) throw new Error('Event reaction effect budget exceeded 32.')
+      if (effects.length > 32) {
+        throw new Error('Event reaction effect budget exceeded 32.')
+      }
       for (const effect of effects) {
-        if (!isRecord(effect)) throw new Error('Event reaction must return JSON effect objects.')
+        if (!isRecord(effect)) {
+          throw new Error('Event reaction must return JSON effect objects.')
+        }
         if (effect.kind === 'action') {
           const identity = String(effect.identity ?? '').trim()
-          if (!identity) throw new Error('Event Action effect identity is required.')
+          if (!identity) {
+            throw new Error('Event Action effect identity is required.')
+          }
           await this._executeEventActionEffect(identity, effect.input, source, ownerIdentity, port.name)
           continue
         }
         if (effect.kind === 'emit') {
           const event = String(effect.event ?? '').trim()
-          if (!port.action.emittedEvents.includes(event)) throw new Error(`Event effect is not compiler-linked: ${event}.`)
+          if (!port.action.emittedEvents.includes(event)) {
+            throw new Error(`Event effect is not compiler-linked: ${event}.`)
+          }
           await emitOwn(event, effect.payload, nextTrace, depth + 1)
           continue
         }
@@ -477,7 +506,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     }
     this.emit('event:port', occurrence)
     this.emit(`event:port:${name}`, occurrence)
-    for (const listener of this._eventPortListeners.get(name) ?? []) listener(occurrence)
+    for (const listener of this._eventPortListeners.get(name) ?? []) {
+      listener(occurrence)
+    }
   }
 
   /** Возвращает активную host-owned edit-сессию конкретного renderer consumer. */
@@ -488,7 +519,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   /** Открывает единственную edit-сессию runtime; предыдущая отменяется без Event. */
   public beginEditSession(key: string, originalValue: unknown, baseVariant = 'default'): ComponentSFCEditSession {
     const normalizedKey = String(key ?? '').trim()
-    if (!normalizedKey) throw new Error('Editable consumer key is required.')
+    if (!normalizedKey) {
+      throw new Error('Editable consumer key is required.')
+    }
     this._editSession = {
       key: normalizedKey,
       originalValue: cloneEditValue(originalValue),
@@ -501,14 +534,18 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
 
   /** Обновляет renderer-owned draft активной edit-сессии. */
   public updateEditDraft(key: string, value: unknown): void {
-    if (this._editSession?.key !== key) return
+    if (this._editSession?.key !== key) {
+      return
+    }
     this._editSession.draftValue = cloneEditValue(value)
   }
 
   /** Завершает edit-сессию и возвращает нормализованный semantic payload. */
   public commitEditSession(key: string, value?: unknown): ComponentSFCEditedEventPayload | null {
     const session = this._editSession
-    if (!session || session.key !== key) return null
+    if (!session || session.key !== key) {
+      return null
+    }
     const payload = {
       value: cloneEditValue(arguments.length >= 2 ? value : session.draftValue),
       previousValue: cloneEditValue(session.originalValue),
@@ -520,7 +557,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
 
   /** Отменяет edit-сессию без публикации edited. */
   public cancelEditSession(key?: string): void {
-    if (!this._editSession || (key && this._editSession.key !== key)) return
+    if (!this._editSession || (key && this._editSession.key !== key)) {
+      return
+    }
     const sessionKey = this._editSession.key
     this._editSession = null
     this.emit('resource:dirty', { kind: 'editable', action: 'cancel', key: sessionKey })
@@ -539,7 +578,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
       input,
       () => Endge.runtime.computation.createResource(identity, input, consumerKey),
       () => {
-        if (resource) this._reportComputationError(resource, identity, consumerKey, portName)
+        if (resource) {
+          this._reportComputationError(resource, identity, consumerKey, portName)
+        }
         this.emit('computation:dirty', { identity, consumerKey })
       },
     )
@@ -552,8 +593,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     this._clearRaphInputSubscriptions()
     this._inputSource = input ?? null
 
-    if (this._inputSource?.kind === 'raph')
+    if (this._inputSource?.kind === 'raph') {
       this._bindRaphInputSource(this._inputSource)
+    }
     this._bindRaphContextSources()
   }
 
@@ -600,8 +642,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   /** Очищает Raph subscriptions перед общим destroy host-а. */
   public override destroy(): void {
     this._clearRaphInputSubscriptions()
-    for (const dispose of this._vocabDisposers.values())
+    for (const dispose of this._vocabDisposers.values()) {
       dispose()
+    }
     this._vocabDisposers.clear()
     this._computationResources.dispose()
     this._computationErrorSignatures.clear()
@@ -620,7 +663,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     depth: number,
   ): Promise<void> {
     const port = this.getIr()?.script.ports.emits.events.find(candidate => candidate.name === name)
-    if (!port) throw new Error(`Component Event port is not declared: ${name}.`)
+    if (!port) {
+      throw new Error(`Component Event port is not declared: ${name}.`)
+    }
     this.publishEventPort(name, payload, source)
     await this.executeEventPortAction(
       this.entityIdentity,
@@ -656,10 +701,12 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
 
   private async _executeEventQueryEffect(identity: string, input: unknown): Promise<unknown> {
     const query = Endge.domain.getQuery(identity)
-    if (!query)
+    if (!query) {
       throw new Error(`Event Query is missing: ${identity}.`)
-    if (!isRecord(input))
+    }
+    if (!isRecord(input)) {
       throw new Error(`Event Query input must be an object: ${identity}.`)
+    }
 
     return await Endge.runtime.query.run(query, input, this)
   }
@@ -701,12 +748,14 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
         ownerIdentity,
         eventName,
       ),
-      redo: materialized.redo ? async context => await this._executeMaterializedOperationBlock(
-        (context.input as MaterializedInlineOperation).redo!,
-        source,
-        ownerIdentity,
-        eventName,
-      ) : null,
+      redo: materialized.redo
+        ? async context => await this._executeMaterializedOperationBlock(
+          (context.input as MaterializedInlineOperation).redo!,
+          source,
+          ownerIdentity,
+          eventName,
+        )
+        : null,
     })
   }
 
@@ -720,8 +769,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     return {
       output: block.output,
       steps: block.steps.map((step) => {
-        if (step.action.kind !== 'action' && step.action.kind !== 'query')
+        if (step.action.kind !== 'action' && step.action.kind !== 'query') {
           throw new Error(`Unsupported inline Operation effect: ${step.action.kind}.`)
+        }
         return {
           name: step.name,
           kind: step.action.kind,
@@ -761,8 +811,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
       return
     }
     const signature = `${resource.error.kind}:${resource.error.outputName ?? ''}:${resource.error.message}`
-    if (this._computationErrorSignatures.get(consumerKey) === signature)
+    if (this._computationErrorSignatures.get(consumerKey) === signature) {
       return
+    }
     this._computationErrorSignatures.set(consumerKey, signature)
     console.error(`[ComponentSFCRuntimeHost] Computation port failed for "${this.entityIdentity}.${portName ?? 'unknown'}" (${resource.error.computationIdentity || identity}/${resource.error.outputName ?? 'unknown'}, ${resource.error.kind})`)
   }
@@ -790,12 +841,13 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
 
   private makeArtifactResourcePayload(): Record<string, unknown> {
     const artifact = this.getArtifact()
-    if (!artifact)
+    if (!artifact) {
       return {
         entityType: 'component-sfc',
         identity: this.entityIdentity,
         missing: true,
       }
+    }
 
     return {
       ref: artifact.ref,
@@ -814,8 +866,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   /** Подписывает host на shared Vocab path один раз, включая вложенные SFC artifacts. */
   private _ensureVocabSubscription(alias: string, path: string): void {
     const key = `${alias}\u0000${path}`
-    if (this._vocabDisposers.has(key))
+    if (this._vocabDisposers.has(key)) {
       return
+    }
 
     const dispose = Raph.watch([path, `${path}.*`], () => {
       this.emit('resource:dirty', { kind: 'vocab', alias, path })
@@ -827,8 +880,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     const dependencies = this.getRuntimeDependencies()
 
     for (const boundary of dependencies.boundaries) {
-      if (boundary.kind !== 'table')
+      if (boundary.kind !== 'table') {
         continue
+      }
 
       const tableNode = new RaphNode(Raph.app, {
         id: `${root.id}:table:${boundary.id}`,
@@ -857,8 +911,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
         payload: { meta: tableNode.meta ?? {} },
       })
 
-      for (const column of boundary.columns)
+      for (const column of boundary.columns) {
         this._createTableColumnBoundaryNode(tableNode, boundary, column)
+      }
     }
   }
 
@@ -900,21 +955,25 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   }
 
   private _bindRaphInputSource(input: Extract<RuntimeHostInputSource, { kind: 'raph' }>): void {
-    if (!this.node)
+    if (!this.node) {
       return
+    }
 
     const deps = this.getRuntimeDependencies()
     for (const dependency of deps.props) {
-      if (this._isCoveredByPatchableBoundary(dependency.prop, dependency.path))
+      if (this._isCoveredByPatchableBoundary(dependency.prop, dependency.path)) {
         continue
+      }
 
       const binding = input.bindings[dependency.prop]
-      if (!binding?.path)
+      if (!binding?.path) {
         continue
+      }
 
       const path = this._joinRaphPath(binding.path, dependency.path)
-      if (!path)
+      if (!path) {
         continue
+      }
 
       for (const observedPath of this._makeObservedRaphPaths(path, dependency.path)) {
         const dispose = Raph.app.observeData(this.node, observedPath, {
@@ -930,31 +989,38 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
 
   /** Context dependencies are Raph-backed and do not depend on the component props input kind. */
   private _bindRaphContextSources(): void {
-    if (!this.node)
+    if (!this.node) {
       return
+    }
 
     const dependencies = this.getRuntimeDependencies()
-    for (const dependency of dependencies.context)
+    for (const dependency of dependencies.context) {
       this._observeContextPath(this.node, dependency.path)
+    }
 
     for (const boundary of dependencies.boundaries) {
-      if (!boundary.contextReads.length)
+      if (!boundary.contextReads.length) {
         continue
+      }
       const boundaryNode = this._findRuntimeNodeByMeta('boundaryId', boundary.id)
-      if (!boundaryNode)
+      if (!boundaryNode) {
         continue
-      for (const path of boundary.contextReads)
+      }
+      for (const path of boundary.contextReads) {
         this._observeContextPath(boundaryNode, path)
+      }
     }
   }
 
   private _observeContextPath(node: RaphNode, path: string[]): void {
     // Configuration is immutable for one build and deliberately not published to Raph.
-    if (path[0] === 'config')
+    if (path[0] === 'config') {
       return
+    }
     const observedPath = this._joinRaphPath(ENDGE_CONTEXT_RAPH_PATH, path)
-    if (!observedPath)
+    if (!observedPath) {
       return
+    }
     for (const mask of [observedPath, `${observedPath}.*`]) {
       this._raphInputDisposers.push(Raph.app.observeData(node, mask, {
         phase: RUNTIME_BOUNDARY_UPDATE_PHASE_NAME,
@@ -969,12 +1035,14 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   ): void {
     for (const boundary of boundaries) {
       const binding = input.bindings[boundary.sourceProp]
-      if (!binding?.path)
+      if (!binding?.path) {
         continue
+      }
 
       const sourcePath = this._joinRaphPath(binding.path, boundary.sourcePath)
-      if (!sourcePath)
+      if (!sourcePath) {
         continue
+      }
 
       const tableNode = this._findRuntimeNodeByMeta('boundaryId', boundary.id)
       if (tableNode) {
@@ -990,8 +1058,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
 
       for (const column of boundary.columns) {
         const columnNode = this._findRuntimeNodeByMeta('boundaryId', column.id)
-        if (!columnNode)
+        if (!columnNode) {
           continue
+        }
 
         for (const observedPath of this._makeObservedColumnPaths(sourcePath, column)) {
           this._raphInputDisposers.push(Raph.app.observeData(columnNode, observedPath, {
@@ -1005,8 +1074,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
 
   private _isCoveredByPatchableBoundary(prop: string, path: string[]): boolean {
     return this.getRuntimeDependencies().boundaries.some((boundary) => {
-      if (boundary.sourceProp !== prop)
+      if (boundary.sourceProp !== prop) {
         return false
+      }
 
       return boundary.sourcePath.every((part, index) => path[index] === part)
     })
@@ -1014,16 +1084,18 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
 
   private _findRuntimeNodeByMeta(key: string, value: unknown): RaphNode | null {
     const resource = this.resources.find((item) => {
-      if (item.kind !== 'raph-node')
+      if (item.kind !== 'raph-node') {
         return false
+      }
 
       const meta = item.payload?.meta
       return isRecord(meta) && meta[key] === value
     })
 
     const nodeId = String(resource?.title ?? '').trim()
-    if (!nodeId)
+    if (!nodeId) {
       return null
+    }
 
     return Raph.app.getNode(nodeId) ?? null
   }
@@ -1037,10 +1109,12 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   }
 
   private _makeBoundaryPatch(ctx: RuntimeHostUpdateContext): RuntimeBoundaryPatch | null {
-    if (ctx.node.meta?.boundaryType === 'table-column')
+    if (ctx.node.meta?.boundaryType === 'table-column') {
       return this._makeTableColumnPatch(ctx)
-    if (ctx.node.meta?.boundaryType === 'table')
+    }
+    if (ctx.node.meta?.boundaryType === 'table') {
       return this._makeTableRowPatch(ctx)
+    }
 
     return null
   }
@@ -1048,34 +1122,38 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   private _makeTableRowPatch(ctx: RuntimeHostUpdateContext): RuntimeBoundaryPatch | null {
     const meta = ctx.node.meta ?? {}
     const sourcePath = this._resolveBoundarySourcePath(meta)
-    if (!sourcePath)
+    if (!sourcePath) {
       return null
+    }
 
     const rowKey = typeof meta.rowKey === 'string' ? meta.rowKey : null
     const boundaryId = String(meta.boundaryId ?? '')
     const boundary = this.getRuntimeDependencies().boundaries.find(item => item.id === boundaryId)
-    if (!boundary)
+    if (!boundary) {
       return null
+    }
 
     const affectedProjections = boundary.columns.map(column => ({
-        boundaryId: column.id,
-        key: column.key,
-        index: column.index,
-      }))
+      boundaryId: column.id,
+      key: column.key,
+      index: column.index,
+    }))
     return this._makeCollectionPatch(ctx, sourcePath, boundaryId, rowKey, affectedProjections)
   }
 
   private _makeTableColumnPatch(ctx: RuntimeHostUpdateContext): RuntimeBoundaryPatch | null {
     const meta = ctx.node.meta ?? {}
     const sourcePath = this._resolveBoundarySourcePath(meta)
-    if (!sourcePath)
+    if (!sourcePath) {
       return null
+    }
 
     const rowKey = typeof meta.rowKey === 'string' ? meta.rowKey : null
     const projection = this._makeColumnProjection(ctx.node)
     const boundaryId = String(meta.tableBoundaryId ?? '')
-    if (!boundaryId)
+    if (!boundaryId) {
       return null
+    }
     return this._makeCollectionPatch(ctx, sourcePath, boundaryId, rowKey, projection ? [projection] : [])
   }
 
@@ -1089,16 +1167,19 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   ): RuntimeBoundaryPatch | null {
     const sourceSegmentCount = DataPath.from(sourcePath).segments().length
     const collection = Raph.get(sourcePath)
-    if (!Array.isArray(collection))
+    if (!Array.isArray(collection)) {
       return null
+    }
 
     const groups = new Map<string, { events: typeof ctx.events, selectorKey: string | null, selectorValue: unknown }>()
     for (const event of ctx.events) {
-      if (!isCollectionEventPath(sourcePath, event.canonical))
+      if (!isCollectionEventPath(sourcePath, event.canonical)) {
         return null
+      }
       const selector = DataPath.from(event.canonical).segments()[sourceSegmentCount]
-      if (selector?.index == null && !selector?.pkey)
+      if (selector?.index == null && !selector?.pkey) {
         return null
+      }
       const selectorKey = selector.pkey ?? null
       const selectorValue = selectorKey ? selector.pval : selector.index
       const groupKey = selectorKey
@@ -1129,8 +1210,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
           .filter((path): path is string[] => Array.isArray(path)),
       }
     })
-    if (items.length === 0)
+    if (items.length === 0) {
       return null
+    }
     if (items.length === 1) {
       return {
         kind: 'collection-projection-update',
@@ -1156,13 +1238,15 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   }
 
   private _resolveBoundarySourcePath(meta: Record<string, unknown>): string {
-    if (this._inputSource?.kind !== 'raph')
+    if (this._inputSource?.kind !== 'raph') {
       return ''
+    }
 
     const sourceProp = String(meta.sourceProp ?? '').trim()
     const binding = this._inputSource.bindings[sourceProp]
-    if (!binding?.path)
+    if (!binding?.path) {
       return ''
+    }
 
     const sourcePath = Array.isArray(meta.sourcePath)
       ? meta.sourcePath.map(part => String(part))
@@ -1175,16 +1259,19 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     const sourceSegmentCount = DataPath.from(sourcePath).segments().length
     const segments = DataPath.from(canonical).segments()
     const selector = segments[sourceSegmentCount]
-    if (selector?.index == null && !selector?.pkey)
+    if (selector?.index == null && !selector?.pkey) {
       return null
+    }
 
     return segments
       .slice(sourceSegmentCount + 1)
       .map((segment) => {
-        if (segment.key != null)
+        if (segment.key != null) {
           return segment.key
-        if (segment.index != null)
+        }
+        if (segment.index != null) {
           return String(segment.index)
+        }
         return ''
       })
       .filter(Boolean)
@@ -1193,8 +1280,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   private _makeColumnProjection(node: RaphNode): RuntimeCollectionProjectionPatch | null {
     const key = String(node.meta?.columnKey ?? '').trim()
     const index = Number(node.meta?.columnIndex)
-    if (!key || !Number.isFinite(index))
+    if (!key || !Number.isFinite(index)) {
       return null
+    }
 
     return {
       boundaryId: String(node.meta?.boundaryId ?? ''),
@@ -1204,15 +1292,17 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   }
 
   private _makeObservedRaphPaths(path: string, dependencyPath: string[]): string[] {
-    if (dependencyPath.length > 0)
+    if (dependencyPath.length > 0) {
       return [path]
+    }
 
     return [path, `${path}.*`]
   }
 
   private _clearRaphInputSubscriptions(): void {
-    for (const dispose of this._raphInputDisposers)
+    for (const dispose of this._raphInputDisposers) {
       dispose()
+    }
     this._raphInputDisposers = []
   }
 
@@ -1223,10 +1313,12 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
       .filter(Boolean)
       .join('.')
 
-    if (!base)
+    if (!base) {
       return child
-    if (!child)
+    }
+    if (!child) {
       return base
+    }
 
     return `${base}.${child}`
   }
@@ -1250,7 +1342,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function cloneEditValue<T>(value: T): T {
-  if (value == null || typeof value !== 'object') return value
-  if (typeof structuredClone === 'function') return structuredClone(value)
+  if (value == null || typeof value !== 'object') {
+    return value
+  }
+  if (typeof structuredClone === 'function') {
+    return structuredClone(value)
+  }
   return JSON.parse(JSON.stringify(value)) as T
 }

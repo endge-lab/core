@@ -10,10 +10,10 @@ import type {
   ComponentSFCTagAttributeContract,
   ComponentSFCTagAttributeLiteral,
 } from '@/domain/types/component/sfc/tag-attribute-contract.types'
+import { parse } from '@babel/parser'
 import {
   getComponentSFCTagAttributeContracts,
 } from '@/domain/types/component/sfc/tag-attribute-contract.types'
-import { parse } from '@babel/parser'
 
 /** Проверяет статические значения конечных SFC-атрибутов по renderer-neutral контрактам. */
 export function validateComponentSFCAttributeValues(
@@ -36,10 +36,14 @@ export function resolveComponentSFCTagAttributeContracts(
   const result: ComponentSFCTagAttributeContract[] = [...getComponentSFCTagAttributeContracts(tag)]
   const names = new Set(result.flatMap(contract => [contract.name, ...(contract.aliases ?? [])]))
   for (const contract of options.resolveTagAttributeContracts?.(tag) ?? []) {
-    if (names.has(contract.name)) continue
+    if (names.has(contract.name)) {
+      continue
+    }
     result.push(contract)
     names.add(contract.name)
-    for (const alias of contract.aliases ?? []) names.add(alias)
+    for (const alias of contract.aliases ?? []) {
+      names.add(alias)
+    }
   }
   return result
 }
@@ -50,7 +54,9 @@ export function createComponentSFCAttributeContractsFromInputs(
 ): ComponentSFCTagAttributeContract[] {
   return inputs.flatMap((input): ComponentSFCTagAttributeContract[] => {
     const values = extractLiteralUnionValues(input.type)
-    if (values.length === 0) return []
+    if (values.length === 0) {
+      return []
+    }
     return [{
       name: input.name,
       values,
@@ -65,9 +71,13 @@ function visitNode(
   options: ComponentSFCAttributeAnalysisOptions,
   diagnostics: RComponentDiagnostic[],
 ): void {
-  if (node.kind !== 'element') return
+  if (node.kind !== 'element') {
+    return
+  }
   validateElement(node, source, options, diagnostics)
-  for (const child of node.children) visitNode(child, source, options, diagnostics)
+  for (const child of node.children) {
+    visitNode(child, source, options, diagnostics)
+  }
 }
 
 function validateElement(
@@ -81,10 +91,14 @@ function validateElement(
     const contract = contracts.find(item => (
       item.name === attribute.name || item.aliases?.includes(attribute.name)
     ))
-    if (!contract || contract.validate === false) continue
+    if (!contract || contract.validate === false) {
+      continue
+    }
 
     const value = readStaticAttributeValue(attribute)
-    if (!value.known || contract.values.some(candidate => Object.is(candidate, value.value))) continue
+    if (!value.known || contract.values.some(candidate => Object.is(candidate, value.value))) {
+      continue
+    }
 
     const range = attributeValueRange(source, attribute)
     diagnostics.push({
@@ -108,13 +122,17 @@ function readStaticAttributeValue(
   }
 
   const source = attribute.value?.trim()
-  if (!source) return { known: false }
+  if (!source) {
+    return { known: false }
+  }
   try {
     const expression = parse(`const __value = (${source})`, {
       sourceType: 'module',
       plugins: ['typescript'],
     }).program.body[0]
-    if (expression?.type !== 'VariableDeclaration') return { known: false }
+    if (expression?.type !== 'VariableDeclaration') {
+      return { known: false }
+    }
     const initializer = expression.declarations[0]?.init
     if (initializer?.type === 'StringLiteral' || initializer?.type === 'NumericLiteral' || initializer?.type === 'BooleanLiteral') {
       return { known: true, value: initializer.value }
@@ -136,7 +154,9 @@ function attributeValueRange(
   const raw = source.slice(attribute.range.start, attribute.range.end)
   const value = attribute.value ?? ''
   const valueOffset = value ? raw.lastIndexOf(value) : -1
-  if (valueOffset < 0) return attribute.range
+  if (valueOffset < 0) {
+    return attribute.range
+  }
   return {
     start: attribute.range.start + valueOffset,
     end: attribute.range.start + valueOffset + Math.max(1, value.length),
@@ -150,15 +170,21 @@ function extractLiteralUnionValues(typeSource: string): ComponentSFCTagAttribute
       plugins: ['typescript'],
     }).program
     const alias = program.body[0]
-    if (alias?.type !== 'TSTypeAliasDeclaration') return []
+    if (alias?.type !== 'TSTypeAliasDeclaration') {
+      return []
+    }
     const nodes = alias.typeAnnotation.type === 'TSUnionType'
       ? alias.typeAnnotation.types
       : [alias.typeAnnotation]
     const values: ComponentSFCTagAttributeLiteral[] = []
     for (const node of nodes) {
-      if (node.type !== 'TSLiteralType') return []
+      if (node.type !== 'TSLiteralType') {
+        return []
+      }
       const literal = node.literal
-      if (literal.type !== 'StringLiteral' && literal.type !== 'NumericLiteral' && literal.type !== 'BooleanLiteral') return []
+      if (literal.type !== 'StringLiteral' && literal.type !== 'NumericLiteral' && literal.type !== 'BooleanLiteral') {
+        return []
+      }
       values.push(literal.value)
     }
     return values

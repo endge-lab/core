@@ -20,10 +20,12 @@ export class ActionTargetError extends Error {
 
 /** Normalizes and validates an authoring target contract. */
 export function normalizeActionTargets(value: unknown): ActionTargetSelector[] | null {
-  if (value == null)
+  if (value == null) {
     return null
-  if (!Array.isArray(value) || value.length === 0)
+  }
+  if (!Array.isArray(value) || value.length === 0) {
     throw new ActionTargetError('action-target-type-mismatch', 'Action target must be a non-empty array or null.')
+  }
 
   const seen = new Set<string>()
   return value.map((raw, index) => {
@@ -32,11 +34,13 @@ export function normalizeActionTargets(value: unknown): ActionTargetSelector[] |
       : {}
     const type = String(selector.type ?? '').trim()
     const identity = String(selector.identity ?? '').trim() || undefined
-    if (!type)
+    if (!type) {
       throw new ActionTargetError('action-target-type-mismatch', `Action target type is required at index ${index}.`)
+    }
     const key = `${type}\u0000${identity ?? ''}`
-    if (seen.has(key))
+    if (seen.has(key)) {
       throw new ActionTargetError('action-target-type-mismatch', `Duplicate Action target selector: ${type}${identity ? `:${identity}` : ''}.`)
+    }
     seen.add(key)
     return identity ? { type, identity } : { type }
   })
@@ -47,10 +51,12 @@ export function validateActionTarget(
   selectors: readonly ActionTargetSelector[] | null,
   target: ActionExecutionTarget | undefined,
 ): void {
-  if (selectors == null)
+  if (selectors == null) {
     return
-  if (!target)
+  }
+  if (!target) {
     throw new ActionTargetError('action-target-required', 'Action requires a runtime target.')
+  }
 
   const sameType = selectors.filter(selector => selector.type === target.type)
   if (sameType.length === 0) {

@@ -1,5 +1,5 @@
-import type { VocabSourceDocument, VocabSourcePatch } from '@/domain/types/source/vocab-source.types'
 import type { SourcePatchResult } from '@/domain/types/source/source-engine.types'
+import type { VocabSourceDocument, VocabSourcePatch } from '@/domain/types/source/vocab-source.types'
 
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
@@ -16,8 +16,9 @@ export function patchVocabSource(source: string, patch: VocabSourcePatch): Sourc
   try {
     const ast = parseTS(source, { sourceType: 'module', plugins: ['typescript'] })
     const definition = findDefinition(ast)
-    if (!definition || definition.end == null)
+    if (!definition || definition.end == null) {
       return failed(source, 'Vocab source должен содержать defineVocab({...}).')
+    }
 
     const property = definition.properties.find(item => t.isObjectProperty(item) && !item.computed && propertyName(item.key) === 'mock')
     const expression = patch.mock ? printMock(patch.mock.identity, patch.mock.path) : null
@@ -25,12 +26,16 @@ export function patchVocabSource(source: string, patch: VocabSourcePatch): Sourc
     if (property && t.isObjectProperty(property) && property.start != null && property.end != null) {
       const start = property.start
       let end = property.end
-      while (end < source.length && /[ \t]/.test(source[end] ?? '')) end += 1
-      if (source[end] === ',') end += 1
-      if (expression)
+      while (end < source.length && /[ \t]/.test(source[end] ?? '')) {
+        end += 1
+      }
+      if (source[end] === ',') {
+        end += 1
+      }
+      if (expression) {
         nextSource = replace(source, property.value.start ?? start, property.value.end ?? end, expression)
-      else
-        nextSource = replace(source, start, end, '')
+      }
+      else { nextSource = replace(source, start, end, '') }
     }
     else if (expression) {
       const close = definition.end - 1
@@ -48,9 +53,13 @@ export function patchVocabSource(source: string, patch: VocabSourcePatch): Sourc
 
 function findDefinition(ast: t.File): t.ObjectExpression | null {
   for (const statement of ast.program.body) {
-    if (!t.isExpressionStatement(statement)) continue
+    if (!t.isExpressionStatement(statement)) {
+      continue
+    }
     const expression = unwrap(statement.expression)
-    if (!t.isCallExpression(expression) || !t.isIdentifier(expression.callee, { name: 'defineVocab' })) continue
+    if (!t.isCallExpression(expression) || !t.isIdentifier(expression.callee, { name: 'defineVocab' })) {
+      continue
+    }
     const argument = expression.arguments[0]
     return argument && t.isExpression(argument) && t.isObjectExpression(unwrap(argument)) ? unwrap(argument) as t.ObjectExpression : null
   }
@@ -69,19 +78,25 @@ function objectIndent(source: string, node: t.ObjectExpression): string {
 }
 
 function propertyName(node: t.Node): string | null {
-  if (t.isIdentifier(node)) return node.name
-  if (t.isStringLiteral(node)) return node.value
+  if (t.isIdentifier(node)) {
+    return node.name
+  }
+  if (t.isStringLiteral(node)) {
+    return node.value
+  }
   return null
 }
 
 function unwrap<T extends t.Expression>(node: T): t.Expression {
   let value: t.Expression = node
-  while (t.isTSAsExpression(value) || t.isTSTypeAssertion(value) || t.isTSNonNullExpression(value) || t.isParenthesizedExpression(value)) value = value.expression
+  while (t.isTSAsExpression(value) || t.isTSTypeAssertion(value) || t.isTSNonNullExpression(value) || t.isParenthesizedExpression(value)) {
+    value = value.expression
+  }
   return value
 }
 
 function quote(value: string): string {
-  return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
+  return `'${value.replace(/\\/g, '\\\\').replace(/'/g, '\\\'')}'`
 }
 
 function replace(source: string, start: number, end: number, value: string): string {

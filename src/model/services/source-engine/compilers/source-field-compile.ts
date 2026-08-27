@@ -1,7 +1,7 @@
 import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
 import type {
-  SourceFieldDefinition,
   SourceFieldDefaultSource,
+  SourceFieldDefinition,
   SourceFieldOption,
   SourceFieldType,
 } from '@/domain/types/source/source-expression.types'
@@ -43,8 +43,9 @@ export function compileSourceField(
 
   while (t.isCallExpression(current) && t.isMemberExpression(current.callee)) {
     const name = propertyName(current.callee.property)
-    if (!name || !t.isExpression(current.callee.object))
+    if (!name || !t.isExpression(current.callee.object)) {
       break
+    }
     modifiers.unshift({ name, call: current })
     current = unwrapExpression(current.callee.object)
   }
@@ -66,8 +67,9 @@ export function compileSourceField(
   const typeExpression = hasInlineType && inlineTypeNode
     ? compileTypeSourceExpression(inlineTypeNode, diagnostics, `${sourcePath}.type`)
     : null
-  if (hasInlineType && !typeExpression)
+  if (hasInlineType && !typeExpression) {
     return null
+  }
 
   const rawType = typeArgument && t.isIdentifier(typeArgument)
     ? typeArgument.name
@@ -97,10 +99,10 @@ export function compileSourceField(
     }
     if (modifier.name === 'default') {
       const argument = modifier.call.arguments[0]
-      if (argument && t.isExpression(argument))
+      if (argument && t.isExpression(argument)) {
         field.defaultValue = compileSourceExpression(argument, diagnostics, `${sourcePath}.default`) ?? undefined
-      else
-        diagnostics.push(diagnostic('error', 'source-field-default', '.default(...) требует expression.', `${sourcePath}.default`, modifier.call))
+      }
+      else { diagnostics.push(diagnostic('error', 'source-field-default', '.default(...) требует expression.', `${sourcePath}.default`, modifier.call)) }
       continue
     }
     if (modifier.name === 'options') {
@@ -226,12 +228,14 @@ function readDefaultSource(
 
   if (base.callee.name === 'filter') {
     const identity = readStringArgument(base, 0)
-    if (identity)
+    if (identity) {
       return { kind: 'filter', identity, output }
+    }
   }
 
-  if (base.callee.name === 'defineFilter' && typeof base.start === 'number' && typeof base.end === 'number')
+  if (base.callee.name === 'defineFilter' && typeof base.start === 'number' && typeof base.end === 'number') {
     return { kind: 'inline-filter', source: source.slice(base.start, base.end), output }
+  }
 
   diagnostics.push(diagnostic('error', 'source-field-from-unsupported', '.from(...) поддерживает только Filter output reference.', sourcePath, expression))
   return null
@@ -244,12 +248,14 @@ function validateLiteralDefault(
   node: t.Node,
 ): void {
   const expression = field.defaultValue
-  if (!expression || !isStaticExpression(expression))
+  if (!expression || !isStaticExpression(expression)) {
     return
+  }
 
   const value = staticExpressionValue(expression)
-  if (value == null)
+  if (value == null) {
     return
+  }
   const valid = field.array
     ? Array.isArray(value) && value.every(item => isScalarValue(field.type, item))
     : field.type === 'String' || field.type === 'Date' || field.type === 'Time' || field.type === 'DateTime'
@@ -260,41 +266,53 @@ function validateLiteralDefault(
           ? typeof value === 'boolean'
           : typeof value === 'object'
 
-  if (!valid)
+  if (!valid) {
     diagnostics.push(diagnostic('error', 'source-field-default-type', `Default поля "${field.key}" не соответствует типу ${field.type}${field.array ? '[]' : ''}.`, `${sourcePath}.default`, node))
+  }
 }
 
 function isStaticExpression(expression: import('@/domain/types/source/source-expression.types').SourceExpressionIR): boolean {
-  if (expression.type === 'literal')
+  if (expression.type === 'literal') {
     return true
-  if (expression.type === 'array')
+  }
+  if (expression.type === 'array') {
     return expression.items.every(isStaticExpression)
-  if (expression.type === 'object')
+  }
+  if (expression.type === 'object') {
     return Object.values(expression.properties).every(isStaticExpression)
+  }
   return false
 }
 
 function staticExpressionValue(expression: import('@/domain/types/source/source-expression.types').SourceExpressionIR): unknown {
-  if (expression.type === 'literal')
+  if (expression.type === 'literal') {
     return expression.value
-  if (expression.type === 'array')
+  }
+  if (expression.type === 'array') {
     return expression.items.map(staticExpressionValue)
-  if (expression.type === 'object')
+  }
+  if (expression.type === 'object') {
     return Object.fromEntries(Object.entries(expression.properties).map(([key, value]) => [key, staticExpressionValue(value)]))
+  }
   return undefined
 }
 
 function isScalarValue(type: SourceFieldType, value: unknown): boolean {
-  if (value == null)
+  if (value == null) {
     return false
-  if (type === 'String' || type === 'Date' || type === 'Time' || type === 'DateTime')
+  }
+  if (type === 'String' || type === 'Date' || type === 'Time' || type === 'DateTime') {
     return typeof value === 'string'
-  if (type === 'Number')
+  }
+  if (type === 'Number') {
     return typeof value === 'number'
-  if (type === 'Boolean')
+  }
+  if (type === 'Boolean') {
     return typeof value === 'boolean'
-  if (type === 'Object')
+  }
+  if (type === 'Object') {
     return typeof value === 'object' && !Array.isArray(value)
+  }
   // Custom types and Any require Type Registry structural validation, which is
   // intentionally diagnostic-only during the migration.
   return true
@@ -302,8 +320,9 @@ function isScalarValue(type: SourceFieldType, value: unknown): boolean {
 
 function readProperty(node: t.ObjectExpression, name: string): t.Expression | null {
   for (const property of node.properties) {
-    if (t.isObjectProperty(property) && !property.computed && propertyName(property.key) === name && t.isExpression(property.value))
+    if (t.isObjectProperty(property) && !property.computed && propertyName(property.key) === name && t.isExpression(property.value)) {
       return unwrapExpression(property.value)
+    }
   }
   return null
 }
@@ -314,11 +333,14 @@ function stringProperty(node: t.ObjectExpression, name: string): string | null {
 }
 
 function primitiveLiteral(node: t.Expression | null): string | number | boolean | null {
-  if (!node)
+  if (!node) {
     return null
-  if (t.isStringLiteral(node) || t.isNumericLiteral(node) || t.isBooleanLiteral(node))
+  }
+  if (t.isStringLiteral(node) || t.isNumericLiteral(node) || t.isBooleanLiteral(node)) {
     return node.value
-  if (t.isNullLiteral(node))
+  }
+  if (t.isNullLiteral(node)) {
     return null
+  }
   return null
 }

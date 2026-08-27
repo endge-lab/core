@@ -1,5 +1,4 @@
 import type { RComponentDependencies, RComponentDiagnostic } from '@/domain/types/component/component-core.types'
-import { createEmptyComponentDependencies } from '@/domain/types/component/component-core.types'
 import type {
   RComponentSFC_AST_Attribute,
   RComponentSFC_AST_Directive,
@@ -10,36 +9,38 @@ import type {
   RComponentSFC_AST_TextNode,
 } from '@/domain/types/component/sfc/ast.types'
 import type {
+  ComponentSFCVariant,
   RComponentSFC_IR_Directives,
+  RComponentSFC_IR_ElementNode,
   RComponentSFC_IR_EventBinding,
   RComponentSFC_IR_EventModifier,
   RComponentSFC_IR_InteractionGroup,
-  RComponentSFC_IR_ElementNode,
   RComponentSFC_IR_Node,
   RComponentSFC_IR_Tag,
   RComponentSFC_IR_Template,
   RComponentSFC_IR_Value,
-  ComponentSFCVariant,
 } from '@/domain/types/component/sfc/ir.types'
 import type {
   ComponentSFCComponentPort,
-  ComponentSFCRequiredPortBinding,
-  ComponentSFCPortProviderDescriptor,
-  ComponentSFCRequiredPortKind,
   ComponentSFCPortManifest,
+  ComponentSFCPortProviderDescriptor,
+  ComponentSFCRequiredPortBinding,
+  ComponentSFCRequiredPortKind,
 } from '@/domain/types/component/sfc/ports.types'
-import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
-import type { ProgramNodeMetadata } from '@/domain/types/program/program-metadata.types'
 import type { EndgeSFCEditingConfiguration } from '@/domain/types/configuration/configuration.type'
+import type { ProgramNodeMetadata } from '@/domain/types/program/program-metadata.types'
+import { parseExpression } from '@babel/parser'
+import { createEmptyComponentDependencies } from '@/domain/types/component/component-core.types'
+import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
 import { DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION } from '@/model/config/sfc-editing.config'
+import { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sfc/component-sfc-built-in-tags'
 import { compileComponentSFCExpression } from '@/model/services/compiler/component-sfc/component-sfc-expression'
+import { createBuiltInComponentPortManifest } from '@/model/services/compiler/component-sfc/component-sfc-forward'
 import {
   compileComponentSFCInteractionAnnotation,
   hasComponentSFCPassivePreventConflict,
 } from '@/model/services/compiler/component-sfc/component-sfc-interactions'
 import { compileComponentSFCLocalEventActions } from '@/model/services/compiler/component-sfc/component-sfc-ports'
-import { createBuiltInComponentPortManifest } from '@/model/services/compiler/component-sfc/component-sfc-forward'
-import { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sfc/component-sfc-built-in-tags'
 import { normalizeComponentSFCTableColumnPin } from '@/model/services/compiler/component-sfc/component-sfc-table-pin'
 import { normalizeComponentSFCTableSort } from '@/model/services/compiler/component-sfc/component-sfc-table-sort'
 import { normalizeComponentSFCTableColumnVisibility } from '@/model/services/compiler/component-sfc/component-sfc-table-visibility'
@@ -154,18 +155,21 @@ function compileTemplateNode(
   metadata: ProgramNodeMetadata[],
   diagnostics: RComponentDiagnostic[],
 ): RComponentSFC_IR_Node | null {
-  if (node.kind === 'text')
+  if (node.kind === 'text') {
     return compileTextNode(node, id)
+  }
 
-  if (node.kind === 'interpolation')
+  if (node.kind === 'interpolation') {
     return compileInterpolationNode(node, id, context, diagnostics)
+  }
 
   return compileElementNode(node, id, context, dependencies, metadata, diagnostics)
 }
 
 function compileTextNode(node: RComponentSFC_AST_TextNode, id: string): RComponentSFC_IR_Node | null {
-  if (!node.content.trim())
+  if (!node.content.trim()) {
     return null
+  }
 
   return {
     id,
@@ -269,8 +273,9 @@ function compileElementNode(
     props.is = { kind: 'literal', value: directComponentIdentity }
   }
 
-  if (tag === 'Component' && !localComponentPort)
+  if (tag === 'Component' && !localComponentPort) {
     validateComponentCall(props.is, context, dependencies, diagnostics, node)
+  }
 
   const element: RComponentSFC_IR_ElementNode = {
     id,
@@ -348,7 +353,9 @@ function compileRequiredPortBindings(
   dependencies: RComponentDependencies,
   diagnostics: RComponentDiagnostic[],
 ): ComponentSFCRequiredPortBinding[] {
-  if (!manifest) return []
+  if (!manifest) {
+    return []
+  }
   const ports = [
     ...manifest.require.computations,
     ...manifest.require.components,
@@ -362,7 +369,9 @@ function compileRequiredPortBindings(
   for (const attribute of node.attributes) {
     const portName = normalizePublicBindingName(attribute.name)
     const port = byName.get(portName)
-    if (!port) continue
+    if (!port) {
+      continue
+    }
     if (seen.has(portName)) {
       diagnostics.push({
         severity: 'error',
@@ -377,7 +386,9 @@ function compileRequiredPortBindings(
     seen.add(portName)
 
     const binding = parseRequiredPortBinding(attribute, port.kind, diagnostics)
-    if (!binding) continue
+    if (!binding) {
+      continue
+    }
     const provider = context.resolvePortProvider?.(binding.identity, binding.kind)
     if (context.resolvePortProvider && !provider) {
       diagnostics.push({
@@ -485,18 +496,26 @@ function appendRequiredPortBindingDependency(
   binding: Omit<ComponentSFCRequiredPortBinding, 'port'>,
   dependencies: RComponentDependencies,
 ): void {
-  if (binding.kind === 'query') dependencies.queries.push(binding.identity)
-  else if (binding.kind === 'action') dependencies.actions.push(binding.identity)
-  else if (binding.kind === 'component') dependencies.components.push({
-    source: 'component-sfc',
-    id: binding.identity,
-    role: 'port-override-component',
-  })
-  else dependencies.computations.push({
-    source: 'computation',
-    id: binding.identity,
-    role: 'port-override-computation',
-  })
+  if (binding.kind === 'query') {
+    dependencies.queries.push(binding.identity)
+  }
+  else if (binding.kind === 'action') {
+    dependencies.actions.push(binding.identity)
+  }
+  else if (binding.kind === 'component') {
+    dependencies.components.push({
+      source: 'component-sfc',
+      id: binding.identity,
+      role: 'port-override-component',
+    })
+  }
+  else {
+    dependencies.computations.push({
+      source: 'computation',
+      id: binding.identity,
+      role: 'port-override-computation',
+    })
+  }
 }
 
 function normalizePublicBindingName(value: string): string {
@@ -528,7 +547,9 @@ function validateTooltipTree(
     parent: RComponentSFC_IR_ElementNode | null,
     insideTooltipContent: boolean,
   ): void => {
-    if (node.kind !== 'element') return
+    if (node.kind !== 'element') {
+      return
+    }
 
     if ((node.tag === 'TooltipTrigger' || node.tag === 'TooltipContent') && parent?.tag !== 'Tooltip') {
       diagnostics.push({
@@ -566,8 +587,8 @@ function validateTooltipNode(
   node: RComponentSFC_IR_ElementNode,
   diagnostics: RComponentDiagnostic[],
 ): void {
-  const hasText = Object.prototype.hasOwnProperty.call(node.props, 'text')
-  const hasMarkdown = Object.prototype.hasOwnProperty.call(node.props, 'markdown')
+  const hasText = Object.hasOwn(node.props, 'text')
+  const hasMarkdown = Object.hasOwn(node.props, 'markdown')
   const triggerNodes = node.children.filter((child): child is RComponentSFC_IR_ElementNode => (
     child.kind === 'element' && child.tag === 'TooltipTrigger'
   ))
@@ -596,8 +617,9 @@ function validateTooltipNode(
   }
 
   if (hasText || hasMarkdown) {
-    if (node.children.length === 0)
+    if (node.children.length === 0) {
       report('sfc-tooltip-trigger-required', 'Tooltip text/markdown требует trigger-содержимое.')
+    }
     return
   }
 
@@ -607,10 +629,12 @@ function validateTooltipNode(
       'Rich Tooltip требует ровно один TooltipTrigger и один TooltipContent без соседних узлов.',
     )
   }
-  if (triggerNodes[0]?.children.length === 0)
+  if (triggerNodes[0]?.children.length === 0) {
     report('sfc-tooltip-trigger-required', 'TooltipTrigger не может быть пустым.')
-  if (contentNodes[0]?.children.length === 0)
+  }
+  if (contentNodes[0]?.children.length === 0) {
     report('sfc-tooltip-content-required', 'TooltipContent не может быть пустым.')
+  }
 }
 
 function compileEditableBehavior(
@@ -622,7 +646,9 @@ function compileEditableBehavior(
 ) {
   const editableAttribute = node.attributes.find(attribute => attribute.name === 'editable')
   const enabled = tag === 'Editable' || Boolean(editableAttribute)
-  if (!enabled) return undefined
+  if (!enabled) {
+    return undefined
+  }
 
   if (editableAttribute?.dynamic || (editableAttribute?.value != null && editableAttribute.value !== '')) {
     diagnostics.push({
@@ -693,7 +719,9 @@ function compileEditableBehavior(
         end: triggerAttribute.range.end,
       })
     }
-    else triggers = { kind: 'literal', value: event }
+    else {
+      triggers = { kind: 'literal', value: event }
+    }
   }
 
   const triggerModifiers: RComponentSFC_IR_EventModifier[] = []
@@ -788,7 +816,9 @@ function compileEditableOutcomeTriggers(
         end: attribute.range.end,
       })
     }
-    else triggers = { kind: 'literal', value: event }
+    else {
+      triggers = { kind: 'literal', value: event }
+    }
   }
 
   const modifiers: RComponentSFC_IR_EventModifier[] = []
@@ -845,10 +875,13 @@ function validateNestedVariants(
   diagnostics: RComponentDiagnostic[],
   sourcePath: string,
 ): void {
-  if (node.tag === 'Editable')
+  if (node.tag === 'Editable') {
     validateVariantContainer(node.children, diagnostics, sourcePath, true)
+  }
   for (const child of node.children) {
-    if (child.kind === 'element') validateNestedVariants(child, diagnostics, `${sourcePath}.${child.id}`)
+    if (child.kind === 'element') {
+      validateNestedVariants(child, diagnostics, `${sourcePath}.${child.id}`)
+    }
   }
 }
 
@@ -860,20 +893,24 @@ function validateVariantContainer(
 ): ComponentSFCVariant[] {
   const variantNodes = nodes.filter((node): node is RComponentSFC_IR_ElementNode => node.kind === 'element' && node.tag === 'Variant')
   if (!variantNodes.length) {
-    if (requireEdit) diagnostics.push({
-      severity: 'error',
-      code: 'sfc-editable-variants-required',
-      message: 'Editable требует Variant name="default" и Variant name="edit".',
-      sourcePath,
-    })
+    if (requireEdit) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'sfc-editable-variants-required',
+        message: 'Editable требует Variant name="default" и Variant name="edit".',
+        sourcePath,
+      })
+    }
     return []
   }
-  if (variantNodes.length !== nodes.length) diagnostics.push({
-    severity: 'error',
-    code: 'sfc-variant-roots-only',
-    message: 'При явных Variant все соседние корневые узлы контейнера должны быть Variant.',
-    sourcePath,
-  })
+  if (variantNodes.length !== nodes.length) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-variant-roots-only',
+      message: 'При явных Variant все соседние корневые узлы контейнера должны быть Variant.',
+      sourcePath,
+    })
+  }
   const result: ComponentSFCVariant[] = []
   const names = new Set<string>()
   for (const variant of variantNodes) {
@@ -892,29 +929,45 @@ function validateVariantContainer(
     names.add(name)
     result.push({ name, nodeId: variant.id })
   }
-  if (!names.has('default')) diagnostics.push({ severity: 'error', code: 'sfc-variant-default-required', message: 'Явные Variant требуют ровно один name="default".', sourcePath })
-  if (requireEdit && !names.has('edit')) diagnostics.push({ severity: 'error', code: 'sfc-variant-edit-required', message: 'Editable требует Variant name="edit".', sourcePath })
+  if (!names.has('default')) {
+    diagnostics.push({ severity: 'error', code: 'sfc-variant-default-required', message: 'Явные Variant требуют ровно один name="default".', sourcePath })
+  }
+  if (requireEdit && !names.has('edit')) {
+    diagnostics.push({ severity: 'error', code: 'sfc-variant-edit-required', message: 'Editable требует Variant name="edit".', sourcePath })
+  }
   return result
 }
 
 function collectTemplateEmittedEvents(nodes: RComponentSFC_IR_Node[]): string[] {
   const result = new Set<string>()
   const visit = (node: RComponentSFC_IR_Node): void => {
-    if (node.kind !== 'element') return
-    if (node.editable) result.add('edited')
+    if (node.kind !== 'element') {
+      return
+    }
+    if (node.editable) {
+      result.add('edited')
+    }
     for (const binding of node.events ?? []) {
-      if (binding.action.kind === 'emit') result.add(binding.action.event)
+      if (binding.action.kind === 'emit') {
+        result.add(binding.action.event)
+      }
       for (const action of binding.actions ?? []) {
-        if (action.kind === 'emit') result.add(action.event)
+        if (action.kind === 'emit') {
+          result.add(action.event)
+        }
       }
     }
     for (const group of node.interactions ?? []) {
       for (const reaction of group.triggerSet?.reactions ?? []) {
-        if (reaction.kind === 'emit') result.add(reaction.event)
+        if (reaction.kind === 'emit') {
+          result.add(reaction.event)
+        }
       }
       for (const rule of group.rules) {
         for (const reaction of rule.reactions) {
-          if (reaction.kind === 'emit') result.add(reaction.event)
+          if (reaction.kind === 'emit') {
+            result.add(reaction.event)
+          }
         }
       }
     }
@@ -940,7 +993,12 @@ function compileInteractionBindings(
 }
 
 const LOCAL_EVENT_MODIFIERS = new Set<RComponentSFC_IR_EventModifier>([
-  'stop', 'prevent', 'self', 'once', 'capture', 'passive',
+  'stop',
+  'prevent',
+  'self',
+  'once',
+  'capture',
+  'passive',
 ])
 
 function compileEventBindings(
@@ -998,18 +1056,22 @@ function compileEventBindings(
     }
     const expression = directive.expression?.trim() ?? ''
     if (invalid || !expression) {
-      if (!expression) diagnostics.push({
-        severity: 'error',
-        code: 'sfc-template-event-action-missing',
-        message: `@${name} требует локальную reaction.`,
-        sourcePath: `template.on.${name}`,
-        start: directive.range.start,
-        end: directive.range.end,
-      })
+      if (!expression) {
+        diagnostics.push({
+          severity: 'error',
+          code: 'sfc-template-event-action-missing',
+          message: `@${name} требует локальную reaction.`,
+          sourcePath: `template.on.${name}`,
+          start: directive.range.start,
+          end: directive.range.end,
+        })
+      }
       continue
     }
     const actions = compileComponentSFCLocalEventActions(name, expression, directive.range.start, dependencies, diagnostics, ownerPorts)
-    if (!actions.length) continue
+    if (!actions.length) {
+      continue
+    }
     result.push({
       name,
       modifiers,
@@ -1027,11 +1089,13 @@ function validateSemanticStyleAttributes(
   sourcePath: string,
 ): void {
   const part = attributes.find(attribute => attribute.name === 'part')
-  if (!part) return
+  if (!part) {
+    return
+  }
   const valid = !part.dynamic
     && typeof part.value === 'string'
     && part.value.trim().length > 0
-    && part.value.trim().split(/\s+/).every(token => /^[a-zA-Z][\w-]*$/.test(token))
+    && part.value.trim().split(/\s+/).every(token => /^[a-z][\w-]*$/i.test(token))
   if (!valid) {
     diagnostics.push({
       severity: 'error',
@@ -1063,7 +1127,9 @@ function validateComponentCall(
     return
   }
 
-  if (value.kind !== 'literal') return
+  if (value.kind !== 'literal') {
+    return
+  }
   const identity = typeof value.value === 'string' ? value.value.trim() : ''
   if (!identity) {
     diagnostics.push({
@@ -1097,8 +1163,9 @@ function compileNodeMetadata(
   sourcePath: string,
 ) {
   const declarations = attributes.filter(attribute => attribute.name === 'metadata')
-  if (declarations.length === 0)
+  if (declarations.length === 0) {
     return {}
+  }
 
   if (declarations.length > 1) {
     diagnostics.push({
@@ -1169,14 +1236,18 @@ function compileDirectives(
     }
 
     const value = compileDirectiveExpression(directive, context, diagnostics)
-    if (directive.name === 'if')
+    if (directive.name === 'if') {
       result.if = value
-    if (directive.name === 'else-if')
+    }
+    if (directive.name === 'else-if') {
       result.elseIf = value
-    if (directive.name === 'key')
+    }
+    if (directive.name === 'key') {
       result.key = value
-    if (directive.name === 'for')
+    }
+    if (directive.name === 'for') {
       result.for = parseForDirective(directive, value)
+    }
   }
 
   return result
@@ -1201,7 +1272,7 @@ function parseForDirective(
   source: RComponentSFC_IR_Value,
 ): RComponentSFC_IR_Directives['for'] {
   const expression = directive.expression ?? ''
-  const match = expression.match(/^\s*(?:\(([^,\s]+)\s*,\s*([^)]+)\)|([^\s]+))\s+in\s+(.+)$/)
+  const match = expression.match(/^\s*(?:\(([^,\s]+)\s*,\s*([^)]+)\)|(\S+))\s+in\s+(.+)$/)
 
   if (!match) {
     return {
@@ -1222,12 +1293,12 @@ function parseForDirective(
 }
 
 function collectComponentDependency(value: RComponentSFC_IR_Value | undefined, dependencies: RComponentDependencies): void {
-  if (!value || value.kind !== 'literal' || typeof value.value !== 'string' || !value.value.trim())
+  if (!value || value.kind !== 'literal' || typeof value.value !== 'string' || !value.value.trim()) {
     return
+  }
 
   dependencies.components.push({
     source: 'component-sfc',
     id: value.value,
   })
 }
-import { parseExpression } from '@babel/parser'

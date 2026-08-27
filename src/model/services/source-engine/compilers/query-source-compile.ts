@@ -1,3 +1,6 @@
+import type { RQueryAuth } from '@/domain/types/document/query.types'
+import type { ProgramDiagnostic, QueryProgramPayload } from '@/domain/types/program/program.types'
+import type { DataViewRef } from '@/domain/types/source/data-view-source.types'
 import type {
   QueryOutputSource,
   QuerySourceCompileResult,
@@ -5,11 +8,8 @@ import type {
   QuerySourceOutput,
   QuerySourceRequestValue,
 } from '@/domain/types/source/query-source.types'
-import type { ProgramDiagnostic, QueryProgramPayload } from '@/domain/types/program/program.types'
-import type { RQueryAuth } from '@/domain/types/document/query.types'
-import type { DataViewRef } from '@/domain/types/source/data-view-source.types'
-import type { QueryProgramProp, SourceExpressionIR } from '@/domain/types/source/source-expression.types'
 import type { ResponseOutputTransform } from '@/domain/types/source/response-output.types'
+import type { QueryProgramProp, SourceExpressionIR } from '@/domain/types/source/source-expression.types'
 
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
@@ -87,15 +87,18 @@ export function compileQuerySource(source: string): QuerySourceCompileResult {
 
 function findDefineQueryCall(ast: t.File): t.CallExpression | null {
   for (const statement of ast.program.body) {
-    if (!t.isExpressionStatement(statement))
+    if (!t.isExpressionStatement(statement)) {
       continue
+    }
 
     const expression = unwrapExpression(statement.expression)
-    if (!t.isCallExpression(expression))
+    if (!t.isCallExpression(expression)) {
       continue
+    }
 
-    if (t.isIdentifier(expression.callee, { name: 'defineQuery' }))
+    if (t.isIdentifier(expression.callee, { name: 'defineQuery' })) {
       return expression
+    }
   }
 
   return null
@@ -279,11 +282,11 @@ function readGraphQLRequest(
   node: t.ObjectExpression,
   diagnostics: DiagnosticDraft[],
 ): {
-    document: string
-    operationName: string | undefined
-    variables: SourceExpressionIR | null
-    errorPolicy: 'throw' | 'ignore'
-  } {
+  document: string
+  operationName: string | undefined
+  variables: SourceExpressionIR | null
+  errorPolicy: 'throw' | 'ignore'
+} {
   const documentNode = readPropertyValue(node, 'document')
   const document = documentNode ? readGraphQLDocument(documentNode, diagnostics) : ''
   if (!documentNode) {
@@ -341,8 +344,9 @@ function readGraphQLDocument(
     const value = expression.arguments[0]
     if (value && t.isExpression(value)) {
       const parsed = readStaticString(value, diagnostics, 'request.document')
-      if (parsed !== undefined)
+      if (parsed !== undefined) {
         return parsed
+      }
     }
   }
 
@@ -380,8 +384,9 @@ function validateGraphQLDocument(
   diagnostics: DiagnosticDraft[],
   node?: t.Node,
 ): string | undefined {
-  if (!document.trim())
+  if (!document.trim()) {
     return requestedOperationName
+  }
 
   try {
     const parsed = parseGraphQL(document)
@@ -449,10 +454,12 @@ function readStaticString(
   sourcePath: string,
 ): string | undefined {
   const expression = unwrapExpression(node)
-  if (t.isStringLiteral(expression))
+  if (t.isStringLiteral(expression)) {
     return expression.value
-  if (t.isTemplateLiteral(expression) && expression.expressions.length === 0)
+  }
+  if (t.isTemplateLiteral(expression) && expression.expressions.length === 0) {
     return expression.quasis[0]?.value.cooked ?? ''
+  }
   diagnostics.push(createDiagnostic(
     'error',
     'query-source-static-string-required',
@@ -469,12 +476,14 @@ function rejectRequestProperties(
   diagnostics: DiagnosticDraft[],
   kind: 'rest' | 'graphql',
 ): void {
-  if (!node)
+  if (!node) {
     return
+  }
   for (const key of keys) {
     const value = readPropertyValue(node, key)
-    if (!value)
+    if (!value) {
       continue
+    }
     diagnostics.push(createDiagnostic(
       'error',
       'query-source-request-property-unsupported',
@@ -509,8 +518,9 @@ function readProps(
       continue
     }
     const key = getPropertyName(property.key)
-    if (!key)
+    if (!key) {
       continue
+    }
     if (declared.has(key)) {
       diagnostics.push(createDiagnostic('error', 'query-source-prop-duplicate', `Prop "${key}" объявлен повторно.`, `props.${key}`, property))
       continue
@@ -519,8 +529,9 @@ function readProps(
     const parsed = compileSourceField(key, property.value, source, diagnostics, `props.${key}`, {
       allowInlineTypeExpressions: true,
     })
-    if (parsed)
+    if (parsed) {
       props.push({ ...parsed.field, defaultSource: parsed.defaultSource })
+    }
   }
   return props
 }
@@ -546,8 +557,9 @@ function readOutputs(
     }
 
     const key = getPropertyName(property.key)
-    if (!key || !t.isExpression(property.value))
+    if (!key || !t.isExpression(property.value)) {
       continue
+    }
 
     if (declared.has(key)) {
       diagnostics.push(createDiagnostic(
@@ -584,8 +596,9 @@ function validateRequestPropReferences(
   diagnostics: DiagnosticDraft[],
   sourcePath: string,
 ): void {
-  if (!isSourceExpression(expression))
+  if (!isSourceExpression(expression)) {
     return
+  }
   const visit = (node: SourceExpressionIR) => {
     if (node.type === 'read') {
       if (node.source === 'current' || node.source === 'env') {
@@ -619,8 +632,9 @@ function readOutput(
   kind: string,
 ): QuerySourceOutput | null {
   const calls = collectMemberCallChain(node)
-  if (!calls)
+  if (!calls) {
     return unsupportedOutput(key, diagnostics, node)
+  }
 
   let outputSource: QueryOutputSource | null = null
   const dataViews: DataViewRef[] = []
@@ -644,8 +658,9 @@ function readOutput(
 
     if (call.name === 'convert') {
       const transform = readConverterTransform(call.arguments, diagnostics, `outputs.${key}.convert`)
-      if (transform)
+      if (transform) {
         transforms.push(transform)
+      }
       continue
     }
 
@@ -722,8 +737,9 @@ function readConverterTransform(
   }
 
   const optionsNode = args[1]
-  if (!optionsNode)
+  if (!optionsNode) {
     return { kind: 'converter', identity }
+  }
   if (!t.isExpression(optionsNode)) {
     diagnostics.push(createDiagnostic('error', 'query-source-output-converter-options-invalid', 'Converter options должны быть объектом.', sourcePath))
     return null
@@ -759,15 +775,17 @@ function collectMemberCallChain(
 
   while (t.isCallExpression(current) && t.isMemberExpression(current.callee)) {
     const name = getPropertyName(current.callee.property)
-    if (!name || !t.isExpression(current.callee.object))
+    if (!name || !t.isExpression(current.callee.object)) {
       return null
+    }
 
     modifiers.unshift({ name, arguments: current.arguments })
     current = unwrapExpression(current.callee.object)
   }
 
-  if (!t.isCallExpression(current) || !t.isIdentifier(current.callee, { name: 'output' }))
+  if (!t.isCallExpression(current) || !t.isIdentifier(current.callee, { name: 'output' })) {
     return null
+  }
 
   return { modifiers }
 }
@@ -784,8 +802,9 @@ function readOutputSource(
   }
 
   const expression = unwrapExpression(node)
-  if (t.isStringLiteral(expression))
+  if (t.isStringLiteral(expression)) {
     return { type: 'output', key: expression.value }
+  }
 
   const isDataCall = t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'data' })
   if (isDataCall && kind !== 'graphql') {
@@ -804,10 +823,12 @@ function readOutputSource(
     && (t.isIdentifier(expression.callee, { name: 'response' }) || isDataCall)
   ) {
     const path = expression.arguments[0]
-    if (!path)
+    if (!path) {
       return { type: 'response', path: null }
-    if (t.isStringLiteral(path))
+    }
+    if (t.isStringLiteral(path)) {
       return { type: 'response', path: path.value }
+    }
   }
 
   if (kind !== 'graphql' && containsCallNamed(expression, 'data')) {
@@ -826,10 +847,12 @@ function readOutputSource(
     diagnostics,
     sourcePath,
   )
-  if (compiled && containsOnlyReads(compiled, new Set(['response', 'current'])))
+  if (compiled && containsOnlyReads(compiled, new Set(['response', 'current']))) {
     return { type: 'response', path: null, expression: compiled }
-  if (compiled)
+  }
+  if (compiled) {
     diagnostics.push(createDiagnostic('error', 'query-source-output-read', 'Query output expression может читать только response(...).', sourcePath, expression))
+  }
 
   diagnostics.push(createDiagnostic(
     'error',
@@ -844,8 +867,9 @@ function readOutputSource(
 function containsCallNamed(node: t.Node, name: string): boolean {
   let found = false
   t.traverseFast(node, (child) => {
-    if (t.isCallExpression(child) && t.isIdentifier(child.callee, { name }))
+    if (t.isCallExpression(child) && t.isIdentifier(child.callee, { name })) {
       found = true
+    }
   })
   return found
 }
@@ -853,8 +877,9 @@ function containsCallNamed(node: t.Node, name: string): boolean {
 function normalizeGraphQLDataReads(node: t.Expression): t.Expression {
   const normalized = t.cloneNode(node, true)
   t.traverseFast(normalized, (child) => {
-    if (t.isCallExpression(child) && t.isIdentifier(child.callee, { name: 'data' }))
+    if (t.isCallExpression(child) && t.isIdentifier(child.callee, { name: 'data' })) {
       child.callee.name = 'response'
+    }
   })
   return normalized
 }
@@ -863,14 +888,18 @@ function containsOnlyReads(
   expression: import('@/domain/types/source/source-expression.types').SourceExpressionIR,
   allowed: Set<import('@/domain/types/source/source-expression.types').SourceExpressionReadKind>,
 ): boolean {
-  if (expression.type === 'read')
+  if (expression.type === 'read') {
     return allowed.has(expression.source)
-  if (expression.type === 'operation')
+  }
+  if (expression.type === 'operation') {
     return expression.arguments.every(argument => containsOnlyReads(argument, allowed))
-  if (expression.type === 'array')
+  }
+  if (expression.type === 'array') {
     return expression.items.every(argument => containsOnlyReads(argument, allowed))
-  if (expression.type === 'object')
+  }
+  if (expression.type === 'object') {
     return Object.values(expression.properties).every(argument => containsOnlyReads(argument, allowed))
+  }
   return true
 }
 
@@ -889,8 +918,9 @@ function readDataViewRef(
     referenceCall: 'dataView',
     defineCall: 'defineDataView',
   })
-  if (reference?.kind === 'external')
+  if (reference?.kind === 'external') {
     return reference
+  }
 
   if (reference?.kind === 'inline') {
     if (isManualDataViewDefinition(reference.definition.arguments[0])) {
@@ -916,8 +946,9 @@ function readDataViewRef(
 }
 
 function isManualDataViewDefinition(node: t.Node | null | undefined): boolean {
-  if (!node || !t.isObjectExpression(unwrapExpression(node as t.Expression)))
+  if (!node || !t.isObjectExpression(unwrapExpression(node as t.Expression))) {
     return false
+  }
 
   const definition = unwrapExpression(node as t.Expression) as t.ObjectExpression
   const mode = readStringProperty(definition, 'mode')
@@ -951,12 +982,14 @@ function readOptionalRequestValue<T>(
   readStatic: StaticRequestValueReader<T>,
 ): QuerySourceRequestValue<T> | undefined {
   const value = readPropertyValue(node, key)
-  if (!value)
+  if (!value) {
     return undefined
+  }
 
   const sourcePath = `request.${key}`
-  if (!isStaticRequestExpression(value))
+  if (!isStaticRequestExpression(value)) {
     return compileSourceExpression(value, diagnostics, sourcePath) ?? undefined
+  }
 
   const parsed = expressionToUnknown(value, diagnostics, sourcePath)
   const normalized = readStatic(parsed, diagnostics, sourcePath)
@@ -985,24 +1018,28 @@ function readBooleanRequestValue(value: unknown): boolean | undefined {
 }
 
 function readHeadersRequestValue(value: unknown): Record<string, string> | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value))
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return undefined
+  }
   return Object.fromEntries(Object.entries(value).map(([name, entry]) => [name, String(entry)]))
 }
 
 function readAuthRequestValue(value: unknown): RQueryAuth | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value))
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return undefined
+  }
 
   const auth = value as Partial<RQueryAuth>
-  if (auth.mode === 'none')
+  if (auth.mode === 'none') {
     return { ...auth, mode: 'none' }
+  }
   if (auth.mode === 'profile') {
     const profile = typeof auth.profile === 'string' ? auth.profile.trim() : ''
     return profile ? { ...auth, mode: 'profile', profile } : undefined
   }
-  if (auth.mode === 'inherit' || auth.mode == null)
+  if (auth.mode === 'inherit' || auth.mode == null) {
     return { ...auth, mode: 'inherit' }
+  }
   return undefined
 }
 
@@ -1016,9 +1053,12 @@ function isStaticRequestExpression(node: t.Expression): boolean {
     || t.isIdentifier(expression, { name: 'undefined' })
     || (t.isTemplateLiteral(expression) && expression.expressions.length === 0)
     || isVarCall(expression)
-  ) return true
-  if (t.isArrayExpression(expression))
+  ) {
+    return true
+  }
+  if (t.isArrayExpression(expression)) {
     return expression.elements.every(item => item != null && t.isExpression(item) && isStaticRequestExpression(item))
+  }
   if (t.isObjectExpression(expression)) {
     return expression.properties.every(property =>
       t.isObjectProperty(property)
@@ -1031,19 +1071,25 @@ function isStaticRequestExpression(node: t.Expression): boolean {
 }
 
 function isSourceExpression(value: unknown): value is SourceExpressionIR {
-  if (!value || typeof value !== 'object' || Array.isArray(value))
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return false
+  }
   const candidate = value as Record<string, unknown>
-  if (candidate.type === 'literal')
-    return Object.prototype.hasOwnProperty.call(candidate, 'value')
-  if (candidate.type === 'object')
+  if (candidate.type === 'literal') {
+    return Object.hasOwn(candidate, 'value')
+  }
+  if (candidate.type === 'object') {
     return Boolean(candidate.properties && typeof candidate.properties === 'object' && !Array.isArray(candidate.properties))
-  if (candidate.type === 'array')
+  }
+  if (candidate.type === 'array') {
     return Array.isArray(candidate.items)
-  if (candidate.type === 'read')
+  }
+  if (candidate.type === 'read') {
     return typeof candidate.source === 'string' && typeof candidate.path === 'string'
-  if (candidate.type === 'operation')
+  }
+  if (candidate.type === 'operation') {
     return typeof candidate.operation === 'string' && Array.isArray(candidate.arguments)
+  }
   return false
 }
 
@@ -1056,8 +1102,9 @@ function readStringProperty(node: t.ObjectExpression, key: string): string | nul
 function readBooleanProperty(node: t.ObjectExpression, key: string): boolean | undefined {
   const value = readPropertyValue(node, key)
   const expression = value ? unwrapExpression(value) : null
-  if (expression && t.isBooleanLiteral(expression))
+  if (expression && t.isBooleanLiteral(expression)) {
     return expression.value
+  }
   return undefined
 }
 
@@ -1078,11 +1125,13 @@ function readObjectProperty(node: t.ObjectExpression, key: string): t.ObjectExpr
 
 function readPropertyValue(node: t.ObjectExpression, key: string): t.Expression | null {
   for (const property of node.properties) {
-    if (!t.isObjectProperty(property) || property.computed)
+    if (!t.isObjectProperty(property) || property.computed) {
       continue
+    }
 
-    if (getPropertyName(property.key) === key)
+    if (getPropertyName(property.key) === key) {
       return unwrapExpression(property.value as t.Expression)
+    }
   }
 
   return null
@@ -1093,27 +1142,36 @@ function expressionToUnknown(
   diagnostics: DiagnosticDraft[],
   sourcePath: string,
 ): unknown {
-  if (!node)
+  if (!node) {
     return undefined
+  }
 
   const expression = unwrapExpression(node as t.Expression)
 
-  if (t.isStringLiteral(expression))
+  if (t.isStringLiteral(expression)) {
     return expression.value
-  if (t.isNumericLiteral(expression))
+  }
+  if (t.isNumericLiteral(expression)) {
     return expression.value
-  if (t.isBooleanLiteral(expression))
+  }
+  if (t.isBooleanLiteral(expression)) {
     return expression.value
-  if (t.isNullLiteral(expression))
+  }
+  if (t.isNullLiteral(expression)) {
     return null
-  if (t.isIdentifier(expression, { name: 'undefined' }))
+  }
+  if (t.isIdentifier(expression, { name: 'undefined' })) {
     return undefined
-  if (t.isTemplateLiteral(expression) && expression.expressions.length === 0)
+  }
+  if (t.isTemplateLiteral(expression) && expression.expressions.length === 0) {
     return expression.quasis[0]?.value.cooked ?? ''
-  if (t.isArrayExpression(expression))
+  }
+  if (t.isArrayExpression(expression)) {
     return expression.elements.map(item => expressionToUnknown(item as t.Expression, diagnostics, sourcePath))
-  if (t.isObjectExpression(expression))
+  }
+  if (t.isObjectExpression(expression)) {
     return objectExpressionToRecord(expression, diagnostics, sourcePath)
+  }
   if (isVarCall(expression)) {
     const name = expressionToUnknown(expression.arguments[0], diagnostics, sourcePath)
     return typeof name === 'string' ? `{${name}}` : ''
@@ -1147,8 +1205,9 @@ function objectExpressionToRecord(
     }
 
     const key = getPropertyName(property.key)
-    if (!key)
+    if (!key) {
       continue
+    }
 
     out[key] = expressionToUnknown(property.value as t.Expression, diagnostics, `${sourcePath}.${key}`)
   }
@@ -1178,12 +1237,15 @@ function unwrapExpression<T extends t.Expression>(node: T): t.Expression {
 }
 
 function getPropertyName(key: t.Node): string | null {
-  if (t.isIdentifier(key))
+  if (t.isIdentifier(key)) {
     return key.name
-  if (t.isStringLiteral(key))
+  }
+  if (t.isStringLiteral(key)) {
     return key.value
-  if (t.isNumericLiteral(key))
+  }
+  if (t.isNumericLiteral(key)) {
     return String(key.value)
+  }
   return null
 }
 

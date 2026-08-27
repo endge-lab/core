@@ -1,8 +1,8 @@
 import type { DocumentNode, ObjectTypeDefinitionNode } from 'graphql'
-import { parse, visit } from 'graphql'
-import { Endge } from '@/model/kernel/endge'
-import { RType } from '@/domain/entities/reflect/RType'
 import type { TypeSourceField } from '@/domain/types/source/type-source.types'
+import { parse, visit } from 'graphql'
+import { RType } from '@/domain/entities/reflect/RType'
+import { Endge } from '@/model/kernel/endge'
 import { serializeTypeSourceDocument } from '@/model/services/source-engine/type-source-serialize'
 
 /**
@@ -23,7 +23,9 @@ export function importGqlSchemaToDomain(schema: string): void {
         return
       }
 
-      if (['Mutation', 'Subscription', 'Query'].includes(name)) return
+      if (['Mutation', 'Subscription', 'Query'].includes(name)) {
+        return
+      }
 
       const sourceFields: TypeSourceField[] = []
       for (const field of node.fields || []) {
@@ -49,7 +51,6 @@ export function importGqlSchemaToDomain(schema: string): void {
   for (const [, type] of typeMap) {
     Endge.domain.addType(type)
   }
-
 }
 
 function resolveFieldTypeWithMeta(type: any): {
@@ -61,12 +62,16 @@ function resolveFieldTypeWithMeta(type: any): {
   const optional = type?.kind !== 'NonNullType'
 
   function unwrap(t: any): string {
-    if (t.kind === 'NonNullType') return unwrap(t.type)
+    if (t.kind === 'NonNullType') {
+      return unwrap(t.type)
+    }
     if (t.kind === 'ListType') {
       isArray = true
       return unwrap(t.type)
     }
-    if (t.kind === 'NamedType') return resolveGraphQlNamedType(t.name.value)
+    if (t.kind === 'NamedType') {
+      return resolveGraphQlNamedType(t.name.value)
+    }
     return 'Any'
   }
 
@@ -78,7 +83,11 @@ function resolveFieldTypeWithMeta(type: any): {
 }
 
 function resolveGraphQlNamedType(value: string): string {
-  if (value === 'Int' || value === 'Float') return 'Number'
-  if (value === 'String' || value === 'Boolean' || value === 'ID') return value
+  if (value === 'Int' || value === 'Float') {
+    return 'Number'
+  }
+  if (value === 'String' || value === 'Boolean' || value === 'ID') {
+    return value
+  }
   return value
 }

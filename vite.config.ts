@@ -1,7 +1,7 @@
 import path from 'node:path'
 
-import { defineConfig } from 'vite'
 import dts from 'unplugin-dts/vite'
+import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({

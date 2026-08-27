@@ -7,8 +7,8 @@ import type {
 } from '@/domain/types/source/source-engine.types'
 
 import { compileDataViewSource } from '@/model/services/source-engine/compilers/data-view-source-compile'
-import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
 import { resolveTypedSourceDocumentReference, typedSourceTypeReferenceHighlights } from '@/model/services/source-engine/source-document-reference'
+import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
 import { DATA_VIEW_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/data-view.default.source'
 import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/model/services/source-engine/value-expression-language'
 
@@ -20,9 +20,31 @@ export class DataViewSourceLanguageStrategy implements SourceLanguageStrategy {
     alias: 'Endge DataView Source',
     extension: '.endge-data-view.ts',
     keywords: [
-      'auto', 'collectionByKey', 'contract', 'convert', 'converter', 'dataView', 'defineDataView', 'defineProps', 'field',
-      'filter', 'filterByKey', 'from', 'full', 'incremental', 'join', 'map', 'output', 'path', 'pick', 'prop', 'select', 'spread',
-      'template', 'transform', ...VALUE_EXPRESSION_FUNCTION_NAMES,
+      'auto',
+      'collectionByKey',
+      'contract',
+      'convert',
+      'converter',
+      'dataView',
+      'defineDataView',
+      'defineProps',
+      'field',
+      'filter',
+      'filterByKey',
+      'from',
+      'full',
+      'incremental',
+      'join',
+      'map',
+      'output',
+      'path',
+      'pick',
+      'prop',
+      'select',
+      'spread',
+      'template',
+      'transform',
+      ...VALUE_EXPRESSION_FUNCTION_NAMES,
     ],
     functions: ['as', 'auto', 'by', 'collectionByKey', 'convert', 'converter', 'dataView', 'filterByKey', 'find', 'from', 'full', 'join', 'map', 'pick', 'prop', 'select', ...VALUE_EXPRESSION_METHOD_NAMES],
     properties: ['contract', 'filter', 'incremental', 'input', 'left', 'manual', 'metadata', 'mode', 'output', 'pipeline', 'props', 'right', 'steps', 'tools'],

@@ -6,7 +6,7 @@ import { RStyle } from '@/domain/entities/reflect/RStyle'
 import { Endge } from '@/model/kernel/endge'
 import { compileEndgeCSS } from '@/model/services/style/endgecss-compile'
 
-describe('Endge style leases', () => {
+describe('endge style leases', () => {
   afterEach(() => {
     Endge.styles.reset()
     Endge.program.clear()
@@ -63,8 +63,14 @@ function installStyle(): void {
   const payload: EndgeStyleProgramPayload = { stylesheet, themes: [], dependencies: [] }
   const artifact: ProgramArtifact<EndgeStyleProgramPayload> = {
     ref: { entityType: 'style', id: style.id, identity: style.identity },
-    sourceHash: 'theme', compilerVersion: 'test', status: 'valid', diagnostics: [], dependencies: [],
-    capabilities: ['compilable'], metadata: { self: {}, nodes: [] }, payload,
+    sourceHash: 'theme',
+    compilerVersion: 'test',
+    status: 'valid',
+    diagnostics: [],
+    dependencies: [],
+    capabilities: ['compilable'],
+    metadata: { self: {}, nodes: [] },
+    payload,
   }
   Endge.program.beginCompile('style-lifecycle')
   Endge.program.addArtifact(artifact)

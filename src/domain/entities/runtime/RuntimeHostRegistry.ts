@@ -45,8 +45,9 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
    */
   public getById(id: string): RuntimeHost<any, any> | null {
     const key = String(id ?? '').trim()
-    if (!key)
+    if (!key) {
       return null
+    }
     return this._hosts.get(key) ?? null
   }
 
@@ -62,11 +63,13 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
     const ordered: string[] = []
     const visited = new Set<string>()
     const visit = (id: string) => {
-      if (!id || visited.has(id))
+      if (!id || visited.has(id)) {
         return
+      }
       visited.add(id)
-      for (const childId of this._childrenByParent.get(id) ?? [])
+      for (const childId of this._childrenByParent.get(id) ?? []) {
         visit(childId)
+      }
       ordered.push(id)
     }
     visit(String(rootId ?? '').trim())
@@ -79,14 +82,16 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
   public getByEntity(entityType: RuntimeEntityType, entityIdentity: string): RuntimeHost<any, any>[] {
     const key = this.entityKey(entityType, entityIdentity)
     const ids = this._indexByEntity.get(key)
-    if (!ids?.size)
+    if (!ids?.size) {
       return []
+    }
 
     const out: RuntimeHost<any, any>[] = []
     for (const id of ids) {
       const host = this._hosts.get(id)
-      if (host)
+      if (host) {
         out.push(host)
+      }
     }
     return out
   }
@@ -96,25 +101,29 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
    */
   public removeById(id: string): RuntimeHost<any, any> | null {
     const key = String(id ?? '').trim()
-    if (!key)
+    if (!key) {
       return null
+    }
 
     const host = this._hosts.get(key) ?? null
-    if (!host)
+    if (!host) {
       return null
+    }
 
     const entityKey = this.entityKey(host.entityType, host.entityIdentity)
     const set = this._indexByEntity.get(entityKey)
     set?.delete(key)
-    if (set && set.size === 0)
+    if (set && set.size === 0) {
       this._indexByEntity.delete(entityKey)
+    }
 
     this._hosts.delete(key)
     const parentId = this._parentByChild.get(key) ?? ''
     const siblings = parentId ? this._childrenByParent.get(parentId) : null
     siblings?.delete(key)
-    if (parentId && siblings?.size === 0)
+    if (parentId && siblings?.size === 0) {
       this._childrenByParent.delete(parentId)
+    }
     this._parentByChild.delete(key)
     this._childrenByParent.delete(key)
     return host
@@ -124,8 +133,9 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
    * LIFECYCLE
    */
   public clear(): void {
-    for (const host of this._hosts.values())
+    for (const host of this._hosts.values()) {
       host.destroy()
+    }
     this._hosts.clear()
     this._indexByEntity.clear()
     this._childrenByParent.clear()
@@ -136,11 +146,13 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
    * ACCESS
    */
   public rememberDeletedSnapshot(snapshot: DestroyedRuntimeHostSnapshot): void {
-    if (this._deletedSnapshotLimit === 0)
+    if (this._deletedSnapshotLimit === 0) {
       return
+    }
     const key = String(snapshot.id ?? '').trim()
-    if (!key)
+    if (!key) {
       return
+    }
 
     this._deletedSnapshots.delete(key)
     this._deletedSnapshots.set(key, snapshot)
@@ -159,12 +171,14 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
    */
   public removeDeletedSnapshot(id: string): DestroyedRuntimeHostSnapshot | null {
     const key = String(id ?? '').trim()
-    if (!key)
+    if (!key) {
       return null
+    }
 
     const snapshot = this._deletedSnapshots.get(key) ?? null
-    if (!snapshot)
+    if (!snapshot) {
       return null
+    }
 
     this._deletedSnapshots.delete(key)
     return snapshot
@@ -185,8 +199,9 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
   private trimDeletedSnapshots(): void {
     while (this._deletedSnapshots.size > this._deletedSnapshotLimit) {
       const oldest = this._deletedSnapshots.keys().next().value
-      if (oldest === undefined)
+      if (oldest === undefined) {
         break
+      }
       this._deletedSnapshots.delete(oldest)
     }
   }
@@ -198,8 +213,9 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
     const hosts = this.getAll().map(host => host.snapshot())
     const deletedHosts = this.getDeletedSnapshots()
     const byStatus: Record<string, number> = {}
-    for (const host of hosts)
+    for (const host of hosts) {
       byStatus[host.status] = (byStatus[host.status] ?? 0) + 1
+    }
 
     return {
       total: hosts.length,

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 
-describe('Component SFC Action reactions', () => {
+describe('component SFC Action reactions', () => {
   it('keeps edited value and previousValue in one Action reaction', () => {
     const result = compileComponentSFC(`<template>
       <Text value="OLD" editable @edited.stop="action({
@@ -15,7 +15,9 @@ describe('Component SFC Action reactions', () => {
     </template>`)
     expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
     const root = result.ir?.template?.roots[0]
-    if (!root || root.kind !== 'element') throw new Error('Text root was not compiled')
+    if (!root || root.kind !== 'element') {
+      throw new Error('Text root was not compiled')
+    }
     expect(root.events?.[0]).toMatchObject({
       name: 'edited',
       modifiers: ['stop'],
@@ -36,7 +38,9 @@ describe('Component SFC Action reactions', () => {
     ]" /></template>`)
     expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
     const root = result.ir?.template?.roots[0]
-    if (!root || root.kind !== 'element') throw new Error('Text root was not compiled')
+    if (!root || root.kind !== 'element') {
+      throw new Error('Text root was not compiled')
+    }
     expect(root.events?.[0]?.actions?.map(action => 'identity' in action ? action.identity : null)).toEqual(['first', 'second'])
   })
 
@@ -47,7 +51,9 @@ describe('Component SFC Action reactions', () => {
     })" /></template>`)
     expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
     const root = result.ir?.template?.roots[0]
-    if (!root || root.kind !== 'element') throw new Error('Text root was not compiled')
+    if (!root || root.kind !== 'element') {
+      throw new Error('Text root was not compiled')
+    }
     expect(root.events?.[0]?.action).toMatchObject({
       kind: 'operation',
       run: { output: null, steps: [{ name: 'default', action: { kind: 'query', identity: 'schedule-update' } }] },
@@ -67,7 +73,9 @@ describe('Component SFC Action reactions', () => {
     })" /></template>`)
     expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
     const root = result.ir?.template?.roots[0]
-    if (!root || root.kind !== 'element') throw new Error('Text root was not compiled')
+    if (!root || root.kind !== 'element') {
+      throw new Error('Text root was not compiled')
+    }
     expect(root.events?.[0]?.action).toMatchObject({
       kind: 'operation',
       run: { output: 'request' },

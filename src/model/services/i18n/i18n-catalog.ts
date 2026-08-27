@@ -4,16 +4,16 @@ import type {
   I18nLocales,
   I18nRuntimeCatalog,
 } from '@/domain/types/i18n.types'
-import type { CompositionI18nResourceArtifact } from '@/domain/types/source/composition-source.types'
-import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
+import type { CompositionI18nResourceArtifact, CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
 
 /** Материализует authored locale trees в плоские dot-path индексы. */
 export function compileI18nLocales(locales: I18nLocales): I18nCompiledLocales {
   return Object.fromEntries(
     Object.entries(locales).map(([locale, messages]) => {
       const target: Record<string, string> = {}
-      if (isPlainObject(messages))
+      if (isPlainObject(messages)) {
         writeMessages(target, messages as I18nLocaleMessages)
+      }
       return [locale, target]
     }),
   )
@@ -37,8 +37,9 @@ export function extendI18nRuntimeCatalog(
     const messages = Object.fromEntries(
       Object.entries(entry.messages).map(([locale, values]) => [locale, { ...values }]),
     )
-    for (const [locale, values] of Object.entries(resource.messages))
+    for (const [locale, values] of Object.entries(resource.messages)) {
       messages[locale] = { ...(messages[locale] ?? {}), ...values }
+    }
     catalog[resource.name] = { messages }
   }
   return catalog
@@ -76,14 +77,16 @@ export function cloneI18nRuntimeCatalog(catalog: I18nRuntimeCatalog): I18nRuntim
 function writeMessages(target: Record<string, string>, source: I18nLocaleMessages, prefix = ''): void {
   for (const [key, value] of Object.entries(source)) {
     const path = prefix ? `${prefix}.${key}` : key
-    if (!path)
+    if (!path) {
       continue
+    }
     if (isPlainObject(value)) {
       writeMessages(target, value as I18nLocaleMessages, path)
       continue
     }
-    if (value != null)
+    if (value != null) {
       target[path] = typeof value === 'string' ? value : String(value)
+    }
   }
 }
 

@@ -13,8 +13,9 @@ export interface EndgeAuthContextSource {
 /** Декодирует только JWT payload; результат не используется для authorization decisions. */
 export function decodeJwtClaims(token: string | null | undefined): Record<string, unknown> | null {
   const payload = String(token ?? '').split('.')[1]
-  if (!payload)
+  if (!payload) {
     return null
+  }
 
   try {
     const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
@@ -31,8 +32,9 @@ export function decodeJwtClaims(token: string | null | undefined): Record<string
 
 /** Строит минимальный actor/session snapshot без сохранения tokens или полного claims. */
 export function createEndgeAuthContext(source: EndgeAuthContextSource): EndgeAuthContext {
-  if (!source.authenticated)
+  if (!source.authenticated) {
     return { authenticated: false }
+  }
 
   const idClaims = decodeJwtClaims(source.idToken)
   const accessClaims = decodeJwtClaims(source.accessToken)
@@ -59,8 +61,9 @@ export function createEndgeAuthContext(source: EndgeAuthContextSource): EndgeAut
 function firstText(...values: unknown[]): string | undefined {
   for (const value of values) {
     const normalized = typeof value === 'string' ? value.trim() : ''
-    if (normalized)
+    if (normalized) {
       return normalized
+    }
   }
   return undefined
 }

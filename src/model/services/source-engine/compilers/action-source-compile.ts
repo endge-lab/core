@@ -1,8 +1,7 @@
-import { parse } from '@babel/parser'
-import * as t from '@babel/types'
-
 import type { ActionProgramPayload } from '@/domain/types/program/action-program.types'
 import type { ProgramDependency, ProgramDiagnostic } from '@/domain/types/program/program.types'
+
+import type { ActionTargetSelector } from '@/domain/types/runtime/action.types'
 import type {
   ActionSourceBlock,
   ActionSourceDocument,
@@ -10,7 +9,9 @@ import type {
   ActionSourceTypescriptStep,
 } from '@/domain/types/source/action-source.types'
 import type { SourceExpressionIR } from '@/domain/types/source/source-expression.types'
-import type { ActionTargetSelector } from '@/domain/types/runtime/action.types'
+import { parse } from '@babel/parser'
+import * as t from '@babel/types'
+import { functionSource, validateSandboxBody } from '@/model/services/compiler/computation/computation-compile'
 import {
   compileSourceExpression,
   diagnostic,
@@ -18,7 +19,6 @@ import {
   unwrapExpression,
 } from '@/model/services/source-engine/compilers/source-expression-compile'
 import { compileSourceField } from '@/model/services/source-engine/compilers/source-field-compile'
-import { functionSource, validateSandboxBody } from '@/model/services/compiler/computation/computation-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
@@ -73,7 +73,9 @@ export function compileActionSource(input: ActionSourceCompileInput): ActionSour
 
   const calls: t.CallExpression[] = []
   for (const statement of file.program.body) {
-    if (t.isTSTypeAliasDeclaration(statement) || t.isTSInterfaceDeclaration(statement)) continue
+    if (t.isTSTypeAliasDeclaration(statement) || t.isTSInterfaceDeclaration(statement)) {
+      continue
+    }
     if (t.isExpressionStatement(statement)) {
       const expression = unwrapExpression(statement.expression)
       if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'defineAction' })) {
@@ -104,22 +106,32 @@ export function compileActionSource(input: ActionSourceCompileInput): ActionSour
       continue
     }
     const name = propertyName(property.key)
-    if (name && !allowed.has(name)) diagnostics.push(diagnostic('error', 'action-definition-property-unsupported', `Свойство "${name}" не поддерживается.`, name, property))
+    if (name && !allowed.has(name)) {
+      diagnostics.push(diagnostic('error', 'action-definition-property-unsupported', `Свойство "${name}" не поддерживается.`, name, property))
+    }
   }
 
   let contractInput = null
   let contractOutput = null
   if (contractNode) {
     const value = unwrapExpression(contractNode)
-    if (!t.isObjectExpression(value)) diagnostics.push(diagnostic('error', 'action-contract-object', 'contract должен быть object literal.', 'contract', value))
+    if (!t.isObjectExpression(value)) {
+      diagnostics.push(diagnostic('error', 'action-contract-object', 'contract должен быть object literal.', 'contract', value))
+    }
     else {
       for (const key of ['input', 'output'] as const) {
         const fieldNode = expressionProperty(value, key)
-        if (!fieldNode) continue
+        if (!fieldNode) {
+          continue
+        }
         const compiled = compileSourceField(key, fieldNode, input.source, diagnostics, `contract.${key}`)
-        if (!compiled) continue
-        if (key === 'input') contractInput = compiled.field
-        else contractOutput = compiled.field
+        if (!compiled) {
+          continue
+        }
+        if (key === 'input') {
+          contractInput = compiled.field
+        }
+        else { contractOutput = compiled.field }
       }
     }
   }
@@ -157,7 +169,9 @@ function compileBlock(
       continue
     }
     const name = propertyName(property.key)
-    if (!name) continue
+    if (!name) {
+      continue
+    }
     if (available.has(name)) {
       context.diagnostics.push(diagnostic('error', 'action-step-duplicate', `Step "${name}" объявлен повторно.`, `${sourcePath}.${name}`, property))
       continue
@@ -184,8 +198,12 @@ function compileStep(
   const expression = unwrapExpression(raw)
   if (t.isCallExpression(expression) && t.isIdentifier(expression.callee)) {
     const callee = expression.callee.name
-    if (callee === 'operation') return compileOperation(name, expression, sourcePath, available, context)
-    if (callee === 'typescript') return compileTypescript(name, expression, sourcePath, available, context)
+    if (callee === 'operation') {
+      return compileOperation(name, expression, sourcePath, available, context)
+    }
+    if (callee === 'typescript') {
+      return compileTypescript(name, expression, sourcePath, available, context)
+    }
     if (callee === 'query' || callee === 'update' || callee === 'action') {
       const definition = expression.arguments[0]
       if (!definition || !t.isObjectExpression(definition)) {
@@ -196,9 +214,13 @@ function compileStep(
       const identityNode = identityExpression ? unwrapExpression(identityExpression) : null
       const identity = staticStringProperty(definition, 'identity')
       const inputNode = expressionProperty(definition, 'input') ?? t.objectExpression([])
-      if (!identity) context.diagnostics.push(diagnostic('error', `action-${callee}-identity`, `${callee}(...) требует static identity.`, `${sourcePath}.identity`, definition))
+      if (!identity) {
+        context.diagnostics.push(diagnostic('error', `action-${callee}-identity`, `${callee}(...) требует static identity.`, `${sourcePath}.identity`, definition))
+      }
       const compiledInput = compileActionExpression(inputNode, context.diagnostics, `${sourcePath}.input`, available, context.inputRead)
-      if (!identity || !compiledInput) return null
+      if (!identity || !compiledInput) {
+        return null
+      }
       context.dependencies.push({
         entityType: callee,
         id: identity,
@@ -219,7 +241,9 @@ function compileStep(
         return null
       }
       const compiledInput = compileActionExpression(inputNode, context.diagnostics, `${sourcePath}.input`, available, context.inputRead)
-      if (!compiledInput) return null
+      if (!compiledInput) {
+        return null
+      }
       context.dependencies.push({
         entityType: 'computation',
         id: identity,
@@ -252,15 +276,21 @@ function compileOperation(
   const runNode = objectProperty(definition, 'run')
   const undoNode = objectProperty(definition, 'undo')
   const redoNode = objectProperty(definition, 'redo')
-  if (!runNode) context.diagnostics.push(diagnostic('error', 'action-operation-run-required', 'operation.run обязателен.', `${sourcePath}.run`, definition))
-  if (!undoNode) context.diagnostics.push(diagnostic('error', 'action-operation-undo-required', 'Operation без undo не допускается.', `${sourcePath}.undo`, definition))
+  if (!runNode) {
+    context.diagnostics.push(diagnostic('error', 'action-operation-run-required', 'operation.run обязателен.', `${sourcePath}.run`, definition))
+  }
+  if (!undoNode) {
+    context.diagnostics.push(diagnostic('error', 'action-operation-undo-required', 'Operation без undo не допускается.', `${sourcePath}.undo`, definition))
+  }
   const operationInput = inputNode
     ? compileActionExpression(inputNode, context.diagnostics, `${sourcePath}.input`, available, context.inputRead)
     : null
   const run = runNode ? compileNestedBlock(runNode, `${sourcePath}.run`, context, 'operation-run') : null
   const undo = undoNode ? compileNestedBlock(undoNode, `${sourcePath}.undo`, context, 'operation-undo') : null
   const redo = redoNode ? compileNestedBlock(redoNode, `${sourcePath}.redo`, context, 'operation-redo') : null
-  if ((inputNode && !operationInput) || !run || !undo) return null
+  if ((inputNode && !operationInput) || !run || !undo) {
+    return null
+  }
   return { kind: 'operation', name, input: operationInput, run, undo, redo }
 }
 
@@ -303,22 +333,34 @@ function compileTypescript(
     return null
   }
   let functionNode: t.ObjectMethod | t.FunctionExpression | t.ArrowFunctionExpression | null = null
-  if (t.isObjectMethod(compute)) functionNode = compute
-  else if (t.isObjectProperty(compute) && (t.isFunctionExpression(compute.value) || t.isArrowFunctionExpression(compute.value))) functionNode = compute.value
+  if (t.isObjectMethod(compute)) {
+    functionNode = compute
+  }
+  else if (t.isObjectProperty(compute) && (t.isFunctionExpression(compute.value) || t.isArrowFunctionExpression(compute.value))) {
+    functionNode = compute.value
+  }
   if (!functionNode) {
     context.diagnostics.push(diagnostic('error', 'action-typescript-compute-required', 'typescript.compute должен быть function или method.', `${sourcePath}.compute`, definition))
     return null
   }
-  if (functionNode.async || functionNode.generator) context.diagnostics.push(diagnostic('error', 'action-typescript-async', 'typescript.compute должен быть синхронным.', `${sourcePath}.compute`, functionNode))
+  if (functionNode.async || functionNode.generator) {
+    context.diagnostics.push(diagnostic('error', 'action-typescript-async', 'typescript.compute должен быть синхронным.', `${sourcePath}.compute`, functionNode))
+  }
   validateSandboxBody(functionNode, context.diagnostics, `${sourcePath}.compute`)
   const source = functionSource(functionNode, context.source)
   const inputs: Record<string, SourceExpressionIR> = {}
   for (const property of (unwrapExpression(inputsNode) as t.ObjectExpression).properties) {
-    if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) continue
+    if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
+      continue
+    }
     const key = propertyName(property.key)
-    if (!key) continue
+    if (!key) {
+      continue
+    }
     const value = compileActionExpression(property.value, context.diagnostics, `${sourcePath}.inputs.${key}`, available, context.inputRead)
-    if (value) inputs[key] = value
+    if (value) {
+      inputs[key] = value
+    }
   }
   return { kind: 'typescript', name, inputs, source, moduleKey: hash(`${name}:${source}`) }
 }
@@ -333,17 +375,27 @@ function compileActionExpression(
   // The compiler owns this parsed AST. Transform it in place so diagnostics retain exact source offsets.
   const node = raw
   walk(node, (current) => {
-    if (!t.isCallExpression(current) || !t.isIdentifier(current.callee)) return
+    if (!t.isCallExpression(current) || !t.isIdentifier(current.callee)) {
+      return
+    }
     if (current.callee.name === 'input') {
-      if (current.arguments.length > 1 || (current.arguments[0] && !t.isStringLiteral(current.arguments[0]))) diagnostics.push(diagnostic('error', 'action-input-path', 'input(...) принимает optional string path.', sourcePath, current))
+      if (current.arguments.length > 1 || (current.arguments[0] && !t.isStringLiteral(current.arguments[0]))) {
+        diagnostics.push(diagnostic('error', 'action-input-path', 'input(...) принимает optional string path.', sourcePath, current))
+      }
       current.callee = t.identifier('path')
-      if (current.arguments.length === 0) current.arguments = [t.stringLiteral('')]
+      if (current.arguments.length === 0) {
+        current.arguments = [t.stringLiteral('')]
+      }
     }
     else if (current.callee.name === 'output') {
       const name = current.arguments[0]
       const reference = t.isStringLiteral(name) ? name.value : ''
-      if (!reference) diagnostics.push(diagnostic('error', 'action-output-name', 'output(...) принимает имя выполненного шага.', sourcePath, current))
-      else if (!available.has(reference)) diagnostics.push(diagnostic('error', 'action-output-forward-reference', `Step "${reference}" ещё не выполнен или не существует.`, sourcePath, current))
+      if (!reference) {
+        diagnostics.push(diagnostic('error', 'action-output-name', 'output(...) принимает имя выполненного шага.', sourcePath, current))
+      }
+      else if (!available.has(reference)) {
+        diagnostics.push(diagnostic('error', 'action-output-forward-reference', `Step "${reference}" ещё не выполнен или не существует.`, sourcePath, current))
+      }
       current.callee = t.identifier('__computationOutput')
     }
     else if (current.callee.name === 'runOutput' || current.callee.name === 'undoOutput') {
@@ -351,7 +403,9 @@ function compileActionExpression(
       const allowed = operationOutput === 'runOutput'
         ? inputRead === 'operation-undo' || inputRead === 'operation-redo'
         : inputRead === 'operation-redo'
-      if (!allowed) diagnostics.push(diagnostic('error', 'action-operation-output-scope', `${operationOutput}(...) недоступен в этом Operation block.`, sourcePath, current))
+      if (!allowed) {
+        diagnostics.push(diagnostic('error', 'action-operation-output-scope', `${operationOutput}(...) недоступен в этом Operation block.`, sourcePath, current))
+      }
       current.callee = t.identifier('path')
       current.arguments = [t.stringLiteral(operationOutput === 'runOutput' ? '__runOutput' : '__undoOutput')]
     }
@@ -365,7 +419,9 @@ function objectProperty(node: t.ObjectExpression, name: string): t.Expression | 
 
 function expressionProperty(node: t.ObjectExpression, name: string): t.Expression | null {
   for (const property of node.properties) {
-    if (t.isObjectProperty(property) && !property.computed && propertyName(property.key) === name && t.isExpression(property.value)) return property.value
+    if (t.isObjectProperty(property) && !property.computed && propertyName(property.key) === name && t.isExpression(property.value)) {
+      return property.value
+    }
   }
   return null
 }
@@ -379,14 +435,20 @@ function walk(node: t.Node, visit: (node: t.Node) => void): void {
   visit(node)
   for (const key of (t.VISITOR_KEYS as Record<string, string[]>)[node.type] ?? []) {
     const value = (node as any)[key]
-    if (Array.isArray(value)) value.forEach(child => child?.type && walk(child, visit))
-    else if (value?.type) walk(value, visit)
+    if (Array.isArray(value)) {
+      value.forEach(child => child?.type && walk(child, visit))
+    }
+    else if (value?.type) {
+      walk(value, visit)
+    }
   }
 }
 
 function uniqueDependencies(dependencies: ProgramDependency[]): ProgramDependency[] {
   const unique = new Map<string, ProgramDependency>()
-  for (const dependency of dependencies) unique.set(`${dependency.entityType}:${dependency.identity}`, dependency)
+  for (const dependency of dependencies) {
+    unique.set(`${dependency.entityType}:${dependency.identity}`, dependency)
+  }
   return [...unique.values()]
 }
 
@@ -400,25 +462,45 @@ function collectDocumentTransforms(document: ActionSourceDocument, dependencies:
         role: 'action-value-transform',
       })
       visitExpression(expression.input)
-      if (expression.options) visitExpression(expression.options)
+      if (expression.options) {
+        visitExpression(expression.options)
+      }
       return
     }
-    if (expression.type === 'array') expression.items.forEach(visitExpression)
-    else if (expression.type === 'object') Object.values(expression.properties).forEach(visitExpression)
-    else if (expression.type === 'operation') expression.arguments.forEach(visitExpression)
+    if (expression.type === 'array') {
+      expression.items.forEach(visitExpression)
+    }
+    else if (expression.type === 'object') {
+      Object.values(expression.properties).forEach(visitExpression)
+    }
+    else if (expression.type === 'operation') {
+      expression.arguments.forEach(visitExpression)
+    }
   }
   const visitBlock = (block: ActionSourceBlock): void => {
-    if (block.output) visitExpression(block.output)
+    if (block.output) {
+      visitExpression(block.output)
+    }
     for (const step of block.steps) {
-      if (step.kind === 'expression') visitExpression(step.expression)
-      else if (step.kind === 'typescript') Object.values(step.inputs).forEach(visitExpression)
+      if (step.kind === 'expression') {
+        visitExpression(step.expression)
+      }
+      else if (step.kind === 'typescript') {
+        Object.values(step.inputs).forEach(visitExpression)
+      }
       else if (step.kind === 'operation') {
-        if (step.input) visitExpression(step.input)
+        if (step.input) {
+          visitExpression(step.input)
+        }
         visitBlock(step.run)
         visitBlock(step.undo)
-        if (step.redo) visitBlock(step.redo)
+        if (step.redo) {
+          visitBlock(step.redo)
+        }
       }
-      else visitExpression(step.input)
+      else {
+        visitExpression(step.input)
+      }
     }
   }
   visitBlock(document)
@@ -426,6 +508,8 @@ function collectDocumentTransforms(document: ActionSourceDocument, dependencies:
 
 function hash(value: string): string {
   let result = 2166136261
-  for (let index = 0; index < value.length; index++) result = Math.imul(result ^ value.charCodeAt(index), 16777619)
+  for (let index = 0; index < value.length; index++) {
+    result = Math.imul(result ^ value.charCodeAt(index), 16777619)
+  }
   return (result >>> 0).toString(16)
 }

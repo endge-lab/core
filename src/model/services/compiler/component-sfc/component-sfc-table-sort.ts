@@ -92,8 +92,9 @@ function collectSortableColumns(
   let visibleIndex = 0
 
   for (const child of tableNode.children) {
-    if (child.kind !== 'element' || child.tag !== 'Column')
+    if (child.kind !== 'element' || child.tag !== 'Column') {
       continue
+    }
 
     const key = normalizeColumnKey(child, visibleIndex)
     const sortable = readBooleanProp(child, 'sortable')
@@ -132,12 +133,14 @@ function normalizeSortMode(
   value: unknown,
   diagnostics: RComponentDiagnostic[],
 ): ComponentSFCTableSortMode {
-  if (value == null || value === '')
+  if (value == null || value === '') {
     return 'multiple'
+  }
 
   const mode = String(value).trim()
-  if (SORT_MODE_SET.has(mode))
+  if (SORT_MODE_SET.has(mode)) {
     return mode as ComponentSFCTableSortMode
+  }
 
   diagnostics.push({
     severity: 'error',
@@ -154,16 +157,18 @@ function parseDefaultSort(
   diagnostics: RComponentDiagnostic[],
 ): ComponentSFCTableSortStateItem[] {
   const source = String(value ?? '').trim()
-  if (!source)
+  if (!source) {
     return []
+  }
 
   const columnKeys = new Set(columns.map(column => column.key))
   const result: ComponentSFCTableSortStateItem[] = []
 
   for (const rawItem of source.split(',')) {
     const item = rawItem.trim()
-    if (!item)
+    if (!item) {
       continue
+    }
 
     const [rawKey, rawDirection] = item.split(':').map(part => part?.trim())
     const key = rawKey ?? ''
@@ -215,12 +220,15 @@ function normalizeColumnKey(node: RComponentSFC_IR_ElementNode, visibleIndex: nu
 
 function readBooleanProp(node: RComponentSFC_IR_ElementNode, name: string): boolean {
   const value = readLiteralProp(node, name)
-  if (value === true)
+  if (value === true) {
     return true
-  if (value === false)
+  }
+  if (value === false) {
     return false
-  if (typeof value === 'string')
+  }
+  if (typeof value === 'string') {
     return value !== 'false'
+  }
   return false
 }
 
@@ -233,8 +241,9 @@ function readLiteralValue(value: RComponentSFC_IR_Value | undefined): unknown {
 }
 
 function readStaticStringValue(value: RComponentSFC_IR_Value | undefined): string | null {
-  if (!value)
+  if (!value) {
     return null
+  }
 
   const source = value.kind === 'literal'
     ? String(value.value ?? '').trim()

@@ -1,14 +1,14 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import type { ProgramArtifact } from '@/domain/types/program/program.types'
 
+import type { RuntimeScopeHandle } from '@/domain/types/runtime/runtime-scope.types'
+import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
+import { afterEach, describe, expect, it } from 'vitest'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { RStyle } from '@/domain/entities/reflect/RStyle'
-import type { ProgramArtifact } from '@/domain/types/program/program.types'
-import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
-import type { RuntimeScopeHandle } from '@/domain/types/runtime/runtime-scope.types'
 import { Endge } from '@/model/kernel/endge'
 import { compileEndgeCSS } from '@/model/services/style/endgecss-compile'
 
-describe('Composition style scope integration', () => {
+describe('composition style scope integration', () => {
   afterEach(async () => {
     await Endge.runtime.reset()
     Endge.styles.reset()
@@ -36,14 +36,26 @@ describe('Composition style scope integration', () => {
       ],
       scopes: [
         {
-          name: 'scope_default', path: 'scope_default', parentPath: null,
-          activationOverride: { mode: 'startup' }, effectiveActivation: { mode: 'startup' },
-          resources: ['projectTheme'], runtimes: [], children: ['pages'], sourceOrder: 0,
+          name: 'scope_default',
+          path: 'scope_default',
+          parentPath: null,
+          activationOverride: { mode: 'startup' },
+          effectiveActivation: { mode: 'startup' },
+          resources: ['projectTheme'],
+          runtimes: [],
+          children: ['pages'],
+          sourceOrder: 0,
         },
         {
-          name: 'pages', path: 'pages', parentPath: 'scope_default',
-          activationOverride: { mode: 'manual' }, effectiveActivation: { mode: 'manual' },
-          resources: ['pages.pageTheme'], runtimes: [], children: [], sourceOrder: 1,
+          name: 'pages',
+          path: 'pages',
+          parentPath: 'scope_default',
+          activationOverride: { mode: 'manual' },
+          effectiveActivation: { mode: 'manual' },
+          resources: ['pages.pageTheme'],
+          runtimes: [],
+          children: [],
+          sourceOrder: 1,
         },
       ],
       runtimes: [],

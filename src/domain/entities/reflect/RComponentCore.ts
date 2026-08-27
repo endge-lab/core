@@ -1,10 +1,11 @@
-import { Expose } from 'class-transformer'
+import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
 
-import { REntity, type DuplicateOptions } from '@/domain/entities/reflect/REntity'
 import type {
   RComponentRenderTarget,
   RComponentSourceKind,
 } from '@/domain/types/component/component-core.types'
+import { Expose } from 'class-transformer'
+import { REntity } from '@/domain/entities/reflect/REntity'
 
 /**
  * Чистая базовая модель компонента нового поколения.

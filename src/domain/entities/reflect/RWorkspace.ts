@@ -47,8 +47,9 @@ export function normalizeEndgeWorkspaceDefinition(input: unknown): EndgeWorkspac
 }
 
 function createWorkspace(input: unknown): RWorkspace {
-  if (!isRecord(input))
+  if (!isRecord(input)) {
     throw new Error('[RWorkspace] Workspace must be an object')
+  }
 
   const source = input as EndgeWorkspaceDefinitionInput
   const workspace = new RWorkspace()
@@ -73,18 +74,23 @@ function normalizeDataMode(value: unknown): EndgeDataMode {
 }
 
 function normalizeInstalledIntegrations(value: unknown): WorkspaceIntegrationReference[] {
-  if (!Array.isArray(value)) return []
+  if (!Array.isArray(value)) {
+    return []
+  }
 
   return value.flatMap((item) => {
-    if (!isRecord(item)) return []
+    if (!isRecord(item)) {
+      return []
+    }
     const relationship = item.integration ?? item.integrationId
     const integration = isRecord(relationship) ? relationship : null
     const integrationId = integration?.id ?? relationship
     const integrationIdentity = String(item.integrationIdentity ?? integration?.identity ?? '').trim()
     const version = String(item.version ?? '').trim()
 
-    if ((typeof integrationId !== 'string' && typeof integrationId !== 'number') || !integrationIdentity || !version)
+    if ((typeof integrationId !== 'string' && typeof integrationId !== 'number') || !integrationIdentity || !version) {
       return []
+    }
 
     return [{ integrationId, integrationIdentity, version }]
   })
@@ -92,8 +98,9 @@ function normalizeInstalledIntegrations(value: unknown): WorkspaceIntegrationRef
 
 function requireText(value: unknown, field: string): string {
   const text = String(value ?? '').trim()
-  if (!text)
+  if (!text) {
     throw new Error(`[RWorkspace] Field "${field}" is required`)
+  }
   return text
 }
 

@@ -3,8 +3,8 @@ import type {
   RComponentSFC_IR_ElementNode,
   RComponentSFC_IR_Value,
 } from '@/domain/types/component/sfc/ir.types'
-import { ENDGE_SFC_TABLE_COLUMN_PIN_MODES } from '@/domain/types/component/sfc/tag-attribute-contract.types'
 import type { TableColumnPinSide } from '@/domain/types/runtime/action.types'
+import { ENDGE_SFC_TABLE_COLUMN_PIN_MODES } from '@/domain/types/component/sfc/tag-attribute-contract.types'
 
 export const SFC_TABLE_COLUMN_PIN_MODES = ENDGE_SFC_TABLE_COLUMN_PIN_MODES
 export const SFC_TABLE_COLUMN_PIN_SIDES = ['left', 'right'] as const
@@ -82,8 +82,9 @@ function collectColumnPinCapabilities(
   let visibleIndex = 0
 
   for (const child of tableNode.children) {
-    if (child.kind !== 'element' || child.tag !== 'Column')
+    if (child.kind !== 'element' || child.tag !== 'Column') {
       continue
+    }
 
     columns.push({
       key: normalizeColumnKey(child, visibleIndex),
@@ -99,12 +100,14 @@ function normalizePinMode(
   value: unknown,
   diagnostics: RComponentDiagnostic[],
 ): ComponentSFCTableColumnPinMode {
-  if (value == null || value === '')
+  if (value == null || value === '') {
     return 'enabled'
+  }
 
   const mode = String(value).trim()
-  if (PIN_MODE_SET.has(mode))
+  if (PIN_MODE_SET.has(mode)) {
     return mode as ComponentSFCTableColumnPinMode
+  }
 
   diagnostics.push({
     severity: 'error',
@@ -121,8 +124,9 @@ function parseDefaultPin(
   diagnostics: RComponentDiagnostic[],
 ): ComponentSFCTableColumnPinStateItem[] {
   const source = String(value ?? '').trim()
-  if (!source)
+  if (!source) {
     return []
+  }
 
   const columnKeys = new Set(columns.map(column => column.key))
   const seenKeys = new Set<string>()
@@ -130,8 +134,9 @@ function parseDefaultPin(
 
   for (const rawItem of source.split(',')) {
     const item = rawItem.trim()
-    if (!item)
+    if (!item) {
       continue
+    }
 
     const [rawKey, rawSide] = item.split(':').map(part => part?.trim())
     const key = rawKey ?? ''
@@ -194,14 +199,18 @@ function normalizeColumnKey(node: RComponentSFC_IR_ElementNode, visibleIndex: nu
 
 function readBooleanProp(node: RComponentSFC_IR_ElementNode, name: string, fallback: boolean): boolean {
   const value = readLiteralProp(node, name)
-  if (value == null || value === '')
+  if (value == null || value === '') {
     return fallback
-  if (value === true)
+  }
+  if (value === true) {
     return true
-  if (value === false)
+  }
+  if (value === false) {
     return false
-  if (typeof value === 'string')
+  }
+  if (typeof value === 'string') {
     return value !== 'false'
+  }
   return fallback
 }
 
@@ -214,8 +223,9 @@ function readLiteralValue(value: RComponentSFC_IR_Value | undefined): unknown {
 }
 
 function readStaticStringValue(value: RComponentSFC_IR_Value | undefined): string | null {
-  if (!value)
+  if (!value) {
     return null
+  }
 
   const source = value.kind === 'literal'
     ? String(value.value ?? '').trim()

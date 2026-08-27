@@ -1,9 +1,9 @@
+import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
+import type { EntityManagement } from '@/domain/types/document/entity-management.type'
+
 import { Serialize } from '@endge/utils'
 import { Expose } from 'class-transformer'
-
-import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
 import { REntity } from '@/domain/entities/reflect/REntity'
-import type { EntityManagement } from '@/domain/types/document/entity-management.type'
 
 export interface RIntegrationSchema extends EntityManagement {
   id: string | number

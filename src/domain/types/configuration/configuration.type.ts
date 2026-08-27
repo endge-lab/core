@@ -2,8 +2,8 @@ import type { ComponentSFCInteractionKeyboardCondition, ComponentSFCInteractionT
 import type {
   DiagnosticsSeverityNumber,
   DiagnosticsSignal,
-  EndgeDiagnosticsOutputConfiguration,
   EndgeDiagnosticsConfiguration,
+  EndgeDiagnosticsOutputConfiguration,
   EndgeDiagnosticsRoute,
 } from '@/domain/types/diagnostics/diagnostics.types'
 import type { EndgeExecutionContext } from '@/domain/types/runtime/execution-context.types'
@@ -82,9 +82,9 @@ export type EndgePublicConfigurationSnapshot = Readonly<
   & Record<string, unknown>
 >
 
-export type EndgeValueOverride<T> =
-  | { op: 'set', value: T }
-  | { op: 'remove' }
+export type EndgeValueOverride<T>
+  = | { op: 'set', value: T }
+    | { op: 'remove' }
 
 /** Независимые override-операции SFC editing для одного configuration layer. */
 export interface EndgeSFCEditingConfigurationPatch {
@@ -101,9 +101,9 @@ export interface EndgeTooltipConfigurationPatch {
   keyboard?: EndgeValueOverride<ComponentSFCInteractionKeyboardCondition>
 }
 
-export type EndgeCollectionPatchEntry<T> =
-  | { key: string, op: 'upsert', value: T }
-  | { key: string, op: 'remove' }
+export type EndgeCollectionPatchEntry<T>
+  = | { key: string, op: 'upsert', value: T }
+    | { key: string, op: 'remove' }
 
 export interface EndgeCollectionPatch<T> {
   entries: EndgeCollectionPatchEntry<T>[]
@@ -173,9 +173,9 @@ export interface EndgeDiagnosticsConfigurationPatch {
   snapshots?: EndgeDiagnosticsSnapshotsPatch
 }
 
-export type EndgeConfigurationContribution =
-  | { mode: 'inherit', patch: EndgeConfigurationPatch }
-  | { mode: 'replace', value: EndgeConfiguration }
+export type EndgeConfigurationContribution
+  = | { mode: 'inherit', patch: EndgeConfigurationPatch }
+    | { mode: 'replace', value: EndgeConfiguration }
 
 export type EndgeConfigurationLayer = 'workspace' | 'tenant' | 'project' | 'environment'
 

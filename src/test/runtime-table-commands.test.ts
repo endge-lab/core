@@ -1,11 +1,11 @@
-import { describe, expect, it, vi } from 'vitest'
-
 import type { TableColumnActionContext } from '@/domain/types/runtime/action.types'
-import { RuntimeActionRegistry } from '@/domain/entities/runtime/RuntimeActionRegistry'
-import { createTableRuntimeActions } from '@/model/services/runtime/table-actions'
-import { TABLE_RUNTIME_ACTION_IDS } from '@/domain/types/runtime/action.types'
 
-describe('Runtime table actions', () => {
+import { describe, expect, it, vi } from 'vitest'
+import { RuntimeActionRegistry } from '@/domain/entities/runtime/RuntimeActionRegistry'
+import { TABLE_RUNTIME_ACTION_IDS } from '@/domain/types/runtime/action.types'
+import { createTableRuntimeActions } from '@/model/services/runtime/table-actions'
+
+describe('runtime table actions', () => {
   it('hides a hideable column through the mounted table target', async () => {
     const registry = createRegistry()
     const setColumnVisibility = vi.fn()

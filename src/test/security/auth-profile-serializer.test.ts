@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { serializeServiceDocument } from '@/model/services/document/endge-service-document-serializer'
 
-describe('AuthProfile service serializer', () => {
+describe('authProfile service serializer', () => {
   it('clears token session policy when profile switches to Basic', () => {
     expect(serializeServiceDocument('auth-profile', {
       identity: 'basic',

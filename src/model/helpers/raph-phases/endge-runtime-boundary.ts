@@ -1,6 +1,4 @@
-import type { DepGraph, PhaseEvent, PhaseExecutorContext, PhaseName, RaphPhase } from '@endge/raph'
-
-import { RaphNode } from '@endge/raph'
+import type { DepGraph, PhaseEvent, PhaseExecutorContext, PhaseName, RaphNode, RaphPhase } from '@endge/raph'
 
 /** Опции фабрики */
 export interface BoundaryPhaseOptions {
@@ -28,8 +26,9 @@ function nearestBoundary(
   isBoundary: (n: RaphNode) => boolean,
 ): RaphNode | null {
   const any = start as any
-  if (any[SYM_BVER] === BOUNDARY_VERSION)
+  if (any[SYM_BVER] === BOUNDARY_VERSION) {
     return (any[SYM_BNEAR] ?? null) as RaphNode | null
+  }
 
   if (isBoundary(start)) {
     any[SYM_BNEAR] = start
@@ -46,13 +45,15 @@ function nearestBoundary(
   while (qi < q.length) {
     const node = q[qi++]
     const parents = graph.parentsOf(node)
-    if (parents.size === 0)
+    if (parents.size === 0) {
       continue
+    }
 
     // пробуем найти boundary на текущем слое родителей
     for (const p of parents) {
-      if (seen.has(p.id))
+      if (seen.has(p.id)) {
         continue
+      }
       if (isBoundary(p)) {
         any[SYM_BNEAR] = p
         any[SYM_BVER] = BOUNDARY_VERSION
@@ -62,8 +63,9 @@ function nearestBoundary(
 
     // иначе расширяем фронт
     for (const p of parents) {
-      if (seen.has(p.id))
+      if (seen.has(p.id)) {
         continue
+      }
       seen.add(p.id)
       q.push(p)
     }
@@ -88,12 +90,14 @@ export function createBoundaryAggregationPhase(
 
       while (qi < q.length) {
         const n = q[qi++]
-        if (n.meta?.kind === 'root')
+        if (n.meta?.kind === 'root') {
           return n
+        }
 
         for (const p of g.parentsOf(n)) {
-          if (seen.has(p.id))
+          if (seen.has(p.id)) {
             continue
+          }
           seen.add(p.id)
           q.push(p)
         }
@@ -114,14 +118,16 @@ export function createBoundaryAggregationPhase(
     nodes,
 
     all: (ctxs) => {
-      if (!ctxs.length)
+      if (!ctxs.length) {
         return
+      }
 
       // nodeId -> PhaseEvent[]
       const eventsByNode = new Map<string, PhaseEvent[]>()
       for (const { node, events } of ctxs) {
-        if (events?.length)
+        if (events?.length) {
           eventsByNode.set(node.id, events)
+        }
       }
 
       // rootId -> Map<boundaryId, PhaseExecutorContext>
@@ -181,17 +187,19 @@ export function createBoundaryAggregationPhase(
           })
         }
         else if (ev?.length) {
-          if (!existing.events)
+          if (!existing.events) {
             existing.events = ev.slice()
-          else existing.events.push(...ev)
+          }
+          else { existing.events.push(...ev) }
         }
       }
 
       // 4) emit update:boundaries (один раз на root)
       for (const [rootId, childrenMap] of byRoot) {
         const root = graph.getNode(rootId)
-        if (!root)
+        if (!root) {
           continue
+        }
 
         const children = Array.from(childrenMap.values())
 
@@ -201,19 +209,20 @@ export function createBoundaryAggregationPhase(
       // 5) emit update:root для root-нод, которые стали dirty напрямую
       //    (и при этом по ним не было update:boundaries в этом тике)
       for (const rootId of dirtyRoots) {
-        if (byRoot.has(rootId))
+        if (byRoot.has(rootId)) {
           continue
+        }
 
         const root = graph.getNode(rootId)
-        if (!root)
+        if (!root) {
           continue
+        }
 
         emitToRoot(root, [])
       }
     },
   }
 }
-
 
 // ---------- TABLES phase (dirty -> nearest boundary -> root aggregation) ----------
 // Raph.addPhase(

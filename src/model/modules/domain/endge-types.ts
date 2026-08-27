@@ -1,5 +1,5 @@
-import { RType } from '@/domain/entities/reflect/RType'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
+import { RType } from '@/domain/entities/reflect/RType'
 import { Endge } from '@/model/kernel/endge'
 
 interface BuiltinTypeDefinition {
@@ -48,8 +48,9 @@ export class EndgeTypes extends EndgeModule {
 
   public constructor() {
     super()
-    for (const definition of CORE_TYPES)
+    for (const definition of CORE_TYPES) {
       this.builtins.set(definition.identity, this.createBuiltin(definition))
+    }
   }
 
   public listBuiltins(): RType[] {

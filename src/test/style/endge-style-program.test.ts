@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { REnvironment } from '@/domain/entities/reflect/REnvironment'
+import { RProject } from '@/domain/entities/reflect/RProject'
 import { RStyle } from '@/domain/entities/reflect/RStyle'
+import { RTenant } from '@/domain/entities/reflect/RTenant'
 import { Endge } from '@/model/kernel/endge'
 import { EndgeUI } from '@/model/modules/ui/endge-ui'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
-import { RProject } from '@/domain/entities/reflect/RProject'
-import { REnvironment } from '@/domain/entities/reflect/REnvironment'
-import { RTenant } from '@/domain/entities/reflect/RTenant'
 
-describe('EndgeCSS program lifecycle', () => {
+describe('endgeCSS program lifecycle', () => {
   afterEach(() => {
     Endge.configuration.reset()
     Endge.program.clear()

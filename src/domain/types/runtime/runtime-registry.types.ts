@@ -16,27 +16,27 @@ export interface RuntimeHostRegistrySnapshot {
 
 export interface RuntimeHostRegistryLike {
   /** Зарегистрировать host в registry и вернуть его же. */
-  register<T extends RuntimeHost<any, any>>(host: T): T
+  register: <T extends RuntimeHost<any, any>>(host: T) => T
   /** Найти host по runtime-id. */
-  getById(id: string): RuntimeHost<any, any> | null
+  getById: (id: string) => RuntimeHost<any, any> | null
   /** Получить список всех host. */
-  getAll(): RuntimeHost<any, any>[]
+  getAll: () => RuntimeHost<any, any>[]
   /** Получить host для конкретной доменной сущности. */
-  getByEntity(entityType: RuntimeEntityType, entityIdentity: string): RuntimeHost<any, any>[]
+  getByEntity: (entityType: RuntimeEntityType, entityIdentity: string) => RuntimeHost<any, any>[]
   /** Удалить host по runtime-id и вернуть удаленный экземпляр. */
-  removeById(id: string): RuntimeHost<any, any> | null
+  removeById: (id: string) => RuntimeHost<any, any> | null
   /** Очистить registry и разрушить все host. */
-  clear(): void
+  clear: () => void
   /** Сохранить snapshot удалённого host в debug-архив. */
-  rememberDeletedSnapshot(snapshot: DestroyedRuntimeHostSnapshot): void
+  rememberDeletedSnapshot: (snapshot: DestroyedRuntimeHostSnapshot) => void
   /** Получить снимки удалённых host из debug-архива. */
-  getDeletedSnapshots(): DestroyedRuntimeHostSnapshot[]
+  getDeletedSnapshots: () => DestroyedRuntimeHostSnapshot[]
   /** Удалить один snapshot из debug-архива по runtime-id. */
-  removeDeletedSnapshot(id: string): DestroyedRuntimeHostSnapshot | null
+  removeDeletedSnapshot: (id: string) => DestroyedRuntimeHostSnapshot | null
   /** Apply the effective bounded inspection capacity immediately. */
-  setDeletedSnapshotLimit(limit: number): void
+  setDeletedSnapshotLimit: (limit: number) => void
   /** Очистить debug-архив удалённых host. */
-  clearDeleted(): void
+  clearDeleted: () => void
   /** Получить сериализованный snapshot registry. */
-  snapshot(): RuntimeHostRegistrySnapshot
+  snapshot: () => RuntimeHostRegistrySnapshot
 }

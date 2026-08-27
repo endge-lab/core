@@ -7,8 +7,8 @@ import type {
 } from '@/domain/types/source/source-engine.types'
 
 import { compileConfigurationSource } from '@/model/services/source-engine/compilers/configuration-source-compile'
-import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
 import { typeReferenceHighlights } from '@/model/services/source-engine/source-document-reference'
+import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
 import { CONFIGURATION_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/configuration.default.source'
 import { collectConfigurationTypeSourceReferences, resolveConfigurationTypeSourceReference } from '@/model/services/source-engine/type-source-references'
 

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { Endge } from '@/model/kernel/endge'
 
-describe('Computation transient source preview', () => {
+describe('computation transient source preview', () => {
   afterEach(() => {
     Endge.runtime.computation.setSandboxAdapter(null)
   })

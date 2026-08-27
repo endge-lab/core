@@ -10,12 +10,14 @@ export function normalizeSortBy(v: unknown): string {
 }
 
 export function normalizeSortConfig(raw: unknown): ColumnSortConfig | null {
-  if (!raw || typeof raw !== 'object')
+  if (!raw || typeof raw !== 'object') {
     return null
+  }
 
   const by: string = normalizeSortBy((raw as any).by)
-  if (!by)
+  if (!by) {
     return null
+  }
 
   return {
     by,

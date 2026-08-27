@@ -1,5 +1,5 @@
-import type { FilterFieldItemSchema, RFilterSchema } from '@/domain/types/document/filter.types'
 import type { DomainDocumentType } from '@/domain/types/document/document.types'
+import type { FilterFieldItemSchema, RFilterSchema } from '@/domain/types/document/filter.types'
 
 import { Expose } from 'class-transformer'
 

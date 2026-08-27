@@ -68,19 +68,19 @@ export interface EndgeSessionIdentity {
 }
 
 export interface EndgeSessionIdentityProvider {
-  getCurrentIdentity(): EndgeSessionIdentity | null
+  getCurrentIdentity: () => EndgeSessionIdentity | null
 }
 
 export interface EndgeStorageAdapter {
   readonly id: EndgePersistenceDriver
 
-  isAvailable(): boolean
+  isAvailable: () => boolean
 
-  read<T>(key: string): T | undefined
+  read: <T>(key: string) => T | undefined
 
-  write<T>(key: string, value: T): void
+  write: <T>(key: string, value: T) => void
 
-  remove(key: string): void
+  remove: (key: string) => void
 }
 
 export interface RuntimeStateDocument {
@@ -96,11 +96,11 @@ export interface RuntimeStateControllerLike {
   readonly storageKey: string
   readonly scope: EndgePersistenceScope
 
-  get<T>(entityKey: string, section: string, fallback: T): T
+  get: <T>(entityKey: string, section: string, fallback: T) => T
 
-  set<T>(entityKey: string, section: string, value: T): void
+  set: <T>(entityKey: string, section: string, value: T) => void
 
-  remove(entityKey: string, section?: string): void
+  remove: (entityKey: string, section?: string) => void
 
-  clear(): void
+  clear: () => void
 }

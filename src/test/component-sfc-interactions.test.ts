@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { ComponentSFCEventBoundary } from '@/domain/entities/runtime/ComponentSFCEventBoundary'
-import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
 import { listComponentSFCEventCapableTags } from '@/domain/types/component/sfc/intrinsic-events.types'
+import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 
-describe('Component SFC :on interactions', () => {
+describe('component SFC :on interactions', () => {
   it('resolves a required Query reaction through the mounted instance binding', async () => {
     const manifest = createEmptyComponentSFCPortManifest()
     manifest.require.queries.push({
@@ -73,7 +73,9 @@ describe('Component SFC :on interactions', () => {
 
     expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
     const root = result.ir?.template?.roots[0]
-    if (!root || root.kind !== 'element') throw new Error('Text root was not compiled')
+    if (!root || root.kind !== 'element') {
+      throw new Error('Text root was not compiled')
+    }
     const rule = root.interactions?.[0]?.rules[0]
     expect(rule).toMatchObject({
       event: 'click',
@@ -85,7 +87,9 @@ describe('Component SFC :on interactions', () => {
       expect.objectContaining({ kind: 'query', identity: 'selection.refresh' }),
     ])
     expect(rule?.trigger.kind).toBe('expression')
-    if (rule?.trigger.kind === 'expression') expect(rule.trigger.source).not.toContain('reaction')
+    if (rule?.trigger.kind === 'expression') {
+      expect(rule.trigger.source).not.toContain('reaction')
+    }
   })
 
   it('checks the complete suffix modifier power set and rejects passive + prevent', () => {
@@ -103,7 +107,9 @@ describe('Component SFC :on interactions', () => {
       else {
         expect(errors).toEqual([])
         const root = result.ir?.template?.roots[0]
-        if (!root || root.kind !== 'element') throw new Error('Text root was not compiled')
+        if (!root || root.kind !== 'element') {
+          throw new Error('Text root was not compiled')
+        }
         expect(root.interactions?.[0]?.rules[0]?.modifiers).toEqual(active)
       }
     }
@@ -131,7 +137,9 @@ describe('Component SFC :on interactions', () => {
       const result = compileComponentSFC(`<template><${tag} :on="{ event: 'click', reaction: action({ identity: 'audit.click' }) }" /></template>`)
       expect(result.diagnostics.filter(item => item.code.startsWith('sfc-template-on'))).toEqual([])
       const root = result.ir?.template?.roots[0]
-      if (!root || root.kind !== 'element') throw new Error(`${tag} root was not compiled`)
+      if (!root || root.kind !== 'element') {
+        throw new Error(`${tag} root was not compiled`)
+      }
       expect(root.interactions?.[0]?.rules[0]?.event).toBe('click')
     }
   })
@@ -156,7 +164,9 @@ describe('Component SFC :on interactions', () => {
 
     expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
     const root = result.ir?.template?.roots[0]
-    if (!root || root.kind !== 'element') throw new Error('Cell root was not compiled')
+    if (!root || root.kind !== 'element') {
+      throw new Error('Cell root was not compiled')
+    }
     const group = root.interactions?.[0]
     expect(group?.rules).toEqual([])
     expect(group?.triggerSet?.events).toEqual(expect.arrayContaining(['contextmenu', 'keydown']))

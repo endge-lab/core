@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthSessionStore } from '@/model/modules/security/auth/AuthSessionStore'
 import { authProfile, MemoryStorage, tokenSet } from '@/test/security/auth-test-helpers'
 
-describe('AuthSessionStore', () => {
+describe('authSessionStore', () => {
   let localStorage: MemoryStorage
   beforeEach(() => {
     localStorage = new MemoryStorage()

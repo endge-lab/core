@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { EndgeDiagnostics } from '@/model/modules/diagnostics/endge-diagnostics'
 
-describe('Подмодули EndgeDiagnostics', () => {
+describe('подмодули EndgeDiagnostics', () => {
   /** Проверяет явную передачу lifecycle каждому подмодулю в прямом порядке. */
   it('передаёт setup, load, build и start подмодулям', async () => {
     const diagnostics = new EndgeDiagnostics()

@@ -25,12 +25,15 @@ export class ImplementationBindingRegistry {
       scopeIdentity: String(binding.scopeIdentity ?? '').trim() || undefined,
       priority: Number(binding.priority ?? 0) || 0,
     }
-    if (!normalized.executableType || !normalized.executableIdentity || !normalized.providerKey)
+    if (!normalized.executableType || !normalized.executableIdentity || !normalized.providerKey) {
       throw new Error('Implementation binding requires executable type, identity and provider key.')
+    }
     this._bindings.add(normalized)
     let disposed = false
     return () => {
-      if (disposed) return
+      if (disposed) {
+        return
+      }
       disposed = true
       this._bindings.delete(normalized)
     }
@@ -38,13 +41,15 @@ export class ImplementationBindingRegistry {
 
   public resolve(request: ImplementationResolutionRequest): ImplementationBinding | null {
     const candidates = [...this._bindings].filter((binding) => {
-      if (binding.executableType !== request.executable.type || binding.executableIdentity !== request.executable.identity)
+      if (binding.executableType !== request.executable.type || binding.executableIdentity !== request.executable.identity) {
         return false
+      }
       const requestedScopeIdentity = request.scopeIdentities?.[binding.scope]
       return binding.scopeIdentity == null || binding.scopeIdentity === requestedScopeIdentity
     })
-    if (candidates.length === 0)
+    if (candidates.length === 0) {
       return null
+    }
 
     const highestScope = Math.max(...candidates.map(binding => SCOPE_WEIGHT[binding.scope]))
     const atScope = candidates.filter(binding => SCOPE_WEIGHT[binding.scope] === highestScope)

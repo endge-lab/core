@@ -1,19 +1,19 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { REntity } from '@/domain/entities/reflect/REntity'
 
+import type { EndgeDomainBundle, EndgeDomainSelection } from '@/domain/types/document/domain-export.type'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RAuthProfile } from '@/domain/entities/reflect/RAuthProfile'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
+import { RComputation } from '@/domain/entities/reflect/RComputation'
 import { RDataView } from '@/domain/entities/reflect/RDataView'
-import type { REntity } from '@/domain/entities/reflect/REntity'
-import { DomainSectionType, QueryType } from '@/domain/types/document/document.types'
-import type { EndgeDomainBundle, EndgeDomainSelection } from '@/domain/types/document/domain-export.type'
+import { RMock } from '@/domain/entities/reflect/RMock'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RStore } from '@/domain/entities/reflect/RStore'
-import { RMock } from '@/domain/entities/reflect/RMock'
-import { RComputation } from '@/domain/entities/reflect/RComputation'
-import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
+import { DomainSectionType, QueryType } from '@/domain/types/document/document.types'
 import { Endge } from '@/model/kernel/endge'
 import { EndgeDomain } from '@/model/modules/domain/endge-domain'
+import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
 function createQuery(id: number, identity: string, type: QueryType): RQuery {
   const query = new RQuery()
@@ -49,13 +49,14 @@ async function downloadBundle(selection?: readonly EndgeDomainSelection[]): Prom
 
   Endge.download(selection)
   const downloadedBlob = downloadedBlobs[0]
-  if (!downloadedBlob)
+  if (!downloadedBlob) {
     throw new Error('Endge.download() did not create a bundle Blob')
+  }
 
   return JSON.parse(await downloadedBlob.text()) as EndgeDomainBundle
 }
 
-describe('Endge domain export', () => {
+describe('endge domain export', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
     Endge.domain.reset()

@@ -1,5 +1,5 @@
-import type { SourceExpressionIR } from '@/domain/types/source/source-expression.types'
 import type { ComputationSourceDocument } from './computation-source.types'
+import type { SourceExpressionIR } from '@/domain/types/source/source-expression.types'
 
 /** Optional persisted metadata; v1 compiler does not compare contracts. */
 export interface ComputationContractField {

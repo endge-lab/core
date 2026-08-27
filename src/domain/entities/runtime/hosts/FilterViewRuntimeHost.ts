@@ -1,14 +1,14 @@
 import type { RFilter } from '@/domain/entities/reflect/RFilter'
 import type { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
+import type { RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime/runtime-host.types'
 import type { CompositionFilterFieldsSlice } from '@/domain/types/source/composition-source.types'
 import type { FilterProgramPayload } from '@/domain/types/source/filter-source.types'
+import type { SourceFieldDefinition, SourceFieldOption } from '@/domain/types/source/source-expression.types'
 import type {
   FilterViewControlDefinition,
   FilterViewImplementation,
   FilterViewRenderModel,
-} from '@/domain/types/ui/filter-view.type'
-import type { RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime/runtime-host.types'
-import type { SourceFieldDefinition, SourceFieldOption } from '@/domain/types/source/source-expression.types'
+} from '@/domain/types/presentation/filter-view.type'
 
 import { Raph } from '@endge/raph'
 
@@ -138,8 +138,9 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
 
   /** Меняет одно поле через state-владельца Filter runtime. */
   public async setValue(key: string, value: unknown): Promise<void> {
-    if (!this._fieldKeys.includes(key))
+    if (!this._fieldKeys.includes(key)) {
       throw new Error(`[FilterViewRuntimeHost] field "${key}" is outside this view.`)
+    }
 
     await this._sourceRuntime.action('set').run({ key, value })
   }
@@ -165,12 +166,15 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
 
   private _resolveControl(field: SourceFieldDefinition): FilterViewControlDefinition {
     const explicit = this._controls[field.key]
-    if (explicit)
+    if (explicit) {
       return explicit
-    if (field.options || field.vocab)
+    }
+    if (field.options || field.vocab) {
       return { type: 'Select' }
-    if (field.type === 'Boolean')
+    }
+    if (field.type === 'Boolean') {
       return { type: 'Checkbox' }
+    }
     return { type: 'Input' }
   }
 
@@ -179,8 +183,9 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
    */
   private _resolveOptions(field: SourceFieldDefinition): SourceFieldOption[] {
     const config = field.vocab
-    if (!config)
+    if (!config) {
       return field.options ?? []
+    }
 
     const rows = Endge.vocabs.getValues(config.identity)
     return rows.map((row) => {
@@ -200,8 +205,9 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
    */
   private _resolveVocabPath(field: SourceFieldDefinition): string | null {
     const identity = String(field.vocab?.identity ?? '').trim()
-    if (!identity)
+    if (!identity) {
       return null
+    }
     return `vocabs.${identity}`
   }
 

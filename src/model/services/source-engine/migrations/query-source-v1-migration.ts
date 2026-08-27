@@ -1,9 +1,9 @@
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
 
-export type QuerySourceV1MigrationResult =
-  | { ok: true, source: string, sourceVersion: 2 }
-  | { ok: false, code: string, message: string }
+export type QuerySourceV1MigrationResult
+  = | { ok: true, source: string, sourceVersion: 2 }
+    | { ok: false, code: string, message: string }
 
 /**
  * Переводит поддерживаемый legacy Query v1 source в canonical Query v2.
@@ -65,7 +65,7 @@ export function migrateQuerySourceV1ToV2(source: string): QuerySourceV1Migration
   const kind = readExpressionProperty(definition, 'kind')
   const mock = readExpressionProperty(definition, 'mock')
   const migrated = `defineQuery({
-  kind: ${kind ? sliceSource(source, kind) : "'rest'"},
+  kind: ${kind ? sliceSource(source, kind) : '\'rest\''},
 
   props: defineProps({}),
 
@@ -85,19 +85,22 @@ export function migrateQuerySourceV1ToV2(source: string): QuerySourceV1Migration
 
 function findDefineQueryCall(ast: t.File): t.CallExpression | null {
   for (const statement of ast.program.body) {
-    if (!t.isExpressionStatement(statement))
+    if (!t.isExpressionStatement(statement)) {
       continue
+    }
     const expression = unwrapExpression(statement.expression)
-    if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'defineQuery' }))
+    if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'defineQuery' })) {
       return expression
+    }
   }
   return null
 }
 
 function readExpressionProperty(node: t.ObjectExpression, key: string): t.Expression | null {
   for (const property of node.properties) {
-    if (!t.isObjectProperty(property) || property.computed || propertyName(property.key) !== key || !t.isExpression(property.value))
+    if (!t.isObjectProperty(property) || property.computed || propertyName(property.key) !== key || !t.isExpression(property.value)) {
       continue
+    }
     return unwrapExpression(property.value)
   }
   return null
@@ -119,27 +122,31 @@ function readStringProperty(node: t.ObjectExpression, key: string): string | nul
 }
 
 function propertyName(node: t.ObjectProperty['key']): string | null {
-  if (t.isIdentifier(node))
+  if (t.isIdentifier(node)) {
     return node.name
-  if (t.isStringLiteral(node) || t.isNumericLiteral(node))
+  }
+  if (t.isStringLiteral(node) || t.isNumericLiteral(node)) {
     return String(node.value)
+  }
   return null
 }
 
 function unwrapExpression<T extends t.Expression>(node: T): t.Expression {
-  if (t.isTSAsExpression(node) || t.isTSSatisfiesExpression(node) || t.isTypeCastExpression(node) || t.isParenthesizedExpression(node))
+  if (t.isTSAsExpression(node) || t.isTSSatisfiesExpression(node) || t.isTypeCastExpression(node) || t.isParenthesizedExpression(node)) {
     return unwrapExpression(node.expression)
+  }
   return node
 }
 
 function sliceSource(source: string, node: t.Node): string {
-  if (typeof node.start !== 'number' || typeof node.end !== 'number')
+  if (typeof node.start !== 'number' || typeof node.end !== 'number') {
     return ''
+  }
   return source.slice(node.start, node.end)
 }
 
 function quote(value: string): string {
-  return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
+  return `'${value.replace(/\\/g, '\\\\').replace(/'/g, '\\\'')}'`
 }
 
 function failure(code: string, message: string): QuerySourceV1MigrationResult {

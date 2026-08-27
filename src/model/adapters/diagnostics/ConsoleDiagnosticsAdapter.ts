@@ -60,14 +60,16 @@ export class ConsoleDiagnosticsAdapter implements DiagnosticsAdapter {
     }
 
     const grouped = this._groupByTrace && Boolean(record.traceId) && typeof console.groupCollapsed === 'function'
-    if (grouped)
+    if (grouped) {
       console.groupCollapsed(`[${this._name}] trace ${record.traceId}`)
+    }
 
     const parts = this._formatRecord(record)
     this._writeRecord(record, parts.message, parts.details)
 
-    if (grouped)
+    if (grouped) {
       console.groupEnd()
+    }
   }
 
   /** Выводит bounded summary снимка, не сериализуя telemetry history целиком. */
@@ -95,10 +97,12 @@ export class ConsoleDiagnosticsAdapter implements DiagnosticsAdapter {
       prefix.push(new Date(timestamp).toISOString())
     }
     prefix.push(record.signal === 'log' ? record.severityText : 'SPAN')
-    if (record.phase)
+    if (record.phase) {
       prefix.push(record.phase)
-    if (this._includeScope)
+    }
+    if (this._includeScope) {
       prefix.push(record.scope.name)
+    }
 
     const text = record.signal === 'log'
       ? boundedConsoleText(record.body)
@@ -117,14 +121,16 @@ export class ConsoleDiagnosticsAdapter implements DiagnosticsAdapter {
       writer(text)
       return
     }
-    if (record.severityNumber >= 17)
+    if (record.severityNumber >= 17) {
       console.error(text)
-    else if (record.severityNumber >= 13)
+    }
+    else if (record.severityNumber >= 13) {
       console.warn(text)
-    else if (record.severityNumber <= 5)
+    }
+    else if (record.severityNumber <= 5) {
       console.debug(text)
-    else
-      console.info(text)
+    }
+    else { console.info(text) }
   }
 }
 

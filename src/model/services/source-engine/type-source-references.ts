@@ -20,11 +20,17 @@ export function collectTypeSourceReferences(source: string): TypeSourceReference
     })
     const references: TypeSourceReferenceLocation[] = []
     for (const statement of ast.program.body) {
-      if (!t.isExpressionStatement(statement)) continue
+      if (!t.isExpressionStatement(statement)) {
+        continue
+      }
       const expression = unwrapExpression(statement.expression)
-      if (!t.isCallExpression(expression) || !t.isIdentifier(expression.callee, { name: 'defineType' })) continue
+      if (!t.isCallExpression(expression) || !t.isIdentifier(expression.callee, { name: 'defineType' })) {
+        continue
+      }
       const definition = expression.arguments[0]
-      if (definition && t.isExpression(definition)) collectTypeExpression(definition, references)
+      if (definition && t.isExpression(definition)) {
+        collectTypeExpression(definition, references)
+      }
     }
     return references
   }
@@ -39,19 +45,32 @@ export function collectConfigurationTypeSourceReferences(source: string): TypeSo
     const ast = parseTS(source, { sourceType: 'module', plugins: ['typescript'], errorRecovery: true })
     const references: TypeSourceReferenceLocation[] = []
     for (const statement of ast.program.body) {
-      if (!t.isExpressionStatement(statement)) continue
+      if (!t.isExpressionStatement(statement)) {
+        continue
+      }
       const expression = unwrapExpression(statement.expression)
-      if (!t.isCallExpression(expression) || !t.isIdentifier(expression.callee, { name: 'defineConfig' })) continue
+      if (!t.isCallExpression(expression) || !t.isIdentifier(expression.callee, { name: 'defineConfig' })) {
+        continue
+      }
       const object = expression.arguments[0]
-      if (!object || !t.isObjectExpression(object)) continue
+      if (!object || !t.isObjectExpression(object)) {
+        continue
+      }
       for (const property of object.properties) {
-        if (!t.isObjectProperty(property) || !t.isExpression(property.value)) continue
+        if (!t.isObjectProperty(property) || !t.isExpression(property.value)) {
+          continue
+        }
         let cursor = unwrapExpression(property.value)
-        while (t.isCallExpression(cursor) && t.isMemberExpression(cursor.callee) && t.isExpression(cursor.callee.object))
+        while (t.isCallExpression(cursor) && t.isMemberExpression(cursor.callee) && t.isExpression(cursor.callee.object)) {
           cursor = unwrapExpression(cursor.callee.object)
-        if (!t.isCallExpression(cursor) || !t.isIdentifier(cursor.callee, { name: 'value' })) continue
+        }
+        if (!t.isCallExpression(cursor) || !t.isIdentifier(cursor.callee, { name: 'value' })) {
+          continue
+        }
         const type = cursor.arguments[0]
-        if (type && t.isExpression(type)) collectTypeExpression(type, references)
+        if (type && t.isExpression(type)) {
+          collectTypeExpression(type, references)
+        }
       }
     }
     return references
@@ -87,7 +106,9 @@ export function resolveConfigurationTypeSourceReference(context: SourceLanguageC
 
 function resolveReference(context: SourceLanguageContext, references: TypeSourceReferenceLocation[]): SourceDocumentReference | null {
   const offset = positionToOffset(context.source, context.position)
-  if (offset == null) return null
+  if (offset == null) {
+    return null
+  }
   return references
     .filter(reference => offset >= reference.range.start && offset < reference.range.end)
     .sort((left, right) => rangeLength(left) - rangeLength(right))[0] ?? null
@@ -103,40 +124,56 @@ function collectTypeExpression(raw: t.Expression, references: TypeSourceReferenc
     collectObjectFields(node, references)
     return
   }
-  if (!t.isCallExpression(node) || !t.isIdentifier(node.callee)) return
+  if (!t.isCallExpression(node) || !t.isIdentifier(node.callee)) {
+    return
+  }
 
   if (node.callee.name === 'type') {
     const argument = node.arguments[0]
-    if (argument && (t.isIdentifier(argument) || t.isStringLiteral(argument))) addReference(argument, references, node)
+    if (argument && (t.isIdentifier(argument) || t.isStringLiteral(argument))) {
+      addReference(argument, references, node)
+    }
     return
   }
   if (node.callee.name === 'objectOf') {
     const argument = node.arguments[0]
-    if (argument && t.isObjectExpression(argument)) collectObjectFields(argument, references)
+    if (argument && t.isObjectExpression(argument)) {
+      collectObjectFields(argument, references)
+    }
     return
   }
   if (node.callee.name === 'unionOf') {
     for (const argument of node.arguments) {
-      if (t.isExpression(argument)) collectTypeExpression(argument, references)
+      if (t.isExpression(argument)) {
+        collectTypeExpression(argument, references)
+      }
     }
     return
   }
   if (node.callee.name === 'arrayOf' || node.callee.name === 'recordOf') {
     const argument = node.arguments[0]
-    if (argument && t.isExpression(argument)) collectTypeExpression(argument, references)
+    if (argument && t.isExpression(argument)) {
+      collectTypeExpression(argument, references)
+    }
   }
 }
 
 function collectObjectFields(object: t.ObjectExpression, references: TypeSourceReferenceLocation[]): void {
   for (const property of object.properties) {
-    if (!t.isObjectProperty(property) || !t.isExpression(property.value)) continue
+    if (!t.isObjectProperty(property) || !t.isExpression(property.value)) {
+      continue
+    }
     let cursor = unwrapExpression(property.value)
     while (t.isCallExpression(cursor) && t.isMemberExpression(cursor.callee) && t.isExpression(cursor.callee.object)) {
       cursor = unwrapExpression(cursor.callee.object)
     }
-    if (!t.isCallExpression(cursor) || !t.isIdentifier(cursor.callee, { name: 'field' })) continue
+    if (!t.isCallExpression(cursor) || !t.isIdentifier(cursor.callee, { name: 'field' })) {
+      continue
+    }
     const argument = cursor.arguments[0]
-    if (argument && t.isExpression(argument)) collectTypeExpression(argument, references)
+    if (argument && t.isExpression(argument)) {
+      collectTypeExpression(argument, references)
+    }
   }
 }
 
@@ -146,7 +183,9 @@ function addReference(
   normalizationNode: t.Node = node,
 ): void {
   const identity = (t.isIdentifier(node) ? node.name : node.value).trim()
-  if (!identity || node.start == null || node.end == null || normalizationNode.start == null || normalizationNode.end == null) return
+  if (!identity || node.start == null || node.end == null || normalizationNode.start == null || normalizationNode.end == null) {
+    return
+  }
   references.push({
     target: 'type',
     identity,
@@ -156,11 +195,15 @@ function addReference(
 }
 
 function positionToOffset(source: string, position: SourceLanguageContext['position']): number | null {
-  if (!position) return null
+  if (!position) {
+    return null
+  }
   const lines = source.split('\n')
   const lineIndex = Math.max(0, Math.min(position.lineNumber - 1, lines.length - 1))
   let offset = 0
-  for (let index = 0; index < lineIndex; index++) offset += (lines[index]?.length ?? 0) + 1
+  for (let index = 0; index < lineIndex; index++) {
+    offset += (lines[index]?.length ?? 0) + 1
+  }
   const line = lines[lineIndex] ?? ''
   return offset + Math.max(0, Math.min(position.column - 1, line.length))
 }

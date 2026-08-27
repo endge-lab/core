@@ -1,8 +1,8 @@
 import type { EntityOrigin } from '@/domain/types/document/entity-management.type'
-import { Endge } from '@/model/kernel/endge'
 import type { ImplementationBindingScope } from '@/domain/types/runtime/action.types'
 import type { ImplementationProvider } from '@/domain/types/runtime/implementation.types'
-import { EndgeImplementations } from '@/model/modules/runtime/implementation/endge-implementations'
+import type { EndgeImplementations } from '@/model/modules/runtime/implementation/endge-implementations'
+import { Endge } from '@/model/kernel/endge'
 import { split } from '@/model/seed/converters/arrays/split'
 import { toArray } from '@/model/seed/converters/arrays/to-array'
 import { dateToDateString } from '@/model/seed/converters/date/date-to-date-string'
@@ -64,12 +64,18 @@ export class EndgeConverters {
 
   public define(definition: { identity: string, origin: EntityOrigin, defaultProviderKey?: string }): VoidFunction {
     const identity = String(definition.identity ?? '').trim()
-    if (!identity) throw new Error('Converter identity is required.')
-    if (Endge.domain.getConverter(identity) || this.definitions.has(identity)) throw new Error(`Converter identity collision: ${identity}.`)
+    if (!identity) {
+      throw new Error('Converter identity is required.')
+    }
+    if (Endge.domain.getConverter(identity) || this.definitions.has(identity)) {
+      throw new Error(`Converter identity collision: ${identity}.`)
+    }
     const stored = { ...definition, identity }
     this.definitions.set(identity, stored)
     const dispose = () => {
-      if (this.definitions.get(identity) === stored) this.definitions.delete(identity)
+      if (this.definitions.get(identity) === stored) {
+        this.definitions.delete(identity)
+      }
       this.definitionDisposers.delete(dispose)
     }
     this.definitionDisposers.add(dispose)
@@ -77,7 +83,9 @@ export class EndgeConverters {
   }
 
   public provide(provider: { identity: string, key: string, origin: EntityOrigin, convert: ConverterProvider }): VoidFunction {
-    if (!Endge.domain.getConverter(provider.identity) && !this.definitions.has(provider.identity)) throw new Error(`Converter provider requires an existing definition: ${provider.identity}.`)
+    if (!Endge.domain.getConverter(provider.identity) && !this.definitions.has(provider.identity)) {
+      throw new Error(`Converter provider requires an existing definition: ${provider.identity}.`)
+    }
     const disposeProvider = this.implementations.registerProvider({
       key: provider.key,
       origin: provider.origin,
@@ -98,10 +106,12 @@ export class EndgeConverters {
     scopeIdentity?: string
     priority?: number
   }): VoidFunction {
-    if (!Endge.domain.getConverter(binding.identity) && !this.definitions.has(binding.identity))
+    if (!Endge.domain.getConverter(binding.identity) && !this.definitions.has(binding.identity)) {
       throw new Error(`Converter cannot be overridden because it does not exist: ${binding.identity}.`)
-    if (!this.implementations.hasProvider(binding.providerKey))
+    }
+    if (!this.implementations.hasProvider(binding.providerKey)) {
       throw new Error(`Converter provider is not registered: ${binding.providerKey}.`)
+    }
     return this.implementations.bind({
       executableType: 'converter',
       executableIdentity: binding.identity,
@@ -123,12 +133,16 @@ export class EndgeConverters {
     }
     catch { return null }
     const result = provider.execute({ executable: { type: 'converter', identity }, input: value, context: options })
-    if (result && typeof (result as PromiseLike<unknown>).then === 'function') throw new Error(`Async converter "${identity}" is not supported.`)
+    if (result && typeof (result as PromiseLike<unknown>).then === 'function') {
+      throw new Error(`Async converter "${identity}" is not supported.`)
+    }
     return result
   }
 
   public start(): void {
-    if (this.started) return
+    if (this.started) {
+      return
+    }
     this.started = true
     for (const [identity, convert] of Object.entries(BUILTIN_CONVERTERS)) {
       const disposeProvider = this.implementations.registerProvider({
@@ -145,8 +159,12 @@ export class EndgeConverters {
   }
 
   public reset(): void {
-    for (const dispose of [...this.providerDisposers]) dispose()
-    for (const dispose of [...this.definitionDisposers]) dispose()
+    for (const dispose of [...this.providerDisposers]) {
+      dispose()
+    }
+    for (const dispose of [...this.definitionDisposers]) {
+      dispose()
+    }
     this.started = false
   }
 }

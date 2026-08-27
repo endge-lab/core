@@ -12,7 +12,10 @@ export class MemoryStorage implements Storage {
 
 export function authProfile(overrides: Partial<AuthProfileSchema> = {}): AuthProfileSchema {
   return {
-    id: 'auth-main', identity: 'auth-main', name: 'Auth main', displayName: 'Auth main',
+    id: 'auth-main',
+    identity: 'auth-main',
+    name: 'Auth main',
+    displayName: 'Auth main',
     adapterId: 'oidc',
     config: { issuer: 'https://issuer.example', clientId: 'web', scopes: ['openid', 'profile'] },
     credentials: {},

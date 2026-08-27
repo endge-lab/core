@@ -18,14 +18,16 @@ export class EndgeProviderCollectionUnsupportedError extends Error {
 
 export function resolveEndgeServiceCollection(documentType: DomainDocumentType): EndgeDomainCollection {
   const collection = ENDGE_SERVICE_COLLECTION_BY_DOCUMENT_TYPE[documentType]
-  if (!collection)
+  if (!collection) {
     throw new EndgeProviderCollectionUnsupportedError(documentType)
+  }
   return collection
 }
 
 /** Принимает canonical collection либо Core document type для server-state lookup. */
 export function resolveEndgeServiceStateCollection(value: string): EndgeDomainCollection {
-  if (ENDGE_SERVICE_COLLECTIONS.has(value as EndgeDomainCollection))
+  if (ENDGE_SERVICE_COLLECTIONS.has(value as EndgeDomainCollection)) {
     return value as EndgeDomainCollection
+  }
   return resolveEndgeServiceCollection(value as DomainDocumentType)
 }

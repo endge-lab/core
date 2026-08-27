@@ -1,7 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ComponentSFCProgramPayload } from '@/domain/types/program/program.types'
 
-import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RAction } from '@/domain/entities/reflect/RAction'
+import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RComputation } from '@/domain/entities/reflect/RComputation'
 import { REnvironment } from '@/domain/entities/reflect/REnvironment'
 import { RProject } from '@/domain/entities/reflect/RProject'
@@ -9,9 +10,8 @@ import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RTenant } from '@/domain/entities/reflect/RTenant'
 import { Endge } from '@/model/kernel/endge'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
-import type { ComponentSFCProgramPayload } from '@/domain/types/program/program.types'
 
-describe('EndgeCompiler ComponentSFC ports', () => {
+describe('endgeCompiler ComponentSFC ports', () => {
   beforeEach(() => prepareCompilerContext())
 
   afterEach(() => {

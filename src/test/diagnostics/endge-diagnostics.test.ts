@@ -5,8 +5,8 @@ import type {
   DiagnosticsSpanRecord,
   EndgeDiagnosticsConfiguration,
 } from '@/domain/types/diagnostics/diagnostics.types'
-import { EndgeDiagnostics } from '@/model/modules/diagnostics/endge-diagnostics'
 import { describe, expect, it, vi } from 'vitest'
+import { EndgeDiagnostics } from '@/model/modules/diagnostics/endge-diagnostics'
 
 /** Создаёт независимую configuration для одного тестового diagnostics module. */
 function configuration(
@@ -37,7 +37,7 @@ function configuration(
   }
 }
 
-describe('EndgeDiagnostics', () => {
+describe('endgeDiagnostics', () => {
   it('applies severity policy and keeps only the bounded history tail', () => {
     const diagnostics = new EndgeDiagnostics()
     diagnostics.configure(configuration({ minSeverity: 9, maxRecords: 2 }))
@@ -80,8 +80,8 @@ describe('EndgeDiagnostics', () => {
       spanId,
       body: 'Invalid value',
       attributes: {
-        component: 'compiler',
-        authorizationHeader: '[REDACTED]',
+        'component': 'compiler',
+        'authorizationHeader': '[REDACTED]',
         'exception.type': 'TypeError',
         'exception.message': 'Invalid value',
       },
@@ -131,7 +131,9 @@ describe('EndgeDiagnostics', () => {
     unsubscribe()
     diagnostics.error('ignored')
 
-    diagnostics.subscribe({}, () => { throw new Error('listener failed') })
+    diagnostics.subscribe({}, () => {
+      throw new Error('listener failed')
+    })
     expect(() => diagnostics.info('safe producer')).not.toThrow()
     expect(received).toEqual(['error', 'fatal'])
     expect(diagnostics.getCounters().listenerFailures).toBe(1)
@@ -144,7 +146,7 @@ describe('EndgeDiagnostics', () => {
     const unregister = diagnostics.registerContextProvider('auth', () => actor)
 
     const log = diagnostics.info('authorized action', {
-      attributes: { 'user.id': 'spoofed', operation: 'save' },
+      attributes: { 'user.id': 'spoofed', 'operation': 'save' },
     })
     const span = diagnostics.startSpan('query.execute', { startTimestamp: 100 })
     actor = { 'user.id': 'user-2', 'session.id': 'session-2' }
@@ -153,7 +155,7 @@ describe('EndgeDiagnostics', () => {
     expect(log?.attributes).toEqual({
       'user.id': 'user-1',
       'session.id': 'session-1',
-      operation: 'save',
+      'operation': 'save',
     })
     expect(spanRecord?.attributes).toMatchObject({
       'user.id': 'user-1',
@@ -169,7 +171,9 @@ describe('EndgeDiagnostics', () => {
   it('isolates context provider errors from record producers', () => {
     const diagnostics = new EndgeDiagnostics()
     diagnostics.configure(configuration())
-    diagnostics.registerContextProvider('broken', () => { throw new Error('context failed') })
+    diagnostics.registerContextProvider('broken', () => {
+      throw new Error('context failed')
+    })
 
     expect(() => diagnostics.info('still stored')).not.toThrow()
     expect(diagnostics.query()).toHaveLength(1)
@@ -277,8 +281,9 @@ describe('EndgeDiagnostics', () => {
     })
     diagnostics.registerAdapter({ id: 'memory', acceptRecord: vi.fn(), acceptSnapshot })
 
-    for (let index = 0; index < 9; index += 1)
+    for (let index = 0; index < 9; index += 1) {
       diagnostics.error(`error-${index}`, { timestamp: 1_000 + index })
+    }
     expect(acceptSnapshot).not.toHaveBeenCalled()
 
     diagnostics.error('error-10', { timestamp: 1_010 })

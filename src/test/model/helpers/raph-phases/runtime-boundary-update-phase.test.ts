@@ -1,12 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import type { RuntimeHost, RuntimeHostUpdateContext } from '@/domain/types/runtime/runtime-host.types'
 import {
   RaphKernel,
   RaphNode,
   RaphSchedulerType,
 } from '@endge/raph'
 
+import { describe, expect, it } from 'vitest'
 import { RuntimeBoundaryUpdatePhase } from '@/model/helpers/raph-phases/runtime-boundary-update-phase'
-import type { RuntimeHost, RuntimeHostUpdateContext } from '@/domain/types/runtime/runtime-host.types'
 
 function createRuntimeNode(
   runtime: ReturnType<RaphKernel['createRuntime']>,
@@ -47,7 +47,7 @@ function createFixture() {
   return { kernel, runtime, updates }
 }
 
-describe('RuntimeBoundaryUpdatePhase', () => {
+describe('runtimeBoundaryUpdatePhase', () => {
   it('updates root host once when root node is dirty', () => {
     const { kernel, runtime, updates } = createFixture()
     const root = createRuntimeNode(runtime, 'root', 'root')

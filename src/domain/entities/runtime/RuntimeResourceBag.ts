@@ -7,10 +7,12 @@ export class RuntimeResourceBag {
 
   public add<T extends RuntimeOwnedResource>(resource: T): T {
     const id = String(resource.id ?? '').trim()
-    if (!id)
+    if (!id) {
       throw new Error('[RuntimeResourceBag] Resource id is required.')
-    if (this._resources.has(id))
+    }
+    if (this._resources.has(id)) {
       throw new Error(`[RuntimeResourceBag] Resource "${id}" is already owned.`)
+    }
     this._resources.set(id, resource)
     return resource
   }
@@ -20,8 +22,9 @@ export class RuntimeResourceBag {
   }
 
   public async pause(): Promise<void> {
-    if (this._paused)
+    if (this._paused) {
       return
+    }
     const resources = [...this._resources.values()].reverse()
     const errors: unknown[] = []
     for (const resource of resources) {
@@ -33,13 +36,15 @@ export class RuntimeResourceBag {
       }
     }
     this._paused = true
-    if (errors.length)
+    if (errors.length) {
       throw new AggregateError(errors, '[RuntimeResourceBag] Failed to pause resources.')
+    }
   }
 
   public async resume(): Promise<void> {
-    if (!this._paused)
+    if (!this._paused) {
       return
+    }
     const resumed: RuntimeOwnedResource[] = []
     try {
       for (const resource of this._resources.values()) {
@@ -72,8 +77,9 @@ export class RuntimeResourceBag {
         errors.push(error)
       }
     }
-    if (errors.length)
+    if (errors.length) {
       throw new AggregateError(errors, '[RuntimeResourceBag] Failed to dispose resources.')
+    }
   }
 
   public snapshot(): RuntimeResourceBagSnapshot {

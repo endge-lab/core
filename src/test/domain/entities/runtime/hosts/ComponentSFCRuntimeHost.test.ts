@@ -1,22 +1,22 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Raph } from '@endge/raph'
+import type { ComponentSFCEventPort } from '@/domain/types/component/sfc/ports.types'
+import type { ComponentSFCProgramPayload, ProgramArtifact } from '@/domain/types/program/program.types'
 
+import type {
+  RuntimeArtifactReader,
+  RuntimeBoundaryPatch,
+  RuntimeHostUpdateContext,
+} from '@/domain/types/runtime/runtime-host.types'
+import { Raph } from '@endge/raph'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentSFCRuntimeHost'
-import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
-import type { ComponentSFCProgramPayload, ProgramArtifact } from '@/domain/types/program/program.types'
-import type { ComponentSFCEventPort } from '@/domain/types/component/sfc/ports.types'
-import type {
-  RuntimeBoundaryPatch,
-  RuntimeArtifactReader,
-  RuntimeHostUpdateContext,
-} from '@/domain/types/runtime/runtime-host.types'
 import { RuntimeBoundaryUpdatePhase } from '@/model/helpers/raph-phases/runtime-boundary-update-phase'
 import { Endge } from '@/model/kernel/endge'
 import { OperationHistory } from '@/model/modules/runtime/operation/operation-history'
+import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 
-describe('ComponentSFCRuntimeHost', () => {
+describe('componentSFCRuntimeHost', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     Endge.styles.reset()
@@ -36,10 +36,16 @@ describe('ComponentSFCRuntimeHost', () => {
       getArtifact: <TPayload>() => artifact as unknown as ProgramArtifact<TPayload>,
     }
     const first = ComponentSFCRuntimeHost.createRuntime({
-      id: 'styled-1', model, meta: { runtimeScopeId: 'scope:test' }, artifactReader: reader,
+      id: 'styled-1',
+      model,
+      meta: { runtimeScopeId: 'scope:test' },
+      artifactReader: reader,
     })
     const second = ComponentSFCRuntimeHost.createRuntime({
-      id: 'styled-2', model, meta: { runtimeScopeId: 'scope:test' }, artifactReader: reader,
+      id: 'styled-2',
+      model,
+      meta: { runtimeScopeId: 'scope:test' },
+      artifactReader: reader,
     })
 
     expect(Endge.styles.getActivePlacements()).toHaveLength(1)

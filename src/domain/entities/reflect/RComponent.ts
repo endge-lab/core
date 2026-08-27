@@ -1,9 +1,9 @@
 import type { RComponentTableColumn } from '@/domain/entities/reflect/RComponentTableColumn'
+import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
+
 import type { RComponent } from '@/domain/types/component/component.types'
 
 import { Serialize } from '@endge/utils'
-
-import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
 import { RComponentBase } from '@/domain/entities/reflect/RComponentBase'
 import { RComponentDSL } from '@/domain/entities/reflect/RComponentDSL'
 import { RComponentTable } from '@/domain/entities/reflect/RComponentTable'
@@ -127,8 +127,9 @@ export function duplicateComponent(
   options: DuplicateOptions,
 ): RComponent {
   const plain = ReflectComponentToPlain(component) as Record<string, any>
-  if (!plain)
+  if (!plain) {
     throw new Error('ReflectComponentToPlain returned null')
+  }
   const name = (options.name ?? options.identity).trim() || options.identity
   plain.identity = options.identity
   plain.name = name
@@ -137,8 +138,9 @@ export function duplicateComponent(
   plain.folder = null
   plain.group = null
   const copy = ReflectComponentFromPlain(plain)
-  if (!copy)
+  if (!copy) {
     throw new Error('ReflectComponentFromPlain returned null')
+  }
   return copy
 }
 
@@ -188,7 +190,7 @@ export function ReflectComponentToPayloadData(
     }
     base.columns = table.columns.map((col) => {
       const dataPaths = Object.entries(col.dataPaths || {}).map(([key, path]) => ({ key, path: path ?? '' }))
-      const dataConvertersArr: Array<{ dataPathKey: string; converter: number }> = []
+      const dataConvertersArr: Array<{ dataPathKey: string, converter: number }> = []
       for (const [key, identityOrIds] of Object.entries(col.dataConverters || {})) {
         const ids = String(identityOrIds ?? '').split(',').map(s => s.trim()).filter(Boolean)
         for (const id of ids) {
@@ -196,7 +198,9 @@ export function ReflectComponentToPayloadData(
             const numericId = Number(id)
             return Number.isFinite(numericId) ? numericId : null
           })()
-          if (convId != null) dataConvertersArr.push({ dataPathKey: key, converter: convId })
+          if (convId != null) {
+            dataConvertersArr.push({ dataPathKey: key, converter: convId })
+          }
         }
       }
       const rawComponentId = col.type === ComponentType.Component ? (col as any).componentId : null
@@ -217,11 +221,11 @@ export function ReflectComponentToPayloadData(
         dataConverters: dataConvertersArr,
         reports: col.reports && typeof col.reports === 'object'
           ? Object.entries(col.reports).map(([key, cfg]: [string, any]) => ({
-            key,
-            enabled: cfg?.enabled !== false,
-            formatterType: cfg?.formatter?.type,
-            formatterFormat: cfg?.formatter?.format,
-          }))
+              key,
+              enabled: cfg?.enabled !== false,
+              formatterType: cfg?.formatter?.type,
+              formatterFormat: cfg?.formatter?.format,
+            }))
           : undefined,
         eventHandlers: (col.eventBindings || []).map(h => ({ event: h?.event ?? '', actionId: h?.actionId != null ? String(h.actionId) : undefined })),
         componentId: compId ?? undefined,

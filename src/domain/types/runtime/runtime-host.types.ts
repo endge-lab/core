@@ -1,8 +1,8 @@
-import type { RuntimeStateControllerLike } from '@/domain/types/runtime/context-persistence.types'
+import type { PhaseEvent, PhaseName, RaphFrameContext, RaphNode } from '@endge/raph'
 import type { ProgramArtifact, ProgramEntityType } from '@/domain/types/program/program.types'
+import type { RuntimeStateControllerLike } from '@/domain/types/runtime/context-persistence.types'
 import type { RuntimeEntityModelMap, RuntimeEntityType } from '@/domain/types/runtime/runtime-entity-map.types'
 import type { RuntimeKind } from '@/domain/types/runtime/runtime.types'
-import type { PhaseEvent, PhaseName, RaphFrameContext, RaphNode } from '@endge/raph'
 
 export type RuntimeHostStatus
   = 'created'
@@ -122,15 +122,15 @@ export interface ProjectRuntimeHostContext extends RuntimeHostContextBase {
 }
 
 export interface RuntimeHostContextMap {
-  action: ActionRuntimeHostContext
-  query: QueryRuntimeHostContext
-  filter: FilterRuntimeHostContext
-  composition: CompositionRuntimeHostContext
-  store: StoreRuntimeHostContext
-  stream: StreamRuntimeHostContext
+  'action': ActionRuntimeHostContext
+  'query': QueryRuntimeHostContext
+  'filter': FilterRuntimeHostContext
+  'composition': CompositionRuntimeHostContext
+  'store': StoreRuntimeHostContext
+  'stream': StreamRuntimeHostContext
   'component-sfc': ComponentSFCRuntimeHostContext
-  page: PageRuntimeHostContext
-  project: ProjectRuntimeHostContext
+  'page': PageRuntimeHostContext
+  'project': ProjectRuntimeHostContext
 }
 
 export type RuntimeHostContext<TType extends RuntimeEntityType>
@@ -206,7 +206,7 @@ export interface DestroyedRuntimeHostSnapshot {
 }
 
 export interface RuntimeInspectionLease {
-  release(): void
+  release: () => void
 }
 
 export interface RuntimeHostLifecycle {

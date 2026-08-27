@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { inspectComponentSFCVisual } from '@/model/services/source-engine/component-sfc/component-sfc-visual-projection'
 
-describe('Component SFC visual projection', () => {
+describe('component SFC visual projection', () => {
   it('enables table visualization for one root Table and projects its columns', () => {
     const result = inspectComponentSFCVisual(`<script setup lang="ts">
 defineProps<{ rows: unknown[] }>()
@@ -138,9 +138,9 @@ defineProps<{ rows: unknown[] }>()
         identity: 'aircraft-tail',
         syntax: 'direct',
         bindings: [
-          { name: 'tail', value: { kind: 'expression', source: "row.departureLeg.attributes[name = 'ACTail']" } },
-          { name: 'aircraftType', value: { kind: 'expression', source: "row.departureLeg.attributes[name = 'ACType']" } },
-          { name: 'configuration', value: { kind: 'expression', source: "row.departureLeg.attributes[name = 'ACConfig']" } },
+          { name: 'tail', value: { kind: 'expression', source: 'row.departureLeg.attributes[name = \'ACTail\']' } },
+          { name: 'aircraftType', value: { kind: 'expression', source: 'row.departureLeg.attributes[name = \'ACType\']' } },
+          { name: 'configuration', value: { kind: 'expression', source: 'row.departureLeg.attributes[name = \'ACConfig\']' } },
         ],
       },
       hasCustomCell: true,
@@ -167,7 +167,7 @@ defineProps<{ rows: unknown[] }>()
       items: [{
         kind: 'item',
         action: { kind: 'literal', value: 'built-in-console-log' },
-        label: { kind: 'expression', source: "t('schedule:menu.open', 'Открыть')" },
+        label: { kind: 'expression', source: 't(\'schedule:menu.open\', \'Открыть\')' },
         input: { kind: 'expression', source: '{ rowId, columnKey, value }' },
       }],
     })

@@ -4,7 +4,7 @@ import type {
   UIComponentDefinition,
   UIComponentPresetDocument,
   UIJsxComponentDocument,
-} from '@/domain/types/ui/ui-composition.types'
+} from '@/domain/types/presentation/ui-composition.types'
 
 /** Декларативная конфигурация встроенных UI-компонентов. */
 export const UI_COMPONENT_HOST_DEFINITION_ID = 'ui.component-host'

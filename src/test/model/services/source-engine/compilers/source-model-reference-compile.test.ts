@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
-
 import type { DataViewRef } from '@/domain/types/source/data-view-source.types'
+
+import { describe, expect, it } from 'vitest'
 
 import { compileDataViewSource } from '@/model/services/source-engine/compilers/data-view-source-compile'
 import { compileQuerySource } from '@/model/services/source-engine/compilers/query-source-compile'

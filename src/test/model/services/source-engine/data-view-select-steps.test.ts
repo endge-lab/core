@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 import { compileDataViewSource } from '@/model/services/source-engine/compilers/data-view-source-compile'
 
-describe('DataView select pipeline compiler', () => {
+describe('dataView select pipeline compiler', () => {
   it('compiles sequential select steps as a full materialization pipeline', () => {
     const result = compileDataViewSource(`
 defineDataView({

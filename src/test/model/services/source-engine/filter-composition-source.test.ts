@@ -4,7 +4,7 @@ import { compileCompositionSource } from '@/model/services/source-engine/compile
 import { compileFilterSource } from '@/model/services/source-engine/compilers/filter-source-compile'
 import { compileQuerySource } from '@/model/services/source-engine/compilers/query-source-compile'
 
-describe('Filter, Query v2 and Composition source compiler', () => {
+describe('filter, Query v2 and Composition source compiler', () => {
   it('compiles Filter fields, options, vocab, defaults and outputs into static IR', () => {
     const result = compileFilterSource(`
 defineFilter({
@@ -13,14 +13,14 @@ defineFilter({
     direction: field('String').options([{ value: 'departure', label: 'Вылет' }]).default('departure'),
     airlines: field('String').array().vocab('airlines', { valuePath: 'code', labelPath: 'name' }).default([]),
   },
-	  outputs: {
-	    request: output().json(({ value }) => compact({
-	      direction: value('direction'),
-	      airlineCode: inList(value('airlines')),
-	    })),
-	    predicate: output().predicate(({ row, value }) => and(
-	      between(row('std'), value('from'), value('from')),
-	      inArray(row('airlineCode'), value('airlines')),
+    outputs: {
+      request: output().json(({ value }) => compact({
+        direction: value('direction'),
+        airlineCode: inList(value('airlines')),
+      })),
+      predicate: output().predicate(({ row, value }) => and(
+        between(row('std'), value('from'), value('from')),
+        inArray(row('airlineCode'), value('airlines')),
     )),
   },
 })
@@ -34,11 +34,11 @@ defineFilter({
         { key: 'direction', options: [{ value: 'departure', label: 'Вылет' }] },
         { key: 'airlines', array: true, vocab: { identity: 'airlines' } },
       ],
-	      outputs: [
-	        { key: 'request', kind: 'json' },
-	        { key: 'predicate', kind: 'predicate' },
-	      ],
-	    })
+      outputs: [
+        { key: 'request', kind: 'json' },
+        { key: 'predicate', kind: 'predicate' },
+      ],
+    })
   })
 
   it('compiles DateTime relative defaults into static IR', () => {
@@ -234,7 +234,7 @@ defineQuery({
       headers: {
         type: 'object',
         properties: {
-          Accept: { type: 'literal', value: 'application/json' },
+          'Accept': { type: 'literal', value: 'application/json' },
           'X-Tenant': { type: 'read', source: 'prop', path: 'tenant' },
         },
       },
@@ -332,64 +332,64 @@ defineComposition({
 
   it('compiles Composition graph and rejects cycles, duplicate persist keys and render config', () => {
     const valid = compileCompositionSource(`
-	defineComposition({
-	  data: {},
-	  runtimes: {
-	    filter: filter('schedule').persist({ key: 'schedule' }),
-	    dateFilter: filterView('filter')
+  defineComposition({
+    data: {},
+    runtimes: {
+      filter: filter('schedule').persist({ key: 'schedule' }),
+      dateFilter: filterView('filter')
         .fields(['from'])
-	      .controls({ from: control('Input') })
-	      .withProps({
-	        showLabels: true,
-	        labels: { from: 'Дата вылета' },
-	        requestPreview: fromOutput('filter', 'request'),
-	      }),
-	    allFilters: filterView('filter'),
-	    query: query('search').withProps({
-	      payload: fromOutput('filter', 'request'),
-	      filterModel: fromFilter('filter').fields(['from', 'direction']),
-	    }),
-	  },
+        .controls({ from: control('Input') })
+        .withProps({
+          showLabels: true,
+          labels: { from: 'Дата вылета' },
+          requestPreview: fromOutput('filter', 'request'),
+        }),
+      allFilters: filterView('filter'),
+      query: query('search').withProps({
+        payload: fromOutput('filter', 'request'),
+        filterModel: fromFilter('filter').fields(['from', 'direction']),
+      }),
+    },
   hooks: [
     onMount().run('query'),
     onChange('filter.request').debounce(200).run('query'),
   ],
-	  outputs: {
-	    filter: output().fromRuntime('filter'),
-	  },
-	})
-	`)
-	    expect(valid.diagnostics).toEqual([])
-	    expect(valid.artifact?.hooks).toHaveLength(2)
-	    expect(valid.artifact?.graph).toMatchObject({
-	      updates: [{
-	        source: { kind: 'runtime-output', runtime: 'filter', output: 'request' },
-	        targetRuntime: 'query',
-	        updateKind: 'run',
-	        debounceMs: 200,
-	      }],
-	      mounts: [{ targetRuntime: 'query', updateKind: 'run' }],
-	    })
-	    expect(valid.artifact?.runtimes.find(runtime => runtime.name === 'dateFilter')).toMatchObject({
-	      kind: 'filter-view',
-	      identity: 'filter',
-	      fields: ['from'],
-	      controls: { from: { type: 'Input' } },
-	      props: {
-	        showLabels: { kind: 'literal', value: true },
-	        labels: { kind: 'literal', value: { from: 'Дата вылета' } },
-	        requestPreview: { kind: 'output', runtime: 'filter', output: 'request' },
-	      },
-	    })
-	    expect(valid.artifact?.runtimes.find(runtime => runtime.name === 'allFilters')).toMatchObject({
-	      kind: 'filter-view',
-	      identity: 'filter',
-	    })
-	    expect(valid.artifact?.runtimes.find(runtime => runtime.name === 'query')?.props.filterModel).toEqual({
-	      kind: 'filter-fields',
-	      runtime: 'filter',
-	      fields: ['from', 'direction'],
-	    })
+    outputs: {
+      filter: output().fromRuntime('filter'),
+    },
+  })
+  `)
+    expect(valid.diagnostics).toEqual([])
+    expect(valid.artifact?.hooks).toHaveLength(2)
+    expect(valid.artifact?.graph).toMatchObject({
+      updates: [{
+        source: { kind: 'runtime-output', runtime: 'filter', output: 'request' },
+        targetRuntime: 'query',
+        updateKind: 'run',
+        debounceMs: 200,
+      }],
+      mounts: [{ targetRuntime: 'query', updateKind: 'run' }],
+    })
+    expect(valid.artifact?.runtimes.find(runtime => runtime.name === 'dateFilter')).toMatchObject({
+      kind: 'filter-view',
+      identity: 'filter',
+      fields: ['from'],
+      controls: { from: { type: 'Input' } },
+      props: {
+        showLabels: { kind: 'literal', value: true },
+        labels: { kind: 'literal', value: { from: 'Дата вылета' } },
+        requestPreview: { kind: 'output', runtime: 'filter', output: 'request' },
+      },
+    })
+    expect(valid.artifact?.runtimes.find(runtime => runtime.name === 'allFilters')).toMatchObject({
+      kind: 'filter-view',
+      identity: 'filter',
+    })
+    expect(valid.artifact?.runtimes.find(runtime => runtime.name === 'query')?.props.filterModel).toEqual({
+      kind: 'filter-fields',
+      runtime: 'filter',
+      fields: ['from', 'direction'],
+    })
 
     const invalid = compileCompositionSource(`
 defineComposition({
@@ -818,9 +818,9 @@ defineComposition({
         },
       ],
       outputs: [],
-	      graph: {
-	        publications: [{ sourceRuntime: 'query', sourceOutput: 'raw', targetData: 'schedule', targetPath: 'raw' }],
-	      },
+      graph: {
+        publications: [{ sourceRuntime: 'query', sourceOutput: 'raw', targetData: 'schedule', targetPath: 'raw' }],
+      },
     })
   })
 

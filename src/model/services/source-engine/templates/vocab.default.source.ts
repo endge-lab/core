@@ -5,4 +5,3 @@ export const VOCAB_DEFAULT_SOURCE = `defineVocab({
   },
 })
 `
-

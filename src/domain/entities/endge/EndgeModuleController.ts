@@ -10,8 +10,9 @@ export class EndgeModuleController {
    */
   public registerModule(key: string, module: any): void {
     const k = String(key ?? '').trim()
-    if (!k)
+    if (!k) {
       throw new Error('[EndgeModuleController] module key is required')
+    }
 
     if (!module || typeof module.init !== 'function' || typeof module.reset !== 'function') {
       throw new Error(`[EndgeModuleController] module "${k}" must have init() and reset()`)
@@ -24,8 +25,9 @@ export class EndgeModuleController {
    * Инициализация всех модулей
    */
   public init(): void {
-    if (this._isInitialized)
+    if (this._isInitialized) {
       return
+    }
 
     for (const [key, mod] of this._modules.entries()) {
       try {

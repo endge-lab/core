@@ -7,7 +7,7 @@ import {
 
 const template = `<template><Table ref="table" :rows="rows" /></template>`
 
-describe('Component SFC Ports Source patch', () => {
+describe('component SFC Ports Source patch', () => {
   it('creates definePorts and round-trips an Event with direct Action', () => {
     const source = `<script setup lang="ts">\nconst untouched = 1 // оставить\n</script>\n${template}`
     const result = patchComponentSFCPortsSource(source, {
@@ -61,7 +61,7 @@ ${template}`
 
     expect(result.ok, result.message).toBe(true)
     expect(result.source).toContain('  },\n  emits: {')
-    expect(result.source).not.toMatch(/\n\s*,\s*\n\s*emits:/)
+    expect(result.source).not.toMatch(/\n\s*,[\t\v\f\r \xA0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]*\n\s*emits:/)
     expect(result.projection.diagnostics).not.toContainEqual(expect.objectContaining({ code: 'sfc-parse-error' }))
   })
 

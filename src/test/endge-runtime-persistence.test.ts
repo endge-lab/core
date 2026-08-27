@@ -1,11 +1,11 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import type { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentSFCRuntimeHost'
 import { Raph } from '@endge/raph'
 
+import { afterEach, describe, expect, it } from 'vitest'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
-import { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentSFCRuntimeHost'
 import { Endge } from '@/model/kernel/endge'
 
-describe('Endge runtime persistence integration', () => {
+describe('endge runtime persistence integration', () => {
   afterEach(() => {
     Endge.runtime.reset()
     Raph.app.reset()

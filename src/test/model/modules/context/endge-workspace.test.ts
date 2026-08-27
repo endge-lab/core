@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Endge } from '@/model/kernel/endge'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
-describe('EndgeWorkspace', () => {
+describe('endgeWorkspace', () => {
   afterEach(() => {
     vi.restoreAllMocks()
   })

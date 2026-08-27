@@ -7,12 +7,12 @@ import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { RProject } from '@/domain/entities/reflect/RProject'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RStore } from '@/domain/entities/reflect/RStore'
-import { RType } from '@/domain/entities/reflect/RType'
 import { RTenant } from '@/domain/entities/reflect/RTenant'
+import { RType } from '@/domain/entities/reflect/RType'
 import { Endge } from '@/model/kernel/endge'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
-describe('EndgeCompiler composition validation', () => {
+describe('endgeCompiler composition validation', () => {
   beforeEach(() => prepareCompilerContext())
 
   afterEach(() => {
@@ -324,8 +324,8 @@ defineComposition({
     ]))
 
     parent.source = parent.source.replace(
-      "composition('requirements-provider')",
-      "composition('requirements-provider').withProps({ requirements: {} })",
+      'composition(\'requirements-provider\')',
+      'composition(\'requirements-provider\').withProps({ requirements: {} })',
     )
     expect(Endge.compiler.buildComposition(parent).status).toBe('valid')
   })
@@ -520,14 +520,18 @@ function createNestedCompositionWithOutput(identity: string, output: string, sto
   const composition = createNestedComposition(identity)
   composition.source = `
 defineComposition({
-  ${storeTo ? `data: {
+  ${storeTo
+    ? `data: {
     db: store('groundhandling-db'),
-  },` : ''}
+  },`
+    : ''}
   runtimes: {
-    requests: composition('${identity}')${storeTo ? `
+    requests: composition('${identity}')${storeTo
+      ? `
       .storeTo(data('db'), {
         'raw.rows': output('${output}'),
-      })` : ''},
+      })`
+      : ''},
   },
   outputs: {
     rows: output().fromRuntime('requests').select('${output}'),

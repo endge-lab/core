@@ -1,26 +1,26 @@
 import type { RComponentDependencies, RComponentDiagnostic } from '@/domain/types/component/component-core.types'
 import type {
+  RComponentSFC_IR_ElementNode,
+  RComponentSFC_IR_Node,
+  RComponentSFC_IR_Template,
+} from '@/domain/types/component/sfc/ir.types'
+import type {
   ComponentSFCActionPort,
   ComponentSFCComponentPort,
   ComponentSFCComputationPort,
   ComponentSFCEventPort,
-  ComponentSFCQueryPort,
   ComponentSFCPortForwardOrigin,
   ComponentSFCPortForwardRule,
   ComponentSFCPortForwardSelector,
   ComponentSFCPortManifest,
   ComponentSFCPortRole,
+  ComponentSFCQueryPort,
 } from '@/domain/types/component/sfc/ports.types'
-import type {
-  RComponentSFC_IR_ElementNode,
-  RComponentSFC_IR_Node,
-  RComponentSFC_IR_Template,
-} from '@/domain/types/component/sfc/ir.types'
-import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
 import {
   getComponentSFCIntrinsicEventDefinitions,
   listComponentSFCEventCapableTags,
 } from '@/domain/types/component/sfc/intrinsic-events.types'
+import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
 import { TABLE_EVENT_DEFINITIONS } from '@/domain/types/component/sfc/table-events.types'
 import { TABLE_RUNTIME_ACTION_IDS } from '@/domain/types/runtime/action.types'
 
@@ -51,13 +51,16 @@ export function resolveComponentSFCPortForwards(
 ): ComponentSFCPortForwardResult {
   const diagnostics: RComponentDiagnostic[] = []
   const dependencies = createEmptyDependencies()
-  if (!template)
+  if (!template) {
     return { diagnostics, dependencies }
+  }
 
   const bindings = collectLocalComponentBindings(template, options)
   const refs = new Map<string, LocalComponentBinding>()
   for (const binding of bindings) {
-    if (!binding.ref) continue
+    if (!binding.ref) {
+      continue
+    }
     const duplicate = refs.get(binding.ref)
     if (duplicate) {
       diagnostics.push({
@@ -72,8 +75,9 @@ export function resolveComponentSFCPortForwards(
   }
 
   validateExplicitEventSources(manifest, refs, diagnostics)
-  if (manifest.forward.rules.length === 0)
+  if (manifest.forward.rules.length === 0) {
     return { diagnostics, dependencies }
+  }
 
   const names = collectManifestNames(manifest)
   const componentTags = new Set(manifest.require.components.map(port => port.tag))
@@ -82,7 +86,9 @@ export function resolveComponentSFCPortForwards(
       ? bindings
       : rule.from.flatMap((ref) => {
           const binding = refs.get(ref)
-          if (binding) return [binding]
+          if (binding) {
+            return [binding]
+          }
           diagnostics.push(forwardDiagnostic(
             'error',
             'sfc-port-forward-ref-missing',
@@ -112,7 +118,9 @@ export function resolveComponentSFCPortForwards(
 /** Returns the intrinsic public manifest of a renderer-neutral built-in component. */
 export function createBuiltInComponentPortManifest(tag: string): ComponentSFCPortManifest | null {
   const normalizedTag = listComponentSFCEventCapableTags().find(candidate => candidate === tag)
-  if (!normalizedTag) return null
+  if (!normalizedTag) {
+    return null
+  }
   const manifest = createEmptyComponentSFCPortManifest()
   if (normalizedTag === 'Table') {
     manifest.provides.actions = Object.values(TABLE_RUNTIME_ACTION_IDS).map(name => ({
@@ -151,7 +159,9 @@ function validateExplicitEventSources(
   diagnostics: RComponentDiagnostic[],
 ): void {
   for (const event of manifest.emits.events) {
-    if (!event.from) continue
+    if (!event.from) {
+      continue
+    }
     const source = refs.get(event.from.ref)
     if (!source) {
       diagnostics.push({
@@ -204,7 +214,9 @@ function collectLocalComponentBindings(
 ): LocalComponentBinding[] {
   const result: LocalComponentBinding[] = []
   const visit = (node: RComponentSFC_IR_Node): void => {
-    if (node.kind !== 'element') return
+    if (node.kind !== 'element') {
+      return
+    }
     const ref = literalString(node.props.ref)
     const builtInManifest = createBuiltInComponentPortManifest(node.tag)
     if (builtInManifest) {
@@ -227,11 +239,13 @@ function collectLocalComponentBindings(
           : null,
       })
     }
-    for (const child of node.children)
+    for (const child of node.children) {
       visit(child)
+    }
   }
-  for (const root of template.roots)
+  for (const root of template.roots) {
     visit(root)
+  }
   return result
 }
 
@@ -246,14 +260,18 @@ function resolveRuleSource(
 ): void {
   for (const role of ['require', 'provides', 'emits'] as const) {
     const selector = rule.ports[role]
-    if (!selector) continue
+    if (!selector) {
+      continue
+    }
     const sourcePorts = portsForRole(source.manifest!, role)
     const selected = sourcePorts.filter(port => matchesSelector(port.name, selector))
     reportUnmatchedIncludes(selector, selected, source, role, rule, diagnostics)
 
     for (const port of selected) {
       const publicName = resolvePublicName(port.name, source, rule, selector, diagnostics)
-      if (!publicName) continue
+      if (!publicName) {
+        continue
+      }
       const existing = names.get(publicName)
       if (existing) {
         const existingSource = existing.kind === 'event' ? existing.from : undefined
@@ -303,7 +321,9 @@ function resolveRuleSource(
 
       appendPort(target, role, forwarded)
       names.set(publicName, forwarded)
-      if (forwarded.kind === 'component') componentTags.add(forwarded.tag)
+      if (forwarded.kind === 'component') {
+        componentTags.add(forwarded.tag)
+      }
       appendDependency(dependencies, forwarded)
     }
   }
@@ -314,10 +334,12 @@ function normalizeType(value: string): string {
 }
 
 function portsForRole(manifest: ComponentSFCPortManifest, role: ComponentSFCPortRole): ForwardablePort[] {
-  if (role === 'require')
+  if (role === 'require') {
     return [...manifest.require.computations, ...manifest.require.components, ...manifest.require.actions, ...manifest.require.queries]
-  if (role === 'provides')
+  }
+  if (role === 'provides') {
     return [...manifest.provides.actions]
+  }
   return [...manifest.emits.events]
 }
 
@@ -330,29 +352,44 @@ function appendPort(manifest: ComponentSFCPortManifest, role: ComponentSFCPortRo
     manifest.emits.events.push(port)
     return
   }
-  if (role !== 'require') return
-  if (port.kind === 'computation') manifest.require.computations.push(port)
-  else if (port.kind === 'component') manifest.require.components.push(port)
-  else if (port.kind === 'action') manifest.require.actions.push({ ...port, role: 'require' })
-  else if (port.kind === 'query') manifest.require.queries.push(port)
+  if (role !== 'require') {
+    return
+  }
+  if (port.kind === 'computation') {
+    manifest.require.computations.push(port)
+  }
+  else if (port.kind === 'component') {
+    manifest.require.components.push(port)
+  }
+  else if (port.kind === 'action') {
+    manifest.require.actions.push({ ...port, role: 'require' })
+  }
+  else if (port.kind === 'query') {
+    manifest.require.queries.push(port)
+  }
 }
 
 function appendDependency(dependencies: RComponentDependencies, port: ForwardablePort): void {
-  if (!port.forwardedFrom || port.kind === 'event' || (port.kind === 'action' && port.role === 'provides'))
+  if (!port.forwardedFrom || port.kind === 'event' || (port.kind === 'action' && port.role === 'provides')) {
     return
-  if (port.kind === 'computation')
+  }
+  if (port.kind === 'computation') {
     dependencies.computations.push({ source: 'computation', id: port.defaultIdentity, role: 'port-default-computation' })
-  else if (port.kind === 'component')
+  }
+  else if (port.kind === 'component') {
     dependencies.components.push({ source: 'component-sfc', id: port.defaultIdentity, role: 'port-default-component' })
-  else if (port.defaultIdentity)
+  }
+  else if (port.defaultIdentity) {
     (port.kind === 'query' ? dependencies.queries : dependencies.actions).push(port.defaultIdentity)
+  }
 }
 
 function collectManifestNames(manifest: ComponentSFCPortManifest): Map<string, ForwardablePort> {
   const result = new Map<string, ForwardablePort>()
   for (const role of ['require', 'provides', 'emits'] as const) {
-    for (const port of portsForRole(manifest, role))
+    for (const port of portsForRole(manifest, role)) {
       result.set(port.name, port)
+    }
   }
   return result
 }
@@ -363,7 +400,9 @@ function matchesSelector(name: string, selector: ComponentSFCPortForwardSelector
 }
 
 function matchesPattern(value: string, pattern: string): boolean {
-  if (pattern === '*') return true
+  if (pattern === '*') {
+    return true
+  }
   const expression = pattern
     .split('*')
     .map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
@@ -380,9 +419,13 @@ function resolvePublicName(
 ): string | null {
   const renamed = selector.rename[sourceName] ?? sourceName
   const namespace = selector.namespace ?? rule.namespace
-  if (namespace === 'none' || namespace === '') return renamed
+  if (namespace === 'none' || namespace === '') {
+    return renamed
+  }
   if (namespace === 'ref') {
-    if (source.ref) return `${source.ref}.${renamed}`
+    if (source.ref) {
+      return `${source.ref}.${renamed}`
+    }
     diagnostics.push(forwardDiagnostic(
       'error',
       'sfc-port-forward-ref-required',
@@ -402,9 +445,13 @@ function reportUnmatchedIncludes(
   rule: ComponentSFCPortForwardRule,
   diagnostics: RComponentDiagnostic[],
 ): void {
-  if (selector.include === '*') return
+  if (selector.include === '*') {
+    return
+  }
   for (const pattern of selector.include) {
-    if (selected.some(port => matchesPattern(port.name, pattern))) continue
+    if (selected.some(port => matchesPattern(port.name, pattern))) {
+      continue
+    }
     diagnostics.push(forwardDiagnostic(
       'warning',
       'sfc-port-forward-selection-empty',

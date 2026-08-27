@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import { analyzeComponentSFCRuntimeDependencies } from '@/model/services/compiler/component-sfc/component-sfc-dependencies'
 
-describe('Component SFC Tooltip', () => {
+describe('component SFC Tooltip', () => {
   it('compiles text, markdown and rich forms into the renderer-neutral tree', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 defineProps<{ help: string }>()
@@ -22,9 +22,13 @@ defineProps<{ help: string }>()
     expect(result.diagnostics.filter(item => item.code.startsWith('sfc-tooltip'))).toEqual([])
     const root = result.ir?.template.roots[0]
     expect(root).toMatchObject({ kind: 'element', tag: 'Flex' })
-    if (root?.kind !== 'element') throw new Error('Flex root expected')
+    if (root?.kind !== 'element') {
+      throw new Error('Flex root expected')
+    }
     expect(root.children.map(node => node.kind === 'element' ? node.tag : node.kind)).toEqual([
-      'Tooltip', 'Tooltip', 'Tooltip',
+      'Tooltip',
+      'Tooltip',
+      'Tooltip',
     ])
   })
 

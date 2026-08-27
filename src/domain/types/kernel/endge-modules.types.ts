@@ -18,5 +18,5 @@ export interface EndgeModuleDescriptor<T extends EndgeModule = EndgeModule> {
 
 export interface EndgePlugin {
   id: string
-  install(): void
+  install: () => void
 }

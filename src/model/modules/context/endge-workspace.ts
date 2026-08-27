@@ -1,4 +1,3 @@
-import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 import type { EndgeConfiguration } from '@/domain/types/configuration/configuration.type'
 import type {
   EndgeDataMode,
@@ -9,6 +8,7 @@ import type {
   EndgeWorkspaceTimezone,
   EndgeWorkspaceVar,
 } from '@/domain/types/document/workspace.types'
+import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { normalizeEndgeWorkspaceDefinition } from '@/domain/entities/reflect/RWorkspace'
@@ -32,8 +32,9 @@ export class EndgeWorkspace extends EndgeModule {
   public override build(ctx: EndgeBootContext): void {
     if (ctx.dataProvider === 'bundle') {
       const bundle = ctx.bundleSource
-      if (!bundle)
+      if (!bundle) {
         throw new Error('[EndgeWorkspace] Workspace bundle is unavailable')
+      }
 
       const workspace = bundle.workspace
       this.apply({
@@ -50,8 +51,9 @@ export class EndgeWorkspace extends EndgeModule {
 
     if (ctx.dataProvider === 'default') {
       const snapshot = Endge.domainRepository.getLoadedSnapshot()
-      if (!snapshot)
+      if (!snapshot) {
         throw new Error('[EndgeWorkspace] live workspace snapshot is unavailable')
+      }
 
       const { state: _serverState, ...workspace } = snapshot.workspace
       this.apply({
@@ -159,16 +161,18 @@ export class EndgeWorkspace extends EndgeModule {
 
   /** Возвращает workspace или сообщает о нарушении boot lifecycle. */
   private _requireCurrent(): EndgeWorkspaceDefinition {
-    if (!this._current)
+    if (!this._current) {
       throw new Error('[EndgeWorkspace] Workspace has not been loaded')
+    }
     return this._current
   }
 
   /** Возвращает effective configuration после resolution и root configuration до него. */
   private _configurationOrNull(): EndgeConfiguration | null {
     try {
-      if (Endge.configuration.isResolved)
+      if (Endge.configuration.isResolved) {
         return Endge.configuration.current
+      }
     }
     catch {
       // Configuration module ещё не доступен на ранней workspace build-фазе.

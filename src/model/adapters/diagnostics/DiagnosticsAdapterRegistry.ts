@@ -13,16 +13,19 @@ export class DiagnosticsAdapterRegistry {
   /** Регистрирует factory по стабильному adapter type и возвращает функцию удаления. */
   public register(factory: DiagnosticsAdapterFactory): () => void {
     const type = String(factory.type ?? '').trim()
-    if (!type)
+    if (!type) {
       throw new Error('[EndgeDiagnostics] Adapter factory type is required')
-    if (this._factories.has(type))
+    }
+    if (this._factories.has(type)) {
       throw new Error(`[EndgeDiagnostics] Adapter factory "${type}" is already registered`)
+    }
 
     this._factories.set(type, factory)
     this._notify()
     return () => {
-      if (this._factories.get(type) !== factory)
+      if (this._factories.get(type) !== factory) {
         return
+      }
       this._factories.delete(type)
       this._notify()
     }
@@ -54,7 +57,8 @@ export class DiagnosticsAdapterRegistry {
 
   /** Уведомляет владельца runtime adapters о необходимости пересборки. */
   private _notify(): void {
-    for (const listener of this._listeners)
+    for (const listener of this._listeners) {
       listener()
+    }
   }
 }

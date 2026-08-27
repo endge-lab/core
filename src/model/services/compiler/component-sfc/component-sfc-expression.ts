@@ -1,13 +1,13 @@
-import { parseExpression } from '@babel/parser'
-
 import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
-import type { EndgeRuntimeContextSnapshot } from '@/domain/types/runtime/context-persistence.types'
-import type { EndgeConfigurationSchemaEntry } from '@/domain/types/source/configuration-source.types'
+
 import type {
   RComponentSFC_IR_Read,
   RComponentSFC_IR_Value,
   RComponentSFC_IR_VocabRead,
 } from '@/domain/types/component/sfc/ir.types'
+import type { EndgeRuntimeContextSnapshot } from '@/domain/types/runtime/context-persistence.types'
+import type { EndgeConfigurationSchemaEntry } from '@/domain/types/source/configuration-source.types'
+import { parseExpression } from '@babel/parser'
 
 const SFC_PLATFORM_LOCALS = new Set(['$table', '$row', '$column', '$cell'])
 
@@ -116,15 +116,21 @@ export function resolveComponentSFCExpressionCompletions(
 ): ComponentSFCExpressionCompletion[] {
   const source = String(request.source ?? '')
   const cursor = Math.max(0, Math.min(source.length, Number(request.cursor) || 0))
-  if (isInsideQuotedExpression(source, cursor)) return []
+  if (isInsideQuotedExpression(source, cursor)) {
+    return []
+  }
 
-  const token = source.slice(0, cursor).match(/[$A-Za-z_][\w$]*(?:\.[\w$]*)*$/)?.[0] ?? ''
-  if (!token) return []
+  const token = source.slice(0, cursor).match(/[$A-Z_][\w$]*(?:\.[\w$]*)*$/i)?.[0] ?? ''
+  if (!token) {
+    return []
+  }
   const replacementEnd = cursor + (source.slice(cursor).match(/^[\w$]*/)?.[0].length ?? 0)
 
   const memberSeparator = token.lastIndexOf('.')
   if (memberSeparator < 0) {
-    if (!token.startsWith('$')) return []
+    if (!token.startsWith('$')) {
+      return []
+    }
     return filterExpressionCompletionCandidates(
       request.scope === 'table-row-menu'
         ? TABLE_ROW_MENU_EXPRESSION_ROOTS
@@ -137,7 +143,9 @@ export function resolveComponentSFCExpressionCompletions(
 
   const parentPath = token.slice(0, memberSeparator)
   const prefix = token.slice(memberSeparator + 1)
-  if (!expressionRootIsAvailable(parentPath, request.scope)) return []
+  if (!expressionRootIsAvailable(parentPath, request.scope)) {
+    return []
+  }
 
   const candidates = resolveMemberCompletionCandidates(parentPath, request)
   return filterExpressionCompletionCandidates(candidates, prefix, cursor - prefix.length, replacementEnd)
@@ -157,13 +165,19 @@ function resolveMemberCompletionCandidates(
 ): ExpressionCompletionCandidate[] {
   const staticCandidates = STATIC_MEMBER_CANDIDATES[parentPath]
   if (staticCandidates) {
-    if (parentPath === '$table.state' && request.scope !== 'table-row-menu') return []
+    if (parentPath === '$table.state' && request.scope !== 'table-row-menu') {
+      return []
+    }
     return [...staticCandidates]
   }
 
-  if (!parentPath.startsWith('$context')) return []
+  if (!parentPath.startsWith('$context')) {
+    return []
+  }
   const runtimeCandidates = objectMemberCompletionCandidates(readContextPath(request.context, parentPath))
-  if (!parentPath.startsWith('$context.config')) return runtimeCandidates
+  if (!parentPath.startsWith('$context.config')) {
+    return runtimeCandidates
+  }
 
   const configurations = [...(request.configurations ?? [])].filter(entry => entry.document)
   if (parentPath === '$context.config') {
@@ -183,11 +197,15 @@ function resolveMemberCompletionCandidates(
 
   const identity = parentPath.slice('$context.config.'.length).split('.')[0] ?? ''
   const configuration = configurations.find(entry => entry.identity === identity)
-  if (parentPath !== `$context.config.${identity}` || !configuration?.document) return runtimeCandidates
+  if (parentPath !== `$context.config.${identity}` || !configuration?.document) {
+    return runtimeCandidates
+  }
   const byKey = new Map(configuration.document.values.map(field => [field.key, field]))
   return runtimeCandidates.map((candidate) => {
     const field = byKey.get(candidate.label)
-    if (!field) return candidate
+    if (!field) {
+      return candidate
+    }
     const type = field.type.kind === 'reference' ? field.type.identity : field.type.kind
     return {
       ...candidate,
@@ -201,15 +219,21 @@ function readContextPath(
   context: ComponentSFCExpressionCompletionRequest['context'],
   path: string,
 ): unknown {
-  if (!context) return undefined
+  if (!context) {
+    return undefined
+  }
   return path.split('.').slice(1).reduce<unknown>((current, segment) => {
-    if (!current || typeof current !== 'object') return undefined
+    if (!current || typeof current !== 'object') {
+      return undefined
+    }
     return (current as Record<string, unknown>)[segment]
   }, context)
 }
 
 function objectMemberCompletionCandidates(value: unknown): ExpressionCompletionCandidate[] {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return []
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return []
+  }
   return Object.keys(value)
     .filter(isExpressionIdentifier)
     .map(label => ({ label, kind: 'property', detail: 'Context property' }))
@@ -232,11 +256,11 @@ function filterExpressionCompletionCandidates(
 }
 
 function isExpressionIdentifier(value: string): boolean {
-  return /^[A-Za-z_$][\w$]*$/.test(value)
+  return /^[A-Z_$][\w$]*$/i.test(value)
 }
 
 function isInsideQuotedExpression(source: string, cursor: number): boolean {
-  let quote: "'" | '"' | '`' | null = null
+  let quote: '\'' | '"' | '`' | null = null
   for (let index = 0; index < cursor; index += 1) {
     const character = source[index]
     if (character === '\\') {
@@ -244,10 +268,14 @@ function isInsideQuotedExpression(source: string, cursor: number): boolean {
       continue
     }
     if (quote) {
-      if (character === quote) quote = null
+      if (character === quote) {
+        quote = null
+      }
       continue
     }
-    if (character === "'" || character === '"' || character === '`') quote = character
+    if (character === '\'' || character === '"' || character === '`') {
+      quote = character
+    }
   }
   return quote != null
 }
@@ -389,20 +417,23 @@ function collectVocabReads(
 }
 
 function readVocabMapping(node: any): { valuePath: string, labelPath: string } | null {
-  if (!node || node.type !== 'ObjectExpression')
+  if (!node || node.type !== 'ObjectExpression') {
     return null
+  }
 
   const values = new Map<string, string>()
   for (const property of node.properties ?? []) {
-    if (property?.type !== 'ObjectProperty' || property.computed)
+    if (property?.type !== 'ObjectProperty' || property.computed) {
       return null
+    }
     const key = property.key?.type === 'Identifier'
       ? property.key.name
       : property.key?.type === 'StringLiteral'
         ? property.key.value
         : null
-    if ((key !== 'valuePath' && key !== 'labelPath') || property.value?.type !== 'StringLiteral')
+    if ((key !== 'valuePath' && key !== 'labelPath') || property.value?.type !== 'StringLiteral') {
       return null
+    }
     values.set(key, String(property.value.value ?? '').trim())
   }
 
@@ -418,13 +449,15 @@ function collectExpressionReads(ast: unknown, context: ComponentSFCExpressionCon
 
   visitExpressionNode(ast, (node) => {
     const path = readMemberPath(node)
-    if (!path.length)
+    if (!path.length) {
       return
+    }
 
     const root = path[0]
     const source = resolveReadSource(root, props, locals)
-    if (!source)
+    if (!source) {
       return
+    }
 
     const raw = path.join('.')
     reads.set(`${source}:${raw}`, {
@@ -442,55 +475,69 @@ function resolveReadSource(
   props: Set<string>,
   locals: Set<string>,
 ): RComponentSFC_IR_Read['source'] | null {
-  if (root === 'raph' || root === 'Raph')
+  if (root === 'raph' || root === 'Raph') {
     return 'raph'
-  if (root === '$context')
+  }
+  if (root === '$context') {
     return 'context'
-  if (SFC_PLATFORM_LOCALS.has(root))
+  }
+  if (SFC_PLATFORM_LOCALS.has(root)) {
     return 'local'
-  if (props.has(root) || root === 'props')
+  }
+  if (props.has(root) || root === 'props') {
     return 'props'
-  if (locals.has(root))
+  }
+  if (locals.has(root)) {
     return 'local'
+  }
   return null
 }
 
 function visitExpressionNode(node: unknown, visitor: (node: Record<string, any>) => void): void {
-  if (!node || typeof node !== 'object')
+  if (!node || typeof node !== 'object') {
     return
+  }
 
   const record = node as Record<string, any>
   visitor(record)
 
   for (const value of Object.values(record)) {
-    if (!value)
-      continue
-    if (Array.isArray(value)) {
-      for (const item of value)
-        visitExpressionNode(item, visitor)
+    if (!value) {
       continue
     }
-    if (typeof value === 'object')
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        visitExpressionNode(item, visitor)
+      }
+      continue
+    }
+    if (typeof value === 'object') {
       visitExpressionNode(value, visitor)
+    }
   }
 }
 
 function readMemberPath(node: Record<string, any>): string[] {
-  if (node.type === 'Identifier')
+  if (node.type === 'Identifier') {
     return [node.name].filter(Boolean)
+  }
 
-  if (node.type !== 'MemberExpression' && node.type !== 'OptionalMemberExpression')
+  if (node.type !== 'MemberExpression' && node.type !== 'OptionalMemberExpression') {
     return []
+  }
 
   const objectPath = readMemberPath(node.object)
-  if (!objectPath.length)
+  if (!objectPath.length) {
     return []
+  }
 
-  if (node.property?.type === 'Identifier' && !node.computed)
+  if (node.property?.type === 'Identifier' && !node.computed) {
     return [...objectPath, node.property.name]
+  }
 
-  if (node.property?.type === 'StringLiteral')
+  if (node.property?.type === 'StringLiteral') {
     return [...objectPath, node.property.value]
+  }
 
   return objectPath
 }

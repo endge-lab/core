@@ -8,7 +8,7 @@ import { RTenant } from '@/domain/entities/reflect/RTenant'
 import { Endge } from '@/model/kernel/endge'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
-describe('EndgeCompiler Query auth dependencies', () => {
+describe('endgeCompiler Query auth dependencies', () => {
   beforeEach(() => prepareCompilerContext())
 
   afterEach(() => {

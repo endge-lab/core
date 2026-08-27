@@ -2,6 +2,10 @@ import type { AuthResolvedSession } from '@/domain/types/auth/auth-profile.types
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { Endge } from '@/model/kernel/endge'
+import { BrowserSseStreamTransportFactory } from '@/model/services/runtime/transports/BrowserSseStreamTransportFactory'
+import { compileStreamSource } from '@/model/services/source-engine/compilers/stream-source-compile'
+
 const sse = vi.hoisted(() => ({ options: null as Record<string, any> | null }))
 
 vi.mock('@endge/utils', async (importOriginal) => {
@@ -18,10 +22,6 @@ vi.mock('@endge/utils', async (importOriginal) => {
     },
   }
 })
-
-import { Endge } from '@/model/kernel/endge'
-import { compileStreamSource } from '@/model/services/source-engine/compilers/stream-source-compile'
-import { BrowserSseStreamTransportFactory } from '@/model/services/runtime/transports/BrowserSseStreamTransportFactory'
 
 describe('authenticated SSE transport', () => {
   afterEach(() => {

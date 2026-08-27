@@ -1,25 +1,18 @@
-import type { RQuery } from '@/domain/entities/reflect/RQuery'
+import type { PhaseEvent, RaphDerivedHandle } from '@endge/raph'
 import type { RFilter } from '@/domain/entities/reflect/RFilter'
-import type { FilterProgramPayload } from '@/domain/types/source/filter-source.types'
+import type { RQuery } from '@/domain/entities/reflect/RQuery'
+import type { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
 import type { ProgramArtifact, QueryProgramPayload } from '@/domain/types/program/program.types'
 import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext, RuntimeHostUpdateContext } from '@/domain/types/runtime/runtime-host.types'
-import type { PhaseEvent } from '@endge/raph'
 
-import {
-  Raph,
-  RaphNode,
-  collectionByKey,
-  filterByKey,
-  full,
-  type RaphDerivedHandle,
-} from '@endge/raph'
+import type { FilterProgramPayload } from '@/domain/types/source/filter-source.types'
 
+import { collectionByKey, filterByKey, full, Raph, RaphNode } from '@endge/raph'
 import { RFilter as FilterModel } from '@/domain/entities/reflect/RFilter'
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
-import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
 import { Endge } from '@/model/kernel/endge'
-import type { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
 import { runResponseOutputTransforms } from '@/model/modules/runtime/execution/endge-response-output'
+import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
 
 function defaultContext(): RuntimeHostContext<'query'> {
   return {
@@ -82,8 +75,9 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     artifacts: RuntimeArtifactReader
   }): QueryRuntimeHost | null {
     const artifact = input.artifacts.getArtifact<QueryProgramPayload>('query', input.model.id ?? input.model.identity)
-    if (!artifact || artifact.status === 'error')
+    if (!artifact || artifact.status === 'error') {
       return null
+    }
 
     const host = new QueryRuntimeHost({
       id: input.id,
@@ -110,11 +104,13 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     host._isMockEnabled = Endge.runtime.resolveDataMode(host) === 'mock'
     host._contextOff = Endge.context.subscribe(() => {
       const isMockEnabled = Endge.runtime.resolveDataMode(host) === 'mock'
-      if (isMockEnabled === host._isMockEnabled)
+      if (isMockEnabled === host._isMockEnabled) {
         return
+      }
       host._isMockEnabled = isMockEnabled
-      if (!isMockEnabled)
+      if (!isMockEnabled) {
         return
+      }
       host._runSequence += 1
       host._abortController?.abort()
     })
@@ -130,8 +126,9 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
 
   /** Активирует зарегистрированный Query host и создаёт его child filters. */
   public override create(): void {
-    if (this.status === 'active')
+    if (this.status === 'active') {
       return
+    }
     this._initializeDefaultSources()
     super.create()
   }
@@ -140,12 +137,14 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
   private _initializeDefaultSources(): void {
     const payload = this.getArtifactPayload()
     const artifact = this.getArtifact()
-    if (!payload || !artifact)
+    if (!payload || !artifact) {
       return
+    }
 
     for (const prop of payload.props) {
-      if (Object.prototype.hasOwnProperty.call(this._props, prop.key) || !prop.defaultSource)
+      if (Object.hasOwn(this._props, prop.key) || !prop.defaultSource) {
         continue
+      }
 
       const source = prop.defaultSource
       let model: RFilter | null = null
@@ -164,8 +163,9 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
           model.sourceVersion = childArtifact.payload.sourceVersion
         }
       }
-      if (!model)
+      if (!model) {
         continue
+      }
 
       const child = Endge.runtime.execute(model, {
         parent: this,
@@ -175,8 +175,9 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
           artifact: childArtifact ?? undefined,
         },
       }) as FilterRuntimeHost | null
-      if (!child)
+      if (!child) {
         continue
+      }
 
       this.bindInput(prop.key, { kind: 'raph', path: child.outputPath(source.output) })
       this._filterChildIds.add(child.id)
@@ -198,14 +199,16 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
   }
 
   public getOutputs(): Readonly<Record<string, unknown>> {
-    if (!this._outputPaths.size)
+    if (!this._outputPaths.size) {
       return { ...this._outputs }
+    }
     return Object.fromEntries([...this._outputPaths].map(([key, path]) => [key, Raph.get(path)]))
   }
 
   public async run(propsPatch?: Record<string, unknown>): Promise<Record<string, unknown>> {
-    if (propsPatch)
+    if (propsPatch) {
       this._applyProps(propsPatch, false)
+    }
 
     this._isMockEnabled = Endge.runtime.resolveDataMode(this) === 'mock'
     if (this._isMockEnabled) {
@@ -219,8 +222,9 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
 
     const payload = this.getArtifactPayload()
     const artifact = this.getArtifact()
-    if (!payload || !artifact)
+    if (!payload || !artifact) {
       throw new Error(`[QueryRuntimeHost] Query artifact is missing for "${this.entityIdentity}".`)
+    }
 
     const sequence = ++this._runSequence
     this._abortController?.abort()
@@ -234,8 +238,9 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
         props: this.readInputs(),
         signal: this._abortController.signal,
       })
-      if (sequence !== this._runSequence)
+      if (sequence !== this._runSequence) {
         return this.getOutputs() as Record<string, unknown>
+      }
 
       if (!payload.outputs.length) {
         this._outputs = response && typeof response === 'object' && !Array.isArray(response)
@@ -246,8 +251,9 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
       else {
         Raph.transaction(() => {
           for (const output of payload.outputs) {
-            if (output.source.type !== 'response')
+            if (output.source.type !== 'response') {
               continue
+            }
             const path = output.materialization.kind === 'source'
               ? this._requireOutputPath(output.key)
               : this._requireResponseInputPath(output.key)
@@ -265,8 +271,9 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
       return outputs
     }
     catch (error: any) {
-      if (sequence !== this._runSequence || error?.name === 'CanceledError' || error?.name === 'AbortError')
+      if (sequence !== this._runSequence || error?.name === 'CanceledError' || error?.name === 'AbortError') {
         return this.getOutputs() as Record<string, unknown>
+      }
       const updatedAt = new Date().toISOString()
       if (!this._derivedErrorActive) {
         this.setContext({ status: 'error', updatedAt })
@@ -303,11 +310,13 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     this._abortController = null
     this._contextOff?.()
     this._contextOff = null
-    for (const dispose of this._outputWatchers)
+    for (const dispose of this._outputWatchers) {
       dispose()
+    }
     this._outputWatchers = []
-    for (const handle of [...this._derivedHandles].reverse())
+    for (const handle of [...this._derivedHandles].reverse()) {
       handle.dispose()
+    }
     this._derivedHandles = []
     this._outputPaths.clear()
     this._outputDependents.clear()
@@ -316,26 +325,30 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     this._props = {}
     this._outputGeneration = 0
     this._derivedErrorActive = false
-    if (Raph.get(this._internalBase) !== undefined)
+    if (Raph.get(this._internalBase) !== undefined) {
       Raph.delete(this._internalBase)
-    for (const runtimeId of this._filterChildIds)
+    }
+    for (const runtimeId of this._filterChildIds) {
       Endge.runtime.destroyRuntimeTree(runtimeId)
+    }
     this._filterChildIds.clear()
     super.destroy()
   }
 
   protected override onUpdate(ctx: RuntimeHostUpdateContext): void {
     const shouldRun = ctx.updates?.some(update => update.kind === 'run') ?? false
-    if (shouldRun)
+    if (shouldRun) {
       void this.run().catch(() => undefined)
+    }
     this.emit('update', ctx)
   }
 
   /** Монтирует compiled output graph как runtime-scoped Raph materialized dependencies. */
   private _mountOutputGraph(artifact: ProgramArtifact<QueryProgramPayload>): void {
     const payload = artifact.payload
-    for (const output of payload.outputs)
+    for (const output of payload.outputs) {
       this._outputPaths.set(output.key, this._resolveOutputPath(output))
+    }
     for (const output of payload.outputs) {
       if (output.source.type === 'output') {
         const dependents = this._outputDependents.get(output.source.key) ?? new Set<string>()
@@ -345,13 +358,15 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     }
 
     for (const output of payload.outputs) {
-      if (output.materialization.kind === 'source')
+      if (output.materialization.kind === 'source') {
         continue
+      }
       const from = output.source.type === 'response'
         ? `${this._internalBase}.inputs.${encodePathPart(output.key)}`
         : this._requireOutputPath(output.source.key)
-      if (output.source.type === 'response')
+      if (output.source.type === 'response') {
         this._responseInputPaths.set(output.key, from)
+      }
       const to = this._requireOutputPath(output.key)
       const strategy = output.materialization.strategy.kind === 'collection-by-key'
         ? collectionByKey(output.materialization.strategy.key)
@@ -397,15 +412,17 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
 
   private _requireOutputPath(key: string): string {
     const path = this._outputPaths.get(key)
-    if (!path)
+    if (!path) {
       throw new Error(`[QueryRuntimeHost] Output path is missing for "${key}".`)
+    }
     return path
   }
 
   private _requireResponseInputPath(key: string): string {
     const path = this._responseInputPaths.get(key)
-    if (!path)
+    if (!path) {
       throw new Error(`[QueryRuntimeHost] Response input path is missing for "${key}".`)
+    }
     return path
   }
 
@@ -422,8 +439,9 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
       this._derivedErrorActive = false
       this.setContext({ status: 'success', updatedAt: new Date().toISOString() })
     }
-    if (!emit)
+    if (!emit) {
       return
+    }
     const generationPath = `${this._internalBase}.outputGeneration`
     const isNewGeneration = events.some(event => event.canonical === generationPath)
     const directKeys = isNewGeneration
@@ -440,8 +458,9 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     while (queue.length) {
       const source = queue.shift()!
       for (const dependent of this._outputDependents.get(source) ?? []) {
-        if (expanded.has(dependent))
+        if (expanded.has(dependent)) {
           continue
+        }
         expanded.add(dependent)
         queue.push(dependent)
       }
@@ -450,18 +469,21 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
   }
 
   private _publishOutputs(changedKeys: string[]): void {
-    if (!changedKeys.length)
+    if (!changedKeys.length) {
       return
-    for (const key of new Set(changedKeys))
+    }
+    for (const key of new Set(changedKeys)) {
       this.emit('output:change', { key, output: this._outputs[key] })
+    }
     this.emit('outputs:change', this._outputs)
   }
 
   private _literalDefaults(payload: QueryProgramPayload): Record<string, unknown> {
     const defaults: Record<string, unknown> = {}
     for (const prop of payload.props) {
-      if (prop.defaultValue)
+      if (prop.defaultValue) {
         defaults[prop.key] = evaluateSourceExpression(prop.defaultValue)
+      }
     }
     return defaults
   }
@@ -470,8 +492,9 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     const payload = this.getArtifactPayload()
     const definitions = new Map((payload?.props ?? []).map(prop => [prop.key, prop]))
     for (const [key, value] of Object.entries(patch)) {
-      if (!definitions.has(key))
+      if (!definitions.has(key)) {
         throw new Error(`[QueryRuntimeHost] unknown prop: ${key}`)
+      }
       this._props[key] = value
       this.bindInput(key, { kind: 'literal', value })
     }

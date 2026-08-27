@@ -20,7 +20,9 @@ export class RuntimeActionRegistry {
   }
 
   public registerMany(actions: AnyRuntimeAction[]): void {
-    for (const action of actions) this.register(action)
+    for (const action of actions) {
+      this.register(action)
+    }
   }
 
   public unregister(id: RuntimeActionId): void {
@@ -63,10 +65,12 @@ export class RuntimeActionRegistry {
     payload?: TPayload,
   ): Promise<TResult | undefined> {
     const action = this.get<TContext, TPayload, TResult>(id)
-    if (!action)
+    if (!action) {
       throw new Error(`[RuntimeActionRegistry] action is not registered: ${id}`)
-    if (!this.canExecute(id, context, payload))
+    }
+    if (!this.canExecute(id, context, payload)) {
       return undefined
+    }
     return await action.execute(context, payload)
   }
 
@@ -82,7 +86,8 @@ export class RuntimeActionRegistry {
   }
 
   private _assertActionId(id: RuntimeActionId): void {
-    if (!String(id ?? '').trim())
+    if (!String(id ?? '').trim()) {
       throw new Error('[RuntimeActionRegistry] action id is required')
+    }
   }
 }

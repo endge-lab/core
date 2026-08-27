@@ -4,7 +4,7 @@ import { RMock } from '@/domain/entities/reflect/RMock'
 import { Endge } from '@/model/kernel/endge'
 import { EndgeMock } from '@/model/modules/mock/EndgeMock'
 
-describe('EndgeMock', () => {
+describe('endgeMock', () => {
   afterEach(() => {
     Endge.domain.reset()
     Endge.mock.reset()

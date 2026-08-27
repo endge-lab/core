@@ -1,9 +1,9 @@
-import { describe, expect, it } from 'vitest'
-
-import { EndgeProgram } from '@/model/modules/program/endge-program'
 import type { ProgramArtifact } from '@/domain/types/program/program.types'
 
-describe('EndgeProgram', () => {
+import { describe, expect, it } from 'vitest'
+import { EndgeProgram } from '@/model/modules/program/endge-program'
+
+describe('endgeProgram', () => {
   it('stores and resolves artifacts by id and identity', () => {
     const program = new EndgeProgram()
     const artifact = makeArtifact('action', 10, 'save-order')

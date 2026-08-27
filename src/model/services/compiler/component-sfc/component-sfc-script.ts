@@ -1,20 +1,20 @@
-import { parse as parseTS } from '@babel/parser'
-
 import type { RComponentContract, RComponentDiagnostic } from '@/domain/types/component/component-core.types'
-import { createEmptyComponentContract } from '@/domain/types/component/component-core.types'
-import type {
-  ComponentSFCPreviewLiteral,
-  ComponentSFCPreviewOptions,
-  ComponentSFCPreviewProps,
-  ComponentSFCPreviewRunTarget,
-} from '@/domain/types/program/program.types'
+
 import type { RComponentSFC_AST_Script } from '@/domain/types/component/sfc/ast.types'
 import type {
   RComponentSFC_IR_LocalBinding,
   RComponentSFC_IR_Prop,
 } from '@/domain/types/component/sfc/ir.types'
 import type { ProgramMetadataMap } from '@/domain/types/program/program-metadata.types'
+import type {
+  ComponentSFCPreviewLiteral,
+  ComponentSFCPreviewOptions,
+  ComponentSFCPreviewProps,
+  ComponentSFCPreviewRunTarget,
+} from '@/domain/types/program/program.types'
 import type { TypeSourceDefinition, TypeSourceExpression } from '@/domain/types/source/type-source.types'
+import { parse as parseTS } from '@babel/parser'
+import { createEmptyComponentContract } from '@/domain/types/component/component-core.types'
 import { compileProgramMetadataSource } from '@/model/services/source-engine/compilers/source-metadata-compile'
 
 export interface ComponentSFCTypeResolutionOptions {
@@ -134,16 +134,18 @@ export function parseComponentSFCTypeFields(
   options: ComponentSFCTypeResolutionOptions = {},
 ): RComponentSFC_IR_Prop[] {
   const identity = source.trim()
-  const named = /^[A-Za-z_$][\w$]*$/.test(identity)
+  const named = /^[A-Z_$][\w$]*$/i.test(identity)
     ? findNamedTypeLiteral(identity, scriptContent)
     : null
-  if (named)
+  if (named) {
     return readTypeMembers(named.members, named.content)
+  }
 
-  if (/^[A-Za-z_$][\w$]*$/.test(identity)) {
+  if (/^[A-Z_$][\w$]*$/i.test(identity)) {
     const definition = options.resolveTypeDefinition?.(identity) ?? null
-    if (definition?.kind === 'object')
+    if (definition?.kind === 'object') {
       return readTypeSourceFields(definition)
+    }
   }
 
   const prefix = 'type __EndgeContract = '
@@ -154,8 +156,9 @@ export function parseComponentSFCTypeFields(
       plugins: ['typescript'],
     }) as any
     const annotation = ast.program.body[0]?.typeAnnotation
-    if (annotation?.type === 'TSTypeLiteral')
+    if (annotation?.type === 'TSTypeLiteral') {
       return readTypeMembers(annotation.members ?? [], content)
+    }
   }
   catch {
     return []
@@ -181,16 +184,21 @@ function readTypeSourceFields(
 }
 
 function typeSourceExpressionToTypeScript(expression: TypeSourceExpression): string {
-  if (expression.kind === 'reference')
+  if (expression.kind === 'reference') {
     return expression.identity
-  if (expression.kind === 'array')
+  }
+  if (expression.kind === 'array') {
     return `Array<${typeSourceExpressionToTypeScript(expression.items)}>`
-  if (expression.kind === 'union')
+  }
+  if (expression.kind === 'union') {
     return expression.variants.map(typeSourceExpressionToTypeScript).join(' | ')
-  if (expression.kind === 'enum')
+  }
+  if (expression.kind === 'enum') {
     return expression.values.map(value => JSON.stringify(value)).join(' | ')
-  if (expression.kind === 'record')
+  }
+  if (expression.kind === 'record') {
     return `Record<string, ${typeSourceExpressionToTypeScript(expression.values)}>`
+  }
   const fields = expression.fields.map((field) => {
     const type = field.array
       ? `Array<${typeSourceExpressionToTypeScript(field.type)}>`
@@ -210,13 +218,16 @@ function findNamedTypeLiteral(
       plugins: ['typescript'],
     }) as any
     for (const statement of ast.program.body ?? []) {
-      if (statement.type === 'TSInterfaceDeclaration' && statement.id?.name === name)
+      if (statement.type === 'TSInterfaceDeclaration' && statement.id?.name === name) {
         return { members: statement.body?.body ?? [], content }
+      }
       if (
         statement.type === 'TSTypeAliasDeclaration'
         && statement.id?.name === name
         && statement.typeAnnotation?.type === 'TSTypeLiteral'
-      ) return { members: statement.typeAnnotation.members ?? [], content }
+      ) {
+        return { members: statement.typeAnnotation.members ?? [], content }
+      }
     }
   }
   catch {
@@ -228,16 +239,18 @@ function findNamedTypeLiteral(
 function readTypeMembers(members: any[], content: string): RComponentSFC_IR_Prop[] {
   const props: RComponentSFC_IR_Prop[] = []
   for (const member of members) {
-    if (member.type !== 'TSPropertySignature' || member.computed)
+    if (member.type !== 'TSPropertySignature' || member.computed) {
       continue
+    }
     const name = member.key?.type === 'Identifier'
       ? member.key.name
       : member.key?.type === 'StringLiteral'
         ? member.key.value
         : ''
     const annotation = member.typeAnnotation?.typeAnnotation
-    if (!name || annotation?.start == null || annotation?.end == null)
+    if (!name || annotation?.start == null || annotation?.end == null) {
       continue
+    }
     const type = content.slice(annotation.start, annotation.end).trim()
     props.push({
       name,
@@ -310,8 +323,9 @@ function parsePreviewOptionsSource(
     }) as any
     const declaration = ast.program.body[0]?.declarations?.[0]
     const value = readPreviewOptionsObject(declaration?.init)
-    if (value.ok)
+    if (value.ok) {
       return value.value
+    }
   }
   catch {
     diagnostics.push({
@@ -334,18 +348,21 @@ function parsePreviewOptionsSource(
 
 function readPreviewPropsObject(node: any): { ok: true, value: ComponentSFCPreviewProps } | { ok: false } {
   const expression = unwrapPreviewExpression(node)
-  if (!expression || expression.type !== 'ObjectExpression')
+  if (!expression || expression.type !== 'ObjectExpression') {
     return { ok: false }
+  }
 
   const object: ComponentSFCPreviewProps = {}
   for (const property of expression.properties ?? []) {
-    if (property.type !== 'ObjectProperty' || property.computed)
+    if (property.type !== 'ObjectProperty' || property.computed) {
       return { ok: false }
+    }
 
     const key = readObjectKey(property.key)
     const value = readPreviewPropValue(property.value)
-    if (!key || !value.ok)
+    if (!key || !value.ok) {
       return { ok: false }
+    }
 
     object[key] = value.value
   }
@@ -356,38 +373,44 @@ function readPreviewPropsObject(node: any): { ok: true, value: ComponentSFCPrevi
 function readPreviewPropValue(node: any): { ok: true, value: ComponentSFCPreviewProps[string] } | { ok: false } {
   const expression = unwrapPreviewExpression(node)
   const storeRef = readFromStoreExpression(expression)
-  if (storeRef)
+  if (storeRef) {
     return { ok: true, value: storeRef }
+  }
   const dataRef = readFromDataExpression(expression)
-  if (dataRef)
+  if (dataRef) {
     return { ok: true, value: dataRef }
+  }
 
   return readPreviewLiteral(expression)
 }
 
 function readPreviewOptionsObject(node: any): { ok: true, value: ComponentSFCPreviewOptions } | { ok: false } {
   const expression = unwrapPreviewExpression(node)
-  if (!expression || expression.type !== 'ObjectExpression')
+  if (!expression || expression.type !== 'ObjectExpression') {
     return { ok: false }
+  }
 
   const options: ComponentSFCPreviewOptions = {}
   for (const property of expression.properties ?? []) {
-    if (property.type !== 'ObjectProperty' || property.computed)
+    if (property.type !== 'ObjectProperty' || property.computed) {
       return { ok: false }
+    }
 
     const key = readObjectKey(property.key)
     if (key === 'seed') {
       const value = readPreviewLiteral(property.value)
-      if (!value.ok || !value.value || typeof value.value !== 'object' || Array.isArray(value.value))
+      if (!value.ok || !value.value || typeof value.value !== 'object' || Array.isArray(value.value)) {
         return { ok: false }
+      }
       options.seed = value.value as Record<string, ComponentSFCPreviewLiteral>
       continue
     }
 
     if (key === 'run') {
       const value = readPreviewRunTargets(property.value)
-      if (!value.ok)
+      if (!value.ok) {
         return { ok: false }
+      }
       options.run = value.value
       continue
     }
@@ -400,14 +423,16 @@ function readPreviewOptionsObject(node: any): { ok: true, value: ComponentSFCPre
 
 function readPreviewRunTargets(node: any): { ok: true, value: ComponentSFCPreviewOptions['run'] } | { ok: false } {
   const expression = unwrapPreviewExpression(node)
-  if (!expression || expression.type !== 'ArrayExpression')
+  if (!expression || expression.type !== 'ArrayExpression') {
     return { ok: false }
+  }
 
   const run: NonNullable<ComponentSFCPreviewOptions['run']> = []
   for (const item of expression.elements ?? []) {
     const queryRef = readQueryExpression(unwrapPreviewExpression(item))
-    if (!queryRef)
+    if (!queryRef) {
       return { ok: false }
+    }
     run.push(queryRef)
   }
 
@@ -439,8 +464,9 @@ function readFromDataExpression(node: any): { type: 'data', store: string, path:
   }
 
   const argument = readPreviewLiteral(node.arguments?.[0])
-  if (!argument.ok || typeof argument.value !== 'string')
+  if (!argument.ok || typeof argument.value !== 'string') {
     return null
+  }
   const dot = argument.value.indexOf('.')
   return dot > 0 && dot < argument.value.length - 1
     ? { type: 'data', store: argument.value.slice(0, dot), path: argument.value.slice(dot + 1) }
@@ -469,8 +495,9 @@ function readQueryExpression(node: any): ComponentSFCPreviewRunTarget | null {
   const queryRef = readQueryExpression(node.callee.object)
   const store = readStoreExpression(node.arguments?.[0])
   const fields = readPreviewStoreMapping(node.arguments?.[1])
-  if (!queryRef || queryRef.storeTo || !store || !fields)
+  if (!queryRef || queryRef.storeTo || !store || !fields) {
     return null
+  }
 
   return {
     ...queryRef,
@@ -480,8 +507,9 @@ function readQueryExpression(node: any): ComponentSFCPreviewRunTarget | null {
 
 function readStoreExpression(node: any): string | null {
   node = unwrapPreviewExpression(node)
-  if (node?.type !== 'CallExpression' || node.callee?.type !== 'Identifier' || node.callee.name !== 'store')
+  if (node?.type !== 'CallExpression' || node.callee?.type !== 'Identifier' || node.callee.name !== 'store') {
     return null
+  }
   const argument = readPreviewLiteral(node.arguments?.[0])
   return argument.ok && typeof argument.value === 'string' && argument.value.trim()
     ? argument.value
@@ -491,19 +519,23 @@ function readStoreExpression(node: any): string | null {
 function readPreviewStoreMapping(node: any): Record<string, string> | null {
   node = unwrapPreviewExpression(node)
   const shorthand = readPreviewLiteral(node)
-  if (shorthand.ok && typeof shorthand.value === 'string' && shorthand.value.trim())
+  if (shorthand.ok && typeof shorthand.value === 'string' && shorthand.value.trim()) {
     return { [shorthand.value]: shorthand.value }
-  if (node?.type !== 'ObjectExpression')
+  }
+  if (node?.type !== 'ObjectExpression') {
     return null
+  }
 
   const fields: Record<string, string> = {}
   for (const property of node.properties ?? []) {
-    if (property.type !== 'ObjectProperty' || property.computed)
+    if (property.type !== 'ObjectProperty' || property.computed) {
       return null
+    }
     const target = readObjectKey(property.key)
     const output = readOutputExpression(property.value)
-    if (!target || !output)
+    if (!target || !output) {
       return null
+    }
     fields[target] = output
   }
   return Object.keys(fields).length ? fields : null
@@ -511,8 +543,9 @@ function readPreviewStoreMapping(node: any): Record<string, string> | null {
 
 function readOutputExpression(node: any): string | null {
   node = unwrapPreviewExpression(node)
-  if (node?.type !== 'CallExpression' || node.callee?.type !== 'Identifier' || node.callee.name !== 'output')
+  if (node?.type !== 'CallExpression' || node.callee?.type !== 'Identifier' || node.callee.name !== 'output') {
     return null
+  }
   const argument = readPreviewLiteral(node.arguments?.[0])
   return argument.ok && typeof argument.value === 'string' && argument.value.trim()
     ? argument.value
@@ -521,31 +554,37 @@ function readOutputExpression(node: any): string | null {
 
 function readPreviewLiteral(node: any): { ok: true, value: ComponentSFCPreviewLiteral } | { ok: false } {
   node = unwrapPreviewExpression(node)
-  if (!node)
-    return { ok: false }
-
-  if (node.type === 'StringLiteral' || node.type === 'NumericLiteral' || node.type === 'BooleanLiteral')
-    return { ok: true, value: node.value }
-
-  if (node.type === 'NullLiteral')
-    return { ok: true, value: null }
-
-  if (node.type === 'UnaryExpression' && node.operator === '-') {
-    const value = readPreviewLiteral(node.argument)
-    if (value.ok && typeof value.value === 'number')
-      return { ok: true, value: -value.value }
+  if (!node) {
     return { ok: false }
   }
 
-  if (node.type === 'TemplateLiteral' && node.expressions?.length === 0)
+  if (node.type === 'StringLiteral' || node.type === 'NumericLiteral' || node.type === 'BooleanLiteral') {
+    return { ok: true, value: node.value }
+  }
+
+  if (node.type === 'NullLiteral') {
+    return { ok: true, value: null }
+  }
+
+  if (node.type === 'UnaryExpression' && node.operator === '-') {
+    const value = readPreviewLiteral(node.argument)
+    if (value.ok && typeof value.value === 'number') {
+      return { ok: true, value: -value.value }
+    }
+    return { ok: false }
+  }
+
+  if (node.type === 'TemplateLiteral' && node.expressions?.length === 0) {
     return { ok: true, value: node.quasis?.[0]?.value?.cooked ?? '' }
+  }
 
   if (node.type === 'ArrayExpression') {
     const items: ComponentSFCPreviewLiteral[] = []
     for (const item of node.elements ?? []) {
       const value = readPreviewLiteral(item)
-      if (!value.ok)
+      if (!value.ok) {
         return { ok: false }
+      }
       items.push(value.value)
     }
     return { ok: true, value: items }
@@ -554,13 +593,15 @@ function readPreviewLiteral(node: any): { ok: true, value: ComponentSFCPreviewLi
   if (node.type === 'ObjectExpression') {
     const object: Record<string, ComponentSFCPreviewLiteral> = {}
     for (const property of node.properties ?? []) {
-      if (property.type !== 'ObjectProperty' || property.computed)
+      if (property.type !== 'ObjectProperty' || property.computed) {
         return { ok: false }
+      }
 
       const key = readObjectKey(property.key)
       const value = readPreviewLiteral(property.value)
-      if (!key || !value.ok)
+      if (!key || !value.ok) {
         return { ok: false }
+      }
 
       object[key] = value.value
     }
@@ -584,9 +625,11 @@ function unwrapPreviewExpression(node: any): any {
 }
 
 function readObjectKey(node: any): string | null {
-  if (node?.type === 'Identifier')
+  if (node?.type === 'Identifier') {
     return node.name
-  if (node?.type === 'StringLiteral' || node?.type === 'NumericLiteral')
+  }
+  if (node?.type === 'StringLiteral' || node?.type === 'NumericLiteral') {
     return String(node.value)
+  }
   return null
 }

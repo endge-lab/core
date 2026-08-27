@@ -1,42 +1,42 @@
+import type { RuntimeAppScopeOptions } from '@/domain/entities/runtime/RuntimeAppScope'
+import type { EndgeDataMode } from '@/domain/types/document/workspace.types'
 import type { RuntimeEntityType } from '@/domain/types/runtime/runtime-entity-map.types'
-import type { AnyRuntimeStrategy } from '@/domain/types/runtime/runtime-strategy.types'
 import type { RuntimeExecuteOptions } from '@/domain/types/runtime/runtime-execute.type'
 import type { DestroyedRuntimeHostSnapshot, RuntimeArtifactReader, RuntimeHost, RuntimeInspectionLease } from '@/domain/types/runtime/runtime-host.types'
+import type { AnyRuntimeHost, AnyRuntimeStrategy } from '@/domain/types/runtime/runtime-strategy.types'
+
 import type { EndgeRuntimeSnapshot, RuntimeExecutableModel } from '@/domain/types/runtime/runtime.types'
-import type { EndgeDataMode } from '@/domain/types/document/workspace.types'
+
 import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
-
 import { Raph, RaphNode } from '@endge/raph'
-
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
-import { RuntimeAppScope, type RuntimeAppScopeOptions } from '@/domain/entities/runtime/RuntimeAppScope'
+import { RuntimeAppScope } from '@/domain/entities/runtime/RuntimeAppScope'
+import { RuntimeHostRegistry } from '@/domain/entities/runtime/RuntimeHostRegistry'
 import { RuntimeScope } from '@/domain/entities/runtime/RuntimeScope'
 import { RuntimeScopeRegistry } from '@/domain/entities/runtime/RuntimeScopeRegistry'
-import { RuntimeHostRegistry } from '@/domain/entities/runtime/RuntimeHostRegistry'
-import type { AnyRuntimeHost } from '@/domain/types/runtime/runtime-strategy.types'
+import { STORAGE_VARS_KEY } from '@/model/config/kernel.config'
+import { RuntimeBoundaryUpdatePhase } from '@/model/helpers/raph-phases/runtime-boundary-update-phase'
+import { RuntimeNodeUpdatePhase } from '@/model/helpers/raph-phases/runtime-node-update-phase'
+import { Endge } from '@/model/kernel/endge'
+import { EndgeActions } from '@/model/modules/runtime/core/endge-actions'
+import { EndgeComposition } from '@/model/modules/runtime/execution/endge-composition'
+import { EndgeComputation } from '@/model/modules/runtime/execution/endge-computation'
+import { EndgeConverters } from '@/model/modules/runtime/execution/endge-converters'
+import { EndgeDataView } from '@/model/modules/runtime/execution/endge-data-view'
+import { EndgeProject } from '@/model/modules/runtime/execution/endge-project'
+import { EndgeQuery } from '@/model/modules/runtime/execution/endge-query'
+import { EndgeImplementations } from '@/model/modules/runtime/implementation/endge-implementations'
+import { EndgeOperations } from '@/model/modules/runtime/operation/endge-operations'
 import { RuntimeStrategyRegistry } from '@/model/services/runtime/RuntimeStrategyRegistry'
 import { ActionRuntimeStrategy } from '@/model/services/runtime/strategies/ActionRuntimeStrategy'
 import { ComponentSFCRuntimeStrategy } from '@/model/services/runtime/strategies/ComponentSFCRuntimeStrategy'
+import { CompositionRuntimeStrategy } from '@/model/services/runtime/strategies/CompositionRuntimeStrategy'
+import { FilterRuntimeStrategy } from '@/model/services/runtime/strategies/FilterRuntimeStrategy'
 import { PageRuntimeStrategy } from '@/model/services/runtime/strategies/PageRuntimeStrategy'
 import { ProjectRuntimeStrategy } from '@/model/services/runtime/strategies/ProjectRuntimeStrategy'
 import { QueryRuntimeStrategy } from '@/model/services/runtime/strategies/QueryRuntimeStrategy'
-import { FilterRuntimeStrategy } from '@/model/services/runtime/strategies/FilterRuntimeStrategy'
-import { CompositionRuntimeStrategy } from '@/model/services/runtime/strategies/CompositionRuntimeStrategy'
 import { StoreRuntimeStrategy } from '@/model/services/runtime/strategies/StoreRuntimeStrategy'
 import { StreamRuntimeStrategy } from '@/model/services/runtime/strategies/StreamRuntimeStrategy'
-import { Endge } from '@/model/kernel/endge'
-import { RuntimeBoundaryUpdatePhase } from '@/model/helpers/raph-phases/runtime-boundary-update-phase'
-import { RuntimeNodeUpdatePhase } from '@/model/helpers/raph-phases/runtime-node-update-phase'
-import { STORAGE_VARS_KEY } from '@/model/config/kernel.config'
-import { EndgeActions } from '@/model/modules/runtime/core/endge-actions'
-import { EndgeImplementations } from '@/model/modules/runtime/implementation/endge-implementations'
-import { EndgeComposition } from '@/model/modules/runtime/execution/endge-composition'
-import { EndgeProject } from '@/model/modules/runtime/execution/endge-project'
-import { EndgeDataView } from '@/model/modules/runtime/execution/endge-data-view'
-import { EndgeQuery } from '@/model/modules/runtime/execution/endge-query'
-import { EndgeComputation } from '@/model/modules/runtime/execution/endge-computation'
-import { EndgeConverters } from '@/model/modules/runtime/execution/endge-converters'
-import { EndgeOperations } from '@/model/modules/runtime/operation/endge-operations'
 
 /** Модуль создания, регистрации и уничтожения runtime hosts и app scopes. */
 export class EndgeRuntime extends EndgeModule {
@@ -71,8 +71,9 @@ export class EndgeRuntime extends EndgeModule {
     let released = false
     return {
       release: () => {
-        if (released)
+        if (released) {
           return
+        }
         released = true
         this._destroyedSnapshotLeases.delete(token)
         this.syncDestroyedSnapshotLimit()
@@ -213,8 +214,9 @@ export class EndgeRuntime extends EndgeModule {
     while (current) {
       if (current.entityType === 'composition') {
         const mode = (current.getArtifactPayload() as CompositionProgramPayload | null)?.dataMode
-        if (mode === 'mock' || mode === 'live')
+        if (mode === 'mock' || mode === 'live') {
           return mode
+        }
       }
       current = current.parent
     }
@@ -281,12 +283,14 @@ export class EndgeRuntime extends EndgeModule {
    * поэтому отдельный dependency graph на этом этапе не нужен.
    */
   public invalidateApplicationScopes(): void {
-    if (!this._inited)
+    if (!this._inited) {
       return
+    }
     Raph.transaction(() => {
       for (const host of this._hosts.getAll()) {
-        if (!host.capabilities.includes('renderable') || !host.node)
+        if (!host.capabilities.includes('renderable') || !host.node) {
           continue
+        }
         host.node.dirty(RuntimeNodeUpdatePhase.PHASE_NAME)
       }
     })
@@ -296,8 +300,9 @@ export class EndgeRuntime extends EndgeModule {
   public registerRuntimeHost(host: AnyRuntimeHost): boolean {
     this.start()
     const registered = this.registerAndActivateHost(host, host.parent)
-    if (registered)
+    if (registered) {
       this.notify()
+    }
     return registered
   }
 
@@ -372,8 +377,9 @@ export class EndgeRuntime extends EndgeModule {
     }
 
     const postOrder = this._hosts.getTreePostOrder(rootId)
-    for (const id of [...postOrder].reverse())
+    for (const id of [...postOrder].reverse()) {
       void this._hosts.getById(id)?.quiesce()
+    }
 
     for (const id of postOrder) {
       void this.destroyRuntimeInternal(id, false)
@@ -390,8 +396,9 @@ export class EndgeRuntime extends EndgeModule {
     }
 
     const postOrder = this._hosts.getTreePostOrder(rootId)
-    for (const id of [...postOrder].reverse())
+    for (const id of [...postOrder].reverse()) {
       await this._hosts.getById(id)?.quiesce()
+    }
 
     for (const id of postOrder) {
       await this.destroyRuntimeInternal(id, false)
@@ -414,11 +421,13 @@ export class EndgeRuntime extends EndgeModule {
     }
 
     Raph.clearPhases()
-    if (this._appNode)
+    if (this._appNode) {
       Raph.app.removeNode(this._appNode)
+    }
     this._scopeNodes.clear()
-    for (const scope of this._appScopes.values())
+    for (const scope of this._appScopes.values()) {
       scope.reset()
+    }
     this._appNode = null
     this._inited = false
     this._unsubscribeWorkspace?.()
@@ -439,34 +448,40 @@ export class EndgeRuntime extends EndgeModule {
 
   /** Projects effective workspace variables into the runtime Raph namespace. */
   private syncWorkspaceVariablesToRaph(): void {
-    if (!Endge.workspace.isLoaded)
+    if (!Endge.workspace.isLoaded) {
       return
+    }
 
     for (const variable of Endge.workspace.variables.getAll()) {
       const name = String(variable.name ?? '').trim()
-      if (!name)
+      if (!name) {
         continue
+      }
       Raph.app.set(`${STORAGE_VARS_KEY}.${name}`, Endge.workspace.variables.getValue(name))
     }
   }
 
   /** Restores persisted runtime filter values independently of workspace variables. */
   private hydrateRuntimeFilters(): void {
-    if (typeof localStorage === 'undefined')
+    if (typeof localStorage === 'undefined') {
       return
+    }
 
     try {
       const raw = localStorage.getItem('endge:parameters')
-      if (!raw)
+      if (!raw) {
         return
+      }
 
       const store = JSON.parse(raw) as Record<string, unknown>
-      if (!store || typeof store !== 'object')
+      if (!store || typeof store !== 'object') {
         return
+      }
 
       for (const [identity, payload] of Object.entries(store)) {
-        if (!identity)
+        if (!identity) {
           continue
+        }
         Raph.set(
           identity.startsWith('parameters.') ? identity : `parameters.${identity}`,
           payload,
@@ -500,12 +515,14 @@ export class EndgeRuntime extends EndgeModule {
     let cleanupError: unknown = null
     try {
       const quiesceCleanup = host.quiesce()
-      if (quiesceCleanup)
+      if (quiesceCleanup) {
         await quiesceCleanup
+      }
       try {
         const strategyCleanup = this._strategies.resolve(host.model)?.destroy?.({ host })
-        if (strategyCleanup)
+        if (strategyCleanup) {
           await strategyCleanup
+        }
       }
       catch (error) {
         cleanupError = error
@@ -514,8 +531,9 @@ export class EndgeRuntime extends EndgeModule {
       Endge.context.destroyRuntimeStateController(id)
       try {
         const hostCleanup = host.destroy()
-        if (hostCleanup)
+        if (hostCleanup) {
           await hostCleanup
+        }
       }
       catch (error) {
         cleanupError ??= error
@@ -525,11 +543,13 @@ export class EndgeRuntime extends EndgeModule {
     }
     finally {
       this._destroyingRuntimeIds.delete(id)
-      if (shouldNotify)
+      if (shouldNotify) {
         this.notify()
+      }
     }
-    if (cleanupError)
+    if (cleanupError) {
       throw cleanupError
+    }
   }
 
   private syncDestroyedSnapshotLimit(): void {
@@ -606,8 +626,9 @@ export class EndgeRuntime extends EndgeModule {
   private ensureLifecycleAppScope(appScope: RuntimeAppScope): RuntimeScope {
     const id = `runtime-scope:${appScope.id}`
     const existing = this.scopes.get(id)
-    if (existing)
+    if (existing) {
       return existing
+    }
     const scope = this.scopes.register(new RuntimeScope({
       id,
       path: appScope.id,

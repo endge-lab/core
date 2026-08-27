@@ -1,9 +1,9 @@
 import type { RQueryAuth } from '@/domain/types/document/query.types'
+import type { ProgramMetadataMap } from '@/domain/types/program/program-metadata.types'
 import type { ProgramDiagnostic, QueryProgramPayload } from '@/domain/types/program/program.types'
 import type { DataViewRef } from '@/domain/types/source/data-view-source.types'
-import type { ProgramMetadataMap } from '@/domain/types/program/program-metadata.types'
-import type { QueryProgramProp, SourceExpressionIR, SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 import type { ResponseOutputTransform } from '@/domain/types/source/response-output.types'
+import type { QueryProgramProp, SourceExpressionIR, SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 
 /** Поддерживаемые transport-kind Query source. */
 export type QuerySourceKind = 'rest' | 'graphql'

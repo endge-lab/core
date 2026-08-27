@@ -1,16 +1,16 @@
 import type {
+  SourceDocumentReference,
   SourceEngineCompileResult,
   SourceEngineGenerateResult,
   SourceEngineStrategy,
+  SourceKind,
   SourceLanguageCompletion,
   SourceLanguageContext,
   SourceLanguageInlineHint,
-  SourceLanguageSignatureHelp,
   SourceLanguageSemanticHighlight,
-  SourceDocumentReference,
+  SourceLanguageSignatureHelp,
   SourceLanguageStrategy,
   SourceLanguageValidationResult,
-  SourceKind,
   SourceParseResult,
   SourcePatchResult,
   SourcePatchStrategy,
@@ -20,36 +20,36 @@ import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { SourceEngineRegistry } from '@/model/services/source-engine/SourceEngineRegistry'
 import { SourceLanguageRegistry } from '@/model/services/source-engine/SourceLanguageRegistry'
 import { SourcePatchRegistry } from '@/model/services/source-engine/SourcePatchRegistry'
+import { ActionSourceEngineStrategy } from '@/model/services/source-engine/strategies/ActionSourceEngineStrategy'
+import { ActionSourceLanguageStrategy } from '@/model/services/source-engine/strategies/ActionSourceLanguageStrategy'
+import { CompositionSourceEngineStrategy } from '@/model/services/source-engine/strategies/CompositionSourceEngineStrategy'
+import { CompositionSourceLanguageStrategy } from '@/model/services/source-engine/strategies/CompositionSourceLanguageStrategy'
+import { CompositionSourcePatchStrategy } from '@/model/services/source-engine/strategies/CompositionSourcePatchStrategy'
+import { ComputationSourceEngineStrategy } from '@/model/services/source-engine/strategies/ComputationSourceEngineStrategy'
+import { ComputationSourceLanguageStrategy } from '@/model/services/source-engine/strategies/ComputationSourceLanguageStrategy'
+import { ConfigurationSourceEngineStrategy } from '@/model/services/source-engine/strategies/ConfigurationSourceEngineStrategy'
+import { ConfigurationSourceLanguageStrategy } from '@/model/services/source-engine/strategies/ConfigurationSourceLanguageStrategy'
 import { DataViewSourceEngineStrategy } from '@/model/services/source-engine/strategies/DataViewSourceEngineStrategy'
 import { DataViewSourceLanguageStrategy } from '@/model/services/source-engine/strategies/DataViewSourceLanguageStrategy'
 import { FilterSourceEngineStrategy } from '@/model/services/source-engine/strategies/FilterSourceEngineStrategy'
 import { FilterSourceLanguageStrategy } from '@/model/services/source-engine/strategies/FilterSourceLanguageStrategy'
 import { FilterSourcePatchStrategy } from '@/model/services/source-engine/strategies/FilterSourcePatchStrategy'
-import { CompositionSourceEngineStrategy } from '@/model/services/source-engine/strategies/CompositionSourceEngineStrategy'
-import { CompositionSourceLanguageStrategy } from '@/model/services/source-engine/strategies/CompositionSourceLanguageStrategy'
-import { CompositionSourcePatchStrategy } from '@/model/services/source-engine/strategies/CompositionSourcePatchStrategy'
 import { QuerySourceEngineStrategy } from '@/model/services/source-engine/strategies/QuerySourceEngineStrategy'
 import { QuerySourceLanguageStrategy } from '@/model/services/source-engine/strategies/QuerySourceLanguageStrategy'
 import { QuerySourcePatchStrategy } from '@/model/services/source-engine/strategies/QuerySourcePatchStrategy'
-import { VocabSourceEngineStrategy } from '@/model/services/source-engine/strategies/VocabSourceEngineStrategy'
-import { VocabSourceLanguageStrategy } from '@/model/services/source-engine/strategies/VocabSourceLanguageStrategy'
-import { VocabSourcePatchStrategy } from '@/model/services/source-engine/strategies/VocabSourcePatchStrategy'
 import { StoreSourceEngineStrategy } from '@/model/services/source-engine/strategies/StoreSourceEngineStrategy'
 import { StoreSourceLanguageStrategy } from '@/model/services/source-engine/strategies/StoreSourceLanguageStrategy'
 import { StreamSourceEngineStrategy } from '@/model/services/source-engine/strategies/StreamSourceEngineStrategy'
 import { StreamSourceLanguageStrategy } from '@/model/services/source-engine/strategies/StreamSourceLanguageStrategy'
-import { UpdateSourceEngineStrategy } from '@/model/services/source-engine/strategies/UpdateSourceEngineStrategy'
-import { UpdateSourceLanguageStrategy } from '@/model/services/source-engine/strategies/UpdateSourceLanguageStrategy'
-import { ComputationSourceEngineStrategy } from '@/model/services/source-engine/strategies/ComputationSourceEngineStrategy'
-import { ComputationSourceLanguageStrategy } from '@/model/services/source-engine/strategies/ComputationSourceLanguageStrategy'
 import { StyleSourceEngineStrategy } from '@/model/services/source-engine/strategies/StyleSourceEngineStrategy'
 import { StyleSourceLanguageStrategy } from '@/model/services/source-engine/strategies/StyleSourceLanguageStrategy'
 import { TypeSourceEngineStrategy } from '@/model/services/source-engine/strategies/TypeSourceEngineStrategy'
 import { TypeSourceLanguageStrategy } from '@/model/services/source-engine/strategies/TypeSourceLanguageStrategy'
-import { ConfigurationSourceEngineStrategy } from '@/model/services/source-engine/strategies/ConfigurationSourceEngineStrategy'
-import { ConfigurationSourceLanguageStrategy } from '@/model/services/source-engine/strategies/ConfigurationSourceLanguageStrategy'
-import { ActionSourceEngineStrategy } from '@/model/services/source-engine/strategies/ActionSourceEngineStrategy'
-import { ActionSourceLanguageStrategy } from '@/model/services/source-engine/strategies/ActionSourceLanguageStrategy'
+import { UpdateSourceEngineStrategy } from '@/model/services/source-engine/strategies/UpdateSourceEngineStrategy'
+import { UpdateSourceLanguageStrategy } from '@/model/services/source-engine/strategies/UpdateSourceLanguageStrategy'
+import { VocabSourceEngineStrategy } from '@/model/services/source-engine/strategies/VocabSourceEngineStrategy'
+import { VocabSourceLanguageStrategy } from '@/model/services/source-engine/strategies/VocabSourceLanguageStrategy'
+import { VocabSourcePatchStrategy } from '@/model/services/source-engine/strategies/VocabSourcePatchStrategy'
 
 /** Модуль authoring-операций над source-документами Endge. */
 export class EndgeSource extends EndgeModule {
@@ -231,8 +231,9 @@ export class EndgeSource extends EndgeModule {
   /** Возвращает strategy или бросает явную ошибку для некорректного source-kind. */
   private _resolveRequiredStrategy(sourceKind: SourceKind | string): SourceEngineStrategy {
     const strategy = this._strategies.resolve(sourceKind)
-    if (!strategy)
+    if (!strategy) {
       throw new Error(`Source strategy is not registered for "${sourceKind}".`)
+    }
 
     return strategy
   }
@@ -240,8 +241,9 @@ export class EndgeSource extends EndgeModule {
   /** Возвращает language strategy или бросает явную ошибку для некорректного source-kind. */
   private _resolveRequiredLanguageStrategy(sourceKind: SourceKind | string): SourceLanguageStrategy {
     const strategy = this._languageStrategies.resolve(sourceKind)
-    if (!strategy)
+    if (!strategy) {
       throw new Error(`Source language strategy is not registered for "${sourceKind}".`)
+    }
 
     return strategy
   }
@@ -249,8 +251,9 @@ export class EndgeSource extends EndgeModule {
   /** Возвращает patch strategy или бросает явную ошибку для некорректного source-kind. */
   private _resolveRequiredPatchStrategy(sourceKind: SourceKind | string): SourcePatchStrategy {
     const strategy = this._patchStrategies.resolve(sourceKind)
-    if (!strategy)
+    if (!strategy) {
       throw new Error(`Source patch strategy is not registered for "${sourceKind}".`)
+    }
 
     return strategy
   }

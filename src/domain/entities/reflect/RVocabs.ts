@@ -1,8 +1,8 @@
-import { Serialize } from '@endge/utils'
-import { Expose } from 'class-transformer'
-
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
 import type { DiagnosticsProblemInput } from '@/domain/types/diagnostics/diagnostics.types'
+
+import { Serialize } from '@endge/utils'
+import { Expose } from 'class-transformer'
 import { REntity } from '@/domain/entities/reflect/REntity'
 import { compileVocabSource } from '@/model/services/source-engine/compilers/vocab-source-compile'
 import { VOCAB_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/vocab.default.source'
@@ -87,13 +87,16 @@ export class RVocabs extends REntity {
   /** Возвращает validation problems vocab без mutable entity state. */
   override getDiagnosticProblems(): DiagnosticsProblemInput[] {
     const problems: DiagnosticsProblemInput[] = []
-    if (!String(this.identity ?? '').trim())
+    if (!String(this.identity ?? '').trim()) {
       problems.push({ severity: 'warning', code: 'vocab.identity.required', message: 'Vocabs.identity не задан' })
-    if (!String(this.displayName ?? '').trim())
+    }
+    if (!String(this.displayName ?? '').trim()) {
       problems.push({ severity: 'warning', code: 'vocab.display-name.required', message: 'Vocabs.displayName не задан' })
+    }
 
-    if (this.sourceVersion !== 1)
+    if (this.sourceVersion !== 1) {
       problems.push({ severity: 'error', code: 'vocab.source-version.unsupported', message: `Vocab sourceVersion=${this.sourceVersion} не поддерживается` })
+    }
     for (const diagnostic of compileVocabSource(this.source).diagnostics) {
       problems.push({
         severity: diagnostic.severity,
@@ -125,11 +128,12 @@ export function createLegacyVocabSource(input: {
   authMode?: 'inherit' | 'profile' | 'none'
   authProfileIdentity?: string | null
 }): string {
-  if (input.mode !== 'external_payload')
+  if (input.mode !== 'external_payload') {
     return VOCAB_DEFAULT_SOURCE
+  }
 
   const rawBaseUrl = String(input.baseApiUrl ?? '').trim()
-  const environment = rawBaseUrl.match(/^\{([A-Za-z_][A-Za-z0-9_]*)\}$/)?.[1]
+  const environment = rawBaseUrl.match(/^\{([A-Z_]\w*)\}$/i)?.[1]
   const baseUrl = environment ? `env(${quote(environment)})` : quote(rawBaseUrl)
   const collection = quote(String(input.collectionSlug ?? '').trim())
   const auth = input.authMode === 'profile'
@@ -152,14 +156,16 @@ export function createLegacyVocabSource(input: {
 }
 
 function quote(value: string): string {
-  return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
+  return `'${value.replace(/\\/g, '\\\\').replace(/'/g, '\\\'')}'`
 }
 
 function normalizeVocabAuthMode(value: unknown): 'inherit' | 'profile' | 'none' {
   const mode = String(value ?? '').trim()
-  if (mode === 'profile' || mode === 'none')
+  if (mode === 'profile' || mode === 'none') {
     return mode
-  if (mode && mode !== 'inherit')
+  }
+  if (mode && mode !== 'inherit') {
     throw new Error(`[RVocabs] Unsupported authMode: ${mode}`)
+  }
   return 'inherit'
 }

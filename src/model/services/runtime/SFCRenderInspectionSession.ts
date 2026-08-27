@@ -33,12 +33,16 @@ export class SFCRenderInspectionSession implements SFCRenderInspectionSessionLik
 
   /** Удаляет instance после unmount renderer-owned physical node. */
   public unregisterNode(id: string): void {
-    if (!this._nodes.has(id)) return
+    if (!this._nodes.has(id)) {
+      return
+    }
     const pending = [id]
     while (pending.length > 0) {
       const currentId = pending.pop()!
       for (const node of this._nodes.values()) {
-        if (node.parentId === currentId) pending.push(node.id)
+        if (node.parentId === currentId) {
+          pending.push(node.id)
+        }
       }
       this._deleteNode(currentId)
     }
@@ -54,14 +58,18 @@ export class SFCRenderInspectionSession implements SFCRenderInspectionSessionLik
   public getTree(runtimeId?: string): SFCRenderInspectionTreeNode[] {
     const source = [...this._nodes.values()].filter(node => !runtimeId || node.runtimeId === runtimeId)
     const treeById = new Map<string, SFCRenderInspectionTreeNode>()
-    for (const node of source) treeById.set(node.id, { ...node, children: [] })
+    for (const node of source) {
+      treeById.set(node.id, { ...node, children: [] })
+    }
 
     const roots: SFCRenderInspectionTreeNode[] = []
     for (const node of source) {
       const treeNode = treeById.get(node.id)!
       const parent = node.parentId ? treeById.get(node.parentId) : null
-      if (parent) parent.children.push(treeNode)
-      else roots.push(treeNode)
+      if (parent) {
+        parent.children.push(treeNode)
+      }
+      else { roots.push(treeNode) }
     }
     return roots
   }
@@ -77,14 +85,20 @@ export class SFCRenderInspectionSession implements SFCRenderInspectionSessionLik
     const ids = [...this._nodes.values()]
       .filter(node => node.runtimeId === runtimeId)
       .map(node => node.id)
-    if (ids.length === 0) return
-    for (const id of ids) this._deleteNode(id)
+    if (ids.length === 0) {
+      return
+    }
+    for (const id of ids) {
+      this._deleteNode(id)
+    }
     this._scheduleNotify()
   }
 
   /** Полностью очищает короткоживущую debug session. */
   public clear(): void {
-    if (this._nodes.size === 0 && this._idsByStableKey.size === 0) return
+    if (this._nodes.size === 0 && this._idsByStableKey.size === 0) {
+      return
+    }
     this._nodes.clear()
     this._idsByStableKey.clear()
     this._stableKeysById.clear()
@@ -105,16 +119,22 @@ export class SFCRenderInspectionSession implements SFCRenderInspectionSessionLik
   private _deleteNode(id: string): void {
     this._nodes.delete(id)
     const stableKey = this._stableKeysById.get(id)
-    if (stableKey) this._idsByStableKey.delete(stableKey)
+    if (stableKey) {
+      this._idsByStableKey.delete(stableKey)
+    }
     this._stableKeysById.delete(id)
   }
 
   private _scheduleNotify(): void {
-    if (this._notifyPending) return
+    if (this._notifyPending) {
+      return
+    }
     this._notifyPending = true
     queueMicrotask(() => {
       this._notifyPending = false
-      for (const listener of this._listeners) listener()
+      for (const listener of this._listeners) {
+        listener()
+      }
     })
   }
 }
@@ -149,23 +169,41 @@ function projectRecord(value: Record<string, unknown>): Record<string, unknown> 
 }
 
 function projectInspectionValue(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
-  if (typeof value === 'string') return truncateString(value)
-  if (value == null || typeof value === 'number' || typeof value === 'boolean') return value
-  if (typeof value === 'bigint') return String(value)
-  if (typeof value === 'function') return '[Function]'
-  if (typeof value === 'symbol') return String(value)
-  if (value instanceof Date) return value.toISOString()
-  if (typeof value !== 'object') return String(value)
-  if (seen.has(value)) return { $truncated: true, reason: 'circular' }
-  if (depth >= INSPECTION_MAX_DEPTH)
+  if (typeof value === 'string') {
+    return truncateString(value)
+  }
+  if (value == null || typeof value === 'number' || typeof value === 'boolean') {
+    return value
+  }
+  if (typeof value === 'bigint') {
+    return String(value)
+  }
+  if (typeof value === 'function') {
+    return '[Function]'
+  }
+  if (typeof value === 'symbol') {
+    return String(value)
+  }
+  if (value instanceof Date) {
+    return value.toISOString()
+  }
+  if (typeof value !== 'object') {
+    return String(value)
+  }
+  if (seen.has(value)) {
+    return { $truncated: true, reason: 'circular' }
+  }
+  if (depth >= INSPECTION_MAX_DEPTH) {
     return { $truncated: true, reason: 'depth' }
+  }
   seen.add(value)
   try {
     if (Array.isArray(value)) {
       const projected = value.slice(0, INSPECTION_MAX_ARRAY)
         .map(item => projectInspectionValue(item, depth + 1, seen))
-      if (value.length > INSPECTION_MAX_ARRAY)
+      if (value.length > INSPECTION_MAX_ARRAY) {
         projected.push({ $truncated: true, omitted: value.length - INSPECTION_MAX_ARRAY })
+      }
       return projected
     }
     const entries = Object.entries(value as Record<string, unknown>)
@@ -173,8 +211,9 @@ function projectInspectionValue(value: unknown, depth = 0, seen = new WeakSet<ob
       key,
       projectInspectionValue(item, depth + 1, seen),
     ]))
-    if (entries.length > INSPECTION_MAX_FIELDS)
+    if (entries.length > INSPECTION_MAX_FIELDS) {
       out.$truncated = { omitted: entries.length - INSPECTION_MAX_FIELDS }
+    }
     return out
   }
   finally {

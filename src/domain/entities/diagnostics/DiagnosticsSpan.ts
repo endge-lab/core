@@ -39,8 +39,9 @@ export class DiagnosticsSpan implements DiagnosticsSpanHandle {
 
   /** Добавляет или заменяет структурированные атрибуты активного span. */
   public setAttributes(attributes: DiagnosticsAttributes): void {
-    if (this._ended)
+    if (this._ended) {
       return
+    }
     this._attributes = { ...this._attributes, ...attributes }
   }
 
@@ -85,8 +86,9 @@ export class DiagnosticsSpan implements DiagnosticsSpanHandle {
 
   /** Идемпотентно завершает span и возвращает сохранённый record. */
   public end(options: DiagnosticsSpanEndOptions = {}): DiagnosticsSpanRecord | null {
-    if (this._ended)
+    if (this._ended) {
       return null
+    }
 
     this._ended = true
     return this._owner.finishSpan({

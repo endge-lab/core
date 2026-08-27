@@ -1,29 +1,29 @@
-import { parse as parseTS } from '@babel/parser'
-
 import type { RComponentDependencies, RComponentDiagnostic } from '@/domain/types/component/component-core.types'
-import type { TypeSourceDefinition } from '@/domain/types/source/type-source.types'
+
+import type { RComponentSFC_AST_Script } from '@/domain/types/component/sfc/ast.types'
 import type {
+  ComponentSFCActionPort,
   ComponentSFCComponentPort,
   ComponentSFCComputationPort,
-  ComponentSFCActionPort,
-  ComponentSFCQueryPort,
-  ComponentSFCEventPort,
   ComponentSFCEventAction,
   ComponentSFCEventInputValue,
   ComponentSFCEventOperationAction,
   ComponentSFCEventOperationBlock,
+  ComponentSFCEventPort,
   ComponentSFCPortForwardRule,
   ComponentSFCPortForwardSelector,
-  ComponentSFCPortRole,
   ComponentSFCPortManifest,
   ComponentSFCPortProviderDescriptor,
+  ComponentSFCPortRole,
+  ComponentSFCQueryPort,
   RComponentSFC_IR_PortCall,
 } from '@/domain/types/component/sfc/ports.types'
-import type { RComponentSFC_AST_Script } from '@/domain/types/component/sfc/ast.types'
+import type { TypeSourceDefinition } from '@/domain/types/source/type-source.types'
+import { parse as parseTS } from '@babel/parser'
 import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
+import { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sfc/component-sfc-built-in-tags'
 import { compileComponentSFCExpression } from '@/model/services/compiler/component-sfc/component-sfc-expression'
 import { parseComponentSFCTypeFields } from '@/model/services/compiler/component-sfc/component-sfc-script'
-import { isComponentSFCBuiltInTag } from '@/model/services/compiler/component-sfc/component-sfc-built-in-tags'
 
 export interface ComponentSFCPortAnalysisOptions {
   resolveProvider?: (
@@ -144,7 +144,9 @@ export function compileComponentSFCLocalEventAction(
       range: { start: sourceOffset, end: sourceOffset + source.length },
     } as RComponentSFC_AST_Script
     const input = parseEventInput(inputNode, script, diagnostics)
-    if (!input) return null
+    if (!input) {
+      return null
+    }
     return {
       kind: 'required-port',
       portKind: requiredPort.kind,
@@ -173,11 +175,14 @@ export function compileComponentSFCLocalEventAction(
       range: { start: sourceOffset, end: sourceOffset + source.length },
     } as RComponentSFC_AST_Script
     const payload = payloadNode ? parseEventInput(payloadNode, script, diagnostics) : undefined
-    if (payloadNode && !payload) return null
+    if (payloadNode && !payload) {
+      return null
+    }
     return { kind: 'emit', event: emittedEvent, ...(payload ? { payload } : {}) }
   }
-  if (isCall(expression, 'action') && expression.arguments?.length === 1)
+  if (isCall(expression, 'action') && expression.arguments?.length === 1) {
     expression = expression.arguments[0]
+  }
   const script = {
     content: source,
     range: { start: sourceOffset, end: sourceOffset + source.length },
@@ -185,13 +190,15 @@ export function compileComponentSFCLocalEventAction(
   const diagnosticsStart = diagnostics.length
   if (isCall(expression, 'operation')) {
     const result = parseEventOperation(eventName, expression, script, dependencies, diagnostics)
-    for (const diagnostic of diagnostics.slice(diagnosticsStart))
+    for (const diagnostic of diagnostics.slice(diagnosticsStart)) {
       diagnostic.sourcePath = `template.on.${eventName}`
+    }
     return result
   }
   const result = parseEventAction(eventName, expression, script, dependencies, diagnostics)
-  for (const diagnostic of diagnostics.slice(diagnosticsStart))
+  for (const diagnostic of diagnostics.slice(diagnosticsStart)) {
     diagnostic.sourcePath = `template.on.${eventName}`
+  }
   return result
 }
 
@@ -212,7 +219,9 @@ export function analyzeComponentSFCPorts(
   const manifest = createEmptyComponentSFCPortManifest()
   const calls: RComponentSFC_IR_PortCall[] = []
   const diagnostics: RComponentDiagnostic[] = []
-  if (!script) return { manifest, calls, dependencies, diagnostics, bindingName: null }
+  if (!script) {
+    return { manifest, calls, dependencies, diagnostics, bindingName: null }
+  }
 
   let ast: any
   try {
@@ -227,10 +236,13 @@ export function analyzeComponentSFCPorts(
 
   const declarations: Array<{ statement: any, declaration: any }> = []
   for (const statement of ast.program.body ?? []) {
-    if (statement.type !== 'VariableDeclaration') continue
+    if (statement.type !== 'VariableDeclaration') {
+      continue
+    }
     for (const declaration of statement.declarations ?? []) {
-      if (isCall(declaration.init, 'definePorts'))
+      if (isCall(declaration.init, 'definePorts')) {
         declarations.push({ statement, declaration })
+      }
     }
   }
 
@@ -373,7 +385,9 @@ function parsePortManifest(
   const tags = new Set<string>()
   for (const role of ['require', 'provides', 'emits'] as const) {
     const roleObject = roles.get(role)
-    if (!roleObject) continue
+    if (!roleObject) {
+      continue
+    }
 
     for (const property of roleObject.properties ?? []) {
       if (property.type !== 'ObjectProperty' || property.computed) {
@@ -454,7 +468,9 @@ function parsePortManifest(
         }
         if (config) {
           const parsed = parseEventConfig(name, config, script, dependencies, diagnostics)
-          if (!parsed.valid) continue
+          if (!parsed.valid) {
+            continue
+          }
           port.from = parsed.from
           port.action = parsed.action
         }
@@ -635,8 +651,10 @@ function parseEventConfig(
       continue
     }
     const parsedAction = parseEventAction(eventName, property.value, script, dependencies, diagnostics)
-    if (!parsedAction) valid = false
-    else action = parsedAction
+    if (!parsedAction) {
+      valid = false
+    }
+    else { action = parsedAction }
   }
   return { valid, from, action }
 }
@@ -674,9 +692,13 @@ function parseEventAction(
     }
     const inputNode = readObjectPropertyValue(directNode, 'input')
     const input = inputNode ? parseEventInput(inputNode, script, diagnostics, allowOperationInput) : undefined
-    if (inputNode && !input) return null
+    if (inputNode && !input) {
+      return null
+    }
     const identities = directKind === 'query' ? dependencies.queries : dependencies.actions
-    if (!identities.includes(identity)) identities.push(identity)
+    if (!identities.includes(identity)) {
+      identities.push(identity)
+    }
     return { kind: directKind, identity, ...(input ? { input } : {}) }
   }
 
@@ -717,15 +739,36 @@ function parseEventAction(
     return null
   }
   const forbidden = new Set([
-    'eval', 'Function', 'Promise', 'fetch', 'XMLHttpRequest', 'WebSocket', 'Worker', 'SharedWorker',
-    'setTimeout', 'setInterval', 'require', 'process', 'Deno', 'Bun', 'globalThis', 'self', 'window',
-    'document', 'navigator', 'Endge',
+    'eval',
+    'Function',
+    'Promise',
+    'fetch',
+    'XMLHttpRequest',
+    'WebSocket',
+    'Worker',
+    'SharedWorker',
+    'setTimeout',
+    'setInterval',
+    'require',
+    'process',
+    'Deno',
+    'Bun',
+    'globalThis',
+    'self',
+    'window',
+    'document',
+    'navigator',
+    'Endge',
   ])
   let invalid = false
   const emittedEvents = new Set<string>()
   walkBabelNodes(compute.body ?? compute, (current) => {
-    if (current.type === 'AwaitExpression' || current.type === 'Import' || current.type === 'ImportDeclaration') invalid = true
-    if (current.type === 'Identifier' && forbidden.has(current.name)) invalid = true
+    if (current.type === 'AwaitExpression' || current.type === 'Import' || current.type === 'ImportDeclaration') {
+      invalid = true
+    }
+    if (current.type === 'Identifier' && forbidden.has(current.name)) {
+      invalid = true
+    }
     const emitted = readPortsEmitCall(current)
     if (emitted) {
       emittedEvents.add(emitted)
@@ -735,7 +778,9 @@ function parseEventAction(
       }
     }
     const actionIdentity = readApiActionCall(current)
-    if (actionIdentity && !dependencies.actions.includes(actionIdentity)) dependencies.actions.push(actionIdentity)
+    if (actionIdentity && !dependencies.actions.includes(actionIdentity)) {
+      dependencies.actions.push(actionIdentity)
+    }
   })
   if (invalid) {
     diagnostics.push(makeDiagnostic('sfc-event-typescript-unsafe', 'typescript.compute содержит запрещённый global, import, await или self-emit.', computeProperty, script))
@@ -784,7 +829,9 @@ function parseEventOperation(
   const run = parseEventOperationBlock(eventName, runNode, 'run', script, dependencies, diagnostics)
   const undo = parseEventOperationBlock(eventName, undoNode, 'undo', script, dependencies, diagnostics)
   const redo = redoNode ? parseEventOperationBlock(eventName, redoNode, 'redo', script, dependencies, diagnostics) : null
-  if ((inputNode && !input) || !run || !undo || (redoNode && !redo)) return null
+  if ((inputNode && !input) || !run || !undo || (redoNode && !redo)) {
+    return null
+  }
   return { kind: 'operation', ...(input ? { input } : {}), run, undo, redo }
 }
 
@@ -861,27 +908,41 @@ function parseEventOperationStep(
 
 function parseEventInput(node: any, script: RComponentSFC_AST_Script, diagnostics: RComponentDiagnostic[], allowOperationInput = false): ComponentSFCEventInputValue | null {
   const eventRead = parseEventRead(node)
-  if (eventRead) return eventRead
+  if (eventRead) {
+    return eventRead
+  }
   const operationInputRead = allowOperationInput ? parseOperationInputRead(node) : null
-  if (operationInputRead) return operationInputRead
-  if (isCall(node, 'now') && (node.arguments?.length ?? 0) === 0) return { kind: 'now' }
+  if (operationInputRead) {
+    return operationInputRead
+  }
+  if (isCall(node, 'now') && (node.arguments?.length ?? 0) === 0) {
+    return { kind: 'now' }
+  }
   if (node?.type === 'LogicalExpression' && node.operator === '??') {
     const left = parseEventInput(node.left, script, diagnostics, allowOperationInput)
     const right = parseEventInput(node.right, script, diagnostics, allowOperationInput)
     return left && right ? { kind: 'coalesce', left, right } : null
   }
   const scopeRead = parseScopeRead(node)
-  if (scopeRead) return scopeRead
-  if (node?.type === 'StringLiteral' || node?.type === 'NumericLiteral' || node?.type === 'BooleanLiteral')
+  if (scopeRead) {
+    return scopeRead
+  }
+  if (node?.type === 'StringLiteral' || node?.type === 'NumericLiteral' || node?.type === 'BooleanLiteral') {
     return { kind: 'literal', value: node.value }
-  if (node?.type === 'NullLiteral') return { kind: 'literal', value: null }
-  if (node?.type === 'UnaryExpression' && node.operator === '-' && node.argument?.type === 'NumericLiteral')
+  }
+  if (node?.type === 'NullLiteral') {
+    return { kind: 'literal', value: null }
+  }
+  if (node?.type === 'UnaryExpression' && node.operator === '-' && node.argument?.type === 'NumericLiteral') {
     return { kind: 'literal', value: -node.argument.value }
+  }
   if (node?.type === 'ArrayExpression') {
     const items: ComponentSFCEventInputValue[] = []
     for (const item of node.elements ?? []) {
       const parsed = parseEventInput(item, script, diagnostics, allowOperationInput)
-      if (!parsed) return null
+      if (!parsed) {
+        return null
+      }
       items.push(parsed)
     }
     return { kind: 'array', items }
@@ -894,7 +955,9 @@ function parseEventInput(node: any, script: RComponentSFC_AST_Script, diagnostic
         ? parseEventInput(property.key, script, diagnostics, allowOperationInput)
         : null
       const parsed = property.type === 'ObjectProperty' ? parseEventInput(property.value, script, diagnostics, allowOperationInput) : null
-      if ((!staticKey && !dynamicKey) || !parsed) return null
+      if ((!staticKey && !dynamicKey) || !parsed) {
+        return null
+      }
       entries.push({ key: staticKey ?? dynamicKey!, value: parsed })
     }
     return { kind: 'object', entries }
@@ -904,8 +967,12 @@ function parseEventInput(node: any, script: RComponentSFC_AST_Script, diagnostic
 }
 
 function parseOperationInputRead(node: any): { kind: 'operation-input', path: string | null } | null {
-  if (!isCall(node, 'input')) return null
-  if ((node.arguments?.length ?? 0) === 0) return { kind: 'operation-input', path: null }
+  if (!isCall(node, 'input')) {
+    return null
+  }
+  if ((node.arguments?.length ?? 0) === 0) {
+    return { kind: 'operation-input', path: null }
+  }
   const path = node.arguments?.length === 1 ? readLiteralString(node.arguments[0]) : null
   return path ? { kind: 'operation-input', path } : null
 }
@@ -915,30 +982,44 @@ function parseScopeRead(node: any): { kind: 'scope', path: string } | null {
   let current = node
   while (current?.type === 'MemberExpression' || current?.type === 'OptionalMemberExpression') {
     const key = current.computed ? readLiteralString(current.property) : readKey(current.property)
-    if (!key) return null
+    if (!key) {
+      return null
+    }
     parts.unshift(key)
     current = current.object
   }
-  if (current?.type !== 'Identifier' || !current.name || current.name === 'event') return null
+  if (current?.type !== 'Identifier' || !current.name || current.name === 'event') {
+    return null
+  }
   parts.unshift(current.name)
   return { kind: 'scope', path: parts.join('.') }
 }
 
 function parseEventRead(node: any): { kind: 'event', path: string | null } | null {
-  if (!isCall(node, 'event')) return null
-  if ((node.arguments?.length ?? 0) === 0) return { kind: 'event', path: null }
+  if (!isCall(node, 'event')) {
+    return null
+  }
+  if ((node.arguments?.length ?? 0) === 0) {
+    return { kind: 'event', path: null }
+  }
   const path = node.arguments?.length === 1 ? readLiteralString(node.arguments[0]) : null
   return path ? { kind: 'event', path } : null
 }
 
 function readComputeFunction(property: any): any | null {
-  if (property?.type === 'ObjectMethod') return property
-  if (property?.type === 'ObjectProperty' && ['FunctionExpression', 'ArrowFunctionExpression'].includes(property.value?.type)) return property.value
+  if (property?.type === 'ObjectMethod') {
+    return property
+  }
+  if (property?.type === 'ObjectProperty' && ['FunctionExpression', 'ArrowFunctionExpression'].includes(property.value?.type)) {
+    return property.value
+  }
   return null
 }
 
 function computeFunctionSource(node: any, source: string): string {
-  if (node.type !== 'ObjectMethod') return source.slice(node.start, node.end)
+  if (node.type !== 'ObjectMethod') {
+    return source.slice(node.start, node.end)
+  }
   const params = (node.params ?? []).map((param: any) => source.slice(param.start, param.end)).join(', ')
   return `function (${params}) ${source.slice(node.body.start, node.body.end)}`
 }
@@ -955,7 +1036,9 @@ function readPortsEmitCall(node: any): string | null {
 
 function readApiActionCall(node: any): string | null {
   const callee = node?.type === 'CallExpression' ? node.callee : null
-  if (callee?.type !== 'MemberExpression' || callee.object?.type !== 'Identifier' || callee.object.name !== 'api' || readKey(callee.property) !== 'action') return null
+  if (callee?.type !== 'MemberExpression' || callee.object?.type !== 'Identifier' || callee.object.name !== 'api' || readKey(callee.property) !== 'action') {
+    return null
+  }
   return readLiteralString(node.arguments?.[0])
 }
 
@@ -987,8 +1070,9 @@ function parseForwardDefinition(
 
   for (const item of definitions) {
     const rule = parseForwardRule(item, script, diagnostics)
-    if (rule)
+    if (rule) {
       manifest.forward.rules.push(rule)
+    }
   }
 }
 
@@ -1023,8 +1107,9 @@ function parseForwardRule(
   const ports = portsNode == null
     ? createForwardAllPorts()
     : parseForwardPorts(portsNode, script, diagnostics)
-  if (!ports)
+  if (!ports) {
     return null
+  }
 
   const namespaceNode = readObjectPropertyValue(definition, 'namespace')
   const namespace = namespaceNode == null ? 'none' : readLiteralString(namespaceNode)
@@ -1051,8 +1136,9 @@ function parseForwardPorts(
   script: RComponentSFC_AST_Script,
   diagnostics: RComponentDiagnostic[],
 ): ComponentSFCPortForwardRule['ports'] | null {
-  if (definition?.type === 'StringLiteral' && definition.value === '*')
+  if (definition?.type === 'StringLiteral' && definition.value === '*') {
     return createForwardAllPorts()
+  }
 
   if (definition?.type !== 'ObjectExpression') {
     diagnostics.push(makeDiagnostic(
@@ -1088,8 +1174,9 @@ function parseForwardPorts(
     const role = rawRole as ComponentSFCPortRole
     roles.add(role)
     const selector = parseForwardSelector(property.value, script, diagnostics)
-    if (selector)
+    if (selector) {
       result[role] = selector
+    }
   }
   return result
 }
@@ -1099,8 +1186,9 @@ function parseForwardSelector(
   script: RComponentSFC_AST_Script,
   diagnostics: RComponentDiagnostic[],
 ): ComponentSFCPortForwardSelector | null {
-  if (definition?.type === 'StringLiteral' && definition.value === '*')
+  if (definition?.type === 'StringLiteral' && definition.value === '*') {
     return createForwardAllSelector()
+  }
 
   const literalNames = readLiteralStringArray(definition)
   if (literalNames) {
@@ -1169,33 +1257,45 @@ function createForwardAllSelector(): ComponentSFCPortForwardSelector {
 }
 
 function readForwardSources(node: any): '*' | string[] | null {
-  if (node?.type === 'StringLiteral')
+  if (node?.type === 'StringLiteral') {
     return node.value === '*' ? '*' : node.value.trim() ? [node.value.trim()] : null
+  }
   const values = readLiteralStringArray(node)
-  if (!values?.length || values.includes('*'))
+  if (!values?.length || values.includes('*')) {
     return null
+  }
   return values
 }
 
 function readLiteralStringArray(node: any): string[] | null {
-  if (node?.type !== 'ArrayExpression') return null
+  if (node?.type !== 'ArrayExpression') {
+    return null
+  }
   const result: string[] = []
   for (const item of node.elements ?? []) {
     const value = readLiteralString(item)
-    if (!value) return null
+    if (!value) {
+      return null
+    }
     result.push(value)
   }
   return result
 }
 
 function readLiteralStringMap(node: any): Record<string, string> | null {
-  if (node?.type !== 'ObjectExpression') return null
+  if (node?.type !== 'ObjectExpression') {
+    return null
+  }
   const result: Record<string, string> = {}
   for (const property of node.properties ?? []) {
-    if (property.type !== 'ObjectProperty' || property.computed) return null
+    if (property.type !== 'ObjectProperty' || property.computed) {
+      return null
+    }
     const key = readKey(property.key)
     const value = readLiteralString(property.value)
-    if (!key || !value) return null
+    if (!key || !value) {
+      return null
+    }
     result[key] = value
   }
   return result
@@ -1203,8 +1303,9 @@ function readLiteralStringMap(node: any): Record<string, string> | null {
 
 function readObjectPropertyValue(object: any, name: string): any | null {
   for (const property of object?.properties ?? []) {
-    if (property.type === 'ObjectProperty' && !property.computed && readKey(property.key) === name)
+    if (property.type === 'ObjectProperty' && !property.computed && readKey(property.key) === name) {
       return property.value
+    }
   }
   return null
 }
@@ -1223,18 +1324,28 @@ function parsePortCalls(
   options: ComponentSFCPortAnalysisOptions,
 ): void {
   const portsByName = new Map<string, ComponentSFCComputationPort | ComponentSFCComponentPort>()
-  for (const port of manifest.require.computations) portsByName.set(port.name, port)
-  for (const port of manifest.require.components) portsByName.set(port.name, port)
+  for (const port of manifest.require.computations) {
+    portsByName.set(port.name, port)
+  }
+  for (const port of manifest.require.components) {
+    portsByName.set(port.name, port)
+  }
   const props = parseComponentSFCProps(script, options)
   const locals = script.bindings.map(binding => binding.name)
   const topLevelCalls = new Set<number>()
 
   for (const statement of statements) {
-    if (statement.type !== 'VariableDeclaration') continue
+    if (statement.type !== 'VariableDeclaration') {
+      continue
+    }
     for (const declaration of statement.declarations ?? []) {
       const init = declaration.init
-      if (!isPortCall(init, bindingName)) continue
-      if (typeof init.start === 'number') topLevelCalls.add(init.start)
+      if (!isPortCall(init, bindingName)) {
+        continue
+      }
+      if (typeof init.start === 'number') {
+        topLevelCalls.add(init.start)
+      }
       const local = declaration.id?.type === 'Identifier' ? declaration.id.name : ''
       const portName = readRequiredPortCallName(init, bindingName)
       const port = portName ? portsByName.get(portName) : null
@@ -1298,7 +1409,9 @@ function parsePortCalls(
   }
 
   walkBabelNodes(statements, (node) => {
-    if (!isPortCall(node, bindingName) || topLevelCalls.has(node.start)) return
+    if (!isPortCall(node, bindingName) || topLevelCalls.has(node.start)) {
+      return
+    }
     diagnostics.push(makeDiagnostic(
       'sfc-port-call-top-level-const',
       'Computation port call должен инициализировать top-level const.',
@@ -1315,9 +1428,13 @@ function validateProvider(
   node: any,
   script: RComponentSFC_AST_Script,
 ): void {
-  if (!options.resolveProvider) return
+  if (!options.resolveProvider) {
+    return
+  }
   const defaultIdentity = port.defaultIdentity
-  if (!defaultIdentity) return
+  if (!defaultIdentity) {
+    return
+  }
   const provider = options.resolveProvider(defaultIdentity, port.kind)
   if (!provider) {
     diagnostics.push(makeDiagnostic(
@@ -1383,7 +1500,9 @@ function parsePortContractFields(
   script: RComponentSFC_AST_Script,
   options: ComponentSFCPortAnalysisOptions,
 ) {
-  if (['void', 'unknown', 'never'].includes(normalizeType(source))) return []
+  if (['void', 'unknown', 'never'].includes(normalizeType(source))) {
+    return []
+  }
   return parseComponentSFCTypeFields(source, script.content, options)
 }
 
@@ -1424,16 +1543,21 @@ function readTypeParameters(call: any, content: string): string[] {
 
 function readStringProperty(object: any, name: string): string | null {
   for (const property of object.properties ?? []) {
-    if (property.type !== 'ObjectProperty' || property.computed || readKey(property.key) !== name)
+    if (property.type !== 'ObjectProperty' || property.computed || readKey(property.key) !== name) {
       continue
+    }
     return property.value?.type === 'StringLiteral' ? property.value.value.trim() || null : null
   }
   return null
 }
 
 function readKey(node: any): string | null {
-  if (node?.type === 'Identifier') return node.name
-  if (node?.type === 'StringLiteral') return node.value
+  if (node?.type === 'Identifier') {
+    return node.name
+  }
+  if (node?.type === 'StringLiteral') {
+    return node.value
+  }
   return null
 }
 
@@ -1450,29 +1574,44 @@ function isPortCall(node: any, bindingName: string): boolean {
 function readRequiredPortCallName(node: any, bindingName: string): string | null {
   const callee = node?.type === 'CallExpression' ? node.callee : null
   const roleMember = callee?.type === 'MemberExpression' ? callee.object : null
-  if (roleMember?.type !== 'MemberExpression') return null
-  if (roleMember.object?.type !== 'Identifier' || roleMember.object.name !== bindingName) return null
-  if (readKey(roleMember.property) !== 'require') return null
+  if (roleMember?.type !== 'MemberExpression') {
+    return null
+  }
+  if (roleMember.object?.type !== 'Identifier' || roleMember.object.name !== bindingName) {
+    return null
+  }
+  if (readKey(roleMember.property) !== 'require') {
+    return null
+  }
   return readKey(callee.property)
 }
 
 function walkBabelNodes(value: unknown, visit: (node: any) => void): void {
   if (Array.isArray(value)) {
-    for (const item of value) walkBabelNodes(item, visit)
+    for (const item of value) {
+      walkBabelNodes(item, visit)
+    }
     return
   }
-  if (!value || typeof value !== 'object') return
+  if (!value || typeof value !== 'object') {
+    return
+  }
   const node = value as Record<string, unknown>
-  if (typeof node.type === 'string') visit(node)
+  if (typeof node.type === 'string') {
+    visit(node)
+  }
   for (const [key, child] of Object.entries(node)) {
-    if (key === 'loc' || key === 'start' || key === 'end' || key === 'extra') continue
-    if (Array.isArray(child) || (child && typeof child === 'object'))
+    if (key === 'loc' || key === 'start' || key === 'end' || key === 'extra') {
+      continue
+    }
+    if (Array.isArray(child) || (child && typeof child === 'object')) {
       walkBabelNodes(child, visit)
+    }
   }
 }
 
 function isValidTag(tag: string): boolean {
-  return /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(tag)
+  return /^[A-Z_$][\w$]*(?:\.[A-Z_$][\w$]*)*$/i.test(tag)
 }
 
 function toRange(node: any, script: RComponentSFC_AST_Script) {

@@ -1,9 +1,13 @@
+import type { ComponentSFCEventInputValue } from '@/domain/types/component/sfc/ports.types'
+import type { EndgeDataMode } from '@/domain/types/document/workspace.types'
+import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
+import type { VocabLoadPolicy } from '@/domain/types/runtime/vocab-cache.types'
 import type {
   CompositionActivationDescriptor,
   CompositionBindingValue,
   CompositionDataDescriptor,
-  CompositionOutputDescriptor,
   CompositionHook,
+  CompositionOutputDescriptor,
   CompositionPreviewLiteral,
   CompositionPreviewProps,
   CompositionResourceDescriptor,
@@ -15,30 +19,26 @@ import type {
   CompositionSourceDocument,
   OperationHistoryShortcutDescriptor,
 } from '@/domain/types/source/composition-source.types'
+import type { SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
+import type { UpdateMutationStrategy } from '@/domain/types/source/update-source.types'
 import type {
   FilterViewControlDefinition,
   FilterViewControlType,
-} from '@/domain/types/ui/filter-view.type'
-import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
-import type { SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
-import type { VocabLoadPolicy } from '@/domain/types/runtime/vocab-cache.types'
-import type { ComponentSFCEventInputValue } from '@/domain/types/component/sfc/ports.types'
-import type { UpdateMutationStrategy } from '@/domain/types/source/update-source.types'
-import type { EndgeDataMode } from '@/domain/types/document/workspace.types'
+} from '@/domain/types/presentation/filter-view.type'
 
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
 
+import { DEFAULT_VOCAB_LOAD_POLICY } from '@/domain/types/runtime/vocab-cache.types'
 import {
-  diagnostic,
   compileSourceExpression,
+  diagnostic,
   propertyName,
   readStringArgument,
   unwrapExpression,
 } from '@/model/services/source-engine/compilers/source-expression-compile'
 import { compileSourceField } from '@/model/services/source-engine/compilers/source-field-compile'
 import { compileProgramMetadataProperty } from '@/model/services/source-engine/compilers/source-metadata-compile'
-import { DEFAULT_VOCAB_LOAD_POLICY } from '@/domain/types/runtime/vocab-cache.types'
 import { normalizeComponentSFCInteractionTriggers } from '@/tools/component-sfc-edit-trigger'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
@@ -82,16 +82,21 @@ export function compileCompositionSource(source: string, sourceVersion = 1): Com
     const runtimesNode = runtimesValue && t.isObjectExpression(runtimesValue) ? runtimesValue : null
     const hooksNode = hooksValue && t.isArrayExpression(hooksValue) ? hooksValue : null
     const outputsNode = outputsValue && t.isObjectExpression(outputsValue) ? outputsValue : null
-    if (dataValue && !dataNode)
+    if (dataValue && !dataNode) {
       diagnostics.push(diagnostic('error', 'composition-source-data-shape', 'data должен быть object literal.', 'data', dataValue))
-    if (resourcesValue && !resourcesNode)
+    }
+    if (resourcesValue && !resourcesNode) {
       diagnostics.push(diagnostic('error', 'composition-source-resources-shape', 'resources должен быть object literal.', 'resources', resourcesValue))
-    if (runtimesValue && !runtimesNode)
+    }
+    if (runtimesValue && !runtimesNode) {
       diagnostics.push(diagnostic('error', 'composition-source-runtimes-shape', 'runtimes должен быть object literal.', 'runtimes', runtimesValue))
-    if (hooksValue && !hooksNode)
+    }
+    if (hooksValue && !hooksNode) {
       diagnostics.push(diagnostic('error', 'composition-source-hooks-shape', 'hooks должен быть array literal.', 'hooks', hooksValue))
-    if (outputsValue && !outputsNode)
+    }
+    if (outputsValue && !outputsNode) {
       diagnostics.push(diagnostic('error', 'composition-source-outputs-shape', 'outputs должен быть object literal.', 'outputs', outputsValue))
+    }
     const props = propsValue ? readProps(propsValue, source, diagnostics) : []
     const previewProps = previewPropsValue
       ? readPreviewProps(previewPropsValue, new Set(props.map(prop => prop.key)), diagnostics)
@@ -140,8 +145,9 @@ export function compileCompositionSource(source: string, sourceVersion = 1): Com
     const scopeNames = new Set(scopes.filter(item => item.path !== 'scope_default').map(item => item.path))
     const outputs = outputsNode ? readOutputs(outputsNode, runtimeNames, scopeNames, diagnostics) : []
 
-    if (!runtimesNode)
+    if (!runtimesNode) {
       diagnostics.push(diagnostic('error', 'composition-source-runtimes-missing', 'defineComposition требует runtimes.', 'runtimes', definition))
+    }
     validatePersistKeys(runtimes, diagnostics)
     validateBindingReferences(props, data, runtimes, diagnostics)
     validateRuntimeCycles(runtimes, hooks, diagnostics)
@@ -151,13 +157,15 @@ export function compileCompositionSource(source: string, sourceVersion = 1): Com
     return {
       ast,
       document: hasErrors ? null : document,
-      artifact: hasErrors ? null : {
-        type: 'composition',
-        sourceVersion,
-        ...document,
-        i18nResources: [],
-        graph: buildRuntimeGraph(document),
-      },
+      artifact: hasErrors
+        ? null
+        : {
+            type: 'composition',
+            sourceVersion,
+            ...document,
+            i18nResources: [],
+            graph: buildRuntimeGraph(document),
+          },
       metadata,
       diagnostics,
     }
@@ -217,11 +225,13 @@ export function buildRuntimeGraph(document: CompositionSourceDocument): Composit
 
 function findDefineComposition(ast: t.File): t.CallExpression | null {
   for (const statement of ast.program.body) {
-    if (!t.isExpressionStatement(statement))
+    if (!t.isExpressionStatement(statement)) {
       continue
+    }
     const expression = unwrapExpression(statement.expression)
-    if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'defineComposition' }))
+    if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'defineComposition' })) {
       return expression
+    }
   }
   return null
 }
@@ -233,8 +243,9 @@ function validateRootProperties(node: t.ObjectExpression, diagnostics: Diagnosti
       continue
     }
     const name = propertyName(property.key)
-    if (name !== 'metadata' && name !== 'dataMode' && name !== 'activateOn' && name !== 'props' && name !== 'previewProps' && name !== 'data' && name !== 'resources' && name !== 'runtimes' && name !== 'hooks' && name !== 'outputs')
+    if (name !== 'metadata' && name !== 'dataMode' && name !== 'activateOn' && name !== 'props' && name !== 'previewProps' && name !== 'data' && name !== 'resources' && name !== 'runtimes' && name !== 'hooks' && name !== 'outputs') {
       diagnostics.push(diagnostic('error', 'composition-source-property-unsupported', `Свойство "${name ?? ''}" не поддерживается Composition v1.`, name ?? 'defineComposition', property))
+    }
   }
 }
 
@@ -287,8 +298,9 @@ function readProps(
     }
     declared.add(key)
     const compiled = compileSourceField(key, property.value, source, diagnostics, `props.${key}`)
-    if (!compiled)
+    if (!compiled) {
       continue
+    }
     if (compiled.defaultSource) {
       diagnostics.push(diagnostic(
         'error',
@@ -383,8 +395,9 @@ function validateScopeProperties(node: t.ObjectExpression, diagnostics: Diagnost
       continue
     }
     const name = propertyName(property.key)
-    if (name !== 'data' && name !== 'resources' && name !== 'runtimes')
+    if (name !== 'data' && name !== 'resources' && name !== 'runtimes') {
       diagnostics.push(diagnostic('error', 'composition-scope-property-unsupported', `Свойство "${name ?? ''}" не поддерживается внутри scope.`, `runtimes.${path}.${name ?? ''}`, property))
+    }
   }
 }
 
@@ -431,18 +444,25 @@ function readResources(
       let limitConfigurationPath: string | null = null
       let shortcuts: OperationHistoryShortcutDescriptor[] | null = null
       if (options != null) {
-        if (!t.isObjectExpression(options)) diagnostics.push(diagnostic('error', 'composition-operation-history-options', 'operationHistory принимает options object.', `resources.${path}`, expression))
+        if (!t.isObjectExpression(options)) {
+          diagnostics.push(diagnostic('error', 'composition-operation-history-options', 'operationHistory принимает options object.', `resources.${path}`, expression))
+        }
         else {
           const limitNode = propertyValue(options, 'limit')
           if (limitNode) {
             const value = unwrapExpression(limitNode)
-            if (t.isNumericLiteral(value) && Number.isFinite(value.value) && value.value > 0) limit = Math.floor(value.value)
-            else if (readConfigurationValuePath(value)) limitConfigurationPath = readConfigurationValuePath(value)
-            else diagnostics.push(diagnostic('error', 'composition-operation-history-limit', 'operationHistory.limit должен быть положительным числом.', `resources.${path}.limit`, value))
+            if (t.isNumericLiteral(value) && Number.isFinite(value.value) && value.value > 0) {
+              limit = Math.floor(value.value)
+            }
+            else if (readConfigurationValuePath(value)) {
+              limitConfigurationPath = readConfigurationValuePath(value)
+            }
+            else { diagnostics.push(diagnostic('error', 'composition-operation-history-limit', 'operationHistory.limit должен быть положительным числом.', `resources.${path}.limit`, value)) }
           }
           const shortcutsNode = propertyValue(options, 'shortcuts')
-          if (shortcutsNode)
+          if (shortcutsNode) {
             shortcuts = readOperationHistoryShortcuts(shortcutsNode, `resources.${path}.shortcuts`, diagnostics)
+          }
         }
       }
       resources.push({
@@ -532,21 +552,30 @@ function readConfigurationValuePath(node: t.Expression): string | null {
     segments.unshift(current.property.name)
     current = unwrapExpression(current.object as t.Expression)
   }
-  if (!t.isIdentifier(current) || !current.name.startsWith('$') || current.name.length < 2)
+  if (!t.isIdentifier(current) || !current.name.startsWith('$') || current.name.length < 2) {
     return null
+  }
   segments.unshift(current.name.slice(1))
   return segments.join('.')
 }
 
 function readStaticJSON(node: t.Expression): unknown {
-  if (t.isStringLiteral(node) || t.isNumericLiteral(node) || t.isBooleanLiteral(node)) return node.value
-  if (t.isNullLiteral(node)) return null
+  if (t.isStringLiteral(node) || t.isNumericLiteral(node) || t.isBooleanLiteral(node)) {
+    return node.value
+  }
+  if (t.isNullLiteral(node)) {
+    return null
+  }
   if (t.isArrayExpression(node)) {
     const result: unknown[] = []
     for (const element of node.elements) {
-      if (!element || t.isSpreadElement(element)) return undefined
+      if (!element || t.isSpreadElement(element)) {
+        return undefined
+      }
       const value = readStaticJSON(unwrapExpression(element))
-      if (value === undefined) return undefined
+      if (value === undefined) {
+        return undefined
+      }
       result.push(value)
     }
     return result
@@ -554,11 +583,17 @@ function readStaticJSON(node: t.Expression): unknown {
   if (t.isObjectExpression(node)) {
     const result: Record<string, unknown> = {}
     for (const property of node.properties) {
-      if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) return undefined
+      if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
+        return undefined
+      }
       const key = propertyName(property.key)
-      if (!key) return undefined
+      if (!key) {
+        return undefined
+      }
       const value = readStaticJSON(unwrapExpression(property.value))
-      if (value === undefined) return undefined
+      if (value === undefined) {
+        return undefined
+      }
       result[key] = value
     }
     return result
@@ -576,8 +611,9 @@ function readData(
   const data: CompositionDataDescriptor[] = []
   const declared = new Set<string>()
   for (const property of node.properties) {
-    if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value))
+    if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
       continue
+    }
     const name = propertyName(property.key)
     const path = publicPrefix ? `${publicPrefix}.${name ?? ''}` : String(name ?? '')
     const chain = memberChain(property.value)
@@ -637,18 +673,20 @@ function readData(
           diagnostics.push(diagnostic('error', 'composition-data-resolution-arguments', `.${modifier.name}() не принимает аргументы.`, `data.${path}.${modifier.name}`, modifier.call))
           continue
         }
-        if (resolutionModifiers.length === 1)
+        if (resolutionModifiers.length === 1) {
           resolution = modifier.name
+        }
         continue
       }
       if (modifier.name === 'slot') {
         const value = readStringArgument(modifier.call, 0)
-        if (!value || modifier.call.arguments.length !== 1)
+        if (!value || modifier.call.arguments.length !== 1) {
           diagnostics.push(diagnostic('error', 'composition-data-slot', '.slot(name) требует одну непустую строку.', `data.${path}.slot`, modifier.call))
-        else if (slot)
+        }
+        else if (slot) {
           diagnostics.push(diagnostic('error', 'composition-data-slot-duplicate', '.slot(name) объявлен повторно.', `data.${path}.slot`, modifier.call))
-        else
-          slot = value
+        }
+        else { slot = value }
         continue
       }
       diagnostics.push(diagnostic('error', 'composition-data-method', `.${modifier.name}(...) не поддерживается Store data descriptor.`, `data.${path}`, modifier.call))
@@ -687,18 +725,22 @@ function readVocabPolicy(
   const raw = value.value as Record<string, unknown>
   const allowed = new Set(['strategy', 'maxAgeMs', 'onError'])
   for (const key of Object.keys(raw)) {
-    if (!allowed.has(key))
+    if (!allowed.has(key)) {
       diagnostics.push(diagnostic('error', 'composition-vocab-policy-property', `Vocab policy property "${key}" не поддерживается.`, `${sourcePath}.${key}`, argument))
+    }
   }
   const strategy = raw.strategy ?? DEFAULT_VOCAB_LOAD_POLICY.strategy
   const maxAgeMs = raw.maxAgeMs === undefined ? DEFAULT_VOCAB_LOAD_POLICY.maxAgeMs : raw.maxAgeMs
   const onError = raw.onError ?? DEFAULT_VOCAB_LOAD_POLICY.onError
-  if (strategy !== 'cache-first' && strategy !== 'network-first' && strategy !== 'stale-while-revalidate')
+  if (strategy !== 'cache-first' && strategy !== 'network-first' && strategy !== 'stale-while-revalidate') {
     diagnostics.push(diagnostic('error', 'composition-vocab-policy-strategy', `Vocab strategy "${String(strategy)}" не поддерживается.`, `${sourcePath}.strategy`, argument))
-  if (maxAgeMs !== null && (typeof maxAgeMs !== 'number' || !Number.isFinite(maxAgeMs) || maxAgeMs < 0))
+  }
+  if (maxAgeMs !== null && (typeof maxAgeMs !== 'number' || !Number.isFinite(maxAgeMs) || maxAgeMs < 0)) {
     diagnostics.push(diagnostic('error', 'composition-vocab-policy-max-age', 'maxAgeMs должен быть неотрицательным числом или null.', `${sourcePath}.maxAgeMs`, argument))
-  if (onError !== 'fail' && onError !== 'use-cache')
+  }
+  if (onError !== 'fail' && onError !== 'use-cache') {
     diagnostics.push(diagnostic('error', 'composition-vocab-policy-on-error', `Vocab onError "${String(onError)}" не поддерживается.`, `${sourcePath}.onError`, argument))
+  }
   return {
     strategy: strategy === 'network-first' || strategy === 'stale-while-revalidate' ? strategy : 'cache-first',
     maxAgeMs: typeof maxAgeMs === 'number' && Number.isFinite(maxAgeMs) && maxAgeMs >= 0 ? maxAgeMs : maxAgeMs === null ? null : null,
@@ -726,8 +768,9 @@ function readRuntimes(
       continue
     }
     const name = propertyName(property.key)
-    if (!name)
+    if (!name) {
       continue
+    }
     if (declared.has(name)) {
       diagnostics.push(diagnostic('error', 'composition-runtime-duplicate', `Runtime или scope "${name}" объявлен повторно.`, `runtimes.${name}`, property))
       continue
@@ -754,12 +797,15 @@ function readRuntimes(
       const scopeDataNode = propertyValue(definition, 'data')
       const scopeResourcesNode = propertyValue(definition, 'resources')
       const scopeRuntimesNode = propertyValue(definition, 'runtimes')
-      if (scopeDataNode && !t.isObjectExpression(scopeDataNode))
+      if (scopeDataNode && !t.isObjectExpression(scopeDataNode)) {
         diagnostics.push(diagnostic('error', 'composition-scope-data-shape', `data scope "${path}" должен быть object literal.`, `runtimes.${path}.data`, scopeDataNode))
-      if (scopeResourcesNode && !t.isObjectExpression(scopeResourcesNode))
+      }
+      if (scopeResourcesNode && !t.isObjectExpression(scopeResourcesNode)) {
         diagnostics.push(diagnostic('error', 'composition-scope-resources-shape', `resources scope "${path}" должен быть object literal.`, `runtimes.${path}.resources`, scopeResourcesNode))
-      if (scopeRuntimesNode && !t.isObjectExpression(scopeRuntimesNode))
+      }
+      if (scopeRuntimesNode && !t.isObjectExpression(scopeRuntimesNode)) {
         diagnostics.push(diagnostic('error', 'composition-scope-runtimes-shape', `runtimes scope "${path}" должен быть object literal.`, `runtimes.${path}.runtimes`, scopeRuntimesNode))
+      }
       const ownedResources = t.isObjectExpression(scopeResourcesNode)
         ? readResources(scopeResourcesNode, path, path, diagnostics, order)
         : []
@@ -818,8 +864,9 @@ function readRuntimes(
     }
     const path = publicPrefix ? `${publicPrefix}.${name}` : name
     const runtime = readRuntime(path, property.value, visibleData, diagnostics, ownerScopePath, ownerActivation)
-    if (runtime)
+    if (runtime) {
       runtimes.push(runtime)
+    }
   }
 }
 
@@ -879,10 +926,10 @@ function readRuntime(
         continue
       }
       const fields = readStringArrayArgument(modifier.call, 0)
-      if (!fields?.length)
+      if (!fields?.length) {
         diagnostics.push(diagnostic('error', 'composition-filter-fields-empty', '.fields([...]) требует непустой массив field keys.', `runtimes.${name}.fields`, modifier.call))
-      else
-        descriptor.fields = [...new Set(fields)]
+      }
+      else { descriptor.fields = [...new Set(fields)] }
       continue
     }
     if (modifier.name === 'controls') {
@@ -904,10 +951,10 @@ function readRuntime(
         continue
       }
       const identity = readStringArgument(modifier.call, 0)
-      if (!identity)
+      if (!identity) {
         diagnostics.push(diagnostic('error', 'composition-filter-view-component-identity', '.component(identity) требует identity.', `runtimes.${name}.component`, modifier.call))
-      else
-        descriptor.componentIdentity = identity
+      }
+      else { descriptor.componentIdentity = identity }
       continue
     }
     if (modifier.name === 'persist') {
@@ -917,10 +964,10 @@ function readRuntime(
       }
       const config = modifier.call.arguments[0]
       const key = config && t.isObjectExpression(config) ? stringProperty(config, 'key') : null
-      if (!key)
+      if (!key) {
         diagnostics.push(diagnostic('error', 'composition-persist-key', '.persist({ key }) требует непустой key.', `runtimes.${name}.persist`, modifier.call))
-      else
-        descriptor.persistKey = key
+      }
+      else { descriptor.persistKey = key }
       continue
     }
     if (modifier.name === 'withProps') {
@@ -980,8 +1027,9 @@ function readRuntime(
       }
       const fields: Record<string, string> = {}
       for (const property of mapping.properties) {
-        if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value))
+        if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
           continue
+        }
         const field = propertyName(property.key)
         const output = readOutputReference(property.value)
         if (!field || !output) {
@@ -1011,10 +1059,10 @@ function readRuntime(
         }
         return [resolvedDataName]
       })
-      if (!resolvedTargets.length)
+      if (!resolvedTargets.length) {
         diagnostics.push(diagnostic('error', 'composition-dispatch-to-empty', '.dispatchTo(...) требует хотя бы один Store data alias.', `runtimes.${name}.dispatchTo`, modifier.call))
-      else
-        descriptor.dispatchTo = [...new Set(resolvedTargets)]
+      }
+      else { descriptor.dispatchTo = [...new Set(resolvedTargets)] }
       continue
     }
     if (modifier.name === 'batch') {
@@ -1121,8 +1169,9 @@ function readBindings(
       continue
     }
     const key = propertyName(property.key)
-    if (!key)
+    if (!key) {
       continue
+    }
     const expression = unwrapExpression(property.value)
     const dataViewBinding = readCompositionDataViewBinding(expression, diagnostics, `${sourcePath}.${key}`)
     if (dataViewBinding) {
@@ -1144,10 +1193,10 @@ function readBindings(
     }
     if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'fromStore' })) {
       const storeKey = readStringArgument(expression, 0)
-      if (!storeKey)
+      if (!storeKey) {
         diagnostics.push(diagnostic('error', 'composition-binding-store', 'fromStore(key) требует непустую строку.', `${sourcePath}.${key}`, expression))
-      else
-        bindings[key] = { kind: 'store', key: storeKey }
+      }
+      else { bindings[key] = { kind: 'store', key: storeKey } }
       continue
     }
     if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'fromData' })) {
@@ -1155,10 +1204,10 @@ function readBindings(
       const dot = ref.indexOf('.')
       const data = dot > 0 ? ref.slice(0, dot) : ref
       const path = dot > 0 ? ref.slice(dot + 1) : ''
-      if (!data)
+      if (!data) {
         diagnostics.push(diagnostic('error', 'composition-binding-data', 'fromData(path) требует data alias.', `${sourcePath}.${key}`, expression))
-      else
-        bindings[key] = { kind: 'data', data, path }
+      }
+      else { bindings[key] = { kind: 'data', data, path } }
       continue
     }
     if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'metadataOf' })) {
@@ -1181,12 +1230,14 @@ function readBindings(
     }
 
     const value = staticValue(expression)
-    if (value.ok)
+    if (value.ok) {
       bindings[key] = { kind: 'literal', value: value.value }
+    }
     else {
       const compiled = compileSourceExpression(expression, diagnostics, `${sourcePath}.${key}`)
-      if (compiled)
+      if (compiled) {
         bindings[key] = { kind: 'expression', expression: compiled }
+      }
     }
   }
   return bindings
@@ -1223,8 +1274,9 @@ function resolveVisibleDataBindings(
       return [key, {
         ...binding,
         expression: mapExpression(binding.expression, (read) => {
-          if (read.source !== 'composition-data')
+          if (read.source !== 'composition-data') {
             return read
+          }
           const ref = read.parameters?.[0] ?? ''
           const dot = ref.indexOf('.')
           const alias = dot > 0 ? ref.slice(0, dot) : ref
@@ -1251,12 +1303,15 @@ function mapExpression(
     read: Extract<import('@/domain/types/source/source-expression.types').SourceExpressionIR, { type: 'read' }>,
   ) => import('@/domain/types/source/source-expression.types').SourceExpressionIR,
 ): import('@/domain/types/source/source-expression.types').SourceExpressionIR {
-  if (expression.type === 'read')
+  if (expression.type === 'read') {
     return mapRead(expression)
-  if (expression.type === 'operation')
+  }
+  if (expression.type === 'operation') {
     return { ...expression, arguments: expression.arguments.map(item => mapExpression(item, mapRead)) }
-  if (expression.type === 'array')
+  }
+  if (expression.type === 'array') {
     return { ...expression, items: expression.items.map(item => mapExpression(item, mapRead)) }
+  }
   if (expression.type === 'object') {
     return {
       ...expression,
@@ -1276,8 +1331,9 @@ function readHooks(
 ): CompositionHook[] {
   const hooks: CompositionHook[] = []
   node.elements.forEach((element, index) => {
-    if (!element || !t.isExpression(element))
+    if (!element || !t.isExpression(element)) {
       return
+    }
     const chain = memberChain(element)
     if (!chain || !t.isIdentifier(chain.base.callee)) {
       diagnostics.push(diagnostic('error', 'composition-hook-shape', 'Hook должен начинаться с onMount(), onChange(path), onSuccess(runtime) или onEvent(runtime, event).', `hooks.${index}`, element))
@@ -1290,14 +1346,17 @@ function readHooks(
     }
     if (root === 'onEvent') {
       const hook = readComponentEventHook(chain, runtimes, data, diagnostics, `hooks.${index}`)
-      if (hook) hooks.push(hook)
+      if (hook) {
+        hooks.push(hook)
+      }
       return
     }
     let target = ''
     let debounceMs = 200
     for (const modifier of chain.modifiers) {
-      if (modifier.name === 'run')
+      if (modifier.name === 'run') {
         target = readStringArgument(modifier.call, 0) ?? ''
+      }
       else if (modifier.name === 'debounce') {
         if (root !== 'onChange') {
           diagnostics.push(diagnostic('error', 'composition-hook-debounce-kind', '.debounce(...) поддерживается только для onChange.', `hooks.${index}`, modifier.call))
@@ -1306,8 +1365,9 @@ function readHooks(
         const value = modifier.call.arguments[0]
         debounceMs = value && t.isNumericLiteral(value) ? value.value : Number.NaN
       }
-      else
+      else {
         diagnostics.push(diagnostic('error', 'composition-hook-method', `Hook method ".${modifier.name}" не поддерживается.`, `hooks.${index}`, modifier.call))
+      }
     }
     if (!target || !runtimeNames.has(target)) {
       diagnostics.push(diagnostic('error', 'composition-hook-target', `Hook target "${target}" не найден.`, `hooks.${index}`, element))
@@ -1344,8 +1404,9 @@ function readHooks(
       return
     }
     const source = readChangeSource(chain.base, runtimeNames, propNames, diagnostics, `hooks.${index}`)
-    if (source)
+    if (source) {
       hooks.push({ kind: 'change', source, target, debounceMs })
+    }
   })
   return hooks
 }
@@ -1424,13 +1485,19 @@ function readComponentEventHook(
         const mapped = t.isObjectProperty(property) && t.isExpression(property.value)
           ? readCompositionEventInput(property.value, diagnostics, sourcePath)
           : null
-        if (!key || !mapped) return null
+        if (!key || !mapped) {
+          return null
+        }
         vars[key] = mapped
       }
     }
-    if (valueNode && !value) return null
+    if (valueNode && !value) {
+      return null
+    }
     return {
-      kind: 'event', runtime, event,
+      kind: 'event',
+      runtime,
+      event,
       effect: {
         kind: 'mutate-store',
         data: resolvedData,
@@ -1448,26 +1515,41 @@ function readCompositionEventInput(
   sourcePath: string,
 ): ComponentSFCEventInputValue | null {
   if (t.isCallExpression(node) && t.isIdentifier(node.callee, { name: 'event' })) {
-    if (node.arguments.length === 0) return { kind: 'event', path: null }
+    if (node.arguments.length === 0) {
+      return { kind: 'event', path: null }
+    }
     const path = readStringArgument(node, 0)
-    if (node.arguments.length === 1 && path) return { kind: 'event', path }
+    if (node.arguments.length === 1 && path) {
+      return { kind: 'event', path }
+    }
   }
-  if (t.isCallExpression(node) && t.isIdentifier(node.callee, { name: 'now' }) && node.arguments.length === 0)
+  if (t.isCallExpression(node) && t.isIdentifier(node.callee, { name: 'now' }) && node.arguments.length === 0) {
     return { kind: 'now' }
+  }
   if (t.isLogicalExpression(node, { operator: '??' })) {
     const left = readCompositionEventInput(node.left, diagnostics, sourcePath)
     const right = readCompositionEventInput(node.right, diagnostics, sourcePath)
     return left && right ? { kind: 'coalesce', left, right } : null
   }
-  if (t.isStringLiteral(node) || t.isNumericLiteral(node) || t.isBooleanLiteral(node)) return { kind: 'literal', value: node.value }
-  if (t.isNullLiteral(node)) return { kind: 'literal', value: null }
-  if (t.isUnaryExpression(node, { operator: '-' }) && t.isNumericLiteral(node.argument)) return { kind: 'literal', value: -node.argument.value }
+  if (t.isStringLiteral(node) || t.isNumericLiteral(node) || t.isBooleanLiteral(node)) {
+    return { kind: 'literal', value: node.value }
+  }
+  if (t.isNullLiteral(node)) {
+    return { kind: 'literal', value: null }
+  }
+  if (t.isUnaryExpression(node, { operator: '-' }) && t.isNumericLiteral(node.argument)) {
+    return { kind: 'literal', value: -node.argument.value }
+  }
   if (t.isArrayExpression(node)) {
     const items: ComponentSFCEventInputValue[] = []
     for (const item of node.elements) {
-      if (!item || !t.isExpression(item)) return null
+      if (!item || !t.isExpression(item)) {
+        return null
+      }
       const value = readCompositionEventInput(item, diagnostics, sourcePath)
-      if (!value) return null
+      if (!value) {
+        return null
+      }
       items.push(value)
     }
     return { kind: 'array', items }
@@ -1479,7 +1561,9 @@ function readCompositionEventInput(
       const value = t.isObjectProperty(property) && t.isExpression(property.value)
         ? readCompositionEventInput(property.value, diagnostics, sourcePath)
         : null
-      if (!key || !value) return null
+      if (!key || !value) {
+        return null
+      }
       entries.push({ key, value })
     }
     return { kind: 'object', entries }
@@ -1558,11 +1642,13 @@ function readOutputs(
   const outputs: CompositionOutputDescriptor[] = []
   const declared = new Set<string>()
   for (const property of node.properties) {
-    if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value))
+    if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
       continue
+    }
     const key = propertyName(property.key)
-    if (!key)
+    if (!key) {
       continue
+    }
     if (declared.has(key)) {
       diagnostics.push(diagnostic('error', 'composition-output-duplicate', `Output "${key}" объявлен повторно.`, `outputs.${key}`, property))
       continue
@@ -1577,14 +1663,16 @@ function readOutputs(
     let scope = ''
     let selected: string | undefined
     for (const modifier of chain.modifiers) {
-      if (modifier.name === 'fromRuntime')
+      if (modifier.name === 'fromRuntime') {
         runtime = readStringArgument(modifier.call, 0) ?? ''
-      else if (modifier.name === 'fromScope')
+      }
+      else if (modifier.name === 'fromScope') {
         scope = readStringArgument(modifier.call, 0) ?? ''
-      else if (modifier.name === 'select')
+      }
+      else if (modifier.name === 'select') {
         selected = readStringArgument(modifier.call, 0) ?? undefined
-      else
-        diagnostics.push(diagnostic('error', 'composition-output-method', `Output method ".${modifier.name}" не поддерживается.`, `outputs.${key}`, modifier.call))
+      }
+      else { diagnostics.push(diagnostic('error', 'composition-output-method', `Output method ".${modifier.name}" не поддерживается.`, `outputs.${key}`, modifier.call)) }
     }
     if (runtime && scope) {
       diagnostics.push(diagnostic('error', 'composition-output-target-conflict', `Output "${key}" не может одновременно ссылаться на runtime и scope.`, `outputs.${key}`, property.value))
@@ -1614,10 +1702,12 @@ function readOutputs(
 function validatePersistKeys(runtimes: CompositionRuntimeDescriptor[], diagnostics: DiagnosticDraft[]): void {
   const keys = new Set<string>()
   for (const runtime of runtimes) {
-    if (!runtime.persistKey)
+    if (!runtime.persistKey) {
       continue
-    if (keys.has(runtime.persistKey))
+    }
+    if (keys.has(runtime.persistKey)) {
       diagnostics.push(diagnostic('error', 'composition-persist-key-duplicate', `Persist key "${runtime.persistKey}" повторяется внутри Composition.`, `runtimes.${runtime.name}.persist`))
+    }
     keys.add(runtime.persistKey)
   }
 }
@@ -1653,59 +1743,63 @@ function validateBindingReferences(
     }
     for (const [prop, binding] of Object.entries(runtime.props)) {
       for (const nestedBinding of flattenCompositionBindings(binding)) {
-      if (nestedBinding.kind === 'expression') {
-        for (const read of collectExpressionReads(nestedBinding.expression)) {
-          const runtimeRef = read.source === 'composition-output' || read.source === 'composition-outputs' || read.source === 'composition-filter-fields' || read.source === 'composition-runtime-metadata'
-            ? read.parameters?.[0]
-            : undefined
-          const dataRef = read.source === 'composition-data'
-            ? findDataReference(String(read.parameters?.[0] ?? ''), dataByName)
-            : undefined
-          const propRef = read.source === 'prop'
-            ? read.path.split('.')[0]
-            : undefined
-          if (runtimeRef && !runtimeByName.has(runtimeRef))
-            diagnostics.push(diagnostic('error', 'composition-binding-runtime-missing', `Expression ссылается на отсутствующий runtime "${runtimeRef}".`, `runtimes.${runtime.name}.withProps.${prop}`))
-          if (read.source === 'composition-filter-fields' && runtimeRef && runtimeByName.get(runtimeRef)?.kind !== 'filter')
-            diagnostics.push(diagnostic('error', 'composition-binding-filter-runtime-kind', `fromFilter(...) должен ссылаться на Filter runtime, получен "${runtimeByName.get(runtimeRef)?.kind ?? ''}".`, `runtimes.${runtime.name}.withProps.${prop}`))
-          if (read.source === 'composition-data' && !dataRef)
-            diagnostics.push(diagnostic('error', 'composition-binding-data-missing', `Expression ссылается на отсутствующий data alias "${String(read.parameters?.[0] ?? '')}".`, `runtimes.${runtime.name}.withProps.${prop}`))
-          if (propRef && !propNames.has(propRef))
-            diagnostics.push(diagnostic('error', 'composition-binding-prop-missing', `prop(...) ссылается на необъявленный Composition prop "${propRef}".`, `runtimes.${runtime.name}.withProps.${prop}`))
+        if (nestedBinding.kind === 'expression') {
+          for (const read of collectExpressionReads(nestedBinding.expression)) {
+            const runtimeRef = read.source === 'composition-output' || read.source === 'composition-outputs' || read.source === 'composition-filter-fields' || read.source === 'composition-runtime-metadata'
+              ? read.parameters?.[0]
+              : undefined
+            const dataRef = read.source === 'composition-data'
+              ? findDataReference(String(read.parameters?.[0] ?? ''), dataByName)
+              : undefined
+            const propRef = read.source === 'prop'
+              ? read.path.split('.')[0]
+              : undefined
+            if (runtimeRef && !runtimeByName.has(runtimeRef)) {
+              diagnostics.push(diagnostic('error', 'composition-binding-runtime-missing', `Expression ссылается на отсутствующий runtime "${runtimeRef}".`, `runtimes.${runtime.name}.withProps.${prop}`))
+            }
+            if (read.source === 'composition-filter-fields' && runtimeRef && runtimeByName.get(runtimeRef)?.kind !== 'filter') {
+              diagnostics.push(diagnostic('error', 'composition-binding-filter-runtime-kind', `fromFilter(...) должен ссылаться на Filter runtime, получен "${runtimeByName.get(runtimeRef)?.kind ?? ''}".`, `runtimes.${runtime.name}.withProps.${prop}`))
+            }
+            if (read.source === 'composition-data' && !dataRef) {
+              diagnostics.push(diagnostic('error', 'composition-binding-data-missing', `Expression ссылается на отсутствующий data alias "${String(read.parameters?.[0] ?? '')}".`, `runtimes.${runtime.name}.withProps.${prop}`))
+            }
+            if (propRef && !propNames.has(propRef)) {
+              diagnostics.push(diagnostic('error', 'composition-binding-prop-missing', `prop(...) ссылается на необъявленный Composition prop "${propRef}".`, `runtimes.${runtime.name}.withProps.${prop}`))
+            }
+          }
         }
-      }
-      if ((nestedBinding.kind === 'output' || nestedBinding.kind === 'outputs' || nestedBinding.kind === 'filter-fields') && !runtimeByName.has(nestedBinding.runtime)) {
-        diagnostics.push(diagnostic(
-          'error',
-          'composition-binding-runtime-missing',
-          `Binding ссылается на отсутствующий runtime "${nestedBinding.runtime}".`,
-          `runtimes.${runtime.name}.withProps.${prop}`,
-        ))
-      }
-      if (nestedBinding.kind === 'runtime-metadata' && !runtimeByName.has(nestedBinding.runtime)) {
-        diagnostics.push(diagnostic(
-          'error',
-          'composition-binding-runtime-missing',
-          `metadataOf(...) ссылается на отсутствующий runtime "${nestedBinding.runtime}".`,
-          `runtimes.${runtime.name}.withProps.${prop}`,
-        ))
-      }
-      if (nestedBinding.kind === 'filter-fields' && runtimeByName.get(nestedBinding.runtime)?.kind !== 'filter') {
-        diagnostics.push(diagnostic(
-          'error',
-          'composition-binding-filter-runtime-kind',
-          `fromFilter(...) должен ссылаться на Filter runtime, получен "${runtimeByName.get(nestedBinding.runtime)?.kind ?? ''}".`,
-          `runtimes.${runtime.name}.withProps.${prop}`,
-        ))
-      }
-      if ((nestedBinding.kind === 'data' || nestedBinding.kind === 'data-view') && !dataByName.has(nestedBinding.data)) {
-        diagnostics.push(diagnostic(
-          'error',
-          'composition-binding-data-missing',
-          `fromData(...) ссылается на отсутствующий data alias "${nestedBinding.data}".`,
-          `runtimes.${runtime.name}.withProps.${prop}`,
-        ))
-      }
+        if ((nestedBinding.kind === 'output' || nestedBinding.kind === 'outputs' || nestedBinding.kind === 'filter-fields') && !runtimeByName.has(nestedBinding.runtime)) {
+          diagnostics.push(diagnostic(
+            'error',
+            'composition-binding-runtime-missing',
+            `Binding ссылается на отсутствующий runtime "${nestedBinding.runtime}".`,
+            `runtimes.${runtime.name}.withProps.${prop}`,
+          ))
+        }
+        if (nestedBinding.kind === 'runtime-metadata' && !runtimeByName.has(nestedBinding.runtime)) {
+          diagnostics.push(diagnostic(
+            'error',
+            'composition-binding-runtime-missing',
+            `metadataOf(...) ссылается на отсутствующий runtime "${nestedBinding.runtime}".`,
+            `runtimes.${runtime.name}.withProps.${prop}`,
+          ))
+        }
+        if (nestedBinding.kind === 'filter-fields' && runtimeByName.get(nestedBinding.runtime)?.kind !== 'filter') {
+          diagnostics.push(diagnostic(
+            'error',
+            'composition-binding-filter-runtime-kind',
+            `fromFilter(...) должен ссылаться на Filter runtime, получен "${runtimeByName.get(nestedBinding.runtime)?.kind ?? ''}".`,
+            `runtimes.${runtime.name}.withProps.${prop}`,
+          ))
+        }
+        if ((nestedBinding.kind === 'data' || nestedBinding.kind === 'data-view') && !dataByName.has(nestedBinding.data)) {
+          diagnostics.push(diagnostic(
+            'error',
+            'composition-binding-data-missing',
+            `fromData(...) ссылается на отсутствующий data alias "${nestedBinding.data}".`,
+            `runtimes.${runtime.name}.withProps.${prop}`,
+          ))
+        }
       }
     }
     for (const publication of runtime.storeTo) {
@@ -1740,13 +1834,15 @@ function validateRuntimeCycles(
     const propEdges = Object.values(runtime.props)
       .flatMap(binding => flattenCompositionBindings(binding))
       .flatMap((binding) => {
-        if (binding.kind === 'output' || binding.kind === 'outputs' || binding.kind === 'filter-fields')
+        if (binding.kind === 'output' || binding.kind === 'outputs' || binding.kind === 'filter-fields') {
           return [binding.runtime]
-        if (binding.kind === 'expression')
+        }
+        if (binding.kind === 'expression') {
           return collectExpressionReads(binding.expression)
             .filter(read => read.source === 'composition-output' || read.source === 'composition-outputs' || read.source === 'composition-filter-fields')
             .map(read => read.parameters?.[0])
             .filter((value): value is string => Boolean(value))
+        }
         return []
       })
     edges.set(runtime.name, runtime.kind === 'filter-view'
@@ -1754,18 +1850,22 @@ function validateRuntimeCycles(
       : propEdges)
   }
   for (const hook of hooks) {
-    if (hook.kind === 'success')
+    if (hook.kind === 'success') {
       edges.set(hook.target, [...(edges.get(hook.target) ?? []), hook.runtime])
-    else if (hook.kind === 'change' && hook.source.kind === 'runtime-output')
+    }
+    else if (hook.kind === 'change' && hook.source.kind === 'runtime-output') {
       edges.set(hook.target, [...(edges.get(hook.target) ?? []), hook.source.runtime])
+    }
   }
   const visiting = new Set<string>()
   const visited = new Set<string>()
   const visit = (name: string): boolean => {
-    if (visiting.has(name))
+    if (visiting.has(name)) {
       return true
-    if (visited.has(name))
+    }
+    if (visited.has(name)) {
       return false
+    }
     visiting.add(name)
     const cycle = (edges.get(name) ?? []).some(visit)
     visiting.delete(name)
@@ -1787,14 +1887,18 @@ function flattenCompositionBindings(binding: CompositionBindingValue): Compositi
 }
 
 function collectExpressionReads(expression: import('@/domain/types/source/source-expression.types').SourceExpressionIR): Array<Extract<import('@/domain/types/source/source-expression.types').SourceExpressionIR, { type: 'read' }>> {
-  if (expression.type === 'read')
+  if (expression.type === 'read') {
     return [expression]
-  if (expression.type === 'operation')
+  }
+  if (expression.type === 'operation') {
     return expression.arguments.flatMap(collectExpressionReads)
-  if (expression.type === 'array')
+  }
+  if (expression.type === 'array') {
     return expression.items.flatMap(collectExpressionReads)
-  if (expression.type === 'object')
+  }
+  if (expression.type === 'object') {
     return Object.values(expression.properties).flatMap(collectExpressionReads)
+  }
   return []
 }
 
@@ -1806,8 +1910,9 @@ function memberChain(raw: t.Expression): {
   const modifiers: Array<{ name: string, call: t.CallExpression }> = []
   while (t.isCallExpression(current) && t.isMemberExpression(current.callee)) {
     const name = propertyName(current.callee.property)
-    if (!name || !t.isExpression(current.callee.object))
+    if (!name || !t.isExpression(current.callee.object)) {
       return null
+    }
     modifiers.unshift({ name, call: current })
     current = unwrapExpression(current.callee.object)
   }
@@ -1823,8 +1928,9 @@ function sourceRange(node: t.Node): { start: number, end: number } {
 }
 
 function readDataTarget(raw: t.CallExpression['arguments'][number] | undefined): string | null {
-  if (!raw || !t.isExpression(raw))
+  if (!raw || !t.isExpression(raw)) {
     return null
+  }
   const expression = unwrapExpression(raw)
   return t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'data' })
     ? readStringArgument(expression, 0)
@@ -1843,14 +1949,17 @@ function readCompositionDataViewBinding(
   diagnostics: DiagnosticDraft[],
   sourcePath: string,
 ): Extract<CompositionBindingValue, { kind: 'data-view' }> | null {
-  if (!t.isCallExpression(expression) || !t.isMemberExpression(expression.callee))
+  if (!t.isCallExpression(expression) || !t.isMemberExpression(expression.callee)) {
     return null
-  if (propertyName(expression.callee.property) !== 'dataView' || !t.isExpression(expression.callee.object))
+  }
+  if (propertyName(expression.callee.property) !== 'dataView' || !t.isExpression(expression.callee.object)) {
     return null
+  }
 
   const sourceCall = unwrapExpression(expression.callee.object)
-  if (!t.isCallExpression(sourceCall) || !t.isIdentifier(sourceCall.callee, { name: 'fromData' }))
+  if (!t.isCallExpression(sourceCall) || !t.isIdentifier(sourceCall.callee, { name: 'fromData' })) {
     return null
+  }
 
   const sourceRef = readStringArgument(sourceCall, 0) ?? ''
   const dot = sourceRef.indexOf('.')
@@ -1894,8 +2003,9 @@ function readFilterFieldsBinding(
   sourcePath: string,
 ): Extract<CompositionBindingValue, { kind: 'filter-fields' }> | null {
   const chain = memberChain(expression)
-  if (!chain || !t.isIdentifier(chain.base.callee, { name: 'fromFilter' }))
+  if (!chain || !t.isIdentifier(chain.base.callee, { name: 'fromFilter' })) {
     return null
+  }
 
   const runtime = readStringArgument(chain.base, 0)
   if (!runtime) {
@@ -1920,12 +2030,14 @@ function readFilterFieldsBinding(
 
 function readStringArrayArgument(call: t.CallExpression, index: number): string[] | null {
   const argument = call.arguments[index]
-  if (!argument || !t.isArrayExpression(argument))
+  if (!argument || !t.isArrayExpression(argument)) {
     return null
+  }
   const out: string[] = []
   for (const element of argument.elements) {
-    if (!element || !t.isStringLiteral(element))
+    if (!element || !t.isStringLiteral(element)) {
       return null
+    }
     out.push(element.value)
   }
   return out
@@ -1933,8 +2045,9 @@ function readStringArrayArgument(call: t.CallExpression, index: number): string[
 
 function propertyValue(node: t.ObjectExpression, name: string): t.Expression | null {
   for (const property of node.properties) {
-    if (t.isObjectProperty(property) && !property.computed && propertyName(property.key) === name && t.isExpression(property.value))
+    if (t.isObjectProperty(property) && !property.computed && propertyName(property.key) === name && t.isExpression(property.value)) {
       return unwrapExpression(property.value)
+    }
   }
   return null
 }
@@ -1947,25 +2060,30 @@ function stringProperty(node: t.ObjectExpression, name: string): string | null {
 function numberProperty(node: t.ObjectExpression, name: string): number | null {
   const property = node.properties.find((item): item is t.ObjectProperty =>
     t.isObjectProperty(item) && !item.computed && propertyName(item.key) === name)
-  if (!property || !t.isExpression(property.value))
+  if (!property || !t.isExpression(property.value)) {
     return null
+  }
   const value = unwrapExpression(property.value)
   return t.isNumericLiteral(value) && Number.isFinite(value.value) ? value.value : null
 }
 
 function staticValue(node: t.Expression): { ok: true, value: unknown } | { ok: false } {
-  if (t.isStringLiteral(node) || t.isNumericLiteral(node) || t.isBooleanLiteral(node))
+  if (t.isStringLiteral(node) || t.isNumericLiteral(node) || t.isBooleanLiteral(node)) {
     return { ok: true, value: node.value }
-  if (t.isNullLiteral(node))
+  }
+  if (t.isNullLiteral(node)) {
     return { ok: true, value: null }
+  }
   if (t.isArrayExpression(node)) {
     const out: unknown[] = []
     for (const item of node.elements) {
-      if (!item || !t.isExpression(item))
+      if (!item || !t.isExpression(item)) {
         return { ok: false }
+      }
       const value = staticValue(unwrapExpression(item))
-      if (!value.ok)
+      if (!value.ok) {
         return value
+      }
       out.push(value.value)
     }
     return { ok: true, value: out }
@@ -1973,14 +2091,17 @@ function staticValue(node: t.Expression): { ok: true, value: unknown } | { ok: f
   if (t.isObjectExpression(node)) {
     const out: Record<string, unknown> = {}
     for (const property of node.properties) {
-      if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value))
+      if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
         return { ok: false }
+      }
       const key = propertyName(property.key)
-      if (!key)
+      if (!key) {
         return { ok: false }
+      }
       const value = staticValue(unwrapExpression(property.value))
-      if (!value.ok)
+      if (!value.ok) {
         return value
+      }
       out[key] = value.value
     }
     return { ok: true, value: out }

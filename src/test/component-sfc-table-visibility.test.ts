@@ -1,10 +1,10 @@
-import { describe, expect, it } from 'vitest'
-
 import type { RComponentSFC_IR_ElementNode } from '@/domain/types/component/sfc/ir.types'
+
+import { describe, expect, it } from 'vitest'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import { normalizeComponentSFCTableColumnVisibility } from '@/model/services/compiler/component-sfc/component-sfc-table-visibility'
 
-describe('Component SFC table column visibility', () => {
+describe('component SFC table column visibility', () => {
   it('parses default-hidden as a sparse list of hidden column keys', () => {
     const result = compileComponentSFC(createTableSource(
       '<Column key="flight" /><Column key="status" /><Column key="gate" />',
@@ -41,8 +41,9 @@ function createTableSource(columns: string, tableAttrs = ''): string {
 
 function readTable(result: ReturnType<typeof compileComponentSFC>): RComponentSFC_IR_ElementNode {
   const node = result.ir?.template.roots[0]
-  if (!node || node.kind !== 'element' || node.tag !== 'Table')
+  if (!node || node.kind !== 'element' || node.tag !== 'Table') {
     throw new Error('Expected root Table node.')
+  }
 
   return node
 }

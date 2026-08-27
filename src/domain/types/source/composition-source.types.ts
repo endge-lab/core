@@ -1,17 +1,17 @@
-import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
+import type { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
+import type { ComponentSFCInteractionTrigger } from '@/domain/types/component/sfc/ir.types'
+import type { ComponentSFCEventInputValue } from '@/domain/types/component/sfc/ports.types'
+import type { EndgeDataMode } from '@/domain/types/document/workspace.types'
+import type { I18nCompiledLocales } from '@/domain/types/i18n.types'
+import type { EndgeMockReference } from '@/domain/types/mock/mock-data.type'
 import type { ProgramMetadataMap } from '@/domain/types/program/program-metadata.types'
+import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
 import type { RuntimeHost } from '@/domain/types/runtime/runtime-host.types'
 import type { RuntimeScopeHandle } from '@/domain/types/runtime/runtime-scope.types'
 import type { VocabLoadPolicy } from '@/domain/types/runtime/vocab-cache.types'
-import type { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
 import type { SourceExpressionIR, SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
-import type { FilterViewControlDefinition } from '@/domain/types/ui/filter-view.type'
-import type { EndgeMockReference } from '@/domain/types/mock/mock-data.type'
-import type { I18nCompiledLocales } from '@/domain/types/i18n.types'
-import type { ComponentSFCEventInputValue } from '@/domain/types/component/sfc/ports.types'
 import type { UpdateMutationStrategy } from '@/domain/types/source/update-source.types'
-import type { EndgeDataMode } from '@/domain/types/document/workspace.types'
-import type { ComponentSFCInteractionTrigger } from '@/domain/types/component/sfc/ir.types'
+import type { FilterViewControlDefinition } from '@/domain/types/presentation/filter-view.type'
 
 export type CompositionRuntimeKind = 'filter' | 'query' | 'component' | 'composition' | 'stream' | 'filter-view'
 
@@ -30,14 +30,14 @@ interface CompositionResourceDescriptorBase {
 
 export type CompositionResourceDescriptor
   = | CompositionResourceDescriptorBase & { kind: 'style' | 'i18n', identity: string }
-    | CompositionResourceDescriptorBase & {
-      kind: 'operation-history'
-      operationHistory: {
-        limit: number
-        limitConfigurationPath: string | null
-        shortcuts: OperationHistoryShortcutDescriptor[] | null
-      }
+  | CompositionResourceDescriptorBase & {
+    kind: 'operation-history'
+    operationHistory: {
+      limit: number
+      limitConfigurationPath: string | null
+      shortcuts: OperationHistoryShortcutDescriptor[] | null
     }
+  }
 
 export interface OperationHistoryShortcutDescriptor {
   command: 'undo' | 'redo'

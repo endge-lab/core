@@ -1,5 +1,4 @@
-import type { EndgeLiveDomainSnapshot } from '@/domain/types/document/domain-snapshot.type'
-import type { EndgeLiveDomainDocument, EndgeWorkspaceServerState } from '@/domain/types/document/domain-snapshot.type'
+import type { EndgeLiveDomainDocument, EndgeLiveDomainSnapshot, EndgeWorkspaceServerState } from '@/domain/types/document/domain-snapshot.type'
 
 /** Канонические коллекции persisted-домена нового backend. */
 export type EndgeDomainCollection
@@ -81,13 +80,13 @@ export interface EndgeDomainProvider {
   readonly capabilities: EndgeDomainProviderCapabilities
   readonly etag: string | null
 
-  loadWorkspace(request: EndgeDomainLoadRequest): Promise<EndgeLiveDomainSnapshot>
-  createDocument(request: EndgeDocumentMutationRequest): Promise<EndgeDocumentMutationResult>
-  updateDocument(request: EndgeDocumentMutationRequest): Promise<EndgeDocumentMutationResult>
-  softDeleteDocument(request: EndgeDocumentMutationRequest): Promise<EndgeDocumentMutationResult>
-  restoreDocument(request: EndgeDocumentMutationRequest): Promise<EndgeDocumentMutationResult>
-  moveDocuments?(request: EndgeDocumentsMoveRequest): Promise<EndgeDocumentsMoveResult>
-  updateWorkspace(request: EndgeWorkspaceMutationRequest): Promise<EndgeWorkspaceMutationResult>
+  loadWorkspace: (request: EndgeDomainLoadRequest) => Promise<EndgeLiveDomainSnapshot>
+  createDocument: (request: EndgeDocumentMutationRequest) => Promise<EndgeDocumentMutationResult>
+  updateDocument: (request: EndgeDocumentMutationRequest) => Promise<EndgeDocumentMutationResult>
+  softDeleteDocument: (request: EndgeDocumentMutationRequest) => Promise<EndgeDocumentMutationResult>
+  restoreDocument: (request: EndgeDocumentMutationRequest) => Promise<EndgeDocumentMutationResult>
+  moveDocuments?: (request: EndgeDocumentsMoveRequest) => Promise<EndgeDocumentsMoveResult>
+  updateWorkspace: (request: EndgeWorkspaceMutationRequest) => Promise<EndgeWorkspaceMutationResult>
 }
 
 export type EndgeDomainRepositoryProviderId = 'service-backend' | 'bundle' | 'plain'

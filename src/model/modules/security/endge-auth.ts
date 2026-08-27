@@ -1,21 +1,21 @@
-import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
-import type { DiagnosticsAttributes } from '@/domain/types/diagnostics/diagnostics.types'
 import type { AuthProfileSchema, OidcBrowserSessionOptions } from '@/domain/types/auth/auth-profile.types'
+import type { DiagnosticsAttributes } from '@/domain/types/diagnostics/diagnostics.types'
+import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 
+import type { AuthInteractionRequiredError } from '@/model/modules/security/auth/AuthInteractionRequiredError'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { Endge } from '@/model/kernel/endge'
-import { AuthAdapterRegistry } from '@/model/modules/security/auth/AuthAdapterRegistry'
-import { AuthProfileRegistry } from '@/model/modules/security/auth/AuthProfileRegistry'
-import { AuthRequestResolver } from '@/model/modules/security/auth/AuthRequestResolver'
-import { AuthSessionManager } from '@/model/modules/security/auth/AuthSessionManager'
-import { AuthSessionStore } from '@/model/modules/security/auth/AuthSessionStore'
 import { BasicAuthAdapter } from '@/model/modules/security/auth/adapters/BasicAuthAdapter'
 import { BearerAuthAdapter } from '@/model/modules/security/auth/adapters/BearerAuthAdapter'
 import { OAuth2ClientCredentialsAuthAdapter } from '@/model/modules/security/auth/adapters/OAuth2ClientCredentialsAuthAdapter'
 import { OAuth2PasswordAuthAdapter } from '@/model/modules/security/auth/adapters/OAuth2PasswordAuthAdapter'
 import { OidcAuthAdapter } from '@/model/modules/security/auth/adapters/OidcAuthAdapter'
-import { OidcBrowserSession_Service } from '@/model/services/auth/OidcBrowserSession_Service'
-import type { AuthInteractionRequiredError } from '@/model/modules/security/auth/AuthInteractionRequiredError'
+import { AuthAdapterRegistry } from '@/model/modules/security/auth/AuthAdapterRegistry'
+import { AuthProfileRegistry } from '@/model/modules/security/auth/AuthProfileRegistry'
+import { AuthRequestResolver } from '@/model/modules/security/auth/AuthRequestResolver'
+import { AuthSessionManager } from '@/model/modules/security/auth/AuthSessionManager'
+import { AuthSessionStore } from '@/model/modules/security/auth/AuthSessionStore'
+import { OidcBrowserSession_Adapter } from '@/model/adapters/auth/OidcBrowserSession_Adapter'
 
 export type AuthInteractionRequiredListener = (error: AuthInteractionRequiredError) => void
 
@@ -80,10 +80,10 @@ export class EndgeAuth extends EndgeModule {
     this._signal = controller.signal
     if (ctx.signal) {
       const abort = (): void => controller.abort(ctx.signal?.reason)
-      if (ctx.signal.aborted)
+      if (ctx.signal.aborted) {
         abort()
-      else
-        ctx.signal.addEventListener('abort', abort, { once: true })
+      }
+      else { ctx.signal.addEventListener('abort', abort, { once: true }) }
       this._detachHostAbort = () => ctx.signal?.removeEventListener('abort', abort)
     }
     this._unregisterDiagnosticsContext?.()
@@ -125,18 +125,20 @@ export class EndgeAuth extends EndgeModule {
   public createOidcSessionSource(
     profileInput: AuthProfileSchema | string,
     options: Pick<OidcBrowserSessionOptions, 'redirectUri' | 'popupRedirectUri' | 'postLogoutRedirectUri' | 'flow'>,
-  ): OidcBrowserSession_Service {
+  ): OidcBrowserSession_Adapter {
     const profile = this.profiles.requireActive(profileInput)
-    if (profile.adapterId !== 'oidc' || !profile.session)
+    if (profile.adapterId !== 'oidc' || !profile.session) {
       throw new Error(`[EndgeAuth] Profile does not support OIDC browser flow: ${profile.identity}`)
+    }
     const issuer = this._resolvePublicValue(profile.config.issuer)
     const clientId = this._resolvePublicValue(profile.config.clientId)
     const scopes = Array.isArray(profile.config.scopes)
       ? profile.config.scopes.map(scope => this._resolvePublicValue(scope)).filter(Boolean)
       : []
-    if (!issuer || !clientId || scopes.length === 0)
+    if (!issuer || !clientId || scopes.length === 0) {
       throw new Error(`[EndgeAuth] OIDC public config is unresolved: ${profile.identity}`)
-    return new OidcBrowserSession_Service({
+    }
+    return new OidcBrowserSession_Adapter({
       issuer,
       clientId,
       scopes,
@@ -149,21 +151,24 @@ export class EndgeAuth extends EndgeModule {
 
   private _resolvePublicValue(raw: unknown): string {
     const value = String(raw ?? '').trim()
-    if (!value)
+    if (!value) {
       return ''
+    }
     const resolved = String(Endge.workspace.variables.resolve(value, {
       fallback: value,
       onInvalid: 'as-is',
     }) ?? value).trim()
-    if (isVariableReference(value) && (!resolved || resolved === value))
+    if (isVariableReference(value) && (!resolved || resolved === value)) {
       throw new Error(`[EndgeAuth] Workspace variable is unavailable: ${value}`)
+    }
     return resolved
   }
 
   private _diagnosticsAttributes(): DiagnosticsAttributes {
     const context = this.session.context
-    if (!context.authenticated)
+    if (!context.authenticated) {
       return {}
+    }
     return {
       ...(context.subject ? { 'user.id': context.subject } : {}),
       ...(context.sessionId ? { 'session.id': context.sessionId } : {}),
@@ -184,5 +189,5 @@ export class EndgeAuth extends EndgeModule {
 }
 
 function isVariableReference(value: string): boolean {
-  return /^\{[A-Za-z_][A-Za-z0-9_.-]*\}$/.test(value)
+  return /^\{[A-Z_][\w.-]*\}$/i.test(value)
 }

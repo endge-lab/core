@@ -1,24 +1,24 @@
+import type { DataViewProgramPayload, ProgramDiagnostic } from '@/domain/types/program/program.types'
 import type {
   DataViewExpression,
   DataViewIncrementalRequest,
-  DataViewMaterializationStrategy,
-  DataViewSourceContract,
-  DataViewRef,
   DataViewManualTransform,
+  DataViewMaterializationStrategy,
   DataViewPathOperation,
   DataViewPipelineStep,
+  DataViewRef,
   DataViewSourceCompileResult,
+  DataViewSourceContract,
   DataViewSourceDocument,
   DataViewSourceMode,
 } from '@/domain/types/source/data-view-source.types'
 import type { SourceExpressionIR } from '@/domain/types/source/source-expression.types'
-import type { DataViewProgramPayload, ProgramDiagnostic } from '@/domain/types/program/program.types'
 
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
-import { compileProgramMetadataProperty } from '@/model/services/source-engine/compilers/source-metadata-compile'
 import { compileSourceCallback, compileSourceExpression } from '@/model/services/source-engine/compilers/source-expression-compile'
 import { compileSourceField } from '@/model/services/source-engine/compilers/source-field-compile'
+import { compileProgramMetadataProperty } from '@/model/services/source-engine/compilers/source-metadata-compile'
 import { readSourceModelIdentity, readSourceModelReference } from '@/model/services/source-engine/compilers/source-model-reference-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
@@ -81,12 +81,14 @@ export function compileDataViewSource(source: string): DataViewSourceCompileResu
 
 function findDefineDataViewCall(ast: t.File): t.CallExpression | null {
   for (const statement of ast.program.body) {
-    if (!t.isExpressionStatement(statement))
+    if (!t.isExpressionStatement(statement)) {
       continue
+    }
 
     const expression = unwrapExpression(statement.expression)
-    if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'defineDataView' }))
+    if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'defineDataView' })) {
       return expression
+    }
   }
 
   return null
@@ -125,9 +127,9 @@ function parseDocument(
       ? 'projection'
       : declaredMode === 'expression'
         ? 'expression'
-    : declaredMode === 'pipeline' || hasSteps
-      ? 'pipeline'
-      : 'manual'
+        : declaredMode === 'pipeline' || hasSteps
+          ? 'pipeline'
+          : 'manual'
   if (declaredMode && declaredMode !== mode) {
     diagnostics.push(createDiagnostic(
       'warning',
@@ -155,8 +157,9 @@ function parseDocument(
         'incremental',
       ))
     }
-    if (filter)
+    if (filter) {
       diagnostics.push(createDiagnostic('error', 'data-view-source-filter-mode', 'filter поддерживается только в pipeline DataView.', 'filter'))
+    }
     return { mode, incremental, props, contract, filter, output }
   }
 
@@ -180,8 +183,9 @@ function parseDocument(
         'incremental',
       ))
     }
-    if (filter)
+    if (filter) {
       diagnostics.push(createDiagnostic('error', 'data-view-source-filter-mode', 'filter поддерживается только в pipeline DataView.', 'filter'))
+    }
     return { mode, incremental, props, contract, filter, expression: expression ?? undefined }
   }
 
@@ -203,8 +207,9 @@ function parseDocument(
         'incremental',
       ))
     }
-    if (filter)
+    if (filter) {
       diagnostics.push(createDiagnostic('error', 'data-view-source-filter-mode', 'filter поддерживается только в pipeline DataView.', 'filter'))
+    }
     return { mode, incremental, props, contract, filter, transform: transform ?? undefined }
   }
 
@@ -270,8 +275,9 @@ function readDataViewProps(
   diagnostics: DiagnosticDraft[],
 ): import('@/domain/types/source/source-expression.types').SourceFieldDefinition[] {
   const raw = readPropertyValue(definition, 'props')
-  if (!raw)
+  if (!raw) {
     return []
+  }
   if (!t.isCallExpression(raw) || !t.isIdentifier(raw.callee, { name: 'defineProps' })) {
     diagnostics.push(createDiagnostic('error', 'data-view-source-props-shape', 'props должен быть defineProps({...}).', 'props'))
     return []
@@ -291,8 +297,9 @@ function readDataViewProps(
     }
     const key = getPropertyName(property.key)
     if (!key || declared.has(key)) {
-      if (key)
+      if (key) {
         diagnostics.push(createDiagnostic('error', 'data-view-source-prop-duplicate', `Prop "${key}" объявлен повторно.`, `props.${key}`))
+      }
       continue
     }
     const compiled = compileSourceField(key, property.value, source, diagnostics, `props.${key}`, {
@@ -311,8 +318,9 @@ function readDataViewFilter(
   diagnostics: DiagnosticDraft[],
 ): SourceExpressionIR | null {
   const property = readObjectProperty(definition, 'filter')
-  if (!property || !t.isObjectProperty(property))
+  if (!property || !t.isObjectProperty(property)) {
     return null
+  }
   if (!t.isExpression(property.value)) {
     diagnostics.push(createDiagnostic(
       'error',
@@ -331,8 +339,9 @@ function readDataViewContract(
   diagnostics: DiagnosticDraft[],
 ): DataViewSourceContract | null {
   const raw = readPropertyValue(definition, 'contract')
-  if (!raw)
+  if (!raw) {
     return null
+  }
   if (!t.isObjectExpression(raw)) {
     diagnostics.push(createDiagnostic(
       'error',
@@ -382,15 +391,17 @@ function readProjectionOutput(
       continue
     }
     const key = getPropertyName(property.key)
-    if (!key)
+    if (!key) {
       continue
+    }
     const expression = compileSourceExpression(
       unwrapExpression(property.value),
       diagnostics,
       `output.${key}`,
     )
-    if (expression)
+    if (expression) {
       output[key] = expression
+    }
   }
   return output
 }
@@ -400,28 +411,33 @@ function readIncrementalRequest(
   diagnostics: DiagnosticDraft[],
 ): DataViewIncrementalRequest {
   const node = readPropertyValue(definition, 'incremental')
-  if (!node)
+  if (!node) {
     return { mode: 'auto' }
+  }
   const expression = unwrapExpression(node)
   if (!t.isCallExpression(expression) || !t.isIdentifier(expression.callee)) {
     diagnostics.push(createDiagnostic('error', 'data-view-source-incremental-shape', 'incremental должен быть auto(), full(), collectionByKey(key) или filterByKey(key).', 'incremental'))
     return { mode: 'auto' }
   }
-  if (expression.callee.name === 'auto' && expression.arguments.length === 0)
+  if (expression.callee.name === 'auto' && expression.arguments.length === 0) {
     return { mode: 'auto' }
-  if (expression.callee.name === 'full' && expression.arguments.length === 0)
+  }
+  if (expression.callee.name === 'full' && expression.arguments.length === 0) {
     return { mode: 'full' }
+  }
   if (expression.callee.name === 'collectionByKey') {
     const key = expression.arguments[0]
-    if (t.isStringLiteral(key) && key.value.trim())
+    if (t.isStringLiteral(key) && key.value.trim()) {
       return { mode: 'collection-by-key', key: key.value.trim() }
+    }
     diagnostics.push(createDiagnostic('error', 'data-view-source-incremental-key', 'collectionByKey требует непустой строковый key.', 'incremental'))
     return { mode: 'auto' }
   }
   if (expression.callee.name === 'filterByKey') {
     const key = expression.arguments[0]
-    if (t.isStringLiteral(key) && key.value.trim())
+    if (t.isStringLiteral(key) && key.value.trim()) {
       return { mode: 'filter-by-key', key: key.value.trim() }
+    }
     diagnostics.push(createDiagnostic('error', 'data-view-source-incremental-key', 'filterByKey требует непустой строковый key.', 'incremental'))
     return { mode: 'auto' }
   }
@@ -455,12 +471,14 @@ function readPipelineSteps(node: t.ArrayExpression, source: string, diagnostics:
   const steps: DataViewPipelineStep[] = []
 
   for (const [index, element] of node.elements.entries()) {
-    if (!element || !t.isExpression(element))
+    if (!element || !t.isExpression(element)) {
       continue
+    }
 
     const step = readPipelineStep(unwrapExpression(element), source, diagnostics, index)
-    if (step)
+    if (step) {
       steps.push(step)
+    }
   }
 
   return steps
@@ -474,20 +492,24 @@ function readPipelineStep(
 ): DataViewPipelineStep | null {
   const expression = unwrapExpression(node)
 
-  if (t.isCallExpression(expression) && isIdentifierCallee(expression, 'select'))
+  if (t.isCallExpression(expression) && isIdentifierCallee(expression, 'select')) {
     return readSelectStep(expression, diagnostics, index)
+  }
 
   const from = readFromStep(expression, source, diagnostics)
-  if (from)
+  if (from) {
     return from
+  }
 
   const join = readJoinStep(expression, diagnostics)
-  if (join)
+  if (join) {
     return join
+  }
 
   const map = readMapStep(expression, diagnostics)
-  if (map)
+  if (map) {
     return map
+  }
 
   diagnostics.push(createDiagnostic(
     'warning',
@@ -503,8 +525,9 @@ function readSelectStep(
   diagnostics: DiagnosticDraft[],
   index: number,
 ): DataViewPipelineStep | null {
-  if (!t.isCallExpression(node) || !isIdentifierCallee(node, 'select'))
+  if (!t.isCallExpression(node) || !isIdentifierCallee(node, 'select')) {
     return null
+  }
 
   const argument = node.arguments[0]
   if (node.arguments.length !== 1 || !argument || !t.isExpression(argument)) {
@@ -531,8 +554,9 @@ function validatePipelineStepKinds(
 ): void {
   const hasSelect = steps.some(step => step.type === 'select')
   const hasStructural = steps.some(step => step.type !== 'select')
-  if (!hasSelect || !hasStructural)
+  if (!hasSelect || !hasStructural) {
     return
+  }
 
   diagnostics.push(createDiagnostic(
     'error',
@@ -544,8 +568,9 @@ function validatePipelineStepKinds(
 
 function readFromStep(node: t.Expression, source: string, diagnostics: DiagnosticDraft[]) {
   const chain = collectFromChain(node)
-  if (!chain)
+  if (!chain) {
     return null
+  }
 
   let as = 'item'
   const dataViews: DataViewRef[] = []
@@ -558,8 +583,9 @@ function readFromStep(node: t.Expression, source: string, diagnostics: Diagnosti
 
     if (call.name === 'dataView') {
       const dataViewRef = readDataViewRef(call.arguments[0], source, diagnostics)
-      if (dataViewRef)
+      if (dataViewRef) {
         dataViews.push(dataViewRef)
+      }
       continue
     }
 
@@ -587,15 +613,17 @@ function collectFromChain(
 
   while (t.isCallExpression(current) && t.isMemberExpression(current.callee)) {
     const name = getPropertyName(current.callee.property)
-    if (!name || !t.isExpression(current.callee.object))
+    if (!name || !t.isExpression(current.callee.object)) {
       return null
+    }
 
     modifiers.unshift({ name, arguments: current.arguments })
     current = unwrapExpression(current.callee.object)
   }
 
-  if (!t.isCallExpression(current) || !isIdentifierCallee(current, 'from'))
+  if (!t.isCallExpression(current) || !isIdentifierCallee(current, 'from')) {
     return null
+  }
 
   return { base: current, modifiers }
 }
@@ -614,8 +642,9 @@ function readDataViewRef(
     referenceCall: 'dataView',
     defineCall: 'defineDataView',
   })
-  if (reference?.kind === 'external')
+  if (reference?.kind === 'external') {
     return reference
+  }
 
   if (reference?.kind === 'inline') {
     if (isManualDataViewDefinition(reference.definition.arguments[0])) {
@@ -640,16 +669,19 @@ function readDataViewRef(
 }
 
 function readJoinStep(node: t.Expression, diagnostics: DiagnosticDraft[]) {
-  if (!t.isCallExpression(node) || !t.isMemberExpression(node.callee))
+  if (!t.isCallExpression(node) || !t.isMemberExpression(node.callee)) {
     return null
+  }
 
   const member = node.callee
-  if (!isIdentifierProperty(member, 'by'))
+  if (!isIdentifierProperty(member, 'by')) {
     return null
+  }
 
   const base = unwrapExpression(member.object as t.Expression)
-  if (!t.isCallExpression(base) || !isIdentifierCallee(base, 'join'))
+  if (!t.isCallExpression(base) || !isIdentifierCallee(base, 'join')) {
     return null
+  }
 
   const byArg = node.arguments[0]
   const by = byArg && t.isObjectExpression(byArg) ? byArg : null
@@ -668,8 +700,9 @@ function readJoinStep(node: t.Expression, diagnostics: DiagnosticDraft[]) {
 }
 
 function readMapStep(node: t.Expression, diagnostics: DiagnosticDraft[]) {
-  if (!t.isCallExpression(node) || !isIdentifierCallee(node, 'map'))
+  if (!t.isCallExpression(node) || !isIdentifierCallee(node, 'map')) {
     return null
+  }
 
   const fieldsArg = node.arguments[0]
   const fieldsNode = fieldsArg && t.isObjectExpression(fieldsArg) ? fieldsArg : null
@@ -683,16 +716,19 @@ function readMapStep(node: t.Expression, diagnostics: DiagnosticDraft[]) {
   for (const property of fieldsNode.properties) {
     if (t.isSpreadElement(property)) {
       const spread = readMapSpread(property.argument, diagnostics)
-      if (spread)
+      if (spread) {
         spreads.push(spread)
+      }
       continue
     }
 
-    if (!t.isObjectProperty(property))
+    if (!t.isObjectProperty(property)) {
       continue
+    }
     const key = getPropertyName(property.key)
-    if (!key || !t.isExpression(property.value))
+    if (!key || !t.isExpression(property.value)) {
       continue
+    }
     fields[key] = readExpression(unwrapExpression(property.value), diagnostics, `steps.map.${key}`)
   }
 
@@ -703,8 +739,9 @@ function readMapSpread(node: t.Expression, diagnostics: DiagnosticDraft[]): { so
   const expression = unwrapExpression(node)
   if (t.isCallExpression(expression) && isIdentifierCallee(expression, 'spread')) {
     const source = readStringArgument(expression, 0)
-    if (source)
+    if (source) {
       return { source }
+    }
   }
 
   diagnostics.push(createDiagnostic(
@@ -718,19 +755,23 @@ function readMapSpread(node: t.Expression, diagnostics: DiagnosticDraft[]): { so
 
 function readExpression(node: t.Expression, diagnostics: DiagnosticDraft[], sourcePath: string): DataViewExpression {
   const expression = unwrapExpression(node)
-  if (t.isStringLiteral(expression) || t.isNumericLiteral(expression) || t.isBooleanLiteral(expression) || t.isNullLiteral(expression))
+  if (t.isStringLiteral(expression) || t.isNumericLiteral(expression) || t.isBooleanLiteral(expression) || t.isNullLiteral(expression)) {
     return { type: 'literal', value: literalValue(expression) }
+  }
 
   const pathExpression = readPathExpression(expression)
-  if (pathExpression)
+  if (pathExpression) {
     return pathExpression
+  }
 
-  if (t.isCallExpression(expression) && isIdentifierCallee(expression, 'template'))
+  if (t.isCallExpression(expression) && isIdentifierCallee(expression, 'template')) {
     return { type: 'template', template: readStringArgument(expression, 0) ?? '' }
+  }
 
   const compiled = compileSourceExpression(expression, diagnostics, sourcePath)
-  if (compiled)
+  if (compiled) {
     return compiled
+  }
 
   return { type: 'literal', value: null }
 }
@@ -797,22 +838,27 @@ function createDataViewArtifact(document: DataViewSourceDocument): DataViewProgr
 }
 
 function resolveMaterializationStrategy(document: DataViewSourceDocument): DataViewMaterializationStrategy {
-  if (document.incremental.mode === 'full' || document.mode === 'manual' || document.mode === 'projection' || document.mode === 'expression')
+  if (document.incremental.mode === 'full' || document.mode === 'manual' || document.mode === 'projection' || document.mode === 'expression') {
     return { kind: 'full' }
-  if (document.incremental.mode === 'collection-by-key')
+  }
+  if (document.incremental.mode === 'collection-by-key') {
     return { kind: 'collection-by-key', key: document.incremental.key }
-  if (document.incremental.mode === 'filter-by-key')
+  }
+  if (document.incremental.mode === 'filter-by-key') {
     return { kind: 'filter-by-key', key: document.incremental.key }
-  if (document.filter)
+  }
+  if (document.filter) {
     return { kind: 'full' }
+  }
   return isRowLocalPipeline(document.steps ?? [], 'id')
     ? { kind: 'collection-by-key', key: 'id' }
     : { kind: 'full' }
 }
 
 function isFilterRowLocalPipeline(steps: DataViewPipelineStep[], key: string): boolean {
-  if (steps.length === 1 && steps[0]?.type === 'from')
+  if (steps.length === 1 && steps[0]?.type === 'from') {
     return steps[0].source === '' && !steps[0].dataViews?.length
+  }
   return isRowLocalPipeline(steps, key)
 }
 
@@ -820,72 +866,89 @@ function isDataViewFilterExpression(
   expression: SourceExpressionIR | null,
   propKeys: ReadonlySet<string>,
 ): boolean {
-  if (!expression)
+  if (!expression) {
     return false
+  }
   if (expression.type === 'read') {
-    if (expression.source === 'row')
+    if (expression.source === 'row') {
       return true
+    }
     return expression.source === 'prop' && propKeys.has(expression.path)
   }
-  if (expression.type === 'operation')
+  if (expression.type === 'operation') {
     return expression.arguments.every(argument => isDataViewFilterExpression(argument, propKeys))
-  if (expression.type === 'array')
+  }
+  if (expression.type === 'array') {
     return expression.items.every(argument => isDataViewFilterExpression(argument, propKeys))
-  if (expression.type === 'object')
+  }
+  if (expression.type === 'object') {
     return Object.values(expression.properties).every(argument => isDataViewFilterExpression(argument, propKeys))
+  }
   return true
 }
 
 function isRowLocalPipeline(steps: DataViewPipelineStep[], key: string): boolean {
-  if (steps.length !== 2 || steps[0]?.type !== 'from' || steps[1]?.type !== 'map')
+  if (steps.length !== 2 || steps[0]?.type !== 'from' || steps[1]?.type !== 'map') {
     return false
+  }
   const from = steps[0]
   const map = steps[1]
-  if (from.source !== '' || from.dataViews?.length)
+  if (from.source !== '' || from.dataViews?.length) {
     return false
+  }
   const keyExpression = map.fields[key]
-  if (!keyExpression || keyExpression.type !== 'path' || keyExpression.path !== `${from.as}.${key}` || keyExpression.operations.length)
+  if (!keyExpression || keyExpression.type !== 'path' || keyExpression.path !== `${from.as}.${key}` || keyExpression.operations.length) {
     return false
-  if (map.spreads.some(spread => spread.source !== from.as))
+  }
+  if (map.spreads.some(spread => spread.source !== from.as)) {
     return false
+  }
   return Object.values(map.fields).every(expression => isRowLocalExpression(expression, from.as))
 }
 
 function isRowLocalExpression(expression: DataViewExpression, alias: string): boolean {
-  if (expression.type === 'literal')
+  if (expression.type === 'literal') {
     return true
-  if (expression.type === 'path')
+  }
+  if (expression.type === 'path') {
     return expression.path === alias || expression.path.startsWith(`${alias}.`)
+  }
   if (expression.type === 'template') {
     const placeholders = [...expression.template.matchAll(/\{([^{}]+)\}/g)]
-    return placeholders.every(match => {
+    return placeholders.every((match) => {
       const path = String(match[1] ?? '').trim()
       return path === alias || path.startsWith(`${alias}.`)
     })
   }
-  if (expression.type === 'read')
+  if (expression.type === 'read') {
     return expression.source === 'scope' && (expression.path === alias || expression.path.startsWith(`${alias}.`))
-  if (expression.type === 'operation')
+  }
+  if (expression.type === 'operation') {
     return expression.arguments.every(argument => isRowLocalExpression(argument, alias))
-  if (expression.type === 'array')
+  }
+  if (expression.type === 'array') {
     return expression.items.every(argument => isRowLocalExpression(argument, alias))
-  if (expression.type === 'object')
+  }
+  if (expression.type === 'object') {
     return Object.values(expression.properties).every(argument => isRowLocalExpression(argument, alias))
+  }
   return false
 }
 
 function readObjectProperty(node: t.ObjectExpression, name: string): t.ObjectMethod | t.ObjectProperty | null {
   for (const property of node.properties) {
-    if ((t.isObjectMethod(property) || t.isObjectProperty(property)) && getPropertyName(property.key) === name)
+    if ((t.isObjectMethod(property) || t.isObjectProperty(property)) && getPropertyName(property.key) === name) {
       return property
+    }
   }
   return null
 }
 
 function readPropertyValue(node: t.ObjectExpression, name: string): t.Expression | null {
   const property = readObjectProperty(node, name)
-  if (!property || !t.isObjectProperty(property) || !t.isExpression(property.value))
+  if (!property || !t.isObjectProperty(property) || !t.isExpression(property.value)) {
     return null
+  }
   return unwrapExpression(property.value)
 }
 
@@ -916,11 +979,13 @@ function readObjectArgument(node: t.CallExpression, index: number): Record<strin
 function readObjectLiteral(node: t.ObjectExpression): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const property of node.properties) {
-    if (!t.isObjectProperty(property))
+    if (!t.isObjectProperty(property)) {
       continue
+    }
     const key = getPropertyName(property.key)
-    if (!key)
+    if (!key) {
       continue
+    }
     const value = property.value
     out[key] = t.isExpression(value) ? readUnknownExpression(unwrapExpression(value)) : null
   }
@@ -928,12 +993,15 @@ function readObjectLiteral(node: t.ObjectExpression): Record<string, unknown> {
 }
 
 function readUnknownExpression(node: t.Expression): unknown {
-  if (t.isStringLiteral(node) || t.isNumericLiteral(node) || t.isBooleanLiteral(node) || t.isNullLiteral(node))
+  if (t.isStringLiteral(node) || t.isNumericLiteral(node) || t.isBooleanLiteral(node) || t.isNullLiteral(node)) {
     return literalValue(node)
-  if (t.isObjectExpression(node))
+  }
+  if (t.isObjectExpression(node)) {
     return readObjectLiteral(node)
-  if (t.isArrayExpression(node))
+  }
+  if (t.isArrayExpression(node)) {
     return node.elements.map(element => element && t.isExpression(element) ? readUnknownExpression(unwrapExpression(element)) : null)
+  }
   return null
 }
 
@@ -943,8 +1011,9 @@ function literalValue(node: t.StringLiteral | t.NumericLiteral | t.BooleanLitera
 
 function unwrapExpression<T extends t.Expression>(node: T): t.Expression {
   let current: t.Expression = node
-  while (t.isTSAsExpression(current) || t.isTSTypeAssertion(current) || t.isParenthesizedExpression(current))
+  while (t.isTSAsExpression(current) || t.isTSTypeAssertion(current) || t.isParenthesizedExpression(current)) {
     current = current.expression
+  }
   return current
 }
 
@@ -957,12 +1026,14 @@ function isIdentifierProperty(node: t.MemberExpression, name: string): boolean {
 }
 
 function isManualDataViewDefinition(node: t.Node | null | undefined): boolean {
-  if (!node || !t.isExpression(node))
+  if (!node || !t.isExpression(node)) {
     return false
+  }
 
   const definition = unwrapExpression(node)
-  if (!t.isObjectExpression(definition))
+  if (!t.isObjectExpression(definition)) {
     return false
+  }
 
   const mode = readStringProperty(definition, 'mode')
   const hasTransform = definition.properties.some(property =>
@@ -973,12 +1044,15 @@ function isManualDataViewDefinition(node: t.Node | null | undefined): boolean {
 }
 
 function getPropertyName(node: t.Node): string | null {
-  if (t.isIdentifier(node))
+  if (t.isIdentifier(node)) {
     return node.name
-  if (t.isStringLiteral(node))
+  }
+  if (t.isStringLiteral(node)) {
     return node.value
-  if (t.isNumericLiteral(node))
+  }
+  if (t.isNumericLiteral(node)) {
     return String(node.value)
+  }
   return null
 }
 

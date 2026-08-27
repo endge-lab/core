@@ -8,7 +8,7 @@ import { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntime
 import { FilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
 import { compileFilterSource } from '@/model/services/source-engine/compilers/filter-source-compile'
 
-describe('FilterViewRuntimeHost', () => {
+describe('filterViewRuntimeHost', () => {
   afterEach(() => Raph.app.reset())
 
   it('builds one renderer-neutral plan and delegates changes to Filter state', async () => {
@@ -99,7 +99,8 @@ defineFilter({
     meta: { artifact },
     artifacts: { getArtifact: <T>() => artifact as unknown as ProgramArtifact<T> },
   })
-  if (!runtime)
+  if (!runtime) {
     throw new Error('Filter runtime was not created.')
+  }
   return runtime
 }

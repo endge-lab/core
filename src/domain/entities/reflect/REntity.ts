@@ -1,6 +1,6 @@
-import { Exclude, Expose, Transform } from 'class-transformer'
 import type { DiagnosticsProblemInput } from '@/domain/types/diagnostics/diagnostics.types'
 import type { EntityManagement, EntityManagementLike, EntityOrigin, ManagedBy } from '@/domain/types/document/entity-management.type'
+import { Exclude, Expose, Transform } from 'class-transformer'
 import { normalizeEntityManagement } from '@/domain/types/document/entity-management.type'
 
 /** Опции для дублирования сущности: новый identity и опционально имя. */

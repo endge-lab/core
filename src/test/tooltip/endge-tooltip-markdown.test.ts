@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { createEndgeTooltipDomId, parseEndgeTooltipMarkdown } from '@/model/services/tooltip/endge-tooltip-markdown'
 
-describe('Tooltip Markdown', () => {
+describe('tooltip Markdown', () => {
   it('parses the safe block and inline subset without producing HTML', () => {
     const blocks = parseEndgeTooltipMarkdown(`# Delay
 

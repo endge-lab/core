@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { normalizeEndgeWorkspaceDefinition } from '@/domain/entities/reflect/RWorkspace'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
-describe('EndgeWorkspace', () => {
+describe('endgeWorkspace', () => {
   it('normalizes one nested configuration document', () => {
     expect(normalizeEndgeWorkspaceDefinition(TEST_ENDGE_WORKSPACE)).toEqual(TEST_ENDGE_WORKSPACE)
   })

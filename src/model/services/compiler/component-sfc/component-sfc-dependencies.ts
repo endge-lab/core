@@ -1,12 +1,4 @@
 import type {
-  RComponentSFC_IR,
-  RComponentSFC_IR_Directives,
-  RComponentSFC_IR_ElementNode,
-  RComponentSFC_IR_Node,
-  RComponentSFC_IR_Read,
-  RComponentSFC_IR_Value,
-} from '@/domain/types/component/sfc/ir.types'
-import type {
   RComponentSFC_RuntimeBoundaryDependency,
   RComponentSFC_RuntimeContextDependency,
   RComponentSFC_RuntimeDependencies,
@@ -14,6 +6,14 @@ import type {
   RComponentSFC_RuntimeTableColumnDependency,
   RComponentSFC_RuntimeVocabDependency,
 } from '@/domain/types/component/sfc/dependencies.types'
+import type {
+  RComponentSFC_IR,
+  RComponentSFC_IR_Directives,
+  RComponentSFC_IR_ElementNode,
+  RComponentSFC_IR_Node,
+  RComponentSFC_IR_Read,
+  RComponentSFC_IR_Value,
+} from '@/domain/types/component/sfc/ir.types'
 import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component/sfc/dependencies.types'
 
 /** Анализирует SFC IR и собирает runtime-зависимости от входных props. */
@@ -21,8 +21,9 @@ export function analyzeComponentSFCRuntimeDependencies(
   ir: RComponentSFC_IR | null,
 ): RComponentSFC_RuntimeDependencies {
   const result = createEmptyComponentSFCRuntimeDependencies()
-  if (!ir)
+  if (!ir) {
     return result
+  }
 
   const props = new Set(ir.script.props.map(prop => prop.name))
   const seen = new Set<string>()
@@ -56,15 +57,18 @@ function collectRootContextDependencies(
     collectContextValueDependency(node.value, result, seen)
     return
   }
-  if (node.kind !== 'element')
+  if (node.kind !== 'element') {
     return
+  }
 
-  if (node.tag === 'Table' && normalizePropBinding(node.props.rows, props))
+  if (node.tag === 'Table' && normalizePropBinding(node.props.rows, props)) {
     return
+  }
 
   collectElementContextValues(node, value => collectContextValueDependency(value, result, seen))
-  for (const child of node.children)
+  for (const child of node.children) {
     collectRootContextDependencies(child, props, result, seen)
+  }
 }
 
 function collectContextValueDependency(
@@ -72,16 +76,19 @@ function collectContextValueDependency(
   result: RComponentSFC_RuntimeContextDependency[],
   seen: Set<string>,
 ): void {
-  if (!value || value.kind !== 'expression')
+  if (!value || value.kind !== 'expression') {
     return
+  }
 
   for (const read of value.reads) {
-    if (read.source !== 'context')
+    if (read.source !== 'context') {
       continue
+    }
     const path = read.path[0] === '$context' ? read.path.slice(1) : [...read.path]
     const key = path.join('.')
-    if (seen.has(key))
+    if (seen.has(key)) {
       continue
+    }
     seen.add(key)
     result.push({ source: 'context', path, raw: read.raw, read })
   }
@@ -91,8 +98,9 @@ function collectElementContextValues(
   node: RComponentSFC_IR_ElementNode,
   collect: (value: RComponentSFC_IR_Value | undefined) => void,
 ): void {
-  for (const value of Object.values(node.props))
+  for (const value of Object.values(node.props)) {
     collect(value)
+  }
   collect(node.directives.if)
   collect(node.directives.elseIf)
   collect(node.directives.key)
@@ -100,8 +108,9 @@ function collectElementContextValues(
   collect(node.editable?.value)
   collect(node.editable?.triggers)
   for (const group of node.interactions ?? []) {
-    for (const rule of group.rules)
+    for (const rule of group.rules) {
       collect(rule.trigger)
+    }
   }
 }
 
@@ -117,22 +126,26 @@ function collectNodeDependencies(
     return
   }
 
-  if (node.kind !== 'element')
+  if (node.kind !== 'element') {
     return
+  }
 
-  for (const value of Object.values(node.props))
+  for (const value of Object.values(node.props)) {
     collectValueDependencies(value, props, result, seen, seenVocabs)
+  }
 
   collectDirectiveDependencies(node.directives, props, result, seen, seenVocabs)
   collectValueDependencies(node.editable?.value, props, result, seen, seenVocabs)
   collectValueDependencies(node.editable?.triggers, props, result, seen, seenVocabs)
   for (const group of node.interactions ?? []) {
-    for (const rule of group.rules)
+    for (const rule of group.rules) {
       collectValueDependencies(rule.trigger, props, result, seen, seenVocabs)
+    }
   }
 
-  for (const child of node.children)
+  for (const child of node.children) {
     collectNodeDependencies(child, props, result, seen, seenVocabs)
+  }
 }
 
 function collectDirectiveDependencies(
@@ -155,17 +168,20 @@ function collectValueDependencies(
   seen: Set<string>,
   seenVocabs: Set<string>,
 ): void {
-  if (!value || value.kind !== 'expression')
+  if (!value || value.kind !== 'expression') {
     return
+  }
 
   for (const read of value.reads) {
     const dependency = normalizePropDependency(read, props)
-    if (!dependency)
+    if (!dependency) {
       continue
+    }
 
     const key = `${dependency.prop}.${dependency.path.join('.')}`
-    if (seen.has(key))
+    if (seen.has(key)) {
       continue
+    }
 
     seen.add(key)
     result.props.push(dependency)
@@ -174,8 +190,9 @@ function collectValueDependencies(
   for (const read of value.vocabReads ?? []) {
     const dependency: RComponentSFC_RuntimeVocabDependency = { ...read }
     const key = `${dependency.alias}\u0000${dependency.valuePath}\u0000${dependency.labelPath}`
-    if (seenVocabs.has(key))
+    if (seenVocabs.has(key)) {
       continue
+    }
 
     seenVocabs.add(key)
     result.vocabs ??= []
@@ -187,16 +204,19 @@ function normalizePropDependency(
   read: RComponentSFC_IR_Read,
   props: Set<string>,
 ): RComponentSFC_RuntimeDependency | null {
-  if (read.source !== 'props')
+  if (read.source !== 'props') {
     return null
+  }
 
   const path = [...read.path]
-  if (path[0] === 'props')
+  if (path[0] === 'props') {
     path.shift()
+  }
 
   const prop = path.shift()
-  if (!prop || !props.has(prop))
+  if (!prop || !props.has(prop)) {
     return null
+  }
 
   return {
     source: 'props',
@@ -211,9 +231,10 @@ function prunePrefixDependencies(
   dependencies: RComponentSFC_RuntimeDependency[],
 ): RComponentSFC_RuntimeDependency[] {
   return dependencies.filter((candidate) => {
-    return !dependencies.some(other => {
-      if (candidate === other || candidate.prop !== other.prop)
+    return !dependencies.some((other) => {
+      if (candidate === other || candidate.prop !== other.prop) {
         return false
+      }
 
       return candidate.path.length < other.path.length
         && candidate.path.every((part, index) => part === other.path[index])
@@ -225,9 +246,10 @@ function pruneContextPrefixDependencies(
   dependencies: RComponentSFC_RuntimeContextDependency[],
 ): RComponentSFC_RuntimeContextDependency[] {
   return dependencies.filter((candidate) => {
-    return !dependencies.some(other => {
-      if (candidate === other)
+    return !dependencies.some((other) => {
+      if (candidate === other) {
         return false
+      }
       return candidate.path.length < other.path.length
         && candidate.path.every((part, index) => part === other.path[index])
     })
@@ -239,17 +261,20 @@ function collectBoundaryDependencies(
   props: Set<string>,
   result: RComponentSFC_RuntimeDependencies,
 ): void {
-  if (node.kind !== 'element')
+  if (node.kind !== 'element') {
     return
+  }
 
   if (node.tag === 'Table') {
     const boundary = createTableBoundaryDependency(node, props)
-    if (boundary)
+    if (boundary) {
       result.boundaries.push(boundary)
+    }
   }
 
-  for (const child of node.children)
+  for (const child of node.children) {
     collectBoundaryDependencies(child, props, result)
+  }
 }
 
 function createTableBoundaryDependency(
@@ -257,8 +282,9 @@ function createTableBoundaryDependency(
   props: Set<string>,
 ): RComponentSFC_RuntimeBoundaryDependency | null {
   const rows = normalizePropBinding(node.props.rows, props)
-  if (!rows)
+  if (!rows) {
     return null
+  }
 
   return {
     id: node.id,
@@ -279,13 +305,16 @@ function collectBoundaryContextReads(tableNode: RComponentSFC_IR_ElementNode): s
       collectContextValueDependency(node.value, dependencies, seen)
       return
     }
-    if (node.kind !== 'element')
+    if (node.kind !== 'element') {
       return
-    if (!isRoot && node.tag === 'Table')
+    }
+    if (!isRoot && node.tag === 'Table') {
       return
+    }
     collectElementContextValues(node, value => collectContextValueDependency(value, dependencies, seen))
-    for (const child of node.children)
+    for (const child of node.children) {
       visit(child)
+    }
   }
   visit(tableNode, true)
   return pruneContextPrefixDependencies(dependencies).map(dependency => dependency.path)
@@ -298,8 +327,9 @@ function collectTableColumnDependencies(
   const columns: RComponentSFC_RuntimeTableColumnDependency[] = []
 
   for (const child of tableNode.children) {
-    if (child.kind !== 'element' || child.tag !== 'Column')
+    if (child.kind !== 'element' || child.tag !== 'Column') {
       continue
+    }
 
     const key = normalizeLiteralString(child.props.key ?? child.directives.key) ?? `column_${visibleIndex}`
     columns.push({
@@ -325,8 +355,9 @@ function resolveCellNodes(columnNode: RComponentSFC_IR_ElementNode): RComponentS
 function collectRowReads(nodes: RComponentSFC_IR_Node[], columnKey: string): string[] {
   const result = new Set<string>()
 
-  for (const node of nodes)
+  for (const node of nodes) {
     collectRowReadsFromNode(node, result, columnKey)
+  }
 
   return [...result]
 }
@@ -337,17 +368,20 @@ function collectRowReadsFromNode(
   columnKey: string,
 ): void {
   if (node.kind === 'expression') {
-    if (node.value.kind === 'expression')
+    if (node.value.kind === 'expression') {
       collectRowReadsFromSource(node.value.source, result, columnKey)
+    }
     return
   }
 
-  if (node.kind !== 'element')
+  if (node.kind !== 'element') {
     return
+  }
 
   for (const value of Object.values(node.props)) {
-    if (value.kind === 'expression')
+    if (value.kind === 'expression') {
       collectRowReadsFromSource(value.source, result, columnKey)
+    }
   }
 
   for (const value of [
@@ -356,47 +390,54 @@ function collectRowReadsFromNode(
     node.directives.key,
     node.directives.for?.source,
   ]) {
-    if (value?.kind === 'expression')
+    if (value?.kind === 'expression') {
       collectRowReadsFromSource(value.source, result, columnKey)
+    }
   }
 
-  for (const child of node.children)
+  for (const child of node.children) {
     collectRowReadsFromNode(child, result, columnKey)
+  }
 }
 
 function collectRowReadsFromSource(source: string, result: Set<string>, columnKey: string): void {
   const rowFieldPattern = /\brow\.([A-Za-z_$][\w$]*)/g
   let match: RegExpExecArray | null
 
-  while ((match = rowFieldPattern.exec(source)))
+  while ((match = rowFieldPattern.exec(source))) {
     result.add(match[1])
+  }
 
-  if (/\bvalue\b/.test(source))
+  if (/\bvalue\b/.test(source)) {
     result.add(columnKey)
+  }
 }
 
 function normalizePropBinding(
   value: RComponentSFC_IR_Value | undefined,
   props: Set<string>,
 ): { prop: string, path: string[] } | null {
-  if (!value || value.kind !== 'expression')
+  if (!value || value.kind !== 'expression') {
     return null
+  }
 
   for (const read of value.reads) {
     const dependency = normalizePropDependency(read, props)
-    if (dependency)
+    if (dependency) {
       return {
         prop: dependency.prop,
         path: dependency.path,
       }
+    }
   }
 
   return null
 }
 
 function normalizeLiteralString(value: RComponentSFC_IR_Value | undefined): string | null {
-  if (!value)
+  if (!value) {
     return null
+  }
 
   const source = value.kind === 'literal'
     ? String(value.value ?? '').trim()

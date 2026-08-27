@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { RStore } from '@/domain/entities/reflect/RStore'
 import { RMock } from '@/domain/entities/reflect/RMock'
+import { RStore } from '@/domain/entities/reflect/RStore'
 import { Endge } from '@/model/kernel/endge'
 
-describe('EndgeCompiler Store mock dependencies', () => {
+describe('endgeCompiler Store mock dependencies', () => {
   afterEach(() => {
     Endge.program.clear()
     Endge.domain.reset()

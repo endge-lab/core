@@ -24,8 +24,9 @@ export function serializeServiceDocument(
     active: (model.active ?? plain.active) !== false,
   }
   const folderIdentity = resolveFolderIdentity(model.folderId ?? plain.folderId ?? plain.folder)
-  if (folderIdentity)
+  if (folderIdentity) {
     common.folderIdentity = folderIdentity
+  }
 
   const value = { ...plain, ...model }
   if (documentType === 'primitive' || documentType === 'type') {
@@ -37,23 +38,28 @@ export function serializeServiceDocument(
   }
   if (isQuery(documentType)) {
     return withFields(common, value, ['source', 'sourceVersion'], {
-      source: text(value.source), sourceVersion: 2,
+      source: text(value.source),
+      sourceVersion: 2,
     })
   }
   if (documentType === 'data-view' || documentType === 'store' || documentType === 'stream' || documentType === 'style' || documentType === 'configuration') {
     return withFields(common, value, ['source', 'sourceVersion'], {
-      source: text(value.source), sourceVersion: positiveInteger(value.sourceVersion, 1),
+      source: text(value.source),
+      sourceVersion: positiveInteger(value.sourceVersion, 1),
     })
   }
   if (documentType === 'composition') {
     return withFields(common, value, ['kind', 'kindIdentity', 'source', 'sourceVersion'], {
-      kind: text(value.kind), kindIdentity: nullableText(value.kindIdentity),
-      source: text(value.source), sourceVersion: positiveInteger(value.sourceVersion, 1),
+      kind: text(value.kind),
+      kindIdentity: nullableText(value.kindIdentity),
+      source: text(value.source),
+      sourceVersion: positiveInteger(value.sourceVersion, 1),
     })
   }
   if (documentType === 'update') {
     return withFields(common, value, ['storeIdentity', 'source', 'sourceVersion'], {
-      storeIdentity: text(value.storeIdentity), source: text(value.source),
+      storeIdentity: text(value.storeIdentity),
+      source: text(value.source),
       sourceVersion: positiveInteger(value.sourceVersion, 1),
     })
   }
@@ -61,12 +67,14 @@ export function serializeServiceDocument(
     return withFields(common, value, ['contentSource', 'contentType', 'source', 'codeRef'], {
       contentSource: text(value.contentSource) || 'inline',
       contentType: text(value.contentType) || 'application/json',
-      source: text(value.source), codeRef: nullableText(value.codeRef),
+      source: text(value.source),
+      codeRef: nullableText(value.codeRef),
     })
   }
   if (documentType === ComponentType.SFC) {
     return withFields(common, value, ['source', 'tag', 'modelVersion', 'supportedTargets'], {
-      source: text(value.source), tag: nullableText(value.tag),
+      source: text(value.source),
+      tag: nullableText(value.tag),
       modelVersion: positiveInteger(value.modelVersion, 1),
       supportedTargets: stringArray(value.supportedTargets),
     })
@@ -76,44 +84,54 @@ export function serializeServiceDocument(
   }
   if (documentType === FilterType.DefaultFilter) {
     return withFields(common, value, ['fields', 'source', 'sourceVersion'], {
-      fields: arrayValue(value.fields), source: text(value.source),
+      fields: arrayValue(value.fields),
+      source: text(value.source),
       sourceVersion: positiveInteger(value.sourceVersion, 1),
     })
   }
-  if (documentType === 'converter')
+  if (documentType === 'converter') {
     return common
+  }
   if (documentType === 'computation') {
     return withFields(common, value, ['source', 'sourceVersion', 'contractVersion'], {
-      source: text(value.source), sourceVersion: positiveInteger(value.sourceVersion, 1),
+      source: text(value.source),
+      sourceVersion: positiveInteger(value.sourceVersion, 1),
       contractVersion: positiveInteger(value.contractVersion, 1),
     })
   }
   if (documentType === 'vocabs') {
     return withFields(common, value, ['source', 'sourceVersion', 'mode', 'baseApiUrl', 'collectionSlug', 'authMode', 'authProfileIdentity'], {
-      source: text(value.source), sourceVersion: positiveInteger(value.sourceVersion, 1),
+      source: text(value.source),
+      sourceVersion: positiveInteger(value.sourceVersion, 1),
     })
   }
-  if (documentType === 'i18n-bundles')
+  if (documentType === 'i18n-bundles') {
     return withFields(common, value, ['locales'], { locales: objectValue(value.locales) })
+  }
   if (documentType === 'auth-profile') {
     return withFields(common, value, ['adapterId', 'config', 'credentials', 'session'], {
-      config: objectValue(value.config), credentials: objectValue(value.credentials),
+      config: objectValue(value.config),
+      credentials: objectValue(value.credentials),
       session: value.session ? objectValue(value.session) : null,
     })
   }
-  if (documentType === 'navigation')
+  if (documentType === 'navigation') {
     return withFields(common, value, ['tree'], { tree: arrayValue(value.tree) })
-  if (documentType === 'environment')
+  }
+  if (documentType === 'environment') {
     return withFields(common, value, ['configuration'], { configuration: objectValue(value.configuration) })
+  }
   if (documentType === 'tenant') {
     return withFields(common, value, ['code', 'configuration'], {
-      code: text(value.code) || identity, configuration: objectValue(value.configuration),
+      code: text(value.code) || identity,
+      configuration: objectValue(value.configuration),
     })
   }
   if (documentType === 'project') {
     return withFields(common, value, ['configuration', 'slug', 'order'], {
       configuration: objectValue(value.configuration),
-      slug: nullableText(value.slug), order: nullableNumber(value.order),
+      slug: nullableText(value.slug),
+      order: nullableNumber(value.order),
       navigationIdentity: resolveNavigationIdentity(value.navigationIdentity ?? value.navigationId),
       allowedEnvironments: resolveEnvironmentIdentities(value.allowedEnvironmentIdentities ?? value.allowedEnvironmentIds ?? value.allowedEnvironments),
     })
@@ -149,20 +167,25 @@ function withFields(
 ): Record<string, unknown> {
   const result = { ...common }
   for (const field of fields) {
-    if (Object.prototype.hasOwnProperty.call(source, field))
+    if (Object.hasOwn(source, field)) {
       result[field] = source[field]
+    }
   }
   return { ...result, ...overrides }
 }
 
 function resolveFolderIdentity(value: unknown): string {
-  if (value == null || value === '') return ''
+  if (value == null || value === '') {
+    return ''
+  }
   const folder = Endge.domain.getFolder(value as string | number)
   return text((folder as any)?.identity ?? value)
 }
 
 function resolveNavigationIdentity(value: unknown): string | null {
-  if (value == null || value === '') return null
+  if (value == null || value === '') {
+    return null
+  }
   const navigation = Endge.domain.getNavigation(value as string | number)
   return nullableText((navigation as any)?.identity ?? value)
 }

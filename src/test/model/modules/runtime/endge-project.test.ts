@@ -1,13 +1,13 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import type { ProgramArtifact } from '@/domain/types/program/program.types'
 
+import type { RuntimeScopeHandle } from '@/domain/types/runtime/runtime-scope.types'
+import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
+import { afterEach, describe, expect, it } from 'vitest'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { RProject } from '@/domain/entities/reflect/RProject'
-import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
-import type { ProgramArtifact } from '@/domain/types/program/program.types'
-import type { RuntimeScopeHandle } from '@/domain/types/runtime/runtime-scope.types'
 import { Endge } from '@/model/kernel/endge'
 
-describe('Endge project runtime session', () => {
+describe('endge project runtime session', () => {
   afterEach(async () => {
     await Endge.runtime.reset()
     Endge.program.clear()
@@ -118,11 +118,25 @@ function composition(id: number, identity: string, project: string): RCompositio
 
 function payload(mode: 'startup' | 'manual'): CompositionProgramPayload {
   return {
-    type: 'composition', sourceVersion: 1, activation: { mode }, props: [], data: [], resources: [], runtimes: [], hooks: [], outputs: [],
+    type: 'composition',
+    sourceVersion: 1,
+    activation: { mode },
+    props: [],
+    data: [],
+    resources: [],
+    runtimes: [],
+    hooks: [],
+    outputs: [],
     scopes: [{
-      name: 'scope_default', path: 'scope_default', parentPath: null,
-      activationOverride: { mode }, effectiveActivation: { mode },
-      resources: [], runtimes: [], children: [], sourceOrder: 0,
+      name: 'scope_default',
+      path: 'scope_default',
+      parentPath: null,
+      activationOverride: { mode },
+      effectiveActivation: { mode },
+      resources: [],
+      runtimes: [],
+      children: [],
+      sourceOrder: 0,
     }],
     graph: { inputs: [], dataInputs: [], updates: [], publications: [], mounts: [] },
   }
@@ -130,22 +144,47 @@ function payload(mode: 'startup' | 'manual'): CompositionProgramPayload {
 
 function payloadWithPages(): CompositionProgramPayload {
   return {
-    type: 'composition', sourceVersion: 1, activation: { mode: 'startup' }, props: [], data: [], resources: [], runtimes: [], hooks: [],
+    type: 'composition',
+    sourceVersion: 1,
+    activation: { mode: 'startup' },
+    props: [],
+    data: [],
+    resources: [],
+    runtimes: [],
+    hooks: [],
     scopes: [
       {
-        name: 'scope_default', path: 'scope_default', parentPath: null,
-        activationOverride: { mode: 'startup' }, effectiveActivation: { mode: 'startup' },
-        resources: [], runtimes: [], children: ['pageA', 'pageB'], sourceOrder: 0,
+        name: 'scope_default',
+        path: 'scope_default',
+        parentPath: null,
+        activationOverride: { mode: 'startup' },
+        effectiveActivation: { mode: 'startup' },
+        resources: [],
+        runtimes: [],
+        children: ['pageA', 'pageB'],
+        sourceOrder: 0,
       },
       {
-        name: 'pageA', path: 'pageA', parentPath: 'scope_default',
-        activationOverride: { mode: 'manual' }, effectiveActivation: { mode: 'manual' },
-        resources: [], runtimes: [], children: [], sourceOrder: 1,
+        name: 'pageA',
+        path: 'pageA',
+        parentPath: 'scope_default',
+        activationOverride: { mode: 'manual' },
+        effectiveActivation: { mode: 'manual' },
+        resources: [],
+        runtimes: [],
+        children: [],
+        sourceOrder: 1,
       },
       {
-        name: 'pageB', path: 'pageB', parentPath: 'scope_default',
-        activationOverride: { mode: 'manual' }, effectiveActivation: { mode: 'manual' },
-        resources: [], runtimes: [], children: [], sourceOrder: 2,
+        name: 'pageB',
+        path: 'pageB',
+        parentPath: 'scope_default',
+        activationOverride: { mode: 'manual' },
+        effectiveActivation: { mode: 'manual' },
+        resources: [],
+        runtimes: [],
+        children: [],
+        sourceOrder: 2,
       },
     ],
     outputs: [
@@ -159,7 +198,14 @@ function payloadWithPages(): CompositionProgramPayload {
 function artifact(model: RComposition, value: CompositionProgramPayload): ProgramArtifact<CompositionProgramPayload> {
   return {
     ref: { entityType: 'composition' as const, id: model.id, identity: model.identity },
-    sourceHash: `test:${model.identity}`, compilerVersion: 'test', contextHash: 'test', status: 'valid' as const,
-    diagnostics: [], dependencies: [], capabilities: ['compilable', 'executable'], metadata: { self: {}, nodes: [] }, payload: value,
+    sourceHash: `test:${model.identity}`,
+    compilerVersion: 'test',
+    contextHash: 'test',
+    status: 'valid' as const,
+    diagnostics: [],
+    dependencies: [],
+    capabilities: ['compilable', 'executable'],
+    metadata: { self: {}, nodes: [] },
+    payload: value,
   }
 }

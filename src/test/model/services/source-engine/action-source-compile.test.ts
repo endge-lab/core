@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { compileActionSource } from '@/model/services/source-engine/compilers/action-source-compile'
 import { ACTION_SOURCE_WITH_OPERATION } from '@/test/fixtures/action-source'
 
-describe('Action Source compiler', () => {
+describe('action Source compiler', () => {
   it('builds sequential named steps, explicit output and dependencies', () => {
     const result = compileActionSource({ source: ACTION_SOURCE_WITH_OPERATION })
     expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
@@ -35,7 +35,9 @@ describe('Action Source compiler', () => {
     expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
     const operation = result.payload.sourceDocument?.steps[0]
     expect(operation).toMatchObject({ kind: 'operation', input: null })
-    if (operation?.kind !== 'operation') throw new Error('Operation was not compiled')
+    if (operation?.kind !== 'operation') {
+      throw new Error('Operation was not compiled')
+    }
     expect(operation.run).toMatchObject({ output: null, steps: [{ name: 'default', kind: 'query' }] })
     expect(operation.undo).toMatchObject({ output: null, steps: [{ name: 'default', kind: 'query' }] })
   })

@@ -1,8 +1,8 @@
-import { Serialize } from '@endge/utils'
-import { Expose } from 'class-transformer'
-
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
 import type { DiagnosticsProblemInput } from '@/domain/types/diagnostics/diagnostics.types'
+
+import { Serialize } from '@endge/utils'
+import { Expose } from 'class-transformer'
 import { REntity } from '@/domain/entities/reflect/REntity'
 
 /** Persisted executable specification. Runtime execution is provided separately. */
@@ -37,8 +37,9 @@ export class RComputation extends REntity {
     computation.active = json?.active !== false
     computation.deletedAt = json?.deletedAt ?? null
     computation.author = json?.author ?? null
-    if (storageMeta)
+    if (storageMeta) {
       computation.applyStorageMeta(storageMeta)
+    }
     return computation
   }
 
@@ -63,12 +64,15 @@ export class RComputation extends REntity {
   /** Возвращает validation problems computation без mutable entity state. */
   override getDiagnosticProblems(): DiagnosticsProblemInput[] {
     const problems: DiagnosticsProblemInput[] = []
-    if (!this.identity)
+    if (!this.identity) {
       problems.push({ severity: 'warning', code: 'computation.identity.required', message: 'Computation.identity не задан' })
-    if (!this.displayName)
+    }
+    if (!this.displayName) {
       problems.push({ severity: 'warning', code: 'computation.display-name.required', message: 'Computation.displayName не задан' })
-    if (!this.source.trim())
+    }
+    if (!this.source.trim()) {
       problems.push({ severity: 'warning', code: 'computation.source.required', message: 'Computation.source не задан', sourcePath: 'source' })
+    }
     return problems
   }
 
@@ -85,9 +89,11 @@ export class RComputation extends REntity {
 }
 
 function relationToId(value: any): string | number | null {
-  if (value == null)
+  if (value == null) {
     return null
-  if (typeof value === 'object')
+  }
+  if (typeof value === 'object') {
     return relationToId(value.id ?? value.value)
+  }
   return value
 }

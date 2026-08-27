@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { patchComponentSFCTableSource } from '@/model/services/source-engine/component-sfc/component-sfc-table-source-patch'
 
-describe('Component SFC Table source patch', () => {
+describe('component SFC Table source patch', () => {
   it('adds a column before the closing Table tag without changing surrounding source', () => {
     const source = `<template>
   <Table :rows="rows">
@@ -424,7 +424,7 @@ describe('Component SFC Table source patch', () => {
       type: 'set-column-cell-attribute',
       columnIndex: 0,
       name: 'tail',
-      value: "row.departureLeg.attributes[name = 'ACTail']",
+      value: 'row.departureLeg.attributes[name = \'ACTail\']',
       valueKind: 'expression',
     })
     const converted = patchComponentSFCTableSource(added.source, {
@@ -472,7 +472,7 @@ describe('Component SFC Table source patch', () => {
       type: 'set-column-cell-attribute',
       columnIndex: 0,
       name: 'configuration',
-      value: "row.departureLeg.attributes[name = 'ACConfig']",
+      value: 'row.departureLeg.attributes[name = \'ACConfig\']',
       valueKind: 'expression',
     })
 
@@ -512,7 +512,7 @@ describe('Component SFC Table source patch', () => {
       menu: 'row',
       nodeIndex: 0,
       name: 'label',
-      value: "t('schedule:menu.open', 'Открыть')",
+      value: 't(\'schedule:menu.open\', \'Открыть\')',
       valueKind: 'expression',
     })
     const input = patchComponentSFCTableSource(label.source, {
@@ -530,7 +530,7 @@ describe('Component SFC Table source patch', () => {
     expect(input.source).toContain(':input="{ rowId, columnKey, value }"')
     expect(input.projection?.menus.row.items[0]).toMatchObject({
       kind: 'item',
-      label: { kind: 'expression', source: "t('schedule:menu.open', 'Открыть')" },
+      label: { kind: 'expression', source: 't(\'schedule:menu.open\', \'Открыть\')' },
       input: { kind: 'expression', source: '{ rowId, columnKey, value }' },
     })
   })

@@ -3,7 +3,7 @@ import type {
   UIRenderAdapter,
   UIRenderAdapterDescriptor,
   UIRenderAdapterRequirement,
-} from '@/domain/types/ui/ui-render-adapter.type'
+} from '@/domain/types/presentation/ui-render-adapter.type'
 
 /** Хранит runtime implementations UI adapter-ов и выбранный adapter. */
 export class UIAdapterRegistry {
@@ -42,13 +42,15 @@ export class UIAdapterRegistry {
     fallbackIds: readonly string[] = [],
   ): UIRenderAdapter<TImplementation> | null {
     const preferred = this.get<TImplementation>(preferredId)
-    if (preferred)
+    if (preferred) {
       return preferred
+    }
 
     for (const fallbackId of fallbackIds) {
       const fallback = this.get<TImplementation>(fallbackId)
-      if (fallback)
+      if (fallback) {
         return fallback
+      }
     }
 
     return null
@@ -120,7 +122,9 @@ export class UIAdapterRegistry {
     const changed = this._adapters.size > 0 || this._activeAdapterId !== null
     this._adapters.clear()
     this._activeAdapterId = null
-    if (changed) this._onChange()
+    if (changed) {
+      this._onChange()
+    }
   }
 
   /** Нормализует descriptor, сохраняя runtime implementations без сериализации. */
@@ -134,9 +138,15 @@ export class UIAdapterRegistry {
     const renderers = input?.renderers
     const roots = input?.roots
 
-    if (!id) throw new Error('[UIAdapterRegistry] adapter id is required')
-    if (!protocol) throw new Error(`[UIAdapterRegistry] adapter "${id}" protocol is required`)
-    if (!renderer) throw new Error(`[UIAdapterRegistry] adapter "${id}" renderer is required`)
+    if (!id) {
+      throw new Error('[UIAdapterRegistry] adapter id is required')
+    }
+    if (!protocol) {
+      throw new Error(`[UIAdapterRegistry] adapter "${id}" protocol is required`)
+    }
+    if (!renderer) {
+      throw new Error(`[UIAdapterRegistry] adapter "${id}" renderer is required`)
+    }
     if (!Number.isInteger(protocolVersion) || protocolVersion < 1) {
       throw new Error(`[UIAdapterRegistry] adapter "${id}" protocolVersion must be a positive integer`)
     }
@@ -149,14 +159,18 @@ export class UIAdapterRegistry {
 
     const normalizedRenderers = { ...renderers }
     for (const [key, implementation] of Object.entries(normalizedRenderers)) {
-      if (!key.trim()) throw new Error(`[UIAdapterRegistry] adapter "${id}" contains an empty renderer key`)
+      if (!key.trim()) {
+        throw new Error(`[UIAdapterRegistry] adapter "${id}" contains an empty renderer key`)
+      }
       if (implementation == null) {
         throw new Error(`[UIAdapterRegistry] adapter "${id}" renderer "${key}" has no implementation`)
       }
     }
     const normalizedRoots = { ...(roots ?? {}) }
     for (const [key, implementation] of Object.entries(normalizedRoots)) {
-      if (!key.trim()) throw new Error(`[UIAdapterRegistry] adapter "${id}" contains an empty root key`)
+      if (!key.trim()) {
+        throw new Error(`[UIAdapterRegistry] adapter "${id}" contains an empty root key`)
+      }
       if (implementation == null) {
         throw new Error(`[UIAdapterRegistry] adapter "${id}" root "${key}" has no implementation`)
       }

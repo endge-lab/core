@@ -1,5 +1,5 @@
-import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
 import type { ProgramMetadataMap } from '@/domain/types/program/program-metadata.types'
+import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
 import type { SourceExpressionIR, SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 
 export type DataViewSourceMode = 'manual' | 'pipeline' | 'projection' | 'expression'

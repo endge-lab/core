@@ -1,20 +1,21 @@
+import type { StateStore, User, UserManagerSettings } from 'oidc-client-ts'
+
 import type {
   AuthSessionSource,
   AuthSessionSourceResolveOptions,
   AuthTokenSet,
   OidcBrowserSessionOptions,
 } from '@/domain/types/auth/auth-profile.types'
-
 import {
   InMemoryWebStorage,
-  User,
   UserManager,
   WebStorageStateStore,
 } from 'oidc-client-ts'
-import type { StateStore, UserManagerSettings } from 'oidc-client-ts'
+
+const POPUP_OPTIONS_KEY = 'endge:oidc:popup-callback-options'
 
 /** Общий browser OIDC runtime для popup и redirect Authorization Code + PKCE flows. */
-export class OidcBrowserSession_Service implements AuthSessionSource {
+export class OidcBrowserSession_Adapter implements AuthSessionSource {
   private readonly _userStore: SanitizingStateStore
   private readonly _manager: UserManager
 
@@ -39,10 +40,11 @@ export class OidcBrowserSession_Service implements AuthSessionSource {
   /** Завершает callback в отдельном popup без загрузки Domain. */
   public static async completeStoredPopupCallback(url: string = globalThis.location?.href ?? ''): Promise<void> {
     const raw = globalThis.sessionStorage.getItem(POPUP_OPTIONS_KEY)
-    if (!raw)
+    if (!raw) {
       throw new Error('[EndgeAuth] OIDC popup callback settings are unavailable')
+    }
     const options = JSON.parse(raw) as OidcBrowserSessionOptions
-    const source = new OidcBrowserSession_Service(options)
+    const source = new OidcBrowserSession_Adapter(options)
     await source.completePopupCallback(url)
   }
 
@@ -74,12 +76,14 @@ export class OidcBrowserSession_Service implements AuthSessionSource {
     if (needsRefresh && user?.refresh_token) {
       try {
         user = await this._manager.signinSilent()
-        if (user)
+        if (user) {
           await this._userStore.adopt(userStoreKey(this.options), user)
+        }
       }
       catch {
-        if (!isUsable(user))
+        if (!isUsable(user)) {
           return null
+        }
       }
     }
     return user && isUsable(user) ? toTokenSet(user) : null
@@ -88,14 +92,16 @@ export class OidcBrowserSession_Service implements AuthSessionSource {
   /** Возвращает claims и при наличии endpoint дополняет их OIDC userinfo. */
   public async loadUserInfo(): Promise<Record<string, unknown> | null> {
     const user = await this._manager.getUser()
-    if (!isUsable(user))
+    if (!isUsable(user)) {
       return null
+    }
     try {
       const discoveryURL = `${this.options.issuer.replace(/\/+$/, '')}/.well-known/openid-configuration`
       const discovery = await fetch(discoveryURL).then(response => response.ok ? response.json() : null) as Record<string, unknown> | null
       const endpoint = String(discovery?.userinfo_endpoint ?? '').trim()
-      if (!endpoint)
+      if (!endpoint) {
         return user.profile as Record<string, unknown>
+      }
       const response = await fetch(endpoint, { headers: { Authorization: `Bearer ${user.access_token}` } })
       return response.ok ? await response.json() as Record<string, unknown> : user.profile as Record<string, unknown>
     }
@@ -107,18 +113,16 @@ export class OidcBrowserSession_Service implements AuthSessionSource {
   /** Завершает provider session выбранным host flow и всегда удаляет local user. */
   public async logout(): Promise<void> {
     try {
-      if (this.options.flow === 'popup')
+      if (this.options.flow === 'popup') {
         await this._manager.signoutPopup()
-      else
-        await this._manager.signoutRedirect()
+      }
+      else { await this._manager.signoutRedirect() }
     }
     finally {
       await this._manager.removeUser()
     }
   }
 }
-
-const POPUP_OPTIONS_KEY = 'endge:oidc:popup-callback-options'
 
 function createUserStore(options: OidcBrowserSessionOptions): SanitizingStateStore {
   const prefix = `endge:oidc:${encodeURIComponent(options.storageNamespace)}:${encodeURIComponent(options.profileIdentity)}:`
@@ -146,10 +150,12 @@ function createSettings(options: OidcBrowserSessionOptions, userStore: StateStor
 }
 
 function resolveStorage(storage: OidcBrowserSessionOptions['session']['storage']): Storage {
-  if (storage === 'localStorage')
+  if (storage === 'localStorage') {
     return globalThis.localStorage
-  if (storage === 'sessionStorage')
+  }
+  if (storage === 'sessionStorage') {
     return globalThis.sessionStorage
+  }
   return new InMemoryWebStorage()
 }
 
@@ -170,10 +176,10 @@ class SanitizingStateStore implements StateStore {
     try {
       const parsed = JSON.parse(value) as Record<string, unknown>
       const refreshToken = String(parsed.refresh_token ?? '')
-      if (refreshToken)
+      if (refreshToken) {
         this._volatileRefreshTokens.set(key, refreshToken)
-      else
-        this._volatileRefreshTokens.delete(key)
+      }
+      else { this._volatileRefreshTokens.delete(key) }
       delete parsed.refresh_token
       await this._delegate.set(key, JSON.stringify(parsed))
     }
@@ -185,8 +191,9 @@ class SanitizingStateStore implements StateStore {
   public async get(key: string): Promise<string | null> {
     const value = await this._delegate.get(key)
     const refreshToken = this._volatileRefreshTokens.get(key)
-    if (!value || !refreshToken || this._persistRefreshToken)
+    if (!value || !refreshToken || this._persistRefreshToken) {
       return value
+    }
     try {
       return JSON.stringify({ ...JSON.parse(value), refresh_token: refreshToken })
     }
@@ -219,8 +226,9 @@ function isUsable(user: User | null | undefined): user is User {
 }
 
 function requireToken(user: User, profileIdentity: string): AuthTokenSet {
-  if (!isUsable(user))
+  if (!isUsable(user)) {
     throw new Error(`[EndgeAuth] OIDC returned no usable session: ${profileIdentity}`)
+  }
   return toTokenSet(user)
 }
 
@@ -234,3 +242,6 @@ function toTokenSet(user: User): AuthTokenSet {
     headers: { Authorization: `Bearer ${user.access_token}` },
   }
 }
+
+/** @deprecated Используйте OidcBrowserSession_Adapter. */
+export { OidcBrowserSession_Adapter as OidcBrowserSession_Service }

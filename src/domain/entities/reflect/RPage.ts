@@ -1,10 +1,10 @@
+import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
+import type { DomainDocumentType } from '@/domain/types/document/document.types'
+
+import type { EntityManagement } from '@/domain/types/document/entity-management.type'
 import { Serialize } from '@endge/utils'
 import { Expose } from 'class-transformer'
-
-import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
 import { REntity } from '@/domain/entities/reflect/REntity'
-import type { DomainDocumentType } from '@/domain/types/document/document.types'
-import type { EntityManagement } from '@/domain/types/document/entity-management.type'
 
 export interface RPageAreaBlockSchema {
   key: string
@@ -73,10 +73,12 @@ export class RPage extends REntity {
       routePath: this.routePath ?? null,
       templateId: this.templateId ?? null,
       enabled: this.enabled,
-      areas: this.areas?.length ? this.areas.map(a => ({
-        slotId: a.slotId,
-        blocks: a.blocks?.map(b => ({ ...b })),
-      })) : undefined,
+      areas: this.areas?.length
+        ? this.areas.map(a => ({
+            slotId: a.slotId,
+            blocks: a.blocks?.map(b => ({ ...b })),
+          }))
+        : undefined,
       meta: this.meta && Object.keys(this.meta).length > 0 ? { ...this.meta } : undefined,
     }
   }

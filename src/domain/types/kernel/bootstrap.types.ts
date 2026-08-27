@@ -1,7 +1,7 @@
-import type { EndgeExecutionContext } from '@/domain/types/runtime/execution-context.types'
 import type { EndgeAuthBootOptions } from '@/domain/types/auth/auth-profile.types'
-import type { EndgeDomainProvider } from '@/domain/types/document/domain-provider.type'
 import type { EndgeDomainBundle } from '@/domain/types/document/domain-export.type'
+import type { EndgeDomainProvider } from '@/domain/types/document/domain-provider.type'
+import type { EndgeExecutionContext } from '@/domain/types/runtime/execution-context.types'
 
 /**
  * Источник получения доменных данных
@@ -9,10 +9,10 @@ import type { EndgeDomainBundle } from '@/domain/types/document/domain-export.ty
  * bundle - read-only работа с переносимым workspace snapshot
  * plain - данные подтягиваются из файла
  */
-export type EndgeDataProvider =
-  | 'default'
-  | 'bundle'
-  | 'plain'
+export type EndgeDataProvider
+  = | 'default'
+    | 'bundle'
+    | 'plain'
 
 /**
  * Конфигурация загрузки движка

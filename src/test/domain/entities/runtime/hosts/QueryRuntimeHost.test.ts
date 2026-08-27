@@ -6,10 +6,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
-import { compileFilterSource } from '@/model/services/source-engine/compilers/filter-source-compile'
 import { Endge } from '@/model/kernel/endge'
+import { compileFilterSource } from '@/model/services/source-engine/compilers/filter-source-compile'
 
-describe('QueryRuntimeHost', () => {
+describe('queryRuntimeHost', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     Endge.context.setDataMode('live')
@@ -114,16 +114,23 @@ defineFilter({
       capabilities: ['compilable', 'executable', 'data-provider', 'configuration'],
     }
     const payload: QueryProgramPayload = {
-      type: 'query-rest', sourceVersion: 2, endpoint: '', query: '',
+      type: 'query-rest',
+      sourceVersion: 2,
+      endpoint: '',
+      query: '',
       props: [{
-        key: 'filterPayload', type: 'Object', optional: true, array: false,
+        key: 'filterPayload',
+        type: 'Object',
+        optional: true,
+        array: false,
         defaultSource: {
           kind: 'local-filter',
           ref: childArtifact.ref as { entityType: 'filter', id: string | number, identity: string },
           output: 'request',
         },
       }],
-      requestBody: null, outputs: [],
+      requestBody: null,
+      outputs: [],
     }
     const queryArtifact: ProgramArtifact<QueryProgramPayload> = {
       ...artifactBase('query', 20, payload),
@@ -190,8 +197,9 @@ function createHost(props: Record<string, unknown> = {}, declaredOutput = false)
     meta: { props },
     artifacts: { getArtifact: () => artifact as any },
   })
-  if (!host)
+  if (!host) {
     throw new Error('Query host was not created')
+  }
   return host
 }
 

@@ -1,33 +1,33 @@
-import type { CompositionProgramPayload, CompositionRuntimeOutputHandle } from '@/domain/types/source/composition-source.types'
+import type { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentSFCRuntimeHost'
+import type { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
+import type { FilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
+import type { StoreRuntimeHost } from '@/domain/entities/runtime/hosts/StoreRuntimeHost'
+
 import type { ProgramArtifact, QueryProgramPayload } from '@/domain/types/program/program.types'
+import type { CompositionProgramPayload, CompositionRuntimeOutputHandle } from '@/domain/types/source/composition-source.types'
+
 import type { StoreSourceArtifact } from '@/domain/types/source/store-source.types'
 import type { UpdateSourceArtifact } from '@/domain/types/source/update-source.types'
-
 import { Raph } from '@endge/raph'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-
-import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
+import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { RDataView } from '@/domain/entities/reflect/RDataView'
 import { RFilter } from '@/domain/entities/reflect/RFilter'
-import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RMock } from '@/domain/entities/reflect/RMock'
+import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RStore } from '@/domain/entities/reflect/RStore'
 import { RUpdate } from '@/domain/entities/reflect/RUpdate'
-import { FilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
-import { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
-import { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
 import { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
-import { StoreRuntimeHost } from '@/domain/entities/runtime/hosts/StoreRuntimeHost'
-import { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentSFCRuntimeHost'
-import { compileFilterSource } from '@/model/services/source-engine/compilers/filter-source-compile'
-import { compileDataViewSource } from '@/model/services/source-engine/compilers/data-view-source-compile'
-import { buildRuntimeGraph, compileCompositionSource } from '@/model/services/source-engine/compilers/composition-source-compile'
+import { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
 import { Endge } from '@/model/kernel/endge'
 import { materializeCompositionPreviewProps } from '@/model/modules/runtime/execution/endge-composition'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
+import { buildRuntimeGraph, compileCompositionSource } from '@/model/services/source-engine/compilers/composition-source-compile'
+import { compileDataViewSource } from '@/model/services/source-engine/compilers/data-view-source-compile'
+import { compileFilterSource } from '@/model/services/source-engine/compilers/filter-source-compile'
 
-describe('Composition runtime session', () => {
+describe('composition runtime session', () => {
   afterEach(() => {
     Endge.context.setDataMode('live')
     vi.useRealTimers()
@@ -297,9 +297,13 @@ defineProps<{ rows: Array<{ id: number, flightNumber: string }> }>()
     Endge.domain.addComposition(composition)
 
     const queryPayload: QueryProgramPayload = {
-      type: 'query-rest', sourceVersion: 2, endpoint: '', query: '',
+      type: 'query-rest',
+      sourceVersion: 2,
+      endpoint: '',
+      query: '',
       props: [{ key: 'legIds', type: 'String', optional: true, array: true }],
-      requestBody: null, outputs: [],
+      requestBody: null,
+      outputs: [],
     }
     const compositionPayload = compileCompositionSource(`
 defineComposition({
@@ -363,8 +367,9 @@ defineComposition({
     expect(propsAtStart.get('departureGroundHandling')).toEqual({ legIds: ['SU300', 'SU400'] })
     expect(mounted).toBe(false)
 
-    for (const name of names.slice(2))
+    for (const name of names.slice(2)) {
       gates.get(name)?.resolve(undefined)
+    }
     const session = await mounting
     expect(mounted).toBe(true)
     await session.unmount()
@@ -408,14 +413,21 @@ defineComposition({
     Endge.domain.addComposition(composition)
 
     const queryPayload: QueryProgramPayload = {
-      type: 'query-rest', sourceVersion: 2, endpoint: '', query: '',
-      props: [], requestBody: null,
+      type: 'query-rest',
+      sourceVersion: 2,
+      endpoint: '',
+      query: '',
+      props: [],
+      requestBody: null,
       outputs: [{ key: 'raw', source: { type: 'response', path: null }, dataViews: [], materialization: { kind: 'source' } }],
     }
     const compositionPayload = makeCompositionPayload({
       data: [{ name: 'schedule', kind: 'store', identity: 'schedule' }],
       runtimes: [{
-        name: 'query', kind: 'query', identity: 'schedule-query', props: {},
+        name: 'query',
+        kind: 'query',
+        identity: 'schedule-query',
+        props: {},
         storeTo: [{ data: 'schedule', fields: { raw: 'raw' } }],
       }],
       hooks: [{ kind: 'mount', target: 'query' }],
@@ -584,9 +596,13 @@ defineFilter({
 })
 `).artifact!
     const queryPayload: QueryProgramPayload = {
-      type: 'query-rest', sourceVersion: 2, endpoint: '', query: '',
+      type: 'query-rest',
+      sourceVersion: 2,
+      endpoint: '',
+      query: '',
       props: [{ key: 'filter', type: 'Object', optional: false, array: false }],
-      requestBody: null, outputs: [],
+      requestBody: null,
+      outputs: [],
     }
     const innerPayload = compileCompositionSource(`
 defineComposition({
@@ -670,9 +686,13 @@ defineComposition({
     Endge.domain.addComponentSFC(table)
 
     const queryPayload: QueryProgramPayload = {
-      type: 'query-rest', sourceVersion: 2, endpoint: '', query: '',
+      type: 'query-rest',
+      sourceVersion: 2,
+      endpoint: '',
+      query: '',
       props: [{ key: 'names', type: 'String', optional: false, array: true }],
-      requestBody: null, outputs: [],
+      requestBody: null,
+      outputs: [],
     }
     const requirements = {
       arrival: { attributes: ['LegStatus', 'BestOn'] },
@@ -681,7 +701,10 @@ defineComposition({
       props: [{ key: 'requirements', type: 'Object', optional: false, array: false }],
       data: [],
       runtimes: [{
-        name: 'attributes', kind: 'query', identity: 'attributes-leg-select', storeTo: [],
+        name: 'attributes',
+        kind: 'query',
+        identity: 'attributes-leg-select',
+        storeTo: [],
         props: {
           names: {
             kind: 'expression',
@@ -695,11 +718,19 @@ defineComposition({
     const outerPayload = makeCompositionPayload({
       data: [],
       runtimes: [{
-        name: 'requests', kind: 'composition', identity: 'groundhandling-default', storeTo: [],
+        name: 'requests',
+        kind: 'composition',
+        identity: 'groundhandling-default',
+        storeTo: [],
         props: { requirements: { kind: 'runtime-metadata', runtime: 'table' } },
       }, {
-        name: 'table', kind: 'component', identity: 'groundhandling-control-table', storeTo: [], props: {},
-        activationOverride: { mode: 'manual' }, effectiveActivation: { mode: 'manual' },
+        name: 'table',
+        kind: 'component',
+        identity: 'groundhandling-control-table',
+        storeTo: [],
+        props: {},
+        activationOverride: { mode: 'manual' },
+        effectiveActivation: { mode: 'manual' },
       }],
       hooks: [],
       outputs: [],
@@ -738,8 +769,9 @@ defineComposition({
   it('mounts a nested Composition and exposes its outputs reactively', async () => {
     const initialRows = [{ id: 1, flight: 'SU100' }]
     vi.spyOn(QueryRuntimeHost.prototype, 'run').mockImplementation(async function (this: QueryRuntimeHost) {
-      if (this.entityIdentity === 'groundhandling-query')
+      if (this.entityIdentity === 'groundhandling-query') {
         Raph.set(this.outputPath('raw'), initialRows)
+      }
       return this.getOutputs() as Record<string, unknown>
     })
 
@@ -775,14 +807,22 @@ defineComposition({
     Endge.domain.addStore(store)
 
     const sourcePayload: QueryProgramPayload = {
-      type: 'query-rest', sourceVersion: 2, endpoint: '', query: '',
-      props: [], requestBody: null,
+      type: 'query-rest',
+      sourceVersion: 2,
+      endpoint: '',
+      query: '',
+      props: [],
+      requestBody: null,
       outputs: [{ key: 'raw', source: { type: 'response', path: null }, dataViews: [], materialization: { kind: 'source' } }],
     }
     const consumerPayload: QueryProgramPayload = {
-      type: 'query-rest', sourceVersion: 2, endpoint: '', query: '',
+      type: 'query-rest',
+      sourceVersion: 2,
+      endpoint: '',
+      query: '',
       props: [{ key: 'rows', type: 'Object', optional: true, array: true }],
-      requestBody: null, outputs: [],
+      requestBody: null,
+      outputs: [],
     }
     const innerPayload = makeCompositionPayload({
       data: [],
@@ -794,11 +834,17 @@ defineComposition({
       data: [{ name: 'db', kind: 'store', identity: 'groundhandling-db' }],
       runtimes: [
         {
-          name: 'requests', kind: 'composition', identity: 'groundhandling-default', props: {},
+          name: 'requests',
+          kind: 'composition',
+          identity: 'groundhandling-default',
+          props: {},
           storeTo: [{ data: 'db', fields: { 'raw.rows': 'rows' } }],
         },
         {
-          name: 'consumer', kind: 'query', identity: 'table-consumer', storeTo: [],
+          name: 'consumer',
+          kind: 'query',
+          identity: 'table-consumer',
+          storeTo: [],
           props: { rows: { kind: 'output', runtime: 'requests', output: 'rows' } },
         },
       ],
@@ -945,20 +991,28 @@ defineFilter({
 })
 `).artifact!
   const queryPayload: QueryProgramPayload = {
-    type: 'query-rest', sourceVersion: 2, endpoint: '', query: '',
+    type: 'query-rest',
+    sourceVersion: 2,
+    endpoint: '',
+    query: '',
     props: [
       { key: 'filterPayload', type: 'Object', optional: true, array: false },
       { key: 'filterBundle', type: 'Object', optional: true, array: false },
       { key: 'filterModel', type: 'Object', optional: true, array: false },
     ],
-    requestBody: null, outputs: [],
+    requestBody: null,
+    outputs: [],
   }
   const compositionPayload = makeCompositionPayload({
     data: [],
     runtimes: [
       { name: 'filter', kind: 'filter', identity: 'schedule-filter', props: {}, storeTo: [] },
       {
-        name: 'dateFilter', kind: 'filter-view', identity: 'filter', fields: ['search'], storeTo: [],
+        name: 'dateFilter',
+        kind: 'filter-view',
+        identity: 'filter',
+        fields: ['search'],
+        storeTo: [],
         props: {
           showLabels: { kind: 'literal', value: true },
           labels: { kind: 'literal', value: { search: 'Поиск рейса' } },
@@ -966,7 +1020,10 @@ defineFilter({
         },
       },
       {
-        name: 'query', kind: 'query', identity: 'schedule-query', storeTo: [],
+        name: 'query',
+        kind: 'query',
+        identity: 'schedule-query',
+        storeTo: [],
         props: {
           filterPayload: { kind: 'output', runtime: 'filter', output: 'request' },
           filterBundle: { kind: 'outputs', runtime: 'filter', outputs: ['request', 'summary'] },
@@ -1097,9 +1154,14 @@ function artifact<T>(
 ): ProgramArtifact<T> {
   return {
     ref: { entityType, id, identity },
-    sourceHash: 'test', compilerVersion: 'test', status: 'valid',
-    diagnostics: [], dependencies: [], capabilities: ['compilable', 'executable'],
-    metadata: { self: metadata, nodes: [] }, payload,
+    sourceHash: 'test',
+    compilerVersion: 'test',
+    status: 'valid',
+    diagnostics: [],
+    dependencies: [],
+    capabilities: ['compilable', 'executable'],
+    metadata: { self: metadata, nodes: [] },
+    payload,
   }
 }
 

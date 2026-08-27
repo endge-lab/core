@@ -4,12 +4,12 @@ import type { StoreSourceArtifact } from '@/domain/types/source/store-source.typ
 import { Raph } from '@endge/raph'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { RStore } from '@/domain/entities/reflect/RStore'
 import { RMock } from '@/domain/entities/reflect/RMock'
+import { RStore } from '@/domain/entities/reflect/RStore'
 import { StoreRuntimeHost } from '@/domain/entities/runtime/hosts/StoreRuntimeHost'
 import { Endge } from '@/model/kernel/endge'
 
-describe('StoreRuntimeHost', () => {
+describe('storeRuntimeHost', () => {
   afterEach(() => {
     Endge.context.setDataMode('live')
     Endge.runtime.reset()

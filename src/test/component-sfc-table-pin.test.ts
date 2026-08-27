@@ -1,10 +1,10 @@
-import { describe, expect, it } from 'vitest'
-
 import type { RComponentSFC_IR_ElementNode } from '@/domain/types/component/sfc/ir.types'
+
+import { describe, expect, it } from 'vitest'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import { normalizeComponentSFCTableColumnPin } from '@/model/services/compiler/component-sfc/component-sfc-table-pin'
 
-describe('Component SFC table column pinning', () => {
+describe('component SFC table column pinning', () => {
   it('parses table-level default-pin state', () => {
     const result = compileComponentSFC(createTableSource(`
       <Column key="number" title="Flight" />
@@ -94,8 +94,9 @@ defineProps<{
 
 function readTable(result: ReturnType<typeof compileComponentSFC>): RComponentSFC_IR_ElementNode {
   const node = result.ir?.template.roots[0]
-  if (!node || node.kind !== 'element' || node.tag !== 'Table')
+  if (!node || node.kind !== 'element' || node.tag !== 'Table') {
     throw new Error('Expected root Table node.')
+  }
 
   return node
 }

@@ -10,8 +10,8 @@ import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
 
 import { inferConfigurationDefault, isEndgeJSONValue, validateConfigurationValue } from '@/model/services/configuration/configuration-value'
-import { compileTypeSourceExpression } from '@/model/services/source-engine/compilers/type-source-compile'
 import { diagnostic, propertyName, unwrapExpression } from '@/model/services/source-engine/compilers/source-expression-compile'
+import { compileTypeSourceExpression } from '@/model/services/source-engine/compilers/type-source-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
@@ -24,8 +24,9 @@ export function compileConfigurationSource(
   try {
     const ast = parseTS(source, { sourceType: 'module', plugins: ['typescript'] })
     const call = readRoot(ast, diagnostics)
-    if (!call)
+    if (!call) {
       return { ast, document: null, diagnostics }
+    }
     const argument = call.arguments[0]
     if (call.arguments.length !== 1 || !argument || !t.isObjectExpression(argument)) {
       diagnostics.push(diagnostic('error', 'configuration-source-shape', 'defineConfig принимает ровно один object literal.', 'defineConfig', call))
@@ -50,7 +51,9 @@ export function compileConfigurationSource(
       }
       seen.add(key)
       const value = readValue(key, property.value, catalog, diagnostics)
-      if (value) values.push(value)
+      if (value) {
+        values.push(value)
+      }
     }
 
     const draftDocument = { values }
@@ -94,8 +97,9 @@ function readValue(
       diagnostics.push(diagnostic('error', 'configuration-value-modifier', `Неизвестный modifier настройки "${key}".`, key, cursor))
       return null
     }
-    if (modifiers.has(name))
+    if (modifiers.has(name)) {
       diagnostics.push(diagnostic('error', 'configuration-value-modifier-duplicate', `Modifier .${name} указан повторно.`, `${key}.${name}`, cursor))
+    }
     modifiers.set(name, cursor)
     cursor = unwrapExpression(cursor.callee.object)
   }
@@ -110,14 +114,18 @@ function readValue(
     return null
   }
   const type = compileTypeSourceExpression(typeArgument, diagnostics, `${key}.type`)
-  if (!type) return null
+  if (!type) {
+    return null
+  }
 
   let defaultValue: EndgeJSONValue
   let defaultWasInferred = false
   const defaultArgument = cursor.arguments[1]
   if (defaultArgument && t.isExpression(defaultArgument)) {
     const value = readStaticJSON(defaultArgument, diagnostics, `${key}.default`)
-    if (!value.ok) return null
+    if (!value.ok) {
+      return null
+    }
     defaultValue = value.value
   }
   else {
@@ -136,23 +144,30 @@ function readValue(
   const min = readNumberModifier(modifiers.get('min'), key, diagnostics)
   const max = readNumberModifier(modifiers.get('max'), key, diagnostics)
   const step = readNumberModifier(modifiers.get('step'), key, diagnostics)
-  if (min != null && max != null && min > max)
+  if (min != null && max != null && min > max) {
     diagnostics.push(diagnostic('error', 'configuration-range-invalid', 'min не может быть больше max.', key, raw))
-  if ((min != null || max != null || step != null) && !(type.kind === 'reference' && type.identity === 'Number'))
+  }
+  if ((min != null || max != null || step != null) && !(type.kind === 'reference' && type.identity === 'Number')) {
     diagnostics.push(diagnostic('error', 'configuration-number-modifier-type', 'min/max/step разрешены только для Number.', key, raw))
-  if (step != null && step <= 0)
+  }
+  if (step != null && step <= 0) {
     diagnostics.push(diagnostic('error', 'configuration-step-invalid', 'step должен быть больше нуля.', `${key}.step`, raw))
+  }
 
   return { key, type, defaultValue, defaultWasInferred, label, description, min, max, step }
 }
 
 function readStaticJSON(node: t.Expression, diagnostics: DiagnosticDraft[], path: string): { ok: true, value: EndgeJSONValue } | { ok: false } {
   const value = unwrapExpression(node)
-  if (t.isStringLiteral(value) || t.isNumericLiteral(value) || t.isBooleanLiteral(value))
+  if (t.isStringLiteral(value) || t.isNumericLiteral(value) || t.isBooleanLiteral(value)) {
     return { ok: true, value: value.value }
-  if (t.isNullLiteral(value)) return { ok: true, value: null }
-  if (t.isUnaryExpression(value) && (value.operator === '-' || value.operator === '+') && t.isNumericLiteral(value.argument))
+  }
+  if (t.isNullLiteral(value)) {
+    return { ok: true, value: null }
+  }
+  if (t.isUnaryExpression(value) && (value.operator === '-' || value.operator === '+') && t.isNumericLiteral(value.argument)) {
     return { ok: true, value: value.operator === '-' ? -value.argument.value : value.argument.value }
+  }
   if (t.isArrayExpression(value)) {
     const result: EndgeJSONValue[] = []
     for (let index = 0; index < value.elements.length; index++) {
@@ -162,7 +177,9 @@ function readStaticJSON(node: t.Expression, diagnostics: DiagnosticDraft[], path
         return { ok: false }
       }
       const parsed = readStaticJSON(item, diagnostics, `${path}.${index}`)
-      if (!parsed.ok) return parsed
+      if (!parsed.ok) {
+        return parsed
+      }
       result.push(parsed.value)
     }
     return { ok: true, value: result }
@@ -180,10 +197,14 @@ function readStaticJSON(node: t.Expression, diagnostics: DiagnosticDraft[], path
         return { ok: false }
       }
       const parsed = readStaticJSON(property.value, diagnostics, `${path}.${key}`)
-      if (!parsed.ok) return parsed
+      if (!parsed.ok) {
+        return parsed
+      }
       result[key] = parsed.value
     }
-    if (!isEndgeJSONValue(result)) return { ok: false }
+    if (!isEndgeJSONValue(result)) {
+      return { ok: false }
+    }
     return { ok: true, value: result }
   }
   diagnostics.push(diagnostic('error', 'configuration-static-value', 'Default должен быть static JSON value.', path, value))
@@ -191,7 +212,9 @@ function readStaticJSON(node: t.Expression, diagnostics: DiagnosticDraft[], path
 }
 
 function readStringModifier(call: t.CallExpression | undefined, key: string, diagnostics: DiagnosticDraft[]): string | null {
-  if (!call) return null
+  if (!call) {
+    return null
+  }
   const argument = call.arguments[0]
   if (call.arguments.length !== 1 || !argument || !t.isStringLiteral(argument)) {
     diagnostics.push(diagnostic('error', 'configuration-string-modifier', 'Modifier принимает одну строку.', key, call))
@@ -201,7 +224,9 @@ function readStringModifier(call: t.CallExpression | undefined, key: string, dia
 }
 
 function readNumberModifier(call: t.CallExpression | undefined, key: string, diagnostics: DiagnosticDraft[]): number | undefined {
-  if (!call) return undefined
+  if (!call) {
+    return undefined
+  }
   const argument = call.arguments[0]
   const parsed = argument && t.isExpression(argument) ? readStaticJSON(argument, diagnostics, key) : { ok: false as const }
   if (!parsed.ok || typeof parsed.value !== 'number') {

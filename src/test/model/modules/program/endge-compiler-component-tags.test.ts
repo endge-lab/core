@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { Endge } from '@/model/kernel/endge'
 
-describe('EndgeCompiler component tag registry', () => {
+describe('endgeCompiler component tag registry', () => {
   afterEach(() => {
     Endge.program.clear()
     Endge.domain.reset()
@@ -48,7 +48,6 @@ describe('EndgeCompiler component tag registry', () => {
       expect.objectContaining({ code: 'component-sfc-tag-reserved', severity: 'error' }),
     ]))
   })
-
 })
 
 function createComponent(

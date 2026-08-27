@@ -25,7 +25,7 @@ describe('legacy component documents', () => {
     expect(component.setupScript).toBe('const value = 1')
     expect(component.jsxScript).toBe('<Text>{{ value }}</Text>')
     expect(component.runtimeFilters).toEqual(['schedule'])
-    expect(Object.prototype.hasOwnProperty.call(RComponentDSL.prototype, 'compile')).toBe(false)
+    expect(Object.hasOwn(RComponentDSL.prototype, 'compile')).toBe(false)
     expect((component as any).execute).toBeUndefined()
   })
 
@@ -70,7 +70,7 @@ describe('legacy component documents', () => {
         template: '<strong>{{ flight }}</strong>',
       }],
     })
-    expect(Object.prototype.hasOwnProperty.call(RComponentTable.prototype, 'compile')).toBe(false)
+    expect(Object.hasOwn(RComponentTable.prototype, 'compile')).toBe(false)
     expect((component as any).execute).toBeUndefined()
   })
 })

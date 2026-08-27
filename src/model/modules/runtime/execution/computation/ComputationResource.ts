@@ -24,8 +24,10 @@ export class ComputationResourceState<T = unknown> implements ComputationResourc
     private readonly syncRunner: SyncRunner<T> | null = null,
   ) {
     this._input = input
-    if (syncRunner) this.runSync()
-    else void this.refresh()
+    if (syncRunner) {
+      this.runSync()
+    }
+    else { void this.refresh() }
   }
 
   get status() { return this._status }
@@ -34,16 +36,20 @@ export class ComputationResourceState<T = unknown> implements ComputationResourc
   get error() { return this._error }
 
   updateInput(input: unknown): void {
-    if (Object.is(input, this._input))
+    if (Object.is(input, this._input)) {
       return
+    }
     this._input = input
-    if (this.syncRunner) this.runSync()
-    else void this.refresh()
+    if (this.syncRunner) {
+      this.runSync()
+    }
+    else { void this.refresh() }
   }
 
   async refresh(): Promise<void> {
-    if (this._disposed)
+    if (this._disposed) {
       return
+    }
     if (this.syncRunner) {
       this.runSync()
       return
@@ -54,15 +60,17 @@ export class ComputationResourceState<T = unknown> implements ComputationResourc
     this.notify()
     try {
       const value = await this.asyncRunner(this._input)
-      if (this._disposed || revision !== this._revision)
+      if (this._disposed || revision !== this._revision) {
         return
+      }
       this._value = value
       this._status = 'success'
       this.notify()
     }
     catch (error) {
-      if (this._disposed || revision !== this._revision)
+      if (this._disposed || revision !== this._revision) {
         return
+      }
       this._error = normalizeError(error)
       this._status = 'error'
       this.notify()
@@ -81,8 +89,9 @@ export class ComputationResourceState<T = unknown> implements ComputationResourc
   }
 
   private runSync(): void {
-    if (!this.syncRunner || this._disposed)
+    if (!this.syncRunner || this._disposed) {
       return
+    }
     try {
       this._value = this.syncRunner(this._input)
       this._error = null
@@ -96,13 +105,16 @@ export class ComputationResourceState<T = unknown> implements ComputationResourc
   }
 
   private notify(): void {
-    for (const listener of this._listeners) listener()
+    for (const listener of this._listeners) {
+      listener()
+    }
   }
 }
 
 function normalizeError(error: unknown): ComputationRuntimeErrorShape {
-  if (error instanceof ComputationRuntimeError)
+  if (error instanceof ComputationRuntimeError) {
     return error.toJSON()
+  }
   return {
     name: 'ComputationRuntimeError',
     message: error instanceof Error ? error.message : String(error),

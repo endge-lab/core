@@ -1,19 +1,5 @@
-import { parse as parseSFC } from '@vue/compiler-sfc'
-import {
-  NodeTypes,
-  type AttributeNode,
-  type DirectiveNode,
-  type ElementNode,
-  type InterpolationNode,
-  type RootNode,
-  type SourceLocation,
-  type TextNode,
-  baseParse,
-} from '@vue/compiler-dom'
-import { parse as parseTS } from '@babel/parser'
-
+import type { AttributeNode, DirectiveNode, ElementNode, InterpolationNode, RootNode, SourceLocation, TextNode } from '@vue/compiler-dom'
 import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
-import type { RComponentSFCSource_Parts } from '@/domain/types/component/sfc/source.types'
 import type {
   RComponentSFC_AST,
   RComponentSFC_AST_Attribute,
@@ -30,7 +16,18 @@ import type {
   RComponentSFC_AST_TemplateNode,
   RComponentSFC_AST_TextNode,
 } from '@/domain/types/component/sfc/ast.types'
+
 import type { RComponentSFC_SourceRange } from '@/domain/types/component/sfc/location.types'
+import type { RComponentSFCSource_Parts } from '@/domain/types/component/sfc/source.types'
+import { parse as parseTS } from '@babel/parser'
+import {
+
+  baseParse,
+
+  NodeTypes,
+
+} from '@vue/compiler-dom'
+import { parse as parseSFC } from '@vue/compiler-sfc'
 import { parseSFCSourceParts } from '@/model/services/compiler/component-sfc/component-sfc-source-parts'
 
 /** Результат parser pass для SFC-компонента. */
@@ -81,8 +78,9 @@ export function parseComponentSFC(source: string): ComponentSFCParseResult {
     }
   }
 
-  for (const error of parsed.errors)
+  for (const error of parsed.errors) {
     diagnostics.push(toParserDiagnostic(error))
+  }
 
   // Во время редактирования source может быть временно незавершённым.
   // Не строим stable AST из descriptor с parser errors: повторный template pass
@@ -140,8 +138,9 @@ export function parseComponentSFC(source: string): ComponentSFCParseResult {
 function normalizeComponentSFCInput(source: string): string {
   const input = source ?? ''
   const trimmed = input.trim()
-  if (!trimmed)
+  if (!trimmed) {
     return input
+  }
 
   try {
     const parsed = parseSFC(trimmed, {
@@ -149,15 +148,17 @@ function normalizeComponentSFCInput(source: string): string {
     })
 
     const templateContent = parsed.descriptor.template?.content?.trim()
-    if (!templateContent || !/<script\b/i.test(templateContent) || !/<template\b/i.test(templateContent))
+    if (!templateContent || !/<script\b/i.test(templateContent) || !/<template\b/i.test(templateContent)) {
       return input
+    }
 
     const nested = parseSFC(templateContent, {
       filename: 'component.endge',
     })
 
-    if (nested.descriptor.template && (nested.descriptor.script || nested.descriptor.scriptSetup || nested.descriptor.styles.length > 0))
+    if (nested.descriptor.template && (nested.descriptor.script || nested.descriptor.scriptSetup || nested.descriptor.styles.length > 0)) {
       return `${templateContent}\n`
+    }
   }
   catch {
     return input
@@ -214,14 +215,17 @@ function parseStyleBlock(block: { content: string, attrs: Record<string, any>, l
 }
 
 function mapTemplateNode(node: RootNode['children'][number], baseOffset: number): RComponentSFC_AST_TemplateNode | null {
-  if (node.type === NodeTypes.TEXT)
+  if (node.type === NodeTypes.TEXT) {
     return mapTextNode(node as TextNode, baseOffset)
+  }
 
-  if (node.type === NodeTypes.INTERPOLATION)
+  if (node.type === NodeTypes.INTERPOLATION) {
     return mapInterpolationNode(node as InterpolationNode, baseOffset)
+  }
 
-  if (node.type === NodeTypes.ELEMENT)
+  if (node.type === NodeTypes.ELEMENT) {
     return mapElementNode(node as ElementNode, baseOffset)
+  }
 
   return null
 }
@@ -314,9 +318,10 @@ function isControlDirectiveName(name: string): boolean {
 }
 
 function extractPropsDeclaration(content: string, baseOffset: number): RComponentSFC_AST_PropsDeclaration | null {
-  const match = content.match(/defineProps\s*(?:<([\s\S]*?)>\s*)?\(([\s\S]*?)\)/m)
-  if (!match || match.index == null)
+  const match = content.match(/defineProps\s*(?:<([\s\S]*?)>\s*)?\(([\s\S]*?)\)/)
+  if (!match || match.index == null) {
     return null
+  }
 
   const typeSource = match[1]?.trim()
   const runtimeSource = match[2]?.trim()
@@ -354,8 +359,9 @@ function extractPreviewPropsDeclaration(content: string, baseOffset: number): RC
       }
 
       const argument = expression.arguments?.[0]
-      if (!argument || argument.start == null || argument.end == null)
+      if (!argument || argument.start == null || argument.end == null) {
         return null
+      }
       const optionsArgument = expression.arguments?.[1]
 
       return {
@@ -400,8 +406,9 @@ function extractMetadataDeclarations(content: string, baseOffset: number): RComp
       }
 
       const argument = expression.arguments?.[0]
-      if (!argument || argument.start == null || argument.end == null)
+      if (!argument || argument.start == null || argument.end == null) {
         continue
+      }
 
       declarations.push({
         source: content.slice(argument.start, argument.end).trim(),
@@ -432,19 +439,22 @@ function extractScriptBindings(content: string, baseOffset: number): RComponentS
       if (statement.type === 'ImportDeclaration') {
         for (const specifier of statement.specifiers ?? []) {
           const name = specifier.local?.name
-          if (name)
+          if (name) {
             bindings.push(makeScriptBinding(name, 'import', statement, baseOffset))
+          }
         }
       }
 
-      if (statement.type === 'FunctionDeclaration' && statement.id?.name)
+      if (statement.type === 'FunctionDeclaration' && statement.id?.name) {
         bindings.push(makeScriptBinding(statement.id.name, 'function', statement, baseOffset))
+      }
 
       if (statement.type === 'VariableDeclaration') {
         for (const declaration of statement.declarations ?? []) {
           const name = declaration.id?.name
-          if (name)
+          if (name) {
             bindings.push(makeScriptBinding(name, statement.kind === 'let' ? 'let' : 'const', declaration, baseOffset))
+          }
         }
       }
     }

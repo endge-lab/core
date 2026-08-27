@@ -10,7 +10,7 @@ import {
   validateConfigurationValue,
 } from '@/main'
 
-describe('Configuration Source v1', () => {
+describe('configuration Source v1', () => {
   it('compiles explicit and inferred defaults including JSON and an empty TriggerSet', () => {
     const result = compileConfigurationSource(`defineConfig({
   title: value(String),

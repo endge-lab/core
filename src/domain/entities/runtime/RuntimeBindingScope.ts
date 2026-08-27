@@ -49,9 +49,9 @@ export function resolveRuntimeBindingScope(input: {
 
   const basePath = String(
     explicitScope?.basePath
-      ?? input.basePath
-      ?? parentScope?.basePath
-      ?? '',
+    ?? input.basePath
+    ?? parentScope?.basePath
+    ?? '',
   ).trim()
 
   const aliases: Record<string, string> = {

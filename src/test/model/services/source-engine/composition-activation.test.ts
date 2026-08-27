@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { resolveCompositionActivation } from '@/model/services/source-engine/composition-activation'
 
-describe('Composition activation precedence', () => {
+describe('composition activation precedence', () => {
   it('uses invocation override before child root and owner scope', () => {
     expect(resolveCompositionActivation({ mode: 'startup' }, { mode: 'manual' }, { mode: 'manual' }))
       .toEqual({ mode: 'startup' })

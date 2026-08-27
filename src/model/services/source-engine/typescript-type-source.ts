@@ -1,11 +1,11 @@
-import { parse as parseTS } from '@babel/parser'
-
 import type {
   TypeSourceDefinition,
   TypeSourceDocument,
   TypeSourceExpression,
   TypeSourceField,
 } from '@/domain/types/source/type-source.types'
+
+import { parse as parseTS } from '@babel/parser'
 
 export interface TypeScriptTypeDeclarationRange {
   start: number
@@ -62,19 +62,22 @@ function analyzeStatement(statement: any, source: string): TypeScriptTypeDeclara
   const declaration = statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
     ? statement.declaration
     : statement
-  if (!declaration || (declaration.type !== 'TSInterfaceDeclaration' && declaration.type !== 'TSTypeAliasDeclaration'))
+  if (!declaration || (declaration.type !== 'TSInterfaceDeclaration' && declaration.type !== 'TSTypeAliasDeclaration')) {
     return null
+  }
 
   const identity = String(declaration.id?.name ?? '').trim()
-  if (!identity || statement.start == null || statement.end == null)
+  if (!identity || statement.start == null || statement.end == null) {
     return null
+  }
 
   const context: ConversionContext = { dependencies: new Set() }
   let document: TypeSourceDocument | null = null
   let unsupportedReason: string | null = null
   try {
-    if (declaration.typeParameters?.params?.length)
+    if (declaration.typeParameters?.params?.length) {
       unsupported(`Generic ${declaration.type === 'TSInterfaceDeclaration' ? 'interface' : 'type alias'} пока нельзя преобразовать в RType.`)
+    }
     document = {
       definition: declaration.type === 'TSInterfaceDeclaration'
         ? convertInterfaceDeclaration(declaration, context)
@@ -99,24 +102,28 @@ function analyzeStatement(statement: any, source: string): TypeScriptTypeDeclara
 
 function findDeclarationHeaderAnchor(source: string, start: number, end: number): number {
   const lineBreak = source.indexOf('\n', start)
-  if (lineBreak < 0 || lineBreak > end)
+  if (lineBreak < 0 || lineBreak > end) {
     return end
+  }
   return lineBreak > start && source[lineBreak - 1] === '\r' ? lineBreak - 1 : lineBreak
 }
 
 function convertInterfaceDeclaration(node: any, context: ConversionContext): TypeSourceDefinition {
-  if (node.extends?.length)
+  if (node.extends?.length) {
     unsupported('Interface extends пока нельзя преобразовать без потери семантики.')
+  }
 
   return convertObjectMembers(node.body?.body ?? [], context)
 }
 
 function convertRootDefinition(node: any, context: ConversionContext): TypeSourceDefinition {
   const unwrapped = unwrapType(node)
-  if (unwrapped?.type === 'TSTypeLiteral')
+  if (unwrapped?.type === 'TSTypeLiteral') {
     return convertObjectMembers(unwrapped.members ?? [], context)
-  if (unwrapped?.type === 'TSUnionType')
+  }
+  if (unwrapped?.type === 'TSUnionType') {
     return convertUnion(unwrapped, context)
+  }
   if (unwrapped?.type === 'TSArrayType') {
     return {
       kind: 'array',
@@ -136,17 +143,21 @@ function convertRootDefinition(node: any, context: ConversionContext): TypeSourc
 function convertObjectMembers(members: any[], context: ConversionContext): TypeSourceDefinition {
   const fields: TypeSourceField[] = []
   for (const member of members) {
-    if (member.type !== 'TSPropertySignature')
+    if (member.type !== 'TSPropertySignature') {
       unsupported('Methods, call signatures и index signatures пока не поддерживаются.')
-    if (member.computed)
+    }
+    if (member.computed) {
       unsupported('Computed property names пока не поддерживаются.')
-    if (member.readonly)
+    }
+    if (member.readonly) {
       unsupported('Readonly fields нельзя преобразовать без потери семантики.')
+    }
 
     const key = readPropertyKey(member.key)
     const annotation = member.typeAnnotation?.typeAnnotation
-    if (!key || !annotation)
+    if (!key || !annotation) {
       unsupported('Каждое поле должно иметь статическое имя и явный type annotation.')
+    }
 
     const fieldType = convertFieldType(annotation, context)
     fields.push({
@@ -181,13 +192,16 @@ function convertFieldType(node: any, context: ConversionContext): { type: TypeSo
 function convertExpression(node: any, context: ConversionContext): TypeSourceExpression {
   const unwrapped = unwrapType(node)
   const primitive = PRIMITIVE_REFERENCES[unwrapped?.type]
-  if (primitive)
+  if (primitive) {
     return { kind: 'reference', identity: primitive }
+  }
 
-  if (unwrapped?.type === 'TSTypeLiteral')
+  if (unwrapped?.type === 'TSTypeLiteral') {
     return convertObjectMembers(unwrapped.members ?? [], context)
-  if (unwrapped?.type === 'TSUnionType')
+  }
+  if (unwrapped?.type === 'TSUnionType') {
     return convertUnion(unwrapped, context)
+  }
   if (unwrapped?.type === 'TSArrayType') {
     return {
       kind: 'array',
@@ -207,11 +221,13 @@ function convertExpression(node: any, context: ConversionContext): TypeSourceExp
     }
   }
   if (unwrapped?.type === 'TSTypeReference') {
-    if (unwrapped.typeParameters?.params?.length)
+    if (unwrapped.typeParameters?.params?.length) {
       unsupported(`Generic type "${readTypeReferenceName(unwrapped.typeName) || 'unknown'}" пока не поддерживается.`)
+    }
     const identity = readTypeReferenceName(unwrapped.typeName)
-    if (!identity)
+    if (!identity) {
       unsupported('Qualified type references пока не поддерживаются.')
+    }
     context.dependencies.add(identity)
     return { kind: 'reference', identity }
   }
@@ -221,13 +237,15 @@ function convertExpression(node: any, context: ConversionContext): TypeSourceExp
 
 function convertUnion(node: any, context: ConversionContext): TypeSourceDefinition {
   const members = node.types ?? []
-  if (members.length < 2)
+  if (members.length < 2) {
     unsupported('Union должен содержать хотя бы два варианта.')
+  }
 
   if (members.every((member: any) => unwrapType(member)?.type === 'TSLiteralType')) {
     const values = members.map((member: any) => readLiteralValue(unwrapType(member).literal))
-    if (new Set(values.map((value: unknown) => typeof value)).size > 1)
+    if (new Set(values.map((value: unknown) => typeof value)).size > 1) {
       unsupported('Mixed literal unions нельзя преобразовать в enumOf.')
+    }
     return { kind: 'enum', values }
   }
 
@@ -239,8 +257,9 @@ function convertUnion(node: any, context: ConversionContext): TypeSourceDefiniti
 
 function unwrapType(node: any): any {
   let current = node
-  while (current?.type === 'TSParenthesizedType')
+  while (current?.type === 'TSParenthesizedType') {
     current = current.typeAnnotation
+  }
   return current
 }
 
@@ -256,21 +275,24 @@ function readTypeReferenceName(node: any): string | null {
 }
 
 function readPropertyKey(node: any): string | null {
-  if (node?.type === 'Identifier' || node?.type === 'StringLiteral' || node?.type === 'NumericLiteral')
+  if (node?.type === 'Identifier' || node?.type === 'StringLiteral' || node?.type === 'NumericLiteral') {
     return String(node.name ?? node.value)
+  }
   return null
 }
 
 function readLiteralValue(node: any): string | number | boolean {
-  if (node?.type === 'StringLiteral' || node?.type === 'NumericLiteral' || node?.type === 'BooleanLiteral')
+  if (node?.type === 'StringLiteral' || node?.type === 'NumericLiteral' || node?.type === 'BooleanLiteral') {
     return node.value
+  }
   unsupported('Поддерживаются только string, number и boolean literal types.')
 }
 
 function readDescription(node: any): string | undefined {
   const comment = node.leadingComments?.at(-1)?.value
-  if (typeof comment !== 'string')
+  if (typeof comment !== 'string') {
     return undefined
+  }
   const value = comment
     .split('\n')
     .map((line: string) => line.replace(/^\s*\*?\s?/, '').trimEnd())

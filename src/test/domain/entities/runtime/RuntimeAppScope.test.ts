@@ -1,17 +1,17 @@
+import type { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
+import type { StoreRuntimeHost } from '@/domain/entities/runtime/hosts/StoreRuntimeHost'
 import type { ProgramArtifact } from '@/domain/types/program/program.types'
+
 import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
 import type { StoreSourceArtifact } from '@/domain/types/source/store-source.types'
 
 import { Raph } from '@endge/raph'
 import { afterEach, describe, expect, it } from 'vitest'
-
-import { RStore } from '@/domain/entities/reflect/RStore'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
-import { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
-import { StoreRuntimeHost } from '@/domain/entities/runtime/hosts/StoreRuntimeHost'
+import { RStore } from '@/domain/entities/reflect/RStore'
 import { Endge } from '@/model/kernel/endge'
 
-describe('RuntimeAppScope', () => {
+describe('runtimeAppScope', () => {
   afterEach(async () => {
     await Endge.runtime.reset()
     Endge.program.clear()

@@ -160,8 +160,9 @@ function parseDefinition(source: string): CompositionDefinitionParseResult {
 
 function findDefineCompositionCall(ast: t.File): t.CallExpression | null {
   for (const statement of ast.program.body) {
-    if (!t.isExpressionStatement(statement))
+    if (!t.isExpressionStatement(statement)) {
       continue
+    }
 
     const expression = unwrapExpression(statement.expression)
     if (
@@ -176,10 +177,12 @@ function findDefineCompositionCall(ast: t.File): t.CallExpression | null {
 }
 
 function getOperationSection(operation: CompositionSourcePatchOperation): CompositionDependencySection {
-  if (operation.type === 'add-data')
+  if (operation.type === 'add-data') {
     return 'data'
-  if (operation.type === 'add-resource')
+  }
+  if (operation.type === 'add-resource') {
     return 'resources'
+  }
   return 'runtimes'
 }
 
@@ -187,8 +190,9 @@ function printOperationExpression(operation: CompositionSourcePatchOperation): s
   const base = operation.kind === 'operation-history'
     ? 'operationHistory({ limit: 20 })'
     : `${operation.kind}(${quote(operation.identity ?? '')})`
-  if (operation.type !== 'add-runtime')
+  if (operation.type !== 'add-runtime') {
     return base
+  }
 
   const activation = operation.activation ?? 'manual'
   return `${base}.activateOn(${activation}())`
@@ -225,15 +229,17 @@ function findRootSectionAnchor(
   const sectionOrder = ROOT_SECTION_ORDER.indexOf(section)
 
   for (const property of root.properties) {
-    if (!t.isObjectProperty(property) || property.computed)
+    if (!t.isObjectProperty(property) || property.computed) {
       continue
+    }
 
     const name = getPropertyName(property.key)
     const propertyOrder = name == null
       ? -1
       : ROOT_SECTION_ORDER.indexOf(name as typeof ROOT_SECTION_ORDER[number])
-    if (propertyOrder <= sectionOrder)
+    if (propertyOrder <= sectionOrder) {
       continue
+    }
 
     const leadingCommentStart = property.leadingComments?.[0]?.start
     return typeof leadingCommentStart === 'number'
@@ -260,8 +266,9 @@ function insertBeforeObjectClose(
   object: t.ObjectExpression,
   block: string,
 ): string {
-  if (typeof object.end !== 'number')
+  if (typeof object.end !== 'number') {
     return source
+  }
 
   let nextSource = source
   let closeOffset = object.end - 1
@@ -296,8 +303,9 @@ function insertBeforeObjectClose(
 
 function getObjectChildIndent(object: t.ObjectExpression, source: string): string {
   const firstProperty = object.properties.find(property => typeof property.start === 'number')
-  if (firstProperty?.start != null)
+  if (firstProperty?.start != null) {
     return getLineIndent(source, firstProperty.start)
+  }
 
   return `${getLineIndent(source, object.start ?? 0)}  `
 }
@@ -317,23 +325,28 @@ function replaceRange(source: string, start: number, end: number, value: string)
 
 function getObjectProperty(node: t.ObjectExpression, key: string): t.ObjectProperty | null {
   for (const property of node.properties) {
-    if (!t.isObjectProperty(property) || property.computed)
+    if (!t.isObjectProperty(property) || property.computed) {
       continue
+    }
 
-    if (getPropertyName(property.key) === key)
+    if (getPropertyName(property.key) === key) {
       return property
+    }
   }
 
   return null
 }
 
 function getPropertyName(key: t.ObjectProperty['key']): string | null {
-  if (t.isIdentifier(key))
+  if (t.isIdentifier(key)) {
     return key.name
-  if (t.isStringLiteral(key))
+  }
+  if (t.isStringLiteral(key)) {
     return key.value
-  if (t.isNumericLiteral(key))
+  }
+  if (t.isNumericLiteral(key)) {
     return String(key.value)
+  }
   return null
 }
 
@@ -351,7 +364,7 @@ function unwrapExpression<T extends t.Expression>(node: T): t.Expression {
 }
 
 function printKey(key: string): string {
-  return /^[A-Za-z_$][\w$]*$/.test(key) ? key : quote(key)
+  return /^[A-Z_$][\w$]*$/i.test(key) ? key : quote(key)
 }
 
 function quote(value: string): string {

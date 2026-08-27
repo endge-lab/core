@@ -1,9 +1,9 @@
+import { describe, expect, it } from 'vitest'
 // @vitest-environment node
 import {
   createEndgeAuthContext,
   decodeJwtClaims,
 } from '@/model/services/auth/auth-context'
-import { describe, expect, it } from 'vitest'
 
 /** Создаёт неподписанный JWT только для проверки безопасного payload decoding. */
 function createToken(payload: Record<string, unknown>): string {
@@ -14,7 +14,7 @@ function createToken(payload: Record<string, unknown>): string {
   return `header.${encoded}.signature`
 }
 
-describe('Endge auth context', () => {
+describe('endge auth context', () => {
   it('extracts stable subject and session id without exposing full claims', () => {
     const accessToken = createToken({
       sub: 'user-from-access',

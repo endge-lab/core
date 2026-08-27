@@ -14,8 +14,9 @@ export function runResponseOutputTransforms(
   const effective = transforms
     ?? legacyDataViews.map(ref => ({ kind: 'data-view' as const, ref }))
   return effective.reduce<unknown>((current, transform) => {
-    if (transform.kind === 'data-view')
+    if (transform.kind === 'data-view') {
       return Endge.runtime.dataView.runRef(transform.ref, current, undefined, { children: [...children] })
+    }
     return Endge.runtime.dataView.convert(transform.identity, current, transform.options)
   }, value)
 }

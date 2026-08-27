@@ -47,8 +47,9 @@ export function compileStreamSource(source: string, sourceVersion = 1): StreamSo
         const config = readObject(transportDefinition)
         const url = readEnvironmentStringProperty(transportDefinition, 'url', diagnostics, 'transport.url')
         if (!url) {
-          if (!diagnostics.some(item => item.sourcePath === 'transport.url'))
+          if (!diagnostics.some(item => item.sourcePath === 'transport.url')) {
             diagnostics.push(diagnostic('error', 'stream-transport-url', 'SSE transport требует непустой url или env(...).', 'transport.url', value))
+          }
           continue
         }
         const auth = readTransportAuth(transportDefinition, diagnostics)
@@ -71,10 +72,12 @@ export function compileStreamSource(source: string, sourceVersion = 1): StreamSo
       diagnostics.push(diagnostic('error', 'stream-source-property-unsupported', `Свойство "${name ?? ''}" не поддерживается Stream v1.`, name ?? 'defineStream', property))
     }
 
-    if (!transport)
+    if (!transport) {
       diagnostics.push(diagnostic('error', 'stream-transport-missing', 'defineStream требует transport.', 'transport', definition))
-    if (!events.length)
+    }
+    if (!events.length) {
       diagnostics.push(diagnostic('error', 'stream-events-empty', 'defineStream требует хотя бы одно событие.', 'events', definition))
+    }
 
     const document = transport ? { transport, events } : null
     const hasErrors = diagnostics.some(item => item.severity === 'error')
@@ -95,8 +98,9 @@ function readEvents(node: t.ObjectExpression, diagnostics: DiagnosticDraft[]): S
   const events: StreamEventDescriptor[] = []
   const types = new Set<string>()
   for (const property of node.properties) {
-    if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value))
+    if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
       continue
+    }
     const sourceEvent = propertyName(property.key)
     const call = unwrapExpression(property.value)
     if (!sourceEvent || !t.isCallExpression(call) || !t.isIdentifier(call.callee, { name: 'event' })) {
@@ -120,10 +124,12 @@ function readEvents(node: t.ObjectExpression, diagnostics: DiagnosticDraft[]): S
       diagnostics.push(diagnostic('error', 'stream-event-type', `Событие "${sourceEvent}" требует type или typeFrom.`, `events.${sourceEvent}`, call))
       continue
     }
-    if (type && types.has(type))
+    if (type && types.has(type)) {
       diagnostics.push(diagnostic('warning', 'stream-event-type-duplicate', `Несколько transport events нормализуются в "${type}".`, `events.${sourceEvent}`, call))
-    if (type)
+    }
+    if (type) {
       types.add(type)
+    }
     events.push({ sourceEvent, type, typePath, payloadPath })
   }
   return events
@@ -138,17 +144,19 @@ function readTransportAuth(
     && !item.computed
     && propertyName(item.key) === 'auth',
   )
-  if (!property || !t.isObjectProperty(property) || !t.isExpression(property.value))
+  if (!property || !t.isObjectProperty(property) || !t.isExpression(property.value)) {
     return { authMode: 'inherit', authProfileIdentity: null }
+  }
 
   const value = unwrapExpression(property.value)
   if (t.isStringLiteral(value)) {
-    if (value.value === 'inherit' || value.value === 'none')
+    if (value.value === 'inherit' || value.value === 'none') {
       return { authMode: value.value, authProfileIdentity: null }
+    }
     diagnostics.push(diagnostic(
       'error',
       'stream-transport-auth',
-      "transport.auth должен быть 'inherit', 'none' или { mode: 'profile', profile: '...' }.",
+      'transport.auth должен быть \'inherit\', \'none\' или { mode: \'profile\', profile: \'...\' }.',
       'transport.auth',
       value,
     ))
@@ -157,16 +165,18 @@ function readTransportAuth(
 
   if (t.isObjectExpression(value)) {
     const config = readObject(value)
-    if (config.mode === 'inherit' || config.mode === 'none')
+    if (config.mode === 'inherit' || config.mode === 'none') {
       return { authMode: config.mode, authProfileIdentity: null }
+    }
     if (config.mode === 'profile') {
       const profile = typeof config.profile === 'string' ? config.profile.trim() : ''
-      if (profile)
+      if (profile) {
         return { authMode: 'profile', authProfileIdentity: profile }
+      }
       diagnostics.push(diagnostic(
         'error',
         'stream-transport-auth-profile',
-        "transport.auth.profile обязателен для mode: 'profile'.",
+        'transport.auth.profile обязателен для mode: \'profile\'.',
         'transport.auth.profile',
         value,
       ))
@@ -177,7 +187,7 @@ function readTransportAuth(
   diagnostics.push(diagnostic(
     'error',
     'stream-transport-auth',
-    "transport.auth должен быть 'inherit', 'none' или { mode: 'profile', profile: '...' }.",
+    'transport.auth должен быть \'inherit\', \'none\' или { mode: \'profile\', profile: \'...\' }.',
     'transport.auth',
     value,
   ))
@@ -187,14 +197,17 @@ function readTransportAuth(
 function readObject(node: t.ObjectExpression): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const property of node.properties) {
-    if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value))
+    if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
       continue
+    }
     const key = propertyName(property.key)
     const value = unwrapExpression(property.value)
-    if (!key)
+    if (!key) {
       continue
-    if (t.isStringLiteral(value) || t.isBooleanLiteral(value) || t.isNumericLiteral(value))
+    }
+    if (t.isStringLiteral(value) || t.isBooleanLiteral(value) || t.isNumericLiteral(value)) {
       out[key] = value.value
+    }
   }
   return out
 }
@@ -214,12 +227,14 @@ function readEnvironmentStringProperty(
     && !item.computed
     && propertyName(item.key) === key,
   )
-  if (!property || !t.isObjectProperty(property) || !t.isExpression(property.value))
+  if (!property || !t.isObjectProperty(property) || !t.isExpression(property.value)) {
     return ''
+  }
 
   const value = unwrapExpression(property.value)
-  if (t.isStringLiteral(value))
+  if (t.isStringLiteral(value)) {
     return value.value.trim()
+  }
 
   if (
     t.isCallExpression(value)
@@ -254,11 +269,13 @@ function readEnvironmentStringProperty(
 
 function findDefinition(ast: t.File, name: string): t.CallExpression | null {
   for (const statement of ast.program.body) {
-    if (!t.isExpressionStatement(statement))
+    if (!t.isExpressionStatement(statement)) {
       continue
+    }
     const expression = unwrapExpression(statement.expression)
-    if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name }))
+    if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name })) {
       return expression
+    }
   }
   return null
 }

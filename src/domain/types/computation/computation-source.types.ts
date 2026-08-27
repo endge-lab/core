@@ -1,5 +1,5 @@
-import type { SourceExpressionIR } from '@/domain/types/source/source-expression.types'
 import type { ComputationContractField } from './computation-program.types'
+import type { SourceExpressionIR } from '@/domain/types/source/source-expression.types'
 
 export interface ComputationSourceRange {
   start: number

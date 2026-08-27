@@ -1,8 +1,8 @@
-import type { ComponentSFCTableColumnVisibilityDescriptor } from '@/domain/types/component/sfc/table-visibility.types'
 import type {
   RComponentSFC_IR_ElementNode,
   RComponentSFC_IR_Value,
 } from '@/domain/types/component/sfc/ir.types'
+import type { ComponentSFCTableColumnVisibilityDescriptor } from '@/domain/types/component/sfc/table-visibility.types'
 
 /** Нормализует authored default-hidden без renderer-specific visibility state. */
 export function normalizeComponentSFCTableColumnVisibility(
@@ -21,8 +21,9 @@ export function normalizeComponentSFCTableColumnVisibility(
 
   for (const rawKey of source.split(',')) {
     const key = rawKey.trim()
-    if (!key)
+    if (!key) {
       continue
+    }
 
     if (!knownKeys.has(key)) {
       diagnostics.push({
@@ -56,8 +57,9 @@ function collectColumnKeys(tableNode: RComponentSFC_IR_ElementNode): string[] {
   let columnIndex = 0
 
   for (const child of tableNode.children) {
-    if (child.kind !== 'element' || child.tag !== 'Column')
+    if (child.kind !== 'element' || child.tag !== 'Column') {
       continue
+    }
 
     result.push(normalizeColumnKey(child, columnIndex))
     columnIndex++
@@ -77,8 +79,9 @@ function readLiteralProp(node: RComponentSFC_IR_ElementNode, name: string): unkn
 }
 
 function readStaticStringValue(value: RComponentSFC_IR_Value | undefined): string | null {
-  if (!value)
+  if (!value) {
     return null
+  }
 
   const source = value.kind === 'literal'
     ? String(value.value ?? '').trim()

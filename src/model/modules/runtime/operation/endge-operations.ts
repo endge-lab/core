@@ -1,7 +1,7 @@
-import type { RuntimeHost } from '@/domain/types/runtime/runtime-host.types'
 import type { RuntimeScope } from '@/domain/entities/runtime/RuntimeScope'
+import type { RuntimeHost } from '@/domain/types/runtime/runtime-host.types'
+import type { OperationHistory } from '@/model/modules/runtime/operation/operation-history'
 import { Endge } from '@/model/kernel/endge'
-import { OperationHistory } from '@/model/modules/runtime/operation/operation-history'
 import {
   matchesComponentSFCInteractionTrigger,
   resolveComponentSFCInteractionTriggerPlatform,
@@ -14,14 +14,22 @@ export class EndgeOperations {
   private keydownDisposer: (() => void) | null = null
 
   public register(scope: RuntimeScope, history: OperationHistory): () => void {
-    if (this.histories.has(scope.id)) throw new Error(`Composition scope "${scope.path}" already owns operationHistory.`)
+    if (this.histories.has(scope.id)) {
+      throw new Error(`Composition scope "${scope.path}" already owns operationHistory.`)
+    }
     this.histories.set(scope.id, { scope, history })
     this.latestScopeId = scope.id
     this.ensureShortcuts()
     return () => {
-      if (this.histories.get(scope.id)?.history === history) this.histories.delete(scope.id)
-      if (this.latestScopeId === scope.id) this.latestScopeId = [...this.histories.keys()].at(-1) ?? null
-      if (!this.histories.size) this.disposeShortcuts()
+      if (this.histories.get(scope.id)?.history === history) {
+        this.histories.delete(scope.id)
+      }
+      if (this.latestScopeId === scope.id) {
+        this.latestScopeId = [...this.histories.keys()].at(-1) ?? null
+      }
+      if (!this.histories.size) {
+        this.disposeShortcuts()
+      }
     }
   }
 
@@ -29,7 +37,9 @@ export class EndgeOperations {
     let scope = host ? Endge.runtime.getRuntimeScopeByHost(host.id) : null
     while (scope) {
       const candidate = this.histories.get(scope.id)?.history
-      if (candidate?.active) return candidate
+      if (candidate?.active) {
+        return candidate
+      }
       scope = scope.parent
     }
     return null
@@ -38,7 +48,9 @@ export class EndgeOperations {
   public getActiveHistory(): OperationHistory | null {
     if (this.latestScopeId) {
       const latest = this.histories.get(this.latestScopeId)?.history
-      if (latest?.active) return latest
+      if (latest?.active) {
+        return latest
+      }
     }
     return [...this.histories.values()].reverse().find(item => item.history.active)?.history ?? null
   }
@@ -49,11 +61,15 @@ export class EndgeOperations {
   public canRedo(): boolean { return this.getActiveHistory()?.canRedo() ?? false }
 
   private ensureShortcuts(): void {
-    if (this.keydownDisposer || typeof globalThis.addEventListener !== 'function') return
+    if (this.keydownDisposer || typeof globalThis.addEventListener !== 'function') {
+      return
+    }
     const listener = (event: Event) => {
       const keyboard = event as KeyboardEvent
       const history = this.getActiveHistory()
-      if (!history) return
+      if (!history) {
+        return
+      }
       const platform = resolveComponentSFCInteractionTriggerPlatform(globalThis.navigator?.platform)
       const snapshot = {
         key: keyboard.key,
@@ -74,9 +90,15 @@ export class EndgeOperations {
           candidate.event === keyboard.type
           && matchesComponentSFCInteractionTrigger(candidate, snapshot, platform),
         )
-        if (!trigger) continue
-        if (trigger.prevent !== false) keyboard.preventDefault()
-        if (trigger.stop) keyboard.stopPropagation()
+        if (!trigger) {
+          continue
+        }
+        if (trigger.prevent !== false) {
+          keyboard.preventDefault()
+        }
+        if (trigger.stop) {
+          keyboard.stopPropagation()
+        }
         void (binding.command === 'redo' ? history.redo() : history.undo())
         return
       }

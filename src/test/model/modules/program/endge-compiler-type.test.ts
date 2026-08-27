@@ -10,7 +10,7 @@ import { Endge } from '@/model/kernel/endge'
 import { validateTypeCompatibility } from '@/model/services/compiler/type/type-program-validation'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
-describe('EndgeCompiler Type Program', () => {
+describe('endgeCompiler Type Program', () => {
   beforeEach(() => {
     Endge.domain.reset()
     prepareCompilerContext()

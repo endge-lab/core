@@ -1,12 +1,12 @@
-import { Serialize } from '@endge/utils'
-import { Expose } from 'class-transformer'
-
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
+import type { DiagnosticsProblemInput } from '@/domain/types/diagnostics/diagnostics.types'
+
 import type {
   RMockContentSource,
   RMockContentType,
 } from '@/domain/types/mock/mock-data.type'
-import type { DiagnosticsProblemInput } from '@/domain/types/diagnostics/diagnostics.types'
+import { Serialize } from '@endge/utils'
+import { Expose } from 'class-transformer'
 import { REntity } from '@/domain/entities/reflect/REntity'
 
 /** Persisted source-first mock document. */
@@ -47,8 +47,9 @@ export class RMock extends REntity {
     mock.active = json?.active !== false
     mock.deletedAt = json?.deletedAt ?? null
     mock.author = json?.author ?? null
-    if (storageMeta)
+    if (storageMeta) {
       mock.applyStorageMeta(storageMeta)
+    }
     return mock
   }
 
@@ -77,13 +78,16 @@ export class RMock extends REntity {
   /** Возвращает validation problems mock-документа без mutable entity state. */
   override getDiagnosticProblems(): DiagnosticsProblemInput[] {
     const problems: DiagnosticsProblemInput[] = []
-    if (!this.identity)
+    if (!this.identity) {
       problems.push({ severity: 'warning', code: 'mock.identity.required', message: 'Mock.identity не задан' })
-    if (!this.displayName)
+    }
+    if (!this.displayName) {
       problems.push({ severity: 'warning', code: 'mock.display-name.required', message: 'Mock.displayName не задан' })
+    }
     if (this.contentSource === 'code-provider') {
-      if (!this.codeRef)
+      if (!this.codeRef) {
         problems.push({ severity: 'warning', code: 'mock.code-ref.required', message: 'Mock.codeRef не задан для code-provider' })
+      }
       return problems
     }
     if (this.contentType === 'application/json') {
@@ -112,9 +116,11 @@ export class RMock extends REntity {
 }
 
 function relationToId(value: any): string | number | null {
-  if (value == null)
+  if (value == null) {
     return null
-  if (typeof value === 'object')
+  }
+  if (typeof value === 'object') {
     return relationToId(value.id ?? value.value)
+  }
   return value
 }

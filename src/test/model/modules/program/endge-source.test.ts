@@ -4,7 +4,7 @@ import { ENDGE_CORE_MODULES } from '@/model/config/modules.config'
 import { Endge } from '@/model/kernel/endge'
 import { EndgeSource } from '@/model/modules/program/endge-source'
 
-describe('EndgeSource', () => {
+describe('endgeSource', () => {
   it('is registered as an Endge federation module', () => {
     expect(ENDGE_CORE_MODULES.some(module => module.key === 'source')).toBe(true)
     expect(Endge.source).toBeInstanceOf(EndgeSource)
@@ -34,7 +34,7 @@ describe('EndgeSource', () => {
     const validation = Endge.source.validate('query', source)
 
     expect(source).toContain('defineQuery({')
-    expect(source).toContain("kind: 'rest'")
+    expect(source).toContain('kind: \'rest\'')
     expect(validation.ok).toBe(true)
     expect(validation.diagnostics).toEqual([])
   })
@@ -43,9 +43,9 @@ describe('EndgeSource', () => {
     const source = Endge.source.createDefault('query', 'graphql')
     const validation = Endge.source.validate('query', source)
 
-    expect(source).toContain("kind: 'graphql'")
+    expect(source).toContain('kind: \'graphql\'')
     expect(source).toContain('document: gql`')
-    expect(source).toContain("data('item')")
+    expect(source).toContain('data(\'item\')')
     expect(validation.ok).toBe(true)
     expect(validation.diagnostics).toEqual([])
   })
@@ -259,7 +259,6 @@ defineQuery({
         profile: 'keycloak-dev',
       },
     })
-
   })
 
   it('returns diagnostics for legacy response block', () => {
@@ -323,8 +322,8 @@ defineQuery({
     expect(result.ok).toBe(true)
     expect(result.changed).toBe(true)
     expect(result.source).toContain('// keep author comment')
-    expect(result.source).toContain("endpoint: env('API_BASE_URL')")
-    expect(result.source).toContain("path: '/schedule'")
+    expect(result.source).toContain('endpoint: env(\'API_BASE_URL\')')
+    expect(result.source).toContain('path: \'/schedule\'')
     expect(result.document).toMatchObject({
       request: {
         path: '/schedule',
@@ -347,7 +346,7 @@ defineQuery({
     })
 
     expect(result.ok).toBe(true)
-    expect(result.source).toContain("raw: output().from(response('items'))")
+    expect(result.source).toContain('raw: output().from(response(\'items\'))')
     expect(result.document).toMatchObject({
       outputs: [
         {
@@ -367,7 +366,7 @@ defineQuery({
 
     const result = Endge.source.patch('query', source, {
       path: 'outputs',
-      expression: "{ raw: output().from(response('items')",
+      expression: '{ raw: output().from(response(\'items\')',
     })
 
     expect(result.ok).toBe(false)

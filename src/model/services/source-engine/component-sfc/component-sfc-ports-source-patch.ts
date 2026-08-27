@@ -1,4 +1,4 @@
-import { parse as parseTS } from '@babel/parser'
+import type { RComponentSFC_AST_Script } from '@/domain/types/component/sfc/ast.types'
 
 import type {
   ComponentSFCPortsSourcePatch,
@@ -6,9 +6,9 @@ import type {
   ComponentSFCPortsSourceProjection,
 } from '@/domain/types/component/sfc/ports-source.types'
 import type { ComponentSFCPortRole } from '@/domain/types/component/sfc/ports.types'
-import type { RComponentSFC_AST_Script } from '@/domain/types/component/sfc/ast.types'
-import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
 import type { ComponentSFCCompileOptions } from '@/model/services/compiler/component-sfc/component-sfc-compile'
+import { parse as parseTS } from '@babel/parser'
+import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import { parseComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-parse'
 
@@ -119,7 +119,9 @@ function applyPortsPatch(
   }
   if (patch.type === 'remove-event-action') {
     const event = projection.manifest.emits.events.find(item => item.name === patch.name)
-    if (!event) throw new Error(`Event "${patch.name}" не найден.`)
+    if (!event) {
+      throw new Error(`Event "${patch.name}" не найден.`)
+    }
     return upsertPort(source, 'emits', patch.name, serializeEvent(event.payloadType, event.from, null), projection)
   }
   if (patch.type === 'upsert-port') {
@@ -130,7 +132,9 @@ function applyPortsPatch(
     return removePort(source, patch.role, patch.name)
   }
   if (patch.type === 'set-forward') {
-    if (patch.declaration != null) assertExpression(patch.declaration)
+    if (patch.declaration != null) {
+      assertExpression(patch.declaration)
+    }
     return setSectionValue(source, 'forward', patch.declaration?.trim() ?? null, projection)
   }
   return source
@@ -142,11 +146,19 @@ function serializeEvent(
   actionSource: string | null | undefined,
 ): string {
   const type = payloadType.trim() || 'unknown'
-  if (actionSource) assertExpression(actionSource)
-  if (!from && !actionSource) return `event<${type}>()`
+  if (actionSource) {
+    assertExpression(actionSource)
+  }
+  if (!from && !actionSource) {
+    return `event<${type}>()`
+  }
   const fields: string[] = []
-  if (from) fields.push(`from: { ref: ${JSON.stringify(from.ref)}, event: ${JSON.stringify(from.event)} }`)
-  if (actionSource) fields.push(`action: ${actionSource.trim()}`)
+  if (from) {
+    fields.push(`from: { ref: ${JSON.stringify(from.ref)}, event: ${JSON.stringify(from.event)} }`)
+  }
+  if (actionSource) {
+    fields.push(`action: ${actionSource.trim()}`)
+  }
   return `event<${type}>({ ${fields.join(', ')} })`
 }
 
@@ -164,16 +176,22 @@ function upsertPort(
   if (!section) {
     return insertObjectProperty(ensured, context.script.range.start, context.object, `${role}: {\n      ${name}: ${declaration},\n    }`, 2)
   }
-  if (section.value?.type !== 'ObjectExpression') throw new Error(`definePorts.${role} доступен только в Source-режиме.`)
+  if (section.value?.type !== 'ObjectExpression') {
+    throw new Error(`definePorts.${role} доступен только в Source-режиме.`)
+  }
   const existing = findProperty(section.value, name)
-  if (existing) return replaceRelative(ensured, context.script.range.start, existing.value.start, existing.value.end, declaration)
+  if (existing) {
+    return replaceRelative(ensured, context.script.range.start, existing.value.start, existing.value.end, declaration)
+  }
   return insertObjectProperty(ensured, context.script.range.start, section.value, `${name}: ${declaration}`, 4)
 }
 
 function removePort(source: string, role: ComponentSFCPortRole, name: string): string {
   const context = requirePortsContext(source)
   const section = findProperty(context.object, role)
-  if (!section || section.value?.type !== 'ObjectExpression') return source
+  if (!section || section.value?.type !== 'ObjectExpression') {
+    return source
+  }
   const existing = findProperty(section.value, name)
   return existing ? removeObjectProperty(source, context.script.range.start, section.value, existing) : source
 }
@@ -184,19 +202,25 @@ function setSectionValue(
   declaration: string | null,
   projection: ComponentSFCPortsSourceProjection,
 ): string {
-  if (declaration == null && !projection.bindingName) return source
+  if (declaration == null && !projection.bindingName) {
+    return source
+  }
   const ensured = ensureDefinePorts(source, projection)
   const context = requirePortsContext(ensured)
   const existing = findProperty(context.object, sectionName)
-  if (declaration == null)
+  if (declaration == null) {
     return existing ? removeObjectProperty(ensured, context.script.range.start, context.object, existing) : ensured
-  if (existing)
+  }
+  if (existing) {
     return replaceRelative(ensured, context.script.range.start, existing.value.start, existing.value.end, declaration)
+  }
   return insertObjectProperty(ensured, context.script.range.start, context.object, `${sectionName}: ${declaration}`, 2)
 }
 
 function ensureDefinePorts(source: string, projection: ComponentSFCPortsSourceProjection): string {
-  if (projection.bindingName) return source
+  if (projection.bindingName) {
+    return source
+  }
   const parsed = parseComponentSFC(source)
   if (parsed.ast?.script) {
     const offset = parsed.ast.script.range.end
@@ -220,8 +244,9 @@ function insertObjectProperty(source: string, base: number, object: any, text: s
 
   const lastPropertyEnd = base + lastProperty.end
   let insertionOffset = objectEnd
-  while (insertionOffset > lastPropertyEnd && /\s/.test(source[insertionOffset - 1]!))
+  while (insertionOffset > lastPropertyEnd && /\s/.test(source[insertionOffset - 1]!)) {
     insertionOffset--
+  }
 
   const separator = source.slice(lastPropertyEnd, insertionOffset)
   const needsComma = removeStructuralComma(separator) === separator
@@ -261,7 +286,9 @@ function removeStructuralComma(source: string): string {
     const char = source[index]
     const next = source[index + 1]
     if (lineComment) {
-      if (char === '\n' || char === '\r') lineComment = false
+      if (char === '\n' || char === '\r') {
+        lineComment = false
+      }
       continue
     }
     if (blockComment) {
@@ -281,7 +308,9 @@ function removeStructuralComma(source: string): string {
       index++
       continue
     }
-    if (char === ',') return `${source.slice(0, index)}${source.slice(index + 1)}`
+    if (char === ',') {
+      return `${source.slice(0, index)}${source.slice(index + 1)}`
+    }
   }
   return source
 }
@@ -292,10 +321,16 @@ function replaceRelative(source: string, base: number, start: number, end: numbe
 
 function requirePortsContext(source: string): PortsAstContext {
   const script = parseComponentSFC(source).ast?.script
-  if (!script) throw new Error('Не удалось создать script setup для definePorts.')
+  if (!script) {
+    throw new Error('Не удалось создать script setup для definePorts.')
+  }
   const located = locatePortsContext(script)
-  if (located.kind !== 'found') throw new Error(located.kind === 'unsupported' ? located.message : 'definePorts не найден.')
-  if (!isEditablePortsObject(located.context.object)) throw new Error('definePorts доступен только в Source-режиме.')
+  if (located.kind !== 'found') {
+    throw new Error(located.kind === 'unsupported' ? located.message : 'definePorts не найден.')
+  }
+  if (!isEditablePortsObject(located.context.object)) {
+    throw new Error('definePorts доступен только в Source-режиме.')
+  }
   return located.context
 }
 
@@ -312,27 +347,41 @@ function locatePortsContext(script: RComponentSFC_AST_Script):
   }
   const found: PortsAstContext[] = []
   for (const statement of program.body) {
-    if (statement.type !== 'VariableDeclaration') continue
+    if (statement.type !== 'VariableDeclaration') {
+      continue
+    }
     for (const declaration of statement.declarations) {
       const call = declaration.init
-      if (call?.type !== 'CallExpression' || call.callee?.type !== 'Identifier' || call.callee.name !== 'definePorts') continue
+      if (call?.type !== 'CallExpression' || call.callee?.type !== 'Identifier' || call.callee.name !== 'definePorts') {
+        continue
+      }
       if (declaration.id?.type !== 'Identifier' || call.arguments.length !== 1 || call.arguments[0]?.type !== 'ObjectExpression') {
         return { kind: 'unsupported', message: 'Visual editor поддерживает только `const ports = definePorts({...})`.' }
       }
       found.push({ script, bindingName: declaration.id.name, call, object: call.arguments[0] })
     }
   }
-  if (found.length === 0) return { kind: 'missing' }
-  if (found.length > 1) return { kind: 'unsupported', message: 'Найдено несколько definePorts.' }
+  if (found.length === 0) {
+    return { kind: 'missing' }
+  }
+  if (found.length > 1) {
+    return { kind: 'unsupported', message: 'Найдено несколько definePorts.' }
+  }
   return { kind: 'found', context: found[0] }
 }
 
 function isEditablePortsObject(object: any): boolean {
   return object.properties.every((property: any) => {
-    if (property.type !== 'ObjectProperty' || property.computed) return false
+    if (property.type !== 'ObjectProperty' || property.computed) {
+      return false
+    }
     const name = propertyName(property)
-    if (!name || !['require', 'provides', 'emits', 'forward'].includes(name)) return false
-    if (name === 'forward') return true
+    if (!name || !['require', 'provides', 'emits', 'forward'].includes(name)) {
+      return false
+    }
+    if (name === 'forward') {
+      return true
+    }
     return property.value?.type === 'ObjectExpression'
       && property.value.properties.every((item: any) => item.type === 'ObjectProperty' && !item.computed && Boolean(propertyName(item)))
   })
@@ -343,17 +392,25 @@ function findProperty(object: any, name: string): any | null {
 }
 
 function propertyName(property: any): string | null {
-  if (property.key?.type === 'Identifier') return property.key.name
-  if (property.key?.type === 'StringLiteral') return property.key.value
+  if (property.key?.type === 'Identifier') {
+    return property.key.name
+  }
+  if (property.key?.type === 'StringLiteral') {
+    return property.key.value
+  }
   return null
 }
 
 function assertIdentifier(value: string): void {
-  if (!/^[$A-Z_a-z][$\w]*$/.test(value)) throw new Error(`Недопустимое имя порта: "${value}".`)
+  if (!/^[$A-Z_][$\w]*$/i.test(value)) {
+    throw new Error(`Недопустимое имя порта: "${value}".`)
+  }
 }
 
 function assertExpression(source: string): void {
   const text = source.trim()
-  if (!text) throw new Error('Expression не может быть пустым.')
+  if (!text) {
+    throw new Error('Expression не может быть пустым.')
+  }
   parseTS(`const value = (${text})`, { sourceType: 'module', plugins: ['typescript'] })
 }

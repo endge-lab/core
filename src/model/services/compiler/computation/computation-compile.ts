@@ -1,6 +1,3 @@
-import { parse } from '@babel/parser'
-import * as t from '@babel/types'
-
 import type {
   ComputationContractField,
   ComputationProgramNode,
@@ -10,8 +7,11 @@ import type {
   ComputationSourceDocument,
   ComputationSourceNode,
 } from '@/domain/types/computation/computation-source.types'
+
 import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
 import type { SourceExpressionIR } from '@/domain/types/source/source-expression.types'
+import { parse } from '@babel/parser'
+import * as t from '@babel/types'
 import {
   compileSourceExpression,
   diagnostic,
@@ -85,8 +85,9 @@ export function compileComputation(input: ComputationCompileInput): ComputationC
       ))
       continue
     }
-    if (t.isTSInterfaceDeclaration(statement) || t.isTSTypeAliasDeclaration(statement))
+    if (t.isTSInterfaceDeclaration(statement) || t.isTSTypeAliasDeclaration(statement)) {
       continue
+    }
     if (t.isExpressionStatement(statement)) {
       const expression = unwrapExpression(statement.expression)
       if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'defineComputation' })) {
@@ -94,8 +95,9 @@ export function compileComputation(input: ComputationCompileInput): ComputationC
         continue
       }
     }
-    if (!t.isEmptyStatement(statement))
+    if (!t.isEmptyStatement(statement)) {
       diagnostics.push(diagnostic('error', 'computation-top-level-unsupported', 'Разрешены только type declarations и один defineComputation({...}).', 'source', statement))
+    }
   }
 
   if (calls.length !== 1) {
@@ -139,32 +141,44 @@ export function compileComputation(input: ComputationCompileInput): ComputationC
           isArray: compiled.field.array,
           optional: compiled.field.optional,
         }
-        if (name === 'input') inputContract = contract
-        else outputContract = contract
+        if (name === 'input') {
+          inputContract = contract
+        }
+        else { outputContract = contract }
       }
     }
     else if (name === 'outputs') {
       const value = unwrapExpression(property.value)
-      if (t.isObjectExpression(value)) outputsNode = value
-      else diagnostics.push(diagnostic('error', 'computation-outputs-object', 'outputs должен быть object literal.', 'outputs', value))
+      if (t.isObjectExpression(value)) {
+        outputsNode = value
+      }
+      else { diagnostics.push(diagnostic('error', 'computation-outputs-object', 'outputs должен быть object literal.', 'outputs', value)) }
     }
-    else if (name === 'result') resultNode = property.value
-    else diagnostics.push(diagnostic('error', 'computation-definition-property-unsupported', `Свойство "${name ?? ''}" не поддерживается.`, 'source', property))
+    else if (name === 'result') {
+      resultNode = property.value
+    }
+    else {
+      diagnostics.push(diagnostic('error', 'computation-definition-property-unsupported', `Свойство "${name ?? ''}" не поддерживается.`, 'source', property))
+    }
   }
 
   payload.input = inputContract
   payload.output = outputContract
-  if (!outputsNode || outputsNode.properties.length === 0)
+  if (!outputsNode || outputsNode.properties.length === 0) {
     diagnostics.push(diagnostic('error', 'computation-outputs-required', 'defineComputation требует непустой outputs object.', 'outputs', outputsNode ?? definition))
-  if (!resultNode)
+  }
+  if (!resultNode) {
     diagnostics.push(diagnostic('error', 'computation-result-required', 'defineComputation требует result expression.', 'result', definition))
-  if (!outputsNode || !resultNode)
+  }
+  if (!outputsNode || !resultNode) {
     return { payload, diagnostics }
+  }
 
   const sourceNodes: ComputationSourceNode[] = []
   const reservedNames = new Set(outputsNode.properties.flatMap((property) => {
-    if (!t.isObjectProperty(property) || property.computed)
+    if (!t.isObjectProperty(property) || property.computed) {
       return []
+    }
     const name = propertyName(property.key)
     return name ? [name] : []
   }))
@@ -180,8 +194,9 @@ export function compileComputation(input: ComputationCompileInput): ComputationC
       continue
     }
     const name = propertyName(property.key)
-    if (!name)
+    if (!name) {
       continue
+    }
     if (declaredNames.has(name)) {
       diagnostics.push(diagnostic('error', 'computation-output-duplicate', `Output "${name}" объявлен повторно.`, `outputs.${name}`, property))
       continue
@@ -191,17 +206,21 @@ export function compileComputation(input: ComputationCompileInput): ComputationC
     const sourceRange = range(property)
     if (isTypescriptCall(value)) {
       const node = compileTypescriptNode(name, value, input.source, diagnostics, externalContext)
-      if (node) sourceNodes.push({ ...node, sourceRange })
+      if (node) {
+        sourceNodes.push({ ...node, sourceRange })
+      }
       continue
     }
     const expression = compileComputationExpression(value, diagnostics, `outputs.${name}`, externalContext)
-    if (expression)
+    if (expression) {
       sourceNodes.push({ kind: 'expression', name, expression, sourceRange })
+    }
   }
 
   const result = compileComputationExpression(resultNode, diagnostics, 'result', externalContext)
-  if (!result)
+  if (!result) {
     return { payload, diagnostics }
+  }
 
   const known = new Set(sourceNodes.map(node => node.name))
   const programNodes: ComputationProgramNode[] = sourceNodes.map((node) => {
@@ -220,8 +239,9 @@ export function compileComputation(input: ComputationCompileInput): ComputationC
         })
       }
     }
-    if (node.kind === 'expression')
+    if (node.kind === 'expression') {
       return { kind: 'expression', name: node.name, dependencies, expression: node.expression }
+    }
     if (node.kind === 'typescript') {
       return {
         kind: 'typescript',
@@ -241,8 +261,9 @@ export function compileComputation(input: ComputationCompileInput): ComputationC
     }
   })
   for (const dependency of collectOutputReferences(result)) {
-    if (!known.has(dependency))
+    if (!known.has(dependency)) {
       diagnostics.push(diagnostic('error', 'computation-result-output-unknown', `result ссылается на неизвестный output "${dependency}".`, 'result', resultNode))
+    }
   }
 
   const ordered = topologicalSort(programNodes, diagnostics, outputsNode)
@@ -277,28 +298,39 @@ function compileTypescriptNode(
     const propertyKey = (t.isObjectProperty(property) || t.isObjectMethod(property)) ? propertyName(property.key) : null
     if (propertyKey === 'inputs' && t.isObjectProperty(property) && t.isExpression(property.value)) {
       const value = unwrapExpression(property.value)
-      if (t.isObjectExpression(value)) inputsNode = value
-      else diagnostics.push(diagnostic('error', 'computation-typescript-inputs-object', 'typescript.inputs должен быть object literal.', `outputs.${name}.inputs`, value))
+      if (t.isObjectExpression(value)) {
+        inputsNode = value
+      }
+      else { diagnostics.push(diagnostic('error', 'computation-typescript-inputs-object', 'typescript.inputs должен быть object literal.', `outputs.${name}.inputs`, value)) }
       continue
     }
     if (propertyKey === 'compute') {
-      if (t.isObjectMethod(property)) computeNode = property
-      else if (t.isObjectProperty(property) && (t.isFunctionExpression(property.value) || t.isArrowFunctionExpression(property.value))) computeNode = property.value
-      else diagnostics.push(diagnostic('error', 'computation-typescript-compute-function', 'typescript.compute должен быть function или method.', `outputs.${name}.compute`, property))
+      if (t.isObjectMethod(property)) {
+        computeNode = property
+      }
+      else if (t.isObjectProperty(property) && (t.isFunctionExpression(property.value) || t.isArrowFunctionExpression(property.value))) {
+        computeNode = property.value
+      }
+      else { diagnostics.push(diagnostic('error', 'computation-typescript-compute-function', 'typescript.compute должен быть function или method.', `outputs.${name}.compute`, property)) }
       continue
     }
     diagnostics.push(diagnostic('error', 'computation-typescript-property', `Свойство "${propertyKey ?? ''}" не поддерживается в typescript node.`, `outputs.${name}`, property))
   }
-  if (!inputsNode)
+  if (!inputsNode) {
     diagnostics.push(diagnostic('error', 'computation-typescript-inputs-required', 'typescript node требует inputs object.', `outputs.${name}.inputs`, definition))
-  if (!computeNode)
+  }
+  if (!computeNode) {
     diagnostics.push(diagnostic('error', 'computation-typescript-compute-required', 'typescript node требует compute(inputs, api).', `outputs.${name}.compute`, definition))
-  if (!inputsNode || !computeNode)
+  }
+  if (!inputsNode || !computeNode) {
     return null
-  if (computeNode.async || computeNode.generator)
+  }
+  if (computeNode.async || computeNode.generator) {
     diagnostics.push(diagnostic('error', 'computation-typescript-async', 'typescript.compute должен быть синхронным и не generator.', `outputs.${name}.compute`, computeNode))
-  if (computeNode.params.length < 1 || computeNode.params.length > 2)
+  }
+  if (computeNode.params.length < 1 || computeNode.params.length > 2) {
     diagnostics.push(diagnostic('error', 'computation-typescript-parameters', 'typescript.compute принимает inputs и optional api.', `outputs.${name}.compute`, computeNode))
+  }
 
   validateSandboxBody(computeNode, diagnostics, `outputs.${name}.compute`)
   const inputs: Record<string, SourceExpressionIR> = {}
@@ -309,8 +341,9 @@ function compileTypescriptNode(
       continue
     }
     const inputName = propertyName(property.key)
-    if (!inputName)
+    if (!inputName) {
       continue
+    }
     if (inputNames.has(inputName)) {
       diagnostics.push(diagnostic('error', 'computation-typescript-input-duplicate', `Input "${inputName}" объявлен повторно.`, `outputs.${name}.inputs.${inputName}`, property))
       continue
@@ -322,7 +355,9 @@ function compileTypescriptNode(
       `outputs.${name}.inputs.${inputName}`,
       externalContext,
     )
-    if (expression) inputs[inputName] = expression
+    if (expression) {
+      inputs[inputName] = expression
+    }
   }
 
   return {
@@ -347,17 +382,21 @@ function compileComputationExpression(
 function rewriteComputationReads(raw: t.Expression, diagnostics: DiagnosticDraft[], sourcePath: string): t.Expression {
   const node = t.cloneNode(raw, true)
   walk(node, (current) => {
-    if (!t.isCallExpression(current) || !t.isIdentifier(current.callee))
+    if (!t.isCallExpression(current) || !t.isIdentifier(current.callee)) {
       return
-    if (current.callee.name !== 'input' && current.callee.name !== 'output')
+    }
+    if (current.callee.name !== 'input' && current.callee.name !== 'output') {
       return
+    }
     if (current.arguments.length > 1 || (current.arguments[0] && !t.isStringLiteral(current.arguments[0]))) {
       diagnostics.push(diagnostic('error', 'computation-read-path', `${current.callee.name}(...) принимает ${current.callee.name === 'input' ? 'optional ' : ''}строковый path.`, sourcePath, current))
       return
     }
     if (current.callee.name === 'input') {
       current.callee = t.identifier('path')
-      if (current.arguments.length === 0) current.arguments = [t.stringLiteral('')]
+      if (current.arguments.length === 0) {
+        current.arguments = [t.stringLiteral('')]
+      }
     }
     else {
       current.callee = t.identifier('__computationOutput')
@@ -385,8 +424,9 @@ function liftExternalComputationCalls(
       }
     }
 
-    if (!t.isCallExpression(current) || !t.isIdentifier(current.callee, { name: 'computation' }))
+    if (!t.isCallExpression(current) || !t.isIdentifier(current.callee, { name: 'computation' })) {
       return current
+    }
 
     const identityNode = current.arguments[0]
     const inputNode = current.arguments[1]
@@ -412,8 +452,9 @@ function liftExternalComputationCalls(
     }
 
     const input = compileSourceExpression(inputNode, diagnostics, `${sourcePath}.input`)
-    if (!input)
+    if (!input) {
       return t.identifier('undefined')
+    }
 
     const name = nextExternalNodeName(context)
     context.sourceNodes.push({
@@ -431,7 +472,9 @@ function liftExternalComputationCalls(
 
 function nextExternalNodeName(context: ExternalComputationCompileContext): string {
   let name = ''
-  do name = `__computation_call_${context.nextCallId++}`
+  do {
+    name = `__computation_call_${context.nextCallId++}`
+  }
   while (context.reservedNames.has(name))
   context.reservedNames.add(name)
   return name
@@ -439,64 +482,106 @@ function nextExternalNodeName(context: ExternalComputationCompileContext): strin
 
 export function validateSandboxBody(node: t.Node, diagnostics: DiagnosticDraft[], sourcePath: string): void {
   const forbidden = new Set([
-    'eval', 'Function', 'Promise', 'fetch', 'XMLHttpRequest', 'WebSocket',
-    'Worker', 'SharedWorker', 'setTimeout', 'setInterval', 'require', 'process',
-    'Deno', 'Bun', 'Endge', 'globalThis', 'self', 'window', 'document', 'navigator',
+    'eval',
+    'Function',
+    'Promise',
+    'fetch',
+    'XMLHttpRequest',
+    'WebSocket',
+    'Worker',
+    'SharedWorker',
+    'setTimeout',
+    'setInterval',
+    'require',
+    'process',
+    'Deno',
+    'Bun',
+    'Endge',
+    'globalThis',
+    'self',
+    'window',
+    'document',
+    'navigator',
   ])
   const bindings = collectBindingNames(node)
   walkWithParent(node, null, (current, parent) => {
-    if (t.isAwaitExpression(current))
+    if (t.isAwaitExpression(current)) {
       diagnostics.push(diagnostic('error', 'computation-typescript-await', 'await запрещён в synchronous typescript.compute.', sourcePath, current))
-    if (t.isImport(current) || t.isImportDeclaration(current))
+    }
+    if (t.isImport(current) || t.isImportDeclaration(current)) {
       diagnostics.push(diagnostic('error', 'computation-typescript-import', 'Dynamic и static imports запрещены.', sourcePath, current))
-    if (t.isCallExpression(current) && t.isIdentifier(current.callee, { name: 'computation' }))
+    }
+    if (t.isCallExpression(current) && t.isIdentifier(current.callee, { name: 'computation' })) {
       diagnostics.push(diagnostic('error', 'computation-typescript-reference', 'External computation calls разрешены только в graph expressions и typescript.inputs.', sourcePath, current))
+    }
     if (t.isIdentifier(current)
       && forbidden.has(current.name)
       && !bindings.has(current.name)
-      && !isNonComputedPropertyName(current, parent))
+      && !isNonComputedPropertyName(current, parent)) {
       diagnostics.push(diagnostic('error', 'computation-typescript-global', `Global "${current.name}" запрещён в sandbox.`, sourcePath, current))
+    }
   })
 }
 
 function collectBindingNames(node: t.Node): Set<string> {
   const names = new Set<string>()
   walk(node, (current) => {
-    if (t.isVariableDeclarator(current)) addPatternNames(current.id, names)
-    else if (t.isFunction(current)) current.params.forEach(param => addPatternNames(param, names))
-    else if ((t.isFunctionDeclaration(current) || t.isClassDeclaration(current)) && current.id) names.add(current.id.name)
-    else if (t.isCatchClause(current) && current.param) addPatternNames(current.param, names)
+    if (t.isVariableDeclarator(current)) {
+      addPatternNames(current.id, names)
+    }
+    else if (t.isFunction(current)) {
+      current.params.forEach(param => addPatternNames(param, names))
+    }
+    else if ((t.isFunctionDeclaration(current) || t.isClassDeclaration(current)) && current.id) {
+      names.add(current.id.name)
+    }
+    else if (t.isCatchClause(current) && current.param) {
+      addPatternNames(current.param, names)
+    }
   })
   return names
 }
 
 function addPatternNames(node: t.LVal | t.PatternLike, names: Set<string>): void {
-  if (t.isIdentifier(node)) names.add(node.name)
-  else if (t.isRestElement(node)) addPatternNames(node.argument, names)
-  else if (t.isAssignmentPattern(node)) addPatternNames(node.left, names)
-  else if (t.isArrayPattern(node)) node.elements.forEach(item => item && addPatternNames(item, names))
+  if (t.isIdentifier(node)) {
+    names.add(node.name)
+  }
+  else if (t.isRestElement(node)) {
+    addPatternNames(node.argument, names)
+  }
+  else if (t.isAssignmentPattern(node)) {
+    addPatternNames(node.left, names)
+  }
+  else if (t.isArrayPattern(node)) {
+    node.elements.forEach(item => item && addPatternNames(item, names))
+  }
   else if (t.isObjectPattern(node)) {
     for (const property of node.properties) {
-      if (t.isRestElement(property)) addPatternNames(property.argument, names)
-      else addPatternNames(property.value as t.LVal | t.PatternLike, names)
+      if (t.isRestElement(property)) {
+        addPatternNames(property.argument, names)
+      }
+      else { addPatternNames(property.value as t.LVal | t.PatternLike, names) }
     }
   }
 }
 
 function isNonComputedPropertyName(node: t.Identifier, parent: t.Node | null): boolean {
-  if (!parent)
+  if (!parent) {
     return false
+  }
   if ((t.isObjectProperty(parent) || t.isObjectMethod(parent) || t.isClassMethod(parent))
     && parent.key === node
-    && !parent.computed)
+    && !parent.computed) {
     return true
+  }
   return t.isMemberExpression(parent) && parent.property === node && !parent.computed
 }
 
 export function functionSource(node: t.ObjectMethod | t.FunctionExpression | t.ArrowFunctionExpression, source: string): string {
   const params = node.params.map(param => source.slice(param.start ?? 0, param.end ?? 0)).join(', ')
-  if (t.isBlockStatement(node.body))
+  if (t.isBlockStatement(node.body)) {
     return `function(${params}) ${source.slice(node.body.start ?? 0, node.body.end ?? 0)}`
+  }
   return `function(${params}) { return (${source.slice(node.body.start ?? 0, node.body.end ?? 0)}); }`
 }
 
@@ -505,14 +590,18 @@ function isTypescriptCall(node: t.Expression): node is t.CallExpression {
 }
 
 function collectOutputReferences(expression: SourceExpressionIR): string[] {
-  if (expression.type === 'read')
+  if (expression.type === 'read') {
     return expression.source === 'computation-output' ? [expression.path] : []
-  if (expression.type === 'array')
+  }
+  if (expression.type === 'array') {
     return expression.items.flatMap(collectOutputReferences)
-  if (expression.type === 'object')
+  }
+  if (expression.type === 'object') {
     return Object.values(expression.properties).flatMap(collectOutputReferences)
-  if (expression.type === 'operation')
+  }
+  if (expression.type === 'operation') {
     return expression.arguments.flatMap(collectOutputReferences)
+  }
   return []
 }
 
@@ -529,7 +618,9 @@ function topologicalSort(nodes: ComputationProgramNode[], diagnostics: Diagnosti
     for (const node of ready) {
       ordered.push(node)
       pending.delete(node.name)
-      for (const dependencies of pending.values()) dependencies.delete(node.name)
+      for (const dependencies of pending.values()) {
+        dependencies.delete(node.name)
+      }
     }
   }
   return ordered
@@ -541,9 +632,15 @@ function walk(node: t.Node, visit: (node: t.Node) => void): void {
   for (const key of keys) {
     const value = (node as any)[key]
     if (Array.isArray(value)) {
-      for (const child of value) if (child && typeof child.type === 'string') walk(child, visit)
+      for (const child of value) {
+        if (child && typeof child.type === 'string') {
+          walk(child, visit)
+        }
+      }
     }
-    else if (value && typeof value.type === 'string') walk(value, visit)
+    else if (value && typeof value.type === 'string') {
+      walk(value, visit)
+    }
   }
 }
 
@@ -553,9 +650,15 @@ function walkWithParent(node: t.Node, parent: t.Node | null, visit: (node: t.Nod
   for (const key of keys) {
     const value = (node as any)[key]
     if (Array.isArray(value)) {
-      for (const child of value) if (child && typeof child.type === 'string') walkWithParent(child, node, visit)
+      for (const child of value) {
+        if (child && typeof child.type === 'string') {
+          walkWithParent(child, node, visit)
+        }
+      }
     }
-    else if (value && typeof value.type === 'string') walkWithParent(value, node, visit)
+    else if (value && typeof value.type === 'string') {
+      walkWithParent(value, node, visit)
+    }
   }
 }
 

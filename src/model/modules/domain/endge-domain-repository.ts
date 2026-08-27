@@ -1,6 +1,6 @@
-import type { DomainDocumentType } from '@/domain/types/document/document.types'
 import type { DocumentCreateRequest, DocumentCreateResult } from '@/domain/types/document/document-create.type'
 import type { EndgeDomainDocumentMove } from '@/domain/types/document/document-move.type'
+import type { DomainDocumentType } from '@/domain/types/document/document.types'
 import type {
   EndgeDomainCollection,
   EndgeDomainProvider,
@@ -22,8 +22,8 @@ import { normalizeEndgeWorkspaceDefinition } from '@/domain/entities/reflect/RWo
 import { ComponentType, FilterType, ParameterType, QueryType } from '@/domain/types/document/document.types'
 import { Endge } from '@/model/kernel/endge'
 import { EndgeDomain, normalizeSnapshotDocuments, normalizeSnapshotFolders } from '@/model/modules/domain/endge-domain'
-import { serializeServiceDocument, serializeServiceFolder } from '@/model/services/document/endge-service-document-serializer'
 import { resolveEndgeServiceCollection, resolveEndgeServiceStateCollection } from '@/model/services/document/domain-provider'
+import { serializeServiceDocument, serializeServiceFolder } from '@/model/services/document/endge-service-document-serializer'
 
 type DomainCollectionKey
   = | 'projects' | 'types' | 'queries' | 'dataViews' | 'compositions' | 'stores'
@@ -63,8 +63,9 @@ export class EndgeDomainRepository extends EndgeModule {
 
   public override async setup(ctx: EndgeBootContext): Promise<void> {
     if (ctx.dataProvider === 'default') {
-      if (!ctx.domainProvider)
+      if (!ctx.domainProvider) {
         throw new Error('[EndgeDomainRepository] domainProvider is required for default data provider')
+      }
       this._domainProvider = ctx.domainProvider
       this._capabilities = {
         provider: 'service-backend',
@@ -81,8 +82,9 @@ export class EndgeDomainRepository extends EndgeModule {
       return
     }
     if (ctx.dataProvider === 'bundle') {
-      if (!ctx.bundleSource)
+      if (!ctx.bundleSource) {
         throw new Error('[EndgeDomainRepository] bundleSource is required for bundle data provider')
+      }
       this._capabilities = { provider: 'bundle', mutations: false, softDelete: false, restore: false }
       return
     }
@@ -92,14 +94,17 @@ export class EndgeDomainRepository extends EndgeModule {
 
   /** Загружает live snapshot через активный transport provider и индексирует server state. */
   public async loadSnapshot(ctx: EndgeBootContext): Promise<EndgeLiveDomainSnapshot> {
-    if (ctx.dataProvider !== 'default')
+    if (ctx.dataProvider !== 'default') {
       throw new Error('[EndgeDomainRepository] Live snapshot is available only for default data provider')
+    }
     const provider = this._serviceProvider()
     const workspaceIdentity = String(ctx.scope.workspaceIdentity ?? '').trim()
-    if (!provider)
+    if (!provider) {
       throw new Error('[EndgeDomainRepository] domainProvider is not configured')
-    if (!workspaceIdentity)
+    }
+    if (!workspaceIdentity) {
       throw new Error('[EndgeDomainRepository] workspaceIdentity is required for live snapshot')
+    }
 
     const snapshot = await provider.loadWorkspace({ workspaceIdentity, signal: ctx.signal })
     this._loadedSnapshot = snapshot
@@ -140,10 +145,12 @@ export class EndgeDomainRepository extends EndgeModule {
   public async createDocument(request: DocumentCreateRequest): Promise<DocumentCreateResult> {
     this._assertMutationsSupported()
     const identity = request.identity.trim()
-    if (!identity)
+    if (!identity) {
       throw new Error('Document identity is required.')
-    if (!(await this.isDocumentIdentityAvailable(request.documentType, identity)))
+    }
+    if (!(await this.isDocumentIdentityAvailable(request.documentType, identity))) {
       throw new Error(`Документ "${identity}" уже существует`)
+    }
 
     const model = request.mode === 'model' ? request.model : request.document
     await this.saveDocument(identity, request.documentType, { model })
@@ -164,8 +171,9 @@ export class EndgeDomainRepository extends EndgeModule {
     documentType: DomainDocumentType,
   ): Promise<void> {
     this._assertMutationsSupported()
-    if (!this._capabilities.softDelete)
+    if (!this._capabilities.softDelete) {
       throw new EndgeDomainRepositoryReadOnlyError(this._capabilities.provider)
+    }
 
     const provider = this._requireServiceProvider()
     const identity = this.resolveDocumentIdentity(documentIdOrIdentity, documentType)
@@ -177,8 +185,9 @@ export class EndgeDomainRepository extends EndgeModule {
       identity,
       expectedRevision: state.revision,
     })
-    if (!result.document.state.deletedAt)
+    if (!result.document.state.deletedAt) {
       throw new Error('[EndgeDomainRepository] Delete response does not contain a tombstone')
+    }
     this._domainETag = result.etag
     this._removeDomainDocumentByType(documentType, documentIdOrIdentity)
     this._documentServerState.set(this._serverStateKey(collection, identity), { ...result.document.state })
@@ -190,8 +199,9 @@ export class EndgeDomainRepository extends EndgeModule {
     documentType: DomainDocumentType,
   ): Promise<void> {
     this._assertMutationsSupported()
-    if (!this._capabilities.restore)
+    if (!this._capabilities.restore) {
       throw new EndgeDomainRepositoryReadOnlyError(this._capabilities.provider)
+    }
 
     const provider = this._requireServiceProvider()
     const identity = this.resolveDocumentIdentity(documentIdOrIdentity, documentType)
@@ -214,8 +224,9 @@ export class EndgeDomainRepository extends EndgeModule {
   ): Promise<void> {
     this._assertMutationsSupported()
     const model = this.getDomainDocumentByType(documentType, documentId)
-    if (!model)
+    if (!model) {
       throw new Error(`Документ не найден: ${String(documentId)}`)
+    }
 
     const document = serializeServiceDocument(documentType, model)
     const folder = folderIdOrIdentity == null ? null : Endge.domain.getFolder(folderIdOrIdentity)
@@ -231,21 +242,25 @@ export class EndgeDomainRepository extends EndgeModule {
     folderIdOrIdentity: string | number,
   ): Promise<number> {
     this._assertMutationsSupported()
-    if (documents.length === 0)
+    if (documents.length === 0) {
       return 0
+    }
 
     const provider = this._requireServiceProvider()
-    if (!provider.moveDocuments)
+    if (!provider.moveDocuments) {
       throw new Error('[EndgeDomainRepository] Domain provider does not support atomic document moves')
+    }
     const folder = Endge.domain.getFolder(folderIdOrIdentity)
     const folderIdentity = String((folder as any)?.identity ?? folderIdOrIdentity).trim()
-    if (!folderIdentity)
+    if (!folderIdentity) {
       throw new Error('Папка назначения не найдена')
+    }
 
     const requests = documents.map(({ documentId, documentType }) => {
       const model = this.getDomainDocumentByType(documentType, documentId)
-      if (!model)
+      if (!model) {
         throw new Error(`Документ не найден: ${String(documentId)}`)
+      }
       const collection = resolveEndgeServiceCollection(documentType)
       const identity = this.resolveDocumentIdentity(documentId, documentType)
       const state = this._requireDocumentServerState(collection, identity)
@@ -256,14 +271,16 @@ export class EndgeDomainRepository extends EndgeModule {
       documents: requests,
       folderIdentity,
     })
-    if (result.documents.length !== documents.length)
+    if (result.documents.length !== documents.length) {
       throw new Error('[EndgeDomainRepository] Bulk move response does not match request')
+    }
 
     result.documents.forEach((item, index) => {
       const expected = requests[index]!
       const responseIdentity = String(item.document.identity ?? '').trim()
-      if (item.collection !== expected.collection || responseIdentity !== expected.identity)
+      if (item.collection !== expected.collection || responseIdentity !== expected.identity) {
         throw new Error('[EndgeDomainRepository] Bulk move response document does not match request')
+      }
     })
     result.documents.forEach((item, index) => {
       const source = documents[index]!
@@ -276,8 +293,9 @@ export class EndgeDomainRepository extends EndgeModule {
     this._assertMutationsSupported()
     const provider = this._requireServiceProvider()
     const folder = Endge.domain.getFolder(folderId)
-    if (!folder)
+    if (!folder) {
       throw new Error(`Папка не найдена: ${folderId}`)
+    }
 
     const document = serializeServiceFolder(folder)
     const identity = String(document.identity ?? '').trim()
@@ -298,8 +316,9 @@ export class EndgeDomainRepository extends EndgeModule {
 
   public async deleteFolder(folderIdentity: string): Promise<void> {
     this._assertMutationsSupported()
-    if (!this._capabilities.softDelete)
+    if (!this._capabilities.softDelete) {
       throw new EndgeDomainRepositoryReadOnlyError(this._capabilities.provider)
+    }
 
     const provider = this._requireServiceProvider()
     const folder = Endge.domain.getFolder(folderIdentity)
@@ -311,19 +330,22 @@ export class EndgeDomainRepository extends EndgeModule {
       identity,
       expectedRevision: state.revision,
     })
-    if (!result.document.state.deletedAt)
+    if (!result.document.state.deletedAt) {
       throw new Error('[EndgeDomainRepository] Delete response does not contain a folder tombstone')
+    }
     this._domainETag = result.etag
-    if (folder)
+    if (folder) {
       Endge.domain.removeFolderById(folder.id)
+    }
     this._documentServerState.set(this._serverStateKey('folders', identity), { ...result.document.state })
     this._notifyDomainChanged()
   }
 
   public async restoreFolder(folderIdentity: string): Promise<void> {
     this._assertMutationsSupported()
-    if (!this._capabilities.restore)
+    if (!this._capabilities.restore) {
       throw new EndgeDomainRepositoryReadOnlyError(this._capabilities.provider)
+    }
 
     const provider = this._requireServiceProvider()
     const folder = Endge.domain.getFolder(folderIdentity)
@@ -352,8 +374,9 @@ export class EndgeDomainRepository extends EndgeModule {
     for (const [documentType, documents] of Object.entries(snapshot.documents)) {
       for (const document of documents) {
         const identity = String(document.identity ?? '').trim()
-        if (identity)
+        if (identity) {
           this._documentServerState.set(this._serverStateKey(documentType, identity), { ...document.state })
+        }
       }
     }
   }
@@ -367,8 +390,9 @@ export class EndgeDomainRepository extends EndgeModule {
     identity: string,
   ): EndgeDocumentServerState {
     const state = this._documentServerState.get(this._serverStateKey(collection, identity))
-    if (!state)
+    if (!state) {
       throw new Error(`Server state не найден для ${collection}/${identity}`)
+    }
     return state
   }
 
@@ -376,15 +400,17 @@ export class EndgeDomainRepository extends EndgeModule {
     const id = String(documentId)
     const prefix = `${collection}:`
     for (const [key, state] of this._documentServerState) {
-      if (key.startsWith(prefix) && String(state.id) === id)
+      if (key.startsWith(prefix) && String(state.id) === id) {
         return key.slice(prefix.length)
+      }
     }
     return null
   }
 
   private _assertMutationsSupported(): void {
-    if (!this._capabilities.mutations)
+    if (!this._capabilities.mutations) {
       throw new EndgeDomainRepositoryReadOnlyError(this._capabilities.provider)
+    }
   }
 
   private _serviceProvider(): EndgeDomainProvider | null {
@@ -393,8 +419,9 @@ export class EndgeDomainRepository extends EndgeModule {
 
   private _requireServiceProvider(): EndgeDomainProvider {
     const provider = this._serviceProvider()
-    if (!provider)
+    if (!provider) {
       throw new Error('[EndgeDomainRepository] Service domain provider is unavailable')
+    }
     return provider
   }
 
@@ -403,8 +430,9 @@ export class EndgeDomainRepository extends EndgeModule {
       this._loadedSnapshot?.workspace.identity
       ?? (Endge.workspace.isLoaded ? Endge.workspace.current.identity : ''),
     ).trim()
-    if (!identity)
+    if (!identity) {
       throw new Error('[EndgeDomainRepository] Service workspace identity is unavailable')
+    }
     return identity
   }
 
@@ -413,8 +441,9 @@ export class EndgeDomainRepository extends EndgeModule {
     for (const folder of Endge.domain.getFolders()) {
       const identity = String((folder as any).identity ?? '').trim()
       const id = String((folder as any).id ?? '').trim()
-      if (identity && id)
+      if (identity && id) {
         result.set(identity, id)
+      }
     }
     return result
   }
@@ -429,8 +458,9 @@ export class EndgeDomainRepository extends EndgeModule {
     if (documentType === 'workspace') {
       const workspace = normalizeEndgeWorkspaceDefinition(opts?.model ?? Endge.workspace.current)
       const state = this._workspaceServerState
-      if (!state)
+      if (!state) {
         throw new Error('[EndgeDomainRepository] Workspace server state is unavailable')
+      }
       const result = await provider.updateWorkspace({
         workspaceIdentity: this._serviceWorkspaceIdentity(),
         expectedRevision: state.revision,
@@ -453,8 +483,9 @@ export class EndgeDomainRepository extends EndgeModule {
     }
 
     const model = opts?.model ?? this.getDomainDocumentByType(documentType, documentId)
-    if (!model)
+    if (!model) {
       throw new Error(`Документ не найден: ${String(documentId)}`)
+    }
     const document = opts?.serializedDocument ?? serializeServiceDocument(documentType, model)
     const identity = String(document.identity ?? '').trim()
     const collection = resolveEndgeServiceCollection(documentType)
@@ -489,19 +520,21 @@ export class EndgeDomainRepository extends EndgeModule {
         ?? (previousIdentity ? this.getDomainDocumentByType(documentType, previousIdentity) : null)
     const persistedIdentity = String((current as any)?.identity ?? previousIdentity ?? replaceRef ?? '').trim()
 
-    if (persistedIdentity && persistedIdentity !== identity)
+    if (persistedIdentity && persistedIdentity !== identity) {
       this._documentServerState.delete(this._serverStateKey(collection, persistedIdentity))
+    }
 
     const key = this._getDomainCollectionKey(documentType)
     const plain = normalizeSnapshotDocuments([document], this._serviceFolderIds())[0]
     const parsed = EndgeDomain.parsePlain({ [key]: [plain] })
     const next = parsed[key][0]
-    if (!next)
+    if (!next) {
       throw new Error(`[EndgeDomainRepository] Failed to materialize ${collection}/${identity}`)
-    if (current)
+    }
+    if (current) {
       Endge.domain.replacePersistedEntity(current, next)
-    else
-      Endge.domain.importFromSchema(parsed)
+    }
+    else { Endge.domain.importFromSchema(parsed) }
     this._documentServerState.set(this._serverStateKey(collection, identity), { ...document.state })
     this._notifyDomainChanged()
   }
@@ -510,10 +543,12 @@ export class EndgeDomainRepository extends EndgeModule {
     const identity = String(document.identity ?? '').trim()
     const existing = replaceRef == null ? null : Endge.domain.getFolder(replaceRef)
     const previousIdentity = String((existing as any)?.identity ?? replaceRef ?? '').trim()
-    if (existing)
+    if (existing) {
       Endge.domain.removeFolderById(existing.id)
-    if (previousIdentity && previousIdentity !== identity)
+    }
+    if (previousIdentity && previousIdentity !== identity) {
       this._documentServerState.delete(this._serverStateKey('folders', previousIdentity))
+    }
 
     const folderIds = this._serviceFolderIds()
     folderIds.set(identity, document.state.id)
@@ -536,34 +571,90 @@ export class EndgeDomainRepository extends EndgeModule {
     documentIdOrIdentity: string | number,
   ): any | null {
     const domain = Endge.domain
-    if (documentType === ComponentType.SFC) return domain.getComponentSFC(documentIdOrIdentity)
-    if (documentType === ComponentType.Table || documentType === ComponentType.DSL) return domain.getComponent(documentIdOrIdentity)
-    if (documentType === QueryType.REST || documentType === QueryType.GraphQL || documentType === QueryType.Custom) return domain.getQuery(documentIdOrIdentity)
-    if (documentType === 'data-view') return domain.getDataView(documentIdOrIdentity)
-    if (documentType === 'composition') return domain.getComposition(documentIdOrIdentity)
-    if (documentType === 'store') return domain.getStore(documentIdOrIdentity)
-    if (documentType === 'stream') return domain.getStream(documentIdOrIdentity)
-    if (documentType === 'update') return domain.getUpdate(documentIdOrIdentity)
-    if (documentType === 'mock') return domain.getMock(documentIdOrIdentity)
-    if (documentType === ParameterType.DefaultParameter) return domain.getParameter(documentIdOrIdentity)
-    if (documentType === FilterType.DefaultFilter) return domain.getFilter(documentIdOrIdentity)
-    if (documentType === 'type' || documentType === 'primitive') return domain.getType(documentIdOrIdentity)
-    if (documentType === 'action') return domain.getAction(documentIdOrIdentity)
-    if (documentType === 'converter') return domain.getConverter(documentIdOrIdentity)
-    if (documentType === 'computation') return domain.getComputation(documentIdOrIdentity)
-    if (documentType === 'integration') return domain.getIntegration(documentIdOrIdentity)
-    if (documentType === 'environment') return domain.getEnvironment(documentIdOrIdentity)
-    if (documentType === 'tenant') return domain.getTenant(documentIdOrIdentity)
-    if (documentType === 'policy') return domain.getPolicy(documentIdOrIdentity)
-    if (documentType === 'style') return domain.getStyle(documentIdOrIdentity)
-    if (documentType === 'configuration') return domain.getConfiguration(documentIdOrIdentity)
-    if (documentType === 'page-template') return domain.getPageTemplate(documentIdOrIdentity)
-    if (documentType === 'page') return domain.getPage(documentIdOrIdentity)
-    if (documentType === 'navigation') return domain.getNavigation(documentIdOrIdentity)
-    if (documentType === 'vocabs') return domain.getVocab(documentIdOrIdentity)
-    if (documentType === 'auth-profile') return domain.getAuthProfile(documentIdOrIdentity)
-    if (documentType === 'i18n-bundles') return domain.getI18nBundle(documentIdOrIdentity)
-    if (documentType === 'project') return domain.getProject(documentIdOrIdentity)
+    if (documentType === ComponentType.SFC) {
+      return domain.getComponentSFC(documentIdOrIdentity)
+    }
+    if (documentType === ComponentType.Table || documentType === ComponentType.DSL) {
+      return domain.getComponent(documentIdOrIdentity)
+    }
+    if (documentType === QueryType.REST || documentType === QueryType.GraphQL || documentType === QueryType.Custom) {
+      return domain.getQuery(documentIdOrIdentity)
+    }
+    if (documentType === 'data-view') {
+      return domain.getDataView(documentIdOrIdentity)
+    }
+    if (documentType === 'composition') {
+      return domain.getComposition(documentIdOrIdentity)
+    }
+    if (documentType === 'store') {
+      return domain.getStore(documentIdOrIdentity)
+    }
+    if (documentType === 'stream') {
+      return domain.getStream(documentIdOrIdentity)
+    }
+    if (documentType === 'update') {
+      return domain.getUpdate(documentIdOrIdentity)
+    }
+    if (documentType === 'mock') {
+      return domain.getMock(documentIdOrIdentity)
+    }
+    if (documentType === ParameterType.DefaultParameter) {
+      return domain.getParameter(documentIdOrIdentity)
+    }
+    if (documentType === FilterType.DefaultFilter) {
+      return domain.getFilter(documentIdOrIdentity)
+    }
+    if (documentType === 'type' || documentType === 'primitive') {
+      return domain.getType(documentIdOrIdentity)
+    }
+    if (documentType === 'action') {
+      return domain.getAction(documentIdOrIdentity)
+    }
+    if (documentType === 'converter') {
+      return domain.getConverter(documentIdOrIdentity)
+    }
+    if (documentType === 'computation') {
+      return domain.getComputation(documentIdOrIdentity)
+    }
+    if (documentType === 'integration') {
+      return domain.getIntegration(documentIdOrIdentity)
+    }
+    if (documentType === 'environment') {
+      return domain.getEnvironment(documentIdOrIdentity)
+    }
+    if (documentType === 'tenant') {
+      return domain.getTenant(documentIdOrIdentity)
+    }
+    if (documentType === 'policy') {
+      return domain.getPolicy(documentIdOrIdentity)
+    }
+    if (documentType === 'style') {
+      return domain.getStyle(documentIdOrIdentity)
+    }
+    if (documentType === 'configuration') {
+      return domain.getConfiguration(documentIdOrIdentity)
+    }
+    if (documentType === 'page-template') {
+      return domain.getPageTemplate(documentIdOrIdentity)
+    }
+    if (documentType === 'page') {
+      return domain.getPage(documentIdOrIdentity)
+    }
+    if (documentType === 'navigation') {
+      return domain.getNavigation(documentIdOrIdentity)
+    }
+    if (documentType === 'vocabs') {
+      return domain.getVocab(documentIdOrIdentity)
+    }
+    if (documentType === 'auth-profile') {
+      return domain.getAuthProfile(documentIdOrIdentity)
+    }
+    if (documentType === 'i18n-bundles') {
+      return domain.getI18nBundle(documentIdOrIdentity)
+    }
+    if (documentType === 'project') {
+      return domain.getProject(documentIdOrIdentity)
+    }
     return null
   }
 
@@ -572,70 +663,175 @@ export class EndgeDomainRepository extends EndgeModule {
     documentIdOrIdentity: string | number,
   ): void {
     const existing = this.getDomainDocumentByType(documentType, documentIdOrIdentity)
-    if (!existing)
+    if (!existing) {
       return
+    }
 
     const id = (existing as any).id
     const identity = String((existing as any).identity ?? '')
     const remove = (removeById: (value: any) => void, removeByIdentity: (value: string) => void) => {
-      if (id != null) removeById(id)
-      else if (identity) removeByIdentity(identity)
+      if (id != null) {
+        removeById(id)
+      }
+      else if (identity) {
+        removeByIdentity(identity)
+      }
     }
     const domain = Endge.domain
 
-    if (documentType === ComponentType.SFC) return remove(x => domain.removeComponentSFCById(x), x => domain.removeComponentSFC(x))
-    if (documentType === ComponentType.Table || documentType === ComponentType.DSL) return remove(x => domain.removeComponentById(x), x => domain.removeComponent(x))
-    if (documentType === QueryType.REST || documentType === QueryType.GraphQL || documentType === QueryType.Custom) return remove(x => domain.removeQueryById(x), x => domain.removeQuery(x))
-    if (documentType === 'data-view') return remove(x => domain.removeDataViewById(x), x => domain.removeDataView(x))
-    if (documentType === 'composition') return remove(x => domain.removeCompositionById(x), x => domain.removeComposition(x))
-    if (documentType === 'store') return remove(x => domain.removeStoreById(x), x => domain.removeStore(x))
-    if (documentType === 'stream') return remove(x => domain.removeStreamById(x), x => domain.removeStream(x))
-    if (documentType === 'update') return remove(x => domain.removeUpdateById(x), x => domain.removeUpdate(x))
-    if (documentType === 'mock') return remove(x => domain.removeMockById(x), x => domain.removeMock(x))
-    if (documentType === 'computation') return remove(x => domain.removeComputationById(x), x => domain.removeComputation(x))
-    if (documentType === ParameterType.DefaultParameter) return remove(x => domain.removeParameterById(x), x => domain.removeParameter(x))
-    if (documentType === FilterType.DefaultFilter) return remove(x => domain.removeFilterById(x), x => domain.removeFilter(x))
-    if (documentType === 'type' || documentType === 'primitive') return remove(x => domain.removeTypeById(x), x => domain.removeType(x))
-    if (documentType === 'action') return remove(x => domain.removeActionById(x), x => domain.removeAction(x))
-    if (documentType === 'converter') return remove(x => domain.removeConverterById(x), x => domain.removeConverter(x))
-    if (documentType === 'integration') return remove(x => domain.removeIntegrationById(x), x => domain.removeIntegration(x))
-    if (documentType === 'environment') return remove(x => domain.removeEnvironmentById(x), x => domain.removeEnvironment(x))
-    if (documentType === 'tenant') return remove(x => domain.removeTenantById(x), x => domain.removeTenant(x))
-    if (documentType === 'policy') return remove(x => domain.removePolicyById(x), x => domain.removePolicy(x))
-    if (documentType === 'style') return remove(x => domain.removeStyleById(x), x => domain.removeStyle(x))
-    if (documentType === 'configuration') return remove(x => domain.removeConfigurationById(x), x => domain.removeConfiguration(x))
-    if (documentType === 'page-template') return remove(x => domain.removePageTemplateById(x), x => domain.removePageTemplate(x))
-    if (documentType === 'page') return remove(x => domain.removePageById(x), x => domain.removePage(x))
-    if (documentType === 'navigation') return remove(x => domain.removeNavigationById(x), x => domain.removeNavigation(x))
-    if (documentType === 'vocabs') return remove(x => domain.removeVocabsById(x), x => domain.removeVocabs(x))
-    if (documentType === 'auth-profile') return remove(x => domain.removeAuthProfileById(x), x => domain.removeAuthProfile(x))
-    if (documentType === 'i18n-bundles') return remove(x => domain.removeI18nBundlesById(x), x => domain.removeI18nBundles(x))
-    if (documentType === 'project') return remove(x => domain.removeProjectById(x), x => domain.removeProject(x))
+    if (documentType === ComponentType.SFC) {
+      return remove(x => domain.removeComponentSFCById(x), x => domain.removeComponentSFC(x))
+    }
+    if (documentType === ComponentType.Table || documentType === ComponentType.DSL) {
+      return remove(x => domain.removeComponentById(x), x => domain.removeComponent(x))
+    }
+    if (documentType === QueryType.REST || documentType === QueryType.GraphQL || documentType === QueryType.Custom) {
+      return remove(x => domain.removeQueryById(x), x => domain.removeQuery(x))
+    }
+    if (documentType === 'data-view') {
+      return remove(x => domain.removeDataViewById(x), x => domain.removeDataView(x))
+    }
+    if (documentType === 'composition') {
+      return remove(x => domain.removeCompositionById(x), x => domain.removeComposition(x))
+    }
+    if (documentType === 'store') {
+      return remove(x => domain.removeStoreById(x), x => domain.removeStore(x))
+    }
+    if (documentType === 'stream') {
+      return remove(x => domain.removeStreamById(x), x => domain.removeStream(x))
+    }
+    if (documentType === 'update') {
+      return remove(x => domain.removeUpdateById(x), x => domain.removeUpdate(x))
+    }
+    if (documentType === 'mock') {
+      return remove(x => domain.removeMockById(x), x => domain.removeMock(x))
+    }
+    if (documentType === 'computation') {
+      return remove(x => domain.removeComputationById(x), x => domain.removeComputation(x))
+    }
+    if (documentType === ParameterType.DefaultParameter) {
+      return remove(x => domain.removeParameterById(x), x => domain.removeParameter(x))
+    }
+    if (documentType === FilterType.DefaultFilter) {
+      return remove(x => domain.removeFilterById(x), x => domain.removeFilter(x))
+    }
+    if (documentType === 'type' || documentType === 'primitive') {
+      return remove(x => domain.removeTypeById(x), x => domain.removeType(x))
+    }
+    if (documentType === 'action') {
+      return remove(x => domain.removeActionById(x), x => domain.removeAction(x))
+    }
+    if (documentType === 'converter') {
+      return remove(x => domain.removeConverterById(x), x => domain.removeConverter(x))
+    }
+    if (documentType === 'integration') {
+      return remove(x => domain.removeIntegrationById(x), x => domain.removeIntegration(x))
+    }
+    if (documentType === 'environment') {
+      return remove(x => domain.removeEnvironmentById(x), x => domain.removeEnvironment(x))
+    }
+    if (documentType === 'tenant') {
+      return remove(x => domain.removeTenantById(x), x => domain.removeTenant(x))
+    }
+    if (documentType === 'policy') {
+      return remove(x => domain.removePolicyById(x), x => domain.removePolicy(x))
+    }
+    if (documentType === 'style') {
+      return remove(x => domain.removeStyleById(x), x => domain.removeStyle(x))
+    }
+    if (documentType === 'configuration') {
+      return remove(x => domain.removeConfigurationById(x), x => domain.removeConfiguration(x))
+    }
+    if (documentType === 'page-template') {
+      return remove(x => domain.removePageTemplateById(x), x => domain.removePageTemplate(x))
+    }
+    if (documentType === 'page') {
+      return remove(x => domain.removePageById(x), x => domain.removePage(x))
+    }
+    if (documentType === 'navigation') {
+      return remove(x => domain.removeNavigationById(x), x => domain.removeNavigation(x))
+    }
+    if (documentType === 'vocabs') {
+      return remove(x => domain.removeVocabsById(x), x => domain.removeVocabs(x))
+    }
+    if (documentType === 'auth-profile') {
+      return remove(x => domain.removeAuthProfileById(x), x => domain.removeAuthProfile(x))
+    }
+    if (documentType === 'i18n-bundles') {
+      return remove(x => domain.removeI18nBundlesById(x), x => domain.removeI18nBundles(x))
+    }
+    if (documentType === 'project') {
+      return remove(x => domain.removeProjectById(x), x => domain.removeProject(x))
+    }
   }
 
   private _getDomainCollectionKey(documentType: DomainDocumentType): DomainCollectionKey {
-    if (documentType === ComponentType.SFC) return 'componentSFCs'
-    if (documentType === QueryType.REST || documentType === QueryType.GraphQL || documentType === QueryType.Custom) return 'queries'
-    if (documentType === 'data-view') return 'dataViews'
-    if (documentType === 'composition') return 'compositions'
-    if (documentType === 'store') return 'stores'
-    if (documentType === 'stream') return 'streams'
-    if (documentType === 'update') return 'updates'
-    if (documentType === 'mock') return 'mocks'
-    if (documentType === 'type' || documentType === 'primitive') return 'types'
-    if (documentType === 'action') return 'actions'
-    if (documentType === FilterType.DefaultFilter) return 'filters'
-    if (documentType === 'converter') return 'converters'
-    if (documentType === 'computation') return 'computations'
-    if (documentType === 'environment') return 'environments'
-    if (documentType === 'tenant') return 'tenants'
-    if (documentType === 'style') return 'styles'
-    if (documentType === 'configuration') return 'configurations'
-    if (documentType === 'vocabs') return 'vocabs'
-    if (documentType === 'auth-profile') return 'authProfiles'
-    if (documentType === 'i18n-bundles') return 'i18nBundles'
-    if (documentType === 'navigation') return 'navigations'
-    if (documentType === 'project') return 'projects'
+    if (documentType === ComponentType.SFC) {
+      return 'componentSFCs'
+    }
+    if (documentType === QueryType.REST || documentType === QueryType.GraphQL || documentType === QueryType.Custom) {
+      return 'queries'
+    }
+    if (documentType === 'data-view') {
+      return 'dataViews'
+    }
+    if (documentType === 'composition') {
+      return 'compositions'
+    }
+    if (documentType === 'store') {
+      return 'stores'
+    }
+    if (documentType === 'stream') {
+      return 'streams'
+    }
+    if (documentType === 'update') {
+      return 'updates'
+    }
+    if (documentType === 'mock') {
+      return 'mocks'
+    }
+    if (documentType === 'type' || documentType === 'primitive') {
+      return 'types'
+    }
+    if (documentType === 'action') {
+      return 'actions'
+    }
+    if (documentType === FilterType.DefaultFilter) {
+      return 'filters'
+    }
+    if (documentType === 'converter') {
+      return 'converters'
+    }
+    if (documentType === 'computation') {
+      return 'computations'
+    }
+    if (documentType === 'environment') {
+      return 'environments'
+    }
+    if (documentType === 'tenant') {
+      return 'tenants'
+    }
+    if (documentType === 'style') {
+      return 'styles'
+    }
+    if (documentType === 'configuration') {
+      return 'configurations'
+    }
+    if (documentType === 'vocabs') {
+      return 'vocabs'
+    }
+    if (documentType === 'auth-profile') {
+      return 'authProfiles'
+    }
+    if (documentType === 'i18n-bundles') {
+      return 'i18nBundles'
+    }
+    if (documentType === 'navigation') {
+      return 'navigations'
+    }
+    if (documentType === 'project') {
+      return 'projects'
+    }
     throw new Error(`[EndgeDomainRepository] Unsupported service document type: ${documentType}`)
   }
 

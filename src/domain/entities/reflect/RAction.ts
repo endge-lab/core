@@ -1,10 +1,10 @@
-import type { EntityRef } from '@/domain/types/document/entity-management.type'
-import type { ActionImplementation, ActionTargetSelector } from '@/domain/types/runtime/action.types'
-
-import { Serialize } from '@endge/utils'
-import { Expose } from 'class-transformer'
-
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
+import type { EntityRef } from '@/domain/types/document/entity-management.type'
+
+import type { ActionImplementation, ActionTargetSelector } from '@/domain/types/runtime/action.types'
+import { Serialize } from '@endge/utils'
+
+import { Expose } from 'class-transformer'
 import { REntity } from '@/domain/entities/reflect/REntity'
 import { Endge } from '@/model/kernel/endge'
 
@@ -57,7 +57,9 @@ export class RAction extends REntity {
     action.active = json?.active !== false
     action.deletedAt = json?.deletedAt ?? null
     action.author = json?.author ?? null
-    if (storageMeta) action.applyStorageMeta(storageMeta)
+    if (storageMeta) {
+      action.applyStorageMeta(storageMeta)
+    }
     return action
   }
 
@@ -99,7 +101,11 @@ export class RAction extends REntity {
 }
 
 function relationToId(value: any): string | number | null {
-  if (value == null) return null
-  if (typeof value === 'object') return relationToId(value.id ?? value.value)
+  if (value == null) {
+    return null
+  }
+  if (typeof value === 'object') {
+    return relationToId(value.id ?? value.value)
+  }
   return value
 }

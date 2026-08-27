@@ -1,7 +1,7 @@
-import { Serialize } from '@endge/utils'
-import { Expose } from 'class-transformer'
-
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
+import { Serialize } from '@endge/utils'
+
+import { Expose } from 'class-transformer'
 import { REntity } from '@/domain/entities/reflect/REntity'
 
 /** Сущность политики (коллекция policies). identity, displayName, description, folder. */

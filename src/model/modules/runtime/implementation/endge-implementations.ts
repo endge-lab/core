@@ -1,7 +1,7 @@
 import type {
   ImplementationBinding,
-  ImplementationInvocation,
   ImplementationContract,
+  ImplementationInvocation,
   ImplementationProvider,
   ImplementationResolutionRequest,
   ImplementationSnapshot,
@@ -61,8 +61,9 @@ export class EndgeImplementations {
   /** Returns null only when neither a binding nor a default provider is declared. */
   public resolveOptional(request: ImplementationResolutionRequest): ResolvedImplementation | null {
     const binding = this._bindings.resolve(request)
-    if (!binding && !request.invocationProviderKey && !request.defaultProviderKey)
+    if (!binding && !request.invocationProviderKey && !request.defaultProviderKey) {
       return null
+    }
     return this.resolve(request)
   }
 
@@ -100,10 +101,12 @@ export class EndgeImplementations {
 
   private _requireProvider(key: string): ImplementationProvider {
     const provider = this._providers.get(key)
-    if (!provider)
+    if (!provider) {
       throw new ImplementationError('implementation-provider-missing', `Implementation provider is not registered: ${key}.`)
-    if (provider.active === false)
+    }
+    if (provider.active === false) {
       throw new ImplementationError('implementation-provider-inactive', `Implementation provider is inactive: ${key}.`)
+    }
     return provider
   }
 
@@ -111,10 +114,12 @@ export class EndgeImplementations {
     provider: ImplementationProvider,
     request: ImplementationResolutionRequest,
   ): void {
-    if (!provider.contract || !request.expectedContract)
+    if (!provider.contract || !request.expectedContract) {
       return
-    if (stableContract(provider.contract) === stableContract(request.expectedContract))
+    }
+    if (stableContract(provider.contract) === stableContract(request.expectedContract)) {
       return
+    }
     throw new ImplementationError(
       'implementation-contract-incompatible',
       `Provider contract is incompatible with ${request.executable.type}:${request.executable.identity}.`,
@@ -124,7 +129,9 @@ export class EndgeImplementations {
 
 function stableContract(contract: ImplementationContract): string {
   const field = (value: unknown) => {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return value ?? null
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return value ?? null
+    }
     const raw = value as Record<string, unknown>
     return {
       name: raw.name ?? null,
@@ -135,7 +142,7 @@ function stableContract(contract: ImplementationContract): string {
   }
   const target = Array.isArray(contract.target)
     ? contract.target.map((selector: any) => ({ type: selector.type, identity: selector.identity ?? null }))
-      .sort((left: any, right: any) => JSON.stringify(left).localeCompare(JSON.stringify(right)))
+        .sort((left: any, right: any) => JSON.stringify(left).localeCompare(JSON.stringify(right)))
     : null
   return JSON.stringify({ target, input: field(contract.input), output: field(contract.output) })
 }

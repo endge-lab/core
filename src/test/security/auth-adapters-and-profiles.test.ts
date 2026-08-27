@@ -5,8 +5,8 @@ import { BearerAuthAdapter } from '@/model/modules/security/auth/adapters/Bearer
 import { OAuth2ClientCredentialsAuthAdapter } from '@/model/modules/security/auth/adapters/OAuth2ClientCredentialsAuthAdapter'
 import { OAuth2PasswordAuthAdapter } from '@/model/modules/security/auth/adapters/OAuth2PasswordAuthAdapter'
 import { OidcAuthAdapter } from '@/model/modules/security/auth/adapters/OidcAuthAdapter'
-import { AuthInteractionRequiredError } from '@/model/modules/security/auth/AuthInteractionRequiredError'
 import { AuthAdapterRegistry } from '@/model/modules/security/auth/AuthAdapterRegistry'
+import { AuthInteractionRequiredError } from '@/model/modules/security/auth/AuthInteractionRequiredError'
 import { AuthProfileRegistry } from '@/model/modules/security/auth/AuthProfileRegistry'
 import { authProfile } from '@/test/security/auth-test-helpers'
 
@@ -76,7 +76,8 @@ describe('universal auth adapters', () => {
       getSignal: () => undefined,
     })
     await expect(profiles.createAdapterContext(profile).resolveCredential('token'))
-      .rejects.toThrow('Credential is unavailable')
+      .rejects
+      .toThrow('Credential is unavailable')
   })
 })
 

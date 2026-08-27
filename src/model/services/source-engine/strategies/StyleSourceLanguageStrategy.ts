@@ -22,7 +22,7 @@ export class StyleSourceLanguageStrategy implements SourceLanguageStrategy {
       { open: '(', close: ')' },
       { open: '[', close: ']' },
       { open: '"', close: '"' },
-      { open: "'", close: "'" },
+      { open: '\'', close: '\'' },
     ],
     triggerCharacters: [':', '@', '.', '#', '-'],
     tokenizer: {

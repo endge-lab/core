@@ -3,13 +3,13 @@ import type * as t from '@babel/types'
 import { parseExpression } from '@babel/parser'
 import { describe, expect, it } from 'vitest'
 
-import { compileValueExpression } from '@/model/services/source-engine/compilers/source-expression-compile'
-import { evaluateValueExpression } from '@/model/services/source-engine/source-expression-evaluate'
-import { compileQuerySource } from '@/model/services/source-engine/compilers/query-source-compile'
+import { EndgeDataView } from '@/model/modules/runtime/execution/endge-data-view'
+import { QueryExecutor_Adapter } from '@/model/adapters/query/QueryExecutor_Adapter'
 import { compileCompositionSource } from '@/model/services/source-engine/compilers/composition-source-compile'
 import { compileDataViewSource } from '@/model/services/source-engine/compilers/data-view-source-compile'
-import { EndgeDataView } from '@/model/modules/runtime/execution/endge-data-view'
-import { QueryExecutor } from '@/model/services/query/QueryExecutor'
+import { compileQuerySource } from '@/model/services/source-engine/compilers/query-source-compile'
+import { compileValueExpression } from '@/model/services/source-engine/compilers/source-expression-compile'
+import { evaluateValueExpression } from '@/model/services/source-engine/source-expression-evaluate'
 
 function compile(source: string) {
   const diagnostics: any[] = []
@@ -23,7 +23,7 @@ function compile(source: string) {
   return expression!
 }
 
-describe('ValueExpression', () => {
+describe('valueExpression', () => {
   it('is available in DataView map expressions while structural steps stay domain-specific', () => {
     const source = `
 defineDataView({
@@ -126,7 +126,7 @@ defineQuery({
       type: 'response',
       expression: { type: 'operation', operation: 'sort-by' },
     })
-    expect(new QueryExecutor().readResponseOutput(result.artifact!.outputs[0], {
+    expect(new QueryExecutor_Adapter().readResponseOutput(result.artifact!.outputs[0], {
       items: [
         { id: 2, active: true, std: '12:00' },
         { id: 3, active: false, std: '09:00' },
@@ -137,7 +137,7 @@ defineQuery({
       { id: 2, active: true, std: '12:00' },
     ])
 
-    expect(new QueryExecutor().readResponseOutput(result.artifact!.outputs[1], {
+    expect(new QueryExecutor_Adapter().readResponseOutput(result.artifact!.outputs[1], {
       pairsArrival: [{ id: 'A-null', arrivalLeg: { id: 'A' } }],
       pairsDeparture: [{ id: 'A-D', arrivalLeg: { id: 'A' }, departureLeg: { id: 'D' } }],
       attributes: [{ legId: 'A', items: [{ name: 'BestOn' }] }],

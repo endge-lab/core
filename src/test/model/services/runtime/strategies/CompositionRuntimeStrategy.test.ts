@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { CompositionRuntimeStrategy } from '@/model/services/runtime/strategies/CompositionRuntimeStrategy'
 
-describe('CompositionRuntimeStrategy', () => {
+describe('compositionRuntimeStrategy', () => {
   const strategy = new CompositionRuntimeStrategy()
 
   it('supports RComposition instances', () => {

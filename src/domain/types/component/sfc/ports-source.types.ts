@@ -1,7 +1,7 @@
-import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
+import type { RComponentSFC_SourceRange } from './location.types'
 
 import type { ComponentSFCEventSource, ComponentSFCPortManifest, ComponentSFCPortRole } from './ports.types'
-import type { RComponentSFC_SourceRange } from './location.types'
+import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
 
 export interface ComponentSFCPortsSourceProjection {
   editable: boolean
@@ -21,28 +21,28 @@ export type ComponentSFCPortsSourcePatch
     /** Complete factory expression, for example `event<RowEvent>()`. */
     declaration: string
   }
-    | {
-      type: 'remove-port'
-      role: ComponentSFCPortRole
-      name: string
-    }
-    | {
-      type: 'set-event'
-      name: string
-      payloadType: string
-      from?: ComponentSFCEventSource | null
-      /** Raw Action expression (`{ identity: ... }` or `typescript({...})`). */
-      actionSource?: string | null
-    }
-    | {
-      type: 'remove-event-action'
-      name: string
-    }
-    | {
-      type: 'set-forward'
-      /** Raw value of `forward`; null removes the section. */
-      declaration: string | null
-    }
+  | {
+    type: 'remove-port'
+    role: ComponentSFCPortRole
+    name: string
+  }
+  | {
+    type: 'set-event'
+    name: string
+    payloadType: string
+    from?: ComponentSFCEventSource | null
+    /** Raw Action expression (`{ identity: ... }` or `typescript({...})`). */
+    actionSource?: string | null
+  }
+  | {
+    type: 'remove-event-action'
+    name: string
+  }
+  | {
+    type: 'set-forward'
+    /** Raw value of `forward`; null removes the section. */
+    declaration: string | null
+  }
 
 export interface ComponentSFCPortsSourcePatchResult {
   ok: boolean

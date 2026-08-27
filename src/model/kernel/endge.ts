@@ -1,39 +1,43 @@
-import { EndgeFederation } from '@/domain/entities/endge/EndgeFederation'
-import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 import type { EndgeDomainBundle, EndgeDomainPlain, EndgeDomainSelection, EndgePortableDocuments } from '@/domain/types/document/domain-export.type'
-import { DomainSectionType } from '@/domain/types/document/document.types'
-import type { EndgeAuth } from '@/model/modules/security/endge-auth'
-import { EndgeActions } from '@/model/modules/runtime/core/endge-actions'
-import { EndgeContext } from '@/model/modules/context/endge-context'
-import { EndgeConfigurationModule } from '@/model/modules/context/endge-configuration'
-import { EndgeConfigurationSchemaModule } from '@/model/modules/context/endge-configuration-schema'
-import { EndgeDataView } from '@/model/modules/runtime/execution/endge-data-view'
-import { EndgeCompiler } from '@/model/modules/program/endge-compiler'
-import { EndgeDiagnostics } from '@/model/modules/diagnostics/endge-diagnostics'
-import { EndgeDomain } from '@/model/modules/domain/endge-domain'
-import { EndgeTypes } from '@/model/modules/domain/endge-types'
-import { EndgeEvents } from '@/model/modules/events/endge-events'
-import { EndgeI18n } from '@/model/modules/context/endge-i18n'
-import type { EndgeMock } from '@/model/modules/mock/EndgeMock'
-import { EndgeProgram } from '@/model/modules/program/endge-program'
-import { EndgeQuery } from '@/model/modules/runtime/execution/endge-query'
-import { EndgeRuntime } from '@/model/modules/runtime/core/endge-runtime'
-import { EndgeRuntimeDebugger } from '@/model/modules/diagnostics/endge-runtime-debugger'
-import { EndgeDomainRepository } from '@/model/modules/domain/endge-domain-repository'
-import { EndgeSource } from '@/model/modules/program/endge-source'
-import { EndgeStyles } from '@/model/modules/ui/endge-styles'
-import { EndgeUI } from '@/model/modules/ui/endge-ui'
-import { EndgeUpdates } from '@/model/modules/runtime/core/endge-updates'
+import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
+import type { EndgeConfigurationModule } from '@/model/modules/context/endge-configuration'
+import type { EndgeConfigurationSchemaModule } from '@/model/modules/context/endge-configuration-schema'
+import type { EndgeContext } from '@/model/modules/context/endge-context'
+import type { EndgeI18n } from '@/model/modules/context/endge-i18n'
 import type { WorkspaceVariables } from '@/model/modules/context/endge-vars'
-import { EndgeVocabs } from '@/model/modules/domain/endge-vocabs'
-import { EndgeWorkspace } from '@/model/modules/context/endge-workspace'
-import { migrateQuerySourceV1ToV2 } from '@/model/services/source-engine/migrations/query-source-v1-migration'
-import { EndgeUIRegistry } from '@/model/modules/ui/endge-ui-registry'
-import { ENDGE_DOMAIN_BUNDLE_VERSION } from '@/model/config/domain.config'
-import { ENDGE_CORE_MODULES } from '@/model/config/modules.config'
+import type { EndgeWorkspace } from '@/model/modules/context/endge-workspace'
+import type { EndgeDiagnostics } from '@/model/modules/diagnostics/endge-diagnostics'
+import type { EndgeRuntimeDebugger } from '@/model/modules/diagnostics/endge-runtime-debugger'
+import type { EndgeDomain } from '@/model/modules/domain/endge-domain'
+import type { EndgeDomainRepository } from '@/model/modules/domain/endge-domain-repository'
+import type { EndgeTypes } from '@/model/modules/domain/endge-types'
+import type { EndgeVocabs } from '@/model/modules/domain/endge-vocabs'
+import type { EndgeEvents } from '@/model/modules/events/endge-events'
+import type { EndgeMock } from '@/model/modules/mock/EndgeMock'
+import type { EndgeCompiler } from '@/model/modules/program/endge-compiler'
+import type { EndgeProgram } from '@/model/modules/program/endge-program'
+import type { EndgeSource } from '@/model/modules/program/endge-source'
+import type { EndgeActions } from '@/model/modules/runtime/core/endge-actions'
+import type { EndgeRuntime } from '@/model/modules/runtime/core/endge-runtime'
+import type { EndgeUpdates } from '@/model/modules/runtime/core/endge-updates'
 import type { EndgeComposition } from '@/model/modules/runtime/execution/endge-composition'
 import type { EndgeComputation } from '@/model/modules/runtime/execution/endge-computation'
 import type { EndgeConverters } from '@/model/modules/runtime/execution/endge-converters'
+import type { EndgeDataView } from '@/model/modules/runtime/execution/endge-data-view'
+import type { EndgeQuery } from '@/model/modules/runtime/execution/endge-query'
+import type { EndgeAuth } from '@/model/modules/security/endge-auth'
+import type { EndgeStyles } from '@/model/modules/ui/endge-styles'
+import type { EndgeUI } from '@/model/modules/ui/endge-ui'
+import type { EndgeUIRegistry } from '@/model/modules/ui/endge-ui-registry'
+import { EndgeFederation } from '@/domain/entities/endge/EndgeFederation'
+import { setEndgeFederationStorageAdapter } from '@/domain/entities/endge/EndgeFederationStorage'
+import { DomainSectionType } from '@/domain/types/document/document.types'
+import { ENDGE_DOMAIN_BUNDLE_VERSION } from '@/model/config/domain.config'
+import { ENDGE_CORE_MODULES } from '@/model/config/modules.config'
+import { LocalStorageContextAdapter } from '@/model/modules/context/persistence/adapters/LocalStorageContextAdapter'
+import { migrateQuerySourceV1ToV2 } from '@/model/services/source-engine/migrations/query-source-v1-migration'
+
+setEndgeFederationStorageAdapter(new LocalStorageContextAdapter())
 
 /**
  * Единая статическая федерация Endge.
@@ -70,8 +74,9 @@ export class Endge extends EndgeFederation {
    * Метод является единственной централизованной точкой старта `Endge`.
    */
   static override async boot(ctx: EndgeBootContext): Promise<void> {
-    if (this.isInitialized)
+    if (this.isInitialized) {
       return
+    }
 
     await super.boot(ctx)
   }
@@ -105,13 +110,15 @@ export class Endge extends EndgeFederation {
     const selectedKeys = new Map<keyof EndgeDomainPlain, Set<string>>()
     for (const item of selection) {
       const collection = Endge.resolveSelectionCollection(item)
-      if (!collection)
+      if (!collection) {
         continue
+      }
 
       const keys = selectedKeys.get(collection) ?? new Set<string>()
       keys.add(String(item.id))
-      if (item.identity != null && item.identity !== '')
+      if (item.identity != null && item.identity !== '') {
         keys.add(String(item.identity))
+      }
       selectedKeys.set(collection, keys)
     }
 
@@ -119,12 +126,14 @@ export class Endge extends EndgeFederation {
     return Object.fromEntries(
       (Object.entries(domain) as Array<[keyof EndgeDomainPlain, unknown[]]>).map(([collection, entities]) => {
         const keys = selectedKeys.get(collection)
-        if (!keys)
+        if (!keys) {
           return [collection, []]
+        }
 
         return [collection, entities.filter((entity) => {
-          if (entity == null || typeof entity !== 'object')
+          if (entity == null || typeof entity !== 'object') {
             return false
+          }
           const candidate = entity as { id?: string | number, identity?: string | number }
           return (candidate.id != null && keys.has(String(candidate.id)))
             || (candidate.identity != null && keys.has(String(candidate.identity)))
@@ -141,29 +150,29 @@ export class Endge extends EndgeFederation {
     const authProfiles = Endge._portableIdentityIndex(domain.authProfiles)
     const stores = Endge._portableIdentityIndex(domain.stores)
     const documents: EndgePortableDocuments = {
-      projects: Endge._portableProjects(domain.projects, folders, environments),
-      tenants: Endge._portableDocuments(domain.tenants, folders),
-      environments: Endge._portableDocuments(domain.environments, folders),
-      folders: Endge._portableFolders(domain.folders),
-      types: Endge._portableDocuments(domain.types, folders),
-      queries: Endge._portableQueries(domain.queries, folders),
+      'projects': Endge._portableProjects(domain.projects, folders, environments),
+      'tenants': Endge._portableDocuments(domain.tenants, folders),
+      'environments': Endge._portableDocuments(domain.environments, folders),
+      'folders': Endge._portableFolders(domain.folders),
+      'types': Endge._portableDocuments(domain.types, folders),
+      'queries': Endge._portableQueries(domain.queries, folders),
       'data-views': Endge._portableDocuments(domain.dataViews, folders),
-      compositions: Endge._portableDocuments(domain.compositions, folders),
-      stores: Endge._portableDocuments(domain.stores, folders),
-      streams: Endge._portableDocuments(domain.streams, folders),
-      updates: Endge._portableDocuments(domain.updates, folders, { storeIdentity: stores }),
-      mocks: Endge._portableDocuments(domain.mocks, folders),
-      components: Endge._portableDocuments(domain.componentSFCs, folders),
-      actions: Endge._portableDocuments(domain.actions, folders),
-      filters: Endge._portableDocuments(domain.filters, folders),
-      converters: Endge._portableDocuments(domain.converters, folders),
-      computations: Endge._portableDocuments(domain.computations, folders),
-      vocabs: Endge._portableDocuments(domain.vocabs, folders, { authProfileIdentity: authProfiles }),
+      'compositions': Endge._portableDocuments(domain.compositions, folders),
+      'stores': Endge._portableDocuments(domain.stores, folders),
+      'streams': Endge._portableDocuments(domain.streams, folders),
+      'updates': Endge._portableDocuments(domain.updates, folders, { storeIdentity: stores }),
+      'mocks': Endge._portableDocuments(domain.mocks, folders),
+      'components': Endge._portableDocuments(domain.componentSFCs, folders),
+      'actions': Endge._portableDocuments(domain.actions, folders),
+      'filters': Endge._portableDocuments(domain.filters, folders),
+      'converters': Endge._portableDocuments(domain.converters, folders),
+      'computations': Endge._portableDocuments(domain.computations, folders),
+      'vocabs': Endge._portableDocuments(domain.vocabs, folders, { authProfileIdentity: authProfiles }),
       'i18n-bundles': Endge._portableDocuments(domain.i18nBundles, folders),
       'auth-profiles': Endge._portableDocuments(domain.authProfiles, folders),
-      navigations: Endge._portableDocuments(domain.navigations, folders),
-      styles: Endge._portableDocuments(domain.styles, folders),
-      configurations: Endge._portableDocuments(domain.configurations, folders),
+      'navigations': Endge._portableDocuments(domain.navigations, folders),
+      'styles': Endge._portableDocuments(domain.styles, folders),
+      'configurations': Endge._portableDocuments(domain.configurations, folders),
     }
 
     const { installedIntegrations, ...workspaceContent } = workspace
@@ -191,18 +200,21 @@ export class Endge extends EndgeFederation {
     relations: Record<string, Map<string, string>> = {},
   ): Record<string, unknown>[] {
     return values.flatMap((value) => {
-      if (value == null || typeof value !== 'object' || Array.isArray(value))
+      if (value == null || typeof value !== 'object' || Array.isArray(value)) {
         return []
+      }
 
       const source = value as Record<string, unknown>
       const identity = String(source.identity ?? '').trim()
-      if (!identity)
+      if (!identity) {
         return []
+      }
 
       const result: Record<string, unknown> = {}
       for (const [key, fieldValue] of Object.entries(source)) {
-        if (['id', 'name', 'author', 'createdAt', 'updatedAt', 'deletedAt', 'revision', 'folder', 'folderId', 'origin', 'isTemporary'].includes(key))
+        if (['id', 'name', 'author', 'createdAt', 'updatedAt', 'deletedAt', 'revision', 'folder', 'folderId', 'origin', 'isTemporary'].includes(key)) {
           continue
+        }
         result[key] = fieldValue
       }
       result.identity = identity
@@ -213,8 +225,9 @@ export class Endge extends EndgeFederation {
       result.active = source.active !== false
 
       const folderIdentity = Endge._portableRelationIdentity(source.folderIdentity ?? source.folder ?? source.folderId, folders)
-      if (folderIdentity)
+      if (folderIdentity) {
         result.folderIdentity = folderIdentity
+      }
 
       for (const [field, index] of Object.entries(relations)) {
         const raw = source[field]
@@ -223,8 +236,9 @@ export class Endge extends EndgeFederation {
         }
         else {
           const relationIdentity = Endge._portableRelationIdentity(raw, index)
-          if (relationIdentity)
+          if (relationIdentity) {
             result[field] = relationIdentity
+          }
         }
       }
 
@@ -235,13 +249,15 @@ export class Endge extends EndgeFederation {
   /** Переводит legacy Query source в обязательный portable Query v2 contract. */
   private static _portableQueries(values: unknown[], folders: Map<string, string>): Record<string, unknown>[] {
     return Endge._portableDocuments(values, folders).map((query) => {
-      if (Number(query.sourceVersion) !== 1)
+      if (Number(query.sourceVersion) !== 1) {
         return query
+      }
 
       const identity = String(query.identity ?? '').trim()
       const migration = migrateQuerySourceV1ToV2(String(query.source ?? ''))
-      if (!migration.ok)
+      if (!migration.ok) {
         throw new Error(`Query "${identity}" cannot be exported: ${migration.message}`)
+      }
 
       return {
         ...query,
@@ -259,8 +275,9 @@ export class Endge extends EndgeFederation {
       project.allowedEnvironments = (Array.isArray(relation) ? relation : [])
         .map(item => Endge._portableRelationIdentity(item, environments))
         .filter(Boolean)
-      for (const field of ['slug', 'order', 'sortOrder', 'navigation', 'navigationId', 'navigationIdentity', 'allowedEnvironmentIds', 'allowedEnvironmentIdentities'])
+      for (const field of ['slug', 'order', 'sortOrder', 'navigation', 'navigationId', 'navigationIdentity', 'allowedEnvironmentIds', 'allowedEnvironmentIdentities']) {
         delete project[field]
+      }
       return project
     })
   }
@@ -275,8 +292,9 @@ export class Endge extends EndgeFederation {
       const source = values.find(value => value != null && typeof value === 'object' && String((value as any).identity) === folder.identity) as Record<string, unknown> | undefined
       const parentIdentity = Endge._portableRelationIdentity(source?.parentIdentity ?? source?.parent ?? source?.parentId, identities)
       delete folder.folderIdentity
-      if (parentIdentity)
+      if (parentIdentity) {
         folder.parentIdentity = parentIdentity
+      }
       return folder
     })
   }
@@ -285,28 +303,33 @@ export class Endge extends EndgeFederation {
   private static _portableIdentityIndex(values: unknown[]): Map<string, string> {
     const result = new Map<string, string>()
     for (const value of values) {
-      if (value == null || typeof value !== 'object' || Array.isArray(value))
+      if (value == null || typeof value !== 'object' || Array.isArray(value)) {
         continue
+      }
       const item = value as Record<string, unknown>
       const identity = String(item.identity ?? '').trim()
-      if (!identity)
+      if (!identity) {
         continue
+      }
       result.set(identity, identity)
-      if (item.id != null)
+      if (item.id != null) {
         result.set(String(item.id), identity)
+      }
     }
     return result
   }
 
   /** Разрешает relation object, runtime id или готовую identity в стабильную identity. */
   private static _portableRelationIdentity(value: unknown, index: Map<string, string>): string | null {
-    if (value == null)
+    if (value == null) {
       return null
+    }
     if (typeof value === 'object' && !Array.isArray(value)) {
       const relation = value as Record<string, unknown>
       const directIdentity = String(relation.identity ?? '').trim()
-      if (directIdentity)
+      if (directIdentity) {
         return directIdentity
+      }
       return Endge._portableRelationIdentity(relation.value ?? relation.id, index)
     }
     return index.get(String(value)) ?? null

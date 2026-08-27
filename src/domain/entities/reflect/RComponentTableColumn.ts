@@ -1,18 +1,20 @@
-import type { EndgeEventBinding } from '@/domain/types/kernel/events.types'
-import type { ColumnSortConfig } from '@/domain/types/runtime/table.types'
 import type { Constructor } from '@endge/utils'
+import type { ColumnComponentType } from '@/domain/types/component/component.types'
+import type { EndgeEventBinding } from '@/domain/types/kernel/events.types'
+
+import type { ColumnSortConfig } from '@/domain/types/runtime/table.types'
 
 import { randomString } from '@endge/utils'
-
-import { normalizeSortConfig } from '@/tools/table'
 import { ComponentType } from '@/domain/types/document/document.types'
-import { ColumnComponentType } from '@/domain/types/component/component.types'
+import { normalizeSortConfig } from '@/tools/table'
 
 function normalizeRelationId(value: unknown): number | null {
-  if (value == null)
+  if (value == null) {
     return null
-  if (typeof value === 'number')
+  }
+  if (typeof value === 'number') {
     return Number.isFinite(value) ? value : null
+  }
   if (typeof value === 'object') {
     const raw = value as Record<string, unknown>
     // Payload relation can be resolved as object; prefer numeric id, fallback to nested value/id.
@@ -20,8 +22,9 @@ function normalizeRelationId(value: unknown): number | null {
     return nested == null ? null : normalizeRelationId(nested)
   }
   const text = String(value).trim()
-  if (!text)
+  if (!text) {
     return null
+  }
   const id = Number(text)
   return Number.isFinite(id) ? id : null
 }
@@ -83,32 +86,34 @@ export class ReflectComponentTableColumnBase {
 
   toPlain(): Record<string, any> {
     const reportsPlain: Record<string, any> | null = (() => {
-      if (!this.reports || typeof this.reports !== 'object')
+      if (!this.reports || typeof this.reports !== 'object') {
         return null
+      }
 
       const out: Record<string, any> = {}
       for (const [k, cfg] of Object.entries(this.reports)) {
-        if (!cfg || typeof cfg !== 'object')
+        if (!cfg || typeof cfg !== 'object') {
           continue
+        }
 
-        const enabled =
-          typeof (cfg as any).enabled === 'boolean'
+        const enabled
+          = typeof (cfg as any).enabled === 'boolean'
             ? (cfg as any).enabled
             : undefined
 
         const formatterRaw = (cfg as any).formatter
-        const formatter =
-          formatterRaw && typeof formatterRaw === 'object'
+        const formatter
+          = formatterRaw && typeof formatterRaw === 'object'
             ? {
-              type:
+                type:
                 typeof formatterRaw.type === 'string'
                   ? formatterRaw.type
                   : undefined,
-              format:
+                format:
                 typeof formatterRaw.format === 'string'
                   ? formatterRaw.format
                   : undefined,
-            }
+              }
             : undefined
 
         out[k] = {
@@ -164,25 +169,26 @@ export class ReflectComponentTableColumnBase {
     if (json.reports && typeof json.reports === 'object') {
       const out: Record<string, any> = {}
       for (const [k, v] of Object.entries(json.reports)) {
-        if (!v || typeof v !== 'object')
+        if (!v || typeof v !== 'object') {
           continue
+        }
 
-        const enabled =
-          typeof (v as any).enabled === 'boolean' ? (v as any).enabled : undefined
+        const enabled
+          = typeof (v as any).enabled === 'boolean' ? (v as any).enabled : undefined
 
         const formatterRaw = (v as any).formatter
-        const formatter =
-          formatterRaw && typeof formatterRaw === 'object'
+        const formatter
+          = formatterRaw && typeof formatterRaw === 'object'
             ? {
-              type:
+                type:
                 typeof formatterRaw.type === 'string'
                   ? formatterRaw.type
                   : undefined,
-              format:
+                format:
                 typeof formatterRaw.format === 'string'
                   ? formatterRaw.format
                   : undefined,
-            }
+              }
             : undefined
 
         out[k] = {
@@ -208,13 +214,18 @@ export class ReflectComponentTableColumnBase {
     if (Array.isArray(json.dataConverters)) {
       for (const item of json.dataConverters) {
         const key = item?.dataPathKey ?? item?.key
-        if (key == null) continue
+        if (key == null) {
+          continue
+        }
         const val = typeof item?.converter === 'object' && item?.converter?.identity != null
           ? item.converter.identity
           : (typeof item?.converter === 'string' ? item.converter : (item?.value ?? ''))
-        if (val) this.dataConverters[key] = (this.dataConverters[key] ? `${this.dataConverters[key]},` : '') + val
+        if (val) {
+          this.dataConverters[key] = (this.dataConverters[key] ? `${this.dataConverters[key]},` : '') + val
+        }
       }
-    } else if (json.dataConverters && typeof json.dataConverters === 'object') {
+    }
+    else if (json.dataConverters && typeof json.dataConverters === 'object') {
       for (const [key, rawPath] of Object.entries(json.dataConverters)) {
         this.dataConverters[key] = rawPath as any
       }

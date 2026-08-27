@@ -1,5 +1,7 @@
-import type { RuntimeEntityModelMap, RuntimeEntityType } from '@/domain/types/runtime/runtime-entity-map.types'
+import type { RaphNode } from '@endge/raph'
+import type { ProgramArtifact } from '@/domain/types/program/program.types'
 import type { RuntimeStateControllerLike } from '@/domain/types/runtime/context-persistence.types'
+import type { RuntimeEntityModelMap, RuntimeEntityType } from '@/domain/types/runtime/runtime-entity-map.types'
 import type {
   RuntimeArtifactReader,
   RuntimeHost,
@@ -8,16 +10,14 @@ import type {
   RuntimeHostChannel,
   RuntimeHostContext,
   RuntimeHostInputBinding,
-  RuntimeHostResource,
   RuntimeHostResolvedUpdate,
+  RuntimeHostResource,
   RuntimeHostSnapshot,
   RuntimeHostStatus,
   RuntimeHostUpdateBinding,
   RuntimeHostUpdateContext,
 } from '@/domain/types/runtime/runtime-host.types'
-import type { ProgramArtifact } from '@/domain/types/program/program.types'
 import type { RuntimeKind } from '@/domain/types/runtime/runtime.types'
-import type { RaphNode } from '@endge/raph'
 
 import { Raph } from '@endge/raph'
 import { EventBus } from '@endge/utils'
@@ -179,58 +179,69 @@ export abstract class RuntimeHostBase<
   }
 
   public mount(): void {
-    if (this.status === 'created' || this.status === 'unmounted' || this.status === 'stopped')
+    if (this.status === 'created' || this.status === 'unmounted' || this.status === 'stopped') {
       this.setStatus('mounted')
+    }
   }
 
   public start(): void {
-    if (this.status === 'mounted')
+    if (this.status === 'mounted') {
       this.setStatus('active')
+    }
   }
 
   public pause(): void {
-    if (this.status !== 'active' && this.status !== 'running')
+    if (this.status !== 'active' && this.status !== 'running') {
       return
+    }
     this.setStatus('pausing')
-    for (const timer of this._updateTimers.values())
+    for (const timer of this._updateTimers.values()) {
       clearTimeout(timer)
+    }
     this._updateTimers.clear()
     this.setStatus('paused')
   }
 
   public resume(): void {
-    if (this.status === 'paused')
+    if (this.status === 'paused') {
       this.setStatus('active')
+    }
   }
 
   public reconcile(): void {}
 
   public stop(): void {
-    if (this.status === 'destroyed' || this.status === 'unmounted' || this.status === 'stopped')
+    if (this.status === 'destroyed' || this.status === 'unmounted' || this.status === 'stopped') {
       return
+    }
     this.setStatus('stopping')
-    for (const timer of this._updateTimers.values())
+    for (const timer of this._updateTimers.values()) {
       clearTimeout(timer)
+    }
     this._updateTimers.clear()
     this.setStatus('stopped')
   }
 
   public unmount(): void {
-    if (this.status !== 'destroyed')
+    if (this.status !== 'destroyed') {
       this.setStatus('unmounted')
+    }
   }
 
   /** Останавливает доставку новых updates, не освобождая данные host-а. */
   public quiesce(): void {
-    if (this._quiesced)
+    if (this._quiesced) {
       return
+    }
     this._quiesced = true
-    for (const timer of this._updateTimers.values())
+    for (const timer of this._updateTimers.values()) {
       clearTimeout(timer)
+    }
     this._updateTimers.clear()
     for (const disposers of this._updateDisposers.values()) {
-      for (const dispose of disposers)
+      for (const dispose of disposers) {
         dispose()
+      }
     }
     this._updateDisposers.clear()
     this._updateBindings.clear()
@@ -243,20 +254,23 @@ export abstract class RuntimeHostBase<
     this.quiesce()
     this.setStatus('destroyed')
     this._inputBindings.clear()
-    for (const node of this._raphNodes.values())
+    for (const node of this._raphNodes.values()) {
       Raph.app.removeNode(node)
+    }
     this._raphNodes.clear()
     this.node = null
-    if (Raph.get(this.basePath) !== undefined)
+    if (Raph.get(this.basePath) !== undefined) {
       Raph.delete(this.basePath)
+    }
     this.resources.splice(0)
     this.channels.splice(0)
     this.runtimeState = null
     this.parent = null
     this._artifactReader = null
     this._artifactRef = null
-    for (const key of Object.keys(this.meta))
+    for (const key of Object.keys(this.meta)) {
       delete this.meta[key]
+    }
     this.context = {} as TContext
     ;(this as any).offAll?.()
   }
@@ -268,13 +282,15 @@ export abstract class RuntimeHostBase<
    * решает, как обновлять свои данные, запросы или render-boundary.
    */
   public update(ctx: RuntimeHostUpdateContext): void {
-    if (this._quiesced || this.status === 'paused' || this.status === 'stopping' || this.status === 'stopped' || this.status === 'unmounted' || this.status === 'destroyed')
+    if (this._quiesced || this.status === 'paused' || this.status === 'stopping' || this.status === 'stopped' || this.status === 'unmounted' || this.status === 'destroyed') {
       return
+    }
     const immediate: RuntimeHostResolvedUpdate[] = []
     let matchedBinding = false
     for (const binding of this._updateBindings.values()) {
-      if (!ctx.events.some(event => pathAffects(binding.sourcePath, event.canonical)))
+      if (!ctx.events.some(event => pathAffects(binding.sourcePath, event.canonical))) {
         continue
+      }
       matchedBinding = true
 
       const update: RuntimeHostResolvedUpdate = {
@@ -290,18 +306,21 @@ export abstract class RuntimeHostBase<
       }
 
       const previous = this._updateTimers.get(binding.id)
-      if (previous)
+      if (previous) {
         clearTimeout(previous)
+      }
       this._updateTimers.set(binding.id, setTimeout(() => {
         this._updateTimers.delete(binding.id)
         this.onUpdate({ ...ctx, updates: [update] })
       }, debounceMs))
     }
 
-    if (immediate.length)
+    if (immediate.length) {
       this.onUpdate({ ...ctx, updates: immediate })
-    else if (!matchedBinding)
+    }
+    else if (!matchedBinding) {
       this.onUpdate(ctx)
+    }
   }
 
   /** Логическая обработка update после разрешения binding-ов. */
@@ -319,15 +338,17 @@ export abstract class RuntimeHostBase<
 
   public bindInput(name: string, binding: RuntimeHostInputBinding): void {
     const key = String(name ?? '').trim()
-    if (!key)
+    if (!key) {
       throw new Error('[RuntimeHostBase] Input name is required.')
+    }
     this._inputBindings.set(key, binding)
   }
 
   public readInput(name: string): unknown {
     const binding = this._inputBindings.get(String(name ?? '').trim())
-    if (!binding)
+    if (!binding) {
       return undefined
+    }
     return binding.kind === 'literal' ? binding.value : Raph.get(binding.path)
   }
 
@@ -338,12 +359,14 @@ export abstract class RuntimeHostBase<
   }
 
   public bindUpdate(binding: RuntimeHostUpdateBinding): () => void {
-    if (!this.node)
+    if (!this.node) {
       throw new Error(`[RuntimeHostBase] Runtime node is missing for "${this.id}".`)
+    }
     const id = String(binding.id ?? '').trim()
     const sourcePath = String(binding.sourcePath ?? '').trim()
-    if (!id || !sourcePath)
+    if (!id || !sourcePath) {
       throw new Error('[RuntimeHostBase] Update binding requires id and sourcePath.')
+    }
 
     this.unbindUpdate(id)
     const normalized: RuntimeHostUpdateBinding = { ...binding, id, sourcePath }
@@ -358,13 +381,15 @@ export abstract class RuntimeHostBase<
   }
 
   private unbindUpdate(id: string): void {
-    for (const dispose of this._updateDisposers.get(id) ?? [])
+    for (const dispose of this._updateDisposers.get(id) ?? []) {
       dispose()
+    }
     this._updateDisposers.delete(id)
     this._updateBindings.delete(id)
     const timer = this._updateTimers.get(id)
-    if (timer)
+    if (timer) {
       clearTimeout(timer)
+    }
     this._updateTimers.delete(id)
   }
 
@@ -386,10 +411,10 @@ export abstract class RuntimeHostBase<
    */
   public addResource(resource: RuntimeHostResource): void {
     const idx = this.resources.findIndex(item => item.id === resource.id)
-    if (idx >= 0)
+    if (idx >= 0) {
       this.resources[idx] = resource
-    else
-      this.resources.push(resource)
+    }
+    else { this.resources.push(resource) }
     this.touch()
   }
 
@@ -398,10 +423,10 @@ export abstract class RuntimeHostBase<
    */
   public addChannel(channel: RuntimeHostChannel): void {
     const idx = this.channels.findIndex(item => item.id === channel.id)
-    if (idx >= 0)
+    if (idx >= 0) {
       this.channels[idx] = channel
-    else
-      this.channels.push(channel)
+    }
+    else { this.channels.push(channel) }
     this.touch()
   }
 
@@ -428,11 +453,13 @@ export abstract class RuntimeHostBase<
    */
   public addRaphNode(node: RaphNode): void {
     const key = String(node?.id ?? '').trim()
-    if (!key)
+    if (!key) {
       return
+    }
     this._raphNodes.set(key, node)
-    if (!this.node)
+    if (!this.node) {
       this.node = node
+    }
     this.touch()
   }
 
@@ -440,12 +467,14 @@ export abstract class RuntimeHostBase<
    * ACCESS
    */
   public getArtifact(): ProgramArtifact<TArtifactPayload> | null {
-    if (!this._artifactReader || !this._artifactRef)
+    if (!this._artifactReader || !this._artifactRef) {
       return null
+    }
 
     const idOrIdentity = this._artifactRef.id ?? this._artifactRef.identity
-    if (idOrIdentity == null)
+    if (idOrIdentity == null) {
       return null
+    }
 
     return this._artifactReader.getArtifact<TArtifactPayload>(
       this._artifactRef.entityType,
@@ -498,8 +527,9 @@ export abstract class RuntimeHostBase<
 
   private serializeContext(): Record<string, unknown> {
     const value = this.context
-    if (!value || typeof value !== 'object')
+    if (!value || typeof value !== 'object') {
       return {}
+    }
 
     try {
       return structuredClone(value) as Record<string, unknown>
@@ -517,8 +547,9 @@ export abstract class RuntimeHostBase<
 
 function appendPath(base: string, path: string): string {
   const suffix = String(path ?? '').trim()
-  if (!suffix)
+  if (!suffix) {
     return base
+  }
   return `${base}.${suffix.split('.').map(encodePathPart).join('.')}`
 }
 

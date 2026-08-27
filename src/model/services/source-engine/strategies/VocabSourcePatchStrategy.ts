@@ -1,5 +1,5 @@
-import type { VocabSourceDocument, VocabSourcePatch } from '@/domain/types/source/vocab-source.types'
 import type { SourceKind, SourceParseResult, SourcePatchResult, SourcePatchStrategy } from '@/domain/types/source/source-engine.types'
+import type { VocabSourceDocument, VocabSourcePatch } from '@/domain/types/source/vocab-source.types'
 
 import { parseVocabSource, patchVocabSource } from '@/model/services/source-engine/vocab-source-patch'
 

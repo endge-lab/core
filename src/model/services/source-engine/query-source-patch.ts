@@ -156,15 +156,18 @@ function parseDefinition(source: string): QueryDefinitionParseResult {
 
 function findDefineQueryCall(ast: t.File): t.CallExpression | null {
   for (const statement of ast.program.body) {
-    if (!t.isExpressionStatement(statement))
+    if (!t.isExpressionStatement(statement)) {
       continue
+    }
 
     const expression = unwrapExpression(statement.expression)
-    if (!t.isCallExpression(expression))
+    if (!t.isCallExpression(expression)) {
       continue
+    }
 
-    if (t.isIdentifier(expression.callee, { name: 'defineQuery' }))
+    if (t.isIdentifier(expression.callee, { name: 'defineQuery' })) {
       return expression
+    }
   }
 
   return null
@@ -178,15 +181,18 @@ function findProperty(
 
   for (const [index, key] of path.entries()) {
     const property = getObjectProperty(current, key)
-    if (!property)
+    if (!property) {
       return null
+    }
 
     const value = unwrapExpression(property.value as t.Expression)
-    if (index === path.length - 1)
+    if (index === path.length - 1) {
       return { property, value }
+    }
 
-    if (!t.isObjectExpression(value))
+    if (!t.isObjectExpression(value)) {
       return null
+    }
     current = value
   }
 
@@ -198,12 +204,14 @@ function resolveInsertTarget(
   parentPath: string[],
   source: string,
 ): InsertTarget | null {
-  if (!parentPath.length)
+  if (!parentPath.length) {
     return { object: root, depth: depthForObject(root, source) }
+  }
 
   const parent = findProperty(root, parentPath)
-  if (!parent || !t.isObjectExpression(parent.value))
+  if (!parent || !t.isObjectExpression(parent.value)) {
     return null
+  }
 
   return {
     object: parent.value,
@@ -213,8 +221,9 @@ function resolveInsertTarget(
 
 function insertProperty(source: string, target: InsertTarget, key: string, expression: string): string {
   const object = target.object
-  if (typeof object.end !== 'number')
+  if (typeof object.end !== 'number') {
     return source
+  }
 
   const closeOffset = object.end - 1
   const hasProperties = object.properties.length > 0
@@ -222,15 +231,17 @@ function insertProperty(source: string, target: InsertTarget, key: string, expre
   const ownIndent = '  '.repeat(target.depth)
   const propertyLine = `${childIndent}${printKey(key)}: ${indentExpression(expression, childIndent)},`
 
-  if (!hasProperties)
+  if (!hasProperties) {
     return replaceRange(source, closeOffset, closeOffset, `\n${propertyLine}\n${ownIndent}`)
+  }
 
   return replaceRange(source, closeOffset, closeOffset, `${propertyLine}\n${ownIndent}`)
 }
 
 function depthForObject(node: t.ObjectExpression, source: string): number {
-  if (typeof node.start !== 'number')
+  if (typeof node.start !== 'number') {
     return 0
+  }
 
   const before = source.slice(0, node.start)
   const lastLineBreak = before.lastIndexOf('\n')
@@ -242,8 +253,9 @@ function depthForObject(node: t.ObjectExpression, source: string): number {
 }
 
 function indentExpression(expression: string, childIndent: string): string {
-  if (!expression.includes('\n'))
+  if (!expression.includes('\n')) {
     return expression
+  }
 
   const continuationIndent = `${childIndent}  `
   return expression
@@ -258,23 +270,28 @@ function replaceRange(source: string, start: number, end: number, value: string)
 
 function getObjectProperty(node: t.ObjectExpression, key: string): t.ObjectProperty | null {
   for (const property of node.properties) {
-    if (!t.isObjectProperty(property) || property.computed)
+    if (!t.isObjectProperty(property) || property.computed) {
       continue
+    }
 
-    if (getPropertyName(property.key) === key)
+    if (getPropertyName(property.key) === key) {
       return property
+    }
   }
 
   return null
 }
 
 function getPropertyName(key: t.ObjectProperty['key']): string | null {
-  if (t.isIdentifier(key))
+  if (t.isIdentifier(key)) {
     return key.name
-  if (t.isStringLiteral(key))
+  }
+  if (t.isStringLiteral(key)) {
     return key.value
-  if (t.isNumericLiteral(key))
+  }
+  if (t.isNumericLiteral(key)) {
     return String(key.value)
+  }
   return null
 }
 
@@ -314,25 +331,32 @@ function isExpressionSyntaxValid(expression: string): boolean {
 }
 
 function printValue(value: unknown, depth = 0): string {
-  if (value === undefined)
+  if (value === undefined) {
     return 'undefined'
-  if (value === null)
+  }
+  if (value === null) {
     return 'null'
-  if (typeof value === 'string')
+  }
+  if (typeof value === 'string') {
     return quote(value)
-  if (typeof value === 'number' || typeof value === 'boolean')
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
     return String(value)
-  if (Array.isArray(value))
+  }
+  if (Array.isArray(value)) {
     return printArray(value, depth)
-  if (typeof value === 'object')
+  }
+  if (typeof value === 'object') {
     return printPlainObject(value as Record<string, unknown>, depth)
+  }
 
   return quote(String(value))
 }
 
 function printArray(value: unknown[], depth: number): string {
-  if (!value.length)
+  if (!value.length) {
     return '[]'
+  }
 
   const indent = '  '.repeat(depth)
   const childIndent = '  '.repeat(depth + 1)
@@ -342,8 +366,9 @@ function printArray(value: unknown[], depth: number): string {
 
 function printPlainObject(value: Record<string, unknown>, depth: number): string {
   const entries = Object.entries(value).filter(([, item]) => item !== undefined)
-  if (!entries.length)
+  if (!entries.length) {
     return '{}'
+  }
 
   const indent = '  '.repeat(depth)
   const childIndent = '  '.repeat(depth + 1)
@@ -352,7 +377,7 @@ function printPlainObject(value: Record<string, unknown>, depth: number): string
 }
 
 function printKey(key: string): string {
-  return /^[A-Za-z_$][\w$]*$/.test(key) ? key : quote(key)
+  return /^[A-Z_$][\w$]*$/i.test(key) ? key : quote(key)
 }
 
 function quote(value: string): string {

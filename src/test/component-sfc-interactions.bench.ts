@@ -1,12 +1,12 @@
-import { bench, describe } from 'vitest'
-
 import type { ComponentSFCInteractionTriggerEvent } from '@/domain/types/component/sfc/ir.types'
+
+import { bench, describe } from 'vitest'
+import { ComponentSFCEventBoundary } from '@/domain/entities/runtime/ComponentSFCEventBoundary'
+import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
 import {
   matchesComponentSFCInteractionTrigger,
   normalizeComponentSFCInteractionTriggers,
 } from '@/tools/component-sfc-edit-trigger'
-import { ComponentSFCEventBoundary } from '@/domain/entities/runtime/ComponentSFCEventBoundary'
-import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
 
 const occurrence: ComponentSFCInteractionTriggerEvent = {
   key: 'e',
@@ -19,7 +19,7 @@ const occurrence: ComponentSFCInteractionTriggerEvent = {
   modifiers: { ctrl: false, shift: true, alt: false, meta: false, altGraph: false },
 }
 
-describe('Component SFC interaction matcher benchmarks', () => {
+describe('component SFC interaction matcher benchmarks', () => {
   for (const size of [1, 16, 100]) {
     const rules = normalizeComponentSFCInteractionTriggers(Array.from({ length: size }, (_item, index) => ({
       event: 'click',

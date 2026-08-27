@@ -1,42 +1,41 @@
 {
   "compilerOptions": {
-    "rootDir": "./src",
-
-    // Безопасность
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-
-    // Декораторы (если нужны)
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
 
     // Модули/таргет
     "target": "esnext",
-    "module": "esnext",
-    "moduleResolution": "bundler",
-
-    // Полезные флаги
-    "esModuleInterop": true,
-    "resolveJsonModule": true,
-    "skipLibCheck": true,
 
     // Если есть JSX / Vue JSX
     "jsx": "preserve",
+    "emitDecoratorMetadata": true,
+    // Декораторы (если нужны)
+    "experimentalDecorators": true,
+    "rootDir": "./src",
+
+    "module": "esnext",
+    "moduleResolution": "bundler",
 
     // Локальные алиасы
     "paths": {
       "@endge/raph": ["../@endge-raph/dist/main.d.ts"],
       "@/*": ["./src/*"]
-    }
+    },
+    "resolveJsonModule": true,
+    // Безопасность
+    "strict": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+
+    // Полезные флаги
+    "esModuleInterop": true,
+    "skipLibCheck": true
   },
   "include": [
     "src/**/*.ts",
     "src/**/*.tsx",
     "src/**/*.d.ts",
     "src/**/*.vue",
-    "src/**/*.scss",
+    "src/**/*.scss"
   ],
   "exclude": [
     "dist",

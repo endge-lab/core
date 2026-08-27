@@ -7,15 +7,19 @@ export class BasicAuthAdapter implements AuthProfileAdapter {
 
   /** Проверяет строгий Basic contract. */
   public validate(profile: AuthProfileSchema): void {
-    if (Object.keys(profile.config ?? {}).length > 0)
+    if (Object.keys(profile.config ?? {}).length > 0) {
       throw new Error(`[EndgeAuth] Basic profile "${profile.identity}" config must be empty`)
-    if (profile.session)
+    }
+    if (profile.session) {
       throw new Error(`[EndgeAuth] Basic profile "${profile.identity}" must not define session`)
+    }
     const keys = Object.keys(profile.credentials ?? {}).sort()
-    if (keys.join(',') !== 'password,username')
+    if (keys.join(',') !== 'password,username') {
       throw new Error(`[EndgeAuth] Basic profile "${profile.identity}" requires only username and password`)
-    if (!String(profile.credentials.username ?? '').trim() || !String(profile.credentials.password ?? '').trim())
+    }
+    if (!String(profile.credentials.username ?? '').trim() || !String(profile.credentials.password ?? '').trim()) {
       throw new Error(`[EndgeAuth] Basic profile "${profile.identity}" credentials are required`)
+    }
   }
 
   /** Разрешает credentials и возвращает готовый Authorization header. */
@@ -32,7 +36,8 @@ export class BasicAuthAdapter implements AuthProfileAdapter {
 }
 
 function encodeBase64(value: string): string {
-  if (typeof btoa === 'function')
+  if (typeof btoa === 'function') {
     return btoa(String.fromCharCode(...new TextEncoder().encode(value)))
+  }
   throw new Error('[EndgeAuth] Base64 encoder is unavailable')
 }

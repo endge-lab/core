@@ -1,5 +1,5 @@
-import { Expose } from 'class-transformer'
 import { TypeMap } from '@endge/utils'
+import { Expose } from 'class-transformer'
 
 export class RField {
   @Expose()

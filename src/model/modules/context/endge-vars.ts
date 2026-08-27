@@ -1,5 +1,5 @@
-import type { EndgeGlobalVar } from '@/domain/types/types'
 import type { EndgeWorkspaceVar } from '@/domain/types/document/workspace.types'
+import type { EndgeGlobalVar } from '@/domain/types/types'
 
 type EnvRecord = Record<string, unknown>
 
@@ -18,7 +18,6 @@ type EnvRecord = Record<string, unknown>
  * Runtime projections are owned by EndgeRuntime, not by this service.
  */
 export class WorkspaceVariables {
-
   // Переопределение переменных среды
   private _envyRecord: EnvRecord = {}
 
@@ -85,17 +84,20 @@ export class WorkspaceVariables {
    */
   getValue(name: string): string | undefined {
     const key: string = name?.trim()
-    if (!key)
+    if (!key) {
       return undefined
+    }
 
     const external = this.getExternalValue(key)
-    if (external != null)
+    if (external != null) {
       return String(external)
+    }
 
     const vars: EndgeGlobalVar[] = this.getDomainVars()
     const v: EndgeGlobalVar | undefined = vars.find((x: EndgeGlobalVar) => x.name === key)
-    if (v)
+    if (v) {
       return v.currentValue ?? v.defaultValue
+    }
 
     return undefined
   }
@@ -108,8 +110,9 @@ export class WorkspaceVariables {
     const used = new Set(vars.map(item => item.name))
     for (const [name, value] of Object.entries(this._envyRecord)) {
       const key = String(name ?? '').trim()
-      if (!key || used.has(key))
+      if (!key || used.has(key)) {
         continue
+      }
       used.add(key)
       vars.push({
         name: key,
@@ -126,8 +129,9 @@ export class WorkspaceVariables {
   toRecord(): Record<string, { defaultValue: string, currentValue: string }> {
     const out: Record<string, { defaultValue: string, currentValue: string }> = {}
     for (const v of this.getDomainVars()) {
-      if (!v.name)
+      if (!v.name) {
         continue
+      }
       out[v.name] = {
         defaultValue: v.defaultValue,
         currentValue: v.currentValue ?? v.defaultValue,
@@ -168,13 +172,15 @@ export class WorkspaceVariables {
 
     const interpolated = this._interpolate(trimmed)
     if (interpolated.hasTokens) {
-      if (interpolated.hasMissingValues)
+      if (interpolated.hasMissingValues) {
         return fallback
+      }
       return coerce(interpolated.value)
     }
 
-    if (parsed.reason === 'not-a-braced-endgeToken')
+    if (parsed.reason === 'not-a-braced-endgeToken') {
       return coerce(trimmed)
+    }
 
     switch (onInvalid) {
       case 'as-is':
@@ -193,10 +199,12 @@ export class WorkspaceVariables {
    * Приводит значение переменной к number.
    */
   static toNumber(v: unknown): number {
-    if (typeof v === 'number')
+    if (typeof v === 'number') {
       return v
-    if (v == null)
+    }
+    if (v == null) {
       return Number.NaN
+    }
     return Number(String(v).trim())
   }
 
@@ -211,8 +219,9 @@ export class WorkspaceVariables {
    * Приводит значение переменной к boolean.
    */
   static toBoolean(v: unknown): boolean {
-    if (typeof v === 'boolean')
+    if (typeof v === 'boolean') {
       return v
+    }
     const s: string = String(v).trim().toLowerCase()
     return s === 'true' || s === '1'
   }
@@ -227,8 +236,9 @@ export class WorkspaceVariables {
     let hasMissingValues = false
     const value = template.replace(/\{\{[^{}]*\}\}|\{[^{}]*\}/g, (token) => {
       const parsed = WorkspaceVariables.parseVarToken(token)
-      if (!parsed.ok)
+      if (!parsed.ok) {
         return token
+      }
 
       hasTokens = true
       const resolved = this.getValue(parsed.name)
@@ -257,8 +267,9 @@ export class WorkspaceVariables {
     let inner: string = usesDoubleBraces
       ? s.slice(2, -2).trim()
       : s.slice(1, -1).trim()
-    if (!inner)
+    if (!inner) {
       return { ok: false, reason: 'empty' }
+    }
     if (inner.includes('{') || inner.includes('}')) {
       return { ok: false, reason: 'nested-braces' }
     }
@@ -268,8 +279,9 @@ export class WorkspaceVariables {
       || (inner.startsWith('\'') && inner.endsWith('\''))
     ) {
       inner = inner.slice(1, -1).trim()
-      if (!inner)
+      if (!inner) {
         return { ok: false, reason: 'empty-quoted' }
+      }
     }
 
     const NAME_RE: RegExp = /^[A-Z_][\w.-]*$/i
@@ -283,19 +295,23 @@ export class WorkspaceVariables {
   /** Читает variable из внешнего environment без изменения module state. */
   private getExternalValue(name: string): unknown {
     const key = String(name ?? '').trim()
-    if (!key)
+    if (!key) {
       return undefined
-    if (Object.prototype.hasOwnProperty.call(this._envyRecord, key))
+    }
+    if (Object.hasOwn(this._envyRecord, key)) {
       return this._envyRecord[key]
+    }
 
     const viteEnv = (import.meta as any)?.env
     const viteKey = `VITE_${key}`
-    if (viteEnv && Object.prototype.hasOwnProperty.call(viteEnv, viteKey))
+    if (viteEnv && Object.hasOwn(viteEnv, viteKey)) {
       return viteEnv[viteKey]
+    }
 
     const globalEnv = (globalThis as any).__ENDGE_ENV__
-    if (globalEnv && Object.prototype.hasOwnProperty.call(globalEnv, key))
+    if (globalEnv && Object.hasOwn(globalEnv, key)) {
       return globalEnv[key]
+    }
 
     return undefined
   }

@@ -1,7 +1,7 @@
 /**
  * Связка события и id Действия из домена
  */
-export type EndgeEventBinding = {
+export interface EndgeEventBinding {
   event: string
   actionId: string | null
 }
@@ -9,7 +9,7 @@ export type EndgeEventBinding = {
 export type AnyEventName = string
 export type AnyPayload = unknown
 
-export type CachedEvent = {
+export interface CachedEvent {
   name: AnyEventName
   payload: AnyPayload
   at: number

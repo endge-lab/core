@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from 'vitest'
-
-import { RuntimeScope } from '@/domain/entities/runtime/RuntimeScope'
 import type { RuntimeHost } from '@/domain/types/runtime/runtime-host.types'
+
+import { describe, expect, it, vi } from 'vitest'
+import { RuntimeScope } from '@/domain/entities/runtime/RuntimeScope'
 
 function host(id: string, events: string[]): RuntimeHost<any, any> {
   return {
@@ -16,7 +16,7 @@ function host(id: string, events: string[]): RuntimeHost<any, any> {
   } as unknown as RuntimeHost<any, any>
 }
 
-describe('RuntimeScope lifecycle', () => {
+describe('runtimeScope lifecycle', () => {
   it('serializes activation, pauses children-first and reconciles once after dropped updates', async () => {
     const events: string[] = []
     const parent = new RuntimeScope({
@@ -52,8 +52,12 @@ describe('RuntimeScope lifecycle', () => {
   it('rolls back resources in reverse order and is idempotent on deactivate', async () => {
     const events: string[] = []
     const scope = new RuntimeScope({ id: 'scope', path: 'scope' })
-    scope.resources.add({ id: 'one', kind: 'test', dispose: () => { events.push('dispose:one') } })
-    scope.resources.add({ id: 'two', kind: 'test', dispose: () => { events.push('dispose:two') } })
+    scope.resources.add({ id: 'one', kind: 'test', dispose: () => {
+      events.push('dispose:one')
+    } })
+    scope.resources.add({ id: 'two', kind: 'test', dispose: () => {
+      events.push('dispose:two')
+    } })
     scope.addRuntime(host('runtime', events))
     await scope.activate()
     await scope.deactivate()
@@ -83,9 +87,8 @@ describe('RuntimeScope lifecycle', () => {
   })
 
   it('returns resources and runtime membership to baseline after 100 lifecycle cycles', async () => {
-    let scope!: RuntimeScope
     let generation = 0
-    scope = new RuntimeScope({
+    const scope = new RuntimeScope({
       id: 'stress',
       path: 'stress',
       hooks: {

@@ -20,7 +20,9 @@ export interface ExecuteRuntimeOperationOptions {
 export async function executeRuntimeOperation(options: ExecuteRuntimeOperationOptions): Promise<unknown> {
   const snapshot = cloneAndFreeze(options.input)
   const runOutput = await options.run({ input: snapshot })
-  if (!options.recordHistory) return runOutput
+  if (!options.recordHistory) {
+    return runOutput
+  }
 
   let undoOutput: unknown
   options.history?.commit({
@@ -46,7 +48,9 @@ function cloneAndFreeze<T>(value: T): T {
 function deepFreeze<T>(value: T): T {
   if (value && typeof value === 'object') {
     Object.freeze(value)
-    for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child)
+    for (const child of Object.values(value as Record<string, unknown>)) {
+      deepFreeze(child)
+    }
   }
   return value
 }

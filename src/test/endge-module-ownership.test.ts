@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { Endge } from '@/model/kernel/endge'
 
-describe('Endge module ownership', () => {
+describe('endge module ownership', () => {
   it('removes retired modules and keeps updates registered', () => {
     expect(Endge.hasModule('extract')).toBe(false)
     expect(Endge.hasModule('store')).toBe(false)

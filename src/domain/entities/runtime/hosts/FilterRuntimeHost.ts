@@ -1,4 +1,5 @@
 import type { RFilter } from '@/domain/entities/reflect/RFilter'
+import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime/runtime-host.types'
 import type {
   FilterProgramPayload,
   FilterRuntimeActionHandle,
@@ -6,7 +7,6 @@ import type {
   FilterRuntimeOutput,
   FilterRuntimeSetPayload,
 } from '@/domain/types/source/filter-source.types'
-import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime/runtime-host.types'
 import type { SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 
 import { Raph, RaphNode } from '@endge/raph'
@@ -67,8 +67,9 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
       : input.artifacts
     const artifact = explicitArtifact
       ?? artifactReader.getArtifact<FilterProgramPayload>('filter', input.model.id ?? input.model.identity)
-    if (!artifact || artifact.status === 'error')
+    if (!artifact || artifact.status === 'error') {
       return null
+    }
 
     const host = new FilterRuntimeHost({
       id: input.id,
@@ -95,16 +96,18 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
 
   /** Активирует зарегистрированный Filter host с восстановленным state. */
   public override create(): void {
-    if (this.status === 'active')
+    if (this.status === 'active') {
       return
+    }
     this._hydratePersistence()
     super.create()
   }
 
   /** Восстанавливает persisted state после подключения runtime controller. */
   private _hydratePersistence(): void {
-    if (!this.runtimeState)
+    if (!this.runtimeState) {
       return
+    }
     const restored = this.runtimeState.get<Record<string, unknown>>(
       `filter:${this.entityIdentity}`,
       'state',
@@ -124,8 +127,9 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
   public getDefaults(): Readonly<Record<string, unknown>> {
     const defaults: Record<string, unknown> = {}
     for (const field of this.getFields()) {
-      if (field.defaultValue)
+      if (field.defaultValue) {
         defaults[field.key] = evaluateSourceExpression(field.defaultValue)
+      }
     }
     return defaults
   }
@@ -149,25 +153,29 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
 
   /** Возвращает вызываемый Action изменения Filter state. */
   public action(id: FilterRuntimeActionId): FilterRuntimeActionHandle {
-    if (!['patch', 'set', 'reset', 'clear'].includes(id))
+    if (!['patch', 'set', 'reset', 'clear'].includes(id)) {
       throw new Error(`[FilterRuntimeHost] unsupported action: ${id}`)
+    }
     return {
       run: async (payload?: unknown) => {
-        if (id === 'patch')
+        if (id === 'patch') {
           this._patch(payload)
-        else if (id === 'set')
+        }
+        else if (id === 'set') {
           this._set(payload)
-        else if (id === 'reset')
+        }
+        else if (id === 'reset') {
           this._resetState(true)
-        else
-          this._replaceState({}, true)
+        }
+        else { this._replaceState({}, true) }
       },
     }
   }
 
   private _patch(payload: unknown): void {
-    if (!payload || typeof payload !== 'object' || Array.isArray(payload))
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
       throw new Error('[FilterRuntimeHost] patch payload must be an object.')
+    }
     const patch = this._normalizePatch(payload as Record<string, unknown>, true)
     this._replaceState(
       { ...this.getState(), ...patch },
@@ -179,8 +187,9 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
   private _set(payload: unknown): void {
     const value = payload as Partial<FilterRuntimeSetPayload> | null
     const key = String(value?.key ?? '').trim()
-    if (!key)
+    if (!key) {
       throw new Error('[FilterRuntimeHost] set payload requires key.')
+    }
     this._patch({ [key]: value?.value })
   }
 
@@ -188,8 +197,9 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
     const payload = this.getArtifactPayload()
     const state: Record<string, unknown> = {}
     for (const field of payload?.fields ?? []) {
-      if (field.defaultValue)
+      if (field.defaultValue) {
         state[field.key] = evaluateSourceExpression(field.defaultValue)
+      }
     }
     this._replaceState(state, emit)
   }
@@ -209,15 +219,17 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
       Raph.set(this.statePath(), state)
       changedOutputs = this._recomputeOutputs(emit ? (invalidatedFields ?? changedFields) : null, emit)
     })
-    if (this.runtimeState)
+    if (this.runtimeState) {
       this.runtimeState.set(`filter:${this.entityIdentity}`, 'state', this.getState())
+    }
 
     const now = new Date().toISOString()
     this.setContext({ status: 'success', updatedAt: now, lastStateChangeAt: now })
     if (emit) {
       this.emit('state:change', this.getState())
-      for (const event of changedOutputs)
+      for (const event of changedOutputs) {
         this.emit('output:change', event)
+      }
     }
   }
 
@@ -238,18 +250,19 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
       }
       const runtimeOutput: FilterRuntimeOutput = output.kind === 'json'
         ? {
-          key: output.key,
-          kind: 'json',
-          value: evaluateSourceExpression(output.expression, { values: this.getState() }),
-        }
+            key: output.key,
+            kind: 'json',
+            value: evaluateSourceExpression(output.expression, { values: this.getState() }),
+          }
         : {
-          key: output.key,
-          kind: 'predicate',
-          test: row => Boolean(evaluateSourceExpression(output.expression, { row, values: this.getState() })),
-        }
+            key: output.key,
+            kind: 'predicate',
+            test: row => Boolean(evaluateSourceExpression(output.expression, { row, values: this.getState() })),
+          }
       next.set(output.key, runtimeOutput)
-      if (emit)
+      if (emit) {
         changed.push({ key: output.key, output: runtimeOutput })
+      }
       Raph.set(
         this.outputPath(output.key),
         runtimeOutput.kind === 'json' ? runtimeOutput.value : runtimeOutput.test,
@@ -265,13 +278,15 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
     for (const [key, value] of Object.entries(patch)) {
       const field = fields.get(key)
       if (!field) {
-        if (strict)
+        if (strict) {
           throw new Error(`[FilterRuntimeHost] unknown field: ${key}`)
+        }
         continue
       }
       if (!this._isValidFieldValue(field, value)) {
-        if (strict)
+        if (strict) {
           throw new Error(`[FilterRuntimeHost] invalid value for field: ${key}`)
+        }
         continue
       }
       out[key] = value
@@ -280,29 +295,36 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
   }
 
   private _isValidFieldValue(field: SourceFieldDefinition, value: unknown): boolean {
-    if (value == null)
+    if (value == null) {
       return field.optional
-    if (field.array)
+    }
+    if (field.array) {
       return Array.isArray(value) && value.every(item => this._isValidScalarValue(field, item))
+    }
     return this._isValidScalarValue(field, value)
   }
 
   private _isValidScalarValue(field: SourceFieldDefinition, value: unknown): boolean {
-    if (value == null)
+    if (value == null) {
       return false
-    if (field.type === 'Number')
+    }
+    if (field.type === 'Number') {
       return typeof value === 'number'
-    if (field.type === 'Boolean')
+    }
+    if (field.type === 'Boolean') {
       return typeof value === 'boolean'
-    if (field.type === 'Object')
+    }
+    if (field.type === 'Object') {
       return typeof value === 'object' && !Array.isArray(value)
+    }
     return typeof value === 'string'
   }
 }
 
 function filterValuesEqual(left: unknown, right: unknown): boolean {
-  if (Object.is(left, right))
+  if (Object.is(left, right)) {
     return true
+  }
   try {
     return JSON.stringify(left) === JSON.stringify(right)
   }

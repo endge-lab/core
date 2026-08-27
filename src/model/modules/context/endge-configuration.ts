@@ -75,15 +75,17 @@ export class EndgeConfigurationModule extends EndgeModule {
 
   /** Возвращает effective configuration текущего build. */
   get current(): EndgeConfiguration {
-    if (!this._current)
+    if (!this._current) {
       throw new Error('[EndgeConfiguration] Configuration has not been resolved')
+    }
     return this._current
   }
 
   /** Возвращает immutable compiler input текущего build. */
   get buildContext(): EndgeBuildContext {
-    if (!this._buildContext)
+    if (!this._buildContext) {
       throw new Error('[EndgeConfiguration] Build context has not been resolved')
+    }
     return this._buildContext
   }
 
@@ -114,8 +116,9 @@ export class EndgeConfigurationModule extends EndgeModule {
   resolveUpstream(layer: EndgeConfigurationLayer): EndgeConfiguration {
     let configuration = normalizeEndgeConfiguration(Endge.workspace.current.configuration)
     configuration.values = Endge.configurationSchema.resolveValues(configuration.values)
-    if (layer === 'workspace' || layer === 'tenant')
+    if (layer === 'workspace' || layer === 'tenant') {
       return configuration
+    }
 
     const execution = Endge.context.getExecutionContext()
     configuration = applyEndgeConfigurationContribution(
@@ -123,8 +126,9 @@ export class EndgeConfigurationModule extends EndgeModule {
       Endge.domain.getTenant(execution.tenantIdentity)?.configuration ?? EMPTY_CONTRIBUTION,
     )
     configuration.values = Endge.configurationSchema.resolveValues(configuration.values)
-    if (layer === 'project')
+    if (layer === 'project') {
       return configuration
+    }
 
     configuration = applyEndgeConfigurationContribution(
       configuration,
@@ -147,8 +151,9 @@ export class EndgeConfigurationModule extends EndgeModule {
     resolve: (identity: string) => TEntity | null,
   ): TEntity {
     const entity = resolve(identity)
-    if (!entity)
+    if (!entity) {
       throw new Error(`[EndgeConfiguration] ${label} "${identity}" was not found in loaded Domain`)
+    }
     return entity
   }
 }

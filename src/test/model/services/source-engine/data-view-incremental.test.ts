@@ -1,10 +1,10 @@
-import { describe, expect, it } from 'vitest'
-
-import { compileDataViewSource } from '@/model/services/source-engine/compilers/data-view-source-compile'
 import type { DataViewProgramPayload } from '@/domain/types/program/program.types'
-import { EndgeDataView } from '@/model/modules/runtime/execution/endge-data-view'
 
-describe('DataView incremental compiler', () => {
+import { describe, expect, it } from 'vitest'
+import { EndgeDataView } from '@/model/modules/runtime/execution/endge-data-view'
+import { compileDataViewSource } from '@/model/services/source-engine/compilers/data-view-source-compile'
+
+describe('dataView incremental compiler', () => {
   it('defaults to auto and proves a root row-local id projection', () => {
     const result = compileDataViewSource(rowLocalSource(''))
     expect(result.diagnostics).toEqual([])

@@ -1,12 +1,10 @@
 {
   "name": "@endge/core",
-  "version": "4.0.1",
-  "private": false,
-  "license": "Apache-2.0",
   "type": "module",
-  "main": "./dist/core.js",
-  "module": "./dist/core.js",
-  "types": "./dist/main.d.ts",
+  "version": "4.0.2",
+  "private": false,
+  "packageManager": "pnpm@8.8.0",
+  "license": "Apache-2.0",
   "exports": {
     ".": {
       "types": "./dist/main.d.ts",
@@ -14,6 +12,9 @@
       "require": "./dist/core.cjs"
     }
   },
+  "main": "./dist/core.js",
+  "module": "./dist/core.js",
+  "types": "./dist/main.d.ts",
   "files": [
     "dist"
   ],
@@ -27,6 +28,12 @@
     "typecheck": "tsc --noEmit",
     "lint-check": "eslint . --cache",
     "lint-fix": "eslint . --fix --cache"
+  },
+  "peerDependencies": {
+    "@endge/raph": "^3.0.11",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "reflect-metadata": "^0.2.2"
   },
   "dependencies": {
     "@babel/parser": "^7.27.2",
@@ -47,12 +54,6 @@
     "uuid": "^11.1.0",
     "yaml": "^2.8.1"
   },
-  "peerDependencies": {
-    "@endge/raph": "^3.0.11",
-    "class-transformer": "^0.5.1",
-    "class-validator": "^0.14.1",
-    "reflect-metadata": "^0.2.2"
-  },
   "devDependencies": {
     "@antfu/eslint-config": "9.3.0",
     "@types/lodash": "^4.14.202",
@@ -62,6 +63,5 @@
     "unplugin-dts": "^1.0.3",
     "vite": "^6.1.0",
     "vitest": "^2.1.9"
-  },
-  "packageManager": "pnpm@8.8.0"
+  }
 }

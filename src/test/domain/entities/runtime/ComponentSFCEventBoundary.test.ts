@@ -1,10 +1,10 @@
-import { describe, expect, it, vi } from 'vitest'
-
-import { ComponentSFCEventBoundary } from '@/domain/entities/runtime/ComponentSFCEventBoundary'
 import type { RComponentSFC_IR_EventBinding } from '@/domain/types/component/sfc/ir.types'
+
+import { describe, expect, it, vi } from 'vitest'
+import { ComponentSFCEventBoundary } from '@/domain/entities/runtime/ComponentSFCEventBoundary'
 import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
 
-describe('ComponentSFCEventBoundary', () => {
+describe('componentSFCEventBoundary', () => {
   it('routes a nested Event through forwarding while keeping reaction independent', async () => {
     const rootManifest = createEmptyComponentSFCPortManifest()
     rootManifest.emits.events.push({

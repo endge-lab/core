@@ -1,3 +1,4 @@
+import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
 import type {
   TypeSourceCompileResult,
   TypeSourceDefinition,
@@ -6,7 +7,6 @@ import type {
   TypeSourceObjectDefinition,
   TypeSourceReference,
 } from '@/domain/types/source/type-source.types'
-import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
 
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
@@ -25,14 +25,16 @@ export function compileTypeSource(source: string, sourceVersion = 1): TypeSource
   const diagnostics: DiagnosticDraft[] = []
 
   // Existing legacy records intentionally have no source during the transition.
-  if (!String(source ?? '').trim())
+  if (!String(source ?? '').trim()) {
     return { ast: null, document: null, artifact: null, diagnostics }
+  }
 
   try {
     const ast = parseTS(source, { sourceType: 'module', plugins: ['typescript'] })
     const call = readRootDefineType(ast, diagnostics)
-    if (!call)
+    if (!call) {
       return { ast, document: null, artifact: null, diagnostics }
+    }
 
     if (call.arguments.length !== 1 || !isExpressionArgument(call.arguments[0])) {
       diagnostics.push(diagnostic('error', 'type-source-define-arity', 'defineType принимает ровно одно type definition.', 'defineType', call))
@@ -75,8 +77,9 @@ function readRootDefineType(ast: t.File, diagnostics: DiagnosticDraft[]): t.Call
 }
 
 function readDefinition(node: t.Expression, diagnostics: DiagnosticDraft[], sourcePath = 'defineType'): TypeSourceDefinition | null {
-  if (t.isObjectExpression(node))
+  if (t.isObjectExpression(node)) {
     return readObjectDefinition(node, diagnostics)
+  }
 
   if (!t.isCallExpression(node) || !t.isIdentifier(node.callee)) {
     diagnostics.push(diagnostic('error', 'type-source-definition', `${sourcePath} поддерживает object, objectOf(...), enumOf(...), unionOf(...) или arrayOf(...).`, sourcePath, node))
@@ -120,8 +123,9 @@ function readObjectDefinition(node: t.ObjectExpression, diagnostics: DiagnosticD
     declared.add(key)
 
     const field = readField(key, property.value, diagnostics)
-    if (field)
+    if (field) {
       fields.push(field)
+    }
   }
 
   return { kind: 'object', fields }
@@ -171,8 +175,9 @@ function readField(key: string, raw: t.Expression, diagnostics: DiagnosticDraft[
   }
 
   const fieldType = readFieldType(cursor, diagnostics, key)
-  if (!fieldType)
+  if (!fieldType) {
     return null
+  }
   field.type = fieldType
 
   if ((field.min != null || field.max != null) && !(fieldType.kind === 'reference' && fieldType.identity === 'Number')) {
@@ -196,8 +201,9 @@ function readFieldType(
   }
 
   const arg = unwrapExpression(call.arguments[0])
-  if (t.isIdentifier(arg))
+  if (t.isIdentifier(arg)) {
     return { kind: 'reference', identity: arg.name }
+  }
 
   if (t.isStringLiteral(arg)) {
     const identity = arg.value.trim()
@@ -219,27 +225,28 @@ function applyFieldModifier(
 ): void {
   const path = `${field.key}.${method}`
   if (method === 'array' || method === 'optional') {
-    if (call.arguments.length !== 0)
+    if (call.arguments.length !== 0) {
       diagnostics.push(diagnostic('error', 'type-source-field-modifier-arity', `.${method}() не принимает аргументы.`, path, call))
+    }
     field[method] = true
     return
   }
 
   if (method === 'description') {
     const value = readStringCallArgument(call)
-    if (value == null)
+    if (value == null) {
       diagnostics.push(diagnostic('error', 'type-source-field-description', '.description(...) принимает одну строку.', path, call))
-    else
-      field.description = value
+    }
+    else { field.description = value }
     return
   }
 
   if (method === 'min' || method === 'max') {
     const value = readNumberCallArgument(call)
-    if (value == null)
+    if (value == null) {
       diagnostics.push(diagnostic('error', 'type-source-field-range-value', `.${method}(...) принимает одно конечное число.`, path, call))
-    else
-      field[method] = value
+    }
+    else { field[method] = value }
     return
   }
 
@@ -249,8 +256,9 @@ function applyFieldModifier(
       return
     }
     const value = readStaticValue(call.arguments[0], diagnostics, path)
-    if (value.ok)
+    if (value.ok) {
       field.examples.push(value.value)
+    }
     return
   }
 
@@ -279,13 +287,16 @@ function readEnumDefinition(call: t.CallExpression, diagnostics: DiagnosticDraft
     values.push(value.value as string | number | boolean)
   }
 
-  if (values.length === 0)
+  if (values.length === 0) {
     diagnostics.push(diagnostic('error', 'type-source-enum-empty', 'enumOf не может быть пустым.', 'enumOf', call))
+  }
   const kinds = new Set(values.map(value => typeof value))
-  if (kinds.size > 1)
+  if (kinds.size > 1) {
     diagnostics.push(diagnostic('error', 'type-source-enum-mixed', 'Все значения enumOf должны иметь один primitive type.', 'enumOf', call))
-  if (new Set(values.map(value => `${typeof value}:${String(value)}`)).size !== values.length)
+  }
+  if (new Set(values.map(value => `${typeof value}:${String(value)}`)).size !== values.length) {
     diagnostics.push(diagnostic('error', 'type-source-enum-duplicate', 'enumOf содержит повторяющиеся значения.', 'enumOf', call))
+  }
 
   return { kind: 'enum', values }
 }
@@ -295,10 +306,12 @@ function readUnionDefinition(call: t.CallExpression, diagnostics: DiagnosticDraf
     .map((arg, index) => isExpressionArgument(arg) ? readTypeExpression(arg, diagnostics, `unionOf.${index}`) : null)
     .filter((item): item is TypeSourceExpression => item != null)
 
-  if (call.arguments.length < 2)
+  if (call.arguments.length < 2) {
     diagnostics.push(diagnostic('error', 'type-source-union-arity', 'unionOf требует минимум два type expression.', 'unionOf', call))
-  if (new Set(variants.map(item => JSON.stringify(item))).size !== variants.length)
+  }
+  if (new Set(variants.map(item => JSON.stringify(item))).size !== variants.length) {
     diagnostics.push(diagnostic('error', 'type-source-union-duplicate', 'unionOf содержит повторяющиеся типы.', 'unionOf', call))
+  }
 
   return { kind: 'union', variants }
 }
@@ -340,13 +353,16 @@ function readTypeExpression(
   sourcePath: string,
 ): TypeSourceExpression | null {
   const node = unwrapExpression(raw)
-  if (t.isIdentifier(node))
+  if (t.isIdentifier(node)) {
     return { kind: 'reference', identity: node.name }
+  }
 
-  if (t.isCallExpression(node) && t.isIdentifier(node.callee, { name: 'type' }))
+  if (t.isCallExpression(node) && t.isIdentifier(node.callee, { name: 'type' })) {
     return readReferenceCall(node, 'type', diagnostics, sourcePath)
-  if (t.isCallExpression(node) && t.isIdentifier(node.callee, { name: 'recordOf' }))
+  }
+  if (t.isCallExpression(node) && t.isIdentifier(node.callee, { name: 'recordOf' })) {
     return readRecordDefinition(node, diagnostics, sourcePath)
+  }
   if (t.isObjectExpression(node)) {
     diagnostics.push(diagnostic('error', 'type-source-object-wrapper', `${sourcePath}: inline object должен быть обёрнут в objectOf({...}).`, sourcePath, node))
     return null
@@ -378,28 +394,33 @@ function readReferenceCall(
 }
 
 function readStringCallArgument(call: t.CallExpression): string | null {
-  if (call.arguments.length !== 1)
+  if (call.arguments.length !== 1) {
     return null
+  }
   const arg = call.arguments[0]
   return arg && t.isStringLiteral(arg) ? arg.value : null
 }
 
 function readNumberCallArgument(call: t.CallExpression): number | null {
-  if (call.arguments.length !== 1 || !isExpressionArgument(call.arguments[0]))
+  if (call.arguments.length !== 1 || !isExpressionArgument(call.arguments[0])) {
     return null
+  }
   const value = staticNumber(call.arguments[0])
   return value != null && Number.isFinite(value) ? value : null
 }
 
 function readStaticValue(node: t.Expression, diagnostics: DiagnosticDraft[], sourcePath: string): StaticValueResult {
   const value = unwrapExpression(node)
-  if (t.isStringLiteral(value) || t.isNumericLiteral(value) || t.isBooleanLiteral(value))
+  if (t.isStringLiteral(value) || t.isNumericLiteral(value) || t.isBooleanLiteral(value)) {
     return { ok: true, value: value.value }
-  if (t.isNullLiteral(value))
+  }
+  if (t.isNullLiteral(value)) {
     return { ok: true, value: null }
+  }
   const number = staticNumber(value)
-  if (number != null)
+  if (number != null) {
     return { ok: true, value: number }
+  }
 
   if (t.isArrayExpression(value)) {
     const items: unknown[] = []
@@ -410,8 +431,9 @@ function readStaticValue(node: t.Expression, diagnostics: DiagnosticDraft[], sou
         return { ok: false }
       }
       const item = readStaticValue(element, diagnostics, `${sourcePath}.${index}`)
-      if (!item.ok)
+      if (!item.ok) {
         return item
+      }
       items.push(item.value)
     }
     return { ok: true, value: items }
@@ -430,8 +452,9 @@ function readStaticValue(node: t.Expression, diagnostics: DiagnosticDraft[], sou
         return { ok: false }
       }
       const item = readStaticValue(property.value, diagnostics, `${sourcePath}.${key}`)
-      if (!item.ok)
+      if (!item.ok) {
         return item
+      }
       result[key] = item.value
     }
     return { ok: true, value: result }
@@ -443,10 +466,12 @@ function readStaticValue(node: t.Expression, diagnostics: DiagnosticDraft[], sou
 
 function staticNumber(node: t.Expression): number | null {
   const value = unwrapExpression(node)
-  if (t.isNumericLiteral(value))
+  if (t.isNumericLiteral(value)) {
     return value.value
-  if (t.isUnaryExpression(value) && (value.operator === '-' || value.operator === '+') && t.isNumericLiteral(value.argument))
+  }
+  if (t.isUnaryExpression(value) && (value.operator === '-' || value.operator === '+') && t.isNumericLiteral(value.argument)) {
     return value.operator === '-' ? -value.argument.value : value.argument.value
+  }
   return null
 }
 

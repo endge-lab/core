@@ -1,9 +1,9 @@
+import type { ComponentType } from '@/domain/types/document/document.types'
+import { TypeRecord } from '@endge/utils'
+import { Expose } from 'class-transformer'
+import { REntity } from '@/domain/entities/reflect/REntity'
 import { RField } from '@/domain/entities/reflect/RField'
 import { ComponentKind } from '@/domain/types/types'
-import { REntity } from '@/domain/entities/reflect/REntity'
-import { Expose } from 'class-transformer'
-import { TypeRecord } from '@endge/utils'
-import { ComponentType } from '@/domain/types/document/document.types'
 
 /**
  * Архивная persisted-модель legacy-компонента.

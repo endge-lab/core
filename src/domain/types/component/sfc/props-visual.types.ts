@@ -1,6 +1,6 @@
-import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
 import type { RComponentSFC_IR_Prop } from './ir.types'
 import type { RComponentSFC_SourceRange } from './location.types'
+import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
 
 /** Source-backed projection of the SFC public props contract for visual editors. */
 export interface ComponentSFCPropsVisualProjection {

@@ -1,5 +1,5 @@
-import type { RuntimeOwnedResource } from '@/domain/types/runtime/runtime-resource.types'
 import type { ComponentSFCInteractionTrigger } from '@/domain/types/component/sfc/ir.types'
+import type { RuntimeOwnedResource } from '@/domain/types/runtime/runtime-resource.types'
 
 export interface OperationHistoryShortcutBinding {
   command: 'undo' | 'redo'
@@ -40,8 +40,9 @@ export class OperationHistory implements RuntimeOwnedResource {
 
   public get limit(): number { return this._limit }
   public get shortcuts(): OperationHistoryShortcutBinding[] {
-    return this.options.shortcuts == null ? defaultOperationHistoryShortcuts() : this.options.shortcuts
+    return this.options.shortcuts ?? defaultOperationHistoryShortcuts()
   }
+
   public get active(): boolean { return !this.paused && !this.disposed }
   public canUndo(): boolean { return this.active && this.cursor > 0 }
   public canRedo(): boolean { return this.active && this.cursor < this.entries.length }
@@ -53,8 +54,12 @@ export class OperationHistory implements RuntimeOwnedResource {
   }
 
   public commit(entry: OperationHistoryEntry): void {
-    if (!this.active) return
-    if (this.cursor < this.entries.length) this.entries.splice(this.cursor)
+    if (!this.active) {
+      return
+    }
+    if (this.cursor < this.entries.length) {
+      this.entries.splice(this.cursor)
+    }
     this.entries.push(entry)
     this.cursor = this.entries.length
     this.trim()
@@ -63,7 +68,9 @@ export class OperationHistory implements RuntimeOwnedResource {
 
   public undo(): Promise<unknown> {
     return this.enqueue(async () => {
-      if (!this.canUndo()) return undefined
+      if (!this.canUndo()) {
+        return undefined
+      }
       const entry = this.entries[this.cursor - 1]!
       const result = await entry.undo()
       entry.undoOutput = result
@@ -75,7 +82,9 @@ export class OperationHistory implements RuntimeOwnedResource {
 
   public redo(): Promise<unknown> {
     return this.enqueue(async () => {
-      if (!this.canRedo()) return undefined
+      if (!this.canRedo()) {
+        return undefined
+      }
       const entry = this.entries[this.cursor]!
       const result = await entry.redo()
       this.cursor += 1
@@ -85,7 +94,12 @@ export class OperationHistory implements RuntimeOwnedResource {
   }
 
   public pause(): void { this.paused = true }
-  public resume(): void { if (!this.disposed) this.paused = false }
+  public resume(): void {
+    if (!this.disposed) {
+      this.paused = false
+    }
+  }
+
   public dispose(): void {
     this.disposed = true
     this.entries = []
@@ -105,7 +119,9 @@ export class OperationHistory implements RuntimeOwnedResource {
 
   private trim(): void {
     const overflow = Math.max(0, this.entries.length - this._limit)
-    if (!overflow) return
+    if (!overflow) {
+      return
+    }
     this.entries.splice(0, overflow)
     this.cursor = Math.max(0, this.cursor - overflow)
   }

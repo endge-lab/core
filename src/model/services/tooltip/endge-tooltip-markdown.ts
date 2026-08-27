@@ -1,7 +1,7 @@
 import type {
   EndgeTooltipMarkdownBlock,
   EndgeTooltipMarkdownInline,
-} from '@/domain/types/ui/tooltip-markdown.types'
+} from '@/domain/types/presentation/tooltip-markdown.types'
 
 /** Parses the intentionally small, safe Tooltip Markdown subset without producing HTML. */
 export function parseEndgeTooltipMarkdown(source: unknown): EndgeTooltipMarkdownBlock[] {
@@ -22,7 +22,9 @@ export function parseEndgeTooltipMarkdown(source: unknown): EndgeTooltipMarkdown
         body.push(lines[index] ?? '')
         index += 1
       }
-      if (index < lines.length) index += 1
+      if (index < lines.length) {
+        index += 1
+      }
       blocks.push({ kind: 'code-block', value: body.join('\n') })
       continue
     }
@@ -44,7 +46,9 @@ export function parseEndgeTooltipMarkdown(source: unknown): EndgeTooltipMarkdown
       const items: EndgeTooltipMarkdownInline[][] = []
       while (index < lines.length) {
         const item = (lines[index] ?? '').match(/^\s*(?:([-+*])|(\d+)\.)\s+(.+)$/)
-        if (!item || Boolean(item[2]) !== ordered) break
+        if (!item || Boolean(item[2]) !== ordered) {
+          break
+        }
         items.push(parseInline(item[3]!))
         index += 1
       }
@@ -85,10 +89,18 @@ function parseInline(source: string): EndgeTooltipMarkdownInline[] {
   let offset = 0
   for (const match of source.matchAll(pattern)) {
     const start = match.index ?? 0
-    if (start > offset) result.push({ kind: 'text', value: source.slice(offset, start) })
-    if (match[2] != null) result.push({ kind: 'strong', children: parseInline(match[2]) })
-    else if (match[3] != null) result.push({ kind: 'code', value: match[3] })
-    else if (match[4] != null) result.push({ kind: 'emphasis', children: parseInline(match[4]) })
+    if (start > offset) {
+      result.push({ kind: 'text', value: source.slice(offset, start) })
+    }
+    if (match[2] != null) {
+      result.push({ kind: 'strong', children: parseInline(match[2]) })
+    }
+    else if (match[3] != null) {
+      result.push({ kind: 'code', value: match[3] })
+    }
+    else if (match[4] != null) {
+      result.push({ kind: 'emphasis', children: parseInline(match[4]) })
+    }
     else if (match[5] != null && match[6] != null) {
       const href = safeHref(match[6])
       result.push(href
@@ -97,7 +109,9 @@ function parseInline(source: string): EndgeTooltipMarkdownInline[] {
     }
     offset = start + match[0].length
   }
-  if (offset < source.length) result.push({ kind: 'text', value: source.slice(offset) })
+  if (offset < source.length) {
+    result.push({ kind: 'text', value: source.slice(offset) })
+  }
   return mergeAdjacentText(result)
 }
 
@@ -105,8 +119,10 @@ function mergeAdjacentText(nodes: EndgeTooltipMarkdownInline[]): EndgeTooltipMar
   const result: EndgeTooltipMarkdownInline[] = []
   for (const node of nodes) {
     const previous = result.at(-1)
-    if (node.kind === 'text' && previous?.kind === 'text') previous.value += node.value
-    else result.push(node)
+    if (node.kind === 'text' && previous?.kind === 'text') {
+      previous.value += node.value
+    }
+    else { result.push(node) }
   }
   return result
 }

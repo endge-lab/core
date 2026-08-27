@@ -1,23 +1,23 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
 import {
   Raph,
   RaphDerivedNode,
   RaphDerivedTargetWriteError,
 } from '@endge/raph'
 
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RConverter } from '@/domain/entities/reflect/RConverter'
 import { REnvironment } from '@/domain/entities/reflect/REnvironment'
 import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { RProject } from '@/domain/entities/reflect/RProject'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RTenant } from '@/domain/entities/reflect/RTenant'
-import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
 import { Endge } from '@/model/kernel/endge'
 import { timeStringToDate } from '@/model/seed/converters/date/time-string-to-date'
 import { weekdaysRange } from '@/model/seed/converters/date/weekdays-range'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
-describe('Query Raph derived integration', () => {
+describe('query Raph derived integration', () => {
   beforeEach(() => {
     Endge.runtime.reset()
     Endge.program.clear()
@@ -142,7 +142,9 @@ describe('Query Raph derived integration', () => {
       .mockImplementationOnce(() => first.promise)
       .mockImplementationOnce(() => second.promise)
     const host = Endge.runtime.execute(query, {
-      id: 'schedule-latest-runtime', persistence: 'disabled', meta: { props: { filterPayload: {} } },
+      id: 'schedule-latest-runtime',
+      persistence: 'disabled',
+      meta: { props: { filterPayload: {} } },
     }) as QueryRuntimeHost
     const rawPath = host.outputPath('raw')
     const tablePath = host.outputPath('table')
@@ -165,7 +167,9 @@ describe('Query Raph derived integration', () => {
     Endge.compiler.buildQuery(query)
     vi.spyOn(Endge.runtime.query, 'executeArtifact').mockResolvedValue([scheduleRow(1, 'SU', '100')])
     const host = Endge.runtime.execute(query, {
-      id: 'schedule-error-runtime', persistence: 'disabled', meta: { props: { filterPayload: {} } },
+      id: 'schedule-error-runtime',
+      persistence: 'disabled',
+      meta: { props: { filterPayload: {} } },
     }) as QueryRuntimeHost
     const rawPath = host.outputPath('raw')
     const tablePath = host.outputPath('table')
@@ -173,7 +177,9 @@ describe('Query Raph derived integration', () => {
     const lastGood = (Raph.get(`${tablePath}[id=1]`) as any).arrivalTime
     const converter = Endge.domain.getConverter('time-string-to-date')!
     converter.setCustom((value) => {
-      if (value === 'boom') throw new Error('converter failed')
+      if (value === 'boom') {
+        throw new Error('converter failed')
+      }
       return timeStringToDate(value)
     })
     const errors: Error[] = []
@@ -192,7 +198,6 @@ describe('Query Raph derived integration', () => {
     expect((Raph.get(`${tablePath}[id=1]`) as any).arrivalTime).toBeInstanceOf(Date)
   })
 })
-
 
 function registerConverter(id: number, identity: string, handler: (value: any) => any): void {
   const converter = new RConverter()

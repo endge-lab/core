@@ -1,13 +1,13 @@
 import type { EventCallback, OneOrMany } from '@endge/utils'
-import { EventBus, RingBuffer } from '@endge/utils'
 import type {
   CachedEvent,
   EndgeCoreEventMap,
   EndgeCustomEventMap,
   EndgeEmitOptions,
 } from '@/domain/types/kernel/events.types'
-import { EndgeEvent } from '@/domain/types/kernel/events.types'
+import { EventBus, RingBuffer } from '@endge/utils'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
+import { EndgeEvent } from '@/domain/types/kernel/events.types'
 
 /**
  * Модуль событий Endge.
@@ -43,7 +43,9 @@ export class EndgeEvents extends EndgeModule {
     const prev = this._cache
     if (n === 0) {
       this._cache = null
-      if (prev?.length) this.notify()
+      if (prev?.length) {
+        this.notify()
+      }
       return
     }
 
@@ -52,7 +54,9 @@ export class EndgeEvents extends EndgeModule {
     if (prev) {
       const old: CachedEvent[] = prev.toArray() // От старых событий к новым.
       const tail: CachedEvent[] = old.slice(Math.max(0, old.length - n))
-      for (const item of tail) nextCache.push(item)
+      for (const item of tail) {
+        nextCache.push(item)
+      }
     }
     this._cache = nextCache
     this.notify()
@@ -102,7 +106,7 @@ export class EndgeEvents extends EndgeModule {
     events: OneOrMany<K>,
     callback: (e: EndgeEvent<EndgeCoreEventMap[K]>) => void,
   ): () => void {
-    const handler: EventCallback<EndgeCoreEventMap[K]> = (payload) =>
+    const handler: EventCallback<EndgeCoreEventMap[K]> = payload =>
       callback(new EndgeEvent(payload))
 
     this._bus.on(events, handler)
@@ -135,7 +139,7 @@ export class EndgeEvents extends EndgeModule {
     events: OneOrMany<K>,
     callback: (e: EndgeEvent<EndgeCustomEventMap[K]>) => void,
   ): () => void {
-    const handler: EventCallback<EndgeCustomEventMap[K]> = (payload) =>
+    const handler: EventCallback<EndgeCustomEventMap[K]> = payload =>
       callback(new EndgeEvent(payload))
 
     this._bus.onCustom(events, handler)

@@ -1,7 +1,7 @@
 import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
 import type {
-  ComponentSFCTableColumnMenuDescriptor,
   ComponentSFCTableCellMenuDescriptor,
+  ComponentSFCTableColumnMenuDescriptor,
   ComponentSFCTableMenuItemDescriptor,
   ComponentSFCTableMenuNodeDescriptor,
   ComponentSFCTableRowMenuDescriptor,
@@ -9,9 +9,9 @@ import type {
   RComponentSFC_IR_Value,
 } from '@/domain/types/component/sfc/ir.types'
 import type { ComponentSFCActionPort } from '@/domain/types/component/sfc/ports.types'
-import { ENDGE_SFC_TABLE_COLUMN_MENU_MODES } from '@/domain/types/component/sfc/tag-attribute-contract.types'
 import { parseExpression } from '@babel/parser'
 import * as t from '@babel/types'
+import { ENDGE_SFC_TABLE_COLUMN_MENU_MODES } from '@/domain/types/component/sfc/tag-attribute-contract.types'
 
 export const SFC_TABLE_COLUMN_MENU_MODES = ENDGE_SFC_TABLE_COLUMN_MENU_MODES
 
@@ -47,10 +47,14 @@ export function normalizeComponentSFCTableColumnMenu(
   const options = normalizeOptions(actionsOrOptions)
 
   diagnostics.push(...collectUnsupportedMenuPlacements(tableNode))
-  if (mode === 'disabled') return { mode, menu: null, diagnostics }
+  if (mode === 'disabled') {
+    return { mode, menu: null, diagnostics }
+  }
 
   const menuNodes = directMenuNodes(tableNode, 'ColumnMenu')
-  if (menuNodes.length === 0) return { mode: 'default', menu: null, diagnostics }
+  if (menuNodes.length === 0) {
+    return { mode: 'default', menu: null, diagnostics }
+  }
   reportDuplicateMenu(menuNodes, 'ColumnMenu', diagnostics)
 
   return {
@@ -71,7 +75,9 @@ export function normalizeComponentSFCTableRowMenu(
   const diagnostics: RComponentDiagnostic[] = []
   const options = normalizeOptions(actionsOrOptions)
   const menuNodes = directMenuNodes(tableNode, 'RowMenu')
-  if (menuNodes.length === 0) return { mode: 'none', menu: null, diagnostics }
+  if (menuNodes.length === 0) {
+    return { mode: 'none', menu: null, diagnostics }
+  }
   reportDuplicateMenu(menuNodes, 'RowMenu', diagnostics)
 
   return {
@@ -94,16 +100,20 @@ export function normalizeComponentSFCTableCellMenu(
   const cellMenus = directMenuNodes(tableNode, 'CellMenu')
   const rowMenus = directMenuNodes(tableNode, 'RowMenu')
 
-  if (cellMenus.length && rowMenus.length) diagnostics.push(menuDiagnostic(
-    rowMenus[0],
-    'sfc-table-cell-menu-legacy-conflict',
-    'Используйте только CellMenu. RowMenu является deprecated compatibility alias.',
-    'CellMenu',
-  ))
+  if (cellMenus.length && rowMenus.length) {
+    diagnostics.push(menuDiagnostic(
+      rowMenus[0],
+      'sfc-table-cell-menu-legacy-conflict',
+      'Используйте только CellMenu. RowMenu является deprecated compatibility alias.',
+      'CellMenu',
+    ))
+  }
 
   const menuTag: 'CellMenu' | 'RowMenu' = cellMenus.length ? 'CellMenu' : 'RowMenu'
   const menuNodes = cellMenus.length ? cellMenus : rowMenus
-  if (menuNodes.length === 0) return { mode: 'none', menu: null, diagnostics }
+  if (menuNodes.length === 0) {
+    return { mode: 'none', menu: null, diagnostics }
+  }
   reportDuplicateMenu(menuNodes, menuTag, diagnostics)
 
   return {
@@ -128,22 +138,30 @@ export function normalizeComponentSFCColumnCellMenu(
   const menuNodes = directMenuNodes(columnNode, 'CellMenu')
 
   if (mode === 'none') {
-    if (menuNodes.length) diagnostics.push(menuDiagnostic(
-      menuNodes[0],
-      'sfc-table-column-cell-menu-conflict',
-      'Column cell-menu="none" нельзя использовать одновременно с Column > CellMenu.',
-      'CellMenu',
-    ))
+    if (menuNodes.length) {
+      diagnostics.push(menuDiagnostic(
+        menuNodes[0],
+        'sfc-table-column-cell-menu-conflict',
+        'Column cell-menu="none" нельзя использовать одновременно с Column > CellMenu.',
+        'CellMenu',
+      ))
+    }
     return { mode: 'none', menu: null, diagnostics }
   }
-  if (mode != null && mode !== '') diagnostics.push(menuDiagnostic(
-    columnNode,
-    'sfc-table-column-cell-menu-mode-invalid',
-    `Column cell-menu поддерживает только значение "none", получено "${String(mode)}".`,
-    'CellMenu',
-  ))
-  if (!menuNodes.length && !diagnostics.length) return undefined
-  if (!menuNodes.length) return { mode: 'none', menu: null, diagnostics }
+  if (mode != null && mode !== '') {
+    diagnostics.push(menuDiagnostic(
+      columnNode,
+      'sfc-table-column-cell-menu-mode-invalid',
+      `Column cell-menu поддерживает только значение "none", получено "${String(mode)}".`,
+      'CellMenu',
+    ))
+  }
+  if (!menuNodes.length && !diagnostics.length) {
+    return undefined
+  }
+  if (!menuNodes.length) {
+    return { mode: 'none', menu: null, diagnostics }
+  }
   reportDuplicateMenu(menuNodes, 'CellMenu', diagnostics)
   return {
     mode: 'inline',
@@ -166,7 +184,9 @@ function collectMenuItems(
   let index = 0
 
   for (const child of menuNode.children) {
-    if (!isElementNode(child)) continue
+    if (!isElementNode(child)) {
+      continue
+    }
     if (child.tag === 'MenuSeparator') {
       items.push({ kind: 'separator', id: readLiteralStringProp(child, 'id') || `separator-${index}` })
       index++
@@ -206,34 +226,42 @@ function createItemDescriptor(
   const icon = readLiteralStringProp(node, 'icon') || undefined
   const explicitInput = node.props.input
 
-  if (legacyCommand) diagnostics.push(menuDiagnostic(
-    node,
-    `sfc-table-${menuCode(menuTag)}-item-command-removed`,
-    'Атрибут command удалён. Используйте action="..." и optional :input="...".',
-    menuTag,
-    'command',
-  ))
-  if (!actionAlias) diagnostics.push(menuDiagnostic(
-    node,
-    `sfc-table-${menuCode(menuTag)}-item-action-missing`,
-    'MenuItem должен содержать literal Action identity, ссылку на Action port или совместимый static :action object.',
-    menuTag,
-    'action',
-  ))
-  if (!label) diagnostics.push(menuDiagnostic(
-    node,
-    `sfc-table-${menuCode(menuTag)}-item-label-missing`,
-    'MenuItem должен содержать label или :label expression.',
-    menuTag,
-    'label',
-  ))
-  if (actionBinding?.hasInput && explicitInput) diagnostics.push(menuDiagnostic(
-    node,
-    `sfc-table-${menuCode(menuTag)}-item-input-conflict`,
-    'Input задан одновременно внутри legacy :action object и отдельным :input. Оставьте только один вариант.',
-    menuTag,
-    'input',
-  ))
+  if (legacyCommand) {
+    diagnostics.push(menuDiagnostic(
+      node,
+      `sfc-table-${menuCode(menuTag)}-item-command-removed`,
+      'Атрибут command удалён. Используйте action="..." и optional :input="...".',
+      menuTag,
+      'command',
+    ))
+  }
+  if (!actionAlias) {
+    diagnostics.push(menuDiagnostic(
+      node,
+      `sfc-table-${menuCode(menuTag)}-item-action-missing`,
+      'MenuItem должен содержать literal Action identity, ссылку на Action port или совместимый static :action object.',
+      menuTag,
+      'action',
+    ))
+  }
+  if (!label) {
+    diagnostics.push(menuDiagnostic(
+      node,
+      `sfc-table-${menuCode(menuTag)}-item-label-missing`,
+      'MenuItem должен содержать label или :label expression.',
+      menuTag,
+      'label',
+    ))
+  }
+  if (actionBinding?.hasInput && explicitInput) {
+    diagnostics.push(menuDiagnostic(
+      node,
+      `sfc-table-${menuCode(menuTag)}-item-input-conflict`,
+      'Input задан одновременно внутри legacy :action object и отдельным :input. Оставьте только один вариант.',
+      menuTag,
+      'input',
+    ))
+  }
 
   const explicitPortReference = actionBinding?.kind === 'port'
   const port = actionAlias && options.availableActions
@@ -259,7 +287,9 @@ function createItemDescriptor(
     ))
   }
 
-  if (!actionAlias || !label || legacyCommand || (actionBinding?.hasInput && explicitInput) || (explicitPortReference && !port)) return null
+  if (!actionAlias || !label || legacyCommand || (actionBinding?.hasInput && explicitInput) || (explicitPortReference && !port)) {
+    return null
+  }
 
   const forwardedFrom = port?.forwardedFrom?.nodeId === tableNode.id ? port.forwardedFrom : undefined
   const action = forwardedFrom?.portName ?? port?.defaultIdentity ?? actionAlias
@@ -299,7 +329,9 @@ function readActionBinding(
     const identity = typeof value.value === 'string' ? value.value.trim() : ''
     return identity ? { kind: 'identity', identity, hasInput: false } : null
   }
-  if (value?.kind !== 'expression') return null
+  if (value?.kind !== 'expression') {
+    return null
+  }
 
   try {
     const expression = unwrapExpression(parseExpression(value.source, { sourceType: 'module', plugins: ['typescript'] }))
@@ -323,7 +355,9 @@ function readActionBinding(
         return null
       }
       const key = t.isIdentifier(property.key) ? property.key.name : t.isStringLiteral(property.key) ? property.key.value : ''
-      if (key) properties.set(key, property.value)
+      if (key) {
+        properties.set(key, property.value)
+      }
     }
     if (properties.has('payload')) {
       pushActionBindingDiagnostic(diagnostics, node, menuTag, 'action-payload-removed', 'Используйте input вместо payload.')
@@ -342,7 +376,9 @@ function readActionBinding(
       return null
     }
     const inputExpression = properties.get('input')
-    if (!inputExpression) return { kind: 'identity', identity, hasInput: false }
+    if (!inputExpression) {
+      return { kind: 'identity', identity, hasInput: false }
+    }
     const input = readStaticExpression(inputExpression)
     if (input === STATIC_VALUE_UNSUPPORTED) {
       pushActionBindingDiagnostic(diagnostics, node, menuTag, 'action-input-dynamic', 'Dynamic input в legacy :action object не поддерживается. Используйте отдельный :input expression.')
@@ -372,47 +408,64 @@ export function readComponentSFCTableMenuActionPortReference(
 function readActionPortReference(
   expression: t.Expression,
 ): { name: string, role?: 'require' | 'provides' } | null {
-  if (t.isIdentifier(expression))
+  if (t.isIdentifier(expression)) {
     return { name: expression.name }
+  }
 
-  if (!t.isMemberExpression(expression))
+  if (!t.isMemberExpression(expression)) {
     return null
+  }
 
   const owner = unwrapExpression(expression.object as t.Expression)
-  if (!t.isMemberExpression(owner))
+  if (!t.isMemberExpression(owner)) {
     return null
+  }
 
   const root = unwrapExpression(owner.object as t.Expression)
-  if (!t.isIdentifier(root, { name: 'ports' }))
+  if (!t.isIdentifier(root, { name: 'ports' })) {
     return null
+  }
 
   const role = readStaticMemberName(owner)
-  if (role !== 'require' && role !== 'provides')
+  if (role !== 'require' && role !== 'provides') {
     return null
+  }
 
   const name = readStaticMemberName(expression)?.trim() ?? ''
   return name ? { name, role } : null
 }
 
 function readStaticMemberName(expression: t.MemberExpression): string | null {
-  if (!expression.computed && t.isIdentifier(expression.property))
+  if (!expression.computed && t.isIdentifier(expression.property)) {
     return expression.property.name
-  if (expression.computed && t.isStringLiteral(expression.property))
+  }
+  if (expression.computed && t.isStringLiteral(expression.property)) {
     return expression.property.value
+  }
   return null
 }
 
 function readStaticExpression(node: t.Expression): unknown | typeof STATIC_VALUE_UNSUPPORTED {
   const expression = unwrapExpression(node)
-  if (t.isStringLiteral(expression) || t.isNumericLiteral(expression) || t.isBooleanLiteral(expression)) return expression.value
-  if (t.isNullLiteral(expression)) return null
-  if (t.isUnaryExpression(expression) && expression.operator === '-' && t.isNumericLiteral(expression.argument)) return -expression.argument.value
+  if (t.isStringLiteral(expression) || t.isNumericLiteral(expression) || t.isBooleanLiteral(expression)) {
+    return expression.value
+  }
+  if (t.isNullLiteral(expression)) {
+    return null
+  }
+  if (t.isUnaryExpression(expression) && expression.operator === '-' && t.isNumericLiteral(expression.argument)) {
+    return -expression.argument.value
+  }
   if (t.isArrayExpression(expression)) {
     const result: unknown[] = []
     for (const element of expression.elements) {
-      if (!element || !t.isExpression(element)) return STATIC_VALUE_UNSUPPORTED
+      if (!element || !t.isExpression(element)) {
+        return STATIC_VALUE_UNSUPPORTED
+      }
       const item = readStaticExpression(element)
-      if (item === STATIC_VALUE_UNSUPPORTED) return item
+      if (item === STATIC_VALUE_UNSUPPORTED) {
+        return item
+      }
       result.push(item)
     }
     return result
@@ -420,11 +473,17 @@ function readStaticExpression(node: t.Expression): unknown | typeof STATIC_VALUE
   if (t.isObjectExpression(expression)) {
     const result: Record<string, unknown> = {}
     for (const property of expression.properties) {
-      if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) return STATIC_VALUE_UNSUPPORTED
+      if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
+        return STATIC_VALUE_UNSUPPORTED
+      }
       const key = t.isIdentifier(property.key) ? property.key.name : t.isStringLiteral(property.key) ? property.key.value : ''
-      if (!key) return STATIC_VALUE_UNSUPPORTED
+      if (!key) {
+        return STATIC_VALUE_UNSUPPORTED
+      }
       const item = readStaticExpression(property.value)
-      if (item === STATIC_VALUE_UNSUPPORTED) return item
+      if (item === STATIC_VALUE_UNSUPPORTED) {
+        return item
+      }
       result[key] = item
     }
     return result
@@ -435,39 +494,55 @@ function readStaticExpression(node: t.Expression): unknown | typeof STATIC_VALUE
 function collectUnsupportedMenuPlacements(tableNode: RComponentSFC_IR_ElementNode): RComponentDiagnostic[] {
   const diagnostics: RComponentDiagnostic[] = []
   for (const child of tableNode.children) {
-    if (!isElementNode(child)) continue
-    if (child.tag === 'MenuItem' || child.tag === 'MenuSeparator') diagnostics.push(menuDiagnostic(
-      child,
-      'sfc-table-menu-placement-invalid',
-      `${child.tag} должен находиться внутри Table > ColumnMenu или Table/Column > CellMenu.`,
-      'ColumnMenu',
-    ))
-    if (child.tag !== 'Column') continue
-    for (const columnChild of child.children) {
-      if (!isElementNode(columnChild)) continue
-      if (columnChild.tag === 'ColumnMenu' || columnChild.tag === 'RowMenu') diagnostics.push(menuDiagnostic(
-        columnChild,
-        columnChild.tag === 'ColumnMenu'
-          ? 'sfc-table-column-menu-placement-unsupported'
-          : 'sfc-table-row-menu-placement-unsupported',
-        `Column > ${columnChild.tag} не поддерживается. Для меню ячейки используйте Column > CellMenu.`,
-        columnChild.tag,
-      ))
-      if (columnChild.tag === 'MenuItem' || columnChild.tag === 'MenuSeparator') diagnostics.push(menuDiagnostic(
-        columnChild,
+    if (!isElementNode(child)) {
+      continue
+    }
+    if (child.tag === 'MenuItem' || child.tag === 'MenuSeparator') {
+      diagnostics.push(menuDiagnostic(
+        child,
         'sfc-table-menu-placement-invalid',
-        `${columnChild.tag} должен находиться внутри Table menu.`,
+        `${child.tag} должен находиться внутри Table > ColumnMenu или Table/Column > CellMenu.`,
         'ColumnMenu',
       ))
+    }
+    if (child.tag !== 'Column') {
+      continue
+    }
+    for (const columnChild of child.children) {
+      if (!isElementNode(columnChild)) {
+        continue
+      }
+      if (columnChild.tag === 'ColumnMenu' || columnChild.tag === 'RowMenu') {
+        diagnostics.push(menuDiagnostic(
+          columnChild,
+          columnChild.tag === 'ColumnMenu'
+            ? 'sfc-table-column-menu-placement-unsupported'
+            : 'sfc-table-row-menu-placement-unsupported',
+          `Column > ${columnChild.tag} не поддерживается. Для меню ячейки используйте Column > CellMenu.`,
+          columnChild.tag,
+        ))
+      }
+      if (columnChild.tag === 'MenuItem' || columnChild.tag === 'MenuSeparator') {
+        diagnostics.push(menuDiagnostic(
+          columnChild,
+          'sfc-table-menu-placement-invalid',
+          `${columnChild.tag} должен находиться внутри Table menu.`,
+          'ColumnMenu',
+        ))
+      }
     }
   }
   return diagnostics
 }
 
 function normalizeColumnMenuMode(value: unknown, diagnostics: RComponentDiagnostic[]): 'default' | 'disabled' {
-  if (value == null || value === '') return 'default'
+  if (value == null || value === '') {
+    return 'default'
+  }
   const mode = String(value).trim()
-  if (COLUMN_MENU_MODE_SET.has(mode)) return mode as 'default' | 'disabled'
+  if (COLUMN_MENU_MODE_SET.has(mode)) {
+    return mode as 'default' | 'disabled'
+  }
   diagnostics.push({
     severity: 'error',
     code: 'sfc-table-column-menu-mode-invalid',
@@ -478,7 +553,9 @@ function normalizeColumnMenuMode(value: unknown, diagnostics: RComponentDiagnost
 }
 
 function reportDuplicateMenu(nodes: RComponentSFC_IR_ElementNode[], tag: TableMenuTag, diagnostics: RComponentDiagnostic[]): void {
-  if (nodes.length < 2) return
+  if (nodes.length < 2) {
+    return
+  }
   diagnostics.push(menuDiagnostic(
     nodes[1],
     `sfc-table-${menuCode(tag)}-duplicate`,
@@ -528,7 +605,9 @@ function menuCode(tag: TableMenuTag): 'column-menu' | 'cell-menu' | 'row-menu' {
 
 function unwrapExpression(node: t.Expression): t.Expression {
   let current = node
-  while (t.isTSAsExpression(current) || t.isTSTypeAssertion(current) || t.isTSNonNullExpression(current)) current = current.expression
+  while (t.isTSAsExpression(current) || t.isTSTypeAssertion(current) || t.isTSNonNullExpression(current)) {
+    current = current.expression
+  }
   return current
 }
 

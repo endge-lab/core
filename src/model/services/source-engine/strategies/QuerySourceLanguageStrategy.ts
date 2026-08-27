@@ -6,12 +6,12 @@ import type {
   SourceLanguageValidationResult,
 } from '@/domain/types/source/source-engine.types'
 
+import { validateTypeExpressionUsage, validateTypeSourceExpressionUsage } from '@/model/services/compiler/type/type-program-validation'
 import { compileQuerySource } from '@/model/services/source-engine/compilers/query-source-compile'
-import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
 import { resolveTypedSourceDocumentReference, typedSourceTypeReferenceHighlights } from '@/model/services/source-engine/source-document-reference'
+import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
 import { QUERY_DEFAULT_SOURCE, QUERY_GRAPHQL_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/query.default.source'
 import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/model/services/source-engine/value-expression-language'
-import { validateTypeExpressionUsage, validateTypeSourceExpressionUsage } from '@/model/services/compiler/type/type-program-validation'
 
 /** Source language strategy для editor-facing операций RQuery source. */
 export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
@@ -21,18 +21,80 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
     alias: 'Endge Query Source',
     extension: '.endge-query.ts',
     keywords: [
-      'auto', 'body', 'collectionByKey', 'compact', 'contract', 'converter', 'data', 'dataView', 'defineDataView', 'defineFilter', 'defineProps',
-      'defineQuery', 'endgeVar', 'env', 'field', 'filter', 'full', 'gql', 'graphql', 'ignore', 'incremental', 'merge', 'objectOf', 'output', 'prop', 'recordOf',
-      'response', 'throw', 'variables', ...VALUE_EXPRESSION_FUNCTION_NAMES,
+      'auto',
+      'body',
+      'collectionByKey',
+      'compact',
+      'contract',
+      'converter',
+      'data',
+      'dataView',
+      'defineDataView',
+      'defineFilter',
+      'defineProps',
+      'defineQuery',
+      'endgeVar',
+      'env',
+      'field',
+      'filter',
+      'full',
+      'gql',
+      'graphql',
+      'ignore',
+      'incremental',
+      'merge',
+      'objectOf',
+      'output',
+      'prop',
+      'recordOf',
+      'response',
+      'throw',
+      'variables',
+      ...VALUE_EXPRESSION_FUNCTION_NAMES,
     ],
     functions: [
-      'array', 'as', 'auto', 'by', 'collectionByKey', 'contract', 'converter', 'dataView', 'default', 'from', 'full', 'map', 'optional',
-      'options', 'vocab', ...VALUE_EXPRESSION_METHOD_NAMES,
+      'array',
+      'as',
+      'auto',
+      'by',
+      'collectionByKey',
+      'contract',
+      'converter',
+      'dataView',
+      'default',
+      'from',
+      'full',
+      'map',
+      'optional',
+      'options',
+      'vocab',
+      ...VALUE_EXPRESSION_METHOD_NAMES,
     ],
     properties: [
-      'auth', 'body', 'data', 'document', 'enabled', 'endpoint', 'errorPolicy', 'formUrlencoded',
-      'headers', 'incremental', 'items', 'kind', 'method', 'mock', 'mode', 'outputs', 'path',
-      'metadata', 'operationName', 'profile', 'props', 'request', 'timeoutMs', 'variables',
+      'auth',
+      'body',
+      'data',
+      'document',
+      'enabled',
+      'endpoint',
+      'errorPolicy',
+      'formUrlencoded',
+      'headers',
+      'incremental',
+      'items',
+      'kind',
+      'method',
+      'mock',
+      'mode',
+      'outputs',
+      'path',
+      'metadata',
+      'operationName',
+      'profile',
+      'props',
+      'request',
+      'timeoutMs',
+      'variables',
     ],
   })
 

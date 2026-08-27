@@ -6,8 +6,9 @@ export class ResolvedEntityIndex {
 
   public set<TEntity extends REntity>(type: string, entity: TEntity): void {
     const identity = String(entity.identity ?? '').trim()
-    if (!identity)
+    if (!identity) {
       throw new Error(`Resolved ${type} identity is required.`)
+    }
     const byIdentity = this._entities.get(type) ?? new Map<string, REntity>()
     byIdentity.set(identity, entity)
     this._entities.set(type, byIdentity)
@@ -29,10 +30,13 @@ export class ResolvedEntityIndex {
   public clearDerived(type?: string): void {
     const entries = type ? [[type, this._entities.get(type)] as const] : [...this._entities.entries()]
     for (const [, byIdentity] of entries) {
-      if (!byIdentity) continue
+      if (!byIdentity) {
+        continue
+      }
       for (const [identity, entity] of byIdentity) {
-        if (entity.origin.kind === 'derived')
+        if (entity.origin.kind === 'derived') {
           byIdentity.delete(identity)
+        }
       }
     }
   }

@@ -11,13 +11,16 @@ export class OidcAuthAdapter implements AuthProfileAdapter {
 
   public validate(profile: AuthProfileSchema): void {
     requireOnlyKeys(profile.config, CONFIG_KEYS, profile.identity)
-    if (!String(profile.config.issuer ?? '').trim() || !String(profile.config.clientId ?? '').trim())
+    if (!String(profile.config.issuer ?? '').trim() || !String(profile.config.clientId ?? '').trim()) {
       throw new Error(`[EndgeAuth] OIDC profile "${profile.identity}" requires issuer and clientId`)
+    }
     const scopes = profile.config.scopes
-    if (!Array.isArray(scopes) || scopes.length === 0 || scopes.some(scope => !String(scope ?? '').trim()))
+    if (!Array.isArray(scopes) || scopes.length === 0 || scopes.some(scope => !String(scope ?? '').trim())) {
       throw new Error(`[EndgeAuth] OIDC profile "${profile.identity}" requires non-empty scopes`)
-    if (Object.keys(profile.credentials ?? {}).length > 0)
+    }
+    if (Object.keys(profile.credentials ?? {}).length > 0) {
       throw new Error(`[EndgeAuth] OIDC profile "${profile.identity}" credentials must be empty`)
+    }
     validateSession(profile)
   }
 
@@ -28,14 +31,17 @@ export class OidcAuthAdapter implements AuthProfileAdapter {
 
 function validateSession(profile: AuthProfileSchema): void {
   const session = profile.session
-  if (!session || !['memory', 'sessionStorage', 'localStorage'].includes(session.storage))
+  if (!session || !['memory', 'sessionStorage', 'localStorage'].includes(session.storage)) {
     throw new Error(`[EndgeAuth] Token profile "${profile.identity}" requires session policy`)
-  if (typeof session.persistRefreshToken !== 'boolean')
+  }
+  if (typeof session.persistRefreshToken !== 'boolean') {
     throw new TypeError(`[EndgeAuth] Invalid refresh token policy: ${profile.identity}`)
+  }
 }
 
 function requireOnlyKeys(value: Record<string, unknown>, allowed: string[], identity: string): void {
   const unexpected = Object.keys(value ?? {}).find(key => !allowed.includes(key))
-  if (unexpected)
+  if (unexpected) {
     throw new Error(`[EndgeAuth] Unsupported OIDC config field "${unexpected}" in profile "${identity}"`)
+  }
 }

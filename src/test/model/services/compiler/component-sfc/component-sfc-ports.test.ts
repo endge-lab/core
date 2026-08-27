@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import { getComponentSFCIntrinsicEventDefinitions } from '@/domain/types/component/sfc/intrinsic-events.types'
 import { TABLE_EVENT_DEFINITIONS } from '@/domain/types/component/sfc/table-events.types'
+import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 
 const SOURCE = `<script setup lang="ts">
 interface Props {
@@ -42,7 +42,7 @@ const state = ports.require.state({ process: props.process })
   <GroundHandling.Cell :point="state.target" />
 </template>`
 
-describe('ComponentSFC ports compiler', () => {
+describe('componentSFC ports compiler', () => {
   it('compiles required Query ports and flat per-instance provider bindings', () => {
     const child = compileComponentSFC(`<script setup lang="ts">
 interface UpdateInput { legId: String; utcTime: DateTime }
@@ -60,7 +60,10 @@ const ports = definePorts({
   />
 </template>`, {
       resolvePortProvider: identity => ({
-        kind: 'query', identity, active: true, outputs: [],
+        kind: 'query',
+        identity,
+        active: true,
+        outputs: [],
         inputs: [
           { name: 'legId', type: 'String', optional: false },
           { name: 'utcTime', type: 'DateTime', optional: false },
@@ -81,7 +84,10 @@ const ports = definePorts({
       resolveComponentTag: () => 'groundhandling-process',
       resolveComponentPortManifest: () => child.ir!.script.ports,
       resolvePortProvider: identity => ({
-        kind: 'query', identity, active: true, outputs: [],
+        kind: 'query',
+        identity,
+        active: true,
+        outputs: [],
         inputs: [
           { name: 'legId', type: 'String', optional: false },
           { name: 'utcTime', type: 'DateTime', optional: false },
@@ -430,7 +436,7 @@ const ports = definePorts({
   it('compiles both port kinds, a computation local and a dotted local tag', () => {
     const result = compileComponentSFC(SOURCE, {
       resolveComponentTag: () => 'global-component-that-must-not-win',
-      resolvePortProvider: (identity) => identity === 'groundhandling-process-state'
+      resolvePortProvider: identity => identity === 'groundhandling-process-state'
         ? {
             kind: 'computation',
             identity,
@@ -563,7 +569,9 @@ const ports = definePorts({
 </script>
 <template><Local.Cell /></template>`, {
       resolvePortProvider: (identity) => {
-        if (identity === 'missing') return null
+        if (identity === 'missing') {
+          return null
+        }
         if (identity === 'wrong-contract') {
           return {
             kind: 'computation',

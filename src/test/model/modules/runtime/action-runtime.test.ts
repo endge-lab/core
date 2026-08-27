@@ -5,7 +5,7 @@ import { ActionProgramExecutor } from '@/model/modules/runtime/execution/action/
 import { OperationHistory } from '@/model/modules/runtime/operation/operation-history'
 import { compileActionSource } from '@/model/services/source-engine/compilers/action-source-compile'
 
-describe('ActionProgramExecutor', () => {
+describe('actionProgramExecutor', () => {
   afterEach(() => vi.restoreAllMocks())
 
   it('executes named steps sequentially and publishes only explicit output', async () => {

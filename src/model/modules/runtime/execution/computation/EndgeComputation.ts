@@ -1,26 +1,26 @@
+import type { ComputationProgramPayload } from '@/domain/types/computation/computation-program.types'
 import type {
   ComputationExecutionApi,
   ComputationExecutionScope,
+  ComputationOverride,
   ComputationSandboxAdapter,
   ComputationSandboxRequest,
-  ComputationOverride,
 } from '@/domain/types/computation/computation-runtime.types'
 import type { EntityOrigin } from '@/domain/types/document/entity-management.type'
-import type { ImplementationBindingScope } from '@/domain/types/runtime/action.types'
-import type { ComputationProgramPayload } from '@/domain/types/computation/computation-program.types'
 import type { ProgramArtifact } from '@/domain/types/program/program.types'
+import type { ImplementationBindingScope } from '@/domain/types/runtime/action.types'
 
-import { Endge } from '@/model/kernel/endge'
+import type { EndgeImplementations } from '@/model/modules/runtime/implementation/endge-implementations'
 import {
   ENDGE_COMPUTATION_MAX_CALL_DEPTH,
   ENDGE_COMPUTATION_MAX_CALLS,
 } from '@/model/config/kernel.config'
+import { Endge } from '@/model/kernel/endge'
 import { compileComputation } from '@/model/services/compiler/computation/computation-compile'
-import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
 
+import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
 import { ComputationGraphExecutor, ComputationRuntimeError } from './ComputationGraphExecutor'
 import { ComputationResourceState } from './ComputationResource'
-import { EndgeImplementations } from '@/model/modules/runtime/implementation/endge-implementations'
 
 /** Executes compiled computation graphs and creates renderer-neutral resources. */
 export class EndgeComputation {
@@ -37,6 +37,7 @@ export class EndgeComputation {
       runSync: (identity, input, scope) => this._runSync(identity, input, scope),
     },
   )
+
   private readonly api: ComputationExecutionApi = {
     evaluate: (expression, scope) => evaluateSourceExpression(expression, { scope }),
   }
@@ -52,12 +53,18 @@ export class EndgeComputation {
   /** Installs a serializable code-owned Computation definition. */
   public define(definition: { identity: string, origin: EntityOrigin, defaultProviderKey?: string, execution?: 'sync' | 'async' }): VoidFunction {
     const identity = String(definition.identity ?? '').trim()
-    if (!identity) throw new Error('Computation identity is required.')
-    if (Endge.domain.getComputation(identity) || this.definitions.has(identity)) throw new Error(`Computation identity collision: ${identity}.`)
+    if (!identity) {
+      throw new Error('Computation identity is required.')
+    }
+    if (Endge.domain.getComputation(identity) || this.definitions.has(identity)) {
+      throw new Error(`Computation identity collision: ${identity}.`)
+    }
     const stored = { ...definition, identity }
     this.definitions.set(identity, stored)
     const dispose = () => {
-      if (this.definitions.get(identity) === stored) this.definitions.delete(identity)
+      if (this.definitions.get(identity) === stored) {
+        this.definitions.delete(identity)
+      }
       this.definitionDisposers.delete(dispose)
     }
     this.definitionDisposers.add(dispose)
@@ -67,8 +74,12 @@ export class EndgeComputation {
   /** Installs executable code separately from a Computation definition. */
   public provide(provider: { identity: string, key: string, origin?: EntityOrigin, implementation: ComputationOverride }): VoidFunction {
     const identity = String(provider.identity ?? '').trim()
-    if (!Endge.domain.getComputation(identity) && !Endge.program.getComputationArtifact(identity) && !this.definitions.has(identity)) throw new Error(`Computation provider requires an existing definition: ${identity}.`)
-    if (this.providers.has(provider.key)) throw new Error(`Computation provider key collision: ${provider.key}.`)
+    if (!Endge.domain.getComputation(identity) && !Endge.program.getComputationArtifact(identity) && !this.definitions.has(identity)) {
+      throw new Error(`Computation provider requires an existing definition: ${identity}.`)
+    }
+    if (this.providers.has(provider.key)) {
+      throw new Error(`Computation provider key collision: ${provider.key}.`)
+    }
     this.providers.set(provider.key, provider.implementation)
     const disposeProvider = this.implementations.registerProvider({
       key: provider.key,
@@ -77,7 +88,9 @@ export class EndgeComputation {
     })
     const dispose = () => {
       disposeProvider()
-      if (this.providers.get(provider.key) === provider.implementation) this.providers.delete(provider.key)
+      if (this.providers.get(provider.key) === provider.implementation) {
+        this.providers.delete(provider.key)
+      }
       this.providerDisposers.delete(dispose)
     }
     this.providerDisposers.add(dispose)
@@ -92,14 +105,19 @@ export class EndgeComputation {
     scopeIdentity?: string
     priority?: number
   }): VoidFunction {
-    if (!Endge.domain.getComputation(binding.identity) && !Endge.program.getComputationArtifact(binding.identity) && !this.definitions.has(binding.identity)) throw new Error(`Computation cannot be overridden because it does not exist: ${binding.identity}.`)
-    if (!this.providers.has(binding.providerKey)) throw new Error(`Computation provider is not registered: ${binding.providerKey}.`)
+    if (!Endge.domain.getComputation(binding.identity) && !Endge.program.getComputationArtifact(binding.identity) && !this.definitions.has(binding.identity)) {
+      throw new Error(`Computation cannot be overridden because it does not exist: ${binding.identity}.`)
+    }
+    if (!this.providers.has(binding.providerKey)) {
+      throw new Error(`Computation provider is not registered: ${binding.providerKey}.`)
+    }
     const artifact = Endge.program.getComputationArtifact(binding.identity)
     const definition = this.definitions.get(binding.identity)
     const provider = this.providers.get(binding.providerKey)!
     const execution = artifact?.payload.execution ?? definition?.execution
-    if (execution === 'sync' && provider.execution !== 'sync')
+    if (execution === 'sync' && provider.execution !== 'sync') {
       throw new Error(`Async Computation provider cannot override sync contract: ${binding.identity}.`)
+    }
     const disposeBinding = this.implementations.bind({
       executableType: 'computation',
       executableIdentity: binding.identity,
@@ -123,8 +141,9 @@ export class EndgeComputation {
 
   /** Executes an already compiler-validated function in the shared isolated sandbox. */
   public async executeSandbox(request: ComputationSandboxRequest): Promise<unknown> {
-    if (!this.sandbox)
+    if (!this.sandbox) {
       throw new ComputationRuntimeError('Computation sandbox adapter is not registered.', request.computationIdentity, 'sandbox-missing')
+    }
     return await this.sandbox.execute(request)
   }
 
@@ -187,8 +206,9 @@ export class EndgeComputation {
     const identity = artifact.ref.identity
     const scope = this._enterExecution(identity, parentScope)
     const override = this.resolveProvider(identity)
-    if (override)
+    if (override) {
       return this.runOverride(identity, override, input)
+    }
     this.assertArtifact(artifact)
     return this.executor.run(artifact.payload, input, identity, scope)
   }
@@ -208,8 +228,9 @@ export class EndgeComputation {
     const identity = artifact.ref.identity
     const scope = this._enterExecution(identity, parentScope)
     const override = this.resolveProvider(identity)
-    if (override)
+    if (override) {
       return this.runOverrideSync(identity, override, input)
+    }
     this.assertArtifact(artifact)
     return this.executor.runSync(artifact.payload, input, identity, scope)
   }
@@ -237,14 +258,16 @@ export class EndgeComputation {
 
   private requireArtifact(idOrIdentity: string | number): ProgramArtifact<ComputationProgramPayload> {
     const artifact = Endge.program.getComputationArtifact(idOrIdentity)
-    if (!artifact)
+    if (!artifact) {
       throw new ComputationRuntimeError(`Computation artifact "${String(idOrIdentity)}" is missing.`, String(idOrIdentity), 'artifact-missing')
+    }
     return artifact
   }
 
   private assertArtifact(artifact: ProgramArtifact<ComputationProgramPayload>): void {
-    if (artifact.status === 'error')
+    if (artifact.status === 'error') {
       throw new ComputationRuntimeError(`Computation "${artifact.ref.identity}" contains compile errors.`, artifact.ref.identity, 'compile-errors')
+    }
   }
 
   /** Создает child scope и блокирует runtime recursion или чрезмерно глубокий call graph. */
@@ -278,17 +301,20 @@ export class EndgeComputation {
     input: unknown,
   ): unknown {
     const key = String(identity)
-    if (override.execution !== 'sync')
+    if (override.execution !== 'sync') {
       throw new ComputationRuntimeError(`Computation override "${key}" is asynchronous.`, key, 'async-override')
+    }
     try {
       const result = override.run(input, this.api)
-      if (result instanceof Promise)
+      if (result instanceof Promise) {
         throw new ComputationRuntimeError(`Sync override "${key}" returned a Promise.`, key, 'invalid-sync-override')
+      }
       return result
     }
     catch (error) {
-      if (error instanceof ComputationRuntimeError)
+      if (error instanceof ComputationRuntimeError) {
         throw error
+      }
       throw new ComputationRuntimeError(
         `Computation override "${key}" failed: ${error instanceof Error ? error.message : String(error)}`,
         key,
@@ -309,8 +335,9 @@ export class EndgeComputation {
       return await override.run(input, this.api)
     }
     catch (error) {
-      if (error instanceof ComputationRuntimeError)
+      if (error instanceof ComputationRuntimeError) {
         throw error
+      }
       throw new ComputationRuntimeError(
         `Computation override "${key}" failed: ${error instanceof Error ? error.message : String(error)}`,
         key,
@@ -331,9 +358,15 @@ export class EndgeComputation {
   }
 
   public reset(): void {
-    for (const dispose of [...this.bindingDisposers]) dispose()
-    for (const dispose of [...this.providerDisposers]) dispose()
-    for (const dispose of [...this.definitionDisposers]) dispose()
+    for (const dispose of [...this.bindingDisposers]) {
+      dispose()
+    }
+    for (const dispose of [...this.providerDisposers]) {
+      dispose()
+    }
+    for (const dispose of [...this.definitionDisposers]) {
+      dispose()
+    }
   }
 }
 

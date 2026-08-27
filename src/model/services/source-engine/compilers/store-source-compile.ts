@@ -1,5 +1,5 @@
-import type { DataViewRef } from '@/domain/types/source/data-view-source.types'
 import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
+import type { DataViewRef } from '@/domain/types/source/data-view-source.types'
 import type { StoreDataDescriptor, StoreSourceCompileResult, StoreValueInitializer } from '@/domain/types/source/store-source.types'
 
 import { parse as parseTS } from '@babel/parser'
@@ -44,13 +44,14 @@ export function compileStoreSource(source: string, sourceVersion = 1): StoreSour
         continue
       }
       const value = unwrapExpression(property.value)
-      if (!t.isObjectExpression(value))
+      if (!t.isObjectExpression(value)) {
         diagnostics.push(diagnostic('error', 'store-source-data-object', 'data должен быть object literal.', 'data', value))
-      else
-        dataNode = value
+      }
+      else { dataNode = value }
     }
-    if (!dataNode)
+    if (!dataNode) {
       diagnostics.push(diagnostic('error', 'store-source-data-missing', 'defineStore требует поле data.', 'data', definition))
+    }
 
     const data = dataNode ? readData(dataNode, source, diagnostics) : []
     const document = { data }
@@ -77,8 +78,9 @@ function readData(node: t.ObjectExpression, source: string, diagnostics: Diagnos
       continue
     }
     const key = propertyName(property.key)
-    if (!key)
+    if (!key) {
       continue
+    }
     if (declared.has(key)) {
       diagnostics.push(diagnostic('error', 'store-data-duplicate', `Data field "${key}" объявлен повторно.`, `data.${key}`, property))
       continue
@@ -132,14 +134,16 @@ function readData(node: t.ObjectExpression, source: string, diagnostics: Diagnos
       }
       if (modifier.name === 'dataView') {
         const ref = readDataViewRef(modifier.call.arguments[0], source, diagnostics, `data.${key}.dataView`)
-        if (ref)
+        if (ref) {
           dataViews.push(ref)
+        }
         continue
       }
       if (modifier.name === 'select') {
         const ref = readSelectDataViewRef(modifier.call.arguments[0], source, diagnostics, `data.${key}.select`)
-        if (ref)
+        if (ref) {
           dataViews.push(ref)
+        }
         continue
       }
       if (modifier.name === 'contract') {
@@ -210,8 +214,9 @@ function readSelectDataViewRef(
 function readValueInitializer(node: t.Expression): { ok: true, initial: StoreValueInitializer } | { ok: false } {
   const value = unwrapExpression(node)
   if (t.isCallExpression(value) && t.isIdentifier(value.callee, { name: 'mock' })) {
-    if (value.arguments.length !== 1)
+    if (value.arguments.length !== 1) {
       return { ok: false }
+    }
     const identity = readStringArgument(value, 0)?.trim()
     return identity
       ? { ok: true, initial: { kind: 'mock', identity } }
@@ -238,10 +243,12 @@ function readDataViewRef(
     referenceCall: 'dataView',
     defineCall: 'defineDataView',
   })
-  if (reference?.kind === 'external')
+  if (reference?.kind === 'external') {
     return reference
-  if (reference?.kind === 'inline')
+  }
+  if (reference?.kind === 'inline') {
     return { kind: 'inline', source: reference.source }
+  }
 
   diagnostics.push(diagnostic('error', 'store-dataview-shape', '.dataView(...) поддерживает identity, dataView(identity) или defineDataView({...}).', sourcePath, unwrapExpression(raw)))
   return null
@@ -249,11 +256,13 @@ function readDataViewRef(
 
 function findDefineStore(ast: t.File): t.CallExpression | null {
   for (const statement of ast.program.body) {
-    if (!t.isExpressionStatement(statement))
+    if (!t.isExpressionStatement(statement)) {
       continue
+    }
     const expression = unwrapExpression(statement.expression)
-    if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'defineStore' }))
+    if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'defineStore' })) {
       return expression
+    }
   }
   return null
 }
@@ -263,8 +272,9 @@ function memberChain(raw: t.Expression): { base: t.CallExpression, modifiers: Ar
   const modifiers: Array<{ name: string, call: t.CallExpression }> = []
   while (t.isCallExpression(current) && t.isMemberExpression(current.callee)) {
     const name = propertyName(current.callee.property)
-    if (!name || !t.isExpression(current.callee.object))
+    if (!name || !t.isExpression(current.callee.object)) {
       return null
+    }
     modifiers.unshift({ name, call: current })
     current = unwrapExpression(current.callee.object)
   }
@@ -273,20 +283,25 @@ function memberChain(raw: t.Expression): { base: t.CallExpression, modifiers: Ar
 
 function readStaticValue(node: t.Expression): { ok: true, value: unknown } | { ok: false } {
   const value = unwrapExpression(node)
-  if (t.isStringLiteral(value) || t.isBooleanLiteral(value) || t.isNumericLiteral(value))
+  if (t.isStringLiteral(value) || t.isBooleanLiteral(value) || t.isNumericLiteral(value)) {
     return { ok: true, value: value.value }
-  if (t.isNullLiteral(value))
+  }
+  if (t.isNullLiteral(value)) {
     return { ok: true, value: null }
-  if (t.isUnaryExpression(value, { operator: '-' }) && t.isNumericLiteral(value.argument))
+  }
+  if (t.isUnaryExpression(value, { operator: '-' }) && t.isNumericLiteral(value.argument)) {
     return { ok: true, value: -value.argument.value }
+  }
   if (t.isArrayExpression(value)) {
     const out: unknown[] = []
     for (const element of value.elements) {
-      if (!element || !t.isExpression(element))
+      if (!element || !t.isExpression(element)) {
         return { ok: false }
+      }
       const item = readStaticValue(element)
-      if (!item.ok)
+      if (!item.ok) {
         return item
+      }
       out.push(item.value)
     }
     return { ok: true, value: out }
@@ -294,14 +309,17 @@ function readStaticValue(node: t.Expression): { ok: true, value: unknown } | { o
   if (t.isObjectExpression(value)) {
     const out: Record<string, unknown> = {}
     for (const property of value.properties) {
-      if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value))
+      if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
         return { ok: false }
+      }
       const key = propertyName(property.key)
-      if (!key)
+      if (!key) {
         return { ok: false }
+      }
       const item = readStaticValue(property.value)
-      if (!item.ok)
+      if (!item.ok) {
         return item
+      }
       out[key] = item.value
     }
     return { ok: true, value: out }

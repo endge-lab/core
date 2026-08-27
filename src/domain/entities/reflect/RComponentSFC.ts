@@ -1,11 +1,11 @@
-import { Expose } from 'class-transformer'
+import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
 
-import { type DuplicateOptions } from '@/domain/entities/reflect/REntity'
-import { RComponentCore } from '@/domain/entities/reflect/RComponentCore'
-import { serializeSFCSourceParts } from '@/model/services/compiler/component-sfc/component-sfc-source-parts'
 import type { RComponentRenderTarget } from '@/domain/types/component/component-core.types'
 import type { RComponentSFCSource_Parts } from '@/domain/types/component/sfc/source.types'
+import { Expose } from 'class-transformer'
+import { RComponentCore } from '@/domain/entities/reflect/RComponentCore'
 import { ComponentType } from '@/domain/types/document/document.types'
+import { serializeSFCSourceParts } from '@/model/services/compiler/component-sfc/component-sfc-source-parts'
 
 /**
  * Новый SFC-компонент Endge.
@@ -116,14 +116,18 @@ export class RComponentSFC extends RComponentCore {
 
 /** Нормализует опциональный пользовательский tag без навязывания namespace. */
 function normalizeTag(raw: unknown): string | null {
-  if (typeof raw !== 'string') return null
+  if (typeof raw !== 'string') {
+    return null
+  }
   return raw.trim() || null
 }
 
 /** Нормализует ссылку на проект из Payload relation или plain-значения. */
 /** Нормализует список поддерживаемых targets и оставляет только v1-значения. */
 function normalizeTargets(raw: unknown): RComponentRenderTarget[] {
-  if (!Array.isArray(raw)) return ['dom', 'canvas']
+  if (!Array.isArray(raw)) {
+    return ['dom', 'canvas']
+  }
 
   const targets = raw.filter((target): target is RComponentRenderTarget => target === 'dom' || target === 'canvas')
   return targets.length ? targets : ['dom', 'canvas']

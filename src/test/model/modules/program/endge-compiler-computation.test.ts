@@ -7,7 +7,7 @@ import { RTenant } from '@/domain/entities/reflect/RTenant'
 import { Endge } from '@/model/kernel/endge'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
-describe('EndgeCompiler computation dependencies', () => {
+describe('endgeCompiler computation dependencies', () => {
   beforeEach(() => prepareCompilerContext())
 
   afterEach(() => {

@@ -1,7 +1,7 @@
-import type { RComponentContractInput } from '@/domain/types/component/component-core.types'
-
 import type { RComponentSFC_IR_Value } from './ir.types'
+
 import type { RComponentSFC_SourceRange } from './location.types'
+import type { RComponentContractInput } from '@/domain/types/component/component-core.types'
 
 export type ComponentSFCPortRole = 'require' | 'provides' | 'emits'
 export type ComponentSFCPortKind = 'computation' | 'component' | 'action' | 'query' | 'event'
@@ -41,26 +41,26 @@ export type ComponentSFCPortProviderDescriptor
     input: { type: string, isArray?: boolean, optional?: boolean } | null
     output: { type: string, isArray?: boolean, optional?: boolean } | null
   }
-    | {
-      kind: 'component'
-      identity: string
-      active: boolean
-      inputs: RComponentContractInput[]
-    }
-    | {
-      kind: 'action'
-      identity: string
-      active: boolean
-      input: { type: string, isArray?: boolean, optional?: boolean } | null
-      output: { type: string, isArray?: boolean, optional?: boolean } | null
-    }
-    | {
-      kind: 'query'
-      identity: string
-      active: boolean
-      inputs: RComponentContractInput[]
-      outputs: RComponentContractInput[]
-    }
+  | {
+    kind: 'component'
+    identity: string
+    active: boolean
+    inputs: RComponentContractInput[]
+  }
+  | {
+    kind: 'action'
+    identity: string
+    active: boolean
+    input: { type: string, isArray?: boolean, optional?: boolean } | null
+    output: { type: string, isArray?: boolean, optional?: boolean } | null
+  }
+  | {
+    kind: 'query'
+    identity: string
+    active: boolean
+    inputs: RComponentContractInput[]
+    outputs: RComponentContractInput[]
+  }
 
 /** Computation port declared by `computation<Input, Output>`. */
 export interface ComponentSFCComputationPort {

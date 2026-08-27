@@ -1,8 +1,8 @@
-import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
-import type { TypeSourceDefinition } from '@/domain/types/source/type-source.types'
-import type { EndgeSFCEditingConfiguration } from '@/domain/types/configuration/configuration.type'
 import type { RComponentSFC_IR_Tag } from './ir.types'
 import type { RComponentSFC_SourceRange } from './location.types'
+import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
+import type { EndgeSFCEditingConfiguration } from '@/domain/types/configuration/configuration.type'
+import type { TypeSourceDefinition } from '@/domain/types/source/type-source.types'
 
 /** Значение SFC source, подготовленное для безопасного отображения в visual editor. */
 export type ComponentSFCVisualSourceValue
@@ -84,13 +84,13 @@ export type ComponentSFCTableEditableElementProjection
     syntax: ComponentSFCTableVisualCellSyntax
     bindings: ComponentSFCTableCellBindingProjection[]
   }
-    | {
-      kind: 'tag'
-      tag: ComponentSFCTableVisualCellTag
-      syntax: ComponentSFCTableVisualCellSyntax
-      bindings: ComponentSFCTableCellBindingProjection[]
-    }
-    | { kind: 'source' }
+  | {
+    kind: 'tag'
+    tag: ComponentSFCTableVisualCellTag
+    syntax: ComponentSFCTableVisualCellSyntax
+    bindings: ComponentSFCTableCellBindingProjection[]
+  }
+  | { kind: 'source' }
 
 /** Source-backed editable-поведение единственного управляемого корня ячейки Table. */
 export interface ComponentSFCTableCellEditingProjection {
@@ -178,18 +178,18 @@ export type ComponentSFCTableMenuNodeProjection
     id: string
     sourceRange: RComponentSFC_SourceRange
   }
-    | {
-      kind: 'item'
-      id: string
-      label: ComponentSFCVisualSourceValue | null
-      action: ComponentSFCVisualSourceValue | null
-      input: ComponentSFCVisualSourceValue | null
-      icon: ComponentSFCVisualSourceValue | null
-      visible: ComponentSFCVisualSourceValue | null
-      disabled: ComponentSFCVisualSourceValue | null
-      sourceOwned: boolean
-      sourceRange: RComponentSFC_SourceRange
-    }
+  | {
+    kind: 'item'
+    id: string
+    label: ComponentSFCVisualSourceValue | null
+    action: ComponentSFCVisualSourceValue | null
+    input: ComponentSFCVisualSourceValue | null
+    icon: ComponentSFCVisualSourceValue | null
+    visible: ComponentSFCVisualSourceValue | null
+    disabled: ComponentSFCVisualSourceValue | null
+    sourceOwned: boolean
+    sourceRange: RComponentSFC_SourceRange
+  }
 
 export interface ComponentSFCTableMenuProjection {
   kind: ComponentSFCTableVisualMenuKind
@@ -206,128 +206,128 @@ export type ComponentSFCTableSourcePatch
     title?: string
     key?: string
   }
-    | {
-      type: 'remove-column'
-      columnIndex: number
-    }
-    | {
-      type: 'move-column'
-      fromIndex: number
-      toIndex: number
-    }
-    | {
-      type: 'set-column-attribute'
-      columnIndex: number
-      name: 'key' | 'title' | 'width' | 'sortable' | 'sort' | 'sort-by'
-      value: string | null
-    }
-    | {
-      type: 'set-table-attribute'
-      name: 'ref' | 'selection-mode' | 'selection-trigger' | 'cell-selection-mode' | 'paging' | 'page-size' | 'page-sizes' | 'default-pin' | 'default-sort' | 'default-hidden'
-      value: string | null
-    }
-    | {
-      type: 'set-column-component'
-      columnIndex: number
-      identity: string | null
-      syntax?: ComponentSFCTableVisualCellSyntax
-    }
-    | {
-      type: 'set-column-tag'
-      columnIndex: number
-      tag: ComponentSFCTableVisualCellTag | null
-      syntax?: ComponentSFCTableVisualCellSyntax
-    }
-    | {
-      type: 'set-column-cell-attribute'
-      columnIndex: number
-      name: string
-      value: string | null
-      valueKind: 'expression' | 'literal'
-    }
-    | {
-      type: 'set-column-cell-on'
-      columnIndex: number
-      /** Complete object/array expression, or null to remove the annotation. */
-      value: string | null
-    }
-    | {
-      type: 'set-column-cell-editable'
-      columnIndex: number
-      enabled: boolean
-    }
-    | {
-      type: 'set-column-cell-edit-triggers'
-      columnIndex: number
-      /** Empty list restores the implicit click trigger and removes edit-on from Source. */
-      triggers: ComponentSFCInteractionTriggerProjection[]
-    }
-    | {
-      type: 'set-column-cell-edited-reaction'
-      columnIndex: number
-      /** Complete local reaction expression, or null to remove @edited. */
-      value: string | null
-    }
-    | {
-      type: 'set-column-cell-cancel-triggers'
-      columnIndex: number
-      /** Null inherits effective configuration; an empty list explicitly disables automatic cancellation. */
-      triggers: ComponentSFCInteractionTriggerProjection[] | null
-    }
-    | {
-      type: 'set-column-cell-commit-triggers'
-      columnIndex: number
-      /** Null inherits effective configuration; an empty list explicitly disables automatic commit. */
-      triggers: ComponentSFCInteractionTriggerProjection[] | null
-    }
-    | {
-      type: 'set-column-cell-editor-component'
-      columnIndex: number
-      identity: string
-    }
-    | {
-      type: 'set-column-cell-editor-tag'
-      columnIndex: number
-      tag: ComponentSFCTableVisualCellTag
-    }
-    | {
-      type: 'set-column-cell-editor-attribute'
-      columnIndex: number
-      name: string
-      value: string | null
-      valueKind: 'expression' | 'literal'
-    }
-    | {
+  | {
+    type: 'remove-column'
+    columnIndex: number
+  }
+  | {
+    type: 'move-column'
+    fromIndex: number
+    toIndex: number
+  }
+  | {
+    type: 'set-column-attribute'
+    columnIndex: number
+    name: 'key' | 'title' | 'width' | 'sortable' | 'sort' | 'sort-by'
+    value: string | null
+  }
+  | {
+    type: 'set-table-attribute'
+    name: 'ref' | 'selection-mode' | 'selection-trigger' | 'cell-selection-mode' | 'paging' | 'page-size' | 'page-sizes' | 'default-pin' | 'default-sort' | 'default-hidden'
+    value: string | null
+  }
+  | {
+    type: 'set-column-component'
+    columnIndex: number
+    identity: string | null
+    syntax?: ComponentSFCTableVisualCellSyntax
+  }
+  | {
+    type: 'set-column-tag'
+    columnIndex: number
+    tag: ComponentSFCTableVisualCellTag | null
+    syntax?: ComponentSFCTableVisualCellSyntax
+  }
+  | {
+    type: 'set-column-cell-attribute'
+    columnIndex: number
+    name: string
+    value: string | null
+    valueKind: 'expression' | 'literal'
+  }
+  | {
+    type: 'set-column-cell-on'
+    columnIndex: number
+    /** Complete object/array expression, or null to remove the annotation. */
+    value: string | null
+  }
+  | {
+    type: 'set-column-cell-editable'
+    columnIndex: number
+    enabled: boolean
+  }
+  | {
+    type: 'set-column-cell-edit-triggers'
+    columnIndex: number
+    /** Empty list restores the implicit click trigger and removes edit-on from Source. */
+    triggers: ComponentSFCInteractionTriggerProjection[]
+  }
+  | {
+    type: 'set-column-cell-edited-reaction'
+    columnIndex: number
+    /** Complete local reaction expression, or null to remove @edited. */
+    value: string | null
+  }
+  | {
+    type: 'set-column-cell-cancel-triggers'
+    columnIndex: number
+    /** Null inherits effective configuration; an empty list explicitly disables automatic cancellation. */
+    triggers: ComponentSFCInteractionTriggerProjection[] | null
+  }
+  | {
+    type: 'set-column-cell-commit-triggers'
+    columnIndex: number
+    /** Null inherits effective configuration; an empty list explicitly disables automatic commit. */
+    triggers: ComponentSFCInteractionTriggerProjection[] | null
+  }
+  | {
+    type: 'set-column-cell-editor-component'
+    columnIndex: number
+    identity: string
+  }
+  | {
+    type: 'set-column-cell-editor-tag'
+    columnIndex: number
+    tag: ComponentSFCTableVisualCellTag
+  }
+  | {
+    type: 'set-column-cell-editor-attribute'
+    columnIndex: number
+    name: string
+    value: string | null
+    valueKind: 'expression' | 'literal'
+  }
+  | {
     type: 'set-menu-mode'
     menu: ComponentSFCTableVisualMenuKind
     columnIndex?: number
-      mode: 'default' | 'disabled' | 'none' | 'custom'
-    }
+    mode: 'default' | 'disabled' | 'none' | 'custom'
+  }
     | {
-    type: 'add-menu-node'
-    menu: ComponentSFCTableVisualMenuKind
-    columnIndex?: number
+      type: 'add-menu-node'
+      menu: ComponentSFCTableVisualMenuKind
+      columnIndex?: number
       node: 'item' | 'separator'
     }
     | {
-    type: 'remove-menu-node'
-    menu: ComponentSFCTableVisualMenuKind
-    columnIndex?: number
+      type: 'remove-menu-node'
+      menu: ComponentSFCTableVisualMenuKind
+      columnIndex?: number
       nodeIndex: number
     }
     | {
-    type: 'move-menu-node'
-    menu: ComponentSFCTableVisualMenuKind
-    columnIndex?: number
+      type: 'move-menu-node'
+      menu: ComponentSFCTableVisualMenuKind
+      columnIndex?: number
       fromIndex: number
       toIndex: number
     }
     | {
-    type: 'set-menu-item-attribute'
-    menu: ComponentSFCTableVisualMenuKind
-    columnIndex?: number
-    nodeIndex: number
-    name: 'label' | 'action' | 'input' | 'icon' | 'visible' | 'disabled'
+      type: 'set-menu-item-attribute'
+      menu: ComponentSFCTableVisualMenuKind
+      columnIndex?: number
+      nodeIndex: number
+      name: 'label' | 'action' | 'input' | 'icon' | 'visible' | 'disabled'
       value: string | null
       valueKind: 'expression' | 'literal'
     }

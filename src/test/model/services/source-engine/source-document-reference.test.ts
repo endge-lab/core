@@ -4,30 +4,30 @@ import { Endge } from '@/model/kernel/endge'
 
 describe('source document references', () => {
   it.each([
-    ['composition', "style('default')", 'default', 'style'],
-    ['composition', "composition('groundhandling-control-page')", 'groundhandling-control-page', 'composition'],
+    ['composition', 'style(\'default\')', 'default', 'style'],
+    ['composition', 'composition(\'groundhandling-control-page\')', 'groundhandling-control-page', 'composition'],
     ['composition', 'field(MyType)', 'MyType', 'type'],
-    ['composition', "query('load-flights')", 'load-flights', 'query'],
-    ['composition', "mock('groundhandling-query-requirements')", 'groundhandling-query-requirements', 'mock'],
-    ['composition', "filterView('flight-filter')", 'flight-filter', 'filter'],
-    ['composition', "filterView('flight-filter').component('compact-filter')", 'compact-filter', 'component'],
-    ['query', "dataView('normalize-flight')", 'normalize-flight', 'data-view'],
-    ['query', "output().from('raw').dataView('normalize-flight')", 'normalize-flight', 'data-view'],
-    ['query', "filter('flight-filter')", 'flight-filter', 'filter'],
+    ['composition', 'query(\'load-flights\')', 'load-flights', 'query'],
+    ['composition', 'mock(\'groundhandling-query-requirements\')', 'groundhandling-query-requirements', 'mock'],
+    ['composition', 'filterView(\'flight-filter\')', 'flight-filter', 'filter'],
+    ['composition', 'filterView(\'flight-filter\').component(\'compact-filter\')', 'compact-filter', 'component'],
+    ['query', 'dataView(\'normalize-flight\')', 'normalize-flight', 'data-view'],
+    ['query', 'output().from(\'raw\').dataView(\'normalize-flight\')', 'normalize-flight', 'data-view'],
+    ['query', 'filter(\'flight-filter\')', 'flight-filter', 'filter'],
     ['query', 'field(MyType)', 'MyType', 'type'],
-    ['query', "{ auth: { mode: 'profile', profile: 'keycloak-dev' } }", 'keycloak-dev', 'auth-profile'],
-    ['data-view', "dataView('normalize-flight')", 'normalize-flight', 'data-view'],
-    ['data-view', "from('items').dataView('normalize-flight')", 'normalize-flight', 'data-view'],
-    ['data-view', "path('item.std').convert('date.iso_to_time')", 'date.iso_to_time', 'converter'],
-    ['data-view', "path('item.std').convert(converter('date.iso_to_time'))", 'date.iso_to_time', 'converter'],
+    ['query', '{ auth: { mode: \'profile\', profile: \'keycloak-dev\' } }', 'keycloak-dev', 'auth-profile'],
+    ['data-view', 'dataView(\'normalize-flight\')', 'normalize-flight', 'data-view'],
+    ['data-view', 'from(\'items\').dataView(\'normalize-flight\')', 'normalize-flight', 'data-view'],
+    ['data-view', 'path(\'item.std\').convert(\'date.iso_to_time\')', 'date.iso_to_time', 'converter'],
+    ['data-view', 'path(\'item.std\').convert(converter(\'date.iso_to_time\'))', 'date.iso_to_time', 'converter'],
     ['data-view', 'field(MyType)', 'MyType', 'type'],
-    ['store', "mock('flight-list')", 'flight-list', 'mock'],
-    ['store', "dataView('normalize-flight')", 'normalize-flight', 'data-view'],
-    ['store', "derived().from('raw').dataView('normalize-flight')", 'normalize-flight', 'data-view'],
+    ['store', 'mock(\'flight-list\')', 'flight-list', 'mock'],
+    ['store', 'dataView(\'normalize-flight\')', 'normalize-flight', 'data-view'],
+    ['store', 'derived().from(\'raw\').dataView(\'normalize-flight\')', 'normalize-flight', 'data-view'],
     ['store', 'field(MyType)', 'MyType', 'type'],
-    ['filter', "field('String').vocab('airports')", 'airports', 'vocabs'],
+    ['filter', 'field(\'String\').vocab(\'airports\')', 'airports', 'vocabs'],
     ['filter', 'field(MyType)', 'MyType', 'type'],
-    ['computation', "computation('calculate-duration', {})", 'calculate-duration', 'computation'],
+    ['computation', 'computation(\'calculate-duration\', {})', 'calculate-duration', 'computation'],
     ['computation', 'field(MyType)', 'MyType', 'type'],
   ] as const)('resolves %s reference %s', (sourceKind, expression, identity, target) => {
     const source = `const value = ${expression}`
@@ -38,7 +38,7 @@ describe('source document references', () => {
   })
 
   it('resolves a reference when the cursor is on the DSL constructor', () => {
-    const source = "const page = composition('groundhandling-control-page').activateOn(startup())"
+    const source = 'const page = composition(\'groundhandling-control-page\').activateOn(startup())'
 
     expect(Endge.source.referenceAt('composition', contextAt(source, 'composition'))).toMatchObject({
       target: 'composition',
@@ -83,7 +83,7 @@ describe('source document references', () => {
   })
 
   it('chooses the nested external reference instead of its wrapping method call', () => {
-    const source = "from('items').dataView(dataView('normalize-flight')).as('item')"
+    const source = 'from(\'items\').dataView(dataView(\'normalize-flight\')).as(\'item\')'
 
     expect(Endge.source.referenceAt('data-view', contextAt(source, 'normalize-flight'))).toMatchObject({
       target: 'data-view',
@@ -92,16 +92,16 @@ describe('source document references', () => {
   })
 
   it.each([
-    ['composition', "fromStore('flight-store.rows')", 'flight-store'],
-    ['query', "response('items')", 'items'],
-    ['data-view', "path('item.id')", 'item.id'],
-    ['store', "from('raw')", 'raw'],
+    ['composition', 'fromStore(\'flight-store.rows\')', 'flight-store'],
+    ['query', 'response(\'items\')', 'items'],
+    ['data-view', 'path(\'item.id\')', 'item.id'],
+    ['store', 'from(\'raw\')', 'raw'],
   ] as const)('does not treat internal %s expression as a document reference', (sourceKind, source, cursor) => {
     expect(Endge.source.referenceAt(sourceKind, contextAt(source, cursor))).toBeNull()
   })
 
   it('returns null when the source is temporarily invalid', () => {
-    const source = "composition('unfinished"
+    const source = 'composition(\'unfinished'
     expect(Endge.source.referenceAt('composition', contextAt(source, 'unfinished'))).toBeNull()
   })
 })
@@ -111,8 +111,9 @@ function contextAt(source: string, needle: string): {
   position: { lineNumber: number, column: number }
 } {
   const offset = source.indexOf(needle)
-  if (offset < 0)
+  if (offset < 0) {
     throw new Error(`Needle not found: ${needle}`)
+  }
   const before = source.slice(0, offset + Math.floor(needle.length / 2))
   const lines = before.split('\n')
   return {

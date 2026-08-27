@@ -55,8 +55,9 @@ export function compileUpdateSource(source: string, sourceVersion = 1): UpdateSo
         }
         if (t.isArrayExpression(value)) {
           handles = value.elements.flatMap((element) => {
-            if (element && t.isStringLiteral(element) && element.value.trim())
+            if (element && t.isStringLiteral(element) && element.value.trim()) {
               return [element.value.trim()]
+            }
             diagnostics.push(diagnostic('error', 'update-handles-type', 'handles допускает только string literals.', 'handles', element ?? value))
             return []
           })
@@ -81,8 +82,9 @@ export function compileUpdateSource(source: string, sourceVersion = 1): UpdateSo
         continue
       }
       const parsed = t.isNullLiteral(value) ? null : t.isStringLiteral(value) ? value.value.trim() : ''
-      if (!t.isNullLiteral(value) && !t.isStringLiteral(value))
+      if (!t.isNullLiteral(value) && !t.isStringLiteral(value)) {
         diagnostics.push(diagnostic('error', 'update-source-property-type', `${name} должен быть string literal${name === 'handles' || name.endsWith('From') ? ' или null' : ''}.`, name, value))
+      }
       legacy[name] = parsed
     }
 
@@ -94,13 +96,14 @@ export function compileUpdateSource(source: string, sourceVersion = 1): UpdateSo
         target,
         forEach: null,
         ifExists: null,
-        valueFrom: legacy.valueFrom == null ? null : legacy.valueFrom,
+        valueFrom: legacy.valueFrom ?? null,
         vars: legacy.keyFrom ? { key: legacy.keyFrom } : {},
       }]
       validateMutation(mutations[0], diagnostics, 'defineUpdate')
     }
-    if (!mutations.length)
+    if (!mutations.length) {
       diagnostics.push(diagnostic('error', 'update-mutations-empty', 'defineUpdate требует хотя бы одну mutation.', 'mutations', definition))
+    }
 
     const document = {
       handles,
@@ -151,28 +154,32 @@ function readMutation(
       continue
     }
     if (['forEach', 'ifExists', 'valueFrom'].includes(name) && t.isNullLiteral(value)) {
-      if (name === 'forEach')
+      if (name === 'forEach') {
         forEach = null
-      else if (name === 'ifExists')
+      }
+      else if (name === 'ifExists') {
         ifExists = null
-      else
-        valueFrom = null
+      }
+      else { valueFrom = null }
       continue
     }
     if (!t.isStringLiteral(value)) {
       diagnostics.push(diagnostic('error', 'update-mutation-property-type', `${name} должен быть string literal${name === 'valueFrom' ? ' или null' : ''}.`, `${sourcePath}.${name}`, value))
       continue
     }
-    if (name === 'strategy')
+    if (name === 'strategy') {
       strategy = value.value.trim() as UpdateMutationStrategy
-    else if (name === 'target')
+    }
+    else if (name === 'target') {
       target = value.value.trim()
-    else if (name === 'forEach')
+    }
+    else if (name === 'forEach') {
       forEach = value.value.trim() || null
-    else if (name === 'ifExists')
+    }
+    else if (name === 'ifExists') {
       ifExists = value.value.trim() || null
-    else
-      valueFrom = value.value.trim()
+    }
+    else { valueFrom = value.value.trim() }
   }
   const mutation = { strategy, target, forEach, ifExists, valueFrom, vars }
   validateMutation(mutation, diagnostics, sourcePath)
@@ -184,16 +191,20 @@ function validateMutation(
   diagnostics: DiagnosticDraft[],
   sourcePath: string,
 ): void {
-  if (!STRATEGIES.has(mutation.strategy))
+  if (!STRATEGIES.has(mutation.strategy)) {
     diagnostics.push(diagnostic('error', 'update-strategy-invalid', 'strategy должен быть set, merge, replace, append или remove.', `${sourcePath}.strategy`))
-  if (!mutation.target)
+  }
+  if (!mutation.target) {
     diagnostics.push(diagnostic('error', 'update-target-required', 'target должен содержать Store-relative path.', `${sourcePath}.target`))
-  if (mutation.target.startsWith('.') || mutation.target.includes('..'))
+  }
+  if (mutation.target.startsWith('.') || mutation.target.includes('..')) {
     diagnostics.push(diagnostic('error', 'update-target-invalid', 'target должен быть безопасным Store-relative path.', `${sourcePath}.target`))
-  const referenced = [...`${mutation.target} ${mutation.ifExists ?? ''}`.matchAll(/\$([A-Za-z_][A-Za-z0-9_]*)/g)].map(match => match[1]!)
+  }
+  const referenced = [...`${mutation.target} ${mutation.ifExists ?? ''}`.matchAll(/\$([A-Z_]\w*)/gi)].map(match => match[1]!)
   for (const name of referenced) {
-    if (!mutation.vars[name])
+    if (!mutation.vars[name]) {
       diagnostics.push(diagnostic('error', 'update-var-required', `target использует $${name}, но mutation.vars.${name} не задан.`, `${sourcePath}.vars.${name}`))
+    }
   }
 }
 
@@ -204,8 +215,9 @@ function readStringMap(
 ): Record<string, string> {
   const result: Record<string, string> = {}
   for (const property of node.properties) {
-    if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value))
+    if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
       continue
+    }
     const name = propertyName(property.key)
     const value = unwrapExpression(property.value)
     if (!name || !t.isStringLiteral(value)) {
@@ -219,11 +231,13 @@ function readStringMap(
 
 function findDefineUpdate(ast: t.File): t.CallExpression | null {
   for (const statement of ast.program.body) {
-    if (!t.isExpressionStatement(statement))
+    if (!t.isExpressionStatement(statement)) {
       continue
+    }
     const expression = unwrapExpression(statement.expression)
-    if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'defineUpdate' }))
+    if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'defineUpdate' })) {
       return expression
+    }
   }
   return null
 }

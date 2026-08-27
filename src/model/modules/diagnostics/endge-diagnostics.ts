@@ -1,5 +1,3 @@
-import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
-import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import type {
   DiagnosticsAdapter,
   DiagnosticsAdapterFactory,
@@ -23,6 +21,8 @@ import type {
   DiagnosticsSubscribeOptions,
   EndgeDiagnosticsConfiguration,
 } from '@/domain/types/diagnostics/diagnostics.types'
+import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
+import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { CONSOLE_DIAGNOSTICS_ADAPTER_FACTORY } from '@/model/adapters/diagnostics/ConsoleDiagnosticsAdapter'
 import { DiagnosticsAdapterRegistry } from '@/model/adapters/diagnostics/DiagnosticsAdapterRegistry'
 import { SENTRY_DIAGNOSTICS_ADAPTER_FACTORY } from '@/model/adapters/diagnostics/SentryDiagnosticsAdapter'
@@ -169,10 +169,12 @@ export class EndgeDiagnostics extends EndgeModule {
     listener?: DiagnosticsListener,
     options: DiagnosticsSubscribeOptions = {},
   ): () => void {
-    if (typeof filterOrListener === 'function')
+    if (typeof filterOrListener === 'function') {
       return super.subscribe(filterOrListener)
-    if (!listener)
+    }
+    if (!listener) {
       throw new Error('[EndgeDiagnostics] Record listener is required')
+    }
     return this.telemetry.subscribe(filterOrListener, listener, options)
   }
 
@@ -261,21 +263,25 @@ export class EndgeDiagnostics extends EndgeModule {
 
   /** Применяет sliding window и cooldown политики автоматического snapshot. */
   private _handleAutomaticSnapshotRecord(record: DiagnosticsRecord): void {
-    if (record.signal !== 'log')
+    if (record.signal !== 'log') {
       return
+    }
     const policy = this.configuration.snapshots.automatic
-    if (!policy.enabled)
+    if (!policy.enabled) {
       return
+    }
 
     const now = record.timestamp
-    if (now < this._automaticCooldownUntil)
+    if (now < this._automaticCooldownUntil) {
       return
+    }
 
     const windowStart = now - policy.windowSeconds * 1_000
     this._automaticErrorTimestamps = this._automaticErrorTimestamps.filter(timestamp => timestamp >= windowStart)
     this._automaticErrorTimestamps.push(now)
-    if (this._automaticErrorTimestamps.length < policy.errorCount)
+    if (this._automaticErrorTimestamps.length < policy.errorCount) {
       return
+    }
 
     this._automaticErrorTimestamps = []
     this._automaticCooldownUntil = now + policy.cooldownSeconds * 1_000

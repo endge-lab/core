@@ -1,25 +1,26 @@
-import type { FilterProgramPayload } from '@/domain/types/source/filter-source.types'
-import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
-import type { StoreSourceArtifact } from '@/domain/types/source/store-source.types'
-import type { StreamSourceArtifact } from '@/domain/types/source/stream-source.types'
-import type { UpdateSourceArtifact } from '@/domain/types/source/update-source.types'
-import type { TypeProgramCatalogEntry, TypeProgramPayload } from '@/domain/types/source/type-source.types'
-import type { VocabProgramPayload } from '@/domain/types/source/vocab-source.types'
-import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import type {
-  DataViewProgramPayload,
-  EndgeProgramSnapshot,
-  ProgramArtifact,
-  ProgramArtifactRef,
-  ProgramArtifactStatus,
+  ActionProgramPayload,
   ComponentSFCTagRegistryEntry,
   ComputationProgramPayload,
-  ActionProgramPayload,
+  DataViewProgramPayload,
+  EndgeProgramSnapshot,
+  EndgeStyleProgramPayload,
+  ProgramArtifact,
+  ProgramArtifactKey,
+  ProgramArtifactRef,
+  ProgramArtifactStatus,
   ProgramDiagnostic,
   ProgramEntityType,
   QueryProgramPayload,
-  EndgeStyleProgramPayload, ProgramArtifactKey,
 } from '@/domain/types/program/program.types'
+import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
+import type { FilterProgramPayload } from '@/domain/types/source/filter-source.types'
+import type { StoreSourceArtifact } from '@/domain/types/source/store-source.types'
+import type { StreamSourceArtifact } from '@/domain/types/source/stream-source.types'
+import type { TypeProgramCatalogEntry, TypeProgramPayload } from '@/domain/types/source/type-source.types'
+import type { UpdateSourceArtifact } from '@/domain/types/source/update-source.types'
+import type { VocabProgramPayload } from '@/domain/types/source/vocab-source.types'
+import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 
 /**
  * Хранилище compiled artifacts, полученных после компиляции домена.
@@ -66,8 +67,9 @@ export class EndgeProgram extends EndgeModule {
   /** Пересчитывает общий status после compiler linking pass. */
   public recalculateStatus(): void {
     this._status = 'valid'
-    for (const artifact of this._artifacts.values())
+    for (const artifact of this._artifacts.values()) {
       this._status = mergeStatus(this._status, artifact.status)
+    }
     this.notify()
   }
 
@@ -86,8 +88,9 @@ export class EndgeProgram extends EndgeModule {
   /** Заменяет build-derived registry пользовательских SFC tags. */
   public setComponentTags(entries: readonly ComponentSFCTagRegistryEntry[]): void {
     this._componentIdentityByTag.clear()
-    for (const entry of entries)
+    for (const entry of entries) {
       this._componentIdentityByTag.set(entry.tag, entry.identity)
+    }
     this.notify()
   }
 
@@ -122,8 +125,9 @@ export class EndgeProgram extends EndgeModule {
     ref: Pick<ProgramArtifactRef, 'entityType'> & { id?: string | number, identity?: string },
   ): ProgramArtifact<TPayload> | null {
     const idOrIdentity = ref.id ?? ref.identity
-    if (idOrIdentity == null)
+    if (idOrIdentity == null) {
       return null
+    }
     return this.getArtifact<TPayload>(ref.entityType, idOrIdentity)
   }
 
@@ -218,8 +222,9 @@ export class EndgeProgram extends EndgeModule {
     }
 
     const diagnostics: ProgramDiagnostic[] = []
-    for (const artifact of this._artifacts.values())
+    for (const artifact of this._artifacts.values()) {
       diagnostics.push(...artifact.diagnostics)
+    }
     return diagnostics
   }
 
@@ -294,9 +299,11 @@ export class EndgeProgram extends EndgeModule {
 }
 
 function mergeStatus(current: ProgramArtifactStatus, next: ProgramArtifactStatus): ProgramArtifactStatus {
-  if (current === 'error' || next === 'error')
+  if (current === 'error' || next === 'error') {
     return 'error'
-  if (current === 'warning' || next === 'warning')
+  }
+  if (current === 'warning' || next === 'warning') {
     return 'warning'
+  }
   return 'valid'
 }

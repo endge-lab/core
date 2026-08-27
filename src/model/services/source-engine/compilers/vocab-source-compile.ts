@@ -1,6 +1,6 @@
 import type { ProgramDiagnostic, QueryProgramOutput } from '@/domain/types/program/program.types'
-import type { ResponseOutputTransform } from '@/domain/types/source/response-output.types'
 import type { DataViewRef } from '@/domain/types/source/data-view-source.types'
+import type { ResponseOutputTransform } from '@/domain/types/source/response-output.types'
 import type { VocabMockReference, VocabPayloadProvider, VocabSourceCompileResult, VocabSourceDocument } from '@/domain/types/source/vocab-source.types'
 
 import { parse as parseTS } from '@babel/parser'
@@ -31,10 +31,12 @@ export function compileVocabSource(source: string): VocabSourceCompileResult {
     const outputs = outputsNode && t.isObjectExpression(unwrap(outputsNode))
       ? readOutputs(unwrap(outputsNode) as t.ObjectExpression, source, diagnostics)
       : []
-    if (!outputsNode || !t.isObjectExpression(unwrap(outputsNode)))
+    if (!outputsNode || !t.isObjectExpression(unwrap(outputsNode))) {
       diagnostics.push(diagnostic('error', 'vocab-source-outputs-required', 'defineVocab.outputs должен быть объектом.', 'outputs', outputsNode ?? undefined))
-    if (!outputs.some(output => output.key === 'items'))
+    }
+    if (!outputs.some(output => output.key === 'items')) {
       diagnostics.push(diagnostic('error', 'vocab-source-items-required', 'Vocab должен объявлять outputs.items.', 'outputs.items', outputsNode ?? undefined))
+    }
 
     const document: VocabSourceDocument = { sourceVersion: 1, provider, mock, outputs }
     const hasErrors = diagnostics.some(item => item.severity === 'error')
@@ -54,10 +56,13 @@ export function compileVocabSource(source: string): VocabSourceCompileResult {
 
 function findDefineCall(ast: t.File): t.CallExpression | null {
   for (const statement of ast.program.body) {
-    if (!t.isExpressionStatement(statement)) continue
+    if (!t.isExpressionStatement(statement)) {
+      continue
+    }
     const value = unwrap(statement.expression)
-    if (t.isCallExpression(value) && t.isIdentifier(value.callee, { name: 'defineVocab' }))
+    if (t.isCallExpression(value) && t.isIdentifier(value.callee, { name: 'defineVocab' })) {
       return value
+    }
   }
   return null
 }
@@ -79,8 +84,9 @@ function readProvider(node: t.Expression, diagnostics: Diagnostic[]): VocabPaylo
   const collectionNode = propertyValue(definition, 'collection')
   const baseUrl = readBaseUrl(baseUrlNode, diagnostics)
   const collection = staticString(collectionNode)
-  if (!collection)
+  if (!collection) {
     diagnostics.push(diagnostic('error', 'vocab-source-provider-collection', 'payload.collection должен быть непустой строкой.', 'provider.collection', collectionNode ?? definition))
+  }
   const authNode = propertyValue(definition, 'auth')
   const auth = readAuth(authNode, diagnostics)
   return { kind: 'payload', baseUrl, collection, auth }
@@ -88,33 +94,38 @@ function readProvider(node: t.Expression, diagnostics: Diagnostic[]): VocabPaylo
 
 function readBaseUrl(node: t.Expression | null, diagnostics: Diagnostic[]): VocabPayloadProvider['baseUrl'] {
   const direct = staticString(node)
-  if (direct !== '')
+  if (direct !== '') {
     return direct
+  }
   const value = node ? unwrap(node) : null
   if (t.isCallExpression(value) && t.isIdentifier(value.callee, { name: 'env' })) {
     const name = staticString(value.arguments[0] && t.isExpression(value.arguments[0]) ? value.arguments[0] : null)
-    if (name)
+    if (name) {
       return { kind: 'env', name }
+    }
   }
   diagnostics.push(diagnostic('error', 'vocab-source-provider-base-url', 'payload.baseUrl должен быть строкой или env("NAME").', 'provider.baseUrl', node ?? undefined))
   return ''
 }
 
 function readAuth(node: t.Expression | null, diagnostics: Diagnostic[]): VocabPayloadProvider['auth'] {
-  if (!node)
+  if (!node) {
     return { mode: 'inherit' }
+  }
   const value = unwrap(node)
   if (!t.isObjectExpression(value)) {
     diagnostics.push(diagnostic('error', 'vocab-source-provider-auth', 'payload.auth должен быть объектом.', 'provider.auth', value))
     return { mode: 'inherit' }
   }
   const mode = staticString(propertyValue(value, 'mode')) || 'inherit'
-  if (mode === 'none' || mode === 'inherit')
+  if (mode === 'none' || mode === 'inherit') {
     return { mode }
+  }
   if (mode === 'profile') {
     const profile = staticString(propertyValue(value, 'profile'))
-    if (!profile)
+    if (!profile) {
       diagnostics.push(diagnostic('error', 'vocab-source-provider-auth-profile', 'auth.profile обязателен для mode="profile".', 'provider.auth.profile', value))
+    }
     return { mode: 'profile', profile }
   }
   diagnostics.push(diagnostic('error', 'vocab-source-provider-auth-mode', `Auth mode "${mode}" не поддерживается.`, 'provider.auth.mode', value))
@@ -127,8 +138,9 @@ function readMock(node: t.Expression, diagnostics: Diagnostic[]): VocabMockRefer
   if (t.isCallExpression(value) && t.isMemberExpression(value.callee) && !value.callee.computed && t.isIdentifier(value.callee.property, { name: 'path' })) {
     path = staticString(value.arguments[0] && t.isExpression(value.arguments[0]) ? value.arguments[0] : null)
     value = t.isExpression(value.callee.object) ? unwrap(value.callee.object) : value
-    if (!path || !isDotPath(path))
+    if (!path || !isDotPath(path)) {
       diagnostics.push(diagnostic('error', 'vocab-source-mock-path', 'mock.path должен использовать dot-нотацию, например "lookups.airlines".', 'mock.path', node))
+    }
   }
   if (!t.isCallExpression(value) || !t.isIdentifier(value.callee, { name: 'mock' })) {
     diagnostics.push(diagnostic('error', 'vocab-source-mock-shape', 'mock должен быть mock("identity") с необязательным .path("a.b").', 'mock', node))
@@ -156,9 +168,12 @@ function readOutputs(node: t.ObjectExpression, source: string, diagnostics: Diag
       continue
     }
     const output = readOutput(key, unwrap(property.value), source, diagnostics)
-    if (!output) continue
-    if (output.source.type === 'output' && !declared.has(output.source.key))
+    if (!output) {
+      continue
+    }
+    if (output.source.type === 'output' && !declared.has(output.source.key)) {
       diagnostics.push(diagnostic('error', 'vocab-source-output-forward-reference', `Output "${output.source.key}" должен быть объявлен выше.`, `outputs.${key}.from`, property))
+    }
     outputs.push(output)
     declared.add(key)
   }
@@ -177,12 +192,13 @@ function readOutput(key: string, node: t.Expression, source: string, diagnostics
   for (const call of calls) {
     if (call.name === 'from') {
       const raw = call.args[0]
-      if (t.isStringLiteral(raw))
+      if (t.isStringLiteral(raw)) {
         outputSource = { type: 'output', key: raw.value }
-      else if (t.isCallExpression(raw) && t.isIdentifier(raw.callee, { name: 'response' }) && raw.arguments.length === 0)
+      }
+      else if (t.isCallExpression(raw) && t.isIdentifier(raw.callee, { name: 'response' }) && raw.arguments.length === 0) {
         outputSource = { type: 'response', path: null }
-      else
-        diagnostics.push(diagnostic('error', 'vocab-source-output-from', '.from(...) поддерживает response() или ключ предыдущего output.', `outputs.${key}.from`, raw && t.isNode(raw) ? raw : node))
+      }
+      else { diagnostics.push(diagnostic('error', 'vocab-source-output-from', '.from(...) поддерживает response() или ключ предыдущего output.', `outputs.${key}.from`, raw && t.isNode(raw) ? raw : node)) }
       continue
     }
     if (call.name === 'dataView') {
@@ -195,7 +211,9 @@ function readOutput(key: string, node: t.Expression, source: string, diagnostics
     }
     if (call.name === 'convert') {
       const transform = readConverter(call.args, diagnostics, `outputs.${key}.convert`)
-      if (transform) transforms.push(transform)
+      if (transform) {
+        transforms.push(transform)
+      }
       continue
     }
     diagnostics.push(diagnostic('error', 'vocab-source-output-method', `output().${call.name}(...) не поддерживается.`, `outputs.${key}`, node))
@@ -222,8 +240,12 @@ function readDataView(node: t.CallExpression['arguments'][number] | undefined, s
     return null
   }
   const ref = readSourceModelReference(node, source, { referenceCall: 'dataView', defineCall: 'defineDataView' })
-  if (ref?.kind === 'external') return ref
-  if (ref?.kind === 'inline') return { kind: 'inline', source: ref.source }
+  if (ref?.kind === 'external') {
+    return ref
+  }
+  if (ref?.kind === 'inline') {
+    return { kind: 'inline', source: ref.source }
+  }
   diagnostics.push(diagnostic('error', 'vocab-source-output-dataview', '.dataView(...) поддерживает identity или defineDataView({...}).', sourcePath, node))
   return null
 }
@@ -240,8 +262,9 @@ function readConverter(args: t.CallExpression['arguments'], diagnostics: Diagnos
     return null
   }
   const optionsNode = args[1]
-  if (!optionsNode)
+  if (!optionsNode) {
     return { kind: 'converter', identity }
+  }
   if (!t.isExpression(optionsNode)) {
     diagnostics.push(diagnostic('error', 'vocab-source-output-converter-options', 'Converter options должны быть объектом.', sourcePath))
     return null
@@ -259,7 +282,9 @@ function memberChain(node: t.Expression): Array<{ name: string, args: t.CallExpr
   const result: Array<{ name: string, args: t.CallExpression['arguments'] }> = []
   while (t.isCallExpression(current) && t.isMemberExpression(current.callee) && !current.callee.computed && t.isIdentifier(current.callee.property)) {
     result.unshift({ name: current.callee.property.name, args: current.arguments })
-    if (!t.isExpression(current.callee.object)) return null
+    if (!t.isExpression(current.callee.object)) {
+      return null
+    }
     current = unwrap(current.callee.object)
   }
   return t.isCallExpression(current) && t.isIdentifier(current.callee, { name: 'output' }) ? result : null
@@ -267,15 +292,25 @@ function memberChain(node: t.Expression): Array<{ name: string, args: t.CallExpr
 
 function staticValue(node: t.Expression): unknown {
   const value = unwrap(node)
-  if (t.isStringLiteral(value) || t.isNumericLiteral(value) || t.isBooleanLiteral(value)) return value.value
-  if (t.isNullLiteral(value)) return null
-  if (t.isArrayExpression(value)) return value.elements.map(item => item && t.isExpression(item) ? staticValue(item) : null)
+  if (t.isStringLiteral(value) || t.isNumericLiteral(value) || t.isBooleanLiteral(value)) {
+    return value.value
+  }
+  if (t.isNullLiteral(value)) {
+    return null
+  }
+  if (t.isArrayExpression(value)) {
+    return value.elements.map(item => item && t.isExpression(item) ? staticValue(item) : null)
+  }
   if (t.isObjectExpression(value)) {
     const result: Record<string, unknown> = {}
     for (const property of value.properties) {
-      if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) return undefined
+      if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
+        return undefined
+      }
       const key = propertyName(property.key)
-      if (!key) return undefined
+      if (!key) {
+        return undefined
+      }
       result[key] = staticValue(property.value)
     }
     return result
@@ -294,20 +329,25 @@ function propertyValue(node: t.ObjectExpression, name: string): t.Expression | n
 }
 
 function propertyName(node: t.Expression | t.PrivateName): string | null {
-  if (t.isIdentifier(node)) return node.name
-  if (t.isStringLiteral(node) || t.isNumericLiteral(node)) return String(node.value)
+  if (t.isIdentifier(node)) {
+    return node.name
+  }
+  if (t.isStringLiteral(node) || t.isNumericLiteral(node)) {
+    return String(node.value)
+  }
   return null
 }
 
 function unwrap<T extends t.Expression>(node: T): t.Expression {
   let value: t.Expression = node
-  while (t.isTSAsExpression(value) || t.isTSTypeAssertion(value) || t.isTSNonNullExpression(value) || t.isParenthesizedExpression(value))
+  while (t.isTSAsExpression(value) || t.isTSTypeAssertion(value) || t.isTSNonNullExpression(value) || t.isParenthesizedExpression(value)) {
     value = value.expression
+  }
   return value
 }
 
 function isDotPath(value: string): boolean {
-  return value.split('.').every(segment => /^(?:[A-Za-z_$][\w$]*|\d+)$/.test(segment))
+  return value.split('.').every(segment => /^(?:[A-Z_$][\w$]*|\d+)$/i.test(segment))
 }
 
 function diagnostic(severity: ProgramDiagnostic['severity'], code: string, message: string, sourcePath?: string, node?: t.Node): Diagnostic {

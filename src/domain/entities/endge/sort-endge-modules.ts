@@ -1,8 +1,9 @@
 import type { EndgeModuleDescriptor } from '@/domain/types/kernel/endge-modules.types'
 
 function toArray(value: string | string[] | undefined): string[] {
-  if (!value)
+  if (!value) {
     return []
+  }
   return Array.isArray(value) ? value : [value]
 }
 
@@ -15,12 +16,15 @@ export function sortEndgeModuleDescriptors(
   descriptors.forEach((descriptor, index) => {
     const key = String(descriptor.key ?? '').trim()
 
-    if (!key)
+    if (!key) {
       throw new Error('[EndgeFederation] module key is required')
-    if (!descriptor.module)
+    }
+    if (!descriptor.module) {
       throw new Error(`[EndgeFederation] module "${key}" is required`)
-    if (byKey.has(key))
+    }
+    if (byKey.has(key)) {
       throw new Error(`[EndgeFederation] module "${key}" is already defined`)
+    }
 
     byKey.set(key, { ...descriptor, key })
     declarationIndex.set(key, index)
@@ -35,27 +39,33 @@ export function sortEndgeModuleDescriptors(
   }
 
   const addEdge = (from: string, to: string, owner: string): void => {
-    if (!byKey.has(from))
+    if (!byKey.has(from)) {
       throw new Error(`[EndgeFederation] module "${owner}" references unknown module "${from}"`)
-    if (!byKey.has(to))
+    }
+    if (!byKey.has(to)) {
       throw new Error(`[EndgeFederation] module "${owner}" references unknown module "${to}"`)
-    if (from === to)
+    }
+    if (from === to) {
       throw new Error(`[EndgeFederation] module "${owner}" cannot reference itself`)
+    }
 
     const targets = edges.get(from)!
-    if (targets.has(to))
+    if (targets.has(to)) {
       return
+    }
 
     targets.add(to)
     indegree.set(to, indegree.get(to)! + 1)
   }
 
   for (const descriptor of byKey.values()) {
-    for (const target of toArray(descriptor.before))
+    for (const target of toArray(descriptor.before)) {
       addEdge(descriptor.key, target, descriptor.key)
+    }
 
-    for (const source of toArray(descriptor.after))
+    for (const source of toArray(descriptor.after)) {
       addEdge(source, descriptor.key, descriptor.key)
+    }
   }
 
   const compare = (a: EndgeModuleDescriptor, b: EndgeModuleDescriptor): number =>

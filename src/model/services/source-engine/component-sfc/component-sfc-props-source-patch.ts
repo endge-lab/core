@@ -1,8 +1,8 @@
+import type { RComponentSFC_IR_Prop } from '@/domain/types/component/sfc/ir.types'
 import type {
   ComponentSFCPropsSourcePatchResult,
   ComponentSFCPropsVisualProjection,
 } from '@/domain/types/component/sfc/props-visual.types'
-import type { RComponentSFC_IR_Prop } from '@/domain/types/component/sfc/ir.types'
 
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import { parseComponentSFCTypeFields } from '@/model/services/compiler/component-sfc/component-sfc-script'
@@ -105,11 +105,12 @@ export function patchComponentSFCPropsSource(
 }
 
 function serializeDefineProps(props: readonly RComponentSFC_IR_Prop[]): string {
-  if (props.length === 0)
+  if (props.length === 0) {
     return 'defineProps<{}>()'
+  }
 
   const fields = props.map((prop) => {
-    const name = /^[A-Za-z_$][\w$]*$/.test(prop.name)
+    const name = /^[A-Z_$][\w$]*$/i.test(prop.name)
       ? prop.name
       : JSON.stringify(prop.name)
     const optional = prop.optional ? '?' : ''
@@ -121,8 +122,9 @@ function serializeDefineProps(props: readonly RComponentSFC_IR_Prop[]): string {
 
 function normalizeType(rawType: string, array: boolean): string {
   const type = rawType.trim() || 'unknown'
-  if (!array || /\[\]$/.test(type) || /^Array<.+>$/.test(type))
+  if (!array || /\[\]$/.test(type) || /^Array<.+>$/.test(type)) {
     return type
+  }
   return needsArrayParentheses(type) ? `(${type})[]` : `${type}[]`
 }
 

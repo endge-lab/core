@@ -1,10 +1,10 @@
 import type { StateStore, UserManagerSettings } from 'oidc-client-ts'
 
-import { User } from 'oidc-client-ts'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-
 import type { OidcBrowserSessionOptions } from '@/domain/types/auth/auth-profile.types'
-import { OidcBrowserSession_Service } from '@/model/services/auth/OidcBrowserSession_Service'
+import { User } from 'oidc-client-ts'
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { OidcBrowserSession_Adapter } from '@/model/adapters/auth/OidcBrowserSession_Adapter'
 import { MemoryStorage } from '@/test/security/auth-test-helpers'
 
 const oidc = vi.hoisted(() => ({ popupCallbackCalls: 0 }))
@@ -44,7 +44,7 @@ vi.mock('oidc-client-ts', async (importOriginal) => {
   return { ...actual, UserManager: FakeUserManager }
 })
 
-describe('OidcBrowserSession_Service', () => {
+describe('oidcBrowserSession_Service', () => {
   let localStorage: MemoryStorage
   let sessionStorage: MemoryStorage
 
@@ -59,21 +59,23 @@ describe('OidcBrowserSession_Service', () => {
   afterEach(() => vi.unstubAllGlobals())
 
   it('keeps a non-persisted refresh token only in the current runtime', async () => {
-    const source = new OidcBrowserSession_Service(options(false))
+    const source = new OidcBrowserSession_Adapter(options(false))
     const login = await source.loginPopup()
     const raw = localStorage.getItem(localStorage.key(0) ?? '') ?? ''
     expect(login.refreshToken).toBe('refresh-token')
     expect(raw).not.toContain('refresh-token')
     await expect(source.resolveToken({ forceRefresh: false, minValiditySeconds: 0 }))
-      .resolves.toEqual(expect.objectContaining({ refreshToken: 'refresh-token' }))
+      .resolves
+      .toEqual(expect.objectContaining({ refreshToken: 'refresh-token' }))
 
-    const restored = new OidcBrowserSession_Service(options(false))
+    const restored = new OidcBrowserSession_Adapter(options(false))
     await expect(restored.resolveToken({ forceRefresh: false, minValiditySeconds: 0 }))
-      .resolves.toEqual(expect.not.objectContaining({ refreshToken: expect.anything() }))
+      .resolves
+      .toEqual(expect.not.objectContaining({ refreshToken: expect.anything() }))
   })
 
   it('persists refresh token only after opt-in and supports both callbacks', async () => {
-    const source = new OidcBrowserSession_Service(options(true))
+    const source = new OidcBrowserSession_Adapter(options(true))
     await source.completeRedirectCallback('https://app.test/callback?code=code&state=state')
     expect(localStorage.getItem(localStorage.key(0) ?? '')).toContain('refresh-token')
     await source.completePopupCallback('https://app.test/popup?code=code&state=state')

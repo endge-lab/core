@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { Endge } from '@/model/kernel/endge'
-import { QueryExecutor } from '@/model/services/query/QueryExecutor'
+import { QueryExecutor_Adapter } from '@/model/adapters/query/QueryExecutor_Adapter'
 import { compileQuerySource } from '@/model/services/source-engine/compilers/query-source-compile'
 
-describe('QueryExecutor dynamic request fields', () => {
+describe('queryExecutor dynamic request fields', () => {
   it('evaluates every request field from props before the HTTP call', async () => {
     const request = vi.fn().mockResolvedValue({ data: { ok: true } })
-    const executor = new QueryExecutor({ request } as any)
+    const executor = new QueryExecutor_Adapter({ request } as any)
     const payload = compileQuerySource(`
 defineQuery({
   kind: 'rest',
@@ -53,7 +53,7 @@ defineQuery({
       url: 'https://aodb.example.test/select',
       method: 'PATCH',
       headers: {
-        Accept: 'application/json',
+        'Accept': 'application/json',
         'X-Tenant': 'sandbox',
       },
       data: { limit: 100 },
@@ -69,7 +69,7 @@ defineQuery({
       headers: { Authorization: 'Bearer resolved-token' },
       expiresAt: null,
     })
-    const executor = new QueryExecutor({ request } as any)
+    const executor = new QueryExecutor_Adapter({ request } as any)
     const payload = compileQuerySource(`
 defineQuery({
   request: {
@@ -95,7 +95,7 @@ defineQuery({
     const request = vi.fn().mockResolvedValue({
       data: { data: { updateItem: { id: 'item-1' } } },
     })
-    const executor = new QueryExecutor({ request } as any)
+    const executor = new QueryExecutor_Adapter({ request } as any)
     const payload = compileQuerySource(`
 defineQuery({
   kind: 'graphql',
@@ -132,7 +132,7 @@ defineQuery({
     const request = vi.fn().mockResolvedValue({
       data: { data: null, errors: [{ message: 'Mutation rejected' }] },
     })
-    const executor = new QueryExecutor({ request } as any)
+    const executor = new QueryExecutor_Adapter({ request } as any)
     const payload = compileQuerySource(`
 defineQuery({
   kind: 'graphql',

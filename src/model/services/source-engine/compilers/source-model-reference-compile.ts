@@ -9,15 +9,18 @@ export function readSourceModelIdentity(
   raw: t.CallExpression['arguments'][number] | undefined,
   referenceCall: string,
 ): string | null {
-  if (!raw || !t.isExpression(raw))
+  if (!raw || !t.isExpression(raw)) {
     return null
+  }
 
   const expression = unwrapExpression(raw)
-  if (t.isStringLiteral(expression))
+  if (t.isStringLiteral(expression)) {
     return expression.value.trim() ? expression.value : null
+  }
 
-  if (!t.isCallExpression(expression) || !t.isIdentifier(expression.callee, { name: referenceCall }))
+  if (!t.isCallExpression(expression) || !t.isIdentifier(expression.callee, { name: referenceCall })) {
     return null
+  }
 
   const identity = expression.arguments[0]
   return identity && t.isStringLiteral(identity) && identity.value.trim()
@@ -35,17 +38,20 @@ export function readSourceModelReference(
   },
 ): ParsedSourceModelReference | null {
   const identity = readSourceModelIdentity(raw, options.referenceCall)
-  if (identity)
+  if (identity) {
     return { kind: 'external', identity }
+  }
 
-  if (!raw || !t.isExpression(raw))
+  if (!raw || !t.isExpression(raw)) {
     return null
+  }
   const expression = unwrapExpression(raw)
   if (!t.isCallExpression(expression)
     || !t.isIdentifier(expression.callee, { name: options.defineCall })
     || expression.start == null
-    || expression.end == null)
+    || expression.end == null) {
     return null
+  }
 
   return {
     kind: 'inline',
@@ -56,7 +62,8 @@ export function readSourceModelReference(
 
 function unwrapExpression<T extends t.Expression>(node: T): t.Expression {
   let current: t.Expression = node
-  while (t.isTSAsExpression(current) || t.isTSTypeAssertion(current) || t.isTSNonNullExpression(current) || t.isParenthesizedExpression(current))
+  while (t.isTSAsExpression(current) || t.isTSTypeAssertion(current) || t.isTSNonNullExpression(current) || t.isParenthesizedExpression(current)) {
     current = current.expression
+  }
   return current
 }

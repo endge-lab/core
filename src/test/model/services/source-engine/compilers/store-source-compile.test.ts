@@ -101,7 +101,7 @@ describe('compileStoreSource', () => {
   })
 
   it('rejects invalid mock references', () => {
-    for (const expression of ['mock()', "mock('')", 'mock(identity)', "mock('one', 'two')"]) {
+    for (const expression of ['mock()', 'mock(\'\')', 'mock(identity)', 'mock(\'one\', \'two\')']) {
       const result = compileStoreSource(`defineStore({ data: { raw: value(${expression}) } })`)
 
       expect(result.artifact).toBeNull()

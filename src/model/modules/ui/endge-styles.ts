@@ -1,16 +1,16 @@
 import type {
-  EndgeStyleMatchNode,
+  EndgeStyleProgramPayload,
+  ProgramArtifact,
+} from '@/domain/types/program/program.types'
+import type {
   AcquireEndgeStyleOptions,
   EndgeStyleLease,
+  EndgeStyleMatchNode,
   EndgeStylePlacement,
   EndgeStyleResolvedDeclaration,
   EndgeStyleSheetArtifact,
   EndgeStyleTargetProfile,
 } from '@/domain/types/style/style.types'
-import type {
-  EndgeStyleProgramPayload,
-  ProgramArtifact,
-} from '@/domain/types/program/program.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { Endge } from '@/model/kernel/endge'
@@ -30,18 +30,22 @@ export class EndgeStyles extends EndgeModule {
     orderKey: string
     owners: Map<string, { ownerScopeId: string, suspended: boolean }>
   }>()
+
   private _leaseSequence = 0
   private _transactionDepth = 0
   private _notificationPending = false
 
   public override start(): void {
-    if (this._unsubscribeProgram) return
+    if (this._unsubscribeProgram) {
+      return
+    }
     this._unsubscribeProgram = Endge.program.subscribe(() => {
       const available = new Map(this.getAvailableArtifacts().map(artifact => [artifact.identity, artifact]))
       for (const placement of this._placements.values()) {
         const replacement = available.get(placement.artifact.identity)
-        if (replacement)
+        if (replacement) {
           placement.artifact = replacement
+        }
       }
       this.notify()
     })
@@ -92,8 +96,9 @@ export class EndgeStyles extends EndgeModule {
     const ownerScopeId = required(options.ownerScopeId, 'ownerScopeId')
     const boundaryId = required(options.boundaryId, 'boundaryId')
     const artifact = options.artifact ?? this.getAvailableArtifacts().find(item => item.identity === options.artifactIdentity)
-    if (!artifact)
+    if (!artifact) {
       throw new Error(`[EndgeStyles] Style artifact "${options.artifactIdentity ?? ''}" is missing.`)
+    }
     const orderKey = String(options.orderKey ?? artifact.identity).trim() || artifact.identity
     const placementId = `${artifact.identity}:${artifact.sourceHash}:${boundaryId}:${orderKey}`
     const placement = this._placements.get(placementId) ?? {
@@ -116,22 +121,29 @@ export class EndgeStyles extends EndgeModule {
       get suspended() { return placement.owners.get(leaseId)?.suspended ?? true },
       suspend: () => {
         const owner = placement.owners.get(leaseId)
-        if (!owner || owner.suspended) return
+        if (!owner || owner.suspended) {
+          return
+        }
         owner.suspended = true
         this._changed()
       },
       resume: () => {
         const owner = placement.owners.get(leaseId)
-        if (!owner || !owner.suspended) return
+        if (!owner || !owner.suspended) {
+          return
+        }
         owner.suspended = false
         this._changed()
       },
       release: () => {
-        if (released) return
+        if (released) {
+          return
+        }
         released = true
         placement.owners.delete(leaseId)
-        if (!placement.owners.size)
+        if (!placement.owners.size) {
           this._placements.delete(placementId)
+        }
         this._changed()
       },
       pause: () => lease.suspend(),
@@ -152,8 +164,9 @@ export class EndgeStyles extends EndgeModule {
     }
     try {
       const result = operation()
-      if (result && typeof (result as any).then === 'function')
+      if (result && typeof (result as any).then === 'function') {
         return (result as any).finally(finish)
+      }
       finish()
       return result
     }
@@ -196,7 +209,8 @@ export class EndgeStyles extends EndgeModule {
 
 function required(value: unknown, field: string): string {
   const normalized = String(value ?? '').trim()
-  if (!normalized)
+  if (!normalized) {
     throw new Error(`[EndgeStyles] ${field} is required.`)
+  }
   return normalized
 }

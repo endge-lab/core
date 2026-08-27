@@ -1,13 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { Raph } from '@endge/raph'
+import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
+import type { QuerySourceDocument } from '@/domain/types/source/query-source.types'
 
+import { Raph } from '@endge/raph'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { RDataView } from '@/domain/entities/reflect/RDataView'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
-import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
-import { EndgeDataView } from '@/model/modules/runtime/execution/endge-data-view'
 import { Endge } from '@/model/kernel/endge'
-import { QueryExecutor } from '@/model/services/query/QueryExecutor'
-import type { QuerySourceDocument } from '@/domain/types/source/query-source.types'
+import { EndgeDataView } from '@/model/modules/runtime/execution/endge-data-view'
+import { QueryExecutor_Adapter } from '@/model/adapters/query/QueryExecutor_Adapter'
 
 describe('query output source compiler', () => {
   it('rejects legacy response block', () => {
@@ -234,7 +234,7 @@ defineQuery({
 describe('source-only Query request body', () => {
   it('sends an empty payload when request.body is absent', async () => {
     const request = vi.fn().mockResolvedValue({ data: { items: [] } })
-    const executor = new QueryExecutor({ request } as any)
+    const executor = new QueryExecutor_Adapter({ request } as any)
 
     await executor.execute({
       payload: {
@@ -260,7 +260,7 @@ describe('source-only Query request body', () => {
   })
 })
 
-describe('DataView nested DataView pipeline', () => {
+describe('dataView nested DataView pipeline', () => {
   beforeEach(() => {
     Endge.domain.reset()
     Endge.program.clear()
@@ -368,8 +368,9 @@ function createDataView(identity: string, source: string): RDataView {
 
 function stableId(value: string): number {
   let hash = 0
-  for (let index = 0; index < value.length; index += 1)
+  for (let index = 0; index < value.length; index += 1) {
     hash = ((hash << 5) - hash + value.charCodeAt(index)) | 0
+  }
   return Math.abs(hash)
 }
 

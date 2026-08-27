@@ -1,18 +1,21 @@
-// RProject.ts
-import { Expose } from 'class-transformer'
 import type { EndgeConfigurationContribution } from '@/domain/types/configuration/configuration.type'
 import type { DiagnosticsProblemInput } from '@/domain/types/diagnostics/diagnostics.types'
+// RProject.ts
+import { Expose } from 'class-transformer'
 import { REntity } from '@/domain/entities/reflect/REntity'
 import { normalizeEndgeConfigurationContribution } from '@/model/services/configuration/endge-configuration'
 
 function normalizeRelationId(value: unknown): number | null {
-  if (value == null)
+  if (value == null) {
     return null
-  if (typeof value === 'number')
+  }
+  if (typeof value === 'number') {
     return Number.isFinite(value) ? value : null
+  }
   const text = String(value).trim()
-  if (!text)
+  if (!text) {
     return null
+  }
   const id = Number(text)
   return Number.isFinite(id) ? id : null
 }
@@ -22,8 +25,9 @@ function normalizeRelationIds(value: unknown): number[] {
   const out: number[] = []
   for (const item of source) {
     const id = normalizeRelationId(item)
-    if (id != null)
+    if (id != null) {
       out.push(id)
+    }
   }
   return Array.from(new Set(out))
 }
@@ -133,12 +137,15 @@ export class RProject extends REntity {
   /** Возвращает validation problems проекта без сохранения их внутри entity. */
   override getDiagnosticProblems(): DiagnosticsProblemInput[] {
     const problems: DiagnosticsProblemInput[] = []
-    if (!this.id)
+    if (!this.id) {
       problems.push({ severity: 'warning', code: 'project.id.required', message: 'Project.id не задан' })
-    if (!this.identity)
+    }
+    if (!this.identity) {
       problems.push({ severity: 'warning', code: 'project.identity.required', message: 'Project.identity не задан' })
-    if (!this.name)
+    }
+    if (!this.name) {
       problems.push({ severity: 'warning', code: 'project.name.required', message: 'Project.name не задан' })
+    }
     return problems
   }
 }

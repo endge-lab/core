@@ -1,14 +1,16 @@
+import type { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 import type { EndgeModuleDescriptor, EndgePlugin } from '@/domain/types/kernel/endge-modules.types'
-import type { EndgeFederationHost } from '@/domain/types/kernel/federation.types'
 
-import type { EndgeModule } from '@/domain/entities/endge/EndgeModule'
+import type { EndgeFederationHost } from '@/domain/types/kernel/federation.types'
 import { sortEndgeModuleDescriptors } from '@/domain/entities/endge/sort-endge-modules'
+import { getEndgeFederationStorageAdapter } from '@/domain/entities/endge/EndgeFederationStorage'
 import { ENDGE_FEDERATION_REGISTRY_KEY } from '@/model/config/kernel.config'
 
 function toArray(value: string | string[] | undefined): string[] {
-  if (!value)
+  if (!value) {
     return []
+  }
   return Array.isArray(value) ? value : [value]
 }
 
@@ -39,8 +41,9 @@ export abstract class EndgeFederation {
    */
   public static async boot(ctx: EndgeBootContext): Promise<void> {
     const host = this.host
-    if (host.isInitialized)
+    if (host.isInitialized) {
       return
+    }
 
     host.bootContext = ctx
 
@@ -59,17 +62,21 @@ export abstract class EndgeFederation {
   public static use(plugin: EndgePlugin): void {
     const host = this.getOrCreateHost()
 
-    if (host.isConfigured || host.isInitialized)
+    if (host.isConfigured || host.isInitialized) {
       throw new Error(`[${this.name}] plugins must be registered before federation configuration`)
+    }
 
     const pluginId = String(plugin?.id ?? '').trim()
-    if (!pluginId)
+    if (!pluginId) {
       throw new Error(`[${this.name}] plugin id is required`)
-    if (typeof plugin.install !== 'function')
-      throw new Error(`[${this.name}] plugin "${pluginId}" install() is required`)
+    }
+    if (typeof plugin.install !== 'function') {
+      throw new TypeError(`[${this.name}] plugin "${pluginId}" install() is required`)
+    }
 
-    if (host.plugins.some(item => item.id === pluginId))
+    if (host.plugins.some(item => item.id === pluginId)) {
       return
+    }
 
     host.plugins.push(plugin)
   }
@@ -80,16 +87,20 @@ export abstract class EndgeFederation {
    */
   public static defineModule<T extends EndgeModule>(descriptor: EndgeModuleDescriptor<T>): T {
     const host = this.getOrCreateHost()
-    if (!host.isConfiguring)
+    if (!host.isConfiguring) {
       throw new Error(`[${this.name}] defineModule() can be used only during federation configuration`)
+    }
 
     const normalizedKey = String(descriptor.key ?? '').trim()
-    if (!normalizedKey)
+    if (!normalizedKey) {
       throw new Error(`[${this.name}] module key is required`)
-    if (!descriptor.module)
+    }
+    if (!descriptor.module) {
       throw new Error(`[${this.name}] module "${normalizedKey}" is required`)
-    if (host.moduleDescriptors.some(item => item.key === normalizedKey))
+    }
+    if (host.moduleDescriptors.some(item => item.key === normalizedKey)) {
       throw new Error(`[${this.name}] module "${normalizedKey}" is already defined`)
+    }
 
     const normalizedDescriptor: EndgeModuleDescriptor<T> = {
       ...descriptor,
@@ -126,8 +137,9 @@ export abstract class EndgeFederation {
    * Итоговый порядок строится после установки plugin-модулей.
    */
   public static defineModules(descriptors: EndgeModuleDescriptor[]): void {
-    for (const descriptor of descriptors)
+    for (const descriptor of descriptors) {
       this.defineModule(descriptor)
+    }
   }
 
   /**
@@ -135,8 +147,9 @@ export abstract class EndgeFederation {
    */
   public static async setup(ctx: EndgeBootContext = this.requireBootContext()): Promise<void> {
     const host = this.host
-    if (host.isSetup)
+    if (host.isSetup) {
       return
+    }
 
     for (const [key, module] of host.modules.entries()) {
       try {
@@ -208,8 +221,9 @@ export abstract class EndgeFederation {
    */
   public static saveToStorage(): void {
     const storageKey = this.storageKey
-    if (!storageKey)
+    if (!storageKey) {
       return
+    }
 
     const payload: Record<string, unknown> = {}
 
@@ -223,7 +237,7 @@ export abstract class EndgeFederation {
     }
 
     try {
-      localStorage.setItem(storageKey, JSON.stringify(payload))
+      getEndgeFederationStorageAdapter()?.write(storageKey, payload)
     }
     catch {
       // ignore storage failures
@@ -235,14 +249,14 @@ export abstract class EndgeFederation {
    */
   public static loadFromStorage(): Record<string, unknown> {
     const storageKey = this.storageKey
-    if (!storageKey)
+    if (!storageKey) {
       return {}
+    }
 
     const host = this.host
 
     try {
-      const raw = localStorage.getItem(storageKey)
-      const parsed = raw ? JSON.parse(raw) : {}
+      const parsed = getEndgeFederationStorageAdapter()?.read<unknown>(storageKey) ?? {}
       const payload = (parsed && typeof parsed === 'object') ? parsed as Record<string, unknown> : {}
 
       for (const [key, module] of host.modules.entries()) {
@@ -274,16 +288,18 @@ export abstract class EndgeFederation {
     const normalizedKey = String(key ?? '').trim()
     const module = this.host.modules.get(normalizedKey)
 
-    if (!module)
+    if (!module) {
       throw new Error(`[${this.name}] module "${normalizedKey}" is not registered`)
+    }
 
     return module as T
   }
 
   public static tryGetModule<T extends EndgeModule = EndgeModule>(key: string): T | null {
     const normalizedKey = String(key ?? '').trim()
-    if (!normalizedKey)
+    if (!normalizedKey) {
       return null
+    }
 
     return (this.host.modules.get(normalizedKey) as T | undefined) ?? null
   }
@@ -352,8 +368,9 @@ export abstract class EndgeFederation {
 
   private static requireBootContext(): EndgeBootContext {
     const ctx = this.host.bootContext
-    if (!ctx)
+    if (!ctx) {
       throw new Error(`[${this.name}] boot context is not available`)
+    }
 
     return ctx
   }
@@ -362,8 +379,9 @@ export abstract class EndgeFederation {
     const host = this.getOrCreateHost()
 
     for (const plugin of host.plugins) {
-      if (host.installedPluginIds.has(plugin.id))
+      if (host.installedPluginIds.has(plugin.id)) {
         continue
+      }
 
       plugin.install()
       host.installedPluginIds.add(plugin.id)
@@ -375,15 +393,17 @@ export abstract class EndgeFederation {
     const descriptors = sortEndgeModuleDescriptors(host.moduleDescriptors)
 
     host.modules.clear()
-    for (const descriptor of descriptors)
+    for (const descriptor of descriptors) {
       host.modules.set(descriptor.key, descriptor.module)
+    }
   }
 
   private static registry(): Map<string, EndgeFederationHost> {
     const globalRegistry = globalThis as typeof globalThis & Record<string | symbol, unknown>
 
-    if (!(ENDGE_FEDERATION_REGISTRY_KEY in globalRegistry))
+    if (!(ENDGE_FEDERATION_REGISTRY_KEY in globalRegistry)) {
       globalRegistry[ENDGE_FEDERATION_REGISTRY_KEY] = new Map<string, EndgeFederationHost>()
+    }
 
     return globalRegistry[ENDGE_FEDERATION_REGISTRY_KEY] as Map<string, EndgeFederationHost>
   }

@@ -10,7 +10,7 @@ const output = {
   options: { format: 'json' },
 }
 
-describe('ConsoleDiagnosticsAdapter memory safety', () => {
+describe('consoleDiagnosticsAdapter memory safety', () => {
   afterEach(() => vi.restoreAllMocks())
 
   it('does not serialize telemetry records in snapshots', () => {

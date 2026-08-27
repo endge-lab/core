@@ -1,17 +1,17 @@
-import type {
-  ComponentSFCTableSourcePatch,
-  ComponentSFCTableSourcePatchResult,
-  ComponentSFCTableVisualCellTag,
-  ComponentSFCTableVisualCellSyntax,
-  ComponentSFCTableVisualMenuKind,
-  ComponentSFCInteractionTriggerProjection,
-  ComponentSFCVisualInspectionOptions,
-} from '@/domain/types/component/sfc/visual-projection.types'
+import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
 import type {
   RComponentSFC_AST_ElementNode,
   RComponentSFC_AST_TemplateNode,
 } from '@/domain/types/component/sfc/ast.types'
-import type { RComponentDiagnostic } from '@/domain/types/component/component-core.types'
+import type {
+  ComponentSFCInteractionTriggerProjection,
+  ComponentSFCTableSourcePatch,
+  ComponentSFCTableSourcePatchResult,
+  ComponentSFCTableVisualCellSyntax,
+  ComponentSFCTableVisualCellTag,
+  ComponentSFCTableVisualMenuKind,
+  ComponentSFCVisualInspectionOptions,
+} from '@/domain/types/component/sfc/visual-projection.types'
 
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import {
@@ -78,15 +78,15 @@ export function patchComponentSFCTableSource(
           ? `Некорректный :on: ${firstError?.message ?? 'выражение нарушило структуру template.'}`
           : patch.type === 'set-column-cell-edited-reaction'
             ? `Некорректный @edited: ${firstError?.message ?? 'reaction нарушила структуру template.'}`
-          : patch.type === 'set-column-cell-editable'
+            : patch.type === 'set-column-cell-editable'
               || patch.type === 'set-column-cell-edit-triggers'
               || patch.type === 'set-column-cell-cancel-triggers'
               || patch.type === 'set-column-cell-commit-triggers'
               || patch.type === 'set-column-cell-editor-component'
               || patch.type === 'set-column-cell-editor-tag'
               || patch.type === 'set-column-cell-editor-attribute'
-            ? `Некорректный editable: ${firstError?.message ?? 'изменение нарушило структуру template.'}`
-          : 'Изменение нарушило структуру корневого Table.',
+              ? `Некорректный editable: ${firstError?.message ?? 'изменение нарушило структуру template.'}`
+              : 'Изменение нарушило структуру корневого Table.',
       }
     }
     if (patch.type === 'set-column-cell-on') {
@@ -289,8 +289,9 @@ function applyTablePatch(
 function resolveTableContext(source: string): TableSourceContext | null {
   const result = compileComponentSFC(source)
   const roots = result.ast?.template?.roots.filter(isSemanticNode) ?? []
-  if (roots.length !== 1 || roots[0].kind !== 'element' || roots[0].tag !== 'Table')
+  if (roots.length !== 1 || roots[0].kind !== 'element' || roots[0].tag !== 'Table') {
     return null
+  }
 
   return {
     table: roots[0],
@@ -321,11 +322,15 @@ function requireMenu(
   columnIndex?: number,
 ): RComponentSFC_AST_ElementNode {
   const owner = columnIndex == null ? context.table : requireColumn(context, columnIndex)
-  if (columnIndex != null && kind !== 'row') throw new Error('На уровне Column поддерживается только CellMenu.')
+  if (columnIndex != null && kind !== 'row') {
+    throw new Error('На уровне Column поддерживается только CellMenu.')
+  }
   const menu = columnIndex == null
     ? context.menus[kind]
     : owner.children.find((node): node is RComponentSFC_AST_ElementNode => node.kind === 'element' && node.tag === 'CellMenu')
-  if (!menu) throw new Error(`${kind === 'column' ? 'ColumnMenu' : 'CellMenu'} не найден.`)
+  if (!menu) {
+    throw new Error(`${kind === 'column' ? 'ColumnMenu' : 'CellMenu'} не найден.`)
+  }
   return menu
 }
 
@@ -342,15 +347,19 @@ function requireMenuNode(
   columnIndex?: number,
 ): RComponentSFC_AST_ElementNode {
   const node = menuNodes(requireMenu(context, kind, columnIndex))[index]
-  if (!node) throw new Error(`Пункт меню с индексом ${index} не найден.`)
+  if (!node) {
+    throw new Error(`Пункт меню с индексом ${index} не найден.`)
+  }
   return node
 }
 
 function assertManagedMenu(source: string, menu: RComponentSFC_AST_ElementNode): void {
-  if (source.slice(menu.range.start, menu.range.end).includes('<!--'))
+  if (source.slice(menu.range.start, menu.range.end).includes('<!--')) {
     throw new Error('Меню содержит комментарии и управляется во вкладке Source.')
-  if (menu.children.some(node => node.kind === 'element' && node.tag !== 'MenuItem' && node.tag !== 'MenuSeparator'))
+  }
+  if (menu.children.some(node => node.kind === 'element' && node.tag !== 'MenuItem' && node.tag !== 'MenuSeparator')) {
     throw new Error('Меню содержит неизвестные конструкции и управляется во вкладке Source.')
+  }
 }
 
 function setMenuMode(
@@ -361,13 +370,19 @@ function setMenuMode(
   columnIndex?: number,
 ): string {
   const owner = columnIndex == null ? context.table : requireColumn(context, columnIndex)
-  if (columnIndex != null && kind !== 'row') throw new Error('На уровне Column поддерживается только CellMenu.')
+  if (columnIndex != null && kind !== 'row') {
+    throw new Error('На уровне Column поддерживается только CellMenu.')
+  }
   const menu = columnIndex == null
     ? context.menus[kind]
     : owner.children.find((node): node is RComponentSFC_AST_ElementNode => node.kind === 'element' && node.tag === 'CellMenu')
-  if (menu) assertManagedMenu(source, menu)
+  if (menu) {
+    assertManagedMenu(source, menu)
+  }
   if (kind === 'column') {
-    if (mode === 'none') throw new Error('ColumnMenu поддерживает режимы default, custom и disabled.')
+    if (mode === 'none') {
+      throw new Error('ColumnMenu поддерживает режимы default, custom и disabled.')
+    }
     if (mode === 'custom') {
       const withMenu = menu ? source : insertChild(source, context.table, '<ColumnMenu></ColumnMenu>')
       return setNodeAttribute(withMenu, context.table, 'column-menu', null)
@@ -376,15 +391,25 @@ function setMenuMode(
     return setNodeAttribute(withoutMenu, context.table, 'column-menu', mode === 'disabled' ? 'disabled' : null)
   }
   if (columnIndex != null) {
-    if (mode === 'disabled') throw new Error('Column CellMenu поддерживает inherit, custom и none.')
+    if (mode === 'disabled') {
+      throw new Error('Column CellMenu поддерживает inherit, custom и none.')
+    }
     const withoutMenu = menu ? removeNode(source, menu) : source
-    if (mode === 'default') return setNodeAttribute(withoutMenu, owner, 'cell-menu', null)
-    if (mode === 'none') return setNodeAttribute(withoutMenu, owner, 'cell-menu', 'none')
+    if (mode === 'default') {
+      return setNodeAttribute(withoutMenu, owner, 'cell-menu', null)
+    }
+    if (mode === 'none') {
+      return setNodeAttribute(withoutMenu, owner, 'cell-menu', 'none')
+    }
     const withoutMode = setNodeAttribute(source, owner, 'cell-menu', null)
     return menu ? withoutMode : insertChild(withoutMode, owner, '<CellMenu></CellMenu>')
   }
-  if (mode === 'default' || mode === 'disabled') throw new Error('CellMenu поддерживает режимы none и custom.')
-  if (mode === 'none') return menu ? removeNode(source, menu) : source
+  if (mode === 'default' || mode === 'disabled') {
+    throw new Error('CellMenu поддерживает режимы none и custom.')
+  }
+  if (mode === 'none') {
+    return menu ? removeNode(source, menu) : source
+  }
   return menu ? source : insertChild(source, context.table, '<CellMenu></CellMenu>')
 }
 
@@ -414,8 +439,12 @@ function moveMenuNode(
   const menu = requireMenu(context, kind, columnIndex)
   assertManagedMenu(source, menu)
   const nodes = menuNodes(menu)
-  if (!nodes[fromIndex] || !nodes[toIndex]) throw new Error('Пункт меню не найден.')
-  if (fromIndex === toIndex) return source
+  if (!nodes[fromIndex] || !nodes[toIndex]) {
+    throw new Error('Пункт меню не найден.')
+  }
+  if (fromIndex === toIndex) {
+    return source
+  }
   const fragments = nodes.map(node => source.slice(node.range.start, node.range.end))
   const [moved] = fragments.splice(fromIndex, 1)
   fragments.splice(toIndex, 0, moved!)
@@ -437,20 +466,27 @@ function setMenuItemAttribute(
   const menu = requireMenu(context, kind, columnIndex)
   assertManagedMenu(source, menu)
   const item = requireMenuNode(context, kind, nodeIndex, columnIndex)
-  if (item.tag !== 'MenuItem') throw new Error('MenuSeparator не содержит attributes.')
-  if (source.slice(item.range.start, item.range.end).includes('<!--'))
+  if (item.tag !== 'MenuItem') {
+    throw new Error('MenuSeparator не содержит attributes.')
+  }
+  if (source.slice(item.range.start, item.range.end).includes('<!--')) {
     throw new Error('Пункт меню управляется во вкладке Source.')
+  }
   const actionAttribute = item.attributes.find(attribute => attribute.name === 'action')
   const labelAttribute = item.attributes.find(attribute => attribute.name === 'label')
-  if (actionAttribute?.dynamic)
+  if (actionAttribute?.dynamic) {
     throw new Error('Legacy :action object управляется во вкладке Source.')
-  if (labelAttribute?.dynamic && readComponentSFCTranslationFallback(labelAttribute.value ?? '') == null)
+  }
+  if (labelAttribute?.dynamic && readComponentSFCTranslationFallback(labelAttribute.value ?? '') == null) {
     throw new Error('Неизвестное label expression управляется во вкладке Source.')
+  }
   if (item.attributes.some(attribute => !['id', 'label', 'action', 'input', 'icon', 'disabled'].includes(attribute.name))
-    || item.directives.some(directive => directive.name !== 'if'))
+    || item.directives.some(directive => directive.name !== 'if')) {
     throw new Error('Пункт меню содержит неизвестные конструкции и управляется во вкладке Source.')
-  if (name === 'action' && valueKind !== 'literal')
+  }
+  if (name === 'action' && valueKind !== 'literal') {
     throw new Error('Visual editor поддерживает literal action="...". Legacy :action object остаётся Source-owned.')
+  }
   if (valueKind === 'expression' && value) {
     const result = compileComponentSFCExpression(value, {
       locals: kind === 'row'
@@ -459,10 +495,14 @@ function setMenuItemAttribute(
       sourcePath: `template.Table.${kind === 'row' ? 'CellMenu' : 'ColumnMenu'}.MenuItem.${name}`,
     })
     const error = result.diagnostics.find(item => item.severity === 'error')
-    if (error) throw new Error(error.message)
+    if (error) {
+      throw new Error(error.message)
+    }
   }
   if (name === 'visible') {
-    if (valueKind !== 'expression' && value) throw new Error('Условие видимости должно быть expression.')
+    if (valueKind !== 'expression' && value) {
+      throw new Error('Условие видимости должно быть expression.')
+    }
     return setNodeDirectiveExpression(source, item, 'if', value)
   }
   return setNodeAttributeValue(source, item, name, value, valueKind)
@@ -474,8 +514,9 @@ function isSemanticNode(node: RComponentSFC_AST_TemplateNode): boolean {
 
 function requireColumn(context: TableSourceContext, index: number): RComponentSFC_AST_ElementNode {
   const column = context.columns[index]
-  if (!column)
+  if (!column) {
     throw new Error(`Column с индексом ${index} не найден.`)
+  }
   return column
 }
 
@@ -500,8 +541,9 @@ function nextColumnKey(source: string, context: TableSourceContext): string {
       : ''
   }))
   let index = context.columns.length + 1
-  while (used.has(`column_${index}`))
+  while (used.has(`column_${index}`)) {
     index += 1
+  }
   return `column_${index}`
 }
 
@@ -513,8 +555,9 @@ function moveColumn(
 ): string {
   requireColumn(context, fromIndex)
   requireColumn(context, toIndex)
-  if (fromIndex === toIndex)
+  if (fromIndex === toIndex) {
     return source
+  }
 
   const fragments = context.columns.map(column => source.slice(column.range.start, column.range.end))
   const [moved] = fragments.splice(fromIndex, 1)
@@ -541,7 +584,9 @@ function setColumnComponent(
 ): string {
   const identity = rawIdentity?.trim() || null
   if (syntax === 'editable-default') {
-    if (!identity) throw new Error('Variant default требует Component или Tag.')
+    if (!identity) {
+      throw new Error('Variant default требует Component или Tag.')
+    }
     return replaceEditableVariantElement(source, column, 'default', componentMarkup(identity))
   }
   const cell = column.children.find(
@@ -550,17 +595,21 @@ function setColumnComponent(
 
   if (!cell) {
     const directChildren = column.children.filter(isSemanticNode)
-    if (directChildren.length > 0 && syntax !== 'direct')
+    if (directChildren.length > 0 && syntax !== 'direct') {
       throw new Error('Колонка содержит прямой компонент или произвольный Source. Измените её во вкладке Source.')
-    if (directChildren.length > 0)
+    }
+    if (directChildren.length > 0) {
       return setDirectColumnComponent(source, column, directChildren, identity)
-    if (!identity)
+    }
+    if (!identity) {
       return source
+    }
     return insertChild(source, column, componentCellMarkup(identity))
   }
 
-  if (source.slice(cell.range.start, cell.range.end).includes('<!--'))
+  if (source.slice(cell.range.start, cell.range.end).includes('<!--')) {
     throw new Error('Ячейка содержит комментарии или произвольный Source. Измените её во вкладке Source.')
+  }
 
   const semanticChildren = cell.children.filter(isSemanticNode)
   const component = semanticChildren.length === 1
@@ -575,15 +624,19 @@ function setColumnComponent(
     : null
   const isEmptyManagedCell = semanticChildren.length === 0
 
-  if (!component && !managedTag && !isEmptyManagedCell)
+  if (!component && !managedTag && !isEmptyManagedCell) {
     throw new Error('Ячейка содержит произвольный Source. Измените её во вкладке Source.')
+  }
 
-  if (!identity)
+  if (!identity) {
     return removeNode(source, cell)
-  if (managedTag)
+  }
+  if (managedTag) {
     return replaceRange(source, managedTag.range.start, managedTag.range.end, `<Component is="${escapeAttribute(identity)}" />`)
-  if (!component)
+  }
+  if (!component) {
     return insertChild(source, cell, `<Component is="${escapeAttribute(identity)}" />`)
+  }
 
   return setNodeAttribute(source, component, 'is', identity)
 }
@@ -594,10 +647,13 @@ function setColumnTag(
   tag: ComponentSFCTableVisualCellTag | null,
   syntax: ComponentSFCTableVisualCellSyntax | undefined,
 ): string {
-  if (tag && !isVisualCellTag(tag))
+  if (tag && !isVisualCellTag(tag)) {
     throw new Error(`Tag ${tag} нельзя использовать как простой Table Cell.`)
+  }
   if (syntax === 'editable-default') {
-    if (!tag) throw new Error('Variant default требует Component или Tag.')
+    if (!tag) {
+      throw new Error('Variant default требует Component или Tag.')
+    }
     return replaceEditableVariantElement(source, column, 'default', tagMarkup(tag))
   }
 
@@ -607,14 +663,18 @@ function setColumnTag(
 
   if (!cell) {
     const directChildren = column.children.filter(isSemanticNode)
-    if (directChildren.length === 0)
+    if (directChildren.length === 0) {
       return tag ? insertChild(source, column, tagCellMarkup(tag)) : source
-    if (syntax !== 'direct' || directChildren.length !== 1 || directChildren[0].kind !== 'element')
+    }
+    if (syntax !== 'direct' || directChildren.length !== 1 || directChildren[0].kind !== 'element') {
       throw new Error('Колонка содержит произвольный Source. Измените её во вкладке Source.')
-    if (source.slice(column.range.start, column.range.end).includes('<!--'))
+    }
+    if (source.slice(column.range.start, column.range.end).includes('<!--')) {
       throw new Error('Колонка содержит комментарии или произвольный Source. Измените её во вкладке Source.')
-    if (!tag)
+    }
+    if (!tag) {
       return removeNode(source, directChildren[0])
+    }
     if (isVisualCellTag(directChildren[0].tag)) {
       return directChildren[0].tag === tag
         ? source
@@ -623,23 +683,27 @@ function setColumnTag(
     return replaceRange(source, directChildren[0].range.start, directChildren[0].range.end, tagMarkup(tag))
   }
 
-  if (source.slice(cell.range.start, cell.range.end).includes('<!--'))
+  if (source.slice(cell.range.start, cell.range.end).includes('<!--')) {
     throw new Error('Ячейка содержит комментарии или произвольный Source. Измените её во вкладке Source.')
+  }
 
   const semanticChildren = cell.children.filter(isSemanticNode)
   if (semanticChildren.length === 0) {
-    if (!tag)
+    if (!tag) {
       return removeNode(source, cell)
+    }
     return insertChild(source, cell, tagMarkup(tag))
   }
 
   const child = semanticChildren.length === 1 && semanticChildren[0].kind === 'element'
     ? semanticChildren[0]
     : null
-  if (!child || (child.tag !== 'Component' && !isVisualCellTag(child.tag)))
+  if (!child || (child.tag !== 'Component' && !isVisualCellTag(child.tag))) {
     throw new Error('Ячейка содержит произвольный Source. Измените её во вкладке Source.')
-  if (!tag)
+  }
+  if (!tag) {
     return removeNode(source, cell)
+  }
   if (isVisualCellTag(child.tag)) {
     return child.tag === tag
       ? source
@@ -657,18 +721,22 @@ function setDirectColumnComponent(
   const component = children.length === 1 && children[0].kind === 'element'
     ? children[0]
     : null
-  if (!component || source.slice(column.range.start, column.range.end).includes('<!--'))
+  if (!component || source.slice(column.range.start, column.range.end).includes('<!--')) {
     throw new Error('Колонка содержит произвольный Source. Измените её во вкладке Source.')
+  }
 
-  if (!identity)
+  if (!identity) {
     return removeNode(source, component)
-  if (component.tag === 'Component')
+  }
+  if (component.tag === 'Component') {
     return setNodeAttribute(source, component, 'is', identity)
+  }
 
   const hasReservedIs = component.attributes.some(attribute => attribute.name === 'is')
     || component.directives.some(directive => directive.name === 'bind' && directive.argument === 'is')
-  if (hasReservedIs)
+  if (hasReservedIs) {
     throw new Error('Direct component содержит зарезервированный attribute is. Измените его во вкладке Source.')
+  }
 
   const normalizedSource = renameElementTag(source, component, 'Component')
   return insertAttribute(normalizedSource, component, serializeAttribute('is', identity))
@@ -682,10 +750,12 @@ function setColumnCellAttribute(
   valueKind: 'expression' | 'literal',
 ): string {
   const name = rawName.trim()
-  if (!/^[A-Za-z_$][\w$.-]*$/.test(name))
+  if (!/^[A-Z_$][\w$.-]*$/i.test(name)) {
     throw new Error(`Некорректное имя входного параметра "${rawName}".`)
-  if (name === 'is')
+  }
+  if (name === 'is') {
     throw new Error('Параметр is управляется выбором компонента.')
+  }
 
   const child = requireManagedColumnCellElement(source, column)
   if (valueKind === 'expression' && value != null) {
@@ -693,8 +763,9 @@ function setColumnCellAttribute(
       sourcePath: `template.Table.Column.${name}`,
     })
     const error = result.diagnostics.find(item => item.severity === 'error')
-    if (error)
+    if (error) {
       throw new Error(error.message)
+    }
   }
 
   return setNodeAttributeValue(source, child, name, value, valueKind)
@@ -712,11 +783,13 @@ function setColumnCellOn(
 
   if (cell) {
     const declarations = cell.attributes.filter(attribute => attribute.name === 'on')
-    if (declarations.length > 1)
+    if (declarations.length > 1) {
       throw new Error(':on объявлен на Cell несколько раз. Измените его во вкладке Source.')
+    }
     const declaration = declarations[0] ?? null
-    if (!value)
+    if (!value) {
       return declaration ? removeRangeWithWhitespace(source, declaration.range.start, declaration.range.end) : source
+    }
     if (declaration) {
       const suffix = declaration.modifiers.map(modifier => `.${modifier}`).join('')
       return replaceRange(
@@ -729,11 +802,14 @@ function setColumnCellOn(
     return insertAttribute(source, cell, serializeAttributeValue('on', value, 'expression'))
   }
 
-  if (!value) return source
+  if (!value) {
+    return source
+  }
   const attribute = serializeAttributeValue('on', value, 'expression')
   const children = column.children.filter(isSemanticNode)
-  if (children.length === 0)
+  if (children.length === 0) {
     return insertChild(source, column, `<Cell ${attribute}>{{ value }}</Cell>`)
+  }
 
   const first = children[0]!
   const last = children.at(-1)!
@@ -754,7 +830,9 @@ function setColumnCellEditable(
 ): string {
   const node = requireColumnCellRootElement(source, column)
   if (node.tag === 'Editable') {
-    if (enabled) return source
+    if (enabled) {
+      return source
+    }
     const structure = requireCanonicalEditableStructure(source, node)
     return replaceRange(
       source,
@@ -763,10 +841,12 @@ function setColumnCellEditable(
       unwrapCompositeEditable(source, structure),
     )
   }
-  if (!EDITABLE_PRIMITIVE_TAGS.has(node.tag))
+  if (!EDITABLE_PRIMITIVE_TAGS.has(node.tag)) {
     throw new Error('Встроенный visual editor поддерживает editable только для Text, Number и DateTime.')
-  if (enabled)
+  }
+  if (enabled) {
     return setStaticBooleanAttribute(source, node, 'editable', true)
+  }
 
   // Удаляем с конца, чтобы первая правка не сдвигала диапазоны следующей.
   const declarations = [
@@ -793,8 +873,9 @@ function setColumnCellEditTriggers(
   const node = requireEditableBehaviorElement(source, column)
 
   const declarations = node.attributes.filter(attribute => attribute.name === 'edit-on')
-  if (declarations.length > 1)
+  if (declarations.length > 1) {
     throw new Error('edit-on объявлен несколько раз. Измените его во вкладке Source.')
+  }
   const declaration = declarations[0] ?? null
   if (!triggers.length) {
     return declaration
@@ -803,10 +884,12 @@ function setColumnCellEditTriggers(
   }
 
   for (const trigger of triggers) {
-    if (!trigger.event.trim())
+    if (!trigger.event.trim()) {
       throw new Error('Trigger входа в редактирование требует непустое событие.')
-    if (trigger.flags.prevent && trigger.flags.passive)
+    }
+    if (trigger.flags.prevent && trigger.flags.passive) {
       throw new Error('Trigger не может одновременно использовать prevent и passive.')
+    }
   }
 
   const suffix = declaration?.modifiers.map(modifier => `.${modifier}`).join('') ?? ''
@@ -834,8 +917,9 @@ function setColumnCellOutcomeTriggers(
 ): string {
   const node = requireEditableBehaviorElement(source, column)
   const declarations = node.attributes.filter(attribute => attribute.name === name)
-  if (declarations.length > 1)
+  if (declarations.length > 1) {
     throw new Error(`${name} объявлен несколько раз. Измените его во вкладке Source.`)
+  }
   const declaration = declarations[0] ?? null
   if (triggers == null) {
     return declaration
@@ -843,23 +927,25 @@ function setColumnCellOutcomeTriggers(
       : source
   }
   for (const trigger of triggers) {
-    if (!trigger.event.trim())
+    if (!trigger.event.trim()) {
       throw new Error(`${name} требует непустое событие.`)
-    if (trigger.flags.prevent && trigger.flags.passive)
+    }
+    if (trigger.flags.prevent && trigger.flags.passive) {
       throw new Error(`${name} trigger не может одновременно использовать prevent и passive.`)
+    }
   }
   const suffix = declaration?.modifiers.map(modifier => `.${modifier}`).join('') ?? ''
   const attribute = triggers.length === 0
     ? serializeAttributeValue(name, '[]', 'expression')
     : !suffix && triggers.length === 1 && isPlainInteractionTrigger(triggers[0]!)
-    ? serializeAttribute(name, triggers[0]!.event.trim())
-    : serializeAttributeValue(
-        `${name}${suffix}`,
-        triggers.length === 1
-          ? serializeInteractionTrigger(triggers[0]!)
-          : `[${triggers.map(serializeInteractionTrigger).join(', ')}]`,
-        'expression',
-      )
+        ? serializeAttribute(name, triggers[0]!.event.trim())
+        : serializeAttributeValue(
+            `${name}${suffix}`,
+            triggers.length === 1
+              ? serializeInteractionTrigger(triggers[0]!)
+              : `[${triggers.map(serializeInteractionTrigger).join(', ')}]`,
+            'expression',
+          )
   return declaration
     ? replaceRange(source, declaration.range.start, declaration.range.end, attribute)
     : insertAttribute(source, node, attribute)
@@ -875,8 +961,9 @@ function setColumnCellEditedReaction(
   const declarations = node.directives.filter(
     directive => directive.name === 'on' && directive.argument?.trim() === 'edited',
   )
-  if (declarations.length > 1)
+  if (declarations.length > 1) {
     throw new Error('@edited объявлен несколько раз. Измените его во вкладке Source.')
+  }
   const declaration = declarations[0] ?? null
   const value = rawValue?.trim() || null
   if (!value) {
@@ -901,11 +988,13 @@ function requireEditableBehaviorElement(
     requireCanonicalEditableStructure(source, node)
     return node
   }
-  if (!EDITABLE_PRIMITIVE_TAGS.has(node.tag))
+  if (!EDITABLE_PRIMITIVE_TAGS.has(node.tag)) {
     throw new Error('Встроенный visual editor поддерживает editable только для Text, Number и DateTime.')
+  }
   const editable = node.attributes.find(attribute => attribute.name === 'editable') ?? null
-  if (!editable || editable.dynamic || editable.value != null)
+  if (!editable || editable.dynamic || editable.value != null) {
     throw new Error('Сначала включите статический editable для выбранного элемента.')
+  }
   return node
 }
 
@@ -915,7 +1004,9 @@ function setColumnCellEditorComponent(
   rawIdentity: string,
 ): string {
   const identity = rawIdentity.trim()
-  if (!identity) throw new Error('Выберите Component для editor-варианта.')
+  if (!identity) {
+    throw new Error('Выберите Component для editor-варианта.')
+  }
   return setColumnCellEditorMarkup(source, column, componentMarkup(identity))
 }
 
@@ -924,19 +1015,23 @@ function setColumnCellEditorTag(
   column: RComponentSFC_AST_ElementNode,
   tag: ComponentSFCTableVisualCellTag,
 ): string {
-  if (!isVisualCellTag(tag))
+  if (!isVisualCellTag(tag)) {
     throw new Error(`Tag ${tag} нельзя использовать как editor-вариант.`)
+  }
   const root = requireColumnCellRootElement(source, column)
   if (root.tag === 'Editable') {
     const structure = requireCanonicalEditableStructure(source, root)
     if (supportsIntrinsicEditor(structure.defaultChild, tag)) {
       const intrinsic = collapseCompositeEditable(source, structure)
-      if (intrinsic) return replaceRange(source, root.range.start, root.range.end, intrinsic)
+      if (intrinsic) {
+        return replaceRange(source, root.range.start, root.range.end, intrinsic)
+      }
     }
     return replaceEditableVariantElement(source, column, 'edit', tagMarkup(tag))
   }
-  if (supportsIntrinsicEditor(root, tag))
+  if (supportsIntrinsicEditor(root, tag)) {
     return setStaticBooleanAttribute(source, root, 'editable', true)
+  }
   return setColumnCellEditorMarkup(source, column, tagMarkup(tag))
 }
 
@@ -946,8 +1041,9 @@ function setColumnCellEditorMarkup(
   markup: string,
 ): string {
   const root = requireColumnCellRootElement(source, column)
-  if (root.tag === 'Editable')
+  if (root.tag === 'Editable') {
     return replaceEditableVariantElement(source, column, 'edit', markup)
+  }
   return convertElementToCompositeEditable(source, root, markup)
 }
 
@@ -959,20 +1055,25 @@ function setColumnCellEditorAttribute(
   valueKind: 'expression' | 'literal',
 ): string {
   const name = rawName.trim()
-  if (!/^[A-Za-z_$][\w$.-]*$/.test(name))
+  if (!/^[A-Z_$][\w$.-]*$/i.test(name)) {
     throw new Error(`Некорректное имя входного параметра "${rawName}".`)
-  if (name === 'is')
+  }
+  if (name === 'is') {
     throw new Error('Параметр is управляется выбором компонента.')
+  }
   if (valueKind === 'expression' && value != null) {
     const result = compileComponentSFCExpression(value, {
       sourcePath: `template.Table.Column.Editable.Variant.edit.${name}`,
     })
     const error = result.diagnostics.find(item => item.severity === 'error')
-    if (error) throw new Error(error.message)
+    if (error) {
+      throw new Error(error.message)
+    }
   }
   const root = requireColumnCellRootElement(source, column)
-  if (root.tag !== 'Editable')
+  if (root.tag !== 'Editable') {
     throw new Error('Сначала выберите отдельный editor; встроенный editor использует параметры отображения.')
+  }
   const structure = requireCanonicalEditableStructure(source, root)
   return setNodeAttributeValue(source, structure.editChild, name, value, valueKind)
 }
@@ -984,13 +1085,16 @@ function setStaticBooleanAttribute(
   enabled: boolean,
 ): string {
   const declarations = node.attributes.filter(attribute => attribute.name === name)
-  if (declarations.length > 1)
+  if (declarations.length > 1) {
     throw new Error(`${name} объявлен несколько раз. Измените его во вкладке Source.`)
+  }
   const declaration = declarations[0] ?? null
-  if (declaration && (declaration.dynamic || declaration.value != null))
+  if (declaration && (declaration.dynamic || declaration.value != null)) {
     throw new Error(`${name} должен быть статическим boolean-атрибутом.`)
-  if (enabled)
+  }
+  if (enabled) {
     return declaration ? source : insertAttribute(source, node, name)
+  }
   return declaration
     ? removeRangeWithWhitespace(source, declaration.range.start, declaration.range.end)
     : source
@@ -1009,25 +1113,49 @@ function isPlainInteractionTrigger(trigger: ComponentSFCInteractionTriggerProjec
 
 function serializeInteractionTrigger(trigger: ComponentSFCInteractionTriggerProjection): string {
   const fields = [`event: ${quoteExpressionString(trigger.event.trim())}`]
-  if (trigger.key.length) fields.push(`key: ${serializeExpressionStringList(trigger.key)}`)
-  if (trigger.code.length) fields.push(`code: ${serializeExpressionStringList(trigger.code)}`)
+  if (trigger.key.length) {
+    fields.push(`key: ${serializeExpressionStringList(trigger.key)}`)
+  }
+  if (trigger.code.length) {
+    fields.push(`code: ${serializeExpressionStringList(trigger.code)}`)
+  }
   if (trigger.held) {
     const held = []
-    if (trigger.held.key.length) held.push(`key: ${serializeExpressionStringList(trigger.held.key)}`)
-    if (trigger.held.code.length) held.push(`code: ${serializeExpressionStringList(trigger.held.code)}`)
-    if (trigger.held.match === 'any') held.push(`match: 'any'`)
-    if (trigger.held.exact) held.push('exact: true')
-    if (held.length) fields.push(`held: { ${held.join(', ')} }`)
+    if (trigger.held.key.length) {
+      held.push(`key: ${serializeExpressionStringList(trigger.held.key)}`)
+    }
+    if (trigger.held.code.length) {
+      held.push(`code: ${serializeExpressionStringList(trigger.held.code)}`)
+    }
+    if (trigger.held.match === 'any') {
+      held.push(`match: 'any'`)
+    }
+    if (trigger.held.exact) {
+      held.push('exact: true')
+    }
+    if (held.length) {
+      fields.push(`held: { ${held.join(', ')} }`)
+    }
   }
   const modifiers = Object.entries(trigger.modifiers)
     .filter(([, value]) => value != null)
     .map(([name, value]) => `${name}: ${value}`)
-  if (modifiers.length) fields.push(`modifiers: { ${modifiers.join(', ')} }`)
-  if (trigger.repeat != null) fields.push(`repeat: ${trigger.repeat}`)
-  if (trigger.composing != null) fields.push(`composing: ${trigger.composing}`)
-  if (trigger.button != null) fields.push(`button: ${trigger.button}`)
+  if (modifiers.length) {
+    fields.push(`modifiers: { ${modifiers.join(', ')} }`)
+  }
+  if (trigger.repeat != null) {
+    fields.push(`repeat: ${trigger.repeat}`)
+  }
+  if (trigger.composing != null) {
+    fields.push(`composing: ${trigger.composing}`)
+  }
+  if (trigger.button != null) {
+    fields.push(`button: ${trigger.button}`)
+  }
   for (const flag of ['stop', 'prevent', 'self', 'once', 'capture', 'passive'] as const) {
-    if (trigger.flags[flag] === true) fields.push(`${flag}: true`)
+    if (trigger.flags[flag] === true) {
+      fields.push(`${flag}: true`)
+    }
   }
   return `{ ${fields.join(', ')} }`
 }
@@ -1039,7 +1167,7 @@ function serializeExpressionStringList(values: string[]): string {
 }
 
 function quoteExpressionString(value: string): string {
-  return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
+  return `'${value.replace(/\\/g, '\\\\').replace(/'/g, '\\\'')}'`
 }
 
 interface CanonicalEditableStructure {
@@ -1054,15 +1182,17 @@ function requireColumnCellRootElement(
   source: string,
   column: RComponentSFC_AST_ElementNode,
 ): RComponentSFC_AST_ElementNode {
-  if (source.slice(column.range.start, column.range.end).includes('<!--'))
+  if (source.slice(column.range.start, column.range.end).includes('<!--')) {
     throw new Error('Колонка содержит комментарии или произвольный Source.')
+  }
 
   const cell = column.children.find(
     (node): node is RComponentSFC_AST_ElementNode => node.kind === 'element' && node.tag === 'Cell',
   ) ?? null
   const children = (cell?.children ?? column.children).filter(isSemanticNode)
-  if (children.length !== 1 || children[0].kind !== 'element')
+  if (children.length !== 1 || children[0].kind !== 'element') {
     throw new Error('Для visual bindings нужен один Component или Tag внутри колонки.')
+  }
 
   return children[0]
 }
@@ -1081,32 +1211,41 @@ function requireCanonicalEditableStructure(
   source: string,
   root: RComponentSFC_AST_ElementNode,
 ): CanonicalEditableStructure {
-  if (root.tag !== 'Editable')
+  if (root.tag !== 'Editable') {
     throw new Error('Ожидался составной Editable.')
-  if (source.slice(root.range.start, root.range.end).includes('<!--'))
+  }
+  if (source.slice(root.range.start, root.range.end).includes('<!--')) {
     throw new Error('Editable с комментариями редактируется только во вкладке Source.')
+  }
   const variants = root.children.filter(isSemanticNode)
-  if (variants.length !== 2 || variants.some(node => node.kind !== 'element' || node.tag !== 'Variant'))
+  if (variants.length !== 2 || variants.some(node => node.kind !== 'element' || node.tag !== 'Variant')) {
     throw new Error('Editable должен содержать ровно Variant default и Variant edit.')
+  }
 
   const resolved = new Map<string, { variant: RComponentSFC_AST_ElementNode, child: RComponentSFC_AST_ElementNode }>()
   for (const rawVariant of variants) {
-    if (rawVariant.kind !== 'element') continue
+    if (rawVariant.kind !== 'element') {
+      continue
+    }
     const names = rawVariant.attributes.filter(attribute => attribute.name === 'name')
     const name = names.length === 1 && !names[0]!.dynamic ? names[0]!.value?.trim() : null
-    if (name !== 'default' && name !== 'edit')
+    if (name !== 'default' && name !== 'edit') {
       throw new Error('Variant внутри Editable должен иметь статическое name="default" или name="edit".')
+    }
     const children = rawVariant.children.filter(isSemanticNode)
-    if (children.length !== 1 || children[0]!.kind !== 'element')
+    if (children.length !== 1 || children[0]!.kind !== 'element') {
       throw new Error(`Variant ${name} должен содержать ровно один Component или Tag.`)
-    if (resolved.has(name))
+    }
+    if (resolved.has(name)) {
       throw new Error(`Variant ${name} объявлен несколько раз.`)
+    }
     resolved.set(name, { variant: rawVariant, child: children[0]! })
   }
   const defaultVariant = resolved.get('default')
   const editVariant = resolved.get('edit')
-  if (!defaultVariant || !editVariant)
+  if (!defaultVariant || !editVariant) {
     throw new Error('Editable должен содержать Variant default и Variant edit.')
+  }
   return {
     root,
     defaultVariant: defaultVariant.variant,
@@ -1134,23 +1273,26 @@ function convertElementToCompositeEditable(
   rawEditorMarkup: string,
 ): string {
   const editable = root.attributes.find(attribute => attribute.name === 'editable') ?? null
-  if (editable && (editable.dynamic || editable.value != null))
+  if (editable && (editable.dynamic || editable.value != null)) {
     throw new Error('editable должен быть статическим boolean-атрибутом.')
+  }
   if (root.directives.some(directive => (
     directive.name === 'if'
     || directive.name === 'else-if'
     || directive.name === 'else'
     || directive.name === 'for'
-  )))
+  ))) {
     throw new Error('Элемент со структурной директивой можно обернуть в Editable только во вкладке Source.')
+  }
   const editOn = root.attributes.filter(attribute => attribute.name === 'edit-on')
   const cancelOn = root.attributes.filter(attribute => attribute.name === 'cancel-on')
   const commitOn = root.attributes.filter(attribute => attribute.name === 'commit-on')
   const edited = root.directives.filter(
     directive => directive.name === 'on' && directive.argument?.trim() === 'edited',
   )
-  if (editOn.length > 1 || cancelOn.length > 1 || commitOn.length > 1 || edited.length > 1)
+  if (editOn.length > 1 || cancelOn.length > 1 || commitOn.length > 1 || edited.length > 1) {
     throw new Error('Дублирующиеся edit-on, cancel-on, commit-on или @edited редактируются только во вкладке Source.')
+  }
 
   const intrinsicDisplay = EDITABLE_PRIMITIVE_TAGS.has(root.tag)
   const value = intrinsicDisplay
@@ -1165,7 +1307,9 @@ function convertElementToCompositeEditable(
   ]
     .filter((declaration): declaration is NonNullable<typeof declaration> => Boolean(declaration))
     .map(declaration => source.slice(declaration.range.start, declaration.range.end).trim())
-  if (!value) wrapperDeclarations.unshift(':value="value"')
+  if (!value) {
+    wrapperDeclarations.unshift(':value="value"')
+  }
 
   const removed = [
     editable,
@@ -1217,10 +1361,13 @@ function unwrapCompositeEditable(
     structure.defaultChild.range.start,
     structure.defaultChild.range.end,
   )
-  if (!EDITABLE_PRIMITIVE_TAGS.has(structure.defaultChild.tag)) return displayMarkup
-  const value = structure.root.attributes.find(attribute => attribute.name === 'value') ?? null
-  if (!value || structure.defaultChild.attributes.some(attribute => attribute.name === 'value'))
+  if (!EDITABLE_PRIMITIVE_TAGS.has(structure.defaultChild.tag)) {
     return displayMarkup
+  }
+  const value = structure.root.attributes.find(attribute => attribute.name === 'value') ?? null
+  if (!value || structure.defaultChild.attributes.some(attribute => attribute.name === 'value')) {
+    return displayMarkup
+  }
   return insertDeclarationsIntoElementMarkup(
     source,
     structure.defaultChild,
@@ -1234,21 +1381,28 @@ function collapseCompositeEditable(
   structure: CanonicalEditableStructure,
 ): string | null {
   const allowedAttributes = new Set(['value', 'edit-on', 'cancel-on', 'commit-on'])
-  if (structure.root.attributes.some(attribute => !allowedAttributes.has(attribute.name)))
+  if (structure.root.attributes.some(attribute => !allowedAttributes.has(attribute.name))) {
     return null
+  }
   if (structure.root.directives.some(directive => (
     directive.name !== 'on' || directive.argument?.trim() !== 'edited'
-  )))
+  ))) {
     return null
+  }
 
   const displayEditable = structure.defaultChild.attributes.filter(attribute => attribute.name === 'editable')
-  if (displayEditable.length > 1) return null
-  if (displayEditable[0] && (displayEditable[0].dynamic || displayEditable[0].value != null))
+  if (displayEditable.length > 1) {
     return null
+  }
+  if (displayEditable[0] && (displayEditable[0].dynamic || displayEditable[0].value != null)) {
+    return null
+  }
   const declarations = displayEditable.length ? [] : ['editable']
   for (const name of allowedAttributes) {
     const wrapperDeclarations = structure.root.attributes.filter(attribute => attribute.name === name)
-    if (wrapperDeclarations.length > 1) return null
+    if (wrapperDeclarations.length > 1) {
+      return null
+    }
     const declaration = wrapperDeclarations[0]
     if (declaration && !structure.defaultChild.attributes.some(attribute => attribute.name === name)) {
       declarations.push(source.slice(declaration.range.start, declaration.range.end).trim())
@@ -1257,7 +1411,9 @@ function collapseCompositeEditable(
   const edited = structure.root.directives.filter(directive => (
     directive.name === 'on' && directive.argument?.trim() === 'edited'
   ))
-  if (edited.length > 1) return null
+  if (edited.length > 1) {
+    return null
+  }
   if (edited[0] && !structure.defaultChild.directives.some(directive => (
     directive.name === 'on' && directive.argument?.trim() === 'edited'
   ))) {
@@ -1278,12 +1434,17 @@ function insertDeclarationsIntoElementMarkup(
   markup: string,
   declarations: string[],
 ): string {
-  if (!declarations.length) return markup
+  if (!declarations.length) {
+    return markup
+  }
   const openingEnd = findOpeningTagEnd(source, node)
   let insertOffset = openingEnd
-  while (insertOffset > node.range.start && /\s/.test(source[insertOffset - 1]!))
+  while (insertOffset > node.range.start && /\s/.test(source[insertOffset - 1]!)) {
     insertOffset -= 1
-  if (source[insertOffset - 1] === '/') insertOffset -= 1
+  }
+  if (source[insertOffset - 1] === '/') {
+    insertOffset -= 1
+  }
   const openingSource = source.slice(node.range.start, insertOffset)
   const lineStart = source.lastIndexOf('\n', insertOffset - 1) + 1
   const closePrefix = source.slice(lineStart, insertOffset)
@@ -1292,8 +1453,9 @@ function insertDeclarationsIntoElementMarkup(
     const block = declarations.map(declaration => `${indent}${declaration}\n`).join('')
     return replaceRange(markup, lineStart - node.range.start, lineStart - node.range.start, block)
   }
-  while (insertOffset > node.range.start && /[ \t]/.test(source[insertOffset - 1]!))
+  while (insertOffset > node.range.start && /[ \t]/.test(source[insertOffset - 1]!)) {
     insertOffset -= 1
+  }
   const relativeOffset = insertOffset - node.range.start
   return replaceRange(markup, relativeOffset, relativeOffset, ` ${declarations.join(' ')}`)
 }
@@ -1316,8 +1478,9 @@ function renameElementTag(
   node: RComponentSFC_AST_ElementNode,
   nextTag: string,
 ): string {
-  if (node.tag === nextTag)
+  if (node.tag === nextTag) {
     return source
+  }
 
   let nextSource = source
   if (!node.selfClosing) {
@@ -1351,16 +1514,21 @@ function tagCellMarkup(tag: ComponentSFCTableVisualCellTag): string {
 }
 
 function tagMarkup(tag: ComponentSFCTableVisualCellTag): string {
-  if (tag === 'Text' || tag === 'DateTime' || tag === 'Number' || tag === 'Input' || tag === 'Textarea' || tag === 'Select')
+  if (tag === 'Text' || tag === 'DateTime' || tag === 'Number' || tag === 'Input' || tag === 'Textarea' || tag === 'Select') {
     return `<${tag} :value="value" />`
-  if (tag === 'Icon')
+  }
+  if (tag === 'Icon') {
     return '<Icon :name="value" />'
-  if (tag === 'Checkbox')
+  }
+  if (tag === 'Checkbox') {
     return '<Checkbox :checked="Boolean(value)" />'
-  if (tag === 'Dot')
+  }
+  if (tag === 'Dot') {
     return '<Dot :tone="value" />'
-  if (tag === 'Divider')
+  }
+  if (tag === 'Divider') {
     return '<Divider />'
+  }
   return `<${tag}>{{ value }}</${tag}>`
 }
 
@@ -1376,8 +1544,9 @@ function setNodeAttribute(
 ): string {
   const attribute = node.attributes.find(item => item.name === name)
   const directive = node.directives.find((item) => {
-    if (item.name === name)
+    if (item.name === name) {
       return true
+    }
     return item.name === 'bind' && item.argument === name
   })
   const declaration = attribute ?? directive ?? null
@@ -1387,10 +1556,12 @@ function setNodeAttribute(
     const dynamic = attribute?.dynamic
       || raw.startsWith(':')
       || raw.startsWith('v-bind:')
-    if (dynamic)
+    if (dynamic) {
       throw new Error(`Dynamic attribute ${name} редактируется только во вкладке Source.`)
-    if (value == null)
+    }
+    if (value == null) {
       return removeRangeWithWhitespace(source, declaration.range.start, declaration.range.end)
+    }
     return replaceRange(
       source,
       declaration.range.start,
@@ -1399,8 +1570,9 @@ function setNodeAttribute(
     )
   }
 
-  if (value == null)
+  if (value == null) {
     return source
+  }
   return insertAttribute(source, node, serializeAttribute(name, value))
 }
 
@@ -1412,13 +1584,15 @@ function setNodeAttributeValue(
   valueKind: 'expression' | 'literal',
 ): string {
   const declarations = node.attributes.filter(item => item.name === name)
-  if (declarations.length > 1)
+  if (declarations.length > 1) {
     throw new Error(`Параметр ${name} объявлен несколько раз. Измените его во вкладке Source.`)
+  }
 
   const declaration = declarations[0] ?? null
   if (declaration) {
-    if (value == null)
+    if (value == null) {
       return removeRangeWithWhitespace(source, declaration.range.start, declaration.range.end)
+    }
     return replaceRange(
       source,
       declaration.range.start,
@@ -1427,8 +1601,9 @@ function setNodeAttributeValue(
     )
   }
 
-  if (value == null)
+  if (value == null) {
     return source
+  }
   return insertAttribute(source, node, serializeAttributeValue(name, value, valueKind))
 }
 
@@ -1439,14 +1614,19 @@ function setNodeDirectiveExpression(
   value: string | null,
 ): string {
   const declarations = node.directives.filter(item => item.name === name)
-  if (declarations.length > 1)
+  if (declarations.length > 1) {
     throw new Error(`Директива v-${name} объявлена несколько раз. Измените её во вкладке Source.`)
+  }
   const declaration = declarations[0] ?? null
   if (declaration) {
-    if (value == null) return removeRangeWithWhitespace(source, declaration.range.start, declaration.range.end)
+    if (value == null) {
+      return removeRangeWithWhitespace(source, declaration.range.start, declaration.range.end)
+    }
     return replaceRange(source, declaration.range.start, declaration.range.end, `v-${name}="${escapeAttribute(value)}"`)
   }
-  if (value == null) return source
+  if (value == null) {
+    return source
+  }
   return insertAttribute(source, node, `v-${name}="${escapeAttribute(value)}"`)
 }
 
@@ -1474,10 +1654,12 @@ function escapeAttribute(value: string): string {
 function insertAttribute(source: string, node: RComponentSFC_AST_ElementNode, attribute: string): string {
   const closeOffset = findOpeningTagEnd(source, node)
   let insertOffset = closeOffset
-  while (insertOffset > node.range.start && /\s/.test(source[insertOffset - 1]))
+  while (insertOffset > node.range.start && /\s/.test(source[insertOffset - 1])) {
     insertOffset -= 1
-  if (source[insertOffset - 1] === '/')
+  }
+  if (source[insertOffset - 1] === '/') {
     insertOffset -= 1
+  }
 
   const openingSource = source.slice(node.range.start, insertOffset)
   const lineStart = source.lastIndexOf('\n', insertOffset - 1) + 1
@@ -1487,8 +1669,9 @@ function insertAttribute(source: string, node: RComponentSFC_AST_ElementNode, at
     return replaceRange(source, lineStart, lineStart, `${indent}${attribute}\n`)
   }
 
-  while (insertOffset > node.range.start && /[ \t]/.test(source[insertOffset - 1]))
+  while (insertOffset > node.range.start && /[ \t]/.test(source[insertOffset - 1])) {
     insertOffset -= 1
+  }
 
   return replaceRange(source, insertOffset, insertOffset, ` ${attribute}`)
 }
@@ -1499,8 +1682,9 @@ function inferAttributeIndent(source: string, node: RComponentSFC_AST_ElementNod
   if (first) {
     const lineStart = source.lastIndexOf('\n', first.range.start - 1) + 1
     const prefix = source.slice(lineStart, first.range.start)
-    if (!prefix.trim())
+    if (!prefix.trim()) {
       return prefix
+    }
   }
   return `${lineIndent(source, node.range.start)}  `
 }
@@ -1516,10 +1700,12 @@ function insertChild(source: string, node: RComponentSFC_AST_ElementNode, markup
   if (node.selfClosing) {
     const closeOffset = findOpeningTagEnd(source, node)
     let slashOffset = closeOffset - 1
-    while (slashOffset > node.range.start && /\s/.test(source[slashOffset]))
+    while (slashOffset > node.range.start && /\s/.test(source[slashOffset])) {
       slashOffset -= 1
-    if (source[slashOffset] !== '/')
+    }
+    if (source[slashOffset] !== '/') {
       throw new Error(`Не удалось раскрыть self-closing тег ${node.tag}.`)
+    }
     return replaceRange(
       source,
       slashOffset,
@@ -1531,8 +1717,9 @@ function insertChild(source: string, node: RComponentSFC_AST_ElementNode, markup
   const closeTagOffset = findClosingTagStart(source, node)
   const closeLineStart = source.lastIndexOf('\n', closeTagOffset - 1) + 1
   const closePrefix = source.slice(closeLineStart, closeTagOffset)
-  if (!closePrefix.trim())
+  if (!closePrefix.trim()) {
     return replaceRange(source, closeLineStart, closeLineStart, `${indentedMarkup}\n`)
+  }
 
   return replaceRange(
     source,
@@ -1544,8 +1731,9 @@ function insertChild(source: string, node: RComponentSFC_AST_ElementNode, markup
 
 function inferChildIndent(source: string, node: RComponentSFC_AST_ElementNode, ownIndent: string): string {
   const firstChild = node.children.find(isSemanticNode)
-  if (!firstChild)
+  if (!firstChild) {
     return `${ownIndent}  `
+  }
   const indent = lineIndent(source, firstChild.range.start)
   return indent.length > ownIndent.length ? indent : `${ownIndent}  `
 }
@@ -1567,12 +1755,14 @@ function removeRangeWithWhitespace(source: string, rangeStart: number, rangeEnd:
   const lineStart = source.lastIndexOf('\n', rangeStart - 1) + 1
   const lineEnd = source.indexOf('\n', rangeEnd)
   const end = lineEnd >= 0 ? lineEnd : source.length
-  if (!source.slice(lineStart, rangeStart).trim() && !source.slice(rangeEnd, end).trim())
+  if (!source.slice(lineStart, rangeStart).trim() && !source.slice(rangeEnd, end).trim()) {
     return replaceRange(source, lineStart, lineEnd >= 0 ? lineEnd + 1 : end, '')
+  }
 
   let start = rangeStart
-  while (start > lineStart && /[ \t]/.test(source[start - 1]))
+  while (start > lineStart && /[ \t]/.test(source[start - 1])) {
     start -= 1
+  }
   return replaceRange(source, start, rangeEnd, '')
 }
 
@@ -1581,16 +1771,18 @@ function findOpeningTagEnd(source: string, node: RComponentSFC_AST_ElementNode):
   for (let index = node.range.start; index < node.range.end; index += 1) {
     const character = source[index]
     if (quote) {
-      if (character === quote)
+      if (character === quote) {
         quote = null
+      }
       continue
     }
     if (character === '"' || character === '\'') {
       quote = character
       continue
     }
-    if (character === '>')
+    if (character === '>') {
       return index
+    }
   }
   throw new Error(`Не найден конец открывающего тега ${node.tag}.`)
 }
@@ -1598,8 +1790,9 @@ function findOpeningTagEnd(source: string, node: RComponentSFC_AST_ElementNode):
 function findClosingTagStart(source: string, node: RComponentSFC_AST_ElementNode): number {
   const local = source.slice(node.range.start, node.range.end)
   const relativeOffset = local.lastIndexOf(`</${node.tag}`)
-  if (relativeOffset < 0)
+  if (relativeOffset < 0) {
     throw new Error(`Не найден закрывающий тег ${node.tag}.`)
+  }
   return node.range.start + relativeOffset
 }
 

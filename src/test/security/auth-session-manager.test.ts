@@ -1,15 +1,15 @@
 import type { AuthProfileAdapter } from '@/domain/types/auth/auth-profile.types'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { OidcAuthAdapter } from '@/model/modules/security/auth/adapters/OidcAuthAdapter'
 import { AuthAdapterRegistry } from '@/model/modules/security/auth/AuthAdapterRegistry'
+import { AuthInteractionRequiredError } from '@/model/modules/security/auth/AuthInteractionRequiredError'
 import { AuthProfileRegistry } from '@/model/modules/security/auth/AuthProfileRegistry'
 import { AuthRequestResolver } from '@/model/modules/security/auth/AuthRequestResolver'
 import { AuthSessionManager } from '@/model/modules/security/auth/AuthSessionManager'
 import { AuthSessionStore } from '@/model/modules/security/auth/AuthSessionStore'
-import { OidcAuthAdapter } from '@/model/modules/security/auth/adapters/OidcAuthAdapter'
-import { AuthInteractionRequiredError } from '@/model/modules/security/auth/AuthInteractionRequiredError'
 import { authProfile, MemoryStorage, tokenSet } from '@/test/security/auth-test-helpers'
 
-describe('AuthSessionManager', () => {
+describe('authSessionManager', () => {
   beforeEach(() => { vi.stubGlobal('localStorage', new MemoryStorage()); vi.stubGlobal('sessionStorage', new MemoryStorage()) })
   afterEach(() => vi.unstubAllGlobals())
 

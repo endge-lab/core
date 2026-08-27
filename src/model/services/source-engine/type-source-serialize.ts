@@ -19,14 +19,20 @@ function serializeDefinition(definition: TypeSourceDefinition): string {
 }
 
 function serializeObject(definition: Extract<TypeSourceDefinition, { kind: 'object' }>, indent: number): string {
-  if (!definition.fields.length) return '{}'
+  if (!definition.fields.length) {
+    return '{}'
+  }
   const fields = definition.fields.map(field => serializeField(field, indent + 2)).join(',\n\n')
   return `{\n${fields},\n${' '.repeat(indent)}}`
 }
 
 export function serializeTypeSourceExpression(expression: TypeSourceExpression, indent = 0): string {
-  if (expression.kind === 'reference') return serializeTypeSourceReference(expression.identity)
-  if (expression.kind === 'object') return `objectOf(${serializeObject(expression, indent)})`
+  if (expression.kind === 'reference') {
+    return serializeTypeSourceReference(expression.identity)
+  }
+  if (expression.kind === 'object') {
+    return `objectOf(${serializeObject(expression, indent)})`
+  }
   if (expression.kind === 'enum') {
     const values = expression.values
       .map(value => `${' '.repeat(indent + 2)}${staticValue(value)},`)
@@ -39,8 +45,9 @@ export function serializeTypeSourceExpression(expression: TypeSourceExpression, 
       .join('\n')
     return `unionOf(\n${variants}\n${' '.repeat(indent)})`
   }
-  if (expression.kind === 'record')
+  if (expression.kind === 'record') {
     return `recordOf(${serializeTypeSourceExpression(expression.values, indent)})`
+  }
   return `arrayOf(\n${' '.repeat(indent + 2)}${serializeTypeSourceExpression(expression.items, indent + 2)},\n${' '.repeat(indent)})`
 }
 
@@ -51,19 +58,37 @@ function serializeField(field: TypeSourceField, indent: number): string {
     ? serializeTypeSourceReference(field.type.identity)
     : serializeTypeSourceExpression(field.type, indent)
   const lines = [`${prefix}${propertyName(field.key)}: field(${type})`]
-  if (field.description) lines.push(`${modifierPrefix}.description(${sourceString(field.description)})`)
-  if (field.min != null) lines.push(`${modifierPrefix}.min(${field.min})`)
-  if (field.max != null) lines.push(`${modifierPrefix}.max(${field.max})`)
-  for (const example of field.examples) lines.push(`${modifierPrefix}.example(${staticValue(example)})`)
-  if (field.array) lines.push(`${modifierPrefix}.array()`)
-  if (field.optional) lines.push(`${modifierPrefix}.optional()`)
+  if (field.description) {
+    lines.push(`${modifierPrefix}.description(${sourceString(field.description)})`)
+  }
+  if (field.min != null) {
+    lines.push(`${modifierPrefix}.min(${field.min})`)
+  }
+  if (field.max != null) {
+    lines.push(`${modifierPrefix}.max(${field.max})`)
+  }
+  for (const example of field.examples) {
+    lines.push(`${modifierPrefix}.example(${staticValue(example)})`)
+  }
+  if (field.array) {
+    lines.push(`${modifierPrefix}.array()`)
+  }
+  if (field.optional) {
+    lines.push(`${modifierPrefix}.optional()`)
+  }
   return lines.join('\n')
 }
 
 function staticValue(value: unknown): string {
-  if (typeof value === 'string') return sourceString(value)
-  if (typeof value === 'number' || typeof value === 'boolean' || value === null) return String(value)
-  if (Array.isArray(value)) return `[${value.map(staticValue).join(', ')}]`
+  if (typeof value === 'string') {
+    return sourceString(value)
+  }
+  if (typeof value === 'number' || typeof value === 'boolean' || value === null) {
+    return String(value)
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(staticValue).join(', ')}]`
+  }
   if (value && typeof value === 'object') {
     const entries = Object.entries(value as Record<string, unknown>)
       .map(([key, nested]) => `${propertyName(key)}: ${staticValue(nested)}`)

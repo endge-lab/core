@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 
-describe('RComponentSFC tag persistence', () => {
+describe('rComponentSFC tag persistence', () => {
   it('normalizes and serializes an optional direct-call tag', () => {
     const component = RComponentSFC.fromPlain({
       id: 1,

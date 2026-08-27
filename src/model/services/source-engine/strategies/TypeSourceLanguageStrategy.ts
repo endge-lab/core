@@ -6,8 +6,8 @@ import type {
   SourceLanguageValidationResult,
 } from '@/domain/types/source/source-engine.types'
 
-import { compileTypeSource } from '@/model/services/source-engine/compilers/type-source-compile'
 import { collectTypeDefinitionReferences, validateTypeDefinitionReferences } from '@/model/services/compiler/type/type-program-validation'
+import { compileTypeSource } from '@/model/services/source-engine/compilers/type-source-compile'
 import { typeReferenceHighlights } from '@/model/services/source-engine/source-document-reference'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
 import { TYPE_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/type.default.source'

@@ -7,10 +7,10 @@ export class RuntimeStrategyRegistry {
   /** Регистрирует стратегию. Повторная регистрация с тем же id заменяет старую. */
   public register(strategy: AnyRuntimeStrategy): void {
     const index = this._strategies.findIndex(item => item.id === strategy.id)
-    if (index >= 0)
+    if (index >= 0) {
       this._strategies[index] = strategy
-    else
-      this._strategies.push(strategy)
+    }
+    else { this._strategies.push(strategy) }
   }
 
   /** Возвращает копию списка стратегий для диагностики. */
@@ -21,8 +21,9 @@ export class RuntimeStrategyRegistry {
   /** Подбирает первую стратегию, которая поддерживает модель. */
   public resolve(model: unknown): AnyRuntimeStrategy | null {
     for (const strategy of this._strategies) {
-      if (strategy.supports(model))
+      if (strategy.supports(model)) {
         return strategy
+      }
     }
 
     return null

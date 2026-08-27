@@ -1,6 +1,6 @@
 import type { RQueryAuth } from '@/domain/types/document/query.types'
-import type { ProgramDiagnostic, QueryProgramOutput } from '@/domain/types/program/program.types'
 import type { ProgramMetadataMap } from '@/domain/types/program/program-metadata.types'
+import type { ProgramDiagnostic, QueryProgramOutput } from '@/domain/types/program/program.types'
 
 export type VocabProviderBaseUrl
   = | string

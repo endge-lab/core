@@ -42,15 +42,18 @@ export class AuthRequestResolver {
       token = await this._sessions.ensureProfile(profile, options)
     }
     catch (error) {
-      if (error instanceof AuthInteractionRequiredError)
+      if (error instanceof AuthInteractionRequiredError) {
         this._publishAndThrow(error)
+      }
       throw error
     }
-    if (!token)
+    if (!token) {
       this._throwInteractionRequired(profile.identity)
+    }
     const session = this._sessions.toResolvedSession(profile, token)
-    if (Object.keys(session.headers).length === 0)
+    if (Object.keys(session.headers).length === 0) {
       this._throwInteractionRequired(profile.identity)
+    }
     return session
   }
 

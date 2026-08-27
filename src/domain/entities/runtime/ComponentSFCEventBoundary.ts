@@ -1,12 +1,12 @@
 import type { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentSFCRuntimeHost'
-import type {
-  ComponentSFCEventPort,
-  ComponentSFCEventAction,
-  ComponentSFCEventRuntimeSource,
-  ComponentSFCRequiredPortBinding,
-  ComponentSFCPortManifest,
-} from '@/domain/types/component/sfc/ports.types'
 import type { RComponentSFC_IR_EventBinding } from '@/domain/types/component/sfc/ir.types'
+import type {
+  ComponentSFCEventAction,
+  ComponentSFCEventPort,
+  ComponentSFCEventRuntimeSource,
+  ComponentSFCPortManifest,
+  ComponentSFCRequiredPortBinding,
+} from '@/domain/types/component/sfc/ports.types'
 
 /** Mount-scoped Event router for one Component SFC artifact boundary. */
 export class ComponentSFCEventBoundary {
@@ -41,7 +41,9 @@ export class ComponentSFCEventBoundary {
 
   /** Claims a mount-scoped logical `.once` rule after it has matched. */
   public claimLocalOnce(key: string): boolean {
-    if (this.consumedLocalOnce.has(key)) return false
+    if (this.consumedLocalOnce.has(key)) {
+      return false
+    }
     this.consumedLocalOnce.add(key)
     return true
   }
@@ -57,10 +59,16 @@ export class ComponentSFCEventBoundary {
     scope: Record<string, unknown> = {},
   ): Promise<void> {
     const local = bindings.flatMap((binding, index) => {
-      if (binding.name !== event) return []
-      if (!binding.modifiers.includes('once')) return [binding]
+      if (binding.name !== event) {
+        return []
+      }
+      if (!binding.modifiers.includes('once')) {
+        return [binding]
+      }
       const key = `${source.nodeId}:${event}:${binding.sourceRange?.start ?? index}`
-      if (!this.claimLocalOnce(key)) return []
+      if (!this.claimLocalOnce(key)) {
+        return []
+      }
       return [binding]
     })
     const reactions = local.map(async (binding) => {
@@ -81,7 +89,9 @@ export class ComponentSFCEventBoundary {
           depth,
           scope,
         )
-        if (succeeded === false) break
+        if (succeeded === false) {
+          break
+        }
       }
     })
     const routed = local.some(binding => binding.modifiers.includes('stop'))
@@ -105,7 +115,9 @@ export class ComponentSFCEventBoundary {
   /** Emits an Event declared as own by this component. */
   public async emitOwn(name: string, payload: unknown, trace: string[] = [], depth = 0): Promise<void> {
     const port = this.manifest.emits.events.find(candidate => candidate.name === name && !candidate.from && !candidate.forwardedFrom)
-    if (!port) throw new Error(`Own Component Event is not declared: ${this.componentIdentity}.${name}.`)
+    if (!port) {
+      throw new Error(`Own Component Event is not declared: ${this.componentIdentity}.${name}.`)
+    }
     await this.dispatch(port, payload, undefined, trace, depth)
   }
 
@@ -128,11 +140,13 @@ export class ComponentSFCEventBoundary {
       const transformed = this.parentEventTransform
         ? this.parentEventTransform(port.name, payload)
         : { event: port.name, payload }
-      if (transformed)
+      if (transformed) {
         void this.parent.routeChild(forwardedSource!, transformed.event, transformed.payload, this.parentBindings, trace, depth + 1).catch(error => this.reportError(port, error))
+      }
     }
-    else
+    else {
       this.host?.publishEventPort(port.name, payload, source)
+    }
 
     await this.host?.executeEventPortAction(
       this.componentIdentity,
@@ -148,16 +162,20 @@ export class ComponentSFCEventBoundary {
   }
 
   private resolveRequiredPortAction(action: ComponentSFCEventAction): ComponentSFCEventAction {
-    if (action.kind !== 'required-port') return action
+    if (action.kind !== 'required-port') {
+      return action
+    }
     const declared = action.portKind === 'query'
       ? this.manifest.require.queries.find(port => port.name === action.port)
       : this.manifest.require.actions.find(port => port.name === action.port)
-    if (!declared)
+    if (!declared) {
       throw new Error(`Required ${action.portKind} port is not declared: ${this.componentIdentity}.${action.port}.`)
+    }
     const binding = this.requiredPortBindings.find(candidate => candidate.port === action.port)
     const identity = binding?.identity ?? declared.defaultIdentity
-    if (!identity)
+    if (!identity) {
       throw new Error(`Required ${action.portKind} port has no provider: ${this.componentIdentity}.${action.port}.`)
+    }
     return {
       kind: action.portKind,
       identity,
@@ -181,7 +199,11 @@ function matchesSource(
   event: string,
 ): boolean {
   const origin = port.forwardedFrom
-  if (!origin || origin.portName !== event) return false
-  if (origin.nodeId && origin.nodeId === source.nodeId) return true
+  if (!origin || origin.portName !== event) {
+    return false
+  }
+  if (origin.nodeId && origin.nodeId === source.nodeId) {
+    return true
+  }
   return Boolean(origin.ref && source.ref && origin.ref === source.ref)
 }

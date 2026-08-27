@@ -1,35 +1,34 @@
 import type { RVersion } from '@/domain/entities/reflect/RVersion'
 import type { RComponent } from '@/domain/types/component/component.types'
-import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
+import type { EndgeDomainBundle, EndgeDomainPlain } from '@/domain/types/document/domain-export.type'
 import type {
   EndgeLiveDomainDocument,
   EndgeLiveDomainSnapshot,
 } from '@/domain/types/document/domain-snapshot.type'
-import type { EndgeDomainBundle, EndgeDomainPlain } from '@/domain/types/document/domain-export.type'
 import type { FilterFieldSchema } from '@/domain/types/document/query.types'
+import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 
 import { Serialize } from '@endge/utils'
 
+import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { RAction } from '@/domain/entities/reflect/RAction'
 import { RAuthProfile } from '@/domain/entities/reflect/RAuthProfile'
-import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import {
   ReflectComponentFromPlain,
   ReflectComponentToPlain,
 } from '@/domain/entities/reflect/RComponent'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
+import { RComposition } from '@/domain/entities/reflect/RComposition'
+import { RComputation } from '@/domain/entities/reflect/RComputation'
+import { RConfiguration } from '@/domain/entities/reflect/RConfiguration'
 import { RConverter } from '@/domain/entities/reflect/RConverter'
 import { RDataView } from '@/domain/entities/reflect/RDataView'
-import { RComposition } from '@/domain/entities/reflect/RComposition'
-import { RStore } from '@/domain/entities/reflect/RStore'
-import { RStream } from '@/domain/entities/reflect/RStream'
-import { RUpdate } from '@/domain/entities/reflect/RUpdate'
-import { RMock } from '@/domain/entities/reflect/RMock'
-import { RComputation } from '@/domain/entities/reflect/RComputation'
 import { REnvironment } from '@/domain/entities/reflect/REnvironment'
 import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { RFolder } from '@/domain/entities/reflect/RFolder'
+import { RI18nBundle } from '@/domain/entities/reflect/RI18nBundle'
 import { RIntegration } from '@/domain/entities/reflect/RIntegration'
+import { RMock } from '@/domain/entities/reflect/RMock'
 import { RNavigation } from '@/domain/entities/reflect/RNavigation'
 import { RPage } from '@/domain/entities/reflect/RPage'
 import { RPageTemplate } from '@/domain/entities/reflect/RPageTemplate'
@@ -37,12 +36,13 @@ import { RParameter } from '@/domain/entities/reflect/RParameter'
 import { RPolicy } from '@/domain/entities/reflect/RPolicy'
 import { RProject } from '@/domain/entities/reflect/RProject'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
+import { RStore } from '@/domain/entities/reflect/RStore'
+import { RStream } from '@/domain/entities/reflect/RStream'
 import { RStyle } from '@/domain/entities/reflect/RStyle'
-import { RConfiguration } from '@/domain/entities/reflect/RConfiguration'
 import { RTenant } from '@/domain/entities/reflect/RTenant'
 import { RType } from '@/domain/entities/reflect/RType'
+import { RUpdate } from '@/domain/entities/reflect/RUpdate'
 import { RVocabs } from '@/domain/entities/reflect/RVocabs'
-import { RI18nBundle } from '@/domain/entities/reflect/RI18nBundle'
 import { DOMAIN_STORAGE_KEY } from '@/model/config/kernel.config'
 import { Endge } from '@/model/kernel/endge'
 import { createDiagnosticsEntityOwner } from '@/model/modules/diagnostics/endge-problems'
@@ -62,8 +62,9 @@ function snapshotIdentityToServerID(
 
     const identity = String(document.identity ?? '').trim()
     const id = String(document.state.id ?? '').trim()
-    if (identity && id)
+    if (identity && id) {
       result.set(identity, id)
+    }
   }
 
   return result
@@ -74,12 +75,14 @@ function bundleDocuments(
   collection: string,
 ): Record<string, unknown>[] {
   return documents.map((document) => {
-    if (document == null || typeof document !== 'object' || Array.isArray(document))
+    if (document == null || typeof document !== 'object' || Array.isArray(document)) {
       throw new Error(`[EndgeDomain] Invalid document in bundle collection: ${collection}`)
+    }
 
     const record = document as Record<string, unknown>
-    if (!String(record.identity ?? '').trim())
+    if (!String(record.identity ?? '').trim()) {
       throw new Error(`[EndgeDomain] Bundle document identity is required: ${collection}`)
+    }
     return record
   })
 }
@@ -219,7 +222,6 @@ export function normalizeSnapshotFolders(
  * Поддерживает подписку, загрузку данных из JSON, слияние и сброс.
  */
 
-
 /** Результат parsePlain: все распарсенные сущности без добавления в домен. */
 export interface EndgeDomainParsed {
   parameters: RParameter[]
@@ -287,8 +289,9 @@ function replaceMapEntry<K, V>(
   nextValue: V,
 ): void {
   const collision = map.get(nextKey)
-  if (nextKey !== previousKey && collision != null && collision !== previousValue)
+  if (nextKey !== previousKey && collision != null && collision !== previousValue) {
     throw new Error(`[EndgeDomain] Entity index key already exists: ${String(nextKey)}`)
+  }
 
   if (nextKey === previousKey) {
     map.set(nextKey, nextValue)
@@ -296,8 +299,7 @@ function replaceMapEntry<K, V>(
   }
 
   const entries = Array.from(map.entries(), ([key, value]): [K, V] =>
-    key === previousKey ? [nextKey, nextValue] : [key, value],
-  )
+    key === previousKey ? [nextKey, nextValue] : [key, value])
   map.clear()
   entries.forEach(([key, value]) => map.set(key, value))
 }
@@ -417,8 +419,9 @@ export class EndgeDomain extends EndgeModule {
     }
 
     if (ctx.dataProvider === 'bundle') {
-      if (!ctx.bundleSource)
+      if (!ctx.bundleSource) {
         throw new Error('[EndgeDomain] Workspace bundle is not loaded')
+      }
       this.mergeFromBundle(ctx.bundleSource)
       return
     }
@@ -555,14 +558,16 @@ export class EndgeDomain extends EndgeModule {
       || candidate.byIdentity.get(currentIdentity) === currentEntity,
     )
 
-    if (!index)
+    if (!index) {
       throw new Error('[EndgeDomain] Persisted entity is not indexed')
+    }
 
     replaceMapEntry(index.byId, current.id, next.id, current, next)
     replaceMapEntry(index.byIdentity, currentIdentity, nextIdentity, current, next)
 
-    if (index.kind === 'update')
+    if (index.kind === 'update') {
       this._replaceUpdateOwnerIndex(currentEntity as RUpdate, nextEntity as RUpdate)
+    }
 
     this.notify()
   }
@@ -610,8 +615,9 @@ export class EndgeDomain extends EndgeModule {
     }
 
     currentOwner?.delete(current.identity)
-    if (currentOwner?.size === 0)
+    if (currentOwner?.size === 0) {
       this._updatesByStoreIdentity.delete(current.storeIdentity)
+    }
 
     const nextOwner = this._updatesByStoreIdentity.get(next.storeIdentity) ?? new Map<string, RUpdate>()
     nextOwner.set(next.identity, next)
@@ -626,7 +632,7 @@ export class EndgeDomain extends EndgeModule {
 
     const documents = snapshot.documents
     const plain: EndgeDomainPlain = {
-      projects: normalizeSnapshotDocuments(documents.projects, folderIds).map((project) => ({
+      projects: normalizeSnapshotDocuments(documents.projects, folderIds).map(project => ({
         ...project,
         allowedEnvironmentIds: Array.isArray(project.allowedEnvironments)
           ? project.allowedEnvironments.map(identity => environmentIds.get(String(identity)) ?? identity)
@@ -799,8 +805,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeProjectById(id: number): void {
     const project = this.getProjectById(id)
-    if (!project)
+    if (!project) {
       return
+    }
 
     this._projectsById.delete(project.id)
     this._projectsByIdentity.delete(project.identity)
@@ -812,8 +819,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeProjectByIdentity(identity: string): void {
     const project = this._projectsByIdentity.get(identity)
-    if (!project)
+    if (!project) {
       return
+    }
 
     this._projectsById.delete(project.id)
     this._projectsByIdentity.delete(project.identity)
@@ -904,8 +912,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeTypeById(id: string | number): void {
     const type = this._typesById.get(id)
-    if (!type)
+    if (!type) {
       return
+    }
     this._removeTypeFromIndexes(type)
     this.notify()
   }
@@ -915,20 +924,23 @@ export class EndgeDomain extends EndgeModule {
    */
   removeTypeByIdentity(identity: string): void {
     const type = this._typesByIdentity.get(identity)
-    if (!type)
+    if (!type) {
       return
+    }
     this._removeTypeFromIndexes(type)
     this.notify()
   }
 
   private _removeTypeFromIndexes(type: RType): void {
     for (const [id, candidate] of this._typesById) {
-      if (candidate === type)
+      if (candidate === type) {
         this._typesById.delete(id)
+      }
     }
     for (const [identity, candidate] of this._typesByIdentity) {
-      if (candidate === type)
+      if (candidate === type) {
         this._typesByIdentity.delete(identity)
+      }
     }
   }
 
@@ -1005,8 +1017,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeQueryById(id: number): void {
     const query = this.getQueryById(id)
-    if (!query)
+    if (!query) {
       return
+    }
     this._queriesById.delete(query.id)
     this._queriesByIdentity.delete(query.identity)
     this.notify()
@@ -1017,8 +1030,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeQueryByIdentity(identity: string): void {
     const query = this._queriesByIdentity.get(identity)
-    if (!query)
+    if (!query) {
       return
+    }
     this._queriesById.delete(query.id)
     this._queriesByIdentity.delete(query.identity)
     this.notify()
@@ -1078,8 +1092,9 @@ export class EndgeDomain extends EndgeModule {
 
   /** Добавляет DataView в домен и обновляет индексы. */
   addDataView(dataView: RDataView): void {
-    if (this._dataViewsByIdentity.has(dataView.identity) || this._dataViewsById.has(dataView.id))
+    if (this._dataViewsByIdentity.has(dataView.identity) || this._dataViewsById.has(dataView.id)) {
       return
+    }
 
     this._dataViewsById.set(dataView.id, dataView)
     this._dataViewsByIdentity.set(dataView.identity, dataView)
@@ -1089,8 +1104,9 @@ export class EndgeDomain extends EndgeModule {
   /** Удаляет DataView из домена по id. */
   removeDataViewById(id: string | number): void {
     const dataView = this.getDataViewById(id)
-    if (!dataView)
+    if (!dataView) {
       return
+    }
 
     this._dataViewsById.delete(dataView.id)
     this._dataViewsByIdentity.delete(dataView.identity)
@@ -1100,8 +1116,9 @@ export class EndgeDomain extends EndgeModule {
   /** Удаляет DataView из домена по identity. */
   removeDataViewByIdentity(identity: string): void {
     const dataView = this._dataViewsByIdentity.get(identity)
-    if (!dataView)
+    if (!dataView) {
       return
+    }
 
     this._dataViewsById.delete(dataView.id)
     this._dataViewsByIdentity.delete(dataView.identity)
@@ -1111,8 +1128,9 @@ export class EndgeDomain extends EndgeModule {
   /** Удаляет DataView из домена по id или identity. */
   removeDataView(idOrIdentity: string | number): void {
     const dataView = this.getDataView(idOrIdentity)
-    if (!dataView)
+    if (!dataView) {
       return
+    }
 
     this.removeDataViewById(dataView.id)
   }
@@ -1146,8 +1164,9 @@ export class EndgeDomain extends EndgeModule {
 
   /** Добавляет Composition в домен. */
   addComposition(composition: RComposition): void {
-    if (this._compositionsByIdentity.has(composition.identity) || this._compositionsById.has(composition.id))
+    if (this._compositionsByIdentity.has(composition.identity) || this._compositionsById.has(composition.id)) {
       return
+    }
     this._compositionsById.set(composition.id, composition)
     this._compositionsByIdentity.set(composition.identity, composition)
     this.notify()
@@ -1156,8 +1175,9 @@ export class EndgeDomain extends EndgeModule {
   /** Удаляет Composition по id. */
   removeCompositionById(id: string | number): void {
     const composition = this.getCompositionById(id)
-    if (!composition)
+    if (!composition) {
       return
+    }
     this._compositionsById.delete(composition.id)
     this._compositionsByIdentity.delete(composition.identity)
     this.notify()
@@ -1166,8 +1186,9 @@ export class EndgeDomain extends EndgeModule {
   /** Удаляет Composition по identity. */
   removeCompositionByIdentity(identity: string): void {
     const composition = this.getCompositionByIdentity(identity)
-    if (!composition)
+    if (!composition) {
       return
+    }
     this._compositionsById.delete(composition.id)
     this._compositionsByIdentity.delete(composition.identity)
     this.notify()
@@ -1176,8 +1197,9 @@ export class EndgeDomain extends EndgeModule {
   /** Удаляет Composition по id или identity. */
   removeComposition(idOrIdentity: string | number): void {
     const composition = this.getComposition(idOrIdentity)
-    if (composition)
+    if (composition) {
       this.removeCompositionById(composition.id)
+    }
   }
 
   /** Возвращает все Store-документы. */
@@ -1204,8 +1226,9 @@ export class EndgeDomain extends EndgeModule {
 
   /** Добавляет Store в доменные indexes. */
   addStore(store: RStore): void {
-    if (this._storesByIdentity.has(store.identity) || this._storesById.has(store.id))
+    if (this._storesByIdentity.has(store.identity) || this._storesById.has(store.id)) {
       return
+    }
     this._storesById.set(store.id, store)
     this._storesByIdentity.set(store.identity, store)
     this.notify()
@@ -1214,8 +1237,9 @@ export class EndgeDomain extends EndgeModule {
   /** Удаляет Store по id. */
   removeStoreById(id: string | number): void {
     const store = this.getStoreById(id)
-    if (!store)
+    if (!store) {
       return
+    }
     for (const update of this.getUpdatesByStoreIdentity(store.identity)) {
       this._updatesById.delete(update.id)
       this._updatesByIdentity.delete(update.identity)
@@ -1229,8 +1253,9 @@ export class EndgeDomain extends EndgeModule {
   /** Удаляет Store по identity. */
   removeStoreByIdentity(identity: string): void {
     const store = this.getStoreByIdentity(identity)
-    if (!store)
+    if (!store) {
       return
+    }
     this._storesById.delete(store.id)
     this._storesByIdentity.delete(store.identity)
     this.notify()
@@ -1239,8 +1264,9 @@ export class EndgeDomain extends EndgeModule {
   /** Удаляет Store по id или identity. */
   removeStore(idOrIdentity: string | number): void {
     const store = this.getStore(idOrIdentity)
-    if (store)
+    if (store) {
       this.removeStoreById(store.id)
+    }
   }
 
   /** Возвращает все Stream-документы. */
@@ -1263,8 +1289,9 @@ export class EndgeDomain extends EndgeModule {
   }
 
   addStream(stream: RStream): void {
-    if (this._streamsByIdentity.has(stream.identity) || this._streamsById.has(stream.id))
+    if (this._streamsByIdentity.has(stream.identity) || this._streamsById.has(stream.id)) {
       return
+    }
     this._streamsById.set(stream.id, stream)
     this._streamsByIdentity.set(stream.identity, stream)
     this.notify()
@@ -1272,8 +1299,9 @@ export class EndgeDomain extends EndgeModule {
 
   removeStreamById(id: string | number): void {
     const stream = this.getStreamById(id)
-    if (!stream)
+    if (!stream) {
       return
+    }
     this._streamsById.delete(stream.id)
     this._streamsByIdentity.delete(stream.identity)
     this.notify()
@@ -1281,14 +1309,16 @@ export class EndgeDomain extends EndgeModule {
 
   removeStreamByIdentity(identity: string): void {
     const stream = this.getStreamByIdentity(identity)
-    if (stream)
+    if (stream) {
       this.removeStreamById(stream.id)
+    }
   }
 
   removeStream(idOrIdentity: string | number): void {
     const stream = this.getStream(idOrIdentity)
-    if (stream)
+    if (stream) {
       this.removeStreamById(stream.id)
+    }
   }
 
   /** Возвращает все Update-документы независимо от Store-owner. */
@@ -1315,8 +1345,9 @@ export class EndgeDomain extends EndgeModule {
   }
 
   addUpdate(update: RUpdate): void {
-    if (this._updatesByIdentity.has(update.identity) || this._updatesById.has(update.id))
+    if (this._updatesByIdentity.has(update.identity) || this._updatesById.has(update.id)) {
       return
+    }
     this._updatesById.set(update.id, update)
     this._updatesByIdentity.set(update.identity, update)
     const owned = this._updatesByStoreIdentity.get(update.storeIdentity) ?? new Map<string, RUpdate>()
@@ -1327,27 +1358,31 @@ export class EndgeDomain extends EndgeModule {
 
   removeUpdateById(id: string | number): void {
     const update = this.getUpdateById(id)
-    if (!update)
+    if (!update) {
       return
+    }
     this._updatesById.delete(update.id)
     this._updatesByIdentity.delete(update.identity)
     const owned = this._updatesByStoreIdentity.get(update.storeIdentity)
     owned?.delete(update.identity)
-    if (owned?.size === 0)
+    if (owned?.size === 0) {
       this._updatesByStoreIdentity.delete(update.storeIdentity)
+    }
     this.notify()
   }
 
   removeUpdateByIdentity(identity: string): void {
     const update = this.getUpdateByIdentity(identity)
-    if (update)
+    if (update) {
       this.removeUpdateById(update.id)
+    }
   }
 
   removeUpdate(idOrIdentity: string | number): void {
     const update = this.getUpdate(idOrIdentity)
-    if (update)
+    if (update) {
       this.removeUpdateById(update.id)
+    }
   }
 
   /** Возвращает все Mock-документы. */
@@ -1374,8 +1409,9 @@ export class EndgeDomain extends EndgeModule {
 
   /** Добавляет Mock в доменные indexes. */
   addMock(mock: RMock): void {
-    if (this._mocksByIdentity.has(mock.identity) || this._mocksById.has(mock.id))
+    if (this._mocksByIdentity.has(mock.identity) || this._mocksById.has(mock.id)) {
       return
+    }
     this._mocksById.set(mock.id, mock)
     this._mocksByIdentity.set(mock.identity, mock)
     this.notify()
@@ -1384,8 +1420,9 @@ export class EndgeDomain extends EndgeModule {
   /** Удаляет Mock по id. */
   removeMockById(id: string | number): void {
     const mock = this.getMockById(id)
-    if (!mock)
+    if (!mock) {
       return
+    }
     this._mocksById.delete(mock.id)
     this._mocksByIdentity.delete(mock.identity)
     this.notify()
@@ -1394,8 +1431,9 @@ export class EndgeDomain extends EndgeModule {
   /** Удаляет Mock по identity. */
   removeMockByIdentity(identity: string): void {
     const mock = this.getMockByIdentity(identity)
-    if (!mock)
+    if (!mock) {
       return
+    }
     this._mocksById.delete(mock.id)
     this._mocksByIdentity.delete(mock.identity)
     this.notify()
@@ -1404,8 +1442,9 @@ export class EndgeDomain extends EndgeModule {
   /** Удаляет Mock по id или identity. */
   removeMock(idOrIdentity: string | number): void {
     const mock = this.getMock(idOrIdentity)
-    if (mock)
+    if (mock) {
       this.removeMockById(mock.id)
+    }
   }
 
   /** Возвращает все Computation-документы. */
@@ -1428,8 +1467,9 @@ export class EndgeDomain extends EndgeModule {
   }
 
   addComputation(computation: RComputation): void {
-    if (this._computationsByIdentity.has(computation.identity) || this._computationsById.has(computation.id))
+    if (this._computationsByIdentity.has(computation.identity) || this._computationsById.has(computation.id)) {
       return
+    }
     this._computationsById.set(computation.id, computation)
     this._computationsByIdentity.set(computation.identity, computation)
     this.notify()
@@ -1437,8 +1477,9 @@ export class EndgeDomain extends EndgeModule {
 
   removeComputationById(id: string | number): void {
     const computation = this.getComputationById(id)
-    if (!computation)
+    if (!computation) {
       return
+    }
     this._computationsById.delete(computation.id)
     this._computationsByIdentity.delete(computation.identity)
     this.notify()
@@ -1446,8 +1487,9 @@ export class EndgeDomain extends EndgeModule {
 
   removeComputationByIdentity(identity: string): void {
     const computation = this.getComputationByIdentity(identity)
-    if (!computation)
+    if (!computation) {
       return
+    }
     this._computationsById.delete(computation.id)
     this._computationsByIdentity.delete(computation.identity)
     this.notify()
@@ -1455,8 +1497,9 @@ export class EndgeDomain extends EndgeModule {
 
   removeComputation(idOrIdentity: string | number): void {
     const computation = this.getComputation(idOrIdentity)
-    if (computation)
+    if (computation) {
       this.removeComputationById(computation.id)
+    }
   }
 
   /**
@@ -1504,8 +1547,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeComponentById(id: string | number): void {
     const component = this._componentsById.get(id)
-    if (!component)
+    if (!component) {
       return
+    }
     this._componentsById.delete(component.id)
     this._componentsByIdentity.delete((component as any).identity ?? component.id)
     this.notify()
@@ -1516,8 +1560,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeComponentByIdentity(identity: string): void {
     const component = this._componentsByIdentity.get(identity)
-    if (!component)
+    if (!component) {
       return
+    }
     this._componentsById.delete(component.id)
     this._componentsByIdentity.delete((component as any).identity ?? component.id)
     this.notify()
@@ -1598,8 +1643,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeComponentSFCById(id: string | number): void {
     const component = this._componentSFCsById.get(id)
-    if (!component)
+    if (!component) {
       return
+    }
     this._componentSFCsById.delete(component.id)
     this._componentSFCsByIdentity.delete(component.identity)
     this.notify()
@@ -1610,8 +1656,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeComponentSFCByIdentity(identity: string): void {
     const component = this._componentSFCsByIdentity.get(identity)
-    if (!component)
+    if (!component) {
       return
+    }
     this._componentSFCsById.delete(component.id)
     this._componentSFCsByIdentity.delete(component.identity)
     this.notify()
@@ -1622,8 +1669,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeComponentSFC(idOrIdentity: string | number): void {
     const component = this.getComponentSFC(idOrIdentity)
-    if (!component)
+    if (!component) {
       return
+    }
     this.removeComponentSFCById(component.id)
   }
 
@@ -1694,8 +1742,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeActionById(id: string | number): void {
     const action = this._actionsById.get(id)
-    if (!action)
+    if (!action) {
       return
+    }
     this._actionsById.delete(action.id)
     this._actionsByIdentity.delete(action.identity ?? action.id)
     this.notify()
@@ -1706,8 +1755,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeActionByIdentity(identity: string): void {
     const action = this._actionsByIdentity.get(identity)
-    if (!action)
+    if (!action) {
       return
+    }
     this._actionsById.delete(action.id)
     this._actionsByIdentity.delete(action.identity ?? action.id)
     this.notify()
@@ -1787,8 +1837,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeConverterById(id: string | number): void {
     const converter = this._convertersById.get(id)
-    if (!converter)
+    if (!converter) {
       return
+    }
     this._convertersById.delete(converter.id)
     this._convertersByIdentity.delete((converter as any).identity ?? converter.id)
     this.notify()
@@ -1799,8 +1850,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeConverterByIdentity(identity: string): void {
     const converter = this._convertersByIdentity.get(identity)
-    if (!converter)
+    if (!converter) {
       return
+    }
     this._convertersById.delete(converter.id)
     this._convertersByIdentity.delete((converter as any).identity ?? converter.id)
     this.notify()
@@ -1880,8 +1932,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeIntegrationById(id: string | number): void {
     const integration = this._integrationsById.get(id)
-    if (!integration)
+    if (!integration) {
       return
+    }
     this._integrationsById.delete(integration.id)
     this._integrationsByIdentity.delete((integration as any).identity ?? integration.id)
     this.notify()
@@ -1892,8 +1945,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeIntegrationByIdentity(identity: string): void {
     const integration = this._integrationsByIdentity.get(identity)
-    if (!integration)
+    if (!integration) {
       return
+    }
     this._integrationsById.delete(integration.id)
     this._integrationsByIdentity.delete((integration as any).identity ?? integration.id)
     this.notify()
@@ -1972,8 +2026,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeEnvironmentById(id: string | number): void {
     const environment = this._environmentsById.get(id)
-    if (!environment)
+    if (!environment) {
       return
+    }
     this._environmentsById.delete(environment.id)
     this._environmentsByIdentity.delete(environment.identity)
     this.notify()
@@ -1984,8 +2039,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeEnvironmentByIdentity(identity: string): void {
     const environment = this._environmentsByIdentity.get(identity)
-    if (!environment)
+    if (!environment) {
       return
+    }
     this._environmentsById.delete(environment.id)
     this._environmentsByIdentity.delete(environment.identity)
     this.notify()
@@ -2064,8 +2120,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeTenantById(id: string | number): void {
     const tenant = this._tenantsById.get(id)
-    if (!tenant)
+    if (!tenant) {
       return
+    }
     this._tenantsById.delete(tenant.id)
     this._tenantsByIdentity.delete(tenant.identity)
     this.notify()
@@ -2076,8 +2133,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeTenantByIdentity(identity: string): void {
     const tenant = this._tenantsByIdentity.get(identity)
-    if (!tenant)
+    if (!tenant) {
       return
+    }
     this._tenantsById.delete(tenant.id)
     this._tenantsByIdentity.delete(tenant.identity)
     this.notify()
@@ -2156,8 +2214,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removePolicyById(id: string | number): void {
     const policy = this._policiesById.get(id)
-    if (!policy)
+    if (!policy) {
       return
+    }
     this._policiesById.delete(policy.id)
     this._policiesByIdentity.delete(policy.identity)
     this.notify()
@@ -2168,8 +2227,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removePolicyByIdentity(identity: string): void {
     const policy = this._policiesByIdentity.get(identity)
-    if (!policy)
+    if (!policy) {
       return
+    }
     this._policiesById.delete(policy.id)
     this._policiesByIdentity.delete(policy.identity)
     this.notify()
@@ -2248,8 +2308,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeStyleById(id: string | number): void {
     const style = this._stylesById.get(id)
-    if (!style)
+    if (!style) {
       return
+    }
     this._stylesById.delete(style.id)
     this._stylesByIdentity.delete(style.identity)
     this.notify()
@@ -2260,8 +2321,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeStyleByIdentity(identity: string): void {
     const style = this._stylesByIdentity.get(identity)
-    if (!style)
+    if (!style) {
       return
+    }
     this._stylesById.delete(style.id)
     this._stylesByIdentity.delete(style.identity)
     this.notify()
@@ -2315,8 +2377,9 @@ export class EndgeDomain extends EndgeModule {
   }
 
   addConfiguration(configuration: RConfiguration): void {
-    if (this._configurationsByIdentity.has(configuration.identity) || this._configurationsById.has(configuration.id))
+    if (this._configurationsByIdentity.has(configuration.identity) || this._configurationsById.has(configuration.id)) {
       return
+    }
     this._configurationsById.set(configuration.id, configuration)
     this._configurationsByIdentity.set(configuration.identity, configuration)
     this.notify()
@@ -2324,7 +2387,9 @@ export class EndgeDomain extends EndgeModule {
 
   removeConfigurationById(id: string | number): void {
     const configuration = this._configurationsById.get(id)
-    if (!configuration) return
+    if (!configuration) {
+      return
+    }
     this._configurationsById.delete(configuration.id)
     this._configurationsByIdentity.delete(configuration.identity)
     this.notify()
@@ -2332,7 +2397,9 @@ export class EndgeDomain extends EndgeModule {
 
   removeConfigurationByIdentity(identity: string): void {
     const configuration = this._configurationsByIdentity.get(identity)
-    if (!configuration) return
+    if (!configuration) {
+      return
+    }
     this._configurationsById.delete(configuration.id)
     this._configurationsByIdentity.delete(configuration.identity)
     this.notify()
@@ -2406,8 +2473,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeVocabsById(id: string | number): void {
     const vocab = this._vocabsById.get(id)
-    if (!vocab)
+    if (!vocab) {
       return
+    }
     this._vocabsById.delete(vocab.id)
     this._vocabsByIdentity.delete(vocab.identity)
     this.notify()
@@ -2418,8 +2486,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeVocabsByIdentity(identity: string): void {
     const vocab = this._vocabsByIdentity.get(identity)
-    if (!vocab)
+    if (!vocab) {
       return
+    }
     this._vocabsById.delete(vocab.id)
     this._vocabsByIdentity.delete(vocab.identity)
     this.notify()
@@ -2477,8 +2546,9 @@ export class EndgeDomain extends EndgeModule {
 
   /** Добавляет auth profile в доменные indexes. */
   addAuthProfile(profile: RAuthProfile): void {
-    if (this._authProfilesByIdentity.has(profile.identity) || this._authProfilesById.has(profile.id))
+    if (this._authProfilesByIdentity.has(profile.identity) || this._authProfilesById.has(profile.id)) {
       return
+    }
     this._authProfilesById.set(profile.id, profile)
     this._authProfilesByIdentity.set(profile.identity, profile)
     this.notify()
@@ -2487,8 +2557,9 @@ export class EndgeDomain extends EndgeModule {
   /** Удаляет auth profile по id. */
   removeAuthProfileById(id: string | number): void {
     const profile = this._authProfilesById.get(id)
-    if (!profile)
+    if (!profile) {
       return
+    }
     this._authProfilesById.delete(profile.id)
     this._authProfilesByIdentity.delete(profile.identity)
     this.notify()
@@ -2497,8 +2568,9 @@ export class EndgeDomain extends EndgeModule {
   /** Удаляет auth profile по identity. */
   removeAuthProfileByIdentity(identity: string): void {
     const profile = this._authProfilesByIdentity.get(identity)
-    if (!profile)
+    if (!profile) {
       return
+    }
     this._authProfilesById.delete(profile.id)
     this._authProfilesByIdentity.delete(profile.identity)
     this.notify()
@@ -2568,8 +2640,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeI18nBundlesById(id: string | number): void {
     const bundle = this._i18nBundlesById.get(id)
-    if (!bundle)
+    if (!bundle) {
       return
+    }
     this._i18nBundlesById.delete(bundle.id)
     this._i18nBundlesByIdentity.delete(bundle.identity)
     this.notify()
@@ -2580,8 +2653,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeI18nBundlesByIdentity(identity: string): void {
     const bundle = this._i18nBundlesByIdentity.get(identity)
-    if (!bundle)
+    if (!bundle) {
       return
+    }
     this._i18nBundlesById.delete(bundle.id)
     this._i18nBundlesByIdentity.delete(bundle.identity)
     this.notify()
@@ -2653,8 +2727,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removePageTemplateById(id: string | number): void {
     const tpl = this._pageTemplatesById.get(id)
-    if (!tpl)
+    if (!tpl) {
       return
+    }
     this._pageTemplatesById.delete(tpl.id)
     this._pageTemplatesByIdentity.delete(tpl.identity)
     this.notify()
@@ -2665,8 +2740,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removePageTemplateByIdentity(identity: string): void {
     const tpl = this._pageTemplatesByIdentity.get(identity)
-    if (!tpl)
+    if (!tpl) {
       return
+    }
     this._pageTemplatesById.delete(tpl.id)
     this._pageTemplatesByIdentity.delete(tpl.identity)
     this.notify()
@@ -2745,8 +2821,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removePageById(id: string | number): void {
     const page = this._pagesById.get(id)
-    if (!page)
+    if (!page) {
       return
+    }
     this._pagesById.delete(page.id)
     this._pagesByIdentity.delete(page.identity)
     this.notify()
@@ -2757,8 +2834,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removePageByIdentity(identity: string): void {
     const page = this._pagesByIdentity.get(identity)
-    if (!page)
+    if (!page) {
       return
+    }
     this._pagesById.delete(page.id)
     this._pagesByIdentity.delete(page.identity)
     this.notify()
@@ -2837,8 +2915,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeNavigationById(id: string | number): void {
     const nav = this._navigationsById.get(id)
-    if (!nav)
+    if (!nav) {
       return
+    }
     this._navigationsById.delete(nav.id)
     this._navigationsByIdentity.delete(nav.identity)
     this.notify()
@@ -2849,8 +2928,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeNavigationByIdentity(identity: string): void {
     const nav = this._navigationsByIdentity.get(identity)
-    if (!nav)
+    if (!nav) {
       return
+    }
     this._navigationsById.delete(nav.id)
     this._navigationsByIdentity.delete(nav.identity)
     this.notify()
@@ -2930,8 +3010,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeFolderById(id: string | number): void {
     const folder = this._foldersById.get(id)
-    if (!folder)
+    if (!folder) {
       return
+    }
     this._foldersById.delete(folder.id)
     this._foldersByIdentity.delete((folder as any).identity ?? folder.id)
     this.notify()
@@ -2942,8 +3023,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeFolderByIdentity(identity: string): void {
     const folder = this._foldersByIdentity.get(identity)
-    if (!folder)
+    if (!folder) {
       return
+    }
     this._foldersById.delete(folder.id)
     this._foldersByIdentity.delete((folder as any).identity ?? folder.id)
     this.notify()
@@ -2976,7 +3058,6 @@ export class EndgeDomain extends EndgeModule {
   hasFolder(identity: string): boolean {
     return this.hasFolderByIdentity(identity)
   }
-
 
   /**
    * Методы для работы с параметрами
@@ -3037,8 +3118,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeParameterById(id: string | number): void {
     const parameter = this._parametersById.get(id)
-    if (!parameter)
+    if (!parameter) {
       return
+    }
     this._parametersById.delete(parameter.id)
     this._parametersByIdentity.delete(parameter.identity)
     this.notify()
@@ -3049,8 +3131,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeParameterByIdentity(identity: string): void {
     const parameter = this._parametersByIdentity.get(identity)
-    if (!parameter)
+    if (!parameter) {
       return
+    }
     this._parametersById.delete(parameter.id)
     this._parametersByIdentity.delete(parameter.identity)
     this.notify()
@@ -3129,8 +3212,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeFilterById(id: string | number): void {
     const filter = this._filtersById.get(id)
-    if (!filter)
+    if (!filter) {
       return
+    }
     this._filtersById.delete(filter.id)
     this._filtersByIdentity.delete(filter.identity)
     this.notify()
@@ -3141,8 +3225,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeFilterByIdentity(identity: string): void {
     const filter = this._filtersByIdentity.get(identity)
-    if (!filter)
+    if (!filter) {
       return
+    }
     this._filtersById.delete(filter.id)
     this._filtersByIdentity.delete(filter.identity)
     this.notify()
@@ -3235,8 +3320,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeVersionById(id: string | number): void {
     const version = this._versionsById.get(id)
-    if (!version)
+    if (!version) {
       return
+    }
     this._versionsById.delete(version.id)
     this._versionsByIdentity.delete(version.identity ?? version.id)
     this.notify()
@@ -3247,8 +3333,9 @@ export class EndgeDomain extends EndgeModule {
    */
   removeVersionByIdentity(identity: string): void {
     const version = this._versionsByIdentity.get(identity)
-    if (!version)
+    if (!version) {
       return
+    }
     this._versionsById.delete(version.id)
     this._versionsByIdentity.delete(version.identity ?? version.id)
     this.notify()
@@ -3361,8 +3448,9 @@ export class EndgeDomain extends EndgeModule {
         if (ent != null) {
           const relationTo = typeof ent === 'object' ? (ent.relationTo ?? ent.collection) : null
           const value = typeof ent === 'object' ? ent.value : ent
-          if (relationTo != null)
+          if (relationTo != null) {
             entityType = relationTo === 'filters' ? 'filter' : (relationTo === 'components' ? 'component' : String(relationTo))
+          }
           if (value != null) {
             entityIdentity = typeof value === 'object'
               ? (value.identity ?? (value.id != null ? String(value.id) : null))
@@ -3388,8 +3476,9 @@ export class EndgeDomain extends EndgeModule {
    * Парсит JSON в объект всех сущностей без добавления в домен.
    */
   static parsePlain(json: any): EndgeDomainParsed {
-    if (json?.domain && typeof json.domain === 'object' && !Array.isArray(json.domain))
+    if (json?.domain && typeof json.domain === 'object' && !Array.isArray(json.domain)) {
       json = json.domain
+    }
 
     const out: EndgeDomainParsed = {
       parameters: [],
@@ -3522,8 +3611,9 @@ export class EndgeDomain extends EndgeModule {
     if (json.components && Array.isArray(json.components)) {
       json.components.forEach((componentJson: any) => {
         const component = ReflectComponentFromPlain(componentJson)
-        if (component)
+        if (component) {
           out.components.push(component)
+        }
       })
     }
     if (json.componentSFCs && Array.isArray(json.componentSFCs)) {

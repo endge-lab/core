@@ -5,8 +5,8 @@ import type {
   DiagnosticsSnapshot,
   EndgeDiagnosticsOutputConfiguration,
 } from '@/domain/types/diagnostics/diagnostics.types'
-import { SentryDiagnosticsAdapter } from '@/model/adapters/diagnostics/SentryDiagnosticsAdapter'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { SentryDiagnosticsAdapter } from '@/model/adapters/diagnostics/SentryDiagnosticsAdapter'
 
 const OUTPUT: EndgeDiagnosticsOutputConfiguration = {
   id: 'sentry-local',
@@ -29,10 +29,12 @@ const CREATE_CONTEXT: DiagnosticsAdapterCreateContext = {
     },
   },
   resolveVariable: (value) => {
-    if (value === '{{ SENTRY_DSN }}')
+    if (value === '{{ SENTRY_DSN }}') {
       return 'http://public-key@localhost:9000/42'
-    if (value === '{{ SENTRY_ENVIRONMENT }}')
+    }
+    if (value === '{{ SENTRY_ENVIRONMENT }}') {
       return 'test'
+    }
     return value
   },
 }
@@ -46,7 +48,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('SentryDiagnosticsAdapter', () => {
+describe('sentryDiagnosticsAdapter', () => {
   it('resolves DSN and maps an exception log to a Sentry event envelope', async () => {
     const fetchMock = vi.fn().mockResolvedValue(successfulResponse())
     vi.stubGlobal('fetch', fetchMock)

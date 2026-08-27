@@ -1,29 +1,21 @@
 import type { RQuery } from '@/domain/entities/reflect/RQuery'
-import type { AxiosInstance } from 'axios'
 
-import axios from 'axios'
-
-import { Endge } from '@/model/kernel/endge'
-import { QueryExecutor } from '@/model/services/query/QueryExecutor'
-import type { QueryProgramPayload } from '@/domain/types/program/program.types'
 import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
+
+import type { QueryProgramPayload } from '@/domain/types/program/program.types'
 import type { RuntimeParentRef } from '@/domain/types/runtime/runtime-execute.type'
+import { Endge } from '@/model/kernel/endge'
+import { QueryExecutor_Adapter } from '@/model/adapters/query/QueryExecutor_Adapter'
 
 /**
  * Модуль выполнения доменных query: custom executor, mock data и REST.
  */
 export class EndgeQuery {
-  private readonly executor: QueryExecutor
+  private readonly _executor: QueryExecutor_Adapter
 
-  /**
-   * Создает query runner с переданным или дефолтным axios instance.
-   */
-  constructor(
-    private readonly http: AxiosInstance = axios.create({
-      headers: { Accept: 'application/json' },
-    }),
-  ) {
-    this.executor = new QueryExecutor(this.http)
+  /** Создаёт query module с явным transport adapter. */
+  public constructor(executor: QueryExecutor_Adapter = new QueryExecutor_Adapter()) {
+    this._executor = executor
   }
 
   /**
@@ -38,18 +30,21 @@ export class EndgeQuery {
     const artifact = idOrIdentity != null
       ? Endge.program.getQueryArtifact(idOrIdentity)
       : null
-    if (!artifact)
+    if (!artifact) {
       throw new Error(`Query artifact is missing for "${query.identity ?? query.name ?? query.id}". Compile domain before running query.`)
-    if (artifact.status === 'error')
+    }
+    if (artifact.status === 'error') {
       throw new Error(`Query artifact has compile errors for "${query.identity ?? query.name ?? query.id}".`)
+    }
 
     const host = Endge.runtime.execute(query, {
       parent,
       persistence: 'disabled',
       meta: { props: params },
     }) as QueryRuntimeHost | null
-    if (!host)
+    if (!host) {
       throw new Error(`Query runtime cannot be created for "${query.identity}".`)
+    }
 
     try {
       return await host.run()
@@ -65,7 +60,7 @@ export class EndgeQuery {
     props: Record<string, unknown>
     signal?: AbortSignal
   }): Promise<any> {
-    return this.executor.execute({
+    return this._executor.execute({
       payload: input.payload,
       vars: input.props,
       signal: input.signal,
@@ -77,6 +72,6 @@ export class EndgeQuery {
     output: QueryProgramPayload['outputs'][number],
     response: unknown,
   ): unknown {
-    return this.executor.readResponseOutput(output, response)
+    return this._executor.readResponseOutput(output, response)
   }
 }

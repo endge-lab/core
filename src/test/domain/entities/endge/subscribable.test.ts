@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { Subscribable } from '@/domain/entities/endge/Subscribable'
 
-describe('Subscribable', () => {
+describe('subscribable', () => {
   /** Проверяет публикацию изменения всем активным подписчикам. */
   it('уведомляет каждого активного подписчика', () => {
     const subscribable = new Subscribable()

@@ -1,8 +1,8 @@
-import type { QueryProgramOutput, QueryProgramPayload } from '@/domain/types/program/program.types'
+import type { AxiosInstance } from 'axios'
 import type { RQueryAuth } from '@/domain/types/document/query.types'
+import type { QueryProgramOutput, QueryProgramPayload } from '@/domain/types/program/program.types'
 import type { QueryExecutionContext } from '@/domain/types/runtime/query-execution.types'
 import type { SourceExpressionIR } from '@/domain/types/source/source-expression.types'
-import type { AxiosInstance } from 'axios'
 
 import axios from 'axios'
 
@@ -10,12 +10,23 @@ import { Endge } from '@/model/kernel/endge'
 import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
 
 /** Выполняет source-only compiled query artifact. */
-export class QueryExecutor {
+export class QueryExecutor_Adapter {
+  /** Transport capability для REST и GraphQL requests. */
+  private readonly _http: AxiosInstance
+
+  /**
+   * ----------------------------------------
+   * PUBLIC
+   * ----------------------------------------
+   */
+
   public constructor(
-    private readonly http: AxiosInstance = axios.create({
+    http: AxiosInstance = axios.create({
       headers: { Accept: 'application/json' },
     }),
-  ) {}
+  ) {
+    this._http = http
+  }
 
   /** Выполняет только transport/mock слой; output graph материализует QueryRuntimeHost через Raph. */
   public async execute(context: QueryExecutionContext): Promise<any> {
@@ -29,15 +40,23 @@ export class QueryExecutor {
     output: QueryProgramOutput,
     response: unknown,
   ): unknown {
-    if (output.source.type !== 'response')
+    if (output.source.type !== 'response') {
       throw new Error(`Query output "${output.key}" is not response-backed.`)
-    if (output.source.expression)
+    }
+    if (output.source.expression) {
       return evaluateSourceExpression(output.source.expression, {
         response,
         onWarning: warning => this._writeExpressionWarning(warning.message, warning.data),
       })
+    }
     return output.source.path == null ? response : this._path(response, output.source.path)
   }
+
+  /**
+   * ----------------------------------------
+   * PRIVATE
+   * ----------------------------------------
+   */
 
   /** Выбирает protocol executor по compiled artifact type. */
   private async _executeByProtocol(
@@ -45,10 +64,12 @@ export class QueryExecutor {
     vars: Record<string, unknown>,
     signal?: AbortSignal,
   ): Promise<any> {
-    if (payload.type === 'query-rest')
+    if (payload.type === 'query-rest') {
       return this._runRest(payload, vars, signal)
-    if (payload.type === 'query-gql')
+    }
+    if (payload.type === 'query-gql') {
       return this._runGraphQL(payload, vars, signal)
+    }
 
     throw new Error(`Unsupported query artifact type: ${payload.type}`)
   }
@@ -62,7 +83,7 @@ export class QueryExecutor {
     const endpointSource = String(this._evaluateRequestValue(payload.endpoint, vars) ?? '')
     const url = Endge.workspace.variables.resolve(endpointSource) || endpointSource
     const headers = {
-      Accept: 'application/json',
+      'Accept': 'application/json',
       'Content-Type': 'application/json',
       ...this._asHeaders(this._evaluateRequestValue(payload.headers, vars)),
     }
@@ -75,7 +96,7 @@ export class QueryExecutor {
     await this._applyAuth(auth, headers, params)
 
     try {
-      const response = await this.http.request({
+      const response = await this._http.request({
         url,
         method: 'POST',
         headers,
@@ -103,14 +124,16 @@ export class QueryExecutor {
           status: response.status,
           message: messages.join('; '),
         })
-        if ((payload.errorPolicy ?? 'throw') === 'throw')
+        if ((payload.errorPolicy ?? 'throw') === 'throw') {
           throw new Error(`[GraphQL] ${messages.join('; ')}`)
+        }
       }
       return envelope.data ?? null
     }
     catch (error: any) {
-      if (String(error?.message ?? '').startsWith('[GraphQL]'))
+      if (String(error?.message ?? '').startsWith('[GraphQL]')) {
         throw error
+      }
       this._throwHttpError(error, {
         protocol: 'GraphQL',
         method: 'POST',
@@ -158,8 +181,9 @@ export class QueryExecutor {
       if (sendAsFormUrlencoded) {
         const form = new URLSearchParams()
         for (const [key, value] of Object.entries(effectiveBody)) {
-          if (value === null || value === undefined)
+          if (value === null || value === undefined) {
             continue
+          }
           form.append(key, String(value))
         }
         data = form
@@ -173,7 +197,7 @@ export class QueryExecutor {
     await this._applyAuth(auth, headers, (params ??= {}))
 
     try {
-      const response = await this.http.request({
+      const response = await this._http.request({
         url,
         method,
         headers,
@@ -203,8 +227,9 @@ export class QueryExecutor {
     },
     signal?: AbortSignal,
   ): never {
-    if (signal?.aborted || error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError' || error?.name === 'AbortError')
+    if (signal?.aborted || error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError' || error?.name === 'AbortError') {
       throw error
+    }
     const status = error?.response?.status
     const statusText = error?.response?.statusText
     const responsePayload = error?.response?.data
@@ -242,7 +267,7 @@ export class QueryExecutor {
       : null
     const reason = [status, input.message].filter(Boolean).join(': ') || 'Request failed'
 
-    console.error(`[QueryExecutor] ${input.protocol}${operation} ${input.method} ${input.url} failed: ${reason}`)
+    console.error(`[QueryExecutor_Adapter] ${input.protocol}${operation} ${input.method} ${input.url} failed: ${reason}`)
   }
 
   /** Публикует runtime warning безопасного expression evaluator. */
@@ -265,8 +290,9 @@ export class QueryExecutor {
 
   /** Evaluates a compiled request expression while accepting legacy static payload fields. */
   private _evaluateRequestValue(value: unknown, props: Record<string, unknown>): unknown {
-    if (!this._isSourceExpression(value))
+    if (!this._isSourceExpression(value)) {
       return value
+    }
     return evaluateSourceExpression(value, {
       props,
       environment: name => Endge.workspace.variables.resolve(`{${name}}`) || `{${name}}`,
@@ -275,25 +301,32 @@ export class QueryExecutor {
   }
 
   private _isSourceExpression(value: unknown): value is SourceExpressionIR {
-    if (!value || typeof value !== 'object' || Array.isArray(value))
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
       return false
+    }
     const candidate = value as Record<string, unknown>
-    if (candidate.type === 'literal')
-      return Object.prototype.hasOwnProperty.call(candidate, 'value')
-    if (candidate.type === 'object')
+    if (candidate.type === 'literal') {
+      return Object.hasOwn(candidate, 'value')
+    }
+    if (candidate.type === 'object') {
       return Boolean(candidate.properties && typeof candidate.properties === 'object' && !Array.isArray(candidate.properties))
-    if (candidate.type === 'array')
+    }
+    if (candidate.type === 'array') {
       return Array.isArray(candidate.items)
-    if (candidate.type === 'read')
+    }
+    if (candidate.type === 'read') {
       return typeof candidate.source === 'string' && typeof candidate.path === 'string'
-    if (candidate.type === 'operation')
+    }
+    if (candidate.type === 'operation') {
       return typeof candidate.operation === 'string' && Array.isArray(candidate.arguments)
+    }
     return false
   }
 
   private _asHeaders(value: unknown): Record<string, string> {
-    if (!value || typeof value !== 'object' || Array.isArray(value))
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
       return {}
+    }
     return Object.fromEntries(
       Object.entries(value)
         .filter(([, entry]) => entry !== null && entry !== undefined)
@@ -302,16 +335,18 @@ export class QueryExecutor {
   }
 
   private _asOptionalNumber(value: unknown): number | undefined {
-    if (value === null || value === undefined || value === '')
+    if (value === null || value === undefined || value === '') {
       return undefined
+    }
     const number = typeof value === 'number' ? value : Number(value)
     return Number.isFinite(number) ? number : undefined
   }
 
   /** Читает mock payload из artifact. */
   private _readMockData(raw: unknown): any {
-    if (typeof raw !== 'string')
+    if (typeof raw !== 'string') {
       return raw
+    }
 
     try {
       return JSON.parse(raw)
@@ -326,8 +361,9 @@ export class QueryExecutor {
     const parts = String(path ?? '').split('.').filter(Boolean)
     let current: any = source
     for (const part of parts) {
-      if (current == null)
+      if (current == null) {
         return undefined
+      }
       current = current[part]
     }
     return current
@@ -335,12 +371,14 @@ export class QueryExecutor {
 
   /** Безопасно склеивает endpoint и path. */
   private _buildUrl(base: string, path?: string | null): string {
-    if (!path)
+    if (!path) {
       return base
+    }
 
     const value = String(path)
-    if (/^(https?:)?\/\//i.test(value))
+    if (/^(?:https?:)?\/\//i.test(value)) {
       return value
+    }
 
     const normalizedBase = base.endsWith('/') ? base.slice(0, -1) : base
     const normalizedPath = value.startsWith('/') ? value.slice(1) : value
@@ -362,8 +400,9 @@ export class QueryExecutor {
     }
 
     const profile = String(current.profile ?? '').trim()
-    if (current.mode === 'profile' && !profile)
+    if (current.mode === 'profile' && !profile) {
       throw new Error('[EndgeAuth] Auth profile is required for profile mode.')
+    }
     const session = await Endge.auth.requests.resolve(
       current.mode === 'profile'
         ? { mode: 'profile', profile }
@@ -382,8 +421,9 @@ export class QueryExecutor {
       Object.assign(headers, session.headers)
       return
     }
-    if (!token)
+    if (!token) {
       throw new Error(`[EndgeAuth] Profile "${session.profileIdentity}" does not expose a token for custom Query auth mapping`)
+    }
     const scheme = current.scheme ?? 'Bearer'
     const headerName = current.headerName ?? 'Authorization'
     headers[headerName] = `${scheme} ${token}`

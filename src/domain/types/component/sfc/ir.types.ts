@@ -1,10 +1,10 @@
-import type { RComponentSFC_SourceRange } from './location.types'
 import type { RComponentDiagnostic } from '../component-core.types'
+import type { RComponentSFC_SourceRange } from './location.types'
 import type {
   ComponentSFCEventAction,
-  ComponentSFCRequiredPortBinding,
   ComponentSFCPortForwardOrigin,
   ComponentSFCPortManifest,
+  ComponentSFCRequiredPortBinding,
   RComponentSFC_IR_ComponentPortMarker,
   RComponentSFC_IR_PortCall,
 } from './ports.types'

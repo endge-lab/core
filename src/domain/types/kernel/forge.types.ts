@@ -5,13 +5,13 @@ export interface EndgeModule {
   //
   // Lifecycle
   id: string
-  setup(): void
-  destroy?(): void
+  setup: () => void
+  destroy?: () => void
 
   //
   // Сериализация модуля
-  toPlain?(): object
-  fromPlain?(data: object): void
+  toPlain?: () => object
+  fromPlain?: (data: object) => void
 }
 
 export type EndgeEventMap = Record<string, any>
@@ -24,15 +24,15 @@ export type EndgeToken<T, E extends EndgeEventMap> = string & {
   __ev?: E
 }
 
-export const endgeToken = <T, E extends EndgeEventMap = object>(
-  id: string,
-): EndgeToken<T, E> => id as EndgeToken<T, E>
+export function endgeToken<T, E extends EndgeEventMap = object>(id: string): EndgeToken<T, E> {
+  return id as EndgeToken<T, E>
+}
 
 export type EndgeModuleCtor = new () => EndgeModule
 export type EndgeModuleSpec = EndgeModule | EndgeModuleCtor
-export type EndgeModuleLoader =
-  | (() => Promise<EndgeModuleSpec> | EndgeModuleSpec)
-  | EndgeModuleSpec
+export type EndgeModuleLoader
+  = | (() => Promise<EndgeModuleSpec> | EndgeModuleSpec)
+    | EndgeModuleSpec
 
 export interface EndgeModuleInstall<
   T extends EndgeModule,

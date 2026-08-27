@@ -28,10 +28,10 @@ export interface NavigationLinkNodeDoc extends NavigationTreeNodeBaseDoc {
 }
 
 /** Узел полного дерева навигации. */
-export type NavigationTreeNodeDoc =
-  | NavigationSectionNodeDoc
-  | NavigationGroupNodeDoc
-  | NavigationLinkNodeDoc
+export type NavigationTreeNodeDoc
+  = | NavigationSectionNodeDoc
+    | NavigationGroupNodeDoc
+    | NavigationLinkNodeDoc
 
 /** Документ навигации из Payload. */
 export interface NavigationDoc extends EntityManagement {

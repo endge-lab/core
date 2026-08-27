@@ -1,5 +1,5 @@
-import type { EndgeWorkspaceDefinition } from '@/domain/types/document/workspace.types'
 import type { DomainDocumentType, DomainSectionType } from './document.types'
+import type { EndgeWorkspaceDefinition } from '@/domain/types/document/workspace.types'
 
 /** Workspace-конфигурация не содержит credential material. */
 export type EndgeWorkspaceExport = EndgeWorkspaceDefinition
@@ -39,29 +39,29 @@ export interface EndgeDomainPlain {
 
 /** Коллекции документов канонического snapshot нового backend-сервиса. */
 export interface EndgePortableDocuments {
-  projects: unknown[]
-  tenants: unknown[]
-  environments: unknown[]
-  folders: unknown[]
-  types: unknown[]
-  queries: unknown[]
+  'projects': unknown[]
+  'tenants': unknown[]
+  'environments': unknown[]
+  'folders': unknown[]
+  'types': unknown[]
+  'queries': unknown[]
   'data-views': unknown[]
-  compositions: unknown[]
-  stores: unknown[]
-  streams: unknown[]
-  updates: unknown[]
-  mocks: unknown[]
-  components: unknown[]
-  actions: unknown[]
-  filters: unknown[]
-  converters: unknown[]
-  computations: unknown[]
-  vocabs: unknown[]
+  'compositions': unknown[]
+  'stores': unknown[]
+  'streams': unknown[]
+  'updates': unknown[]
+  'mocks': unknown[]
+  'components': unknown[]
+  'actions': unknown[]
+  'filters': unknown[]
+  'converters': unknown[]
+  'computations': unknown[]
+  'vocabs': unknown[]
   'i18n-bundles': unknown[]
   'auth-profiles': unknown[]
-  navigations: unknown[]
-  styles: unknown[]
-  configurations: unknown[]
+  'navigations': unknown[]
+  'styles': unknown[]
+  'configurations': unknown[]
 }
 
 export interface EndgeInstalledIntegrationExport {

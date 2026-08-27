@@ -1,13 +1,13 @@
-import { describe, expect, it } from 'vitest'
-
 import type { RComponentSFC_IR_ElementNode } from '@/domain/types/component/sfc/ir.types'
+
+import { describe, expect, it } from 'vitest'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import {
   normalizeComponentSFCTableColumnMenu,
   normalizeComponentSFCTableRowMenu,
 } from '@/model/services/compiler/component-sfc/component-sfc-table-menu'
 
-describe('Component SFC table column menu', () => {
+describe('component SFC table column menu', () => {
   it('compiles Table > ColumnMenu into a context menu descriptor', () => {
     const result = compileComponentSFC(createTableSource(`
       <ColumnMenu>
@@ -230,7 +230,7 @@ const ports = definePorts({
     expect(menu.menu?.items).toEqual([expect.objectContaining({
       kind: 'item',
       action: 'built-in-console-log',
-      label: expect.objectContaining({ kind: 'expression', source: "t('schedule:menu.open', 'Открыть')" }),
+      label: expect.objectContaining({ kind: 'expression', source: 't(\'schedule:menu.open\', \'Открыть\')' }),
       input: expect.objectContaining({ kind: 'expression', source: '{ row, rowId, rowIndex, columnKey, value }' }),
     })])
   })
@@ -323,8 +323,9 @@ const ports = definePorts({
 
 function readTable(result: ReturnType<typeof compileComponentSFC>): RComponentSFC_IR_ElementNode {
   const node = result.ir?.template.roots[0]
-  if (!node || node.kind !== 'element' || node.tag !== 'Table')
+  if (!node || node.kind !== 'element' || node.tag !== 'Table') {
     throw new Error('Expected root Table node.')
+  }
 
   return node
 }

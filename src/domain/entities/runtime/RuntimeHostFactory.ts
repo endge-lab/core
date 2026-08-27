@@ -1,12 +1,12 @@
 import type { RuntimeEntityModelMap, RuntimeEntityType } from '@/domain/types/runtime/runtime-entity-map.types'
 import type { RuntimeHost } from '@/domain/types/runtime/runtime-host.types'
 
-import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 import { ActionRuntimeHost } from '@/domain/entities/runtime/hosts/ActionRuntimeHost'
 import { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentSFCRuntimeHost'
 import { PageRuntimeHost } from '@/domain/entities/runtime/hosts/PageRuntimeHost'
 import { ProjectRuntimeHost } from '@/domain/entities/runtime/hosts/ProjectRuntimeHost'
 import { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
+import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 
 export interface RuntimeHostFactoryInput<TType extends RuntimeEntityType> {
   id: string
@@ -69,7 +69,7 @@ export function createRuntimeHost(
         meta,
       })
     default:
-      return new (class extends RuntimeHostBase<RuntimeEntityType> {} )({
+      return new (class extends RuntimeHostBase<RuntimeEntityType> {})({
         id,
         kind: 'runtime',
         runtimeType: `${entityType}-runtime-host`,

@@ -11,4 +11,3 @@ export type ResponseOutputTransform
     identity: string
     options?: Record<string, unknown>
   }
-

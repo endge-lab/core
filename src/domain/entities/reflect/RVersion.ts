@@ -25,18 +25,20 @@ export class RVersion {
   updatedAt?: string
 
   /** Заполнить из persisted document (без data для списка). */
-  static fromPlain(doc: { id: number; identity?: string; description?: string; data?: any; createdAt?: string; updatedAt?: string }): RVersion {
+  static fromPlain(doc: { id: number, identity?: string, description?: string, data?: any, createdAt?: string, updatedAt?: string }): RVersion {
     const v = new RVersion()
     v.id = doc.id
     v.identity = doc.identity ?? ''
     v.description = doc.description ?? ''
-    if (doc.data !== undefined) v.data = doc.data
+    if (doc.data !== undefined) {
+      v.data = doc.data
+    }
     v.createdAt = doc.createdAt
     v.updatedAt = doc.updatedAt
     return v
   }
 
-  toPlain(): { id: string | number; identity: string; description: string; data?: any } {
+  toPlain(): { id: string | number, identity: string, description: string, data?: any } {
     return {
       id: this.id,
       identity: this.identity,

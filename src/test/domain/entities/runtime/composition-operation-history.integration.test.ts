@@ -6,7 +6,7 @@ import { EndgeOperations } from '@/model/modules/runtime/operation/endge-operati
 import { OperationHistory } from '@/model/modules/runtime/operation/operation-history'
 import { compileCompositionSource } from '@/model/services/source-engine/compilers/composition-source-compile'
 
-describe('Composition Operation History integration', () => {
+describe('composition Operation History integration', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
@@ -74,7 +74,9 @@ describe('Composition Operation History integration', () => {
 
   it('dispatches a custom TriggerSet and prevents the browser default', async () => {
     const listeners: Record<string, (event: Event) => void> = {}
-    vi.stubGlobal('addEventListener', vi.fn((name: string, next: (event: Event) => void) => { listeners[name] = next }))
+    vi.stubGlobal('addEventListener', vi.fn((name: string, next: (event: Event) => void) => {
+      listeners[name] = next
+    }))
     vi.stubGlobal('removeEventListener', vi.fn())
     const scope = new RuntimeScope({ id: 'scope', path: 'scope' })
     const undo = vi.fn(async () => undefined)

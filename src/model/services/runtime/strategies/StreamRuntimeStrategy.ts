@@ -1,6 +1,6 @@
+import type { RuntimeStrategy } from '@/domain/types/runtime/runtime-strategy.types'
 import { RStream } from '@/domain/entities/reflect/RStream'
 import { StreamRuntimeHost } from '@/domain/entities/runtime/hosts/StreamRuntimeHost'
-import type { RuntimeStrategy } from '@/domain/types/runtime/runtime-strategy.types'
 import { BrowserSseStreamTransportFactory } from '@/model/services/runtime/transports/BrowserSseStreamTransportFactory'
 
 export class StreamRuntimeStrategy implements RuntimeStrategy<RStream, StreamRuntimeHost> {

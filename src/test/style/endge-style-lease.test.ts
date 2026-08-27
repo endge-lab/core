@@ -4,7 +4,7 @@ import { RStyle } from '@/domain/entities/reflect/RStyle'
 import { Endge } from '@/model/kernel/endge'
 import { compileEndgeCSS } from '@/model/services/style/endgecss-compile'
 
-describe('Endge style leases', () => {
+describe('endge style leases', () => {
   afterEach(() => {
     Endge.styles.reset()
     Endge.program.clear()

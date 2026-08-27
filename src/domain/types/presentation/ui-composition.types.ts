@@ -1,4 +1,4 @@
-import type { UIRenderAdapterDescriptor } from '@/domain/types/ui/ui-render-adapter.type'
+import type { UIRenderAdapterDescriptor } from '@/domain/types/presentation/ui-render-adapter.type'
 
 export type UIPrimitiveKind
   = | 'page'

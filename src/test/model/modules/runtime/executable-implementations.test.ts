@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { EndgeImplementations } from '@/model/modules/runtime/implementation/endge-implementations'
 
-describe('EndgeImplementations', () => {
+describe('endgeImplementations', () => {
   it('selects a scoped override and immediately returns to the default after disposal', async () => {
     const implementations = new EndgeImplementations()
     implementations.registerProvider({

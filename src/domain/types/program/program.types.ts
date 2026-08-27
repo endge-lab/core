@@ -1,20 +1,21 @@
 import type { RComponentContract, RComponentDependencies } from '@/domain/types/component/component-core.types'
+import type { RComponentSFC_AST } from '@/domain/types/component/sfc/ast.types'
+import type { RComponentSFC_RuntimeDependencies } from '@/domain/types/component/sfc/dependencies.types'
+import type { RComponentSFC_IR } from '@/domain/types/component/sfc/ir.types'
+import type { RComponentSFCSource_Parts } from '@/domain/types/component/sfc/source.types'
+import type { ComputationProgramPayload } from '@/domain/types/computation/computation-program.types'
+import type { ProgramMetadata } from '@/domain/types/program/program-metadata.types'
 import type {
   DataViewManualTransform,
   DataViewPipelineStep,
   DataViewRef,
   DataViewSourceDocument,
 } from '@/domain/types/source/data-view-source.types'
-import type { RComponentSFC_AST } from '@/domain/types/component/sfc/ast.types'
-import type { RComponentSFC_IR } from '@/domain/types/component/sfc/ir.types'
-import type { RComponentSFC_RuntimeDependencies } from '@/domain/types/component/sfc/dependencies.types'
-import type { RComponentSFCSource_Parts } from '@/domain/types/component/sfc/source.types'
-import type { QueryProgramProp, SourceExpressionIR, SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 import type { ResponseOutputTransform } from '@/domain/types/source/response-output.types'
+import type { QueryProgramProp, SourceExpressionIR, SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 import type { VocabProgramPayload } from '@/domain/types/source/vocab-source.types'
-import type { ProgramMetadata } from '@/domain/types/program/program-metadata.types'
-import type { ComputationProgramPayload } from '@/domain/types/computation/computation-program.types'
 import type { EndgeStyleSheetArtifact } from '@/domain/types/style/style.types'
+
 export type { ActionProgramPayload } from '@/domain/types/program/action-program.types'
 export type { ConfigurationProgramPayload } from '@/domain/types/source/configuration-source.types'
 

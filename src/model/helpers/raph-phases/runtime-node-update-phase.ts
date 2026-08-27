@@ -1,7 +1,5 @@
-import type { PhaseName, RaphPhase } from '@endge/raph'
+import type { PhaseName, RaphNode, RaphPhase } from '@endge/raph'
 import type { RuntimeHost } from '@/domain/types/runtime/runtime-host.types'
-
-import { RaphNode } from '@endge/raph'
 
 import { RUNTIME_NODE_UPDATE_PHASE_NAME } from '@/domain/types/runtime/runtime-host.types'
 import { Endge } from '@/model/kernel/endge'
@@ -29,8 +27,9 @@ export class RuntimeNodeUpdatePhase {
       nodes: node => isRuntimeRoot(node),
       each: (ctx) => {
         const runtimeId = String(ctx.node.meta?.runtimeId ?? '').trim()
-        if (!runtimeId)
+        if (!runtimeId) {
           return
+        }
         const resolveHost = options.resolveHost
           ?? ((id: string) => Endge.runtime.getRuntimeById(id))
         const host = resolveHost(runtimeId)

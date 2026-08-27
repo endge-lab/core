@@ -5,9 +5,11 @@ import { EndgeDataView } from '@/model/modules/runtime/execution/endge-data-view
 
 const disposers: VoidFunction[] = []
 
-describe('EndgeDataView domain converters', () => {
+describe('endgeDataView domain converters', () => {
   afterEach(() => {
-    while (disposers.length) disposers.pop()?.()
+    while (disposers.length) {
+      disposers.pop()?.()
+    }
   })
 
   it('uses a registered RConverter handler', () => {

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { Endge } from '@/model/kernel/endge'
 
-describe('EndgeCompiler metadata artifact envelope', () => {
+describe('endgeCompiler metadata artifact envelope', () => {
   afterEach(() => {
     Endge.program.clear()
     Endge.domain.reset()

@@ -1,3 +1,4 @@
+import type { EntityManagement } from './entity-management.type'
 import type {
   EndgeConfiguration,
   EndgeLocaleDefinition,
@@ -5,7 +6,6 @@ import type {
   EndgeTimezoneDefinition,
   EndgeVariableDefinition,
 } from '@/domain/types/configuration/configuration.type'
-import type { EntityManagement } from './entity-management.type'
 
 export type EndgeWorkspaceLocale = EndgeLocaleDefinition
 export type EndgeDataMode = 'live' | 'mock'

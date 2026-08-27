@@ -3,41 +3,41 @@ import type {
   RComponentDependencies,
   RComponentDiagnostic,
 } from '@/domain/types/component/component-core.types'
-import {
-  createEmptyComponentContract,
-  createEmptyComponentDependencies,
-} from '@/domain/types/component/component-core.types'
-import type {
-  ComponentSFCPreviewOptions,
-  ComponentSFCPreviewProps,
-} from '@/domain/types/program/program.types'
-import type { RComponentSFCSource_Parts } from '@/domain/types/component/sfc/source.types'
 import type { RComponentSFC_AST } from '@/domain/types/component/sfc/ast.types'
-import type { RComponentSFC_IR, RComponentSFC_IR_Node, RComponentSFC_IR_Template } from '@/domain/types/component/sfc/ir.types'
 import type { RComponentSFC_RuntimeDependencies } from '@/domain/types/component/sfc/dependencies.types'
+import type { RComponentSFC_IR, RComponentSFC_IR_Node, RComponentSFC_IR_Template } from '@/domain/types/component/sfc/ir.types'
 import type {
   ComponentSFCActionPort,
   ComponentSFCPortManifest,
   ComponentSFCPortProviderDescriptor,
 } from '@/domain/types/component/sfc/ports.types'
-import type { ProgramMetadata } from '@/domain/types/program/program-metadata.types'
-import type { TypeSourceDefinition } from '@/domain/types/source/type-source.types'
+import type { RComponentSFCSource_Parts } from '@/domain/types/component/sfc/source.types'
 import type { EndgeSFCEditingConfiguration } from '@/domain/types/configuration/configuration.type'
-import { parseComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-parse'
-import { analyzeComponentSFCScript } from '@/model/services/compiler/component-sfc/component-sfc-script'
-import { analyzeComponentSFCRuntimeDependencies } from '@/model/services/compiler/component-sfc/component-sfc-dependencies'
-import { compileComponentSFCStyle } from '@/model/services/compiler/component-sfc/component-sfc-style'
-import { compileComponentSFCTemplate } from '@/model/services/compiler/component-sfc/component-sfc-template'
-import { validateComponentSFCAttributeValues } from '@/model/services/compiler/component-sfc/component-sfc-attributes'
+import type { ProgramMetadata } from '@/domain/types/program/program-metadata.types'
+import type {
+  ComponentSFCPreviewOptions,
+  ComponentSFCPreviewProps,
+} from '@/domain/types/program/program.types'
+import type { TypeSourceDefinition } from '@/domain/types/source/type-source.types'
+import {
+  createEmptyComponentContract,
+  createEmptyComponentDependencies,
+} from '@/domain/types/component/component-core.types'
 import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component/sfc/dependencies.types'
 import { createEmptyProgramMetadata } from '@/domain/types/program/program-metadata.types'
-import { analyzeComponentSFCPorts } from '@/model/services/compiler/component-sfc/component-sfc-ports'
+import { validateComponentSFCAttributeValues } from '@/model/services/compiler/component-sfc/component-sfc-attributes'
+import { analyzeComponentSFCRuntimeDependencies } from '@/model/services/compiler/component-sfc/component-sfc-dependencies'
 import { resolveComponentSFCPortForwards } from '@/model/services/compiler/component-sfc/component-sfc-forward'
+import { parseComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-parse'
+import { analyzeComponentSFCPorts } from '@/model/services/compiler/component-sfc/component-sfc-ports'
+import { analyzeComponentSFCScript } from '@/model/services/compiler/component-sfc/component-sfc-script'
+import { compileComponentSFCStyle } from '@/model/services/compiler/component-sfc/component-sfc-style'
 import {
-  normalizeComponentSFCTableColumnMenu,
   normalizeComponentSFCColumnCellMenu,
   normalizeComponentSFCTableCellMenu,
+  normalizeComponentSFCTableColumnMenu,
 } from '@/model/services/compiler/component-sfc/component-sfc-table-menu'
+import { compileComponentSFCTemplate } from '@/model/services/compiler/component-sfc/component-sfc-template'
 
 /** Результат полного SFC compiler pipeline в core. */
 export interface ComponentSFCCompileResult {
@@ -155,8 +155,9 @@ export function compileComponentSFC(
     sfcEditing: options.sfcEditing,
   })
   for (const eventName of templateResult.emittedEvents) {
-    if (portResult.manifest.emits.events.some(event => event.name === eventName))
+    if (portResult.manifest.emits.events.some(event => event.name === eventName)) {
       continue
+    }
     if (eventName === 'edited') {
       portResult.manifest.emits.events.push({
         kind: 'event',
@@ -187,7 +188,9 @@ export function compileComponentSFC(
 
   const propNames = new Set(scriptResult.props.map(prop => prop.name))
   for (const binding of [...scriptResult.props, ...scriptResult.locals]) {
-    if (!binding.name.startsWith('$')) continue
+    if (!binding.name.startsWith('$')) {
+      continue
+    }
     diagnostics.push({
       severity: 'error',
       code: 'sfc-platform-binding-name-reserved',
@@ -198,15 +201,19 @@ export function compileComponentSFC(
     })
   }
   for (const port of allComponentSFCPorts(portResult.manifest)) {
-    if (port.name.startsWith('$')) diagnostics.push({
-      severity: 'error',
-      code: 'sfc-platform-port-name-reserved',
-      message: `Имя port "${port.name}" зарезервировано для runtime-контекста платформы.`,
-      sourcePath: `script.ports.${'role' in port ? port.role : 'require'}.${port.name}`,
-      start: port.sourceRange?.start,
-      end: port.sourceRange?.end,
-    })
-    if (!propNames.has(port.name)) continue
+    if (port.name.startsWith('$')) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'sfc-platform-port-name-reserved',
+        message: `Имя port "${port.name}" зарезервировано для runtime-контекста платформы.`,
+        sourcePath: `script.ports.${'role' in port ? port.role : 'require'}.${port.name}`,
+        start: port.sourceRange?.start,
+        end: port.sourceRange?.end,
+      })
+    }
+    if (!propNames.has(port.name)) {
+      continue
+    }
     diagnostics.push({
       severity: 'error',
       code: 'sfc-prop-port-name-conflict',
@@ -297,7 +304,9 @@ function collectTableMenus(
   const diagnostics: RComponentDiagnostic[] = []
   const actions = new Set<string>()
   const visit = (node: RComponentSFC_IR_Node): void => {
-    if (node.kind !== 'element') return
+    if (node.kind !== 'element') {
+      return
+    }
     if (node.tag === 'Table') {
       const column = normalizeComponentSFCTableColumnMenu(node, { availableActions })
       const row = normalizeComponentSFCTableCellMenu(node, { availableActions })
@@ -305,23 +314,35 @@ function collectTableMenus(
       diagnostics.push(...column.diagnostics, ...row.diagnostics)
       for (const menu of [column.menu, row.menu]) {
         for (const item of menu?.items ?? []) {
-          if (item.kind === 'item') actions.add(item.action)
+          if (item.kind === 'item') {
+            actions.add(item.action)
+          }
         }
       }
       for (const columnNode of node.children) {
-        if (columnNode.kind !== 'element' || columnNode.tag !== 'Column') continue
+        if (columnNode.kind !== 'element' || columnNode.tag !== 'Column') {
+          continue
+        }
         const cellMenu = normalizeComponentSFCColumnCellMenu(node, columnNode, { availableActions })
-        if (!cellMenu) continue
+        if (!cellMenu) {
+          continue
+        }
         columnNode.cellMenu = cellMenu
         diagnostics.push(...cellMenu.diagnostics)
         for (const item of cellMenu.menu?.items ?? []) {
-          if (item.kind === 'item') actions.add(item.action)
+          if (item.kind === 'item') {
+            actions.add(item.action)
+          }
         }
       }
     }
-    for (const child of node.children) visit(child)
+    for (const child of node.children) {
+      visit(child)
+    }
   }
-  for (const root of template?.roots ?? []) visit(root)
+  for (const root of template?.roots ?? []) {
+    visit(root)
+  }
   return { diagnostics, actions: [...actions] }
 }
 
@@ -329,9 +350,15 @@ function sectionStatuses(diagnostics: RComponentDiagnostic[]): Record<'script' |
   const sections = { script: 'valid', template: 'valid', style: 'valid' } as Record<'script' | 'template' | 'style', 'valid' | 'warning' | 'error'>
   for (const diagnostic of diagnostics) {
     const section = diagnostic.sourcePath?.split('.')[0]
-    if (section !== 'script' && section !== 'template' && section !== 'style') continue
-    if (diagnostic.severity === 'error') sections[section] = 'error'
-    else if (diagnostic.severity === 'warning' && sections[section] === 'valid') sections[section] = 'warning'
+    if (section !== 'script' && section !== 'template' && section !== 'style') {
+      continue
+    }
+    if (diagnostic.severity === 'error') {
+      sections[section] = 'error'
+    }
+    else if (diagnostic.severity === 'warning' && sections[section] === 'valid') {
+      sections[section] = 'warning'
+    }
   }
   return sections
 }

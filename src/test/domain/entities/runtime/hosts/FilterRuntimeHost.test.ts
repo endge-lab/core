@@ -1,5 +1,5 @@
-import type { FilterProgramPayload } from '@/domain/types/source/filter-source.types'
 import type { ProgramArtifact } from '@/domain/types/program/program.types'
+import type { FilterProgramPayload } from '@/domain/types/source/filter-source.types'
 
 import { Raph } from '@endge/raph'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -8,7 +8,7 @@ import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
 import { compileFilterSource } from '@/model/services/source-engine/compilers/filter-source-compile'
 
-describe('FilterRuntimeHost', () => {
+describe('filterRuntimeHost', () => {
   afterEach(() => {
     vi.useRealTimers()
     Raph.app.reset()
@@ -158,7 +158,8 @@ defineFilter({
     model,
     artifacts: { getArtifact: () => artifact as any },
   })
-  if (!host)
+  if (!host) {
     throw new Error('Filter host was not created')
+  }
   return host
 }

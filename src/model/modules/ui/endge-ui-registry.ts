@@ -3,18 +3,18 @@ import type {
   UIAstNodeLayout,
   UIComponentConfigDefinition,
   UIComponentDefinition,
-  UIComponentPresetDocument,
   UIComponentDefinitionGroup,
+  UIComponentPresetDocument,
   UIComponentRendererRegistration,
   UIJsxComponentDocument,
+  UIPresentationRoleContract,
+  UIPresentationSurface,
   UIPrimitiveKind,
   UIRegistryNodeDraft,
   UIRegistrySnapshot,
-  UIResolveRendererOptions,
   UIResolvedComponentRenderer,
-  UIPresentationRoleContract,
-  UIPresentationSurface,
-} from '@/domain/types/ui/ui-composition.types'
+  UIResolveRendererOptions,
+} from '@/domain/types/presentation/ui-composition.types'
 
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import {
@@ -511,7 +511,6 @@ export class EndgeUIRegistry extends EndgeModule {
     }
     return ['admin', 'runtime']
   }
-
 }
 
 export function getUIPresentationRoleContract(

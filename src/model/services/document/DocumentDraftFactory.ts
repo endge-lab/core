@@ -7,11 +7,14 @@ import { RComponentDSL } from '@/domain/entities/reflect/RComponentDSL'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RComponentTable } from '@/domain/entities/reflect/RComponentTable'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
+import { RComputation } from '@/domain/entities/reflect/RComputation'
+import { RConfiguration } from '@/domain/entities/reflect/RConfiguration'
 import { RDataView } from '@/domain/entities/reflect/RDataView'
 import { REnvironment } from '@/domain/entities/reflect/REnvironment'
 import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { RI18nBundle } from '@/domain/entities/reflect/RI18nBundle'
 import { RIntegration } from '@/domain/entities/reflect/RIntegration'
+import { RMock } from '@/domain/entities/reflect/RMock'
 import { RNavigation } from '@/domain/entities/reflect/RNavigation'
 import { RPage } from '@/domain/entities/reflect/RPage'
 import { RPageTemplate } from '@/domain/entities/reflect/RPageTemplate'
@@ -19,13 +22,10 @@ import { RPolicy } from '@/domain/entities/reflect/RPolicy'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { RStore } from '@/domain/entities/reflect/RStore'
 import { RStream } from '@/domain/entities/reflect/RStream'
-import { RUpdate } from '@/domain/entities/reflect/RUpdate'
-import { RMock } from '@/domain/entities/reflect/RMock'
-import { RComputation } from '@/domain/entities/reflect/RComputation'
 import { RStyle } from '@/domain/entities/reflect/RStyle'
-import { RConfiguration } from '@/domain/entities/reflect/RConfiguration'
 import { RTenant } from '@/domain/entities/reflect/RTenant'
 import { RType } from '@/domain/entities/reflect/RType'
+import { RUpdate } from '@/domain/entities/reflect/RUpdate'
 import { RVocabs } from '@/domain/entities/reflect/RVocabs'
 import { ComponentType, FilterType, QueryType } from '@/domain/types/document/document.types'
 import { Endge } from '@/model/kernel/endge'
@@ -36,8 +36,9 @@ export class DocumentDraftFactory {
   /** Создаёт валидный черновик с defaults конкретного типа. */
   public static create(type: DomainDocumentType, options: DocumentDraftOptions): RDocument {
     const identity = options.identity.trim()
-    if (!identity)
+    if (!identity) {
       throw new Error('Document identity is required.')
+    }
 
     const title = options.name?.trim() || identity
     const folderId = options.folderId ?? undefined
@@ -75,8 +76,9 @@ export class DocumentDraftFactory {
         item.source = COMPONENT_SFC_DEFAULT_SOURCE
         item.supportedTargets = ['dom', 'canvas']
         item.modelVersion = 1
-        if (folderId != null)
+        if (folderId != null) {
           item.folderId = folderId
+        }
         return item
       }
 
@@ -90,8 +92,9 @@ export class DocumentDraftFactory {
         item.type = type
         item.source = Endge.source.createDefault('query', type === QueryType.GraphQL ? 'graphql' : 'rest')
         item.sourceVersion = 2
-        if (folderId != null)
+        if (folderId != null) {
           item.folderId = folderId
+        }
         return item
       }
 
@@ -102,8 +105,9 @@ export class DocumentDraftFactory {
         item.displayName = title
         item.source = Endge.source.createDefault('data-view')
         item.sourceVersion = 1
-        if (folderId != null)
+        if (folderId != null) {
           item.folderId = folderId
+        }
         return item
       }
 
@@ -116,8 +120,9 @@ export class DocumentDraftFactory {
         item.kindIdentity = null
         item.source = Endge.source.createDefault('composition')
         item.sourceVersion = 1
-        if (folderId != null)
+        if (folderId != null) {
           item.folderId = folderId
+        }
         return item
       }
 
@@ -128,8 +133,9 @@ export class DocumentDraftFactory {
         item.displayName = title
         item.source = Endge.source.createDefault('store')
         item.sourceVersion = 1
-        if (folderId != null)
+        if (folderId != null) {
           item.folderId = folderId
+        }
         return item
       }
 
@@ -140,8 +146,9 @@ export class DocumentDraftFactory {
         item.displayName = title
         item.source = Endge.source.createDefault('stream')
         item.sourceVersion = 1
-        if (folderId != null)
+        if (folderId != null) {
           item.folderId = folderId
+        }
         return item
       }
 
@@ -163,8 +170,9 @@ export class DocumentDraftFactory {
         item.contentSource = 'document'
         item.contentType = 'application/json'
         item.source = '{}'
-        if (folderId != null)
+        if (folderId != null) {
           item.folderId = folderId
+        }
         return item
       }
 
@@ -176,8 +184,9 @@ export class DocumentDraftFactory {
         item.source = Endge.source.createDefault('computation')
         item.sourceVersion = 1
         item.contractVersion = 1
-        if (folderId != null)
+        if (folderId != null) {
           item.folderId = folderId
+        }
         return item
       }
 
@@ -189,8 +198,9 @@ export class DocumentDraftFactory {
         item.isPrimitive = false
         item.source = Endge.source.createDefault('type')
         item.sourceVersion = 1
-        if (folderId != null)
+        if (folderId != null) {
           item.folderId = folderId
+        }
         return item
       }
 
@@ -201,8 +211,9 @@ export class DocumentDraftFactory {
         item.displayName = title
         item.source = Endge.source.createDefault('filter')
         item.sourceVersion = 1
-        if (folderId != null)
+        if (folderId != null) {
           item.folderId = folderId
+        }
         return item
       }
 
@@ -213,8 +224,9 @@ export class DocumentDraftFactory {
         item.displayName = title
         item.source = Endge.source.createDefault('action')
         item.sourceVersion = 1
-        if (folderId != null)
+        if (folderId != null) {
           item.folderId = folderId
+        }
         return item
       }
 
@@ -222,8 +234,9 @@ export class DocumentDraftFactory {
         const item = new RIntegration()
         item.identity = identity
         item.name = title
-        if (folderId != null)
+        if (folderId != null) {
           item.folderId = folderId
+        }
         return item
       }
 
@@ -231,8 +244,9 @@ export class DocumentDraftFactory {
         const item = new REnvironment()
         item.identity = identity
         item.name = title
-        if (folderId != null)
+        if (folderId != null) {
           item.folderId = folderId
+        }
         return item
       }
 
@@ -240,8 +254,9 @@ export class DocumentDraftFactory {
         const item = new RPolicy()
         item.identity = identity
         item.name = title
-        if (folderId != null)
+        if (folderId != null) {
           item.folderId = folderId
+        }
         return item
       }
 
@@ -251,8 +266,9 @@ export class DocumentDraftFactory {
         item.name = title
         item.displayName = title
         item.code = identity
-        if (folderId != null)
+        if (folderId != null) {
           item.folderId = folderId
+        }
         return item
       }
 
@@ -262,8 +278,9 @@ export class DocumentDraftFactory {
         item.name = title
         item.displayName = title
         item.sourceVersion = 1
-        if (folderId != null)
+        if (folderId != null) {
           item.folderId = folderId
+        }
         return item
       }
 
@@ -282,8 +299,9 @@ export class DocumentDraftFactory {
         const item = new RPageTemplate()
         item.identity = identity
         item.name = title
-        if (folderId != null)
+        if (folderId != null) {
           item.folderId = folderId
+        }
         return item
       }
 
@@ -291,8 +309,9 @@ export class DocumentDraftFactory {
         const item = new RPage()
         item.identity = identity
         item.name = title
-        if (folderId != null)
+        if (folderId != null) {
           item.folderId = folderId
+        }
         return item
       }
 
@@ -300,8 +319,9 @@ export class DocumentDraftFactory {
         const item = new RNavigation()
         item.identity = identity
         item.name = title
-        if (folderId != null)
+        if (folderId != null) {
           item.folderId = folderId
+        }
         return item
       }
 
@@ -312,8 +332,9 @@ export class DocumentDraftFactory {
         item.displayName = title
         item.mode = 'internal'
         item.active = true
-        if (folderId != null)
+        if (folderId != null) {
           item.folderId = folderId
+        }
         return item
       }
 
@@ -324,8 +345,9 @@ export class DocumentDraftFactory {
         item.displayName = title
         item.locales = { ru: {}, en: {} }
         item.active = true
-        if (folderId != null)
+        if (folderId != null) {
           item.folderId = folderId
+        }
         return item
       }
 
@@ -339,8 +361,9 @@ export class DocumentDraftFactory {
         item.credentials = { token: '{TOKEN}' }
         item.session = undefined
         item.active = true
-        if (folderId != null)
+        if (folderId != null) {
           item.folderId = folderId
+        }
         return item
       }
 

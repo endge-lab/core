@@ -1,7 +1,7 @@
-import { Exclude, Expose } from 'class-transformer'
-
-import { REntity } from '@/domain/entities/reflect/REntity'
 import type { EntityManagement } from '@/domain/types/document/entity-management.type'
+
+import { Exclude, Expose } from 'class-transformer'
+import { REntity } from '@/domain/entities/reflect/REntity'
 
 export interface RConverterSchema extends EntityManagement {
   id: number
@@ -24,8 +24,9 @@ export class RConverter extends REntity {
   convert(v: any, options?: Record<string, unknown>): any {
     if (this.customHandler) {
       const result = this.customHandler(v, options)
-      if (result && typeof result.then === 'function')
+      if (result && typeof result.then === 'function') {
         throw new Error(`Async converter "${this.identity || this.id}" is not supported`)
+      }
       return result
     }
     return null

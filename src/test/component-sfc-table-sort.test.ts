@@ -1,10 +1,10 @@
-import { describe, expect, it } from 'vitest'
-
 import type { RComponentSFC_IR_ElementNode } from '@/domain/types/component/sfc/ir.types'
+
+import { describe, expect, it } from 'vitest'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import { normalizeComponentSFCTableSort } from '@/model/services/compiler/component-sfc/component-sfc-table-sort'
 
-describe('Component SFC table sorting', () => {
+describe('component SFC table sorting', () => {
   it('uses natural comparator for sortable columns without explicit sort', () => {
     const result = compileComponentSFC(createTableSource(`
       <Column key="number" title="Flight" sortable />
@@ -94,8 +94,9 @@ defineProps<{
 
 function readTable(result: ReturnType<typeof compileComponentSFC>): RComponentSFC_IR_ElementNode {
   const node = result.ir?.template.roots[0]
-  if (!node || node.kind !== 'element' || node.tag !== 'Table')
+  if (!node || node.kind !== 'element' || node.tag !== 'Table') {
     throw new Error('Expected root Table node.')
+  }
 
   return node
 }

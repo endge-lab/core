@@ -1,8 +1,8 @@
+import { describe, expect, it } from 'vitest'
 // @vitest-environment node
 import { WorkspaceVariables } from '@/model/modules/context/endge-vars'
-import { describe, expect, it } from 'vitest'
 
-describe('WorkspaceVariables', () => {
+describe('workspaceVariables', () => {
   it('resolves double-braced and legacy variable tokens', () => {
     const variables = new WorkspaceVariables(() => [])
     variables.setEnvironment({ SENTRY_DSN: 'http://public@localhost:9000/1' })

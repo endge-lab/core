@@ -7,10 +7,12 @@ export class AuthAdapterRegistry {
   /** Регистрирует adapter и запрещает неявную замену существующего id. */
   public register(adapter: AuthProfileAdapter): void {
     const id = String(adapter.id ?? '').trim()
-    if (!id)
+    if (!id) {
       throw new Error('[EndgeAuth.adapters] adapter.id is required')
-    if (this._adapters.has(id))
+    }
+    if (this._adapters.has(id)) {
       throw new Error(`[EndgeAuth.adapters] Adapter already registered: ${id}`)
+    }
     this._adapters.set(id, adapter)
   }
 
@@ -22,8 +24,9 @@ export class AuthAdapterRegistry {
   /** Требует зарегистрированный adapter для profile. */
   public require(profile: AuthProfileSchema): AuthProfileAdapter {
     const adapter = this.get(profile.adapterId)
-    if (!adapter)
+    if (!adapter) {
       throw new Error(`[EndgeAuth] Unknown auth adapter: ${profile.adapterId}`)
+    }
     return adapter
   }
 

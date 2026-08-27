@@ -3,20 +3,18 @@ import type {
   EndgeConfiguration,
   EndgeConfigurationContribution,
   EndgeConfigurationPatch,
+  EndgeConfigurationValues,
   EndgeLocaleDefinition,
+  EndgePublicConfigurationSnapshot,
   EndgeSFCEditingConfiguration,
-  EndgeTooltipConfiguration,
   EndgeThemeDefinition,
   EndgeTimezoneDefinition,
+  EndgeTooltipConfiguration,
   EndgeVariableDefinition,
-  EndgeConfigurationValues,
-  EndgePublicConfigurationSnapshot,
 } from '@/domain/types/configuration/configuration.type'
-import type { EndgeJSONValue } from '@/domain/types/source/configuration-source.types'
-import { isEndgeJSONValue } from '@/model/services/configuration/configuration-value'
 import type {
-  DiagnosticsAttributes,
   DiagnosticsAdapterOptionValue,
+  DiagnosticsAttributes,
   DiagnosticsFilter,
   DiagnosticsPhase,
   DiagnosticsSeverityNumber,
@@ -25,10 +23,12 @@ import type {
   EndgeDiagnosticsOutputConfiguration,
   EndgeDiagnosticsRoute,
 } from '@/domain/types/diagnostics/diagnostics.types'
+import type { EndgeJSONValue } from '@/domain/types/source/configuration-source.types'
 import { DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION } from '@/model/config/diagnostics.config'
 import { DEFAULT_FALLBACK_LOCALE, DEFAULT_LOCALE, DEFAULT_THEME, DEFAULT_TIMEZONE } from '@/model/config/kernel.config'
 import { DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION } from '@/model/config/sfc-editing.config'
 import { DEFAULT_ENDGE_TOOLTIP_CONFIGURATION } from '@/model/config/tooltip.config'
+import { isEndgeJSONValue } from '@/model/services/configuration/configuration-value'
 import { normalizeComponentSFCInteractionKeyboardCondition, normalizeComponentSFCInteractionTriggers } from '@/tools/component-sfc-edit-trigger'
 
 const LEGACY_SFC_ADAPTER_IDS: Readonly<Record<string, string>> = {
@@ -72,8 +72,9 @@ export function createDefaultEndgeConfiguration(): EndgeConfiguration {
 
 /** Нормализует и строго проверяет полную persisted-конфигурацию. */
 export function normalizeEndgeConfiguration(input: unknown): EndgeConfiguration {
-  if (!isRecord(input))
+  if (!isRecord(input)) {
     throw new Error('[EndgeConfiguration] configuration must be an object')
+  }
 
   const locales = normalizeLocales(input.locales)
   const themes = normalizeThemes(input.themes)
@@ -139,8 +140,9 @@ function normalizeSfcAdapterId(input: unknown): string {
 
 /** Нормализует contribution сущности; пустое значение означает чистое наследование. */
 export function normalizeEndgeConfigurationContribution(input: unknown): EndgeConfigurationContribution {
-  if (!isRecord(input))
+  if (!isRecord(input)) {
     return { mode: 'inherit', patch: {} }
+  }
 
   if (input.mode === 'replace') {
     return {
@@ -160,30 +162,40 @@ export function applyEndgeConfigurationContribution(
   upstream: EndgeConfiguration,
   contribution: EndgeConfigurationContribution,
 ): EndgeConfiguration {
-  if (contribution.mode === 'replace')
+  if (contribution.mode === 'replace') {
     return cloneConfiguration(contribution.value)
+  }
 
   const next = cloneConfiguration(upstream)
   const patch = contribution.patch
 
-  if (patch.vars)
+  if (patch.vars) {
     next.vars = applyCollectionPatch(next.vars, patch.vars, item => item.name)
-  if (patch.locales)
+  }
+  if (patch.locales) {
     next.locales = applyCollectionPatch(next.locales, patch.locales, item => item.code)
-  if (patch.themes)
+  }
+  if (patch.themes) {
     next.themes = applyCollectionPatch(next.themes, patch.themes, item => item.identity)
-  if (patch.timezones)
+  }
+  if (patch.timezones) {
     next.timezones = applyCollectionPatch(next.timezones, patch.timezones, item => item.identity)
-  if (patch.sfcAdapterIds)
+  }
+  if (patch.sfcAdapterIds) {
     next.sfcAdapterIds = applyCollectionPatch(next.sfcAdapterIds, patch.sfcAdapterIds, item => item)
-  if (patch.diagnostics)
+  }
+  if (patch.diagnostics) {
     next.diagnostics = applyDiagnosticsPatch(next.diagnostics, patch.diagnostics)
-  if (patch.sfcEditing)
+  }
+  if (patch.sfcEditing) {
     applySFCEditingPatch(next.sfcEditing, patch.sfcEditing)
-  if (patch.tooltips)
+  }
+  if (patch.tooltips) {
     applyTooltipPatch(next.tooltips, patch.tooltips)
-  if (patch.values)
+  }
+  if (patch.values) {
     next.values = applyConfigurationValuePatch(next.values, patch.values)
+  }
 
   applyRequiredValue(next, 'defaultLocale', patch.defaultLocale)
   applyRequiredValue(next, 'fallbackLocale', patch.fallbackLocale)
@@ -217,29 +229,34 @@ export function createEndgePublicConfigurationSnapshot(
     ...publicSystemConfiguration
   } = cloneConfiguration(configuration)
   const result: Record<string, unknown> = { ...publicSystemConfiguration }
-  for (const [identity, category] of Object.entries(values))
+  for (const [identity, category] of Object.entries(values)) {
     result[identity] = structuredCloneSafe(category)
+  }
   return deepFreeze(result) as EndgePublicConfigurationSnapshot
 }
 
 function normalizePatch(input: unknown): EndgeConfigurationPatch {
-  if (!isRecord(input))
+  if (!isRecord(input)) {
     return {}
+  }
 
   return structuredCloneSafe(input) as EndgeConfigurationPatch
 }
 
 function normalizeConfigurationValues(input: unknown): EndgeConfigurationValues {
-  if (!isRecord(input))
+  if (!isRecord(input)) {
     return {}
+  }
   const result: EndgeConfigurationValues = {}
   for (const [configurationIdentity, rawValues] of Object.entries(input)) {
-    if (!isSafeConfigurationKey(configurationIdentity) || !isRecord(rawValues))
+    if (!isSafeConfigurationKey(configurationIdentity) || !isRecord(rawValues)) {
       continue
+    }
     const values: Record<string, EndgeJSONValue> = {}
     for (const [field, value] of Object.entries(rawValues)) {
-      if (isSafeConfigurationKey(field) && isEndgeJSONValue(value))
+      if (isSafeConfigurationKey(field) && isEndgeJSONValue(value)) {
         values[field] = structuredCloneSafe(value)
+      }
     }
     result[configurationIdentity] = values
   }
@@ -252,18 +269,21 @@ function applyConfigurationValuePatch(
 ): EndgeConfigurationValues {
   const result = structuredCloneSafe(upstream)
   for (const [configurationIdentity, fields] of Object.entries(patch)) {
-    if (!isSafeConfigurationKey(configurationIdentity) || !isRecord(fields))
+    if (!isSafeConfigurationKey(configurationIdentity) || !isRecord(fields)) {
       continue
+    }
     const category = result[configurationIdentity] ?? {}
     for (const [field, operation] of Object.entries(fields)) {
-      if (!isSafeConfigurationKey(field) || !isRecord(operation))
+      if (!isSafeConfigurationKey(field) || !isRecord(operation)) {
         continue
+      }
       if (operation.op === 'remove') {
         // A remove operation removes this layer's override and therefore keeps upstream.
         continue
       }
-      if (operation.op === 'set' && isEndgeJSONValue(operation.value))
+      if (operation.op === 'set' && isEndgeJSONValue(operation.value)) {
         category[field] = structuredCloneSafe(operation.value)
+      }
     }
     result[configurationIdentity] = category
   }
@@ -296,27 +316,32 @@ function normalizeSFCEditingTriggers(
   fallback: readonly EndgeSFCEditingConfiguration['cancelOn'][number][],
   path: string,
 ): EndgeSFCEditingConfiguration['cancelOn'] {
-  if (input == null)
+  if (input == null) {
     return structuredCloneSafe(fallback) as EndgeSFCEditingConfiguration['cancelOn']
+  }
 
   const normalized = normalizeComponentSFCInteractionTriggers(input)
-  if ((Array.isArray(input) ? input.length > 0 : true) && normalized.length === 0)
+  if ((Array.isArray(input) ? input.length > 0 : true) && normalized.length === 0) {
     throw new Error(`[EndgeConfiguration] ${path} contains no valid triggers`)
-  if (normalized.some(trigger => trigger.passive && trigger.prevent))
+  }
+  if (normalized.some(trigger => trigger.passive && trigger.prevent)) {
     throw new Error(`[EndgeConfiguration] ${path} cannot combine passive and prevent`)
+  }
 
   return normalized.map(trigger => ({
     event: trigger.event,
     ...(trigger.key?.length ? { key: [...trigger.key] } : {}),
     ...(trigger.code?.length ? { code: [...trigger.code] } : {}),
-    ...(trigger.held ? {
-      held: {
-        ...(trigger.held.key?.length ? { key: [...trigger.held.key] } : {}),
-        ...(trigger.held.code?.length ? { code: [...trigger.held.code] } : {}),
-        ...(trigger.held.match ? { match: trigger.held.match } : {}),
-        ...(trigger.held.exact != null ? { exact: trigger.held.exact } : {}),
-      },
-    } : {}),
+    ...(trigger.held
+      ? {
+          held: {
+            ...(trigger.held.key?.length ? { key: [...trigger.held.key] } : {}),
+            ...(trigger.held.code?.length ? { code: [...trigger.held.code] } : {}),
+            ...(trigger.held.match ? { match: trigger.held.match } : {}),
+            ...(trigger.held.exact != null ? { exact: trigger.held.exact } : {}),
+          },
+        }
+      : {}),
     ...(trigger.modifiers ? { modifiers: { ...trigger.modifiers } } : {}),
     ...(trigger.repeat != null ? { repeat: trigger.repeat } : {}),
     ...(trigger.composing != null ? { composing: trigger.composing } : {}),
@@ -336,10 +361,12 @@ function applySFCEditingPatch(
 ): void {
   for (const key of ['cancelOn', 'commitOn'] as const) {
     const override = patch[key]
-    if (!override)
+    if (!override) {
       continue
-    if (override.op === 'remove')
+    }
+    if (override.op === 'remove') {
       throw new Error(`[EndgeConfiguration] Required field "sfcEditing.${key}" cannot be removed`)
+    }
     target[key] = structuredCloneSafe(override.value)
   }
 }
@@ -348,10 +375,12 @@ function normalizeTooltipConfiguration(input: unknown): EndgeTooltipConfiguratio
   const source = isRecord(input) ? input : {}
   const side = source.side ?? DEFAULT_ENDGE_TOOLTIP_CONFIGURATION.side
   const align = source.align ?? DEFAULT_ENDGE_TOOLTIP_CONFIGURATION.align
-  if (!['top', 'right', 'bottom', 'left'].includes(String(side)))
+  if (!['top', 'right', 'bottom', 'left'].includes(String(side))) {
     throw new Error('[EndgeConfiguration] tooltips.side must be top, right, bottom or left')
-  if (!['start', 'center', 'end'].includes(String(align)))
+  }
+  if (!['start', 'center', 'end'].includes(String(align))) {
     throw new Error('[EndgeConfiguration] tooltips.align must be start, center or end')
+  }
   const keyboard = normalizeComponentSFCInteractionKeyboardCondition(source.keyboard)
   return {
     side: side as EndgeTooltipConfiguration['side'],
@@ -364,8 +393,9 @@ function normalizeTooltipConfiguration(input: unknown): EndgeTooltipConfiguratio
 
 function normalizeTooltipDelay(input: unknown, fallback: number, name: string): number {
   const value = input == null ? fallback : Number(input)
-  if (!Number.isFinite(value) || value < 0 || value > 60_000)
+  if (!Number.isFinite(value) || value < 0 || value > 60_000) {
     throw new Error(`[EndgeConfiguration] tooltips.${name} must be between 0 and 60000 ms`)
+  }
   return Math.round(value)
 }
 
@@ -375,14 +405,17 @@ function applyTooltipPatch(
 ): void {
   for (const key of ['side', 'align', 'openDelay', 'closeDelay', 'keyboard'] as const) {
     const override = patch[key]
-    if (!override) continue
+    if (!override) {
+      continue
+    }
     if (override.op === 'remove' && key === 'keyboard') {
       delete target.keyboard
       continue
     }
-    if (override.op === 'remove')
+    if (override.op === 'remove') {
       throw new Error(`[EndgeConfiguration] Required field "tooltips.${key}" cannot be removed`)
-    ;(target as unknown as Record<string, unknown>)[key] = override.value
+    }
+    (target as unknown as Record<string, unknown>)[key] = override.value
   }
 }
 
@@ -402,28 +435,37 @@ function applyDiagnosticsPatch(
   }
   const collection = telemetry.collection
 
-  if (collection?.enabled?.op === 'set')
+  if (collection?.enabled?.op === 'set') {
     next.telemetry.collection.enabled = collection.enabled.value
-  if (collection?.enabled?.op === 'remove')
+  }
+  if (collection?.enabled?.op === 'remove') {
     throw new Error('[EndgeConfiguration] Required field "diagnostics.telemetry.collection.enabled" cannot be removed')
+  }
 
-  if (collection?.signals)
+  if (collection?.signals) {
     next.telemetry.collection.signals = applyCollectionPatch(next.telemetry.collection.signals, collection.signals, item => item)
+  }
 
-  if (collection?.minSeverity?.op === 'set')
+  if (collection?.minSeverity?.op === 'set') {
     next.telemetry.collection.minSeverity = collection.minSeverity.value
-  if (collection?.minSeverity?.op === 'remove')
+  }
+  if (collection?.minSeverity?.op === 'remove') {
     throw new Error('[EndgeConfiguration] Required field "diagnostics.telemetry.collection.minSeverity" cannot be removed')
+  }
 
-  if (collection?.maxRecords?.op === 'set')
+  if (collection?.maxRecords?.op === 'set') {
     next.telemetry.collection.maxRecords = collection.maxRecords.value
-  if (collection?.maxRecords?.op === 'remove')
+  }
+  if (collection?.maxRecords?.op === 'remove') {
     throw new Error('[EndgeConfiguration] Required field "diagnostics.telemetry.collection.maxRecords" cannot be removed')
+  }
 
-  if (telemetry.outputs)
+  if (telemetry.outputs) {
     next.telemetry.outputs = applyCollectionPatch(next.telemetry.outputs, telemetry.outputs, item => item.id)
-  if (telemetry.routes)
+  }
+  if (telemetry.routes) {
     next.telemetry.routes = applyCollectionPatch(next.telemetry.routes, telemetry.routes, item => item.id)
+  }
 
   const snapshots = patch.snapshots
   applyDiagnosticsRequiredValue(next.snapshots.content, 'telemetry', snapshots?.content?.telemetry)
@@ -450,10 +492,12 @@ function applyDiagnosticsRequiredValue<TTarget extends object, TKey extends keyo
   key: TKey,
   override: { op: 'set', value: TTarget[TKey] } | { op: 'remove' } | undefined,
 ): void {
-  if (!override)
+  if (!override) {
     return
-  if (override.op === 'remove')
+  }
+  if (override.op === 'remove') {
     throw new Error(`[EndgeConfiguration] Required field "diagnostics.${String(key)}" cannot be removed`)
+  }
   target[key] = override.value
 }
 
@@ -465,12 +509,15 @@ function applyCollectionPatch<T>(
   const result = new Map(upstream.map(item => [getKey(item), structuredCloneSafe(item)]))
   for (const entry of patch.entries ?? []) {
     const key = String(entry.key ?? '').trim()
-    if (!key)
+    if (!key) {
       continue
-    if (entry.op === 'remove')
+    }
+    if (entry.op === 'remove') {
       result.delete(key)
-    else if (entry.op === 'upsert')
+    }
+    else if (entry.op === 'upsert') {
       result.set(key, structuredCloneSafe(entry.value))
+    }
   }
   return [...result.values()]
 }
@@ -480,10 +527,12 @@ function applyRequiredValue<K extends 'defaultLocale' | 'fallbackLocale' | 'defa
   key: K,
   override: EndgeConfigurationPatch[K],
 ): void {
-  if (!override)
+  if (!override) {
     return
-  if (override.op === 'remove')
+  }
+  if (override.op === 'remove') {
     throw new Error(`[EndgeConfiguration] Required field "${key}" cannot be removed`)
+  }
   target[key] = override.value
 }
 
@@ -492,8 +541,9 @@ function applyNullableValue<K extends 'defaultAuthProfileIdentity'>(
   key: K,
   override: EndgeConfigurationPatch[K],
 ): void {
-  if (!override)
+  if (!override) {
     return
+  }
   target[key] = override.op === 'remove' ? null : override.value
 }
 
@@ -505,11 +555,13 @@ function normalizeVars(input: unknown): EndgeVariableDefinition[] {
   const result: EndgeVariableDefinition[] = []
   const used = new Set<string>()
   for (const raw of Array.isArray(input) ? input : []) {
-    if (!isRecord(raw))
+    if (!isRecord(raw)) {
       continue
+    }
     const name = normalizeText(raw.name)
-    if (!name || used.has(name))
+    if (!name || used.has(name)) {
       continue
+    }
     used.add(name)
     result.push({ name, defaultValue: String(raw.defaultValue ?? '') })
   }
@@ -520,11 +572,13 @@ function normalizeLocales(input: unknown): EndgeLocaleDefinition[] {
   const result: EndgeLocaleDefinition[] = []
   const used = new Set<string>()
   for (const raw of Array.isArray(input) ? input : []) {
-    if (!isRecord(raw))
+    if (!isRecord(raw)) {
       continue
+    }
     const code = normalizeText(raw.code ?? raw.identity)
-    if (!code || used.has(code))
+    if (!code || used.has(code)) {
       continue
+    }
     used.add(code)
     result.push({
       code,
@@ -533,8 +587,9 @@ function normalizeLocales(input: unknown): EndgeLocaleDefinition[] {
       direction: raw.direction === 'rtl' ? 'rtl' : 'ltr',
     })
   }
-  if (!result.length)
+  if (!result.length) {
     throw new Error('[EndgeConfiguration] locales must contain at least one locale')
+  }
   return result
 }
 
@@ -542,16 +597,19 @@ function normalizeThemes(input: unknown): EndgeThemeDefinition[] {
   const result: EndgeThemeDefinition[] = []
   const used = new Set<string>()
   for (const raw of Array.isArray(input) ? input : []) {
-    if (!isRecord(raw))
+    if (!isRecord(raw)) {
       continue
+    }
     const identity = normalizeText(raw.identity)
-    if (!identity || used.has(identity))
+    if (!identity || used.has(identity)) {
       continue
+    }
     used.add(identity)
     result.push({ identity, displayName: normalizeText(raw.displayName) || identity })
   }
-  if (!result.length)
+  if (!result.length) {
     throw new Error('[EndgeConfiguration] themes must contain at least one theme')
+  }
   return result
 }
 
@@ -562,22 +620,26 @@ function normalizeTimezones(input: unknown): EndgeTimezoneDefinition[] {
   const result: EndgeTimezoneDefinition[] = []
   const used = new Set<string>()
   for (const raw of source) {
-    if (!isRecord(raw))
+    if (!isRecord(raw)) {
       continue
+    }
     const identity = normalizeText(raw.identity)
-    if (!identity || used.has(identity) || !isValidTimezone(identity))
+    if (!identity || used.has(identity) || !isValidTimezone(identity)) {
       continue
+    }
     used.add(identity)
     result.push({ identity, displayName: normalizeText(raw.displayName) || identity })
   }
-  if (!result.length)
+  if (!result.length) {
     throw new Error('[EndgeConfiguration] timezones must contain at least one valid timezone')
+  }
   return result
 }
 
 function isValidTimezone(identity: string): boolean {
-  if (identity === 'local')
+  if (identity === 'local') {
     return true
+  }
   try {
     new Intl.DateTimeFormat('en', { timeZone: identity }).format()
     return true
@@ -589,16 +651,18 @@ function isValidTimezone(identity: string): boolean {
 
 function normalizeStringCollection(input: unknown, field: string): string[] {
   const result = [...new Set((Array.isArray(input) ? input : []).map(normalizeText).filter(Boolean))]
-  if (!result.length)
+  if (!result.length) {
     throw new Error(`[EndgeConfiguration] ${field} must contain at least one item`)
+  }
   return result
 }
 
 /** Нормализует полную diagnostics configuration и добавляет системные defaults. */
 function normalizeDiagnosticsConfiguration(input: unknown): EndgeDiagnosticsConfiguration {
   const defaults = structuredCloneSafe(DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION)
-  if (!isRecord(input))
+  if (!isRecord(input)) {
     return defaults
+  }
 
   const rawTelemetry = isRecord(input.telemetry) ? input.telemetry : input
   const rawCollection = isRecord(rawTelemetry.collection) ? rawTelemetry.collection : {}
@@ -663,12 +727,14 @@ function normalizeDiagnosticsOutputs(input: unknown): EndgeDiagnosticsOutputConf
   const used = new Set<string>()
 
   for (const raw of Array.isArray(input) ? input : []) {
-    if (!isRecord(raw))
+    if (!isRecord(raw)) {
       continue
+    }
     const id = normalizeText(raw.id)
     const adapterType = normalizeText(raw.adapterType)
-    if (!id || !adapterType || used.has(id))
+    if (!id || !adapterType || used.has(id)) {
       continue
+    }
 
     used.add(id)
     outputs.push({
@@ -689,14 +755,16 @@ function normalizeDiagnosticsRoutes(input: unknown): EndgeDiagnosticsRoute[] {
   const used = new Set<string>()
 
   for (const raw of Array.isArray(input) ? input : []) {
-    if (!isRecord(raw))
+    if (!isRecord(raw)) {
       continue
+    }
 
     const id = normalizeText(raw.id)
     const legacyTarget = isRecord(raw.target) ? raw.target : {}
     const outputId = normalizeText(raw.outputId ?? legacyTarget.adapterId)
-    if (!id || !outputId || used.has(id))
+    if (!id || !outputId || used.has(id)) {
       continue
+    }
 
     used.add(id)
     routes.push({
@@ -713,8 +781,9 @@ function normalizeDiagnosticsRoutes(input: unknown): EndgeDiagnosticsRoute[] {
 
 /** Нормализует persisted route filter до поддерживаемого подмножества. */
 function normalizeDiagnosticsFilter(input: unknown): DiagnosticsFilter {
-  if (!isRecord(input))
+  if (!isRecord(input)) {
     return {}
+  }
 
   const signals = Array.isArray(input.signals) ? normalizeDiagnosticsSignals(input.signals) : undefined
   const phases = normalizeDiagnosticsPhases(input.phases)
@@ -740,45 +809,52 @@ function normalizeDiagnosticsFilter(input: unknown): DiagnosticsFilter {
 
 /** Нормализует optional список diagnostics phases. */
 function normalizeDiagnosticsPhases(input: unknown): DiagnosticsPhase[] | undefined {
-  if (!Array.isArray(input))
+  if (!Array.isArray(input)) {
     return undefined
+  }
   const values = [...new Set(input.filter((item): item is DiagnosticsPhase => item === 'authoring' || item === 'build' || item === 'runtime'))]
   return values.length ? values : undefined
 }
 
 /** Нормализует optional список статусов завершённых spans. */
 function normalizeDiagnosticsSpanStatuses(input: unknown): Array<'unset' | 'ok' | 'error'> | undefined {
-  if (!Array.isArray(input))
+  if (!Array.isArray(input)) {
     return undefined
+  }
   const values = [...new Set(input.filter((item): item is 'unset' | 'ok' | 'error' => item === 'unset' || item === 'ok' || item === 'error'))]
   return values.length ? values : undefined
 }
 
 /** Нормализует JSON-safe options без функций и undefined. */
 function normalizeDiagnosticsAdapterOptions(input: unknown): Record<string, DiagnosticsAdapterOptionValue> {
-  if (!isRecord(input))
+  if (!isRecord(input)) {
     return {}
+  }
   const result: Record<string, DiagnosticsAdapterOptionValue> = {}
   for (const [key, value] of Object.entries(input)) {
     const normalized = normalizeDiagnosticsAdapterOptionValue(value)
-    if (normalized !== undefined)
+    if (normalized !== undefined) {
       result[key] = normalized
+    }
   }
   return result
 }
 
 /** Рекурсивно оставляет только JSON-safe adapter option value. */
 function normalizeDiagnosticsAdapterOptionValue(input: unknown): DiagnosticsAdapterOptionValue | undefined {
-  if (input === null || typeof input === 'string' || typeof input === 'boolean')
+  if (input === null || typeof input === 'string' || typeof input === 'boolean') {
     return input
-  if (typeof input === 'number')
+  }
+  if (typeof input === 'number') {
     return Number.isFinite(input) ? input : undefined
+  }
   if (Array.isArray(input)) {
     const values = input.map(normalizeDiagnosticsAdapterOptionValue).filter((value): value is DiagnosticsAdapterOptionValue => value !== undefined)
     return values
   }
-  if (isRecord(input))
+  if (isRecord(input)) {
     return normalizeDiagnosticsAdapterOptions(input)
+  }
   return undefined
 }
 
@@ -801,26 +877,31 @@ function normalizeNonNegativeInteger(input: unknown, fallback: number): number {
 
 /** Нормализует непустой список строк или возвращает undefined. */
 function normalizeOptionalStringArray(input: unknown): string[] | undefined {
-  if (!Array.isArray(input))
+  if (!Array.isArray(input)) {
     return undefined
+  }
   const values = [...new Set(input.map(normalizeText).filter(Boolean))]
   return values.length > 0 ? values : undefined
 }
 
 /** Нормализует безопасные scalar/array attributes route. */
 function normalizeDiagnosticsAttributes(input: unknown): DiagnosticsAttributes | undefined {
-  if (!isRecord(input))
+  if (!isRecord(input)) {
     return undefined
+  }
 
   const attributes: DiagnosticsAttributes = {}
   for (const [key, value] of Object.entries(input)) {
     const normalizedKey = normalizeText(key)
-    if (!normalizedKey)
+    if (!normalizedKey) {
       continue
-    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean')
+    }
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
       attributes[normalizedKey] = value
-    else if (Array.isArray(value) && value.every(item => typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean'))
+    }
+    else if (Array.isArray(value) && value.every(item => typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean')) {
       attributes[normalizedKey] = value as Array<string | number | boolean>
+    }
   }
 
   return Object.keys(attributes).length > 0 ? attributes : undefined
@@ -828,8 +909,9 @@ function normalizeDiagnosticsAttributes(input: unknown): DiagnosticsAttributes |
 
 function requireMember(input: unknown, values: string[], field: string): string {
   const value = normalizeText(input)
-  if (!value || !values.includes(value))
+  if (!value || !values.includes(value)) {
     throw new Error(`[EndgeConfiguration] ${field} must reference an available item`)
+  }
   return value
 }
 
@@ -851,17 +933,20 @@ function structuredCloneSafe<T>(input: T): T {
 
 function deepFreeze<T>(value: T): T {
   if (value != null && typeof value === 'object') {
-    for (const nested of Object.values(value as Record<string, unknown>))
+    for (const nested of Object.values(value as Record<string, unknown>)) {
       deepFreeze(nested)
+    }
     Object.freeze(value)
   }
   return value
 }
 
 function stableStringify(input: unknown): string {
-  if (Array.isArray(input))
+  if (Array.isArray(input)) {
     return `[${input.map(stableStringify).join(',')}]`
-  if (isRecord(input))
+  }
+  if (isRecord(input)) {
     return `{${Object.keys(input).sort().map(key => `${JSON.stringify(key)}:${stableStringify(input[key])}`).join(',')}}`
+  }
   return JSON.stringify(input)
 }

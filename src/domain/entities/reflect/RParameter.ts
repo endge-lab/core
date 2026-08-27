@@ -1,9 +1,9 @@
+import type { DomainDocumentType } from '@/domain/types/document/document.types'
 import type {
   FilterFieldSchema,
   RParameterSchema,
   RuntimeFilterLinkEntity,
 } from '@/domain/types/document/query.types'
-import type { DomainDocumentType } from '@/domain/types/document/document.types'
 
 import { TypeMap } from '@endge/utils'
 import { Expose } from 'class-transformer'

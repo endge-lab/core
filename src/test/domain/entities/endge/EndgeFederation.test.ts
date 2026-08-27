@@ -16,7 +16,7 @@ function createBootContext(): EndgeBootContext {
   }
 }
 
-describe('EndgeFederation stages', () => {
+describe('endgeFederation stages', () => {
   it('runs module stages in registration order', async () => {
     const calls: string[] = []
 
@@ -49,7 +49,6 @@ describe('EndgeFederation stages', () => {
         this.defineModule({ key: 'first', module: new TestModule('first') })
         this.defineModule({ key: 'second', module: new TestModule('second') })
       }
-
     }
 
     await TestFederation.boot(createBootContext())
@@ -84,8 +83,9 @@ describe('EndgeFederation stages', () => {
 
       public override reset(): void {
         calls.push(`${this.key}:reset`)
-        if (this.shouldThrow)
+        if (this.shouldThrow) {
           throw new Error('reset failed')
+        }
       }
     }
 
@@ -96,7 +96,6 @@ describe('EndgeFederation stages', () => {
         this.defineModule({ key: 'first', module: new ResetModule('first', true) })
         this.defineModule({ key: 'second', module: new ResetModule('second') })
       }
-
     }
 
     try {

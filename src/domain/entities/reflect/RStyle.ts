@@ -1,7 +1,7 @@
-import { Serialize } from '@endge/utils'
-import { Exclude, Expose } from 'class-transformer'
-
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
+import { Serialize } from '@endge/utils'
+
+import { Exclude, Expose } from 'class-transformer'
 import { REntity } from '@/domain/entities/reflect/REntity'
 
 /** Initial source-first EndgeCSS document. */
@@ -46,8 +46,9 @@ export class RStyle extends REntity {
     style.active = json?.active ?? null
     style.deletedAt = json?.deletedAt ?? null
     style.author = json?.author ?? null
-    if (storageMeta)
+    if (storageMeta) {
       style.applyStorageMeta(storageMeta)
+    }
     return style
   }
 
@@ -82,9 +83,11 @@ export class RStyle extends REntity {
 }
 
 function relationToId(value: any): string | number | null {
-  if (value == null)
+  if (value == null) {
     return null
-  if (typeof value === 'object')
+  }
+  if (typeof value === 'object') {
     return relationToId(value.id ?? value.value)
+  }
   return value
 }

@@ -15,9 +15,9 @@ export interface ComputationResource<T = unknown> {
   readonly loading: boolean
   readonly value: T | undefined
   readonly error: ComputationRuntimeErrorShape | null
-  refresh(): Promise<void>
-  subscribe(listener: VoidFunction): VoidFunction
-  dispose(): void
+  refresh: () => Promise<void>
+  subscribe: (listener: VoidFunction) => VoidFunction
+  dispose: () => void
 }
 
 export interface ComputationSandboxRequest {
@@ -29,8 +29,8 @@ export interface ComputationSandboxRequest {
 }
 
 export interface ComputationSandboxAdapter {
-  execute(request: ComputationSandboxRequest): Promise<unknown>
-  dispose?(): void | Promise<void>
+  execute: (request: ComputationSandboxRequest) => Promise<unknown>
+  dispose?: () => void | Promise<void>
 }
 
 /** Shared execution scope одного root computation call. */
@@ -41,15 +41,15 @@ export interface ComputationExecutionScope {
 
 /** Runtime boundary для вызова compiler-linked computation dependency. */
 export interface ComputationDependencyRunner {
-  run(identity: string, input: unknown, scope: ComputationExecutionScope): Promise<unknown>
-  runSync(identity: string, input: unknown, scope: ComputationExecutionScope): unknown
+  run: (identity: string, input: unknown, scope: ComputationExecutionScope) => Promise<unknown>
+  runSync: (identity: string, input: unknown, scope: ComputationExecutionScope) => unknown
 }
 
 export interface ComputationExecutionApi {
-  evaluate(expression: SourceExpressionIR, scope?: unknown): unknown
+  evaluate: (expression: SourceExpressionIR, scope?: unknown) => unknown
 }
 
 export interface ComputationOverride {
   execution: 'sync' | 'async'
-  run(input: unknown, api: ComputationExecutionApi): unknown | Promise<unknown>
+  run: (input: unknown, api: ComputationExecutionApi) => unknown | Promise<unknown>
 }

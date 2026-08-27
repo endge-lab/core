@@ -1,12 +1,12 @@
+import type { Node } from '@babel/types'
+import type { I18nRuntimeCatalog } from '@/domain/types/i18n.types'
+import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
 import type {
   SourceDocumentReference,
   SourceLanguageContext,
-  SourceLanguageInlineHint,
   SourceLanguageI18nOccurrence,
+  SourceLanguageInlineHint,
 } from '@/domain/types/source/source-engine.types'
-import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
-import type { I18nRuntimeCatalog } from '@/domain/types/i18n.types'
-import type { Node } from '@babel/types'
 
 import * as t from '@babel/types'
 
@@ -25,12 +25,14 @@ interface TranslationResolution {
 /** Resolves translation inline hints from current source and projected catalogs. */
 export function compositionSourceI18nHints(context: SourceLanguageContext): SourceLanguageInlineHint[] {
   const i18n = context.i18n
-  if (!i18n?.occurrences.length)
+  if (!i18n?.occurrences.length) {
     return []
+  }
 
   const compiled = compileCompositionSource(context.source)
-  if (!compiled.ast)
+  if (!compiled.ast) {
     return []
+  }
 
   return collectTranslationLiterals(compiled.ast as Node).flatMap((literal) => {
     const scopePath = compiled.artifact
@@ -53,18 +55,21 @@ export function compositionSourceI18nReferenceAt(
 ): SourceDocumentReference | null {
   const i18n = context.i18n
   const offset = positionToOffset(context)
-  if (!i18n?.occurrences.length || offset == null)
+  if (!i18n?.occurrences.length || offset == null) {
     return null
+  }
 
   const compiled = compileCompositionSource(context.source)
-  if (!compiled.ast)
+  if (!compiled.ast) {
     return null
+  }
 
   const literal = collectTranslationLiterals(compiled.ast as Node)
     .filter(item => item.range.start <= offset && item.range.end >= offset)
     .sort((left, right) => rangeLength(left.range) - rangeLength(right.range))[0]
-  if (!literal)
+  if (!literal) {
     return null
+  }
 
   const scopePath = compiled.artifact
     ? resolveLiteralScopePath(compiled.artifact, literal.range)
@@ -78,8 +83,9 @@ export function compositionSourceI18nReferenceAt(
       i18n.fallbackLocale,
     ),
   ))
-  if (identities.size !== 1)
+  if (identities.size !== 1) {
     return null
+  }
 
   return {
     target: 'i18n-bundles',
@@ -91,11 +97,13 @@ export function compositionSourceI18nReferenceAt(
 function collectTranslationLiterals(ast: Node): TranslationLiteral[] {
   const literals: TranslationLiteral[] = []
   visitNode(ast, (node) => {
-    if (!t.isStringLiteral(node) || node.start == null || node.end == null)
+    if (!t.isStringLiteral(node) || node.start == null || node.end == null) {
       return
+    }
     const separator = node.value.indexOf(':')
-    if (separator < 1 || separator >= node.value.length - 1)
+    if (separator < 1 || separator >= node.value.length - 1) {
       return
+    }
     literals.push({
       key: node.value,
       range: { start: node.start, end: node.end },
@@ -110,8 +118,9 @@ function visitNode(node: Node, visit: (node: Node) => void): void {
     const child = (node as unknown as Record<string, unknown>)[key]
     if (Array.isArray(child)) {
       for (const item of child) {
-        if (isNode(item))
+        if (isNode(item)) {
           visitNode(item, visit)
+        }
       }
     }
     else if (isNode(child)) {
@@ -137,7 +146,8 @@ function resolveLiteralScopePath(
       const leftRange = left.sourceLocations!.runtime
       const rightRange = right.sourceLocations!.runtime
       return (leftRange.end - leftRange.start) - (rightRange.end - rightRange.start)
-    })[0]?.scopePath ?? 'scope_default'
+    })[0]
+    ?.scopePath ?? 'scope_default'
 }
 
 function resolveTranslations(
@@ -210,8 +220,9 @@ function createInlineHint(
   locale: string,
 ): SourceLanguageInlineHint[] {
   const values = new Set(resolutions.flatMap(item => item.value == null ? [] : [item.value]))
-  if (!values.size)
+  if (!values.size) {
     return []
+  }
 
   const missingCount = resolutions.filter(item => item.value == null).length
   if (values.size === 1 && missingCount === 0) {
@@ -247,17 +258,19 @@ function normalizeInlineText(value: string): string {
 }
 
 function escapeMarkdown(value: string): string {
-  return String(value).replace(/[\\`*_{}\[\]()#+.!|>-]/g, '\\$&')
+  return String(value).replace(/[\\`*_{}[\]()#+.!|>-]/g, '\\$&')
 }
 
 function positionToOffset(context: SourceLanguageContext): number | null {
-  if (!context.position)
+  if (!context.position) {
     return null
+  }
   const lines = context.source.split('\n')
   const lineIndex = Math.max(0, Math.min(context.position.lineNumber - 1, lines.length - 1))
   let offset = 0
-  for (let index = 0; index < lineIndex; index++)
+  for (let index = 0; index < lineIndex; index++) {
     offset += (lines[index]?.length ?? 0) + 1
+  }
   return offset + Math.max(0, context.position.column - 1)
 }
 

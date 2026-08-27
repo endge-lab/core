@@ -7,8 +7,8 @@ import type {
 } from '@/domain/types/source/source-engine.types'
 
 import { compileComputation } from '@/model/services/compiler/computation/computation-compile'
-import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
 import { resolveTypedSourceDocumentReference, typedSourceTypeReferenceHighlights } from '@/model/services/source-engine/source-document-reference'
+import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
 import { COMPUTATION_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/computation.default.source'
 import {
   VALUE_EXPRESSION_COMPLETIONS,
@@ -45,10 +45,10 @@ export class ComputationSourceLanguageStrategy implements SourceLanguageStrategy
     return [
       { label: 'defineComputation', kind: 'snippet', insertText: COMPUTATION_DEFAULT_SOURCE.trimEnd(), detail: 'Создать computation graph' },
       { label: 'field', kind: 'snippet', insertText: 'field(Type)', detail: 'Объявить input/output contract' },
-      { label: 'typescript', kind: 'snippet', insertText: "typescript({\n  inputs: {\n    value: input('value'),\n  },\n  compute({ value }, api) {\n    return value\n  },\n})", detail: 'Sandboxed TypeScript output node' },
-      { label: 'computation', kind: 'snippet', insertText: "computation('identity', {\n  value: input('value'),\n})", detail: 'Вызвать внешний computation' },
-      { label: 'input', kind: 'function', insertText: "input('path')", detail: 'Прочитать внешний computation input' },
-      { label: 'output', kind: 'function', insertText: "output('name')", detail: 'Прочитать named output' },
+      { label: 'typescript', kind: 'snippet', insertText: 'typescript({\n  inputs: {\n    value: input(\'value\'),\n  },\n  compute({ value }, api) {\n    return value\n  },\n})', detail: 'Sandboxed TypeScript output node' },
+      { label: 'computation', kind: 'snippet', insertText: 'computation(\'identity\', {\n  value: input(\'value\'),\n})', detail: 'Вызвать внешний computation' },
+      { label: 'input', kind: 'function', insertText: 'input(\'path\')', detail: 'Прочитать внешний computation input' },
+      { label: 'output', kind: 'function', insertText: 'output(\'name\')', detail: 'Прочитать named output' },
       ...VALUE_EXPRESSION_COMPLETIONS,
     ]
   }

@@ -1,10 +1,11 @@
+import type { RaphDerivedHandle } from '@endge/raph'
 import type { RStore } from '@/domain/entities/reflect/RStore'
 import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime/runtime-host.types'
 import type { StoreDataDescriptor, StoreSourceArtifact, StoreValueDescriptor } from '@/domain/types/source/store-source.types'
-import type { StoreMutationPlan, UpdateSourceArtifact } from '@/domain/types/source/update-source.types'
 import type { StreamEventEnvelope } from '@/domain/types/source/stream-source.types'
 
-import { collectionByKey, filterByKey, Raph, RaphNode, full, type RaphDerivedHandle } from '@endge/raph'
+import type { StoreMutationPlan, UpdateSourceArtifact } from '@/domain/types/source/update-source.types'
+import { collectionByKey, filterByKey, full, Raph, RaphNode } from '@endge/raph'
 
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 import { Endge } from '@/model/kernel/endge'
@@ -61,8 +62,9 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
       'store',
       input.model.id ?? input.model.identity,
     )
-    if (!programArtifact || programArtifact.status === 'error')
+    if (!programArtifact || programArtifact.status === 'error') {
       return null
+    }
 
     const host = new StoreRuntimeHost({
       id: input.id,
@@ -120,8 +122,9 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
   /** Записывает значение в writable Store field и запускает derived graph через Raph. */
   public set(path: string, value: unknown): void {
     const normalizedPath = String(path ?? '').trim()
-    if (!normalizedPath || !this.isWritable(normalizedPath))
+    if (!normalizedPath || !this.isWritable(normalizedPath)) {
       throw new Error(`[StoreRuntimeHost] Store path "${normalizedPath}" is derived or missing.`)
+    }
 
     Raph.set(this.getDataPath(normalizedPath), cloneRuntimeValue(value))
     const now = new Date().toISOString()
@@ -134,31 +137,34 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
    * Возвращает false, если Store не объявляет Update для данного типа.
    */
   public dispatch(event: StreamEventEnvelope): boolean {
-    const handler = this.getArtifactPayload()?.updateHandlers
-      .find(item => item.eventTypes.includes(event.type))
-    if (!handler)
+    const handler = this.getArtifactPayload()?.updateHandlers.find(item => item.eventTypes.includes(event.type))
+    if (!handler) {
       return false
+    }
     this.applyUpdate(handler.identity, event.payload)
     return true
   }
 
   /** Применяет именованный дочерний Update к Store без привязки к транспорту. */
   public applyUpdate(updateIdentity: string, payload: unknown): void {
-    const descriptor = this.getArtifactPayload()?.updateHandlers
-      .find(item => item.identity === updateIdentity)
-    if (!descriptor)
+    const descriptor = this.getArtifactPayload()?.updateHandlers.find(item => item.identity === updateIdentity)
+    if (!descriptor) {
       throw new Error(`[StoreRuntimeHost] Update "${updateIdentity}" does not belong to Store "${this.entityIdentity}".`)
+    }
 
     const artifact = this.getArtifactReader()?.getArtifact<UpdateSourceArtifact>('update', updateIdentity)
-    if (!artifact || artifact.status === 'error')
+    if (!artifact || artifact.status === 'error') {
       throw new Error(`[StoreRuntimeHost] Update "${updateIdentity}" is not compiled.`)
-    if (artifact.payload.storeIdentity !== this.entityIdentity)
+    }
+    if (artifact.payload.storeIdentity !== this.entityIdentity) {
       throw new Error(`[StoreRuntimeHost] Update "${updateIdentity}" belongs to another Store.`)
+    }
 
     const plans = this._makeMutationPlans(artifact.payload, payload)
     Raph.transaction(() => {
-      for (const plan of plans)
+      for (const plan of plans) {
         this._applyMutationPlan(plan)
+      }
     })
     const now = new Date().toISOString()
     this.setContext({ status: 'success', updatedAt: now, lastStateChangeAt: now })
@@ -178,8 +184,9 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
    */
   public applyMutation(plan: StoreMutationPlan): void {
     const target = String(plan.path ?? '').trim()
-    if (!target || !this.isWritable(target))
+    if (!target || !this.isWritable(target)) {
       throw new Error(`[StoreRuntimeHost] Store path "${target}" is derived or missing.`)
+    }
 
     Raph.transaction(() => this._applyMutationPlan(plan))
 
@@ -190,8 +197,9 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
 
   /** Освобождает derived registrations до удаления Store state. */
   public override destroy(): void {
-    for (const handle of [...this._derivedHandles].reverse())
+    for (const handle of [...this._derivedHandles].reverse()) {
       handle.dispose()
+    }
     this._derivedHandles = []
     super.destroy()
   }
@@ -200,14 +208,16 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
   private _mount(artifact: StoreSourceArtifact): void {
     const initialValues = new Map<string, unknown>()
     for (const field of artifact.data) {
-      if (field.kind === 'value')
+      if (field.kind === 'value') {
         initialValues.set(field.key, resolveStoreInitialValue(field, this))
+      }
     }
 
     Raph.transaction(() => {
       for (const field of artifact.data) {
-        if (field.kind === 'value')
+        if (field.kind === 'value') {
           Raph.set(this.getDataPath(field.key), cloneRuntimeValue(initialValues.get(field.key)))
+        }
       }
     })
 
@@ -228,8 +238,9 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
               }),
         },
       })
-      if (field.kind !== 'derived')
+      if (field.kind !== 'derived') {
         continue
+      }
 
       const materialization = field.materializationStrategy ?? { kind: 'full' as const }
       const strategy = materialization.kind === 'collection-by-key'
@@ -275,23 +286,26 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
 
   private _makeMutationPlans(update: UpdateSourceArtifact, payload: unknown): StoreMutationPlan[] {
     return update.mutations.flatMap((mutation) => {
-      if (!mutation.target || !this.isWritable(mutation.target))
+      if (!mutation.target || !this.isWritable(mutation.target)) {
         throw new Error(`[StoreRuntimeHost] Update "${update.storeIdentity}" targets derived or missing path "${mutation.target}".`)
+      }
       const contexts = mutation.forEach
         ? expandPayloadContexts(payload, mutation.forEach)
         : [{ root: payload, current: payload, parent: null }]
       return contexts.flatMap((context) => {
         const vars = Object.fromEntries(Object.entries(mutation.vars).map(([name, path]) => {
           const value = readContextPath(context, path)
-          if (value == null || value === '')
+          if (value == null || value === '') {
             throw new Error(`[StoreRuntimeHost] Update "${update.storeIdentity}" cannot resolve var "${name}" from "${path}".`)
+          }
           return [name, value]
         }))
         const options = Object.keys(vars).length ? { vars } : undefined
         if (mutation.ifExists) {
           const guardPath = appendRawStorePath(this.basePath, mutation.ifExists)
-          if (Raph.get(guardPath, options) === undefined)
+          if (Raph.get(guardPath, options) === undefined) {
             return []
+          }
         }
         return [{
           strategy: mutation.strategy,
@@ -330,8 +344,9 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
 }
 
 function resolveStoreInitialValue(field: StoreValueDescriptor, host: RuntimeHost<any, any>): unknown {
-  if (field.initial.kind !== 'mock')
+  if (field.initial.kind !== 'mock') {
     return field.initial.value
+  }
   return Endge.runtime.resolveDataMode(host) === 'mock'
     ? Endge.mock.get(field.initial.identity)
     : undefined
@@ -339,8 +354,9 @@ function resolveStoreInitialValue(field: StoreValueDescriptor, host: RuntimeHost
 
 function appendStorePath(base: string, path: string): string {
   const suffix = String(path ?? '').trim()
-  if (!suffix)
+  if (!suffix) {
     return base
+  }
   return `${base}.${suffix.split('.').map(encodePathPart).join('.')}`
 }
 
@@ -350,11 +366,13 @@ function appendRawStorePath(base: string, path: string): string {
 
 function readPayloadPath(value: unknown, path: string): unknown {
   const normalized = String(path ?? '').trim()
-  if (!normalized)
+  if (!normalized) {
     return value
+  }
   return normalized.split('.').reduce<unknown>((current, key) => {
-    if (current == null || typeof current !== 'object')
+    if (current == null || typeof current !== 'object') {
       return undefined
+    }
     return (current as Record<string, unknown>)[key]
   }, value)
 }
@@ -375,10 +393,12 @@ function expandPayloadContexts(root: unknown, path: string): UpdatePayloadContex
     for (const state of states) {
       const container = key ? readPayloadPath(state.current, key) : state.current
       if (iterate) {
-        if (!Array.isArray(container))
+        if (!Array.isArray(container)) {
           continue
-        for (const item of container)
+        }
+        for (const item of container) {
           next.push({ root, current: item, parent: state.current })
+        }
       }
       else {
         next.push({ root, current: container, parent: state.current })
@@ -391,16 +411,21 @@ function expandPayloadContexts(root: unknown, path: string): UpdatePayloadContex
 
 function readContextPath(context: UpdatePayloadContext, path: string): unknown {
   const normalized = String(path ?? '').trim()
-  if (!normalized)
+  if (!normalized) {
     return context.current
-  if (normalized === '$root')
+  }
+  if (normalized === '$root') {
     return context.root
-  if (normalized.startsWith('$root.'))
+  }
+  if (normalized.startsWith('$root.')) {
     return readPayloadPath(context.root, normalized.slice(6))
-  if (normalized === '$parent')
+  }
+  if (normalized === '$parent') {
     return context.parent
-  if (normalized.startsWith('$parent.'))
+  }
+  if (normalized.startsWith('$parent.')) {
     return readPayloadPath(context.parent, normalized.slice(8))
+  }
   return readPayloadPath(context.current, normalized)
 }
 

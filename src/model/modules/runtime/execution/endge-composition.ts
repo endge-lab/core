@@ -1,7 +1,7 @@
-import type { CompositionMountOptions, CompositionPreviewProps, CompositionSession } from '@/domain/types/source/composition-source.types'
+import type { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
 import type { EndgeDataMode } from '@/domain/types/document/workspace.types'
 
-import type { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
+import type { CompositionMountOptions, CompositionPreviewProps, CompositionSession } from '@/domain/types/source/composition-source.types'
 import { Endge } from '@/model/kernel/endge'
 
 /** Публичный API монтирования Composition runtime sessions. */
@@ -10,14 +10,17 @@ export class EndgeComposition {
   public async mount(identity: string, options: CompositionMountOptions = {}): Promise<CompositionSession> {
     const normalizedIdentity = String(identity ?? '').trim()
     const model = Endge.domain.getComposition(normalizedIdentity)
-    if (!model)
+    if (!model) {
       throw new Error(`[EndgeComposition] Composition "${normalizedIdentity}" is missing.`)
+    }
 
     const artifact = Endge.program.getCompositionArtifact(normalizedIdentity)
-    if (!artifact)
+    if (!artifact) {
       throw new Error(`[EndgeComposition] Compile domain before mounting "${normalizedIdentity}".`)
-    if (artifact.status === 'error')
+    }
+    if (artifact.status === 'error') {
       throw new Error(`[EndgeComposition] Composition "${normalizedIdentity}" has compile errors.`)
+    }
 
     const host = Endge.runtime.execute(model, {
       ...(options.id ? { id: options.id } : {}),
@@ -29,8 +32,9 @@ export class EndgeComposition {
           }
         : undefined,
     }) as CompositionRuntimeHost | null
-    if (!host)
+    if (!host) {
       throw new Error(`[EndgeComposition] Runtime host cannot be created for "${normalizedIdentity}".`)
+    }
 
     try {
       await host.mountGraph()
@@ -47,8 +51,9 @@ export class EndgeComposition {
       outputs: host.getOutputs(),
       output: <T = unknown>(name: string) => host.getOutput(name) as T | undefined,
       unmount: async () => {
-        if (!mounted)
+        if (!mounted) {
           return
+        }
         mounted = false
         await host.getScope('scope_default')?.dispose()
         await Endge.runtime.destroyRuntimeTreeAsync(host.id)

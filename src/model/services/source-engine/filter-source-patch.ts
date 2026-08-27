@@ -1,15 +1,15 @@
 import type {
+  FilterProgramOutput,
   FilterSourceEditorDocument,
   FilterSourceEditorField,
   FilterSourceEditorOutput,
-  FilterProgramOutput,
   FilterSourcePatch,
   FilterSourcePatchOperation,
 } from '@/domain/types/source/filter-source.types'
 import type { SourcePatchResult } from '@/domain/types/source/source-engine.types'
 import type { SourceFieldDefinition } from '@/domain/types/source/source-expression.types'
 
-import { parse as parseTS, parseExpression } from '@babel/parser'
+import { parseExpression, parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
 
 import { compileFilterSource } from '@/model/services/source-engine/compilers/filter-source-compile'
@@ -96,8 +96,9 @@ function applyFilterPatch(
     if (operation.type === 'add-field') {
       validateFieldKey(operation.key)
       validateFieldExpression(operation.key, operation.expression)
-      if (findFieldProperty(context.fields, operation.key))
+      if (findFieldProperty(context.fields, operation.key)) {
         throw new Error(`Field "${operation.key}" уже существует.`)
+      }
       nextSource = insertField(source, context.fields, operation.key, operation.expression)
     }
     else if (operation.type === 'remove-field') {
@@ -109,8 +110,9 @@ function applyFilterPatch(
     }
     else if (operation.type === 'rename-field') {
       validateFieldKey(operation.nextKey)
-      if (operation.key !== operation.nextKey && findFieldProperty(context.fields, operation.nextKey))
+      if (operation.key !== operation.nextKey && findFieldProperty(context.fields, operation.nextKey)) {
         throw new Error(`Field "${operation.nextKey}" уже существует.`)
+      }
       nextSource = renameField(source, context, operation.key, operation.nextKey)
     }
     else {
@@ -187,12 +189,14 @@ function projectEditorDocument(
   const outputs: FilterSourceEditorOutput[] = []
 
   for (const property of context.fields.properties) {
-    if (!isEditableProperty(property))
+    if (!isEditableProperty(property)) {
       continue
+    }
     const key = propertyName(property.key)
     const field = key ? fieldsByKey.get(key) : null
-    if (!key || !field)
+    if (!key || !field) {
       continue
+    }
     fields.push({
       ...field,
       sourceRange: range(property),
@@ -204,12 +208,14 @@ function projectEditorDocument(
   }
 
   for (const property of context.outputs.properties) {
-    if (!isEditableProperty(property))
+    if (!isEditableProperty(property)) {
       continue
+    }
     const key = propertyName(property.key)
     const output = key ? outputsByKey.get(key) : null
-    if (!key || !output)
+    if (!key || !output) {
       continue
+    }
     outputs.push({
       key,
       kind: output.kind,
@@ -223,11 +229,13 @@ function projectEditorDocument(
 
 function findDefineFilter(ast: t.File): t.CallExpression | null {
   for (const statement of ast.program.body) {
-    if (!t.isExpressionStatement(statement))
+    if (!t.isExpressionStatement(statement)) {
       continue
+    }
     const expression = unwrapExpression(statement.expression)
-    if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'defineFilter' }))
+    if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'defineFilter' })) {
       return expression
+    }
   }
   return null
 }
@@ -239,8 +247,9 @@ function objectProperty(node: t.ObjectExpression, name: string): t.ObjectExpress
       && !property.computed
       && propertyName(property.key) === name
       && t.isObjectExpression(property.value)
-    )
+    ) {
       return property.value
+    }
   }
   return null
 }
@@ -259,8 +268,9 @@ function findFieldProperty(
   key: string,
 ): (t.ObjectProperty & { key: t.Expression, value: t.Expression }) | null {
   for (const property of fields.properties) {
-    if (isEditableProperty(property) && propertyName(property.key) === key)
+    if (isEditableProperty(property) && propertyName(property.key) === key) {
       return property
+    }
   }
   return null
 }
@@ -270,8 +280,9 @@ function requireFieldProperty(
   key: string,
 ): t.ObjectProperty & { key: t.Expression, value: t.Expression } {
   const property = findFieldProperty(fields, key)
-  if (!property)
+  if (!property) {
     throw new Error(`Field "${key}" не найден в source.`)
+  }
   return property
 }
 
@@ -287,8 +298,9 @@ function insertField(
   const entry = `${childIndent}${printKey(key)}: ${expression},`
   const closingLineStart = source.lastIndexOf('\n', closeOffset - 1) + 1
   const hasOwnClosingLine = source.slice(closingLineStart, closeOffset).trim() === ''
-  if (hasOwnClosingLine)
+  if (hasOwnClosingLine) {
     return replaceRange(source, closingLineStart, closeOffset, `${entry}\n${ownIndent}`)
+  }
   return replaceRange(source, closeOffset, closeOffset, `\n${entry}\n${ownIndent}`)
 }
 
@@ -304,10 +316,12 @@ function removeObjectProperty(
   const next = properties[index + 1]
   const previous = properties[index - 1]
 
-  if (next)
+  if (next) {
     return replaceRange(source, start, requireOffset(next.start), '')
-  if (previous)
+  }
+  if (previous) {
     return replaceRange(source, requireOffset(previous.end), end, '')
+  }
 
   const comma = source.slice(end, requireOffset(object.end) - 1).indexOf(',')
   return comma >= 0
@@ -323,16 +337,19 @@ function moveField(
 ): string {
   const properties = fields.properties.filter(isEditableProperty)
   const fromIndex = properties.findIndex(property => propertyName(property.key) === key)
-  if (fromIndex < 0)
+  if (fromIndex < 0) {
     throw new Error(`Field "${key}" не найден в source.`)
+  }
   const toIndex = Math.max(0, Math.min(properties.length - 1, rawToIndex))
-  if (fromIndex === toIndex)
+  if (fromIndex === toIndex) {
     return source
+  }
 
   const ordered = [...properties]
   const [property] = ordered.splice(fromIndex, 1)
-  if (!property)
+  if (!property) {
     return source
+  }
   ordered.splice(toIndex, 0, property)
 
   const fragments = ordered.map(item => sliceNode(source, item))
@@ -360,8 +377,9 @@ function renameField(
   key: string,
   nextKey: string,
 ): string {
-  if (key === nextKey)
+  if (key === nextKey) {
     return source
+  }
   const property = requireFieldProperty(context.fields, key)
   const replacements: Array<{ start: number, end: number, value: string }> = [{
     start: requireOffset(property.key.start),
@@ -409,16 +427,18 @@ function modifierArgumentSource(
       const argument = current.arguments[0]
       return argument && t.isExpression(argument) ? sliceNode(source, argument) : null
     }
-    if (!t.isExpression(current.callee.object))
+    if (!t.isExpression(current.callee.object)) {
       break
+    }
     current = unwrapExpression(current.callee.object)
   }
   return null
 }
 
 function validateFieldKey(key: string): void {
-  if (!String(key ?? '').trim())
+  if (!String(key ?? '').trim()) {
     throw new Error('Field key не может быть пустым.')
+  }
 }
 
 function validateFieldExpression(key: string, expression: string): void {
@@ -437,8 +457,9 @@ function validateFieldExpression(key: string, expression: string): void {
 })`
   const result = compileFilterSource(source)
   const error = result.diagnostics.find(item => item.severity === 'error')
-  if (error)
+  if (error) {
     throw new Error(error.message)
+  }
 }
 
 function visitNodes(node: t.Node, visitor: (node: t.Node) => void): void {
@@ -448,8 +469,9 @@ function visitNodes(node: t.Node, visitor: (node: t.Node) => void): void {
     const value = (node as unknown as Record<string, unknown>)[key]
     if (Array.isArray(value)) {
       for (const child of value) {
-        if (child && typeof child === 'object' && 'type' in child)
+        if (child && typeof child === 'object' && 'type' in child) {
           visitNodes(child as t.Node, visitor)
+        }
       }
     }
     else if (value && typeof value === 'object' && 'type' in value) {
@@ -459,7 +481,7 @@ function visitNodes(node: t.Node, visitor: (node: t.Node) => void): void {
 }
 
 function printKey(key: string): string {
-  return /^[A-Za-z_$][\w$]*$/.test(key) ? key : JSON.stringify(key)
+  return /^[A-Z_$][\w$]*$/i.test(key) ? key : JSON.stringify(key)
 }
 
 function range(node: t.Node): { start: number, end: number } {
@@ -482,8 +504,9 @@ function replaceRange(source: string, start: number, end: number, value: string)
 }
 
 function requireOffset(value: number | null | undefined): number {
-  if (typeof value !== 'number')
-    throw new Error('Filter AST не содержит source range.')
+  if (typeof value !== 'number') {
+    throw new TypeError('Filter AST не содержит source range.')
+  }
   return value
 }
 

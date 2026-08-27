@@ -6,11 +6,11 @@ import type {
   SourceLanguageValidationResult,
 } from '@/domain/types/source/source-engine.types'
 
-import { compileFilterSource } from '@/model/services/source-engine/compilers/filter-source-compile'
-import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
-import { resolveTypedSourceDocumentReference, typedSourceTypeReferenceHighlights } from '@/model/services/source-engine/source-document-reference'
-import { FILTER_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/filter.default.source'
 import { validateTypeExpressionUsage } from '@/model/services/compiler/type/type-program-validation'
+import { compileFilterSource } from '@/model/services/source-engine/compilers/filter-source-compile'
+import { resolveTypedSourceDocumentReference, typedSourceTypeReferenceHighlights } from '@/model/services/source-engine/source-document-reference'
+import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
+import { FILTER_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/filter.default.source'
 
 export class FilterSourceLanguageStrategy implements SourceLanguageStrategy {
   public readonly id = 'source-language:filter'
@@ -19,11 +19,27 @@ export class FilterSourceLanguageStrategy implements SourceLanguageStrategy {
     alias: 'Endge Filter Source',
     extension: '.endge-filter.ts',
     keywords: [
-      'and', 'between', 'compact', 'defineFilter', 'field', 'inArray', 'inList',
-      'output', 'relativeDate', 'relativeDateTime', 'row', 'value',
+      'and',
+      'between',
+      'compact',
+      'defineFilter',
+      'field',
+      'inArray',
+      'inList',
+      'output',
+      'relativeDate',
+      'relativeDateTime',
+      'row',
+      'value',
     ],
     functions: [
-      'array', 'default', 'json', 'optional', 'options', 'predicate', 'vocab',
+      'array',
+      'default',
+      'json',
+      'optional',
+      'options',
+      'predicate',
+      'vocab',
     ],
     properties: ['fields', 'label', 'labelPath', 'metadata', 'outputs', 'value', 'valuePath'],
   })

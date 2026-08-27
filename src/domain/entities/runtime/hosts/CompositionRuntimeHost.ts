@@ -1,15 +1,21 @@
+import type { RaphDerivedHandle } from '@endge/raph'
 import type { RComposition } from '@/domain/entities/reflect/RComposition'
 import type { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentSFCRuntimeHost'
-import type { RaphDerivedHandle } from '@endge/raph'
-import type { FilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
 import type { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
+import type { FilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
 import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
 import type { StoreRuntimeHost } from '@/domain/entities/runtime/hosts/StoreRuntimeHost'
 import type { StreamRuntimeHost } from '@/domain/entities/runtime/hosts/StreamRuntimeHost'
-import type { StreamEventEnvelope } from '@/domain/types/source/stream-source.types'
-import type { StoreMutationPlan } from '@/domain/types/source/update-source.types'
+import type {
+  ComponentSFCEventInputValue,
+  ComponentSFCEventOccurrence,
+} from '@/domain/types/component/sfc/ports.types'
+import type { I18nRuntimeCatalog } from '@/domain/types/i18n.types'
+import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext, RuntimeHostInputBinding, RuntimeHostInputSource, RuntimeHostUpdateContext } from '@/domain/types/runtime/runtime-host.types'
+import type { VocabRuntimeCatalog } from '@/domain/types/runtime/vocab-cache.types'
 import type {
   CompositionBindingValue,
+  CompositionComponentEventEffect,
   CompositionFilterFieldsSlice,
   CompositionProgramPayload,
   CompositionPublicOutputHandle,
@@ -17,28 +23,22 @@ import type {
   CompositionRuntimeChildHandle,
   CompositionRuntimeOutputHandle,
   CompositionRuntimePublicationConnection,
+  OperationHistoryShortcutDescriptor,
 } from '@/domain/types/source/composition-source.types'
-import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext, RuntimeHostInputBinding, RuntimeHostInputSource, RuntimeHostUpdateContext } from '@/domain/types/runtime/runtime-host.types'
-import type { I18nRuntimeCatalog } from '@/domain/types/i18n.types'
-import type { VocabRuntimeCatalog } from '@/domain/types/runtime/vocab-cache.types'
-import type {
-  ComponentSFCEventInputValue,
-  ComponentSFCEventOccurrence,
-} from '@/domain/types/component/sfc/ports.types'
-import type { CompositionComponentEventEffect } from '@/domain/types/source/composition-source.types'
+import type { StreamEventEnvelope } from '@/domain/types/source/stream-source.types'
 
+import type { StoreMutationPlan } from '@/domain/types/source/update-source.types'
+
+import type { OperationHistoryShortcutBinding } from '@/model/modules/runtime/operation/operation-history'
 import { collectionByKey, filterByKey, full, Raph, RaphNode } from '@endge/raph'
-
+import { FilterViewRuntimeHost as EndgeFilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
 import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 import { RuntimeScope } from '@/domain/entities/runtime/RuntimeScope'
-import { FilterViewRuntimeHost as EndgeFilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
 import { Endge } from '@/model/kernel/endge'
-import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
 import { OperationHistory } from '@/model/modules/runtime/operation/operation-history'
-import type { OperationHistoryShortcutBinding } from '@/model/modules/runtime/operation/operation-history'
-import type { OperationHistoryShortcutDescriptor } from '@/domain/types/source/composition-source.types'
-import { normalizeComponentSFCInteractionTriggers } from '@/tools/component-sfc-edit-trigger'
 import { buildCompositionI18nCatalogs, cloneI18nRuntimeCatalog } from '@/model/services/i18n/i18n-catalog'
+import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
+import { normalizeComponentSFCInteractionTriggers } from '@/tools/component-sfc-edit-trigger'
 
 function defaultContext(): RuntimeHostContext<'composition'> {
   return {
@@ -55,16 +55,28 @@ function evaluateComponentEventInput(
   payload: unknown,
   evaluatedAt = new Date().toISOString(),
 ): unknown {
-  if (value.kind === 'event') return value.path == null ? payload : readValuePath(payload, value.path)
-  if (value.kind === 'operation-input') return undefined
-  if (value.kind === 'now') return evaluatedAt
-  if (value.kind === 'literal') return value.value
-  if (value.kind === 'scope') return undefined
+  if (value.kind === 'event') {
+    return value.path == null ? payload : readValuePath(payload, value.path)
+  }
+  if (value.kind === 'operation-input') {
+    return undefined
+  }
+  if (value.kind === 'now') {
+    return evaluatedAt
+  }
+  if (value.kind === 'literal') {
+    return value.value
+  }
+  if (value.kind === 'scope') {
+    return undefined
+  }
   if (value.kind === 'coalesce') {
     const left = evaluateComponentEventInput(value.left, payload, evaluatedAt)
     return left ?? evaluateComponentEventInput(value.right, payload, evaluatedAt)
   }
-  if (value.kind === 'array') return value.items.map(item => evaluateComponentEventInput(item, payload, evaluatedAt))
+  if (value.kind === 'array') {
+    return value.items.map(item => evaluateComponentEventInput(item, payload, evaluatedAt))
+  }
   return Object.fromEntries(value.entries.map(entry => [
     typeof entry.key === 'string' ? entry.key : String(evaluateComponentEventInput(entry.key, payload, evaluatedAt)),
     evaluateComponentEventInput(entry.value, payload, evaluatedAt),
@@ -130,8 +142,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     artifacts: RuntimeArtifactReader
   }): CompositionRuntimeHost | null {
     const artifact = input.artifacts.getArtifact<CompositionProgramPayload>('composition', input.model.id ?? input.model.identity)
-    if (!artifact || artifact.status === 'error')
+    if (!artifact || artifact.status === 'error') {
       return null
+    }
 
     const host = new CompositionRuntimeHost({
       id: input.id,
@@ -153,11 +166,13 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
 
   /** Создает children, bindings и hooks. Повторный mount является no-op. */
   public async mountGraph(): Promise<void> {
-    if (this._mounted)
+    if (this._mounted) {
       return
+    }
     const payload = this.getArtifactPayload()
-    if (!payload)
+    if (!payload) {
       throw new Error(`[CompositionRuntimeHost] artifact is missing for "${this.entityIdentity}".`)
+    }
 
     try {
       this._assertRequiredProps(payload)
@@ -175,8 +190,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
 
       this._bindHooks(payload)
       for (const mount of payload.graph.mounts) {
-        if (!this._children.has(mount.targetRuntime))
+        if (!this._children.has(mount.targetRuntime)) {
           throw new Error(`[CompositionRuntimeHost] onMount target "${mount.targetRuntime}" is inactive.`)
+        }
       }
       await this._runQueries(payload.graph.mounts.map(mount => mount.targetRuntime))
     }
@@ -193,8 +209,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   public getChildren(): CompositionRuntimeChildHandle[] {
     return Array.from(this._children.entries()).map(([name, runtime]) => {
       const descriptor = this._childDescriptors.get(name)
-      if (!descriptor)
+      if (!descriptor) {
         throw new Error(`[CompositionRuntimeHost] descriptor "${name}" is missing.`)
+      }
       return { name, descriptor, runtime }
     })
   }
@@ -233,10 +250,12 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   public getOutput(name: string): unknown {
     const key = String(name ?? '').trim()
     const handle = this._publicOutputs[key]
-    if (!handle)
+    if (!handle) {
       return undefined
-    if ('boundaryId' in handle)
+    }
+    if ('boundaryId' in handle) {
       return handle
+    }
     if ('activate' in handle) {
       const descriptor = this.getArtifactPayload()?.outputs.find(output => output.key === key)
       return descriptor?.kind === 'runtime' && descriptor.output
@@ -271,22 +290,28 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   /** Resolves an Update artifact to the Store data alias owned by this Composition. */
   public applyUpdateByIdentity(updateIdentity: string, payload: unknown): void {
     const update = Endge.program.getUpdateArtifact(updateIdentity)
-    if (!update) throw new Error(`[CompositionRuntimeHost] Update artifact is missing: ${updateIdentity}.`)
+    if (!update) {
+      throw new Error(`[CompositionRuntimeHost] Update artifact is missing: ${updateIdentity}.`)
+    }
     const data = this.getArtifactPayload()?.data.find(item => item.kind === 'store' && item.identity === update.payload.storeIdentity)
-    if (!data) throw new Error(`[CompositionRuntimeHost] Store "${update.payload.storeIdentity}" is not mounted for Update "${updateIdentity}".`)
+    if (!data) {
+      throw new Error(`[CompositionRuntimeHost] Store "${update.payload.storeIdentity}" is not mounted for Update "${updateIdentity}".`)
+    }
     this.applyStoreUpdate(data.path ?? data.name, updateIdentity, payload)
   }
 
   /** Устанавливает literal/Raph-backed источник публичных Composition props. */
   public setInputSource(input: RuntimeHostInputSource | null | undefined): void {
     const payload = this.getArtifactPayload()
-    if (!payload)
+    if (!payload) {
       return
+    }
 
     this._compositionInputBindings.clear()
     for (const descriptor of payload.props) {
-      if (descriptor.defaultValue === undefined)
+      if (descriptor.defaultValue === undefined) {
         continue
+      }
       const value = evaluateSourceExpression(descriptor.defaultValue, {
         environment: name => Endge.workspace.variables.resolve(`{${name}}`) || `{${name}}`,
       })
@@ -313,10 +338,12 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   /** Проверяет обязательные props до создания child runtime graph. */
   private _assertRequiredProps(payload: CompositionProgramPayload): void {
     for (const descriptor of payload.props) {
-      if (descriptor.optional || descriptor.defaultValue !== undefined)
+      if (descriptor.optional || descriptor.defaultValue !== undefined) {
         continue
-      if (this.readInput(descriptor.key) === undefined)
+      }
+      if (this.readInput(descriptor.key) === undefined) {
         throw new Error(`[CompositionRuntimeHost] Required prop "${descriptor.key}" is missing for "${this.entityIdentity}".`)
+      }
     }
   }
 
@@ -331,8 +358,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       const parent = descriptor.parentPath
         ? this._scopes.get(descriptor.parentPath) ?? null
         : ownerScope
-      if (descriptor.parentPath && !parent)
+      if (descriptor.parentPath && !parent) {
         throw new Error(`[CompositionRuntimeHost] Parent scope "${descriptor.parentPath}" is missing.`)
+      }
       const id = `${this.id}:scope:${descriptor.path}`
       const scope = new RuntimeScope({
         id,
@@ -343,8 +371,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         hooks: {
           activate: () => this._activateScope(descriptor, payload),
           reconcile: async () => {
-            for (const runtimePath of descriptor.runtimes)
+            for (const runtimePath of descriptor.runtimes) {
               await this._children.get(runtimePath)?.reconcile?.()
+            }
           },
           deactivate: () => this._forgetScopeRuntimes(descriptor.path),
           destroyRuntime: runtimeId => Endge.runtime.destroyRuntimeTreeAsync(runtimeId),
@@ -355,8 +384,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       this._scopes.set(descriptor.path, scope)
       Endge.runtime.scopes.register(scope)
     }
-    for (const descriptor of payload.runtimes)
+    for (const descriptor of payload.runtimes) {
       this._runtimeHandles.set(descriptor.path, this._createRuntimeHandle(descriptor))
+    }
   }
 
   private async _activateScope(
@@ -370,15 +400,18 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       .map(data => data.path ?? data.name)
     await Promise.all(scopeData.map(async (dataPath) => {
       const data = payload.data.find(item => (item.path ?? item.name) === dataPath)
-      if (!data || data.kind !== 'vocab')
+      if (!data || data.kind !== 'vocab') {
         return
+      }
       await Endge.vocabs.acquire([data.identity], data.policy, { dataMode })
     }))
 
     Endge.styles.transaction(() => {
       for (const resourcePath of descriptor.resources) {
         const resource = payload.resources.find(item => item.path === resourcePath)
-        if (!resource || resource.kind !== 'style') continue
+        if (!resource || resource.kind !== 'style') {
+          continue
+        }
         scope.resources.add(Endge.styles.acquireStyle({
           artifactIdentity: resource.identity,
           ownerScopeId: scope.id,
@@ -390,7 +423,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
 
     for (const resourcePath of descriptor.resources) {
       const resource = payload.resources.find(item => item.path === resourcePath)
-      if (!resource || resource.kind !== 'operation-history') continue
+      if (!resource || resource.kind !== 'operation-history') {
+        continue
+      }
       const history = new OperationHistory({
         id: `${scope.id}:operation-history`,
         limit: resolveOperationHistoryLimit(resource.operationHistory),
@@ -413,30 +448,37 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       payload.runtimes.filter(item => item.scopePath === descriptor.path && item.effectiveActivation.mode === 'startup'),
     )
     for (const runtime of runtimeDescriptors) {
-      if (!this._children.has(runtime.path))
+      if (!this._children.has(runtime.path)) {
         await this._createChild(runtime)
+      }
     }
-    for (const runtime of runtimeDescriptors)
+    for (const runtime of runtimeDescriptors) {
       this._bindChild(runtime)
+    }
 
     const childScopes = payload.scopes
       .filter(item => item.parentPath === descriptor.path && item.effectiveActivation.mode === 'startup')
       .sort((left, right) => left.sourceOrder - right.sourceOrder)
-    for (const child of childScopes)
+    for (const child of childScopes) {
       await this._requireScope(child.path).activate()
+    }
     this._bindHooks(payload)
   }
 
   private _forgetScopeRuntimes(scopePath: string): void {
     for (const [path, descriptor] of this._childDescriptors) {
-      if (descriptor.scopePath !== scopePath) continue
+      if (descriptor.scopePath !== scopePath) {
+        continue
+      }
       this._forgetRuntime(path)
     }
   }
 
   private _forgetRuntime(path: string): void {
     for (const connection of this.getArtifactPayload()?.graph.updates ?? []) {
-      if (connection.targetRuntime !== path) continue
+      if (connection.targetRuntime !== path) {
+        continue
+      }
       this._hookDisposers.get(connection.id)?.()
       this._hookDisposers.delete(connection.id)
     }
@@ -446,7 +488,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       this._hookDisposers.delete(id)
     }
     for (const publication of this.getArtifactPayload()?.graph.publications ?? []) {
-      if (publication.sourceRuntime !== path) continue
+      if (publication.sourceRuntime !== path) {
+        continue
+      }
       this._publicationDisposers.get(publication.id)?.()
       this._publicationDisposers.delete(publication.id)
     }
@@ -463,34 +507,46 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     return {
       path: descriptor.path,
       get state() {
-        if (disposed) return 'disposed'
+        if (disposed) {
+          return 'disposed'
+        }
         const runtime = owner._children.get(descriptor.path)
-        if (!runtime) return 'inactive'
+        if (!runtime) {
+          return 'inactive'
+        }
         return runtime.status === 'paused' ? 'paused' : 'active'
       },
       get runtime() { return owner._children.get(descriptor.path) ?? null },
       activate: async () => {
-        if (disposed)
+        if (disposed) {
           throw new Error(`[CompositionRuntimeHost] Runtime handle "${descriptor.path}" is disposed.`)
+        }
         const scope = owner._requireScope(descriptor.scopePath)
-        if (scope.state !== 'active') await scope.activate()
+        if (scope.state !== 'active') {
+          await scope.activate()
+        }
         let runtime = owner._children.get(descriptor.path)
         if (!runtime) {
           await owner._createChild(descriptor)
           owner._bindChild(descriptor)
           const payload = owner.getArtifactPayload()
-          if (payload) owner._bindHooks(payload)
+          if (payload) {
+            owner._bindHooks(payload)
+          }
           runtime = owner._children.get(descriptor.path)
         }
-        if (!runtime)
+        if (!runtime) {
           throw new Error(`[CompositionRuntimeHost] Runtime "${descriptor.path}" cannot be activated.`)
+        }
         return runtime
       },
       pause: async () => { await owner._children.get(descriptor.path)?.pause?.() },
       resume: async () => { await owner._children.get(descriptor.path)?.resume?.() },
       deactivate: async () => {
         const runtime = owner._children.get(descriptor.path)
-        if (!runtime) return
+        if (!runtime) {
+          return
+        }
         await Endge.runtime.destroyRuntimeTreeAsync(runtime.id)
         owner._forgetRuntime(descriptor.path)
       },
@@ -498,9 +554,11 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         await owner._runtimeHandles.get(descriptor.path)?.deactivate()
         disposed = true
       },
-      getOutput: name => {
+      getOutput: (name) => {
         const runtime = owner._children.get(descriptor.path) as any
-        if (!runtime) return undefined
+        if (!runtime) {
+          return undefined
+        }
         return runtime.getOutput?.(name) ?? Raph.get(runtime.outputPath(name))
       },
     }
@@ -508,30 +566,35 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
 
   private _requireScope(path: string): RuntimeScope {
     const scope = this._scopes.get(path)
-    if (!scope)
+    if (!scope) {
       throw new Error(`[CompositionRuntimeHost] Scope "${path}" is missing.`)
+    }
     return scope
   }
 
   private _prepareOutputBridges(payload: CompositionProgramPayload): void {
     for (const connection of payload.graph.inputs) {
       for (const binding of this._flattenBindings(connection.source)) {
-        if (binding.kind === 'output')
+        if (binding.kind === 'output') {
           this._requireOutputBridge(binding.runtime, binding.output)
+        }
         else if (binding.kind === 'outputs') {
-          for (const output of this._requireResolvedOutputs(binding.runtime, binding.outputs))
+          for (const output of this._requireResolvedOutputs(binding.runtime, binding.outputs)) {
             this._requireOutputBridge(binding.runtime, output)
+          }
         }
         else if (binding.kind === 'expression') {
           for (const read of this._collectExpressionReads(binding.expression)) {
-          if (read.source === 'composition-output')
-            this._requireOutputBridge(read.parameters?.[0] ?? '', read.parameters?.[1] ?? '')
-          else if (read.source === 'composition-outputs') {
-            const [runtime = '', ...outputs] = read.parameters ?? []
-            for (const output of outputs)
-              this._requireOutputBridge(runtime, output)
+            if (read.source === 'composition-output') {
+              this._requireOutputBridge(read.parameters?.[0] ?? '', read.parameters?.[1] ?? '')
+            }
+            else if (read.source === 'composition-outputs') {
+              const [runtime = '', ...outputs] = read.parameters ?? []
+              for (const output of outputs) {
+                this._requireOutputBridge(runtime, output)
+              }
+            }
           }
-        }
         }
       }
     }
@@ -544,11 +607,13 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
           })
       this._updateSourcePaths.set(connection.id, sourcePath)
     }
-    for (const connection of payload.graph.publications)
+    for (const connection of payload.graph.publications) {
       this._requireOutputBridge(connection.sourceRuntime, connection.sourceOutput)
+    }
     for (const output of payload.outputs) {
-      if (output.kind === 'runtime' && output.output)
+      if (output.kind === 'runtime' && output.output) {
         this._requireOutputBridge(output.runtime, output.output)
+      }
     }
   }
 
@@ -559,7 +624,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   private _requireOutputBridge(runtime: string, output: string): string {
     const key = this._outputBridgeKey(runtime, output)
     const existing = this._outputBridges.get(key)
-    if (existing) return existing
+    if (existing) {
+      return existing
+    }
     const path = `${this.basePath}.runtimeOutputs.${encodePathPart(runtime)}.${encodePathPart(output)}`
     this._outputBridges.set(key, path)
     this._bridgePaths.add(path)
@@ -569,16 +636,22 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   private _connectRuntimeOutputs(runtimePath: string, runtime: RuntimeHost<any, any>): void {
     const prefix = `${runtimePath}\u0000`
     for (const [key, bridgePath] of this._outputBridges) {
-      if (!key.startsWith(prefix)) continue
+      if (!key.startsWith(prefix)) {
+        continue
+      }
       this._outputBridgeDisposers.get(key)?.()
       const output = key.slice(prefix.length)
       const sourcePath = runtime.outputPath(output)
       const sync = () => {
         const value = Raph.get(sourcePath)
         if (value === undefined) {
-          if (Raph.get(bridgePath) !== undefined) Raph.delete(bridgePath)
+          if (Raph.get(bridgePath) !== undefined) {
+            Raph.delete(bridgePath)
+          }
         }
-        else Raph.set(bridgePath, value)
+        else {
+          Raph.set(bridgePath, value)
+        }
       }
       sync()
       this._outputBridgeDisposers.set(key, Raph.watch([sourcePath, `${sourcePath}.*`], sync))
@@ -588,47 +661,64 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   private _disconnectRuntimeOutputs(runtimePath: string): void {
     const prefix = `${runtimePath}\u0000`
     for (const [key, bridgePath] of this._outputBridges) {
-      if (!key.startsWith(prefix)) continue
+      if (!key.startsWith(prefix)) {
+        continue
+      }
       this._outputBridgeDisposers.get(key)?.()
       this._outputBridgeDisposers.delete(key)
-      if (Raph.get(bridgePath) !== undefined) Raph.delete(bridgePath)
+      if (Raph.get(bridgePath) !== undefined) {
+        Raph.delete(bridgePath)
+      }
     }
   }
 
   public override quiesce(): void {
     super.quiesce()
-    for (const timer of this._streamBatchTimers.values())
+    for (const timer of this._streamBatchTimers.values()) {
       clearTimeout(timer)
+    }
     this._streamBatchTimers.clear()
     this._streamBatches.clear()
-    for (const handle of [...this._bindingDerivedHandles].reverse())
+    for (const handle of [...this._bindingDerivedHandles].reverse()) {
       handle.dispose()
+    }
     this._bindingDerivedHandles = []
-    for (const dispose of this._disposers)
+    for (const dispose of this._disposers) {
       dispose()
+    }
     this._disposers = []
-    for (const path of this._bridgePaths)
+    for (const path of this._bridgePaths) {
       Raph.delete(path)
+    }
     this._bridgePaths.clear()
-    for (const dispose of this._outputBridgeDisposers.values()) dispose()
+    for (const dispose of this._outputBridgeDisposers.values()) {
+      dispose()
+    }
     this._outputBridgeDisposers.clear()
-    for (const dispose of this._hookDisposers.values()) dispose()
+    for (const dispose of this._hookDisposers.values()) {
+      dispose()
+    }
     this._hookDisposers.clear()
-    for (const dispose of this._publicationDisposers.values()) dispose()
+    for (const dispose of this._publicationDisposers.values()) {
+      dispose()
+    }
     this._publicationDisposers.clear()
   }
 
   public override async destroy(): Promise<void> {
     this.quiesce()
     for (const child of this._children.values()) {
-      if (Endge.runtime.getRuntimeById(child.id))
+      if (Endge.runtime.getRuntimeById(child.id)) {
         await Endge.runtime.destroyRuntimeTreeAsync(child.id)
-      else if (child.status !== 'destroyed')
+      }
+      else if (child.status !== 'destroyed') {
         await child.destroy()
+      }
     }
     for (const runtimeId of this._ownedStoreRuntimeIds) {
-      if (Endge.runtime.getRuntimeById(runtimeId))
+      if (Endge.runtime.getRuntimeById(runtimeId)) {
         await Endge.runtime.destroyRuntimeTreeAsync(runtimeId)
+      }
     }
     this._ownedStoreRuntimeIds.clear()
     this._children.clear()
@@ -671,12 +761,14 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       const catalog: VocabRuntimeCatalog = { ...parent }
 
       for (const descriptor of payload.data) {
-        if (descriptor.kind !== 'vocab' || (descriptor.scopePath ?? 'scope_default') !== scope.path)
+        if (descriptor.kind !== 'vocab' || (descriptor.scopePath ?? 'scope_default') !== scope.path) {
           continue
+        }
         const descriptorPath = descriptor.path ?? descriptor.name
         const path = this._dataPaths.get(descriptorPath)
-        if (!path)
+        if (!path) {
           throw new Error(`[CompositionRuntimeHost] Vocab data path "${descriptorPath}" is missing.`)
+        }
         catalog[descriptor.name] = {
           identity: descriptor.identity,
           path,
@@ -718,8 +810,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       }
 
       const store = Endge.domain.getStore(descriptor.identity)
-      if (!store)
+      if (!store) {
         throw new Error(`[CompositionRuntimeHost] Store data "${descriptor.identity}" is missing.`)
+      }
       const explicitRuntimeId = String(explicitStoreRuntimes[descriptorPath] ?? explicitStoreRuntimes[descriptor.name] ?? '').trim()
       let storeRuntime: StoreRuntimeHost | null = null
       let ownership: 'owned' | 'borrowed' = 'owned'
@@ -728,10 +821,12 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         storeRuntime = Endge.runtime.getRuntimeById<StoreRuntimeHost>(explicitRuntimeId)
         ownership = 'borrowed'
         provider = 'explicit'
-        if (!storeRuntime || storeRuntime.entityType !== 'store')
+        if (!storeRuntime || storeRuntime.entityType !== 'store') {
           throw new Error(`[CompositionRuntimeHost] Store runtime "${explicitRuntimeId}" for data alias "${descriptor.name}" is missing.`)
-        if (storeRuntime.entityIdentity !== descriptor.identity)
+        }
+        if (storeRuntime.entityIdentity !== descriptor.identity) {
           throw new Error(`[CompositionRuntimeHost] Store runtime "${explicitRuntimeId}" has identity "${storeRuntime.entityIdentity}" instead of "${descriptor.identity}".`)
+        }
       }
       else if (descriptor.resolution !== 'isolated') {
         storeRuntime = this._findAncestorStoreProvider(descriptor.identity, descriptor.slot)
@@ -749,8 +844,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
           persistence: 'disabled',
           meta: { instance: descriptor.name },
         }) as StoreRuntimeHost | null
-        if (!storeRuntime)
+        if (!storeRuntime) {
           throw new Error(`[CompositionRuntimeHost] Store runtime for "${descriptor.identity}" cannot be created.`)
+        }
         this._ownedStoreRuntimeIds.add(storeRuntime.id)
       }
 
@@ -785,12 +881,14 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       if (current instanceof CompositionRuntimeHost) {
         const runtimeIds = current._storeProviderRuntimeIds.get(key)
         if (runtimeIds?.size) {
-          if (runtimeIds.size > 1)
+          if (runtimeIds.size > 1) {
             throw new Error(`[CompositionRuntimeHost] Store provider "${identity}"${slot ? ` in slot "${slot}"` : ''} is ambiguous in ancestor "${current.entityIdentity}".`)
+          }
           const runtimeId = runtimeIds.values().next().value as string
           const runtime = Endge.runtime.getRuntimeById<StoreRuntimeHost>(runtimeId)
-          if (!runtime || runtime.entityType !== 'store')
+          if (!runtime || runtime.entityType !== 'store') {
             throw new Error(`[CompositionRuntimeHost] Store provider runtime "${runtimeId}" is missing.`)
+          }
           return runtime
         }
       }
@@ -815,13 +913,16 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       const storeRuntime = runtimeId
         ? Endge.runtime.getRuntimeById<StoreRuntimeHost>(runtimeId)
         : null
-      if (!storeRuntime || storeRuntime.entityType !== 'store')
+      if (!storeRuntime || storeRuntime.entityType !== 'store') {
         throw new Error(`[CompositionRuntimeHost] Store data "${publication.targetData}" is not mounted.`)
-      if (!storeRuntime.isWritable(publication.targetPath))
+      }
+      if (!storeRuntime.isWritable(publication.targetPath)) {
         throw new Error(`[CompositionRuntimeHost] Store target "${publication.targetData}.${publication.targetPath}" is derived or missing.`)
+      }
       const source = this._children.get(publication.sourceRuntime)
-      if (!source)
+      if (!source) {
         throw new Error(`[CompositionRuntimeHost] Runtime "${publication.sourceRuntime}" is missing.`)
+      }
       writes.push({
         runtimeId: storeRuntime.id,
         path: publication.targetPath,
@@ -832,8 +933,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     Raph.transaction(() => {
       for (const write of writes) {
         const storeRuntime = Endge.runtime.getRuntimeById<StoreRuntimeHost>(write.runtimeId)
-        if (!storeRuntime)
+        if (!storeRuntime) {
           throw new Error(`[CompositionRuntimeHost] Store runtime "${write.runtimeId}" was replaced or removed.`)
+        }
         storeRuntime.set(write.path, write.value)
       }
     })
@@ -844,23 +946,26 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     const publications = (ctx.updates ?? [])
       .filter(update => update.kind === 'publish')
       .map(update => update.payload as CompositionRuntimePublicationConnection)
-    if (publications.length)
+    if (publications.length) {
       this._publishUpdates(publications)
+    }
     this.emit('update', ctx)
   }
 
   private _requireDataPath(name: string, path = ''): string {
     const basePath = this._dataPaths.get(name)
-    if (!basePath)
+    if (!basePath) {
       throw new Error(`[CompositionRuntimeHost] Data alias "${name}" is missing.`)
+    }
     return path ? `${basePath}.${path.split('.').map(encodePathPart).join('.')}` : basePath
   }
 
   private _requireStoreRuntime(dataAlias: string): StoreRuntimeHost {
     const runtimeId = this._storeRuntimeIds.get(String(dataAlias ?? '').trim())
     const runtime = runtimeId ? Endge.runtime.getRuntimeById<StoreRuntimeHost>(runtimeId) : null
-    if (!runtime || runtime.entityType !== 'store')
+    if (!runtime || runtime.entityType !== 'store') {
       throw new Error(`[CompositionRuntimeHost] Store data "${dataAlias}" is not mounted.`)
+    }
     return runtime
   }
 
@@ -868,8 +973,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     const data = [...this._dataPaths.keys()]
       .sort((left, right) => right.length - left.length)
       .find(candidate => reference === candidate || reference.startsWith(`${candidate}.`))
-    if (!data)
+    if (!data) {
       return null
+    }
     return {
       data,
       path: reference === data ? '' : reference.slice(data.length + 1),
@@ -879,8 +985,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   private async _createChild(descriptor: CompositionProgramPayload['runtimes'][number]): Promise<void> {
     if (descriptor.kind === 'filter-view') {
       const source = this._children.get(descriptor.identity) as FilterRuntimeHost | undefined
-      if (!source || source.entityType !== 'filter' || source.runtimeType !== 'filter-runtime-host')
+      if (!source || source.entityType !== 'filter' || source.runtimeType !== 'filter-runtime-host') {
         throw new Error(`[CompositionRuntimeHost] filterView source runtime "${descriptor.identity}" is missing.`)
+      }
       const initialProps = Object.fromEntries(
         Object.entries(this._compiledInputs(descriptor.name))
           .map(([key, binding]) => [key, this._readBinding(binding)]),
@@ -934,21 +1041,26 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }
 
     let model: any = null
-    if (descriptor.kind === 'filter')
+    if (descriptor.kind === 'filter') {
       model = Endge.domain.getFilter(descriptor.identity)
-    else if (descriptor.kind === 'query')
+    }
+    else if (descriptor.kind === 'query') {
       model = Endge.domain.getQuery(descriptor.identity)
-    else if (descriptor.kind === 'stream')
+    }
+    else if (descriptor.kind === 'stream') {
       model = Endge.domain.getStream(descriptor.identity)
-    else if (descriptor.kind === 'composition')
+    }
+    else if (descriptor.kind === 'composition') {
       model = Endge.domain.getComposition(descriptor.identity)
-    else
-      model = Endge.domain.getComponentSFC(descriptor.identity) ?? Endge.domain.getComponent(descriptor.identity)
-    if (!model)
+    }
+    else { model = Endge.domain.getComponentSFC(descriptor.identity) ?? Endge.domain.getComponent(descriptor.identity) }
+    if (!model) {
       throw new Error(`[CompositionRuntimeHost] model "${descriptor.identity}" is missing.`)
+    }
 
-    if (descriptor.kind === 'composition')
+    if (descriptor.kind === 'composition') {
       this._assertCompositionCycle(descriptor.identity)
+    }
 
     const initialProps = Object.fromEntries(
       Object.entries(this._compiledInputs(descriptor.name))
@@ -971,13 +1083,15 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
           .filter(connection => connection.targetRuntime === descriptor.name)
           .map((connection) => {
             const runtimeId = this._storeRuntimeIds.get(connection.sourceData)
-            if (!runtimeId)
+            if (!runtimeId) {
               throw new Error(`[CompositionRuntimeHost] Store data "${connection.sourceData}" is not mounted for nested Composition "${descriptor.name}".`)
+            }
             return [connection.targetData, runtimeId]
           }),
       )
-      if (Object.keys(dataRuntimes).length)
+      if (Object.keys(dataRuntimes).length) {
         meta.dataRuntimes = dataRuntimes
+      }
     }
     if (descriptor.kind === 'component') {
       Raph.set(basePath, initialProps)
@@ -991,26 +1105,30 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       persistenceKey: descriptor.persistKey,
       meta,
     })
-    if (!child)
+    if (!child) {
       throw new Error(`[CompositionRuntimeHost] runtime "${descriptor.name}" cannot be created.`)
+    }
     this._children.set(descriptor.name, child)
     this._childDescriptors.set(descriptor.name, descriptor)
     this._connectRuntimeOutputs(descriptor.name, child)
-    if (descriptor.kind === 'composition')
+    if (descriptor.kind === 'composition') {
       await (child as unknown as CompositionRuntimeHost).mountGraph()
+    }
   }
 
   private _bindChild(descriptor: CompositionProgramPayload['runtimes'][number]): void {
     const child = this._children.get(descriptor.name)
-    if (!child)
+    if (!child) {
       return
+    }
     const inputBindings = this._compiledInputs(descriptor.name)
 
     if (descriptor.kind === 'filter-view') {
       const filterView = child as unknown as FilterViewRuntimeHost
       for (const [prop, binding] of Object.entries(inputBindings)) {
-        if (binding.kind === 'literal')
+        if (binding.kind === 'literal') {
           continue
+        }
         const sync = () => filterView.setProps({ [prop]: this._readBinding(binding) })
         sync()
         this._subscribeBinding(binding, sync)
@@ -1038,11 +1156,13 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       return
     }
 
-    if (descriptor.kind === 'composition')
+    if (descriptor.kind === 'composition') {
       return
+    }
 
-    if (descriptor.kind !== 'component')
+    if (descriptor.kind !== 'component') {
       return
+    }
     const modelType = String((child.model as any)?.type ?? '')
     if (modelType === 'component-sfc') {
       const literals: Record<string, unknown> = {}
@@ -1069,21 +1189,24 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       Raph.set(basePath, props)
     }
     syncLegacy()
-    for (const binding of Object.values(inputBindings))
+    for (const binding of Object.values(inputBindings)) {
       this._subscribeBinding(binding, syncLegacy)
+    }
   }
 
   private _bindStreamDispatch(
     descriptor: CompositionProgramPayload['runtimes'][number],
     stream: StreamRuntimeHost,
   ): void {
-    if (!descriptor.dispatchTo?.length)
+    if (!descriptor.dispatchTo?.length) {
       return
+    }
     const stores = descriptor.dispatchTo.map((dataAlias) => {
       const runtimeId = this._storeRuntimeIds.get(dataAlias)
       const store = runtimeId ? Endge.runtime.getRuntimeById<StoreRuntimeHost>(runtimeId) : null
-      if (!store || store.entityType !== 'store')
+      if (!store || store.entityType !== 'store') {
         throw new Error(`[CompositionRuntimeHost] Store data "${dataAlias}" is not mounted.`)
+      }
       return store
     })
 
@@ -1091,8 +1214,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       const batch = descriptor.batch
       if (!batch || (batch.maxItems === 1 && batch.maxWaitMs === 0)) {
         Raph.transaction(() => {
-          for (const store of stores)
+          for (const store of stores) {
             store.dispatch(event)
+          }
         })
         return
       }
@@ -1118,7 +1242,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     descriptor: CompositionProgramPayload['runtimes'][number],
     component: ComponentSFCRuntimeHost,
   ): void {
-    if (!descriptor.dispatchTo?.length) return
+    if (!descriptor.dispatchTo?.length) {
+      return
+    }
     const stores = descriptor.dispatchTo.map(dataAlias => this._requireStoreRuntime(dataAlias))
     for (const port of component.getIr()?.script.ports.emits.events ?? []) {
       const dispose = component.onEventPort(port.name, (occurrence) => {
@@ -1133,7 +1259,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
           },
         }
         Raph.transaction(() => {
-          for (const store of stores) store.dispatch(envelope)
+          for (const store of stores) {
+            store.dispatch(envelope)
+          }
         })
       })
       this._disposers.push(dispose)
@@ -1142,25 +1270,29 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
 
   private _flushStreamBatch(name: string, stores: StoreRuntimeHost[]): void {
     const timer = this._streamBatchTimers.get(name)
-    if (timer)
+    if (timer) {
       clearTimeout(timer)
+    }
     this._streamBatchTimers.delete(name)
     const events = this._streamBatches.get(name) ?? []
     this._streamBatches.delete(name)
-    if (!events.length)
+    if (!events.length) {
       return
+    }
     Raph.transaction(() => {
       for (const event of events) {
-        for (const store of stores)
+        for (const store of stores) {
           store.dispatch(event)
+        }
       }
     })
   }
 
   private _makeOutputs(payload: CompositionProgramPayload): void {
     this._publicOutputs = Object.fromEntries(payload.outputs.map((output) => {
-      if (output.kind === 'scope')
+      if (output.kind === 'scope') {
         return [output.key, this._requireScope(output.scope)]
+      }
       const runtime = this._children.get(output.runtime) ?? null
       if (output.output) {
         const sourcePath = this._requireOutputBridge(output.runtime, output.output)
@@ -1168,15 +1300,20 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         const sync = () => {
           const value = Raph.get(sourcePath)
           if (value === undefined) {
-            if (Raph.get(targetPath) !== undefined) Raph.delete(targetPath)
+            if (Raph.get(targetPath) !== undefined) {
+              Raph.delete(targetPath)
+            }
           }
-          else Raph.set(targetPath, value)
+          else {
+            Raph.set(targetPath, value)
+          }
         }
         sync()
         this._disposers.push(Raph.watch([sourcePath, `${sourcePath}.*`], sync))
       }
-      if (!runtime)
+      if (!runtime) {
         return [output.key, this._runtimeHandles.get(output.runtime) ?? { kind: 'runtime', runtime: null, output: output.output }]
+      }
       const handle: CompositionRuntimeOutputHandle = { kind: 'runtime', runtime, output: output.output }
       return [output.key, handle]
     }))
@@ -1195,21 +1332,28 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
 
   private _bindHooks(payload: CompositionProgramPayload): void {
     for (const connection of payload.graph.events ?? []) {
-      if (this._hookDisposers.has(connection.id)) continue
+      if (this._hookDisposers.has(connection.id)) {
+        continue
+      }
       const source = this._children.get(connection.runtime)
-      if (!source || source.entityType !== 'component-sfc') continue
+      if (!source || source.entityType !== 'component-sfc') {
+        continue
+      }
       const component = source as unknown as ComponentSFCRuntimeHost
-      this._hookDisposers.set(connection.id, component.onEventPort(connection.event, occurrence => {
+      this._hookDisposers.set(connection.id, component.onEventPort(connection.event, (occurrence) => {
         void this._executeComponentEventEffect(connection.effect, occurrence, connection.runtime)
       }))
     }
 
     for (const connection of payload.graph.updates) {
-      if (this._hookDisposers.has(connection.id)) continue
+      if (this._hookDisposers.has(connection.id)) {
+        continue
+      }
       const target = this._children.get(connection.targetRuntime)
       const sourcePath = this._updateSourcePaths.get(connection.id)
-      if (!sourcePath || !target)
+      if (!sourcePath || !target) {
         continue
+      }
       this._hookDisposers.set(connection.id, target.bindUpdate({
         id: connection.id,
         sourcePath,
@@ -1220,13 +1364,15 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
 
     const successSources = new Set<string>()
     for (const connection of payload.graph.successes ?? []) {
-      if (this._children.has(connection.sourceRuntime))
+      if (this._children.has(connection.sourceRuntime)) {
         successSources.add(connection.sourceRuntime)
+      }
     }
     for (const sourceRuntime of successSources) {
       const id = this._successHookId(sourceRuntime)
-      if (this._hookDisposers.has(id))
+      if (this._hookDisposers.has(id)) {
         continue
+      }
       const source = this._children.get(sourceRuntime) as unknown as QueryRuntimeHost
       const runTargets = (): void => {
         if (this._orchestratedQueries.has(sourceRuntime)) {
@@ -1240,10 +1386,13 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }
 
     for (const publication of payload.graph.publications) {
-      if (this._publicationDisposers.has(publication.id)) continue
-      const source = this._children.get(publication.sourceRuntime)
-      if (!source)
+      if (this._publicationDisposers.has(publication.id)) {
         continue
+      }
+      const source = this._children.get(publication.sourceRuntime)
+      if (!source) {
+        continue
+      }
       this._publicationDisposers.set(publication.id, this.bindUpdate({
         id: publication.id,
         sourcePath: this._requireOutputBridge(publication.sourceRuntime, publication.sourceOutput),
@@ -1251,12 +1400,13 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       }))
     }
 
-    const initialPublications = payload.graph.publications.filter(publication => {
+    const initialPublications = payload.graph.publications.filter((publication) => {
       const source = this._children.get(publication.sourceRuntime)
       return source && Raph.get(this._requireOutputBridge(publication.sourceRuntime, publication.sourceOutput)) !== undefined
     })
-    if (initialPublications.length)
+    if (initialPublications.length) {
       this._publishUpdates(initialPublications)
+    }
   }
 
   private async _executeComponentEventEffect(
@@ -1313,8 +1463,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
 
   private async _runQuery(name: string): Promise<void> {
     const query = this._children.get(name) as unknown as QueryRuntimeHost | undefined
-    if (!query || typeof query.run !== 'function')
+    if (!query || typeof query.run !== 'function') {
       throw new Error(`[CompositionRuntimeHost] Query runtime "${name}" is missing.`)
+    }
     this._orchestratedQueries.add(name)
     this._orchestratedSuccesses.delete(name)
     try {
@@ -1323,8 +1474,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       this.setContext({ updatedAt: now, lastHookAt: now })
       if (this._orchestratedSuccesses.delete(name)) {
         const payload = this.getArtifactPayload()
-        if (payload)
+        if (payload) {
           await this._runSuccessTargets(name, payload)
+        }
       }
     }
     finally {
@@ -1352,20 +1504,27 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   }
 
   private _readBinding(binding: CompositionBindingValue): unknown {
-    if (binding.kind === 'literal')
+    if (binding.kind === 'literal') {
       return binding.value
-    if (binding.kind === 'store')
+    }
+    if (binding.kind === 'store') {
       return Raph.get(binding.key)
-    if (binding.kind === 'data')
+    }
+    if (binding.kind === 'data') {
       return Raph.get(this._requireDataPath(binding.data, binding.path))
-    if (binding.kind === 'runtime-metadata')
+    }
+    if (binding.kind === 'runtime-metadata') {
       return this._readRuntimeMetadata(binding.runtime, binding.namespace)
-    if (binding.kind === 'filter-fields')
+    }
+    if (binding.kind === 'filter-fields') {
       return this._readFilterFieldsBinding(binding)
-    if (binding.kind === 'data-view')
+    }
+    if (binding.kind === 'data-view') {
       return undefined
-    if (binding.kind === 'outputs')
+    }
+    if (binding.kind === 'outputs') {
       return this._readRuntimeOutputs(binding.runtime, this._requireResolvedOutputs(binding.runtime, binding.outputs))
+    }
     if (binding.kind === 'expression') {
       return evaluateSourceExpression(binding.expression, {
         environment: name => Endge.workspace.variables.resolve(`{${name}}`) || `{${name}}`,
@@ -1383,8 +1542,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
 
   private _compiledInputs(runtimeName: string): Record<string, CompositionBindingValue> {
     const graph = this.getArtifactPayload()?.graph
-    if (!graph)
+    if (!graph) {
       return {}
+    }
     return Object.fromEntries(
       graph.inputs
         .filter(connection => connection.targetRuntime === runtimeName)
@@ -1409,8 +1569,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   }
 
   private _subscribeBinding(binding: CompositionBindingValue, sync: () => void): void {
-    if (binding.kind === 'literal')
+    if (binding.kind === 'literal') {
       return
+    }
     if (binding.kind === 'store') {
       const dispose = Raph.watch(binding.key, sync)
       this._disposers.push(dispose)
@@ -1421,14 +1582,17 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       this._disposers.push(dispose)
       return
     }
-    if (binding.kind === 'runtime-metadata')
+    if (binding.kind === 'runtime-metadata') {
       return
-    if (binding.kind === 'data-view')
+    }
+    if (binding.kind === 'data-view') {
       return
+    }
     if (binding.kind === 'filter-fields') {
       const runtime = this._children.get(binding.runtime)
-      if (!runtime)
+      if (!runtime) {
         return
+      }
       this._disposers.push(Raph.watch([
         runtime.statePath(),
         `${runtime.statePath()}.*`,
@@ -1439,8 +1603,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       const seen = new Set<string>()
       for (const read of this._collectExpressionReads(binding.expression)) {
         const key = `${read.source}:${read.path}:${JSON.stringify(read.parameters ?? [])}`
-        if (seen.has(key))
+        if (seen.has(key)) {
           continue
+        }
         seen.add(key)
         this._subscribeExpressionRead(read, sync)
       }
@@ -1452,8 +1617,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
           const path = this._requireOutputBridge(binding.runtime, output)
           return [path, `${path}.*`]
         })
-      if (paths.length)
+      if (paths.length) {
         this._disposers.push(Raph.watch(paths, sync))
+      }
       return
     }
     const path = this._requireOutputBridge(binding.runtime, binding.output)
@@ -1465,14 +1631,18 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     prop: string,
     binding: Exclude<CompositionBindingValue, { kind: 'literal' }>,
   ): string {
-    if (binding.kind === 'store')
+    if (binding.kind === 'store') {
       return binding.key
-    if (binding.kind === 'data')
+    }
+    if (binding.kind === 'data') {
       return this._requireDataPath(binding.data, binding.path)
-    if (binding.kind === 'data-view')
+    }
+    if (binding.kind === 'data-view') {
       return this._materializeDataViewBinding(runtimeName, prop, binding)
-    if (binding.kind === 'output')
+    }
+    if (binding.kind === 'output') {
       return this._requireOutputBridge(binding.runtime, binding.output)
+    }
     return this._materializeBinding(runtimeName, prop, binding)
   }
 
@@ -1496,8 +1666,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     binding: Extract<CompositionBindingValue, { kind: 'data-view' }>,
   ): string {
     const artifact = Endge.program.getDataViewArtifact(binding.identity)
-    if (!artifact || artifact.status === 'error')
+    if (!artifact || artifact.status === 'error') {
       throw new Error(`[CompositionRuntimeHost] DataView "${binding.identity}" is missing or invalid.`)
+    }
 
     const from = this._requireDataPath(binding.data, binding.path)
     const to = `${this.basePath}.bindings.${encodePathPart(runtimeName)}.${encodePathPart(prop)}`
@@ -1521,16 +1692,18 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     })
     this.node?.addChild(handle.node, { invalidate: false })
     this._bindingDerivedHandles.push(handle)
-    for (const propBinding of Object.values(binding.props))
+    for (const propBinding of Object.values(binding.props)) {
       this._subscribeBinding(propBinding, () => handle.recompute())
+    }
     this._bridgePaths.add(to)
     return to
   }
 
   /** Гарантирует, что список outputs для fromOutput(runtime) был связан до запуска runtime. */
   private _requireResolvedOutputs(runtime: string, outputs: string[] | undefined): string[] {
-    if (!outputs)
+    if (!outputs) {
       throw new Error(`[CompositionRuntimeHost] fromOutput("${runtime}") was not linked by the compiler.`)
+    }
     return outputs
   }
 
@@ -1548,13 +1721,15 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   /** Читает весь compiled metadata map или один namespace сущности runtime alias-а. */
   private _readRuntimeMetadata(runtimePath: string, namespace?: string): unknown {
     const descriptor = this.getArtifactPayload()?.runtimes.find(runtime => runtime.path === runtimePath)
-    if (!descriptor)
+    if (!descriptor) {
       return undefined
+    }
     const dependency = descriptor.kind === 'filter-view'
       ? this.getArtifactPayload()?.runtimes.find(runtime => runtime.path === descriptor.identity)
       : descriptor
-    if (!dependency)
+    if (!dependency) {
       return undefined
+    }
     const entityType = dependency.kind === 'component'
       ? 'component-sfc'
       : dependency.kind === 'filter-view'
@@ -1571,12 +1746,15 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     if (read.source === 'composition-output') {
       return this._readRuntimeOutput(parameters[0], parameters[1])
     }
-    if (read.source === 'composition-outputs')
+    if (read.source === 'composition-outputs') {
       return this._readRuntimeOutputs(parameters[0], parameters.slice(1))
-    if (read.source === 'composition-runtime-metadata')
+    }
+    if (read.source === 'composition-runtime-metadata') {
       return this._readRuntimeMetadata(parameters[0], parameters[1])
-    if (read.source === 'composition-store')
+    }
+    if (read.source === 'composition-store') {
       return Raph.get(parameters[0])
+    }
     if (read.source === 'composition-data') {
       const ref = parameters[0] ?? ''
       const resolved = this._resolveDataReference(ref)
@@ -1595,24 +1773,30 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       const path = dot > 0 ? read.path.slice(dot + 1) : ''
       return readValuePath(this.readInput(prop), path)
     }
-    if (read.source === 'metadata')
+    if (read.source === 'metadata') {
       return Endge.program.getArtifact(parameters[0] as any, parameters[1])?.metadata
-    if (read.source === 'store')
+    }
+    if (read.source === 'store') {
       return Raph.get(read.path)
+    }
     return undefined
   }
 
   private _collectExpressionReads(
     expression: import('@/domain/types/source/source-expression.types').SourceExpressionIR,
   ): Array<Extract<import('@/domain/types/source/source-expression.types').SourceExpressionIR, { type: 'read' }>> {
-    if (expression.type === 'read')
+    if (expression.type === 'read') {
       return [expression]
-    if (expression.type === 'operation')
+    }
+    if (expression.type === 'operation') {
       return expression.arguments.flatMap(argument => this._collectExpressionReads(argument))
-    if (expression.type === 'array')
+    }
+    if (expression.type === 'array') {
       return expression.items.flatMap(argument => this._collectExpressionReads(argument))
-    if (expression.type === 'object')
+    }
+    if (expression.type === 'object') {
       return Object.values(expression.properties).flatMap(argument => this._collectExpressionReads(argument))
+    }
     return []
   }
 
@@ -1627,14 +1811,16 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     sync: () => void,
   ): void {
     const parameters = read.parameters ?? []
-    if (read.source === 'metadata' || read.source === 'composition-runtime-metadata' || read.source === 'current' || read.source === 'env')
+    if (read.source === 'metadata' || read.source === 'composition-runtime-metadata' || read.source === 'current' || read.source === 'env') {
       return
+    }
     if (read.source === 'prop') {
       const dot = read.path.indexOf('.')
       const prop = dot > 0 ? read.path.slice(0, dot) : read.path
       const source = this._compositionInputBindings.get(prop)
-      if (source?.kind === 'raph')
+      if (source?.kind === 'raph') {
         this._disposers.push(Raph.watch([source.path, `${source.path}.*`], sync))
+      }
       return
     }
     if (read.source === 'composition-output') {
@@ -1648,14 +1834,16 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         const path = this._requireOutputBridge(runtime, output)
         return [path, `${path}.*`]
       })
-      if (paths.length)
+      if (paths.length) {
         this._disposers.push(Raph.watch(paths, sync))
+      }
       return
     }
     if (read.source === 'composition-filter-fields') {
       const runtime = this._children.get(parameters[0])
-      if (runtime)
+      if (runtime) {
         this._disposers.push(Raph.watch([runtime.statePath(), `${runtime.statePath()}.*`], sync))
+      }
       return
     }
     if (read.source === 'composition-store' || read.source === 'store') {
@@ -1665,8 +1853,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     if (read.source === 'composition-data') {
       const ref = parameters[0] ?? ''
       const resolved = this._resolveDataReference(ref)
-      if (!resolved)
+      if (!resolved) {
         throw new Error(`[CompositionRuntimeHost] Data reference "${ref}" is missing.`)
+      }
       const path = this._requireDataPath(resolved.data, resolved.path)
       this._disposers.push(Raph.watch(`${path}.*`, sync))
     }
@@ -1674,8 +1863,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
 
   private _readFilterFieldsBinding(binding: Extract<CompositionBindingValue, { kind: 'filter-fields' }>): CompositionFilterFieldsSlice | null {
     const runtime = this._children.get(binding.runtime) as FilterRuntimeHost | undefined
-    if (!runtime || typeof runtime.getFields !== 'function' || typeof runtime.getState !== 'function')
+    if (!runtime || typeof runtime.getFields !== 'function' || typeof runtime.getState !== 'function') {
       return null
+    }
 
     const fields = runtime.getFields()
       .filter(field => binding.fields.includes(field.key))
@@ -1704,26 +1894,32 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     const ordered: CompositionProgramPayload['runtimes'] = []
 
     const visit = (name: string) => {
-      if (visited.has(name))
+      if (visited.has(name)) {
         return
-      if (visiting.has(name))
+      }
+      if (visiting.has(name)) {
         throw new Error(`[CompositionRuntimeHost] runtime dependency cycle near "${name}".`)
+      }
       const runtime = byName.get(name)
       if (!runtime) {
-        if (this.getArtifactPayload()?.runtimes.some(item => item.path === name))
+        if (this.getArtifactPayload()?.runtimes.some(item => item.path === name)) {
           return
+        }
         throw new Error(`[CompositionRuntimeHost] runtime dependency "${name}" is missing.`)
       }
       visiting.add(name)
-      if (runtime.kind === 'filter-view')
+      if (runtime.kind === 'filter-view') {
         visit(runtime.identity)
+      }
       for (const binding of Object.values(this._compiledInputs(runtime.name))) {
-        if (binding.kind === 'output' || binding.kind === 'outputs' || binding.kind === 'filter-fields')
+        if (binding.kind === 'output' || binding.kind === 'outputs' || binding.kind === 'filter-fields') {
           visit(binding.runtime)
+        }
         else if (binding.kind === 'expression') {
           for (const read of this._collectExpressionReads(binding.expression)) {
-            if (read.source === 'composition-output' || read.source === 'composition-outputs' || read.source === 'composition-filter-fields')
+            if (read.source === 'composition-output' || read.source === 'composition-outputs' || read.source === 'composition-filter-fields') {
               visit(read.parameters?.[0] ?? '')
+            }
           }
         }
       }
@@ -1732,8 +1928,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       ordered.push(runtime)
     }
 
-    for (const runtime of runtimes)
+    for (const runtime of runtimes) {
       visit(runtime.name)
+    }
     return ordered
   }
 }
@@ -1742,25 +1939,31 @@ function resolveOperationHistoryLimit(options: {
   limit: number
   limitConfigurationPath: string | null
 } | undefined): number {
-  if (!options?.limitConfigurationPath) return options?.limit ?? 20
+  if (!options?.limitConfigurationPath) {
+    return options?.limit ?? 20
+  }
   const value = resolveConfigurationValue(options.limitConfigurationPath)
   const limit = Number(value)
-  if (!Number.isFinite(limit) || limit <= 0)
+  if (!Number.isFinite(limit) || limit <= 0) {
     throw new Error(`[OperationHistory] Configuration value "${options.limitConfigurationPath}" must be a positive number.`)
+  }
   return Math.floor(limit)
 }
 
 function resolveOperationHistoryShortcuts(
   descriptors: OperationHistoryShortcutDescriptor[] | null,
 ): OperationHistoryShortcutBinding[] | null {
-  if (descriptors == null) return null
-  return descriptors.map(descriptor => {
+  if (descriptors == null) {
+    return null
+  }
+  return descriptors.map((descriptor) => {
     const value = descriptor.triggerSet.kind === 'literal'
       ? descriptor.triggerSet.value
       : resolveConfigurationValue(descriptor.triggerSet.path)
     const triggers = normalizeComponentSFCInteractionTriggers(value)
-    if (!triggers.length)
+    if (!triggers.length) {
       throw new Error(`[OperationHistory] TriggerSet for ${descriptor.command} is empty or invalid.`)
+    }
     return { command: descriptor.command, triggers }
   })
 }
@@ -1768,8 +1971,9 @@ function resolveOperationHistoryShortcuts(
 function resolveConfigurationValue(path: string): unknown {
   let value: unknown = Endge.configuration.current.values
   for (const segment of path.split('.').filter(Boolean)) {
-    if (!value || typeof value !== 'object' || Array.isArray(value) || !(segment in value))
+    if (!value || typeof value !== 'object' || Array.isArray(value) || !(segment in value)) {
       throw new Error(`[OperationHistory] Configuration value is not resolved: ${path}.`)
+    }
     value = (value as Record<string, unknown>)[segment]
   }
   return value
@@ -1784,11 +1988,13 @@ function encodePathPart(value: string): string {
 }
 
 function readValuePath(value: unknown, path: string): unknown {
-  if (!path)
+  if (!path) {
     return value
+  }
   return path.split('.').reduce<unknown>((current, segment) => {
-    if (current == null || typeof current !== 'object')
+    if (current == null || typeof current !== 'object') {
       return undefined
+    }
     return (current as Record<string, unknown>)[segment]
   }, value)
 }

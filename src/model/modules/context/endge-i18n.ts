@@ -81,8 +81,9 @@ export class EndgeI18n extends EndgeModule {
    */
   public setFallbackLocale(locale: string): void {
     const next = String(locale ?? '').trim()
-    if (!next || next === this._fallbackLocale)
+    if (!next || next === this._fallbackLocale) {
       return
+    }
 
     this._fallbackLocale = next
     Endge.runtime.invalidateApplicationScopes()
@@ -98,13 +99,15 @@ export class EndgeI18n extends EndgeModule {
 
     for (const bundle of this._getBundles(false)) {
       const bundleIdentity = String(bundle.identity ?? '').trim()
-      if (!bundleIdentity)
+      if (!bundleIdentity) {
         continue
+      }
 
       const locales = bundle.locales ?? {}
       for (const [locale, messages] of Object.entries(locales)) {
-        if (!this._isPlainObject(messages))
+        if (!this._isPlainObject(messages)) {
           continue
+        }
 
         this._writeMessagesIndex(
           this._getLocaleIndex(locale),
@@ -127,8 +130,9 @@ export class EndgeI18n extends EndgeModule {
     const normalized = this._normalizeOptions(options)
     const value = this.resolve(key, normalized)
 
-    if (value == null)
+    if (value == null) {
       return normalized.defaultValue ?? key
+    }
 
     const text = typeof value === 'string' ? value : String(value)
     return this._interpolate(text, normalized.params)
@@ -147,8 +151,9 @@ export class EndgeI18n extends EndgeModule {
       const entry = catalog[alias]
       const value = entry?.messages[this.locale]?.[messageKey]
         ?? entry?.messages[this._fallbackLocale]?.[messageKey]
-      if (value != null)
+      if (value != null) {
         return value
+      }
     }
     return fallback ?? `{{${rawKey}}}`
   }
@@ -180,8 +185,9 @@ export class EndgeI18n extends EndgeModule {
     const out: I18nLocaleMessages = {}
 
     for (const bundle of this._getBundles(options.includeInactive === true)) {
-      if (options.bundle && bundle.identity !== options.bundle)
+      if (options.bundle && bundle.identity !== options.bundle) {
         continue
+      }
 
       const messages = this._readLocaleMessages(bundle, locale)
       this._mergeMessages(out, messages)
@@ -215,11 +221,13 @@ export class EndgeI18n extends EndgeModule {
 
   /** Ищет перевод в общем или bundle-specific index. */
   private _resolveFromIndex(key: string, locale: string, bundleIdentity?: string): string | undefined {
-    if (!key || !locale)
+    if (!key || !locale) {
       return undefined
+    }
 
-    if (bundleIdentity)
+    if (bundleIdentity) {
       return this._messagesByBundle.get(bundleIdentity)?.get(locale)?.get(key)
+    }
 
     return this._messagesByLocale.get(locale)?.get(key)
   }
@@ -238,8 +246,9 @@ export class EndgeI18n extends EndgeModule {
 
   /** Подставляет параметры в placeholders строки перевода. */
   private _interpolate(text: string, params?: Record<string, unknown>): string {
-    if (!params)
+    if (!params) {
       return text
+    }
 
     return text.replace(/\{([^{}]+)\}/g, (match, key: string) => {
       const value = params[key]
@@ -304,16 +313,18 @@ export class EndgeI18n extends EndgeModule {
   ): void {
     for (const [key, value] of Object.entries(source)) {
       const path = prefix ? `${prefix}.${key}` : key
-      if (!path)
+      if (!path) {
         continue
+      }
 
       if (this._isPlainObject(value)) {
         this._writeMessagesIndex(target, value as I18nLocaleMessages, path)
         continue
       }
 
-      if (value != null)
+      if (value != null) {
         target.set(path, typeof value === 'string' ? value : String(value))
+      }
     }
   }
 

@@ -1,16 +1,43 @@
+import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
 import type {
   TypeProgramCatalogEntry,
   TypeSourceDefinition,
   TypeSourceExpression,
 } from '@/domain/types/source/type-source.types'
-import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
 const TYPE_EXPRESSION_BUILTINS = new Set([
-  'Array', 'Boolean', 'Date', 'DateTime', 'ID', 'Null', 'Number', 'Object', 'Record', 'String',
-  'Time', 'Any', 'Promise', 'Readonly', 'Partial', 'Required', 'Pick', 'Omit', 'unknown', 'never',
-  'void', 'null', 'undefined', 'string', 'number', 'boolean', 'object', 'any', 'true', 'false',
+  'Array',
+  'Boolean',
+  'Date',
+  'DateTime',
+  'ID',
+  'Null',
+  'Number',
+  'Object',
+  'Record',
+  'String',
+  'Time',
+  'Any',
+  'Promise',
+  'Readonly',
+  'Partial',
+  'Required',
+  'Pick',
+  'Omit',
+  'unknown',
+  'never',
+  'void',
+  'null',
+  'undefined',
+  'string',
+  'number',
+  'boolean',
+  'object',
+  'any',
+  'true',
+  'false',
 ])
 
 /** Returns every named reference without expanding the referenced document. */
@@ -20,7 +47,9 @@ export function collectTypeDefinitionReferences(definition: TypeSourceDefinition
 
 /** Returns every named reference from one recursive source type expression. */
 export function collectTypeSourceExpressionReferences(expression: TypeSourceExpression | null | undefined): string[] {
-  if (!expression) return []
+  if (!expression) {
+    return []
+  }
   const references = new Set<string>()
   visitExpression(expression, identity => references.add(identity))
   return [...references]
@@ -60,7 +89,9 @@ export function validateTypeSourceExpressionUsage(
   catalog: readonly TypeProgramCatalogEntry[],
   sourcePath: string,
 ): DiagnosticDraft[] {
-  if (!expression) return []
+  if (!expression) {
+    return []
+  }
   const known = new Set(catalog.map(item => item.identity))
   const diagnostics: DiagnosticDraft[] = []
 
@@ -74,7 +105,9 @@ export function validateTypeSourceExpressionUsage(
       })
       continue
     }
-    if (TYPE_EXPRESSION_BUILTINS.has(identity) || known.has(identity)) continue
+    if (TYPE_EXPRESSION_BUILTINS.has(identity) || known.has(identity)) {
+      continue
+    }
     diagnostics.push({
       severity: 'error',
       code: 'type-reference-missing',
@@ -92,7 +125,9 @@ export function validateTypeExpressionUsage(
   sourcePath: string,
 ): DiagnosticDraft[] {
   const value = String(expression ?? '').trim()
-  if (!value) return []
+  if (!value) {
+    return []
+  }
   const known = new Set(catalog.map(item => item.identity))
   const referenced = collectTypeExpressionReferences(value)
   const diagnostics: DiagnosticDraft[] = []
@@ -107,7 +142,9 @@ export function validateTypeExpressionUsage(
   }
 
   for (const identity of referenced) {
-    if (TYPE_EXPRESSION_BUILTINS.has(identity) || known.has(identity)) continue
+    if (TYPE_EXPRESSION_BUILTINS.has(identity) || known.has(identity)) {
+      continue
+    }
     diagnostics.push({
       severity: 'error',
       code: 'type-reference-missing',
@@ -122,12 +159,16 @@ export function validateTypeExpressionUsage(
 export function collectTypeExpressionReferences(expression: string | null | undefined): Set<string> {
   const value = String(expression ?? '').trim()
   const result = new Set<string>()
-  for (const match of value.matchAll(/\b[A-Za-z_$][\w$]*\b/g)) {
+  for (const match of value.matchAll(/\b[A-Z_$][\w$]*\b/gi)) {
     const token = match[0]
     const tail = value.slice((match.index ?? 0) + token.length)
     // Property names are part of the TypeScript shape, not Type Registry references.
-    if (/^\s*\??\s*:/.test(tail)) continue
-    if (!TYPE_EXPRESSION_BUILTINS.has(token) && /^[A-Z]/.test(token)) result.add(token)
+    if (/^\s*(?:\?\s*)?:/.test(tail)) {
+      continue
+    }
+    if (!TYPE_EXPRESSION_BUILTINS.has(token) && /^[A-Z]/.test(token)) {
+      result.add(token)
+    }
   }
   return result
 }
@@ -140,7 +181,9 @@ export function validateTypeCompatibility(
 ): DiagnosticDraft[] {
   const left = normalizeTypeExpression(expected)
   const right = normalizeTypeExpression(actual)
-  if (!left || !right || left === right || isAny(left) || isAny(right)) return []
+  if (!left || !right || left === right || isAny(left) || isAny(right)) {
+    return []
+  }
   return [{
     severity: 'warning',
     code: 'type-contract-mismatch',
@@ -151,14 +194,20 @@ export function validateTypeCompatibility(
 
 function visitDefinition(definition: TypeSourceDefinition, visit: (identity: string) => void): void {
   if (definition.kind === 'object') {
-    for (const field of definition.fields) visitExpression(field.type, visit)
+    for (const field of definition.fields) {
+      visitExpression(field.type, visit)
+    }
     return
   }
   if (definition.kind === 'union') {
-    for (const variant of definition.variants) visitExpression(variant, visit)
+    for (const variant of definition.variants) {
+      visitExpression(variant, visit)
+    }
     return
   }
-  if (definition.kind === 'array') visitExpression(definition.items, visit)
+  if (definition.kind === 'array') {
+    visitExpression(definition.items, visit)
+  }
 }
 
 function visitExpression(expression: TypeSourceExpression, visit: (identity: string) => void): void {

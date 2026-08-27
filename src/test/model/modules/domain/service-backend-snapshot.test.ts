@@ -6,14 +6,16 @@ import type {
   EndgeLiveDomainSnapshot,
 } from '@/main'
 
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import type {
+  EndgeDomainRepositoryReadOnlyError,
+} from '@/model/modules/domain/endge-domain-repository'
 
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ENDGE_DOMAIN_BUNDLE_VERSION } from '@/model/config/domain.config'
 import { Endge } from '@/model/kernel/endge'
 import { EndgeDomain } from '@/model/modules/domain/endge-domain'
 import {
   EndgeDomainRepository,
-  EndgeDomainRepositoryReadOnlyError,
 } from '@/model/modules/domain/endge-domain-repository'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
@@ -135,7 +137,12 @@ describe('service-backend Core provider', () => {
       capabilities: { snapshot: true, mutations: false, softDelete: false, restore: false },
       etag: '"generation-id:4"',
       loadWorkspace,
-      createDocument: vi.fn(), updateDocument: vi.fn(), softDeleteDocument: vi.fn(), restoreDocument: vi.fn(), moveDocuments: vi.fn(), updateWorkspace: vi.fn(),
+      createDocument: vi.fn(),
+      updateDocument: vi.fn(),
+      softDeleteDocument: vi.fn(),
+      restoreDocument: vi.fn(),
+      moveDocuments: vi.fn(),
+      updateWorkspace: vi.fn(),
     }
     const repository = new EndgeDomainRepository()
 
@@ -184,13 +191,32 @@ describe('service-backend Core provider', () => {
     expect(plain.integrations).toEqual([])
 
     const mappedCollections = [
-      'projects', 'types', 'queries', 'dataViews', 'compositions', 'stores', 'streams',
-      'updates', 'mocks', 'componentSFCs', 'actions', 'filters', 'converters',
-      'computations', 'folders', 'environments', 'tenants', 'styles', 'vocabs',
-      'authProfiles', 'i18nBundles', 'navigations',
+      'projects',
+      'types',
+      'queries',
+      'dataViews',
+      'compositions',
+      'stores',
+      'streams',
+      'updates',
+      'mocks',
+      'componentSFCs',
+      'actions',
+      'filters',
+      'converters',
+      'computations',
+      'folders',
+      'environments',
+      'tenants',
+      'styles',
+      'vocabs',
+      'authProfiles',
+      'i18nBundles',
+      'navigations',
     ]
-    for (const collection of mappedCollections)
+    for (const collection of mappedCollections) {
       expect(plain[collection]).toHaveLength(1)
+    }
   })
 
   it('keeps tombstones in repository state without materializing them in the live domain', async () => {
@@ -235,8 +261,9 @@ describe('service-backend Core provider', () => {
 
   it('uses the server UUID as the live document id without copying revision into domain data', () => {
     const snapshot = liveSnapshot()
-    for (const key of DOCUMENT_KEYS)
+    for (const key of DOCUMENT_KEYS) {
       snapshot.documents[key] = []
+    }
     snapshot.documents.components = [liveDocument('component-sfc-a', { source: '<template />' })]
     const domain = new EndgeDomain()
 
@@ -250,8 +277,9 @@ describe('service-backend Core provider', () => {
   it('creates a document only through service-backend and applies the returned revision', async () => {
     Endge.domain.reset()
     const snapshot = liveSnapshot()
-    for (const key of DOCUMENT_KEYS)
+    for (const key of DOCUMENT_KEYS) {
       snapshot.documents[key] = []
+    }
     const createDocument = vi.fn().mockResolvedValue({
       document: liveDocument('query-new', {
         displayName: 'Query new',
@@ -304,8 +332,9 @@ describe('service-backend Core provider', () => {
   it('keeps project order when an updated document is applied to the live domain', async () => {
     Endge.domain.reset()
     const snapshot = liveSnapshot()
-    for (const key of DOCUMENT_KEYS)
+    for (const key of DOCUMENT_KEYS) {
       snapshot.documents[key] = []
+    }
     snapshot.documents.folders = [liveDocument('folder-root', { parentIdentity: null })]
     snapshot.documents.environments = [liveDocument('environment-dev')]
     snapshot.documents.projects = ['project-a', 'project-b', 'project-c'].map(identity =>
@@ -451,7 +480,12 @@ describe('service-backend Core provider', () => {
       capabilities: { snapshot: true, mutations: false, softDelete: false, restore: false },
       etag: null,
       loadWorkspace: vi.fn().mockResolvedValue(liveSnapshot()),
-      createDocument: vi.fn(), updateDocument: vi.fn(), softDeleteDocument: vi.fn(), restoreDocument: vi.fn(), moveDocuments: vi.fn(), updateWorkspace: vi.fn(),
+      createDocument: vi.fn(),
+      updateDocument: vi.fn(),
+      softDeleteDocument: vi.fn(),
+      restoreDocument: vi.fn(),
+      moveDocuments: vi.fn(),
+      updateWorkspace: vi.fn(),
     }
     const repository = new EndgeDomainRepository()
     await repository.setup(defaultContext(provider))

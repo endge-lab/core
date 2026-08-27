@@ -1,8 +1,4 @@
-import type { ChildNode, Container, Node, Rule, Root } from 'postcss'
-import scss from 'postcss-scss'
-import selectorParser from 'postcss-selector-parser'
-import valueParser from 'postcss-value-parser'
-
+import type { ChildNode, Container, Node, Root, Rule } from 'postcss'
 import type {
   CompileEndgeCSSOptions,
   CompileEndgeCSSResult,
@@ -20,6 +16,10 @@ import type {
   EndgeStyleTheme,
   EndgeStyleValueToken,
 } from '@/domain/types/style/style.types'
+import scss from 'postcss-scss'
+import selectorParser from 'postcss-selector-parser'
+
+import valueParser from 'postcss-value-parser'
 
 const DEFAULT_MAX_NESTED_SELECTORS = 256
 
@@ -35,8 +35,9 @@ function hashSource(source: string): string {
 function sourceRange(node: Node) {
   const start = node.source?.start
   const end = node.source?.end
-  if (!start)
+  if (!start) {
     return undefined
+  }
 
   return {
     start: start.offset ?? 0,
@@ -69,8 +70,9 @@ function parseSelectorNode(selectorNode: any): EndgeStyleSelector {
   const flush = () => {
     const hasValues = compound.universal || compound.tag || compound.ids.length > 0
       || compound.classes.length > 0 || compound.attributes.length > 0 || compound.pseudos.length > 0
-    if (!hasValues)
+    if (!hasValues) {
       return
+    }
     segments.push({ combinator: segments.length === 0 ? null : pendingCombinator ?? 'descendant', compound })
     compound = emptyCompound()
     pendingCombinator = null
@@ -113,8 +115,9 @@ function parseSelectorNode(selectorNode: any): EndgeStyleSelector {
       specificity.classes += 1
       return
     }
-    if (node.type !== 'pseudo')
+    if (node.type !== 'pseudo') {
       return
+    }
 
     const name = node.value.replace(/^:+/, '').toLowerCase()
     const argument = node.nodes?.map((child: any) => child.toString()).join(',').trim() ?? ''
@@ -143,8 +146,7 @@ function parseSelectorNode(selectorNode: any): EndgeStyleSelector {
       compound.pseudos.push({ name, selectors })
       if (name !== 'where') {
         const maximum = selectors.reduce((current: EndgeStyleSpecificity, selector: EndgeStyleSelector) =>
-          compareSpecificity(selector.specificity, current) > 0 ? selector.specificity : current,
-        { ids: 0, classes: 0, types: 0 })
+          compareSpecificity(selector.specificity, current) > 0 ? selector.specificity : current, { ids: 0, classes: 0, types: 0 })
         addSpecificity(specificity, maximum)
       }
       return
@@ -197,8 +199,12 @@ function splitTopLevelBoolean(source: string, operator: 'and' | 'or'): string[] 
   let start = 0
   const pattern = ` ${operator} `
   for (let index = 0; index <= source.length - pattern.length; index += 1) {
-    if (source[index] === '(') depth += 1
-    if (source[index] === ')') depth -= 1
+    if (source[index] === '(') {
+      depth += 1
+    }
+    if (source[index] === ')') {
+      depth -= 1
+    }
     if (depth === 0 && source.slice(index, index + pattern.length).toLowerCase() === pattern) {
       result.push(source.slice(start, index).trim())
       start = index + pattern.length
@@ -215,14 +221,20 @@ function unwrapParentheses(source: string): string {
     let depth = 0
     let wrapsWholeValue = true
     for (let index = 0; index < result.length; index += 1) {
-      if (result[index] === '(') depth += 1
-      if (result[index] === ')') depth -= 1
+      if (result[index] === '(') {
+        depth += 1
+      }
+      if (result[index] === ')') {
+        depth -= 1
+      }
       if (depth === 0 && index < result.length - 1) {
         wrapsWholeValue = false
         break
       }
     }
-    if (!wrapsWholeValue) break
+    if (!wrapsWholeValue) {
+      break
+    }
     result = result.slice(1, -1).trim()
   }
   return result
@@ -231,26 +243,32 @@ function unwrapParentheses(source: string): string {
 export function parseEndgeStyleSupportCondition(source: string): EndgeStyleSupportCondition {
   const normalized = unwrapParentheses(source)
   const orParts = splitTopLevelBoolean(normalized, 'or')
-  if (orParts.length > 1)
+  if (orParts.length > 1) {
     return { type: 'or', operands: orParts.map(parseEndgeStyleSupportCondition) }
+  }
   const andParts = splitTopLevelBoolean(normalized, 'and')
-  if (andParts.length > 1)
+  if (andParts.length > 1) {
     return { type: 'and', operands: andParts.map(parseEndgeStyleSupportCondition) }
-  if (/^not\s+/i.test(normalized))
+  }
+  if (/^not\s+/i.test(normalized)) {
     return { type: 'not', operand: parseEndgeStyleSupportCondition(normalized.replace(/^not\s+/i, '')) }
+  }
   const renderer = normalized.match(/^renderer\(\s*([\w-]+)\s*\)$/i)
-  if (renderer)
+  if (renderer) {
     return { type: 'renderer', renderer: renderer[1] }
+  }
   const capability = normalized.match(/^capability\(\s*([\w-]+)\s*\)$/i)
-  if (capability)
+  if (capability) {
     return { type: 'capability', capability: capability[1] }
+  }
   throw new Error(`Expected renderer(name) or capability(name), received: ${source}`)
 }
 
 function parseScope(source: string): EndgeStyleScope {
   const match = source.trim().match(/^\((.+?)\)(?:\s+to\s+\((.+)\))?$/s)
-  if (!match)
+  if (!match) {
     throw new Error('Expected @scope (<selector>) or @scope (<selector>) to (<selector>)')
+  }
   return {
     root: parseEndgeStyleSelectorList(match[1]),
     limit: match[2] ? parseEndgeStyleSelectorList(match[2]) : undefined,
@@ -262,14 +280,17 @@ function selectorsFromRule(rule: Rule): string[] {
 }
 
 function expandNestedSelectors(parents: string[], children: string[], maximum: number): string[] {
-  if (parents.length === 0)
+  if (parents.length === 0) {
     return children
-  if (parents.length * children.length > maximum)
+  }
+  if (parents.length * children.length > maximum) {
     throw new Error(`Nested selector expansion exceeds the limit of ${maximum}`)
+  }
   const result: string[] = []
   for (const parent of parents) {
-    for (const child of children)
+    for (const child of children) {
       result.push(child.includes('&') ? child.replaceAll('&', parent) : `${parent} ${child}`)
+    }
   }
   return result
 }
@@ -280,7 +301,9 @@ function createEmptyIndex(): EndgeStyleRuleIndex {
 
 function appendIndex(index: Record<string, string[]>, key: string, ruleId: string): void {
   const values = index[key] ?? (index[key] = [])
-  if (!values.includes(ruleId)) values.push(ruleId)
+  if (!values.includes(ruleId)) {
+    values.push(ruleId)
+  }
 }
 
 function indexRules(rules: EndgeStyleRule[]): EndgeStyleRuleIndex {
@@ -301,7 +324,9 @@ function indexRules(rules: EndgeStyleRule[]): EndgeStyleRuleIndex {
         }
       }
     }
-    if (!indexed) index.universal.push(rule.id)
+    if (!indexed) {
+      index.universal.push(rule.id)
+    }
   }
   return index
 }
@@ -332,8 +357,9 @@ export function compileEndgeCSS(source: string, options: CompileEndgeCSSOptions 
     context: { theme?: string, scope?: EndgeStyleScope, supports?: EndgeStyleSupportCondition } = {},
   ) => {
     for (const node of container.nodes ?? []) {
-      if (node.type === 'comment' || node.type === 'decl')
+      if (node.type === 'comment' || node.type === 'decl') {
         continue
+      }
 
       if (node.type === 'rule') {
         try {
@@ -367,8 +393,9 @@ export function compileEndgeCSS(source: string, options: CompileEndgeCSSOptions 
         continue
       }
 
-      if (node.type !== 'atrule')
+      if (node.type !== 'atrule') {
         continue
+      }
       const name = node.name.toLowerCase()
       if (name === 'layer') {
         diagnostics.push({
@@ -381,7 +408,7 @@ export function compileEndgeCSS(source: string, options: CompileEndgeCSSOptions 
       }
       if (name === 'theme') {
         const id = node.params.trim()
-        if (!id || !/^[a-zA-Z][\w-]*$/.test(id)) {
+        if (!id || !/^[a-z][\w-]*$/i.test(id)) {
           diagnostics.push({ severity: 'error', code: 'ENDGECSS_THEME_ID', message: '@theme requires a stable identifier.', range: sourceRange(node) })
           continue
         }
@@ -390,8 +417,10 @@ export function compileEndgeCSS(source: string, options: CompileEndgeCSSOptions 
           .map(child => parseDeclaration(child, diagnostics))
           .filter((declaration): declaration is EndgeStyleDeclaration => declaration !== null)
         const existing = themes.find(theme => theme.id === id)
-        if (existing) existing.declarations.push(...declarations)
-        else themes.push({ id, declarations, range: sourceRange(node) })
+        if (existing) {
+          existing.declarations.push(...declarations)
+        }
+        else { themes.push({ id, declarations, range: sourceRange(node) }) }
         visit(node, parentSelectors, { ...context, theme: id })
         continue
       }

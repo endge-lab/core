@@ -1,6 +1,6 @@
+import type { EndgeConfigurationValues } from '@/domain/types/configuration/configuration.type'
 import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
-import type { EndgeConfigurationValues } from '@/domain/types/configuration/configuration.type'
 import type { EndgeConfigurationSchemaEntry, EndgeJSONValue } from '@/domain/types/source/configuration-source.types'
 import type { TypeProgramCatalogEntry } from '@/domain/types/source/type-source.types'
 
@@ -11,10 +11,24 @@ import { compileConfigurationSource } from '@/model/services/source-engine/compi
 import { compileTypeSource } from '@/model/services/source-engine/compilers/type-source-compile'
 
 const PUBLIC_SYSTEM_KEYS = new Set([
-  'vars', 'locales', 'defaultLocale', 'fallbackLocale', 'themes', 'defaultTheme',
-  'timezones', 'defaultTimezone', 'defaultAuthProfileIdentity', 'sfcAdapterIds',
-  'defaultSfcAdapterId', 'sfcEditing', 'tooltips', 'diagnostics', 'values',
-  '__proto__', 'prototype', 'constructor',
+  'vars',
+  'locales',
+  'defaultLocale',
+  'fallbackLocale',
+  'themes',
+  'defaultTheme',
+  'timezones',
+  'defaultTimezone',
+  'defaultAuthProfileIdentity',
+  'sfcAdapterIds',
+  'defaultSfcAdapterId',
+  'sfcEditing',
+  'tooltips',
+  'diagnostics',
+  'values',
+  '__proto__',
+  'prototype',
+  'constructor',
 ])
 
 /** Compiles Configuration schemas before effective context resolution. */
@@ -93,12 +107,14 @@ export class EndgeConfigurationSchemaModule extends EndgeModule {
     const result: EndgeConfigurationValues = {}
     this._valueDiagnostics.clear()
     for (const entry of this._entries) {
-      if (!entry.document) continue
+      if (!entry.document) {
+        continue
+      }
       const category: Record<string, EndgeJSONValue> = {}
       const persisted = input[entry.identity] ?? {}
       const activeFieldKeys = new Set(entry.document.values.map(field => field.key))
       for (const field of entry.document.values) {
-        const value = Object.prototype.hasOwnProperty.call(persisted, field.key)
+        const value = Object.hasOwn(persisted, field.key)
           ? persisted[field.key]
           : field.defaultValue
         const validation = validateConfigurationValue(field.type, value, this._types, `${entry.identity}.${field.key}`)

@@ -86,7 +86,8 @@ function requireTargetMethod<TMethod extends TableTargetMethodName>(
   method: TMethod,
 ): NonNullable<TableRuntimeActionTarget[TMethod]> {
   const fn = context.target?.[method]
-  if (typeof fn !== 'function')
-    throw new Error(`[TableRuntimeActions] target does not implement "${method}".`)
+  if (typeof fn !== 'function') {
+    throw new TypeError(`[TableRuntimeActions] target does not implement "${method}".`)
+  }
   return fn as NonNullable<TableRuntimeActionTarget[TMethod]>
 }

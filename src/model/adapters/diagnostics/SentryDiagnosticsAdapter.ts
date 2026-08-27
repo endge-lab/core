@@ -1,3 +1,4 @@
+import type { SentryDiagnosticsAdapterOptions } from './SentryDiagnosticsAdapter.types'
 import type {
   DiagnosticsAdapter,
   DiagnosticsAdapterCreateContext,
@@ -13,7 +14,6 @@ import type {
   DiagnosticsSpanRecord,
   EndgeDiagnosticsOutputConfiguration,
 } from '@/domain/types/diagnostics/diagnostics.types'
-import type { SentryDiagnosticsAdapterOptions } from './SentryDiagnosticsAdapter.types'
 
 const SENTRY_PROTOCOL_VERSION = '7'
 const SENTRY_SDK_NAME = 'endge.diagnostics'
@@ -75,8 +75,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
 
   /** Отправляет snapshot как отдельное событие с полным JSON attachment. */
   public acceptSnapshot(snapshot: DiagnosticsSnapshot, context: DiagnosticsAdapterSnapshotContext): Promise<void> | void {
-    if (!this._sendSnapshots)
+    if (!this._sendSnapshots) {
       return
+    }
 
     const snapshotBody = JSON.stringify(snapshot)
     const payload = this._baseEvent(context.resource.attributes, {
@@ -118,8 +119,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
   /** Ожидает завершения всех ingestion requests, начатых adapter-ом. */
   public async flush(): Promise<void> {
     const pending = [...this._pending]
-    if (pending.length)
+    if (pending.length) {
       await Promise.all(pending)
+    }
   }
 
   /** Завершает pending delivery перед освобождением adapter. */
@@ -134,15 +136,17 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
   ): SentryDiagnosticsAdapterOptions {
     const options = output.options
     const resolve = (value: unknown): string | undefined => {
-      if (typeof value !== 'string')
+      if (typeof value !== 'string') {
         return undefined
+      }
       const resolved = context.resolveVariable ? context.resolveVariable(value) : value
       const text = String(resolved ?? '').trim()
       return text || undefined
     }
     const dsn = resolve(options.dsn)
-    if (!dsn)
+    if (!dsn) {
       throw new Error(`[SentryDiagnosticsAdapter] Output "${output.id}" requires a resolved DSN`)
+    }
 
     return {
       dsn,
@@ -169,8 +173,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
     const publicKey = decodeURIComponent(url.username)
     const pathSegments = url.pathname.split('/').filter(Boolean)
     const projectId = pathSegments.pop()
-    if (!publicKey || !projectId || (url.protocol !== 'http:' && url.protocol !== 'https:'))
+    if (!publicKey || !projectId || (url.protocol !== 'http:' && url.protocol !== 'https:')) {
       throw new Error('[SentryDiagnosticsAdapter] Sentry DSN must contain protocol, public key and project id')
+    }
 
     const prefix = pathSegments.length ? `/${pathSegments.join('/')}` : ''
     const auth = new URLSearchParams({
@@ -277,8 +282,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
 
   /** Формирует Sentry trace context из OpenTelemetry-compatible ids. */
   private _traceContext(record: DiagnosticsRecord): Record<string, unknown> {
-    if (!record.traceId || !record.spanId)
+    if (!record.traceId || !record.spanId) {
       return {}
+    }
     return {
       trace: {
         trace_id: record.traceId,
@@ -298,8 +304,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
     const email = this._attributeText(attributes, 'user.email')
     const username = this._attributeText(attributes, 'user.username')
     const sessionId = this._attributeText(attributes, 'session.id')
-    if (!id && !email && !username && !sessionId)
+    if (!id && !email && !username && !sessionId) {
       return undefined
+    }
     return {
       ...(id ? { id } : {}),
       ...(email ? { email } : {}),
@@ -314,8 +321,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
     payload: Record<string, unknown>,
     attachment?: SentryEnvelopeAttachment,
   ): Promise<void> {
-    if (typeof globalThis.fetch !== 'function')
-      throw new Error('[SentryDiagnosticsAdapter] Runtime does not provide fetch')
+    if (typeof globalThis.fetch !== 'function') {
+      throw new TypeError('[SentryDiagnosticsAdapter] Runtime does not provide fetch')
+    }
 
     const eventId = this._createEventId()
     const envelopeLines = [
@@ -349,8 +357,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
         body: envelopeLines.join('\n'),
         signal: controller.signal,
       })
-      if (!response.ok)
+      if (!response.ok) {
         throw new Error(`[SentryDiagnosticsAdapter] Ingestion failed with HTTP ${response.status}`)
+      }
     }
     finally {
       globalThis.clearTimeout(timeoutId)
@@ -369,17 +378,29 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
 
   /** Преобразует Endge severity в Sentry event level. */
   private _mapLogLevel(record: DiagnosticsLogRecord): 'debug' | 'info' | 'warning' | 'error' | 'fatal' {
-    if (record.severityNumber >= 21) return 'fatal'
-    if (record.severityNumber >= 17) return 'error'
-    if (record.severityNumber >= 13) return 'warning'
-    if (record.severityNumber >= 9) return 'info'
+    if (record.severityNumber >= 21) {
+      return 'fatal'
+    }
+    if (record.severityNumber >= 17) {
+      return 'error'
+    }
+    if (record.severityNumber >= 13) {
+      return 'warning'
+    }
+    if (record.severityNumber >= 9) {
+      return 'info'
+    }
     return 'debug'
   }
 
   /** Преобразует Endge span status в Sentry trace status. */
   private _mapSpanStatus(record: DiagnosticsSpanRecord): 'ok' | 'internal_error' | 'unknown' {
-    if (record.status.code === 'ok') return 'ok'
-    if (record.status.code === 'error') return 'internal_error'
+    if (record.status.code === 'ok') {
+      return 'ok'
+    }
+    if (record.status.code === 'error') {
+      return 'internal_error'
+    }
     return 'unknown'
   }
 
@@ -395,32 +416,37 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
       'endge.project.id',
     ]) {
       const value = this._attributeText(resource, key)
-      if (value)
+      if (value) {
         tags[key] = value
+      }
     }
     return tags
   }
 
   /** Читает adapter tags из JSON-safe options. */
   private _readTags(value: unknown): SentryDiagnosticsAdapterOptions['tags'] {
-    if (!this._isRecord(value))
+    if (!this._isRecord(value)) {
       return undefined
+    }
     const tags: NonNullable<SentryDiagnosticsAdapterOptions['tags']> = {}
     for (const [key, item] of Object.entries(value)) {
-      if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean')
+      if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
         tags[key] = item
+      }
     }
     return tags
   }
 
   /** Нормализует произвольный tags object в строковые Sentry tags. */
   private _normalizeTags(value: unknown): Record<string, string> {
-    if (!this._isRecord(value))
+    if (!this._isRecord(value)) {
       return {}
+    }
     const tags: Record<string, string> = {}
     for (const [key, item] of Object.entries(value)) {
-      if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean')
+      if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
         tags[key] = String(item).slice(0, 200)
+      }
     }
     return tags
   }
@@ -428,8 +454,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
   /** Возвращает непустой scalar attribute как строку. */
   private _attributeText(attributes: DiagnosticsAttributes, key: string): string | undefined {
     const value = attributes[key]
-    if (Array.isArray(value) || value == null)
+    if (Array.isArray(value) || value == null) {
       return undefined
+    }
     const text = String(value).trim()
     return text || undefined
   }
@@ -443,10 +470,14 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
   /** Создаёт 128-bit Sentry event id в lowercase hexadecimal representation. */
   private _createEventId(): string {
     const bytes = new Uint8Array(16)
-    if (globalThis.crypto?.getRandomValues)
+    if (globalThis.crypto?.getRandomValues) {
       globalThis.crypto.getRandomValues(bytes)
-    else
-      bytes.forEach((_, index) => { bytes[index] = Math.floor(Math.random() * 256) })
+    }
+    else {
+      bytes.forEach((_, index) => {
+        bytes[index] = Math.floor(Math.random() * 256)
+      })
+    }
     return [...bytes].map(byte => byte.toString(16).padStart(2, '0')).join('')
   }
 

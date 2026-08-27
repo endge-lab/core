@@ -1,7 +1,7 @@
-import { Serialize } from '@endge/utils'
-import { Exclude, Expose } from 'class-transformer'
-
 import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
+import { Serialize } from '@endge/utils'
+
+import { Exclude, Expose } from 'class-transformer'
 import { REntity } from '@/domain/entities/reflect/REntity'
 import { CONFIGURATION_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/configuration.default.source'
 
@@ -34,8 +34,9 @@ export class RConfiguration extends REntity {
     configuration.active = json?.active ?? null
     configuration.deletedAt = json?.deletedAt ?? null
     configuration.author = json?.author ?? null
-    if (storageMeta)
+    if (storageMeta) {
       configuration.applyStorageMeta(storageMeta)
+    }
     return configuration
   }
 
@@ -68,4 +69,3 @@ export class RConfiguration extends REntity {
     return RConfiguration.fromPlain(plain)
   }
 }
-

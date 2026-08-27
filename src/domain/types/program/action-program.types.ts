@@ -1,5 +1,5 @@
-import type { ActionSourceDocument } from '@/domain/types/source/action-source.types'
 import type { ActionTargetSelector } from '@/domain/types/runtime/action.types'
+import type { ActionSourceDocument } from '@/domain/types/source/action-source.types'
 
 export interface ActionProgramPayload {
   type: 'action'
@@ -7,4 +7,3 @@ export interface ActionProgramPayload {
   sourceDocument: ActionSourceDocument | null
   target: ActionTargetSelector[] | null
 }
-

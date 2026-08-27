@@ -112,7 +112,8 @@ defineVocab({
     publishVocabArtifact(vocab)
 
     await expect(Endge.vocabs.loadVocab('airlines', { dataMode: 'mock', throwOnError: true }))
-      .resolves.toEqual([{ code: 'SU' }, 'done'])
+      .resolves
+      .toEqual([{ code: 'SU' }, 'done'])
     expect(handler).toHaveBeenCalledTimes(1)
     expect(handler).toHaveBeenCalledWith([{ code: 'SU' }], { tail: 'done' })
   })
@@ -136,7 +137,8 @@ defineVocab({
     publishVocabArtifact(vocab)
 
     await expect(Endge.vocabs.loadVocab('airlines', { dataMode: 'live', throwOnError: true }))
-      .resolves.toEqual([{ code: 'SU' }, { code: 'FV' }])
+      .resolves
+      .toEqual([{ code: 'SU' }, { code: 'FV' }])
     expect(fetchSpy).toHaveBeenCalledTimes(2)
     expect(fetchSpy.mock.calls[0]?.[0]).toBe('https://payload.example/airlines-payload?limit=1000&page=1')
     expect(fetchSpy.mock.calls[1]?.[0]).toBe('https://payload.example/airlines-payload?limit=1000&page=2')
@@ -160,7 +162,8 @@ defineVocab({
     publishVocabArtifact(vocab)
 
     await expect(Endge.vocabs.loadVocab('airlines', { dataMode: 'mock', throwOnError: true }))
-      .rejects.toThrow('путь "lookups.airlines" отсутствует')
+      .rejects
+      .toThrow('путь "lookups.airlines" отсутствует')
   })
 
   it('rejects async Converter handlers', () => {
@@ -214,8 +217,9 @@ function prepareCompilerContext(): void {
 
 function publishVocabArtifact(vocab: RVocabs): void {
   const result = Endge.source.compile('vocab', vocab.source)
-  if (!result.ok || !result.artifact)
+  if (!result.ok || !result.artifact) {
     throw new Error(result.message ?? 'Vocab source did not compile.')
+  }
   Endge.program.addArtifact({
     ref: { entityType: 'vocab', id: vocab.id, identity: vocab.identity },
     sourceHash: 'test',

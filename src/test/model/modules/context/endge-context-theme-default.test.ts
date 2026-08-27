@@ -6,7 +6,7 @@ import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
 const configuration = TEST_ENDGE_WORKSPACE.configuration
 
-describe('EndgeContext effective default theme', () => {
+describe('endgeContext effective default theme', () => {
   beforeEach(() => {
     installLocalStorageMock()
   })

@@ -1,7 +1,10 @@
+import type { EndgeConfiguration } from '@/domain/types/configuration/configuration.type'
+import type { EndgeDataMode } from '@/domain/types/document/workspace.types'
+import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 import type {
   EndgeContextPersistenceConfig,
-  EndgeKeyboardContextSnapshot,
   EndgeContextSnapshot,
+  EndgeKeyboardContextSnapshot,
   EndgePersistedContextSnapshot,
   EndgePersistenceOptions,
   EndgePersistenceScope,
@@ -9,16 +12,14 @@ import type {
   EndgeSessionIdentityProvider,
   EndgeStorageAdapter,
 } from '@/domain/types/runtime/context-persistence.types'
-import type { EndgeConfiguration } from '@/domain/types/configuration/configuration.type'
-import type { EndgeDataMode } from '@/domain/types/document/workspace.types'
-import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 import type {
   EndgeExecutionContext,
   EndgeExecutionContextResolutionInput,
 } from '@/domain/types/runtime/execution-context.types'
 
-import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
+import type { EndgePersistenceInput } from '@/model/modules/context/persistence/EndgeStorageAdapterRegistry'
 import { Raph } from '@endge/raph'
+import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import {
   CONTEXT_STORAGE_KEY,
   DEFAULT_LOCALE,
@@ -32,17 +33,18 @@ import {
   LEGACY_TIMEZONE_STORAGE_KEY,
 } from '@/model/config/kernel.config'
 import { Endge } from '@/model/kernel/endge'
-import {
-  EndgeStorageAdapterRegistry,
-  normalizePersistence,
-  type EndgePersistenceInput,
-} from '@/model/modules/context/persistence/EndgeStorageAdapterRegistry'
-import { RuntimeStateController } from '@/model/modules/context/persistence/RuntimeStateController'
 import { DisabledContextAdapter } from '@/model/modules/context/persistence/adapters/DisabledContextAdapter'
 import { LocalStorageContextAdapter } from '@/model/modules/context/persistence/adapters/LocalStorageContextAdapter'
+import {
+
+  EndgeStorageAdapterRegistry,
+  normalizePersistence,
+} from '@/model/modules/context/persistence/EndgeStorageAdapterRegistry'
+import { RuntimeStateController } from '@/model/modules/context/persistence/RuntimeStateController'
 import { createEndgePublicConfigurationSnapshot } from '@/model/services/configuration/endge-configuration'
 
 const THEME_PREFERENCE_VERSION = 1 as const
+const LEGACY_STORAGE_ADAPTER = new LocalStorageContextAdapter()
 
 /**
  * Контекст выполнения Endge: текущий workspace/project/environment/user scope
@@ -83,12 +85,15 @@ export class EndgeContext extends EndgeModule {
     this._executionContextLocked = false
     const input = ctx.context
     if (input) {
-      if (input.tenantIdentity != null)
+      if (input.tenantIdentity != null) {
         this._currentTenant = normalizeScopePart(input.tenantIdentity, DEFAULT_SCOPE.tenantId)
-      if (input.projectIdentity != null)
+      }
+      if (input.projectIdentity != null) {
         this._currentProject = normalizeScopePart(input.projectIdentity, DEFAULT_SCOPE.projectId)
-      if (input.environmentIdentity != null)
+      }
+      if (input.environmentIdentity != null) {
         this._currentEnvironment = normalizeScopePart(input.environmentIdentity, DEFAULT_SCOPE.environmentId)
+      }
     }
     this._executionContextLocked = true
     this._syncPersistentContextToRaph()
@@ -248,8 +253,9 @@ export class EndgeContext extends EndgeModule {
     finally {
       queueMicrotask(() => {
         this._isHydrating = false
-        if (shouldPersistThemeMigration)
+        if (shouldPersistThemeMigration) {
           this.saveToStorage()
+        }
       })
     }
   }
@@ -310,8 +316,9 @@ export class EndgeContext extends EndgeModule {
   /** Устанавливает текущий workspace и сохраняет контекст. */
   public setCurrentWorkspace(identity: string | null): void {
     const next = normalizeOptionalText(identity)
-    if (next === this._currentWorkspace)
+    if (next === this._currentWorkspace) {
       return
+    }
 
     this._currentWorkspace = next
     this._dataModeOverride = null
@@ -443,20 +450,23 @@ export class EndgeContext extends EndgeModule {
   /** Applies the persisted Workspace default without writing it into local context storage. */
   public setWorkspaceDataMode(mode: EndgeDataMode): void {
     const next = normalizeDataMode(mode)
-    if (next === this._workspaceDataMode)
+    if (next === this._workspaceDataMode) {
       return
+    }
 
     const previousEffective = this.dataMode
     this._workspaceDataMode = next
-    if (previousEffective !== this.dataMode)
+    if (previousEffective !== this.dataMode) {
       this.notify()
+    }
   }
 
   /** Applies a host-owned data mode override without rebuilding the structural context. */
   public setDataMode(mode: EndgeDataMode): void {
     const next = normalizeDataMode(mode)
-    if (next === this._dataModeOverride)
+    if (next === this._dataModeOverride) {
       return
+    }
 
     this._dataModeOverride = next
     this.notify()
@@ -464,8 +474,9 @@ export class EndgeContext extends EndgeModule {
 
   /** Removes the local override and restores the current Workspace default. */
   public clearDataModeOverride(): void {
-    if (this._dataModeOverride == null)
+    if (this._dataModeOverride == null) {
       return
+    }
 
     this._dataModeOverride = null
     this.notify()
@@ -487,8 +498,9 @@ export class EndgeContext extends EndgeModule {
     const raw = normalizeOptionalText(locale) ?? DEFAULT_LOCALE
     const next = this._normalizeLocale(raw, configuration)
     this._pendingLocale = configuration ? null : raw
-    if (next === this._currentLocale)
+    if (next === this._currentLocale) {
       return
+    }
 
     this._currentLocale = next
     this.saveToStorage()
@@ -498,14 +510,16 @@ export class EndgeContext extends EndgeModule {
   /** Согласует текущую locale с effective configuration после workspace resolution. */
   public reconcileCurrentLocaleWithWorkspace(configuration?: EndgeConfiguration): void {
     const activeConfiguration = configuration ?? this._activeConfiguration()
-    if (!activeConfiguration)
+    if (!activeConfiguration) {
       return
+    }
 
     const pending = this._pendingLocale
     const next = this._normalizeLocale(pending ?? this._currentLocale, activeConfiguration)
     this._pendingLocale = null
-    if (next === this._currentLocale)
+    if (next === this._currentLocale) {
       return
+    }
 
     this._currentLocale = next
     this.saveToStorage()
@@ -526,20 +540,23 @@ export class EndgeContext extends EndgeModule {
     const preferenceChanged = preference !== this._themePreference
     const themeChanged = next !== this._currentTheme
     this._themePreference = preference
-    if (!preferenceChanged && !themeChanged)
+    if (!preferenceChanged && !themeChanged) {
       return
+    }
 
     this._currentTheme = next
     this.saveToStorage()
-    if (themeChanged)
+    if (themeChanged) {
       this.notify()
+    }
   }
 
   /** Согласует сохранённую тему с effective configuration после workspace resolution. */
   public reconcileCurrentThemeWithWorkspace(configuration?: EndgeConfiguration): void {
     const activeConfiguration = configuration ?? this._activeConfiguration()
-    if (!activeConfiguration)
+    if (!activeConfiguration) {
       return
+    }
 
     const preference = this._themePreference
     const normalizedPreference = preference == null
@@ -550,15 +567,18 @@ export class EndgeContext extends EndgeModule {
       : normalizedPreference
     const preferenceChanged = preference != null && normalizedPreference !== preference
     const themeChanged = next !== this._currentTheme
-    if (preferenceChanged)
+    if (preferenceChanged) {
       this._themePreference = null
-    if (!preferenceChanged && !themeChanged)
+    }
+    if (!preferenceChanged && !themeChanged) {
       return
+    }
 
     this._currentTheme = next
     this.saveToStorage()
-    if (themeChanged)
+    if (themeChanged) {
       this.notify()
+    }
   }
 
   /** Возвращает текущую временную зону контекста. */
@@ -572,8 +592,9 @@ export class EndgeContext extends EndgeModule {
     const raw = normalizeOptionalText(timezone) ?? DEFAULT_TIMEZONE
     const next = this._normalizeTimezone(raw, configuration)
     this._pendingTimezone = configuration ? null : raw
-    if (next === this._currentTimezone)
+    if (next === this._currentTimezone) {
       return
+    }
 
     this._currentTimezone = next
     this.saveToStorage()
@@ -583,14 +604,16 @@ export class EndgeContext extends EndgeModule {
   /** Согласует сохранённую временную зону с effective configuration. */
   public reconcileCurrentTimezoneWithWorkspace(configuration?: EndgeConfiguration): void {
     const activeConfiguration = configuration ?? this._activeConfiguration()
-    if (!activeConfiguration)
+    if (!activeConfiguration) {
       return
+    }
 
     const pending = this._pendingTimezone
     const next = this._normalizeTimezone(pending ?? this._currentTimezone, activeConfiguration)
     this._pendingTimezone = null
-    if (next === this._currentTimezone)
+    if (next === this._currentTimezone) {
       return
+    }
 
     this._currentTimezone = next
     this.saveToStorage()
@@ -600,10 +623,12 @@ export class EndgeContext extends EndgeModule {
   /** Возвращает effective configuration либо persisted workspace configuration до resolution. */
   private _activeConfiguration(): EndgeConfiguration | null {
     try {
-      if (Endge.configuration.isResolved)
+      if (Endge.configuration.isResolved) {
         return Endge.configuration.current
-      if (Endge.workspace.isLoaded)
+      }
+      if (Endge.workspace.isLoaded) {
         return Endge.workspace.current.configuration
+      }
     }
     catch {
       // Federation ещё не завершила configuration lifecycle.
@@ -612,20 +637,23 @@ export class EndgeContext extends EndgeModule {
   }
 
   private _normalizeLocale(value: string, configuration: EndgeConfiguration | null): string {
-    if (!configuration)
+    if (!configuration) {
       return value
+    }
     return configuration.locales.some(item => item.code === value) ? value : configuration.defaultLocale
   }
 
   private _normalizeTheme(value: string, configuration: EndgeConfiguration | null): string {
-    if (!configuration)
+    if (!configuration) {
       return value
+    }
     return configuration.themes.some(item => item.identity === value) ? value : configuration.defaultTheme
   }
 
   private _normalizeTimezone(value: string, configuration: EndgeConfiguration | null): string {
-    if (!configuration)
+    if (!configuration) {
       return value
+    }
     return configuration.timezones.some(item => item.identity === value) ? value : configuration.defaultTimezone
   }
 
@@ -654,15 +682,17 @@ export class EndgeContext extends EndgeModule {
   }
 
   private _setRaphValueIfChanged(path: string, current: unknown, next: unknown): void {
-    if (sameContextValue(current, next))
+    if (sameContextValue(current, next)) {
       return
+    }
     Raph.set(path, Array.isArray(next) ? [...next] : next)
   }
 
   /** Возвращает identity активного workspace для persistence scope. */
   private _requireCurrentWorkspace(): string {
-    if (!this._currentWorkspace)
+    if (!this._currentWorkspace) {
       throw new Error('[EndgeContext] Active workspace has not been loaded')
+    }
     return this._currentWorkspace
   }
 
@@ -711,8 +741,9 @@ export class EndgeContext extends EndgeModule {
     fallback: string,
   ): void {
     const next = normalizeScopePart(identity, fallback)
-    if (!this._executionContextLocked || next === this[field])
+    if (!this._executionContextLocked || next === this[field]) {
       return
+    }
     throw new Error('[EndgeContext] Structural context is immutable during boot. Call Endge.reset() and boot with a new context.')
   }
 }
@@ -757,8 +788,9 @@ function normalizeKeyboardStrings(input: unknown, normalize: (value: string) => 
 }
 
 function sameContextValue(left: unknown, right: unknown): boolean {
-  if (Array.isArray(left) && Array.isArray(right))
+  if (Array.isArray(left) && Array.isArray(right)) {
     return left.length === right.length && left.every((value, index) => Object.is(value, right[index]))
+  }
   return Object.is(left, right)
 }
 
@@ -786,8 +818,9 @@ function normalizeIdentityList(values: readonly string[]): string[] {
   const seen = new Set<string>()
   for (const value of values) {
     const identity = normalizeOptionalText(value)
-    if (!identity || seen.has(identity))
+    if (!identity || seen.has(identity)) {
       continue
+    }
     seen.add(identity)
     result.push(identity)
   }
@@ -803,29 +836,30 @@ function resolveAvailableIdentity(input: {
 }): string {
   const available = normalizeIdentityList(input.available)
   const requested = normalizeOptionalText(input.requested)
-  if (requested && available.includes(requested))
+  if (requested && available.includes(requested)) {
     return requested
+  }
 
-  if (requested && input.required)
+  if (requested && input.required) {
     throw new Error(`[EndgeContext] ${input.label} "${requested}" was not found in loaded Domain`)
+  }
 
   const fallback = available[0]
-  if (fallback)
+  if (fallback) {
     return fallback
+  }
 
   const fallbackWhenEmpty = normalizeOptionalText(input.fallbackWhenEmpty)
-  if (fallbackWhenEmpty)
+  if (fallbackWhenEmpty) {
     return fallbackWhenEmpty
+  }
 
   throw new Error(`[EndgeContext] Cannot resolve ${input.label}: no available entities were loaded`)
 }
 
 function readLegacyThemePreference(): string | null {
-  if (typeof localStorage === 'undefined')
-    return null
-
   try {
-    return normalizeOptionalText(localStorage.getItem(LEGACY_THEME_STORAGE_KEY))
+    return normalizeOptionalText(LEGACY_STORAGE_ADAPTER.readRaw(LEGACY_THEME_STORAGE_KEY))
   }
   catch {
     return null
@@ -833,15 +867,14 @@ function readLegacyThemePreference(): string | null {
 }
 
 function readLegacyTimezonePreference(): string | null {
-  if (typeof localStorage === 'undefined')
-    return null
-
   try {
-    const value = normalizeOptionalText(localStorage.getItem(LEGACY_TIMEZONE_STORAGE_KEY))?.toLowerCase()
-    if (value === 'false' || value === '0')
+    const value = normalizeOptionalText(LEGACY_STORAGE_ADAPTER.readRaw(LEGACY_TIMEZONE_STORAGE_KEY))?.toLowerCase()
+    if (value === 'false' || value === '0') {
       return 'UTC'
-    if (value === 'true' || value === '1')
+    }
+    if (value === 'true' || value === '1') {
       return 'local'
+    }
     return null
   }
   catch {

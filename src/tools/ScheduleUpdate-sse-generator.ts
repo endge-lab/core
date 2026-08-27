@@ -4,7 +4,7 @@ import { Raph } from '@endge/raph'
 
 type ScheduleRecord = Record<string, unknown>
 
-type PatchField = {
+interface PatchField {
   key: string
   makeValue: (cur: unknown) => unknown
 }
@@ -35,7 +35,9 @@ function randomLocalTime(): string {
 function randomDaysOfWeek(): string {
   const cnt = randInt(1, 7)
   const set = new Set<number>()
-  while (set.size < cnt) set.add(randInt(1, 7))
+  while (set.size < cnt) {
+    set.add(randInt(1, 7))
+  }
   return [...set].sort((a, b) => a - b).join(',')
 }
 
@@ -69,8 +71,8 @@ function randomAircraftType(): string {
 }
 
 function randomFlightNumber(cur: unknown): string {
-  const base =
-    typeof cur === 'string' && cur.trim()
+  const base
+    = typeof cur === 'string' && cur.trim()
       ? cur.trim()
       : String(randInt(1, 999)).padStart(3, '0')
   // слегка мутируем
@@ -98,11 +100,15 @@ function buildPatchFields(): PatchField[] {
 
 function getIdsFromStore(): string[] {
   const items: unknown = Raph.get(`${STORE_PATH}.items`)
-  if (!Array.isArray(items)) return []
+  if (!Array.isArray(items)) {
+    return []
+  }
   const ids: string[] = []
   for (const it of items as any[]) {
     const id: unknown = it?.id
-    if (typeof id === 'string' && id) ids.push(id)
+    if (typeof id === 'string' && id) {
+      ids.push(id)
+    }
   }
   return ids
 }
@@ -110,7 +116,9 @@ function getIdsFromStore(): string[] {
 function getRecordById(id: string): ScheduleRecord | undefined {
   const path = `${STORE_PATH}.items[id=${id}]`
   const rec: unknown = Raph.get(path)
-  if (!rec || typeof rec !== 'object') return undefined
+  if (!rec || typeof rec !== 'object') {
+    return undefined
+  }
   return rec as ScheduleRecord
 }
 
@@ -124,7 +132,9 @@ function getRecordById(id: string): ScheduleRecord | undefined {
  */
 export function runUpdates(): () => void {
   const ids: string[] = getIdsFromStore()
-  if (ids.length === 0) return () => {}
+  if (ids.length === 0) {
+    return () => {}
+  }
 
   const intervalMs: number = Math.max(1, (1000 / MESSAGES_PER_SECOND) | 0)
   const patchFields: PatchField[] = buildPatchFields()
@@ -134,7 +144,9 @@ export function runUpdates(): () => void {
   let timer: ReturnType<typeof setTimeout> | null = null
 
   const tick = (): void => {
-    if (stopped) return
+    if (stopped) {
+      return
+    }
 
     const id: string = pick(ids)
     const cur: ScheduleRecord | undefined = getRecordById(id)
@@ -166,7 +178,9 @@ export function runUpdates(): () => void {
 
   return (): void => {
     stopped = true
-    if (timer) clearTimeout(timer)
+    if (timer) {
+      clearTimeout(timer)
+    }
     timer = null
     void emitted
   }

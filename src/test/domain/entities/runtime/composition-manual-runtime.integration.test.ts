@@ -1,14 +1,14 @@
-import { afterEach, describe, expect, it } from 'vitest'
-import { Raph } from '@endge/raph'
+import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
+import type { ProgramArtifact, QueryProgramPayload } from '@/domain/types/program/program.types'
 
+import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
+import { Raph } from '@endge/raph'
+import { afterEach, describe, expect, it } from 'vitest'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
-import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
-import type { ProgramArtifact, QueryProgramPayload } from '@/domain/types/program/program.types'
-import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
 import { Endge } from '@/model/kernel/endge'
 
-describe('Composition manual runtime handle', () => {
+describe('composition manual runtime handle', () => {
   afterEach(async () => {
     await Endge.runtime.reset()
     Endge.program.clear()
@@ -58,7 +58,11 @@ function query(id: number, identity: string): RQuery {
 
 function queryArtifact(model: RQuery, hasOutput: boolean): ProgramArtifact<QueryProgramPayload> {
   return baseArtifact('query', model.id, model.identity, {
-    type: 'query-rest', sourceVersion: 2, endpoint: '', query: '', requestBody: null,
+    type: 'query-rest',
+    sourceVersion: 2,
+    endpoint: '',
+    query: '',
+    requestBody: null,
     props: hasOutput ? [] : [{ key: 'rows', type: 'Object', optional: true, array: true }],
     outputs: hasOutput
       ? [{ key: 'rows', source: { type: 'response', path: null }, dataViews: [], materialization: { kind: 'source' } }]
@@ -69,33 +73,70 @@ function queryArtifact(model: RQuery, hasOutput: boolean): ProgramArtifact<Query
 function compositionArtifact(model: RComposition): ProgramArtifact<CompositionProgramPayload> {
   const runtimes: CompositionProgramPayload['runtimes'] = [
     {
-      name: 'source', path: 'source', scopePath: 'scope_default', kind: 'query', identity: 'manual-source',
-      activationOverride: { mode: 'manual' }, effectiveActivation: { mode: 'manual' }, props: {}, storeTo: [],
+      name: 'source',
+      path: 'source',
+      scopePath: 'scope_default',
+      kind: 'query',
+      identity: 'manual-source',
+      activationOverride: { mode: 'manual' },
+      effectiveActivation: { mode: 'manual' },
+      props: {},
+      storeTo: [],
     },
     {
-      name: 'consumer', path: 'consumer', scopePath: 'scope_default', kind: 'query', identity: 'consumer',
-      activationOverride: { mode: 'startup' }, effectiveActivation: { mode: 'startup' },
-      props: { rows: { kind: 'output', runtime: 'source', output: 'rows' } }, storeTo: [],
+      name: 'consumer',
+      path: 'consumer',
+      scopePath: 'scope_default',
+      kind: 'query',
+      identity: 'consumer',
+      activationOverride: { mode: 'startup' },
+      effectiveActivation: { mode: 'startup' },
+      props: { rows: { kind: 'output', runtime: 'source', output: 'rows' } },
+      storeTo: [],
     },
   ]
   return baseArtifact('composition', model.id, model.identity, {
-    type: 'composition', sourceVersion: 1, activation: { mode: 'startup' }, props: [], data: [], resources: [], runtimes, hooks: [], outputs: [],
+    type: 'composition',
+    sourceVersion: 1,
+    activation: { mode: 'startup' },
+    props: [],
+    data: [],
+    resources: [],
+    runtimes,
+    hooks: [],
+    outputs: [],
     scopes: [{
-      name: 'scope_default', path: 'scope_default', parentPath: null,
-      activationOverride: { mode: 'startup' }, effectiveActivation: { mode: 'startup' },
-      resources: [], runtimes: ['source', 'consumer'], children: [], sourceOrder: 0,
+      name: 'scope_default',
+      path: 'scope_default',
+      parentPath: null,
+      activationOverride: { mode: 'startup' },
+      effectiveActivation: { mode: 'startup' },
+      resources: [],
+      runtimes: ['source', 'consumer'],
+      children: [],
+      sourceOrder: 0,
     }],
     graph: {
       inputs: [{ targetRuntime: 'consumer', targetProp: 'rows', source: { kind: 'output', runtime: 'source', output: 'rows' } }],
-      dataInputs: [], updates: [], publications: [], mounts: [],
+      dataInputs: [],
+      updates: [],
+      publications: [],
+      mounts: [],
     },
   })
 }
 
 function baseArtifact<T>(entityType: 'query' | 'composition', id: number, identity: string, payload: T): ProgramArtifact<T> {
   return {
-    ref: { entityType, id, identity }, sourceHash: `test:${identity}`, compilerVersion: 'test', contextHash: 'test',
-    status: 'valid', diagnostics: [], dependencies: [], capabilities: ['compilable', 'executable'],
-    metadata: { self: {}, nodes: [] }, payload,
+    ref: { entityType, id, identity },
+    sourceHash: `test:${identity}`,
+    compilerVersion: 'test',
+    contextHash: 'test',
+    status: 'valid',
+    diagnostics: [],
+    dependencies: [],
+    capabilities: ['compilable', 'executable'],
+    metadata: { self: {}, nodes: [] },
+    payload,
   }
 }

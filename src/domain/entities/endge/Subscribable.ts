@@ -1,6 +1,6 @@
 /** Минимальный framework-independent contract объекта с подпиской на изменения. */
 export interface SubscribableLike {
-  subscribe(listener: () => void): () => void
+  subscribe: (listener: () => void) => () => void
 }
 
 /**
@@ -26,7 +26,8 @@ export class Subscribable implements SubscribableLike {
 
   /** Уведомляет текущих подписчиков об изменении владельца состояния. */
   public notify(): void {
-    for (const listener of this._subscribers)
+    for (const listener of this._subscribers) {
       listener()
+    }
   }
 }

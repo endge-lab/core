@@ -25,13 +25,13 @@ export function createActionContext(options: {
 }): ActionRuntimeHostContext {
   const base = createDefaultActionContext()
   const input = options.input
-  const contextInput =
-    input != null && typeof input === 'object' && !Array.isArray(input)
+  const contextInput
+    = input != null && typeof input === 'object' && !Array.isArray(input)
       ? { ...(input as Record<string, unknown>) }
       : input
   return {
     ...base,
-    input: (contextInput !== undefined && contextInput !== null ? contextInput : {}) as Record<string, unknown>,
+    input: (contextInput ?? {}) as Record<string, unknown>,
     ...(options.parent != null && { parent: options.parent }),
   }
 }

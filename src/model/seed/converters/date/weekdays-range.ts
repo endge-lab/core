@@ -5,7 +5,9 @@
 export function weekdaysRange(str: any): boolean[] {
   const result = Array(7).fill(false)
   const s = str != null ? String(str).trim() : ''
-  if (!s) return result
+  if (!s) {
+    return result
+  }
 
   const parts = s.split(',').map((p: string) => p.trim())
 
@@ -13,11 +15,16 @@ export function weekdaysRange(str: any): boolean[] {
     if (part.includes('-')) {
       const [start, end] = part.split('-').map(Number)
       for (let i = start; i <= end; i++) {
-        if (i >= 1 && i <= 7) result[i - 1] = true
+        if (i >= 1 && i <= 7) {
+          result[i - 1] = true
+        }
       }
-    } else {
+    }
+    else {
       const day = Number(part)
-      if (day >= 1 && day <= 7) result[day - 1] = true
+      if (day >= 1 && day <= 7) {
+        result[day - 1] = true
+      }
     }
   }
 

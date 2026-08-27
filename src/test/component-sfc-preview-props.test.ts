@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 
-describe('Component SFC preview props', () => {
+describe('component SFC preview props', () => {
   it('keeps literal definePreviewProps backwards-compatible', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 defineProps<{

@@ -1,6 +1,6 @@
-import type { RuntimeHost } from '@/domain/types/runtime/runtime-host.types'
+import type { RuntimeScope } from '@/domain/entities/runtime/RuntimeScope'
 
-import { RuntimeScope } from '@/domain/entities/runtime/RuntimeScope'
+import type { RuntimeHost } from '@/domain/types/runtime/runtime-host.types'
 
 /** Индексирует runtime scopes и membership RuntimeHost. */
 export class RuntimeScopeRegistry {
@@ -12,8 +12,9 @@ export class RuntimeScopeRegistry {
   private _notificationPending = false
 
   public register(scope: RuntimeScope): RuntimeScope {
-    if (this._scopes.has(scope.id))
+    if (this._scopes.has(scope.id)) {
       throw new Error(`[RuntimeScopeRegistry] Scope "${scope.id}" is already registered.`)
+    }
     this._scopes.set(scope.id, scope)
     this._scopeDisposers.set(scope.id, scope.subscribe(() => this._changed()))
     this._changed()
@@ -36,8 +37,9 @@ export class RuntimeScopeRegistry {
     }
     try {
       const result = operation()
-      if (result && typeof (result as any).then === 'function')
+      if (result && typeof (result as any).then === 'function') {
         return (result as any).finally(finish)
+      }
       finish()
       return result
     }
@@ -61,11 +63,13 @@ export class RuntimeScopeRegistry {
 
   public attachRuntime(scopeId: string, host: RuntimeHost<any, any>): void {
     const scope = this.get(scopeId)
-    if (!scope)
+    if (!scope) {
       throw new Error(`[RuntimeScopeRegistry] Scope "${scopeId}" is missing.`)
+    }
     const previous = this._scopeByRuntime.get(host.id)
-    if (previous && previous !== scope.id)
+    if (previous && previous !== scope.id) {
       throw new Error(`[RuntimeScopeRegistry] Runtime "${host.id}" already belongs to scope "${previous}".`)
+    }
     scope.addRuntime(host)
     this._scopeByRuntime.set(host.id, scope.id)
   }
@@ -73,8 +77,9 @@ export class RuntimeScopeRegistry {
   public detachRuntime(runtimeId: string): void {
     const id = String(runtimeId ?? '').trim()
     const scopeId = this._scopeByRuntime.get(id)
-    if (scopeId)
+    if (scopeId) {
       this.get(scopeId)?.removeRuntime(id)
+    }
     this._scopeByRuntime.delete(id)
   }
 
@@ -85,11 +90,14 @@ export class RuntimeScopeRegistry {
 
   public async remove(id: string): Promise<void> {
     const scope = this.get(id)
-    if (!scope) return
+    if (!scope) {
+      return
+    }
     await scope.dispose()
     for (const [runtimeId, scopeId] of this._scopeByRuntime) {
-      if (scopeId === scope.id)
+      if (scopeId === scope.id) {
         this._scopeByRuntime.delete(runtimeId)
+      }
     }
     this._scopes.delete(scope.id)
     this._scopeDisposers.get(scope.id)?.()
@@ -101,19 +109,26 @@ export class RuntimeScopeRegistry {
     const roots = this.getAll().filter(scope => !scope.parent)
     this._scopes.clear()
     this._scopeByRuntime.clear()
-    for (const dispose of this._scopeDisposers.values()) dispose()
+    for (const dispose of this._scopeDisposers.values()) {
+      dispose()
+    }
     this._scopeDisposers.clear()
     this._changed()
-    for (const scope of roots.reverse())
+    for (const scope of roots.reverse()) {
       await scope.dispose()
+    }
   }
 
   private _changed(): void {
-    if (this._transactionDepth) this._notificationPending = true
-    else this._notify()
+    if (this._transactionDepth) {
+      this._notificationPending = true
+    }
+    else { this._notify() }
   }
 
   private _notify(): void {
-    for (const listener of this._listeners) listener()
+    for (const listener of this._listeners) {
+      listener()
+    }
   }
 }

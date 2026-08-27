@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { EndgeContext } from '@/model/modules/context/endge-context'
-import { buildRuntimeStateStorageKey, RuntimeStateController } from '@/model/modules/context/persistence/RuntimeStateController'
 import { DisabledContextAdapter } from '@/model/modules/context/persistence/adapters/DisabledContextAdapter'
 import { LocalStorageContextAdapter } from '@/model/modules/context/persistence/adapters/LocalStorageContextAdapter'
+import { buildRuntimeStateStorageKey, RuntimeStateController } from '@/model/modules/context/persistence/RuntimeStateController'
 
-describe('EndgeContext persistence', () => {
+describe('endgeContext persistence', () => {
   beforeEach(() => {
     installLocalStorageMock()
   })
@@ -165,15 +165,22 @@ describe('EndgeContext persistence', () => {
 
   it('separates active runtime id from durable storage id', () => {
     const scope = {
-      workspaceId: 'workspace', tenantId: 'tenant', projectId: 'project',
-      environmentId: 'prod', userId: 'user',
+      workspaceId: 'workspace',
+      tenantId: 'tenant',
+      projectId: 'project',
+      environmentId: 'prod',
+      userId: 'user',
     }
     const first = new RuntimeStateController({
-      runtimeId: 'runtime-a', storageId: 'schedule-filter', scope,
+      runtimeId: 'runtime-a',
+      storageId: 'schedule-filter',
+      scope,
       adapter: new LocalStorageContextAdapter(),
     })
     const second = new RuntimeStateController({
-      runtimeId: 'runtime-b', storageId: 'schedule-filter', scope,
+      runtimeId: 'runtime-b',
+      storageId: 'schedule-filter',
+      scope,
       adapter: new LocalStorageContextAdapter(),
     })
 
@@ -187,8 +194,11 @@ describe('EndgeContext persistence', () => {
 
   it('isolates durable state when any context dimension changes', () => {
     const base = {
-      workspaceId: 'workspace', tenantId: 'tenant', projectId: 'project',
-      environmentId: 'prod', userId: 'user',
+      workspaceId: 'workspace',
+      tenantId: 'tenant',
+      projectId: 'project',
+      environmentId: 'prod',
+      userId: 'user',
     }
     const keys = (Object.keys(base) as Array<keyof typeof base>).map(key =>
       buildRuntimeStateStorageKey({ ...base, [key]: `${base[key]}-other` }, 'schedule-filter'),

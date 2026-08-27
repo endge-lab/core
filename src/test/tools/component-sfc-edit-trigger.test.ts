@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
-
 import type { ComponentSFCEditTriggerEvent } from '@/domain/types/component/sfc/ir.types'
+
+import { describe, expect, it } from 'vitest'
 import {
   matchesComponentSFCEditTrigger,
   normalizeComponentSFCEditTriggers,
@@ -23,7 +23,7 @@ const baseEvent: ComponentSFCEditTriggerEvent = {
   },
 }
 
-describe('Component SFC edit trigger', () => {
+describe('component SFC edit trigger', () => {
   it('normalizes keyboard filters and explicit false modifier states', () => {
     expect(normalizeComponentSFCEditTriggers({
       event: 'keydown',

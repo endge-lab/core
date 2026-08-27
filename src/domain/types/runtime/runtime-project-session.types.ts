@@ -1,7 +1,7 @@
-import type { CompositionPublicOutputHandle, CompositionSession } from '@/domain/types/source/composition-source.types'
 import type { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
-import type { RuntimeScopeHandle } from '@/domain/types/runtime/runtime-scope.types'
 import type { RuntimeArtifactReader } from '@/domain/types/runtime/runtime-host.types'
+import type { RuntimeScopeHandle } from '@/domain/types/runtime/runtime-scope.types'
+import type { CompositionPublicOutputHandle, CompositionSession } from '@/domain/types/source/composition-source.types'
 
 export interface ProjectCompositionRegistry {
   get: (identity: string) => ProjectCompositionHandle | null

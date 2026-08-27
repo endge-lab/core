@@ -30,16 +30,18 @@ export class DiagnosticsRecordStore {
   /** Изменяет ёмкость, сохраняя самые новые records. */
   public setCapacity(nextCapacity: number): void {
     const next = this._normalizeCapacity(nextCapacity)
-    if (next === this._capacity)
+    if (next === this._capacity) {
       return
+    }
 
     const tail = this.toArray().slice(-next)
     this._capacity = next
     this._clearState()
     this._slots = new Array<DiagnosticsRecord | undefined>(next)
 
-    for (const record of tail)
+    for (const record of tail) {
       this.append(record)
+    }
   }
 
   /** Добавляет record и возвращает вытесненную запись. */
@@ -48,8 +50,9 @@ export class DiagnosticsRecordStore {
 
     if (this._length === this._capacity) {
       evicted = this._slots[this._head] ?? null
-      if (evicted)
+      if (evicted) {
         this._removeIndexes(evicted)
+      }
     }
     else {
       this._length += 1
@@ -71,16 +74,18 @@ export class DiagnosticsRecordStore {
 
   /** Возвращает records от старых к новым с необязательным ограничением хвоста. */
   public toArray(limit?: number): DiagnosticsRecord[] {
-    if (this._length === 0)
+    if (this._length === 0) {
       return []
+    }
 
     const records: DiagnosticsRecord[] = []
     const start = (this._head - this._length + this._capacity) % this._capacity
     for (let index = 0; index < this._length; index += 1) {
       const slot = (start + index) % this._capacity
       const record = this._slots[slot]
-      if (record)
+      if (record) {
         records.push(record)
+      }
     }
 
     return limit != null && limit > 0 ? records.slice(-limit) : records
@@ -125,8 +130,9 @@ export class DiagnosticsRecordStore {
 
   /** Возвращает records по готовому индексу. */
   private _fromIndex(index: Set<number> | undefined, limit?: number): DiagnosticsRecord[] {
-    if (!index)
+    if (!index) {
       return []
+    }
 
     const ids = [...index]
     const selected = limit != null && limit > 0 ? ids.slice(-limit) : ids
@@ -135,10 +141,12 @@ export class DiagnosticsRecordStore {
 
   /** Добавляет record во все индексы store. */
   private _addIndexes(record: DiagnosticsRecord): void {
-    if (record.traceId)
+    if (record.traceId) {
       this._addToIndex(this._traceIndex, record.traceId, record.id)
-    if (record.spanId)
+    }
+    if (record.spanId) {
       this._addToIndex(this._spanIndex, record.spanId, record.id)
+    }
 
     const scopeName = record.scope.name
     this._addToIndex(this._scopeIndex, scopeName, record.id)
@@ -149,10 +157,12 @@ export class DiagnosticsRecordStore {
   /** Удаляет вытесненный record из всех индексов store. */
   private _removeIndexes(record: DiagnosticsRecord): void {
     this._byId.delete(record.id)
-    if (record.traceId)
+    if (record.traceId) {
       this._removeFromIndex(this._traceIndex, record.traceId, record.id)
-    if (record.spanId)
+    }
+    if (record.spanId) {
       this._removeFromIndex(this._spanIndex, record.spanId, record.id)
+    }
 
     const scopeName = record.scope.name
     this._removeFromIndex(this._scopeIndex, scopeName, record.id)
@@ -170,20 +180,22 @@ export class DiagnosticsRecordStore {
   /** Удаляет id из индекса и очищает пустую корзину. */
   private _removeFromIndex(index: Map<string, Set<number>>, key: string, id: number): void {
     const bucket = index.get(key)
-    if (!bucket)
+    if (!bucket) {
       return
+    }
     bucket.delete(id)
-    if (bucket.size === 0)
+    if (bucket.size === 0) {
       index.delete(key)
+    }
   }
 
   /** Изменяет счётчик и удаляет нулевое значение. */
   private _bump<TKey extends string>(target: Map<TKey, number>, key: TKey, delta: number): void {
     const next = Math.max(0, (target.get(key) ?? 0) + delta)
-    if (next === 0)
+    if (next === 0) {
       target.delete(key)
-    else
-      target.set(key, next)
+    }
+    else { target.set(key, next) }
   }
 
   /** Нормализует ёмкость store до положительного целого числа. */

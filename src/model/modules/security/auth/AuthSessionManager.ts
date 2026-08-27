@@ -8,10 +8,10 @@ import type {
 } from '@/domain/types/auth/auth-profile.types'
 import type { AuthSessionState } from '@/domain/types/auth/auth-runtime.types'
 
-import { createEndgeAuthContext, decodeJwtClaims } from '@/model/services/auth/auth-context'
 import type { AuthAdapterRegistry } from '@/model/modules/security/auth/AuthAdapterRegistry'
 import type { AuthProfileRegistry } from '@/model/modules/security/auth/AuthProfileRegistry'
 import type { AuthSessionStore } from '@/model/modules/security/auth/AuthSessionStore'
+import { createEndgeAuthContext, decodeJwtClaims } from '@/model/services/auth/auth-context'
 
 interface AuthSessionManagerDependencies {
   getWorkspaceIdentity: () => string
@@ -50,8 +50,9 @@ export class AuthSessionManager {
   /** Безопасный actor/session context без tokens. */
   public get context(): EndgeAuthContext {
     const state = this._defaultState()
-    if (!state || !this._defaultProfile || !this._isSessionUsable(state.token))
+    if (!state || !this._defaultProfile || !this._isSessionUsable(state.token)) {
       return { authenticated: false }
+    }
     return createEndgeAuthContext({
       authenticated: true,
       accessToken: state.token.accessToken,
@@ -101,15 +102,17 @@ export class AuthSessionManager {
     this._states.delete(profile.identity)
     this._operations.delete(profile.identity)
     this._store.remove(this._workspaceIdentity(), profile.identity)
-    if (profile.identity === this._defaultProfile?.identity)
+    if (profile.identity === this._defaultProfile?.identity) {
       this._dependencies.onSessionChange()
+    }
   }
 
   /** Гарантирует действующую session default runtime profile. */
   public async ensureValid(options: AuthEnsureOptions = {}): Promise<boolean> {
     const profile = this._defaultProfile
-    if (!profile)
+    if (!profile) {
       return false
+    }
     const token = await this.ensureProfile(profile, options)
     return Boolean(token && this._isSessionUsable(token))
   }
@@ -117,14 +120,17 @@ export class AuthSessionManager {
   /** Загружает userinfo для session default runtime profile. */
   public async ensureUserInfo(): Promise<Record<string, unknown> | null> {
     const profile = this._defaultProfile
-    if (!profile)
+    if (!profile) {
       return null
+    }
     const token = await this.ensureProfile(profile)
-    if (!token)
+    if (!token) {
       return null
+    }
     const state = this._states.get(profile.identity)
-    if (state?.userInfo)
+    if (state?.userInfo) {
       return state.userInfo
+    }
     const source = this._sources.get(profile.identity)
     if (source?.loadUserInfo) {
       const userInfo = await source.loadUserInfo()
@@ -133,8 +139,9 @@ export class AuthSessionManager {
       return userInfo
     }
     const adapter = this._adapters.require(profile)
-    if (!adapter.loadUserInfo)
+    if (!adapter.loadUserInfo) {
       return null
+    }
     const userInfo = await adapter.loadUserInfo({
       ...this._profiles.createAdapterContext(profile),
       token,
@@ -147,8 +154,9 @@ export class AuthSessionManager {
   /** Завершает session default runtime profile и всегда очищает local snapshot. */
   public async logout(): Promise<void> {
     const profile = this._defaultProfile
-    if (!profile)
+    if (!profile) {
       return
+    }
     const state = this._states.get(profile.identity)
     const source = this._sources.get(profile.identity)
     if (source) {
@@ -207,8 +215,9 @@ export class AuthSessionManager {
       }
     }
 
-    if (!options.forceRefresh && state && this._isAccessTokenFresh(profile, state.token))
+    if (!options.forceRefresh && state && this._isAccessTokenFresh(profile, state.token)) {
       return state.token
+    }
 
     const adapter = this._adapters.require(profile)
     if (state?.token.refreshToken && !this._isRefreshExpired(state.token) && adapter.refresh) {
@@ -226,15 +235,17 @@ export class AuthSessionManager {
             this._clearState(profile)
             return this._authenticateWhenAllowed(profile)
           }
-          if (this._isAccessTokenUsable(state!.token))
+          if (this._isAccessTokenUsable(state!.token)) {
             return state!.token
+          }
           throw error
         }
       })
     }
 
-    if (state && this._isRefreshExpired(state.token))
+    if (state && this._isRefreshExpired(state.token)) {
       this._clearState(profile)
+    }
     return this._singleFlight(profile.identity, () => this._authenticateWhenAllowed(profile))
   }
 
@@ -291,15 +302,17 @@ export class AuthSessionManager {
         updatedAt: new Date(this._now()).toISOString(),
       })
     }
-    if (profile.identity === this._defaultProfile?.identity)
+    if (profile.identity === this._defaultProfile?.identity) {
       this._dependencies.onSessionChange()
+    }
   }
 
   private _clearState(profile: AuthProfileSchema): void {
     this._states.delete(profile.identity)
     this._store.remove(this._workspaceIdentity(), profile.identity)
-    if (profile.identity === this._defaultProfile?.identity)
+    if (profile.identity === this._defaultProfile?.identity) {
       this._dependencies.onSessionChange()
+    }
   }
 
   private _defaultState(): AuthSessionState | null {
@@ -318,10 +331,12 @@ export class AuthSessionManager {
   }
 
   private _isAccessTokenFresh(profile: AuthProfileSchema, token: AuthTokenSet): boolean {
-    if (!token.accessToken)
+    if (!token.accessToken) {
       return Object.keys(token.headers ?? {}).length > 0
-    if (token.accessExpiresAt == null)
+    }
+    if (token.accessExpiresAt == null) {
       return true
+    }
     const skew = this._refreshSkewMs(profile)
     return token.accessExpiresAt - Math.max(0, skew) > this._now()
   }
@@ -340,8 +355,9 @@ export class AuthSessionManager {
 
   private _workspaceIdentity(): string {
     const identity = String(this._dependencies.getWorkspaceIdentity() ?? '').trim()
-    if (!identity)
+    if (!identity) {
       throw new Error('[EndgeAuth] Workspace identity is unavailable')
+    }
     return identity
   }
 
@@ -350,11 +366,13 @@ export class AuthSessionManager {
     operation: () => Promise<AuthTokenSet | null>,
   ): Promise<AuthTokenSet | null> {
     const existing = this._operations.get(profileIdentity)
-    if (existing)
+    if (existing) {
       return existing
+    }
     const promise = operation().finally(() => {
-      if (this._operations.get(profileIdentity) === promise)
+      if (this._operations.get(profileIdentity) === promise) {
         this._operations.delete(profileIdentity)
+      }
     })
     this._operations.set(profileIdentity, promise)
     return promise
@@ -362,8 +380,9 @@ export class AuthSessionManager {
 }
 
 function isInvalidGrant(error: unknown): boolean {
-  if (!error || typeof error !== 'object')
+  if (!error || typeof error !== 'object') {
     return false
+  }
   const record = error as Record<string, any>
   return record.response?.data?.error === 'invalid_grant'
     || record.code === 'invalid_grant'
