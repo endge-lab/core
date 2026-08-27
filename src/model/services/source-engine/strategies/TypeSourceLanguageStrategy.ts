@@ -14,6 +14,44 @@ import { TYPE_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/ty
 import { collectTypeSourceReferences, normalizeTypeSourceReferences, resolveTypeSourceReference } from '@/model/services/source-engine/type-source-references'
 import { serializeTypeSourceReference } from '@/model/services/source-engine/type-source-serialize'
 
+const TYPE_COMPLETIONS: SourceLanguageCompletion[] = [
+  { label: 'defineType.object', kind: 'snippet', insertText: TYPE_DEFAULT_SOURCE.trimEnd(), detail: 'Object Type source' },
+  { label: 'defineType.enum', kind: 'snippet', insertText: `defineType(enumOf([\n  'draft',\n  'active',\n]))`, detail: 'Enum Type source' },
+  { label: 'defineType.union', kind: 'snippet', insertText: `defineType(unionOf(\n  FirstType,\n  SecondType,\n))`, detail: 'Union Type source' },
+  { label: 'defineType.array', kind: 'snippet', insertText: `defineType(arrayOf(\n  ItemType,\n))`, detail: 'Array Type source' },
+  { label: 'field', kind: 'function', insertText: `field(String)`, detail: 'Object field type' },
+  {
+    label: 'field.object',
+    kind: 'snippet',
+    insertText: `field(objectOf({
+  property: field(String),
+}))`,
+    detail: 'Anonymous inline object field',
+  },
+  {
+    label: 'objectOf',
+    kind: 'function',
+    insertText: `objectOf({
+  property: field(String),
+})`,
+    detail: 'Anonymous inline object type expression',
+  },
+  {
+    label: 'recordOf',
+    kind: 'function',
+    insertText: `recordOf(objectOf({
+  property: field(String),
+}))`,
+    detail: 'String-keyed dictionary type expression',
+  },
+  { label: 'description', kind: 'function', insertText: `.description('')`, detail: 'Field description' },
+  { label: 'optional', kind: 'function', insertText: `.optional()`, detail: 'Optional field' },
+  { label: 'array', kind: 'function', insertText: `.array()`, detail: 'Array field' },
+  { label: 'min', kind: 'function', insertText: `.min(0)`, detail: 'Minimum Number value' },
+  { label: 'max', kind: 'function', insertText: `.max(1)`, detail: 'Maximum Number value' },
+  { label: 'example', kind: 'function', insertText: `.example(null)`, detail: 'Static JSON example' },
+]
+
 export class TypeSourceLanguageStrategy implements SourceLanguageStrategy {
   public readonly id = 'source-language:type'
   public readonly sourceKind: SourceKind = 'type'
@@ -83,41 +121,3 @@ export class TypeSourceLanguageStrategy implements SourceLanguageStrategy {
     return typeReferenceHighlights(context, collectTypeSourceReferences(context.source))
   }
 }
-
-const TYPE_COMPLETIONS: SourceLanguageCompletion[] = [
-  { label: 'defineType.object', kind: 'snippet', insertText: TYPE_DEFAULT_SOURCE.trimEnd(), detail: 'Object Type source' },
-  { label: 'defineType.enum', kind: 'snippet', insertText: `defineType(enumOf([\n  'draft',\n  'active',\n]))`, detail: 'Enum Type source' },
-  { label: 'defineType.union', kind: 'snippet', insertText: `defineType(unionOf(\n  FirstType,\n  SecondType,\n))`, detail: 'Union Type source' },
-  { label: 'defineType.array', kind: 'snippet', insertText: `defineType(arrayOf(\n  ItemType,\n))`, detail: 'Array Type source' },
-  { label: 'field', kind: 'function', insertText: `field(String)`, detail: 'Object field type' },
-  {
-    label: 'field.object',
-    kind: 'snippet',
-    insertText: `field(objectOf({
-  property: field(String),
-}))`,
-    detail: 'Anonymous inline object field',
-  },
-  {
-    label: 'objectOf',
-    kind: 'function',
-    insertText: `objectOf({
-  property: field(String),
-})`,
-    detail: 'Anonymous inline object type expression',
-  },
-  {
-    label: 'recordOf',
-    kind: 'function',
-    insertText: `recordOf(objectOf({
-  property: field(String),
-}))`,
-    detail: 'String-keyed dictionary type expression',
-  },
-  { label: 'description', kind: 'function', insertText: `.description('')`, detail: 'Field description' },
-  { label: 'optional', kind: 'function', insertText: `.optional()`, detail: 'Optional field' },
-  { label: 'array', kind: 'function', insertText: `.array()`, detail: 'Array field' },
-  { label: 'min', kind: 'function', insertText: `.min(0)`, detail: 'Minimum Number value' },
-  { label: 'max', kind: 'function', insertText: `.max(1)`, detail: 'Maximum Number value' },
-  { label: 'example', kind: 'function', insertText: `.example(null)`, detail: 'Static JSON example' },
-]

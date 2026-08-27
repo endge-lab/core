@@ -12,89 +12,6 @@ import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine
 import { DATA_VIEW_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/data-view.default.source'
 import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/model/services/source-engine/value-expression-language'
 
-/** Source language strategy для editor-facing операций RDataView source. */
-export class DataViewSourceLanguageStrategy implements SourceLanguageStrategy {
-  public readonly id = 'source-language:data-view'
-  public readonly sourceKind: SourceKind = 'data-view'
-  public readonly syntax = createTypeScriptLikeSourceSyntax({
-    alias: 'Endge DataView Source',
-    extension: '.endge-data-view.ts',
-    keywords: [
-      'auto',
-      'collectionByKey',
-      'contract',
-      'convert',
-      'converter',
-      'dataView',
-      'defineDataView',
-      'defineProps',
-      'field',
-      'filter',
-      'filterByKey',
-      'from',
-      'full',
-      'incremental',
-      'join',
-      'map',
-      'output',
-      'path',
-      'pick',
-      'prop',
-      'select',
-      'spread',
-      'template',
-      'transform',
-      ...VALUE_EXPRESSION_FUNCTION_NAMES,
-    ],
-    functions: ['as', 'auto', 'by', 'collectionByKey', 'convert', 'converter', 'dataView', 'filterByKey', 'find', 'from', 'full', 'join', 'map', 'pick', 'prop', 'select', ...VALUE_EXPRESSION_METHOD_NAMES],
-    properties: ['contract', 'filter', 'incremental', 'input', 'left', 'manual', 'metadata', 'mode', 'output', 'pipeline', 'props', 'right', 'steps', 'tools'],
-  })
-
-  /** Проверяет, что strategy обслуживает DataView source. */
-  public supports(sourceKind: SourceKind | string): boolean {
-    return sourceKind === this.sourceKind
-  }
-
-  /** Возвращает базовый source новой RDataView. */
-  public createDefaultSource(): string {
-    return DATA_VIEW_DEFAULT_SOURCE
-  }
-
-  /** Валидирует DataView source через текущий compiler pass. */
-  public validate(source: string): SourceLanguageValidationResult {
-    const result = compileDataViewSource(source)
-    const ok = !result.diagnostics.some(diagnostic => diagnostic.severity === 'error')
-
-    return {
-      ok,
-      diagnostics: result.diagnostics,
-      message: ok ? undefined : 'DataView source contains validation errors.',
-    }
-  }
-
-  /** Возвращает подсказки v1 для разрешенного DataView source API. */
-  public completions(_context: SourceLanguageContext): SourceLanguageCompletion[] {
-    return [...DATA_VIEW_SOURCE_COMPLETIONS, ...VALUE_EXPRESSION_COMPLETIONS]
-  }
-
-  public resolveReference(context: SourceLanguageContext) {
-    return resolveTypedSourceDocumentReference(context, {
-      functions: {
-        converter: 'converter',
-        dataView: 'data-view',
-      },
-      methods: {
-        convert: 'converter',
-        dataView: 'data-view',
-      },
-    })
-  }
-
-  public semanticHighlights(context: SourceLanguageContext) {
-    return typedSourceTypeReferenceHighlights(context)
-  }
-}
-
 const DATA_VIEW_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
   {
     label: 'defineDataView',
@@ -182,3 +99,86 @@ const DATA_VIEW_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'convert', kind: 'function', insertText: `.convert('date.iso_to_time', { format: 'HH:mm' })`, detail: 'Применяет converter' },
   { label: 'field', kind: 'function', insertText: `field('String')`, detail: 'Описание поля контракта' },
 ]
+
+/** Source language strategy для editor-facing операций RDataView source. */
+export class DataViewSourceLanguageStrategy implements SourceLanguageStrategy {
+  public readonly id = 'source-language:data-view'
+  public readonly sourceKind: SourceKind = 'data-view'
+  public readonly syntax = createTypeScriptLikeSourceSyntax({
+    alias: 'Endge DataView Source',
+    extension: '.endge-data-view.ts',
+    keywords: [
+      'auto',
+      'collectionByKey',
+      'contract',
+      'convert',
+      'converter',
+      'dataView',
+      'defineDataView',
+      'defineProps',
+      'field',
+      'filter',
+      'filterByKey',
+      'from',
+      'full',
+      'incremental',
+      'join',
+      'map',
+      'output',
+      'path',
+      'pick',
+      'prop',
+      'select',
+      'spread',
+      'template',
+      'transform',
+      ...VALUE_EXPRESSION_FUNCTION_NAMES,
+    ],
+    functions: ['as', 'auto', 'by', 'collectionByKey', 'convert', 'converter', 'dataView', 'filterByKey', 'find', 'from', 'full', 'join', 'map', 'pick', 'prop', 'select', ...VALUE_EXPRESSION_METHOD_NAMES],
+    properties: ['contract', 'filter', 'incremental', 'input', 'left', 'manual', 'metadata', 'mode', 'output', 'pipeline', 'props', 'right', 'steps', 'tools'],
+  })
+
+  /** Проверяет, что strategy обслуживает DataView source. */
+  public supports(sourceKind: SourceKind | string): boolean {
+    return sourceKind === this.sourceKind
+  }
+
+  /** Возвращает базовый source новой RDataView. */
+  public createDefaultSource(): string {
+    return DATA_VIEW_DEFAULT_SOURCE
+  }
+
+  /** Валидирует DataView source через текущий compiler pass. */
+  public validate(source: string): SourceLanguageValidationResult {
+    const result = compileDataViewSource(source)
+    const ok = !result.diagnostics.some(diagnostic => diagnostic.severity === 'error')
+
+    return {
+      ok,
+      diagnostics: result.diagnostics,
+      message: ok ? undefined : 'DataView source contains validation errors.',
+    }
+  }
+
+  /** Возвращает подсказки v1 для разрешенного DataView source API. */
+  public completions(_context: SourceLanguageContext): SourceLanguageCompletion[] {
+    return [...DATA_VIEW_SOURCE_COMPLETIONS, ...VALUE_EXPRESSION_COMPLETIONS]
+  }
+
+  public resolveReference(context: SourceLanguageContext) {
+    return resolveTypedSourceDocumentReference(context, {
+      functions: {
+        converter: 'converter',
+        dataView: 'data-view',
+      },
+      methods: {
+        convert: 'converter',
+        dataView: 'data-view',
+      },
+    })
+  }
+
+  public semanticHighlights(context: SourceLanguageContext) {
+    return typedSourceTypeReferenceHighlights(context)
+  }
+}

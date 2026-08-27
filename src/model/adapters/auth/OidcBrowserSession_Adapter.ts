@@ -14,6 +14,64 @@ import {
 
 const POPUP_OPTIONS_KEY = 'endge:oidc:popup-callback-options'
 
+class SanitizingStateStore implements StateStore {
+  private readonly _volatileRefreshTokens = new Map<string, string>()
+
+  public constructor(
+    private readonly _delegate: StateStore,
+    private readonly _persistRefreshToken: boolean,
+  ) {}
+
+  public async set(key: string, value: string): Promise<void> {
+    if (this._persistRefreshToken) {
+      this._volatileRefreshTokens.delete(key)
+      await this._delegate.set(key, value)
+      return
+    }
+    try {
+      const parsed = JSON.parse(value) as Record<string, unknown>
+      const refreshToken = String(parsed.refresh_token ?? '')
+      if (refreshToken) {
+        this._volatileRefreshTokens.set(key, refreshToken)
+      }
+      else { this._volatileRefreshTokens.delete(key) }
+      delete parsed.refresh_token
+      await this._delegate.set(key, JSON.stringify(parsed))
+    }
+    catch {
+      await this._delegate.set(key, value)
+    }
+  }
+
+  public async get(key: string): Promise<string | null> {
+    const value = await this._delegate.get(key)
+    const refreshToken = this._volatileRefreshTokens.get(key)
+    if (!value || !refreshToken || this._persistRefreshToken) {
+      return value
+    }
+    try {
+      return JSON.stringify({ ...JSON.parse(value), refresh_token: refreshToken })
+    }
+    catch {
+      return value
+    }
+  }
+
+  public async remove(key: string): Promise<string | null> {
+    this._volatileRefreshTokens.delete(key)
+    return this._delegate.remove(key)
+  }
+
+  public getAllKeys(): Promise<string[]> {
+    return this._delegate.getAllKeys()
+  }
+
+  /** Принимает User, возвращённого popup/redirect callback, в память текущей вкладки. */
+  public async adopt(key: string, user: User): Promise<void> {
+    await this.set(key, user.toStorageString())
+  }
+}
+
 /** Общий browser OIDC runtime для popup и redirect Authorization Code + PKCE flows. */
 export class OidcBrowserSession_Adapter implements AuthSessionSource {
   private readonly _userStore: SanitizingStateStore
@@ -158,65 +216,6 @@ function resolveStorage(storage: OidcBrowserSessionOptions['session']['storage']
   }
   return new InMemoryWebStorage()
 }
-
-class SanitizingStateStore implements StateStore {
-  private readonly _volatileRefreshTokens = new Map<string, string>()
-
-  public constructor(
-    private readonly _delegate: StateStore,
-    private readonly _persistRefreshToken: boolean,
-  ) {}
-
-  public async set(key: string, value: string): Promise<void> {
-    if (this._persistRefreshToken) {
-      this._volatileRefreshTokens.delete(key)
-      await this._delegate.set(key, value)
-      return
-    }
-    try {
-      const parsed = JSON.parse(value) as Record<string, unknown>
-      const refreshToken = String(parsed.refresh_token ?? '')
-      if (refreshToken) {
-        this._volatileRefreshTokens.set(key, refreshToken)
-      }
-      else { this._volatileRefreshTokens.delete(key) }
-      delete parsed.refresh_token
-      await this._delegate.set(key, JSON.stringify(parsed))
-    }
-    catch {
-      await this._delegate.set(key, value)
-    }
-  }
-
-  public async get(key: string): Promise<string | null> {
-    const value = await this._delegate.get(key)
-    const refreshToken = this._volatileRefreshTokens.get(key)
-    if (!value || !refreshToken || this._persistRefreshToken) {
-      return value
-    }
-    try {
-      return JSON.stringify({ ...JSON.parse(value), refresh_token: refreshToken })
-    }
-    catch {
-      return value
-    }
-  }
-
-  public async remove(key: string): Promise<string | null> {
-    this._volatileRefreshTokens.delete(key)
-    return this._delegate.remove(key)
-  }
-
-  public getAllKeys(): Promise<string[]> {
-    return this._delegate.getAllKeys()
-  }
-
-  /** Принимает User, возвращённого popup/redirect callback, в память текущей вкладки. */
-  public async adopt(key: string, user: User): Promise<void> {
-    await this.set(key, user.toStorageString())
-  }
-}
-
 function userStoreKey(options: OidcBrowserSessionOptions): string {
   return `user:${options.issuer.replace(/\/+$/, '')}:${options.clientId}`
 }

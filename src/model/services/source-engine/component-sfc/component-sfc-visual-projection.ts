@@ -1008,6 +1008,18 @@ function sourceOwnedInteractions(
   return { editable: false, rules: [], suffixes, sourceRange, message }
 }
 
+const INTERACTION_TRIGGER_FIELDS = new Set([
+  'event',
+  'key',
+  'code',
+  'held',
+  'modifiers',
+  'repeat',
+  'composing',
+  'button',
+  ...CELL_INTERACTION_FLAGS,
+])
+
 function projectCellInteractionRule(
   node: any,
   source: string,
@@ -1033,19 +1045,6 @@ function projectCellInteractionRule(
     reactionSource: source.slice(reaction.start ?? 0, reaction.end ?? source.length),
   }
 }
-
-const INTERACTION_TRIGGER_FIELDS = new Set([
-  'event',
-  'key',
-  'code',
-  'held',
-  'modifiers',
-  'repeat',
-  'composing',
-  'button',
-  ...CELL_INTERACTION_FLAGS,
-])
-
 function projectInteractionTrigger(node: any, allowReaction = false): ComponentSFCInteractionTriggerProjection | null {
   const literalEvent = babelLiteralString(node)
   if (literalEvent) {

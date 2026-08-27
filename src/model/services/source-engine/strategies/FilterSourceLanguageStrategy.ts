@@ -12,6 +12,19 @@ import { resolveTypedSourceDocumentReference, typedSourceTypeReferenceHighlights
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
 import { FILTER_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/filter.default.source'
 
+const FILTER_COMPLETIONS: SourceLanguageCompletion[] = [
+  { label: 'defineFilter', kind: 'snippet', insertText: FILTER_DEFAULT_SOURCE.trimEnd(), detail: 'Создать Filter source' },
+  { label: 'metadata', kind: 'property', insertText: `metadata: {\n  'namespace.feature': {},\n},`, detail: 'Статическая metadata Filter' },
+  { label: 'field', kind: 'function', insertText: `field('String').optional().default('')`, detail: 'Описание Filter field' },
+  { label: 'options', kind: 'function', insertText: `.options([{ value: '', label: '' }])`, detail: 'Статические варианты поля' },
+  { label: 'vocab', kind: 'function', insertText: `.vocab('', { valuePath: 'code', labelPath: 'name' })`, detail: 'Внешний vocab поля' },
+  { label: 'meta', kind: 'function', insertText: `.meta({\n  'endge.ui.select': { searchable: true },\n})`, detail: 'Presentation metadata поля' },
+  { label: 'output.json', kind: 'function', insertText: `output().json(({ value }) => compact({}))`, detail: 'JSON output' },
+  { label: 'output.predicate', kind: 'function', insertText: `output().predicate(({ row, value }) => and())`, detail: 'Predicate output' },
+  { label: 'relativeDate', kind: 'function', insertText: `relativeDate('-1d')`, detail: 'Относительная дата' },
+  { label: 'relativeDateTime', kind: 'function', insertText: `relativeDateTime('-1d', 'startOfDay')`, detail: 'Относительная дата-время в UTC ISO' },
+]
+
 export class FilterSourceLanguageStrategy implements SourceLanguageStrategy {
   public readonly id = 'source-language:filter'
   public readonly sourceKind: SourceKind = 'filter'
@@ -99,16 +112,3 @@ export class FilterSourceLanguageStrategy implements SourceLanguageStrategy {
     return typedSourceTypeReferenceHighlights(context)
   }
 }
-
-const FILTER_COMPLETIONS: SourceLanguageCompletion[] = [
-  { label: 'defineFilter', kind: 'snippet', insertText: FILTER_DEFAULT_SOURCE.trimEnd(), detail: 'Создать Filter source' },
-  { label: 'metadata', kind: 'property', insertText: `metadata: {\n  'namespace.feature': {},\n},`, detail: 'Статическая metadata Filter' },
-  { label: 'field', kind: 'function', insertText: `field('String').optional().default('')`, detail: 'Описание Filter field' },
-  { label: 'options', kind: 'function', insertText: `.options([{ value: '', label: '' }])`, detail: 'Статические варианты поля' },
-  { label: 'vocab', kind: 'function', insertText: `.vocab('', { valuePath: 'code', labelPath: 'name' })`, detail: 'Внешний vocab поля' },
-  { label: 'meta', kind: 'function', insertText: `.meta({\n  'endge.ui.select': { searchable: true },\n})`, detail: 'Presentation metadata поля' },
-  { label: 'output.json', kind: 'function', insertText: `output().json(({ value }) => compact({}))`, detail: 'JSON output' },
-  { label: 'output.predicate', kind: 'function', insertText: `output().predicate(({ row, value }) => and())`, detail: 'Predicate output' },
-  { label: 'relativeDate', kind: 'function', insertText: `relativeDate('-1d')`, detail: 'Относительная дата' },
-  { label: 'relativeDateTime', kind: 'function', insertText: `relativeDateTime('-1d', 'startOfDay')`, detail: 'Относительная дата-время в UTC ISO' },
-]

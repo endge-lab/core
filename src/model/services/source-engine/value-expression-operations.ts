@@ -253,6 +253,8 @@ function orderBy(args: SourceExpressionIR[], runtime: ValueOperationRuntime): un
     .map(item => item.value)
 }
 
+const resolveJoinSource = resolveCollectionSource
+
 /** Создаёт отложенное описание join до объявления matching keys. */
 function joinBuilder(type: JoinType): ValueOperation {
   return (args, runtime) => ({
@@ -411,9 +413,6 @@ function resolveCollectionSource(expression: SourceExpressionIR, runtime: ValueO
   const resolved = runtime.evaluate({ type: 'read', source: 'scope', path: value })
   return Array.isArray(resolved) ? resolved : []
 }
-
-const resolveJoinSource = resolveCollectionSource
-
 function normalizeJoinKey(value: unknown): JoinKey | null {
   if (typeof value === 'string' && value.trim()) {
     return { left: value.trim(), right: value.trim() }

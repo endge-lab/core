@@ -12,6 +12,18 @@ import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine
 import { CONFIGURATION_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/configuration.default.source'
 import { collectConfigurationTypeSourceReferences, resolveConfigurationTypeSourceReference } from '@/model/services/source-engine/type-source-references'
 
+const CONFIGURATION_COMPLETIONS: SourceLanguageCompletion[] = [
+  { label: 'defineConfig', kind: 'snippet', insertText: CONFIGURATION_DEFAULT_SOURCE.trimEnd(), detail: 'Configuration category' },
+  { label: 'value', kind: 'snippet', insertText: `value(String, '')`, detail: 'Typed configuration value' },
+  { label: 'TriggerSet', kind: 'value', insertText: 'TriggerSet', detail: 'Interaction trigger array' },
+  { label: 'JSON', kind: 'value', insertText: 'JSON', detail: 'Any JSON value' },
+  { label: 'label', kind: 'function', insertText: `.label('')`, detail: 'Editor label' },
+  { label: 'description', kind: 'function', insertText: `.description('')`, detail: 'Editor description' },
+  { label: 'min', kind: 'function', insertText: '.min(0)', detail: 'Minimum Number value' },
+  { label: 'max', kind: 'function', insertText: '.max(100)', detail: 'Maximum Number value' },
+  { label: 'step', kind: 'function', insertText: '.step(1)', detail: 'Number editor step' },
+]
+
 export class ConfigurationSourceLanguageStrategy implements SourceLanguageStrategy {
   readonly id = 'source-language:configuration'
   readonly sourceKind: SourceKind = 'configuration'
@@ -65,15 +77,3 @@ export class ConfigurationSourceLanguageStrategy implements SourceLanguageStrate
     return typeReferenceHighlights(context, collectConfigurationTypeSourceReferences(context.source))
   }
 }
-
-const CONFIGURATION_COMPLETIONS: SourceLanguageCompletion[] = [
-  { label: 'defineConfig', kind: 'snippet', insertText: CONFIGURATION_DEFAULT_SOURCE.trimEnd(), detail: 'Configuration category' },
-  { label: 'value', kind: 'snippet', insertText: `value(String, '')`, detail: 'Typed configuration value' },
-  { label: 'TriggerSet', kind: 'value', insertText: 'TriggerSet', detail: 'Interaction trigger array' },
-  { label: 'JSON', kind: 'value', insertText: 'JSON', detail: 'Any JSON value' },
-  { label: 'label', kind: 'function', insertText: `.label('')`, detail: 'Editor label' },
-  { label: 'description', kind: 'function', insertText: `.description('')`, detail: 'Editor description' },
-  { label: 'min', kind: 'function', insertText: '.min(0)', detail: 'Minimum Number value' },
-  { label: 'max', kind: 'function', insertText: '.max(100)', detail: 'Maximum Number value' },
-  { label: 'step', kind: 'function', insertText: '.step(1)', detail: 'Number editor step' },
-]

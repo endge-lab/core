@@ -11,6 +11,33 @@ import { resolveSourceDocumentReference } from '@/model/services/source-engine/s
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
 import { VOCAB_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/vocab.default.source'
 
+const VOCAB_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
+  {
+    label: 'defineVocab',
+    kind: 'snippet',
+    insertText: VOCAB_DEFAULT_SOURCE.trimEnd(),
+    detail: 'Создать Vocab source',
+  },
+  {
+    label: 'payload provider',
+    kind: 'property',
+    insertText: `provider: payload({\n  baseUrl: env('ENDPOINT_VOCABS_SERVICE'),\n  collection: '',\n  auth: { mode: 'inherit' },\n}),`,
+    detail: 'Payload provider словаря',
+  },
+  {
+    label: 'mock',
+    kind: 'property',
+    insertText: `mock: mock('fixtures').path('lookups.items'),`,
+    detail: 'Mock JSON document и dot-path',
+  },
+  {
+    label: 'convert',
+    kind: 'function',
+    insertText: `.convert('converter-identity')`,
+    detail: 'Преобразовать текущее значение целиком',
+  },
+]
+
 export class VocabSourceLanguageStrategy implements SourceLanguageStrategy {
   public readonly id = 'source-language:vocab'
   public readonly sourceKind: SourceKind = 'vocab'
@@ -48,30 +75,3 @@ export class VocabSourceLanguageStrategy implements SourceLanguageStrategy {
     })
   }
 }
-
-const VOCAB_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
-  {
-    label: 'defineVocab',
-    kind: 'snippet',
-    insertText: VOCAB_DEFAULT_SOURCE.trimEnd(),
-    detail: 'Создать Vocab source',
-  },
-  {
-    label: 'payload provider',
-    kind: 'property',
-    insertText: `provider: payload({\n  baseUrl: env('ENDPOINT_VOCABS_SERVICE'),\n  collection: '',\n  auth: { mode: 'inherit' },\n}),`,
-    detail: 'Payload provider словаря',
-  },
-  {
-    label: 'mock',
-    kind: 'property',
-    insertText: `mock: mock('fixtures').path('lookups.items'),`,
-    detail: 'Mock JSON document и dot-path',
-  },
-  {
-    label: 'convert',
-    kind: 'function',
-    insertText: `.convert('converter-identity')`,
-    detail: 'Преобразовать текущее значение целиком',
-  },
-]

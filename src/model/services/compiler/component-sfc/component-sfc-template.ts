@@ -637,6 +637,15 @@ function validateTooltipNode(
   }
 }
 
+const LOCAL_EVENT_MODIFIERS = new Set<RComponentSFC_IR_EventModifier>([
+  'stop',
+  'prevent',
+  'self',
+  'once',
+  'capture',
+  'passive',
+])
+
 function compileEditableBehavior(
   node: RComponentSFC_AST_ElementNode,
   tag: RComponentSFC_IR_Tag,
@@ -991,16 +1000,6 @@ function compileInteractionBindings(
       return group ? [group] : []
     })
 }
-
-const LOCAL_EVENT_MODIFIERS = new Set<RComponentSFC_IR_EventModifier>([
-  'stop',
-  'prevent',
-  'self',
-  'once',
-  'capture',
-  'passive',
-])
-
 function compileEventBindings(
   directives: RComponentSFC_AST_Directive[],
   manifest: ComponentSFCPortManifest | null,

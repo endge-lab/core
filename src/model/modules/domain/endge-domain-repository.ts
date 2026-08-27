@@ -31,6 +31,18 @@ type DomainCollectionKey
     | 'converters' | 'computations' | 'environments' | 'tenants' | 'styles' | 'configurations'
     | 'vocabs' | 'authProfiles' | 'i18nBundles' | 'navigations'
 
+/** Explicit error for writes through bundle/plain or a read-only live backend. */
+export class EndgeDomainRepositoryReadOnlyError extends Error {
+  public readonly code = 'provider_read_only'
+
+  public constructor(provider: string) {
+    super(provider === 'service-backend'
+      ? 'Service backend mutations are disabled'
+      : `Domain repository provider "${provider}" is read-only`)
+    this.name = 'EndgeDomainRepositoryReadOnlyError'
+  }
+}
+
 /** Persistence boundary for live service-backend and read-only local sources. */
 export class EndgeDomainRepository extends EndgeModule {
   private _loadedSnapshot: EndgeLiveDomainSnapshot | null = null
@@ -837,17 +849,5 @@ export class EndgeDomainRepository extends EndgeModule {
 
   private _notifyDomainChanged(): void {
     ;(AppBus.emit as (event: string, payload?: unknown) => void)('domainChanged', undefined)
-  }
-}
-
-/** Explicit error for writes through bundle/plain or a read-only live backend. */
-export class EndgeDomainRepositoryReadOnlyError extends Error {
-  public readonly code = 'provider_read_only'
-
-  public constructor(provider: string) {
-    super(provider === 'service-backend'
-      ? 'Service backend mutations are disabled'
-      : `Domain repository provider "${provider}" is read-only`)
-    this.name = 'EndgeDomainRepositoryReadOnlyError'
   }
 }

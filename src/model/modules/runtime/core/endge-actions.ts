@@ -397,10 +397,12 @@ export class EndgeActions extends Subscribable {
           : action.identity
         const target = invocation.target?.value as Record<string, unknown> | undefined
         if (typeof target?.invokeAction === 'function') {
-          return await (target.invokeAction as Function)(portName, invocation.input)
+          const invokeAction = target.invokeAction as (name: string, input: unknown) => unknown
+          return await invokeAction(portName, invocation.input)
         }
         if (typeof target?.[portName] === 'function') {
-          return await (target[portName] as Function)(invocation.input)
+          const invokePort = target[portName] as (input: unknown) => unknown
+          return await invokePort(invocation.input)
         }
         throw new Error(`Component target does not provide Action port: ${portName}.`)
       },

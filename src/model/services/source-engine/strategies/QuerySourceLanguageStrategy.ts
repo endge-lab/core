@@ -13,172 +13,6 @@ import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine
 import { QUERY_DEFAULT_SOURCE, QUERY_GRAPHQL_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/query.default.source'
 import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/model/services/source-engine/value-expression-language'
 
-/** Source language strategy для editor-facing операций RQuery source. */
-export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
-  public readonly id = 'source-language:query'
-  public readonly sourceKind: SourceKind = 'query'
-  public readonly syntax = createTypeScriptLikeSourceSyntax({
-    alias: 'Endge Query Source',
-    extension: '.endge-query.ts',
-    keywords: [
-      'auto',
-      'body',
-      'collectionByKey',
-      'compact',
-      'contract',
-      'converter',
-      'data',
-      'dataView',
-      'defineDataView',
-      'defineFilter',
-      'defineProps',
-      'defineQuery',
-      'endgeVar',
-      'env',
-      'field',
-      'filter',
-      'full',
-      'gql',
-      'graphql',
-      'ignore',
-      'incremental',
-      'merge',
-      'objectOf',
-      'output',
-      'prop',
-      'recordOf',
-      'response',
-      'throw',
-      'variables',
-      ...VALUE_EXPRESSION_FUNCTION_NAMES,
-    ],
-    functions: [
-      'array',
-      'as',
-      'auto',
-      'by',
-      'collectionByKey',
-      'contract',
-      'converter',
-      'dataView',
-      'default',
-      'from',
-      'full',
-      'map',
-      'optional',
-      'options',
-      'vocab',
-      ...VALUE_EXPRESSION_METHOD_NAMES,
-    ],
-    properties: [
-      'auth',
-      'body',
-      'data',
-      'document',
-      'enabled',
-      'endpoint',
-      'errorPolicy',
-      'formUrlencoded',
-      'headers',
-      'incremental',
-      'items',
-      'kind',
-      'method',
-      'mock',
-      'mode',
-      'outputs',
-      'path',
-      'metadata',
-      'operationName',
-      'profile',
-      'props',
-      'request',
-      'timeoutMs',
-      'variables',
-    ],
-  })
-
-  /** Проверяет, что стратегия обслуживает query source. */
-  public supports(sourceKind: SourceKind | string): boolean {
-    return sourceKind === this.sourceKind
-  }
-
-  /** Возвращает базовый source новой RQuery. */
-  public createDefaultSource(variant?: string): string {
-    return variant === 'graphql' || variant === 'query-gql'
-      ? QUERY_GRAPHQL_DEFAULT_SOURCE
-      : QUERY_DEFAULT_SOURCE
-  }
-
-  /** Валидирует query source через текущий compiler pass. */
-  public validate(source: string, context?: SourceLanguageContext): SourceLanguageValidationResult {
-    const result = compileQuerySource(source)
-    const typeCatalog = context?.typeSymbols?.map((type, index) => ({
-      id: index,
-      identity: type.identity,
-      displayName: type.displayName ?? type.identity,
-      category: type.category ?? 'user',
-      sourceVersion: 1,
-      definition: null,
-      status: 'valid',
-    } as const))
-    const typeDiagnostics = typeCatalog
-      ? [
-          ...(result.artifact?.props.flatMap(prop => [
-            ...validateTypeExpressionUsage(prop.type, typeCatalog, `props.${prop.key}.type`),
-            ...validateTypeSourceExpressionUsage(prop.typeExpression, typeCatalog, `props.${prop.key}.typeExpression`),
-          ]) ?? []),
-          ...(result.artifact?.outputs.flatMap(output => [
-            ...validateTypeExpressionUsage(output.contract?.type, typeCatalog, `outputs.${output.key}.contract.type`),
-            ...validateTypeSourceExpressionUsage(output.contract?.typeExpression, typeCatalog, `outputs.${output.key}.contract.typeExpression`),
-          ]) ?? []),
-        ]
-      : []
-    const diagnostics = [...result.diagnostics, ...typeDiagnostics]
-    const ok = !diagnostics.some(diagnostic => diagnostic.severity === 'error')
-
-    return {
-      ok,
-      diagnostics,
-      message: ok ? undefined : 'Query source contains validation errors.',
-    }
-  }
-
-  /** Возвращает подсказки source-only Query v2 API. */
-  public completions(context: SourceLanguageContext): SourceLanguageCompletion[] {
-    return [...QUERY_SOURCE_COMPLETIONS, ...VALUE_EXPRESSION_COMPLETIONS, ...typeCompletions(context)]
-  }
-
-  public resolveReference(context: SourceLanguageContext) {
-    return resolveTypedSourceDocumentReference(context, {
-      functions: {
-        converter: 'converter',
-        dataView: 'data-view',
-        filter: 'filter',
-      },
-      methods: {
-        convert: 'converter',
-        dataView: 'data-view',
-      },
-      properties: [{ property: 'profile', parentProperty: 'auth', target: 'auth-profile' }],
-    })
-  }
-
-  public semanticHighlights(context: SourceLanguageContext) {
-    return typedSourceTypeReferenceHighlights(context)
-  }
-}
-
-function typeCompletions(context: SourceLanguageContext): SourceLanguageCompletion[] {
-  return (context.typeSymbols ?? []).map(type => ({
-    label: type.identity,
-    kind: 'value',
-    insertText: type.identity,
-    detail: `${type.category ?? 'user'} type`,
-    documentation: type.displayName,
-  }))
-}
-
 const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
   {
     label: 'defineQuery',
@@ -377,3 +211,169 @@ const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
     detail: 'HTTP POST',
   },
 ]
+
+/** Source language strategy для editor-facing операций RQuery source. */
+export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
+  public readonly id = 'source-language:query'
+  public readonly sourceKind: SourceKind = 'query'
+  public readonly syntax = createTypeScriptLikeSourceSyntax({
+    alias: 'Endge Query Source',
+    extension: '.endge-query.ts',
+    keywords: [
+      'auto',
+      'body',
+      'collectionByKey',
+      'compact',
+      'contract',
+      'converter',
+      'data',
+      'dataView',
+      'defineDataView',
+      'defineFilter',
+      'defineProps',
+      'defineQuery',
+      'endgeVar',
+      'env',
+      'field',
+      'filter',
+      'full',
+      'gql',
+      'graphql',
+      'ignore',
+      'incremental',
+      'merge',
+      'objectOf',
+      'output',
+      'prop',
+      'recordOf',
+      'response',
+      'throw',
+      'variables',
+      ...VALUE_EXPRESSION_FUNCTION_NAMES,
+    ],
+    functions: [
+      'array',
+      'as',
+      'auto',
+      'by',
+      'collectionByKey',
+      'contract',
+      'converter',
+      'dataView',
+      'default',
+      'from',
+      'full',
+      'map',
+      'optional',
+      'options',
+      'vocab',
+      ...VALUE_EXPRESSION_METHOD_NAMES,
+    ],
+    properties: [
+      'auth',
+      'body',
+      'data',
+      'document',
+      'enabled',
+      'endpoint',
+      'errorPolicy',
+      'formUrlencoded',
+      'headers',
+      'incremental',
+      'items',
+      'kind',
+      'method',
+      'mock',
+      'mode',
+      'outputs',
+      'path',
+      'metadata',
+      'operationName',
+      'profile',
+      'props',
+      'request',
+      'timeoutMs',
+      'variables',
+    ],
+  })
+
+  /** Проверяет, что стратегия обслуживает query source. */
+  public supports(sourceKind: SourceKind | string): boolean {
+    return sourceKind === this.sourceKind
+  }
+
+  /** Возвращает базовый source новой RQuery. */
+  public createDefaultSource(variant?: string): string {
+    return variant === 'graphql' || variant === 'query-gql'
+      ? QUERY_GRAPHQL_DEFAULT_SOURCE
+      : QUERY_DEFAULT_SOURCE
+  }
+
+  /** Валидирует query source через текущий compiler pass. */
+  public validate(source: string, context?: SourceLanguageContext): SourceLanguageValidationResult {
+    const result = compileQuerySource(source)
+    const typeCatalog = context?.typeSymbols?.map((type, index) => ({
+      id: index,
+      identity: type.identity,
+      displayName: type.displayName ?? type.identity,
+      category: type.category ?? 'user',
+      sourceVersion: 1,
+      definition: null,
+      status: 'valid',
+    } as const))
+    const typeDiagnostics = typeCatalog
+      ? [
+          ...(result.artifact?.props.flatMap(prop => [
+            ...validateTypeExpressionUsage(prop.type, typeCatalog, `props.${prop.key}.type`),
+            ...validateTypeSourceExpressionUsage(prop.typeExpression, typeCatalog, `props.${prop.key}.typeExpression`),
+          ]) ?? []),
+          ...(result.artifact?.outputs.flatMap(output => [
+            ...validateTypeExpressionUsage(output.contract?.type, typeCatalog, `outputs.${output.key}.contract.type`),
+            ...validateTypeSourceExpressionUsage(output.contract?.typeExpression, typeCatalog, `outputs.${output.key}.contract.typeExpression`),
+          ]) ?? []),
+        ]
+      : []
+    const diagnostics = [...result.diagnostics, ...typeDiagnostics]
+    const ok = !diagnostics.some(diagnostic => diagnostic.severity === 'error')
+
+    return {
+      ok,
+      diagnostics,
+      message: ok ? undefined : 'Query source contains validation errors.',
+    }
+  }
+
+  /** Возвращает подсказки source-only Query v2 API. */
+  public completions(context: SourceLanguageContext): SourceLanguageCompletion[] {
+    return [...QUERY_SOURCE_COMPLETIONS, ...VALUE_EXPRESSION_COMPLETIONS, ...typeCompletions(context)]
+  }
+
+  public resolveReference(context: SourceLanguageContext) {
+    return resolveTypedSourceDocumentReference(context, {
+      functions: {
+        converter: 'converter',
+        dataView: 'data-view',
+        filter: 'filter',
+      },
+      methods: {
+        convert: 'converter',
+        dataView: 'data-view',
+      },
+      properties: [{ property: 'profile', parentProperty: 'auth', target: 'auth-profile' }],
+    })
+  }
+
+  public semanticHighlights(context: SourceLanguageContext) {
+    return typedSourceTypeReferenceHighlights(context)
+  }
+}
+
+function typeCompletions(context: SourceLanguageContext): SourceLanguageCompletion[] {
+  return (context.typeSymbols ?? []).map(type => ({
+    label: type.identity,
+    kind: 'value',
+    insertText: type.identity,
+    detail: `${type.category ?? 'user'} type`,
+    documentation: type.displayName,
+  }))
+}

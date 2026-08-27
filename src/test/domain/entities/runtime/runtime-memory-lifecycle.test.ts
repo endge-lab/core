@@ -8,6 +8,21 @@ import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 import { RuntimeHostRegistry } from '@/domain/entities/runtime/RuntimeHostRegistry'
 import { Endge } from '@/model/kernel/endge'
 
+class TestQueryHost extends RuntimeHostBase<'query', RuntimeHostContext<'query'>> {
+  constructor(model: RQuery, id = 'test-host', parent: TestQueryHost | null = null) {
+    super({
+      id,
+      kind: 'query',
+      runtimeType: 'test-query',
+      entityType: 'query',
+      entityIdentity: model.identity,
+      model,
+      parent,
+      context: { status: 'idle', startedAt: null, updatedAt: null, lastFilterChangeAt: null },
+    })
+  }
+}
+
 describe('runtime memory lifecycle', () => {
   afterEach(async () => {
     await Endge.runtime.reset()
@@ -138,22 +153,6 @@ describe('runtime memory lifecycle', () => {
     }
   })
 })
-
-class TestQueryHost extends RuntimeHostBase<'query', RuntimeHostContext<'query'>> {
-  constructor(model: RQuery, id = 'test-host', parent: TestQueryHost | null = null) {
-    super({
-      id,
-      kind: 'query',
-      runtimeType: 'test-query',
-      entityType: 'query',
-      entityIdentity: model.identity,
-      model,
-      parent,
-      context: { status: 'idle', startedAt: null, updatedAt: null, lastFilterChangeAt: null },
-    })
-  }
-}
-
 function executeQuery(id: number, meta: Record<string, unknown> = {}, parent: RuntimeHost<any, any> | null = null) {
   const model = queryModel(id)
   const artifact = queryArtifact(id)
