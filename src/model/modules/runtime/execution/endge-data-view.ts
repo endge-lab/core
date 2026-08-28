@@ -58,7 +58,7 @@ export class EndgeDataView {
     const props = this._resolveProps(artifact, context.props)
 
     if (artifact.mode === 'manual') {
-      return this._runManual(artifact, input, runTools)
+      return this._runManual()
     }
     if (artifact.mode === 'projection') {
       return this._runProjection(artifact, input, props)
@@ -184,20 +184,9 @@ export class EndgeDataView {
     return artifact
   }
 
-  /** Выполняет manual transform в controlled wrapper текущего frontend runtime. */
-  private _runManual(
-    artifact: DataViewProgramPayload,
-    input: unknown,
-    tools: DataViewRunTools,
-  ): unknown {
-    const body = artifact.transform?.body ?? ''
-    const wrappedBody = `
-      "use strict";
-      const { convert, pick, path, template } = tools;
-      ${body}
-    `
-    const fn = new Function('input', 'tools', wrappedBody) as (input: unknown, tools: DataViewRunTools) => unknown
-    return fn(input, tools)
+  /** Останавливает manual DataView до появления безопасного runtime. */
+  private _runManual(): never {
+    throw new Error('[DataView] mode "manual" временно отключён: безопасный runtime для пользовательского TypeScript ещё не реализован.')
   }
 
   /** Интерпретирует декларативные pipeline steps без eval. */
