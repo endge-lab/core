@@ -4,9 +4,9 @@ import type { ProgramDiagnostic } from '@/domain/types/program/program.types'
 import type { EndgeConfigurationSchemaEntry, EndgeJSONValue } from '@/domain/types/source/configuration-source.types'
 import type { TypeProgramCatalogEntry } from '@/domain/types/source/type-source.types'
 
+import { validateConfigurationValue } from '@/domain/configuration/configuration-value'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { Endge } from '@/model/kernel/endge'
-import { validateConfigurationValue } from '@/model/services/configuration/configuration-value'
 import { compileConfigurationSource } from '@/model/services/source-engine/compilers/configuration-source-compile'
 import { compileTypeSource } from '@/model/services/source-engine/compilers/type-source-compile'
 

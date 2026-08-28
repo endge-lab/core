@@ -1,3 +1,4 @@
+import type { AuthRequestPolicy, AuthResolvedSession, AuthResolveOptions } from '@/domain/types/auth/auth-profile.types'
 import type {
   StreamTransportConnection,
   StreamTransportFactory,
@@ -6,10 +7,15 @@ import type {
 
 import { SSEManager } from '@endge/utils'
 
-import { Endge } from '@/model/kernel/endge'
+export type ResolveAuthSession = (
+  policy: AuthRequestPolicy,
+  options?: AuthResolveOptions,
+) => Promise<AuthResolvedSession>
 
 /** Browser adapter that owns native EventSource and converts it to a Core transport port. */
 export class BrowserSseStreamTransportFactory implements StreamTransportFactory {
+  public constructor(private readonly _resolveAuthSession: ResolveAuthSession) {}
+
   public open(artifact: Parameters<StreamTransportFactory['open']>[0], callbacks: Parameters<StreamTransportFactory['open']>[1]): StreamTransportConnection {
     if (artifact.transport.kind !== 'sse') {
       throw new Error(`Unsupported Stream transport: ${(artifact.transport as any).kind}`)
@@ -27,7 +33,7 @@ export class BrowserSseStreamTransportFactory implements StreamTransportFactory 
           if (artifact.transport.authMode === 'profile' && !profileIdentity) {
             throw new Error('[BrowserSseStreamTransportFactory] Auth profile is required for profile mode.')
           }
-          const session = await Endge.auth.requests.resolve(
+          const session = await this._resolveAuthSession(
             artifact.transport.authMode === 'profile'
               ? { mode: 'profile', profile: profileIdentity }
               : { mode: 'inherit' },

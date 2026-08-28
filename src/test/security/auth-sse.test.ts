@@ -2,7 +2,6 @@ import type { AuthResolvedSession } from '@/domain/types/auth/auth-profile.types
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { Endge } from '@/model/kernel/endge'
 import { BrowserSseStreamTransportFactory } from '@/model/services/runtime/transports/BrowserSseStreamTransportFactory'
 import { compileStreamSource } from '@/model/services/source-engine/compilers/stream-source-compile'
 
@@ -36,9 +35,9 @@ describe('authenticated SSE transport', () => {
       headers: { Authorization: 'Bearer token' },
       expiresAt: null,
     }
-    const resolve = vi.spyOn(Endge.auth.requests, 'resolve').mockResolvedValue(resolved)
+    const resolve = vi.fn().mockResolvedValue(resolved)
     const setIntervalSpy = vi.spyOn(globalThis, 'setInterval')
-    new BrowserSseStreamTransportFactory().open({
+    new BrowserSseStreamTransportFactory(resolve).open({
       type: 'stream',
       sourceVersion: 1,
       transport: {
@@ -82,13 +81,13 @@ describe('authenticated SSE transport', () => {
       authProfileIdentity: 'keycloak-local',
     })
 
-    const resolve = vi.spyOn(Endge.auth.requests, 'resolve').mockResolvedValue({
+    const resolve = vi.fn().mockResolvedValue({
       profileIdentity: 'keycloak-local',
       accessToken: 'profile-token',
       headers: { Authorization: 'Bearer profile-token' },
       expiresAt: null,
     })
-    new BrowserSseStreamTransportFactory().open(compiled.artifact!, {
+    new BrowserSseStreamTransportFactory(resolve).open(compiled.artifact!, {
       message: vi.fn(),
       error: vi.fn(),
       open: vi.fn(),

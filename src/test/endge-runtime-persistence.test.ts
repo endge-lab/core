@@ -1,4 +1,4 @@
-import type { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentSFCRuntimeHost'
+import type { ComponentSFCRuntimeHost } from '@/model/runtime/hosts/ComponentSFCRuntimeHost'
 import { Raph } from '@endge/raph'
 
 import { afterEach, describe, expect, it } from 'vitest'

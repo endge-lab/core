@@ -3,7 +3,7 @@ import { Serialize } from '@endge/utils'
 
 import { Exclude, Expose } from 'class-transformer'
 import { REntity } from '@/domain/entities/reflect/REntity'
-import { CONFIGURATION_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/configuration.default.source'
+import { CONFIGURATION_DEFAULT_SOURCE } from '@/domain/source/templates/configuration.default.source'
 
 /** Workspace-owned source document that declares one settings category. */
 export class RConfiguration extends REntity {

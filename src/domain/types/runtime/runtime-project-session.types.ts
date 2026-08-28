@@ -1,23 +1,22 @@
-import type { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
 import type { RuntimeArtifactReader } from '@/domain/types/runtime/runtime-host.types'
 import type { RuntimeScopeHandle } from '@/domain/types/runtime/runtime-scope.types'
-import type { CompositionPublicOutputHandle, CompositionSession } from '@/domain/types/source/composition-source.types'
+import type { CompositionPublicOutputHandle, CompositionRuntimeHostHandle, CompositionSession } from '@/domain/types/source/composition-source.types'
 
-export interface ProjectCompositionRegistry {
-  get: (identity: string) => ProjectCompositionHandle | null
-  require: (identity: string) => ProjectCompositionHandle
-  getAll: () => ProjectCompositionHandle[]
+export interface ProjectCompositionRegistry<THost extends CompositionRuntimeHostHandle = CompositionRuntimeHostHandle> {
+  get: (identity: string) => ProjectCompositionHandle<THost> | null
+  require: (identity: string) => ProjectCompositionHandle<THost>
+  getAll: () => ProjectCompositionHandle<THost>[]
 }
 
-export interface ProjectCompositionHandle {
+export interface ProjectCompositionHandle<THost extends CompositionRuntimeHostHandle = CompositionRuntimeHostHandle> {
   readonly identity: string
   readonly state: 'inactive' | 'active' | 'paused' | 'disposed'
-  readonly host: CompositionRuntimeHost | null
+  readonly host: THost | null
   readonly outputs: Readonly<Record<string, CompositionPublicOutputHandle>>
-  activate: () => Promise<CompositionSession>
+  activate: () => Promise<CompositionSession<THost>>
   pause: () => Promise<void>
   resume: () => Promise<void>
-  restart: () => Promise<CompositionSession>
+  restart: () => Promise<CompositionSession<THost>>
   deactivate: () => Promise<void>
   output: <T = unknown>(name: string) => T | undefined
 }
@@ -29,9 +28,9 @@ export interface ProjectRuntimeMountOptions {
   artifactReader?: RuntimeArtifactReader
 }
 
-export interface ProjectRuntimeSession {
+export interface ProjectRuntimeSession<THost extends CompositionRuntimeHostHandle = CompositionRuntimeHostHandle> {
   readonly id: string
-  readonly compositions: ProjectCompositionRegistry
+  readonly compositions: ProjectCompositionRegistry<THost>
   switchScope: (options: {
     from?: RuntimeScopeHandle | null
     to: RuntimeScopeHandle

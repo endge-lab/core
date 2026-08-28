@@ -109,8 +109,8 @@ function collectSortableColumns(
         code: 'sfc-table-sort-comparator-invalid',
         message: `Column "${key}" использует неизвестный comparator "${String(rawComparator)}".`,
         sourcePath: `template.Table.Column.${key}.sort`,
-        start: child.sourceRange.start,
-        end: child.sourceRange.end,
+        start: child.sourceRange?.start,
+        end: child.sourceRange?.end,
       })
     }
 

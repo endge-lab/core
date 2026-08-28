@@ -1,14 +1,16 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { RMock } from '@/domain/entities/reflect/RMock'
 import { RStore } from '@/domain/entities/reflect/RStore'
 import { Endge } from '@/model/kernel/endge'
+import { prepareTestCompilerContext, resetTestCompilerContext } from '@/test/helpers/compiler-context'
 
 describe('endgeCompiler Store mock dependencies', () => {
+  beforeEach(() => prepareTestCompilerContext())
+
   afterEach(() => {
-    Endge.program.clear()
-    Endge.domain.reset()
     Endge.mock.reset()
+    resetTestCompilerContext()
   })
 
   it('publishes persisted mock as an explicit artifact dependency', () => {

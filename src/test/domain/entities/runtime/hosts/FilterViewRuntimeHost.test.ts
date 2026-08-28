@@ -4,8 +4,8 @@ import { Raph } from '@endge/raph'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { RFilter } from '@/domain/entities/reflect/RFilter'
-import { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
-import { FilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
+import { FilterRuntimeHost } from '@/model/runtime/hosts/FilterRuntimeHost'
+import { FilterViewRuntimeHost } from '@/model/runtime/hosts/FilterViewRuntimeHost'
 import { compileFilterSource } from '@/model/services/source-engine/compilers/filter-source-compile'
 
 describe('filterViewRuntimeHost', () => {

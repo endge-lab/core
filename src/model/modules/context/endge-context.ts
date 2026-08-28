@@ -19,6 +19,7 @@ import type {
 
 import type { EndgePersistenceInput } from '@/model/modules/context/persistence/EndgeStorageAdapterRegistry'
 import { Raph } from '@endge/raph'
+import { createEndgePublicConfigurationSnapshot } from '@/domain/configuration/endge-configuration'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import {
   CONTEXT_STORAGE_KEY,
@@ -41,7 +42,6 @@ import {
   normalizePersistence,
 } from '@/model/modules/context/persistence/EndgeStorageAdapterRegistry'
 import { RuntimeStateController } from '@/model/modules/context/persistence/RuntimeStateController'
-import { createEndgePublicConfigurationSnapshot } from '@/model/services/configuration/endge-configuration'
 
 const THEME_PREFERENCE_VERSION = 1 as const
 const LEGACY_STORAGE_ADAPTER = new LocalStorageContextAdapter()

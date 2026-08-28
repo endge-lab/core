@@ -5,8 +5,8 @@ import { Raph } from '@endge/raph'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { RQuery } from '@/domain/entities/reflect/RQuery'
-import { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
 import { Endge } from '@/model/kernel/endge'
+import { QueryRuntimeHost } from '@/model/runtime/hosts/QueryRuntimeHost'
 import { compileFilterSource } from '@/model/services/source-engine/compilers/filter-source-compile'
 
 describe('queryRuntimeHost', () => {

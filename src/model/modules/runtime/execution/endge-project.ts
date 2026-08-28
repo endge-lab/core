@@ -1,7 +1,4 @@
-import type { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
-import type { ProjectRuntimeHost } from '@/domain/entities/runtime/hosts/ProjectRuntimeHost'
 import type { RuntimeArtifactReader } from '@/domain/types/runtime/runtime-host.types'
-
 import type {
   ProjectCompositionHandle,
   ProjectCompositionRegistry,
@@ -9,10 +6,13 @@ import type {
   ProjectRuntimeSession,
 } from '@/domain/types/runtime/runtime-project-session.types'
 import type { CompositionProgramPayload, CompositionSession } from '@/domain/types/source/composition-source.types'
-import { RuntimeScope } from '@/domain/entities/runtime/RuntimeScope'
-import { Endge } from '@/model/kernel/endge'
 
-class ProjectCompositionHandleImpl implements ProjectCompositionHandle {
+import type { CompositionRuntimeHost } from '@/model/runtime/hosts/CompositionRuntimeHost'
+import type { ProjectRuntimeHost } from '@/model/runtime/hosts/ProjectRuntimeHost'
+import { Endge } from '@/model/kernel/endge'
+import { RuntimeScope } from '@/model/runtime/RuntimeScope'
+
+class ProjectCompositionHandleImpl implements ProjectCompositionHandle<CompositionRuntimeHost> {
   public readonly identity: string
   private _host: CompositionRuntimeHost | null = null
   private _disposed = false
@@ -40,7 +40,7 @@ class ProjectCompositionHandleImpl implements ProjectCompositionHandle {
   public get host(): CompositionRuntimeHost | null { return this._host }
   public get outputs() { return this._host?.getOutputs() ?? {} }
 
-  public async activate(): Promise<CompositionSession> {
+  public async activate(): Promise<CompositionSession<CompositionRuntimeHost>> {
     if (this._disposed) {
       throw new Error(`[EndgeProject] Composition "${this.identity}" handle is disposed.`)
     }
@@ -87,7 +87,7 @@ class ProjectCompositionHandleImpl implements ProjectCompositionHandle {
     await this._host?.getScope('scope_default')?.activate()
   }
 
-  public async restart(): Promise<CompositionSession> {
+  public async restart(): Promise<CompositionSession<CompositionRuntimeHost>> {
     await this.deactivate()
     return this.activate()
   }
@@ -112,13 +112,13 @@ class ProjectCompositionHandleImpl implements ProjectCompositionHandle {
   }
 }
 
-class ProjectCompositionRegistryImpl implements ProjectCompositionRegistry {
+class ProjectCompositionRegistryImpl implements ProjectCompositionRegistry<CompositionRuntimeHost> {
   public constructor(private readonly _handles: Map<string, ProjectCompositionHandleImpl>) {}
-  public get(identity: string): ProjectCompositionHandle | null {
+  public get(identity: string): ProjectCompositionHandle<CompositionRuntimeHost> | null {
     return this._handles.get(String(identity ?? '').trim()) ?? null
   }
 
-  public require(identity: string): ProjectCompositionHandle {
+  public require(identity: string): ProjectCompositionHandle<CompositionRuntimeHost> {
     const handle = this.get(identity)
     if (!handle) {
       throw new Error(`[EndgeProject] Project Composition "${identity}" is missing.`)
@@ -126,12 +126,12 @@ class ProjectCompositionRegistryImpl implements ProjectCompositionRegistry {
     return handle
   }
 
-  public getAll(): ProjectCompositionHandle[] { return [...this._handles.values()] }
+  public getAll(): ProjectCompositionHandle<CompositionRuntimeHost>[] { return [...this._handles.values()] }
 }
 
 /** Mounts one project into an isolated runtime session. */
 export class EndgeProject {
-  public async mount(identity: string, options: ProjectRuntimeMountOptions = {}): Promise<ProjectRuntimeSession> {
+  public async mount(identity: string, options: ProjectRuntimeMountOptions = {}): Promise<ProjectRuntimeSession<CompositionRuntimeHost>> {
     const normalized = String(identity ?? '').trim()
     const model = Endge.domain.getProject(normalized)
     if (!model) {

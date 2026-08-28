@@ -88,6 +88,7 @@ describe('endge domain export', () => {
       'components',
       'compositions',
       'computations',
+      'configurations',
       'converters',
       'dataViews',
       'environments',

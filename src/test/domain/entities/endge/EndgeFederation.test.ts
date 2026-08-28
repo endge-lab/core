@@ -1,7 +1,7 @@
 // @vitest-environment node
 import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import { EndgeFederation } from '@/domain/entities/endge/EndgeFederation'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
@@ -51,7 +51,8 @@ describe('endgeFederation stages', () => {
       }
     }
 
-    await TestFederation.boot(createBootContext())
+    const context = createBootContext()
+    await TestFederation.boot(context)
 
     expect(calls).toEqual([
       'first:setup',
@@ -65,13 +66,12 @@ describe('endgeFederation stages', () => {
     ])
     expect(TestFederation.isInitialized).toBe(true)
 
-    await TestFederation.boot(createBootContext())
+    await TestFederation.boot(context)
     expect(calls).toHaveLength(8)
   })
 
-  it('resets modules in reverse order and continues after an error', async () => {
+  it('resets modules in reverse order and reports cleanup errors', async () => {
     const calls: string[] = []
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
     class ResetModule extends EndgeModule {
       constructor(
@@ -98,14 +98,9 @@ describe('endgeFederation stages', () => {
       }
     }
 
-    try {
-      await TestFederation.reset()
-      expect(calls).toEqual(['second:reset', 'first:reset'])
-      expect(warnSpy).toHaveBeenCalledOnce()
-    }
-    finally {
-      warnSpy.mockRestore()
-    }
+    await expect(TestFederation.reset()).rejects.toBeInstanceOf(AggregateError)
+    expect(calls).toEqual(['second:reset', 'first:reset'])
+    expect(TestFederation.state).toBe('failed')
   })
 
   it('reuses boot context for repeated lifecycle stages', async () => {

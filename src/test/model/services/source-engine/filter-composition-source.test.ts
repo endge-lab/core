@@ -754,9 +754,9 @@ defineComposition({
 
     expect(result.diagnostics).toEqual([])
     expect(result.artifact?.data).toEqual([
-      { name: 'shared', kind: 'store', identity: 'schedule', resolution: 'contextual', slot: 'primary' },
-      { name: 'draft', kind: 'store', identity: 'schedule', resolution: 'isolated', slot: 'draft' },
-      { name: 'session', kind: 'store', identity: 'session', resolution: 'injected' },
+      { name: 'shared', path: 'shared', scopePath: 'scope_default', kind: 'store', identity: 'schedule', resolution: 'contextual', slot: 'primary' },
+      { name: 'draft', path: 'draft', scopePath: 'scope_default', kind: 'store', identity: 'schedule', resolution: 'isolated', slot: 'draft' },
+      { name: 'session', path: 'session', scopePath: 'scope_default', kind: 'store', identity: 'session', resolution: 'injected' },
     ])
     expect(result.artifact?.runtimes[0]?.dataBindings).toEqual({ schedule: 'shared' })
     expect(result.artifact?.graph.dataInputs).toEqual([

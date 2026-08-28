@@ -43,6 +43,7 @@ describe('compileStoreSource', () => {
         key: 'raw',
         kind: 'value',
         initial: { kind: 'mock', identity: 'groundhandling' },
+        contract: null,
       },
     ])
   })

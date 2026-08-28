@@ -6,10 +6,10 @@ import type {
   SourceLanguageValidationResult,
 } from '@/domain/types/source/source-engine.types'
 
+import { VOCAB_DEFAULT_SOURCE } from '@/domain/source/templates/vocab.default.source'
 import { compileVocabSource } from '@/model/services/source-engine/compilers/vocab-source-compile'
 import { resolveSourceDocumentReference } from '@/model/services/source-engine/source-document-reference'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
-import { VOCAB_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/vocab.default.source'
 
 const VOCAB_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
   {

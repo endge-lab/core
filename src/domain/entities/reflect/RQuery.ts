@@ -3,7 +3,6 @@ import { Expose } from 'class-transformer'
 import { REntity } from '@/domain/entities/reflect/REntity'
 
 import { QueryType } from '@/domain/types/document/document.types'
-import { Endge } from '@/model/kernel/endge'
 
 /**
  * Persisted Query document.
@@ -22,9 +21,4 @@ export class RQuery extends REntity {
   /** Версия Query source syntax. */
   @Expose()
   sourceVersion: number = 2
-
-  /** Выполняет скомпилированный source Query через one-shot runtime session. */
-  async run(props: Record<string, unknown> = {}): Promise<any> {
-    return Endge.runtime.query.run(this, props)
-  }
 }

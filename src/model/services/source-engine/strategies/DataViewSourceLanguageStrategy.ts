@@ -6,10 +6,10 @@ import type {
   SourceLanguageValidationResult,
 } from '@/domain/types/source/source-engine.types'
 
+import { DATA_VIEW_DEFAULT_SOURCE } from '@/domain/source/templates/data-view.default.source'
 import { compileDataViewSource } from '@/model/services/source-engine/compilers/data-view-source-compile'
 import { resolveTypedSourceDocumentReference, typedSourceTypeReferenceHighlights } from '@/model/services/source-engine/source-document-reference'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
-import { DATA_VIEW_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/data-view.default.source'
 import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/model/services/source-engine/value-expression-language'
 
 const DATA_VIEW_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [

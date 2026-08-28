@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
+import { DATA_VIEW_DEFAULT_SOURCE } from '@/domain/source/templates/data-view.default.source'
 import { EndgeDataView } from '@/model/modules/runtime/execution/endge-data-view'
-import { DATA_VIEW_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/data-view.default.source'
 
 const dataView = new EndgeDataView()
 
@@ -313,8 +313,8 @@ defineDataView({
 })
 
 describe('endgeDataView manual transform', () => {
-  it('runs transform source with input and built-in tools', () => {
-    const output = dataView.runSource(`
+  it('отклоняет manual source до появления безопасного runtime', () => {
+    expect(() => dataView.runSource(`
 defineDataView({
   mode: 'manual',
 
@@ -334,24 +334,12 @@ defineDataView({
     })
   },
 })
-`, INPUT)
-
-    expect(output).toEqual([
-      {
-        id: 'leg1',
-        flight: 'SU/522',
-        stdTime: '13:45',
-      },
-      {
-        id: 'leg2',
-        flight: 'FV/101',
-        stdTime: undefined,
-      },
-    ])
+`, INPUT)).toThrow('mode "manual" временно отключён')
   })
 
-  it('allows runtime tool overrides for preview and tests', () => {
-    const output = dataView.runSource(`
+  it('не исполняет tool overrides для отключённого manual source', () => {
+    const convert = vi.fn((_identity: string, value: unknown) => String(value).toLowerCase())
+    expect(() => dataView.runSource(`
 defineDataView({
   mode: 'manual',
 
@@ -364,13 +352,10 @@ defineDataView({
   },
 })
 `, INPUT, {
-      convert: (_identity, value) => String(value).toLowerCase(),
-    })
+      convert,
+    })).toThrow('mode "manual" временно отключён')
 
-    expect(output).toEqual([
-      { id: 'leg1', flight: 'SU/522', converted: 'su' },
-      { id: 'leg2', flight: 'FV/101', converted: 'fv' },
-    ])
+    expect(convert).not.toHaveBeenCalled()
   })
 })
 

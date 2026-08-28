@@ -6,10 +6,10 @@ import type {
   SourceLanguageValidationResult,
 } from '@/domain/types/source/source-engine.types'
 
+import { COMPUTATION_DEFAULT_SOURCE } from '@/domain/source/templates/computation.default.source'
 import { compileComputation } from '@/model/services/compiler/computation/computation-compile'
 import { resolveTypedSourceDocumentReference, typedSourceTypeReferenceHighlights } from '@/model/services/source-engine/source-document-reference'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
-import { COMPUTATION_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/computation.default.source'
 import {
   VALUE_EXPRESSION_COMPLETIONS,
   VALUE_EXPRESSION_FUNCTION_NAMES,

@@ -1,23 +1,23 @@
-import type { RPage } from '@/domain/entities/reflect/RPage'
+import type { RProject } from '@/domain/entities/reflect/RProject'
 import type { RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime/runtime-host.types'
 
 import { Raph, RaphNode } from '@endge/raph'
 
-import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
+import { RuntimeHostBase } from '@/model/runtime/RuntimeHostBase'
 
-function createDefaultPageContext(): RuntimeHostContext<'page'> {
+function createDefaultProjectContext(): RuntimeHostContext<'project'> {
   return {
     status: 'idle',
     startedAt: null,
     updatedAt: null,
-    lastRenderAt: null,
+    lastRefreshAt: null,
   }
 }
 
-export class PageRuntimeHost extends RuntimeHostBase<'page'> {
+export class ProjectRuntimeHost extends RuntimeHostBase<'project'> {
   constructor(input: {
     id: string
-    model: RPage
+    model: RProject
     entityIdentity: string
     parent?: RuntimeHost<any, any> | null
     title?: string
@@ -26,9 +26,9 @@ export class PageRuntimeHost extends RuntimeHostBase<'page'> {
     super({
       ...input,
       kind: 'runtime',
-      runtimeType: 'page-runtime-host',
-      entityType: 'page',
-      context: createDefaultPageContext(),
+      runtimeType: 'project-runtime-host',
+      entityType: 'project',
+      context: createDefaultProjectContext(),
     })
   }
 
@@ -37,10 +37,10 @@ export class PageRuntimeHost extends RuntimeHostBase<'page'> {
    */
   public static createRuntime(input: {
     id: string
-    model: RPage
+    model: RProject
     meta?: Record<string, any>
     parent?: RuntimeHost<any, any> | null
-  }): RuntimeHost<'page'> {
+  }): RuntimeHost<'project'> {
     const { id, model } = input
     const meta = input.meta ?? {}
     const parent = input.parent ?? null
@@ -48,21 +48,21 @@ export class PageRuntimeHost extends RuntimeHostBase<'page'> {
     const node = new RaphNode(Raph.app, {
       id: `${model.identity || model.id}-${id}`,
       meta: {
-        type: 'page',
+        type: 'project',
         kind: 'root',
         entityId: model.id,
-        pageIdentity: model.identity,
+        projectIdentity: model.identity,
         parentRuntimeId: parent?.id ?? null,
         ...meta,
       },
     })
 
-    const host = new PageRuntimeHost({
+    const host = new ProjectRuntimeHost({
       id,
       model,
       entityIdentity: model.identity ?? String(model.id),
       parent,
-      title: model.name ?? model.identity ?? `Page ${model.id}`,
+      title: model.displayName ?? model.name ?? model.identity ?? `Project ${model.id}`,
       meta: { ...meta, runtimeKind: 'runtime', parentRuntimeId: parent?.id ?? null },
     })
 

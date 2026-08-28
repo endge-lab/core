@@ -3,13 +3,13 @@ import type * as t from '@babel/types'
 import { parseExpression } from '@babel/parser'
 import { describe, expect, it } from 'vitest'
 
-import { QueryExecutor_Adapter } from '@/model/adapters/query/QueryExecutor_Adapter'
 import { EndgeDataView } from '@/model/modules/runtime/execution/endge-data-view'
 import { compileCompositionSource } from '@/model/services/source-engine/compilers/composition-source-compile'
 import { compileDataViewSource } from '@/model/services/source-engine/compilers/data-view-source-compile'
 import { compileQuerySource } from '@/model/services/source-engine/compilers/query-source-compile'
 import { compileValueExpression } from '@/model/services/source-engine/compilers/source-expression-compile'
 import { evaluateValueExpression } from '@/model/services/source-engine/source-expression-evaluate'
+import { createQueryExecutor } from '@/test/helpers/query-executor'
 
 function compile(source: string) {
   const diagnostics: any[] = []
@@ -126,7 +126,7 @@ defineQuery({
       type: 'response',
       expression: { type: 'operation', operation: 'sort-by' },
     })
-    expect(new QueryExecutor_Adapter().readResponseOutput(result.artifact!.outputs[0], {
+    expect(createQueryExecutor().readResponseOutput(result.artifact!.outputs[0], {
       items: [
         { id: 2, active: true, std: '12:00' },
         { id: 3, active: false, std: '09:00' },
@@ -137,7 +137,7 @@ defineQuery({
       { id: 2, active: true, std: '12:00' },
     ])
 
-    expect(new QueryExecutor_Adapter().readResponseOutput(result.artifact!.outputs[1], {
+    expect(createQueryExecutor().readResponseOutput(result.artifact!.outputs[1], {
       pairsArrival: [{ id: 'A-null', arrivalLeg: { id: 'A' } }],
       pairsDeparture: [{ id: 'A-D', arrivalLeg: { id: 'A' }, departureLeg: { id: 'D' } }],
       attributes: [{ legId: 'A', items: [{ name: 'BestOn' }] }],

@@ -3,8 +3,8 @@ import type { EndgeConfigurationContribution } from '@/domain/types/configuratio
 
 import { Serialize } from '@endge/utils'
 import { Expose } from 'class-transformer'
+import { normalizeEndgeConfigurationContribution } from '@/domain/configuration/endge-configuration'
 import { REntity } from '@/domain/entities/reflect/REntity'
-import { normalizeEndgeConfigurationContribution } from '@/model/services/configuration/endge-configuration'
 
 /** Сущность окружения (коллекция environments). Без привязки к проекту. */
 export class REnvironment extends REntity {

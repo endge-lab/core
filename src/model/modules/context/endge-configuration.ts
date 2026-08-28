@@ -6,13 +6,13 @@ import type {
 } from '@/domain/types/configuration/configuration.type'
 import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 
-import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
-import { Endge } from '@/model/kernel/endge'
 import {
   applyEndgeConfigurationContribution,
   createEndgeContextHash,
   normalizeEndgeConfiguration,
-} from '@/model/services/configuration/endge-configuration'
+} from '@/domain/configuration/endge-configuration'
+import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
+import { Endge } from '@/model/kernel/endge'
 
 const EMPTY_CONTRIBUTION: EndgeConfigurationContribution = { mode: 'inherit', patch: {} }
 

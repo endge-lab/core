@@ -3,7 +3,7 @@ import type { ActionRuntimeHostContext, RuntimeHost, RuntimeHostContext } from '
 
 import { Raph, RaphNode } from '@endge/raph'
 
-import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
+import { RuntimeHostBase } from '@/model/runtime/RuntimeHostBase'
 
 function createDefaultActionContext(): RuntimeHostContext<'action'> {
   return {

@@ -11,15 +11,38 @@ import { Expose } from 'class-transformer'
 import { REntity } from '@/domain/entities/reflect/REntity'
 import { ParameterType } from '@/domain/types/document/document.types'
 
-export class RParameter extends REntity {
+class RParameterField implements FilterFieldSchema {
   @Expose()
-  displayName!: string
+  key: string = ''
+
+  @Expose()
+  label: string = ''
 
   @Expose()
   description?: string
 
   @Expose()
-  @TypeMap(null, 'key')
+  required?: boolean
+
+  @Expose()
+  multiple?: boolean
+
+  @Expose()
+  type: FilterFieldSchema['type'] = 'string'
+
+  @Expose()
+  staticValues?: FilterFieldSchema['staticValues']
+
+  @Expose()
+  dynamicSource?: FilterFieldSchema['dynamicSource']
+}
+
+export class RParameter extends REntity {
+  @Expose()
+  override description: string | null = null
+
+  @Expose()
+  @TypeMap(RParameterField, 'key')
   fields: Map<string, FilterFieldSchema> = new Map()
 
   @Expose()
@@ -35,7 +58,7 @@ export class RParameter extends REntity {
     f.identity = json.identity
     f.name = json.displayName
     f.displayName = json.displayName
-    f.description = json.description ?? undefined
+    f.description = json.description ?? null
     f.folderId = json.folderId ?? json.folder ?? null
     f.active = json.active ?? true
     f.deletedAt = json.deletedAt ?? null

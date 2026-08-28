@@ -123,6 +123,11 @@ export class EndgeConverters {
   }
 
   public execute(identity: string, value: unknown, options?: Record<string, unknown>): unknown {
+    const persisted = Endge.domain.getConverter(identity)
+    if (persisted?.customHandler) {
+      return persisted.convert(value, options)
+    }
+
     const definition = this._definitions.get(identity)
     let provider: ImplementationProvider
     try {

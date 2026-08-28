@@ -1,14 +1,21 @@
 import type { DomainDocumentType } from '@/domain/types/document/document.types'
 
 import { ComponentType, FilterType, QueryType } from '@/domain/types/document/document.types'
-import { Endge } from '@/model/kernel/endge'
 
 type RecordValue = Record<string, any>
+
+/** Явные Domain lookup-зависимости чистой сериализации persisted-документа. */
+export interface DocumentSerializationContext {
+  resolveFolderIdentity: (value: string | number) => string | null
+  resolveNavigationIdentity: (value: string | number) => string | null
+  resolveEnvironmentIdentity: (value: string | number) => string | null
+}
 
 /** Преобразует persisted-модель Core в строгий write DTO service-backend. */
 export function serializeServiceDocument(
   documentType: DomainDocumentType,
   source: unknown,
+  context: DocumentSerializationContext,
 ): Record<string, unknown> {
   const model = asRecord(source)
   const plain = asRecord(typeof model.toPlain === 'function' ? model.toPlain() : source)
@@ -23,7 +30,7 @@ export function serializeServiceDocument(
     meta: objectValue(model.meta ?? plain.meta),
     active: (model.active ?? plain.active) !== false,
   }
-  const folderIdentity = resolveFolderIdentity(model.folderId ?? plain.folderId ?? plain.folder)
+  const folderIdentity = resolveIdentity(model.folderId ?? plain.folderId ?? plain.folder, context.resolveFolderIdentity)
   if (folderIdentity) {
     common.folderIdentity = folderIdentity
   }
@@ -132,8 +139,8 @@ export function serializeServiceDocument(
       configuration: objectValue(value.configuration),
       slug: nullableText(value.slug),
       order: nullableNumber(value.order),
-      navigationIdentity: resolveNavigationIdentity(value.navigationIdentity ?? value.navigationId),
-      allowedEnvironments: resolveEnvironmentIdentities(value.allowedEnvironmentIdentities ?? value.allowedEnvironmentIds ?? value.allowedEnvironments),
+      navigationIdentity: resolveNullableIdentity(value.navigationIdentity ?? value.navigationId, context.resolveNavigationIdentity),
+      allowedEnvironments: resolveIdentities(value.allowedEnvironmentIdentities ?? value.allowedEnvironmentIds ?? value.allowedEnvironments, context.resolveEnvironmentIdentity),
     })
   }
 
@@ -141,11 +148,14 @@ export function serializeServiceDocument(
 }
 
 /** Преобразует RFolder в write DTO service-backend. */
-export function serializeServiceFolder(source: unknown): Record<string, unknown> {
+export function serializeServiceFolder(
+  source: unknown,
+  context: Pick<DocumentSerializationContext, 'resolveFolderIdentity'>,
+): Record<string, unknown> {
   const model = asRecord(source)
   const plain = asRecord(typeof model.toPlain === 'function' ? model.toPlain() : source)
   const identity = text(model.identity ?? plain.identity ?? plain.id)
-  const parentIdentity = resolveFolderIdentity(model.parent ?? plain.parent)
+  const parentIdentity = resolveIdentity(model.parent ?? plain.parent, context.resolveFolderIdentity)
   return {
     identity,
     displayName: text(model.displayName ?? plain.displayName ?? model.name ?? plain.name ?? identity),
@@ -174,26 +184,32 @@ function withFields(
   return { ...result, ...overrides }
 }
 
-function resolveFolderIdentity(value: unknown): string {
+function resolveIdentity(
+  value: unknown,
+  resolver: (value: string | number) => string | null,
+): string {
   if (value == null || value === '') {
     return ''
   }
-  const folder = Endge.domain.getFolder(value as string | number)
-  return text((folder as any)?.identity ?? value)
+  return text(resolver(value as string | number) ?? value)
 }
 
-function resolveNavigationIdentity(value: unknown): string | null {
+function resolveNullableIdentity(
+  value: unknown,
+  resolver: (value: string | number) => string | null,
+): string | null {
   if (value == null || value === '') {
     return null
   }
-  const navigation = Endge.domain.getNavigation(value as string | number)
-  return nullableText((navigation as any)?.identity ?? value)
+  return nullableText(resolver(value as string | number) ?? value)
 }
 
-function resolveEnvironmentIdentities(value: unknown): string[] {
+function resolveIdentities(
+  value: unknown,
+  resolver: (value: string | number) => string | null,
+): string[] {
   return arrayValue(value).flatMap((item) => {
-    const environment = Endge.domain.getEnvironment(item as string | number)
-    const identity = text((environment as any)?.identity ?? item)
+    const identity = text(resolver(item as string | number) ?? item)
     return identity ? [identity] : []
   })
 }

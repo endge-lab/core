@@ -1,6 +1,6 @@
-import type { RuntimeScope } from '@/domain/entities/runtime/RuntimeScope'
-
 import type { RuntimeHost } from '@/domain/types/runtime/runtime-host.types'
+
+import type { RuntimeScope } from '@/model/runtime/RuntimeScope'
 
 /** Индексирует runtime scopes и membership RuntimeHost. */
 export class RuntimeScopeRegistry {

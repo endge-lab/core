@@ -10,10 +10,10 @@ import { Raph } from '@endge/raph'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
-import { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentSFCRuntimeHost'
 import { RuntimeBoundaryUpdatePhase } from '@/model/helpers/raph-phases/runtime-boundary-update-phase'
 import { Endge } from '@/model/kernel/endge'
 import { OperationHistory } from '@/model/modules/runtime/operation/operation-history'
+import { ComponentSFCRuntimeHost } from '@/model/runtime/hosts/ComponentSFCRuntimeHost'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 
 describe('componentSFCRuntimeHost', () => {

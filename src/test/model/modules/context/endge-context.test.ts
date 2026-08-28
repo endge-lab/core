@@ -68,10 +68,10 @@ describe('endgeContext locale and theme', () => {
     const listener = vi.fn()
 
     const off = context.subscribe(listener)
-    context.setCurrentLocale('en')
+    context.setCurrentLocale('ru')
     off()
 
-    expect(context.currentLocale).toBe('en')
+    expect(context.currentLocale).toBe('ru')
     expect(listener).toHaveBeenCalledTimes(1)
   })
 

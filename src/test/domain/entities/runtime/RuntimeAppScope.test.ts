@@ -1,9 +1,9 @@
-import type { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
-import type { StoreRuntimeHost } from '@/domain/entities/runtime/hosts/StoreRuntimeHost'
 import type { ProgramArtifact } from '@/domain/types/program/program.types'
-
 import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
 import type { StoreSourceArtifact } from '@/domain/types/source/store-source.types'
+
+import type { CompositionRuntimeHost } from '@/model/runtime/hosts/CompositionRuntimeHost'
+import type { StoreRuntimeHost } from '@/model/runtime/hosts/StoreRuntimeHost'
 
 import { Raph } from '@endge/raph'
 import { afterEach, describe, expect, it } from 'vitest'

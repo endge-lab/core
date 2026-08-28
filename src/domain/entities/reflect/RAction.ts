@@ -6,7 +6,6 @@ import { Serialize } from '@endge/utils'
 
 import { Expose } from 'class-transformer'
 import { REntity } from '@/domain/entities/reflect/REntity'
-import { Endge } from '@/model/kernel/endge'
 
 /** Canonical source-backed Action definition. Executable code is supplied by a provider. */
 export class RAction extends REntity {
@@ -61,10 +60,6 @@ export class RAction extends REntity {
       action.applyStorageMeta(storageMeta)
     }
     return action
-  }
-
-  run(input?: unknown): Promise<unknown> {
-    return Endge.actions.execute(this.identity, { input })
   }
 
   toPlain(): Record<string, unknown> {

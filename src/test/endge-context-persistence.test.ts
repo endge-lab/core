@@ -88,7 +88,8 @@ describe('endgeContext persistence', () => {
       environment: 'prod',
       user: 'anonymous',
       locale: 'en',
-      theme: 'light',
+      theme: 'dark',
+      timezone: 'local',
     })
   })
 

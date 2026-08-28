@@ -6,6 +6,7 @@ import type { RComputation } from '@/domain/entities/reflect/RComputation'
 import type { RConfiguration } from '@/domain/entities/reflect/RConfiguration'
 import type { RConverter } from '@/domain/entities/reflect/RConverter'
 import type { RDataView } from '@/domain/entities/reflect/RDataView'
+import type { REnvironment } from '@/domain/entities/reflect/REnvironment'
 import type { RFilter } from '@/domain/entities/reflect/RFilter'
 import type { RI18nBundle } from '@/domain/entities/reflect/RI18nBundle'
 import type { RIntegration } from '@/domain/entities/reflect/RIntegration'
@@ -15,6 +16,7 @@ import type { RPage } from '@/domain/entities/reflect/RPage'
 import type { RPageTemplate } from '@/domain/entities/reflect/RPageTemplate'
 import type { RParameter } from '@/domain/entities/reflect/RParameter'
 import type { RPolicy } from '@/domain/entities/reflect/RPolicy'
+import type { RProject } from '@/domain/entities/reflect/RProject'
 import type { RQuery } from '@/domain/entities/reflect/RQuery'
 import type { RStore } from '@/domain/entities/reflect/RStore'
 import type { RStream } from '@/domain/entities/reflect/RStream'
@@ -91,39 +93,45 @@ export enum DomainSectionType {
   Project = 'project',
 }
 
-/**
- * Все возможные типы документов
- */
-export type DomainDocumentType
-  = | 'primitive'
-    | 'type'
-    | 'action'
-    | 'converter'
-    | 'computation'
-    | 'data-view'
-    | 'composition'
-    | 'store'
-    | 'stream'
-    | 'update'
-    | 'mock'
-    | 'integration'
-    | 'page-template'
-    | 'page'
-    | 'navigation'
-    | 'environment'
-    | 'policy'
-    | 'style'
-    | 'configuration'
-    | 'vocabs'
-    | 'i18n-bundles'
-    | 'auth-profile'
-    | 'tenant'
-    | 'project'
-    | 'workspace'
-    | Exclude<ComponentType, ComponentType.Component | ComponentType.Html>
-    | QueryType
-    | ParameterType
-    | FilterType
+/** Канонический исчерпывающий список типов документов Domain. */
+export const DOMAIN_DOCUMENT_TYPES = [
+  'primitive',
+  'type',
+  'action',
+  'converter',
+  'computation',
+  'data-view',
+  'composition',
+  'store',
+  'stream',
+  'update',
+  'mock',
+  'integration',
+  'page-template',
+  'page',
+  'navigation',
+  'environment',
+  'policy',
+  'style',
+  'configuration',
+  'vocabs',
+  'i18n-bundles',
+  'auth-profile',
+  'tenant',
+  'project',
+  'workspace',
+  ComponentType.DSL,
+  ComponentType.Table,
+  ComponentType.SFC,
+  QueryType.Custom,
+  QueryType.GraphQL,
+  QueryType.REST,
+  ParameterType.DefaultParameter,
+  FilterType.DefaultFilter,
+] as const
+
+/** Все возможные типы документов. */
+export type DomainDocumentType = (typeof DOMAIN_DOCUMENT_TYPES)[number]
 
 /**
  * Описывает любой документ
@@ -142,4 +150,4 @@ export interface Document {
 /**
  * Описывает любой документ рефлекцию
  */
-export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RComposition | RStore | RStream | RUpdate | RMock | RAction | RConverter | RComputation | RIntegration | RParameter | RFilter | RPolicy | RStyle | RConfiguration | RType | RVocabs | RI18nBundle | RAuthProfile | RWorkspace | RTenant | RPageTemplate | RPage | RNavigation
+export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RComposition | RStore | RStream | RUpdate | RMock | RAction | RConverter | RComputation | RIntegration | RParameter | RFilter | RPolicy | RStyle | RConfiguration | RType | RVocabs | RI18nBundle | RAuthProfile | RWorkspace | RTenant | RProject | REnvironment | RPageTemplate | RPage | RNavigation

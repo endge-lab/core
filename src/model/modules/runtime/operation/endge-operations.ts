@@ -1,6 +1,6 @@
-import type { RuntimeScope } from '@/domain/entities/runtime/RuntimeScope'
 import type { RuntimeHost } from '@/domain/types/runtime/runtime-host.types'
 import type { OperationHistory } from '@/model/modules/runtime/operation/operation-history'
+import type { RuntimeScope } from '@/model/runtime/RuntimeScope'
 import { Endge } from '@/model/kernel/endge'
 import {
   matchesComponentSFCInteractionTrigger,

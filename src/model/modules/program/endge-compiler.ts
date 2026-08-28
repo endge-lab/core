@@ -118,6 +118,11 @@ export class EndgeCompiler extends EndgeModule {
     this._registerDefaultHandlers()
   }
 
+  /** Возвращает фактически зарегистрированные compiler entity types для contract verification. */
+  public listSupportedEntityTypes(): ProgramEntityType[] {
+    return [...this._handlers.keys()]
+  }
+
   /**
    * Lifecycle-точка входа компилятора.
    *

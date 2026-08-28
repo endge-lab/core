@@ -7,8 +7,8 @@ import type { StreamEventEnvelope } from '@/domain/types/source/stream-source.ty
 import type { StoreMutationPlan, UpdateSourceArtifact } from '@/domain/types/source/update-source.types'
 import { collectionByKey, filterByKey, full, Raph, RaphNode } from '@endge/raph'
 
-import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 import { Endge } from '@/model/kernel/endge'
+import { RuntimeHostBase } from '@/model/runtime/RuntimeHostBase'
 
 function defaultContext(artifact: StoreSourceArtifact): RuntimeHostContext<'store'> {
   return {

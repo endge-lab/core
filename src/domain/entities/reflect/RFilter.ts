@@ -8,9 +8,6 @@ import { FilterType } from '@/domain/types/document/document.types'
 
 export class RFilter extends REntity {
   @Expose()
-  displayName!: string
-
-  @Expose()
   fields: FilterFieldItemSchema[] = []
 
   /** Независимый source-first контракт нового Filter runtime. */

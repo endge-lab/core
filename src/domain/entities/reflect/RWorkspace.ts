@@ -7,8 +7,8 @@ import type {
 } from '@/domain/types/document/workspace.types'
 
 import { Expose } from 'class-transformer'
+import { normalizeEndgeConfiguration } from '@/domain/configuration/endge-configuration'
 import { REntity } from '@/domain/entities/reflect/REntity'
-import { normalizeEndgeConfiguration } from '@/model/services/configuration/endge-configuration'
 
 /** Persisted Workspace root with one complete configuration document. */
 export class RWorkspace extends REntity implements EndgeWorkspaceDefinition {

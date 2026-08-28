@@ -1,13 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { QueryExecutor_Adapter } from '@/model/adapters/query/QueryExecutor_Adapter'
-import { Endge } from '@/model/kernel/endge'
 import { compileQuerySource } from '@/model/services/source-engine/compilers/query-source-compile'
+import { createQueryExecutor } from '@/test/helpers/query-executor'
 
 describe('queryExecutor dynamic request fields', () => {
   it('evaluates every request field from props before the HTTP call', async () => {
     const request = vi.fn().mockResolvedValue({ data: { ok: true } })
-    const executor = new QueryExecutor_Adapter({ request } as any)
+    const executor = createQueryExecutor({ request } as any)
     const payload = compileQuerySource(`
 defineQuery({
   kind: 'rest',
@@ -63,13 +62,13 @@ defineQuery({
 
   it('resolves canonical profile auth through EndgeAuth requests', async () => {
     const request = vi.fn().mockResolvedValue({ data: { ok: true } })
-    const resolve = vi.spyOn(Endge.auth.requests, 'resolve').mockResolvedValue({
+    const resolve = vi.fn().mockResolvedValue({
       profileIdentity: 'payload-auth',
       accessToken: 'resolved-token',
       headers: { Authorization: 'Bearer resolved-token' },
       expiresAt: null,
     })
-    const executor = new QueryExecutor_Adapter({ request } as any)
+    const executor = createQueryExecutor({ request } as any, { resolveAuth: resolve })
     const payload = compileQuerySource(`
 defineQuery({
   request: {
@@ -88,14 +87,13 @@ defineQuery({
     expect(request).toHaveBeenCalledWith(expect.objectContaining({
       headers: { Authorization: 'Bearer resolved-token' },
     }))
-    resolve.mockRestore()
   })
 
   it('executes GraphQL with a standard envelope and returns data', async () => {
     const request = vi.fn().mockResolvedValue({
       data: { data: { updateItem: { id: 'item-1' } } },
     })
-    const executor = new QueryExecutor_Adapter({ request } as any)
+    const executor = createQueryExecutor({ request } as any)
     const payload = compileQuerySource(`
 defineQuery({
   kind: 'graphql',
@@ -132,7 +130,7 @@ defineQuery({
     const request = vi.fn().mockResolvedValue({
       data: { data: null, errors: [{ message: 'Mutation rejected' }] },
     })
-    const executor = new QueryExecutor_Adapter({ request } as any)
+    const executor = createQueryExecutor({ request } as any)
     const payload = compileQuerySource(`
 defineQuery({
   kind: 'graphql',

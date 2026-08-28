@@ -1,19 +1,15 @@
-import type { RuntimeAppScopeOptions } from '@/domain/entities/runtime/RuntimeAppScope'
 import type { EndgeDataMode } from '@/domain/types/document/workspace.types'
 import type { RuntimeEntityType } from '@/domain/types/runtime/runtime-entity-map.types'
 import type { RuntimeExecuteOptions } from '@/domain/types/runtime/runtime-execute.type'
 import type { DestroyedRuntimeHostSnapshot, RuntimeArtifactReader, RuntimeHost, RuntimeInspectionLease } from '@/domain/types/runtime/runtime-host.types'
 import type { AnyRuntimeHost, AnyRuntimeStrategy } from '@/domain/types/runtime/runtime-strategy.types'
-
 import type { EndgeRuntimeSnapshot, RuntimeExecutableModel } from '@/domain/types/runtime/runtime.types'
 
 import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
+
+import type { RuntimeAppScopeOptions } from '@/model/runtime/RuntimeAppScope'
 import { Raph, RaphNode } from '@endge/raph'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
-import { RuntimeAppScope } from '@/domain/entities/runtime/RuntimeAppScope'
-import { RuntimeHostRegistry } from '@/domain/entities/runtime/RuntimeHostRegistry'
-import { RuntimeScope } from '@/domain/entities/runtime/RuntimeScope'
-import { RuntimeScopeRegistry } from '@/domain/entities/runtime/RuntimeScopeRegistry'
 import { STORAGE_VARS_KEY } from '@/model/config/kernel.config'
 import { RuntimeBoundaryUpdatePhase } from '@/model/helpers/raph-phases/runtime-boundary-update-phase'
 import { RuntimeNodeUpdatePhase } from '@/model/helpers/raph-phases/runtime-node-update-phase'
@@ -27,6 +23,10 @@ import { EndgeProject } from '@/model/modules/runtime/execution/endge-project'
 import { EndgeQuery } from '@/model/modules/runtime/execution/endge-query'
 import { EndgeImplementations } from '@/model/modules/runtime/implementation/endge-implementations'
 import { EndgeOperations } from '@/model/modules/runtime/operation/endge-operations'
+import { RuntimeAppScope } from '@/model/runtime/RuntimeAppScope'
+import { RuntimeHostRegistry } from '@/model/runtime/RuntimeHostRegistry'
+import { RuntimeScope } from '@/model/runtime/RuntimeScope'
+import { RuntimeScopeRegistry } from '@/model/runtime/RuntimeScopeRegistry'
 import { RuntimeStrategyRegistry } from '@/model/services/runtime/RuntimeStrategyRegistry'
 import { ActionRuntimeStrategy } from '@/model/services/runtime/strategies/ActionRuntimeStrategy'
 import { ComponentSFCRuntimeStrategy } from '@/model/services/runtime/strategies/ComponentSFCRuntimeStrategy'
@@ -647,7 +647,9 @@ export class EndgeRuntime extends EndgeModule {
   private _registerDefaultStrategies(): void {
     this.registerStrategy(new CompositionRuntimeStrategy())
     this.registerStrategy(new StoreRuntimeStrategy())
-    this.registerStrategy(new StreamRuntimeStrategy())
+    this.registerStrategy(new StreamRuntimeStrategy(
+      (policy, options) => Endge.auth.requests.resolve(policy, options),
+    ))
     this.registerStrategy(new FilterRuntimeStrategy())
     this.registerStrategy(new QueryRuntimeStrategy())
     this.registerStrategy(new ComponentSFCRuntimeStrategy())
@@ -661,7 +663,11 @@ export class EndgeRuntime extends EndgeModule {
     if (rawScope instanceof RuntimeAppScope) {
       return rawScope
     }
-    const explicitId = typeof rawScope === 'string' ? rawScope.trim() : ''
+    const explicitId = typeof rawScope === 'string'
+      ? rawScope.trim()
+      : rawScope && typeof rawScope === 'object' && 'id' in rawScope
+        ? String(rawScope.id ?? '').trim()
+        : ''
     if (explicitId) {
       const explicit = this.getAppScope(explicitId)
       if (!explicit) {

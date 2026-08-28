@@ -4,14 +4,12 @@ import { REntity } from '@/domain/entities/reflect/REntity'
 /**
  * Source-first доменная сущность типа.
  */
-export class RType extends REntity {
-  //
-  get id(): string {
-    return this.name
-  }
+export class RType extends REntity<string> {
+  @Expose()
+  override id: string
 
   @Expose()
-  name: string
+  override name: string
 
   @Expose()
   isPrimitive: boolean = false
@@ -23,8 +21,9 @@ export class RType extends REntity {
   @Expose()
   sourceVersion: number = 1
 
-  constructor(name: string) {
+  constructor(name = '') {
     super()
+    this.id = name
     this.name = name
   }
 }

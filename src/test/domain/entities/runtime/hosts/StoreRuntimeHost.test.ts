@@ -6,8 +6,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { RMock } from '@/domain/entities/reflect/RMock'
 import { RStore } from '@/domain/entities/reflect/RStore'
-import { StoreRuntimeHost } from '@/domain/entities/runtime/hosts/StoreRuntimeHost'
 import { Endge } from '@/model/kernel/endge'
+import { StoreRuntimeHost } from '@/model/runtime/hosts/StoreRuntimeHost'
 
 describe('storeRuntimeHost', () => {
   afterEach(() => {

@@ -21,7 +21,7 @@ export interface RPageTemplatePreviewSchema {
 }
 
 export interface RPageTemplateSchema extends EntityManagement {
-  id: string
+  id: string | number
   name: string
   description?: string | null
   areas?: RPageTemplateAreaSchema[]

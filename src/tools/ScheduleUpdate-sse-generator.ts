@@ -1,6 +1,6 @@
 // utils/runUpdates.ts
-import { Endge } from '@endge/core'
 import { Raph } from '@endge/raph'
+import { Endge } from '@/model/kernel/endge'
 
 type ScheduleRecord = Record<string, unknown>
 
@@ -21,17 +21,6 @@ function randInt(min: number, max: number): number {
   return min + ((Math.random() * (max - min + 1)) | 0)
 }
 
-function pad2(n: number): string {
-  return n < 10 ? `0${n}` : String(n)
-}
-
-function _randomLocalTime(): string {
-  const h = randInt(0, 23)
-  const m = randInt(0, 59)
-  const s = randInt(0, 59)
-  return `${pad2(h)}:${pad2(m)}:${pad2(s)}`
-}
-
 function randomDaysOfWeek(): string {
   const cnt = randInt(1, 7)
   const set = new Set<number>()
@@ -39,46 +28,6 @@ function randomDaysOfWeek(): string {
     set.add(randInt(1, 7))
   }
   return [...set].sort((a, b) => a - b).join(',')
-}
-
-function _randomBool(): boolean {
-  return Math.random() < 0.5
-}
-
-function _randomCarrier(): string {
-  const carriers = ['SU', 'S7', 'UT', 'DP', 'FV', 'U6', 'N4']
-  return pick(carriers)
-}
-
-function _randomStation(): string {
-  const stations = ['SVO', 'DME', 'VKO', 'LED', 'KZN', 'AER', 'SVX', 'OVB']
-  return pick(stations)
-}
-
-function _randomTerminal(): string {
-  const terms = ['A', 'B', 'C', 'D', '1', '2', '3']
-  return pick(terms)
-}
-
-function _randomServiceType(): string {
-  const t = ['S', 'C', 'G']
-  return pick(t)
-}
-
-function _randomAircraftType(): string {
-  const t = ['32B', 'A320', 'B738', 'SU9', 'E190']
-  return pick(t)
-}
-
-function _randomFlightNumber(cur: unknown): string {
-  const base
-    = typeof cur === 'string' && cur.trim()
-      ? cur.trim()
-      : String(randInt(1, 999)).padStart(3, '0')
-  // слегка мутируем
-  const n = Number(base.replace(/\D/g, '')) || randInt(1, 999)
-  const next = (n + randInt(1, 9)) % 1000
-  return String(next).padStart(3, '0')
 }
 
 function buildPatchFields(): PatchField[] {

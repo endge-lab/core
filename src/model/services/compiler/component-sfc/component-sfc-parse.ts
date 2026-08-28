@@ -28,7 +28,7 @@ import {
 
 } from '@vue/compiler-dom'
 import { parse as parseSFC } from '@vue/compiler-sfc'
-import { parseSFCSourceParts } from '@/model/services/compiler/component-sfc/component-sfc-source-parts'
+import { parseSFCSourceParts } from '@/domain/component/sfc/component-sfc-source-parts'
 
 /** Результат parser pass для SFC-компонента. */
 export interface ComponentSFCParseResult {

@@ -45,13 +45,13 @@ import type { EndgeStyleLease } from '@/domain/types/style/style.types'
 
 import { DataPath, Raph, RaphNode } from '@endge/raph'
 
-import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 import { createEmptyComponentSFCRuntimeDependencies } from '@/domain/types/component/sfc/dependencies.types'
 import { RUNTIME_BOUNDARY_UPDATE_PHASE_NAME } from '@/domain/types/runtime/runtime-host.types'
 import { ENDGE_CONTEXT_RAPH_PATH } from '@/model/config/kernel.config'
 import { Endge } from '@/model/kernel/endge'
 import { ComputationResourceRegistry } from '@/model/modules/runtime/execution/computation/ComputationResourceRegistry'
 import { executeRuntimeOperation } from '@/model/modules/runtime/operation/operation-executor'
+import { RuntimeHostBase } from '@/model/runtime/RuntimeHostBase'
 
 function createDefaultSFCContext(target: RComponentRenderTarget | null): RuntimeHostContext<'component-sfc'> {
   return {

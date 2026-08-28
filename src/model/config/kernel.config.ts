@@ -1,5 +1,13 @@
 import type { EndgeMockProvider } from '@/domain/types/mock/mock-data.type'
-import type { EndgePersistenceScope } from '@/domain/types/runtime/context-persistence.types'
+
+export {
+  DEFAULT_FALLBACK_LOCALE,
+  DEFAULT_LOCALE,
+  DEFAULT_SCOPE,
+  DEFAULT_THEME,
+  DEFAULT_TIMEZONE,
+  ENDGE_FEDERATION_REGISTRY_KEY,
+} from '@/domain/constants/kernel.constants'
 
 export const ENDGE_COMPILER_VERSION = 'program-v2'
 
@@ -21,21 +29,6 @@ export const CONTEXT_STORAGE_KEY = 'endge:context:v1'
 export const LEGACY_CONTEXT_STORAGE_KEY = 'endge-context'
 export const LEGACY_THEME_STORAGE_KEY = 'endge:theme'
 export const LEGACY_TIMEZONE_STORAGE_KEY = 'endge:isLocalTime'
-
-export const DEFAULT_LOCALE = 'en'
-export const DEFAULT_FALLBACK_LOCALE = 'en'
-export const DEFAULT_THEME = 'dark'
-export const DEFAULT_TIMEZONE = 'local'
-
-export const DEFAULT_SCOPE = {
-  tenantId: 'default',
-  projectId: 'default',
-  environmentId: 'dev',
-  userId: 'anonymous',
-} as const satisfies Omit<EndgePersistenceScope, 'workspaceId'>
-
-/** Глобальный ключ registry для всех экземпляров федерации Endge. */
-export const ENDGE_FEDERATION_REGISTRY_KEY = Symbol.for('endge.federation.registry.v2')
 
 /** Built-in mock providers. Application-owned providers are registered at boot. */
 export const ENDGE_CORE_MOCK_PROVIDERS: EndgeMockProvider[] = []

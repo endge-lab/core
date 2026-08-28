@@ -4,9 +4,9 @@ import type { RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime/run
 import { Raph, RaphNode } from '@endge/raph'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
-import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
-import { RuntimeHostRegistry } from '@/domain/entities/runtime/RuntimeHostRegistry'
 import { Endge } from '@/model/kernel/endge'
+import { RuntimeHostBase } from '@/model/runtime/RuntimeHostBase'
+import { RuntimeHostRegistry } from '@/model/runtime/RuntimeHostRegistry'
 
 class TestQueryHost extends RuntimeHostBase<'query', RuntimeHostContext<'query'>> {
   constructor(model: RQuery, id = 'test-host', parent: TestQueryHost | null = null) {

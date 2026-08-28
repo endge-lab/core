@@ -1,8 +1,8 @@
 import type { ComponentSFCInteractionTriggerEvent } from '@/domain/types/component/sfc/ir.types'
 
 import { bench, describe } from 'vitest'
-import { ComponentSFCEventBoundary } from '@/domain/entities/runtime/ComponentSFCEventBoundary'
 import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
+import { ComponentSFCEventBoundary } from '@/model/runtime/ComponentSFCEventBoundary'
 import {
   matchesComponentSFCInteractionTrigger,
   normalizeComponentSFCInteractionTriggers,

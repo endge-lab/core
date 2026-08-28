@@ -1,11 +1,5 @@
 import type { RaphDerivedHandle } from '@endge/raph'
 import type { RComposition } from '@/domain/entities/reflect/RComposition'
-import type { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentSFCRuntimeHost'
-import type { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
-import type { FilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
-import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
-import type { StoreRuntimeHost } from '@/domain/entities/runtime/hosts/StoreRuntimeHost'
-import type { StreamRuntimeHost } from '@/domain/entities/runtime/hosts/StreamRuntimeHost'
 import type {
   ComponentSFCEventInputValue,
   ComponentSFCEventOccurrence,
@@ -26,16 +20,22 @@ import type {
   OperationHistoryShortcutDescriptor,
 } from '@/domain/types/source/composition-source.types'
 import type { StreamEventEnvelope } from '@/domain/types/source/stream-source.types'
-
 import type { StoreMutationPlan } from '@/domain/types/source/update-source.types'
-
 import type { OperationHistoryShortcutBinding } from '@/model/modules/runtime/operation/operation-history'
+import type { ComponentSFCRuntimeHost } from '@/model/runtime/hosts/ComponentSFCRuntimeHost'
+import type { FilterRuntimeHost } from '@/model/runtime/hosts/FilterRuntimeHost'
+import type { FilterViewRuntimeHost } from '@/model/runtime/hosts/FilterViewRuntimeHost'
+import type { QueryRuntimeHost } from '@/model/runtime/hosts/QueryRuntimeHost'
+
+import type { StoreRuntimeHost } from '@/model/runtime/hosts/StoreRuntimeHost'
+
+import type { StreamRuntimeHost } from '@/model/runtime/hosts/StreamRuntimeHost'
 import { collectionByKey, filterByKey, full, Raph, RaphNode } from '@endge/raph'
-import { FilterViewRuntimeHost as EndgeFilterViewRuntimeHost } from '@/domain/entities/runtime/hosts/FilterViewRuntimeHost'
-import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
-import { RuntimeScope } from '@/domain/entities/runtime/RuntimeScope'
 import { Endge } from '@/model/kernel/endge'
 import { OperationHistory } from '@/model/modules/runtime/operation/operation-history'
+import { FilterViewRuntimeHost as EndgeFilterViewRuntimeHost } from '@/model/runtime/hosts/FilterViewRuntimeHost'
+import { RuntimeHostBase } from '@/model/runtime/RuntimeHostBase'
+import { RuntimeScope } from '@/model/runtime/RuntimeScope'
 import { buildCompositionI18nCatalogs, cloneI18nRuntimeCatalog } from '@/model/services/i18n/i18n-catalog'
 import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
 import { normalizeComponentSFCInteractionTriggers } from '@/tools/component-sfc-edit-trigger'

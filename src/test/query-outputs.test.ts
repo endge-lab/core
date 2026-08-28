@@ -1,13 +1,16 @@
-import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
 import type { QuerySourceDocument } from '@/domain/types/source/query-source.types'
+import type { QueryRuntimeHost } from '@/model/runtime/hosts/QueryRuntimeHost'
 
 import { Raph } from '@endge/raph'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RDataView } from '@/domain/entities/reflect/RDataView'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
-import { QueryExecutor_Adapter } from '@/model/adapters/query/QueryExecutor_Adapter'
 import { Endge } from '@/model/kernel/endge'
 import { EndgeDataView } from '@/model/modules/runtime/execution/endge-data-view'
+import { prepareTestCompilerContext, resetTestCompilerContext } from '@/test/helpers/compiler-context'
+import { createQueryExecutor } from '@/test/helpers/query-executor'
+
+afterEach(() => resetTestCompilerContext())
 
 describe('query output source compiler', () => {
   it('rejects legacy response block', () => {
@@ -108,6 +111,7 @@ describe('query output compiler artifacts', () => {
   beforeEach(() => {
     Endge.domain.reset()
     Endge.program.clear()
+    prepareTestCompilerContext()
   })
 
   it('materializes local DataView refs as query child artifacts and keeps external refs as dependencies', () => {
@@ -165,6 +169,7 @@ describe('query output runtime', () => {
   beforeEach(() => {
     Endge.domain.reset()
     Endge.program.clear()
+    prepareTestCompilerContext()
   })
 
   it('computes every declared output in order without publishing to a store', async () => {
@@ -234,7 +239,7 @@ defineQuery({
 describe('source-only Query request body', () => {
   it('sends an empty payload when request.body is absent', async () => {
     const request = vi.fn().mockResolvedValue({ data: { items: [] } })
-    const executor = new QueryExecutor_Adapter({ request } as any)
+    const executor = createQueryExecutor({ request } as any)
 
     await executor.execute({
       payload: {
@@ -264,6 +269,7 @@ describe('dataView nested DataView pipeline', () => {
   beforeEach(() => {
     Endge.domain.reset()
     Endge.program.clear()
+    prepareTestCompilerContext()
   })
 
   it('runs external DataView from from(...).dataView(...).as(...)', () => {

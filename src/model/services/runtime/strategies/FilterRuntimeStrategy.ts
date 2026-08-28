@@ -1,6 +1,6 @@
 import type { RuntimeStrategy } from '@/domain/types/runtime/runtime-strategy.types'
 import { RFilter } from '@/domain/entities/reflect/RFilter'
-import { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
+import { FilterRuntimeHost } from '@/model/runtime/hosts/FilterRuntimeHost'
 
 export class FilterRuntimeStrategy implements RuntimeStrategy<RFilter, FilterRuntimeHost> {
   public readonly id = 'runtime:filter'

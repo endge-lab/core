@@ -1,10 +1,11 @@
 import type { DomainDocumentType } from '@/domain/types/document/document.types'
 import type { EndgeDomainCollection } from '@/domain/types/document/domain-provider.type'
 
-import { ENDGE_SERVICE_COLLECTION_BY_DOCUMENT_TYPE } from '@/model/config/domain.config'
+import { DOMAIN_DOCUMENT_DESCRIPTORS } from '@/domain/documents/domain-document-descriptors'
 
 const ENDGE_SERVICE_COLLECTIONS = new Set<EndgeDomainCollection>(
-  Object.values(ENDGE_SERVICE_COLLECTION_BY_DOCUMENT_TYPE),
+  Object.values(DOMAIN_DOCUMENT_DESCRIPTORS)
+    .flatMap(descriptor => descriptor.persistence?.collection ?? []),
 )
 
 export class EndgeProviderCollectionUnsupportedError extends Error {
@@ -17,7 +18,7 @@ export class EndgeProviderCollectionUnsupportedError extends Error {
 }
 
 export function resolveEndgeServiceCollection(documentType: DomainDocumentType): EndgeDomainCollection {
-  const collection = ENDGE_SERVICE_COLLECTION_BY_DOCUMENT_TYPE[documentType]
+  const collection = DOMAIN_DOCUMENT_DESCRIPTORS[documentType].persistence?.collection
   if (!collection) {
     throw new EndgeProviderCollectionUnsupportedError(documentType)
   }

@@ -1,4 +1,4 @@
-import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
+import type { QueryRuntimeHost } from '@/model/runtime/hosts/QueryRuntimeHost'
 import {
   Raph,
   RaphDerivedNode,

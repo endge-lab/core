@@ -1,17 +1,17 @@
 import type { PhaseEvent, RaphDerivedHandle } from '@endge/raph'
 import type { RFilter } from '@/domain/entities/reflect/RFilter'
 import type { RQuery } from '@/domain/entities/reflect/RQuery'
-import type { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
 import type { ProgramArtifact, QueryProgramPayload } from '@/domain/types/program/program.types'
 import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext, RuntimeHostUpdateContext } from '@/domain/types/runtime/runtime-host.types'
-
 import type { FilterProgramPayload } from '@/domain/types/source/filter-source.types'
+
+import type { FilterRuntimeHost } from '@/model/runtime/hosts/FilterRuntimeHost'
 
 import { collectionByKey, filterByKey, full, Raph, RaphNode } from '@endge/raph'
 import { RFilter as FilterModel } from '@/domain/entities/reflect/RFilter'
-import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 import { Endge } from '@/model/kernel/endge'
 import { runResponseOutputTransforms } from '@/model/modules/runtime/execution/endge-response-output'
+import { RuntimeHostBase } from '@/model/runtime/RuntimeHostBase'
 import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
 
 function defaultContext(): RuntimeHostContext<'query'> {

@@ -1,7 +1,7 @@
 import type { RuntimeHost } from '@/domain/types/runtime/runtime-host.types'
 
 import { describe, expect, it, vi } from 'vitest'
-import { RuntimeScope } from '@/domain/entities/runtime/RuntimeScope'
+import { RuntimeScope } from '@/model/runtime/RuntimeScope'
 
 function host(id: string, events: string[]): RuntimeHost<any, any> {
   return {

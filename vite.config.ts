@@ -8,7 +8,7 @@ export default defineConfig({
   build: {
     lib: {
       entry: path.resolve(__dirname, 'src/main.ts'),
-      formats: ['es', 'cjs'],
+      formats: ['es'],
       name: 'core',
     },
     rollupOptions: {
@@ -22,7 +22,11 @@ export default defineConfig({
       ],
     },
   },
-  plugins: [dts({ bundleTypes: false, tsconfigPath: './tsconfig.json' })],
+  plugins: [dts({
+    bundleTypes: false,
+    exclude: ['src/test/**'],
+    tsconfigPath: './tsconfig.json',
+  })],
   worker: {
     format: 'es',
   },

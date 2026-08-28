@@ -11,10 +11,7 @@ export type RI18nBundleLocales = Record<string, Record<string, unknown>>
 /** Сущность словаря переводов (коллекция i18n-bundles). Один документ = словарь с несколькими локалями. */
 export class RI18nBundle extends REntity {
   @Expose()
-  displayName!: string
-
-  @Expose()
-  description?: string | null = null
+  override description: string | null = null
 
   /** По коду локали (ru, en) — дерево ключ-значение. */
   @Expose()

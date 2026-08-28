@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
+import {
+  createNewDomainDocument,
+  DOMAIN_DOCUMENT_DESCRIPTORS,
+  getDomainDocumentDescriptor,
+} from '@/domain/documents/domain-document-descriptors'
 import { RAction } from '@/domain/entities/reflect/RAction'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { RComposition } from '@/domain/entities/reflect/RComposition'
@@ -8,12 +13,11 @@ import { RMock } from '@/domain/entities/reflect/RMock'
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { ENDGE_STYLE_DEFAULT_SOURCE, RStyle } from '@/domain/entities/reflect/RStyle'
 import { RType } from '@/domain/entities/reflect/RType'
-import { ComponentType, QueryType } from '@/domain/types/document/document.types'
-import { DocumentDraftFactory } from '@/model/services/document/DocumentDraftFactory'
+import { ComponentType, DOMAIN_DOCUMENT_TYPES, QueryType } from '@/domain/types/document/document.types'
 
-describe('documentDraftFactory', () => {
+describe('domainDocumentDescriptors', () => {
   it('creates a source-first query draft without a persisted id', () => {
-    const draft = DocumentDraftFactory.create(QueryType.REST, {
+    const draft = createNewDomainDocument(QueryType.REST, {
       identity: 'flight-list',
       name: 'Flights',
       folderId: 'root-queries',
@@ -33,7 +37,7 @@ describe('documentDraftFactory', () => {
   })
 
   it('uses the canonical SFC source template', () => {
-    const draft = DocumentDraftFactory.create(ComponentType.SFC, {
+    const draft = createNewDomainDocument(ComponentType.SFC, {
       identity: 'status-label',
     })
 
@@ -43,7 +47,7 @@ describe('documentDraftFactory', () => {
   })
 
   it('creates a canonical Source Action', () => {
-    const draft = DocumentDraftFactory.create('action', {
+    const draft = createNewDomainDocument('action', {
       identity: 'refresh-data',
       name: 'Refresh data',
     })
@@ -54,7 +58,7 @@ describe('documentDraftFactory', () => {
   })
 
   it('creates a persisted JSON mock draft', () => {
-    const draft = DocumentDraftFactory.create('mock', {
+    const draft = createNewDomainDocument('mock', {
       identity: 'orders-response',
       name: 'Orders response',
       folderId: 'root-mocks',
@@ -72,7 +76,7 @@ describe('documentDraftFactory', () => {
   })
 
   it('creates a source-first computation draft', () => {
-    const draft = DocumentDraftFactory.create('computation', {
+    const draft = createNewDomainDocument('computation', {
       identity: 'ground-handling-cell-state',
       name: 'Ground handling cell state',
       folderId: 'root-computations',
@@ -90,7 +94,7 @@ describe('documentDraftFactory', () => {
   })
 
   it('creates a library Composition by default', () => {
-    const draft = DocumentDraftFactory.create('composition', {
+    const draft = createNewDomainDocument('composition', {
       identity: 'project-startup',
       name: 'Project startup',
       folderId: 'root-compositions',
@@ -106,7 +110,7 @@ describe('documentDraftFactory', () => {
   })
 
   it('creates a source-first style draft without derived artifacts', () => {
-    const draft = DocumentDraftFactory.create('style', {
+    const draft = createNewDomainDocument('style', {
       identity: 'flight-board',
       name: 'Flight board',
       folderId: 'root-styles',
@@ -124,7 +128,7 @@ describe('documentDraftFactory', () => {
   })
 
   it('creates a source-first complex type draft', () => {
-    const draft = DocumentDraftFactory.create('type', {
+    const draft = createNewDomainDocument('type', {
       identity: 'flight-status',
       name: 'Flight status',
       folderId: 'root-types',
@@ -143,7 +147,60 @@ describe('documentDraftFactory', () => {
   })
 
   it('rejects an empty identity', () => {
-    expect(() => DocumentDraftFactory.create(QueryType.REST, { identity: '  ' }))
+    expect(() => createNewDomainDocument(QueryType.REST, { identity: '  ' }))
       .toThrow('Document identity is required.')
+  })
+
+  /** Гарантирует descriptor и явные capabilities для каждого canonical document type. */
+  it('covers every canonical document type with explicit capability values', () => {
+    expect(Object.keys(DOMAIN_DOCUMENT_DESCRIPTORS).sort())
+      .toEqual([...DOMAIN_DOCUMENT_TYPES].sort())
+
+    for (const type of DOMAIN_DOCUMENT_TYPES) {
+      const descriptor = getDomainDocumentDescriptor(type)
+      expect(descriptor.type).toBe(type)
+      expect(descriptor.structuralValidationOwner).toBe('entity')
+      expect(descriptor.capabilities).toHaveProperty('source')
+      expect(descriptor.capabilities).toHaveProperty('program')
+      expect(descriptor.capabilities).toHaveProperty('runtime')
+    }
+  })
+
+  /** Проверяет единый round-trip создания, сериализации и материализации Query. */
+  it('round-trips a persisted query through its descriptor', () => {
+    const descriptor = getDomainDocumentDescriptor(QueryType.REST)
+    const draft = createNewDomainDocument(QueryType.REST, {
+      identity: 'flight-list',
+      name: 'Flights',
+      folderId: 'queries-root',
+    })
+    const serialized = descriptor.persistence?.serialize(draft, {
+      resolveFolderIdentity: value => String(value),
+      resolveNavigationIdentity: value => String(value),
+      resolveEnvironmentIdentity: value => String(value),
+    })
+    const materialized = descriptor.materialize(serialized ?? {})
+
+    expect(descriptor.persistence?.collection).toBe('queries')
+    expect(materialized).toBeInstanceOf(RQuery)
+    expect(materialized).toMatchObject({
+      identity: 'flight-list',
+      displayName: 'Flights',
+      sourceVersion: 2,
+    })
+  })
+
+  /** Фиксирует отсутствие несуществующих Source, Program и Runtime возможностей. */
+  it('represents unsupported capabilities as null', () => {
+    expect(getDomainDocumentDescriptor('auth-profile').capabilities).toEqual({
+      source: null,
+      program: null,
+      runtime: null,
+    })
+    expect(getDomainDocumentDescriptor('page').capabilities).toEqual({
+      source: null,
+      program: null,
+      runtime: 'page',
+    })
   })
 })

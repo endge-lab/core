@@ -74,12 +74,8 @@ export class Endge extends EndgeFederation {
    * Запускает ядро по полному boot pipeline: `setup -> load -> build -> start`.
    * Метод является единственной централизованной точкой старта `Endge`.
    */
-  static override async boot(ctx: EndgeBootContext): Promise<void> {
-    if (this.isInitialized) {
-      return
-    }
-
-    await super.boot(ctx)
+  static override boot(ctx: EndgeBootContext): Promise<void> {
+    return super.boot(ctx)
   }
 
   /**

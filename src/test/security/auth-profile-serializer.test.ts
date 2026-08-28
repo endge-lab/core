@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { serializeServiceDocument } from '@/model/services/document/endge-service-document-serializer'
+import { serializeServiceDocument } from '@/domain/documents/service-document-serializer'
 
 describe('authProfile service serializer', () => {
   it('clears token session policy when profile switches to Basic', () => {
@@ -11,6 +11,10 @@ describe('authProfile service serializer', () => {
       config: {},
       credentials: { username: 'test', password: 'literal' },
       session: undefined,
+    }, {
+      resolveFolderIdentity: value => String(value),
+      resolveNavigationIdentity: value => String(value),
+      resolveEnvironmentIdentity: value => String(value),
     })).toMatchObject({
       adapterId: 'basic',
       credentials: { username: 'test', password: 'literal' },

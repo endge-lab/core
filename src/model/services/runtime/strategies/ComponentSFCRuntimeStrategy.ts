@@ -1,6 +1,6 @@
 import type { RuntimeStrategy } from '@/domain/types/runtime/runtime-strategy.types'
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
-import { ComponentSFCRuntimeHost } from '@/domain/entities/runtime/hosts/ComponentSFCRuntimeHost'
+import { ComponentSFCRuntimeHost } from '@/model/runtime/hosts/ComponentSFCRuntimeHost'
 
 export class ComponentSFCRuntimeStrategy implements RuntimeStrategy<RComponentSFC> {
   public readonly id = 'runtime:component-sfc'

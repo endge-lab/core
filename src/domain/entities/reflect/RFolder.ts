@@ -10,10 +10,6 @@ import { REntity } from '@/domain/entities/reflect/REntity'
  *  - из plain-domain-формата (schema)
  */
 export class RFolder extends REntity {
-  /** Отображаемое имя папки */
-  @Expose()
-  displayName!: string
-
   /** Тип сущностей, для которых предназначена папка (canonical collection slug). */
   @Expose()
   entityType: string | null = null

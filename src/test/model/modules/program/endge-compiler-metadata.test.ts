@@ -1,13 +1,12 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { RQuery } from '@/domain/entities/reflect/RQuery'
 import { Endge } from '@/model/kernel/endge'
+import { prepareTestCompilerContext, resetTestCompilerContext } from '@/test/helpers/compiler-context'
 
 describe('endgeCompiler metadata artifact envelope', () => {
-  afterEach(() => {
-    Endge.program.clear()
-    Endge.domain.reset()
-  })
+  beforeEach(() => prepareTestCompilerContext())
+  afterEach(() => resetTestCompilerContext())
 
   it('publishes source metadata outside the transport payload', () => {
     const query = new RQuery()

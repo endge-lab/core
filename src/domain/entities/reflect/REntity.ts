@@ -16,10 +16,10 @@ export function normalizeEntityMeta(value: unknown): Record<string, unknown> {
     : {}
 }
 
-export class REntity {
+export class REntity<TId extends string | number = number> {
   /** Идентификатор в storage (Payload: number, plain: string | number) */
   @Expose()
-  id!: number
+  id!: TId
 
   @Expose()
   identity!: string

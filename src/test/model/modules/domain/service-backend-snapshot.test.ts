@@ -72,6 +72,11 @@ function liveSnapshot(): EndgeLiveDomainSnapshot {
     folderIdentity: 'folder-root',
     source: '<template />',
   })]
+  documents['auth-profiles'] = [liveDocument('auth-profiles-item', {
+    adapterId: 'bearer',
+    config: {},
+    credentials: {},
+  })]
 
   return {
     kind: 'workspace-snapshot',
@@ -412,6 +417,7 @@ describe('service-backend Core provider', () => {
     const context = defaultContext(provider)
     await repository.setup(context)
     await repository.loadSnapshot(context)
+    Endge.domain.mergeFromSnapshot(snapshot)
 
     await repository.changeDocumentFolder('queries-item', 'query-rest' as never, 'folder-target')
 
@@ -455,6 +461,7 @@ describe('service-backend Core provider', () => {
     const context = defaultContext(provider)
     await repository.setup(context)
     await repository.loadSnapshot(context)
+    Endge.domain.mergeFromSnapshot(snapshot)
 
     await expect(repository.changeDocumentsFolder([
       { documentId: 'action-a', documentType: 'action' },

@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { RuntimeScope } from '@/domain/entities/runtime/RuntimeScope'
 import { Endge } from '@/model/kernel/endge'
 import { EndgeOperations } from '@/model/modules/runtime/operation/endge-operations'
 import { OperationHistory } from '@/model/modules/runtime/operation/operation-history'
+import { RuntimeScope } from '@/model/runtime/RuntimeScope'
 import { compileCompositionSource } from '@/model/services/source-engine/compilers/composition-source-compile'
 
 describe('composition Operation History integration', () => {

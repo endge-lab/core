@@ -1,7 +1,7 @@
-import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
 import type { ProgramArtifact, QueryProgramPayload } from '@/domain/types/program/program.types'
-
 import type { CompositionProgramPayload } from '@/domain/types/source/composition-source.types'
+
+import type { QueryRuntimeHost } from '@/model/runtime/hosts/QueryRuntimeHost'
 import { Raph } from '@endge/raph'
 import { afterEach, describe, expect, it } from 'vitest'
 import { RComposition } from '@/domain/entities/reflect/RComposition'

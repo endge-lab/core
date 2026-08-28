@@ -1,6 +1,6 @@
 import type { RuntimeStrategy } from '@/domain/types/runtime/runtime-strategy.types'
 import { RAction } from '@/domain/entities/reflect/RAction'
-import { ActionRuntimeHost } from '@/domain/entities/runtime/hosts/ActionRuntimeHost'
+import { ActionRuntimeHost } from '@/model/runtime/hosts/ActionRuntimeHost'
 
 export class ActionRuntimeStrategy implements RuntimeStrategy<RAction> {
   public readonly id = 'runtime:action'

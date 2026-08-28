@@ -8,7 +8,7 @@ import { Expose } from 'class-transformer'
 import { REntity } from '@/domain/entities/reflect/REntity'
 
 export interface RNavigationSchema extends EntityManagement {
-  id: string
+  id: string | number
   identity: string
   name: string
   displayName?: string
@@ -19,7 +19,7 @@ export interface RNavigationSchema extends EntityManagement {
 }
 
 function cloneTreeNode(node: NavigationTreeNodeDoc): NavigationTreeNodeDoc {
-  return {
+  const common = {
     id: node.id ?? null,
     type: node.type,
     title: node.title,
@@ -30,8 +30,14 @@ function cloneTreeNode(node: NavigationTreeNodeDoc): NavigationTreeNodeDoc {
     path: node.path ?? null,
     routeName: node.routeName ?? null,
     external: node.external ?? false,
-    children: Array.isArray(node.children) ? node.children.map(cloneTreeNode) : [],
   }
+
+  return node.type === 'link'
+    ? common
+    : {
+        ...common,
+        children: Array.isArray(node.children) ? node.children.map(cloneTreeNode) : [],
+      }
 }
 
 /** Навигация (коллекция navigations). */

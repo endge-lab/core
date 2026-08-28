@@ -1,10 +1,14 @@
-import type { RuntimeAppScope } from '@/domain/entities/runtime/RuntimeAppScope'
 import type { EndgePersistenceDriver } from '@/domain/types/runtime/context-persistence.types'
 import type { RuntimeArtifactReader } from '@/domain/types/runtime/runtime-host.types'
 import type { AnyRuntimeHost } from '@/domain/types/runtime/runtime-strategy.types'
 
 /** Допустимая ссылка на зарегистрированный родительский runtime-host. */
 export type RuntimeParentRef = AnyRuntimeHost | string
+
+/** Публичная ссылка на зарегистрированный runtime app scope без зависимости Domain от Model. */
+export interface RuntimeAppScopeReference {
+  readonly id: string
+}
 
 /** Типизированные параметры создания runtime-host. */
 export interface RuntimeExecuteOptions {
@@ -18,7 +22,7 @@ export interface RuntimeExecuteOptions {
   parent?: RuntimeParentRef | null
 
   /** App scope или id зарегистрированного app scope. */
-  appScope?: RuntimeAppScope | string
+  appScope?: RuntimeAppScopeReference | string
 
   /** Read-only источник compiled artifacts. */
   artifactReader?: RuntimeArtifactReader

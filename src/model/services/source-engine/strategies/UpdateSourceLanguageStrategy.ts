@@ -1,8 +1,8 @@
 import type { SourceKind, SourceLanguageCompletion, SourceLanguageContext, SourceLanguageStrategy, SourceLanguageValidationResult } from '@/domain/types/source/source-engine.types'
 
+import { UPDATE_DEFAULT_SOURCE } from '@/domain/source/templates/update.default.source'
 import { compileUpdateSource } from '@/model/services/source-engine/compilers/update-source-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
-import { UPDATE_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/update.default.source'
 
 export class UpdateSourceLanguageStrategy implements SourceLanguageStrategy {
   public readonly id = 'source-language:update'

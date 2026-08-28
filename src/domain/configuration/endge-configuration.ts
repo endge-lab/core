@@ -24,11 +24,11 @@ import type {
   EndgeDiagnosticsRoute,
 } from '@/domain/types/diagnostics/diagnostics.types'
 import type { EndgeJSONValue } from '@/domain/types/source/configuration-source.types'
-import { DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION } from '@/model/config/diagnostics.config'
-import { DEFAULT_FALLBACK_LOCALE, DEFAULT_LOCALE, DEFAULT_THEME, DEFAULT_TIMEZONE } from '@/model/config/kernel.config'
-import { DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION } from '@/model/config/sfc-editing.config'
-import { DEFAULT_ENDGE_TOOLTIP_CONFIGURATION } from '@/model/config/tooltip.config'
-import { isEndgeJSONValue } from '@/model/services/configuration/configuration-value'
+import { isEndgeJSONValue } from '@/domain/configuration/configuration-value'
+import { DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION } from '@/domain/configuration/diagnostics.config'
+import { DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION } from '@/domain/configuration/sfc-editing.config'
+import { DEFAULT_ENDGE_TOOLTIP_CONFIGURATION } from '@/domain/configuration/tooltip.config'
+import { DEFAULT_FALLBACK_LOCALE, DEFAULT_LOCALE, DEFAULT_THEME, DEFAULT_TIMEZONE } from '@/domain/constants/kernel.constants'
 import { normalizeComponentSFCInteractionKeyboardCondition, normalizeComponentSFCInteractionTriggers } from '@/tools/component-sfc-edit-trigger'
 
 const LEGACY_SFC_ADAPTER_IDS: Readonly<Record<string, string>> = {

@@ -6,11 +6,11 @@ import type {
   SourceLanguageValidationResult,
 } from '@/domain/types/source/source-engine.types'
 
+import { FILTER_DEFAULT_SOURCE } from '@/domain/source/templates/filter.default.source'
 import { validateTypeExpressionUsage } from '@/model/services/compiler/type/type-program-validation'
 import { compileFilterSource } from '@/model/services/source-engine/compilers/filter-source-compile'
 import { resolveTypedSourceDocumentReference, typedSourceTypeReferenceHighlights } from '@/model/services/source-engine/source-document-reference'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
-import { FILTER_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/filter.default.source'
 
 const FILTER_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'defineFilter', kind: 'snippet', insertText: FILTER_DEFAULT_SOURCE.trimEnd(), detail: 'Создать Filter source' },

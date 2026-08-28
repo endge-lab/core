@@ -1,4 +1,5 @@
 import type { AxiosInstance } from 'axios'
+import type { AuthRequestPolicy, AuthResolvedSession, AuthResolveOptions } from '@/domain/types/auth/auth-profile.types'
 import type { RQueryAuth } from '@/domain/types/document/query.types'
 import type { QueryProgramOutput, QueryProgramPayload } from '@/domain/types/program/program.types'
 import type { QueryExecutionContext } from '@/domain/types/runtime/query-execution.types'
@@ -6,8 +7,13 @@ import type { SourceExpressionIR } from '@/domain/types/source/source-expression
 
 import axios from 'axios'
 
-import { Endge } from '@/model/kernel/endge'
 import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
+
+export interface QueryExecutorDependencies {
+  resolveVariable: (source: string) => string
+  resolveAuth: (policy: AuthRequestPolicy, options?: AuthResolveOptions) => Promise<AuthResolvedSession>
+  reportWarning: (message: string, data?: unknown) => void
+}
 
 /** Выполняет source-only compiled query artifact. */
 export class QueryExecutor_Adapter {
@@ -21,6 +27,7 @@ export class QueryExecutor_Adapter {
    */
 
   public constructor(
+    private readonly _dependencies: QueryExecutorDependencies,
     http: AxiosInstance = axios.create({
       headers: { Accept: 'application/json' },
     }),
@@ -81,7 +88,7 @@ export class QueryExecutor_Adapter {
     signal?: AbortSignal,
   ): Promise<any> {
     const endpointSource = String(this._evaluateRequestValue(payload.endpoint, vars) ?? '')
-    const url = Endge.workspace.variables.resolve(endpointSource) || endpointSource
+    const url = this._resolveVariable(endpointSource)
     const headers = {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
@@ -151,8 +158,8 @@ export class QueryExecutor_Adapter {
   ): Promise<any> {
     const endpointSource = String(this._evaluateRequestValue(payload.endpoint, vars) ?? '')
     const queryPathSource = String(this._evaluateRequestValue(payload.query, vars) ?? '')
-    const endpoint = Endge.workspace.variables.resolve(endpointSource) || endpointSource
-    const queryPath = Endge.workspace.variables.resolve(queryPathSource) || queryPathSource
+    const endpoint = this._resolveVariable(endpointSource)
+    const queryPath = this._resolveVariable(queryPathSource)
     const url = this._buildUrl(endpoint, queryPath)
     const method = String(this._evaluateRequestValue(payload.method, vars) ?? 'POST').toUpperCase() as
       | 'GET'
@@ -272,14 +279,7 @@ export class QueryExecutor_Adapter {
 
   /** Публикует runtime warning безопасного expression evaluator. */
   private _writeExpressionWarning(message: string, data?: unknown): void {
-    void data
-    if (Endge.isConfigured) {
-      Endge.diagnostics.warn(`[Query] ${message}`, {
-        scope: { name: 'endge.runtime.query' },
-        phase: 'runtime',
-        eventName: 'endge.expression.warning',
-      })
-    }
+    this._dependencies.reportWarning(message, data)
   }
 
   private _asRecord(value: unknown): Record<string, any> {
@@ -295,7 +295,7 @@ export class QueryExecutor_Adapter {
     }
     return evaluateSourceExpression(value, {
       props,
-      environment: name => Endge.workspace.variables.resolve(`{${name}}`) || `{${name}}`,
+      environment: name => this._resolveVariable(`{${name}}`),
       onWarning: warning => this._writeExpressionWarning(warning.message, warning.data),
     })
   }
@@ -403,7 +403,7 @@ export class QueryExecutor_Adapter {
     if (current.mode === 'profile' && !profile) {
       throw new Error('[EndgeAuth] Auth profile is required for profile mode.')
     }
-    const session = await Endge.auth.requests.resolve(
+    const session = await this._dependencies.resolveAuth(
       current.mode === 'profile'
         ? { mode: 'profile', profile }
         : { mode: 'inherit' },
@@ -427,5 +427,10 @@ export class QueryExecutor_Adapter {
     const scheme = current.scheme ?? 'Bearer'
     const headerName = current.headerName ?? 'Authorization'
     headers[headerName] = `${scheme} ${token}`
+  }
+
+  /** Разрешает environment placeholder через переданный composition owner. */
+  private _resolveVariable(source: string): string {
+    return this._dependencies.resolveVariable(source) || source
   }
 }

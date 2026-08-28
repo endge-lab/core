@@ -1,4 +1,3 @@
-import type { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
 import type { ComponentSFCInteractionTrigger } from '@/domain/types/component/sfc/ir.types'
 import type { ComponentSFCEventInputValue } from '@/domain/types/component/sfc/ports.types'
 import type { EndgeDataMode } from '@/domain/types/document/workspace.types'
@@ -380,6 +379,21 @@ export interface CompositionRuntimeOutputHandle {
   output?: string
 }
 
+/** Публичный контракт Composition host без зависимости Domain от concrete Model runtime. */
+export interface CompositionRuntimeHostHandle extends RuntimeHost<'composition', any, CompositionProgramPayload> {
+  mountGraph: () => Promise<void>
+  getChild: (name: string) => RuntimeHost<any, any> | null
+  getChildren: () => CompositionRuntimeChildHandle[]
+  getFilterFieldsSlice: (runtimeName: string, fieldKeys: string[]) => CompositionFilterFieldsSlice | null
+  getOutputs: () => Readonly<Record<string, CompositionPublicOutputHandle>>
+  getScope: (path: string) => RuntimeScopeHandle | null
+  getRuntimeHandle: (path: string) => CompositionRuntimeActivationHandle | null
+  getOutput: (name: string) => unknown
+  getDataSnapshot: () => Readonly<Record<string, unknown>>
+  getProps: () => Readonly<Record<string, unknown>>
+  getDataPath: (name: string, path?: string) => string
+}
+
 export interface CompositionRuntimeActivationHandle {
   readonly path: string
   readonly state: 'inactive' | 'active' | 'paused' | 'disposed'
@@ -405,9 +419,9 @@ export interface CompositionMountOptions {
   dataRuntimes?: Record<string, string>
 }
 
-export interface CompositionSession {
+export interface CompositionSession<THost extends CompositionRuntimeHostHandle = CompositionRuntimeHostHandle> {
   id: string
-  host: CompositionRuntimeHost
+  host: THost
   outputs: Readonly<Record<string, CompositionPublicOutputHandle>>
   output: <T = unknown>(name: string) => T | undefined
   unmount: () => Promise<void>

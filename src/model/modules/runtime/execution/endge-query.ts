@@ -1,9 +1,9 @@
 import type { RQuery } from '@/domain/entities/reflect/RQuery'
 
-import type { QueryRuntimeHost } from '@/domain/entities/runtime/hosts/QueryRuntimeHost'
-
 import type { QueryProgramPayload } from '@/domain/types/program/program.types'
+
 import type { RuntimeParentRef } from '@/domain/types/runtime/runtime-execute.type'
+import type { QueryRuntimeHost } from '@/model/runtime/hosts/QueryRuntimeHost'
 import { QueryExecutor_Adapter } from '@/model/adapters/query/QueryExecutor_Adapter'
 import { Endge } from '@/model/kernel/endge'
 
@@ -14,7 +14,7 @@ export class EndgeQuery {
   private readonly _executor: QueryExecutor_Adapter
 
   /** Создаёт query module с явным transport adapter. */
-  public constructor(executor: QueryExecutor_Adapter = new QueryExecutor_Adapter()) {
+  public constructor(executor: QueryExecutor_Adapter = createQueryExecutor()) {
     this._executor = executor
   }
 
@@ -74,4 +74,21 @@ export class EndgeQuery {
   ): unknown {
     return this._executor.readResponseOutput(output, response)
   }
+}
+
+function createQueryExecutor(): QueryExecutor_Adapter {
+  return new QueryExecutor_Adapter({
+    resolveVariable: source => Endge.workspace.variables.resolve(source) || source,
+    resolveAuth: (policy, options) => Endge.auth.requests.resolve(policy, options),
+    reportWarning: (message) => {
+      if (!Endge.isConfigured) {
+        return
+      }
+      Endge.diagnostics.warn(`[Query] ${message}`, {
+        scope: { name: 'endge.runtime.query' },
+        phase: 'runtime',
+        eventName: 'endge.expression.warning',
+      })
+    },
+  })
 }

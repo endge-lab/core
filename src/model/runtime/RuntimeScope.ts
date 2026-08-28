@@ -6,7 +6,7 @@ import type {
   RuntimeScopeState,
 } from '@/domain/types/runtime/runtime-scope.types'
 
-import { RuntimeResourceBag } from '@/domain/entities/runtime/RuntimeResourceBag'
+import { RuntimeResourceBag } from '@/model/runtime/RuntimeResourceBag'
 
 export interface RuntimeScopeOptions {
   id: string

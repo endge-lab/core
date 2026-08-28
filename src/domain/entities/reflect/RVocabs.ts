@@ -4,8 +4,7 @@ import type { DiagnosticsProblemInput } from '@/domain/types/diagnostics/diagnos
 import { Serialize } from '@endge/utils'
 import { Expose } from 'class-transformer'
 import { REntity } from '@/domain/entities/reflect/REntity'
-import { compileVocabSource } from '@/model/services/source-engine/compilers/vocab-source-compile'
-import { VOCAB_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/vocab.default.source'
+import { VOCAB_DEFAULT_SOURCE } from '@/domain/source/templates/vocab.default.source'
 
 export type RVocabMode = 'external_payload' | 'internal'
 
@@ -96,16 +95,6 @@ export class RVocabs extends REntity {
 
     if (this.sourceVersion !== 1) {
       problems.push({ severity: 'error', code: 'vocab.source-version.unsupported', message: `Vocab sourceVersion=${this.sourceVersion} не поддерживается` })
-    }
-    for (const diagnostic of compileVocabSource(this.source).diagnostics) {
-      problems.push({
-        severity: diagnostic.severity,
-        code: diagnostic.code,
-        message: diagnostic.message,
-        sourcePath: diagnostic.sourcePath,
-        start: diagnostic.start,
-        end: diagnostic.end,
-      })
     }
     return problems
   }

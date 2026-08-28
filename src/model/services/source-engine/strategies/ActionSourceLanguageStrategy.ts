@@ -5,13 +5,13 @@ import type {
   SourceLanguageStrategy,
   SourceLanguageValidationResult,
 } from '@/domain/types/source/source-engine.types'
+import { ACTION_DEFAULT_SOURCE } from '@/domain/source/templates/action.default.source'
 import { compileActionSource } from '@/model/services/source-engine/compilers/action-source-compile'
 import {
   resolveTypedSourceDocumentReference,
   typedSourceTypeReferenceHighlights,
 } from '@/model/services/source-engine/source-document-reference'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
-import { ACTION_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/action.default.source'
 import {
   VALUE_EXPRESSION_COMPLETIONS,
   VALUE_EXPRESSION_FUNCTION_NAMES,

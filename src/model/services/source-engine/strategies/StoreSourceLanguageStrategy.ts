@@ -1,9 +1,9 @@
 import type { SourceKind, SourceLanguageCompletion, SourceLanguageContext, SourceLanguageStrategy, SourceLanguageValidationResult } from '@/domain/types/source/source-engine.types'
 
+import { STORE_DEFAULT_SOURCE } from '@/domain/source/templates/store.default.source'
 import { compileStoreSource } from '@/model/services/source-engine/compilers/store-source-compile'
 import { resolveTypedSourceDocumentReference, typedSourceTypeReferenceHighlights } from '@/model/services/source-engine/source-document-reference'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
-import { STORE_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/store.default.source'
 import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EXPRESSION_METHOD_NAMES } from '@/model/services/source-engine/value-expression-language'
 
 export class StoreSourceLanguageStrategy implements SourceLanguageStrategy {

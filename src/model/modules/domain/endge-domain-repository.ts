@@ -1,3 +1,4 @@
+import type { DomainCollectionKey } from '@/domain/documents/domain-document-descriptors'
 import type { DocumentCreateRequest, DocumentCreateResult } from '@/domain/types/document/document-create.type'
 import type { EndgeDomainDocumentMove } from '@/domain/types/document/document-move.type'
 import type { DomainDocumentType } from '@/domain/types/document/document.types'
@@ -16,6 +17,8 @@ import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 
 import { AppBus } from '@endge/utils'
 
+import { getDomainDocumentDescriptor } from '@/domain/documents/domain-document-descriptors'
+import { serializeServiceFolder } from '@/domain/documents/service-document-serializer'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { normalizeEntityMeta } from '@/domain/entities/reflect/REntity'
 import { normalizeEndgeWorkspaceDefinition } from '@/domain/entities/reflect/RWorkspace'
@@ -23,13 +26,6 @@ import { ComponentType, FilterType, ParameterType, QueryType } from '@/domain/ty
 import { Endge } from '@/model/kernel/endge'
 import { EndgeDomain, normalizeSnapshotDocuments, normalizeSnapshotFolders } from '@/model/modules/domain/endge-domain'
 import { resolveEndgeServiceCollection, resolveEndgeServiceStateCollection } from '@/model/services/document/domain-provider'
-import { serializeServiceDocument, serializeServiceFolder } from '@/model/services/document/endge-service-document-serializer'
-
-type DomainCollectionKey
-  = | 'projects' | 'types' | 'queries' | 'dataViews' | 'compositions' | 'stores'
-    | 'streams' | 'updates' | 'mocks' | 'componentSFCs' | 'actions' | 'filters'
-    | 'converters' | 'computations' | 'environments' | 'tenants' | 'styles' | 'configurations'
-    | 'vocabs' | 'authProfiles' | 'i18nBundles' | 'navigations'
 
 /** Explicit error for writes through bundle/plain or a read-only live backend. */
 export class EndgeDomainRepositoryReadOnlyError extends Error {
@@ -240,7 +236,7 @@ export class EndgeDomainRepository extends EndgeModule {
       throw new Error(`Документ не найден: ${String(documentId)}`)
     }
 
-    const document = serializeServiceDocument(documentType, model)
+    const document = this._serializeDocument(documentType, model)
     const folder = folderIdOrIdentity == null ? null : Endge.domain.getFolder(folderIdOrIdentity)
     document.folderIdentity = folderIdOrIdentity == null
       ? null
@@ -309,7 +305,7 @@ export class EndgeDomainRepository extends EndgeModule {
       throw new Error(`Папка не найдена: ${folderId}`)
     }
 
-    const document = serializeServiceFolder(folder)
+    const document = serializeServiceFolder(folder, this._serializationContext())
     const identity = String(document.identity ?? '').trim()
     const persistedIdentity = this._findServerIdentity('folders', folder.id) || identity
     const state = this._documentServerState.get(this._serverStateKey('folders', persistedIdentity))
@@ -498,7 +494,7 @@ export class EndgeDomainRepository extends EndgeModule {
     if (!model) {
       throw new Error(`Документ не найден: ${String(documentId)}`)
     }
-    const document = opts?.serializedDocument ?? serializeServiceDocument(documentType, model)
+    const document = opts?.serializedDocument ?? this._serializeDocument(documentType, model)
     const identity = String(document.identity ?? '').trim()
     const collection = resolveEndgeServiceCollection(documentType)
     const persistedIdentity = String(opts?.previousIdentity ?? '').trim()
@@ -538,11 +534,9 @@ export class EndgeDomainRepository extends EndgeModule {
 
     const key = this._getDomainCollectionKey(documentType)
     const plain = normalizeSnapshotDocuments([document], this._serviceFolderIds())[0]
-    const parsed = EndgeDomain.parsePlain({ [key]: [plain] })
-    const next = parsed[key][0]
-    if (!next) {
-      throw new Error(`[EndgeDomainRepository] Failed to materialize ${collection}/${identity}`)
-    }
+    const next = getDomainDocumentDescriptor(documentType).materialize(plain)
+    const parsed = EndgeDomain.parsePlain({})
+    ;(parsed[key] as unknown[]).push(next)
     if (current) {
       Endge.domain.replacePersistedEntity(current, next)
     }
@@ -778,76 +772,32 @@ export class EndgeDomainRepository extends EndgeModule {
   }
 
   private _getDomainCollectionKey(documentType: DomainDocumentType): DomainCollectionKey {
-    if (documentType === ComponentType.SFC) {
-      return 'componentSFCs'
+    const key = getDomainDocumentDescriptor(documentType).domainCollection
+    if (!key) {
+      throw new Error(`[EndgeDomainRepository] Unsupported service document type: ${documentType}`)
     }
-    if (documentType === QueryType.REST || documentType === QueryType.GraphQL || documentType === QueryType.Custom) {
-      return 'queries'
-    }
-    if (documentType === 'data-view') {
-      return 'dataViews'
-    }
-    if (documentType === 'composition') {
-      return 'compositions'
-    }
-    if (documentType === 'store') {
-      return 'stores'
-    }
-    if (documentType === 'stream') {
-      return 'streams'
-    }
-    if (documentType === 'update') {
-      return 'updates'
-    }
-    if (documentType === 'mock') {
-      return 'mocks'
-    }
-    if (documentType === 'type' || documentType === 'primitive') {
-      return 'types'
-    }
-    if (documentType === 'action') {
-      return 'actions'
-    }
-    if (documentType === FilterType.DefaultFilter) {
-      return 'filters'
-    }
-    if (documentType === 'converter') {
-      return 'converters'
-    }
-    if (documentType === 'computation') {
-      return 'computations'
-    }
-    if (documentType === 'environment') {
-      return 'environments'
-    }
-    if (documentType === 'tenant') {
-      return 'tenants'
-    }
-    if (documentType === 'style') {
-      return 'styles'
-    }
-    if (documentType === 'configuration') {
-      return 'configurations'
-    }
-    if (documentType === 'vocabs') {
-      return 'vocabs'
-    }
-    if (documentType === 'auth-profile') {
-      return 'authProfiles'
-    }
-    if (documentType === 'i18n-bundles') {
-      return 'i18nBundles'
-    }
-    if (documentType === 'navigation') {
-      return 'navigations'
-    }
-    if (documentType === 'project') {
-      return 'projects'
-    }
-    throw new Error(`[EndgeDomainRepository] Unsupported service document type: ${documentType}`)
+    return key
   }
 
   private _notifyDomainChanged(): void {
     ;(AppBus.emit as (event: string, payload?: unknown) => void)('domainChanged', undefined)
+  }
+
+  /** Собирает явные lookup-зависимости чистой Domain-сериализации. */
+  private _serializationContext() {
+    return {
+      resolveFolderIdentity: (value: string | number) => Endge.domain.getFolder(value)?.identity ?? null,
+      resolveNavigationIdentity: (value: string | number) => Endge.domain.getNavigation(value)?.identity ?? null,
+      resolveEnvironmentIdentity: (value: string | number) => Endge.domain.getEnvironment(value)?.identity ?? null,
+    }
+  }
+
+  /** Сериализует persisted document через его канонический Domain descriptor. */
+  private _serializeDocument(documentType: DomainDocumentType, model: unknown): Record<string, unknown> {
+    const persistence = getDomainDocumentDescriptor(documentType).persistence
+    if (!persistence) {
+      throw new Error(`[EndgeDomainRepository] Document type is not persisted: ${documentType}`)
+    }
+    return persistence.serialize(model, this._serializationContext())
   }
 }

@@ -6,7 +6,7 @@ import {
   createDefaultEndgeConfiguration,
   createEndgeContextHash,
   normalizeEndgeConfiguration,
-} from '@/model/services/configuration/endge-configuration'
+} from '@/domain/configuration/endge-configuration'
 
 describe('endge configuration cascade', () => {
   it('uses en locales and the dark theme when defaults are not set', () => {

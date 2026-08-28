@@ -9,7 +9,7 @@ import type { TypeProgramCatalogEntry } from '@/domain/types/source/type-source.
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
 
-import { inferConfigurationDefault, isEndgeJSONValue, validateConfigurationValue } from '@/model/services/configuration/configuration-value'
+import { inferConfigurationDefault, isEndgeJSONValue, validateConfigurationValue } from '@/domain/configuration/configuration-value'
 import { diagnostic, propertyName, unwrapExpression } from '@/model/services/source-engine/compilers/source-expression-compile'
 import { compileTypeSourceExpression } from '@/model/services/source-engine/compilers/type-source-compile'
 

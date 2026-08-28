@@ -1,6 +1,6 @@
 import type { RuntimeStrategy } from '@/domain/types/runtime/runtime-strategy.types'
 import { RPage } from '@/domain/entities/reflect/RPage'
-import { PageRuntimeHost } from '@/domain/entities/runtime/hosts/PageRuntimeHost'
+import { PageRuntimeHost } from '@/model/runtime/hosts/PageRuntimeHost'
 
 export class PageRuntimeStrategy implements RuntimeStrategy<RPage> {
   public readonly id = 'runtime:page'

@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { ComponentSFCEventBoundary } from '@/domain/entities/runtime/ComponentSFCEventBoundary'
 import { listComponentSFCEventCapableTags } from '@/domain/types/component/sfc/intrinsic-events.types'
 import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
+import { ComponentSFCEventBoundary } from '@/model/runtime/ComponentSFCEventBoundary'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 
 describe('component SFC :on interactions', () => {
@@ -179,7 +179,10 @@ describe('component SFC :on interactions', () => {
         kind: 'query',
         identity: 'groundHandling.actualTime.update',
         input: expect.objectContaining({
-          value: { kind: 'now' },
+          kind: 'object',
+          entries: expect.arrayContaining([
+            { key: 'value', value: { kind: 'now' } },
+          ]),
         }),
       }),
     ])

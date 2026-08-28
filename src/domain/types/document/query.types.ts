@@ -69,14 +69,15 @@ export interface RuntimeFilterLink {
 export interface RParameterSchema {
   identity: string
   displayName: string
-  description?: string
+  description?: string | null
   fields: FilterFieldSchema[]
   runtimeFilters?: RuntimeFilterLink[]
   folder?: string | null
+  folderId?: string | number | null
   author?: string
   active: boolean
   deletedAt?: string | null
-  meta: Record<string, unknown>
+  meta?: Record<string, unknown>
 }
 
 export class RuntimeFilterLinkEntity {

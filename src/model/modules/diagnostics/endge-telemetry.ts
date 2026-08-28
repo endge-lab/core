@@ -31,13 +31,13 @@ import type {
 } from '@/domain/types/diagnostics/diagnostics.types'
 import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 import type { DiagnosticsAdapterRegistry } from '@/model/adapters/diagnostics/DiagnosticsAdapterRegistry'
-import { DiagnosticsRecordStore } from '@/domain/entities/diagnostics/DiagnosticsRecordStore'
-import { DiagnosticsSpan } from '@/domain/entities/diagnostics/DiagnosticsSpan'
-import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import {
   DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION,
   DIAGNOSTICS_SEVERITY_TEXT,
-} from '@/model/config/diagnostics.config'
+} from '@/domain/configuration/diagnostics.config'
+import { DiagnosticsRecordStore } from '@/domain/entities/diagnostics/DiagnosticsRecordStore'
+import { DiagnosticsSpan } from '@/domain/entities/diagnostics/DiagnosticsSpan'
+import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { Endge } from '@/model/kernel/endge'
 
 const DEFAULT_SCOPE: DiagnosticsInstrumentationScope = { name: 'endge.core' }

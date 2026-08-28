@@ -53,8 +53,9 @@ describe('endgeCompiler composition validation', () => {
     component.id = 40
     component.identity = 'output-consumer'
     component.name = 'Output consumer'
-    component.source = '<template><div /></template>'
+    component.source = '<template><Text /></template>'
     Endge.domain.addComponentSFC(component)
+    Endge.compiler.buildComponentSFC(component)
 
     const filter = new RFilter()
     filter.id = 41

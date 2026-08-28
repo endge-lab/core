@@ -1,8 +1,8 @@
 import type { SourceKind, SourceLanguageCompletion, SourceLanguageContext, SourceLanguageStrategy, SourceLanguageValidationResult } from '@/domain/types/source/source-engine.types'
 
+import { STREAM_DEFAULT_SOURCE } from '@/domain/source/templates/stream.default.source'
 import { compileStreamSource } from '@/model/services/source-engine/compilers/stream-source-compile'
 import { createTypeScriptLikeSourceSyntax } from '@/model/services/source-engine/source-language-syntax'
-import { STREAM_DEFAULT_SOURCE } from '@/model/services/source-engine/templates/stream.default.source'
 
 export class StreamSourceLanguageStrategy implements SourceLanguageStrategy {
   public readonly id = 'source-language:stream'

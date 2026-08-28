@@ -7,7 +7,7 @@ import { REntity } from '@/domain/entities/reflect/REntity'
 /** Сущность политики (коллекция policies). identity, displayName, description, folder. */
 export class RPolicy extends REntity {
   @Expose()
-  description?: string | null = null
+  override description: string | null = null
 
   toPlain(): Record<string, unknown> {
     return {

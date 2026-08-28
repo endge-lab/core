@@ -3,9 +3,9 @@ import type { DuplicateOptions } from '@/domain/entities/reflect/REntity'
 import type { RComponentRenderTarget } from '@/domain/types/component/component-core.types'
 import type { RComponentSFCSource_Parts } from '@/domain/types/component/sfc/source.types'
 import { Expose } from 'class-transformer'
+import { serializeSFCSourceParts } from '@/domain/component/sfc/component-sfc-source-parts'
 import { RComponentCore } from '@/domain/entities/reflect/RComponentCore'
 import { ComponentType } from '@/domain/types/document/document.types'
-import { serializeSFCSourceParts } from '@/model/services/compiler/component-sfc/component-sfc-source-parts'
 
 /**
  * Новый SFC-компонент Endge.

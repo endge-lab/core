@@ -1,5 +1,4 @@
 import type { RFilter } from '@/domain/entities/reflect/RFilter'
-import type { FilterRuntimeHost } from '@/domain/entities/runtime/hosts/FilterRuntimeHost'
 import type {
   FilterViewControlDefinition,
   FilterViewImplementation,
@@ -9,11 +8,12 @@ import type { RuntimeHost, RuntimeHostContext } from '@/domain/types/runtime/run
 import type { CompositionFilterFieldsSlice } from '@/domain/types/source/composition-source.types'
 import type { FilterProgramPayload } from '@/domain/types/source/filter-source.types'
 import type { SourceFieldDefinition, SourceFieldOption } from '@/domain/types/source/source-expression.types'
+import type { FilterRuntimeHost } from '@/model/runtime/hosts/FilterRuntimeHost'
 
 import { Raph } from '@endge/raph'
 
-import { RuntimeHostBase } from '@/domain/entities/runtime/RuntimeHostBase'
 import { Endge } from '@/model/kernel/endge'
+import { RuntimeHostBase } from '@/model/runtime/RuntimeHostBase'
 
 function defaultContext(instance: string): RuntimeHostContext<'filter'> {
   return {

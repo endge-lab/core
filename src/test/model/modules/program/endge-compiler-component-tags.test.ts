@@ -1,12 +1,14 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
 import { Endge } from '@/model/kernel/endge'
+import { prepareTestCompilerContext, resetTestCompilerContext } from '@/test/helpers/compiler-context'
 
 describe('endgeCompiler component tag registry', () => {
+  beforeEach(() => prepareTestCompilerContext())
+
   afterEach(() => {
-    Endge.program.clear()
-    Endge.domain.reset()
+    resetTestCompilerContext()
   })
 
   it('registers simple and dotted tags before compiling templates', () => {

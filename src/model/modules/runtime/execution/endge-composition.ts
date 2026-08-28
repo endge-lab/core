@@ -1,13 +1,13 @@
-import type { CompositionRuntimeHost } from '@/domain/entities/runtime/hosts/CompositionRuntimeHost'
 import type { EndgeDataMode } from '@/domain/types/document/workspace.types'
-
 import type { CompositionMountOptions, CompositionPreviewProps, CompositionSession } from '@/domain/types/source/composition-source.types'
+
+import type { CompositionRuntimeHost } from '@/model/runtime/hosts/CompositionRuntimeHost'
 import { Endge } from '@/model/kernel/endge'
 
 /** Публичный API монтирования Composition runtime sessions. */
 export class EndgeComposition {
   /** Монтирует Composition runtime и возвращает управляемую session. */
-  public async mount(identity: string, options: CompositionMountOptions = {}): Promise<CompositionSession> {
+  public async mount(identity: string, options: CompositionMountOptions = {}): Promise<CompositionSession<CompositionRuntimeHost>> {
     const normalizedIdentity = String(identity ?? '').trim()
     const model = Endge.domain.getComposition(normalizedIdentity)
     if (!model) {

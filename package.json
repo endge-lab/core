@@ -1,7 +1,7 @@
 {
   "name": "@endge/core",
   "type": "module",
-  "version": "5.0.0",
+  "version": "6.0.0",
   "private": false,
   "packageManager": "pnpm@8.8.0",
   "license": "Apache-2.0",
@@ -9,7 +9,7 @@
     ".": {
       "types": "./dist/main.d.ts",
       "import": "./dist/core.js",
-      "require": "./dist/core.cjs"
+      "default": "./dist/core.js"
     }
   },
   "main": "./dist/core.js",
@@ -21,10 +21,10 @@
   "scripts": {
     "clean": "rimraf dist tsconfig.tsbuildinfo",
     "dev": "vite build --watch",
-    "build": "vite build",
+    "build": "pnpm typecheck && vite build",
     "preview": "vite preview",
     "test": "vitest",
-    "bench:interactions": "vitest bench src/test/component-sfc-interactions.bench.ts",
+    "bench:interactions": "vitest bench --run src/test/component-sfc-interactions.bench.ts",
     "typecheck": "tsc --noEmit",
     "lint-check": "eslint . --cache",
     "lint-fix": "eslint . --fix --cache"

@@ -1,5 +1,36 @@
+import type { DomainDocumentModelMap } from '@/domain/documents/domain-document-descriptors'
+import type { RAction } from '@/domain/entities/reflect/RAction'
+import type { RAuthProfile } from '@/domain/entities/reflect/RAuthProfile'
+import type { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
+import type { RComposition } from '@/domain/entities/reflect/RComposition'
+import type { RComputation } from '@/domain/entities/reflect/RComputation'
+import type { RConfiguration } from '@/domain/entities/reflect/RConfiguration'
+import type { RConverter } from '@/domain/entities/reflect/RConverter'
+
+import type { RDataView } from '@/domain/entities/reflect/RDataView'
+
+import type { REnvironment } from '@/domain/entities/reflect/REnvironment'
+import type { RFilter } from '@/domain/entities/reflect/RFilter'
+import type { RI18nBundle } from '@/domain/entities/reflect/RI18nBundle'
+import type { RIntegration } from '@/domain/entities/reflect/RIntegration'
+import type { RMock } from '@/domain/entities/reflect/RMock'
+import type { RNavigation } from '@/domain/entities/reflect/RNavigation'
+import type { RPage } from '@/domain/entities/reflect/RPage'
+import type { RPageTemplate } from '@/domain/entities/reflect/RPageTemplate'
+import type { RParameter } from '@/domain/entities/reflect/RParameter'
+import type { RPolicy } from '@/domain/entities/reflect/RPolicy'
+import type { RProject } from '@/domain/entities/reflect/RProject'
+import type { RQuery } from '@/domain/entities/reflect/RQuery'
+import type { RStore } from '@/domain/entities/reflect/RStore'
+import type { RStream } from '@/domain/entities/reflect/RStream'
+import type { RStyle } from '@/domain/entities/reflect/RStyle'
+import type { RTenant } from '@/domain/entities/reflect/RTenant'
+import type { RType } from '@/domain/entities/reflect/RType'
+import type { RUpdate } from '@/domain/entities/reflect/RUpdate'
 import type { RVersion } from '@/domain/entities/reflect/RVersion'
+import type { RVocabs } from '@/domain/entities/reflect/RVocabs'
 import type { RComponent } from '@/domain/types/component/component.types'
+import type { DomainDocumentType } from '@/domain/types/document/document.types'
 import type { EndgeDomainBundle, EndgeDomainPlain } from '@/domain/types/document/domain-export.type'
 import type {
   EndgeLiveDomainDocument,
@@ -7,42 +38,20 @@ import type {
 } from '@/domain/types/document/domain-snapshot.type'
 import type { FilterFieldSchema } from '@/domain/types/document/query.types'
 import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
-
 import { Serialize } from '@endge/utils'
-
+import { getDomainDocumentDescriptor } from '@/domain/documents/domain-document-descriptors'
 import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
-import { RAction } from '@/domain/entities/reflect/RAction'
-import { RAuthProfile } from '@/domain/entities/reflect/RAuthProfile'
 import {
   ReflectComponentFromPlain,
   ReflectComponentToPlain,
 } from '@/domain/entities/reflect/RComponent'
-import { RComponentSFC } from '@/domain/entities/reflect/RComponentSFC'
-import { RComposition } from '@/domain/entities/reflect/RComposition'
-import { RComputation } from '@/domain/entities/reflect/RComputation'
-import { RConfiguration } from '@/domain/entities/reflect/RConfiguration'
-import { RConverter } from '@/domain/entities/reflect/RConverter'
-import { RDataView } from '@/domain/entities/reflect/RDataView'
-import { REnvironment } from '@/domain/entities/reflect/REnvironment'
-import { RFilter } from '@/domain/entities/reflect/RFilter'
 import { RFolder } from '@/domain/entities/reflect/RFolder'
-import { RI18nBundle } from '@/domain/entities/reflect/RI18nBundle'
-import { RIntegration } from '@/domain/entities/reflect/RIntegration'
-import { RMock } from '@/domain/entities/reflect/RMock'
-import { RNavigation } from '@/domain/entities/reflect/RNavigation'
-import { RPage } from '@/domain/entities/reflect/RPage'
-import { RPageTemplate } from '@/domain/entities/reflect/RPageTemplate'
-import { RParameter } from '@/domain/entities/reflect/RParameter'
-import { RPolicy } from '@/domain/entities/reflect/RPolicy'
-import { RProject } from '@/domain/entities/reflect/RProject'
-import { RQuery } from '@/domain/entities/reflect/RQuery'
-import { RStore } from '@/domain/entities/reflect/RStore'
-import { RStream } from '@/domain/entities/reflect/RStream'
-import { RStyle } from '@/domain/entities/reflect/RStyle'
-import { RTenant } from '@/domain/entities/reflect/RTenant'
-import { RType } from '@/domain/entities/reflect/RType'
-import { RUpdate } from '@/domain/entities/reflect/RUpdate'
-import { RVocabs } from '@/domain/entities/reflect/RVocabs'
+import {
+  ComponentType,
+  FilterType,
+  ParameterType,
+  QueryType,
+} from '@/domain/types/document/document.types'
 import { DOMAIN_STORAGE_KEY } from '@/model/config/kernel.config'
 import { Endge } from '@/model/kernel/endge'
 import { createDiagnosticsEntityOwner } from '@/model/modules/diagnostics/endge-problems'
@@ -147,6 +156,31 @@ function normalizeBundleFolders(
       folderId: null,
     }
   })
+}
+
+function materializeDomainDocuments<TType extends DomainDocumentType>(
+  source: unknown,
+  resolveType: (record: Record<string, unknown>) => TType,
+  normalize: (record: Record<string, unknown>) => Record<string, unknown> = record => record,
+): DomainDocumentModelMap[TType][] {
+  if (!Array.isArray(source)) {
+    return []
+  }
+  return source.map((value) => {
+    const record = value != null && typeof value === 'object' && !Array.isArray(value)
+      ? value as Record<string, unknown>
+      : {}
+    const type = resolveType(record)
+    return getDomainDocumentDescriptor(type).materialize(normalize(record))
+  })
+}
+
+function materializeDomainDocumentsOfType<TType extends DomainDocumentType>(
+  source: unknown,
+  type: TType,
+  normalize?: (record: Record<string, unknown>) => Record<string, unknown>,
+): DomainDocumentModelMap[TType][] {
+  return materializeDomainDocuments(source, () => type, normalize)
 }
 
 /** Материализует только активные документы; tombstones остаются в repository server state. */
@@ -3512,102 +3546,47 @@ export class EndgeDomain extends EndgeModule {
       folders: [],
     }
 
-    if (json.parameters && Array.isArray(json.parameters)) {
-      json.parameters.forEach((p: any) => out.parameters.push(RParameter.fromPlain(p)))
-    }
-    if (json.filters && Array.isArray(json.filters)) {
-      json.filters.forEach((f: any) => out.filters.push(RFilter.fromPlain(f)))
-    }
-
-    const projectsRaw = json.projects ?? json._projectsByIdentity
-    if (Array.isArray(projectsRaw)) {
-      projectsRaw.forEach((projectJson: any) => out.projects.push(Serialize.fromJSON(RProject, projectJson)))
-    }
-    if (json.types && Array.isArray(json.types)) {
-      json.types.forEach((typeJson: any) => out.types.push(Serialize.fromJSON(RType, typeJson)))
-    }
-    if (json.queries && Array.isArray(json.queries)) {
-      json.queries.forEach((queryJson: any) => {
-        const query = Serialize.fromJSON(RQuery, queryJson)
-        out.queries.push(query)
-      })
-    }
-    if (json.dataViews && Array.isArray(json.dataViews)) {
-      json.dataViews.forEach((dataViewJson: any) => {
-        out.dataViews.push(Serialize.fromJSON(RDataView, dataViewJson))
-      })
-    }
-    if (json.compositions && Array.isArray(json.compositions)) {
-      json.compositions.forEach((compositionJson: any) => {
-        out.compositions.push(RComposition.fromPlain(compositionJson))
-      })
-    }
-    if (json.stores && Array.isArray(json.stores)) {
-      json.stores.forEach((storeJson: any) => {
-        out.stores.push(Serialize.fromJSON(RStore, storeJson))
-      })
-    }
-    if (json.streams && Array.isArray(json.streams)) {
-      json.streams.forEach((streamJson: any) => {
-        out.streams.push(Serialize.fromJSON(RStream, streamJson))
-      })
-    }
-    if (json.updates && Array.isArray(json.updates)) {
-      json.updates.forEach((updateJson: any) => {
-        out.updates.push(Serialize.fromJSON(RUpdate, updateJson))
-      })
-    }
-    if (json.mocks && Array.isArray(json.mocks)) {
-      json.mocks.forEach((mockJson: any) => out.mocks.push(RMock.fromPlain(mockJson)))
-    }
-    if (json.computations && Array.isArray(json.computations)) {
-      json.computations.forEach((computationJson: any) => out.computations.push(RComputation.fromPlain(computationJson)))
-    }
-    if (json.actions && Array.isArray(json.actions)) {
-      json.actions.forEach((actionJson: any) => out.actions.push(Serialize.fromJSON(RAction, actionJson)))
-    }
-    if (json.converters && Array.isArray(json.converters)) {
-      json.converters.forEach((converterJson: any) => out.converters.push(Serialize.fromJSON(RConverter, converterJson)))
-    }
-    if (json.integrations && Array.isArray(json.integrations)) {
-      json.integrations.forEach((integrationJson: any) => out.integrations.push(Serialize.fromJSON(RIntegration, integrationJson)))
-    }
-    if (json.environments && Array.isArray(json.environments)) {
-      json.environments.forEach((envJson: any) => out.environments.push(Serialize.fromJSON(REnvironment, envJson)))
-    }
-    if (json.tenants && Array.isArray(json.tenants)) {
-      json.tenants.forEach((tenantJson: any) => out.tenants.push(Serialize.fromJSON(RTenant, tenantJson)))
-    }
-    if (json.policies && Array.isArray(json.policies)) {
-      json.policies.forEach((policyJson: any) => out.policies.push(Serialize.fromJSON(RPolicy, policyJson)))
-    }
-    if (json.styles && Array.isArray(json.styles)) {
-      json.styles.forEach((styleJson: any) => out.styles.push(RStyle.fromPlain(styleJson)))
-    }
-    if (json.configurations && Array.isArray(json.configurations)) {
-      json.configurations.forEach((configurationJson: any) => out.configurations.push(RConfiguration.fromPlain(configurationJson)))
-    }
-    if (json.vocabs && Array.isArray(json.vocabs)) {
-      json.vocabs.forEach((vocabJson: any) => out.vocabs.push(Serialize.fromJSON(RVocabs, vocabJson)))
-    }
-    if (json.authProfiles && Array.isArray(json.authProfiles)) {
-      json.authProfiles.forEach((profileJson: any) => out.authProfiles.push(RAuthProfile.fromPlain(profileJson)))
-    }
-    if (json.i18nBundles && Array.isArray(json.i18nBundles)) {
-      json.i18nBundles.forEach((bundleJson: any) => out.i18nBundles.push(Serialize.fromJSON(RI18nBundle, bundleJson)))
-    }
-    if (json.pageTemplates && Array.isArray(json.pageTemplates)) {
-      json.pageTemplates.forEach((tplJson: any) => out.pageTemplates.push(Serialize.fromJSON(RPageTemplate, tplJson)))
-    }
-    if (json.pages && Array.isArray(json.pages)) {
-      json.pages.forEach((pageJson: any) => {
-        const normalized = EndgeDomain._normalizePageBlocksFromPayload(pageJson)
-        out.pages.push(Serialize.fromJSON(RPage, normalized))
-      })
-    }
-    if (json.navigations && Array.isArray(json.navigations)) {
-      json.navigations.forEach((navJson: any) => out.navigations.push(Serialize.fromJSON(RNavigation, navJson)))
-    }
+    out.parameters.push(...materializeDomainDocumentsOfType(json.parameters, ParameterType.DefaultParameter))
+    out.filters.push(...materializeDomainDocumentsOfType(json.filters, FilterType.DefaultFilter))
+    out.projects.push(...materializeDomainDocumentsOfType(json.projects ?? json._projectsByIdentity, 'project'))
+    out.types.push(...materializeDomainDocuments(
+      json.types,
+      record => record.isPrimitive === true ? 'primitive' : 'type',
+    ))
+    out.queries.push(...materializeDomainDocuments(
+      json.queries,
+      (record) => {
+        const type = record.type
+        return type === QueryType.Custom || type === QueryType.GraphQL || type === QueryType.REST
+          ? type
+          : QueryType.REST
+      },
+    ))
+    out.dataViews.push(...materializeDomainDocumentsOfType(json.dataViews, 'data-view'))
+    out.compositions.push(...materializeDomainDocumentsOfType(json.compositions, 'composition'))
+    out.stores.push(...materializeDomainDocumentsOfType(json.stores, 'store'))
+    out.streams.push(...materializeDomainDocumentsOfType(json.streams, 'stream'))
+    out.updates.push(...materializeDomainDocumentsOfType(json.updates, 'update'))
+    out.mocks.push(...materializeDomainDocumentsOfType(json.mocks, 'mock'))
+    out.computations.push(...materializeDomainDocumentsOfType(json.computations, 'computation'))
+    out.actions.push(...materializeDomainDocumentsOfType(json.actions, 'action'))
+    out.converters.push(...materializeDomainDocumentsOfType(json.converters, 'converter'))
+    out.integrations.push(...materializeDomainDocumentsOfType(json.integrations, 'integration'))
+    out.environments.push(...materializeDomainDocumentsOfType(json.environments, 'environment'))
+    out.tenants.push(...materializeDomainDocumentsOfType(json.tenants, 'tenant'))
+    out.policies.push(...materializeDomainDocumentsOfType(json.policies, 'policy'))
+    out.styles.push(...materializeDomainDocumentsOfType(json.styles, 'style'))
+    out.configurations.push(...materializeDomainDocumentsOfType(json.configurations, 'configuration'))
+    out.vocabs.push(...materializeDomainDocumentsOfType(json.vocabs, 'vocabs'))
+    out.authProfiles.push(...materializeDomainDocumentsOfType(json.authProfiles, 'auth-profile'))
+    out.i18nBundles.push(...materializeDomainDocumentsOfType(json.i18nBundles, 'i18n-bundles'))
+    out.pageTemplates.push(...materializeDomainDocumentsOfType(json.pageTemplates, 'page-template'))
+    out.pages.push(...materializeDomainDocumentsOfType(
+      json.pages,
+      'page',
+      record => EndgeDomain._normalizePageBlocksFromPayload(record),
+    ))
+    out.navigations.push(...materializeDomainDocumentsOfType(json.navigations, 'navigation'))
     if (json.components && Array.isArray(json.components)) {
       json.components.forEach((componentJson: any) => {
         const component = ReflectComponentFromPlain(componentJson)
@@ -3616,9 +3595,7 @@ export class EndgeDomain extends EndgeModule {
         }
       })
     }
-    if (json.componentSFCs && Array.isArray(json.componentSFCs)) {
-      json.componentSFCs.forEach((componentJson: any) => out.componentSFCs.push(RComponentSFC.fromPlain(componentJson)))
-    }
+    out.componentSFCs.push(...materializeDomainDocumentsOfType(json.componentSFCs, ComponentType.SFC))
     if (json.folders && Array.isArray(json.folders)) {
       json.folders.forEach((folderJson: any) => out.folders.push(Serialize.fromJSON(RFolder, folderJson)))
     }
