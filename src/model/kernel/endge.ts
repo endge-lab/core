@@ -32,6 +32,7 @@ import { EndgeFederation } from '@/domain/entities/endge/EndgeFederation'
 import { setEndgeFederationStorageAdapter } from '@/domain/entities/endge/EndgeFederationStorage'
 import { ENDGE_CORE_MODULES } from '@/model/config/modules.config'
 import { LocalStorageContextAdapter } from '@/model/modules/context/persistence/adapters/LocalStorageContextAdapter'
+import { DomainSnapshotCodec } from '@/model/services/document/DomainSnapshotCodec'
 
 setEndgeFederationStorageAdapter(new LocalStorageContextAdapter())
 
@@ -41,6 +42,7 @@ setEndgeFederationStorageAdapter(new LocalStorageContextAdapter())
  */
 export class Endge extends EndgeFederation {
   protected static override readonly federationId = 'endge'
+  private static readonly _domainSnapshot = new DomainSnapshotCodec()
 
   /**
    * Запрещает создание экземпляров `Endge`.
@@ -86,6 +88,11 @@ export class Endge extends EndgeFederation {
    */
   static get domain(): EndgeDomain {
     return this.getModule<EndgeDomain>('domain')
+  }
+
+  /** Доступ к чистому codec локального Domain snapshot. */
+  public static get domainSnapshot(): DomainSnapshotCodec {
+    return this._domainSnapshot
   }
 
   /** Доступ к effective registry встроенных и пользовательских типов. */
