@@ -52,7 +52,6 @@ import {
   ParameterType,
   QueryType,
 } from '@/domain/types/document/document.types'
-import { DOMAIN_STORAGE_KEY } from '@/model/config/kernel.config'
 import { Endge } from '@/model/kernel/endge'
 import { createDiagnosticsEntityOwner } from '@/model/modules/diagnostics/endge-problems'
 import { ResolvedEntityIndex } from '@/model/modules/domain/resolved/resolved-entity-index'
@@ -3401,21 +3400,6 @@ export class EndgeDomain extends EndgeModule {
    */
   hasVersion(identity: string): boolean {
     return this.hasVersionByIdentity(identity)
-  }
-
-  /**
-   * Сохранить текущее состояние в localStorage.
-   */
-  public save(): void {
-    try {
-      localStorage.setItem(
-        DOMAIN_STORAGE_KEY,
-        JSON.stringify(this.toPlain()),
-      )
-    }
-    catch (e) {
-      console.error(`[EndgeDomain] Не удалось сохранить состояние: ${e instanceof Error ? e.message : String(e)}`)
-    }
   }
 
   /**

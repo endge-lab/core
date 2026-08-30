@@ -1,4 +1,3 @@
-import type { DomainDocumentType, DomainSectionType } from './document.types'
 import type { EndgeWorkspaceDefinition } from '@/domain/types/document/workspace.types'
 
 /** Workspace-конфигурация не содержит credential material. */
@@ -82,12 +81,4 @@ export interface EndgeDomainBundle {
   workspace: EndgePortableWorkspace
   installedIntegrations: EndgeInstalledIntegrationExport[]
   documents: EndgePortableDocuments
-}
-
-/** Ссылка на выбранный документ с типом коллекции, в которой локален его id. */
-export interface EndgeDomainSelection {
-  id: string | number
-  identity?: string
-  sectionType: DomainSectionType
-  docType: DomainDocumentType
 }

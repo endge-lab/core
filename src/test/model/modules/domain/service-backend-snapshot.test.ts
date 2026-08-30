@@ -11,7 +11,6 @@ import type {
 } from '@/model/modules/domain/endge-domain-repository'
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ENDGE_DOMAIN_BUNDLE_VERSION } from '@/model/config/domain.config'
 import { Endge } from '@/model/kernel/endge'
 import { EndgeDomain } from '@/model/modules/domain/endge-domain'
 import {
@@ -80,7 +79,7 @@ function liveSnapshot(): EndgeLiveDomainSnapshot {
 
   return {
     kind: 'workspace-snapshot',
-    schemaVersion: ENDGE_DOMAIN_BUNDLE_VERSION,
+    schemaVersion: 1,
     workspace: {
       identity: 'workspace-a',
       displayName: 'Workspace A',

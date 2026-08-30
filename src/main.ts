@@ -40,7 +40,6 @@ export * from '@/model/modules/runtime/core/endge-actions'
 export * from '@/model/modules/ui/endge-ui'
 export * from '@/model/modules/ui/endge-ui-registry'
 export * from '@/model/modules/ui/endge-styles'
-export * from '@/model/config/domain.config'
 export * from '@/domain/entities/diagnostics/DiagnosticsRecordStore'
 export * from '@/domain/entities/diagnostics/DiagnosticsSpan'
 

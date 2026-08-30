@@ -33,7 +33,6 @@ export const LEGACY_TIMEZONE_STORAGE_KEY = 'endge:isLocalTime'
 /** Built-in mock providers. Application-owned providers are registered at boot. */
 export const ENDGE_CORE_MOCK_PROVIDERS: EndgeMockProvider[] = []
 
-export const DOMAIN_STORAGE_KEY = 'endge:domain'
 export const VARS_STORAGE_KEY = 'endge:vars'
 export const AUTH_STORAGE_KEY = 'endge:auth'
 
@@ -45,7 +44,6 @@ export const ENDGE_KEYBOARD_CONTEXT_RAPH_PATH = `${ENDGE_CONTEXT_RAPH_PATH}.inpu
 
 /** Обратная совместимость публичного API `Config`. */
 export default {
-  DOMAIN_STORAGE_KEY,
   VARS_STORAGE_KEY,
   AUTH_STORAGE_KEY,
   STORAGE_VARS_KEY,
