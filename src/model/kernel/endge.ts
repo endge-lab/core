@@ -42,7 +42,7 @@ setEndgeFederationStorageAdapter(new LocalStorageContextAdapter())
  */
 export class Endge extends EndgeFederation {
   protected static override readonly federationId = 'endge'
-  private static readonly _domainSnapshot = new DomainSnapshotCodec()
+  private static _domainSnapshot: DomainSnapshotCodec | null = null
 
   /**
    * Запрещает создание экземпляров `Endge`.
@@ -92,6 +92,7 @@ export class Endge extends EndgeFederation {
 
   /** Доступ к чистому codec локального Domain snapshot. */
   public static get domainSnapshot(): DomainSnapshotCodec {
+    this._domainSnapshot ??= new DomainSnapshotCodec(snapshot => this.domain.materializeSnapshot(snapshot))
     return this._domainSnapshot
   }
 

@@ -1,9 +1,15 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { RDataView } from '@/domain/entities/reflect/RDataView'
 import { DATA_VIEW_DEFAULT_SOURCE } from '@/domain/source/templates/data-view.default.source'
+import { Endge } from '@/model/kernel/endge'
 import { EndgeDataView } from '@/model/modules/runtime/execution/endge-data-view'
 
 const dataView = new EndgeDataView()
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 const INPUT = {
   legs: [
@@ -356,6 +362,21 @@ defineDataView({
     })).toThrow('mode "manual" временно отключён')
 
     expect(convert).not.toHaveBeenCalled()
+  })
+})
+
+describe('endgeDataView artifact ownership', () => {
+  /** Проверяет запрет локальной компиляции persisted DataView во время runtime. */
+  it('отклоняет выполнение без artifact общего build pipeline', () => {
+    const model = new RDataView()
+    model.id = 501
+    model.identity = 'schedule-view'
+    const resolveArtifact = vi.spyOn(Endge.program, 'getDataViewArtifact').mockReturnValue(null)
+    const compile = vi.spyOn(Endge.compiler, 'buildDataView')
+
+    expect(() => dataView.run(model, [])).toThrow('Run the compiler build before runtime execution')
+    expect(resolveArtifact).toHaveBeenCalledWith(501)
+    expect(compile).not.toHaveBeenCalled()
   })
 })
 

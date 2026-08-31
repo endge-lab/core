@@ -12,6 +12,16 @@ import { Endge } from '@/model/kernel/endge'
 import { compileDataViewSource } from '@/model/services/source-engine/compilers/data-view-source-compile'
 import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
 
+/** Сообщает, что persisted DataView не прошёл общий build pipeline. */
+export class DataViewArtifactUnavailableError extends Error {
+  public readonly code = 'data_view_artifact_unavailable'
+
+  public constructor(identity: string) {
+    super(`DataView artifact is unavailable for "${identity}". Run the compiler build before runtime execution.`)
+    this.name = 'DataViewArtifactUnavailableError'
+  }
+}
+
 /** Модуль выполнения скомпилированных RDataView artifacts. */
 export class EndgeDataView {
   /** Выполняет DataView по id/identity/model над переданным input object. */
@@ -172,10 +182,12 @@ export class EndgeDataView {
     return dataView
   }
 
-  /** Возвращает compiled artifact, компилируя DataView локально при необходимости. */
+  /** Возвращает только artifact, подготовленный общим compiler build. */
   private _resolveArtifact(dataView: RDataView): ProgramArtifact<DataViewProgramPayload> {
     const artifact = Endge.program.getDataViewArtifact(dataView.id ?? dataView.identity)
-      ?? Endge.compiler.buildDataView(dataView)
+    if (!artifact) {
+      throw new DataViewArtifactUnavailableError(dataView.identity)
+    }
     if (artifact.status === 'error') {
       const message = artifact.diagnostics[0]?.message ?? `DataView artifact has compile errors for "${dataView.identity}".`
       throw new Error(message)

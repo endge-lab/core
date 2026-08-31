@@ -273,7 +273,7 @@ describe('dataView nested DataView pipeline', () => {
   })
 
   it('runs external DataView from from(...).dataView(...).as(...)', () => {
-    Endge.domain.addDataView(createDataView('normalizeFlight', `
+    const nestedDataView = createDataView('normalizeFlight', `
 defineDataView({
   mode: 'pipeline',
   steps: [
@@ -284,7 +284,9 @@ defineDataView({
     }),
   ],
 })
-`))
+`)
+    Endge.domain.addDataView(nestedDataView)
+    Endge.compiler.buildDataView(nestedDataView)
 
     const output = new EndgeDataView().runSource(`
 defineDataView({

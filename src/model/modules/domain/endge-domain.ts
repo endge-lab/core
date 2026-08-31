@@ -3630,6 +3630,11 @@ export class EndgeDomain extends EndgeModule {
     return domain
   }
 
+  /** Материализует независимый Domain для Core snapshot codec. */
+  public materializeSnapshot(snapshot: EndgeDomainPlain): EndgeDomain {
+    return EndgeDomain.fromPlain(snapshot)
+  }
+
   //
   // Инструменты
   //

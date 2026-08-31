@@ -28,7 +28,7 @@ describe('domain snapshot codec', () => {
 
   /** Проверяет сохранение правила исключения временных сущностей из snapshot. */
   it('не переносит временные сущности', () => {
-    const codec = new DomainSnapshotCodec()
+    const codec = new DomainSnapshotCodec(snapshot => EndgeDomain.fromPlain(snapshot))
     const source = new EndgeDomain()
     const temporary = RProject.fromPlain({
       id: 102,
