@@ -57,12 +57,25 @@ export class EndgeActions extends Subscribable {
   private readonly _codeActionDisposers = new Map<string, () => void>()
   private readonly _providerDisposers: Array<() => void> = []
   private _hasSynchronizedResolvedIndex = false
-  private readonly _sourceExecutor = new ActionProgramExecutor()
+  private readonly _sourceExecutor: ActionProgramExecutor
 
   public constructor(
     private readonly _implementations: EndgeImplementations,
   ) {
     super()
+    this._sourceExecutor = new ActionProgramExecutor({
+      resolveQuery: identity => Endge.domain.getQuery(identity),
+      runQuery: async (query, input, parent) => await Endge.runtime.query.run(query, input, parent),
+      executeAction: async (identity, input, parentRuntimeId) => await this.execute(identity, {
+        input,
+        context: { parentRuntimeId },
+      }),
+      runComputation: async (identity, input) => await Endge.runtime.computation.run(identity, input),
+      executeSandbox: async request => await Endge.runtime.computation.executeSandbox(request),
+      resolveOperationHistory: parent => Endge.runtime.operations.resolveForHost(parent),
+      runDataView: (identity, input, props) => Endge.runtime.dataView.run(identity, input, undefined, { props }),
+      executeConverter: (identity, input, options) => Endge.converters.execute(identity, input, options),
+    })
     this.reset()
   }
 

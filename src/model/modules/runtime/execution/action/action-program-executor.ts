@@ -1,10 +1,23 @@
+import type { RQuery } from '@/domain/entities/reflect/RQuery'
+import type { ComputationSandboxRequest } from '@/domain/types/computation/computation-runtime.types'
 import type { ActionProgramPayload } from '@/domain/types/program/action-program.types'
 import type { RuntimeHost } from '@/domain/types/runtime/runtime-host.types'
 import type { ActionSourceBlock, ActionSourceOperationStep, ActionSourceStep } from '@/domain/types/source/action-source.types'
 import type { SourceExpressionIR } from '@/domain/types/source/source-expression.types'
-import { Endge } from '@/model/kernel/endge'
+import type { OperationHistory } from '@/model/modules/runtime/operation/operation-history'
 import { executeRuntimeOperation } from '@/model/modules/runtime/operation/operation-executor'
 import { evaluateSourceExpression } from '@/model/services/source-engine/source-expression-evaluate'
+
+export interface ActionProgramExecutorDependencies {
+  resolveQuery: (identity: string) => RQuery | null
+  runQuery: (query: RQuery, input: Record<string, unknown>, parent: RuntimeHost<any, any> | null) => Promise<unknown>
+  executeAction: (identity: string, input: unknown, parentRuntimeId?: string) => Promise<unknown>
+  runComputation: (identity: string, input: unknown) => Promise<unknown>
+  executeSandbox: (request: ComputationSandboxRequest) => Promise<unknown>
+  resolveOperationHistory: (parent: RuntimeHost<any, any> | null) => OperationHistory | null
+  runDataView: (identity: string, input: unknown, props?: Record<string, unknown>) => unknown
+  executeConverter: (identity: string, input: unknown, options?: Record<string, unknown>) => unknown
+}
 
 interface ExecutionContext {
   input: unknown
@@ -15,6 +28,8 @@ interface ExecutionContext {
 
 /** Executes compiler-produced Action IR without interpreting Source. */
 export class ActionProgramExecutor {
+  public constructor(private readonly _dependencies: ActionProgramExecutorDependencies) {}
+
   public async run(payload: ActionProgramPayload, input: unknown, parent: RuntimeHost<any, any> | null): Promise<unknown> {
     if (!payload.sourceDocument) {
       throw new Error('Action artifact has no executable source document.')
@@ -34,12 +49,12 @@ export class ActionProgramExecutor {
       return this._evaluate(step.expression, context)
     }
     if (step.kind === 'query') {
-      const query = Endge.domain.getQuery(step.identity)
+      const query = this._dependencies.resolveQuery(step.identity)
       if (!query) {
         throw new Error(`Action Query is missing: ${step.identity}.`)
       }
       const input = this._requireObject(this._evaluate(step.input, context), `Query ${step.identity}`)
-      const host = await Endge.runtime.query.run(query, input, context.parent)
+      const host = await this._dependencies.runQuery(query, input, context.parent)
       return host
     }
     if (step.kind === 'update') {
@@ -52,17 +67,14 @@ export class ActionProgramExecutor {
       return input
     }
     if (step.kind === 'action') {
-      return await Endge.actions.execute(step.identity, {
-        input: this._evaluate(step.input, context),
-        context: { parentRuntimeId: context.parent?.id },
-      })
+      return await this._dependencies.executeAction(step.identity, this._evaluate(step.input, context), context.parent?.id)
     }
     if (step.kind === 'computation') {
-      return await Endge.runtime.computation.run(step.identity, this._evaluate(step.input, context))
+      return await this._dependencies.runComputation(step.identity, this._evaluate(step.input, context))
     }
     if (step.kind === 'typescript') {
       const inputs = Object.fromEntries(Object.entries(step.inputs).map(([name, expression]) => [name, this._evaluate(expression, context)]))
-      return await Endge.runtime.computation.executeSandbox({
+      return await this._dependencies.executeSandbox({
         computationIdentity: 'action',
         outputName: step.name,
         moduleKey: step.moduleKey,
@@ -77,7 +89,7 @@ export class ActionProgramExecutor {
   }
 
   private async _runOperation(step: ActionSourceOperationStep, outer: ExecutionContext): Promise<unknown> {
-    const history = Endge.runtime.operations.resolveForHost(outer.parent)
+    const history = this._dependencies.resolveOperationHistory(outer.parent)
     return await executeRuntimeOperation({
       id: `${step.name}:${Date.now()}`,
       input: step.input ? this._evaluate(step.input, outer) : outer.input,
@@ -111,8 +123,8 @@ export class ActionProgramExecutor {
       scope: context.input,
       read: read => read.source === 'computation-output' ? context.outputs.get(read.path) : undefined,
       transform: (transform, value, options) => transform.transform === 'data-view'
-        ? Endge.runtime.dataView.run(transform.identity, value, undefined, { props: this._optionalObject(options) })
-        : Endge.converters.execute(transform.identity, value, this._optionalObject(options)),
+        ? this._dependencies.runDataView(transform.identity, value, this._optionalObject(options))
+        : this._dependencies.executeConverter(transform.identity, value, this._optionalObject(options)),
     })
   }
 
