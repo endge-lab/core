@@ -1,9 +1,9 @@
 import type { AxiosInstance } from 'axios'
-import type { QueryExecutorDependencies } from '@/model/adapters/query/QueryExecutor_Adapter'
+import type { QueryExecutorDependencies } from '@/modules/runtime/adapters/QueryExecutor_Adapter'
 
 import axios from 'axios'
 
-import { QueryExecutor_Adapter } from '@/model/adapters/query/QueryExecutor_Adapter'
+import { QueryExecutor_Adapter } from '@/modules/runtime/adapters/QueryExecutor_Adapter'
 
 /** Создаёт Query executor с изолированными test dependencies. */
 export function createQueryExecutor(

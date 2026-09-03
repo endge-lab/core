@@ -1,0 +1,89 @@
+import type { DocumentNode, ObjectTypeDefinitionNode } from 'graphql'
+import type { TypeSourceField } from '@/modules/source/domain/types/type-source.types'
+import { parse, visit } from 'graphql'
+import { RType } from '@/modules/domain/entities/RType'
+import { serializeTypeSourceDocument } from '@/modules/source/services/type-source-serialize'
+
+/**
+ * Вспомогательная утилита для парсинга GraphQL-схемы в объектную структуру домена.
+ * На вход подаем просто строку с GraphQL-схемой.
+ */
+export function parseGraphQLSchema(schema: string): RType[] {
+  const document: DocumentNode = parse(schema)
+
+  const typeMap = new Map<string, RType>()
+
+  visit(document, {
+    ObjectTypeDefinition(node: ObjectTypeDefinitionNode) {
+      const name = node.name.value
+
+      // Query source v2 currently supports REST only; GraphQL schema import keeps types.
+      if (name === 'Query') {
+        return
+      }
+
+      if (['Mutation', 'Subscription', 'Query'].includes(name)) {
+        return
+      }
+
+      const sourceFields: TypeSourceField[] = []
+      for (const field of node.fields || []) {
+        const { typeStr, isArray, optional } = resolveFieldTypeWithMeta(field.type)
+        sourceFields.push({
+          key: field.name.value,
+          type: { kind: 'reference', identity: typeStr },
+          optional,
+          array: isArray,
+          description: field.description?.value,
+          examples: [],
+        })
+      }
+
+      const rType = new RType(name)
+      rType.sourceVersion = 1
+      rType.source = serializeTypeSourceDocument({ definition: { kind: 'object', fields: sourceFields } })
+      typeMap.set(name, rType)
+    },
+  })
+
+  return [...typeMap.values()]
+}
+
+function resolveFieldTypeWithMeta(type: any): {
+  typeStr: string
+  isArray: boolean
+  optional: boolean
+} {
+  let isArray = false
+  const optional = type?.kind !== 'NonNullType'
+
+  function unwrap(t: any): string {
+    if (t.kind === 'NonNullType') {
+      return unwrap(t.type)
+    }
+    if (t.kind === 'ListType') {
+      isArray = true
+      return unwrap(t.type)
+    }
+    if (t.kind === 'NamedType') {
+      return resolveGraphQlNamedType(t.name.value)
+    }
+    return 'Any'
+  }
+
+  return {
+    typeStr: unwrap(type),
+    isArray,
+    optional,
+  }
+}
+
+function resolveGraphQlNamedType(value: string): string {
+  if (value === 'Int' || value === 'Float') {
+    return 'Number'
+  }
+  if (value === 'String' || value === 'Boolean' || value === 'ID') {
+    return value
+  }
+  return value
+}

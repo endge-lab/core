@@ -1,12 +1,12 @@
-import type { ComponentSFCInteractionTriggerEvent } from '@/domain/types/component/sfc/ir.types'
+import type { ComponentSFCInteractionTriggerEvent } from '@/modules/domain/types/component/sfc/ir.types'
 
 import { bench, describe } from 'vitest'
-import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
-import { ComponentSFCEventBoundary } from '@/model/runtime/ComponentSFCEventBoundary'
 import {
   matchesComponentSFCInteractionTrigger,
   normalizeComponentSFCInteractionTriggers,
-} from '@/tools/component-sfc-edit-trigger'
+} from '@/modules/domain/component/component-sfc-edit-trigger'
+import { createEmptyComponentSFCPortManifest } from '@/modules/domain/types/component/sfc/ports.types'
+import { ComponentSFCEventBoundary } from '@/modules/runtime/ComponentSFCEventBoundary'
 
 const occurrence: ComponentSFCInteractionTriggerEvent = {
   key: 'e',

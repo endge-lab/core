@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { listComponentSFCEventCapableTags } from '@/domain/types/component/sfc/intrinsic-events.types'
-import { createEmptyComponentSFCPortManifest } from '@/domain/types/component/sfc/ports.types'
-import { ComponentSFCEventBoundary } from '@/model/runtime/ComponentSFCEventBoundary'
-import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
+import { compileComponentSFC } from '@/modules/compiler/services/component-sfc/component-sfc-compile'
+import { listComponentSFCEventCapableTags } from '@/modules/domain/types/component/sfc/intrinsic-events.types'
+import { createEmptyComponentSFCPortManifest } from '@/modules/domain/types/component/sfc/ports.types'
+import { ComponentSFCEventBoundary } from '@/modules/runtime/ComponentSFCEventBoundary'
 
 describe('component SFC :on interactions', () => {
   it('resolves a required Query reaction through the mounted instance binding', async () => {

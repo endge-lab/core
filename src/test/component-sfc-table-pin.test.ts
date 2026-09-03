@@ -1,8 +1,8 @@
-import type { RComponentSFC_IR_ElementNode } from '@/domain/types/component/sfc/ir.types'
+import type { RComponentSFC_IR_ElementNode } from '@/modules/domain/types/component/sfc/ir.types'
 
 import { describe, expect, it } from 'vitest'
-import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
-import { normalizeComponentSFCTableColumnPin } from '@/model/services/compiler/component-sfc/component-sfc-table-pin'
+import { compileComponentSFC } from '@/modules/compiler/services/component-sfc/component-sfc-compile'
+import { normalizeComponentSFCTableColumnPin } from '@/modules/compiler/services/component-sfc/component-sfc-table-pin'
 
 describe('component SFC table column pinning', () => {
   it('parses table-level default-pin state', () => {

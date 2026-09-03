@@ -1,8 +1,8 @@
-import type { RComponentSFC_IR_ElementNode } from '@/domain/types/component/sfc/ir.types'
+import type { RComponentSFC_IR_ElementNode } from '@/modules/domain/types/component/sfc/ir.types'
 
 import { describe, expect, it } from 'vitest'
-import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
-import { normalizeComponentSFCTableSort } from '@/model/services/compiler/component-sfc/component-sfc-table-sort'
+import { compileComponentSFC } from '@/modules/compiler/services/component-sfc/component-sfc-compile'
+import { normalizeComponentSFCTableSort } from '@/modules/compiler/services/component-sfc/component-sfc-table-sort'
 
 describe('component SFC table sorting', () => {
   it('uses natural comparator for sortable columns without explicit sort', () => {
