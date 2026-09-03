@@ -50,7 +50,7 @@ const LEGACY_STORAGE_ADAPTER = new LocalStorageContextAdapter()
  * Контекст выполнения Endge: текущий workspace/project/environment/user scope
  * и координатор persistence-инфраструктуры приложения.
  */
-export class EndgeContext extends EndgeModule {
+export class EndgeContext_Module extends EndgeModule {
   private readonly _adapters = new EndgeStorageAdapterRegistry()
   private readonly _runtimeControllers = new Map<string, RuntimeStateController>()
 
@@ -106,7 +106,7 @@ export class EndgeContext extends EndgeModule {
   }
 
   /** Показывает, выполняется ли восстановление контекста из storage. */
-  get isLoadingFromStorage(): boolean {
+  public get isLoadingFromStorage(): boolean {
     return this._isHydrating
   }
 
@@ -132,7 +132,7 @@ export class EndgeContext extends EndgeModule {
   }
 
   /** Показывает, что Tenant принудительно задан authenticated session provider. */
-  get isTenantLockedBySession(): boolean {
+  public get isTenantLockedBySession(): boolean {
     return normalizeOptionalText(this._sessionProvider?.getCurrentIdentity()?.tenantId) != null
   }
 
@@ -433,17 +433,17 @@ export class EndgeContext extends EndgeModule {
   }
 
   /** Returns the current data execution mode for Store fixtures and external Query runs. */
-  get dataMode(): EndgeDataMode {
+  public get dataMode(): EndgeDataMode {
     return this._dataModeOverride ?? this._workspaceDataMode
   }
 
   /** Shows whether runtime consumers should resolve persisted RMock fixtures. */
-  get isMockEnabled(): boolean {
+  public get isMockEnabled(): boolean {
     return this.dataMode === 'mock'
   }
 
   /** Shows whether the effective mode comes from a local runtime override. */
-  get isDataModeOverridden(): boolean {
+  public get isDataModeOverridden(): boolean {
     return this._dataModeOverride != null
   }
 

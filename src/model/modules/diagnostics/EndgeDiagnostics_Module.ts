@@ -26,22 +26,22 @@ import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { CONSOLE_DIAGNOSTICS_ADAPTER_FACTORY } from '@/model/adapters/diagnostics/ConsoleDiagnosticsAdapter'
 import { DiagnosticsAdapterRegistry } from '@/model/adapters/diagnostics/DiagnosticsAdapterRegistry'
 import { SENTRY_DIAGNOSTICS_ADAPTER_FACTORY } from '@/model/adapters/diagnostics/SentryDiagnosticsAdapter'
-import { EndgeProblems } from '@/model/modules/diagnostics/endge-problems'
-import { EndgeTelemetry } from '@/model/modules/diagnostics/endge-telemetry'
+import { EndgeProblems_Module } from '@/model/modules/diagnostics/EndgeProblems_Module'
+import { EndgeTelemetry_Module } from '@/model/modules/diagnostics/EndgeTelemetry_Module'
 
 /**
  * Родительский diagnostics-модуль ядра.
  * Объединяет append-only telemetry history и replaceable registry актуальных problems.
  */
-export class EndgeDiagnostics extends EndgeModule {
+export class EndgeDiagnostics_Module extends EndgeModule {
   /** Registry системных и внешних adapter factories. */
   public readonly adapters: DiagnosticsAdapterRegistry
 
   /** Подмодуль logs, traces, adapters и external delivery. */
-  public readonly telemetry: EndgeTelemetry
+  public readonly telemetry: EndgeTelemetry_Module
 
   /** Подмодуль актуальных authoring/build/runtime problems. */
-  public readonly problems: EndgeProblems
+  public readonly problems: EndgeProblems_Module
 
   /** Состояние automatic snapshot policy и её внутренней подписки. */
   private _automaticErrorTimestamps: number[] = []
@@ -60,8 +60,8 @@ export class EndgeDiagnostics extends EndgeModule {
     this.adapters = new DiagnosticsAdapterRegistry()
     this.adapters.register(CONSOLE_DIAGNOSTICS_ADAPTER_FACTORY)
     this.adapters.register(SENTRY_DIAGNOSTICS_ADAPTER_FACTORY)
-    this.telemetry = new EndgeTelemetry(this.adapters)
-    this.problems = new EndgeProblems()
+    this.telemetry = new EndgeTelemetry_Module(this.adapters)
+    this.problems = new EndgeProblems_Module()
     this.telemetry.subscribe(() => this.notify())
     this.problems.subscribe(() => this.notify())
     this._subscribeAutomaticSnapshots()
@@ -153,7 +153,7 @@ export class EndgeDiagnostics extends EndgeModule {
   }
 
   /** Завершает span, созданный через низкоуровневый DiagnosticsSpanOwner contract. */
-  public finishSpan(input: Parameters<EndgeTelemetry['finishSpan']>[0]): DiagnosticsSpanRecord | null {
+  public finishSpan(input: Parameters<EndgeTelemetry_Module['finishSpan']>[0]): DiagnosticsSpanRecord | null {
     return this.telemetry.finishSpan(input)
   }
 
@@ -207,7 +207,7 @@ export class EndgeDiagnostics extends EndgeModule {
   }
 
   /** Возвращает telemetry counters текущей session. */
-  public getCounters(): ReturnType<EndgeTelemetry['getCounters']> {
+  public getCounters(): ReturnType<EndgeTelemetry_Module['getCounters']> {
     return this.telemetry.getCounters()
   }
 

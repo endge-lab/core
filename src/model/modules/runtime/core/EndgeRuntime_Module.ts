@@ -39,7 +39,7 @@ import { StoreRuntimeStrategy } from '@/model/services/runtime/strategies/StoreR
 import { StreamRuntimeStrategy } from '@/model/services/runtime/strategies/StreamRuntimeStrategy'
 
 /** Модуль создания, регистрации и уничтожения runtime hosts и app scopes. */
-export class EndgeRuntime extends EndgeModule {
+export class EndgeRuntime_Module extends EndgeModule {
   public readonly implementations = new EndgeImplementations()
   public readonly computation = new EndgeComputation(this.implementations)
   public readonly converters = new EndgeConverters(this.implementations)

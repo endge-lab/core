@@ -16,6 +16,13 @@ export type EndgeWorkspaceTheme = EndgeThemeDefinition
 export type EndgeWorkspaceTimezone = EndgeTimezoneDefinition
 export type EndgeWorkspaceVar = EndgeVariableDefinition
 
+/** Effective workspace variable after applying runtime and environment overrides. */
+export interface EndgeResolvedWorkspaceVariable {
+  name: string
+  defaultValue: string
+  currentValue: string
+}
+
 export interface WorkspaceIntegrationReference {
   integrationId: string | number
   integrationIdentity: string

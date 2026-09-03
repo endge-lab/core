@@ -23,7 +23,7 @@ describe('endgeWorkspace', () => {
     expect(Endge.context.dataMode).toBe('live')
   })
 
-  it('applies the persisted mock default to EndgeContext', () => {
+  it('applies the persisted mock default to EndgeContext_Module', () => {
     Endge.context.clearDataModeOverride()
 
     Endge.workspace.apply({ ...TEST_ENDGE_WORKSPACE, dataMode: 'mock' })

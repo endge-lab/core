@@ -166,7 +166,7 @@ export interface AuthAdapterContext {
   resolveCredential: (credential: string) => Promise<string>
 }
 
-/** Контракт расширяемого auth adapter. Storage и application state остаются в EndgeAuth. */
+/** Контракт расширяемого auth adapter. Storage и application state остаются в EndgeAuth_Module. */
 export interface AuthProfileAdapter {
   id: AuthProfileAdapterId
   label: string

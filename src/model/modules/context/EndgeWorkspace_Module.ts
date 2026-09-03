@@ -19,7 +19,7 @@ import { WorkspaceVariables } from '@/model/modules/context/endge-vars'
  * Модуль workspace-профиля frontend-приложения.
  * Владеет workspace, загруженным из service-backend или release bundle.
  */
-export class EndgeWorkspace extends EndgeModule {
+export class EndgeWorkspace_Module extends EndgeModule {
   private _current: EndgeWorkspaceDefinition | null = null
   public readonly variables = new WorkspaceVariables(() => this._configurationOrNull()?.vars ?? [])
 
@@ -95,53 +95,53 @@ export class EndgeWorkspace extends EndgeModule {
   }
 
   /** Проверяет, поддерживает ли workspace указанную locale. */
-  supportsLocale(locale: string | null | undefined): boolean {
+  public supportsLocale(locale: string | null | undefined): boolean {
     const code = String(locale ?? '').trim()
     return this.locales.some(item => item.code === code)
   }
 
   /** Нормализует locale по правилам активного workspace. */
-  normalizeLocale(locale: string | null | undefined): string {
+  public normalizeLocale(locale: string | null | undefined): string {
     const code = String(locale ?? '').trim()
     return this.supportsLocale(code) ? code : this.defaultLocale
   }
 
   /** Возвращает label locale в указанном режиме. */
-  getLocaleLabel(locale: string, mode: EndgeWorkspaceLocaleLabelMode = 'displayName'): string {
+  public getLocaleLabel(locale: string, mode: EndgeWorkspaceLocaleLabelMode = 'displayName'): string {
     return this.locales.find(item => item.code === locale)?.[mode] ?? locale
   }
 
   /** Проверяет, поддерживает ли workspace указанную тему. */
-  supportsTheme(theme: string | null | undefined): boolean {
+  public supportsTheme(theme: string | null | undefined): boolean {
     const identity = String(theme ?? '').trim()
     return this.themes.some(item => item.identity === identity)
   }
 
   /** Нормализует тему по правилам активного workspace. */
-  normalizeTheme(theme: string | null | undefined): string {
+  public normalizeTheme(theme: string | null | undefined): string {
     const identity = String(theme ?? '').trim()
     return this.supportsTheme(identity) ? identity : this.defaultTheme
   }
 
   /** Возвращает пользовательское имя темы. */
-  getThemeLabel(theme: string): string {
+  public getThemeLabel(theme: string): string {
     return this.themes.find(item => item.identity === theme)?.displayName ?? theme
   }
 
   /** Проверяет, поддерживает ли workspace указанную временную зону. */
-  supportsTimezone(timezone: string | null | undefined): boolean {
+  public supportsTimezone(timezone: string | null | undefined): boolean {
     const identity = String(timezone ?? '').trim()
     return this.timezones.some(item => item.identity === identity)
   }
 
   /** Нормализует временную зону по правилам активного workspace. */
-  normalizeTimezone(timezone: string | null | undefined): string {
+  public normalizeTimezone(timezone: string | null | undefined): string {
     const identity = String(timezone ?? '').trim()
     return this.supportsTimezone(identity) ? identity : this.defaultTimezone
   }
 
   /** Возвращает пользовательское имя временной зоны. */
-  getTimezoneLabel(timezone: string): string {
+  public getTimezoneLabel(timezone: string): string {
     return this.timezones.find(item => item.identity === timezone)?.displayName ?? timezone
   }
 
@@ -189,82 +189,82 @@ export class EndgeWorkspace extends EndgeModule {
    */
 
   /** Показывает, загружен ли workspace. */
-  get isLoaded(): boolean {
+  public get isLoaded(): boolean {
     return this._current != null
   }
 
   /** Возвращает текущую нормализованную workspace-конфигурацию. */
-  get current(): EndgeWorkspaceDefinition {
+  public get current(): EndgeWorkspaceDefinition {
     return this._requireCurrent()
   }
 
   /** Returns the persisted default used when the runtime has no local override. */
-  get dataMode(): EndgeDataMode {
+  public get dataMode(): EndgeDataMode {
     return this._requireCurrent().dataMode
   }
 
   /** Shows whether this workspace starts runtimes with mock data by default. */
-  get isMockEnabled(): boolean {
+  public get isMockEnabled(): boolean {
     return this.dataMode === 'mock'
   }
 
   /** Возвращает доступные workspace locales. */
-  get locales(): EndgeWorkspaceLocale[] {
+  public get locales(): EndgeWorkspaceLocale[] {
     return this._configuration().locales
   }
 
   /** Возвращает определения workspace variables. */
-  get vars(): EndgeWorkspaceVar[] {
+  public get vars(): EndgeWorkspaceVar[] {
     return this._configuration().vars
   }
 
   /** Explicit name for the persisted variable definitions. */
-  get variableDefinitions(): EndgeWorkspaceVar[] {
+  public get variableDefinitions(): EndgeWorkspaceVar[] {
     return this.vars
   }
 
   /** Возвращает locale по умолчанию. */
-  get defaultLocale(): string {
+  public get defaultLocale(): string {
     return this._configuration().defaultLocale
   }
 
   /** Возвращает fallback locale. */
-  get fallbackLocale(): string {
+  public get fallbackLocale(): string {
     return this._configuration().fallbackLocale
   }
 
   /** Возвращает доступные workspace themes. */
-  get themes(): EndgeWorkspaceTheme[] {
+  public get themes(): EndgeWorkspaceTheme[] {
     return this._configuration().themes
   }
 
   /** Возвращает тему по умолчанию. */
-  get defaultTheme(): string {
+  public get defaultTheme(): string {
     return this._configuration().defaultTheme
   }
 
   /** Возвращает доступные workspace timezones. */
-  get timezones(): EndgeWorkspaceTimezone[] {
+  public get timezones(): EndgeWorkspaceTimezone[] {
     return this._configuration().timezones
   }
 
   /** Возвращает временную зону по умолчанию. */
-  get defaultTimezone(): string {
+  public get defaultTimezone(): string {
     return this._configuration().defaultTimezone
   }
 
   /** Возвращает identity auth profile по умолчанию. */
-  get defaultAuthProfileIdentity(): string | null {
+  public get defaultAuthProfileIdentity(): string | null {
     return this._configuration().defaultAuthProfileIdentity
   }
 
   /** Возвращает список разрешённых SFC adapter ids. */
-  get sfcAdapterIds(): string[] {
+  public get sfcAdapterIds(): string[] {
     return this._configuration().sfcAdapterIds
   }
 
   /** Возвращает SFC adapter id по умолчанию. */
-  get defaultSfcAdapterId(): string {
+  public get defaultSfcAdapterId(): string {
     return this._configuration().defaultSfcAdapterId
   }
 }

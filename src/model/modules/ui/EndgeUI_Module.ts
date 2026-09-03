@@ -14,7 +14,7 @@ import { Endge } from '@/model/kernel/endge'
 /**
  * UI-состояние ядра: zoom, theme и режим отображения времени.
  */
-export class EndgeUI extends EndgeModule {
+export class EndgeUI_Module extends EndgeModule {
   private _offContext: (() => void) | null = null
   private _offWorkspace: (() => void) | null = null
   //
@@ -32,7 +32,7 @@ export class EndgeUI extends EndgeModule {
   /**
    * Восстанавливает UI-настройки из localStorage и применяет тему к document.
    */
-  constructor() {
+  public constructor() {
     super()
 
     this._zoom = this._readZoomFromLS()
@@ -59,7 +59,7 @@ export class EndgeUI extends EndgeModule {
     this._syncThemeFromContext()
   }
 
-  /** Отключает runtime subscription; пользовательское значение остаётся в EndgeContext. */
+  /** Отключает runtime subscription; пользовательское значение остаётся в EndgeContext_Module. */
   public override reset(): void {
     this._offContext?.()
     this._offWorkspace?.()

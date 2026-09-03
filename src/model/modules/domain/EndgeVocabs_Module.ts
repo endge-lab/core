@@ -55,7 +55,7 @@ export interface VocabAcquireOptions {
 /**
  * Модуль загрузки и чтения external vocabs в Raph cache.
  */
-export class EndgeVocabs extends EndgeModule {
+export class EndgeVocabs_Module extends EndgeModule {
   /**
    * slug -> namespace
    * Можно оставить для getNamespaceValues (чтобы понимать какие slugs в пространстве)
@@ -68,12 +68,12 @@ export class EndgeVocabs extends EndgeModule {
   private readonly _inFlight = new Map<string, Promise<any[]>>()
   private readonly _cacheVersions = new Map<string, number>()
   private _loadingRequests: number = 0
-  loading: boolean = false
+  public loading: boolean = false
 
   /**
    * Строит индекс collectionSlug -> vocab identity из доменных документов vocabs.
    */
-  init(): void {
+  public init(): void {
     const nextIndex: Record<string, string> = {}
 
     for (const artifact of Endge.program.getArtifacts().filter(item => item.ref.entityType === 'vocab')) {
@@ -95,7 +95,7 @@ export class EndgeVocabs extends EndgeModule {
    * Загружает словарь по identity или collectionSlug.
    * Namespace резолвится через доменный документ справочника.
    */
-  async loadNamespace(namespace: string): Promise<void> {
+  public async loadNamespace(namespace: string): Promise<void> {
     const ns: string = String(namespace ?? '').trim()
     if (!ns) {
       return
@@ -131,7 +131,7 @@ export class EndgeVocabs extends EndgeModule {
   /**
    * Возвращает значения всех collections namespace или конкретного collection slug.
    */
-  getNamespaceValues(namespace: string, vocabs: string | null = null): Array<any> {
+  public getNamespaceValues(namespace: string, vocabs: string | null = null): Array<any> {
     const ns: string = String(namespace ?? '').trim()
     if (!ns) {
       return []
@@ -153,7 +153,7 @@ export class EndgeVocabs extends EndgeModule {
    * По сигнатуре namespace остаётся, но фактически не используется для чтения,
    * потому что в Raph ключ теперь без namespace.
    */
-  getVocabsValues(namespace: string, vocabs: string): Array<any> {
+  public getVocabsValues(namespace: string, vocabs: string): Array<any> {
     void namespace
     const vb: string = String(vocabs ?? '').trim()
     if (!vb) {
@@ -171,7 +171,7 @@ export class EndgeVocabs extends EndgeModule {
    *
    * Индекс больше не обязателен для чтения - оставлен только для других сценариев.
    */
-  getValues(vocabs: string): Array<any> {
+  public getValues(vocabs: string): Array<any> {
     const vb: string = String(vocabs ?? '').trim()
     if (!vb) {
       return []
@@ -190,7 +190,7 @@ export class EndgeVocabs extends EndgeModule {
    * @param collectionSlug имя коллекции (name)
    * @param limit максимум документов (по умолчанию 1)
    */
-  async getSample(vocabIdentity: string, collectionSlug: string, limit: number = 1): Promise<any[]> {
+  public async getSample(vocabIdentity: string, collectionSlug: string, limit: number = 1): Promise<any[]> {
     const ns = String(vocabIdentity ?? '').trim()
     const slug = String(collectionSlug ?? '').trim()
     if (!ns || !slug) {
@@ -231,7 +231,7 @@ export class EndgeVocabs extends EndgeModule {
   /**
    * Возвращает значения словаря по id, используя Raph cache и локальный fallback cache.
    */
-  getValuesById(vocabId: string | number): Array<any> {
+  public getValuesById(vocabId: string | number): Array<any> {
     const cfg = this._resolveVocabConfigById(vocabId)
     if (!cfg) {
       return []
@@ -259,14 +259,14 @@ export class EndgeVocabs extends EndgeModule {
   /**
    * Проверяет, есть ли загруженные значения словаря по id.
    */
-  hasCacheById(vocabId: string | number): boolean {
+  public hasCacheById(vocabId: string | number): boolean {
     return this.getValuesById(vocabId).length > 0
   }
 
   /**
    * Очищает cache словаря по id.
    */
-  clearCacheById(vocabId: string | number): void {
+  public clearCacheById(vocabId: string | number): void {
     const cfg = this._resolveVocabConfigByIdOrIdentity(vocabId)
     if (!cfg) {
       return
@@ -287,7 +287,7 @@ export class EndgeVocabs extends EndgeModule {
   /**
    * Загружает отсутствующие справочники параллельно и переиспользует cache.
    */
-  async acquire(
+  public async acquire(
     vocabs: readonly VocabReference[],
     policy: Partial<VocabLoadPolicy> = {},
     options: VocabAcquireOptions = {},
@@ -351,7 +351,7 @@ export class EndgeVocabs extends EndgeModule {
   /**
    * Принудительно обновляет справочники параллельно, сохраняя дедупликацию одновременных запросов.
    */
-  async refresh(vocabs: readonly VocabReference[]): Promise<VocabCacheOperationResult[]> {
+  public async refresh(vocabs: readonly VocabReference[]): Promise<VocabCacheOperationResult[]> {
     return await Promise.all(this._normalizeReferences(vocabs).map(async (reference) => {
       const cfg = this._requireVocabConfig(reference)
       const docs = await this._loadShared(cfg, true)
@@ -366,7 +366,7 @@ export class EndgeVocabs extends EndgeModule {
   /**
    * Удаляет справочники только из runtime cache, не выполняя сетевых запросов.
    */
-  invalidate(vocabs: readonly VocabReference[]): VocabCacheOperationResult[] {
+  public invalidate(vocabs: readonly VocabReference[]): VocabCacheOperationResult[] {
     return this._normalizeReferences(vocabs).map((reference) => {
       const cfg = this._requireVocabConfig(reference)
       const cached = this._getCache(cfg)
@@ -383,7 +383,7 @@ export class EndgeVocabs extends EndgeModule {
   /**
    * Загружает словарь по id и кладет результат в Raph cache.
    */
-  async loadById(vocabId: string | number, limit: number = 10000): Promise<void> {
+  public async loadById(vocabId: string | number, limit: number = 10000): Promise<void> {
     const cfg = this._resolveVocabConfigById(vocabId)
     if (!cfg) {
       return
@@ -412,7 +412,7 @@ export class EndgeVocabs extends EndgeModule {
   /**
    * Возвращает sample словаря по id, используя cache или сетевую загрузку.
    */
-  async getSampleById(vocabId: string | number, limit: number = 1): Promise<any[]> {
+  public async getSampleById(vocabId: string | number, limit: number = 1): Promise<any[]> {
     const maxLimit = Math.max(1, Number(limit) || 1)
     const cfg = this._resolveVocabConfigById(vocabId)
     if (!cfg) {
@@ -454,7 +454,7 @@ export class EndgeVocabs extends EndgeModule {
   /**
    * Полностью загружает словарь по id или identity с постраничным обходом.
    */
-  async loadVocab(
+  public async loadVocab(
     idOrIdentity: string | number,
     options: { throwOnError?: boolean, dataMode?: 'live' | 'mock' } = {},
   ): Promise<any[]> {
@@ -488,7 +488,7 @@ export class EndgeVocabs extends EndgeModule {
   }
 
   /** Загружает raw Payload без output pipeline; используется authoring preview и Mock generator. */
-  async loadRawVocab(
+  public async loadRawVocab(
     idOrIdentity: string | number,
     options: { limit?: number, throwOnError?: boolean } = {},
   ): Promise<unknown> {

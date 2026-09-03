@@ -8,7 +8,7 @@ import { Endge } from '@/model/kernel/endge'
 /**
  * Runtime-доступ к доменным словарям переводов.
  */
-export class EndgeI18n extends EndgeModule {
+export class EndgeI18n_Module extends EndgeModule {
   private _fallbackLocale = DEFAULT_FALLBACK_LOCALE
   private _offContext: (() => void) | null = null
   private _offDomain: (() => void) | null = null

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { DOMAIN_DOCUMENT_DESCRIPTORS } from '@/domain/documents/domain-document-descriptors'
-import { EndgeCompiler } from '@/model/modules/program/endge-compiler'
-import { EndgeSource } from '@/model/modules/program/endge-source'
+import { EndgeCompiler_Module } from '@/model/modules/program/EndgeCompiler_Module'
+import { EndgeSource_Module } from '@/model/modules/program/EndgeSource_Module'
 import { ActionRuntimeStrategy } from '@/model/services/runtime/strategies/ActionRuntimeStrategy'
 import { ComponentSFCRuntimeStrategy } from '@/model/services/runtime/strategies/ComponentSFCRuntimeStrategy'
 import { CompositionRuntimeStrategy } from '@/model/services/runtime/strategies/CompositionRuntimeStrategy'
@@ -23,7 +23,7 @@ function descriptorCapabilityValues(key: 'source' | 'program' | 'runtime'): stri
 describe('domain document capability contracts', () => {
   /** Сверяет descriptor Source capabilities с реальным language strategy registry. */
   it('matches registered Source language strategies', () => {
-    const registered = new EndgeSource()
+    const registered = new EndgeSource_Module()
       .listLanguageStrategies()
       .map(strategy => strategy.sourceKind)
       .sort()
@@ -35,7 +35,7 @@ describe('domain document capability contracts', () => {
   /** Сверяет descriptor Program capabilities с реальными compiler handlers. */
   it('matches registered compiler handlers', () => {
     expect(descriptorCapabilityValues('program'))
-      .toEqual(new EndgeCompiler().listSupportedEntityTypes().sort())
+      .toEqual(new EndgeCompiler_Module().listSupportedEntityTypes().sort())
   })
 
   /** Сверяет descriptor Runtime capabilities с реальными built-in strategies. */

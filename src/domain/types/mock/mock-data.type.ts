@@ -20,7 +20,7 @@ export interface EndgeMockRegistration {
   /** Стабильный identity, используемый в source через mock(identity). */
   identity: string
 
-  /** Исходный mock payload. EndgeMock хранит и возвращает независимые копии. */
+  /** Исходный mock payload. EndgeMock_Module хранит и возвращает независимые копии. */
   data: unknown
 
   /** Необязательное описание сценария для diagnostics и configurator UI. */
@@ -35,7 +35,7 @@ export interface EndgeMockDescriptor {
 
 export type EndgeMockBindingStatus = 'document' | 'connected' | 'missing-document' | 'missing-provider' | 'invalid-content'
 
-/** Сериализуемый snapshot модуля EndgeMock. */
+/** Сериализуемый snapshot модуля EndgeMock_Module. */
 export interface EndgeMockSnapshot {
   providers: EndgeMockDescriptor[]
 }

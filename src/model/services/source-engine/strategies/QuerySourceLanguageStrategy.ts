@@ -3,6 +3,7 @@ import type {
   SourceLanguageCompletion,
   SourceLanguageContext,
   SourceLanguageStrategy,
+  SourceLanguageSyntaxDefinition,
   SourceLanguageValidationResult,
 } from '@/domain/types/source/source-engine.types'
 
@@ -216,7 +217,7 @@ const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
 export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
   public readonly id = 'source-language:query'
   public readonly sourceKind: SourceKind = 'query'
-  public readonly syntax = createTypeScriptLikeSourceSyntax({
+  public readonly syntax = withGraphQLSyntax(createTypeScriptLikeSourceSyntax({
     alias: 'Endge Query Source',
     extension: '.endge-query.ts',
     keywords: [
@@ -295,7 +296,7 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
       'timeoutMs',
       'variables',
     ],
-  })
+  }))
 
   /** Проверяет, что стратегия обслуживает query source. */
   public supports(sourceKind: SourceKind | string): boolean {
@@ -365,6 +366,48 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
 
   public semanticHighlights(context: SourceLanguageContext) {
     return typedSourceTypeReferenceHighlights(context)
+  }
+}
+
+/** Adds GraphQL tokenization only inside static gql tagged templates. */
+function withGraphQLSyntax(syntax: SourceLanguageSyntaxDefinition): SourceLanguageSyntaxDefinition {
+  return {
+    ...syntax,
+    tokenizer: {
+      ...syntax.tokenizer,
+      root: [
+        { pattern: /\bgql\s*`/, token: 'keyword', next: '@graphql' },
+        ...syntax.tokenizer.root,
+      ],
+      graphql: [
+        { pattern: /`/, token: 'string', next: '@pop' },
+        { pattern: /#.*$/, token: 'comment' },
+        { pattern: /"""/, token: 'string', next: '@graphqlBlockString' },
+        { pattern: /"/, token: 'string', next: '@graphqlString' },
+        { pattern: /\.\.\./, token: 'keyword' },
+        { pattern: /\$(?!\d)\w+/, token: 'variable' },
+        { pattern: /@(?!\d)\w+/, token: 'keyword' },
+        { pattern: /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:(?:e|E)[+-]?\d+)?/, token: 'number' },
+        {
+          pattern: /\b(?:query|mutation|subscription|fragment|on|schema|scalar|type|interface|implements|enum|union|input|directive|extend|repeatable|true|false|null)\b/,
+          token: 'keyword',
+        },
+        { pattern: /(?!\d)\w+/, token: 'type.identifier' },
+        { pattern: /[!():=[\]{|}&,]/, token: 'delimiter' },
+      ],
+      graphqlString: [
+        { pattern: /[^"\\]+/, token: 'string' },
+        { pattern: /\\(?:["\\/bfnrt]|u[\da-fA-F]{4})/, token: 'string.escape' },
+        { pattern: /"/, token: 'string', next: '@pop' },
+        { pattern: /\\./, token: 'string.invalid' },
+      ],
+      graphqlBlockString: [
+        { pattern: /[^"\\]+/, token: 'string' },
+        { pattern: /\\"""/, token: 'string.escape' },
+        { pattern: /"""/, token: 'string', next: '@pop' },
+        { pattern: /["\\]/, token: 'string' },
+      ],
+    },
   }
 }
 

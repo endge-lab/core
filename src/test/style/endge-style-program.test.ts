@@ -5,7 +5,7 @@ import { RProject } from '@/domain/entities/reflect/RProject'
 import { RStyle } from '@/domain/entities/reflect/RStyle'
 import { RTenant } from '@/domain/entities/reflect/RTenant'
 import { Endge } from '@/model/kernel/endge'
-import { EndgeUI } from '@/model/modules/ui/endge-ui'
+import { EndgeUI_Module } from '@/model/modules/ui/EndgeUI_Module'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
 describe('endgeCSS program lifecycle', () => {
@@ -33,7 +33,7 @@ describe('endgeCSS program lifecycle', () => {
   it('uses the workspace catalog instead of exposing every theme found in style source', () => {
     Endge.workspace.apply(TEST_ENDGE_WORKSPACE)
     Endge.context.setCurrentTheme('light')
-    const ui = new EndgeUI()
+    const ui = new EndgeUI_Module()
     ui.start()
     expect(ui.availableThemes).toEqual(['light', 'dark'])
     ui.setTheme('night')

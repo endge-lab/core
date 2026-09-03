@@ -26,7 +26,7 @@ export function createDiagnosticsEntityOwner(
  * Replaceable registry актуальных проблем Endge.
  * В отличие от telemetry history, исправленные проблемы удаляются через replace/resolve.
  */
-export class EndgeProblems extends EndgeModule {
+export class EndgeProblems_Module extends EndgeModule {
   private readonly _problemsByOwner = new Map<string, readonly DiagnosticsProblem[]>()
   private _revision = 0
 

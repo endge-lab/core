@@ -6,7 +6,7 @@ export type AnyRuntimeHost = RuntimeHost<any, any>
 
 /** Контекст создания runtime-host конкретной стратегией. */
 export interface RuntimeCreateContext<TModel = unknown> {
-  /** Уникальный runtime-id, выделенный EndgeRuntime. */
+  /** Уникальный runtime-id, выделенный EndgeRuntime_Module. */
   id: string
 
   /** Доменная модель, для которой создается runtime-host. */
@@ -42,7 +42,7 @@ export interface RuntimeStrategy<
   /** Проверяет, умеет ли стратегия запустить переданную модель. */
   supports: (model: unknown) => model is TModel
 
-  /** Создает runtime-host. Регистрация в EndgeRuntime здесь не выполняется. */
+  /** Создает runtime-host. Регистрация в EndgeRuntime_Module здесь не выполняется. */
   create: (ctx: RuntimeCreateContext<TModel>) => THost | null
 
   /** Выполняет strategy-specific cleanup перед общим host.destroy(). */

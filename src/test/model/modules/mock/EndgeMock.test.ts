@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { RMock } from '@/domain/entities/reflect/RMock'
 import { Endge } from '@/model/kernel/endge'
-import { EndgeMock } from '@/model/modules/mock/EndgeMock'
+import { EndgeMock_Module } from '@/model/modules/mock/EndgeMock_Module'
 
 describe('endgeMock', () => {
   afterEach(() => {
@@ -11,7 +11,7 @@ describe('endgeMock', () => {
   })
 
   it('reads JSON from a persisted RMock and returns an independent copy', () => {
-    const registry = new EndgeMock()
+    const registry = new EndgeMock_Module()
     Endge.domain.addMock(makeMock({
       identity: 'test.rows',
       source: '{"rows":[{"id":1}]}',
@@ -24,7 +24,7 @@ describe('endgeMock', () => {
   })
 
   it('connects a persisted RMock to a code provider', () => {
-    const registry = new EndgeMock()
+    const registry = new EndgeMock_Module()
     Endge.domain.addMock(makeMock({
       identity: 'test.provider',
       contentSource: 'code-provider',
@@ -40,7 +40,7 @@ describe('endgeMock', () => {
   })
 
   it('starts without hidden builtin providers', () => {
-    const registry = new EndgeMock()
+    const registry = new EndgeMock_Module()
 
     expect(registry.listProviders()).toEqual([])
     expect(registry.getBindingStatus('groundhandling')).toBe('missing-document')

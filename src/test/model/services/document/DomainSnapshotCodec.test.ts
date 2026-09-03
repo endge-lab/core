@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest'
 
 import { RProject } from '@/domain/entities/reflect/RProject'
 import { Endge } from '@/model/kernel/endge'
-import { EndgeDomain } from '@/model/modules/domain/endge-domain'
+import { EndgeDomain_Module } from '@/model/modules/domain/EndgeDomain_Module'
 import { DomainSnapshotCodec } from '@/model/services/document/DomainSnapshotCodec'
 
 describe('domain snapshot codec', () => {
   /** Проверяет независимое восстановление Domain через единый локальный codec. */
   it('сериализует и десериализует persisted-сущности Domain', () => {
     const codec = Endge.domainSnapshot
-    const source = new EndgeDomain()
+    const source = new EndgeDomain_Module()
     source.addProject(RProject.fromPlain({
       id: 101,
       identity: 'airport',
@@ -28,8 +28,8 @@ describe('domain snapshot codec', () => {
 
   /** Проверяет сохранение правила исключения временных сущностей из snapshot. */
   it('не переносит временные сущности', () => {
-    const codec = new DomainSnapshotCodec(snapshot => EndgeDomain.fromPlain(snapshot))
-    const source = new EndgeDomain()
+    const codec = new DomainSnapshotCodec(snapshot => EndgeDomain_Module.fromPlain(snapshot))
+    const source = new EndgeDomain_Module()
     const temporary = RProject.fromPlain({
       id: 102,
       identity: 'preview',

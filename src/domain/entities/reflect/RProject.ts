@@ -115,7 +115,7 @@ export class RProject extends REntity {
 
   /**
    * Экспорт только схемы (без storage-меты).
-   * Используется в EndgeDomain.toPlain().
+   * Используется в EndgeDomain_Module.toPlain().
    */
   toPlain(): any {
     return {

@@ -59,7 +59,7 @@ import { TABLE_EVENT_DEFINITIONS } from '@/domain/types/component/sfc/table-even
 import { createEmptyProgramMetadata } from '@/domain/types/program/program-metadata.types'
 import { ENDGE_COMPILER_SPAN_GROUPS, ENDGE_COMPILER_VERSION } from '@/model/config/kernel.config'
 import { Endge } from '@/model/kernel/endge'
-import { createDiagnosticsEntityOwner } from '@/model/modules/diagnostics/endge-problems'
+import { createDiagnosticsEntityOwner } from '@/model/modules/diagnostics/EndgeProblems_Module'
 import { compileAction } from '@/model/services/compiler/action/action-compile'
 import { compileComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-compile'
 import { parseComponentSFC } from '@/model/services/compiler/component-sfc/component-sfc-parse'
@@ -98,7 +98,7 @@ const COMPONENT_SFC_BUILTIN_EVENT_PAYLOAD_TYPES = new Set([
 /**
  * Компилятор persisted domain model в compiled program artifacts.
  */
-export class EndgeCompiler extends EndgeModule {
+export class EndgeCompiler_Module extends EndgeModule {
   private readonly _handlers = new Map<ProgramEntityType, EntityCompilerHandler<any, any>>()
   private _localDataViewCounter = 0
   private _localFilterCounter = 0
@@ -113,7 +113,7 @@ export class EndgeCompiler extends EndgeModule {
    * Регистрация выполняется один раз при создании модуля, чтобы build-фаза
    * только запускала pipeline и не пересобирала таблицу обработчиков.
    */
-  constructor() {
+  public constructor() {
     super()
     this._registerDefaultHandlers()
   }

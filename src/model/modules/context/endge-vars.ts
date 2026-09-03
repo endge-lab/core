@@ -1,5 +1,4 @@
-import type { EndgeWorkspaceVar } from '@/domain/types/document/workspace.types'
-import type { EndgeGlobalVar } from '@/domain/types/types'
+import type { EndgeResolvedWorkspaceVariable, EndgeWorkspaceVar } from '@/domain/types/document/workspace.types'
 
 type EnvRecord = Record<string, unknown>
 
@@ -15,7 +14,7 @@ type EnvRecord = Record<string, unknown>
  *     - имя переменной внутри системы: без префикса (ENDPOINT_AUTH -> VITE_ENDPOINT_AUTH)
  *  3) workspace.vars
  *
- * Runtime projections are owned by EndgeRuntime, not by this service.
+ * Runtime projections are owned by EndgeRuntime_Module, not by this service.
  */
 export class WorkspaceVariables {
   // Переопределение переменных среды
@@ -49,7 +48,7 @@ export class WorkspaceVariables {
   /**
    * Возвращает Domain Vars.
    */
-  private _getDomainVars(): EndgeGlobalVar[] {
+  private _getDomainVars(): EndgeResolvedWorkspaceVariable[] {
     try {
       const workspaceVars = this._getDefinitions()
       if (workspaceVars.length > 0) {
@@ -93,8 +92,8 @@ export class WorkspaceVariables {
       return String(external)
     }
 
-    const vars: EndgeGlobalVar[] = this._getDomainVars()
-    const v: EndgeGlobalVar | undefined = vars.find((x: EndgeGlobalVar) => x.name === key)
+    const vars = this._getDomainVars()
+    const v = vars.find(x => x.name === key)
     if (v) {
       return v.currentValue ?? v.defaultValue
     }
@@ -105,7 +104,7 @@ export class WorkspaceVariables {
   /**
    * Возвращает все доменные переменные с учетом overrides.
    */
-  getAll(): EndgeGlobalVar[] {
+  getAll(): EndgeResolvedWorkspaceVariable[] {
     const vars = this._getDomainVars()
     const used = new Set(vars.map(item => item.name))
     for (const [name, value] of Object.entries(this._envyRecord)) {

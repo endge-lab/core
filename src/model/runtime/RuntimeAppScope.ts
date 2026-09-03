@@ -6,7 +6,7 @@ import type { RuntimeExecutableModel } from '@/domain/types/runtime/runtime.type
 export type RuntimeAppScopeCollisionPolicy = 'multi' | 'reject' | 'replace'
 
 export interface RuntimeAppScopeOptions {
-  /** Уникальный id scope внутри EndgeRuntime. */
+  /** Уникальный id scope внутри EndgeRuntime_Module. */
   id: string
   /** Публичный корень runtime data в Raph. */
   rootPath: string

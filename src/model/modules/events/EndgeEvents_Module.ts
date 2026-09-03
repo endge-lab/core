@@ -13,7 +13,7 @@ import { EndgeEvent } from '@/domain/types/kernel/events.types'
  * Модуль событий Endge.
  * Инкапсулирует core/custom event bus и небольшой runtime-кеш последних событий.
  */
-export class EndgeEvents extends EndgeModule {
+export class EndgeEvents_Module extends EndgeModule {
   // 0 - кеш отключён
   public static EVENTS_CACHE_SIZE = 0
 
@@ -25,12 +25,12 @@ export class EndgeEvents extends EndgeModule {
   /**
    * Создает event bus с заранее известными core-событиями.
    */
-  constructor(predefinedEvents: (keyof EndgeCoreEventMap & string)[] = []) {
+  public constructor(predefinedEvents: (keyof EndgeCoreEventMap & string)[] = []) {
     super()
     this._bus = new EventBus<EndgeCoreEventMap, EndgeCustomEventMap>(
       predefinedEvents as (keyof EndgeCoreEventMap)[],
     )
-    this._cache = this._makeCache(EndgeEvents.EVENTS_CACHE_SIZE)
+    this._cache = this._makeCache(EndgeEvents_Module.EVENTS_CACHE_SIZE)
   }
 
   /**
@@ -38,7 +38,7 @@ export class EndgeEvents extends EndgeModule {
    */
   public setCacheSize(next: number): void {
     const n = Math.max(0, Math.floor(Number(next) || 0))
-    EndgeEvents.EVENTS_CACHE_SIZE = n
+    EndgeEvents_Module.EVENTS_CACHE_SIZE = n
 
     const prev = this._cache
     if (n === 0) {
@@ -102,7 +102,7 @@ export class EndgeEvents extends EndgeModule {
   /**
    * Подписывает обработчик на типизированные core-события Endge.
    */
-  onEvent<K extends keyof EndgeCoreEventMap & string>(
+  public onEvent<K extends keyof EndgeCoreEventMap & string>(
     events: OneOrMany<K>,
     callback: (e: EndgeEvent<EndgeCoreEventMap[K]>) => void,
   ): () => void {
@@ -116,7 +116,7 @@ export class EndgeEvents extends EndgeModule {
   /**
    * Публикует типизированное core-событие Endge.
    */
-  emitEvent<K extends keyof EndgeCoreEventMap & string>(
+  public emitEvent<K extends keyof EndgeCoreEventMap & string>(
     event: K,
     payload: EndgeCoreEventMap[K],
     opts: EndgeEmitOptions = {},
@@ -135,7 +135,7 @@ export class EndgeEvents extends EndgeModule {
   /**
    * Подписывает обработчик на динамические пользовательские события.
    */
-  onDynamic<K extends keyof EndgeCustomEventMap & string>(
+  public onDynamic<K extends keyof EndgeCustomEventMap & string>(
     events: OneOrMany<K>,
     callback: (e: EndgeEvent<EndgeCustomEventMap[K]>) => void,
   ): () => void {
@@ -149,7 +149,7 @@ export class EndgeEvents extends EndgeModule {
   /**
    * Публикует динамическое пользовательское событие.
    */
-  emitDynamic<K extends keyof EndgeCustomEventMap & string>(
+  public emitDynamic<K extends keyof EndgeCustomEventMap & string>(
     event: K,
     payload: EndgeCustomEventMap[K],
     opts: EndgeEmitOptions = {},

@@ -5,7 +5,7 @@ import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
  * Устаревшие update-профили из документа настроек удалены; новый SSE pipeline
  * должен описываться отдельной доменной моделью.
  */
-export class EndgeUpdates extends EndgeModule {
+export class EndgeUpdates_Module extends EndgeModule {
   /** Обрабатывает legacy update profile; текущая реализация оставлена как no-op boundary. */
   public applyUpdateForProfile(
     profileIdentity: string,

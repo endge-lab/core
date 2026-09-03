@@ -10,7 +10,7 @@ import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 import { Endge } from '@/model/kernel/endge'
 
 /** Runtime resolver persisted mock-документов и подключенных code providers. */
-export class EndgeMock extends EndgeModule {
+export class EndgeMock_Module extends EndgeModule {
   private readonly _providers = new Map<string, EndgeMockProvider>()
 
   /** Создает пустой registry для application providers. */

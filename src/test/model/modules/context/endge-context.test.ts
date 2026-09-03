@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Endge } from '@/model/kernel/endge'
-import { EndgeContext } from '@/model/modules/context/endge-context'
+import { EndgeContext_Module } from '@/model/modules/context/EndgeContext_Module'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
 describe('endgeContext locale and theme', () => {
@@ -10,7 +10,7 @@ describe('endgeContext locale and theme', () => {
   })
 
   it('uses en when the stored locale is not set', () => {
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
 
     context.deserialize(undefined)
 
@@ -19,7 +19,7 @@ describe('endgeContext locale and theme', () => {
 
   it('uses en before the workspace is loaded', () => {
     Endge.workspace.reset()
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
 
     context.deserialize(undefined)
 
@@ -27,7 +27,7 @@ describe('endgeContext locale and theme', () => {
   })
 
   it('uses dark when the stored theme is not set', () => {
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
 
     context.deserialize(undefined)
 
@@ -36,7 +36,7 @@ describe('endgeContext locale and theme', () => {
 
   it('uses dark before the workspace is loaded', () => {
     Endge.workspace.reset()
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
 
     context.deserialize(undefined)
 
@@ -44,7 +44,7 @@ describe('endgeContext locale and theme', () => {
   })
 
   it('keeps supported stored locales', () => {
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
 
     context.deserialize({ project: null, environment: 'dev', locale: 'en' })
     expect(context.currentLocale).toBe('en')
@@ -54,7 +54,7 @@ describe('endgeContext locale and theme', () => {
   })
 
   it('reconciles unsupported stored locales to ru', () => {
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
 
     context.deserialize({ project: null, environment: 'dev', locale: 'kk' })
     context.reconcileCurrentLocaleWithWorkspace()
@@ -63,7 +63,7 @@ describe('endgeContext locale and theme', () => {
   })
 
   it('notifies subscribers when locale changes', () => {
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
     context.deserialize(undefined)
     const listener = vi.fn()
 
@@ -76,7 +76,7 @@ describe('endgeContext locale and theme', () => {
   })
 
   it('normalizes unsupported locale updates to ru', () => {
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
     context.deserialize({ project: null, environment: 'dev', locale: 'en' })
 
     context.setCurrentLocale('kk')
@@ -85,7 +85,7 @@ describe('endgeContext locale and theme', () => {
   })
 
   it('stores supported themes and normalizes unsupported updates', () => {
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
     const listener = vi.fn()
     context.deserialize(undefined)
 
@@ -100,7 +100,7 @@ describe('endgeContext locale and theme', () => {
 
   it('reconciles stored locale after workspace locales are loaded', () => {
     Endge.workspace.reset()
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
     context.deserialize({ project: null, environment: 'dev', locale: 'kk' })
 
     Endge.workspace.apply({
@@ -121,7 +121,7 @@ describe('endgeContext locale and theme', () => {
 
   it('reconciles a stored theme after workspace themes are loaded', () => {
     Endge.workspace.reset()
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
     context.deserialize({ project: null, environment: 'dev', theme: 'contrast' })
 
     Endge.workspace.apply({
@@ -155,7 +155,7 @@ describe('endgeContext execution context resolution', () => {
   } as const
 
   it('falls back to the first available entities for stale stored coordinates', () => {
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
     context.deserialize({ tenant: 'removed', project: 'removed', environment: 'removed' })
 
     expect(context.resolveExecutionContext(candidates)).toEqual({
@@ -166,7 +166,7 @@ describe('endgeContext execution context resolution', () => {
   })
 
   it('keeps valid stored coordinates', () => {
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
     context.deserialize({ tenant: 'tenant-b', project: 'project-b', environment: 'development' })
 
     expect(context.resolveExecutionContext(candidates)).toEqual({
@@ -177,7 +177,7 @@ describe('endgeContext execution context resolution', () => {
   })
 
   it('rejects an explicitly requested coordinate that is not available', () => {
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
 
     expect(() => context.resolveExecutionContext({
       ...candidates,
@@ -186,7 +186,7 @@ describe('endgeContext execution context resolution', () => {
   })
 
   it('rejects an explicitly requested environment outside the selected project', () => {
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
 
     expect(() => context.resolveExecutionContext({
       ...candidates,

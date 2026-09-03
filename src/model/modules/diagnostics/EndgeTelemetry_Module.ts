@@ -53,7 +53,7 @@ interface DiagnosticsSubscription {
  * Telemetry-подмодуль диагностики Endge.
  * Собирает logs и завершённые spans, хранит bounded session history и маршрутизирует records в adapters.
  */
-export class EndgeTelemetry extends EndgeModule implements DiagnosticsSpanOwner {
+export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpanOwner {
   private _configuration = this._cloneConfiguration(DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION)
   private _resource: DiagnosticsResource = { attributes: { 'service.name': 'endge' } }
   private _store = new DiagnosticsRecordStore(this._configuration.telemetry.collection.maxRecords)

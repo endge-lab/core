@@ -39,7 +39,7 @@ function rendererIndexKey(input: {
 }
 
 /** Модуль UI definitions, presets, renderers и adapter registry. */
-export class EndgeUIRegistry extends EndgeModule {
+export class EndgeUIRegistry_Module extends EndgeModule {
   public readonly adapters = new UIAdapterRegistry(() => this.notify())
 
   private _definitions = new Map<string, UIComponentDefinition>()

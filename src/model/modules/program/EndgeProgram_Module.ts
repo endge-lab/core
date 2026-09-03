@@ -25,7 +25,7 @@ import { EndgeModule } from '@/domain/entities/endge/EndgeModule'
 /**
  * Хранилище compiled artifacts, полученных после компиляции домена.
  */
-export class EndgeProgram extends EndgeModule {
+export class EndgeProgram_Module extends EndgeModule {
   private _artifacts = new Map<ProgramArtifactKey, ProgramArtifact>()
   private _indexByIdentity = new Map<ProgramArtifactKey, ProgramArtifactKey>()
 

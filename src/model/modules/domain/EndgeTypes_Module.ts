@@ -43,7 +43,7 @@ const CORE_TYPES: readonly BuiltinTypeDefinition[] = [
 ]
 
 /** Effective Type Registry: code-owned built-ins plus persisted user Types. */
-export class EndgeTypes extends EndgeModule {
+export class EndgeTypes_Module extends EndgeModule {
   private readonly _builtins = new Map<string, RType>()
 
   public constructor() {

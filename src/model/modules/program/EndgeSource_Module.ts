@@ -52,7 +52,7 @@ import { VocabSourceLanguageStrategy } from '@/model/services/source-engine/stra
 import { VocabSourcePatchStrategy } from '@/model/services/source-engine/strategies/VocabSourcePatchStrategy'
 
 /** Модуль authoring-операций над source-документами Endge. */
-export class EndgeSource extends EndgeModule {
+export class EndgeSource_Module extends EndgeModule {
   private readonly _strategies = new SourceEngineRegistry()
   private readonly _languageStrategies = new SourceLanguageRegistry()
   private readonly _patchStrategies = new SourcePatchRegistry()

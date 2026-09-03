@@ -2,12 +2,12 @@ import type { EndgeBootContext } from '@/domain/types/kernel/bootstrap.types'
 
 import { describe, expect, it, vi } from 'vitest'
 
-import { EndgeDiagnostics } from '@/model/modules/diagnostics/endge-diagnostics'
+import { EndgeDiagnostics_Module } from '@/model/modules/diagnostics/EndgeDiagnostics_Module'
 
-describe('подмодули EndgeDiagnostics', () => {
+describe('подмодули EndgeDiagnostics_Module', () => {
   /** Проверяет явную передачу lifecycle каждому подмодулю в прямом порядке. */
   it('передаёт setup, load, build и start подмодулям', async () => {
-    const diagnostics = new EndgeDiagnostics()
+    const diagnostics = new EndgeDiagnostics_Module()
     const context = {} as EndgeBootContext
     const telemetrySetup = vi.spyOn(diagnostics.telemetry, 'setup').mockResolvedValue()
     const problemsSetup = vi.spyOn(diagnostics.problems, 'setup').mockResolvedValue()
@@ -37,7 +37,7 @@ describe('подмодули EndgeDiagnostics', () => {
 
   /** Проверяет обратный порядок reset для зависимых подмодулей. */
   it('сбрасывает подмодули в обратном порядке', async () => {
-    const diagnostics = new EndgeDiagnostics()
+    const diagnostics = new EndgeDiagnostics_Module()
     const telemetryReset = vi.spyOn(diagnostics.telemetry, 'reset').mockResolvedValue()
     const problemsReset = vi.spyOn(diagnostics.problems, 'reset').mockImplementation(() => {})
 

@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 
 import { ENDGE_CORE_MODULES } from '@/model/config/modules.config'
 import { Endge } from '@/model/kernel/endge'
-import { EndgeSource } from '@/model/modules/program/endge-source'
+import { EndgeSource_Module } from '@/model/modules/program/EndgeSource_Module'
 
 describe('endgeSource', () => {
   it('is registered as an Endge federation module', () => {
     expect(ENDGE_CORE_MODULES.some(module => module.key === 'source')).toBe(true)
-    expect(Endge.source).toBeInstanceOf(EndgeSource)
+    expect(Endge.source).toBeInstanceOf(EndgeSource_Module)
   })
 
   it('registers query source strategy by default', () => {
@@ -112,6 +112,18 @@ describe('endgeSource', () => {
       'style',
       'vocab',
     ].every(keyword => keywordPattern?.test(keyword))).toBe(true)
+  })
+
+  it('exposes GraphQL tokens inside gql tagged templates', () => {
+    const tokenizer = Endge.source.resolveLanguageStrategy('query')?.syntax.tokenizer
+    const graphQLOpen = tokenizer?.root.find(rule => rule.next === '@graphql')
+    const graphQLRules = tokenizer?.graphql ?? []
+
+    expect(graphQLOpen?.pattern.test('gql`')).toBe(true)
+    expect(graphQLRules.some(rule => rule.token === 'keyword' && rule.pattern.test('mutation'))).toBe(true)
+    expect(graphQLRules.some(rule => rule.token === 'variable' && rule.pattern.test('$legId'))).toBe(true)
+    expect(graphQLRules.some(rule => rule.token === 'type.identifier' && rule.pattern.test('TypeGHActual'))).toBe(true)
+    expect(graphQLRules.some(rule => rule.next === '@pop' && rule.pattern.test('`'))).toBe(true)
   })
 
   it('compiles query source into query program artifact payload', () => {

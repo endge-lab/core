@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { CONTEXT_STORAGE_KEY, LEGACY_THEME_STORAGE_KEY } from '@/model/config/kernel.config'
-import { EndgeContext } from '@/model/modules/context/endge-context'
+import { EndgeContext_Module } from '@/model/modules/context/EndgeContext_Module'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
 const configuration = TEST_ENDGE_WORKSPACE.configuration
@@ -12,7 +12,7 @@ describe('endgeContext effective default theme', () => {
   })
 
   it('uses the effective default after bootstrap when no preference exists', async () => {
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
     await Promise.resolve()
 
     expect(context.currentTheme).toBe('dark')
@@ -33,7 +33,7 @@ describe('endgeContext effective default theme', () => {
       themePreferenceVersion: 1,
     }))
 
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
     await Promise.resolve()
     context.reconcileCurrentThemeWithWorkspace(configuration)
 
@@ -43,7 +43,7 @@ describe('endgeContext effective default theme', () => {
   it('does not treat an unversioned bootstrap theme as a user preference', async () => {
     localStorage.setItem(CONTEXT_STORAGE_KEY, JSON.stringify({ theme: 'dark' }))
 
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
     await Promise.resolve()
     context.reconcileCurrentThemeWithWorkspace(configuration)
 
@@ -58,7 +58,7 @@ describe('endgeContext effective default theme', () => {
     localStorage.setItem(CONTEXT_STORAGE_KEY, JSON.stringify({ theme: 'dark' }))
     localStorage.setItem(LEGACY_THEME_STORAGE_KEY, 'dark')
 
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
     await Promise.resolve()
     context.reconcileCurrentThemeWithWorkspace(configuration)
 
@@ -70,12 +70,12 @@ describe('endgeContext effective default theme', () => {
   })
 
   it('persists a new explicit preference with its version marker', async () => {
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
     await Promise.resolve()
     context.reconcileCurrentThemeWithWorkspace(configuration)
     context.setCurrentTheme('dark')
 
-    const restored = new EndgeContext()
+    const restored = new EndgeContext_Module()
     await Promise.resolve()
     restored.reconcileCurrentThemeWithWorkspace(configuration)
 

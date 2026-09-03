@@ -8,14 +8,14 @@ import type {
 
 import type {
   EndgeDomainRepositoryReadOnlyError,
-} from '@/model/modules/domain/endge-domain-repository'
+} from '@/model/modules/domain/EndgeDomainRepository_Module'
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Endge } from '@/model/kernel/endge'
-import { EndgeDomain } from '@/model/modules/domain/endge-domain'
+import { EndgeDomain_Module } from '@/model/modules/domain/EndgeDomain_Module'
 import {
-  EndgeDomainRepository,
-} from '@/model/modules/domain/endge-domain-repository'
+  EndgeDomainRepository_Module,
+} from '@/model/modules/domain/EndgeDomainRepository_Module'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
 const DOCUMENT_KEYS = [
@@ -148,7 +148,7 @@ describe('service-backend Core provider', () => {
       moveDocuments: vi.fn(),
       updateWorkspace: vi.fn(),
     }
-    const repository = new EndgeDomainRepository()
+    const repository = new EndgeDomainRepository_Module()
 
     await repository.setup(defaultContext(provider))
     await repository.loadSnapshot(defaultContext(provider))
@@ -168,8 +168,8 @@ describe('service-backend Core provider', () => {
 
   it('maps transport collection names and leaves unsupported Core collections empty', () => {
     const snapshot = liveSnapshot()
-    const domain = new EndgeDomain()
-    const parsePlain = vi.spyOn(EndgeDomain, 'parsePlain').mockReturnValue({} as never)
+    const domain = new EndgeDomain_Module()
+    const parsePlain = vi.spyOn(EndgeDomain_Module, 'parsePlain').mockReturnValue({} as never)
     vi.spyOn(domain, 'importFromSchema').mockImplementation(() => undefined)
 
     domain.mergeFromSnapshot(snapshot)
@@ -249,12 +249,12 @@ describe('service-backend Core provider', () => {
       moveDocuments: vi.fn(),
       updateWorkspace: vi.fn(),
     }
-    const repository = new EndgeDomainRepository()
+    const repository = new EndgeDomainRepository_Module()
     const context = defaultContext(provider)
     await repository.setup(context)
     await repository.loadSnapshot(context)
 
-    const domain = new EndgeDomain()
+    const domain = new EndgeDomain_Module()
     domain.mergeFromSnapshot(snapshot)
 
     expect(repository.getDocumentServerState('actions', 'deleted-action')).toMatchObject({ deletedAt })
@@ -269,7 +269,7 @@ describe('service-backend Core provider', () => {
       snapshot.documents[key] = []
     }
     snapshot.documents.components = [liveDocument('component-sfc-a', { source: '<template />' })]
-    const domain = new EndgeDomain()
+    const domain = new EndgeDomain_Module()
 
     domain.mergeFromSnapshot(snapshot)
 
@@ -304,7 +304,7 @@ describe('service-backend Core provider', () => {
       moveDocuments: vi.fn(),
       updateWorkspace: vi.fn(),
     }
-    const repository = new EndgeDomainRepository()
+    const repository = new EndgeDomainRepository_Module()
     const context = defaultContext(provider)
     await repository.setup(context)
     await repository.loadSnapshot(context)
@@ -369,7 +369,7 @@ describe('service-backend Core provider', () => {
       moveDocuments: vi.fn(),
       updateWorkspace: vi.fn(),
     }
-    const repository = new EndgeDomainRepository()
+    const repository = new EndgeDomainRepository_Module()
     const context = defaultContext(provider)
     await repository.setup(context)
     await repository.loadSnapshot(context)
@@ -412,7 +412,7 @@ describe('service-backend Core provider', () => {
       moveDocuments: vi.fn(),
       updateWorkspace: vi.fn(),
     }
-    const repository = new EndgeDomainRepository()
+    const repository = new EndgeDomainRepository_Module()
     const context = defaultContext(provider)
     await repository.setup(context)
     await repository.loadSnapshot(context)
@@ -456,7 +456,7 @@ describe('service-backend Core provider', () => {
       moveDocuments,
       updateWorkspace: vi.fn(),
     }
-    const repository = new EndgeDomainRepository()
+    const repository = new EndgeDomainRepository_Module()
     const context = defaultContext(provider)
     await repository.setup(context)
     await repository.loadSnapshot(context)
@@ -493,7 +493,7 @@ describe('service-backend Core provider', () => {
       moveDocuments: vi.fn(),
       updateWorkspace: vi.fn(),
     }
-    const repository = new EndgeDomainRepository()
+    const repository = new EndgeDomainRepository_Module()
     await repository.setup(defaultContext(provider))
 
     const mutations = [
@@ -545,9 +545,9 @@ describe('service-backend Core provider', () => {
       vars: {},
       bundleSource: bundle,
     }
-    const repository = new EndgeDomainRepository()
-    const domain = new EndgeDomain()
-    const parsePlain = vi.spyOn(EndgeDomain, 'parsePlain').mockReturnValue({} as never)
+    const repository = new EndgeDomainRepository_Module()
+    const domain = new EndgeDomain_Module()
+    const parsePlain = vi.spyOn(EndgeDomain_Module, 'parsePlain').mockReturnValue({} as never)
     vi.spyOn(domain, 'importFromSchema').mockImplementation(() => undefined)
 
     await repository.setup(context)

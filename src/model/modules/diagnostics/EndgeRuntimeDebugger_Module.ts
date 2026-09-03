@@ -34,7 +34,7 @@ function isAdminUrl(url: string): boolean {
  * start() - создаёт канал и слушает регистрации (вызывать в админке).
  * activate() - регистрирует текущую вкладку как клиент Runtime Debug.
  */
-export class EndgeRuntimeDebugger extends EndgeModule {
+export class EndgeRuntimeDebugger_Module extends EndgeModule {
   /** Канал для отправки (activate) */
   private _channel: BroadcastChannel | null = null
   /** Канал для приёма (start); живёт глобально в админке */

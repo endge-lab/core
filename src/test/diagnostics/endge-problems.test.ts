@@ -2,12 +2,12 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { RMock } from '@/domain/entities/reflect/RMock'
-import { EndgeDiagnostics } from '@/model/modules/diagnostics/endge-diagnostics'
-import { createDiagnosticsEntityOwner, EndgeProblems } from '@/model/modules/diagnostics/endge-problems'
+import { EndgeDiagnostics_Module } from '@/model/modules/diagnostics/EndgeDiagnostics_Module'
+import { createDiagnosticsEntityOwner, EndgeProblems_Module } from '@/model/modules/diagnostics/EndgeProblems_Module'
 
 describe('endgeProblems', () => {
   it('атомарно заменяет problems одного entity owner', () => {
-    const problems = new EndgeProblems()
+    const problems = new EndgeProblems_Module()
     const owner = createDiagnosticsEntityOwner({
       entityType: 'component-sfc',
       id: 'component-1',
@@ -24,7 +24,7 @@ describe('endgeProblems', () => {
   })
 
   it('поддерживает upsert и resolve persistent runtime problems', () => {
-    const problems = new EndgeProblems()
+    const problems = new EndgeProblems_Module()
     const owner = { key: 'runtime:host-1', phase: 'runtime' as const, runtimeId: 'host-1' }
 
     problems.upsert(owner, { key: 'failed', severity: 'error', code: 'runtime.failed', message: 'Failed' })
@@ -37,7 +37,7 @@ describe('endgeProblems', () => {
   })
 
   it('уведомляет telemetry и problems subscribers независимо', async () => {
-    const diagnostics = new EndgeDiagnostics()
+    const diagnostics = new EndgeDiagnostics_Module()
     const telemetryListener = vi.fn()
     const problemsListener = vi.fn()
     diagnostics.telemetry.subscribe(telemetryListener)

@@ -1,11 +1,11 @@
 import type { ProgramArtifact } from '@/domain/types/program/program.types'
 
 import { describe, expect, it } from 'vitest'
-import { EndgeProgram } from '@/model/modules/program/endge-program'
+import { EndgeProgram_Module } from '@/model/modules/program/EndgeProgram_Module'
 
 describe('endgeProgram', () => {
   it('stores and resolves artifacts by id and identity', () => {
-    const program = new EndgeProgram()
+    const program = new EndgeProgram_Module()
     const artifact = makeArtifact('action', 10, 'save-order')
 
     program.beginCompile('test')
@@ -16,7 +16,7 @@ describe('endgeProgram', () => {
   })
 
   it('clear removes artifacts and resets status', () => {
-    const program = new EndgeProgram()
+    const program = new EndgeProgram_Module()
     program.beginCompile('test')
     program.addArtifact(makeArtifact('query', 'q1', 'query-one', 'error'))
 
@@ -30,7 +30,7 @@ describe('endgeProgram', () => {
   })
 
   it('groups diagnostics in snapshots', () => {
-    const program = new EndgeProgram()
+    const program = new EndgeProgram_Module()
     program.beginCompile('test')
     program.addArtifact(makeArtifact('action', 'a1', 'action-one', 'warning'))
     program.addArtifact(makeArtifact('query', 'q1', 'query-one'))
@@ -44,7 +44,7 @@ describe('endgeProgram', () => {
   })
 
   it('stores component tag registry only for the active compile cycle', () => {
-    const program = new EndgeProgram()
+    const program = new EndgeProgram_Module()
     program.beginCompile('test')
     program.setComponentTags([
       { tag: 'Tail', identity: 'aircraft-tail' },

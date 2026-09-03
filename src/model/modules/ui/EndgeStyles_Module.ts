@@ -22,7 +22,7 @@ export interface EndgeStyleResolver {
 }
 
 /** Neutral style registry. Renderer materializers consume its artifacts/resolver. */
-export class EndgeStyles extends EndgeModule {
+export class EndgeStyles_Module extends EndgeModule {
   private _unsubscribeProgram: (() => void) | null = null
   private readonly _placements = new Map<string, {
     artifact: EndgeStyleSheetArtifact

@@ -24,7 +24,7 @@ import { normalizeEntityMeta } from '@/domain/entities/reflect/REntity'
 import { normalizeEndgeWorkspaceDefinition } from '@/domain/entities/reflect/RWorkspace'
 import { ComponentType, FilterType, ParameterType, QueryType } from '@/domain/types/document/document.types'
 import { Endge } from '@/model/kernel/endge'
-import { EndgeDomain, normalizeSnapshotDocuments, normalizeSnapshotFolders } from '@/model/modules/domain/endge-domain'
+import { EndgeDomain_Module, normalizeSnapshotDocuments, normalizeSnapshotFolders } from '@/model/modules/domain/EndgeDomain_Module'
 import { resolveEndgeServiceCollection, resolveEndgeServiceStateCollection } from '@/model/services/document/domain-provider'
 
 /** Explicit error for writes through bundle/plain or a read-only live backend. */
@@ -40,7 +40,7 @@ export class EndgeDomainRepositoryReadOnlyError extends Error {
 }
 
 /** Persistence boundary for live service-backend and read-only local sources. */
-export class EndgeDomainRepository extends EndgeModule {
+export class EndgeDomainRepository_Module extends EndgeModule {
   private _loadedSnapshot: EndgeLiveDomainSnapshot | null = null
   private _domainProvider: EndgeDomainProvider | null = null
   private _domainETag: string | null = null
@@ -535,7 +535,7 @@ export class EndgeDomainRepository extends EndgeModule {
     const key = this._getDomainCollectionKey(documentType)
     const plain = normalizeSnapshotDocuments([document], this._serviceFolderIds())[0]
     const next = getDomainDocumentDescriptor(documentType).materialize(plain)
-    const parsed = EndgeDomain.parsePlain({})
+    const parsed = EndgeDomain_Module.parsePlain({})
     ;(parsed[key] as unknown[]).push(next)
     if (current) {
       Endge.domain.replacePersistedEntity(current, next)

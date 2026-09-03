@@ -60,7 +60,7 @@ defineQuery({
     }))
   })
 
-  it('resolves canonical profile auth through EndgeAuth requests', async () => {
+  it('resolves canonical profile auth through EndgeAuth_Module requests', async () => {
     const request = vi.fn().mockResolvedValue({ data: { ok: true } })
     const resolve = vi.fn().mockResolvedValue({
       profileIdentity: 'payload-auth',

@@ -6,7 +6,7 @@ import type {
   EndgeDiagnosticsConfiguration,
 } from '@/domain/types/diagnostics/diagnostics.types'
 import { describe, expect, it, vi } from 'vitest'
-import { EndgeDiagnostics } from '@/model/modules/diagnostics/endge-diagnostics'
+import { EndgeDiagnostics_Module } from '@/model/modules/diagnostics/EndgeDiagnostics_Module'
 
 /** Создаёт независимую configuration для одного тестового diagnostics module. */
 function configuration(
@@ -39,7 +39,7 @@ function configuration(
 
 describe('endgeDiagnostics', () => {
   it('applies severity policy and keeps only the bounded history tail', () => {
-    const diagnostics = new EndgeDiagnostics()
+    const diagnostics = new EndgeDiagnostics_Module()
     diagnostics.configure(configuration({ minSeverity: 9, maxRecords: 2 }))
 
     expect(diagnostics.debug('hidden')).toBeNull()
@@ -57,7 +57,7 @@ describe('endgeDiagnostics', () => {
   })
 
   it('normalizes correlation, exceptions and sensitive attributes', () => {
-    const diagnostics = new EndgeDiagnostics()
+    const diagnostics = new EndgeDiagnostics_Module()
     diagnostics.configure(configuration())
     const traceId = '0123456789abcdef0123456789abcdef'
     const spanId = '0123456789abcdef'
@@ -89,7 +89,7 @@ describe('endgeDiagnostics', () => {
   })
 
   it('stores one completed record per span and links child logs', () => {
-    const diagnostics = new EndgeDiagnostics()
+    const diagnostics = new EndgeDiagnostics_Module()
     diagnostics.configure(configuration())
     const root = diagnostics.startSpan('compile', { startTimestamp: 100 })
     const child = root.startChild('compile.stores', { startTimestamp: 110 })
@@ -116,7 +116,7 @@ describe('endgeDiagnostics', () => {
   })
 
   it('filters subscriptions, supports replay and isolates listener errors', () => {
-    const diagnostics = new EndgeDiagnostics()
+    const diagnostics = new EndgeDiagnostics_Module()
     diagnostics.configure(configuration())
     diagnostics.warn('warning')
     diagnostics.error('error')
@@ -140,7 +140,7 @@ describe('endgeDiagnostics', () => {
   })
 
   it('enriches logs and spans with context captured at record start', () => {
-    const diagnostics = new EndgeDiagnostics()
+    const diagnostics = new EndgeDiagnostics_Module()
     diagnostics.configure(configuration())
     let actor = { 'user.id': 'user-1', 'session.id': 'session-1' }
     const unregister = diagnostics.registerContextProvider('auth', () => actor)
@@ -169,7 +169,7 @@ describe('endgeDiagnostics', () => {
   })
 
   it('isolates context provider errors from record producers', () => {
-    const diagnostics = new EndgeDiagnostics()
+    const diagnostics = new EndgeDiagnostics_Module()
     diagnostics.configure(configuration())
     diagnostics.registerContextProvider('broken', () => {
       throw new Error('context failed')
@@ -181,7 +181,7 @@ describe('endgeDiagnostics', () => {
   })
 
   it('routes matching records to adapters and flushes them best-effort', async () => {
-    const diagnostics = new EndgeDiagnostics()
+    const diagnostics = new EndgeDiagnostics_Module()
     const accept = vi.fn()
     const flush = vi.fn()
     const adapter: DiagnosticsAdapter = { id: 'memory', acceptRecord: accept, flush }
@@ -213,7 +213,7 @@ describe('endgeDiagnostics', () => {
   })
 
   it('does not let a rejected adapter promise break the producer', async () => {
-    const diagnostics = new EndgeDiagnostics()
+    const diagnostics = new EndgeDiagnostics_Module()
     diagnostics.configure({
       ...configuration(),
       telemetry: {
@@ -241,7 +241,7 @@ describe('endgeDiagnostics', () => {
   })
 
   it('routes one record to an output once when several routes match', () => {
-    const diagnostics = new EndgeDiagnostics()
+    const diagnostics = new EndgeDiagnostics_Module()
     const acceptRecord = vi.fn()
     const base = configuration()
     diagnostics.configure({
@@ -263,7 +263,7 @@ describe('endgeDiagnostics', () => {
   })
 
   it('creates an automatic snapshot only when the sliding window threshold is reached', () => {
-    const diagnostics = new EndgeDiagnostics()
+    const diagnostics = new EndgeDiagnostics_Module()
     const acceptSnapshot = vi.fn()
     const base = configuration()
     diagnostics.configure({

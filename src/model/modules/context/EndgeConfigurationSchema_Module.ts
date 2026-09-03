@@ -32,12 +32,12 @@ const PUBLIC_SYSTEM_KEYS = new Set([
 ])
 
 /** Compiles Configuration schemas before effective context resolution. */
-export class EndgeConfigurationSchemaModule extends EndgeModule {
+export class EndgeConfigurationSchema_Module extends EndgeModule {
   private _entries: EndgeConfigurationSchemaEntry[] = []
   private _types: TypeProgramCatalogEntry[] = []
   private _valueDiagnostics = new Map<string, Omit<ProgramDiagnostic, 'entityRef'>[]>()
 
-  override build(_ctx: EndgeBootContext): void {
+  public override build(_ctx: EndgeBootContext): void {
     this._types = buildEarlyTypeCatalog()
     this._entries = Endge.domain.getConfigurations()
       .filter(item => item.deletedAt == null && item.active !== false)
@@ -76,34 +76,34 @@ export class EndgeConfigurationSchemaModule extends EndgeModule {
     this.notify()
   }
 
-  override reset(): void {
+  public override reset(): void {
     this._entries = []
     this._types = []
     this._valueDiagnostics.clear()
     this.notify()
   }
 
-  list(): EndgeConfigurationSchemaEntry[] {
+  public list(): EndgeConfigurationSchemaEntry[] {
     return this._entries.map(entry => this._withValueDiagnostics(entry))
   }
 
-  get(identity: string): EndgeConfigurationSchemaEntry | null {
+  public get(identity: string): EndgeConfigurationSchemaEntry | null {
     const entry = this._entries.find(item => item.identity === identity)
     return entry ? this._withValueDiagnostics(entry) : null
   }
 
-  get typeCatalog(): TypeProgramCatalogEntry[] {
+  public get typeCatalog(): TypeProgramCatalogEntry[] {
     return [...this._types]
   }
 
-  get errors(): Array<{ identity: string, diagnostic: Omit<ProgramDiagnostic, 'entityRef'> }> {
+  public get errors(): Array<{ identity: string, diagnostic: Omit<ProgramDiagnostic, 'entityRef'> }> {
     return this.list().flatMap(entry => entry.diagnostics
       .filter(diagnostic => diagnostic.severity === 'error')
       .map(diagnostic => ({ identity: entry.identity, diagnostic })))
   }
 
   /** Applies defaults, ignores stale keys and records incompatible active values for Compiler Problems. */
-  resolveValues(input: EndgeConfigurationValues): EndgeConfigurationValues {
+  public resolveValues(input: EndgeConfigurationValues): EndgeConfigurationValues {
     const result: EndgeConfigurationValues = {}
     this._valueDiagnostics.clear()
     for (const entry of this._entries) {

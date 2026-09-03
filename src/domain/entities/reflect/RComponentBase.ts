@@ -3,7 +3,7 @@ import { TypeRecord } from '@endge/utils'
 import { Expose } from 'class-transformer'
 import { REntity } from '@/domain/entities/reflect/REntity'
 import { RField } from '@/domain/entities/reflect/RField'
-import { ComponentKind } from '@/domain/types/types'
+import { ComponentKind } from '@/domain/types/component/component.types'
 
 /**
  * Архивная persisted-модель legacy-компонента.

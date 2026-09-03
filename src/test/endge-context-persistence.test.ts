@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { EndgeContext } from '@/model/modules/context/endge-context'
+import { EndgeContext_Module } from '@/model/modules/context/EndgeContext_Module'
 import { DisabledContextAdapter } from '@/model/modules/context/persistence/adapters/DisabledContextAdapter'
 import { LocalStorageContextAdapter } from '@/model/modules/context/persistence/adapters/LocalStorageContextAdapter'
 import { buildRuntimeStateStorageKey, RuntimeStateController } from '@/model/modules/context/persistence/RuntimeStateController'
@@ -11,7 +11,7 @@ describe('endgeContext persistence', () => {
   })
 
   it('keeps workspace unresolved until the backend selects it', () => {
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
     context.deserialize(undefined)
 
     expect(context.getCurrentWorkspace()).toBeNull()
@@ -20,7 +20,7 @@ describe('endgeContext persistence', () => {
   })
 
   it('normalizes empty non-workspace scope values to defaults', () => {
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
 
     context.setCurrentWorkspace('workspace-a')
     context.setCurrentTenant('')
@@ -38,7 +38,7 @@ describe('endgeContext persistence', () => {
   })
 
   it('uses session provider for user and tenant scope', () => {
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
     context.setCurrentWorkspace('workspace-a')
     context.setCurrentProject('project-a')
     context.setCurrentEnvironment('prod')
@@ -56,7 +56,7 @@ describe('endgeContext persistence', () => {
   })
 
   it('keeps structural coordinates immutable until reset', () => {
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
     context.setup({
       dataProvider: 'plain',
       scope: {},
@@ -73,7 +73,7 @@ describe('endgeContext persistence', () => {
   })
 
   it('serializes new context fields and reads legacy snapshots', () => {
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
 
     context.deserialize({
       project: 'legacy-project',
@@ -94,7 +94,7 @@ describe('endgeContext persistence', () => {
   })
 
   it('resolves Workspace data mode with a non-persisted host override', async () => {
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
     context.deserialize({ project: 'project-a', environment: 'prod' })
     await Promise.resolve()
 
@@ -228,7 +228,7 @@ describe('endgeContext persistence', () => {
   })
 
   it('notifies subscribers when locale changes', () => {
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
     context.deserialize(undefined)
     const listener = vi.fn()
 
@@ -241,7 +241,7 @@ describe('endgeContext persistence', () => {
   })
 
   it('persists the current user theme inside the context snapshot', async () => {
-    const context = new EndgeContext()
+    const context = new EndgeContext_Module()
     context.deserialize(undefined)
     await Promise.resolve()
 

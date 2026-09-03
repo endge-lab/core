@@ -17,7 +17,7 @@ import { Endge } from '@/model/kernel/endge'
 const EMPTY_CONTRIBUTION: EndgeConfigurationContribution = { mode: 'inherit', patch: {} }
 
 /** Владеет effective configuration и immutable build context одного boot lifecycle. */
-export class EndgeConfigurationModule extends EndgeModule {
+export class EndgeConfiguration_Module extends EndgeModule {
   private _current: EndgeConfiguration | null = null
   private _buildContext: EndgeBuildContext | null = null
 
@@ -74,7 +74,7 @@ export class EndgeConfigurationModule extends EndgeModule {
   }
 
   /** Возвращает effective configuration текущего build. */
-  get current(): EndgeConfiguration {
+  public get current(): EndgeConfiguration {
     if (!this._current) {
       throw new Error('[EndgeConfiguration] Configuration has not been resolved')
     }
@@ -82,7 +82,7 @@ export class EndgeConfigurationModule extends EndgeModule {
   }
 
   /** Возвращает immutable compiler input текущего build. */
-  get buildContext(): EndgeBuildContext {
+  public get buildContext(): EndgeBuildContext {
     if (!this._buildContext) {
       throw new Error('[EndgeConfiguration] Build context has not been resolved')
     }
@@ -90,30 +90,30 @@ export class EndgeConfigurationModule extends EndgeModule {
   }
 
   /** Показывает, завершено ли configuration resolution. */
-  get isResolved(): boolean {
+  public get isResolved(): boolean {
     return this._current != null
   }
 
   /** Нормализует locale относительно effective configuration. */
-  normalizeLocale(locale: string | null | undefined): string {
+  public normalizeLocale(locale: string | null | undefined): string {
     const value = String(locale ?? '').trim()
     return this.current.locales.some(item => item.code === value) ? value : this.current.defaultLocale
   }
 
   /** Нормализует theme относительно effective configuration. */
-  normalizeTheme(theme: string | null | undefined): string {
+  public normalizeTheme(theme: string | null | undefined): string {
     const value = String(theme ?? '').trim()
     return this.current.themes.some(item => item.identity === value) ? value : this.current.defaultTheme
   }
 
   /** Нормализует timezone относительно effective configuration. */
-  normalizeTimezone(timezone: string | null | undefined): string {
+  public normalizeTimezone(timezone: string | null | undefined): string {
     const value = String(timezone ?? '').trim()
     return this.current.timezones.some(item => item.identity === value) ? value : this.current.defaultTimezone
   }
 
   /** Вычисляет upstream snapshot для общего редактора указанного слоя. */
-  resolveUpstream(layer: EndgeConfigurationLayer): EndgeConfiguration {
+  public resolveUpstream(layer: EndgeConfigurationLayer): EndgeConfiguration {
     let configuration = normalizeEndgeConfiguration(Endge.workspace.current.configuration)
     configuration.values = Endge.configurationSchema.resolveValues(configuration.values)
     if (layer === 'workspace' || layer === 'tenant') {
@@ -139,7 +139,7 @@ export class EndgeConfigurationModule extends EndgeModule {
   }
 
   /** Builds a preview without mutating active boot configuration. */
-  preview(upstream: EndgeConfiguration, contribution: EndgeConfigurationContribution): EndgeConfiguration {
+  public preview(upstream: EndgeConfiguration, contribution: EndgeConfigurationContribution): EndgeConfiguration {
     const result = applyEndgeConfigurationContribution(upstream, contribution)
     result.values = Endge.configurationSchema.resolveValues(result.values)
     return result

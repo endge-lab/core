@@ -9,14 +9,14 @@ describe('endge module ownership', () => {
     expect(Endge.hasModule('updates')).toBe(true)
   })
 
-  it('owns auth profiles through EndgeAuth without a parallel module', () => {
+  it('owns auth profiles through EndgeAuth_Module without a parallel module', () => {
     expect(Endge.hasModule('authProfiles')).toBe(false)
     expect(Endge.auth.profiles).toBeDefined()
     expect(Endge.auth.session).toBeDefined()
     expect(Endge.auth.requests).toBeDefined()
   })
 
-  it('owns execution services through EndgeRuntime', () => {
+  it('owns execution services through EndgeRuntime_Module', () => {
     for (const key of ['query', 'dataView', 'composition', 'actions', 'computations', 'converters']) {
       expect(Endge.hasModule(key)).toBe(false)
     }
@@ -29,7 +29,7 @@ describe('endge module ownership', () => {
     expect(Endge.converters).toBe(Endge.runtime.converters)
   })
 
-  it('owns effective variables through EndgeWorkspace', () => {
+  it('owns effective variables through EndgeWorkspace_Module', () => {
     expect(Endge.hasModule('vars')).toBe(false)
     expect(Endge.vars).toBe(Endge.workspace.variables)
   })
