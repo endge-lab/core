@@ -3,10 +3,15 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Endge } from '@/kernel/endge'
 
 describe('type importers', () => {
-  afterEach(() => Endge.domain.reset())
+  afterEach(() => {
+    Endge.documentImport.reset()
+    Endge.domain.reset()
+  })
 
-  it('writes OpenAPI fields to canonical Type Source', () => {
-    Endge.domain.mergeYamlOpenApi(`
+  it('prepares OpenAPI fields as canonical Type Source without mutating Domain', () => {
+    const plan = Endge.documentImport.prepare({
+      format: 'openapi',
+      source: `
 openapi: 3.0.0
 components:
   schemas:
@@ -22,10 +27,13 @@ components:
         tags:
           type: array
           items: { type: string }
-`)
+`,
+    })
 
-    const type = Endge.domain.getType('Customer')
-    const compiled = Endge.source.compile('type', type?.source ?? '')
+    const candidate = plan.candidates.find(item => item.identity === 'Customer')
+    const compiled = Endge.source.compile('type', candidate?.sourcePreview ?? '')
+    expect(Endge.domain.getType('Customer')).toBeNull()
+    expect(candidate).toMatchObject({ status: 'ready', summary: { fields: 3, requiredFields: 2 } })
     expect(compiled.diagnostics).toEqual([])
     expect(compiled.document).toMatchObject({
       definition: {
@@ -39,15 +47,20 @@ components:
     })
   })
 
-  it('writes GraphQL nullability and custom references to Type Source', () => {
-    Endge.domain.mergeGraphQL(`
+  it('prepares GraphQL nullability and custom references without operation roots', () => {
+    const plan = Endge.documentImport.prepare({
+      format: 'graphql',
+      source: `
       type Customer { id: ID!, orders: [Order!]! }
       type Order { number: String!, note: String }
       type Query { customer: Customer }
-    `)
+    `,
+    })
 
-    const customer = Endge.domain.getType('Customer')
-    const compiled = Endge.source.compile('type', customer?.source ?? '')
+    const customer = plan.candidates.find(item => item.identity === 'Customer')
+    const compiled = Endge.source.compile('type', customer?.sourcePreview ?? '')
+    expect(plan.candidates.map(item => item.identity)).toEqual(['Customer', 'Order'])
+    expect(plan.skipped).toContainEqual(expect.objectContaining({ identity: 'Query' }))
     expect(compiled.document).toMatchObject({
       definition: {
         fields: [

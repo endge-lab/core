@@ -6,6 +6,7 @@ import type { EndgeConfigurationSchema_Module } from '@/modules/configuration/En
 import type { WorkspaceVariables } from '@/modules/context/endge-vars'
 import type { EndgeContext_Module } from '@/modules/context/EndgeContext_Module'
 import type { EndgeDiagnostics_Module } from '@/modules/diagnostics/EndgeDiagnostics_Module'
+import type { EndgeDocumentImport_Module } from '@/modules/document-import/EndgeDocumentImport_Module'
 import type { EndgeDomainRepository_Module } from '@/modules/domain-repository/EndgeDomainRepository_Module'
 import type { EndgeDomain_Module } from '@/modules/domain/EndgeDomain_Module'
 import type { EndgeRuntimeDebugger_Module } from '@/modules/EndgeRuntimeDebugger_Module'
@@ -88,6 +89,11 @@ export class Endge extends EndgeFederation {
    */
   static get domain(): EndgeDomain_Module {
     return this.getModule<EndgeDomain_Module>('domain')
+  }
+
+  /** Доступ к подготовке и применению внешних схем как Domain-документов. */
+  static get documentImport(): EndgeDocumentImport_Module {
+    return this.getModule<EndgeDocumentImport_Module>('documentImport')
   }
 
   /** Доступ к чистому codec локального Domain snapshot. */

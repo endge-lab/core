@@ -49,8 +49,6 @@ import {
 } from '@/modules/domain/entities/RComponent'
 import { RFolder } from '@/modules/domain/entities/RFolder'
 import { ResolvedEntityIndex } from '@/modules/domain/resolved/resolved-entity-index'
-import { parseGraphQLSchema } from '@/modules/domain/services/import/graphql-parser'
-import { parseOpenApiSchema } from '@/modules/domain/services/import/openapi-parser'
 import {
   ComponentType,
   FilterType,
@@ -774,26 +772,6 @@ export class EndgeDomain_Module extends EndgeModule {
     }
 
     this.importFromSchema(EndgeDomain_Module.parsePlain(plain))
-    this.notify()
-  }
-
-  /**
-   * Объединяет доменные данные из GraphQL схемы.
-   */
-  public mergeGraphQL(schema: string): void {
-    for (const type of parseGraphQLSchema(schema)) {
-      this.addType(type)
-    }
-    this.notify()
-  }
-
-  /**
-   * Объединяет доменные данные из Yaml OpenApi схемы.
-   */
-  public mergeYamlOpenApi(schema: string): void {
-    for (const type of parseOpenApiSchema(schema)) {
-      this.addType(type)
-    }
     this.notify()
   }
 

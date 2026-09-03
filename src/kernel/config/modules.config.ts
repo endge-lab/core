@@ -5,6 +5,7 @@ import { EndgeConfiguration_Module } from '@/modules/configuration/EndgeConfigur
 import { EndgeConfigurationSchema_Module } from '@/modules/configuration/EndgeConfigurationSchema_Module'
 import { EndgeContext_Module } from '@/modules/context/EndgeContext_Module'
 import { EndgeDiagnostics_Module } from '@/modules/diagnostics/EndgeDiagnostics_Module'
+import { EndgeDocumentImport_Module } from '@/modules/document-import/EndgeDocumentImport_Module'
 import { EndgeDomainRepository_Module } from '@/modules/domain-repository/EndgeDomainRepository_Module'
 import { EndgeDomain_Module } from '@/modules/domain/EndgeDomain_Module'
 import { EndgeRuntimeDebugger_Module } from '@/modules/EndgeRuntimeDebugger_Module'
@@ -34,6 +35,7 @@ export const ENDGE_CORE_MODULES: EndgeModuleDefinition[] = [
   { key: 'configuration', module: EndgeConfiguration_Module, after: ['workspace', 'domain', 'context', 'configurationSchema'] },
   { key: 'diagnostics', module: EndgeDiagnostics_Module, after: 'configuration' },
   { key: 'source', module: EndgeSource_Module, after: 'domain' },
+  { key: 'documentImport', module: EndgeDocumentImport_Module, after: ['domain', 'domainRepository', 'source', 'types'] },
   { key: 'program', module: EndgeProgram_Module, after: 'domain' },
   { key: 'compiler', module: EndgeCompiler_Module, after: ['domain', 'types', 'configuration', 'diagnostics', 'source', 'program', 'mock'] },
   { key: 'auth', module: EndgeAuth_Module, after: ['configuration', 'domain'] },
