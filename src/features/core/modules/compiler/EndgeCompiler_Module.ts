@@ -927,8 +927,10 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     //
     // Связывает Store fields с Update handlers, Mock data и derived DataView artifacts.
     this._registerHandler<RStore, StoreSourceArtifact>({
+
       //
       entityType: 'store',
+
       //
       compile: (entity, context) => {
         const result = Endge.source.compile('store', entity.source)
