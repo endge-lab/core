@@ -7,17 +7,17 @@ import { compileComputation } from '@/modules/compiler/services/computation/comp
 import { ComputationResourceState } from '@/modules/runtime/execution/computation/ComputationResource'
 import { ComputationResourceRegistry } from '@/modules/runtime/execution/computation/ComputationResourceRegistry'
 
-describe('computationResourceState', () => {
+describe('состояние ресурса Computation', () => {
   afterEach(() => Endge.program.clear())
 
-  it('creates an immediate success resource for sync execution', () => {
+  it('создаёт ресурс с немедленным успешным результатом для синхронного выполнения', () => {
     const resource = new ComputationResourceState(5, async value => value, value => Number(value) * 2)
     expect(resource.status).toBe('success')
     expect(resource.loading).toBe(false)
     expect(resource.value).toBe(10)
   })
 
-  it('keeps only the latest asynchronous result and disposes subscriptions', async () => {
+  it('сохраняет только последний асинхронный результат и освобождает подписки', async () => {
     const resolvers: Array<(value: number) => void> = []
     const listener = vi.fn()
     const resource = new ComputationResourceState<number>(1, () => new Promise(resolve => resolvers.push(resolve)))
@@ -34,7 +34,7 @@ describe('computationResourceState', () => {
     resource.dispose()
   })
 
-  it('processes each new input reference without serializing content', () => {
+  it('обрабатывает каждую новую ссылку input без сериализации содержимого', () => {
     const run = vi.fn((input: any) => input.process.point.value)
     const resource = new ComputationResourceState(
       { process: { point: { value: 1, code: 'value' } } },
@@ -48,7 +48,7 @@ describe('computationResourceState', () => {
     expect(resource.value).toBe(2)
   })
 
-  it('does not invalidate the renderer for a sync input update pulled by the current render', () => {
+  it('не инвалидирует renderer при синхронном обновлении input, полученном текущим render', () => {
     const onChange = vi.fn()
     const registry = new ComputationResourceRegistry()
     const create = () => new ComputationResourceState(
@@ -65,7 +65,7 @@ describe('computationResourceState', () => {
     registry.dispose()
   })
 
-  it('invalidates the renderer when an async resource settles after the render', async () => {
+  it('инвалидирует renderer, когда асинхронный ресурс завершается после render', async () => {
     let resolve = (_value: number): void => undefined
     const onChange = vi.fn()
     const registry = new ComputationResourceRegistry()
@@ -81,7 +81,7 @@ describe('computationResourceState', () => {
     registry.dispose()
   })
 
-  it('uses a local identity override as a full replacement without fallback', () => {
+  it('использует локальное переопределение identity как полную замену без fallback', () => {
     const compiled = compileComputation({
       source: 'defineComputation({ outputs: { value: 1 }, result: output(\'value\') })',
     })

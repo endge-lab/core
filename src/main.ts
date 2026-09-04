@@ -1,7 +1,7 @@
 /* eslint-disable perfectionist/sort-exports -- Публичный API сгруппирован вручную по архитектурным разделам. */
 
 //
-// KERNEL AND MODULE OWNERS
+// ЯДРО И ВЛАДЕЛЬЦЫ МОДУЛЕЙ
 //
 
 export * from '@/kernel/endge'
@@ -46,7 +46,7 @@ export * from '@/modules/diagnostics/domain/entities/DiagnosticsRecordStore'
 export * from '@/modules/diagnostics/domain/entities/DiagnosticsSpan'
 
 //
-// PUBLIC CONTRACTS
+// ПУБЛИЧНЫЕ КОНТРАКТЫ
 //
 
 export * from '@/modules/auth/domain/types/auth-profile.types'
@@ -136,7 +136,7 @@ export * from '@/modules/ui/domain/types/ui.types'
 export * from '@/modules/i18n/domain/i18n.types'
 
 //
-// DOMAIN AND RUNTIME ENTITIES
+// ДОМЕННЫЕ И RUNTIME-СУЩНОСТИ
 //
 
 export * from '@/kernel/EndgeModuleController'

@@ -1,7 +1,7 @@
 import type { ProgramDiagnostic } from '@/modules/program/domain/types/program.types'
 import type { TypeSourceExpression } from '@/modules/source/domain/types/type-source.types'
 
-/** JSON-serializable persisted configuration value. */
+/** Сохраняемое JSON-сериализуемое значение конфигурации. */
 export type EndgeJSONValue
   = | null
     | boolean
@@ -10,7 +10,7 @@ export type EndgeJSONValue
     | EndgeJSONValue[]
     | { [key: string]: EndgeJSONValue }
 
-/** One source-backed user setting. */
+/** Одна пользовательская настройка на основе Source. */
 export interface ConfigurationSourceValueDefinition {
   key: string
   type: TypeSourceExpression
@@ -23,12 +23,12 @@ export interface ConfigurationSourceValueDefinition {
   step?: number
 }
 
-/** Canonical Configuration Source v1 document. */
+/** Канонический документ Configuration Source v1. */
 export interface ConfigurationSourceDocument {
   values: ConfigurationSourceValueDefinition[]
 }
 
-/** Early/compiler-facing Configuration artifact. */
+/** Ранний артефакт Configuration для компилятора. */
 export interface ConfigurationProgramPayload {
   type: 'configuration'
   identity: string
@@ -40,7 +40,7 @@ export interface ConfigurationProgramPayload {
 export interface ConfigurationSourceCompileResult {
   ast: unknown | null
   document: ConfigurationSourceDocument | null
-  /** Best-effort AST projection for visual repair when semantic diagnostics block compilation. */
+  /** Best-effort проекция AST для визуального исправления, когда семантическая диагностика блокирует компиляцию. */
   draftDocument?: ConfigurationSourceDocument | null
   diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
 }

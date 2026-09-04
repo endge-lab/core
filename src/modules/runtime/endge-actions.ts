@@ -79,7 +79,7 @@ export class EndgeActions extends Subscribable {
     this.reset()
   }
 
-  /** Rebuilds code-owned defaults. Local application code registers again after reset. */
+  /** Перестраивает defaults из кода. Локальный код приложения регистрирует их заново после reset. */
   public reset(): void {
     if (this._hasSynchronizedResolvedIndex) {
       for (const identity of this._codeActions.keys()) {
@@ -99,7 +99,7 @@ export class EndgeActions extends Subscribable {
     this.notify()
   }
 
-  /** Installs a serializable code-owned semantic definition without executable code. */
+  /** Устанавливает сериализуемое семантическое определение из кода без исполняемого кода. */
   public define(definition: ActionDefinitionDescriptor): () => void {
     if (this._findAction(definition.identity)) {
       throw new Error(`Action identity collision: ${definition.identity}. Use Endge.actions.override() explicitly.`)
@@ -112,7 +112,7 @@ export class EndgeActions extends Subscribable {
     return this._defineCodeAction({ ...definition, owner }, definition.origin)
   }
 
-  /** Installs executable code separately from its semantic definition. */
+  /** Устанавливает исполняемый код отдельно от его семантического определения. */
   public provide(provider: ActionProviderDescriptor): () => void {
     const action = this._findAction(provider.identity)
     if (!action) {
@@ -128,7 +128,7 @@ export class EndgeActions extends Subscribable {
     })
   }
 
-  /** Binds local code over an existing Action without mutating its definition. */
+  /** Привязывает локальный код к существующему Action без изменения его определения. */
   public override(override: ActionOverrideInput): () => void {
     const action = this._findAction(override.identity)
     if (!action) {
@@ -152,7 +152,7 @@ export class EndgeActions extends Subscribable {
     }
   }
 
-  /** Executes a resolved Action through the generic implementation pipeline. */
+  /** Выполняет вычисленный Action через общий pipeline реализации. */
   public async execute<TResult = unknown>(
     identity: RuntimeActionId,
     optionsOrContext: ActionExecuteOptions | RuntimeActionContext = {},
@@ -191,7 +191,7 @@ export class EndgeActions extends Subscribable {
     })
   }
 
-  /** Returns effective definitions for palettes and the Domain Widget. */
+  /** Возвращает фактические определения для палитр и Domain Widget. */
   public listResolved(): ResolvedActionDescriptor[] {
     this._syncResolvedIndex()
     const all = [...Endge.domain.getActions(), ...Endge.domain.resolved.list<RAction>('action')]
@@ -204,7 +204,7 @@ export class EndgeActions extends Subscribable {
     return [...unique.values()].map(action => this._describe(action)).sort((left, right) => left.identity.localeCompare(right.identity))
   }
 
-  /** Compatibility projection for existing context-menu code. */
+  /** Проекция совместимости для существующего кода контекстного меню. */
   public list(input?: { surface?: string }): RuntimeAction[] {
     return this.listResolved()
       .filter(action => !input?.surface || action.identity.startsWith(input.surface === 'table-column-header' ? 'table.' : ''))
@@ -219,12 +219,12 @@ export class EndgeActions extends Subscribable {
     return this._findAction(id) != null
   }
 
-  /** Compiler inspection API for code-owned identity collision diagnostics. */
+  /** API инспекции компилятора для диагностики конфликтов identity, принадлежащих коду. */
   public getCodeDefinition(identity: string): RAction | null {
     return this._codeActions.get(String(identity ?? '').trim()) ?? null
   }
 
-  /** Returns the semantic definition regardless of storage origin. */
+  /** Возвращает семантическое определение независимо от источника хранения. */
   public getDefinition(identity: string): RAction | null {
     return this._findAction(identity)
   }
@@ -438,7 +438,7 @@ export class EndgeActions extends Subscribable {
     }
   }
 
-  /** Bridges typed Action invocation to the legacy context-menu adapter during migration. */
+  /** Связывает типизированный вызов Action с legacy-адаптером контекстного меню на время миграции. */
   private _tableInvocationContext(invocation: ImplementationInvocation): TableColumnActionContext {
     const context = invocation.context ?? {}
     const input = invocation.input != null && typeof invocation.input === 'object' && !Array.isArray(invocation.input)

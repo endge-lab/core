@@ -57,7 +57,7 @@ export class AuthRequestResolver {
     return session
   }
 
-  /** Publishes the typed host signal before the request fails. */
+  /** Публикует типизированный сигнал host до завершения запроса с ошибкой. */
   private _throwInteractionRequired(profileIdentity: string): never {
     this._publishAndThrow(new AuthInteractionRequiredError(profileIdentity))
   }

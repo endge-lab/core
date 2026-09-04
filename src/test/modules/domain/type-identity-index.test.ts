@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { EndgeDomain_Module } from '@/modules/domain/EndgeDomain_Module'
 import { RType } from '@/modules/domain/entities/RType'
 
-describe('endgeDomain type identity index', () => {
-  it('removes the old identity entry after the model identity was changed', () => {
+describe('индекс identity типов EndgeDomain', () => {
+  it('удаляет старую запись identity после изменения identity модели', () => {
     const domain = new EndgeDomain_Module()
     const type = new RType('Flight')
     type.identity = 'original-flight'

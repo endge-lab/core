@@ -14,8 +14,8 @@ function createToken(payload: Record<string, unknown>): string {
   return `header.${encoded}.signature`
 }
 
-describe('endge auth context', () => {
-  it('extracts stable subject and session id without exposing full claims', () => {
+describe('контекст авторизации Endge', () => {
+  it('извлекает стабильные subject и ID сессии без раскрытия полных claims', () => {
     const accessToken = createToken({
       sub: 'user-from-access',
       sid: 'session-from-access',
@@ -36,7 +36,7 @@ describe('endge auth context', () => {
     })
   })
 
-  it('prefers userinfo subject and accepts Keycloak session_state fallback', () => {
+  it('предпочитает subject из userinfo и принимает резервный session_state Keycloak', () => {
     expect(createEndgeAuthContext({
       authenticated: true,
       accessToken: createToken({ sub: 'token-user' }),
@@ -49,7 +49,7 @@ describe('endge auth context', () => {
     })
   })
 
-  it('returns anonymous context for inactive auth and ignores malformed JWT', () => {
+  it('возвращает анонимный контекст для неактивной авторизации и игнорирует некорректный JWT', () => {
     expect(createEndgeAuthContext({
       authenticated: false,
       accessToken: createToken({ sub: 'must-not-leak' }),

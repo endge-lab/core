@@ -10,10 +10,10 @@ const output = {
   options: { format: 'json' },
 }
 
-describe('consoleDiagnosticsAdapter memory safety', () => {
+describe('безопасность памяти ConsoleDiagnosticsAdapter', () => {
   afterEach(() => vi.restoreAllMocks())
 
-  it('does not serialize telemetry records in snapshots', () => {
+  it('не сериализует записи телеметрии в snapshots', () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {})
     const adapter = new ConsoleDiagnosticsAdapter(output)
     const largeBody = 'response-row'.repeat(10_000)
@@ -34,7 +34,7 @@ describe('consoleDiagnosticsAdapter memory safety', () => {
     expect(text).not.toContain('response-row')
   })
 
-  it('bounds JSON record bodies and keeps only attribute names', () => {
+  it('ограничивает тела JSON-записей и сохраняет только имена атрибутов', () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {})
     const adapter = new ConsoleDiagnosticsAdapter(output)
 

@@ -68,7 +68,7 @@ export interface RuntimeHostContextBase {
 }
 
 export interface ActionRuntimeHostContext extends RuntimeHostContextBase {
-  /** Immutable input of the current Source Action invocation. */
+  /** Неизменяемый вход текущего вызова Action из Source. */
   input: Record<string, unknown>
   result: unknown
   parent?: ActionRuntimeHostContext | null
@@ -186,7 +186,7 @@ export interface RuntimeHostSnapshot {
   context: Record<string, unknown>
 }
 
-/** Lightweight archived descriptor. It deliberately excludes runtime data. */
+/** Лёгкий архивный описатель. Runtime-данные намеренно исключены. */
 export interface DestroyedRuntimeHostSnapshot {
   id: string
   basePath: string
@@ -210,7 +210,7 @@ export interface RuntimeInspectionLease {
 }
 
 export interface RuntimeHostLifecycle {
-  /** Compatibility entrypoint: mount + start. */
+  /** Точка входа совместимости: mount и start. */
   create: () => Promise<void> | void
   mount: () => Promise<void> | void
   start: () => Promise<void> | void

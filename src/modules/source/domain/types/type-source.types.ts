@@ -57,7 +57,7 @@ export type TypeSourceExpression
     | TypeSourceDefinition
     | TypeSourceRecordDefinition
 
-/** Canonical authoring document Type Source v1. */
+/** Канонический authoring-документ Type Source v1. */
 export interface TypeSourceDocument {
   definition: TypeSourceDefinition
 }
@@ -66,7 +66,7 @@ export interface TypeSourceDocument {
 export interface TypeProgramPayload {
   type: 'type'
   sourceVersion: number
-  /** Stable identity of the compiled type. Parser-only artifacts may omit it. */
+  /** Стабильная identity скомпилированного типа. Артефакты только parser могут её не содержать. */
   identity?: string
   displayName?: string
   category?: 'primitive' | 'reference' | 'user'
@@ -78,7 +78,7 @@ export interface TypeProgramPayload {
   }
 }
 
-/** Read-only projection used by editors and language tooling. */
+/** Проекция только для чтения, используемая редакторами и языковыми инструментами. */
 export interface TypeProgramCatalogEntry {
   id: string | number
   identity: string

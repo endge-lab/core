@@ -6,14 +6,14 @@ import { Endge } from '@/kernel/endge'
 import { RStyle } from '@/modules/domain/entities/RStyle'
 import { compileEndgeCSS } from '@/modules/styles/services/endgecss-compile'
 
-describe('endge style leases', () => {
+describe('аренда стилей Endge', () => {
   afterEach(() => {
     Endge.styles.reset()
     Endge.program.clear()
     Endge.domain.reset()
   })
 
-  it('reference-counts owners and only suspends a placement after every owner pauses', () => {
+  it('ведёт подсчёт ссылок владельцев и приостанавливает размещение только после паузы каждого владельца', () => {
     installStyle()
     const first = Endge.styles.acquireStyle({ artifactIdentity: 'theme', ownerScopeId: 'a', boundaryId: 'root' })
     const second = Endge.styles.acquireStyle({ artifactIdentity: 'theme', ownerScopeId: 'b', boundaryId: 'root' })
@@ -35,7 +35,7 @@ describe('endge style leases', () => {
     expect(Endge.styles.getActivePlacements()).toEqual([])
   })
 
-  it('keeps boundaries independent and batches async transactions into one notification', async () => {
+  it('сохраняет независимость границ и объединяет асинхронные транзакции в одно уведомление', async () => {
     installStyle()
     const listener = vi.fn()
     const unsubscribe = Endge.styles.subscribe(listener)

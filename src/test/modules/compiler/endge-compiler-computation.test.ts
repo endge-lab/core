@@ -7,7 +7,7 @@ import { RProject } from '@/modules/domain/entities/RProject'
 import { RTenant } from '@/modules/domain/entities/RTenant'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
-describe('endgeCompiler computation dependencies', () => {
+describe('зависимости computation в EndgeCompiler', () => {
   beforeEach(() => prepareCompilerContext())
 
   afterEach(() => {
@@ -18,7 +18,7 @@ describe('endgeCompiler computation dependencies', () => {
     Endge.workspace.reset()
   })
 
-  it('links and executes a sync external computation inside a value-expression chain', () => {
+  it('связывает и выполняет синхронную внешнюю computation внутри цепочки value-выражений', () => {
     Endge.domain.addComputation(computation(1, 'shared.normalize', `defineComputation({
       outputs: {
         result: { label: input('value').trim() },
@@ -49,7 +49,7 @@ describe('endgeCompiler computation dependencies', () => {
     expect(Endge.runtime.computation.runSync('feature.label', { name: '  endge  ' })).toBe('ENDGE')
   })
 
-  it('propagates async execution through external computation calls', async () => {
+  it('распространяет асинхронное выполнение через вызовы внешних computations', async () => {
     Endge.domain.addComputation(computation(1, 'shared.double', `defineComputation({
       outputs: {
         result: typescript({
@@ -76,7 +76,7 @@ describe('endgeCompiler computation dependencies', () => {
     expect(() => Endge.runtime.computation.runSync('feature.total', { value: 5 })).toThrow('requires asynchronous')
   })
 
-  it('rejects missing references and indirect computation cycles during linking', () => {
+  it('отклоняет отсутствующие ссылки и непрямые циклы computation во время связывания', () => {
     Endge.domain.addComputation(computation(1, 'cycle.a', sourceCalling('cycle.b')))
     Endge.domain.addComputation(computation(2, 'cycle.b', sourceCalling('cycle.c')))
     Endge.domain.addComputation(computation(3, 'cycle.c', sourceCalling('cycle.a')))

@@ -63,7 +63,7 @@ export class EndgeRuntime_Module extends EndgeModule {
   private _destroyedSnapshotLeases = new Map<symbol, number>()
   private _destroyingRuntimeIds = new Set<string>()
 
-  /** Retain only bounded lightweight descriptors for an explicit inspector. */
+  /** Сохраняет только ограниченные лёгкие описатели для явного inspector. */
   public acquireDestroyedHostSnapshots(limit: number): RuntimeInspectionLease {
     const token = Symbol('destroyed-runtime-host-snapshots')
     this._destroyedSnapshotLeases.set(token, normalizeInspectionLimit(limit))
@@ -412,9 +412,9 @@ export class EndgeRuntime_Module extends EndgeModule {
    */
   public override async reset(): Promise<void> {
     const hostIds = this._hosts.getAll().map(host => host.id)
-    // Detach the old scope registry synchronously. Existing callers that do
-    // not await reset can no longer attach a new runtime to a scope being
-    // disposed by this reset generation.
+    // Синхронно отсоединяем старый реестр scope. Существующие вызывающие стороны, которые
+    // не ожидают reset, больше не смогут подключить новый runtime к scope, который
+    // освобождается текущим поколением reset.
     const scopesReset = this.scopes.reset()
     for (const runtimeId of hostIds) {
       await this._destroyRuntimeInternal(runtimeId, false)
@@ -446,7 +446,7 @@ export class EndgeRuntime_Module extends EndgeModule {
     this.notify()
   }
 
-  /** Projects effective workspace variables into the runtime Raph namespace. */
+  /** Проецирует фактические переменные workspace в runtime namespace Raph. */
   private _syncWorkspaceVariablesToRaph(): void {
     if (!Endge.workspace.isLoaded) {
       return
@@ -461,7 +461,7 @@ export class EndgeRuntime_Module extends EndgeModule {
     }
   }
 
-  /** Restores persisted runtime filter values independently of workspace variables. */
+  /** Восстанавливает сохранённые значения runtime-фильтров независимо от переменных workspace. */
   private _hydrateRuntimeFilters(): void {
     if (typeof localStorage === 'undefined') {
       return
@@ -622,7 +622,7 @@ export class EndgeRuntime_Module extends EndgeModule {
     return true
   }
 
-  /** Creates the lifecycle root lazily again after a full Endge.reset(). */
+  /** Лениво пересоздаёт корень жизненного цикла после полного Endge.reset(). */
   private _ensureLifecycleAppScope(appScope: RuntimeAppScope): RuntimeScope {
     const id = `runtime-scope:${appScope.id}`
     const existing = this.scopes.get(id)

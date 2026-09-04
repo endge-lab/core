@@ -16,7 +16,7 @@ export interface ExecuteRuntimeOperationOptions {
   redo?: ((context: RuntimeOperationContext) => Promise<unknown>) | null
 }
 
-/** Executes one immutable Operation snapshot and owns the common History cursor semantics. */
+/** Выполняет один неизменяемый snapshot Operation и владеет общей семантикой курсора History. */
 export async function executeRuntimeOperation(options: ExecuteRuntimeOperationOptions): Promise<unknown> {
   const snapshot = cloneAndFreeze(options.input)
   const runOutput = await options.run({ input: snapshot })

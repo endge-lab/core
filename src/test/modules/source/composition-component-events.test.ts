@@ -8,8 +8,8 @@ const sourceHead = `defineComposition({
     table: component('telegraph').withProps({ rows: fromData('telegraph.rows') }),
   },`
 
-describe('composition Component event source', () => {
-  it('allows automatic Component dispatchTo without Stream batching', () => {
+describe('проверка Source событий Component в Composition', () => {
+  it('разрешает автоматический dispatchTo для Component без пакетной обработки Stream', () => {
     const result = compileCompositionSource(`defineComposition({
       data: { telegraph: store('telegraph') },
       runtimes: {
@@ -23,7 +23,7 @@ describe('composition Component event source', () => {
     expect(result.artifact?.runtimes[0]?.dispatchTo).toEqual(['telegraph'])
   })
 
-  it('compiles named Update, inline mutation and Action effects', () => {
+  it('компилирует эффекты именованного Update, inline-изменения и Action', () => {
     const result = compileCompositionSource(`${sourceHead}
       hooks: [
         onEvent('table', 'edited').applyUpdate(data('telegraph'), update('telegraph-update-row')),
@@ -45,7 +45,7 @@ describe('composition Component event source', () => {
     ])
   })
 
-  it('rejects multiple terminal effects and non-component sources', () => {
+  it('отклоняет несколько терминальных эффектов и источники не из компонентов', () => {
     const result = compileCompositionSource(`defineComposition({
       data: { telegraph: store('telegraph') },
       runtimes: { query: query('rows') },

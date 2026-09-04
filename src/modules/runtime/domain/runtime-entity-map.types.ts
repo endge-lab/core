@@ -20,13 +20,13 @@ export interface RuntimeEntityModelMap {
   'component-sfc': RComponentSFC
   /** Доменная модель запроса. */
   'query': RQuery
-  /** Source-first Filter runtime. */
+  /** Source-first runtime для Filter. */
   'filter': RFilter
-  /** Runtime orchestration graph. */
+  /** Граф оркестрации runtime. */
   'composition': RComposition
-  /** Source-first reactive Store runtime. */
+  /** Source-first реактивный runtime Store. */
   'store': RStore
-  /** External or emulated normalized event stream. */
+  /** Внешний или эмулируемый нормализованный поток событий. */
   'stream': RStream
   /** Доменная модель action. */
   'action': RAction

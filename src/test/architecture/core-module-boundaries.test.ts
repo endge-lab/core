@@ -33,12 +33,12 @@ function collectNamedDirectories(root: string, name: string): string[] {
   })
 }
 
-describe('core module-first boundaries', () => {
-  it('does not keep legacy global production layers', () => {
+describe('границы Core с приоритетом модулей', () => {
+  it('не сохраняет legacy-глобальные production-слои', () => {
     expect(LEGACY_PRODUCTION_ROOTS.filter(existsSync)).toEqual([])
   })
 
-  it('keeps local domain slices independent from implementations and global Endge', () => {
+  it('сохраняет локальные domain-срезы независимыми от реализаций и глобального Endge', () => {
     const domainRoots = new Set([
       ...collectNamedDirectories(MODULES_ROOT, 'domain'),
       join(MODULES_ROOT, 'domain', 'component'),
@@ -55,7 +55,7 @@ describe('core module-first boundaries', () => {
     expect(violations).toEqual([])
   })
 
-  it('uses folders only for structured Modules and files for leaf Modules', () => {
+  it('использует папки только для структурированных Modules, а файлы — для leaf Modules', () => {
     const entries = readdirSync(MODULES_ROOT, { withFileTypes: true })
     const invalidLeafFiles = entries
       .filter(entry => entry.isFile() && extname(entry.name) === '.ts')

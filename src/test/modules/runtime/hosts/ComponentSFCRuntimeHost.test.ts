@@ -16,7 +16,7 @@ import { RuntimeBoundaryUpdatePhase } from '@/modules/runtime/helpers/raph-phase
 import { ComponentSFCRuntimeHost } from '@/modules/runtime/hosts/ComponentSFCRuntimeHost'
 import { OperationHistory } from '@/modules/runtime/operation/operation-history'
 
-describe('componentSFCRuntimeHost', () => {
+describe('проверка Host runtime для ComponentSFC', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     Endge.styles.reset()
@@ -25,7 +25,7 @@ describe('componentSFCRuntimeHost', () => {
     Raph.clearPhases()
   })
 
-  it('acquires scoped style on first instance and releases it after the last instance', () => {
+  it('получает стиль scope при первом экземпляре и освобождает после последнего', () => {
     const source = `<template><Text part="label">Hello</Text></template>
 <style lang="endgecss" scoped>
 ::part(label) { color: red; }
@@ -63,7 +63,7 @@ describe('componentSFCRuntimeHost', () => {
     expect(Endge.styles.getActivePlacements()).toEqual([])
   })
 
-  it('emits table column boundary patch for Raph-backed row field update', () => {
+  it('отправляет boundary patch колонки таблицы при обновлении поля строки через Raph', () => {
     const source = `<script setup lang="ts">
 defineProps<{
   flights: FlightLeg[]
@@ -218,7 +218,7 @@ defineProps<{
     })
   })
 
-  it('publishes declared Event ports through the host API', async () => {
+  it('публикует объявленные порты Event через API host', async () => {
     const source = `<script setup lang="ts">
 const ports = definePorts({ emits: { opened: event<{ id: string }>() } })
 </script>
@@ -245,7 +245,7 @@ const ports = definePorts({ emits: { opened: event<{ id: string }>() } })
     host.destroy()
   })
 
-  it('runs a compiler-linked Query reaction with evaluated Event and lexical input', async () => {
+  it('выполняет связанную компилятором реакцию Query с вычисленными Event и лексическим input', async () => {
     const source = '<template><Text>Query reaction</Text></template>'
     const artifact = createSFCArtifact(compileComponentSFC(source))
     const model = RComponentSFC.fromPlain({ id: 3, identity: 'query-owner', name: 'Query owner', source })
@@ -308,7 +308,7 @@ const ports = definePorts({ emits: { opened: event<{ id: string }>() } })
     host.destroy()
   })
 
-  it('captures inline Operation event and lexical values for undo and default redo', async () => {
+  it('сохраняет Event встроенной Operation и лексические значения для undo и стандартного redo', async () => {
     const source = '<template><Text>Inline operation</Text></template>'
     const artifact = createSFCArtifact(compileComponentSFC(source))
     const model = RComponentSFC.fromPlain({ id: 31, identity: 'inline-operation-owner', name: 'Inline operation owner', source })
@@ -368,7 +368,7 @@ const ports = definePorts({ emits: { opened: event<{ id: string }>() } })
     host.destroy()
   })
 
-  it('owns one edit session and cancels the previous consumer without publishing', () => {
+  it('владеет одной сессией редактирования и отменяет предыдущего потребителя без публикации', () => {
     const source = '<template><Text value="A" editable /></template>'
     const artifact = createSFCArtifact(compileComponentSFC(source))
     const model = RComponentSFC.fromPlain({ id: 2, identity: 'editable-host', name: 'Editable host', source })

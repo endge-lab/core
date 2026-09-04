@@ -16,8 +16,8 @@ function host(id: string, events: string[]): RuntimeHost<any, any> {
   } as unknown as RuntimeHost<any, any>
 }
 
-describe('runtimeScope lifecycle', () => {
-  it('serializes activation, pauses children-first and reconciles once after dropped updates', async () => {
+describe('жизненный цикл RuntimeScope', () => {
+  it('последовательно выполняет активацию, приостанавливает сначала детей и один раз согласует состояние после пропущенных обновлений', async () => {
     const events: string[] = []
     const parent = new RuntimeScope({
       id: 'parent',
@@ -49,7 +49,7 @@ describe('runtimeScope lifecycle', () => {
     expect(child.state).toBe('active')
   })
 
-  it('rolls back resources in reverse order and is idempotent on deactivate', async () => {
+  it('откатывает ресурсы в обратном порядке и идемпотентно выполняет deactivate', async () => {
     const events: string[] = []
     const scope = new RuntimeScope({ id: 'scope', path: 'scope' })
     scope.resources.add({ id: 'one', kind: 'test', dispose: () => {
@@ -67,7 +67,7 @@ describe('runtimeScope lifecycle', () => {
     expect(scope.snapshot()).toMatchObject({ state: 'inactive', resources: { total: 0 } })
   })
 
-  it('ignores a late activation result after abort by rolling the scope back', async () => {
+  it('игнорирует поздний результат активации после abort, откатывая scope', async () => {
     let release!: () => void
     const scope = new RuntimeScope({
       id: 'late',
@@ -86,7 +86,7 @@ describe('runtimeScope lifecycle', () => {
     expect(scope.state).toBe('inactive')
   })
 
-  it('returns resources and runtime membership to baseline after 100 lifecycle cycles', async () => {
+  it('возвращает ресурсы и состав runtime к исходному состоянию после 100 циклов lifecycle', async () => {
     let generation = 0
     const scope = new RuntimeScope({
       id: 'stress',

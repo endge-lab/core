@@ -12,7 +12,7 @@ export interface TypeScriptTypeDeclarationRange {
   end: number
 }
 
-/** Editor-facing analysis of one top-level TypeScript type declaration. */
+/** Анализ одного объявления типа TypeScript верхнего уровня для редактора. */
 export interface TypeScriptTypeDeclarationAnalysis {
   kind: 'interface' | 'type'
   identity: string
@@ -40,7 +40,7 @@ const PRIMITIVE_REFERENCES: Record<string, string> = {
   TSNullKeyword: 'Null',
 }
 
-/** Parses top-level `interface` and `type` declarations from one TS script block. */
+/** Разбирает объявления `interface` и `type` верхнего уровня из одного script-блока TS. */
 export function analyzeTypeScriptTypeDeclarations(source: string): TypeScriptTypeDeclarationAnalysis[] {
   let ast: any
   try {

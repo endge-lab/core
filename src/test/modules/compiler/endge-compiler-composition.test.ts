@@ -12,7 +12,7 @@ import { RTenant } from '@/modules/domain/entities/RTenant'
 import { RType } from '@/modules/domain/entities/RType'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
-describe('endgeCompiler composition validation', () => {
+describe('проверка Composition в EndgeCompiler', () => {
   beforeEach(() => prepareCompilerContext())
 
   afterEach(() => {
@@ -22,7 +22,7 @@ describe('endgeCompiler composition validation', () => {
     Endge.workspace.reset()
   })
 
-  it('distinguishes missing query model from missing query artifact', () => {
+  it('отличает отсутствие модели Query от отсутствия артефакта Query', () => {
     const composition = createComposition()
 
     const missingModel = Endge.compiler.buildComposition(composition)
@@ -48,7 +48,7 @@ describe('endgeCompiler composition validation', () => {
     ]))
   })
 
-  it('collects all runtime outputs while preserving explicit output selection', () => {
+  it('собирает все runtime outputs, сохраняя явный выбор output', () => {
     const component = new RComponentSFC()
     component.id = 40
     component.identity = 'output-consumer'
@@ -121,7 +121,7 @@ defineComposition({
     })
   })
 
-  it('validates nested Composition references and rejects self-reference', () => {
+  it('проверяет ссылки на вложенные Composition и отклоняет ссылку на себя', () => {
     const composition = createNestedComposition('groundhandling-default')
 
     const missingModel = Endge.compiler.buildComposition(composition)
@@ -146,7 +146,7 @@ defineComposition({
     ]))
   })
 
-  it('accepts public outputs of a compiled nested Composition', () => {
+  it('принимает публичные outputs скомпилированной вложенной Composition', () => {
     const query = new RQuery()
     query.id = 10
     query.identity = 'groundhandling-query'
@@ -199,7 +199,7 @@ defineComposition({
     expect(artifact.status).toBe('valid')
   })
 
-  it('compiles nested Composition dependencies before their consumers', () => {
+  it('компилирует зависимости вложенной Composition до их потребителей', () => {
     const parent = createNestedComposition('groundhandling-default')
     const child = new RComposition()
     child.id = 2
@@ -219,7 +219,7 @@ defineComposition({
     ]))
   })
 
-  it('records component runtimes as component-sfc dependencies', () => {
+  it('записывает runtimes компонентов как зависимости component-sfc', () => {
     const component = new RComponentSFC()
     component.id = 30
     component.identity = 'groundhandling-control-table'
@@ -252,7 +252,7 @@ defineComposition({
     }))
   })
 
-  it('validates explicit Store data bindings against the nested Composition contract', () => {
+  it('проверяет явные bindings данных Store по контракту вложенной Composition', () => {
     const store = new RStore()
     store.id = 20
     store.identity = 'schedule-store'
@@ -293,7 +293,7 @@ defineComposition({
     ]))
   })
 
-  it('validates required public props of a nested Composition', () => {
+  it('проверяет обязательные публичные props вложенной Composition', () => {
     const child = new RComposition()
     child.id = 25
     child.identity = 'requirements-provider'
@@ -331,7 +331,7 @@ defineComposition({
     expect(Endge.compiler.buildComposition(parent).status).toBe('valid')
   })
 
-  it('links public prop change hooks as explicit Query updates', () => {
+  it('связывает hooks изменения публичных props как явные Updates Query', () => {
     const query = new RQuery()
     query.id = 28
     query.identity = 'arrival-pairs'
@@ -381,7 +381,7 @@ defineComposition({
     ])
   })
 
-  it('keeps preview fixture failures non-blocking and indexes RMock dependencies', () => {
+  it('оставляет ошибки preview fixtures неблокирующими и индексирует зависимости RMock', () => {
     const stringType = new RType('String')
     stringType.identity = 'String'
     stringType.displayName = 'String'
@@ -444,7 +444,7 @@ defineComposition({
     }))
   })
 
-  it('reports transitive Composition dependency cycles during compilation', () => {
+  it('сообщает о транзитивных циклах зависимостей Composition во время компиляции', () => {
     const first = createNestedComposition('second')
     first.identity = 'first'
     first.name = 'First'

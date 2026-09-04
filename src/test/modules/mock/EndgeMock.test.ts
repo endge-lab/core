@@ -4,13 +4,13 @@ import { Endge } from '@/kernel/endge'
 import { RMock } from '@/modules/domain/entities/RMock'
 import { EndgeMock_Module } from '@/modules/mock/EndgeMock_Module'
 
-describe('endgeMock', () => {
+describe('проверка Mock в Endge', () => {
   afterEach(() => {
     Endge.domain.reset()
     Endge.mock.reset()
   })
 
-  it('reads JSON from a persisted RMock and returns an independent copy', () => {
+  it('читает JSON из сохранённого RMock и возвращает независимую копию', () => {
     const registry = new EndgeMock_Module()
     Endge.domain.addMock(makeMock({
       identity: 'test.rows',
@@ -23,7 +23,7 @@ describe('endgeMock', () => {
     expect(registry.get('test.rows')).toEqual({ rows: [{ id: 1 }] })
   })
 
-  it('connects a persisted RMock to a code provider', () => {
+  it('подключает сохранённый RMock к провайдеру кода', () => {
     const registry = new EndgeMock_Module()
     Endge.domain.addMock(makeMock({
       identity: 'test.provider',
@@ -39,7 +39,7 @@ describe('endgeMock', () => {
     expect(registry.get('test.provider')).toEqual({ rows: [1, 2] })
   })
 
-  it('starts without hidden builtin providers', () => {
+  it('запускается без скрытых встроенных провайдеров', () => {
     const registry = new EndgeMock_Module()
 
     expect(registry.listProviders()).toEqual([])

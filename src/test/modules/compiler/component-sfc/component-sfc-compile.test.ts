@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { compileComponentSFC } from '@/modules/compiler/services/component-sfc/component-sfc-compile'
 import { isComponentSFCBuiltInTag } from '@/modules/compiler/services/component-sfc/component-sfc-template'
 
-describe('compileComponentSFC', () => {
-  it('extracts preview props without changing the component contract', () => {
+describe('компиляция Component SFC', () => {
+  it('извлекает preview props без изменения контракта компонента', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 defineProps<{
   status: string
@@ -42,7 +42,7 @@ definePreviewProps({
     ])
   })
 
-  it('unwraps a full SFC accidentally stored inside the template block', () => {
+  it('разворачивает полный SFC, случайно сохранённый внутри блока template', () => {
     const result = compileComponentSFC(`<template>
 <script setup lang="ts">
 defineProps<{
@@ -68,7 +68,7 @@ defineProps<{
     expect(result.ir?.template.roots[0]?.kind).toBe('element')
   })
 
-  it('unwraps a full SFC stored inside a default SFC wrapper template', () => {
+  it('разворачивает полный SFC, сохранённый внутри стандартной SFC-обёртки template', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 const props = defineProps<Record<string, unknown>>()
 </script>
@@ -97,7 +97,7 @@ defineProps<{
     expect(result.ir?.template.roots[0]?.kind).toBe('element')
   })
 
-  it('accepts table structural primitives', () => {
+  it('принимает структурные примитивы таблицы', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 defineProps<{
   flights: FlightLeg[]
@@ -122,7 +122,7 @@ defineProps<{
     })
   })
 
-  it('accepts Grid containers and preserves child placement props', () => {
+  it('принимает контейнеры Grid и сохраняет props размещения дочерних узлов', () => {
     const result = compileComponentSFC(`<template>
 <Grid columns="12" gap="2" autoRows="28px">
   <Text colStart="1" colSpan="5" rowStart="1" rowSpan="2">Primary</Text>
@@ -156,7 +156,7 @@ defineProps<{
     expect(isComponentSFCBuiltInTag('Grid')).toBe(true)
   })
 
-  it('extracts entity and node metadata without leaking compiler attributes into IR props', () => {
+  it('извлекает метаданные сущности и узла без утечки атрибутов компилятора в props IR', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 defineProps<{
   flights: FlightLeg[]
@@ -199,7 +199,7 @@ defineMetadata({
     expect(column?.kind === 'element' ? column.props.metadata : undefined).toBeUndefined()
   })
 
-  it('rejects runtime-dependent node metadata', () => {
+  it('отклоняет метаданные узла, зависящие от runtime', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 const columnMetadata = { 'hub.tgo': { attributes: ['BestOn'] } }
 </script>
@@ -215,7 +215,7 @@ const columnMetadata = { 'hub.tgo': { attributes: ['BestOn'] } }
     expect(result.metadata.nodes).toEqual([])
   })
 
-  it('accepts display-only input primitives and preserves their props in IR', () => {
+  it('принимает input-примитивы только для отображения и сохраняет их props в IR', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 defineProps<{
   search: string
@@ -273,7 +273,7 @@ defineProps<{
     ])
   })
 
-  it('normalizes direct user tags and Component is into one component-call IR', () => {
+  it('нормализует прямые пользовательские теги и Component is в единый IR вызова компонента', () => {
     const identities = new Set(['aircraft-tail', 'aircraft-type'])
     const result = compileComponentSFC(`<script setup lang="ts">
 defineProps<{
@@ -337,7 +337,7 @@ defineProps<{
     ])
   })
 
-  it('reports unknown direct tags and missing static Component identities', () => {
+  it('сообщает о неизвестных прямых тегах и отсутствующих статических identities Component', () => {
     const result = compileComponentSFC(`<template>
   <Unknown.Tag />
   <Component is="missing-component" />

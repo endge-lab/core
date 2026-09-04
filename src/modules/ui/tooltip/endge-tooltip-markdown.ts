@@ -3,7 +3,7 @@ import type {
   EndgeTooltipMarkdownInline,
 } from '@/modules/ui/domain/types/tooltip-markdown.types'
 
-/** Parses the intentionally small, safe Tooltip Markdown subset without producing HTML. */
+/** Разбирает намеренно небольшой безопасный поднабор Tooltip Markdown без создания HTML. */
 export function parseEndgeTooltipMarkdown(source: unknown): EndgeTooltipMarkdownBlock[] {
   const lines = String(source ?? '').replace(/\r\n?/g, '\n').split('\n')
   const blocks: EndgeTooltipMarkdownBlock[] = []
@@ -68,7 +68,7 @@ export function parseEndgeTooltipMarkdown(source: unknown): EndgeTooltipMarkdown
   return blocks
 }
 
-/** Stable DOM id for one consumer-scoped tooltip without leaking source values into selectors. */
+/** Стабильный DOM id одного tooltip уровня consumer без утечки значений Source в селекторы. */
 export function createEndgeTooltipDomId(seed: string): string {
   let hash = 0x811C9DC5
   for (let index = 0; index < seed.length; index += 1) {

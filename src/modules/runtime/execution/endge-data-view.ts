@@ -408,8 +408,8 @@ export class EndgeDataView {
   /** Минимальные built-in converters для preview v1. */
   private _convert(identity: string, value: unknown, options?: Record<string, unknown>): unknown {
     // Converter resolution принадлежит общему definition/provider owner.
-    // This also keeps standalone DataView execution compatible with code-owned
-    // definitions which intentionally have no persisted RConverter document.
+    // Это также сохраняет совместимость автономного выполнения DataView с определениями,
+    // принадлежащими коду и намеренно не имеющими сохранённого документа RConverter.
     if (Endge.converters.has(identity)) {
       return Endge.converters.execute(identity, value, options)
     }
@@ -428,7 +428,7 @@ export class EndgeDataView {
     return value
   }
 
-  /** Applies one registered Converter to the current value as a whole. */
+  /** Применяет один зарегистрированный Converter ко всему текущему значению. */
   public convert(identity: string, value: unknown, options?: Record<string, unknown>): unknown {
     return this._convert(identity, value, options)
   }

@@ -27,7 +27,7 @@ import { normalizeEntityMeta } from '@/modules/domain/entities/REntity'
 import { normalizeEndgeWorkspaceDefinition } from '@/modules/domain/entities/RWorkspace'
 import { ComponentType, FilterType, ParameterType, QueryType } from '@/modules/domain/types/document/document.types'
 
-/** Explicit error for writes through bundle/plain or a read-only live backend. */
+/** Явная ошибка записи через bundle/plain или live backend только для чтения. */
 export class EndgeDomainRepositoryReadOnlyError extends Error {
   public readonly code = 'provider_read_only'
 
@@ -39,7 +39,7 @@ export class EndgeDomainRepositoryReadOnlyError extends Error {
   }
 }
 
-/** Persistence boundary for live service-backend and read-only local sources. */
+/** Граница persistence для live service-backend и локальных источников только для чтения. */
 export class EndgeDomainRepository_Module extends EndgeModule {
   private _loadedSnapshot: EndgeLiveDomainSnapshot | null = null
   private _domainProvider: EndgeDomainProvider | null = null

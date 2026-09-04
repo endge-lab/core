@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { compileComponentSFC } from '@/modules/compiler/services/component-sfc/component-sfc-compile'
 
-describe('component SFC Action reactions', () => {
-  it('keeps edited value and previousValue in one Action reaction', () => {
+describe('реакции Action в Component SFC', () => {
+  it('сохраняет изменённое value и previousValue в одной реакции Action', () => {
     const result = compileComponentSFC(`<template>
       <Text value="OLD" editable @edited.stop="action({
         identity: 'schedule-edit-flight-carrier',
@@ -31,7 +31,7 @@ describe('component SFC Action reactions', () => {
     expect(input).toContain('"path":"previousValue"')
   })
 
-  it('preserves the source order of an Action reaction array', () => {
+  it('сохраняет исходный порядок массива реакций Action', () => {
     const result = compileComponentSFC(`<template><Text value="OLD" editable @edited="[
       action({ identity: 'first', input: event() }),
       action({ identity: 'second', input: event() }),
@@ -44,7 +44,7 @@ describe('component SFC Action reactions', () => {
     expect(root.events?.[0]?.actions?.map(action => 'identity' in action ? action.identity : null)).toEqual(['first', 'second'])
   })
 
-  it('compiles an inline Operation with implicit input and shorthand blocks', () => {
+  it('компилирует inline Operation с неявным input и сокращёнными блоками', () => {
     const result = compileComponentSFC(`<template><Text value="OLD" editable @edited="operation({
       run: query({ identity: 'schedule-update', input: { id: rowKey, value: input('value') } }),
       undo: query({ identity: 'schedule-update', input: { id: rowKey, value: input('previousValue') } }),
@@ -64,7 +64,7 @@ describe('component SFC Action reactions', () => {
     expect(result.dependencies.queries).toContain('schedule-update')
   })
 
-  it('compiles explicit operation input and an optional full-block output', () => {
+  it('компилирует явный input operation и необязательный полноформатный output', () => {
     const result = compileComponentSFC(`<template><Text value="OLD" editable @edited="operation({
       input: { id: rowKey, value: event('value'), previousValue: event('previousValue') },
       run: { steps: { request: query({ identity: 'schedule-update', input: { id: input('id'), value: input('value') } }) }, output: output('request') },

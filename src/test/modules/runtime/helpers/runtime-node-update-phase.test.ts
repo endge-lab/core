@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest'
 
 import { RuntimeNodeUpdatePhase } from '@/modules/runtime/helpers/raph-phases/runtime-node-update-phase'
 
-describe('runtimeNodeUpdatePhase', () => {
-  it('routes observed data only to the logical runtime root', () => {
+describe('фаза обновления узлов runtime', () => {
+  it('направляет наблюдаемые данные только в логический корень runtime', () => {
     const kernel = new RaphKernel()
     const runtime = kernel.createRuntime({ id: 'runtime-node-phase', scheduler: RaphSchedulerType.Sync })
     const updates: RuntimeHostUpdateContext[] = []

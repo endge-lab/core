@@ -11,7 +11,7 @@ export type QuerySourceKind = 'rest' | 'graphql'
 /** Политика GraphQL errors в HTTP 2xx response. */
 export type QueryGraphQLErrorPolicy = 'throw' | 'ignore'
 
-/** Static request value or a safe expression evaluated from Query props at runtime. */
+/** Статическое значение запроса или безопасное выражение, вычисляемое из props Query в runtime. */
 export type QuerySourceRequestValue<T> = T | SourceExpressionIR
 
 /** Source-описание HTTP request части REST-запроса. */
@@ -22,16 +22,16 @@ export interface QuerySourceRestRequest {
   /** REST path. В legacy RQuery это поле хранится как query. */
   path: QuerySourceRequestValue<string>
 
-  /** HTTP method. */
+  /** Метод HTTP. */
   method: QuerySourceRequestValue<string>
 
-  /** HTTP headers. */
+  /** Заголовки HTTP. */
   headers: QuerySourceRequestValue<Record<string, string>>
 
-  /** Auth config. */
+  /** Конфигурация авторизации. */
   auth: QuerySourceRequestValue<RQueryAuth>
 
-  /** Request timeout. */
+  /** Таймаут запроса. */
   timeoutMs?: QuerySourceRequestValue<number>
 
   /** Отправлять body как application/x-www-form-urlencoded. */
@@ -58,10 +58,10 @@ export interface QuerySourceGraphQLRequest {
   /** Дополнительные HTTP headers. */
   headers: QuerySourceRequestValue<Record<string, string>>
 
-  /** Auth config. */
+  /** Конфигурация авторизации. */
   auth: QuerySourceRequestValue<RQueryAuth>
 
-  /** Request timeout. */
+  /** Таймаут запроса. */
   timeoutMs?: QuerySourceRequestValue<number>
 
   /** Обработка GraphQL errors в HTTP 2xx response. */
@@ -73,7 +73,7 @@ export interface QuerySourceMock {
   /** Включены ли mock data. */
   enabled: boolean
 
-  /** Mock payload. */
+  /** Mock-данные. */
   data: unknown
 }
 
@@ -91,9 +91,9 @@ export type QueryOutputSource
 export interface QuerySourceOutput {
   key: string
   source: QueryOutputSource
-  /** Ordered transform chain. */
+  /** Упорядоченная цепочка transform. */
   transforms: ResponseOutputTransform[]
-  /** Compatibility projection containing only DataView transforms. */
+  /** Проекция совместимости, содержащая только transforms DataView. */
   dataViews: DataViewRef[]
   contract?: SourceFieldDefinition | null
 }
@@ -104,10 +104,10 @@ interface QuerySourceDocumentBase {
   /** Единственный runtime input contract Query. */
   props: QueryProgramProp[]
 
-  /** Ordered output graph: response/output sources and transformations. */
+  /** Упорядоченный выходной граф: источники response/output и преобразования. */
   outputs: QuerySourceOutputs
 
-  /** Mock config. */
+  /** Конфигурация mock. */
   mock: QuerySourceMock
 }
 
@@ -157,7 +157,7 @@ export type QuerySourcePatch = QuerySourcePatchOperation | QuerySourcePatchOpera
 
 /** Результат компиляции query source. */
 export interface QuerySourceCompileResult {
-  /** Parser-level AST. */
+  /** AST уровня parser. */
   ast: unknown | null
 
   /** Canonical authoring-модель. */

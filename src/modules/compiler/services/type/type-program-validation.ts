@@ -40,12 +40,12 @@ const TYPE_EXPRESSION_BUILTINS = new Set([
   'false',
 ])
 
-/** Returns every named reference without expanding the referenced document. */
+/** Возвращает все именованные ссылки без раскрытия документа, на который они указывают. */
 export function collectTypeDefinitionReferences(definition: TypeSourceDefinition | null): string[] {
   return collectTypeSourceExpressionReferences(definition)
 }
 
-/** Returns every named reference from one recursive source type expression. */
+/** Возвращает все именованные ссылки из одного рекурсивного выражения типа Source. */
 export function collectTypeSourceExpressionReferences(expression: TypeSourceExpression | null | undefined): string[] {
   if (!expression) {
     return []
@@ -55,7 +55,7 @@ export function collectTypeSourceExpressionReferences(expression: TypeSourceExpr
   return [...references]
 }
 
-/** Semantic diagnostics for one Type Source against the compiled/domain catalog. */
+/** Семантическая диагностика одного Type Source по скомпилированному доменному каталогу. */
 export function validateTypeDefinitionReferences(
   definition: TypeSourceDefinition | null,
   knownIdentities: ReadonlySet<string>,
@@ -83,7 +83,7 @@ export function validateTypeDefinitionReferences(
   return diagnostics
 }
 
-/** Diagnostics for a structural inline type expression owned by Query or another source document. */
+/** Диагностика структурного inline-выражения типа, принадлежащего Query или другому Source-документу. */
 export function validateTypeSourceExpressionUsage(
   expression: TypeSourceExpression | null | undefined,
   catalog: readonly TypeProgramCatalogEntry[],
@@ -118,7 +118,7 @@ export function validateTypeSourceExpressionUsage(
   return diagnostics
 }
 
-/** Diagnostics for a type expression owned by Action, Computation, SFC or another document. */
+/** Диагностика выражения типа, принадлежащего Action, Computation, SFC или другому документу. */
 export function validateTypeExpressionUsage(
   expression: string | null | undefined,
   catalog: readonly TypeProgramCatalogEntry[],
@@ -155,14 +155,14 @@ export function validateTypeExpressionUsage(
   return diagnostics
 }
 
-/** Named registry references used by Type Program dependency indexing. */
+/** Именованные ссылки реестра для индексации зависимостей Type Program. */
 export function collectTypeExpressionReferences(expression: string | null | undefined): Set<string> {
   const value = String(expression ?? '').trim()
   const result = new Set<string>()
   for (const match of value.matchAll(/\b[A-Z_$][\w$]*\b/gi)) {
     const token = match[0]
     const tail = value.slice((match.index ?? 0) + token.length)
-    // Property names are part of the TypeScript shape, not Type Registry references.
+    // Имена свойств являются частью структуры TypeScript, а не ссылками Type Registry.
     if (/^\s*(?:\?\s*)?:/.test(tail)) {
       continue
     }
@@ -173,7 +173,7 @@ export function collectTypeExpressionReferences(expression: string | null | unde
   return result
 }
 
-/** Contract mismatch is intentionally non-blocking during the migration. */
+/** Несоответствие контракта намеренно не блокирует работу во время миграции. */
 export function validateTypeCompatibility(
   expected: string | null | undefined,
   actual: string | null | undefined,

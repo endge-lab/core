@@ -3,12 +3,12 @@ import { describe, expect, it } from 'vitest'
 import { normalizeEndgeWorkspaceDefinition } from '@/modules/domain/entities/RWorkspace'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
-describe('endgeWorkspace', () => {
-  it('normalizes one nested configuration document', () => {
+describe('рабочее пространство Endge', () => {
+  it('нормализует один вложенный документ Configuration', () => {
     expect(normalizeEndgeWorkspaceDefinition(TEST_ENDGE_WORKSPACE)).toEqual(TEST_ENDGE_WORKSPACE)
   })
 
-  it('normalizes duplicate and legacy adapter identifiers', () => {
+  it('нормализует повторяющиеся и legacy-идентификаторы адаптеров', () => {
     const workspace = normalizeEndgeWorkspaceDefinition({
       ...TEST_ENDGE_WORKSPACE,
       configuration: {
@@ -20,7 +20,7 @@ describe('endgeWorkspace', () => {
     expect(workspace.configuration.sfcAdapterIds).toEqual(['vue-shadcn', 'customer:aodb'])
   })
 
-  it('migrates persisted Vue Shadcn adapter ids to the canonical adapter id', () => {
+  it('мигрирует сохранённые ID адаптера Vue Shadcn в канонический ID адаптера', () => {
     const workspace = normalizeEndgeWorkspaceDefinition({
       ...TEST_ENDGE_WORKSPACE,
       configuration: {
@@ -34,7 +34,7 @@ describe('endgeWorkspace', () => {
     expect(workspace.configuration.defaultSfcAdapterId).toBe('vue-shadcn')
   })
 
-  it('rejects flat legacy workspace settings', () => {
+  it('отклоняет плоские legacy-настройки Workspace', () => {
     expect(() => normalizeEndgeWorkspaceDefinition({
       identity: 'workspace-a',
       displayName: 'Workspace A',

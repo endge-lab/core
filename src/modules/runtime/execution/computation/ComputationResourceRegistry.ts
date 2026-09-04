@@ -4,11 +4,11 @@ import type {
   ComputationResource as ComputationResourceContract,
 } from '@/modules/domain/types/computation/computation-runtime.types'
 
-/** Host-owned registry that isolates resources by call site and row consumer key. */
+/** Принадлежащий host реестр, изолирующий ресурсы по месту вызова и ключу consumer строки. */
 export class ComputationResourceRegistry {
   private readonly _resources = new Map<string, ComputationResourceState>()
   private readonly _disposers = new Map<string, VoidFunction>()
-  /** Resource inputs currently pulled by the active renderer pass. */
+  /** Входы ресурсов, запрошенные текущим активным проходом renderer. */
   private readonly _updatingInputs = new Set<string>()
 
   getOrCreate(

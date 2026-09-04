@@ -42,8 +42,8 @@ const state = ports.require.state({ process: props.process })
   <GroundHandling.Cell :point="state.target" />
 </template>`
 
-describe('componentSFC ports compiler', () => {
-  it('compiles required Query ports and flat per-instance provider bindings', () => {
+describe('компилятор портов Component SFC', () => {
+  it('компилирует обязательные порты Query и плоские bindings провайдеров для каждого экземпляра', () => {
     const child = compileComponentSFC(`<script setup lang="ts">
 interface UpdateInput { legId: String; utcTime: DateTime }
 const ports = definePorts({
@@ -106,7 +106,7 @@ const ports = definePorts({
     expect((parent.ir?.template.roots[0] as any).props['update-actual-time']).toBeUndefined()
   })
 
-  it('rejects prop and port name collisions', () => {
+  it('отклоняет конфликты имён prop и порта', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 defineProps<{ updateActualTime: String }>()
 const ports = definePorts({
@@ -121,7 +121,7 @@ const ports = definePorts({
     ]))
   })
 
-  it('compiles sourced Events with direct Action input mappings', () => {
+  it('компилирует Events из source с прямыми mappings input Action', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 const ports = definePorts({
   emits: {
@@ -157,7 +157,7 @@ const ports = definePorts({
     expect(result.dependencies.actions).toContain('flight.open-details')
   })
 
-  it('compiles sandboxed Event effects and rejects a direct self cycle', () => {
+  it('компилирует изолированные эффекты Event и отклоняет прямой цикл на себя', () => {
     const valid = compileComponentSFC(`<script setup lang="ts">
 const ports = definePorts({
   emits: {
@@ -200,7 +200,7 @@ const ports = definePorts({ emits: {
     ]))
   })
 
-  it('adds the intrinsic Table Event manifest to wildcard forwarding', () => {
+  it('добавляет встроенный manifest Event таблицы в wildcard-forwarding', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 const ports = definePorts({ forward: { from: 'table', ports: { emits: '*' } } })
 </script><template><Table ref="table" :rows="[]" /></template>`)
@@ -211,7 +211,7 @@ const ports = definePorts({ forward: { from: 'table', ports: { emits: '*' } } })
     ])
   })
 
-  it('publishes a click from a referenced Text tag and compiles a local stopped reaction', () => {
+  it('публикует click из ссылочного тега Text и компилирует локальную остановленную реакцию', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 const ports = definePorts({
   emits: {
@@ -245,7 +245,7 @@ const ports = definePorts({
     expect(result.dependencies.actions).toContain('flight.open-details')
   })
 
-  it('compiles a direct Query reaction with lexical and Event input mappings', () => {
+  it('компилирует прямую реакцию Query с лексическими mappings и mappings input Event', () => {
     const result = compileComponentSFC(`<template>
   <Text
     value="A320"
@@ -275,7 +275,7 @@ const ports = definePorts({
     expect(result.dependencies.queries).toContain('schedule-sandbox-update-leg')
   })
 
-  it('forwards all intrinsic public Table Actions with forward wildcard', () => {
+  it('перенаправляет все встроенные публичные Actions Table через wildcard forward', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 const ports = definePorts({
   forward: '*',
@@ -294,7 +294,7 @@ const ports = definePorts({
     ]))
   })
 
-  it('forwards different port selections from different component refs', () => {
+  it('перенаправляет разные наборы портов из разных ссылок на компоненты', () => {
     const first = compileComponentSFC(`<script setup lang="ts">
 const ports = definePorts({
   provides: {
@@ -362,7 +362,7 @@ const ports = definePorts({
     expect(result.contract.events).toEqual([{ name: 'firstChanged', payloadType: '{ id: string }' }])
   })
 
-  it('reports forward collisions and unmatched selectors as build diagnostics', () => {
+  it('сообщает о конфликтах forward и несопоставленных селекторах как о диагностике сборки', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 const ports = definePorts({
   forward: [
@@ -382,7 +382,7 @@ const ports = definePorts({
     ]))
   })
 
-  it('rejects the removed request section with a targeted migration diagnostic', () => {
+  it('отклоняет удалённую секцию request с целевой диагностикой миграции', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 const ports = definePorts({
   request: {
@@ -397,7 +397,7 @@ const ports = definePorts({
     ]))
   })
 
-  it('compiles required and provided Actions plus emitted Events into one manifest', () => {
+  it('компилирует требуемые и предоставленные Actions вместе с опубликованными Events в единый manifest', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 interface OpenInput { id: string }
 interface RowActivated { id: string }
@@ -433,7 +433,7 @@ const ports = definePorts({
     expect(result.dependencies.actions).toContain('flight.open-details')
   })
 
-  it('compiles both port kinds, a computation local and a dotted local tag', () => {
+  it('компилирует оба вида портов, локальную computation и локальный тег с точкой', () => {
     const result = compileComponentSFC(SOURCE, {
       resolveComponentTag: () => 'global-component-that-must-not-win',
       resolvePortProvider: identity => identity === 'groundhandling-process-state'
@@ -485,7 +485,7 @@ const ports = definePorts({
     ])
   })
 
-  it('reports missing defaults, reserved tags and wrong provider kinds', () => {
+  it('сообщает об отсутствующих значениях по умолчанию, зарезервированных тегах и неверных видах провайдеров', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 interface Input { value?: string }
 interface Output { tone?: string }
@@ -515,7 +515,7 @@ const ports = definePorts({
     ]))
   })
 
-  it('reports an unknown port call with a source range', () => {
+  it('сообщает о неизвестном вызове порта с диапазоном Source', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 const ports = definePorts({})
 const state = ports.require.unknown({})
@@ -532,7 +532,7 @@ const state = ports.require.unknown({})
     ]))
   })
 
-  it('rejects nested definePorts and non-top-level computation calls', () => {
+  it('отклоняет вложенные definePorts и вызовы computation вне верхнего уровня', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 interface Input { value?: string }
 interface Output { value?: string }
@@ -554,7 +554,7 @@ function invalid() {
     ]))
   })
 
-  it('validates missing and inactive providers without requiring a computation contract', () => {
+  it('проверяет отсутствующие и неактивные провайдеры без требования контракта computation', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 interface Input { value?: string }
 interface Output { tone?: string }

@@ -1,6 +1,6 @@
 import type { DataViewRef } from '@/modules/source/domain/types/data-view-source.types'
 
-/** Ordered response-output transform shared by Query and Vocab. */
+/** Упорядоченный transform response-output, общий для Query и Vocab. */
 export type ResponseOutputTransform
   = | {
     kind: 'data-view'

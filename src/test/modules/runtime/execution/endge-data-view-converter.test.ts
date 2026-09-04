@@ -5,20 +5,20 @@ import { EndgeDataView } from '@/modules/runtime/execution/endge-data-view'
 
 const disposers: VoidFunction[] = []
 
-describe('endgeDataView domain converters', () => {
+describe('доменные конвертеры EndgeDataView', () => {
   afterEach(() => {
     while (disposers.length) {
       disposers.pop()?.()
     }
   })
 
-  it('uses a registered RConverter handler', () => {
+  it('использует зарегистрированный handler RConverter', () => {
     register('upper', value => String(value).toUpperCase())
     const output = new EndgeDataView().runSource(source('upper'), [{ id: 1, value: 'abc' }])
     expect(output).toEqual([{ id: 1, value: 'ABC' }])
   })
 
-  it('rejects async converter handlers', () => {
+  it('отклоняет асинхронные handlers конвертера', () => {
     register('async', async value => value)
     expect(() => new EndgeDataView().runSource(source('async'), [{ id: 1, value: 'abc' }]))
       .toThrow('Async converter "async" is not supported')

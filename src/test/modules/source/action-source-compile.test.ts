@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { compileActionSource } from '@/modules/source/services/compilers/action-source-compile'
 import { ACTION_SOURCE_WITH_OPERATION } from '@/test/fixtures/action-source'
 
-describe('action Source compiler', () => {
-  it('builds sequential named steps, explicit output and dependencies', () => {
+describe('компилятор Source для Action', () => {
+  it('строит последовательные именованные шаги, явный output и зависимости', () => {
     const result = compileActionSource({ source: ACTION_SOURCE_WITH_OPERATION })
     expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
     expect(result.payload.sourceDocument?.steps.map(step => step.name)).toEqual(['normalized', 'validation', 'edit'])
@@ -15,17 +15,17 @@ describe('action Source compiler', () => {
     ]))
   })
 
-  it('rejects forward references', () => {
+  it('отклоняет опережающие ссылки', () => {
     const result = compileActionSource({ source: `defineAction({ steps: { first: output('second'), second: input() } })` })
     expect(result.diagnostics).toContainEqual(expect.objectContaining({ code: 'action-output-forward-reference', severity: 'error' }))
   })
 
-  it('requires undo for every operation', () => {
+  it('требует undo для каждой операции', () => {
     const result = compileActionSource({ source: `defineAction({ steps: { edit: operation({ input: {}, run: { steps: {} } }) } })` })
     expect(result.diagnostics).toContainEqual(expect.objectContaining({ code: 'action-operation-undo-required', severity: 'error' }))
   })
 
-  it('supports implicit input and one-step operation block shorthand', () => {
+  it('поддерживает неявный input и сокращённую запись одношагового блока operation', () => {
     const result = compileActionSource({ source: `defineAction({ steps: {
       edit: operation({
         run: query({ identity: 'schedule-update', input: { value: input('value') } }),
@@ -42,7 +42,7 @@ describe('action Source compiler', () => {
     expect(operation.undo).toMatchObject({ output: null, steps: [{ name: 'default', kind: 'query' }] })
   })
 
-  it('keeps operation outputs scoped to undo and redo', () => {
+  it('ограничивает outputs операции областями undo и redo', () => {
     const result = compileActionSource({ source: `defineAction({
       steps: {
         edit: operation({
@@ -59,7 +59,7 @@ describe('action Source compiler', () => {
     ]))
   })
 
-  it('rejects privileged globals in a TypeScript step', () => {
+  it('отклоняет привилегированные глобальные объекты в шаге TypeScript', () => {
     const result = compileActionSource({ source: `defineAction({ steps: {
       unsafe: typescript({ inputs: {}, compute() { return Endge.actions } }),
     } })` })

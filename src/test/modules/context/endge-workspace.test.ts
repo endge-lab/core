@@ -3,12 +3,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Endge } from '@/kernel/endge'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
-describe('endgeWorkspace', () => {
+describe('проверка Workspace в Endge', () => {
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  it('exposes the applied workspace', () => {
+  it('предоставляет применённый Workspace', () => {
     const workspace = Endge.workspace
     workspace.apply(TEST_ENDGE_WORKSPACE)
 
@@ -23,7 +23,7 @@ describe('endgeWorkspace', () => {
     expect(Endge.context.dataMode).toBe('live')
   })
 
-  it('applies the persisted mock default to EndgeContext_Module', () => {
+  it('применяет сохранённый Mock по умолчанию к EndgeContext_Module', () => {
     Endge.context.clearDataModeOverride()
 
     Endge.workspace.apply({ ...TEST_ENDGE_WORKSPACE, dataMode: 'mock' })
@@ -32,7 +32,7 @@ describe('endgeWorkspace', () => {
     expect(Endge.context.isMockEnabled).toBe(true)
   })
 
-  it('normalizes unsupported locales to default locale', () => {
+  it('нормализует неподдерживаемые локали к локали по умолчанию', () => {
     const workspace = Endge.workspace
     workspace.apply(TEST_ENDGE_WORKSPACE)
 
@@ -42,7 +42,7 @@ describe('endgeWorkspace', () => {
     expect(workspace.normalizeLocale(null)).toBe('ru')
   })
 
-  it('returns locale labels by mode', () => {
+  it('возвращает подписи локалей по режиму', () => {
     const workspace = Endge.workspace
     workspace.apply(TEST_ENDGE_WORKSPACE)
 
@@ -51,7 +51,7 @@ describe('endgeWorkspace', () => {
     expect(workspace.getLocaleLabel('kk', 'shortLabel')).toBe('kk')
   })
 
-  it('normalizes themes and returns their labels', () => {
+  it('нормализует темы и возвращает их подписи', () => {
     const workspace = Endge.workspace
     workspace.apply(TEST_ENDGE_WORKSPACE)
 
@@ -60,7 +60,7 @@ describe('endgeWorkspace', () => {
     expect(workspace.getThemeLabel('dark')).toBe('Тёмная')
   })
 
-  it('fails before a workspace is applied', () => {
+  it('завершается ошибкой до применения Workspace', () => {
     const workspace = Endge.workspace
     workspace.reset()
 

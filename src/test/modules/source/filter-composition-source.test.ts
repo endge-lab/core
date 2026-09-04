@@ -4,8 +4,8 @@ import { compileCompositionSource } from '@/modules/source/services/compilers/co
 import { compileFilterSource } from '@/modules/source/services/compilers/filter-source-compile'
 import { compileQuerySource } from '@/modules/source/services/compilers/query-source-compile'
 
-describe('filter, Query v2 and Composition source compiler', () => {
-  it('compiles Filter fields, options, vocab, defaults and outputs into static IR', () => {
+describe('компилятор Source для Filter, Query v2 и Composition', () => {
+  it('компилирует поля, options, vocab, значения по умолчанию и outputs Filter в статический IR', () => {
     const result = compileFilterSource(`
 defineFilter({
   fields: {
@@ -41,7 +41,7 @@ defineFilter({
     })
   })
 
-  it('compiles DateTime relative defaults into static IR', () => {
+  it('компилирует относительные значения DateTime по умолчанию в статический IR', () => {
     const result = compileFilterSource(`
 defineFilter({
   fields: {
@@ -63,7 +63,7 @@ defineFilter({
     })
   })
 
-  it('compiles Time fields with string defaults and rejects non-string defaults', () => {
+  it('компилирует поля Time со строковыми значениями по умолчанию и отклоняет нестроковые значения', () => {
     const valid = compileFilterSource(`
 defineFilter({
   fields: {
@@ -97,7 +97,7 @@ defineFilter({
     ]))
   })
 
-  it('rejects legacy fallback, arbitrary JavaScript and incompatible field config', () => {
+  it('отклоняет legacy fallback, произвольный JavaScript и несовместимый config поля', () => {
     expect(compileFilterSource('').diagnostics).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'filter-source-empty' }),
     ]))
@@ -121,7 +121,7 @@ defineFilter({
     ]))
   })
 
-  it('compiles Query props/body and output graph', () => {
+  it('компилирует props и body Query, а также граф outputs', () => {
     const result = compileQuerySource(`
 defineQuery({
   kind: 'rest',
@@ -146,7 +146,7 @@ defineQuery({
     })
   })
 
-  it('compiles nested object and record Query prop contracts', () => {
+  it('компилирует контракты вложенных object и record props Query', () => {
     const result = compileQuerySource(`
 defineQuery({
   kind: 'rest',
@@ -198,7 +198,7 @@ defineQuery({
     ])
   })
 
-  it('compiles props in every runtime request field', () => {
+  it('компилирует props в каждом поле runtime-запроса', () => {
     const result = compileQuerySource(`
 defineQuery({
   kind: 'rest',
@@ -245,7 +245,7 @@ defineQuery({
     })
   })
 
-  it('rejects an undeclared prop in any request field', () => {
+  it('отклоняет необъявленный prop в любом поле запроса', () => {
     const result = compileQuerySource(`
 defineQuery({
   kind: 'rest',
@@ -264,7 +264,7 @@ defineQuery({
     ]))
   })
 
-  it('compiles env bindings passed from Composition to Query props', () => {
+  it('компилирует bindings env, переданные из Composition в props Query', () => {
     const result = compileCompositionSource(`
 defineComposition({
   runtimes: {
@@ -280,7 +280,7 @@ defineComposition({
     })
   })
 
-  it('compiles all-output fromOutput bindings and rejects an empty explicit output', () => {
+  it('компилирует bindings fromOutput для всех outputs и отклоняет пустой явный output', () => {
     const valid = compileCompositionSource(`
 defineComposition({
   runtimes: {
@@ -330,7 +330,7 @@ defineComposition({
     ]))
   })
 
-  it('compiles Composition graph and rejects cycles, duplicate persist keys and render config', () => {
+  it('компилирует граф Composition и отклоняет циклы, повторяющиеся ключи persist и config render', () => {
     const valid = compileCompositionSource(`
   defineComposition({
     data: {},
@@ -411,7 +411,7 @@ defineComposition({
     ]))
   })
 
-  it('compiles onSuccess hooks into success graph edges and validates their sources', () => {
+  it('компилирует hooks onSuccess в рёбра успеха графа и проверяет их источники', () => {
     const valid = compileCompositionSource(`
 defineComposition({
   runtimes: {
@@ -485,7 +485,7 @@ defineComposition({
     ]))
   })
 
-  it('compiles public prop change hooks into explicit run graph edges', () => {
+  it('компилирует hooks изменения публичных props в явные рёбра запуска графа', () => {
     const valid = compileCompositionSource(`
 defineComposition({
   props: defineProps({
@@ -551,7 +551,7 @@ defineComposition({
     ]))
   })
 
-  it('compiles optional custom component construction for Filter view', () => {
+  it('компилирует необязательное создание пользовательского компонента для представления Filter', () => {
     const result = compileCompositionSource(`
 defineComposition({
   runtimes: {
@@ -572,7 +572,7 @@ defineComposition({
     })
   })
 
-  it('compiles nested Composition runtimes and keeps their props explicit', () => {
+  it('компилирует runtime вложенных Composition и сохраняет их props явными', () => {
     const valid = compileCompositionSource(`
 defineComposition({
   data: {
@@ -633,7 +633,7 @@ defineComposition({
     })
   })
 
-  it('compiles public Composition props and explicit nested prop bindings', () => {
+  it('компилирует публичные props Composition и явные вложенные bindings props', () => {
     const provider = compileCompositionSource(`
 defineComposition({
   props: defineProps({
@@ -706,7 +706,7 @@ defineComposition({
     })
   })
 
-  it('compiles inline and mock-backed Composition preview props without turning them into defaults', () => {
+  it('компилирует inline preview props Composition и props на основе Mock, не превращая их в значения по умолчанию', () => {
     const result = compileCompositionSource(`
 defineComposition({
   props: defineProps({
@@ -736,7 +736,7 @@ defineComposition({
     ]))
   })
 
-  it('compiles contextual Store policies and explicit nested data bindings', () => {
+  it('компилирует контекстные политики Store и явные вложенные bindings данных', () => {
     const result = compileCompositionSource(`
 defineComposition({
   data: {
@@ -782,7 +782,7 @@ defineComposition({
     ]))
   })
 
-  it('compiles data, storeTo and fromData with optional outputs', () => {
+  it('компилирует data, storeTo и fromData с необязательными outputs', () => {
     const result = compileCompositionSource(`
 defineComposition({
   data: {
@@ -824,7 +824,7 @@ defineComposition({
     })
   })
 
-  it('compiles canonical parameterized DataView binding on fromData', () => {
+  it('компилирует канонический параметризованный binding DataView для fromData', () => {
     const result = compileCompositionSource(`
 defineComposition({
   data: {

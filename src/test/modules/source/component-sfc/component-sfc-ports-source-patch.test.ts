@@ -7,8 +7,8 @@ import {
 
 const template = `<template><Table ref="table" :rows="rows" /></template>`
 
-describe('component SFC Ports Source patch', () => {
-  it('creates definePorts and round-trips an Event with direct Action', () => {
+describe('изменение Ports в Source компонента SFC', () => {
+  it('создаёт definePorts и обеспечивает round-trip Event с прямым Action', () => {
     const source = `<script setup lang="ts">\nconst untouched = 1 // оставить\n</script>\n${template}`
     const result = patchComponentSFCPortsSource(source, {
       type: 'set-event',
@@ -24,7 +24,7 @@ describe('component SFC Ports Source patch', () => {
     expect(result.projection.manifest.emits.events[0]?.action?.kind).toBe('action')
   })
 
-  it('removes only an attached reaction and preserves the Event contract', () => {
+  it('удаляет только присоединённую реакцию и сохраняет контракт Event', () => {
     const source = `<script setup lang="ts">
 const ports = definePorts({
   emits: {
@@ -42,7 +42,7 @@ ${template}`
     expect(result.projection.manifest.emits.events[0]?.action).toBeUndefined()
   })
 
-  it('inserts emits after a forward section that already has a trailing comma', () => {
+  it('вставляет emits после секции forward, уже содержащей завершающую запятую', () => {
     const source = `<script setup lang="ts">
 const ports = definePorts({
   forward: {
@@ -65,7 +65,7 @@ ${template}`
     expect(result.projection.diagnostics).not.toContainEqual(expect.objectContaining({ code: 'sfc-parse-error' }))
   })
 
-  it('round-trips CRUD for require, provides, emits and forward without rewriting unrelated source', () => {
+  it('обеспечивает round-trip CRUD для require, provides, emits и forward без перезаписи несвязанного Source', () => {
     const original = `<script setup lang="ts">
 // этот комментарий не принадлежит definePorts
 const untouched = { value: 1 }
@@ -132,7 +132,7 @@ ${template}`
     expect(result.source).toContain('const untouched = { value: 1 }')
   })
 
-  it('keeps unsupported constructions in source-only mode', () => {
+  it('сохраняет неподдерживаемые конструкции в режиме только Source', () => {
     const source = `<script setup lang="ts">const ports = definePorts({ emits: { ...shared } })</script>${template}`
     const projection = inspectComponentSFCPortsSource(source)
     const result = patchComponentSFCPortsSource(source, {

@@ -126,7 +126,7 @@ export function normalizeEndgeConfiguration(input: unknown): EndgeConfiguration 
   }
 }
 
-/** Migrates persisted adapter identifiers while exposing only canonical runtime ids. */
+/** Мигрирует сохранённые идентификаторы адаптеров, предоставляя только канонические runtime-id. */
 function normalizeSfcAdapterIds(input: unknown): string[] {
   return [...new Set(
     normalizeStringCollection(input, 'sfcAdapterIds').map(normalizeSfcAdapterId),
@@ -218,7 +218,7 @@ export function createEndgeContextHash(input: unknown): string {
   return `ctx-${(hash >>> 0).toString(16).padStart(8, '0')}`
 }
 
-/** Builds the stable public SFC projection without internal vars/diagnostics/storage namespace. */
+/** Строит стабильную публичную проекцию SFC без внутренних vars, diagnostics и namespace storage. */
 export function createEndgePublicConfigurationSnapshot(
   configuration: EndgeConfiguration,
 ): EndgePublicConfigurationSnapshot {
@@ -278,7 +278,7 @@ function applyConfigurationValuePatch(
         continue
       }
       if (operation.op === 'remove') {
-        // A remove operation removes this layer's override and therefore keeps upstream.
+        // Операция remove удаляет переопределение этого слоя и сохраняет upstream-значение.
         continue
       }
       if (operation.op === 'set' && isEndgeJSONValue(operation.value)) {

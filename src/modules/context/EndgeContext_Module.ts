@@ -150,7 +150,7 @@ export class EndgeContext_Module extends EndgeModule {
     }
   }
 
-  /** Returns the full SFC-visible context without adding volatile values to persistence. */
+  /** Возвращает полный доступный SFC контекст без добавления временных значений в persistence. */
   public runtimeSnapshot(): EndgeRuntimeContextSnapshot {
     return {
       ...this.serialize(),
@@ -161,12 +161,12 @@ export class EndgeContext_Module extends EndgeModule {
     }
   }
 
-  /** Returns the current volatile keyboard state from the shared Raph context namespace. */
+  /** Возвращает текущее временное состояние клавиатуры из общего пространства контекста Raph. */
   public getKeyboardState(): EndgeKeyboardContextSnapshot {
     return normalizeKeyboardContextSnapshot(Raph.get(ENDGE_KEYBOARD_CONTEXT_RAPH_PATH))
   }
 
-  /** Publishes UI-adapter keyboard state as narrow, non-persisted Raph mutations. */
+  /** Публикует состояние клавиатуры UI-адаптера как узкие несохраняемые изменения Raph. */
   public setKeyboardState(input: EndgeKeyboardContextSnapshot): void {
     const next = normalizeKeyboardContextSnapshot(input)
     const current = this.getKeyboardState()
@@ -184,7 +184,7 @@ export class EndgeContext_Module extends EndgeModule {
     })
   }
 
-  /** Keeps legacy module subscribers while projecting persistent context fields into Raph. */
+  /** Сохраняет подписчиков legacy-модуля и проецирует постоянные поля контекста в Raph. */
   public override notify(): void {
     this._syncPersistentContextToRaph()
     super.notify()
@@ -234,9 +234,9 @@ export class EndgeContext_Module extends EndgeModule {
       const snapshot = adapter.read<EndgePersistedContextSnapshot>(CONTEXT_STORAGE_KEY)
         ?? adapter.read<EndgePersistedContextSnapshot>(LEGACY_CONTEXT_STORAGE_KEY)
 
-      // Older context snapshots persisted the bootstrap fallback as if it were
-      // selected by the user. Only the older dedicated theme key can prove an
-      // explicit legacy selection; otherwise effective configuration owns it.
+      // Старые snapshots контекста сохраняли запасное bootstrap-значение так, будто оно было
+      // выбрано пользователем. Только старый отдельный ключ темы может подтвердить явный
+      // legacy-выбор; в остальных случаях значением владеет фактическая конфигурация.
       shouldPersistThemeMigration = snapshot != null
         && snapshot.themePreferenceVersion !== THEME_PREFERENCE_VERSION
       const migratedSnapshot = shouldPersistThemeMigration && snapshot
@@ -432,22 +432,22 @@ export class EndgeContext_Module extends EndgeModule {
     this._setScopeValue('_currentUser', identity, DEFAULT_SCOPE.userId)
   }
 
-  /** Returns the current data execution mode for Store fixtures and external Query runs. */
+  /** Возвращает текущий режим выполнения данных для fixtures Store и внешних запусков Query. */
   public get dataMode(): EndgeDataMode {
     return this._dataModeOverride ?? this._workspaceDataMode
   }
 
-  /** Shows whether runtime consumers should resolve persisted RMock fixtures. */
+  /** Показывает, должны ли runtime-потребители вычислять сохранённые fixtures RMock. */
   public get isMockEnabled(): boolean {
     return this.dataMode === 'mock'
   }
 
-  /** Shows whether the effective mode comes from a local runtime override. */
+  /** Показывает, получен ли фактический режим из локального runtime-переопределения. */
   public get isDataModeOverridden(): boolean {
     return this._dataModeOverride != null
   }
 
-  /** Applies the persisted Workspace default without writing it into local context storage. */
+  /** Применяет сохранённое значение Workspace по умолчанию без записи в локальное хранилище контекста. */
   public setWorkspaceDataMode(mode: EndgeDataMode): void {
     const next = normalizeDataMode(mode)
     if (next === this._workspaceDataMode) {
@@ -461,7 +461,7 @@ export class EndgeContext_Module extends EndgeModule {
     }
   }
 
-  /** Applies a host-owned data mode override without rebuilding the structural context. */
+  /** Применяет принадлежащее host переопределение режима данных без перестроения структурного контекста. */
   public setDataMode(mode: EndgeDataMode): void {
     const next = normalizeDataMode(mode)
     if (next === this._dataModeOverride) {
@@ -472,7 +472,7 @@ export class EndgeContext_Module extends EndgeModule {
     this.notify()
   }
 
-  /** Removes the local override and restores the current Workspace default. */
+  /** Удаляет локальное переопределение и восстанавливает текущее значение Workspace по умолчанию. */
   public clearDataModeOverride(): void {
     if (this._dataModeOverride == null) {
       return
@@ -482,7 +482,7 @@ export class EndgeContext_Module extends EndgeModule {
     this.notify()
   }
 
-  /** Convenience API for UI toggles that expose mock mode as a boolean state. */
+  /** Упрощённый API для переключателей UI, представляющих mock-режим как boolean-состояние. */
   public setMockEnabled(enabled: boolean): void {
     this.setDataMode(enabled ? 'mock' : 'live')
   }
@@ -657,7 +657,7 @@ export class EndgeContext_Module extends EndgeModule {
     return configuration.timezones.some(item => item.identity === value) ? value : configuration.defaultTimezone
   }
 
-  /** Persists only an explicit preference; the effective default remains configuration-owned. */
+  /** Сохраняет только явное предпочтение; фактическим значением по умолчанию продолжает владеть конфигурация. */
   private _serializeForPersistence(): EndgePersistedContextSnapshot {
     return {
       ...this.serialize(),
@@ -696,7 +696,7 @@ export class EndgeContext_Module extends EndgeModule {
     return this._currentWorkspace
   }
 
-  /** Builds a harmless scope for a controller that never reads or writes state. */
+  /** Создаёт безопасный scope для контроллера, который не читает и не изменяет состояние. */
   private _getDisabledPersistenceScope(): EndgePersistenceScope {
     const session = this._resolveSessionIdentity()
 

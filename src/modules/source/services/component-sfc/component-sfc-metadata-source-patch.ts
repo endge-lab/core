@@ -6,7 +6,7 @@ import type { ProgramMetadataMap } from '@/modules/program/domain/types/program-
 
 import { compileComponentSFC } from '@/modules/compiler/services/component-sfc/component-sfc-compile'
 
-/** Reads component-level defineMetadata as strict JSON for the visual editor. */
+/** Читает defineMetadata уровня компонента как строгий JSON для визуального редактора. */
 export function inspectComponentSFCMetadata(source: string): ComponentSFCMetadataVisualProjection {
   const compiled = compileComponentSFC(source)
   const declarations = compiled.ast?.script?.metadata ?? []
@@ -61,7 +61,7 @@ export function inspectComponentSFCMetadata(source: string): ComponentSFCMetadat
   }
 }
 
-/** Replaces one defineMetadata call or inserts it into script setup. */
+/** Заменяет один вызов defineMetadata или вставляет его в script setup. */
 export function patchComponentSFCMetadataSource(
   source: string,
   metadata: ProgramMetadataMap,

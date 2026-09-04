@@ -4,8 +4,8 @@ import { compileComponentSFC } from '@/modules/compiler/services/component-sfc/c
 import { parseComponentSFC } from '@/modules/compiler/services/component-sfc/component-sfc-parse'
 import { inspectComponentSFCVisual } from '@/modules/source/services/component-sfc/component-sfc-visual-projection'
 
-describe('parseComponentSFC', () => {
-  it('returns diagnostics instead of throwing for an unfinished template tag', () => {
+describe('разбор Component SFC', () => {
+  it('возвращает диагностику вместо исключения для незавершённого тега template', () => {
     const source = `<template>
   <Table>
 </template>`
@@ -23,7 +23,7 @@ describe('parseComponentSFC', () => {
     ]))
   })
 
-  it('keeps compile and visual inspection non-fatal for an unfinished draft', () => {
+  it('оставляет компиляцию и визуальную инспекцию нефатальными для незавершённого черновика', () => {
     const source = `<template>
   <Table><Column>
 </template>`

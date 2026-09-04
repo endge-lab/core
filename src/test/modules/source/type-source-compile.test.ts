@@ -4,8 +4,8 @@ import { compileTypeSource } from '@/modules/source/services/compilers/type-sour
 import { TypeSourceLanguageStrategy } from '@/modules/source/services/strategies/TypeSourceLanguageStrategy'
 import { serializeTypeSourceDocument } from '@/modules/source/services/type-source-serialize'
 
-describe('type source compiler', () => {
-  it('compiles an object type with field modifiers', () => {
+describe('компилятор Source типа', () => {
+  it('компилирует объектный тип с модификаторами полей', () => {
     const result = compileTypeSource(`defineType({
       identity: field(String)
         .description('Passenger profile identifier'),
@@ -77,13 +77,13 @@ describe('type source compiler', () => {
       `defineType(arrayOf(Flight))`,
       { kind: 'array', items: { kind: 'reference', identity: 'Flight' } },
     ],
-  ])('compiles supported root forms', (source, expected) => {
+  ])('компилирует поддерживаемые корневые формы', (source, expected) => {
     const result = compileTypeSource(source)
     expect(result.diagnostics).toEqual([])
     expect(result.document?.definition).toEqual(expected)
   })
 
-  it('compiles recursive inline object expressions', () => {
+  it('компилирует рекурсивные inline-выражения объектов', () => {
     const result = compileTypeSource(`defineType({
       id: field(ID),
       delivery: field(objectOf({
@@ -136,7 +136,7 @@ describe('type source compiler', () => {
     })
   })
 
-  it('allows inline definitions in unionOf and arrayOf', () => {
+  it('разрешает inline-определения в unionOf и arrayOf', () => {
     const result = compileTypeSource(`defineType(unionOf(
       SavedAddress,
       objectOf({
@@ -170,7 +170,7 @@ describe('type source compiler', () => {
     })
   })
 
-  it('accepts empty source for an unmigrated legacy type', () => {
+  it('принимает пустой Source для немигрированного legacy-типа', () => {
     expect(compileTypeSource('')).toEqual({
       ast: null,
       document: null,
@@ -179,7 +179,7 @@ describe('type source compiler', () => {
     })
   })
 
-  it('keeps quoted references as a backwards-compatible alternative', () => {
+  it('сохраняет ссылки в кавычках как обратно совместимую альтернативу', () => {
     const result = compileTypeSource(`defineType({
       customer: field('Customer'),
       items: field(arrayOf(type('LineItem'))),
@@ -194,7 +194,7 @@ describe('type source compiler', () => {
     })
   })
 
-  it('serializes named references with canonical bare syntax', () => {
+  it('сериализует именованные ссылки в каноническом синтаксисе без кавычек', () => {
     const result = compileTypeSource(`defineType(unionOf(type('ArrivalFlight'), type('vendor:DepartureFlight')))`)
 
     expect(serializeTypeSourceDocument(result.document!)).toBe(`defineType(unionOf(
@@ -204,7 +204,7 @@ describe('type source compiler', () => {
 `)
   })
 
-  it('rejects executable expressions and unsupported modifiers', () => {
+  it('отклоняет исполняемые выражения и неподдерживаемые модификаторы', () => {
     const result = compileTypeSource(`defineType({
       name: field(resolveType()).nullable(),
     })`)
@@ -216,7 +216,7 @@ describe('type source compiler', () => {
     ]))
   })
 
-  it('requires objectOf around nested object literals and rejects range modifiers for objects', () => {
+  it('требует objectOf вокруг вложенных объектных литералов и отклоняет range-модификаторы объектов', () => {
     const result = compileTypeSource(`defineType({
       invalidShape: field({ value: field(String) }),
       invalidRange: field(objectOf({ value: field(Number) })).min(0),
@@ -229,7 +229,7 @@ describe('type source compiler', () => {
     ]))
   })
 
-  it('resolves field and type references for editor navigation', () => {
+  it('разрешает ссылки на поля и типы для навигации редактора', () => {
     const strategy = new TypeSourceLanguageStrategy()
     const source = `defineType(arrayOf(Flight))`
     const reference = strategy.resolveReference({
@@ -240,7 +240,7 @@ describe('type source compiler', () => {
     expect(reference).toMatchObject({ target: 'type', identity: 'Flight' })
   })
 
-  it('resolves references nested inside objectOf', () => {
+  it('разрешает ссылки, вложенные в objectOf', () => {
     const strategy = new TypeSourceLanguageStrategy()
     const source = `defineType({ delivery: field(objectOf({ customer: field(Customer) })) })`
     const reference = strategy.resolveReference({
@@ -251,7 +251,7 @@ describe('type source compiler', () => {
     expect(reference).toMatchObject({ target: 'type', identity: 'Customer' })
   })
 
-  it('offers source-backed Type Registry symbols', () => {
+  it('предлагает символы Type Registry на основе Source', () => {
     const strategy = new TypeSourceLanguageStrategy()
     const completions = strategy.completions({
       source: `defineType({ customer: field(Customer) })`,
@@ -267,7 +267,7 @@ describe('type source compiler', () => {
     expect(completions).not.toContainEqual(expect.objectContaining({ label: 'Order' }))
   })
 
-  it('reports missing registry references and allows Any with a warning', () => {
+  it('сообщает об отсутствующих ссылках реестра и разрешает Any с предупреждением', () => {
     const strategy = new TypeSourceLanguageStrategy()
     const result = strategy.validate(`defineType({
       unknown: field(MissingType),
@@ -284,7 +284,7 @@ describe('type source compiler', () => {
     ]))
   })
 
-  it('returns resolved and unresolved semantic type highlights', () => {
+  it('возвращает подсветку разрешённых и неразрешённых семантических типов', () => {
     const strategy = new TypeSourceLanguageStrategy()
     const source = `defineType({ known: field(Flight), primitive: field(String), missing: field(MissingType) })`
 

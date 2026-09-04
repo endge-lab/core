@@ -27,7 +27,7 @@ import { buildRuntimeGraph, compileCompositionSource } from '@/modules/source/se
 import { compileDataViewSource } from '@/modules/source/services/compilers/data-view-source-compile'
 import { compileFilterSource } from '@/modules/source/services/compilers/filter-source-compile'
 
-describe('composition runtime session', () => {
+describe('проверка Runtime-сессия Composition', () => {
   afterEach(() => {
     Endge.context.setDataMode('live')
     vi.useRealTimers()
@@ -38,7 +38,7 @@ describe('composition runtime session', () => {
     Raph.app.reset()
   })
 
-  it('materializes isolated inline and RMock-backed preview props on demand', () => {
+  it('по запросу материализует изолированные inline preview props и props на основе RMock', () => {
     Endge.context.setDataMode('mock')
     const mock = new RMock()
     mock.id = 49
@@ -62,14 +62,14 @@ describe('composition runtime session', () => {
     expect(second.requirements).toEqual({ arrival: { attributes: ['LegStatus'] } })
   })
 
-  it('omits RMock-backed preview props in live mode but keeps literal fixtures', () => {
+  it('пропускает preview props на основе RMock в live-режиме, сохраняя литеральные fixtures', () => {
     expect(materializeCompositionPreviewProps({
       airport: { kind: 'literal', value: 'SVO' },
       requirements: { kind: 'mock', identity: 'groundhandling-query-requirements' },
     })).toEqual({ airport: 'SVO' })
   })
 
-  it('mounts children, binds output, debounces changes and unmounts the runtime tree', async () => {
+  it('монтирует дочерние узлы, связывает output, устраняет дребезг изменений и демонтирует runtime-дерево', async () => {
     vi.useFakeTimers()
     const run = vi.spyOn(QueryRuntimeHost.prototype, 'run').mockResolvedValue({})
     installDomainAndProgram()
@@ -143,7 +143,7 @@ describe('composition runtime session', () => {
     await session.unmount()
   })
 
-  it('materializes a parameterized local-filter DataView and keeps keyed Store updates incremental', async () => {
+  it('материализует параметризованный DataView локального фильтра и сохраняет инкрементальность обновлений Store по ключам', async () => {
     const store = new RStore()
     store.id = 90
     store.identity = 'schedule-store'
@@ -246,7 +246,7 @@ defineProps<{ rows: Array<{ id: number, flightNumber: string }> }>()
     await session.unmount()
   })
 
-  it('runs mount roots and successful sibling targets in parallel batches', async () => {
+  it('выполняет корни монтирования и успешные соседние цели параллельными пакетами', async () => {
     const names = [
       'arrivalPairs',
       'departurePairs',
@@ -375,7 +375,7 @@ defineComposition({
     await session.unmount()
   })
 
-  it('publishes Query outputs atomically into Store data and recomputes derived fields', async () => {
+  it('атомарно публикует outputs Query в данные Store и повторно вычисляет производные поля', async () => {
     const rows = [{ id: 1, flight: 'SU100' }]
     vi.spyOn(QueryRuntimeHost.prototype, 'run').mockImplementation(async function (this: QueryRuntimeHost) {
       Raph.set(this.outputPath('raw'), rows)
@@ -460,7 +460,7 @@ defineComposition({
     expect(Raph.get(base)).toBeUndefined()
   })
 
-  it('borrows an explicit Store runtime without destroying it on Composition unmount', async () => {
+  it('использует явно заданный runtime Store без его уничтожения при демонтировании Composition', async () => {
     const store = new RStore()
     store.id = 30
     store.identity = 'shared-db'
@@ -497,7 +497,7 @@ defineComposition({
     expect(sharedRuntime.getDataSnapshot()).toEqual({ raw: [1] })
   })
 
-  it('reuses the nearest ancestor Store and creates a local fallback in standalone preview', async () => {
+  it('повторно использует ближайший родительский Store и создаёт локальный fallback в самостоятельном preview', async () => {
     installContextualStoreCompositions({ resolution: 'contextual', parentHasStore: true })
 
     const session = await Endge.runtime.composition.mount('context-parent')
@@ -520,7 +520,7 @@ defineComposition({
     await preview.unmount()
   })
 
-  it('supports isolated Store instances and lets explicit withData override isolation', async () => {
+  it('поддерживает изолированные экземпляры Store и разрешает явному withData переопределить изоляцию', async () => {
     installContextualStoreCompositions({ resolution: 'isolated', parentHasStore: true })
     const isolatedSession = await Endge.runtime.composition.mount('context-parent')
     const isolatedChild = isolatedSession.host.getChild('child') as CompositionRuntimeHost
@@ -540,7 +540,7 @@ defineComposition({
     await explicitSession.unmount()
   })
 
-  it('keeps sibling fallbacks separate and rejects a missing injected Store provider', async () => {
+  it('разделяет fallback соседних узлов и отклоняет отсутствие внедрённого provider Store', async () => {
     installContextualStoreCompositions({ resolution: 'contextual', parentHasStore: false, childNames: ['left', 'right'] })
     const session = await Endge.runtime.composition.mount('context-parent')
     const left = session.host.getChild('left') as CompositionRuntimeHost
@@ -558,7 +558,7 @@ defineComposition({
     expect(Endge.runtime.getRuntimeHosts()).toEqual([])
   })
 
-  it('reruns a nested Composition Query when its reactive public prop changes', async () => {
+  it('повторно запускает Query вложенной Composition при изменении её реактивного публичного prop', async () => {
     vi.useFakeTimers()
     const run = vi.spyOn(QueryRuntimeHost.prototype, 'run').mockResolvedValue({})
 
@@ -662,7 +662,7 @@ defineComposition({
     await session.unmount()
   })
 
-  it('passes public props into nested and standalone Compositions before their onMount queries run', async () => {
+  it('передаёт публичные props во вложенные и самостоятельные Composition до запуска их запросов onMount', async () => {
     const run = vi.spyOn(QueryRuntimeHost.prototype, 'run').mockResolvedValue({})
     const query = new RQuery()
     query.id = 50
@@ -766,7 +766,7 @@ defineComposition({
     await direct.unmount()
   })
 
-  it('mounts a nested Composition and exposes its outputs reactively', async () => {
+  it('монтирует вложенную Composition и реактивно предоставляет её outputs', async () => {
     const initialRows = [{ id: 1, flight: 'SU100' }]
     vi.spyOn(QueryRuntimeHost.prototype, 'run').mockImplementation(async function (this: QueryRuntimeHost) {
       if (this.entityIdentity === 'groundhandling-query') {
@@ -883,7 +883,7 @@ defineComposition({
     expect(Endge.runtime.getRuntimeHosts()).toEqual([])
   })
 
-  it('routes Component events automatically by handles and manually to a named Update', async () => {
+  it('автоматически маршрутизирует Events компонента по handles и вручную в именованный Update', async () => {
     const store = new RStore()
     store.id = 70
     store.identity = 'telegraph-store'

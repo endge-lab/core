@@ -62,7 +62,7 @@ export class EndgeComposition {
   }
 }
 
-/** Materializes preview-only literals and RMock references into regular Composition props. */
+/** Материализует литералы только для preview и ссылки RMock в обычные props Composition. */
 export function materializeCompositionPreviewProps(
   previewProps: CompositionPreviewProps | null | undefined,
   dataMode: EndgeDataMode = Endge.context.dataMode,

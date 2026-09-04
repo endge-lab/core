@@ -16,8 +16,8 @@ defineProps<{
 </template>
 `
 
-describe('component SFC props source patch', () => {
-  it('replaces an inline defineProps contract without rewriting the template', () => {
+describe('изменение props в Source компонента SFC', () => {
+  it('заменяет inline-контракт defineProps без перезаписи шаблона', () => {
     const result = patchComponentSFCPropsSource(TABLE_SOURCE, [
       { name: 'items', type: 'Flight', isArray: true },
       { name: 'selectedId', type: 'string', optional: true },
@@ -29,7 +29,7 @@ describe('component SFC props source patch', () => {
     expect(result.source).toContain('<Table :rows="rows" />')
   })
 
-  it('inserts defineProps into an existing script setup', () => {
+  it('вставляет defineProps в существующий script setup', () => {
     const result = patchComponentSFCPropsSource(`<script setup lang="ts">\nconst ready = true\n</script>\n<template><Table /></template>`, [
       { name: 'rows', type: 'unknown', isArray: true },
     ])
@@ -39,7 +39,7 @@ describe('component SFC props source patch', () => {
     expect(result.source).toContain('const ready = true')
   })
 
-  it('keeps named contracts Source-owned', () => {
+  it('оставляет именованные контракты во владении Source', () => {
     const source = `<script setup lang="ts">\ninterface Props { rows: string[] }\ndefineProps<Props>()\n</script>\n<template><Table /></template>`
     const projection = inspectComponentSFCProps(source)
     const result = patchComponentSFCPropsSource(source, [])

@@ -21,12 +21,12 @@ export interface EndgeContextSnapshot {
   timezone: string | null
 }
 
-/** Storage payload that distinguishes an explicit theme choice from an effective default. */
+/** Данные хранилища, отличающие явный выбор темы от фактического default. */
 export interface EndgePersistedContextSnapshot extends EndgeContextSnapshot {
   themePreferenceVersion?: 1
 }
 
-/** Volatile keyboard state supplied by the active UI adapter. */
+/** Временное состояние клавиатуры, предоставляемое активным UI-адаптером. */
 export interface EndgeKeyboardContextSnapshot {
   platform: 'macos' | 'windows' | 'linux' | 'unknown'
   modifiers: {
@@ -43,9 +43,9 @@ export interface EndgeKeyboardContextSnapshot {
   }
 }
 
-/** Full read-only SFC context. Volatile input state is deliberately not serializable. */
+/** Полный readonly-контекст SFC. Временное состояние ввода намеренно не сериализуется. */
 export interface EndgeRuntimeContextSnapshot extends EndgeContextSnapshot {
-  /** Static effective configuration of the current build; never persisted or Raph-backed. */
+  /** Статическая фактическая конфигурация текущей сборки; не сохраняется и не поддерживается Raph. */
   config: EndgePublicConfigurationSnapshot
   input: {
     keyboard: EndgeKeyboardContextSnapshot

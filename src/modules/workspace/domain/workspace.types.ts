@@ -16,7 +16,7 @@ export type EndgeWorkspaceTheme = EndgeThemeDefinition
 export type EndgeWorkspaceTimezone = EndgeTimezoneDefinition
 export type EndgeWorkspaceVar = EndgeVariableDefinition
 
-/** Effective workspace variable after applying runtime and environment overrides. */
+/** Фактическая переменная workspace после применения переопределений runtime и окружения. */
 export interface EndgeResolvedWorkspaceVariable {
   name: string
   defaultValue: string

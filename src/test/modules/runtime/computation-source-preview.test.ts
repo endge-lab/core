@@ -2,12 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { Endge } from '@/kernel/endge'
 
-describe('computation transient source preview', () => {
+describe('временный preview Source для Computation', () => {
   afterEach(() => {
     Endge.runtime.computation.setSandboxAdapter(null)
   })
 
-  it('executes a declarative draft without publishing an artifact', async () => {
+  it('выполняет декларативный черновик без публикации артефакта', async () => {
     const source = `defineComputation({
       outputs: {
         normalized: input('value').trim().upperCase(),
@@ -30,7 +30,7 @@ describe('computation transient source preview', () => {
     expect(Endge.program.getComputationArtifact('draft-preview')).toBeNull()
   })
 
-  it('uses the registered sandbox for an asynchronous TypeScript node', async () => {
+  it('использует зарегистрированный sandbox для асинхронного узла TypeScript', async () => {
     const execute = vi.fn(async request => Number(request.inputs.value) * 2)
     Endge.runtime.computation.setSandboxAdapter({ execute })
 
@@ -49,7 +49,7 @@ describe('computation transient source preview', () => {
     expect(execute).toHaveBeenCalledOnce()
   })
 
-  it('returns the first compiler diagnostic as a runtime error', async () => {
+  it('возвращает первую диагностику компилятора как runtime-ошибку', async () => {
     await expect(Endge.runtime.computation.runSource(
       'defineComputation({ outputs: {}, result: output(\'missing\') })',
       {},

@@ -33,7 +33,7 @@ export interface UIRenderAdapter<TImplementation = unknown> {
   protocolVersion: number
   renderer: string
   renderers: Readonly<Record<string, TImplementation>>
-  /** Opaque host entry points owned by this adapter: shell, SFC root, runtime root, etc. */
+  /** Непрозрачные точки входа host, принадлежащие адаптеру: shell, корень SFC, корень runtime и прочие. */
   roots?: Readonly<Record<string, unknown>>
 }
 

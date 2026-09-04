@@ -4,22 +4,22 @@ import { describe, expect, it } from 'vitest'
 import { RComposition } from '@/modules/domain/entities/RComposition'
 import { CompositionRuntimeStrategy } from '@/modules/runtime/services/strategies/CompositionRuntimeStrategy'
 
-describe('compositionRuntimeStrategy', () => {
+describe('проверка Runtime-стратегия Composition', () => {
   const strategy = new CompositionRuntimeStrategy()
 
-  it('supports RComposition instances', () => {
+  it('поддерживает экземпляры RComposition', () => {
     expect(strategy.supports(new RComposition())).toBe(true)
   })
 
-  it('supports composition models created by another module instance', () => {
+  it('поддерживает модели Composition, созданные другим экземпляром модуля', () => {
     expect(strategy.supports({ type: 'composition' })).toBe(true)
   })
 
-  it('rejects source-first models without the composition discriminator', () => {
+  it('отклоняет source-first модели без дискриминатора Composition', () => {
     expect(strategy.supports({ source: '', sourceVersion: 1 })).toBe(false)
   })
 
-  it('does not persist the runtime discriminator', () => {
+  it('не сохраняет дискриминатор runtime', () => {
     expect(Serialize.toPlain(new RComposition())).not.toHaveProperty('type')
   })
 })

@@ -5,8 +5,8 @@ import { TABLE_RUNTIME_ACTION_IDS } from '@/modules/runtime/domain/action.types'
 import { RuntimeActionRegistry } from '@/modules/runtime/RuntimeActionRegistry'
 import { createTableRuntimeActions } from '@/modules/runtime/services/table-actions'
 
-describe('runtime table actions', () => {
-  it('hides a hideable column through the mounted table target', async () => {
+describe('проверка Actions runtime-таблицы', () => {
+  it('скрывает доступный для скрытия столбец через смонтированную цель таблицы', async () => {
     const registry = createRegistry()
     const setColumnVisibility = vi.fn()
     const context = createContext({ target: { setColumnVisibility } })
@@ -16,7 +16,7 @@ describe('runtime table actions', () => {
     expect(setColumnVisibility).toHaveBeenCalledWith('number', false)
   })
 
-  it('runs column sort actions against the table runtime target', async () => {
+  it('выполняет Actions сортировки столбца для runtime-цели таблицы', async () => {
     const registry = createRegistry()
     const setColumnSort = vi.fn()
     const context = createContext({
@@ -32,7 +32,7 @@ describe('runtime table actions', () => {
     expect(setColumnSort).toHaveBeenCalledWith('number', 'asc')
   })
 
-  it('clears only the active column sort', async () => {
+  it('сбрасывает сортировку только активного столбца', async () => {
     const registry = createRegistry()
     const clearColumnSort = vi.fn()
     const context = createContext({
@@ -54,7 +54,7 @@ describe('runtime table actions', () => {
     expect(clearColumnSort).toHaveBeenCalledWith('number')
   })
 
-  it('clears all sorts only when table has active sorts', async () => {
+  it('сбрасывает все сортировки только при наличии активных сортировок таблицы', async () => {
     const registry = createRegistry()
     const clearAllSort = vi.fn()
     const inactiveContext = createContext({
@@ -78,7 +78,7 @@ describe('runtime table actions', () => {
     expect(clearAllSort).toHaveBeenCalledTimes(1)
   })
 
-  it('disables mutable sort actions for disabled and fixed sort modes', () => {
+  it('отключает изменяющие сортировку Actions для режимов disabled и fixed', () => {
     const registry = createRegistry()
     const target = {
       setColumnSort: vi.fn(),
@@ -105,7 +105,7 @@ describe('runtime table actions', () => {
     }
   })
 
-  it('does not allow column sort actions for non-sortable columns', () => {
+  it('не разрешает Actions сортировки для несортируемых столбцов', () => {
     const registry = createRegistry()
     const context = createContext({
       sortable: false,
@@ -118,7 +118,7 @@ describe('runtime table actions', () => {
     expect(registry.canExecute(TABLE_RUNTIME_ACTION_IDS.sortSetColumnDesc, context)).toBe(false)
   })
 
-  it('runs column pin actions against the table runtime target', async () => {
+  it('выполняет Actions закрепления столбца для runtime-цели таблицы', async () => {
     const registry = createRegistry()
     const setColumnPin = vi.fn()
     const context = createContext({
@@ -134,7 +134,7 @@ describe('runtime table actions', () => {
     expect(setColumnPin).toHaveBeenCalledWith('number', 'left')
   })
 
-  it('resets column pin and all pins to default state', async () => {
+  it('возвращает закрепление столбца и все закрепления в стандартное состояние', async () => {
     const registry = createRegistry()
     const resetColumnPin = vi.fn()
     const resetAllPins = vi.fn()
@@ -158,7 +158,7 @@ describe('runtime table actions', () => {
     expect(resetAllPins).toHaveBeenCalledTimes(1)
   })
 
-  it('disables pin actions when column pinning is disabled or column is not pinnable', () => {
+  it('отключает Actions закрепления, когда закрепление столбцов запрещено или столбец нельзя закрепить', () => {
     const registry = createRegistry()
     const target = {
       setColumnPin: vi.fn(),

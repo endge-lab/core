@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { compileComponentSFC } from '@/modules/compiler/services/component-sfc/component-sfc-compile'
 
-describe('component SFC preview props', () => {
-  it('keeps literal definePreviewProps backwards-compatible', () => {
+describe('свойства предварительного просмотра Component SFC', () => {
+  it('сохраняет обратную совместимость литерального definePreviewProps', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 defineProps<{
   rows: unknown[]
@@ -39,7 +39,7 @@ definePreviewProps({
     expect(result.previewOptions).toBeNull()
   })
 
-  it('parses store-backed preview props and preview runtime options', () => {
+  it('разбирает preview props из Store и настройки preview runtime', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 defineProps<{
   rows: unknown[]
@@ -98,7 +98,7 @@ definePreviewProps(
     })
   })
 
-  it('parses Store-backed data props and routed Query preview runs', () => {
+  it('разбирает data props из Store и маршрутизированные preview-запуски Query', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 defineProps<{ rows: unknown[] }>()
 

@@ -48,8 +48,8 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('sentryDiagnosticsAdapter', () => {
-  it('resolves DSN and maps an exception log to a Sentry event envelope', async () => {
+describe('адаптер диагностики Sentry', () => {
+  it('разрешает DSN и преобразует log исключения в оболочку события Sentry', async () => {
     const fetchMock = vi.fn().mockResolvedValue(successfulResponse())
     vi.stubGlobal('fetch', fetchMock)
     const adapter = new SentryDiagnosticsAdapter(OUTPUT, CREATE_CONTEXT)
@@ -108,7 +108,7 @@ describe('sentryDiagnosticsAdapter', () => {
     })
   })
 
-  it('sends a diagnostics snapshot as a JSON attachment', async () => {
+  it('отправляет snapshot диагностики как вложение JSON', async () => {
     const fetchMock = vi.fn().mockResolvedValue(successfulResponse())
     vi.stubGlobal('fetch', fetchMock)
     const adapter = new SentryDiagnosticsAdapter(OUTPUT, CREATE_CONTEXT)
@@ -134,7 +134,7 @@ describe('sentryDiagnosticsAdapter', () => {
     expect(JSON.parse(lines[4])).toEqual(snapshot)
   })
 
-  it('rejects a missing resolved DSN during adapter creation', () => {
+  it('отклоняет отсутствие разрешённого DSN при создании адаптера', () => {
     expect(() => new SentryDiagnosticsAdapter(OUTPUT, {
       ...CREATE_CONTEXT,
       resolveVariable: () => undefined,

@@ -18,7 +18,7 @@ function defaultContext(): RuntimeHostContext<'stream'> {
   }
 }
 
-/** Runtime lifecycle owner for one compiled Stream transport. */
+/** Владелец lifecycle runtime для одного скомпилированного транспорта Stream. */
 export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostContext<'stream'>, StreamSourceArtifact> {
   private _connection: StreamTransportConnection | null = null
 

@@ -18,8 +18,8 @@ const DATA_VIEW_REFERENCES = [
   },
 ] as const
 
-describe('typed source model references', () => {
-  it.each(DATA_VIEW_REFERENCES)('accepts $source in Store DataView slots', ({ source, expected }) => {
+describe('типизированные ссылки моделей Source', () => {
+  it.each(DATA_VIEW_REFERENCES)('принимает $source в слотах DataView для Store', ({ source, expected }) => {
     const result = compileStoreSource(`defineStore({
       data: {
         raw: value([]),
@@ -31,7 +31,7 @@ describe('typed source model references', () => {
     expect((result.document?.data[1] as { dataViews: DataViewRef[] }).dataViews[0]).toMatchObject(expected)
   })
 
-  it.each(DATA_VIEW_REFERENCES)('accepts $source in Query DataView slots', ({ source, expected }) => {
+  it.each(DATA_VIEW_REFERENCES)('принимает $source в слотах DataView для Query', ({ source, expected }) => {
     const result = compileQuerySource(`defineQuery({
       request: { endpoint: '/api' },
       outputs: {
@@ -43,7 +43,7 @@ describe('typed source model references', () => {
     expect(result.document?.outputs[0]?.dataViews[0]).toMatchObject(expected)
   })
 
-  it.each(DATA_VIEW_REFERENCES)('accepts $source in nested DataView slots', ({ source, expected }) => {
+  it.each(DATA_VIEW_REFERENCES)('принимает $source во вложенных слотах DataView', ({ source, expected }) => {
     const result = compileDataViewSource(`defineDataView({
       mode: 'pipeline',
       steps: [
@@ -60,7 +60,7 @@ describe('typed source model references', () => {
   it.each([
     `'date.iso_to_time'`,
     `converter('date.iso_to_time')`,
-  ])('accepts converter identity form %s', (reference) => {
+  ])('принимает форму identity конвертера %s', (reference) => {
     const result = compileDataViewSource(`defineDataView({
       mode: 'pipeline',
       steps: [

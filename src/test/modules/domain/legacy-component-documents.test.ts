@@ -8,8 +8,8 @@ import { RComponentDSL } from '@/modules/domain/entities/RComponentDSL'
 import { RComponentTable } from '@/modules/domain/entities/RComponentTable'
 import { ComponentType } from '@/modules/domain/types/document/document.types'
 
-describe('legacy component documents', () => {
-  it('keeps DSL persisted source without compile or execute behavior', () => {
+describe('проверка Legacy-документы компонентов', () => {
+  it('сохраняет записанный Source DSL без поведения компиляции или выполнения', () => {
     const component = ReflectComponentFromPlain({
       id: 11,
       identity: 'legacy-dsl',
@@ -29,7 +29,7 @@ describe('legacy component documents', () => {
     expect((component as any).execute).toBeUndefined()
   })
 
-  it('round-trips the retained Table structure as data only', () => {
+  it('сохраняет оставленную структуру Table при двустороннем преобразовании только как данные', () => {
     const component = ReflectComponentFromPlain({
       id: 12,
       identity: 'legacy-table',

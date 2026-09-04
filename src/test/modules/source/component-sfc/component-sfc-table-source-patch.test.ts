@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { patchComponentSFCTableSource } from '@/modules/source/services/component-sfc/component-sfc-table-source-patch'
 
-describe('component SFC Table source patch', () => {
-  it('adds a column before the closing Table tag without changing surrounding source', () => {
+describe('изменение Table в Source компонента SFC', () => {
+  it('добавляет столбец перед закрывающим тегом Table без изменения окружающего Source', () => {
     const source = `<template>
   <Table :rows="rows">
     <!-- keep this comment -->
@@ -19,7 +19,7 @@ describe('component SFC Table source patch', () => {
     expect(result.projection?.columns).toHaveLength(2)
   })
 
-  it('updates only one static attribute and refuses to overwrite a dynamic expression', () => {
+  it('обновляет только один статический атрибут и не перезаписывает динамическое выражение', () => {
     const source = `<template>
   <Table>
     <Column key="flight" title="Flight" :width="columnWidth" />
@@ -46,7 +46,7 @@ describe('component SFC Table source patch', () => {
     expect(width.message).toContain('Source')
   })
 
-  it('enables sortable without changing other Column attributes', () => {
+  it('включает sortable без изменения других атрибутов Column', () => {
     const source = `<template><Table><Column key="flight" title="Flight" /></Table></template>`
 
     const result = patchComponentSFCTableSource(source, {
@@ -61,7 +61,7 @@ describe('component SFC Table source patch', () => {
     expect(result.projection?.columns[0]?.sortable).toEqual({ kind: 'literal', value: 'true' })
   })
 
-  it('writes sort settings independently without removing ordered sort-by paths', () => {
+  it('независимо записывает настройки сортировки без удаления упорядоченных путей sort-by', () => {
     const source = `<template><Table><Column key="aircraft" /></Table></template>`
     const withComparator = patchComponentSFCTableSource(source, {
       type: 'set-column-attribute',
@@ -98,7 +98,7 @@ describe('component SFC Table source patch', () => {
     })
   })
 
-  it('adds, updates and removes editable Table attributes without touching its children', () => {
+  it('добавляет, обновляет и удаляет редактируемые атрибуты Table, не затрагивая дочерние узлы', () => {
     const source = `<template>
   <Table :rows="rows">
     <!-- keep this comment -->
@@ -141,7 +141,7 @@ describe('component SFC Table source patch', () => {
     expect(removed.projection?.pageSize).toBeNull()
   })
 
-  it('does not overwrite a dynamic Table attribute from the visual editor', () => {
+  it('не перезаписывает динамический атрибут Table из визуального редактора', () => {
     const source = `<template><Table :default-sort="sortState"><Column key="flight" /></Table></template>`
 
     const result = patchComponentSFCTableSource(source, {
@@ -155,7 +155,7 @@ describe('component SFC Table source patch', () => {
     expect(result.message).toContain('Source')
   })
 
-  it('moves exact Column fragments while preserving comments and formatting between slots', () => {
+  it('перемещает точные фрагменты Column, сохраняя комментарии и форматирование между слотами', () => {
     const source = `<template>
   <Table>
     <Column key="first" title="First" />
@@ -181,7 +181,7 @@ describe('component SFC Table source patch', () => {
     ])
   })
 
-  it('attaches, replaces and removes a managed component cell', () => {
+  it('присоединяет, заменяет и удаляет управляемую ячейку компонента', () => {
     const source = `<template>
   <Table>
     <Column key="status" title="Status" />
@@ -212,7 +212,7 @@ describe('component SFC Table source patch', () => {
     expect(removed.projection?.columns[0]?.cell).toEqual({ kind: 'default' })
   })
 
-  it('selects and replaces a managed built-in tag without creating a parallel model', () => {
+  it('выбирает и заменяет управляемый встроенный тег без создания параллельной модели', () => {
     const source = '<template><Table><Column key="delay" /></Table></template>'
 
     const attached = patchComponentSFCTableSource(source, {
@@ -245,7 +245,7 @@ describe('component SFC Table source patch', () => {
     expect(component.projection?.columns[0]?.cell).toEqual({ kind: 'component', identity: 'Cell.Delay', syntax: 'cell', bindings: [] })
   })
 
-  it('does not overwrite arbitrary Cell source', () => {
+  it('не перезаписывает произвольный Source ячейки Cell', () => {
     const source = `<template>
   <Table>
     <Column key="status">
@@ -268,7 +268,7 @@ describe('component SFC Table source patch', () => {
     expect(result.message).toContain('Source')
   })
 
-  it('does not duplicate a direct component when applying a managed cell patch', () => {
+  it('не дублирует прямой компонент при применении управляемого изменения ячейки', () => {
     const source = `<template><Table><Column key="aircraft"><AircraftTail :tail="row.tail" /></Column></Table></template>`
 
     const result = patchComponentSFCTableSource(source, {
@@ -283,7 +283,7 @@ describe('component SFC Table source patch', () => {
     expect(result.message).toContain('Source')
   })
 
-  it('materializes Cell interactions without replacing existing direct column source', () => {
+  it('материализует взаимодействия Cell без замены существующего прямого Source столбца', () => {
     const source = `<template>
   <Table>
     <Column key="status">
@@ -323,7 +323,7 @@ describe('component SFC Table source patch', () => {
     expect(materialized.projection?.columns[1]?.interactions.rules[0]?.event).toBe('click')
   })
 
-  it('preserves Cell suffix modifiers while editing and removes only the annotation', () => {
+  it('сохраняет suffix-модификаторы Cell при редактировании и удаляет только аннотацию', () => {
     const source = `<template><Table><Column key="status"><Cell :on.stop="{ event: 'click', reaction: action({ identity: 'old' }) }"><Text>{{ value }}</Text></Cell></Column></Table></template>`
     const updated = patchComponentSFCTableSource(source, {
       type: 'set-column-cell-on',
@@ -344,7 +344,7 @@ describe('component SFC Table source patch', () => {
     expect(removed.source).toContain('<Text>{{ value }}</Text>')
   })
 
-  it('does not commit an invalid visual Cell interaction', () => {
+  it('не фиксирует некорректное визуальное взаимодействие Cell', () => {
     const source = '<template><Table><Column key="status" /></Table></template>'
     const result = patchComponentSFCTableSource(source, {
       type: 'set-column-cell-on',
@@ -357,7 +357,7 @@ describe('component SFC Table source patch', () => {
     expect(result.message).toContain(':on')
   })
 
-  it('replaces and removes a direct component while preserving its bindings', () => {
+  it('заменяет и удаляет прямой компонент, сохраняя его bindings', () => {
     const source = `<template>
   <Table>
     <Column key="aircraft">
@@ -395,7 +395,7 @@ describe('component SFC Table source patch', () => {
     expect(removed.source).not.toContain('<Component')
   })
 
-  it('does not remove comments stored inside a managed-looking Cell', () => {
+  it('не удаляет комментарии внутри Cell, внешне похожей на управляемую', () => {
     const source = `<template><Table><Column key="status"><Cell><!-- keep --><Component is="Cell.Status" /></Cell></Column></Table></template>`
 
     const result = patchComponentSFCTableSource(source, {
@@ -409,7 +409,7 @@ describe('component SFC Table source patch', () => {
     expect(result.projection?.columns[0]?.cell).toEqual({ kind: 'source' })
   })
 
-  it('adds, converts and removes a managed component prop binding', () => {
+  it('добавляет, преобразует и удаляет управляемый binding prop компонента', () => {
     const source = `<template>
   <Table>
     <Column key="aircraft">
@@ -451,7 +451,7 @@ describe('component SFC Table source patch', () => {
     expect(removed.source).toContain(':configuration="row.configuration"')
   })
 
-  it('refuses an invalid expression and preserves the previous Source', () => {
+  it('отклоняет некорректное выражение и сохраняет предыдущий Source', () => {
     const source = '<template><Table><Column key="one"><Cell><Text /></Cell></Column></Table></template>'
     const result = patchComponentSFCTableSource(source, {
       type: 'set-column-cell-attribute',
@@ -466,7 +466,7 @@ describe('component SFC Table source patch', () => {
     expect(result.message).toContain('Не удалось разобрать выражение')
   })
 
-  it('updates bindings of a direct component tag without rewriting its syntax', () => {
+  it('обновляет bindings прямого тега компонента без перезаписи его синтаксиса', () => {
     const source = `<template><Table><Column key="aircraft"><AircraftTail :tail="row.tail" /></Column></Table></template>`
     const result = patchComponentSFCTableSource(source, {
       type: 'set-column-cell-attribute',
@@ -483,7 +483,7 @@ describe('component SFC Table source patch', () => {
     expect(result.source).not.toContain('<Component')
   })
 
-  it('removes only the selected Column line', () => {
+  it('удаляет только строку выбранного Column', () => {
     const source = `<template>
   <Table>
     <Column key="first" />
@@ -503,7 +503,7 @@ describe('component SFC Table source patch', () => {
     expect(result.source).toContain('key="second"')
   })
 
-  it('round-trips CellMenu t() label and dynamic row input through narrow patches', () => {
+  it('обеспечивает round-trip метки t() в CellMenu и динамического input строки через узкие изменения', () => {
     const source = '<template><Table><Column key="flight" /></Table></template>'
     const custom = patchComponentSFCTableSource(source, { type: 'set-menu-mode', menu: 'row', mode: 'custom' })
     const added = patchComponentSFCTableSource(custom.source, { type: 'add-menu-node', menu: 'row', node: 'item' })
@@ -535,7 +535,7 @@ describe('component SFC Table source patch', () => {
     })
   })
 
-  it('preserves Source-owned menu expressions', () => {
+  it('сохраняет выражения меню, принадлежащие Source', () => {
     const source = '<template><Table><RowMenu><MenuItem action="built-in-console-log" :label="formatLabel(row)" /></RowMenu></Table></template>'
     const result = patchComponentSFCTableSource(source, {
       type: 'set-menu-item-attribute',

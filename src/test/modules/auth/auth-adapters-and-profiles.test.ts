@@ -10,15 +10,15 @@ import { AuthAdapterRegistry } from '@/modules/auth/services/AuthAdapterRegistry
 import { AuthProfileRegistry } from '@/modules/auth/services/AuthProfileRegistry'
 import { authProfile } from '@/test/modules/auth/auth-test-helpers'
 
-describe('universal auth adapters', () => {
-  it('validates OIDC and requires host interaction', async () => {
+describe('универсальные адаптеры авторизации', () => {
+  it('проверяет OIDC и требует взаимодействия host', async () => {
     const profile = authProfile()
     const adapter = new OidcAuthAdapter()
     expect(() => adapter.validate(profile)).not.toThrow()
     await expect(adapter.authenticate(context(profile))).rejects.toBeInstanceOf(AuthInteractionRequiredError)
   })
 
-  it('materializes Basic and Bearer headers from literal or variable values', async () => {
+  it('материализует заголовки Basic и Bearer из литеральных значений или переменных', async () => {
     const basic = authProfile({ adapterId: 'basic', config: {}, credentials: { username: 'alice', password: '{PASSWORD}' }, session: undefined })
     const bearer = authProfile({ adapterId: 'bearer', config: {}, credentials: { token: '{TOKEN}' }, session: undefined })
     const resolve = (value: unknown) => value === '{PASSWORD}' ? 'secret' : value === '{TOKEN}' ? 'opaque' : String(value)
@@ -26,7 +26,7 @@ describe('universal auth adapters', () => {
     await expect(new BearerAuthAdapter().authenticate(context(bearer, resolve))).resolves.toEqual(expect.objectContaining({ headers: { Authorization: 'Bearer opaque' } }))
   })
 
-  it('performs client_secret_basic grant', async () => {
+  it('выполняет grant client_secret_basic', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ access_token: 'service-token', expires_in: 60 }), { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
     const profile = authProfile({
@@ -40,7 +40,7 @@ describe('universal auth adapters', () => {
     vi.unstubAllGlobals()
   })
 
-  it('performs password grant and refreshes its token', async () => {
+  it('выполняет password grant и обновляет его token', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: 'user-token', refresh_token: 'refresh-token', id_token: 'id-token', expires_in: 60 }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: 'refreshed-token', expires_in: 60 }), { status: 200 }))
@@ -65,7 +65,7 @@ describe('universal auth adapters', () => {
     vi.unstubAllGlobals()
   })
 
-  it('rejects an unresolved credential reference instead of sending it literally', async () => {
+  it('отклоняет неразрешённую ссылку на credential вместо её буквальной отправки', async () => {
     const profile = authProfile({ adapterId: 'bearer', config: {}, credentials: { token: '{MISSING_TOKEN}' }, session: undefined })
     const adapters = new AuthAdapterRegistry()
     adapters.register(new BearerAuthAdapter())

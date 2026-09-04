@@ -2,7 +2,7 @@ import type { CompositionActivationDescriptor } from '@/modules/source/domain/ty
 
 const STARTUP: CompositionActivationDescriptor = Object.freeze({ mode: 'startup' })
 
-/** Compiler-only precedence. Runtime consumes the resulting effectiveActivation. */
+/** Приоритет только для компилятора. Runtime использует полученный effectiveActivation. */
 export function resolveCompositionActivation(
   invocationOverride: CompositionActivationDescriptor | null | undefined,
   targetRoot: CompositionActivationDescriptor | null | undefined,

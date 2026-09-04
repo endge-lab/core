@@ -24,10 +24,10 @@ function createExecutor(overrides: Partial<ActionProgramExecutorDependencies> = 
   })
 }
 
-describe('actionProgramExecutor', () => {
+describe('исполнитель программы Action', () => {
   afterEach(() => vi.restoreAllMocks())
 
-  it('executes named steps sequentially and publishes only explicit output', async () => {
+  it('последовательно выполняет именованные шаги и публикует только явный output', async () => {
     const compiled = compileActionSource({ source: `defineAction({
       steps: {
         normalized: input('value').trim(),
@@ -40,7 +40,7 @@ describe('actionProgramExecutor', () => {
     expect(result).toEqual({ value: 'ABC' })
   })
 
-  it('freezes operation input and reuses it for undo and default redo', async () => {
+  it('фиксирует input операции и повторно использует его для undo и стандартного redo', async () => {
     const compiled = compileActionSource({ source: `defineAction({
       steps: {
         edit: operation({
@@ -61,7 +61,7 @@ describe('actionProgramExecutor', () => {
     expect(await history.redo()).toBe('NEW')
   })
 
-  it('uses the parent Action input when operation input is omitted', async () => {
+  it('использует input родительского Action, если input операции не задан', async () => {
     const compiled = compileActionSource({ source: `defineAction({
       steps: {
         edit: operation({
@@ -79,7 +79,7 @@ describe('actionProgramExecutor', () => {
     await expect(history.redo()).resolves.toBe('NEW')
   })
 
-  it('does not commit an operation when run fails', async () => {
+  it('не фиксирует операцию при ошибке выполнения', async () => {
     const compiled = compileActionSource({ source: `defineAction({ steps: {
       edit: operation({
         input: {},
@@ -92,7 +92,7 @@ describe('actionProgramExecutor', () => {
     expect(history.snapshot()).toMatchObject({ size: 0, cursor: 0 })
   })
 
-  it('passes runOutput and undoOutput to custom redo', async () => {
+  it('передаёт runOutput и undoOutput в пользовательский redo', async () => {
     const compiled = compileActionSource({ source: `defineAction({ steps: {
       edit: operation({
         input: { value: input('value'), previousValue: input('previousValue') },

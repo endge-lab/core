@@ -13,8 +13,8 @@ import {
 } from '@/modules/domain/types/document/entity-management.type'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
-describe('entity management', () => {
-  it('defaults entities to user management and normalizes owner IDs', () => {
+describe('управление сущностями', () => {
+  it('по умолчанию назначает сущностям пользовательское управление и нормализует ID owner', () => {
     const entity = new REntity()
     expect(entity.managedBy).toBe('user')
     expect(entity.managedById).toBeNull()
@@ -29,7 +29,7 @@ describe('entity management', () => {
     })
   })
 
-  it('exposes explicit management predicates', () => {
+  it('предоставляет явные предикаты управления', () => {
     expect(isUserManaged({ managedBy: 'user' })).toBe(true)
     expect(isSystemManaged({ managedBy: 'system' })).toBe(true)
     expect(isIntegrationManaged({ managedBy: 'integration' })).toBe(true)
@@ -38,7 +38,7 @@ describe('entity management', () => {
     expect(isExternallyManaged({ managedBy: 'user' })).toBe(false)
   })
 
-  it('round-trips management through representative domain documents', () => {
+  it('сохраняет управление при двустороннем преобразовании репрезентативных документов домена', () => {
     const style = RStyle.fromPlain({
       id: 1,
       identity: 'default',
@@ -63,8 +63,8 @@ describe('entity management', () => {
   })
 })
 
-describe('workspace integration references', () => {
-  it('normalizes populated integration relationships and serializes stable references', () => {
+describe('ссылки на интеграции Workspace', () => {
+  it('нормализует заполненные связи интеграций и сериализует стабильные ссылки', () => {
     const workspace = RWorkspace.fromPlain({
       id: 10,
       identity: 'main',

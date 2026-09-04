@@ -16,7 +16,7 @@ export interface I18nRuntimeCatalogEntry {
 /** Накопленный translation catalog, доступный дочернему runtime. */
 export type I18nRuntimeCatalog = Record<string, I18nRuntimeCatalogEntry>
 
-/** Authoring-only provenance: public alias -> locale -> message key -> document identity. */
+/** Происхождение только для authoring: публичный alias -> локаль -> ключ сообщения -> идентификатор документа. */
 export type I18nCatalogProvenance = Record<string, Record<string, Record<string, string>>>
 
 export interface I18nTranslateOptions {

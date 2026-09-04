@@ -259,8 +259,8 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
               : this._requireResponseInputPath(output.key)
             Raph.set(path, Endge.runtime.query.readResponseOutput(output, response))
           }
-          // A response is a new data generation even when its values are
-          // referentially or structurally equal to the previous generation.
+          // Ответ является новым поколением данных, даже когда его значения
+          // ссылочно или структурно равны предыдущему поколению.
           Raph.set(`${this._internalBase}.outputGeneration`, ++this._outputGeneration)
         })
       }

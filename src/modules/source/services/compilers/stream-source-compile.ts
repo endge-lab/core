@@ -12,7 +12,7 @@ import { diagnostic, propertyName, readStringArgument, unwrapExpression } from '
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
-/** Compiles declarative Stream source without opening a transport. */
+/** Компилирует декларативный source Stream без открытия транспорта. */
 export function compileStreamSource(source: string, sourceVersion = 1): StreamSourceCompileResult {
   const diagnostics: DiagnosticDraft[] = []
   if (!String(source ?? '').trim()) {
@@ -213,8 +213,8 @@ function readObject(node: t.ObjectExpression): Record<string, unknown> {
 }
 
 /**
- * Reads a string authoring value and normalizes env('NAME') to the existing
- * workspace-variable token consumed by runtime artifacts.
+ * Читает строковое значение авторинга и нормализует env('NAME') в существующий
+ * token переменной workspace, используемый runtime-артефактами.
  */
 function readEnvironmentStringProperty(
   node: t.ObjectExpression,

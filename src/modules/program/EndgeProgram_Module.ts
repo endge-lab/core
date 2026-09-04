@@ -131,7 +131,7 @@ export class EndgeProgram_Module extends EndgeModule {
     return this.getArtifact<TPayload>(ref.entityType, idOrIdentity)
   }
 
-  /** Returns a compiled Action artifact by id or identity. */
+  /** Возвращает скомпилированный артефакт Action по id или identity. */
   public getActionArtifact(idOrIdentity: string | number): ProgramArtifact<ActionProgramPayload> | null {
     return this.getArtifact<ActionProgramPayload>('action', idOrIdentity)
   }
@@ -146,7 +146,7 @@ export class EndgeProgram_Module extends EndgeModule {
     return this.getArtifact<VocabProgramPayload>('vocab', idOrIdentity)
   }
 
-  /** Returns a compiled Computation artifact by id or identity. */
+  /** Возвращает скомпилированный артефакт Computation по id или identity. */
   public getComputationArtifact(idOrIdentity: string | number): ProgramArtifact<ComputationProgramPayload> | null {
     return this.getArtifact<ComputationProgramPayload>('computation', idOrIdentity)
   }
@@ -181,17 +181,17 @@ export class EndgeProgram_Module extends EndgeModule {
     return this.getArtifact<CompositionProgramPayload>('composition', idOrIdentity)
   }
 
-  /** Returns a compiled EndgeCSS document by persisted id or identity. */
+  /** Возвращает скомпилированный документ EndgeCSS по сохранённому id или identity. */
   public getStyleArtifact(idOrIdentity: string | number): ProgramArtifact<EndgeStyleProgramPayload> | null {
     return this.getArtifact<EndgeStyleProgramPayload>('style', idOrIdentity)
   }
 
-  /** Returns one compiler-owned Type artifact. */
+  /** Возвращает один артефакт Type, принадлежащий компилятору. */
   public getTypeArtifact(idOrIdentity: string | number): ProgramArtifact<TypeProgramPayload> | null {
     return this.getArtifact<TypeProgramPayload>('type', idOrIdentity)
   }
 
-  /** Stable editor-facing catalog derived only from compiled Type artifacts. */
+  /** Стабильный каталог для редактора, полученный только из скомпилированных артефактов Type. */
   public getTypeCatalog(): TypeProgramCatalogEntry[] {
     return this.getArtifacts()
       .filter((artifact): artifact is ProgramArtifact<TypeProgramPayload> => artifact.ref.entityType === 'type')

@@ -22,7 +22,7 @@ export interface OperationHistoryOptions {
   onChange?: () => void
 }
 
-/** Runtime-memory undo/redo cursor. Transitions are serialized and failures keep the cursor stable. */
+/** Курсор undo/redo в runtime-памяти. Переходы сериализованы, а ошибки не изменяют курсор. */
 export class OperationHistory implements RuntimeOwnedResource {
   public readonly kind = 'operation-history'
   public readonly id: string

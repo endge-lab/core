@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthSessionStore } from '@/modules/auth/services/AuthSessionStore'
 import { authProfile, MemoryStorage, tokenSet } from '@/test/modules/auth/auth-test-helpers'
 
-describe('authSessionStore', () => {
+describe('хранилище сессии авторизации', () => {
   let localStorage: MemoryStorage
   beforeEach(() => {
     localStorage = new MemoryStorage()
@@ -11,7 +11,7 @@ describe('authSessionStore', () => {
   })
   afterEach(() => vi.unstubAllGlobals())
 
-  it('uses profile storage and omits refresh token by default', () => {
+  it('использует хранилище профиля и по умолчанию не сохраняет refresh token', () => {
     const store = new AuthSessionStore()
     const profile = authProfile()
     store.write('workspace', profile, snapshot(profile))
@@ -20,7 +20,7 @@ describe('authSessionStore', () => {
     expect(raw).not.toContain('refresh-token')
   })
 
-  it('persists refresh token only after explicit opt-in', () => {
+  it('сохраняет refresh token только после явного согласия', () => {
     const store = new AuthSessionStore()
     const profile = authProfile({ session: { storage: 'localStorage', persistRefreshToken: true } })
     store.write('workspace', profile, snapshot(profile))

@@ -288,7 +288,7 @@ export class QueryExecutor_Adapter {
       : {}
   }
 
-  /** Evaluates a compiled request expression while accepting legacy static payload fields. */
+  /** Вычисляет скомпилированное выражение запроса с поддержкой legacy-полей статической нагрузки. */
   private _evaluateRequestValue(value: unknown, props: Record<string, unknown>): unknown {
     if (!this._isSourceExpression(value)) {
       return value

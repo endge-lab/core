@@ -22,7 +22,7 @@ export interface StreamSourceDocument {
   events: StreamEventDescriptor[]
 }
 
-/** Runtime-ready Stream artifact. */
+/** Готовый для runtime артефакт Stream. */
 export interface StreamSourceArtifact extends StreamSourceDocument {
   type: 'stream'
   sourceVersion: number

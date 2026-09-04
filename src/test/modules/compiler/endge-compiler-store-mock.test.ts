@@ -5,7 +5,7 @@ import { RMock } from '@/modules/domain/entities/RMock'
 import { RStore } from '@/modules/domain/entities/RStore'
 import { prepareTestCompilerContext, resetTestCompilerContext } from '@/test/helpers/compiler-context'
 
-describe('endgeCompiler Store mock dependencies', () => {
+describe('зависимости Mock Store в EndgeCompiler', () => {
   beforeEach(() => prepareTestCompilerContext())
 
   afterEach(() => {
@@ -13,7 +13,7 @@ describe('endgeCompiler Store mock dependencies', () => {
     resetTestCompilerContext()
   })
 
-  it('publishes persisted mock as an explicit artifact dependency', () => {
+  it('публикует сохранённый Mock как явную зависимость артефакта', () => {
     Endge.domain.addMock(makeMock('groundhandling'))
     const store = makeStore('groundhandling')
 
@@ -28,7 +28,7 @@ describe('endgeCompiler Store mock dependencies', () => {
     })
   })
 
-  it('reports an unregistered mock before runtime launch', () => {
+  it('сообщает о незарегистрированном Mock до запуска runtime', () => {
     const store = makeStore('missing.mock')
 
     const artifact = Endge.compiler.buildStore(store)

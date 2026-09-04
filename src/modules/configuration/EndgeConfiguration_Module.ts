@@ -138,7 +138,7 @@ export class EndgeConfiguration_Module extends EndgeModule {
     return configuration
   }
 
-  /** Builds a preview without mutating active boot configuration. */
+  /** Строит preview без изменения активной конфигурации запуска. */
   public preview(upstream: EndgeConfiguration, contribution: EndgeConfigurationContribution): EndgeConfiguration {
     const result = applyEndgeConfigurationContribution(upstream, contribution)
     result.values = Endge.configurationSchema.resolveValues(result.values)

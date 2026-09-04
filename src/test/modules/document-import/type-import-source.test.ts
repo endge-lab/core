@@ -2,13 +2,13 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { Endge } from '@/kernel/endge'
 
-describe('type importers', () => {
+describe('импортёры Type', () => {
   afterEach(() => {
     Endge.documentImport.reset()
     Endge.domain.reset()
   })
 
-  it('prepares OpenAPI fields as canonical Type Source without mutating Domain', () => {
+  it('подготавливает поля OpenAPI как канонический Type Source без изменения Domain', () => {
     const plan = Endge.documentImport.prepare({
       format: 'openapi',
       source: `
@@ -47,7 +47,7 @@ components:
     })
   })
 
-  it('prepares GraphQL nullability and custom references without operation roots', () => {
+  it('подготавливает nullability GraphQL и пользовательские ссылки без корней операций', () => {
     const plan = Endge.documentImport.prepare({
       format: 'graphql',
       source: `

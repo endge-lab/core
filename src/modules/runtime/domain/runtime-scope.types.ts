@@ -50,7 +50,7 @@ export interface RuntimeScopeLifecycleHooks {
   reconcile?: () => Promise<void> | void
   deactivate?: () => Promise<void> | void
   dispose?: () => Promise<void> | void
-  /** Centralized teardown keeps RuntimeHostRegistry and scope indexes consistent. */
+  /** Централизованное завершение сохраняет согласованность RuntimeHostRegistry и индексов scope. */
   destroyRuntime?: (runtimeId: string) => Promise<void> | void
   resolveRuntime?: (path: string) => RuntimeHost<any, any> | null
   resolveOutput?: (name: string) => unknown

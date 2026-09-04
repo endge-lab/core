@@ -5,8 +5,8 @@ import {
 } from '@/modules/ui/domain/types/ui-render-adapter.type'
 import { UIAdapterRegistry } from '@/modules/ui/registry/UIAdapterRegistry'
 
-describe('uIAdapterRegistry', () => {
-  it('registers, validates and activates an adapter', () => {
+describe('реестр UI-адаптеров', () => {
+  it('регистрирует, проверяет и активирует адаптер', () => {
     const onChange = vi.fn()
     const registry = new UIAdapterRegistry(onChange)
     const renderer = () => null
@@ -40,7 +40,7 @@ describe('uIAdapterRegistry', () => {
     expect(onChange).toHaveBeenCalledTimes(2)
   })
 
-  it('preserves opaque roots and validates required root entry points', () => {
+  it('сохраняет непрозрачные roots и проверяет обязательные корневые entrypoints', () => {
     const registry = new UIAdapterRegistry()
     const shell = { name: 'AdapterShell' }
 
@@ -64,7 +64,7 @@ describe('uIAdapterRegistry', () => {
     })).toThrow('missing roots: runtime')
   })
 
-  it('rejects duplicate ids and incomplete adapters', () => {
+  it('отклоняет повторяющиеся ID и неполные адаптеры', () => {
     const registry = new UIAdapterRegistry()
     registry.register({
       id: 'vue-native',
@@ -88,7 +88,7 @@ describe('uIAdapterRegistry', () => {
     })).toThrow('missing renderers: Select')
   })
 
-  it('reports the selected id and actually registered adapters', () => {
+  it('сообщает выбранный ID и фактически зарегистрированные адаптеры', () => {
     const registry = new UIAdapterRegistry()
     registry.register({
       id: 'vue-native',

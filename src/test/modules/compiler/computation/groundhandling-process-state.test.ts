@@ -273,14 +273,14 @@ defineComputation({
 const compiled = compileComputation({ source })
 const executor = new ComputationGraphExecutor(() => null)
 
-describe('groundhandling-process-state declarative computation', () => {
-  it('compiles as a synchronous graph without TypeScript nodes', () => {
+describe('декларативная computation groundhandling-process-state', () => {
+  it('компилируется в синхронный граф без узлов TypeScript', () => {
     expect(compiled.diagnostics.filter(item => item.severity === 'error')).toEqual([])
     expect(compiled.payload.execution).toBe('sync')
     expect(compiled.payload.nodes.every(node => node.kind === 'expression')).toBe(true)
   })
 
-  it('builds four independently styled sectors for a critical process', () => {
+  it('строит четыре независимо стилизованных сектора для критического процесса', () => {
     const result = executor.runSync(compiled.payload, {
       now: '2026-07-25T10:00:00Z',
       process: {
@@ -311,7 +311,7 @@ describe('groundhandling-process-state declarative computation', () => {
     ])
   })
 
-  it('marks a missing critical fact only after the strict five-minute boundary', () => {
+  it('помечает отсутствие критического факта только после строгой пятиминутной границы', () => {
     const overdue = executor.runSync(compiled.payload, {
       now: '2026-07-25T10:06:00Z',
       process: {
@@ -339,7 +339,7 @@ describe('groundhandling-process-state declarative computation', () => {
     })
   })
 
-  it('builds two milestone sectors and uses the available end pair first', () => {
+  it('строит два сектора milestones и сначала использует доступную пару завершения', () => {
     const result = executor.runSync(compiled.payload, {
       now: '2026-07-25T10:00:00Z',
       settings: { critical: false },

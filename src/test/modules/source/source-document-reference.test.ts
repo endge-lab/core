@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { Endge } from '@/kernel/endge'
 
-describe('source document references', () => {
+describe('ссылки документов Source', () => {
   it.each([
     ['composition', 'style(\'default\')', 'default', 'style'],
     ['composition', 'composition(\'groundhandling-control-page\')', 'groundhandling-control-page', 'composition'],
@@ -29,7 +29,7 @@ describe('source document references', () => {
     ['filter', 'field(MyType)', 'MyType', 'type'],
     ['computation', 'computation(\'calculate-duration\', {})', 'calculate-duration', 'computation'],
     ['computation', 'field(MyType)', 'MyType', 'type'],
-  ] as const)('resolves %s reference %s', (sourceKind, expression, identity, target) => {
+  ] as const)('разрешает ссылку %s %s', (sourceKind, expression, identity, target) => {
     const source = `const value = ${expression}`
     const reference = Endge.source.referenceAt(sourceKind, contextAt(source, identity))
 
@@ -37,7 +37,7 @@ describe('source document references', () => {
     expect(source.slice(reference!.range.start, reference!.range.end)).toContain(identity)
   })
 
-  it('resolves a reference when the cursor is on the DSL constructor', () => {
+  it('разрешает ссылку, когда курсор находится на конструкторе DSL', () => {
     const source = 'const page = composition(\'groundhandling-control-page\').activateOn(startup())'
 
     expect(Endge.source.referenceAt('composition', contextAt(source, 'composition'))).toMatchObject({
@@ -46,7 +46,7 @@ describe('source document references', () => {
     })
   })
 
-  it('resolves a type reference when the cursor is on the field constructor', () => {
+  it('разрешает ссылку на тип, когда курсор находится на конструкторе поля', () => {
     const source = 'defineComposition({ props: defineProps({ value: field(MyType) }) })'
 
     expect(Endge.source.referenceAt('composition', contextAt(source, 'field'))).toMatchObject({
@@ -62,7 +62,7 @@ describe('source document references', () => {
     'store',
     'filter',
     'computation',
-  ] as const)('highlights openable field type references in %s source', (sourceKind) => {
+  ] as const)('подсвечивает открываемые ссылки на типы полей в Source %s', (sourceKind) => {
     const source = 'const contract = { external: field(Flight), primitive: field(String), missing: field(MissingType) }'
     const highlights = Endge.source.semanticHighlights(sourceKind, {
       source,
@@ -82,7 +82,7 @@ describe('source document references', () => {
     ])
   })
 
-  it('chooses the nested external reference instead of its wrapping method call', () => {
+  it('выбирает вложенную внешнюю ссылку вместо оборачивающего её вызова метода', () => {
     const source = 'from(\'items\').dataView(dataView(\'normalize-flight\')).as(\'item\')'
 
     expect(Endge.source.referenceAt('data-view', contextAt(source, 'normalize-flight'))).toMatchObject({
@@ -96,11 +96,11 @@ describe('source document references', () => {
     ['query', 'response(\'items\')', 'items'],
     ['data-view', 'path(\'item.id\')', 'item.id'],
     ['store', 'from(\'raw\')', 'raw'],
-  ] as const)('does not treat internal %s expression as a document reference', (sourceKind, source, cursor) => {
+  ] as const)('не считает внутреннее выражение %s ссылкой на документ', (sourceKind, source, cursor) => {
     expect(Endge.source.referenceAt(sourceKind, contextAt(source, cursor))).toBeNull()
   })
 
-  it('returns null when the source is temporarily invalid', () => {
+  it('возвращает null, когда Source временно некорректен', () => {
     const source = 'composition(\'unfinished'
     expect(Endge.source.referenceAt('composition', contextAt(source, 'unfinished'))).toBeNull()
   })

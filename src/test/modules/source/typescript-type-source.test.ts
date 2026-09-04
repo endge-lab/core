@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { compileComponentSFC } from '@/modules/compiler/services/component-sfc/component-sfc-compile'
 import { analyzeTypeScriptTypeDeclarations } from '@/modules/source/services/typescript-type-source'
 
-describe('typescript type source extraction', () => {
-  it('converts a safe interface into canonical Type Source data', () => {
+describe('извлечение Source типов TypeScript', () => {
+  it('преобразует безопасный interface в канонические данные Type Source', () => {
     const [result] = analyzeTypeScriptTypeDeclarations(`interface FlightRow {
   /** Stable flight identity. */
   id: string
@@ -53,7 +53,7 @@ describe('typescript type source extraction', () => {
     })
   })
 
-  it('keeps local references so the editor can extract their dependency closure', () => {
+  it('сохраняет локальные ссылки, чтобы редактор мог извлечь замыкание их зависимостей', () => {
     const results = analyzeTypeScriptTypeDeclarations(`interface Address { city: string }
 interface Passenger { address: Address }`)
 
@@ -70,7 +70,7 @@ interface Passenger { address: Address }`)
     })
   })
 
-  it('resolves an extracted RType as an external named props contract', () => {
+  it('разрешает извлечённый RType как внешний именованный контракт props', () => {
     const definition = analyzeTypeScriptTypeDeclarations(`interface FlightRow {
   id: string
   delayed?: boolean

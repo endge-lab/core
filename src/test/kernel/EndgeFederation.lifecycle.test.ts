@@ -32,9 +32,9 @@ function uniqueFederationId(label: string): string {
   return `${label}-${Date.now()}-${Math.random()}`
 }
 
-describe('endgeFederation lifecycle state machine', () => {
+describe('машина состояний жизненного цикла EndgeFederation', () => {
   /** Проверяет single-flight boot и запрет подмены активного контекста. */
-  it('shares one boot for the same context and rejects another context', async () => {
+  it('разделяет один запуск для одинакового контекста и отклоняет другой контекст', async () => {
     const setupGate = createDeferred()
 
     class TestModule extends EndgeModule {
@@ -67,7 +67,7 @@ describe('endgeFederation lifecycle state machine', () => {
 
   /** Проверяет rollback каждой boot phase и разрешённый retry после успешной очистки. */
   it.each(['setup', 'load', 'build', 'start'] as const)(
-    'rolls touched modules back after %s failure and allows retry',
+    'откатывает затронутые модули после ошибки %s и разрешает повтор',
     async (failedPhase) => {
       const calls: string[] = []
       let shouldFail = true
@@ -126,7 +126,7 @@ describe('endgeFederation lifecycle state machine', () => {
   )
 
   /** Проверяет failed-state при ошибке rollback и восстановление отдельным reset. */
-  it('keeps original and rollback errors until a recovery reset succeeds', async () => {
+  it('сохраняет исходную ошибку и ошибку отката до успешного восстановительного reset', async () => {
     let resetShouldFail = true
 
     class TestModule extends EndgeModule {
@@ -165,7 +165,7 @@ describe('endgeFederation lifecycle state machine', () => {
   })
 
   /** Проверяет FIFO rebuild, изоляцию ошибки и продолжение очереди. */
-  it('runs rebuilds in FIFO order and continues after one failure', async () => {
+  it('выполняет пересборки в порядке FIFO и продолжает после одной ошибки', async () => {
     const firstBuildGate = createDeferred()
     const starts: number[] = []
     let buildNumber = 0
@@ -216,7 +216,7 @@ describe('endgeFederation lifecycle state machine', () => {
   })
 
   /** Проверяет ожидание build queue и single-flight reset. */
-  it('waits for queued builds and shares one concurrent reset', async () => {
+  it('ожидает поставленные в очередь сборки и разделяет один конкурентный reset', async () => {
     const buildGate = createDeferred()
     const calls: string[] = []
     let buildNumber = 0

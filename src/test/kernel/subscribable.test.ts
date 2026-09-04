@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { Subscribable } from '@/kernel/Subscribable'
 
-describe('subscribable', () => {
+describe('подписываемое состояние', () => {
   /** Проверяет публикацию изменения всем активным подписчикам. */
   it('уведомляет каждого активного подписчика', () => {
     const subscribable = new Subscribable()

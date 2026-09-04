@@ -2,15 +2,15 @@ import { describe, expect, it } from 'vitest'
 
 import { resolveCompositionActivation } from '@/modules/source/services/composition-activation'
 
-describe('composition activation precedence', () => {
-  it('uses invocation override before child root and owner scope', () => {
+describe('приоритет активации Composition', () => {
+  it('использует переопределение вызова раньше дочернего корня и scope владельца', () => {
     expect(resolveCompositionActivation({ mode: 'startup' }, { mode: 'manual' }, { mode: 'manual' }))
       .toEqual({ mode: 'startup' })
     expect(resolveCompositionActivation({ mode: 'manual' }, { mode: 'startup' }, { mode: 'startup' }))
       .toEqual({ mode: 'manual' })
   })
 
-  it('uses child root before owner scope and then startup default', () => {
+  it('использует дочерний корень раньше scope владельца, а затем стартового значения по умолчанию', () => {
     expect(resolveCompositionActivation(null, { mode: 'manual' }, { mode: 'startup' }))
       .toEqual({ mode: 'manual' })
     expect(resolveCompositionActivation(null, null, { mode: 'manual' }))

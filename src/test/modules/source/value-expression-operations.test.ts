@@ -36,8 +36,8 @@ function collectOperations(expression: SourceExpressionIR): void {
   }
 }
 
-describe('valueExpression operation registry', () => {
-  it('evaluates object, path and conversion operations immutably', () => {
+describe('реестр операций ValueExpression', () => {
+  it('иммутабельно вычисляет операции объектов, путей и преобразования', () => {
     const source = { nested: { value: 2 }, keep: true, remove: 1 }
 
     expect(evaluate(`get(${JSON.stringify(source)}, 'nested.value')`)).toBe(2)
@@ -81,7 +81,7 @@ describe('valueExpression operation registry', () => {
     expect(source).toEqual({ nested: { value: 2 }, keep: true, remove: 1 })
   })
 
-  it('evaluates collection, aggregate and ordering operations', () => {
+  it('вычисляет операции коллекций, агрегации и упорядочивания', () => {
     expect(evaluate(`[1, 2].map(add(get(''), 1))`)).toEqual([2, 3])
     expect(evaluate(`[1, 2, 3].where(gt(get(''), 1))`)).toEqual([2, 3])
     expect(evaluate(`[1, 2, 3].reject(gt(get(''), 1))`)).toEqual([1])
@@ -123,7 +123,7 @@ describe('valueExpression operation registry', () => {
     expect(evaluate(`[{ t: 'a' }, { t: 'a' }, { t: 'b' }].countBy(get('t'))`)).toEqual({ a: 2, b: 1 })
   })
 
-  it('evaluates strings, numbers, predicates and lazy branches', () => {
+  it('вычисляет строки, числа, предикаты и ленивые ветви', () => {
     expect(evaluate(`concat('A', 'B')`)).toBe('AB')
     expect(evaluate(`trim(' a ')`)).toBe('a')
     expect(evaluate(`lowerCase('A')`)).toBe('a')
@@ -171,7 +171,7 @@ describe('valueExpression operation registry', () => {
     expect(evaluate(`containsAny([1, 2, 3], [4, 2])`)).toBe(true)
   })
 
-  it('evaluates explicit UTC DateTime and Duration operations', () => {
+  it('вычисляет явные операции UTC DateTime и Duration', () => {
     expect(evaluate(`dateTime('2026-07-25T10:00:00+03:00')`)).toBe('2026-07-25T07:00:00.000Z')
     expect(evaluate(`duration({ minutes: 5 })`)).toEqual({ kind: 'duration', milliseconds: 300_000 })
     expect(evaluate(`isDateTime('2026-07-25T07:00:00Z')`)).toBe(true)
@@ -198,7 +198,7 @@ describe('valueExpression operation registry', () => {
     expect(evaluate(`relativeDateTime('invalid')`)).toBe('invalid')
   })
 
-  it('evaluates joins, lookups and enrichment', () => {
+  it('вычисляет соединения, поиски и обогащение данных', () => {
     expect(evaluate(`leftJoin([{ id: 1 }, { id: 2 }], [{ id: 1 }]).by('id')`)).toEqual([
       { left: { id: 1 }, right: { id: 1 } },
       { left: { id: 2 }, right: null },
@@ -222,7 +222,7 @@ describe('valueExpression operation registry', () => {
     }])
   })
 
-  it('covers every registered operation with a compiled and evaluated expression', () => {
+  it('покрывает каждую зарегистрированную операцию скомпилированным и вычисленным выражением', () => {
     expect([...coveredOperations].sort()).toEqual(
       (Object.keys(VALUE_EXPRESSION_OPERATIONS) as SourceExpressionOperation[]).sort(),
     )

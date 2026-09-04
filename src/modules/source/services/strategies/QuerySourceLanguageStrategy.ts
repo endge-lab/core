@@ -369,7 +369,7 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
   }
 }
 
-/** Adds GraphQL tokenization only inside static gql tagged templates. */
+/** Добавляет токенизацию GraphQL только внутри статических tagged templates gql. */
 function withGraphQLSyntax(syntax: SourceLanguageSyntaxDefinition): SourceLanguageSyntaxDefinition {
   return {
     ...syntax,

@@ -11,12 +11,12 @@ import { ImplementationError } from '@/modules/runtime/domain/implementation.typ
 import { ImplementationBindingRegistry } from '@/modules/runtime/implementation/implementation-binding-registry'
 import { ImplementationProviderRegistry } from '@/modules/runtime/implementation/implementation-provider-registry'
 
-/** Generic runtime module for code providers, bindings and effective resolution. */
+/** Общий runtime-модуль для провайдеров кода, bindings и фактического разрешения. */
 export class EndgeImplementations {
   private readonly _providers = new ImplementationProviderRegistry()
   private readonly _bindings = new ImplementationBindingRegistry()
 
-  /** Registers local executable code and returns its disposer. */
+  /** Регистрирует локальный исполняемый код и возвращает его disposer. */
   public registerProvider(provider: ImplementationProvider): () => void {
     return this._providers.register(provider)
   }
@@ -25,12 +25,12 @@ export class EndgeImplementations {
     return this._providers.get(key) != null
   }
 
-  /** Registers an explicit binding and returns its disposer. */
+  /** Регистрирует явный binding и возвращает его disposer. */
   public bind(binding: ImplementationBinding): () => void {
     return this._bindings.register(binding)
   }
 
-  /** Resolves the effective provider by scope and priority. */
+  /** Определяет фактический провайдер по scope и приоритету. */
   public resolve(request: ImplementationResolutionRequest): ResolvedImplementation {
     if (request.invocationProviderKey) {
       const provider = this._requireProvider(request.invocationProviderKey)
@@ -58,7 +58,7 @@ export class EndgeImplementations {
     }
   }
 
-  /** Returns null only when neither a binding nor a default provider is declared. */
+  /** Возвращает null только когда не объявлены ни binding, ни provider по умолчанию. */
   public resolveOptional(request: ImplementationResolutionRequest): ResolvedImplementation | null {
     const binding = this._bindings.resolve(request)
     if (!binding && !request.invocationProviderKey && !request.defaultProviderKey) {
@@ -67,7 +67,7 @@ export class EndgeImplementations {
     return this.resolve(request)
   }
 
-  /** Resolves and executes one invocation through its effective provider. */
+  /** Вычисляет и выполняет один вызов через его фактический provider. */
   public async execute<TResult = unknown>(
     request: ImplementationResolutionRequest,
     invocation: ImplementationInvocation,
@@ -82,7 +82,7 @@ export class EndgeImplementations {
     return await resolved.provider.execute(invocation) as TResult
   }
 
-  /** Returns a serializable inspection snapshot without functions. */
+  /** Возвращает сериализуемый snapshot инспекции без функций. */
   public snapshot(): ImplementationSnapshot {
     return {
       providers: this._providers.list().map(provider => ({

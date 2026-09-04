@@ -11,7 +11,7 @@ import { RQuery } from '@/modules/domain/entities/RQuery'
 import { RTenant } from '@/modules/domain/entities/RTenant'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
-describe('endgeCompiler ComponentSFC ports', () => {
+describe('порты ComponentSFC в EndgeCompiler', () => {
   beforeEach(() => prepareCompilerContext())
 
   afterEach(() => {
@@ -21,7 +21,7 @@ describe('endgeCompiler ComponentSFC ports', () => {
     Endge.workspace.reset()
   })
 
-  it('compiles computations before components and executes the default artifact', async () => {
+  it('компилирует computations до компонентов и выполняет артефакт по умолчанию', async () => {
     const computation = new RComputation()
     computation.id = 1
     computation.identity = 'process-state'
@@ -73,7 +73,7 @@ const state = ports.require.state({ value: props.value })
     })
   })
 
-  it('records required Action defaults as program dependencies', () => {
+  it('записывает обязательные значения Action по умолчанию как зависимости Program', () => {
     const openDetails = new RAction()
     openDetails.id = 7
     openDetails.identity = 'flight.open-details'
@@ -98,7 +98,7 @@ const ports = definePorts({
     })
   })
 
-  it('records a direct MenuItem Action as a component dependency', () => {
+  it('записывает прямой Action MenuItem как зависимость компонента', () => {
     const openDetails = new RAction()
     openDetails.id = 9
     openDetails.identity = 'flight.open-details'
@@ -120,7 +120,7 @@ const ports = definePorts({
     })
   })
 
-  it('records direct Event Query reactions as program dependencies', () => {
+  it('записывает прямые реакции Event Query как зависимости Program', () => {
     const query = new RQuery()
     query.id = 8
     query.identity = 'schedule-sandbox-update-leg'
@@ -145,7 +145,7 @@ const ports = definePorts({
     })
   })
 
-  it('publishes forward collisions to the build diagnostics system', () => {
+  it('публикует конфликты forward в систему диагностики сборки', () => {
     Endge.domain.addComponentSFC(component(9, 'table-collision', `<script setup lang="ts">
 const ports = definePorts({
   forward: '*',
@@ -164,7 +164,7 @@ const ports = definePorts({
     ]))
   })
 
-  it('accepts Core-owned Event payload types without hiding missing user types', () => {
+  it('принимает принадлежащие Core типы payload Event, не скрывая отсутствующие пользовательские типы', () => {
     Endge.domain.addComponentSFC(component(10, 'table-events', `<script setup lang="ts">
 const ports = definePorts({ forward: { from: 'table', ports: { emits: '*' } } })
 </script>
@@ -195,7 +195,7 @@ const ports = definePorts({ emits: { changed: event<MissingUserEvent>() } })
     ]))
   })
 
-  it('resolves forwarded child manifests independently from component compile order', () => {
+  it('разрешает перенаправленные дочерние manifests независимо от порядка компиляции компонентов', () => {
     const parent = component(10, 'parent-public', `<script setup lang="ts">
 const ports = definePorts({
   forward: '*',
@@ -231,7 +231,7 @@ const ports = definePorts({
     })
   })
 
-  it('routes a derived component-port Action to the concrete runtime target', async () => {
+  it('направляет производный Action порта компонента в конкретную runtime-цель', async () => {
     Endge.domain.addComponentSFC(component(12, 'action-owner', `<script setup lang="ts">
 const ports = definePorts({ provides: { refresh: action<{ force: boolean }, void>() } })
 </script>

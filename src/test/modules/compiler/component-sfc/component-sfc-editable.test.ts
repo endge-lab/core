@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { compileComponentSFC } from '@/modules/compiler/services/component-sfc/component-sfc-compile'
 
-describe('component SFC editable compiler', () => {
-  it('compiles primitive editable behavior and synthesizes the edited port', () => {
+describe('компилятор редактируемого поведения Component SFC', () => {
+  it('компилирует редактируемое поведение примитива и синтезирует порт edited', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 defineProps<{ status: string }>()
 </script>
@@ -26,7 +26,7 @@ defineProps<{ status: string }>()
     ]))
   })
 
-  it('accepts a Configuration TriggerSet through $context.config', () => {
+  it('принимает TriggerSet Configuration через $context.config', () => {
     const result = compileComponentSFC(`<template>
   <DateTime
     value="2026-08-20T12:00:00Z"
@@ -43,7 +43,7 @@ defineProps<{ status: string }>()
     })
   })
 
-  it('compiles lexical row scope and a computed patch key in emit()', () => {
+  it('компилирует лексический scope строки и вычисляемый ключ patch в emit()', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 defineProps<{ rows: Array<{ id: number, status: string }> }>()
 </script>
@@ -76,7 +76,7 @@ defineProps<{ rows: Array<{ id: number, status: string }> }>()
     })
   })
 
-  it('validates explicit component and Editable variants', () => {
+  it('проверяет явный компонент и варианты Editable', () => {
     const valid = compileComponentSFC(`<template>
   <Variant name="default"><Text>View</Text></Variant>
   <Variant name="edit"><Input value="Edit" /></Variant>
@@ -94,7 +94,7 @@ defineProps<{ rows: Array<{ id: number, status: string }> }>()
     ]))
   })
 
-  it('rejects mixed Text children when value cannot be inferred', () => {
+  it('отклоняет смешанные дочерние узлы Text, если value нельзя вывести', () => {
     const result = compileComponentSFC(`<script setup lang="ts">defineProps<{ status: string }>()</script>
 <template><Text editable>Status: {{ status }}</Text></template>`)
     expect(result.diagnostics).toEqual(expect.arrayContaining([
@@ -102,7 +102,7 @@ defineProps<{ rows: Array<{ id: number, status: string }> }>()
     ]))
   })
 
-  it('requires an edit variant from an editable custom component dependency', () => {
+  it('требует вариант edit у зависимости редактируемого пользовательского компонента', () => {
     const result = compileComponentSFC(`<template><MyStatus value="RUN" editable /></template>`, {
       resolveComponentTag: tag => tag === 'MyStatus' ? 'MyStatus' : null,
       resolveComponentVariants: identity => identity === 'MyStatus' ? ['default'] : null,

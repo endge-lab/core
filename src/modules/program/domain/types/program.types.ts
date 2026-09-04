@@ -100,7 +100,7 @@ export interface ProgramDependency {
   /** Роль зависимости: child-component, renderer, data-source и т.п. */
   role?: string
 
-  /** Optional source location of the dependency reference for linker diagnostics. */
+  /** Необязательное местоположение в Source ссылки на зависимость для диагностики linker. */
   sourcePath?: string
   start?: number
   end?: number
@@ -156,9 +156,9 @@ export type QueryProgramOutputSource
 export interface QueryProgramOutput {
   key: string
   source: QueryProgramOutputSource
-  /** Ordered transform chain used by new runtimes. */
+  /** Упорядоченная цепочка transform для новых runtimes. */
   transforms?: ResponseOutputTransform[]
-  /** Compatibility projection for runtimes compiled before ordered transforms. */
+  /** Проекция совместимости для runtimes, скомпилированных до упорядоченных transforms. */
   dataViews: DataViewRef[]
   contract?: SourceFieldDefinition | null
   materialization:
@@ -166,7 +166,7 @@ export interface QueryProgramOutput {
     | { kind: 'derived', strategy: import('@/modules/source/domain/types/data-view-source.types').DataViewMaterializationStrategy }
 }
 
-/** Backward-compatible static value or compiled runtime request expression. */
+/** Статическое значение для обратной совместимости или скомпилированное выражение runtime-запроса. */
 export type QueryProgramRequestValue<T> = T | SourceExpressionIR
 
 /** Payload artifact для query-сущности. */
@@ -198,7 +198,7 @@ export interface QueryProgramPayload {
   /** Политика GraphQL errors в HTTP 2xx response. */
   errorPolicy?: 'throw' | 'ignore'
 
-  /** HTTP headers Query transport. */
+  /** HTTP-заголовки транспорта Query. */
   headers?: QueryProgramRequestValue<Record<string, string>>
 
   /** Auth config, подготовленный для runtime query layer. */
@@ -222,7 +222,7 @@ export interface QueryProgramPayload {
   /** Включены ли mock data для query. */
   mockDataEnabled?: boolean
 
-  /** Mock payload query. */
+  /** Query с mock-payload. */
   mockData?: unknown
 
   /** Ordered output graph, который runtime вычисляет после backend response. */
@@ -269,7 +269,7 @@ export interface DataViewProgramPayload {
 
 /** Payload artifact для нового source-first SFC компонента. */
 export interface ComponentSFCProgramPayload {
-  /** Independent compiler status for each SFC section. */
+  /** Независимый статус компилятора для каждой секции SFC. */
   sections?: Record<'script' | 'template' | 'style', ProgramArtifactStatus>
   /** Разложенный canonical source: script, template и style. */
   sourceParts: RComponentSFCSource_Parts
@@ -286,7 +286,7 @@ export interface ComponentSFCProgramPayload {
   /** Preview-only props для песочницы/debug UI. Не являются runtime default props. */
   previewProps: ComponentSFCPreviewProps | null
 
-  /** Preview-only runtime options: seed local store, run queries/actions etc. */
+  /** Runtime-параметры только для preview: заполнение локального store, запуск queries/actions и прочее. */
   previewOptions: ComponentSFCPreviewOptions | null
 
   /** Parser-level AST SFC source, нужен для diagnostics и debug UI. */
@@ -296,15 +296,15 @@ export interface ComponentSFCProgramPayload {
   ir: RComponentSFC_IR | null
 }
 
-/** Runtime payload source-first style document. */
+/** Source-first документ стилей в payload runtime. */
 export interface EndgeStyleProgramPayload {
-  /** Renderer-neutral compiled stylesheet. */
+  /** Скомпилированная таблица стилей, нейтральная к renderer. */
   stylesheet: EndgeStyleSheetArtifact
 
-  /** Theme ids contributed by this document. */
+  /** ID тем, предоставляемые этим документом. */
   themes: string[]
 
-  /** External dependencies discovered while compiling style conditions. */
+  /** Внешние зависимости, найденные при компиляции условий стилей. */
   dependencies: ProgramDependency[]
 }
 
@@ -364,7 +364,7 @@ export interface ProgramCompileContext {
   /** Версия compiler pipeline, которая попадет во все artifacts текущей сборки. */
   compilerVersion: string
 
-  /** Immutable structural context and effective configuration of this build. */
+  /** Неизменяемый структурный контекст и фактическая конфигурация этой сборки. */
   buildContext: import('@/modules/configuration/domain/types/configuration.type').EndgeBuildContext
 }
 
@@ -420,7 +420,7 @@ export interface EndgeProgramSnapshot {
     /** Возможности artifact. */
     capabilities: ProgramCapability[]
 
-    /** Hash source input artifact. */
+    /** Исходный входной артефакт для hash. */
     sourceHash: string
 
     /** Версия compiler, построившая artifact. */

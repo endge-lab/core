@@ -22,9 +22,9 @@ export interface ProjectCompositionHandle<THost extends CompositionRuntimeHostHa
 }
 
 export interface ProjectRuntimeMountOptions {
-  /** `declared` preserves root activateOn; `none` creates stable handles for an on-demand/debug session. */
+  /** `declared` сохраняет корневой activateOn; `none` создаёт стабильные handles для сессии по требованию или отладки. */
   autoActivate?: 'declared' | 'none'
-  /** Session-local artifact projection used by Preview without mutating Endge.program. */
+  /** Локальная для сессии проекция артефактов, используемая Preview без изменения Endge.program. */
   artifactReader?: RuntimeArtifactReader
 }
 

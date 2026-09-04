@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { compileComputation } from '@/modules/compiler/services/computation/computation-compile'
 import { ComputationGraphExecutor } from '@/modules/runtime/execution/computation/ComputationGraphExecutor'
 
-describe('compileComputation graph', () => {
-  it('compiles forward references and evaluates the safe graph once', () => {
+describe('граф compileComputation', () => {
+  it('компилирует опережающие ссылки и однократно вычисляет безопасный граф', () => {
     const result = compileComputation({
       source: `defineComputation({
   input: field(ProcessStateInput),
@@ -31,7 +31,7 @@ describe('compileComputation graph', () => {
     )).toEqual({ target: { value: '07:15', tone: 'default' } })
   })
 
-  it('compiles a mixed graph and executes a TypeScript node through the adapter', async () => {
+  it('компилирует смешанный граф и выполняет узел TypeScript через адаптер', async () => {
     const result = compileComputation({
       source: `defineComputation({
   outputs: {
@@ -53,7 +53,7 @@ describe('compileComputation graph', () => {
     await expect(executor.run(result.payload, {}, 'mixed')).resolves.toEqual({ value: 10, tone: 'success' })
   })
 
-  it('starts independent TypeScript outputs concurrently', async () => {
+  it('запускает независимые выходы TypeScript конкурентно', async () => {
     const result = compileComputation({
       source: `defineComputation({
         outputs: {
@@ -81,7 +81,7 @@ describe('compileComputation graph', () => {
     await expect(execution).resolves.toBe(3)
   })
 
-  it('lifts external computations from value-expression chains into graph nodes', () => {
+  it('выносит внешние computations из цепочек value-выражений в узлы графа', () => {
     const result = compileComputation({
       source: `defineComputation({
         outputs: {
@@ -109,7 +109,7 @@ describe('compileComputation graph', () => {
     expect(result.payload.execution).toBe('async')
   })
 
-  it('rejects dynamic external computation identities', () => {
+  it('отклоняет динамические identities внешних computations', () => {
     const result = compileComputation({
       source: `defineComputation({
         outputs: { value: computation(input('identity'), input('value')) },
@@ -122,7 +122,7 @@ describe('compileComputation graph', () => {
     ]))
   })
 
-  it('reports unknown outputs, cycles, async blocks and the legacy syntax', () => {
+  it('сообщает о неизвестных outputs, циклах, асинхронных блоках и legacy-синтаксисе', () => {
     const invalid = compileComputation({
       source: `defineComputation({
   outputs: {
@@ -149,7 +149,7 @@ describe('compileComputation graph', () => {
     ]))
   })
 
-  it('rejects forbidden globals without rejecting local names or object keys', () => {
+  it('отклоняет запрещённые глобальные объекты, не отклоняя локальные имена и ключи объектов', () => {
     const local = compileComputation({
       source: `defineComputation({
         outputs: {

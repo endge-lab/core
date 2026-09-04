@@ -3,7 +3,7 @@ import type { EntityOrigin, EntityRef } from '@/modules/domain/types/document/en
 export type RuntimeActionId = string
 export type RuntimeActionSurface = string
 
-/** Stable identities of targetless Actions provided by Endge itself. */
+/** Стабильные идентификаторы Actions без цели, предоставляемых самим Endge. */
 export const BUILTIN_ACTION_IDS = {
   consoleLog: 'built-in-console-log',
   testAlert: 'built-in-test-alert',
@@ -12,26 +12,26 @@ export const BUILTIN_ACTION_IDS = {
   vocabInvalidate: 'built-in-vocabs-invalidate',
 } as const
 
-/** Declarative reference accepted by interactive primitives such as MenuItem. */
+/** Декларативная ссылка, принимаемая интерактивными примитивами, например MenuItem. */
 export interface ActionBinding<TInput = unknown> {
   identity: RuntimeActionId
   input?: TInput
 }
 
-/** One allowed target shape. Multiple selectors are alternatives. */
+/** Одна допустимая форма цели. Несколько селекторов являются альтернативами. */
 export interface ActionTargetSelector {
   type: string
   identity?: string
 }
 
-/** Concrete runtime target. Database ids are intentionally not part of the contract. */
+/** Конкретная runtime-цель. ID базы данных намеренно не входят в контракт. */
 export interface ActionExecutionTarget<TValue = unknown> {
   type: string
   identity: string
   value: TValue
 }
 
-/** How an Action is executed when there is no higher-priority runtime binding. */
+/** Способ выполнения Action при отсутствии runtime-binding с более высоким приоритетом. */
 export type ActionImplementation
   = | { kind: 'source' }
     | { kind: 'provider', providerKey: string }
@@ -63,7 +63,7 @@ export interface ResolvedActionDescriptor {
   description: string | null
   active: boolean
   origin: EntityOrigin
-  /** Runtime catalog placement; it does not affect ownership or persistence. */
+  /** Размещение в runtime-каталоге; оно не влияет на ownership или persistence. */
   catalogPath?: string[]
   owner?: EntityRef
   target: ActionTargetSelector[] | null
@@ -84,14 +84,14 @@ export type ImplementationBindingScope
     | 'component'
     | 'invocation'
 
-/** Renderer-neutral context passed to a runtime Action provider. */
+/** Нейтральный к renderer контекст, передаваемый runtime-провайдеру Action. */
 export interface RuntimeActionContext {
   surface: RuntimeActionSurface
   runtimeId?: string
   target?: unknown
 }
 
-/** Callable runtime behavior. Unlike Event, Action has one provider and may return a result. */
+/** Вызываемое runtime-поведение. В отличие от Event, Action имеет одного провайдера и может вернуть результат. */
 export interface RuntimeAction<TContext extends RuntimeActionContext = RuntimeActionContext, TPayload = unknown, TResult = void> {
   id: RuntimeActionId
   label?: string
@@ -139,7 +139,7 @@ export interface TableColumnSortState {
   index?: number
 }
 
-/** Operations implemented by one mounted Table instance. */
+/** Операции, реализованные одним смонтированным экземпляром Table. */
 export interface TableRuntimeActionTarget {
   setColumnVisibility?: (columnKey: string, visible: boolean) => void | Promise<void>
   setColumnPin?: (columnKey: string, side: TableColumnPinSide) => void | Promise<void>
@@ -192,9 +192,9 @@ export interface TableActionCellContext {
   value: unknown
 }
 
-/** Renderer-neutral cell context shared by every Table menu adapter. */
+/** Нейтральный к renderer контекст ячейки, общий для всех адаптеров меню Table. */
 export interface TableRowActionContext extends RuntimeActionContext {
-  /** Compatibility surface value retained for existing Action providers. */
+  /** Значение поверхности совместимости, сохранённое для существующих провайдеров Action. */
   surface: 'table-row'
   table: TableActionTableContext
   rowContext: TableActionRowContext
@@ -210,5 +210,5 @@ export interface TableRowActionContext extends RuntimeActionContext {
   value: unknown
 }
 
-/** Canonical name for new consumers; TableRowActionContext remains source-compatible. */
+/** Каноническое имя для новых consumers; TableRowActionContext сохраняет совместимость Source. */
 export type TableCellActionContext = TableRowActionContext

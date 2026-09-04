@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 // @vitest-environment node
 import { WorkspaceVariables } from '@/modules/context/endge-vars'
 
-describe('workspaceVariables', () => {
-  it('resolves double-braced and legacy variable tokens', () => {
+describe('переменные Workspace', () => {
+  it('разрешает токены переменных с двойными фигурными скобками и legacy-токены', () => {
     const variables = new WorkspaceVariables(() => [])
     variables.setEnvironment({ SENTRY_DSN: 'http://public@localhost:9000/1' })
 
@@ -11,7 +11,7 @@ describe('workspaceVariables', () => {
     expect(variables.resolve('{SENTRY_DSN}')).toBe('http://public@localhost:9000/1')
   })
 
-  it('interpolates multiple variables in one string', () => {
+  it('интерполирует несколько переменных в одной строке', () => {
     const variables = new WorkspaceVariables(() => [])
     variables.setEnvironment({
       OIDC_ISSUER: 'https://auth.example.com',
@@ -23,7 +23,7 @@ describe('workspaceVariables', () => {
       .toBe('https://auth.example.com/realms/example/protocol/openid-connect/token')
   })
 
-  it('uses fallback when an interpolated variable is unavailable', () => {
+  it('использует резервное значение, если интерполируемая переменная недоступна', () => {
     const variables = new WorkspaceVariables(() => [])
     variables.setEnvironment({ OIDC_ISSUER: 'https://auth.example.com' })
 
@@ -32,7 +32,7 @@ describe('workspaceVariables', () => {
       .toBe('fallback')
   })
 
-  it('does not expose an unresolved variable token as a credential', () => {
+  it('не раскрывает неразрешённый токен переменной как credential', () => {
     const variables = new WorkspaceVariables(() => [])
 
     expect(variables.resolve('{{ MISSING_SECRET }}')).toBeUndefined()

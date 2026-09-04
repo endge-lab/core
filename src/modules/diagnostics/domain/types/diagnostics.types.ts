@@ -81,7 +81,7 @@ export interface DiagnosticsProblemFilter {
   codes?: string[]
 }
 
-/** Snapshot replaceable problem registry. */
+/** Реестр проблем, заменяемый целиком через snapshot. */
 export interface DiagnosticsProblemsSnapshot {
   revision: number
   total: number

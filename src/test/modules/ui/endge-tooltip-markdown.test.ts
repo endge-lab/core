@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { createEndgeTooltipDomId, parseEndgeTooltipMarkdown } from '@/modules/ui/tooltip/endge-tooltip-markdown'
 
-describe('tooltip Markdown', () => {
-  it('parses the safe block and inline subset without producing HTML', () => {
+describe('проверка Markdown всплывающей подсказки', () => {
+  it('разбирает безопасное подмножество блоков и inline-разметки без генерации HTML', () => {
     const blocks = parseEndgeTooltipMarkdown(`# Delay
 
 **Reason:** late aircraft
@@ -19,7 +19,7 @@ describe('tooltip Markdown', () => {
     expect(blocks.at(-1)).toEqual({ kind: 'code-block', value: '<script>alert(1)</script>' })
   })
 
-  it('drops unsafe link protocols and creates stable scoped DOM ids', () => {
+  it('отбрасывает небезопасные протоколы ссылок и создаёт стабильные DOM ID в scope', () => {
     expect(parseEndgeTooltipMarkdown('[unsafe](javascript:alert(1))')).toEqual([
       { kind: 'paragraph', children: [{ kind: 'text', value: 'unsafe)' }] },
     ])

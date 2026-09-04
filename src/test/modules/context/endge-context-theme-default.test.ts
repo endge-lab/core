@@ -6,12 +6,12 @@ import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
 const configuration = TEST_ENDGE_WORKSPACE.configuration
 
-describe('endgeContext effective default theme', () => {
+describe('эффективная тема по умолчанию EndgeContext', () => {
   beforeEach(() => {
     installLocalStorageMock()
   })
 
-  it('uses the effective default after bootstrap when no preference exists', async () => {
+  it('использует эффективное значение по умолчанию после запуска при отсутствии настройки', async () => {
     const context = new EndgeContext_Module()
     await Promise.resolve()
 
@@ -27,7 +27,7 @@ describe('endgeContext effective default theme', () => {
     })
   })
 
-  it('keeps an explicit supported preference over the effective default', async () => {
+  it('предпочитает явную поддерживаемую настройку эффективному значению по умолчанию', async () => {
     localStorage.setItem(CONTEXT_STORAGE_KEY, JSON.stringify({
       theme: 'dark',
       themePreferenceVersion: 1,
@@ -40,7 +40,7 @@ describe('endgeContext effective default theme', () => {
     expect(context.currentTheme).toBe('dark')
   })
 
-  it('does not treat an unversioned bootstrap theme as a user preference', async () => {
+  it('не считает стартовую тему без версии пользовательской настройкой', async () => {
     localStorage.setItem(CONTEXT_STORAGE_KEY, JSON.stringify({ theme: 'dark' }))
 
     const context = new EndgeContext_Module()
@@ -54,7 +54,7 @@ describe('endgeContext effective default theme', () => {
     })
   })
 
-  it('preserves a selection from the dedicated legacy preference key', async () => {
+  it('сохраняет выбор из отдельного legacy-ключа настройки', async () => {
     localStorage.setItem(CONTEXT_STORAGE_KEY, JSON.stringify({ theme: 'dark' }))
     localStorage.setItem(LEGACY_THEME_STORAGE_KEY, 'dark')
 
@@ -69,7 +69,7 @@ describe('endgeContext effective default theme', () => {
     })
   })
 
-  it('persists a new explicit preference with its version marker', async () => {
+  it('сохраняет новую явную настройку вместе с маркером версии', async () => {
     const context = new EndgeContext_Module()
     await Promise.resolve()
     context.reconcileCurrentThemeWithWorkspace(configuration)

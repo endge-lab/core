@@ -23,8 +23,8 @@ const baseEvent: ComponentSFCEditTriggerEvent = {
   },
 }
 
-describe('component SFC edit trigger', () => {
-  it('normalizes keyboard filters and explicit false modifier states', () => {
+describe('триггер редактирования Component SFC', () => {
+  it('нормализует фильтры клавиатуры и явно ложные состояния модификаторов', () => {
     expect(normalizeComponentSFCEditTriggers({
       event: 'keydown',
       key: 'e',
@@ -47,7 +47,7 @@ describe('component SFC edit trigger', () => {
     }])
   })
 
-  it('maps mod to Control on Windows/Linux and Meta on macOS', () => {
+  it('сопоставляет mod с Control в Windows/Linux и с Meta в macOS', () => {
     const trigger = normalizeComponentSFCEditTriggers({
       event: 'keydown',
       key: ['e', 'r'],
@@ -68,7 +68,7 @@ describe('component SFC edit trigger', () => {
     }, 'macos')).toBe(false)
   })
 
-  it('uses exact to reject unmentioned physical modifiers', () => {
+  it('использует exact для отклонения неуказанных физических модификаторов', () => {
     const trigger = normalizeComponentSFCEditTriggers({
       event: 'keydown',
       key: ['e'],
@@ -81,7 +81,7 @@ describe('component SFC edit trigger', () => {
     }, 'windows')).toBe(false)
   })
 
-  it('supports layout-independent code and keyboard event state', () => {
+  it('поддерживает независимый от раскладки code и состояние события клавиатуры', () => {
     const trigger = normalizeComponentSFCEditTriggers({
       event: 'keydown',
       code: ['KeyE'],
@@ -94,7 +94,7 @@ describe('component SFC edit trigger', () => {
     expect(matchesComponentSFCEditTrigger(trigger, { ...baseEvent, composing: true }, 'linux')).toBe(false)
   })
 
-  it('distinguishes a reported AltGraph state from an explicit Ctrl+Alt combination', () => {
+  it('отличает сообщённое состояние AltGraph от явной комбинации Ctrl+Alt', () => {
     const trigger = normalizeComponentSFCEditTriggers({
       event: 'keydown',
       code: ['KeyE'],
@@ -111,7 +111,7 @@ describe('component SFC edit trigger', () => {
     }, 'linux')).toBe(false)
   })
 
-  it('matches all held keys by default and rejects extras in exact mode', () => {
+  it('по умолчанию сопоставляет все удерживаемые клавиши и отклоняет лишние в режиме exact', () => {
     const trigger = normalizeComponentSFCEditTriggers({
       event: 'contextmenu',
       held: { code: ['KeyW', 'KeyE'], exact: true },
@@ -127,7 +127,7 @@ describe('component SFC edit trigger', () => {
     }, 'macos')).toBe(false)
   })
 
-  it('supports any held key without requiring the whole list', () => {
+  it('поддерживает любую удерживаемую клавишу без требования полного списка', () => {
     const trigger = normalizeComponentSFCEditTriggers({
       event: 'contextmenu',
       held: { key: ['w', 'e'], match: 'any' },
@@ -143,7 +143,7 @@ describe('component SFC edit trigger', () => {
     }, 'macos')).toBe(false)
   })
 
-  it('normalizes common browser platform labels', () => {
+  it('нормализует распространённые названия браузерных платформ', () => {
     expect(resolveComponentSFCEditTriggerPlatform('macOS')).toBe('macos')
     expect(resolveComponentSFCEditTriggerPlatform('Darwin')).toBe('macos')
     expect(resolveComponentSFCEditTriggerPlatform('Win32')).toBe('windows')

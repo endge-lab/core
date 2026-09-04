@@ -4,8 +4,8 @@ import { describe, expect, it } from 'vitest'
 import { compileComponentSFC } from '@/modules/compiler/services/component-sfc/component-sfc-compile'
 import { normalizeComponentSFCTableColumnVisibility } from '@/modules/compiler/services/component-sfc/component-sfc-table-visibility'
 
-describe('component SFC table column visibility', () => {
-  it('parses default-hidden as a sparse list of hidden column keys', () => {
+describe('видимость колонок таблицы Component SFC', () => {
+  it('разбирает default-hidden как разреженный список ключей скрытых колонок', () => {
     const result = compileComponentSFC(createTableSource(
       '<Column key="flight" /><Column key="status" /><Column key="gate" />',
       'default-hidden="status,gate"',
@@ -16,7 +16,7 @@ describe('component SFC table column visibility', () => {
     expect(visibility.defaultHidden).toEqual(['status', 'gate'])
   })
 
-  it('reports missing and duplicate column keys', () => {
+  it('сообщает об отсутствующих и дублирующихся ключах колонок', () => {
     const result = compileComponentSFC(createTableSource(
       '<Column key="flight" /><Column key="status" />',
       'default-hidden="status,missing,status"',

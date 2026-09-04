@@ -4,7 +4,7 @@ import type { ResponseOutputTransform } from '@/modules/source/domain/types/resp
 
 import { Endge } from '@/kernel/endge'
 
-/** Applies ordered Query/Vocab transforms without implicit array mapping. */
+/** Применяет упорядоченные transforms Query и Vocab без неявного mapping массивов. */
 export function runResponseOutputTransforms(
   transforms: readonly ResponseOutputTransform[] | undefined,
   legacyDataViews: readonly DataViewRef[],

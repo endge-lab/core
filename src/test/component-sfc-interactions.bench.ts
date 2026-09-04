@@ -19,7 +19,7 @@ const occurrence: ComponentSFCInteractionTriggerEvent = {
   modifiers: { ctrl: false, shift: true, alt: false, meta: false, altGraph: false },
 }
 
-describe('component SFC interaction matcher benchmarks', () => {
+describe('проверка Benchmarks сопоставления взаимодействий Component SFC', () => {
   for (const size of [1, 16, 100]) {
     const rules = normalizeComponentSFCInteractionTriggers(Array.from({ length: size }, (_item, index) => ({
       event: 'click',

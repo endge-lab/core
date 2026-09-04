@@ -54,10 +54,10 @@ export interface ComponentSFCTemplateCompileContext {
   /** Имена locals для классификации expression reads. */
   locals: string[]
 
-  /** Local component ports have priority over the global user tag registry. */
+  /** Порты локального компонента имеют приоритет над глобальным реестром пользовательских тегов. */
   componentPorts?: ComponentSFCComponentPort[]
 
-  /** Required ports owned by the Component SFC currently being compiled. */
+  /** Обязательные порты, принадлежащие компилируемому Component SFC. */
   ownerPorts?: ComponentSFCPortManifest | null
 
   /** Разрешает зарегистрированный пользовательский tag в identity компонента. */
@@ -66,16 +66,16 @@ export interface ComponentSFCTemplateCompileContext {
   /** Проверяет статическую identity из Component is. */
   hasComponentIdentity?: (identity: string) => boolean
 
-  /** Resolves public Events of a nested user Component for local `@event` bindings. */
+  /** Определяет публичные Events вложенного пользовательского Component для локальных bindings `@event`. */
   resolveComponentPortManifest?: (identity: string) => ComponentSFCPortManifest | null
 
-  /** Resolves static providers used by flat child port bindings. */
+  /** Определяет статические провайдеры для плоских bindings дочерних портов. */
   resolvePortProvider?: (
     identity: string,
     expectedKind: ComponentSFCRequiredPortKind,
   ) => ComponentSFCPortProviderDescriptor | null
 
-  /** Resolves explicit root Variant names of a nested custom component. */
+  /** Определяет явные имена корневых Variant вложенного пользовательского компонента. */
   resolveComponentVariants?: (identity: string) => string[] | null
 
   /** Effective defaults завершения edit session для текущего build context. */
@@ -90,13 +90,13 @@ export interface ComponentSFCTemplateCompileResult {
   /** Зависимости, найденные в template. */
   dependencies: RComponentDependencies
 
-  /** Diagnostics template pass. */
+  /** Диагностический проход template. */
   diagnostics: RComponentDiagnostic[]
 
   /** Публичная metadata внутренних template-узлов. */
   metadata: ProgramNodeMetadata[]
 
-  /** Events emitted by declarative template reactions or editable behavior. */
+  /** Events, создаваемые декларативными реакциями template или редактируемым поведением. */
   emittedEvents: string[]
 }
 
@@ -537,7 +537,7 @@ function hasTemplatePortFieldMismatch(
   }) || actualFields.some(field => !field.optional && !expected.has(field.name))
 }
 
-/** Validates the lazy Tooltip compound shape after whitespace-only nodes have been removed. */
+/** Проверяет составную форму lazy Tooltip после удаления узлов, содержащих только пробелы. */
 function validateTooltipTree(
   roots: RComponentSFC_IR_Node[],
   diagnostics: RComponentDiagnostic[],

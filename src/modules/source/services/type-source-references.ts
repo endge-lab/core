@@ -39,7 +39,7 @@ export function collectTypeSourceReferences(source: string): TypeSourceReference
   }
 }
 
-/** Collects Type Registry references from value(Type, ...) calls in Configuration Source. */
+/** Собирает ссылки Type Registry из вызовов value(Type, ...) в Configuration Source. */
 export function collectConfigurationTypeSourceReferences(source: string): TypeSourceReferenceLocation[] {
   try {
     const ast = parseTS(source, { sourceType: 'module', plugins: ['typescript'], errorRecovery: true })

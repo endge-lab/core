@@ -11,7 +11,7 @@ export type ConfigurationSourcePatch
     | { op: 'remove', key: string }
     | { op: 'rename', key: string, nextKey: string }
 
-/** Applies a narrow property-level patch to canonical defineConfig source. */
+/** Применяет узкий patch уровня свойства к каноническому source defineConfig. */
 export function patchConfigurationSource(source: string, patch: ConfigurationSourcePatch): string {
   const ast = parse(source, { sourceType: 'module', plugins: ['typescript'] })
   const statement = ast.program.body[0]
@@ -73,7 +73,7 @@ export function patchConfigurationSource(source: string, patch: ConfigurationSou
   return `${source.slice(0, close) + prefix + ' '.repeat(indent) + serializeConfigurationValue(patch.value, indent)},\n${' '.repeat(Math.max(0, indent - 2))}${source.slice(close)}`
 }
 
-/** Deterministic source for one value; visual authoring always writes an explicit default. */
+/** Детерминированный исходник одного значения; визуальный авторинг всегда записывает явное значение по умолчанию. */
 export function serializeConfigurationValue(value: ConfigurationSourceValueDefinition, indent = 2): string {
   const continuation = ' '.repeat(indent + 2)
   const lines = [

@@ -132,11 +132,11 @@ export type ComponentSFCTableCellProjection
     }
     | { kind: 'source' }
 
-/** Registry context required to resolve direct user component tags while reading Source. */
+/** Контекст реестра для разрешения прямых тегов пользовательских компонентов при чтении Source. */
 export interface ComponentSFCVisualInspectionOptions {
   resolveComponentTag?: (tag: string) => string | null
   resolveTypeDefinition?: (identity: string) => TypeSourceDefinition | null
-  /** Direct Action identities available to source-authored MenuItem bindings. */
+  /** Идентификаторы прямых Action, доступные bindings MenuItem из Source. */
   actionIdentities?: Iterable<string>
   /** Effective editing defaults текущего compiler context. */
   sfcEditing?: EndgeSFCEditingConfiguration
@@ -157,7 +157,7 @@ export interface ComponentSFCTableColumnProjection {
   cell: ComponentSFCTableCellProjection
   editing: ComponentSFCTableCellEditingProjection
   interactions: ComponentSFCTableCellInteractionsProjection
-  /** Column-level CellMenu override; default mode inherits Table > CellMenu. */
+  /** Переопределение CellMenu уровня Column; режим по умолчанию наследует Table > CellMenu. */
   cellMenu: ComponentSFCTableMenuProjection
   hasCustomCell: boolean
   cellSource: string | null
@@ -248,7 +248,7 @@ export type ComponentSFCTableSourcePatch
   | {
     type: 'set-column-cell-on'
     columnIndex: number
-    /** Complete object/array expression, or null to remove the annotation. */
+    /** Полное выражение объекта или массива либо null для удаления аннотации. */
     value: string | null
   }
   | {
@@ -259,25 +259,25 @@ export type ComponentSFCTableSourcePatch
   | {
     type: 'set-column-cell-edit-triggers'
     columnIndex: number
-    /** Empty list restores the implicit click trigger and removes edit-on from Source. */
+    /** Пустой список восстанавливает неявный trigger клика и удаляет edit-on из Source. */
     triggers: ComponentSFCInteractionTriggerProjection[]
   }
   | {
     type: 'set-column-cell-edited-reaction'
     columnIndex: number
-    /** Complete local reaction expression, or null to remove @edited. */
+    /** Полное выражение локальной реакции либо null для удаления @edited. */
     value: string | null
   }
   | {
     type: 'set-column-cell-cancel-triggers'
     columnIndex: number
-    /** Null inherits effective configuration; an empty list explicitly disables automatic cancellation. */
+    /** Null наследует фактическую конфигурацию; пустой список явно отключает автоматическую отмену. */
     triggers: ComponentSFCInteractionTriggerProjection[] | null
   }
   | {
     type: 'set-column-cell-commit-triggers'
     columnIndex: number
-    /** Null inherits effective configuration; an empty list explicitly disables automatic commit. */
+    /** Null наследует фактическую конфигурацию; пустой список явно отключает автоматическое подтверждение. */
     triggers: ComponentSFCInteractionTriggerProjection[] | null
   }
   | {

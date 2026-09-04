@@ -277,17 +277,17 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     return this.readInputs()
   }
 
-  /** Imperative local mutation for UI flows that do not need a persisted RUpdate. */
+  /** Императивное локальное изменение для UI-сценариев, которым не нужен сохраняемый RUpdate. */
   public mutateStore(dataAlias: string, plan: StoreMutationPlan): void {
     this._requireStoreRuntime(dataAlias).applyMutation(plan)
   }
 
-  /** Explicitly invokes one named Store-owned RUpdate outside Stream dispatch. */
+  /** Явно вызывает один именованный RUpdate, принадлежащий Store, вне dispatch Stream. */
   public applyStoreUpdate(dataAlias: string, updateIdentity: string, payload: unknown): void {
     this._requireStoreRuntime(dataAlias).applyUpdate(updateIdentity, payload)
   }
 
-  /** Resolves an Update artifact to the Store data alias owned by this Composition. */
+  /** Сопоставляет артефакт Update с alias данных Store, принадлежащим этой Composition. */
   public applyUpdateByIdentity(updateIdentity: string, payload: unknown): void {
     const update = Endge.program.getUpdateArtifact(updateIdentity)
     if (!update) {

@@ -4,8 +4,8 @@ import { describe, expect, it } from 'vitest'
 import { compileComponentSFC } from '@/modules/compiler/services/component-sfc/component-sfc-compile'
 import { normalizeComponentSFCTableColumnPin } from '@/modules/compiler/services/component-sfc/component-sfc-table-pin'
 
-describe('component SFC table column pinning', () => {
-  it('parses table-level default-pin state', () => {
+describe('закрепление колонок таблицы Component SFC', () => {
+  it('разбирает состояние default-pin уровня таблицы', () => {
     const result = compileComponentSFC(createTableSource(`
       <Column key="number" title="Flight" />
       <Column key="status" title="Status" />
@@ -22,7 +22,7 @@ describe('component SFC table column pinning', () => {
     ])
   })
 
-  it('reports invalid default-pin side, missing column, and duplicate key', () => {
+  it('сообщает о невалидной стороне default-pin, отсутствующей колонке и дублирующемся ключе', () => {
     const result = compileComponentSFC(createTableSource(`
       <Column key="number" title="Flight" />
     `, {
@@ -45,7 +45,7 @@ describe('component SFC table column pinning', () => {
     ]))
   })
 
-  it('supports column-pin disabled without default pin state', () => {
+  it('поддерживает отключённый column-pin без состояния закрепления по умолчанию', () => {
     const result = compileComponentSFC(createTableSource(`
       <Column key="number" title="Flight" />
     `, {
@@ -63,7 +63,7 @@ describe('component SFC table column pinning', () => {
     expect(pin.defaultPin).toEqual([])
   })
 
-  it('reads per-column pinnable capability', () => {
+  it('читает возможность закрепления для каждой колонки', () => {
     const result = compileComponentSFC(createTableSource(`
       <Column key="number" title="Flight" />
       <Column key="actions" title="" pinnable="false" />

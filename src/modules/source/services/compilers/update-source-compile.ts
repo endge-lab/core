@@ -13,7 +13,7 @@ import { diagnostic, propertyName, unwrapExpression } from '@/modules/source/ser
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 const STRATEGIES = new Set<UpdateMutationStrategy>(['set', 'merge', 'replace', 'append', 'remove'])
 
-/** Compiles one Store-owned update recipe into a runtime-ready mutation descriptor. */
+/** Компилирует один принадлежащий Store рецепт update в готовый для runtime описатель изменения. */
 export function compileUpdateSource(source: string, sourceVersion = 1): UpdateSourceCompileResult {
   const diagnostics: DiagnosticDraft[] = []
   if (!String(source ?? '').trim()) {

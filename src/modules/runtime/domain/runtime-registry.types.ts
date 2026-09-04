@@ -33,7 +33,7 @@ export interface RuntimeHostRegistryLike {
   getDeletedSnapshots: () => DestroyedRuntimeHostSnapshot[]
   /** Удалить один snapshot из debug-архива по runtime-id. */
   removeDeletedSnapshot: (id: string) => DestroyedRuntimeHostSnapshot | null
-  /** Apply the effective bounded inspection capacity immediately. */
+  /** Немедленно применяет фактическую ограниченную ёмкость инспекции. */
   setDeletedSnapshotLimit: (limit: number) => void
   /** Очистить debug-архив удалённых host. */
   clearDeleted: () => void

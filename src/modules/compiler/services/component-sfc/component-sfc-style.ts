@@ -23,7 +23,7 @@ function stableScopeId(identity: string): string {
   return `es-${readable}-${(hash >>> 0).toString(36)}`
 }
 
-/** Compiles an SFC style block through the same EndgeCSS pipeline as RStyle. */
+/** Компилирует блок стилей SFC через тот же pipeline EndgeCSS, что и RStyle. */
 export function compileComponentSFCStyle(
   style: RComponentSFC_AST_Style | null,
   options: ComponentSFCStyleCompileOptions = {},

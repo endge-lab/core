@@ -37,7 +37,7 @@ export interface ComputationCompileResult {
   diagnostics: DiagnosticDraft[]
 }
 
-/** Compiles defineComputation source into a deterministic output graph. */
+/** Компилирует source defineComputation в детерминированный выходной граф. */
 export function compileComputation(input: ComputationCompileInput): ComputationCompileResult {
   const diagnostics: DiagnosticDraft[] = []
   const payload: ComputationProgramPayload = {

@@ -9,7 +9,7 @@ import { RMock } from '@/modules/domain/entities/RMock'
 import { RStore } from '@/modules/domain/entities/RStore'
 import { StoreRuntimeHost } from '@/modules/runtime/hosts/StoreRuntimeHost'
 
-describe('storeRuntimeHost', () => {
+describe('проверка Host runtime для Store', () => {
   afterEach(() => {
     Endge.context.setDataMode('live')
     Endge.runtime.reset()
@@ -19,7 +19,7 @@ describe('storeRuntimeHost', () => {
     Raph.app.reset()
   })
 
-  it('mounts default values, computes derived DataView immediately and owns its Raph state', () => {
+  it('монтирует стандартные значения, сразу вычисляет производный DataView и владеет его состоянием Raph', () => {
     const store = new RStore()
     store.id = 101
     store.identity = 'schedule-db'
@@ -74,7 +74,7 @@ describe('storeRuntimeHost', () => {
     expect(Raph.get(statePath)).toBeUndefined()
   })
 
-  it('resolves a persisted mock before immediate derived materialization', () => {
+  it('разрешает сохранённый Mock до немедленной материализации производных данных', () => {
     Endge.context.setDataMode('mock')
     const mock = new RMock()
     mock.id = 103
@@ -151,7 +151,7 @@ describe('storeRuntimeHost', () => {
     expect(Endge.mock.get<any[]>('groundhandling')).toHaveLength(2)
   })
 
-  it('keeps mock-backed fields empty in live mode until a runtime publication writes them', () => {
+  it('оставляет поля на основе Mock пустыми в live-режиме, пока их не запишет публикация runtime', () => {
     const mock = new RMock()
     mock.id = 106
     mock.identity = 'groundhandling-live'
@@ -204,7 +204,7 @@ describe('storeRuntimeHost', () => {
     })
   })
 
-  it('materializes a root select expression as the derived array itself', () => {
+  it('материализует корневое выражение select непосредственно как производный массив', () => {
     const store = new RStore()
     store.id = 104
     store.identity = 'pairs-db'

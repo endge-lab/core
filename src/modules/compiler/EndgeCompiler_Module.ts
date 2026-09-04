@@ -255,12 +255,12 @@ export class EndgeCompiler_Module extends EndgeModule {
     return artifact
   }
 
-  /** Compiles one Type Source into the shared Type Registry. */
+  /** Компилирует один Type Source в общий Type Registry. */
   public buildType(entity: RType): ProgramArtifact<TypeProgramPayload> {
     return this._compileEntity('type', entity, this._createCompileContext()) as ProgramArtifact<TypeProgramPayload>
   }
 
-  /** Compiles one persisted Action into an immutable Program artifact. */
+  /** Компилирует один сохранённый Action в неизменяемый артефакт Program. */
   public buildAction(entity: RAction): ProgramArtifact<ActionProgramPayload> {
     return this._compileEntity('action', entity, this._createCompileContext()) as ProgramArtifact<ActionProgramPayload>
   }
@@ -318,7 +318,7 @@ export class EndgeCompiler_Module extends EndgeModule {
     return handler.compile(entity, this._createCompileContext())
   }
 
-  /** Compiles one global source-first EndgeCSS document. */
+  /** Компилирует один глобальный source-first документ EndgeCSS. */
   public buildStyle(entity: RStyle): ProgramArtifact<EndgeStyleProgramPayload> {
     const context = this._createCompileContext()
     return this._compileEntity('style', entity, context) as ProgramArtifact<EndgeStyleProgramPayload>
@@ -1200,7 +1200,7 @@ export class EndgeCompiler_Module extends EndgeModule {
     })
   }
 
-  /** Stable source order: system documents first, then authored documents by identity. */
+  /** Стабильный порядок исходников: сначала системные документы, затем авторские по identity. */
   private _orderedStyles(): RStyle[] {
     const rank = (style: RStyle) => style.managedBy === 'system' ? 0 : 1
     return Endge.domain.getStyles()
@@ -1228,7 +1228,7 @@ export class EndgeCompiler_Module extends EndgeModule {
     return dependencies
   }
 
-  /** Validates one owner contract against the source-backed Type Registry. */
+  /** Проверяет контракт одного владельца по Type Registry, построенному из исходников. */
   private _typeContractDiagnostics(
     expression: string | TypeSourceExpression | null | undefined,
     sourcePath: string,
@@ -1278,7 +1278,7 @@ export class EndgeCompiler_Module extends EndgeModule {
       : validateTypeSourceExpressionUsage(expression, catalogWithLocals, sourcePath)
   }
 
-  /** Creates stable Program dependencies for every custom type expression. */
+  /** Создаёт стабильные зависимости Program для каждого выражения пользовательского типа. */
   private _typeDependencies(
     expressions: Array<string | TypeSourceExpression | null | undefined>,
     excluded: ReadonlySet<string> = new Set(),
@@ -1306,7 +1306,7 @@ export class EndgeCompiler_Module extends EndgeModule {
     })
   }
 
-  /** Exposes a static Query auth-profile reference to the shared Program graph. */
+  /** Публикует статическую ссылку Query на профиль авторизации в общем графе Program. */
   private _queryAuthDependencies(
     payload: QueryProgramPayload | undefined,
   ): ProgramArtifact['dependencies'] {
@@ -1328,7 +1328,7 @@ export class EndgeCompiler_Module extends EndgeModule {
     }]
   }
 
-  /** Adds explicit RMock dependencies used only by Composition preview fixtures. */
+  /** Добавляет явные зависимости RMock, используемые только fixtures preview для Composition. */
   private _compositionPreviewDependencies(
     payload: CompositionProgramPayload | undefined,
   ): ProgramArtifact['dependencies'] {
@@ -1342,7 +1342,7 @@ export class EndgeCompiler_Module extends EndgeModule {
       : [])
   }
 
-  /** Preview diagnostics stay warnings so a broken fixture never invalidates production execution. */
+  /** Диагностика preview остаётся предупреждением, чтобы сломанный fixture не делал production-выполнение невалидным. */
   private _compositionPreviewDiagnostics(
     payload: CompositionProgramPayload | undefined,
   ): Omit<ProgramDiagnostic, 'entityRef'>[] {
@@ -1545,7 +1545,7 @@ export class EndgeCompiler_Module extends EndgeModule {
     return search(component[0]!, [component[0]!]) ?? [...component, component[0]!]
   }
 
-  /** Compiles one SFC source and caches its resolved public port manifest for parent forwarding. */
+  /** Компилирует один исходник SFC и кеширует его вычисленный манифест публичных портов для проброса родителем. */
   private _compileComponentSFCSource(
     entity: RComponentSFC,
     sfcEditing: EndgeSFCEditingConfiguration,
@@ -1577,7 +1577,7 @@ export class EndgeCompiler_Module extends EndgeModule {
     }
   }
 
-  /** Reads explicit root Variant names without recursively compiling the child. */
+  /** Читает явные имена корневых Variant без рекурсивной компиляции дочернего элемента. */
   private _resolveComponentVariantNames(identity: string): string[] | null {
     const component = Endge.domain.getComponentSFC(identity)
     if (!component) {
@@ -1598,7 +1598,7 @@ export class EndgeCompiler_Module extends EndgeModule {
     return variants.length ? variants : []
   }
 
-  /** Resolves child public ports independently from the domain component compile order. */
+  /** Вычисляет публичные порты дочернего элемента независимо от порядка компиляции доменных компонентов. */
   private _resolveComponentPortManifest(
     identity: string,
     sfcEditing: EndgeSFCEditingConfiguration,
@@ -1617,7 +1617,7 @@ export class EndgeCompiler_Module extends EndgeModule {
     return this._compileComponentSFCSource(component, sfcEditing).ir?.script.ports ?? null
   }
 
-  /** Resolves Type Source independently from type/component compilation order. */
+  /** Вычисляет Type Source независимо от порядка компиляции типов и компонентов. */
   private _resolveTypeDefinition(identity: string): TypeSourceDefinition | null {
     const compiled = Endge.program.getTypeArtifact(identity)?.payload.definition
     if (compiled) {
@@ -1631,7 +1631,7 @@ export class EndgeCompiler_Module extends EndgeModule {
     return compileTypeSource(type.source, type.sourceVersion).document?.definition ?? null
   }
 
-  /** Materializes final provided/forwarded SFC Action ports as derived descriptors. */
+  /** Материализует итоговые предоставленные и проброшенные порты SFC Action как производные дескрипторы. */
   private _materializeProvidedActions(components: readonly RComponentSFC[]): void {
     for (const component of components) {
       const artifact = Endge.program.getArtifact<ComponentSFCProgramPayload>('component-sfc', component.identity)
@@ -1671,7 +1671,7 @@ export class EndgeCompiler_Module extends EndgeModule {
     Endge.program.recalculateStatus()
   }
 
-  /** Resolves a domain provider descriptor without requiring compile order among SFCs. */
+  /** Вычисляет дескриптор доменного provider без зависимости от порядка компиляции SFC. */
   private _resolvePortProvider(
     identity: string,
     expectedKind: 'computation' | 'component' | 'action' | 'query',
@@ -1796,7 +1796,7 @@ export class EndgeCompiler_Module extends EndgeModule {
     this._componentTagDiagnosticsByIdentity.set(identity, diagnostics)
   }
 
-  /** Links every external Action step against storage or installed code catalogs. */
+  /** Связывает каждый внешний шаг Action с каталогами storage или установленного кода. */
   private _linkActionDependencies(seed: ProgramDependency[]): {
     dependencies: ProgramDependency[]
     diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]

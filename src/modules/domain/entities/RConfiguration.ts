@@ -5,7 +5,7 @@ import { Exclude, Expose } from 'class-transformer'
 import { REntity } from '@/modules/domain/entities/REntity'
 import { CONFIGURATION_DEFAULT_SOURCE } from '@/modules/source/templates/configuration.default.source'
 
-/** Workspace-owned source document that declares one settings category. */
+/** Принадлежащий Workspace Source-документ, объявляющий одну категорию настроек. */
 export class RConfiguration extends REntity {
   @Exclude()
   readonly type = 'configuration' as const

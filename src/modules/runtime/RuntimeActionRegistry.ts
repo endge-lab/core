@@ -6,7 +6,7 @@ import type {
   RuntimeActionRegistrySnapshot,
 } from '@/modules/runtime/domain/action.types'
 
-/** Registry of callable runtime Action providers. */
+/** Реестр вызываемых runtime-провайдеров Action. */
 export class RuntimeActionRegistry {
   private readonly _actions = new Map<RuntimeActionId, AnyRuntimeAction>()
 

@@ -129,7 +129,7 @@ class ProjectCompositionRegistryImpl implements ProjectCompositionRegistry<Compo
   public getAll(): ProjectCompositionHandle<CompositionRuntimeHost>[] { return [...this._handles.values()] }
 }
 
-/** Mounts one project into an isolated runtime session. */
+/** Монтирует один project в изолированную runtime-сессию. */
 export class EndgeProject {
   public async mount(identity: string, options: ProjectRuntimeMountOptions = {}): Promise<ProjectRuntimeSession<CompositionRuntimeHost>> {
     const normalized = String(identity ?? '').trim()

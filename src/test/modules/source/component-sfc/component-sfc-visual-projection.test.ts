@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { inspectComponentSFCVisual } from '@/modules/source/services/component-sfc/component-sfc-visual-projection'
 
-describe('component SFC visual projection', () => {
-  it('enables table visualization for one root Table and projects its columns', () => {
+describe('визуальная проекция компонента SFC', () => {
+  it('включает визуализацию таблицы для одного корневого Table и проецирует его столбцы', () => {
     const result = inspectComponentSFCVisual(`<script setup lang="ts">
 defineProps<{ rows: unknown[] }>()
 </script>
@@ -65,7 +65,7 @@ defineProps<{ rows: unknown[] }>()
     expect(result.projection?.columns[0]?.cellSource).toContain('<Cell>')
   })
 
-  it('does not enable table visualization for a Table nested in another root', () => {
+  it('не включает визуализацию таблицы для Table, вложенного в другой корень', () => {
     const result = inspectComponentSFCVisual(`<template>
   <Flex>
     <Table />
@@ -76,7 +76,7 @@ defineProps<{ rows: unknown[] }>()
     expect(result.projection).toBeNull()
   })
 
-  it('does not enable table visualization for multiple semantic roots', () => {
+  it('не включает визуализацию таблицы при нескольких семантических корнях', () => {
     const result = inspectComponentSFCVisual(`<template>
   <Table />
   <Text>Summary</Text>
@@ -86,7 +86,7 @@ defineProps<{ rows: unknown[] }>()
     expect(result.projection).toBeNull()
   })
 
-  it('ignores whitespace-only template roots', () => {
+  it('игнорирует корни шаблона, содержащие только пробельные символы', () => {
     const result = inspectComponentSFCVisual(`<template>
 
   <Table />
@@ -96,7 +96,7 @@ defineProps<{ rows: unknown[] }>()
     expect(result.support).toEqual({ kind: 'table' })
   })
 
-  it('recognizes a simple attached component but keeps dynamic component code source-owned', () => {
+  it('распознаёт простой присоединённый компонент, но оставляет динамический код компонента во владении Source', () => {
     const managed = inspectComponentSFCVisual(`<template><Table><Column key="one"><Cell><Component is="Cell.Status" /></Cell></Column></Table></template>`)
     const dynamic = inspectComponentSFCVisual(`<template><Table><Column key="one"><Cell><Component :is="cellComponent" /></Cell></Column></Table></template>`)
 
@@ -104,7 +104,7 @@ defineProps<{ rows: unknown[] }>()
     expect(dynamic.projection?.columns[0]?.cell).toEqual({ kind: 'source' })
   })
 
-  it('recognizes direct and Cell-wrapped built-in tags', () => {
+  it('распознаёт прямые встроенные теги и теги в оболочке Cell', () => {
     const wrapped = inspectComponentSFCVisual('<template><Table><Column key="one"><Cell><Number :value="value" /></Cell></Column></Table></template>')
     const direct = inspectComponentSFCVisual('<template><Table><Column key="two"><Badge>{{ value }}</Badge></Column></Table></template>')
 
@@ -117,7 +117,7 @@ defineProps<{ rows: unknown[] }>()
     expect(direct.projection?.columns[0]?.cell).toEqual({ kind: 'tag', tag: 'Badge', syntax: 'direct', bindings: [] })
   })
 
-  it('recognizes a direct user component tag without requiring a Cell wrapper', () => {
+  it('распознаёт прямой тег пользовательского компонента без обязательной оболочки Cell', () => {
     const result = inspectComponentSFCVisual(`<template>
   <Table>
     <Column key="aircraft" title="ВС" width="200">
@@ -148,7 +148,7 @@ defineProps<{ rows: unknown[] }>()
     expect(result.projection?.columns[0]?.cellSource).toContain('<AircraftTail')
   })
 
-  it('projects row menus, translation labels and built-in Action choices without a parallel model', () => {
+  it('проецирует меню строк, переводимые метки и варианты встроенных Action без параллельной модели', () => {
     const result = inspectComponentSFCVisual(`<template>
   <Table :rows="[]">
     <RowMenu>
@@ -177,7 +177,7 @@ defineProps<{ rows: unknown[] }>()
     ]))
   })
 
-  it('keeps a declared Action port reference visual-managed and exposes direct Actions', () => {
+  it('оставляет объявленную ссылку порта Action под управлением визуального редактора и предоставляет прямые Actions', () => {
     const result = inspectComponentSFCVisual(`<script setup lang="ts">
 const ports = definePorts({
   require: {

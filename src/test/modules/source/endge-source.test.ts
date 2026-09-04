@@ -4,13 +4,13 @@ import { ENDGE_CORE_MODULES } from '@/kernel/config/modules.config'
 import { Endge } from '@/kernel/endge'
 import { EndgeSource_Module } from '@/modules/source/EndgeSource_Module'
 
-describe('endgeSource', () => {
-  it('is registered as an Endge federation module', () => {
+describe('модуль EndgeSource', () => {
+  it('регистрируется как модуль федерации Endge', () => {
     expect(ENDGE_CORE_MODULES.some(module => module.key === 'source')).toBe(true)
     expect(Endge.source).toBeInstanceOf(EndgeSource_Module)
   })
 
-  it('registers query source strategy by default', () => {
+  it('по умолчанию регистрирует стратегию Source для Query', () => {
     const strategy = Endge.source.resolveStrategy('query')
     const languageStrategy = Endge.source.resolveLanguageStrategy('query')
     const patchStrategy = Endge.source.resolvePatchStrategy('query')
@@ -29,7 +29,7 @@ describe('endgeSource', () => {
     })
   })
 
-  it('creates default query source through source language strategy', () => {
+  it('создаёт стандартный Source Query через стратегию языка Source', () => {
     const source = Endge.source.createDefault('query')
     const validation = Endge.source.validate('query', source)
 
@@ -39,7 +39,7 @@ describe('endgeSource', () => {
     expect(validation.diagnostics).toEqual([])
   })
 
-  it('creates and validates the GraphQL query source variant', () => {
+  it('создаёт и проверяет вариант Source для GraphQL Query', () => {
     const source = Endge.source.createDefault('query', 'graphql')
     const validation = Endge.source.validate('query', source)
 
@@ -50,7 +50,7 @@ describe('endgeSource', () => {
     expect(validation.diagnostics).toEqual([])
   })
 
-  it('registers and validates computation source strategies', () => {
+  it('регистрирует и проверяет стратегии Source для Computation', () => {
     const source = Endge.source.createDefault('computation')
     const validation = Endge.source.validate('computation', source)
 
@@ -60,7 +60,7 @@ describe('endgeSource', () => {
     expect(validation.ok).toBe(true)
   })
 
-  it('returns query source language completions', () => {
+  it('возвращает подсказки языка Source для Query', () => {
     const completions = Endge.source.completions('query', {
       source: '',
       position: { lineNumber: 1, column: 1 },
@@ -74,7 +74,7 @@ describe('endgeSource', () => {
     ]))
   })
 
-  it('keeps syntax highlighting patterns inside each source language strategy', () => {
+  it('хранит patterns подсветки синтаксиса внутри каждой стратегии языка Source', () => {
     const cases = [
       ['query', 'defineQuery'],
       ['data-view', 'defineDataView'],
@@ -94,7 +94,7 @@ describe('endgeSource', () => {
     }
   })
 
-  it('highlights every Composition functional block', () => {
+  it('подсвечивает каждый функциональный блок Composition', () => {
     const rootPatterns = Endge.source.resolveLanguageStrategy('composition')?.syntax.tokenizer.root ?? []
     const keywordPattern = rootPatterns.find(rule => rule.token === 'keyword')?.pattern
 
@@ -114,7 +114,7 @@ describe('endgeSource', () => {
     ].every(keyword => keywordPattern?.test(keyword))).toBe(true)
   })
 
-  it('exposes GraphQL tokens inside gql tagged templates', () => {
+  it('предоставляет tokens GraphQL внутри tagged templates gql', () => {
     const tokenizer = Endge.source.resolveLanguageStrategy('query')?.syntax.tokenizer
     const graphQLOpen = tokenizer?.root.find(rule => rule.next === '@graphql')
     const graphQLRules = tokenizer?.graphql ?? []
@@ -126,7 +126,7 @@ describe('endgeSource', () => {
     expect(graphQLRules.some(rule => rule.next === '@pop' && rule.pattern.test('`'))).toBe(true)
   })
 
-  it('compiles query source into query program artifact payload', () => {
+  it('компилирует Source Query в payload артефакта программы Query', () => {
     const result = Endge.source.compile('query', createQuerySource())
 
     expect(result.ok).toBe(true)
@@ -154,7 +154,7 @@ describe('endgeSource', () => {
     })
   })
 
-  it('rejects legacy params and filters instead of silently retaining them', () => {
+  it('отклоняет legacy params и filters вместо их молчаливого сохранения', () => {
     const result = Endge.source.compile('query', `
 defineQuery({
   kind: 'rest',
@@ -170,7 +170,7 @@ defineQuery({
     ]))
   })
 
-  it('returns diagnostics for unsupported query source kind', () => {
+  it('возвращает диагностику для неподдерживаемого вида Source Query', () => {
     const result = Endge.source.compile('query', `
 defineQuery({
   kind: 'soap',
@@ -186,7 +186,7 @@ defineQuery({
     ]))
   })
 
-  it('compiles a GraphQL document, variables and data output', () => {
+  it('компилирует документ GraphQL, variables и output data', () => {
     const result = Endge.source.compile('query', `
 defineQuery({
   kind: 'graphql',
@@ -229,7 +229,7 @@ defineQuery({
     })
   })
 
-  it('compiles env macro and legacy endgeVar macro into variable tokens', () => {
+  it('компилирует macro env и legacy macro endgeVar в tokens переменных', () => {
     const envResult = Endge.source.compile('query', `
 defineQuery({
   request: {
@@ -251,7 +251,7 @@ defineQuery({
     expect(legacyResult.artifact).toMatchObject({ endpoint: '{ENDPOINT_AODB}' })
   })
 
-  it('uses profile as canonical query auth profile syntax', () => {
+  it('использует profile как канонический синтаксис профиля авторизации Query', () => {
     const result = Endge.source.compile('query', `
 defineQuery({
   request: {
@@ -273,7 +273,7 @@ defineQuery({
     })
   })
 
-  it('returns diagnostics for legacy response block', () => {
+  it('возвращает диагностику для legacy-блока response', () => {
     const result = Endge.source.compile('query', `
 defineQuery({
   request: {
@@ -296,7 +296,7 @@ defineQuery({
     ]))
   })
 
-  it('marks legacy params as unsupported Query v2 configuration', () => {
+  it('помечает legacy params как неподдерживаемую конфигурацию Query v2', () => {
     const source = `
 defineQuery({
   params: {
@@ -314,7 +314,7 @@ defineQuery({
     }))
   })
 
-  it('patches query source slots without reprinting untouched author code', () => {
+  it('изменяет слоты Source Query без повторной печати нетронутого авторского кода', () => {
     const source = `
 defineQuery({
   // keep author comment
@@ -343,7 +343,7 @@ defineQuery({
     })
   })
 
-  it('patches query source with raw DSL expressions', () => {
+  it('изменяет Source Query сырыми DSL-выражениями', () => {
     const source = `
 defineQuery({
   outputs: {},
@@ -369,7 +369,7 @@ defineQuery({
     })
   })
 
-  it('does not apply invalid raw DSL expressions', () => {
+  it('не применяет некорректные сырые DSL-выражения', () => {
     const source = `
 defineQuery({
   outputs: {},

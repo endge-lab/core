@@ -22,13 +22,13 @@ vi.mock('@endge/utils', async (importOriginal) => {
   }
 })
 
-describe('authenticated SSE transport', () => {
+describe('авторизованный транспорт SSE', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     sse.options = null
   })
 
-  it('forces one refresh on reconnect after 401/403 without a background timer', async () => {
+  it('принудительно выполняет одно обновление при переподключении после 401/403 без фонового таймера', async () => {
     const resolved: AuthResolvedSession = {
       profileIdentity: 'application-auth',
       accessToken: 'token',
@@ -62,7 +62,7 @@ describe('authenticated SSE transport', () => {
     expect(setIntervalSpy).not.toHaveBeenCalled()
   })
 
-  it('resolves the named profile authored in Stream source', async () => {
+  it('разрешает именованный профиль, заданный в Source Stream', async () => {
     const compiled = compileStreamSource(`defineStream({
       transport: sse({
         url: '/events',

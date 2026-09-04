@@ -5,8 +5,8 @@ import { listComponentSFCEventCapableTags } from '@/modules/domain/types/compone
 import { createEmptyComponentSFCPortManifest } from '@/modules/domain/types/component/sfc/ports.types'
 import { ComponentSFCEventBoundary } from '@/modules/runtime/ComponentSFCEventBoundary'
 
-describe('component SFC :on interactions', () => {
-  it('resolves a required Query reaction through the mounted instance binding', async () => {
+describe('взаимодействия :on в Component SFC', () => {
+  it('разрешает обязательную реакцию Query через binding смонтированного экземпляра', async () => {
     const manifest = createEmptyComponentSFCPortManifest()
     manifest.require.queries.push({
       kind: 'query',
@@ -54,7 +54,7 @@ describe('component SFC :on interactions', () => {
     expect(calls).toEqual(['groundhandling-update-special'])
   })
 
-  it('compiles ordered reactions and keeps the trigger expression reaction-free', () => {
+  it('компилирует упорядоченные реакции и не добавляет реакцию в выражение trigger', () => {
     const result = compileComponentSFC(`<template>
   <Text
     value="Open"
@@ -92,7 +92,7 @@ describe('component SFC :on interactions', () => {
     }
   })
 
-  it('checks the complete suffix modifier power set and rejects passive + prevent', () => {
+  it('проверяет полный набор сочетаний suffix-модификаторов и отклоняет passive + prevent', () => {
     const modifiers = ['stop', 'prevent', 'self', 'once', 'capture', 'passive']
     for (let mask = 0; mask < 2 ** modifiers.length; mask++) {
       const active = modifiers.filter((_modifier, index) => (mask & (1 << index)) !== 0)
@@ -115,7 +115,7 @@ describe('component SFC :on interactions', () => {
     }
   })
 
-  it('rejects structural tags and dynamic listener options', () => {
+  it('отклоняет структурные теги и динамические настройки listener', () => {
     const structural = compileComponentSFC(`<template><Column :on="{ event: 'click', reaction: action({ identity: 'x' }) }" /></template>`)
     expect(structural.diagnostics).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'sfc-template-on-event-unknown' }),
@@ -132,7 +132,7 @@ describe('component SFC :on interactions', () => {
     ]))
   })
 
-  it('accepts :on on every renderer-owned event-capable tag', () => {
+  it('принимает :on на каждом поддерживающем события теге владельца renderer', () => {
     for (const tag of listComponentSFCEventCapableTags()) {
       const result = compileComponentSFC(`<template><${tag} :on="{ event: 'click', reaction: action({ identity: 'audit.click' }) }" /></template>`)
       expect(result.diagnostics.filter(item => item.code.startsWith('sfc-template-on'))).toEqual([])
@@ -144,7 +144,7 @@ describe('component SFC :on interactions', () => {
     }
   })
 
-  it('compiles a context-backed TriggerSet with one shared Query reaction', () => {
+  it('компилирует TriggerSet из context с одной общей реакцией Query', () => {
     const result = compileComponentSFC(`<template>
   <Cell :on="{
     triggers: $context.config.groundHandling.actualTimeTriggers,
@@ -189,7 +189,7 @@ describe('component SFC :on interactions', () => {
     expect(result.dependencies.queries).toContain('groundHandling.actualTime.update')
   })
 
-  it('executes a reaction list sequentially and stops after a failed reaction', async () => {
+  it('последовательно выполняет список реакций и останавливается после ошибки реакции', async () => {
     const calls: string[] = []
     const host = {
       publishEventPort: vi.fn(),

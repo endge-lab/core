@@ -11,7 +11,7 @@ import { Endge } from '@/kernel/endge'
 import { RComposition } from '@/modules/domain/entities/RComposition'
 import { RStore } from '@/modules/domain/entities/RStore'
 
-describe('runtimeAppScope', () => {
+describe('проверка Scope runtime-приложения', () => {
   afterEach(async () => {
     await Endge.runtime.reset()
     Endge.program.clear()
@@ -19,7 +19,7 @@ describe('runtimeAppScope', () => {
     Raph.app.reset()
   })
 
-  it('owns preview root path and replaces the same root entity without preview suffixes', () => {
+  it('владеет корневым путём preview и заменяет ту же корневую сущность без suffix preview', () => {
     const store = installStore()
     const preview = Endge.runtime.createAppScope({
       id: 'preview',
@@ -43,7 +43,7 @@ describe('runtimeAppScope', () => {
     expect(Endge.runtime.getRuntimeHostsByEntity('store', 'groundhandling-db', 'preview')).toEqual([second])
   })
 
-  it('allocates identity-index local ids for multi-instance app scope', () => {
+  it('выделяет локальные ID из identity-index для scope приложения с несколькими экземплярами', () => {
     const store = installStore()
     const app = Endge.runtime.getDefaultAppScope()
 
@@ -56,7 +56,7 @@ describe('runtimeAppScope', () => {
     expect(second.id).toBe('app:store:groundhandling-db-1')
   })
 
-  it('waits for owned composition scopes before starting the same preview again', async () => {
+  it('ожидает принадлежащие ему scopes Composition перед повторным запуском того же preview', async () => {
     const composition = installComposition()
     const preview = Endge.runtime.createAppScope({
       id: 'preview',
@@ -80,7 +80,7 @@ describe('runtimeAppScope', () => {
     expect(Endge.runtime.getRuntimeHostsByEntity('composition', composition.identity, 'preview')).toEqual([second])
   })
 
-  it('keeps the typed parent relation outside host metadata', () => {
+  it('хранит типизированную связь с родителем вне метаданных host', () => {
     const store = installStore()
     const parent = Endge.runtime.execute(store, { id: 'runtime-parent' }) as StoreRuntimeHost
     const child = Endge.runtime.execute(store, {
@@ -94,7 +94,7 @@ describe('runtimeAppScope', () => {
     expect(child.meta.scopeRoot).toBe(false)
   })
 
-  it('derives scope root only from the parent relation', () => {
+  it('определяет корень scope только по связи с родителем', () => {
     const store = installStore()
     const app = Endge.runtime.getDefaultAppScope()
     const parent = app.execute(store) as StoreRuntimeHost
@@ -105,14 +105,14 @@ describe('runtimeAppScope', () => {
     expect(child.meta.scopeRoot).toBe(false)
   })
 
-  it('rejects an explicit parent that is not registered', () => {
+  it('отклоняет явно заданного незарегистрированного родителя', () => {
     const store = installStore()
 
     expect(() => Endge.runtime.execute(store, { parent: 'missing-runtime' }))
       .toThrow('[EndgeRuntime] Parent runtime host "missing-runtime" is not registered.')
   })
 
-  it('rejects an explicit invalid artifact reader', () => {
+  it('отклоняет явно заданный некорректный reader артефактов', () => {
     const store = installStore()
 
     expect(() => Endge.runtime.execute(store, { artifactReader: {} as any }))

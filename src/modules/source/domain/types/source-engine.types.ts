@@ -29,7 +29,7 @@ export interface SourceLanguageContext {
   /** Текущая позиция курсора, если она есть у editor adapter. */
   position?: SourceLanguagePosition
 
-  /** Source-backed Type Registry symbols available to this editor. */
+  /** Символы Type Registry на основе Source, доступные этому редактору. */
   typeSymbols?: Array<{
     identity: string
     displayName?: string
@@ -38,7 +38,7 @@ export interface SourceLanguageContext {
     entityReference?: { target: string, storage: 'id' | 'identity' }
   }>
 
-  /** Installed storage and code definition catalog used by identity completions. */
+  /** Каталог установленных определений storage и кода для completions identity. */
   documentSymbols?: Array<{
     target: SourceDocumentReferenceTarget
     identity: string
@@ -46,21 +46,21 @@ export interface SourceLanguageContext {
     description?: string | null
   }>
 
-  /** Identity of the document that owns current source diagnostics. */
+  /** Identity документа, владеющего текущей диагностикой Source. */
   ownerIdentity?: string
 
-  /** Effective translation catalogs for all current Project occurrences. */
+  /** Фактические каталоги переводов для всех текущих вхождений Project. */
   i18n?: SourceLanguageI18nContext
 }
 
-/** One statically projected Composition occurrence in the current Project. */
+/** Одно статически спроецированное вхождение Composition в текущем Project. */
 export interface SourceLanguageI18nOccurrence {
   id: string
   catalogsByScope: Readonly<Record<string, I18nRuntimeCatalog>>
   provenanceByScope: Readonly<Record<string, I18nCatalogProvenance>>
 }
 
-/** Translation input prepared by the application without mounting Runtime. */
+/** Вход переводов, подготовленный приложением без монтирования Runtime. */
 export interface SourceLanguageI18nContext {
   locale: string
   fallbackLocale: string
@@ -130,7 +130,7 @@ export interface SourceDocumentReference {
   }
 }
 
-/** Renderer-neutral semantic emphasis for one source range. */
+/** Нейтральное к renderer семантическое выделение одного диапазона Source. */
 export interface SourceLanguageSemanticHighlight {
   kind: 'type-reference'
   status: 'resolved' | 'unresolved'
@@ -138,7 +138,7 @@ export interface SourceLanguageSemanticHighlight {
   range: SourceDocumentReference['range']
 }
 
-/** Renderer-neutral inline annotation shown after one source range. */
+/** Нейтральная к renderer inline-аннотация после одного диапазона Source. */
 export interface SourceLanguageInlineHint {
   kind: 'translation'
   status: 'resolved' | 'ambiguous'
@@ -182,13 +182,13 @@ export interface SourceEngineGenerateResult extends SourceEngineResult {
 
 /** Результат компиляции source в normalized document и runtime artifact payload. */
 export interface SourceEngineCompileResult extends SourceEngineResult {
-  /** Parser-level AST. */
+  /** AST уровня parser. */
   ast?: unknown
 
   /** Нормализованный source document. */
   document?: unknown
 
-  /** Runtime/program-ready artifact payload. */
+  /** Payload артефакта, готовый для runtime и program. */
   artifact?: any
 
   /** Публичная metadata, извлечённая из source. */
@@ -197,13 +197,13 @@ export interface SourceEngineCompileResult extends SourceEngineResult {
   /** Diagnostics, найденные source compiler-ом. */
   diagnostics?: unknown[]
 
-  /** Static Program dependencies discovered by the source compiler. */
+  /** Статические зависимости Program, найденные компилятором Source. */
   dependencies?: import('@/modules/program/domain/types/program.types').ProgramDependency[]
 }
 
 /** Результат parse source без обязательной runtime-компиляции. */
 export interface SourceParseResult<TDocument = unknown> extends SourceEngineResult {
-  /** Parser-level AST. */
+  /** AST уровня parser. */
   ast?: unknown
 
   /** Нормализованный source document. */
@@ -308,7 +308,7 @@ export interface SourceLanguageStrategy {
   /** Возвращает доступные подсказки языка в нейтральном формате. */
   completions: (context: SourceLanguageContext) => SourceLanguageCompletion[]
 
-  /** Returns call signature information at the current cursor position. */
+  /** Возвращает сведения о сигнатуре вызова в текущей позиции курсора. */
   signatureHelp?: (context: SourceLanguageContext) => SourceLanguageSignatureHelp | null
 
   /** Возвращает внешнюю document reference под курсором, если язык её поддерживает. */

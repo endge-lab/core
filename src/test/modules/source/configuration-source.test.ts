@@ -10,8 +10,8 @@ import {
   validateConfigurationValue,
 } from '@/main'
 
-describe('configuration Source v1', () => {
-  it('compiles explicit and inferred defaults including JSON and an empty TriggerSet', () => {
+describe('проверка Source конфигурации v1', () => {
+  it('компилирует явные и выведенные значения по умолчанию, включая JSON и пустой TriggerSet', () => {
     const result = compileConfigurationSource(`defineConfig({
   title: value(String),
   count: value(Number).min(0).max(10).step(1),
@@ -28,7 +28,7 @@ describe('configuration Source v1', () => {
     ])
   })
 
-  it('rejects executable syntax and unsafe/computed values', () => {
+  it('отклоняет исполняемый синтаксис и небезопасные либо вычисляемые значения', () => {
     for (const source of [
       `import x from 'x'; defineConfig({ a: value(String, x) })`,
       `defineConfig({ ...other })`,
@@ -39,7 +39,7 @@ describe('configuration Source v1', () => {
     }
   })
 
-  it('patches only one property and preserves neighboring source', () => {
+  it('изменяет только одно свойство и сохраняет соседний Source', () => {
     const source = `defineConfig({
   first: value(String, 'keep'),
   second: value(Number, 1).label('Old'),
@@ -63,7 +63,7 @@ describe('configuration Source v1', () => {
     expect(compileConfigurationSource(removed).document?.values.map(item => item.key)).toEqual(['first'])
   })
 
-  it('renames one key in place and rejects duplicates', () => {
+  it('переименовывает один ключ на месте и отклоняет дубликаты', () => {
     const source = `defineConfig({
   first: value(String, 'keep'),
   second: value(Number, 1).label('Second'),
@@ -74,7 +74,7 @@ describe('configuration Source v1', () => {
     expect(() => patchConfigurationSource(renamed, { op: 'rename', key: 'rowHeight', nextKey: 'first' })).toThrow('already exists')
   })
 
-  it('validates full TriggerSet semantics', () => {
+  it('проверяет полную семантику TriggerSet', () => {
     const type = { kind: 'reference' as const, identity: 'TriggerSet' }
     expect(validateConfigurationValue(type, [], []).ok).toBe(true)
     expect(validateConfigurationValue(type, [{ event: 'contextmenu', button: 2, prevent: true }], []).ok).toBe(true)
@@ -82,7 +82,7 @@ describe('configuration Source v1', () => {
     expect(validateConfigurationValue(type, [{ event: 'click', passive: true, prevent: true }], []).ok).toBe(false)
   })
 
-  it('requires explicit defaults for references and ambiguous empty schemas', () => {
+  it('требует явные значения по умолчанию для ссылок и неоднозначных пустых схем', () => {
     const catalog = [{
       id: 1,
       identity: 'FlightRef',
@@ -99,7 +99,7 @@ describe('configuration Source v1', () => {
     expect(validateConfigurationValue({ kind: 'reference', identity: 'FlightRef' }, 'flight-1', catalog).ok).toBe(true)
   })
 
-  it('keeps a draft projection available when a value has semantic diagnostics', () => {
+  it('сохраняет доступность черновой проекции при семантической диагностике значения', () => {
     const catalog = [{
       id: 1,
       identity: 'FolderRef',
@@ -116,8 +116,8 @@ describe('configuration Source v1', () => {
   })
 })
 
-describe('configuration cascade and public context', () => {
-  it('applies field-level set/remove semantics without losing sibling values', () => {
+describe('каскад Configuration и публичный контекст', () => {
+  it('применяет семантику set/remove на уровне поля без потери соседних значений', () => {
     const root = createDefaultEndgeConfiguration()
     root.values = { groundHandling: { rowHeight: 32, compact: true } }
     const overridden = applyEndgeConfigurationContribution(root, {
@@ -132,7 +132,7 @@ describe('configuration cascade and public context', () => {
     expect(inherited.values).toEqual({ groundHandling: { rowHeight: 40, compact: true } })
   })
 
-  it('publishes a deeply frozen flat config without storage internals', () => {
+  it('публикует глубоко замороженный плоский config без внутренних деталей storage', () => {
     const configuration = createDefaultEndgeConfiguration()
     configuration.values = { groundHandling: { actualTimeTriggers: [] } }
     const snapshot = createEndgePublicConfigurationSnapshot(configuration)

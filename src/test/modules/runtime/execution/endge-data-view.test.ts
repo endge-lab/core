@@ -68,8 +68,8 @@ const INPUT = {
   ],
 }
 
-describe('endgeDataView pipeline transform', () => {
-  it('passes each select result to the next step and returns the last result', () => {
+describe('преобразование pipeline EndgeDataView', () => {
+  it('передаёт результат каждого select следующему шагу и возвращает последний результат', () => {
     const output = dataView.runSource(`
 defineDataView({
   mode: 'pipeline',
@@ -92,7 +92,7 @@ defineDataView({
     ])
   })
 
-  it('returns a root expression result without an object projection wrapper', () => {
+  it('возвращает результат корневого выражения без оболочки объектной проекции', () => {
     const output = dataView.runSource(`
 defineDataView({
   output: fullJoin(
@@ -112,7 +112,7 @@ defineDataView({
     ])
   })
 
-  it('evaluates projection output over the whole input object', () => {
+  it('вычисляет output проекции для всего входного объекта', () => {
     const output = dataView.runSource(`
 defineDataView({
   output: {
@@ -146,7 +146,7 @@ defineDataView({
     })
   })
 
-  it('runs default source as legs enriched with related attrs', () => {
+  it('выполняет стандартный Source как legs, дополненные связанными attrs', () => {
     const output = dataView.runSource(DATA_VIEW_DEFAULT_SOURCE, {
       legs: [
         {
@@ -183,7 +183,7 @@ defineDataView({
     ])
   })
 
-  it('runs from, join, map, path, template, find, pick and convert', () => {
+  it('выполняет from, join, map, path, template, find, pick и convert', () => {
     const output = dataView.runSource(createFlightPipelineSource('std'), INPUT)
 
     expect(output).toEqual([
@@ -210,7 +210,7 @@ defineDataView({
     ])
   })
 
-  it('keeps missing find/pick chain safe and JSON preview omits undefined fields', () => {
+  it('безопасно обрабатывает отсутствующую цепочку find/pick, а JSON preview пропускает неопределённые поля', () => {
     const output = dataView.runSource(createFlightPipelineSource('attr1'), INPUT)
 
     expect(output).toEqual([
@@ -231,7 +231,7 @@ defineDataView({
     expect(JSON.stringify(output, null, 2)).not.toContain('attrTime')
   })
 
-  it('supports literal map fields', () => {
+  it('поддерживает литеральные поля map', () => {
     const output = dataView.runSource(`
 defineDataView({
   mode: 'pipeline',
@@ -253,7 +253,7 @@ defineDataView({
     ])
   })
 
-  it('supports map spread and explicit field override', () => {
+  it('поддерживает spread в map и явное переопределение поля', () => {
     const output = dataView.runSource(`
 defineDataView({
   mode: 'pipeline',
@@ -288,7 +288,7 @@ defineDataView({
     ])
   })
 
-  it('returns empty rows when from source is missing or not an array', () => {
+  it('возвращает пустые строки, если Source для from отсутствует или не является массивом', () => {
     const output = dataView.runSource(`
 defineDataView({
   mode: 'pipeline',
@@ -304,7 +304,7 @@ defineDataView({
     expect(output).toEqual([])
   })
 
-  it('returns original rows when pipeline has from without map', () => {
+  it('возвращает исходные строки, если pipeline содержит from без map', () => {
     const output = dataView.runSource(`
 defineDataView({
   mode: 'pipeline',
@@ -318,7 +318,7 @@ defineDataView({
   })
 })
 
-describe('endgeDataView manual transform', () => {
+describe('ручное преобразование EndgeDataView', () => {
   it('отклоняет manual source до появления безопасного runtime', () => {
     expect(() => dataView.runSource(`
 defineDataView({
@@ -365,7 +365,7 @@ defineDataView({
   })
 })
 
-describe('endgeDataView artifact ownership', () => {
+describe('владение артефактом EndgeDataView', () => {
   /** Проверяет запрет локальной компиляции persisted DataView во время runtime. */
   it('отклоняет выполнение без artifact общего build pipeline', () => {
     const model = new RDataView()

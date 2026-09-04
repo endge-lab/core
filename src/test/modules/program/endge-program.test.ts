@@ -3,8 +3,8 @@ import type { ProgramArtifact } from '@/modules/program/domain/types/program.typ
 import { describe, expect, it } from 'vitest'
 import { EndgeProgram_Module } from '@/modules/program/EndgeProgram_Module'
 
-describe('endgeProgram', () => {
-  it('stores and resolves artifacts by id and identity', () => {
+describe('проверка Program в Endge', () => {
+  it('хранит и разрешает артефакты по ID и identity', () => {
     const program = new EndgeProgram_Module()
     const artifact = makeArtifact('action', 10, 'save-order')
 
@@ -15,7 +15,7 @@ describe('endgeProgram', () => {
     expect(program.getArtifact('action', 'save-order')).toBe(artifact)
   })
 
-  it('clear removes artifacts and resets status', () => {
+  it('clear удаляет артефакты и сбрасывает status', () => {
     const program = new EndgeProgram_Module()
     program.beginCompile('test')
     program.addArtifact(makeArtifact('query', 'q1', 'query-one', 'error'))
@@ -29,7 +29,7 @@ describe('endgeProgram', () => {
     expect(program.snapshot().total).toBe(0)
   })
 
-  it('groups diagnostics in snapshots', () => {
+  it('группирует диагностику в snapshots', () => {
     const program = new EndgeProgram_Module()
     program.beginCompile('test')
     program.addArtifact(makeArtifact('action', 'a1', 'action-one', 'warning'))
@@ -43,7 +43,7 @@ describe('endgeProgram', () => {
     expect(snapshot.diagnostics).toHaveLength(1)
   })
 
-  it('stores component tag registry only for the active compile cycle', () => {
+  it('хранит реестр тегов компонентов только для активного цикла компиляции', () => {
     const program = new EndgeProgram_Module()
     program.beginCompile('test')
     program.setComponentTags([

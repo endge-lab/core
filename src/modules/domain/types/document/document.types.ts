@@ -33,7 +33,7 @@ import type { RComponent } from '@/modules/domain/types/component/component.type
  */
 export enum ComponentType {
   Component = 'component',
-  /** Legacy table-column template type; not a standalone document. */
+  /** Legacy-тип шаблона колонки таблицы; не является отдельным документом. */
   Html = 'html',
   DSL = 'component-dsl',
   Table = 'component-table',
@@ -72,7 +72,7 @@ export enum DomainSectionType {
   Store = 'store',
   Mock = 'mock',
   Action = 'action',
-  /** Frontend-only catalog classification; Event is not a persisted document. */
+  /** Классификация каталога только для frontend; Event не является сохраняемым документом. */
   Event = 'event',
   Converter = 'converter',
   Computation = 'computation',

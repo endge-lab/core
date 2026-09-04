@@ -1,14 +1,14 @@
 export type ManagedBy = 'system' | 'integration' | 'user'
 
-/** Stable domain reference that never depends on a database identifier. */
+/** Стабильная доменная ссылка, не зависящая от идентификатора базы данных. */
 export interface EntityRef {
   type: string
   identity: string
 }
 
 /**
- * Provenance of an entity in the effective domain read-model.
- * Only storage entities participate in persistence and export operations.
+ * Происхождение сущности в фактической read-модели домена.
+ * Только сущности storage участвуют в операциях сохранения и экспорта.
  */
 export type EntityOrigin
   = | { kind: 'storage' }

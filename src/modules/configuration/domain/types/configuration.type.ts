@@ -43,13 +43,13 @@ export interface EndgeSFCEditingConfiguration {
 export type EndgeTooltipSide = 'top' | 'right' | 'bottom' | 'left'
 export type EndgeTooltipAlign = 'start' | 'center' | 'end'
 
-/** Effective behavioral defaults of the single Shell-owned tooltip overlay. */
+/** Фактические defaults поведения единственного tooltip-слоя, принадлежащего Shell. */
 export interface EndgeTooltipConfiguration {
   side: EndgeTooltipSide
   align: EndgeTooltipAlign
   openDelay: number
   closeDelay: number
-  /** Optional keyboard state required while the pointer or focus activates a tooltip. */
+  /** Необязательное состояние клавиатуры, требуемое при активации tooltip указателем или focus. */
   keyboard?: ComponentSFCInteractionKeyboardCondition
 }
 
@@ -68,15 +68,15 @@ export interface EndgeConfiguration {
   defaultSfcAdapterId: string
   /** Effective triggers, которые наследуют editable-узлы без локальных атрибутов. */
   sfcEditing: EndgeSFCEditingConfiguration
-  /** Effective tooltip behavior. Visual styling is owned by CSS and adapter hooks. */
+  /** Фактическое поведение tooltip. Визуальные стили принадлежат CSS и хукам адаптера. */
   tooltips: EndgeTooltipConfiguration
   /** Настройки telemetry, output adapters, routing и snapshots. */
   diagnostics: EndgeDiagnosticsConfiguration
-  /** Persisted/effective values grouped by Configuration document identity. */
+  /** Сохранённые и фактические значения, сгруппированные по идентификатору документа Configuration. */
   values: EndgeConfigurationValues
 }
 
-/** Deep-readonly, SFC-visible effective configuration projection. */
+/** Глубоко readonly фактическая проекция конфигурации, доступная SFC. */
 export type EndgePublicConfigurationSnapshot = Readonly<
   Omit<EndgeConfiguration, 'vars' | 'diagnostics' | 'values'>
   & Record<string, unknown>
@@ -92,7 +92,7 @@ export interface EndgeSFCEditingConfigurationPatch {
   commitOn?: EndgeValueOverride<ComponentSFCInteractionTrigger[]>
 }
 
-/** Field-level tooltip overrides for one configuration cascade layer. */
+/** Переопределения tooltip уровня поля для одного слоя каскада конфигурации. */
 export interface EndgeTooltipConfigurationPatch {
   side?: EndgeValueOverride<EndgeTooltipSide>
   align?: EndgeValueOverride<EndgeTooltipAlign>
@@ -126,7 +126,7 @@ export interface EndgeConfigurationPatch {
   tooltips?: EndgeTooltipConfigurationPatch
   /** Локальный contribution diagnostics для текущего configuration layer. */
   diagnostics?: EndgeDiagnosticsConfigurationPatch
-  /** Field-level overrides of source-backed Configuration values. */
+  /** Переопределения значений Configuration уровня поля, основанных на Source. */
   values?: EndgeConfigurationValuePatch
 }
 

@@ -8,7 +8,7 @@ import { Endge } from '@/kernel/endge'
 import { RComposition } from '@/modules/domain/entities/RComposition'
 import { RQuery } from '@/modules/domain/entities/RQuery'
 
-describe('composition manual runtime handle', () => {
+describe('проверка Handle ручного runtime Composition', () => {
   afterEach(async () => {
     await Endge.runtime.reset()
     Endge.program.clear()
@@ -16,7 +16,7 @@ describe('composition manual runtime handle', () => {
     Raph.app.reset()
   })
 
-  it('keeps fromOutput undefined before activation and reconnects the stable bridge afterwards', async () => {
+  it('оставляет fromOutput неопределённым до активации и затем повторно подключает стабильный bridge', async () => {
     const source = query(601, 'manual-source')
     const consumer = query(602, 'consumer')
     const composition = new RComposition()

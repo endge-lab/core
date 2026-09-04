@@ -1,7 +1,7 @@
 import type { ComputationSourceDocument } from './computation-source.types'
 import type { SourceExpressionIR } from '@/modules/source/domain/types/source-expression.types'
 
-/** Optional persisted metadata; v1 compiler does not compare contracts. */
+/** Необязательные сохраняемые метаданные; компилятор v1 не сравнивает контракты. */
 export interface ComputationContractField {
   type: string
   isArray?: boolean
@@ -31,7 +31,7 @@ export type ComputationProgramNode
     input: SourceExpressionIR
   }
 
-/** Runtime-ready graph compiled from one defineComputation source document. */
+/** Готовый для runtime граф, скомпилированный из одного Source-документа defineComputation. */
 export interface ComputationProgramPayload {
   input: ComputationContractField | null
   output: ComputationContractField | null

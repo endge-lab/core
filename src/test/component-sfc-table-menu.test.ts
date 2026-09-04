@@ -7,8 +7,8 @@ import {
   normalizeComponentSFCTableRowMenu,
 } from '@/modules/compiler/services/component-sfc/component-sfc-table-menu'
 
-describe('component SFC table column menu', () => {
-  it('compiles Table > ColumnMenu into a context menu descriptor', () => {
+describe('меню колонки таблицы Component SFC', () => {
+  it('компилирует Table > ColumnMenu в дескриптор контекстного меню', () => {
     const result = compileComponentSFC(createTableSource(`
       <ColumnMenu>
         <MenuItem action="table.sort.setColumnAsc" label="Сортировать по возрастанию" />
@@ -51,7 +51,7 @@ describe('component SFC table column menu', () => {
     })
   })
 
-  it('compiles a built-in Action binding with static input', () => {
+  it('компилирует встроенный binding Action со статическим input', () => {
     const result = compileComponentSFC(createTableSource(`
       <ColumnMenu>
         <MenuItem
@@ -76,7 +76,7 @@ describe('component SFC table column menu', () => {
     }])
   })
 
-  it('rejects payload and flattened Action input fields', () => {
+  it('отклоняет payload и развёрнутые поля input Action', () => {
     const payload = compileComponentSFC(createTableSource(`
       <ColumnMenu>
         <MenuItem :action="{ identity: 'built-in-console-log', payload: { message: 'test' } }" label="Debug" />
@@ -98,7 +98,7 @@ describe('component SFC table column menu', () => {
     ]))
   })
 
-  it('reports MenuItem without action or label', () => {
+  it('сообщает о MenuItem без action или label', () => {
     const result = compileComponentSFC(createTableSource(`
       <ColumnMenu>
         <MenuItem action="table.sort.clearAll" />
@@ -119,7 +119,7 @@ describe('component SFC table column menu', () => {
     ]))
   })
 
-  it('rejects removed command syntax and resolves a direct Action identity without a port', () => {
+  it('отклоняет удалённый синтаксис command и разрешает прямой identity Action без порта', () => {
     const legacy = compileComponentSFC(createTableSource(`
       <ColumnMenu>
         <MenuItem command="table.sort.clearAll" label="Сбросить" />
@@ -144,7 +144,7 @@ describe('component SFC table column menu', () => {
     expect(direct.dependencies.actions).toContain('flight.open')
   })
 
-  it('resolves an expression Action port reference and preserves the legacy string alias', () => {
+  it('разрешает expression-ссылку на порт Action и сохраняет legacy string alias', () => {
     const source = (action: string) => `<script setup lang="ts">
 const ports = definePorts({
   require: {
@@ -172,7 +172,7 @@ const ports = definePorts({
     }
   })
 
-  it('rejects an expression Action reference that is not declared as a port', () => {
+  it('отклоняет expression-ссылку на Action, не объявленную как порт', () => {
     const result = compileComponentSFC(createTableSource(`
       <RowMenu><MenuItem :action="missingActionPort" label="Открыть" /></RowMenu>
     `))
@@ -182,7 +182,7 @@ const ports = definePorts({
     ]))
   })
 
-  it('reports Column > ColumnMenu as unsupported in v1', () => {
+  it('сообщает, что Column > ColumnMenu не поддерживается в v1', () => {
     const result = compileComponentSFC(createTableSource(`
       <Column key="number" title="Flight" sortable>
         <ColumnMenu>
@@ -199,7 +199,7 @@ const ports = definePorts({
     ]))
   })
 
-  it('supports column-menu disabled without a menu descriptor', () => {
+  it('поддерживает отключённый column-menu без дескриптора меню', () => {
     const result = compileComponentSFC(createTableSource(`
       <Column key="number" title="Flight" sortable />
     `, {
@@ -212,7 +212,7 @@ const ports = definePorts({
     expect(menu.menu).toBeNull()
   })
 
-  it('compiles RowMenu with t() label and row/cell input expressions', () => {
+  it('компилирует RowMenu с label через t() и выражениями input строки и ячейки', () => {
     const result = compileComponentSFC(createTableSource(`
       <RowMenu>
         <MenuItem
@@ -235,7 +235,7 @@ const ports = definePorts({
     })])
   })
 
-  it('reports conflicting legacy action.input and explicit :input', () => {
+  it('сообщает о конфликте legacy action.input и явного :input', () => {
     const result = compileComponentSFC(createTableSource(`
       <RowMenu>
         <MenuItem
@@ -251,7 +251,7 @@ const ports = definePorts({
     ]))
   })
 
-  it('expands a namespaced forwarded alias to the Action of the same mounted Table', () => {
+  it('раскрывает перенаправленный alias с namespace в Action той же смонтированной Table', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 const ports = definePorts({
   forward: {
@@ -276,7 +276,7 @@ const ports = definePorts({
     })
   })
 
-  it('rejects a forwarded Action owned by another mounted Table', () => {
+  it('отклоняет перенаправленный Action, принадлежащий другой смонтированной Table', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 const ports = definePorts({
   forward: {

@@ -95,7 +95,7 @@ export interface TableEventDefinition {
   description: string
 }
 
-/** Canonical renderer-neutral Event manifest of the built-in Table tag. */
+/** Канонический нейтральный к renderer манифест Event встроенного тега Table. */
 export const TABLE_EVENT_DEFINITIONS: readonly TableEventDefinition[] = [
   { name: 'rowActivated', displayName: 'Активация строки', payloadType: 'TableRowActivatedEvent', description: 'Строка активирована указателем или клавиатурой.' },
   { name: 'rowContextMenuRequested', displayName: 'Контекстное меню строки', payloadType: 'TableRowContextMenuRequestedEvent', description: 'Для строки запрошено контекстное меню.' },

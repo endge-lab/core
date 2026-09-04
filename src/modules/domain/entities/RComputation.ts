@@ -5,7 +5,7 @@ import { Serialize } from '@endge/utils'
 import { Expose } from 'class-transformer'
 import { REntity } from '@/modules/domain/entities/REntity'
 
-/** Persisted executable specification. Runtime execution is provided separately. */
+/** Сохранённая исполняемая спецификация. Runtime-выполнение предоставляется отдельно. */
 export class RComputation extends REntity {
   @Expose()
   override displayName: string = ''

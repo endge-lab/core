@@ -85,7 +85,7 @@ export abstract class RuntimeHostBase<
   /** Runtime-scoped namespace данных host. */
   public readonly basePath: string
 
-  /** Runtime-scoped persistence controller. */
+  /** Контроллер persistence уровня runtime. */
   public runtimeState: RuntimeStateControllerLike | null = null
 
   /** Список raph-нод, которыми владеет host. */

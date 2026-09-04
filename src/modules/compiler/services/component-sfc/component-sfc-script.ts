@@ -41,7 +41,7 @@ export interface ComponentSFCScriptAnalysisResult {
   /** Публичная metadata компонента из defineMetadata. */
   metadata: ProgramMetadataMap
 
-  /** Diagnostics script pass. */
+  /** Диагностический проход script. */
   diagnostics: RComponentDiagnostic[]
 }
 
@@ -127,7 +127,7 @@ export function analyzeComponentSFCScript(
   }
 }
 
-/** Resolves inline or named TypeScript object contracts used by SFC macros. */
+/** Определяет inline или именованные TypeScript-контракты объектов, используемые макросами SFC. */
 export function parseComponentSFCTypeFields(
   source: string,
   scriptContent = '',

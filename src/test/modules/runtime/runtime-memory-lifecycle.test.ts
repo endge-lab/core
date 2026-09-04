@@ -23,13 +23,13 @@ class TestQueryHost extends RuntimeHostBase<'query', RuntimeHostContext<'query'>
   }
 }
 
-describe('runtime memory lifecycle', () => {
+describe('жизненный цикл памяти runtime', () => {
   afterEach(async () => {
     await Endge.runtime.reset()
     Raph.app.reset()
   })
 
-  it('processes every delivered update binding without structural hashing', () => {
+  it('обрабатывает каждую доставленную привязку обновления без структурного хеширования', () => {
     const model = queryModel(1)
     const host = new TestQueryHost(model)
     const node = new RaphNode(Raph.app, { id: 'binding-node' })
@@ -57,7 +57,7 @@ describe('runtime memory lifecycle', () => {
     host.destroy()
   })
 
-  it('quiesces the whole tree from parent to child before child-first destruction', async () => {
+  it('останавливает всё дерево от родителя к детям перед уничтожением от детей к родителю', async () => {
     const parent = executeQuery(10)
     const child = executeQuery(11, {}, parent)
     const order: string[] = []
@@ -89,13 +89,13 @@ describe('runtime memory lifecycle', () => {
     ])
   })
 
-  it('keeps destroyed snapshots disabled by default', async () => {
+  it('по умолчанию не сохраняет snapshots уничтоженных runtime', async () => {
     const host = executeQuery(1)
     await Endge.runtime.destroyRuntimeTreeAsync(host.id)
     expect(Endge.runtime.getDeletedRuntimeHostSnapshots()).toEqual([])
   })
 
-  it('removes a child from the registry index after host cleanup clears its parent reference', () => {
+  it('удаляет дочерний узел из индекса реестра после очистки host, удалившей ссылку на родителя', () => {
     const registry = new RuntimeHostRegistry()
     const parent = new TestQueryHost(queryModel(1), 'parent')
     const child = new TestQueryHost(queryModel(2), 'child', parent)
@@ -110,7 +110,7 @@ describe('runtime memory lifecycle', () => {
     registry.removeById(parent.id)
   })
 
-  it('uses the maximum lease capacity, trims immediately and stores no runtime payloads', async () => {
+  it('использует максимальную ёмкость lease, сразу сокращает её и не хранит payload runtime', async () => {
     const small = Endge.runtime.acquireDestroyedHostSnapshots(2)
     const large = Endge.runtime.acquireDestroyedHostSnapshots(4)
     try {

@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { RComponentSFC } from '@/modules/domain/entities/RComponentSFC'
 
-describe('rComponentSFC tag persistence', () => {
-  it('normalizes and serializes an optional direct-call tag', () => {
+describe('сохранение тега RComponentSFC', () => {
+  it('нормализует и сериализует необязательный тег прямого вызова', () => {
     const component = RComponentSFC.fromPlain({
       id: 1,
       identity: 'aircraft-tail',
@@ -19,7 +19,7 @@ describe('rComponentSFC tag persistence', () => {
     })
   })
 
-  it('clears tag on duplicate so the draft can be saved before choosing a unique tag', () => {
+  it('очищает тег при дублировании, чтобы черновик можно было сохранить до выбора уникального тега', () => {
     const component = RComponentSFC.fromPlain({
       id: 1,
       identity: 'aircraft-tail',

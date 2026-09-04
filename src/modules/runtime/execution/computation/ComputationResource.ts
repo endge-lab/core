@@ -8,7 +8,7 @@ import { ComputationRuntimeError } from './ComputationGraphExecutor'
 type AsyncRunner<T> = (input: unknown) => Promise<T>
 type SyncRunner<T> = (input: unknown) => T
 
-/** Renderer-neutral latest-wins state for one computation consumer. */
+/** Нейтральное к renderer состояние latest-wins для одного consumer computation. */
 export class ComputationResourceState<T = unknown> implements ComputationResourceContract<T> {
   private _status: ComputationResourceContract<T>['status'] = 'idle'
   private _value: T | undefined

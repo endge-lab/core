@@ -65,7 +65,7 @@ export interface RComponentSFC_RuntimeBoundaryDependency {
   /** Поле ключа строки из `row-key`. */
   rowKey: string | null
 
-  /** Context paths used inside this boundary; they invalidate the whole boundary. */
+  /** Пути контекста, используемые внутри границы; они инвалидируют всю границу. */
   contextReads: string[][]
 
   /** Колонки таблицы, которые можно обновлять точечно. */
@@ -92,7 +92,7 @@ export interface RComponentSFC_RuntimeDependencies {
   /** Зависимости от props, которые можно связать с внешним input source. */
   props: RComponentSFC_RuntimeDependency[]
 
-  /** Context dependencies outside patchable boundaries. */
+  /** Зависимости контекста за пределами изменяемых границ. */
   context: RComponentSFC_RuntimeContextDependency[]
 
   /** Patchable boundaries, для которых runtime строит отдельные Raph-ноды. */

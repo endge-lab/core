@@ -9,7 +9,7 @@ export interface ActionCompileResult {
   dependencies: ProgramDependency[]
 }
 
-/** Compiles persisted Action Source into Program. */
+/** Компилирует сохранённый Source Action в Program. */
 export function compileAction(entity: RAction): ActionCompileResult {
   const diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[] = []
   let target = entity.target

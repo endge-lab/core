@@ -7,7 +7,7 @@ import type {
 import { compileComponentSFC } from '@/modules/compiler/services/component-sfc/component-sfc-compile'
 import { parseComponentSFCTypeFields } from '@/modules/compiler/services/component-sfc/component-sfc-script'
 
-/** Reads defineProps as a source-backed projection. Named and runtime contracts stay Source-owned. */
+/** Читает defineProps как проекцию на основе Source. Именованные и runtime-контракты остаются во владении Source. */
 export function inspectComponentSFCProps(source: string): ComponentSFCPropsVisualProjection {
   const compiled = compileComponentSFC(source)
   const declaration = compiled.ast?.script?.props
@@ -47,7 +47,7 @@ export function inspectComponentSFCProps(source: string): ComponentSFCPropsVisua
   }
 }
 
-/** Replaces only the defineProps call, or inserts one into script setup when it is missing. */
+/** Заменяет только вызов defineProps либо вставляет его в script setup при отсутствии. */
 export function patchComponentSFCPropsSource(
   source: string,
   props: readonly RComponentSFC_IR_Prop[],

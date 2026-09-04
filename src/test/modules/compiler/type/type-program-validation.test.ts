@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { collectTypeExpressionReferences } from '@/modules/compiler/services/type/type-program-validation'
 
-describe('type program validation', () => {
-  it('does not treat uppercase object property names as Type Registry references', () => {
+describe('проверка программы Type', () => {
+  it('не считает имена свойств объекта с заглавной буквы ссылками Type Registry', () => {
     expect(collectTypeExpressionReferences(`Array<{
       id: number
       Q: string

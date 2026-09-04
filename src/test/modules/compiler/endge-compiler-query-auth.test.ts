@@ -8,7 +8,7 @@ import { RQuery } from '@/modules/domain/entities/RQuery'
 import { RTenant } from '@/modules/domain/entities/RTenant'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
-describe('endgeCompiler Query auth dependencies', () => {
+describe('зависимости авторизации Query в EndgeCompiler', () => {
   beforeEach(() => prepareCompilerContext())
 
   afterEach(() => {
@@ -18,7 +18,7 @@ describe('endgeCompiler Query auth dependencies', () => {
     Endge.workspace.reset()
   })
 
-  it('publishes a static auth profile as an explicit Program dependency', () => {
+  it('публикует статический профиль авторизации как явную зависимость Program', () => {
     const profile = new RAuthProfile()
     profile.id = 41
     profile.identity = 'payload-auth'

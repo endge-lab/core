@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { compileComponentSFC } from '@/modules/compiler/services/component-sfc/component-sfc-compile'
 import { analyzeComponentSFCRuntimeDependencies } from '@/modules/compiler/services/component-sfc/component-sfc-dependencies'
 
-describe('component SFC Tooltip', () => {
-  it('compiles text, markdown and rich forms into the renderer-neutral tree', () => {
+describe('проверка Tooltip в Component SFC', () => {
+  it('компилирует текстовую, markdown- и rich-формы в независимое от renderer дерево', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 defineProps<{ help: string }>()
 </script>
@@ -32,7 +32,7 @@ defineProps<{ help: string }>()
     ])
   })
 
-  it('preserves dependencies from lazy rich content', () => {
+  it('сохраняет зависимости из ленивого rich-содержимого', () => {
     const result = compileComponentSFC(`<script setup lang="ts">
 defineProps<{ row: FlightRow }>()
 </script>
@@ -50,7 +50,7 @@ defineProps<{ row: FlightRow }>()
     ]))
   })
 
-  it('rejects ambiguous, malformed and nested tooltip structures', () => {
+  it('отклоняет неоднозначные, некорректные и вложенные структуры tooltip', () => {
     const ambiguous = compileComponentSFC(`<template><Tooltip text="A" markdown="B"><Text>X</Text></Tooltip></template>`)
     const malformed = compileComponentSFC(`<template><Tooltip><TooltipTrigger><Text>X</Text></TooltipTrigger></Tooltip></template>`)
     const nested = compileComponentSFC(`<template><Tooltip><TooltipTrigger><Text>X</Text></TooltipTrigger><TooltipContent><Tooltip text="Y"><Text>Z</Text></Tooltip></TooltipContent></Tooltip></template>`)
@@ -60,7 +60,7 @@ defineProps<{ row: FlightRow }>()
     expect(nested.diagnostics.some(item => item.code === 'sfc-tooltip-nested')).toBe(true)
   })
 
-  it('keeps tooltip shorthand as a lazy renderer prop', () => {
+  it('сохраняет сокращённый tooltip как ленивый prop renderer', () => {
     const result = compileComponentSFC(`<template><Badge tooltip="Ready">OK</Badge></template>`)
     expect(result.ir?.template.roots[0]).toMatchObject({
       kind: 'element',

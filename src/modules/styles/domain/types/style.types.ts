@@ -50,7 +50,7 @@ export interface EndgeStyleSelectorSegment {
   compound: EndgeStyleCompoundSelector
 }
 
-/** Selector is stored left-to-right. The matcher evaluates it right-to-left. */
+/** Селектор хранится слева направо, а matcher вычисляет его справа налево. */
 export interface EndgeStyleSelector {
   source: string
   segments: EndgeStyleSelectorSegment[]
@@ -146,7 +146,7 @@ export interface EndgeStyleTargetProfile {
   capabilities?: Iterable<string>
 }
 
-/** Renderer-neutral logical node. DOM wrappers are intentionally absent. */
+/** Нейтральный к renderer логический узел. DOM-обёртки намеренно отсутствуют. */
 export interface EndgeStyleMatchNode {
   tag: string
   id?: string
@@ -157,12 +157,12 @@ export interface EndgeStyleMatchNode {
   component?: string
   identity?: string
   ownerScopeId?: string
-  /** Runtime lifecycle ancestry; used by renderer-neutral placement isolation. */
+  /** Иерархия lifecycle runtime для нейтральной к renderer изоляции размещения. */
   runtimeScopeIds?: ReadonlySet<string>
   parent?: EndgeStyleMatchNode
   /**
-   * Immediate logical predecessor. A linked chain keeps sibling combinators
-   * renderer-neutral without retaining a copied prefix for every node.
+   * Непосредственный логический предшественник. Связанная цепочка сохраняет соседние
+   * комбинаторы нейтральными к renderer без копии префикса в каждом узле.
    */
   previousSibling?: EndgeStyleMatchNode
   index: number

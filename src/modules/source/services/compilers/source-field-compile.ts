@@ -313,8 +313,8 @@ function isScalarValue(type: SourceFieldType, value: unknown): boolean {
   if (type === 'Object') {
     return typeof value === 'object' && !Array.isArray(value)
   }
-  // Custom types and Any require Type Registry structural validation, which is
-  // intentionally diagnostic-only during the migration.
+  // Пользовательские типы и Any требуют структурной проверки Type Registry, которая
+  // во время миграции намеренно используется только для диагностики.
   return true
 }
 

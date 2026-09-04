@@ -24,7 +24,7 @@ export interface EndgeLoadScope {
 }
 
 export interface EndgeUIBootOptions {
-  /** Host-local fallback order when the configured adapter implementation is unavailable. */
+  /** Локальный для host порядок fallback, когда настроенная реализация адаптера недоступна. */
   adapterFallbackIds?: readonly string[]
 }
 
@@ -39,7 +39,7 @@ export interface EndgeBootContext {
    */
   scope: EndgeLoadScope
 
-  /** Structural context immutable for one complete boot/build lifecycle. */
+  /** Структурный контекст, неизменяемый в течение полного lifecycle запуска и сборки. */
   context?: Partial<EndgeExecutionContext>
 
   /**
@@ -47,10 +47,10 @@ export interface EndgeBootContext {
    */
   vars: Record<string, unknown>
 
-  /** Host-local UI policy; it does not mutate persisted Workspace configuration. */
+  /** Локальная для host политика UI, не изменяющая сохранённую конфигурацию Workspace. */
   ui?: EndgeUIBootOptions
 
-  /** Host-owned browser session namespace. */
+  /** Пространство имён браузерной сессии, принадлежащее host. */
   auth?: EndgeAuthBootOptions
 
   /**

@@ -8,13 +8,13 @@ import { RFilter } from '@/modules/domain/entities/RFilter'
 import { FilterRuntimeHost } from '@/modules/runtime/hosts/FilterRuntimeHost'
 import { compileFilterSource } from '@/modules/source/services/compilers/filter-source-compile'
 
-describe('filterRuntimeHost', () => {
+describe('проверка Host runtime для Filter', () => {
   afterEach(() => {
     vi.useRealTimers()
     Raph.app.reset()
   })
 
-  it('shares one state through Actions and treats every action as a new output generation', async () => {
+  it('разделяет одно состояние через Actions и считает каждый action новым поколением output', async () => {
     const host = createHost()
     const changed: string[] = []
     const eventOrder: string[] = []
@@ -39,7 +39,7 @@ describe('filterRuntimeHost', () => {
     expect(host.getState()).toEqual({ search: '', codes: [] })
   })
 
-  it('re-evaluates relative date defaults on reset', async () => {
+  it('повторно вычисляет стандартные относительные даты при reset', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-07-10T12:00:00Z'))
     const host = createHost(`
@@ -54,7 +54,7 @@ defineFilter({
     expect(host.getState()).toEqual({ from: '2026-07-11' })
   })
 
-  it('re-evaluates relative date-time defaults on reset', async () => {
+  it('повторно вычисляет стандартные относительные дату и время при reset', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-07-10T12:34:56.789Z'))
     const host = createHost(`
@@ -82,13 +82,13 @@ defineFilter({
     })
   })
 
-  it('rejects unknown fields and invalid values', async () => {
+  it('отклоняет неизвестные поля и некорректные значения', async () => {
     const host = createHost()
     await expect(host.action('patch').run({ unknown: true })).rejects.toThrow('unknown field')
     await expect(host.action('set').run({ key: 'search', value: 42 })).rejects.toThrow('invalid value')
   })
 
-  it('accepts string values for Time fields and rejects non-string values', async () => {
+  it('принимает строковые значения полей Time и отклоняет нестроковые', async () => {
     const host = createHost(`
 defineFilter({
   fields: { departureTime: field('Time').default('06:30') },
@@ -102,7 +102,7 @@ defineFilter({
     await expect(host.action('set').run({ key: 'departureTime', value: 1245 })).rejects.toThrow('invalid value')
   })
 
-  it('invalidates only outputs that depend on changed fields', async () => {
+  it('инвалидирует только outputs, зависящие от изменённых полей', async () => {
     const host = createHost(`
 defineFilter({
   fields: {

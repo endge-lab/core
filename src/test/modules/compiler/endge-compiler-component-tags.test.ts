@@ -4,14 +4,14 @@ import { Endge } from '@/kernel/endge'
 import { RComponentSFC } from '@/modules/domain/entities/RComponentSFC'
 import { prepareTestCompilerContext, resetTestCompilerContext } from '@/test/helpers/compiler-context'
 
-describe('endgeCompiler component tag registry', () => {
+describe('реестр тегов компонентов EndgeCompiler', () => {
   beforeEach(() => prepareTestCompilerContext())
 
   afterEach(() => {
     resetTestCompilerContext()
   })
 
-  it('registers simple and dotted tags before compiling templates', () => {
+  it('регистрирует простые теги и теги с точкой до компиляции templates', () => {
     const tail = createComponent(1, 'aircraft-tail', 'Tail', '<Text>Tail</Text>')
     const type = createComponent(2, 'aircraft-type', 'Module.SomeTag', '<Text>Type</Text>')
     const consumer = createComponent(3, 'aircraft-cell', null, '<Tail /><Module.SomeTag />')
@@ -26,7 +26,7 @@ describe('endgeCompiler component tag registry', () => {
     expect(Endge.program.getArtifact('component-sfc', 'aircraft-cell')?.status).not.toBe('error')
   })
 
-  it('reports duplicate tags on every owner and does not register an ambiguous tag', () => {
+  it('сообщает о дублирующихся тегах у каждого owner и не регистрирует неоднозначный тег', () => {
     Endge.domain.addComponentSFC(createComponent(1, 'first-tail', 'Tail', '<Text>First</Text>'))
     Endge.domain.addComponentSFC(createComponent(2, 'second-tail', 'Tail', '<Text>Second</Text>'))
 
@@ -40,7 +40,7 @@ describe('endgeCompiler component tag registry', () => {
     }
   })
 
-  it('keeps built-in primitive names reserved', () => {
+  it('сохраняет имена встроенных примитивов зарезервированными', () => {
     Endge.domain.addComponentSFC(createComponent(1, 'custom-text', 'Text', '<Text>Custom</Text>'))
 
     Endge.compiler.build({} as any)

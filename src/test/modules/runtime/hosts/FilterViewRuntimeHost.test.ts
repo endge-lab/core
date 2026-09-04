@@ -8,10 +8,10 @@ import { FilterRuntimeHost } from '@/modules/runtime/hosts/FilterRuntimeHost'
 import { FilterViewRuntimeHost } from '@/modules/runtime/hosts/FilterViewRuntimeHost'
 import { compileFilterSource } from '@/modules/source/services/compilers/filter-source-compile'
 
-describe('filterViewRuntimeHost', () => {
+describe('проверка Host runtime для FilterView', () => {
   afterEach(() => Raph.app.reset())
 
-  it('builds one renderer-neutral plan and delegates changes to Filter state', async () => {
+  it('строит единый независимый от renderer план и делегирует изменения состоянию Filter', async () => {
     const filter = makeFilterRuntime()
     const view = new FilterViewRuntimeHost({
       id: 'filter-view',

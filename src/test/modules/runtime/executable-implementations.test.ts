@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { EndgeImplementations } from '@/modules/runtime/implementation/endge-implementations'
 
-describe('endgeImplementations', () => {
-  it('selects a scoped override and immediately returns to the default after disposal', async () => {
+describe('реализации Endge', () => {
+  it('выбирает переопределение в scope и сразу возвращается к стандартной реализации после освобождения', async () => {
     const implementations = new EndgeImplementations()
     implementations.registerProvider({
       key: 'default',
@@ -31,7 +31,7 @@ describe('endgeImplementations', () => {
     await expect(implementations.execute(request, { executable: request.executable })).resolves.toBe('default')
   })
 
-  it('rejects an incompatible provider contract before execution', () => {
+  it('отклоняет несовместимый контракт provider до выполнения', () => {
     const implementations = new EndgeImplementations()
     const execute = vi.fn()
     implementations.registerProvider({
@@ -48,7 +48,7 @@ describe('endgeImplementations', () => {
     expect(execute).not.toHaveBeenCalled()
   })
 
-  it('does not hide an explicitly bound missing provider', () => {
+  it('не скрывает отсутствие явно привязанного provider', () => {
     const implementations = new EndgeImplementations()
     implementations.bind({
       executableType: 'computation',

@@ -2,21 +2,21 @@ import { describe, expect, it } from 'vitest'
 
 import { Endge } from '@/kernel/endge'
 
-describe('endge module ownership', () => {
-  it('removes retired modules and keeps updates registered', () => {
+describe('владение модулями Endge', () => {
+  it('удаляет выведенные из эксплуатации модули и сохраняет регистрацию Updates', () => {
     expect(Endge.hasModule('extract')).toBe(false)
     expect(Endge.hasModule('store')).toBe(false)
     expect(Endge.hasModule('updates')).toBe(true)
   })
 
-  it('owns auth profiles through EndgeAuth_Module without a parallel module', () => {
+  it('владеет профилями авторизации через EndgeAuth_Module без параллельного модуля', () => {
     expect(Endge.hasModule('authProfiles')).toBe(false)
     expect(Endge.auth.profiles).toBeDefined()
     expect(Endge.auth.session).toBeDefined()
     expect(Endge.auth.requests).toBeDefined()
   })
 
-  it('owns execution services through EndgeRuntime_Module', () => {
+  it('владеет сервисами выполнения через EndgeRuntime_Module', () => {
     for (const key of ['query', 'dataView', 'composition', 'actions', 'computations', 'converters']) {
       expect(Endge.hasModule(key)).toBe(false)
     }
@@ -29,7 +29,7 @@ describe('endge module ownership', () => {
     expect(Endge.converters).toBe(Endge.runtime.converters)
   })
 
-  it('owns effective variables through EndgeWorkspace_Module', () => {
+  it('владеет эффективными переменными через EndgeWorkspace_Module', () => {
     expect(Endge.hasModule('vars')).toBe(false)
     expect(Endge.vars).toBe(Endge.workspace.variables)
   })

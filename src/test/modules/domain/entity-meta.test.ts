@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest'
 
 import { normalizeEntityMeta, REntity } from '@/modules/domain/entities/REntity'
 
-describe('rEntity metadata', () => {
-  it('defaults invalid or missing metadata to an empty object', () => {
+describe('метаданные REntity', () => {
+  it('заменяет невалидные или отсутствующие метаданные пустым объектом', () => {
     expect(normalizeEntityMeta(undefined)).toEqual({})
     expect(normalizeEntityMeta(null)).toEqual({})
     expect(normalizeEntityMeta([])).toEqual({})
   })
 
-  it('clones transport metadata through the common entity parser', () => {
+  it('клонирует transport-метаданные через общий parser сущностей', () => {
     const source = { table: { attributes: ['STA'] } }
     const entity = new REntity()
 

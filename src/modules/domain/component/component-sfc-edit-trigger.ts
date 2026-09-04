@@ -7,7 +7,7 @@ import type {
   ComponentSFCInteractionTriggerPlatform,
 } from '@/modules/domain/types/component/sfc/ir.types'
 
-/** Normalizes the shared `edit-on` / `on` trigger value. */
+/** Нормализует общее значение trigger `edit-on` или `on`. */
 export function normalizeComponentSFCInteractionTriggers(value: unknown): ComponentSFCInteractionTrigger[] {
   const values = Array.isArray(value) ? value : [value]
   return values.flatMap((item): ComponentSFCInteractionTrigger[] => {
@@ -110,7 +110,7 @@ export function normalizeComponentSFCInteractionHeldKeys(value: unknown): Compon
   return Object.keys(result).length ? result : undefined
 }
 
-/** Normalizes a reusable condition on the current keyboard state. */
+/** Нормализует переиспользуемое условие текущего состояния клавиатуры. */
 export function normalizeComponentSFCInteractionKeyboardCondition(value: unknown): ComponentSFCInteractionKeyboardCondition | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return undefined
@@ -181,7 +181,7 @@ export function matchesComponentSFCInteractionHeldKeys(
   return true
 }
 
-/** Checks modifiers and ordinary held keys against one keyboard snapshot. */
+/** Проверяет модификаторы и обычные удерживаемые клавиши по одному snapshot клавиатуры. */
 export function matchesComponentSFCInteractionKeyboardCondition(
   expected: ComponentSFCInteractionKeyboardCondition | undefined,
   actual: Pick<ComponentSFCInteractionTriggerEvent, 'held' | 'modifiers'>,
@@ -264,7 +264,7 @@ function primaryModifierActive(
   return modifiers.ctrl || modifiers.meta
 }
 
-/** Backward-compatible editable wrappers. */
+/** Editable-обёртки для обратной совместимости. */
 export const normalizeComponentSFCEditTriggers = normalizeComponentSFCInteractionTriggers
 export const matchesComponentSFCEditTrigger = matchesComponentSFCInteractionTrigger
 export const resolveComponentSFCEditTriggerPlatform = resolveComponentSFCInteractionTriggerPlatform

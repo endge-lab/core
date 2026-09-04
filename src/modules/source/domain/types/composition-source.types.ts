@@ -126,9 +126,9 @@ export interface CompositionRuntimeDescriptor {
   name: string
   /** Полный публичный path runtime внутри Composition. */
   path: string
-  /** Internal path owning RuntimeScope. */
+  /** Внутренний путь, владеющий RuntimeScope. */
   scopePath: string
-  /** Source offsets used by authoring tools; runtime does not interpret them. */
+  /** Смещения Source для authoring-инструментов; runtime их не интерпретирует. */
   sourceLocations?: {
     runtime: { start: number, end: number }
     call: { start: number, end: number }
@@ -148,9 +148,9 @@ export interface CompositionRuntimeDescriptor {
   /** Локальный data alias child -> data alias owner Composition. */
   dataBindings?: Record<string, string>
   storeTo: CompositionStorePublication[]
-  /** Store data aliases receiving normalized Stream events. */
+  /** Псевдонимы данных Store, получающие нормализованные события Stream. */
   dispatchTo?: string[]
-  /** Optional Composition-owned event batching policy. */
+  /** Необязательная политика пакетной обработки событий, принадлежащая Composition. */
   batch?: {
     maxItems: number
     maxWaitMs: number
@@ -352,7 +352,7 @@ export interface CompositionRuntimeGraph {
   successes?: CompositionRuntimeSuccessConnection[]
   publications: CompositionRuntimePublicationConnection[]
   mounts: CompositionRuntimeMountConnection[]
-  /** Component semantic Event effects owned by this Composition. */
+  /** Семантические эффекты Event компонента, принадлежащие этой Composition. */
   events?: CompositionRuntimeEventConnection[]
 }
 

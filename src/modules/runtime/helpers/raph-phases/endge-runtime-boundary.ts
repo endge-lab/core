@@ -224,7 +224,7 @@ export function createBoundaryAggregationPhase(
   }
 }
 
-// ---------- TABLES phase (dirty -> nearest boundary -> root aggregation) ----------
+// ---------- фаза TABLES: dirty -> ближайшая граница -> агрегация корня ----------
 // Raph.addPhase(
 //   createBoundaryAggregationPhase(Raph.app.graph, {
 //     name: 'tables' as PhaseName,

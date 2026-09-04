@@ -44,10 +44,10 @@ export interface ComponentSFCCompileResult {
   /** Разложенный canonical source. */
   sourceParts: RComponentSFCSource_Parts
 
-  /** Parser-level AST. */
+  /** AST уровня parser. */
   ast: RComponentSFC_AST | null
 
-  /** Target-neutral semantic IR. */
+  /** Семантический IR, нейтральный к цели. */
   ir: RComponentSFC_IR | null
 
   /** Внешний контракт компонента. */
@@ -71,13 +71,13 @@ export interface ComponentSFCCompileResult {
   /** Публичная metadata компонента и его template-узлов. */
   metadata: ProgramMetadata
 
-  /** Per-section status; style errors do not invalidate template rendering. */
+  /** Статус каждой секции; ошибки style не отменяют отображение template. */
   sections: Record<'script' | 'template' | 'style', 'valid' | 'warning' | 'error'>
 }
 
 /** Внешний registry-контекст, который связывает чистый SFC compiler с domain build. */
 export interface ComponentSFCCompileOptions {
-  /** Stable persisted identity used for the component style scope id. */
+  /** Стабильный сохранённый идентификатор для scope id стилей компонента. */
   identity?: string
   /** Разрешает прямой пользовательский tag в identity компонента. */
   resolveComponentTag?: (tag: string) => string | null
@@ -85,19 +85,19 @@ export interface ComponentSFCCompileOptions {
   /** Проверяет существование статической identity из Component is. */
   hasComponentIdentity?: (identity: string) => boolean
 
-  /** Resolves and describes a default port provider for build-time validation. */
+  /** Определяет и описывает провайдер порта по умолчанию для проверки при сборке. */
   resolvePortProvider?: (
     identity: string,
     expectedKind: 'computation' | 'component' | 'action' | 'query',
   ) => ComponentSFCPortProviderDescriptor | null
 
-  /** Resolves the compiled public port manifest of a nested SFC component. */
+  /** Определяет скомпилированный публичный манифест портов вложенного SFC-компонента. */
   resolveComponentPortManifest?: (identity: string) => ComponentSFCPortManifest | null
 
-  /** Resolves explicit root variants of one nested custom component. */
+  /** Определяет явные корневые variants одного вложенного пользовательского компонента. */
   resolveComponentVariants?: (identity: string) => string[] | null
 
-  /** Resolves an external Type Registry definition used by a named SFC contract. */
+  /** Определяет внешнее объявление Type Registry для именованного контракта SFC. */
   resolveTypeDefinition?: (identity: string) => TypeSourceDefinition | null
 
   /** Effective edit-session defaults из immutable build context. */

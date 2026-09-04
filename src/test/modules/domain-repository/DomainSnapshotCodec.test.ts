@@ -5,7 +5,7 @@ import { DomainSnapshotCodec } from '@/modules/domain-repository/services/Domain
 import { EndgeDomain_Module } from '@/modules/domain/EndgeDomain_Module'
 import { RProject } from '@/modules/domain/entities/RProject'
 
-describe('domain snapshot codec', () => {
+describe('кодек snapshot домена', () => {
   /** Проверяет независимое восстановление Domain через единый локальный codec. */
   it('сериализует и десериализует persisted-сущности Domain', () => {
     const codec = Endge.domainSnapshot

@@ -30,7 +30,7 @@ export const LEGACY_CONTEXT_STORAGE_KEY = 'EndgeContext_Module'
 export const LEGACY_THEME_STORAGE_KEY = 'endge:theme'
 export const LEGACY_TIMEZONE_STORAGE_KEY = 'endge:isLocalTime'
 
-/** Built-in mock providers. Application-owned providers are registered at boot. */
+/** Встроенные mock-провайдеры. Провайдеры приложения регистрируются при запуске. */
 export const ENDGE_CORE_MOCK_PROVIDERS: EndgeMockProvider[] = []
 
 export const VARS_STORAGE_KEY = 'endge:vars'
@@ -38,7 +38,7 @@ export const AUTH_STORAGE_KEY = 'endge:auth'
 
 /** Ключ в Raph-хранилище для глобальных переменных. */
 export const STORAGE_VARS_KEY = 'vars'
-/** Raph namespace containing persistent and volatile Endge context values. */
+/** Пространство имён Raph с постоянными и временными значениями контекста Endge. */
 export const ENDGE_CONTEXT_RAPH_PATH = 'context'
 export const ENDGE_KEYBOARD_CONTEXT_RAPH_PATH = `${ENDGE_CONTEXT_RAPH_PATH}.input.keyboard`
 

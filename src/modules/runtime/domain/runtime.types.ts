@@ -10,7 +10,7 @@ import type { RStream } from '@/modules/domain/entities/RStream'
 import type { RuntimeHostRegistrySnapshot } from '@/modules/runtime/domain/runtime-registry.types'
 
 /**
- * Runtime kinds
+ * Виды runtime
  */
 export type RuntimeKind = 'query' | 'filter' | 'composition' | 'store' | 'stream' | 'action' | 'runtime'
 
@@ -38,7 +38,7 @@ export interface FilterChangeEvent {
 }
 
 /**
- * Query runtime events
+ * Runtime-события Query
  */
 export interface QueryRuntimeEvents {
   'filter:change': FilterChangeEvent
@@ -75,7 +75,7 @@ export interface ActionRuntimeEvents {
 }
 
 /**
- * Runtime profile types
+ * Типы runtime-профилей
  */
 export interface RuntimeProfile<
   K extends RuntimeKind,
@@ -86,7 +86,7 @@ export interface RuntimeProfile<
 }
 
 /**
- * Profiles registry
+ * Реестр профилей
  */
 export interface RuntimeProfiles {
   query: RuntimeProfile<'query', QueryRuntimeEvents>

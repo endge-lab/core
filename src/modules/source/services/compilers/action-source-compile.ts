@@ -41,7 +41,7 @@ interface BlockContext {
   inputRead: 'action' | 'operation-run' | 'operation-undo' | 'operation-redo'
 }
 
-/** Compiles one canonical defineAction source into deterministic sequential IR. */
+/** Компилирует один канонический source defineAction в детерминированный последовательный IR. */
 export function compileActionSource(input: ActionSourceCompileInput): ActionSourceCompileResult {
   const diagnostics: DiagnosticDraft[] = []
   const dependencies: ProgramDependency[] = []
@@ -372,7 +372,7 @@ function compileActionExpression(
   available: Set<string>,
   inputRead: BlockContext['inputRead'],
 ): SourceExpressionIR | null {
-  // The compiler owns this parsed AST. Transform it in place so diagnostics retain exact source offsets.
+  // Компилятор владеет разобранным AST. Изменяем его на месте, чтобы диагностика сохраняла точные смещения в исходнике.
   const node = raw
   walk(node, (current) => {
     if (!t.isCallExpression(current) || !t.isIdentifier(current.callee)) {

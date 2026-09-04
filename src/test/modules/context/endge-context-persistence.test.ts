@@ -5,12 +5,12 @@ import { DisabledContextAdapter } from '@/modules/context/persistence/adapters/D
 import { LocalStorageContextAdapter } from '@/modules/context/persistence/adapters/LocalStorageContextAdapter'
 import { buildRuntimeStateStorageKey, RuntimeStateController } from '@/modules/context/persistence/RuntimeStateController'
 
-describe('endgeContext persistence', () => {
+describe('сохранение EndgeContext', () => {
   beforeEach(() => {
     installLocalStorageMock()
   })
 
-  it('keeps workspace unresolved until the backend selects it', () => {
+  it('оставляет Workspace неразрешённым, пока его не выберет backend', () => {
     const context = new EndgeContext_Module()
     context.deserialize(undefined)
 
@@ -19,7 +19,7 @@ describe('endgeContext persistence', () => {
     expect(() => context.getPersistenceScope()).toThrow('Active workspace has not been loaded')
   })
 
-  it('normalizes empty non-workspace scope values to defaults', () => {
+  it('нормализует пустые значения scope вне Workspace к значениям по умолчанию', () => {
     const context = new EndgeContext_Module()
 
     context.setCurrentWorkspace('workspace-a')
@@ -37,7 +37,7 @@ describe('endgeContext persistence', () => {
     })
   })
 
-  it('uses session provider for user and tenant scope', () => {
+  it('использует провайдер сессии для scope пользователя и Tenant', () => {
     const context = new EndgeContext_Module()
     context.setCurrentWorkspace('workspace-a')
     context.setCurrentProject('project-a')
@@ -55,7 +55,7 @@ describe('endgeContext persistence', () => {
     })
   })
 
-  it('keeps structural coordinates immutable until reset', () => {
+  it('сохраняет структурные координаты неизменяемыми до reset', () => {
     const context = new EndgeContext_Module()
     context.setup({
       dataProvider: 'plain',
@@ -72,7 +72,7 @@ describe('endgeContext persistence', () => {
     expect(context.getCurrentProject()).toBe('project-b')
   })
 
-  it('serializes new context fields and reads legacy snapshots', () => {
+  it('сериализует новые поля контекста и читает legacy snapshots', () => {
     const context = new EndgeContext_Module()
 
     context.deserialize({
@@ -93,7 +93,7 @@ describe('endgeContext persistence', () => {
     })
   })
 
-  it('resolves Workspace data mode with a non-persisted host override', async () => {
+  it('разрешает режим данных Workspace с несохраняемым переопределением host', async () => {
     const context = new EndgeContext_Module()
     context.deserialize({ project: 'project-a', environment: 'prod' })
     await Promise.resolve()
@@ -122,7 +122,7 @@ describe('endgeContext persistence', () => {
     expect(context.isDataModeOverridden).toBe(false)
   })
 
-  it('builds runtime storage keys from full scope and encodes ids', () => {
+  it('строит ключи runtime-хранилища из полного scope и кодирует ID', () => {
     const scope = {
       workspaceId: 'workspace/a',
       tenantId: 'tenant a',
@@ -139,7 +139,7 @@ describe('endgeContext persistence', () => {
     )
   })
 
-  it('stores runtime sections independently in local storage', () => {
+  it('хранит секции runtime независимо в локальном хранилище', () => {
     const controller = new RuntimeStateController({
       runtimeId: 'runtime-main',
       scope: {
@@ -164,7 +164,7 @@ describe('endgeContext persistence', () => {
     expect(controller.get('table:flights', 'pin', [])).toEqual([{ key: 'number', side: 'left' }])
   })
 
-  it('separates active runtime id from durable storage id', () => {
+  it('отделяет ID активного runtime от ID долговременного хранилища', () => {
     const scope = {
       workspaceId: 'workspace',
       tenantId: 'tenant',
@@ -193,7 +193,7 @@ describe('endgeContext persistence', () => {
     expect(second.get('filter:schedule', 'state', {})).toEqual({ airlineCodes: ['SU'] })
   })
 
-  it('isolates durable state when any context dimension changes', () => {
+  it('изолирует долговременное состояние при изменении любого измерения контекста', () => {
     const base = {
       workspaceId: 'workspace',
       tenantId: 'tenant',
@@ -208,7 +208,7 @@ describe('endgeContext persistence', () => {
     expect(keys).not.toContain(buildRuntimeStateStorageKey(base, 'schedule-filter'))
   })
 
-  it('disabled adapter always returns fallback and does not write', () => {
+  it('отключённый адаптер всегда возвращает резервное значение и ничего не записывает', () => {
     const adapter = new DisabledContextAdapter()
     const controller = new RuntimeStateController({
       runtimeId: 'runtime-main',
@@ -227,7 +227,7 @@ describe('endgeContext persistence', () => {
     expect(controller.get('table:flights', 'sort', [])).toEqual([])
   })
 
-  it('notifies subscribers when locale changes', () => {
+  it('уведомляет подписчиков при изменении локали', () => {
     const context = new EndgeContext_Module()
     context.deserialize(undefined)
     const listener = vi.fn()
@@ -240,7 +240,7 @@ describe('endgeContext persistence', () => {
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
-  it('persists the current user theme inside the context snapshot', async () => {
+  it('сохраняет текущую пользовательскую тему внутри snapshot контекста', async () => {
     const context = new EndgeContext_Module()
     context.deserialize(undefined)
     await Promise.resolve()

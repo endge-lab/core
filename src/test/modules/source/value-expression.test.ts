@@ -23,8 +23,8 @@ function compile(source: string) {
   return expression!
 }
 
-describe('valueExpression', () => {
-  it('is available in DataView map expressions while structural steps stay domain-specific', () => {
+describe('выражение ValueExpression', () => {
+  it('доступно в выражениях map DataView, пока структурные шаги остаются доменно-специфичными', () => {
     const source = `
 defineDataView({
   mode: 'pipeline',
@@ -59,7 +59,7 @@ defineDataView({
     }])).toEqual([{ activeIds: [1, 2], title: 'Board' }])
   })
 
-  it('compiles Composition bindings with domain readers and common chains', () => {
+  it('компилирует bindings Composition с доменными readers и общими цепочками', () => {
     const result = compileCompositionSource(`
 defineComposition({
   data: {},
@@ -92,7 +92,7 @@ defineComposition({
     })
   })
 
-  it('is available in Query request payload and response outputs', () => {
+  it('доступно в payload запроса Query и outputs response', () => {
     const result = compileQuerySource(`
 defineQuery({
   kind: 'rest',
@@ -150,7 +150,7 @@ defineQuery({
     ])
   })
 
-  it('compiles and evaluates immutable dot chains', () => {
+  it('компилирует и вычисляет иммутабельные цепочки через точку', () => {
     const expression = compile(`
 prop('flights')
   .where(and(inList(get('status'), ['active']), gt(get('delay'), 5)))
@@ -172,7 +172,7 @@ prop('flights')
     ])
   })
 
-  it('supports object, collection, aggregate and string operations from one registry', () => {
+  it('поддерживает операции объектов, коллекций, агрегации и строк из одного реестра', () => {
     const expression = compile(`
 prop('rows')
   .uniqBy(get('id'))
@@ -197,7 +197,7 @@ prop('rows')
     })).toBe('hello-world')
   })
 
-  it('keeps legacy pick(path) behavior and supports pick(keys)', () => {
+  it('сохраняет legacy-поведение pick(path) и поддерживает pick(keys)', () => {
     expect(evaluateValueExpression(compile(`prop('row').pick('nested.value')`), {
       props: { row: { nested: { value: 42 } } },
     })).toBe(42)
@@ -207,7 +207,7 @@ prop('rows')
     })).toEqual({ id: 1 })
   })
 
-  it('supports relational joins with alternative keys and record coalescing', () => {
+  it('поддерживает реляционные соединения с альтернативными ключами и объединением записей', () => {
     const expression = compile(`
 fullJoin(prop('arrival'), prop('departure'))
   .byAny('arrivalLeg.id', 'departureLeg.id')
@@ -261,7 +261,7 @@ fullJoin(prop('arrival'), prop('departure'))
     ])
   })
 
-  it('enriches existing branches through indexed one-to-one and one-to-many lookups', () => {
+  it('обогащает существующие ветви через индексированные поиски один-к-одному и один-ко-многим', () => {
     const expression = compile(`
 fullJoin('pairsArrival', 'pairsDeparture')
   .byAny('arrivalLeg.id', 'departureLeg.id')
@@ -330,7 +330,7 @@ fullJoin('pairsArrival', 'pairsDeparture')
     })
   })
 
-  it('warns once when lookupOne finds duplicate records for one key', () => {
+  it('однократно предупреждает, когда lookupOne находит повторяющиеся записи для одного ключа', () => {
     const warnings: any[] = []
     const expression = compile(`
 prop('rows').enrich('leg', {

@@ -376,7 +376,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     return this.getArtifactPayload()?.previewOptions ?? null
   }
 
-  /** Subscribes to one public Event port of this mounted component instance. */
+  /** Подписывается на один публичный порт Event смонтированного экземпляра компонента. */
   public onEventPort(name: string, listener: (occurrence: ComponentSFCEventOccurrence) => void): () => void {
     const key = String(name ?? '').trim()
     if (!key) {
@@ -393,12 +393,12 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     }
   }
 
-  /** Emits an own/public Event through the root Component SFC boundary. */
+  /** Отправляет собственный публичный Event через корневую границу Component SFC. */
   public async emitEventPort(name: string, payload: unknown, source?: ComponentSFCEventRuntimeSource): Promise<void> {
     await this._emitRootEventPort(name, payload, source, [], 0)
   }
 
-  /** Executes one compiler-linked Event reaction for a renderer boundary. */
+  /** Выполняет одну связанную компилятором реакцию Event для границы renderer. */
   public async executeEventPortAction(
     ownerIdentity: string,
     port: ComponentSFCEventPort,
@@ -496,7 +496,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     }
   }
 
-  /** Publishes an already routed root Event without using the global Endge.events bus. */
+  /** Публикует уже маршрутизированный корневой Event без глобальной шины Endge.events. */
   public publishEventPort(name: string, payload: unknown, source?: ComponentSFCEventRuntimeSource): void {
     const occurrence: ComponentSFCEventOccurrence = {
       componentIdentity: this.entityIdentity,
@@ -565,7 +565,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     this.emit('resource:dirty', { kind: 'editable', action: 'cancel', key: sessionKey })
   }
 
-  /** Returns one host-owned computation resource isolated by renderer consumer scope. */
+  /** Возвращает один ресурс вычислений, принадлежащий host и изолированный scope потребителя renderer. */
   public getComputationResource(
     identity: string,
     input: unknown,
@@ -987,7 +987,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     this._bindRaphBoundaryInputSource(input, deps.boundaries)
   }
 
-  /** Context dependencies are Raph-backed and do not depend on the component props input kind. */
+  /** Зависимости контекста основаны на Raph и не зависят от вида входных props компонента. */
   private _bindRaphContextSources(): void {
     if (!this.node) {
       return
@@ -1013,7 +1013,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   }
 
   private _observeContextPath(node: RaphNode, path: string[]): void {
-    // Configuration is immutable for one build and deliberately not published to Raph.
+    // Configuration неизменяема в рамках одной сборки и намеренно не публикуется в Raph.
     if (path[0] === 'config') {
       return
     }

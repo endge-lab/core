@@ -4,8 +4,8 @@ import { describe, expect, it } from 'vitest'
 import { compileComponentSFC } from '@/modules/compiler/services/component-sfc/component-sfc-compile'
 import { normalizeComponentSFCTableSort } from '@/modules/compiler/services/component-sfc/component-sfc-table-sort'
 
-describe('component SFC table sorting', () => {
-  it('uses natural comparator for sortable columns without explicit sort', () => {
+describe('сортировка таблицы Component SFC', () => {
+  it('использует естественный comparator для сортируемых колонок без явной сортировки', () => {
     const result = compileComponentSFC(createTableSource(`
       <Column key="number" title="Flight" sortable />
     `))
@@ -22,7 +22,7 @@ describe('component SFC table sorting', () => {
     ])
   })
 
-  it('parses explicit comparator and comma-separated sort-by paths', () => {
+  it('разбирает явный comparator и разделённые запятыми пути sort-by', () => {
     const result = compileComponentSFC(createTableSource(`
       <Column key="flight" title="Flight" sortable sort-by="flightCarrier, flightNumber" />
       <Column key="std" title="STD" sortable sort="date" />
@@ -44,7 +44,7 @@ describe('component SFC table sorting', () => {
     ])
   })
 
-  it('reports invalid comparator', () => {
+  it('сообщает о невалидном comparator', () => {
     const result = compileComponentSFC(createTableSource(`
       <Column key="std" title="STD" sortable sort="weekday" />
     `))
@@ -57,7 +57,7 @@ describe('component SFC table sorting', () => {
     ]))
   })
 
-  it('reports invalid default-sort direction and missing sortable column', () => {
+  it('сообщает о невалидном направлении default-sort и отсутствующей сортируемой колонке', () => {
     const result = compileComponentSFC(createTableSource(`
       <Column key="std" title="STD" sortable sort="date" />
       <Column key="route" title="Route" />

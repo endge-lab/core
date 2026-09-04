@@ -1,7 +1,7 @@
 import type { ImplementationProvider } from '@/modules/runtime/domain/implementation.types'
 import { ImplementationError } from '@/modules/runtime/domain/implementation.types'
 
-/** Owns executable provider functions; providers are never persisted. */
+/** Владеет исполняемыми функциями провайдеров; провайдеры никогда не сохраняются. */
 export class ImplementationProviderRegistry {
   private readonly _providers = new Map<string, ImplementationProvider>()
 

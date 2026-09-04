@@ -35,7 +35,7 @@ export interface StoreUpdateHandlerDescriptor {
   eventTypes: string[]
 }
 
-/** Runtime-ready Store source artifact v1. */
+/** Готовый для runtime артефакт source Store v1. */
 export interface StoreSourceArtifact extends StoreSourceDocument {
   type: 'store'
   sourceVersion: number

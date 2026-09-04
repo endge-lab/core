@@ -7,7 +7,7 @@ import {
   resolveComponentSFCInteractionTriggerPlatform,
 } from '@/modules/domain/component/component-sfc-edit-trigger'
 
-/** Resolves the nearest active Operation History along runtime-scope ancestry. */
+/** Определяет ближайшую активную Operation History по иерархии runtime-scope. */
 export class EndgeOperations {
   private readonly _histories = new Map<string, { scope: RuntimeScope, history: OperationHistory }>()
   private _latestScopeId: string | null = null

@@ -5,13 +5,13 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Endge } from '@/kernel/endge'
 import { RComponentSFC } from '@/modules/domain/entities/RComponentSFC'
 
-describe('endge runtime persistence integration', () => {
+describe('интеграция сохранения runtime Endge', () => {
   afterEach(() => {
     Endge.runtime.reset()
     Raph.app.reset()
   })
 
-  it('uses explicit runtime id and attaches runtime state controller', () => {
+  it('использует явный ID runtime и подключает контроллер состояния runtime', () => {
     const host = Endge.runtime.execute(createSFCModel(), {
       id: 'test-runtime',
       persistence: 'disabled',
@@ -23,7 +23,7 @@ describe('endge runtime persistence integration', () => {
     expect(host?.status).toBe('active')
   })
 
-  it('rejects duplicate active runtime ids and allows reuse after destroy', () => {
+  it('отклоняет дублирующиеся ID активных runtime и разрешает повторное использование после destroy', () => {
     const first = Endge.runtime.execute(createSFCModel('first'), {
       id: 'duplicate-runtime',
       persistence: 'disabled',

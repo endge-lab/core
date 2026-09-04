@@ -4,11 +4,11 @@ import { Endge } from '@/kernel/endge'
 import { RQuery } from '@/modules/domain/entities/RQuery'
 import { prepareTestCompilerContext, resetTestCompilerContext } from '@/test/helpers/compiler-context'
 
-describe('endgeCompiler metadata artifact envelope', () => {
+describe('оболочка метаданных артефакта EndgeCompiler', () => {
   beforeEach(() => prepareTestCompilerContext())
   afterEach(() => resetTestCompilerContext())
 
-  it('publishes source metadata outside the transport payload', () => {
+  it('публикует метаданные Source вне transport payload', () => {
     const query = new RQuery()
     query.id = 1
     query.identity = 'flights'

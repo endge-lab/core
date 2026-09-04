@@ -5,7 +5,7 @@ import { Exclude, Expose } from 'class-transformer'
 
 import { REntity } from '@/modules/domain/entities/REntity'
 
-/** Persisted source-first definition of a normalized event stream. */
+/** Сохранённое source-first определение нормализованного потока событий. */
 export class RStream extends REntity {
   @Exclude()
   readonly type = 'stream' as const

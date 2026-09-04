@@ -8,8 +8,8 @@ import {
   normalizeEndgeConfiguration,
 } from '@/modules/configuration/domain/endge-configuration'
 
-describe('endge configuration cascade', () => {
-  it('uses en locales and the dark theme when defaults are not set', () => {
+describe('каскад Configuration Endge', () => {
+  it('использует локаль en и тёмную тему, если значения по умолчанию не заданы', () => {
     const configuration = createDefaultEndgeConfiguration()
     const result = normalizeEndgeConfiguration({
       ...configuration,
@@ -23,7 +23,7 @@ describe('endge configuration cascade', () => {
     expect(result.defaultTheme).toBe('dark')
   })
 
-  it('applies keyed upserts, removals and scalar overrides', () => {
+  it('применяет upsert по ключам, удаления и скалярные переопределения', () => {
     const contribution: EndgeConfigurationContribution = {
       mode: 'inherit',
       patch: {
@@ -42,7 +42,7 @@ describe('endge configuration cascade', () => {
     expect(result.defaultTheme).toBe('airport')
   })
 
-  it('resets accumulated values in replace mode', () => {
+  it('сбрасывает накопленные значения в режиме replace', () => {
     const replacement = createDefaultEndgeConfiguration()
     replacement.vars = [{ name: 'ONLY', defaultValue: 'replacement' }]
     const result = applyEndgeConfigurationContribution(
@@ -52,7 +52,7 @@ describe('endge configuration cascade', () => {
     expect(result.vars).toEqual([{ name: 'ONLY', defaultValue: 'replacement' }])
   })
 
-  it('resolves workspace, tenant, project and environment contributions in order', () => {
+  it('последовательно разрешает вклады Workspace, Tenant, Project и Environment', () => {
     const workspace = createDefaultEndgeConfiguration()
     const tenant = applyEndgeConfigurationContribution(workspace, {
       mode: 'inherit',
@@ -79,7 +79,7 @@ describe('endge configuration cascade', () => {
     expect(environment.vars).toEqual([{ name: 'ACCENT', defaultValue: 'environment' }])
   })
 
-  it('adds diagnostics defaults to legacy configuration and merges collection patches', () => {
+  it('добавляет значения диагностики по умолчанию в legacy Configuration и объединяет patches коллекций', () => {
     const defaults = createDefaultEndgeConfiguration()
     const result = applyEndgeConfigurationContribution(defaults, {
       mode: 'inherit',
@@ -109,7 +109,7 @@ describe('endge configuration cascade', () => {
     })
   })
 
-  it('merges outputs, routes and automatic snapshot policy by cascade layer', () => {
+  it('объединяет outputs, routes и политику автоматических snapshots по слоям каскада', () => {
     const result = applyEndgeConfigurationContribution(createDefaultEndgeConfiguration(), {
       mode: 'inherit',
       patch: {
@@ -145,11 +145,11 @@ describe('endge configuration cascade', () => {
     expect(result.diagnostics.snapshots.automatic).toMatchObject({ enabled: true, outputIds: ['output-1', 'output-2'] })
   })
 
-  it('creates a deterministic context hash', () => {
+  it('создаёт детерминированный hash контекста', () => {
     expect(createEndgeContextHash({ b: 2, a: 1 })).toBe(createEndgeContextHash({ a: 1, b: 2 }))
   })
 
-  it('adds tooltip defaults to legacy configuration documents', () => {
+  it('добавляет значения tooltip по умолчанию в legacy-документы Configuration', () => {
     const configuration = createDefaultEndgeConfiguration()
     const result = normalizeEndgeConfiguration({ ...configuration, tooltips: undefined })
 
@@ -161,7 +161,7 @@ describe('endge configuration cascade', () => {
     })
   })
 
-  it('merges tooltip fields independently across cascade layers', () => {
+  it('независимо объединяет поля tooltip между слоями каскада', () => {
     const workspace = createDefaultEndgeConfiguration()
     const tenant = applyEndgeConfigurationContribution(workspace, {
       mode: 'inherit',
@@ -180,7 +180,7 @@ describe('endge configuration cascade', () => {
     expect(workspace.tooltips.side).toBe('right')
   })
 
-  it('rejects invalid tooltip behavior', () => {
+  it('отклоняет невалидное поведение tooltip', () => {
     const configuration = createDefaultEndgeConfiguration()
     expect(() => normalizeEndgeConfiguration({
       ...configuration,

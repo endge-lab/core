@@ -1,7 +1,7 @@
 import type { ProgramMetadataMap } from '@/modules/program/domain/types/program-metadata.types'
 import type { TypeSourceExpression } from '@/modules/source/domain/types/type-source.types'
 
-/** Type Registry identity used by Query/Filter field contracts. */
+/** Identity Type Registry для контрактов полей Query и Filter. */
 export type SourceFieldType
   = | 'String'
     | 'Number'
@@ -234,7 +234,7 @@ export interface QueryProgramProp extends SourceFieldDefinition {
 
 /** Контекст вычисления безопасного source expression. */
 export interface SourceExpressionContext {
-  /** Resolves an env(name) read without exposing the workspace to the evaluator. */
+  /** Разрешает чтение env(name), не предоставляя workspace вычислителю. */
   environment?: (name: string) => unknown
   props?: Record<string, unknown>
   values?: Record<string, unknown>

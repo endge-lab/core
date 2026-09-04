@@ -4,8 +4,8 @@ import { compileCompositionSource } from '@/modules/source/services/compilers/co
 import { CompositionSourceLanguageStrategy } from '@/modules/source/services/strategies/CompositionSourceLanguageStrategy'
 import { TypeSourceLanguageStrategy } from '@/modules/source/services/strategies/TypeSourceLanguageStrategy'
 
-describe('source language normalization', () => {
-  it('canonicalizes quoted Type Source references without changing string values', () => {
+describe('нормализация языка Source', () => {
+  it('канонизирует заключённые в кавычки ссылки Type Source без изменения строковых значений', () => {
     const strategy = new TypeSourceLanguageStrategy()
     const source = `defineType({
   // Keep this author comment.
@@ -20,7 +20,7 @@ describe('source language normalization', () => {
 })`)
   })
 
-  it('canonicalizes only defineProps field types in Composition Source', () => {
+  it('канонизирует только типы полей defineProps в Source Composition', () => {
     const strategy = new CompositionSourceLanguageStrategy()
     const source = `defineComposition({
   props: defineProps({
@@ -43,7 +43,7 @@ describe('source language normalization', () => {
 })`)
   })
 
-  it('compiles bare field types in Composition defineProps', () => {
+  it('компилирует типы полей без кавычек в defineProps Composition', () => {
     const source = new CompositionSourceLanguageStrategy().normalize(`defineComposition({
       props: defineProps({ customer: field('Customer').optional() }),
       runtimes: {},

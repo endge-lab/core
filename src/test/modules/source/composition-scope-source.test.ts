@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { compileCompositionSource } from '@/modules/source/services/compilers/composition-source-compile'
 
-describe('composition scope source', () => {
-  it('flattens resources, nested scopes and activation overrides deterministically', () => {
+describe('проверка Source области Composition', () => {
+  it('детерминированно разворачивает ресурсы, вложенные scopes и переопределения активации', () => {
     const result = compileCompositionSource(`
 defineComposition({
   activateOn: startup(),
@@ -49,7 +49,7 @@ defineComposition({
     ])
   })
 
-  it('rejects onMount hooks targeting a manual runtime', () => {
+  it('отклоняет hooks onMount, нацеленные на ручной runtime', () => {
     const result = compileCompositionSource(`
 defineComposition({
   runtimes: {

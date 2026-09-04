@@ -16,8 +16,8 @@ function createBootContext(): EndgeBootContext {
   }
 }
 
-describe('endgeFederation stages', () => {
-  it('runs module stages in registration order', async () => {
+describe('этапы EndgeFederation', () => {
+  it('выполняет этапы модулей в порядке регистрации', async () => {
     const calls: string[] = []
 
     class TestModule extends EndgeModule {
@@ -70,7 +70,7 @@ describe('endgeFederation stages', () => {
     expect(calls).toHaveLength(8)
   })
 
-  it('resets modules in reverse order and reports cleanup errors', async () => {
+  it('сбрасывает модули в обратном порядке и сообщает об ошибках очистки', async () => {
     const calls: string[] = []
 
     class ResetModule extends EndgeModule {
@@ -103,7 +103,7 @@ describe('endgeFederation stages', () => {
     expect(TestFederation.state).toBe('failed')
   })
 
-  it('reuses boot context for repeated lifecycle stages', async () => {
+  it('повторно использует контекст запуска для повторяющихся этапов жизненного цикла', async () => {
     const calls: string[] = []
 
     class BuildModule extends EndgeModule {
@@ -129,7 +129,7 @@ describe('endgeFederation stages', () => {
     await expect(TestFederation.build()).rejects.toThrow('[TestFederation] boot context is not available')
   })
 
-  it('orders constrained modules before their targets', async () => {
+  it('располагает модули с ограничениями перед их целями', async () => {
     const calls: string[] = []
 
     class TestModule extends EndgeModule {
@@ -166,7 +166,7 @@ describe('endgeFederation stages', () => {
     expect(calls).toEqual(['compiler', 'vue', 'runtime', 'vars'])
   })
 
-  it('installs plugins during federation configuration', async () => {
+  it('устанавливает плагины во время конфигурации федерации', async () => {
     const calls: string[] = []
 
     class TestModule extends EndgeModule {
@@ -207,7 +207,7 @@ describe('endgeFederation stages', () => {
     expect(calls).toEqual(['vue', 'runtime'])
   })
 
-  it('keeps schema before domain in core modules', () => {
+  it('сохраняет schema перед domain в модулях Core', () => {
     const keys = ENDGE_CORE_MODULES.map(item => item.key)
 
     expect(keys.indexOf('domainRepository')).toBeGreaterThanOrEqual(0)

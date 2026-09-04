@@ -10,7 +10,7 @@ import { RTenant } from '@/modules/domain/entities/RTenant'
 import { RVocabs } from '@/modules/domain/entities/RVocabs'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
-describe('source-first Vocab', () => {
+describe('проверка Vocab с приоритетом Source', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     Endge.program.clear()
@@ -22,7 +22,7 @@ describe('source-first Vocab', () => {
     Raph.delete('vocabs.airlines-payload')
   })
 
-  it('compiles Payload, Mock dot-path and ordered transforms', () => {
+  it('компилирует Payload, dot-path Mock и упорядоченные transforms', () => {
     const result = Endge.source.compile('vocab', `
 defineVocab({
   provider: payload({
@@ -55,7 +55,7 @@ defineVocab({
     })
   })
 
-  it('uses [] in mock mode without touching Payload or auth when mock is absent', async () => {
+  it('использует [] в mock-режиме, не затрагивая Payload и auth при отсутствии Mock', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
     const vocab = makeVocab(`
 defineVocab({
@@ -78,7 +78,7 @@ defineVocab({
     expect(Raph.get('vocabs.airlines-payload')).toEqual([])
   })
 
-  it('reads explicit Mock dot-path and passes Converter options once for the whole value', async () => {
+  it('читает явный dot-path Mock и однократно передаёт настройки Converter для всего значения', async () => {
     const converter = new RConverter()
     converter.id = 3
     converter.identity = 'append-item'
@@ -118,7 +118,7 @@ defineVocab({
     expect(handler).toHaveBeenCalledWith([{ code: 'SU' }], { tail: 'done' })
   })
 
-  it('aggregates paginated Payload docs before applying outputs', async () => {
+  it('объединяет страницы документов Payload до применения outputs', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(response({ docs: [{ code: 'SU' }], hasNextPage: true, nextPage: 2 }))
       .mockResolvedValueOnce(response({ docs: [{ code: 'FV' }], totalPages: 2 }))
@@ -144,7 +144,7 @@ defineVocab({
     expect(fetchSpy.mock.calls[1]?.[0]).toBe('https://payload.example/airlines-payload?limit=1000&page=2')
   })
 
-  it('reports a missing explicit Mock path', async () => {
+  it('сообщает об отсутствующем явном пути Mock', async () => {
     const mock = new RMock()
     mock.id = 4
     mock.identity = 'fixtures'
@@ -166,7 +166,7 @@ defineVocab({
       .toThrow('путь "lookups.airlines" отсутствует')
   })
 
-  it('rejects async Converter handlers', () => {
+  it('отклоняет асинхронные handlers Converter', () => {
     const converter = new RConverter()
     converter.identity = 'async-converter'
     converter.setCustom(async value => value)
@@ -174,7 +174,7 @@ defineVocab({
     expect(() => converter.convert([])).toThrow('Async converter "async-converter" is not supported')
   })
 
-  it('patches Mock binding without rewriting the rest of source', () => {
+  it('изменяет binding Mock без перезаписи остального Source', () => {
     const source = `defineVocab({\n  // author note\n  outputs: { items: output().from(response()) },\n})\n`
     const patched = Endge.source.patch('vocab', source, {
       mock: { identity: 'fixtures', path: 'airlines' },

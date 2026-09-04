@@ -12,7 +12,7 @@ const SCOPE_WEIGHT = {
   invocation: 5,
 } as const
 
-/** Resolves explicit bindings without relying on registration order. */
+/** Разрешает явные bindings без зависимости от порядка регистрации. */
 export class ImplementationBindingRegistry {
   private readonly _bindings = new Set<ImplementationBinding>()
 

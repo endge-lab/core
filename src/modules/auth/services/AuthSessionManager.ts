@@ -36,7 +36,7 @@ export class AuthSessionManager {
     this._now = _dependencies.now ?? (() => Date.now())
   }
 
-  /** Identity default runtime profile. */
+  /** Runtime-профиль идентификации по умолчанию. */
   public get profileIdentity(): string | null {
     return this._defaultProfile?.identity ?? null
   }

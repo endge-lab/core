@@ -35,7 +35,7 @@ export class ComputationRuntimeError extends Error {
   }
 }
 
-/** Executes compiler-ordered computation graphs without evaluating authored JS in core. */
+/** Выполняет упорядоченные компилятором графы computation без вычисления пользовательского JS в core. */
 export class ComputationGraphExecutor {
   constructor(
     private readonly _sandbox: () => ComputationSandboxAdapter | null,

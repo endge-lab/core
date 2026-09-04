@@ -33,7 +33,7 @@ export interface ComponentSFCPortAnalysisOptions {
   resolveTypeDefinition?: (identity: string) => TypeSourceDefinition | null
 }
 
-/** Compiles one direct reaction or a non-empty ordered reaction array. */
+/** Компилирует одну прямую реакцию или непустой упорядоченный массив реакций. */
 export function compileComponentSFCLocalEventActions(
   eventName: string,
   source: string,
@@ -80,7 +80,7 @@ export function compileComponentSFCLocalEventActions(
   return actions.length === expression.elements.length ? actions : []
 }
 
-/** Compiles the safe reaction grammar used by local `@event` template bindings. */
+/** Компилирует безопасную грамматику реакций для локальных template bindings `@event`. */
 export function compileComponentSFCLocalEventAction(
   eventName: string,
   source: string,
@@ -210,7 +210,7 @@ export interface ComponentSFCPortAnalysisResult {
   bindingName: string | null
 }
 
-/** Parses `definePorts` and top-level computation port locals from script setup. */
+/** Разбирает `definePorts` и локальные порты вычислений верхнего уровня из script setup. */
 export function analyzeComponentSFCPorts(
   script: RComponentSFC_AST_Script | null,
   dependencies: RComponentDependencies,

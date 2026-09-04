@@ -15,7 +15,7 @@ export interface RComponentRef {
   /** Идентификатор компонента внутри выбранного хранилища. */
   id: string | number
 
-  /** Semantic dependency role in the compiled artifact. */
+  /** Семантическая роль зависимости в скомпилированном артефакте. */
   role?: 'child-component' | 'port-default-component' | 'port-override-component'
 }
 
@@ -97,7 +97,7 @@ export interface RComponentDependencies {
   /** Дочерние компоненты, на которые ссылается template. */
   components: RComponentRef[]
 
-  /** Computation providers required by source ports. */
+  /** Провайдеры Computation, требуемые портами Source. */
   computations: RComputationRef[]
 
   /** Действия, которые вызываются из handlers или bindings. */

@@ -22,7 +22,7 @@ import { evaluateSourceExpression } from '@/modules/source/services/source-expre
 import { ComputationGraphExecutor, ComputationRuntimeError } from './ComputationGraphExecutor'
 import { ComputationResourceState } from './ComputationResource'
 
-/** Executes compiled computation graphs and creates renderer-neutral resources. */
+/** Выполняет скомпилированные графы computation и создаёт нейтральные к renderer ресурсы. */
 export class EndgeComputation {
   private readonly _definitions = new Map<string, { identity: string, origin: EntityOrigin, defaultProviderKey?: string, execution?: 'sync' | 'async' }>()
   private readonly _providers = new Map<string, ComputationOverride>()
@@ -50,7 +50,7 @@ export class EndgeComputation {
       || this._definitions.has(identity)
   }
 
-  /** Installs a serializable code-owned Computation definition. */
+  /** Устанавливает сериализуемое определение Computation из кода. */
   public define(definition: { identity: string, origin: EntityOrigin, defaultProviderKey?: string, execution?: 'sync' | 'async' }): VoidFunction {
     const identity = String(definition.identity ?? '').trim()
     if (!identity) {
@@ -71,7 +71,7 @@ export class EndgeComputation {
     return dispose
   }
 
-  /** Installs executable code separately from a Computation definition. */
+  /** Устанавливает исполняемый код отдельно от определения Computation. */
   public provide(provider: { identity: string, key: string, origin?: EntityOrigin, implementation: ComputationOverride }): VoidFunction {
     const identity = String(provider.identity ?? '').trim()
     if (!Endge.domain.getComputation(identity) && !Endge.program.getComputationArtifact(identity) && !this._definitions.has(identity)) {
@@ -97,7 +97,7 @@ export class EndgeComputation {
     return dispose
   }
 
-  /** Selects one previously provided implementation without redefining semantics. */
+  /** Выбирает ранее предоставленную реализацию без переопределения семантики. */
   public override(binding: {
     identity: string
     providerKey: string
@@ -139,7 +139,7 @@ export class EndgeComputation {
     this._sandbox = adapter
   }
 
-  /** Executes an already compiler-validated function in the shared isolated sandbox. */
+  /** Выполняет уже проверенную компилятором функцию в общем изолированном sandbox. */
   public async executeSandbox(request: ComputationSandboxRequest): Promise<unknown> {
     if (!this._sandbox) {
       throw new ComputationRuntimeError('Computation sandbox adapter is not registered.', request.computationIdentity, 'sandbox-missing')

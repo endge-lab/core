@@ -19,8 +19,8 @@ export interface CompositionI18nCatalogProjectionInput {
 }
 
 /**
- * Projects effective i18n catalogs from compiled Composition artifacts only.
- * No RuntimeHost, lifecycle hook or authored runtime source is executed.
+ * Проецирует фактические каталоги i18n только из скомпилированных артефактов Composition.
+ * RuntimeHost, lifecycle-хуки и пользовательский runtime source не выполняются.
  */
 export function projectCompositionI18nCatalogs(
   input: CompositionI18nCatalogProjectionInput,

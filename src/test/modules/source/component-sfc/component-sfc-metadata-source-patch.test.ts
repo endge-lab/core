@@ -20,8 +20,8 @@ const rows = []
 </template>
 `
 
-describe('component SFC metadata source patch', () => {
-  it('reads and replaces component-level defineMetadata without rewriting template source', () => {
+describe('изменение метаданных в Source компонента SFC', () => {
+  it('читает и заменяет defineMetadata уровня компонента без перезаписи Source шаблона', () => {
     const projection = inspectComponentSFCMetadata(TABLE_SOURCE)
     const result = patchComponentSFCMetadataSource(TABLE_SOURCE, {
       'hub.table': { attributes: ['STA', 'ETA', 'ATA'] },
@@ -35,7 +35,7 @@ describe('component SFC metadata source patch', () => {
     expect(result.source).toContain('<Table :rows="rows" />')
   })
 
-  it('inserts defineMetadata into an existing script setup', () => {
+  it('вставляет defineMetadata в существующий script setup', () => {
     const source = `<script setup lang="ts">\nconst rows = []\n</script>\n<template><Table :rows="rows" /></template>`
     const result = patchComponentSFCMetadataSource(source, { 'hub.table': { attributes: ['STA'] } })
 
@@ -47,7 +47,7 @@ describe('component SFC metadata source patch', () => {
     })
   })
 
-  it('keeps duplicate metadata declarations Source-owned', () => {
+  it('оставляет дублирующиеся объявления метаданных во владении Source', () => {
     const source = `<script setup lang="ts">\ndefineMetadata({})\ndefineMetadata({ value: true })\n</script>\n<template><Table /></template>`
     const projection = inspectComponentSFCMetadata(source)
     const result = patchComponentSFCMetadataSource(source, {})

@@ -17,7 +17,7 @@ function normalizeRelationId(value: unknown): number | null {
   }
   if (typeof value === 'object') {
     const raw = value as Record<string, unknown>
-    // Payload relation can be resolved as object; prefer numeric id, fallback to nested value/id.
+    // Связь payload может быть объектом: предпочитаем числовой id, затем вложенные value или id.
     const nested = raw.id ?? raw.value ?? raw.componentId ?? null
     return nested == null ? null : normalizeRelationId(nested)
   }

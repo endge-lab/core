@@ -28,7 +28,7 @@ export type ComputationSourceNode
     sourceRange?: ComputationSourceRange
   }
 
-/** Canonical compiler-derived representation of defineComputation source. */
+/** Каноническое представление source defineComputation, полученное компилятором. */
 export interface ComputationSourceDocument {
   input: ComputationContractField | null
   output: ComputationContractField | null

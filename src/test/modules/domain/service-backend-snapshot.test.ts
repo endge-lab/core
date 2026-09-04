@@ -130,10 +130,10 @@ function releaseBundle(): EndgeDomainBundle {
   }
 }
 
-describe('service-backend Core provider', () => {
+describe('провайдер Core для service backend', () => {
   afterEach(() => vi.restoreAllMocks())
 
-  it('loads exactly one snapshot and keeps ETag plus revision metadata in repository', async () => {
+  it('загружает ровно один snapshot и хранит ETag и метаданные ревизии в репозитории', async () => {
     const snapshot = liveSnapshot()
     const loadWorkspace = vi.fn().mockResolvedValue(snapshot)
     const provider: EndgeDomainProvider = {
@@ -166,7 +166,7 @@ describe('service-backend Core provider', () => {
     })
   })
 
-  it('maps transport collection names and leaves unsupported Core collections empty', () => {
+  it('сопоставляет имена transport-коллекций и оставляет неподдерживаемые коллекции Core пустыми', () => {
     const snapshot = liveSnapshot()
     const domain = new EndgeDomain_Module()
     const parsePlain = vi.spyOn(EndgeDomain_Module, 'parsePlain').mockReturnValue({} as never)
@@ -223,7 +223,7 @@ describe('service-backend Core provider', () => {
     }
   })
 
-  it('keeps tombstones in repository state without materializing them in the live domain', async () => {
+  it('хранит tombstones в состоянии репозитория без материализации в live-домене', async () => {
     const snapshot = liveSnapshot()
     const deletedAction = liveDocument('deleted-action')
     const deletedFolder = liveDocument('deleted-folder', { parentIdentity: 'folder-root' })
@@ -263,7 +263,7 @@ describe('service-backend Core provider', () => {
     expect(domain.getEnvironmentByIdentity('deleted-environment')).toBeNull()
   })
 
-  it('uses the server UUID as the live document id without copying revision into domain data', () => {
+  it('использует серверный UUID как ID live-документа без копирования ревизии в данные домена', () => {
     const snapshot = liveSnapshot()
     for (const key of DOCUMENT_KEYS) {
       snapshot.documents[key] = []
@@ -278,7 +278,7 @@ describe('service-backend Core provider', () => {
     expect(component).not.toHaveProperty('revision')
   })
 
-  it('creates a document only through service-backend and applies the returned revision', async () => {
+  it('создаёт документ только через service backend и применяет возвращённую ревизию', async () => {
     Endge.domain.reset()
     const snapshot = liveSnapshot()
     for (const key of DOCUMENT_KEYS) {
@@ -333,7 +333,7 @@ describe('service-backend Core provider', () => {
     })
   })
 
-  it('keeps project order when an updated document is applied to the live domain', async () => {
+  it('сохраняет порядок проекта при применении обновлённого документа к live-домену', async () => {
     Endge.domain.reset()
     const snapshot = liveSnapshot()
     for (const key of DOCUMENT_KEYS) {
@@ -388,7 +388,7 @@ describe('service-backend Core provider', () => {
     expect(repository.getDocumentServerState('projects', 'project-b')?.revision).toBe(8)
   })
 
-  it('keeps folderIdentity when a single document is serialized for update', async () => {
+  it('сохраняет folderIdentity при сериализации одного документа для обновления', async () => {
     Endge.domain.reset()
     const snapshot = liveSnapshot()
     snapshot.documents.folders.push(liveDocument('folder-target', { parentIdentity: 'folder-root' }))
@@ -428,7 +428,7 @@ describe('service-backend Core provider', () => {
     }))
   })
 
-  it('moves several documents through one provider call and applies every response', async () => {
+  it('перемещает несколько документов одним вызовом провайдера и применяет каждый ответ', async () => {
     Endge.domain.reset()
     const snapshot = liveSnapshot()
     snapshot.documents.folders.push(liveDocument('folder-target', { parentIdentity: 'folder-root' }))
@@ -480,7 +480,7 @@ describe('service-backend Core provider', () => {
     expect(repository.getDocumentServerState('actions', 'action-b')?.revision).toBe(8)
   })
 
-  it('blocks every public mutation when service-backend is read-only', async () => {
+  it('блокирует каждую публичную мутацию, если service backend доступен только для чтения', async () => {
     const provider: EndgeDomainProvider = {
       id: 'service-backend',
       capabilities: { snapshot: true, mutations: false, softDelete: false, restore: false },
@@ -515,7 +515,7 @@ describe('service-backend Core provider', () => {
     }
   })
 
-  it('normalizes snapshot workspace without changing runtime tenant or user', () => {
+  it('нормализует Workspace snapshot без изменения runtime Tenant или пользователя', () => {
     const snapshot = liveSnapshot()
     const tenantBefore = Endge.context.getCurrentTenant()
     const userBefore = Endge.context.getCurrentUser()
@@ -537,7 +537,7 @@ describe('service-backend Core provider', () => {
     expect(Endge.context.getCurrentUser()).toBe(userBefore)
   })
 
-  it('loads an immutable release bundle without service-backend revision state', async () => {
+  it('загружает неизменяемый release bundle без состояния ревизии service backend', async () => {
     const bundle = releaseBundle()
     const context: EndgeBootContext = {
       dataProvider: 'bundle',

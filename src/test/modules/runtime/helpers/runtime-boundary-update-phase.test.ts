@@ -47,8 +47,8 @@ function createFixture() {
   return { kernel, runtime, updates }
 }
 
-describe('runtimeBoundaryUpdatePhase', () => {
-  it('updates root host once when root node is dirty', () => {
+describe('фаза обновления границ runtime', () => {
+  it('однократно обновляет корневой host, когда корневой узел изменён', () => {
     const { kernel, runtime, updates } = createFixture()
     const root = createRuntimeNode(runtime, 'root', 'root')
 
@@ -63,7 +63,7 @@ describe('runtimeBoundaryUpdatePhase', () => {
     expect(updates[0].events).toHaveLength(1)
   })
 
-  it('updates root host when nested data changes through deep wildcard observer', () => {
+  it('обновляет корневой host при изменении вложенных данных через deep wildcard observer', () => {
     const { kernel, runtime, updates } = createFixture()
     const root = createRuntimeNode(runtime, 'root', 'root')
 
@@ -78,7 +78,7 @@ describe('runtimeBoundaryUpdatePhase', () => {
     expect(updates[0].events[0].canonical).toBe('data.rows[0].counter')
   })
 
-  it('updates dirty boundary directly', () => {
+  it('напрямую обновляет изменённую границу', () => {
     const { kernel, runtime, updates } = createFixture()
     const root = createRuntimeNode(runtime, 'root', 'root')
     const boundary = createRuntimeNode(runtime, 'boundary', 'boundary')
@@ -96,7 +96,7 @@ describe('runtimeBoundaryUpdatePhase', () => {
     expect(updates[0].boundaries[0].dirtyNodes.map(node => node.id)).toEqual(['boundary'])
   })
 
-  it('updates nearest boundary when leaf is dirty', () => {
+  it('обновляет ближайшую границу при изменении листового узла', () => {
     const { kernel, runtime, updates } = createFixture()
     const root = createRuntimeNode(runtime, 'root', 'root')
     const boundary = createRuntimeNode(runtime, 'boundary', 'boundary')
@@ -115,7 +115,7 @@ describe('runtimeBoundaryUpdatePhase', () => {
     expect(updates[0].boundaries[0].dirtyNodes.map(node => node.id)).toEqual(['leaf'])
   })
 
-  it('merges several dirty leaf nodes in one boundary into one boundary update', () => {
+  it('объединяет несколько изменённых листовых узлов одной границы в одно обновление', () => {
     const { kernel, runtime, updates } = createFixture()
     const root = createRuntimeNode(runtime, 'root', 'root')
     const boundary = createRuntimeNode(runtime, 'boundary', 'boundary')
@@ -141,7 +141,7 @@ describe('runtimeBoundaryUpdatePhase', () => {
     expect(updates[0].boundaries[0].dirtyNodes.map(node => node.id).sort()).toEqual(['leaf-1', 'leaf-2'])
   })
 
-  it('updates separate top-level dirty boundaries independently', () => {
+  it('независимо обновляет отдельные изменённые границы верхнего уровня', () => {
     const { kernel, runtime, updates } = createFixture()
     const root = createRuntimeNode(runtime, 'root', 'root')
     const firstBoundary = createRuntimeNode(runtime, 'boundary-1', 'boundary')
@@ -166,7 +166,7 @@ describe('runtimeBoundaryUpdatePhase', () => {
     expect(updates.map(update => update.node.id).sort()).toEqual(['boundary-1', 'boundary-2'])
   })
 
-  it('prunes child boundary updates when root is dirty in same transaction', () => {
+  it('отбрасывает обновления дочерних границ, если в той же транзакции изменён корень', () => {
     const { kernel, runtime, updates } = createFixture()
     const root = createRuntimeNode(runtime, 'root', 'root')
     const boundary = createRuntimeNode(runtime, 'boundary', 'boundary')

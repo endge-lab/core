@@ -2,7 +2,7 @@ import type { RComponentSFC_SourceRange } from './location.types'
 import type { RComponentDiagnostic } from '@/modules/domain/types/component/component-core.types'
 import type { ProgramMetadataMap } from '@/modules/program/domain/types/program-metadata.types'
 
-/** Source-backed read model of component-level defineMetadata. */
+/** Read-модель defineMetadata уровня компонента на основе Source. */
 export interface ComponentSFCMetadataVisualProjection {
   mode: 'missing' | 'static' | 'invalid' | 'duplicate'
   editable: boolean
@@ -12,7 +12,7 @@ export interface ComponentSFCMetadataVisualProjection {
   message?: string
 }
 
-/** Result of replacing or inserting component-level defineMetadata. */
+/** Результат замены или вставки defineMetadata уровня компонента. */
 export interface ComponentSFCMetadataSourcePatchResult {
   ok: boolean
   source: string

@@ -9,7 +9,7 @@ import { Serialize } from '@endge/utils'
 import { Expose } from 'class-transformer'
 import { REntity } from '@/modules/domain/entities/REntity'
 
-/** Persisted source-first mock document. */
+/** Сохранённый source-first документ mock. */
 export class RMock extends REntity {
   @Expose()
   override displayName: string = ''

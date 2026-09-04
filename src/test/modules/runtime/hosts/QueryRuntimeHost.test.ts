@@ -9,7 +9,7 @@ import { RQuery } from '@/modules/domain/entities/RQuery'
 import { QueryRuntimeHost } from '@/modules/runtime/hosts/QueryRuntimeHost'
 import { compileFilterSource } from '@/modules/source/services/compilers/filter-source-compile'
 
-describe('queryRuntimeHost', () => {
+describe('проверка Host runtime для Query', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     Endge.context.setDataMode('live')
@@ -19,7 +19,7 @@ describe('queryRuntimeHost', () => {
     Raph.app.reset()
   })
 
-  it('uses latest-wins, aborts previous transport and ignores stale result', async () => {
+  it('использует стратегию latest-wins, отменяет предыдущий transport и игнорирует устаревший результат', async () => {
     const first = deferred<Record<string, unknown>>()
     const second = deferred<Record<string, unknown>>()
     const signals: AbortSignal[] = []
@@ -53,7 +53,7 @@ describe('queryRuntimeHost', () => {
     expect(success).toHaveBeenCalledWith({ outputs: { raw: 'new' } })
   })
 
-  it('publishes one batched output generation for every response without content hashing', async () => {
+  it('публикует одно пакетное поколение output для каждого ответа без хеширования содержимого', async () => {
     const rows = Array.from({ length: 10_000 }, (_, id) => ({ id, value: `row-${id}` }))
     vi.spyOn(Endge.runtime.query, 'executeArtifact').mockResolvedValue(rows)
     const host = createHost({}, true)
@@ -72,14 +72,14 @@ describe('queryRuntimeHost', () => {
     expect('_outputHashes' in (host as unknown as Record<string, unknown>)).toBe(false)
   })
 
-  it('updates declared props without store-key remount restrictions', () => {
+  it('обновляет объявленные props без ограничений повторного монтирования по ключу Store', () => {
     const host = createHost({ filterPayload: { active: true } })
     expect(host.getProps()).toEqual({ filterPayload: { active: true } })
     host.setProps({ filterPayload: { active: false } })
     expect(host.getProps()).toEqual({ filterPayload: { active: false } })
   })
 
-  it('skips transport and aborts an in-flight request when mock mode is enabled', async () => {
+  it('пропускает transport и отменяет выполняющийся запрос при включённом mock-режиме', async () => {
     const request = deferred<Record<string, unknown>>()
     const execute = vi.spyOn(Endge.runtime.query, 'executeArtifact')
       .mockImplementation(input => new Promise((resolve, reject) => {
@@ -100,7 +100,7 @@ describe('queryRuntimeHost', () => {
     expect(skipped).toHaveBeenCalledWith({ reason: 'mock-mode' })
   })
 
-  it('mounts a local default Filter only without an explicit prop and owns its lifecycle', () => {
+  it('монтирует локальный стандартный Filter только без явного prop и владеет его lifecycle', () => {
     const filterPayload = compileFilterSource(`
 defineFilter({
   fields: { search: field('String').optional().default('SU') },

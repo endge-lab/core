@@ -13,14 +13,14 @@ import {
   tokenSet,
 } from '@/test/modules/auth/auth-test-helpers'
 
-describe('authSessionManager', () => {
+describe('менеджер сессии авторизации', () => {
   beforeEach(() => {
     vi.stubGlobal('localStorage', new MemoryStorage())
     vi.stubGlobal('sessionStorage', new MemoryStorage())
   })
   afterEach(() => vi.unstubAllGlobals())
 
-  it('uses a host-owned OIDC source and materializes its headers', async () => {
+  it('использует принадлежащий host источник OIDC и материализует его заголовки', async () => {
     const runtime = createRuntime()
     runtime.sessions.configureDefault(runtime.profile)
     runtime.sessions.connect(runtime.profile.identity, {
@@ -36,7 +36,7 @@ describe('authSessionManager', () => {
     )
   })
 
-  it('surfaces typed interaction requirement without a source', async () => {
+  it('предоставляет типизированное требование взаимодействия без источника', async () => {
     const onInteractionRequired = vi.fn()
     const runtime = createRuntime(onInteractionRequired)
     runtime.sessions.configureDefault(runtime.profile)

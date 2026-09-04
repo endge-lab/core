@@ -4,8 +4,8 @@ import { describe, expect, it } from 'vitest'
 
 import { compileDataViewSource } from '@/modules/source/services/compilers/data-view-source-compile'
 
-describe('dataView select pipeline compiler', () => {
-  it('compiles sequential select steps as a full materialization pipeline', () => {
+describe('компилятор pipeline select для DataView', () => {
+  it('компилирует последовательные шаги select как pipeline полной материализации', () => {
     const result = compileDataViewSource(`
 defineDataView({
   mode: 'pipeline',
@@ -23,7 +23,7 @@ defineDataView({
     expect((result.artifact as DataViewProgramPayload).materializationStrategy).toEqual({ kind: 'full' })
   })
 
-  it('rejects mixing select steps with structural collection steps', () => {
+  it('отклоняет смешение шагов select со структурными шагами коллекции', () => {
     const result = compileDataViewSource(`
 defineDataView({
   mode: 'pipeline',
@@ -43,7 +43,7 @@ defineDataView({
     ]))
   })
 
-  it('requires exactly one expression in select', () => {
+  it('требует ровно одно выражение в select', () => {
     for (const step of ['select()', `select(path('items'), path('other'))`]) {
       const result = compileDataViewSource(`
 defineDataView({

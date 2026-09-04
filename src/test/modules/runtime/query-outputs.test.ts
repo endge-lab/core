@@ -12,8 +12,8 @@ import { createQueryExecutor } from '@/test/helpers/query-executor'
 
 afterEach(() => resetTestCompilerContext())
 
-describe('query output source compiler', () => {
-  it('rejects legacy response block', () => {
+describe('компилятор Source для output Query', () => {
+  it('отклоняет legacy-блок response', () => {
     const result = Endge.source.compile('query', `
 defineQuery({
   request: {
@@ -36,7 +36,7 @@ defineQuery({
     ]))
   })
 
-  it('parses response output and local/external DataView refs', () => {
+  it('разбирает output response и локальные либо внешние ссылки DataView', () => {
     const result = Endge.source.compile('query', createQuerySource('query_output_parse'))
 
     expect(result.ok).toBe(true)
@@ -64,7 +64,7 @@ defineQuery({
     })
   })
 
-  it('reports missing or later output references', () => {
+  it('сообщает об отсутствующих ссылках output или ссылках на последующие outputs', () => {
     const result = Endge.source.compile('query', `
 defineQuery({
   request: {
@@ -87,7 +87,7 @@ defineQuery({
     ]))
   })
 
-  it('rejects removed toStore output modifier', () => {
+  it('отклоняет удалённый модификатор output toStore', () => {
     const result = Endge.source.compile('query', `
 defineQuery({
   request: { endpoint: '/api', path: '/flights' },
@@ -107,14 +107,14 @@ defineQuery({
   })
 })
 
-describe('query output compiler artifacts', () => {
+describe('артефакты компилятора outputs Query', () => {
   beforeEach(() => {
     Endge.domain.reset()
     Endge.program.clear()
     prepareTestCompilerContext()
   })
 
-  it('materializes local DataView refs as query child artifacts and keeps external refs as dependencies', () => {
+  it('материализует локальные ссылки DataView как дочерние артефакты Query и сохраняет внешние ссылки как зависимости', () => {
     const query = createQuery('query_output_compile', createQuerySource('query_output_compile'))
     const artifact = Endge.compiler.buildQuery(query)
 
@@ -134,7 +134,7 @@ describe('query output compiler artifacts', () => {
     ]))
   })
 
-  it('bubbles local DataView diagnostics to parent query artifact', () => {
+  it('поднимает диагностику локального DataView в родительский артефакт Query', () => {
     const query = createQuery('query_output_invalid_local', `
 defineQuery({
   request: {
@@ -165,14 +165,14 @@ defineQuery({
   })
 })
 
-describe('query output runtime', () => {
+describe('проверка Outputs Query в runtime', () => {
   beforeEach(() => {
     Endge.domain.reset()
     Endge.program.clear()
     prepareTestCompilerContext()
   })
 
-  it('computes every declared output in order without publishing to a store', async () => {
+  it('последовательно вычисляет каждый объявленный output без публикации в Store', async () => {
     const queryIdentity = 'query_output_runtime'
     const query = createQuery(queryIdentity, `
 defineQuery({
@@ -236,8 +236,8 @@ defineQuery({
   })
 })
 
-describe('source-only Query request body', () => {
-  it('sends an empty payload when request.body is absent', async () => {
+describe('тело запроса Query только из Source', () => {
+  it('отправляет пустой payload при отсутствии request.body', async () => {
     const request = vi.fn().mockResolvedValue({ data: { items: [] } })
     const executor = createQueryExecutor({ request } as any)
 
@@ -265,14 +265,14 @@ describe('source-only Query request body', () => {
   })
 })
 
-describe('dataView nested DataView pipeline', () => {
+describe('вложенный pipeline DataView', () => {
   beforeEach(() => {
     Endge.domain.reset()
     Endge.program.clear()
     prepareTestCompilerContext()
   })
 
-  it('runs external DataView from from(...).dataView(...).as(...)', () => {
+  it('выполняет внешний DataView из from(...).dataView(...).as(...)', () => {
     const nestedDataView = createDataView('normalizeFlight', `
 defineDataView({
   mode: 'pipeline',
@@ -308,7 +308,7 @@ defineDataView({
     ])
   })
 
-  it('runs local inline DataView from from(...).dataView(...).as(...)', () => {
+  it('выполняет локальный inline DataView из from(...).dataView(...).as(...)', () => {
     const output = new EndgeDataView().runSource(`
 defineDataView({
   mode: 'pipeline',
@@ -340,7 +340,7 @@ defineDataView({
     ])
   })
 
-  it('throws clear error for missing external DataView', () => {
+  it('выбрасывает понятную ошибку при отсутствии внешнего DataView', () => {
     expect(() => new EndgeDataView().runSource(`
 defineDataView({
   mode: 'pipeline',

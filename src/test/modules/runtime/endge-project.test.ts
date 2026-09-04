@@ -7,14 +7,14 @@ import { Endge } from '@/kernel/endge'
 import { RComposition } from '@/modules/domain/entities/RComposition'
 import { RProject } from '@/modules/domain/entities/RProject'
 
-describe('endge project runtime session', () => {
+describe('проверка Runtime-сессия проекта Endge', () => {
   afterEach(async () => {
     await Endge.runtime.reset()
     Endge.program.clear()
     Endge.domain.reset()
   })
 
-  it('discovers project compositions and respects startup/manual root activation', async () => {
+  it('находит Composition проекта и учитывает стартовую либо ручную активацию корней', async () => {
     const project = RProject.fromPlain({ id: 501, identity: 'airport', name: 'Airport' })
     Endge.domain.addProject(project)
     const startup = composition(502, 'project-startup', 'airport')
@@ -43,7 +43,7 @@ describe('endge project runtime session', () => {
     expect(Endge.runtime.scopes.getAll().filter(scope => scope.ownerRuntimeId === session.id)).toEqual([])
   })
 
-  it('supports debug mounting without auto activation and reusable pause/resume/restart handles', async () => {
+  it('поддерживает отладочное монтирование без автоактивации и повторное использование handles pause/resume/restart', async () => {
     const project = RProject.fromPlain({ id: 505, identity: 'debug-project', name: 'Debug project' })
     const entry = composition(506, 'debug-entry', 'debug-project')
     Endge.domain.addProject(project)
@@ -73,7 +73,7 @@ describe('endge project runtime session', () => {
     expect(Endge.runtime.getRuntimeHosts()).toEqual([])
   })
 
-  it('switches named scopes atomically and rejects handles from another project session', async () => {
+  it('атомарно переключает именованные scopes и отклоняет handles другой сессии проекта', async () => {
     const project = RProject.fromPlain({ id: 510, identity: 'airport', name: 'Airport' })
     const entry = composition(511, 'project-entry', 'airport')
     Endge.domain.addProject(project)

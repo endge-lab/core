@@ -23,7 +23,7 @@ export class EndgeWorkspace_Module extends EndgeModule {
   private _current: EndgeWorkspaceDefinition | null = null
   public readonly variables = new WorkspaceVariables(() => this._configurationOrNull()?.vars ?? [])
 
-  /** Captures environment overrides before the workspace definition is loaded. */
+  /** Сохраняет переопределения окружения до загрузки определения workspace. */
   public override setup(ctx: EndgeBootContext): void {
     this.variables.setEnvironment(ctx.vars)
   }
@@ -198,12 +198,12 @@ export class EndgeWorkspace_Module extends EndgeModule {
     return this._requireCurrent()
   }
 
-  /** Returns the persisted default used when the runtime has no local override. */
+  /** Возвращает сохранённое значение по умолчанию, используемое при отсутствии локального runtime-переопределения. */
   public get dataMode(): EndgeDataMode {
     return this._requireCurrent().dataMode
   }
 
-  /** Shows whether this workspace starts runtimes with mock data by default. */
+  /** Показывает, запускает ли workspace runtime с mock-данными по умолчанию. */
   public get isMockEnabled(): boolean {
     return this.dataMode === 'mock'
   }
@@ -218,7 +218,7 @@ export class EndgeWorkspace_Module extends EndgeModule {
     return this._configuration().vars
   }
 
-  /** Explicit name for the persisted variable definitions. */
+  /** Явное имя для сохранённых определений переменных. */
   public get variableDefinitions(): EndgeWorkspaceVar[] {
     return this.vars
   }

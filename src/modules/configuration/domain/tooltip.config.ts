@@ -1,6 +1,6 @@
 import type { EndgeTooltipConfiguration } from '@/modules/configuration/domain/types/configuration.type'
 
-/** System defaults used before Workspace -> Tenant -> Project -> Environment overrides. */
+/** Системные defaults, применяемые до переопределений Workspace -> Tenant -> Project -> Environment. */
 export const DEFAULT_ENDGE_TOOLTIP_CONFIGURATION: Readonly<EndgeTooltipConfiguration> = Object.freeze({
   side: 'right',
   align: 'start',

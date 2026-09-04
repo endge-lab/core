@@ -33,10 +33,10 @@ export interface RComponentSFC_IR_Script {
   /** Локальные bindings, доступные template-выражениям. */
   locals: RComponentSFC_IR_LocalBinding[]
 
-  /** Port declarations resolved during compilation. */
+  /** Объявления портов, разрешённые при компиляции. */
   ports: ComponentSFCPortManifest
 
-  /** Top-level computation port calls that initialize template locals. */
+  /** Вызовы портов computation верхнего уровня, инициализирующие локальные значения template. */
   portCalls: RComponentSFC_IR_PortCall[]
 }
 
@@ -159,7 +159,7 @@ export interface ComponentSFCInteractionTriggerEvent {
   }
 }
 
-/** Backward-compatible editable names for the shared interaction contract. */
+/** Editable-имена общего контракта взаимодействия для обратной совместимости. */
 export type ComponentSFCEditTriggerModifiers = ComponentSFCInteractionTriggerModifiers
 export type ComponentSFCEditTriggerHeldKeys = ComponentSFCInteractionTriggerHeldKeys
 export type ComponentSFCEditTrigger = ComponentSFCInteractionTrigger
@@ -170,11 +170,11 @@ export type ComponentSFCEditTriggerEvent = ComponentSFCInteractionTriggerEvent
 export interface ComponentSFCEditableBehavior {
   value: RComponentSFC_IR_Value
   triggers: RComponentSFC_IR_Value
-  /** Triggers that discard the active draft. Defaults to Escape and focus leaving Editable. */
+  /** Triggers, отменяющие активный черновик. По умолчанию Escape и уход focus из Editable. */
   cancelTriggers: RComponentSFC_IR_Value
-  /** Triggers that commit the active draft. Defaults to Enter. */
+  /** Triggers, подтверждающие активный черновик. По умолчанию Enter. */
   commitTriggers: RComponentSFC_IR_Value
-  /** Static suffix modifiers declared on `:edit-on`. */
+  /** Статические суффиксные модификаторы, объявленные в `:edit-on`. */
   modifiers?: RComponentSFC_IR_EventModifier[]
   cancelModifiers?: RComponentSFC_IR_EventModifier[]
   commitModifiers?: RComponentSFC_IR_EventModifier[]
@@ -234,7 +234,7 @@ export interface RComponentSFC_IR_ElementNode {
   /** Нормализованный Endge primitive tag. */
   tag: RComponentSFC_IR_Tag
 
-  /** Original public component tag before normalization to Component. */
+  /** Исходный публичный тег компонента до нормализации в Component. */
   componentTag?: string
 
   /** Нормализованные props элемента. */
@@ -243,10 +243,10 @@ export interface RComponentSFC_IR_ElementNode {
   /** Нормализованные control-flow директивы элемента. */
   directives: RComponentSFC_IR_Directives
 
-  /** Local renderer Event reactions declared through `@event` attributes. */
+  /** Локальные реакции renderer на Event, объявленные через атрибуты `@event`. */
   events?: RComponentSFC_IR_EventBinding[]
 
-  /** Conditional local reactions declared through the renderer-neutral `:on` annotation. */
+  /** Условные локальные реакции, объявленные через нейтральную к renderer аннотацию `:on`. */
   interactions?: RComponentSFC_IR_InteractionGroup[]
 
   /** Compiler-owned edit behavior; editable/edit-on не передаются visual adapter-у как props. */
@@ -255,16 +255,16 @@ export interface RComponentSFC_IR_ElementNode {
   /** Дочерние IR-узлы. */
   children: RComponentSFC_IR_Node[]
 
-  /** Local component port marker retained for future provider overrides. */
+  /** Маркер порта локального компонента, сохранённый для будущих переопределений провайдера. */
   port?: RComponentSFC_IR_ComponentPortMarker
 
-  /** Static per-instance bindings for required ports of this child component. */
+  /** Статические bindings экземпляра для обязательных портов дочернего компонента. */
   portBindings?: ComponentSFCRequiredPortBinding[]
 
-  /** Compiler-resolved Table menus, including forwarded Action identities and targets. */
+  /** Разрешённые компилятором меню Table, включая перенаправленные идентификаторы и цели Action. */
   tableMenus?: RComponentSFC_IR_TableMenus
 
-  /** Compiler-resolved CellMenu override for one Column. */
+  /** Разрешённое компилятором переопределение CellMenu для одной Column. */
   cellMenu?: ComponentSFCTableCellMenuDescriptor
 
   /** Позиция исходного AST-узла. */
@@ -273,7 +273,7 @@ export interface RComponentSFC_IR_ElementNode {
 
 export interface RComponentSFC_IR_TableMenus {
   column: ComponentSFCTableColumnMenuDescriptor
-  /** Default data-cell menu. `row` is retained as the compatibility field name. */
+  /** Меню ячейки данных по умолчанию. `row` сохранено как имя поля совместимости. */
   row: ComponentSFCTableCellMenuDescriptor
 }
 
@@ -281,7 +281,7 @@ export type ComponentSFCTableColumnMenuMode = 'default' | 'disabled' | 'inline'
 export type ComponentSFCTableRowMenuMode = 'none' | 'inline'
 export type ComponentSFCTableCellMenuMode = 'none' | 'inline'
 
-/** Renderer-neutral menu retained in compiled SFC form until a concrete row/column context exists. */
+/** Нейтральное к renderer меню в скомпилированной форме SFC до появления контекста конкретной строки и колонки. */
 export interface ComponentSFCTableMenuDescriptor {
   kind: 'sfc-table-menu'
   items: ComponentSFCTableMenuNodeDescriptor[]
@@ -295,16 +295,16 @@ export interface ComponentSFCTableMenuItemDescriptor {
   kind: 'item'
   id: string
   label: RComponentSFC_IR_Value
-  /** `v-if` expression evaluated against the concrete table/cell context. */
+  /** Выражение `v-if`, вычисляемое в контексте конкретной таблицы и ячейки. */
   visible?: RComponentSFC_IR_Value
-  /** Static or dynamic disabled state evaluated against the same context as the Action. */
+  /** Статическое или динамическое состояние disabled, вычисляемое в том же контексте, что и Action. */
   disabled?: RComponentSFC_IR_Value
   action: string
-  /** Required Action port whose mounted provider may replace `action`. */
+  /** Обязательный порт Action, смонтированный провайдер которого может заменить `action`. */
   requiredPort?: string
   input?: RComponentSFC_IR_Value
   icon?: string
-  /** Set only for a provided alias forwarded from this exact Table node. */
+  /** Задаётся только для предоставленного alias, перенаправленного из этого конкретного узла Table. */
   forwardedFrom?: ComponentSFCPortForwardOrigin
 }
 
@@ -325,7 +325,7 @@ export interface ComponentSFCTableRowMenuDescriptor {
   diagnostics: RComponentDiagnostic[]
 }
 
-/** Canonical cell menu descriptor. RowMenu uses the same shape as a legacy alias. */
+/** Канонический описатель меню ячейки. RowMenu использует ту же форму как legacy alias. */
 export type ComponentSFCTableCellMenuDescriptor = ComponentSFCTableRowMenuDescriptor
 
 export type RComponentSFC_IR_EventModifier
@@ -335,39 +335,39 @@ export interface RComponentSFC_IR_EventBinding {
   name: string
   modifiers: RComponentSFC_IR_EventModifier[]
   action: ComponentSFCEventAction
-  /** Ordered reactions. `action` remains as a compatibility view of the first item. */
+  /** Упорядоченные реакции. `action` остаётся представлением первого элемента для совместимости. */
   actions?: ComponentSFCEventAction[]
   sourceRange?: RComponentSFC_SourceRange
 }
 
 export interface RComponentSFC_IR_InteractionRule {
-  /** Static event name required to install the adapter listener. */
+  /** Статическое имя события, необходимое для установки listener адаптера. */
   event: string
-  /** Runtime-evaluated trigger descriptor without `reaction`. */
+  /** Вычисляемый в runtime описатель trigger без `reaction`. */
   trigger: RComponentSFC_IR_Value
-  /** Suffix modifiers applied to this rule after evaluating `trigger`. */
+  /** Суффиксные модификаторы, применяемые к правилу после вычисления `trigger`. */
   modifiers: RComponentSFC_IR_EventModifier[]
-  /** Listener options known at compile time. */
+  /** Параметры listener, известные при компиляции. */
   listener: { capture: boolean, passive: boolean }
-  /** Reactions executed sequentially in Source order. */
+  /** Реакции, последовательно выполняемые в порядке Source. */
   reactions: ComponentSFCEventAction[]
   sourceRange?: RComponentSFC_SourceRange
 }
 
-/** One referenced TriggerSet paired with reactions that stay stable across context layers. */
+/** Один TriggerSet по ссылке вместе с реакциями, стабильными между слоями контекста. */
 export interface RComponentSFC_IR_InteractionTriggerSet {
   triggers: RComponentSFC_IR_Value
-  /** Event names supported by the source tag's compiled event surface. */
+  /** Имена Event, поддерживаемые скомпилированной поверхностью событий исходного тега. */
   events: string[]
   modifiers: RComponentSFC_IR_EventModifier[]
   reactions: ComponentSFCEventAction[]
   sourceRange?: RComponentSFC_SourceRange
 }
 
-/** One `:on` annotation. Rules inside the group use first-match-wins semantics. */
+/** Одна аннотация `:on`. Правила группы используют семантику первого совпадения. */
 export interface RComponentSFC_IR_InteractionGroup {
   rules: RComponentSFC_IR_InteractionRule[]
-  /** Optional context-backed TriggerSet form `{ triggers, reaction }`. */
+  /** Необязательная форма TriggerSet `{ triggers, reaction }`, основанная на контексте. */
   triggerSet?: RComponentSFC_IR_InteractionTriggerSet
   sourceRange?: RComponentSFC_SourceRange
 }

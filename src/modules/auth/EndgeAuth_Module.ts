@@ -63,7 +63,7 @@ export class EndgeAuth_Module extends EndgeModule {
     )
   }
 
-  /** Subscribes a host application to requests that require an interactive OIDC flow. */
+  /** Подписывает host-приложение на запросы, требующие интерактивного OIDC flow. */
   public onInteractionRequired(listener: AuthInteractionRequiredListener): () => void {
     this._interactionRequiredListeners.add(listener)
     return () => this._interactionRequiredListeners.delete(listener)

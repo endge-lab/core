@@ -26,7 +26,7 @@ interface ExecutionContext {
   recordHistory: boolean
 }
 
-/** Executes compiler-produced Action IR without interpreting Source. */
+/** Выполняет созданный компилятором IR Action без интерпретации Source. */
 export class ActionProgramExecutor {
   public constructor(private readonly _dependencies: ActionProgramExecutorDependencies) {}
 

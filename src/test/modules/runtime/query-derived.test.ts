@@ -17,7 +17,7 @@ import { timeStringToDate } from '@/modules/runtime/converters/date/time-string-
 import { weekdaysRange } from '@/modules/runtime/converters/date/weekdays-range'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
-describe('query Raph derived integration', () => {
+describe('интеграция Query с производными данными Raph', () => {
   beforeEach(() => {
     Endge.runtime.reset()
     Endge.program.clear()
@@ -55,7 +55,7 @@ describe('query Raph derived integration', () => {
     Raph.app.kernel.clear()
   })
 
-  it('compiles auto strategy and materializes full/incremental schedule outputs', async () => {
+  it('компилирует стратегию auto и материализует полные и инкрементальные outputs расписания', async () => {
     const query = createScheduleQuery('schedule-derived')
     const artifact = Endge.compiler.buildQuery(query)
     expect(artifact.status).toBe('valid')
@@ -133,7 +133,7 @@ describe('query Raph derived integration', () => {
     expect(Raph.get(tablePath)).toBeUndefined()
   })
 
-  it('keeps latest materialized response and ignores a stale transport result', async () => {
+  it('сохраняет последний материализованный ответ и игнорирует устаревший результат transport', async () => {
     const query = createScheduleQuery('schedule-latest')
     Endge.compiler.buildQuery(query)
     const first = deferred<any[]>()
@@ -162,7 +162,7 @@ describe('query Raph derived integration', () => {
     expect(node.snapshot().fullComputeCount).toBe(1)
   })
 
-  it('keeps last-good table and exposes external derived errors on the host', async () => {
+  it('сохраняет последнюю корректную таблицу и предоставляет внешние ошибки производных данных через host', async () => {
     const query = createScheduleQuery('schedule-error')
     Endge.compiler.buildQuery(query)
     vi.spyOn(Endge.runtime.query, 'executeArtifact').mockResolvedValue([scheduleRow(1, 'SU', '100')])

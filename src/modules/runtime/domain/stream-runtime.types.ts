@@ -10,7 +10,7 @@ export interface StreamTransportConnection {
   close: () => void
 }
 
-/** Browser-neutral port used by StreamRuntimeHost. */
+/** Нейтральный к браузеру порт, используемый StreamRuntimeHost. */
 export interface StreamTransportFactory {
   open: (
     artifact: StreamSourceArtifact,

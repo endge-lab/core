@@ -4,15 +4,15 @@ import { describe, expect, it } from 'vitest'
 import { EndgeDataView } from '@/modules/runtime/execution/endge-data-view'
 import { compileDataViewSource } from '@/modules/source/services/compilers/data-view-source-compile'
 
-describe('dataView incremental compiler', () => {
-  it('defaults to auto and proves a root row-local id projection', () => {
+describe('инкрементальный компилятор DataView', () => {
+  it('по умолчанию выбирает auto и доказывает корневую проекцию локального ID строки', () => {
     const result = compileDataViewSource(rowLocalSource(''))
     expect(result.diagnostics).toEqual([])
     expect(result.document?.incremental).toEqual({ mode: 'auto' })
     expect((result.artifact as DataViewProgramPayload).materializationStrategy).toEqual({ kind: 'collection-by-key', key: 'id' })
   })
 
-  it('supports explicit full and a proven custom key', () => {
+  it('поддерживает явный full и доказанный пользовательский ключ', () => {
     const fullResult = compileDataViewSource(rowLocalSource('incremental: full(),'))
     expect((fullResult.artifact as DataViewProgramPayload).materializationStrategy).toEqual({ kind: 'full' })
 
@@ -30,7 +30,7 @@ defineDataView({
     expect((byCode.artifact as DataViewProgramPayload).materializationStrategy).toEqual({ kind: 'collection-by-key', key: 'code' })
   })
 
-  it('compiles and executes parameterized row-local filtering with filterByKey', () => {
+  it('компилирует и выполняет параметризованную локальную фильтрацию строк через filterByKey', () => {
     const result = compileDataViewSource(`
 defineDataView({
   mode: 'pipeline',
@@ -66,7 +66,7 @@ defineDataView({
     expect(runtime.runPayload(payload, rows, undefined, { props: { search: '' } })).toEqual(rows)
   })
 
-  it('falls back to full for joins and nested DataViews in auto mode', () => {
+  it('переходит к full для joins и вложенных DataView в режиме auto', () => {
     const joined = compileDataViewSource(`
 defineDataView({
   mode: 'pipeline',
@@ -91,7 +91,7 @@ defineDataView({
     expect((nested.artifact as DataViewProgramPayload).materializationStrategy).toEqual({ kind: 'full' })
   })
 
-  it('rejects unproven explicit byKey, manual byKey and invalid strategy syntax', () => {
+  it('отклоняет недоказанный явный byKey, ручной byKey и некорректный синтаксис стратегии', () => {
     const unproven = compileDataViewSource(`
 defineDataView({
   mode: 'pipeline',

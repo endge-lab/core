@@ -4,14 +4,14 @@ import { Endge } from '@/kernel/endge'
 import { RStyle } from '@/modules/domain/entities/RStyle'
 import { compileEndgeCSS } from '@/modules/styles/services/endgecss-compile'
 
-describe('endge style leases', () => {
+describe('аренда стилей Endge', () => {
   afterEach(() => {
     Endge.styles.reset()
     Endge.program.clear()
     Endge.domain.reset()
   })
 
-  it('reference-counts one placement and suspends owners independently', () => {
+  it('ведёт подсчёт ссылок для одного размещения и независимо приостанавливает владельцев', () => {
     const style = RStyle.fromPlain({
       id: 900,
       identity: 'shared-theme',
@@ -49,7 +49,7 @@ describe('endge style leases', () => {
     expect(Endge.styles.getActivePlacements()).toEqual([])
   })
 
-  it('emits one change notification for an async transaction', async () => {
+  it('отправляет одно уведомление об изменении для асинхронной транзакции', async () => {
     const style = RStyle.fromPlain({ id: 901, identity: 'atomic-theme', name: 'Atomic', source: 'Text { color: red; }' })
     Endge.domain.addStyle(style)
     Endge.program.beginCompile('style-transaction')

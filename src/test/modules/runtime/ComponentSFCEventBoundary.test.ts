@@ -4,8 +4,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { createEmptyComponentSFCPortManifest } from '@/modules/domain/types/component/sfc/ports.types'
 import { ComponentSFCEventBoundary } from '@/modules/runtime/ComponentSFCEventBoundary'
 
-describe('componentSFCEventBoundary', () => {
-  it('routes a nested Event through forwarding while keeping reaction independent', async () => {
+describe('граница Events ComponentSFC', () => {
+  it('маршрутизирует вложенный Event через forwarding, сохраняя реакцию независимой', async () => {
     const rootManifest = createEmptyComponentSFCPortManifest()
     rootManifest.emits.events.push({
       kind: 'event',
@@ -36,7 +36,7 @@ describe('componentSFCEventBoundary', () => {
     expect(host.executeEventPortAction).toHaveBeenCalledTimes(2)
   })
 
-  it('executes a local tag reaction and keeps routing when stop is absent', async () => {
+  it('выполняет локальную реакцию тега и продолжает маршрутизацию при отсутствии stop', async () => {
     const manifest = createEmptyComponentSFCPortManifest()
     manifest.emits.events.push({
       kind: 'event',
@@ -63,7 +63,7 @@ describe('componentSFCEventBoundary', () => {
     expect(host.publishEventPort).toHaveBeenCalledWith('titleClicked', { button: 0 }, source)
   })
 
-  it('executes a local tag reaction but stops public routing with .stop', async () => {
+  it('выполняет локальную реакцию тега, но останавливает публичную маршрутизацию через .stop', async () => {
     const manifest = createEmptyComponentSFCPortManifest()
     manifest.emits.events.push({
       kind: 'event',
@@ -94,7 +94,7 @@ describe('componentSFCEventBoundary', () => {
     expect(host.publishEventPort).not.toHaveBeenCalled()
   })
 
-  it('executes a local .once reaction once without consuming later public occurrences', async () => {
+  it('однократно выполняет локальную реакцию .once, не поглощая последующие публичные вхождения', async () => {
     const manifest = createEmptyComponentSFCPortManifest()
     manifest.emits.events.push({
       kind: 'event',

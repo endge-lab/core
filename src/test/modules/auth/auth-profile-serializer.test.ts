@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { serializeServiceDocument } from '@/modules/domain/documents/service-document-serializer'
 
-describe('authProfile service serializer', () => {
-  it('clears token session policy when profile switches to Basic', () => {
+describe('сериализатор сервиса AuthProfile', () => {
+  it('очищает политику token-сессии при переключении профиля на Basic', () => {
     expect(serializeServiceDocument('auth-profile', {
       identity: 'basic',
       displayName: 'Basic',

@@ -13,7 +13,7 @@ const EXPECTED_METADATA = {
   },
 }
 
-describe('source metadata compilation', () => {
+describe('компиляция метаданных Source', () => {
   it.each([
     ['Query', compileQuerySource, `defineQuery({
       metadata: {
@@ -49,14 +49,14 @@ describe('source metadata compilation', () => {
       hooks: [],
       outputs: {},
     })`],
-  ])('extracts static metadata from %s source', (_name, compile, source) => {
+  ])('извлекает статические метаданные из Source %s', (_name, compile, source) => {
     const result = compile(source)
 
     expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
     expect(result.metadata).toEqual(EXPECTED_METADATA)
   })
 
-  it('rejects runtime-dependent metadata instead of executing it', () => {
+  it('отклоняет зависящие от runtime метаданные вместо их выполнения', () => {
     const result = compileFilterSource(`defineFilter({
       metadata: { 'hub.tgo': getAttributes() },
       fields: {},

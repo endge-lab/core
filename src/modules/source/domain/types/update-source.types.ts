@@ -16,7 +16,7 @@ export interface UpdateSourceDocument {
   mutations: UpdateMutationDescriptor[]
 }
 
-/** Runtime-ready Update artifact, always scoped to its owner Store. */
+/** Готовый для runtime артефакт Update, всегда ограниченный своим владельцем Store. */
 export interface UpdateSourceArtifact extends UpdateSourceDocument {
   type: 'update'
   sourceVersion: number

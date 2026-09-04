@@ -31,7 +31,7 @@ const PUBLIC_SYSTEM_KEYS = new Set([
   'constructor',
 ])
 
-/** Compiles Configuration schemas before effective context resolution. */
+/** Компилирует схемы Configuration до разрешения фактического контекста. */
 export class EndgeConfigurationSchema_Module extends EndgeModule {
   private _entries: EndgeConfigurationSchemaEntry[] = []
   private _types: TypeProgramCatalogEntry[] = []
@@ -102,7 +102,7 @@ export class EndgeConfigurationSchema_Module extends EndgeModule {
       .map(diagnostic => ({ identity: entry.identity, diagnostic })))
   }
 
-  /** Applies defaults, ignores stale keys and records incompatible active values for Compiler Problems. */
+  /** Применяет defaults, игнорирует устаревшие ключи и записывает несовместимые активные значения в Compiler Problems. */
   public resolveValues(input: EndgeConfigurationValues): EndgeConfigurationValues {
     const result: EndgeConfigurationValues = {}
     this._valueDiagnostics.clear()

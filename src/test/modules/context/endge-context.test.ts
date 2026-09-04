@@ -4,12 +4,12 @@ import { Endge } from '@/kernel/endge'
 import { EndgeContext_Module } from '@/modules/context/EndgeContext_Module'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
-describe('endgeContext locale and theme', () => {
+describe('локаль и тема EndgeContext', () => {
   beforeEach(() => {
     Endge.workspace.apply(TEST_ENDGE_WORKSPACE)
   })
 
-  it('uses en when the stored locale is not set', () => {
+  it('использует en, если сохранённая локаль не задана', () => {
     const context = new EndgeContext_Module()
 
     context.deserialize(undefined)
@@ -17,7 +17,7 @@ describe('endgeContext locale and theme', () => {
     expect(context.currentLocale).toBe('en')
   })
 
-  it('uses en before the workspace is loaded', () => {
+  it('использует en до загрузки Workspace', () => {
     Endge.workspace.reset()
     const context = new EndgeContext_Module()
 
@@ -26,7 +26,7 @@ describe('endgeContext locale and theme', () => {
     expect(context.currentLocale).toBe('en')
   })
 
-  it('uses dark when the stored theme is not set', () => {
+  it('использует dark, если сохранённая тема не задана', () => {
     const context = new EndgeContext_Module()
 
     context.deserialize(undefined)
@@ -34,7 +34,7 @@ describe('endgeContext locale and theme', () => {
     expect(context.currentTheme).toBe('dark')
   })
 
-  it('uses dark before the workspace is loaded', () => {
+  it('использует dark до загрузки Workspace', () => {
     Endge.workspace.reset()
     const context = new EndgeContext_Module()
 
@@ -43,7 +43,7 @@ describe('endgeContext locale and theme', () => {
     expect(context.currentTheme).toBe('dark')
   })
 
-  it('keeps supported stored locales', () => {
+  it('сохраняет поддерживаемые записанные локали', () => {
     const context = new EndgeContext_Module()
 
     context.deserialize({ project: null, environment: 'dev', locale: 'en' })
@@ -53,7 +53,7 @@ describe('endgeContext locale and theme', () => {
     expect(context.currentLocale).toBe('ru')
   })
 
-  it('reconciles unsupported stored locales to ru', () => {
+  it('приводит неподдерживаемые записанные локали к ru', () => {
     const context = new EndgeContext_Module()
 
     context.deserialize({ project: null, environment: 'dev', locale: 'kk' })
@@ -62,7 +62,7 @@ describe('endgeContext locale and theme', () => {
     expect(context.currentLocale).toBe('ru')
   })
 
-  it('notifies subscribers when locale changes', () => {
+  it('уведомляет подписчиков при изменении локали', () => {
     const context = new EndgeContext_Module()
     context.deserialize(undefined)
     const listener = vi.fn()
@@ -75,7 +75,7 @@ describe('endgeContext locale and theme', () => {
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
-  it('normalizes unsupported locale updates to ru', () => {
+  it('нормализует неподдерживаемые обновления локали к ru', () => {
     const context = new EndgeContext_Module()
     context.deserialize({ project: null, environment: 'dev', locale: 'en' })
 
@@ -84,7 +84,7 @@ describe('endgeContext locale and theme', () => {
     expect(context.currentLocale).toBe('ru')
   })
 
-  it('stores supported themes and normalizes unsupported updates', () => {
+  it('сохраняет поддерживаемые темы и нормализует неподдерживаемые обновления', () => {
     const context = new EndgeContext_Module()
     const listener = vi.fn()
     context.deserialize(undefined)
@@ -98,7 +98,7 @@ describe('endgeContext locale and theme', () => {
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
-  it('reconciles stored locale after workspace locales are loaded', () => {
+  it('согласует сохранённую локаль после загрузки локалей Workspace', () => {
     Endge.workspace.reset()
     const context = new EndgeContext_Module()
     context.deserialize({ project: null, environment: 'dev', locale: 'kk' })
@@ -119,7 +119,7 @@ describe('endgeContext locale and theme', () => {
     expect(context.currentLocale).toBe('kk')
   })
 
-  it('reconciles a stored theme after workspace themes are loaded', () => {
+  it('согласует сохранённую тему после загрузки тем Workspace', () => {
     Endge.workspace.reset()
     const context = new EndgeContext_Module()
     context.deserialize({ project: null, environment: 'dev', theme: 'contrast' })
@@ -141,7 +141,7 @@ describe('endgeContext locale and theme', () => {
   })
 })
 
-describe('endgeContext execution context resolution', () => {
+describe('разрешение контекста выполнения EndgeContext', () => {
   const candidates = {
     tenants: ['tenant-a', 'tenant-b'],
     projects: [
@@ -154,7 +154,7 @@ describe('endgeContext execution context resolution', () => {
     ],
   } as const
 
-  it('falls back to the first available entities for stale stored coordinates', () => {
+  it('использует первые доступные сущности для устаревших сохранённых координат', () => {
     const context = new EndgeContext_Module()
     context.deserialize({ tenant: 'removed', project: 'removed', environment: 'removed' })
 
@@ -165,7 +165,7 @@ describe('endgeContext execution context resolution', () => {
     })
   })
 
-  it('keeps valid stored coordinates', () => {
+  it('сохраняет валидные записанные координаты', () => {
     const context = new EndgeContext_Module()
     context.deserialize({ tenant: 'tenant-b', project: 'project-b', environment: 'development' })
 
@@ -176,7 +176,7 @@ describe('endgeContext execution context resolution', () => {
     })
   })
 
-  it('rejects an explicitly requested coordinate that is not available', () => {
+  it('отклоняет явно запрошенную недоступную координату', () => {
     const context = new EndgeContext_Module()
 
     expect(() => context.resolveExecutionContext({
@@ -185,7 +185,7 @@ describe('endgeContext execution context resolution', () => {
     })).toThrow('[EndgeContext] Project "missing-project" was not found in loaded Domain')
   })
 
-  it('rejects an explicitly requested environment outside the selected project', () => {
+  it('отклоняет явно запрошенный Environment вне выбранного Project', () => {
     const context = new EndgeContext_Module()
 
     expect(() => context.resolveExecutionContext({

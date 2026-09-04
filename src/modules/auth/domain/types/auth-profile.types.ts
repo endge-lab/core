@@ -21,7 +21,7 @@ export interface AuthProfileCredentials {
   [key: string]: string
 }
 
-/** Persisted discriminated contract of the built-in adapters. */
+/** Сохраняемый дискриминированный контракт встроенных адаптеров. */
 export interface AuthProfileBase {
   id: string
   identity: string
@@ -84,7 +84,7 @@ export type AuthProfile
     | BasicAuthProfile
     | BearerAuthProfile
 
-/** Runtime projection also accepts structurally validated registry extensions and legacy numeric IDs. */
+/** Runtime-проекция также принимает структурно проверенные расширения реестра и legacy числовые ID. */
 export interface AuthProfileSchema {
   id: string | number
   identity: string

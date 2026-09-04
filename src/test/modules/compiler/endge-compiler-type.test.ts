@@ -10,7 +10,7 @@ import { RTenant } from '@/modules/domain/entities/RTenant'
 import { RType } from '@/modules/domain/entities/RType'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
-describe('endgeCompiler Type Program', () => {
+describe('проверка Program Type в EndgeCompiler', () => {
   beforeEach(() => {
     Endge.domain.reset()
     prepareCompilerContext()
@@ -24,7 +24,7 @@ describe('endgeCompiler Type Program', () => {
     Endge.workspace.reset()
   })
 
-  it('builds a source-backed registry and warns about Any', () => {
+  it('строит реестр на основе Source и предупреждает об Any', () => {
     const stringType = makeType('String', '', true)
     const customer = makeType('Customer', `defineType({
       name: field('String'),
@@ -45,7 +45,7 @@ describe('endgeCompiler Type Program', () => {
     ]))
   })
 
-  it('attaches Any warnings to the owning entity without blocking compilation', () => {
+  it('прикрепляет предупреждения Any к сущности-owner без блокировки компиляции', () => {
     const anyType = makeType('Any', '', true)
     Endge.domain.addType(anyType)
     Endge.compiler.buildType(anyType)
@@ -69,7 +69,7 @@ describe('endgeCompiler Type Program', () => {
     }))
   })
 
-  it('keeps entity references as registry metadata without legacy field expansion', () => {
+  it('сохраняет ссылки на сущности как метаданные реестра без legacy-разворачивания полей', () => {
     const reference = makeType('RefComponent', '')
     reference.meta = { primitiveKind: 'reference', target: 'components', storage: 'identity' }
     Endge.domain.addType(reference)
@@ -84,13 +84,13 @@ describe('endgeCompiler Type Program', () => {
     })
   })
 
-  it('keeps contract mismatch diagnostic non-critical', () => {
+  it('оставляет диагностику несоответствия контракта некритичной', () => {
     expect(validateTypeCompatibility('Customer', 'Order', 'input.type')).toEqual([
       expect.objectContaining({ code: 'type-contract-mismatch', severity: 'warning' }),
     ])
   })
 
-  it('resolves an external RType in an SFC props contract and keeps the direct dependency', () => {
+  it('разрешает внешний RType в контракте props SFC и сохраняет прямую зависимость', () => {
     const stringType = makeType('String', '', true)
     const flightRow = makeType('FlightRow', `defineType({
       id: field('String'),

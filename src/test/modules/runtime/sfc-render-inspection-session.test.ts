@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { SFCRenderInspectionSession } from '@/modules/runtime/services/SFCRenderInspectionSession'
 
-describe('sFCRenderInspectionSession', () => {
-  it('keeps stable instance ids and builds a live hierarchy', async () => {
+describe('сессия инспекции render SFC', () => {
+  it('сохраняет стабильные ID экземпляров и строит живую иерархию', async () => {
     const session = new SFCRenderInspectionSession()
     const listener = vi.fn()
     session.subscribe(listener)
@@ -38,7 +38,7 @@ describe('sFCRenderInspectionSession', () => {
     expect(listener).toHaveBeenCalledOnce()
   })
 
-  it('isolates repeated node definitions by renderer scope', () => {
+  it('изолирует повторяющиеся определения узлов по scope renderer', () => {
     const session = new SFCRenderInspectionSession()
     const first = session.registerNode(createNode({ scope: 'root/row:flight-1', nodeId: 'root-0' }))
     const second = session.registerNode(createNode({ scope: 'root/row:flight-2', nodeId: 'root-0' }))
@@ -50,7 +50,7 @@ describe('sFCRenderInspectionSession', () => {
     expect(session.getTree()).toEqual([])
   })
 
-  it('stores only bounded JSON-safe projections and releases raw values', () => {
+  it('хранит только ограниченные JSON-безопасные проекции и освобождает исходные значения', () => {
     const session = new SFCRenderInspectionSession()
     const circular: Record<string, unknown> = {}
     circular.self = circular

@@ -34,7 +34,7 @@ interface NormalizeMenuOptions {
 
 const COLUMN_MENU_MODE_SET = new Set<string>(SFC_TABLE_COLUMN_MENU_MODES)
 type TableMenuTag = 'ColumnMenu' | 'CellMenu' | 'RowMenu'
-/** Normalizes declarative column context menu without evaluating SFC expressions. */
+/** Нормализует декларативное контекстное меню колонки без вычисления выражений SFC. */
 export function normalizeComponentSFCTableColumnMenu(
   tableNode: RComponentSFC_IR_ElementNode,
   actionsOrOptions?: ComponentSFCActionPort[] | NormalizeMenuOptions,
@@ -67,7 +67,7 @@ export function normalizeComponentSFCTableColumnMenu(
   }
 }
 
-/** Normalizes one optional row menu. Cell-aware values remain expressions until a right click occurs. */
+/** Нормализует необязательное меню строки. Значения ячеек остаются выражениями до правого клика. */
 export function normalizeComponentSFCTableRowMenu(
   tableNode: RComponentSFC_IR_ElementNode,
   actionsOrOptions?: ComponentSFCActionPort[] | NormalizeMenuOptions,
@@ -90,7 +90,7 @@ export function normalizeComponentSFCTableRowMenu(
   }
 }
 
-/** Normalizes the canonical Table > CellMenu, falling back to legacy Table > RowMenu. */
+/** Нормализует канонический Table > CellMenu с fallback на legacy Table > RowMenu. */
 export function normalizeComponentSFCTableCellMenu(
   tableNode: RComponentSFC_IR_ElementNode,
   actionsOrOptions?: ComponentSFCActionPort[] | NormalizeMenuOptions,
@@ -126,7 +126,7 @@ export function normalizeComponentSFCTableCellMenu(
   }
 }
 
-/** Normalizes an optional Column > CellMenu override; `cell-menu="none"` disables the default. */
+/** Нормализует необязательное переопределение Column > CellMenu; `cell-menu="none"` отключает значение по умолчанию. */
 export function normalizeComponentSFCColumnCellMenu(
   tableNode: RComponentSFC_IR_ElementNode,
   columnNode: RComponentSFC_IR_ElementNode,
@@ -392,7 +392,7 @@ function readActionBinding(
   }
 }
 
-/** Reads a compile-time MenuItem reference to one Action port. */
+/** Читает compile-time ссылку MenuItem на один порт Action. */
 export function readComponentSFCTableMenuActionPortReference(
   source: string,
 ): { name: string, role?: 'require' | 'provides' } | null {

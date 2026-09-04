@@ -8,14 +8,14 @@ import { RTenant } from '@/modules/domain/entities/RTenant'
 import { EndgeUI_Module } from '@/modules/ui/EndgeUI_Module'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
-describe('endgeCSS program lifecycle', () => {
+describe('жизненный цикл программы EndgeCSS', () => {
   afterEach(() => {
     Endge.configuration.reset()
     Endge.program.clear()
     Endge.domain.reset()
   })
 
-  it('registers source strategies and provides a typed style artifact', () => {
+  it('регистрирует стратегии Source и предоставляет типизированный артефакт стиля', () => {
     prepareCompilerContext()
     const source = '@theme night { --surface: #111; }\nText { color: white; }'
     expect(Endge.source.resolveStrategy('style')?.id).toBe('source:style')
@@ -30,7 +30,7 @@ describe('endgeCSS program lifecycle', () => {
     expect(Endge.program.getStyleArtifact(71)?.payload.stylesheet.rules).toHaveLength(1)
   })
 
-  it('uses the workspace catalog instead of exposing every theme found in style source', () => {
+  it('использует каталог Workspace вместо публикации каждой темы из Source стиля', () => {
     Endge.workspace.apply(TEST_ENDGE_WORKSPACE)
     Endge.context.setCurrentTheme('light')
     const ui = new EndgeUI_Module()

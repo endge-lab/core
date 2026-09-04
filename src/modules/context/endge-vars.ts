@@ -31,12 +31,12 @@ export class WorkspaceVariables {
     this._envyRecord = envyRecord ?? {}
   }
 
-  /** Compatibility name for callers that still provide runtime overrides directly. */
+  /** Имя совместимости для вызывающего кода, который всё ещё напрямую передаёт runtime-переопределения. */
   setEnvyRecord(envyRecord: EnvRecord): void {
     this.setEnvironment(envyRecord)
   }
 
-  /** Workspace-owned persisted variable definitions. */
+  /** Сохранённые определения переменных, принадлежащие Workspace. */
   get definitions(): EndgeWorkspaceVar[] {
     return [...this._getDefinitions()]
   }

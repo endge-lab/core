@@ -49,6 +49,6 @@ export class RFolder extends REntity {
   }
 
   compile(): void {
-    /* nothing yet */
+    /* пока пусто */
   }
 }

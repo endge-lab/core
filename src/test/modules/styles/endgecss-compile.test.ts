@@ -16,8 +16,8 @@ function node(input: Partial<EndgeStyleMatchNode> & Pick<EndgeStyleMatchNode, 't
   }
 }
 
-describe('compileEndgeCSS', () => {
-  it('compiles nesting, themes, scopes, supports and semantic selectors', () => {
+describe('компиляция EndgeCSS', () => {
+  it('компилирует вложенность, темы, scopes, supports и семантические селекторы', () => {
     const result = compileEndgeCSS(`
       // SCSS-like line comments are accepted
       @theme dark {
@@ -49,7 +49,7 @@ describe('compileEndgeCSS', () => {
     expect(result.artifact?.indexes.parts.status).toHaveLength(1)
   })
 
-  it('rejects @layer and reserves ::slot with explicit diagnostics', () => {
+  it('отклоняет @layer и резервирует ::slot с явной диагностикой', () => {
     const result = compileEndgeCSS('@layer base { Text { color: red; } }\nFlex::slot(actions) { gap: 1rem; }')
     expect(result.artifact).toBeNull()
     expect(result.diagnostics.map(item => item.code)).toEqual(expect.arrayContaining([
@@ -58,7 +58,7 @@ describe('compileEndgeCSS', () => {
     ]))
   })
 
-  it('matches logical combinators and nth-child without a DOM tree', () => {
+  it('сопоставляет логические комбинаторы и nth-child без DOM-дерева', () => {
     const artifact = compileEndgeCSS('.list > Text:nth-child(even):state(selected) { color: red; }').artifact!
     const parent = node({ tag: 'Flex', classes: new Set(['list']) })
     const first = node({ tag: 'Text', parent, index: 1, siblingCount: 2 })
@@ -66,7 +66,7 @@ describe('compileEndgeCSS', () => {
     expect(matchEndgeStyleSelector(artifact.rules[0].selectors[0], second)).toBe(true)
   })
 
-  it('walks a linked sibling chain for adjacent and general sibling selectors', () => {
+  it('обходит связанную цепочку соседей для смежных и общих sibling-селекторов', () => {
     const artifact = compileEndgeCSS('Text + Badge { color: red; } Text ~ Icon { color: blue; }').artifact!
     const first = node({ tag: 'Text', index: 1, siblingCount: 3 })
     const second = node({ tag: 'Badge', index: 2, siblingCount: 3, previousSibling: first })
@@ -76,7 +76,7 @@ describe('compileEndgeCSS', () => {
     expect(matchEndgeStyleSelector(artifact.rules[1].selectors[0], third)).toBe(true)
   })
 
-  it('resolves important, specificity and stable source order', () => {
+  it('разрешает important, специфичность и стабильный порядок Source', () => {
     const artifact = compileEndgeCSS(`
       Text { color: gray; }
       .status { color: blue; }

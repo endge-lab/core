@@ -311,7 +311,7 @@ function domainEntityIndex<TId, TEntity>(
   }
 }
 
-/** Replaces one Map entry without changing its iteration position. */
+/** Заменяет одну запись Map без изменения её позиции при итерации. */
 function replaceMapEntry<K, V>(
   map: Map<K, V>,
   previousKey: K,
@@ -337,7 +337,7 @@ function replaceMapEntry<K, V>(
 
 /** Модуль хранения, индексации и изменения документов домена. */
 export class EndgeDomain_Module extends EndgeModule {
-  /** Non-persisted descriptors materialized by core, plugins and compiler. */
+  /** Несохраняемые дескрипторы, материализованные ядром, плагинами и компилятором. */
   public readonly resolved = new ResolvedEntityIndex()
   private _projectsById: Map<number, RProject> = new Map()
   private _projectsByIdentity: Map<string, RProject> = new Map()
@@ -2372,7 +2372,7 @@ export class EndgeDomain_Module extends EndgeModule {
     return this.hasStyleByIdentity(identity)
   }
 
-  /** Workspace-owned Configuration source documents. */
+  /** Исходные документы Configuration, принадлежащие Workspace. */
   public getConfigurations(): RConfiguration[] {
     return Array.from(this._configurationsById.values())
   }

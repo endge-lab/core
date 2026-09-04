@@ -44,7 +44,7 @@ vi.mock('oidc-client-ts', async (importOriginal) => {
   return { ...actual, UserManager: FakeUserManager }
 })
 
-describe('oidcBrowserSession_Service', () => {
+describe('сервис браузерной сессии OIDC', () => {
   let localStorage: MemoryStorage
   let sessionStorage: MemoryStorage
 
@@ -58,7 +58,7 @@ describe('oidcBrowserSession_Service', () => {
 
   afterEach(() => vi.unstubAllGlobals())
 
-  it('keeps a non-persisted refresh token only in the current runtime', async () => {
+  it('хранит несохраняемый refresh token только в текущем runtime', async () => {
     const source = new OidcBrowserSession_Adapter(options(false))
     const login = await source.loginPopup()
     const raw = localStorage.getItem(localStorage.key(0) ?? '') ?? ''
@@ -74,7 +74,7 @@ describe('oidcBrowserSession_Service', () => {
       .toEqual(expect.not.objectContaining({ refreshToken: expect.anything() }))
   })
 
-  it('persists refresh token only after opt-in and supports both callbacks', async () => {
+  it('сохраняет refresh token только после согласия и поддерживает оба callback', async () => {
     const source = new OidcBrowserSession_Adapter(options(true))
     await source.completeRedirectCallback('https://app.test/callback?code=code&state=state')
     expect(localStorage.getItem(localStorage.key(0) ?? '')).toContain('refresh-token')

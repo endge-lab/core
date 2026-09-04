@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { compileStoreSource } from '@/modules/source/services/compilers/store-source-compile'
 
-describe('compileStoreSource', () => {
-  it('compiles writable and derived data fields', () => {
+describe('компиляция Source для Store', () => {
+  it('компилирует записываемые и производные поля данных', () => {
     const result = compileStoreSource(`defineStore({
       data: {
         raw: value([]),
@@ -30,7 +30,7 @@ describe('compileStoreSource', () => {
     })
   })
 
-  it('compiles mock reference as a writable value initializer', () => {
+  it('компилирует ссылку Mock как инициализатор записываемого значения', () => {
     const result = compileStoreSource(`defineStore({
       data: {
         raw: value(mock('groundhandling')),
@@ -48,7 +48,7 @@ describe('compileStoreSource', () => {
     ])
   })
 
-  it('compiles select as an inline projection DataView', () => {
+  it('компилирует select как inline-проекцию DataView', () => {
     const result = compileStoreSource(`defineStore({
       data: {
         raw: value({ pairsArrival: [], pairsDeparture: [] }),
@@ -82,7 +82,7 @@ describe('compileStoreSource', () => {
     expect((result.artifact?.data[1] as any).dataViews[0].source).toContain('defineDataView({ output:')
   })
 
-  it('compiles a root select expression without an object wrapper', () => {
+  it('компилирует корневое выражение select без объектной оболочки', () => {
     const result = compileStoreSource(`defineStore({
       data: {
         raw: value({ pairsArrival: [], pairsDeparture: [] }),
@@ -101,7 +101,7 @@ describe('compileStoreSource', () => {
     expect(source).toContain('defineDataView({ output: fullJoin(')
   })
 
-  it('rejects invalid mock references', () => {
+  it('отклоняет некорректные ссылки Mock', () => {
     for (const expression of ['mock()', 'mock(\'\')', 'mock(identity)', 'mock(\'one\', \'two\')']) {
       const result = compileStoreSource(`defineStore({ data: { raw: value(${expression}) } })`)
 
@@ -110,14 +110,14 @@ describe('compileStoreSource', () => {
     }
   })
 
-  it('rejects runtime expressions in value', () => {
+  it('отклоняет runtime-выражения в value', () => {
     const result = compileStoreSource(`defineStore({ data: { raw: value(createState()) } })`)
 
     expect(result.artifact).toBeNull()
     expect(result.diagnostics.some(item => item.code === 'store-value-static')).toBe(true)
   })
 
-  it('rejects forward derived references', () => {
+  it('отклоняет опережающие ссылки на производные данные', () => {
     const result = compileStoreSource(`defineStore({
       data: {
         table: derived().from('raw').dataView(dataView('rows')),

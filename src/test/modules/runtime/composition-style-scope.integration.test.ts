@@ -8,7 +8,7 @@ import { RComposition } from '@/modules/domain/entities/RComposition'
 import { RStyle } from '@/modules/domain/entities/RStyle'
 import { compileEndgeCSS } from '@/modules/styles/services/endgecss-compile'
 
-describe('composition style scope integration', () => {
+describe('интеграция Composition со scope стилей', () => {
   afterEach(async () => {
     await Endge.runtime.reset()
     Endge.styles.reset()
@@ -16,7 +16,7 @@ describe('composition style scope integration', () => {
     Endge.domain.reset()
   })
 
-  it('acquires, suspends, resumes and releases scoped style resources', async () => {
+  it('получает, приостанавливает, возобновляет и освобождает ресурсы стилей scope', async () => {
     addStyle(101, 'project-theme', 'Text { color: red; }')
     addStyle(102, 'page-theme', 'Text { color: blue; }')
     const composition = new RComposition()

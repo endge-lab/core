@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { compileQuerySource } from '@/modules/source/services/compilers/query-source-compile'
 import { createQueryExecutor } from '@/test/helpers/query-executor'
 
-describe('queryExecutor dynamic request fields', () => {
-  it('evaluates every request field from props before the HTTP call', async () => {
+describe('динамические поля запроса QueryExecutor', () => {
+  it('вычисляет каждое поле запроса из props до HTTP-вызова', async () => {
     const request = vi.fn().mockResolvedValue({ data: { ok: true } })
     const executor = createQueryExecutor({ request } as any)
     const payload = compileQuerySource(`
@@ -60,7 +60,7 @@ defineQuery({
     }))
   })
 
-  it('resolves canonical profile auth through EndgeAuth_Module requests', async () => {
+  it('разрешает авторизацию канонического профиля через запросы EndgeAuth_Module', async () => {
     const request = vi.fn().mockResolvedValue({ data: { ok: true } })
     const resolve = vi.fn().mockResolvedValue({
       profileIdentity: 'payload-auth',
@@ -89,7 +89,7 @@ defineQuery({
     }))
   })
 
-  it('executes GraphQL with a standard envelope and returns data', async () => {
+  it('выполняет GraphQL со стандартной оболочкой и возвращает data', async () => {
     const request = vi.fn().mockResolvedValue({
       data: { data: { updateItem: { id: 'item-1' } } },
     })
@@ -126,7 +126,7 @@ defineQuery({
     }))
   })
 
-  it('throws GraphQL errors returned with HTTP 2xx by default', async () => {
+  it('по умолчанию выбрасывает ошибки GraphQL, возвращённые с HTTP 2xx', async () => {
     const request = vi.fn().mockResolvedValue({
       data: { data: null, errors: [{ message: 'Mutation rejected' }] },
     })

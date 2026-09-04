@@ -1,3 +1,3 @@
-/** Base source for a new Configuration v1 category. */
+/** Базовый source новой категории Configuration v1. */
 export const CONFIGURATION_DEFAULT_SOURCE = `defineConfig({})
 `

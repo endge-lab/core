@@ -3,7 +3,7 @@ import type { RComponentSFC } from '@/modules/domain/entities/RComponentSFC'
 import type { RComponentTable } from '@/modules/domain/entities/RComponentTable'
 import type { ComponentType } from '@/modules/domain/types/document/document.types'
 
-/** Persisted renderer kind of a legacy component document. */
+/** Сохранённый вид renderer legacy-документа компонента. */
 export enum ComponentKind {
   JSX = 'jsx',
   Vue = 'vue',

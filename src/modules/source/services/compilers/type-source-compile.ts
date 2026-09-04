@@ -24,7 +24,7 @@ type StaticValueResult = { ok: true, value: unknown } | { ok: false }
 export function compileTypeSource(source: string, sourceVersion = 1): TypeSourceCompileResult {
   const diagnostics: DiagnosticDraft[] = []
 
-  // Existing legacy records intentionally have no source during the transition.
+  // Существующие legacy-записи намеренно не имеют Source во время перехода.
   if (!String(source ?? '').trim()) {
     return { ast: null, document: null, artifact: null, diagnostics }
   }

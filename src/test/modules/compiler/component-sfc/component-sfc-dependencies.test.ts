@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { compileComponentSFC } from '@/modules/compiler/services/component-sfc/component-sfc-compile'
 import { analyzeComponentSFCRuntimeDependencies } from '@/modules/compiler/services/component-sfc/component-sfc-dependencies'
 
-describe('analyzeComponentSFCRuntimeDependencies', () => {
-  it('finds prop reads from interpolation, dynamic attrs and if directives', () => {
+describe('анализ runtime-зависимостей Component SFC', () => {
+  it('находит чтения props из интерполяций, динамических атрибутов и директив if', () => {
     const ir = compileComponentSFC(`<script setup lang="ts">
 defineProps<{
   flight: FlightLeg
@@ -27,7 +27,7 @@ defineProps<{
     ])
   })
 
-  it('deduplicates same reads and ignores literals', () => {
+  it('дедублицирует одинаковые чтения и игнорирует литералы', () => {
     const ir = compileComponentSFC(`<script setup lang="ts">
 defineProps<{
   flight: FlightLeg
@@ -50,7 +50,7 @@ defineProps<{
     })
   })
 
-  it('collects for source dependency without analyzing arbitrary script body', () => {
+  it('собирает зависимость source для for без анализа произвольного тела script', () => {
     const ir = compileComponentSFC(`<script setup lang="ts">
 const localValue = flight.hidden
 defineProps<{
@@ -74,7 +74,7 @@ defineProps<{
     ])
   })
 
-  it('collects table rows dependency and ignores row scoped reads', () => {
+  it('собирает зависимость строк таблицы и игнорирует чтения в scope строки', () => {
     const ir = compileComponentSFC(`<script setup lang="ts">
 defineProps<{
   flights: FlightLeg[]
@@ -116,7 +116,7 @@ defineProps<{
     ])
   })
 
-  it('collects prop reads from display-only input primitives', () => {
+  it('собирает чтения props из input-примитивов только для отображения', () => {
     const ir = compileComponentSFC(`<script setup lang="ts">
 defineProps<{
   search: string
@@ -143,7 +143,7 @@ defineProps<{
     ])
   })
 
-  it('ignores unsupported or global identifiers', () => {
+  it('игнорирует неподдерживаемые и глобальные идентификаторы', () => {
     const ir = compileComponentSFC(`<script setup lang="ts">
 defineProps<{
   flight: FlightLeg

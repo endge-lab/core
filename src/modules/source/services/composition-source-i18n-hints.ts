@@ -22,7 +22,7 @@ interface TranslationResolution {
   value: string | null
 }
 
-/** Resolves translation inline hints from current source and projected catalogs. */
+/** Определяет inline-подсказки перевода из текущего Source и спроецированных каталогов. */
 export function compositionSourceI18nHints(context: SourceLanguageContext): SourceLanguageInlineHint[] {
   const i18n = context.i18n
   if (!i18n?.occurrences.length) {
@@ -49,7 +49,7 @@ export function compositionSourceI18nHints(context: SourceLanguageContext): Sour
   })
 }
 
-/** Resolves an `alias:key` literal to one physical i18n document when unambiguous. */
+/** Сопоставляет литерал `alias:key` с одним физическим документом i18n при однозначности. */
 export function compositionSourceI18nReferenceAt(
   context: SourceLanguageContext,
 ): SourceDocumentReference | null {

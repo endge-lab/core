@@ -6,13 +6,13 @@ import { OperationHistory } from '@/modules/runtime/operation/operation-history'
 import { RuntimeScope } from '@/modules/runtime/RuntimeScope'
 import { compileCompositionSource } from '@/modules/source/services/compilers/composition-source-compile'
 
-describe('composition Operation History integration', () => {
+describe('интеграция Composition с историей операций', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
   })
 
-  it('compiles one History resource with configuration-backed limit and TriggerSets', () => {
+  it('компилирует один ресурс History с лимитом из Configuration и TriggerSets', () => {
     const result = compileCompositionSource(`defineComposition({
       resources: {
         operations: operationHistory({
@@ -39,7 +39,7 @@ describe('composition Operation History integration', () => {
     })
   })
 
-  it('rejects two History aliases in one Composition scope', () => {
+  it('отклоняет два alias History в одном scope Composition', () => {
     const result = compileCompositionSource(`defineComposition({
       resources: {
         first: operationHistory({ limit: 10 }),
@@ -50,7 +50,7 @@ describe('composition Operation History integration', () => {
     expect(result.diagnostics).toContainEqual(expect.objectContaining({ code: 'composition-operation-history-conflict' }))
   })
 
-  it('resolves the nearest active History and falls back to its parent while paused', () => {
+  it('разрешает ближайшую активную History, а во время паузы использует родительскую', () => {
     const root = new RuntimeScope({ id: 'root', path: 'root' })
     const child = new RuntimeScope({ id: 'child', path: 'root.child', parent: root })
     const rootHistory = new OperationHistory({ id: 'root-history' })
@@ -72,7 +72,7 @@ describe('composition Operation History integration', () => {
     rootHistory.dispose()
   })
 
-  it('dispatches a custom TriggerSet and prevents the browser default', async () => {
+  it('отправляет пользовательский TriggerSet и предотвращает стандартное действие браузера', async () => {
     const listeners: Record<string, (event: Event) => void> = {}
     vi.stubGlobal('addEventListener', vi.fn((name: string, next: (event: Event) => void) => {
       listeners[name] = next

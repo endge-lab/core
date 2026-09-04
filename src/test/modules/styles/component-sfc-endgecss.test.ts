@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { compileComponentSFC } from '@/modules/compiler/services/component-sfc/component-sfc-compile'
 import { compileEndgeCSS } from '@/modules/styles/services/endgecss-compile'
 
-describe('sFC EndgeCSS compilation', () => {
-  it('uses the shared artifact and derives a stable identity scope', () => {
+describe('компиляция EndgeCSS для SFC', () => {
+  it('использует общий артефакт и выводит стабильный scope identity', () => {
     const source = `<template><Text id="status">Ready</Text></template>
 <style scoped lang="endgecss">#status { color: green; }</style>`
     const first = compileComponentSFC(source, { identity: 'flight-board' })
@@ -17,7 +17,7 @@ describe('sFC EndgeCSS compilation', () => {
     expect(first.ir?.style?.rules.map(rule => rule.declarations)).toEqual(global.rules.map(rule => rule.declarations))
   })
 
-  it('keeps a component renderable when only its style is invalid', () => {
+  it('сохраняет возможность render компонента, когда некорректен только его стиль', () => {
     const result = compileComponentSFC(`<template><Text>Ready</Text></template>
 <style lang="css">Text { color: red; }</style>`, { identity: 'flight-board' })
     expect(result.ir?.template.roots).toHaveLength(1)

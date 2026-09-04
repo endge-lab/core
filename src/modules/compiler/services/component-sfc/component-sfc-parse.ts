@@ -38,7 +38,7 @@ export interface ComponentSFCParseResult {
   /** Stable AST, независимый от внутренних типов Vue parser. */
   ast: RComponentSFC_AST | null
 
-  /** Diagnostics parser pass. */
+  /** Диагностический проход parser. */
   diagnostics: RComponentDiagnostic[]
 }
 

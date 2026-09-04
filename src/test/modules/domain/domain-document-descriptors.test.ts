@@ -15,8 +15,8 @@ import { ENDGE_STYLE_DEFAULT_SOURCE, RStyle } from '@/modules/domain/entities/RS
 import { RType } from '@/modules/domain/entities/RType'
 import { ComponentType, DOMAIN_DOCUMENT_TYPES, QueryType } from '@/modules/domain/types/document/document.types'
 
-describe('domainDocumentDescriptors', () => {
-  it('creates a source-first query draft without a persisted id', () => {
+describe('дескрипторы документов домена', () => {
+  it('создаёт черновик Query с приоритетом Source без сохранённого ID', () => {
     const draft = createNewDomainDocument(QueryType.REST, {
       identity: 'flight-list',
       name: 'Flights',
@@ -36,7 +36,7 @@ describe('domainDocumentDescriptors', () => {
     expect(draft.id).toBeUndefined()
   })
 
-  it('uses the canonical SFC source template', () => {
+  it('использует канонический template Source SFC', () => {
     const draft = createNewDomainDocument(ComponentType.SFC, {
       identity: 'status-label',
     })
@@ -46,7 +46,7 @@ describe('domainDocumentDescriptors', () => {
     expect((draft as RComponentSFC).source).toContain('<Text>')
   })
 
-  it('creates a canonical Source Action', () => {
+  it('создаёт канонический Source Action', () => {
     const draft = createNewDomainDocument('action', {
       identity: 'refresh-data',
       name: 'Refresh data',
@@ -57,7 +57,7 @@ describe('domainDocumentDescriptors', () => {
     expect((draft as RAction).sourceVersion).toBe(1)
   })
 
-  it('creates a persisted JSON mock draft', () => {
+  it('создаёт сохраняемый черновик Mock в JSON', () => {
     const draft = createNewDomainDocument('mock', {
       identity: 'orders-response',
       name: 'Orders response',
@@ -75,7 +75,7 @@ describe('domainDocumentDescriptors', () => {
     })
   })
 
-  it('creates a source-first computation draft', () => {
+  it('создаёт черновик Computation с приоритетом Source', () => {
     const draft = createNewDomainDocument('computation', {
       identity: 'ground-handling-cell-state',
       name: 'Ground handling cell state',
@@ -93,7 +93,7 @@ describe('domainDocumentDescriptors', () => {
     expect((draft as RComputation).source).toContain('defineComputation')
   })
 
-  it('creates a library Composition by default', () => {
+  it('по умолчанию создаёт библиотечную Composition', () => {
     const draft = createNewDomainDocument('composition', {
       identity: 'project-startup',
       name: 'Project startup',
@@ -109,7 +109,7 @@ describe('domainDocumentDescriptors', () => {
     })
   })
 
-  it('creates a source-first style draft without derived artifacts', () => {
+  it('создаёт черновик Style с приоритетом Source без производных артефактов', () => {
     const draft = createNewDomainDocument('style', {
       identity: 'flight-board',
       name: 'Flight board',
@@ -127,7 +127,7 @@ describe('domainDocumentDescriptors', () => {
     expect((draft as RStyle).toPlain()).not.toHaveProperty('styles')
   })
 
-  it('creates a source-first complex type draft', () => {
+  it('создаёт черновик сложного Type с приоритетом Source', () => {
     const draft = createNewDomainDocument('type', {
       identity: 'flight-status',
       name: 'Flight status',
@@ -146,13 +146,13 @@ describe('domainDocumentDescriptors', () => {
     expect((draft as RType).source).toContain('defineType')
   })
 
-  it('rejects an empty identity', () => {
+  it('отклоняет пустой identity', () => {
     expect(() => createNewDomainDocument(QueryType.REST, { identity: '  ' }))
       .toThrow('Document identity is required.')
   })
 
   /** Гарантирует descriptor и явные capabilities для каждого canonical document type. */
-  it('covers every canonical document type with explicit capability values', () => {
+  it('охватывает каждый канонический тип документа явными значениями capabilities', () => {
     expect(Object.keys(DOMAIN_DOCUMENT_DESCRIPTORS).sort())
       .toEqual([...DOMAIN_DOCUMENT_TYPES].sort())
 
@@ -167,7 +167,7 @@ describe('domainDocumentDescriptors', () => {
   })
 
   /** Проверяет единый round-trip создания, сериализации и материализации Query. */
-  it('round-trips a persisted query through its descriptor', () => {
+  it('сохраняет сохранённый Query при двустороннем преобразовании через его descriptor', () => {
     const descriptor = getDomainDocumentDescriptor(QueryType.REST)
     const draft = createNewDomainDocument(QueryType.REST, {
       identity: 'flight-list',
@@ -191,7 +191,7 @@ describe('domainDocumentDescriptors', () => {
   })
 
   /** Фиксирует отсутствие несуществующих Source, Program и Runtime возможностей. */
-  it('represents unsupported capabilities as null', () => {
+  it('представляет неподдерживаемые capabilities значением null', () => {
     expect(getDomainDocumentDescriptor('auth-profile').capabilities).toEqual({
       source: null,
       program: null,

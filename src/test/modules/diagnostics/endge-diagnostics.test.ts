@@ -37,8 +37,8 @@ function configuration(
   }
 }
 
-describe('endgeDiagnostics', () => {
-  it('applies severity policy and keeps only the bounded history tail', () => {
+describe('диагностика Endge', () => {
+  it('применяет политику severity и сохраняет только ограниченный хвост истории', () => {
     const diagnostics = new EndgeDiagnostics_Module()
     diagnostics.configure(configuration({ minSeverity: 9, maxRecords: 2 }))
 
@@ -56,7 +56,7 @@ describe('endgeDiagnostics', () => {
     })
   })
 
-  it('normalizes correlation, exceptions and sensitive attributes', () => {
+  it('нормализует correlation, исключения и чувствительные атрибуты', () => {
     const diagnostics = new EndgeDiagnostics_Module()
     diagnostics.configure(configuration())
     const traceId = '0123456789abcdef0123456789abcdef'
@@ -88,7 +88,7 @@ describe('endgeDiagnostics', () => {
     })
   })
 
-  it('stores one completed record per span and links child logs', () => {
+  it('хранит одну завершённую запись на span и связывает дочерние logs', () => {
     const diagnostics = new EndgeDiagnostics_Module()
     diagnostics.configure(configuration())
     const root = diagnostics.startSpan('compile', { startTimestamp: 100 })
@@ -115,7 +115,7 @@ describe('endgeDiagnostics', () => {
     expect(child.end()).toBeNull()
   })
 
-  it('filters subscriptions, supports replay and isolates listener errors', () => {
+  it('фильтрует подписки, поддерживает replay и изолирует ошибки listeners', () => {
     const diagnostics = new EndgeDiagnostics_Module()
     diagnostics.configure(configuration())
     diagnostics.warn('warning')
@@ -139,7 +139,7 @@ describe('endgeDiagnostics', () => {
     expect(diagnostics.getCounters().listenerFailures).toBe(1)
   })
 
-  it('enriches logs and spans with context captured at record start', () => {
+  it('обогащает logs и spans контекстом, захваченным при начале записи', () => {
     const diagnostics = new EndgeDiagnostics_Module()
     diagnostics.configure(configuration())
     let actor = { 'user.id': 'user-1', 'session.id': 'session-1' }
@@ -168,7 +168,7 @@ describe('endgeDiagnostics', () => {
     expect(diagnostics.getCounters().activeContextProviders).toBe(0)
   })
 
-  it('isolates context provider errors from record producers', () => {
+  it('изолирует ошибки провайдера контекста от производителей записей', () => {
     const diagnostics = new EndgeDiagnostics_Module()
     diagnostics.configure(configuration())
     diagnostics.registerContextProvider('broken', () => {
@@ -180,7 +180,7 @@ describe('endgeDiagnostics', () => {
     expect(diagnostics.getCounters().contextProviderFailures).toBe(1)
   })
 
-  it('routes matching records to adapters and flushes them best-effort', async () => {
+  it('направляет подходящие записи в адаптеры и сбрасывает их по возможности', async () => {
     const diagnostics = new EndgeDiagnostics_Module()
     const accept = vi.fn()
     const flush = vi.fn()
@@ -212,7 +212,7 @@ describe('endgeDiagnostics', () => {
     expect(() => diagnostics.registerAdapter(adapter)).toThrow('Adapter "memory" is already registered')
   })
 
-  it('does not let a rejected adapter promise break the producer', async () => {
+  it('не позволяет отклонённому promise адаптера нарушить работу производителя', async () => {
     const diagnostics = new EndgeDiagnostics_Module()
     diagnostics.configure({
       ...configuration(),
@@ -240,7 +240,7 @@ describe('endgeDiagnostics', () => {
     expect(diagnostics.getCounters().adapterFailures).toBe(1)
   })
 
-  it('routes one record to an output once when several routes match', () => {
+  it('однократно направляет запись в output при совпадении нескольких routes', () => {
     const diagnostics = new EndgeDiagnostics_Module()
     const acceptRecord = vi.fn()
     const base = configuration()
@@ -262,7 +262,7 @@ describe('endgeDiagnostics', () => {
     expect(acceptRecord.mock.calls[0]?.[1]).toMatchObject({ routeIds: ['runtime', 'errors'] })
   })
 
-  it('creates an automatic snapshot only when the sliding window threshold is reached', () => {
+  it('создаёт автоматический snapshot только при достижении порога скользящего окна', () => {
     const diagnostics = new EndgeDiagnostics_Module()
     const acceptSnapshot = vi.fn()
     const base = configuration()

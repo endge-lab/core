@@ -20,9 +20,9 @@ function descriptorCapabilityValues(key: 'source' | 'program' | 'runtime'): stri
     .sort()
 }
 
-describe('domain document capability contracts', () => {
+describe('контракты возможностей документов домена', () => {
   /** Сверяет descriptor Source capabilities с реальным language strategy registry. */
-  it('matches registered Source language strategies', () => {
+  it('сопоставляет зарегистрированные стратегии языка Source', () => {
     const registered = new EndgeSource_Module()
       .listLanguageStrategies()
       .map(strategy => strategy.sourceKind)
@@ -33,13 +33,13 @@ describe('domain document capability contracts', () => {
   })
 
   /** Сверяет descriptor Program capabilities с реальными compiler handlers. */
-  it('matches registered compiler handlers', () => {
+  it('сопоставляет зарегистрированные handlers компилятора', () => {
     expect(descriptorCapabilityValues('program'))
       .toEqual(new EndgeCompiler_Module().listSupportedEntityTypes().sort())
   })
 
   /** Сверяет descriptor Runtime capabilities с реальными built-in strategies. */
-  it('matches built-in runtime strategies', () => {
+  it('сопоставляет встроенные runtime-стратегии', () => {
     const strategies = [
       new ActionRuntimeStrategy(),
       new ComponentSFCRuntimeStrategy(),

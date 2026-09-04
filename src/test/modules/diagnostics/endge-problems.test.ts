@@ -5,7 +5,7 @@ import { EndgeDiagnostics_Module } from '@/modules/diagnostics/EndgeDiagnostics_
 import { createDiagnosticsEntityOwner, EndgeProblems_Module } from '@/modules/diagnostics/EndgeProblems_Module'
 import { RMock } from '@/modules/domain/entities/RMock'
 
-describe('endgeProblems', () => {
+describe('проблемы Endge', () => {
   it('атомарно заменяет problems одного entity owner', () => {
     const problems = new EndgeProblems_Module()
     const owner = createDiagnosticsEntityOwner({
