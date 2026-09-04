@@ -1,8 +1,8 @@
-import type { RComponentSFC_IR_ElementNode } from '@/modules/domain/types/component/sfc/ir.types'
+import type { RComponentSFC_IR_ElementNode } from '@/features/core/modules/domain/types/component/sfc/ir.types'
 
 import { describe, expect, it } from 'vitest'
-import { compileComponentSFC } from '@/modules/compiler/services/component-sfc/component-sfc-compile'
-import { normalizeComponentSFCTableColumnVisibility } from '@/modules/compiler/services/component-sfc/component-sfc-table-visibility'
+import { compileComponentSFC } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-compile'
+import { normalizeComponentSFCTableColumnVisibility } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-table-visibility'
 
 describe('видимость колонок таблицы Component SFC', () => {
   it('разбирает default-hidden как разреженный список ключей скрытых колонок', () => {

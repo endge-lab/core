@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { compileComponentSFC } from '@/modules/compiler/services/component-sfc/component-sfc-compile'
-import { listComponentSFCEventCapableTags } from '@/modules/domain/types/component/sfc/intrinsic-events.types'
-import { createEmptyComponentSFCPortManifest } from '@/modules/domain/types/component/sfc/ports.types'
-import { ComponentSFCEventBoundary } from '@/modules/runtime/ComponentSFCEventBoundary'
+import { compileComponentSFC } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-compile'
+import { listComponentSFCEventCapableTags } from '@/features/core/modules/domain/types/component/sfc/intrinsic-events.types'
+import { createEmptyComponentSFCPortManifest } from '@/features/core/modules/domain/types/component/sfc/ports.types'
+import { ComponentSFCEventBoundary } from '@/features/core/modules/runtime/ComponentSFCEventBoundary'
 
 describe('взаимодействия :on в Component SFC', () => {
   it('разрешает обязательную реакцию Query через binding смонтированного экземпляра', async () => {

@@ -1,0 +1,3493 @@
+import type { EndgeBootContext } from '@/features/core/kernel/types/bootstrap.types'
+import type { ComponentSFCCompileResult } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-compile'
+import type { EndgeSFCEditingConfiguration } from '@/features/core/modules/configuration/domain/types/configuration.type'
+import type { DiagnosticsSpanHandle } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
+import type { RConfiguration } from '@/features/core/modules/domain/entities/RConfiguration'
+import type { RStore } from '@/features/core/modules/domain/entities/RStore'
+import type { RStream } from '@/features/core/modules/domain/entities/RStream'
+import type { RStyle } from '@/features/core/modules/domain/entities/RStyle'
+import type { RType } from '@/features/core/modules/domain/entities/RType'
+import type { RUpdate } from '@/features/core/modules/domain/entities/RUpdate'
+import type { RVocabs } from '@/features/core/modules/domain/entities/RVocabs'
+import type { ComponentSFCPortManifest } from '@/features/core/modules/domain/types/component/sfc/ports.types'
+import type { ProgramMetadata } from '@/features/core/modules/program/domain/types/program-metadata.types'
+import type {
+  ActionProgramPayload,
+  ComponentSFCProgramPayload,
+  ComponentSFCTagRegistryEntry,
+  ComputationProgramPayload,
+  ConfigurationProgramPayload,
+  DataViewProgramPayload,
+  EndgeStyleProgramPayload,
+  EntityCompilerHandler,
+  ProgramArtifact,
+  ProgramArtifactRef,
+  ProgramCapability,
+  ProgramCompileContext,
+  ProgramDependency,
+  ProgramDiagnostic,
+  ProgramEntityType,
+  QueryProgramOutput,
+  QueryProgramPayload,
+} from '@/features/core/modules/program/domain/types/program.types'
+import type { CompositionBindingValue, CompositionProgramPayload } from '@/features/core/modules/source/domain/types/composition-source.types'
+
+import type { DataViewMaterializationStrategy, DataViewPipelineStep, DataViewRef } from '@/features/core/modules/source/domain/types/data-view-source.types'
+import type { FilterProgramPayload } from '@/features/core/modules/source/domain/types/filter-source.types'
+import type { ResponseOutputTransform } from '@/features/core/modules/source/domain/types/response-output.types'
+import type { SourceExpressionIR, SourceFieldDefinition } from '@/features/core/modules/source/domain/types/source-expression.types'
+import type { StoreSourceArtifact } from '@/features/core/modules/source/domain/types/store-source.types'
+import type { StreamSourceArtifact } from '@/features/core/modules/source/domain/types/stream-source.types'
+import type { TypeProgramCatalogEntry, TypeProgramPayload, TypeSourceDefinition, TypeSourceExpression } from '@/features/core/modules/source/domain/types/type-source.types'
+import type { UpdateSourceArtifact } from '@/features/core/modules/source/domain/types/update-source.types'
+import type { VocabProgramPayload } from '@/features/core/modules/source/domain/types/vocab-source.types'
+import type { EndgeStyleSheetArtifact } from '@/features/core/modules/styles/domain/types/style.types'
+import { ENDGE_COMPILER_SPAN_GROUPS, ENDGE_COMPILER_VERSION } from '@/features/core/kernel/config/kernel.config'
+import { Endge } from '@/features/core/kernel/endge'
+import { compileAction } from '@/features/core/modules/compiler/services/action/action-compile'
+import { compileComponentSFC } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-compile'
+import { parseComponentSFC } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-parse'
+import { analyzeComponentSFCScript } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-script'
+import { isComponentSFCBuiltInTag } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-template'
+import { compileComputation } from '@/features/core/modules/compiler/services/computation/computation-compile'
+import {
+  collectTypeDefinitionReferences,
+  collectTypeExpressionReferences,
+  collectTypeSourceExpressionReferences,
+  validateTypeDefinitionReferences,
+  validateTypeExpressionUsage,
+  validateTypeSourceExpressionUsage,
+} from '@/features/core/modules/compiler/services/type/type-program-validation'
+import { createDiagnosticsEntityOwner } from '@/features/core/modules/diagnostics/EndgeProblems_Module'
+import { RAction } from '@/features/core/modules/domain/entities/RAction'
+import { RComponentSFC } from '@/features/core/modules/domain/entities/RComponentSFC'
+import { RComposition } from '@/features/core/modules/domain/entities/RComposition'
+import { RComputation } from '@/features/core/modules/domain/entities/RComputation'
+import { RDataView } from '@/features/core/modules/domain/entities/RDataView'
+import { RField } from '@/features/core/modules/domain/entities/RField'
+import { RFilter } from '@/features/core/modules/domain/entities/RFilter'
+import { RQuery } from '@/features/core/modules/domain/entities/RQuery'
+import {
+  COMPONENT_SFC_FORM_EVENT_DEFINITIONS,
+  COMPONENT_SFC_INTERACTION_EVENT_DEFINITIONS,
+} from '@/features/core/modules/domain/types/component/sfc/intrinsic-events.types'
+import { TABLE_EVENT_DEFINITIONS } from '@/features/core/modules/domain/types/component/sfc/table-events.types'
+import { collectI18nMessageKeys, compileI18nLocales } from '@/features/core/modules/i18n/services/i18n-catalog'
+import { createEmptyProgramMetadata } from '@/features/core/modules/program/domain/types/program-metadata.types'
+import { compileTypeSource } from '@/features/core/modules/source/services/compilers/type-source-compile'
+import { resolveCompositionActivation } from '@/features/core/modules/source/services/composition-activation'
+import { compileEndgeCSS } from '@/features/core/modules/styles/services/endgecss-compile'
+import { EndgeModule } from '@/features/federation/EndgeModule'
+
+const MISSING_STATIC_PATH = Symbol('missing-static-path')
+
+type ComputationArtifact = ProgramArtifact<ComputationProgramPayload>
+
+const COMPUTATION_LINK_DIAGNOSTICS = new Set([
+  'computation-reference-missing',
+  'computation-reference-invalid',
+  'computation-reference-cycle',
+])
+
+const COMPONENT_SFC_BUILTIN_EVENT_PAYLOAD_TYPES = new Set([
+  ...COMPONENT_SFC_INTERACTION_EVENT_DEFINITIONS,
+  ...COMPONENT_SFC_FORM_EVENT_DEFINITIONS,
+  ...TABLE_EVENT_DEFINITIONS,
+].map(event => event.payloadType))
+
+/**
+ * Компилятор persisted domain model в compiled program artifacts.
+ */
+export class EndgeCompiler_Module extends EndgeModule {
+  private readonly _handlers = new Map<ProgramEntityType, EntityCompilerHandler<any, any>>()
+  private _localDataViewCounter = 0
+  private _localFilterCounter = 0
+  private _componentTagDiagnosticsByIdentity = new Map<string, Omit<ProgramDiagnostic, 'entityRef'>[]>()
+  private _componentPortManifestCache = new Map<string, ComponentSFCPortManifest>()
+  private _componentPortManifestResolving = new Set<string>()
+  private _compileSpan: DiagnosticsSpanHandle | null = null
+
+  /**
+   * Создает singleton-bound compiler module и регистрирует стандартные handlers.
+   *
+   * Регистрация выполняется один раз при создании модуля, чтобы build-фаза
+   * только запускала pipeline и не пересобирала таблицу обработчиков.
+   */
+  public constructor() {
+    super()
+    this._registerDefaultHandlers()
+  }
+
+  /** Возвращает фактически зарегистрированные compiler entity types для contract verification. */
+  public listSupportedEntityTypes(): ProgramEntityType[] {
+    return [...this._handlers.keys()]
+  }
+
+  /**
+   * Lifecycle-точка входа компилятора.
+   *
+   * На build-фазе читает текущий `Endge.domain`, очищает/начинает новый
+   * `Endge.program` compile cycle и строит artifacts для сущностей.
+   */
+  public override build(_ctx: EndgeBootContext): void {
+    const context = this._createCompileContext()
+    const componentSFCs = Endge.domain.getComponentSFCs()
+
+    Endge.program.beginCompile(ENDGE_COMPILER_VERSION)
+    Endge.domain.resolved.clearDerived('action')
+    this._componentPortManifestCache.clear()
+    this._componentPortManifestResolving.clear()
+    Endge.diagnostics.problems.clear({
+      phases: ['build'],
+      entityTypes: [...this._handlers.keys()],
+    })
+    this._prepareComponentTagRegistry(componentSFCs)
+    this._compileSpan = Endge.diagnostics.startSpan('domain.compile', {
+      scope: { name: 'endge.compiler', version: ENDGE_COMPILER_VERSION },
+      phase: 'build',
+    })
+
+    try {
+      if (!this._compilePhase('type', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'types', Endge.types.listResolved(), context)) {
+        return
+      }
+
+      if (!this._compilePhase('configuration', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'configurations', Endge.domain.getConfigurations(), context)) {
+        return
+      }
+
+      if (!this._compilePhase('computation', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'computations', Endge.domain.getComputations(), context)) {
+        return
+      }
+      this._linkComputations()
+
+      if (!this._compilePhase('action', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'actions', Endge.domain.getActions(), context)) {
+        return
+      }
+
+      if (!this._compilePhase('component-sfc', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'SFC-компонентов', componentSFCs, context)) {
+        return
+      }
+      this._materializeProvidedActions(componentSFCs)
+
+      if (!this._compilePhase('style', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'EndgeCSS styles', this._orderedStyles(), context)) {
+        return
+      }
+
+      if (!this._compilePhase('data-view', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'data views', Endge.domain.getDataViews(), context)) {
+        return
+      }
+
+      if (!this._compilePhase('vocab', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'vocab source', Endge.domain.getVocabs(), context)) {
+        return
+      }
+
+      if (!this._compilePhase('update', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'updates', Endge.domain.getUpdates(), context)) {
+        return
+      }
+
+      if (!this._compilePhase('store', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'stores', Endge.domain.getStores(), context)) {
+        return
+      }
+
+      if (!this._compilePhase('stream', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'streams', Endge.domain.getStreams(), context)) {
+        return
+      }
+
+      if (!this._compilePhase('filter', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'filter source', Endge.domain.getFilters(), context)) {
+        return
+      }
+
+      if (!this._compilePhase('query', ENDGE_COMPILER_SPAN_GROUPS.QUERIES, 'query source', Endge.domain.getQueries(), context)) {
+        return
+      }
+
+      if (!this._compilePhase(
+        'composition',
+        ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS,
+        'compositions',
+        this._orderCompositionsForCompile(Endge.domain.getCompositions()),
+        context,
+      )) {
+        return
+      }
+
+      const diagnostics = Endge.program.getDiagnostics()
+      const errorCount = diagnostics.filter(diagnostic => diagnostic.severity === 'error').length
+      const warningCount = diagnostics.filter(diagnostic => diagnostic.severity === 'warning').length
+      const compileSpan = this._compileSpan
+      compileSpan?.log({
+        body: errorCount > 0 ? 'Компиляция проекта завершена с ошибками' : 'Компиляция проекта завершена',
+        severityNumber: errorCount > 0 ? 17 : warningCount > 0 ? 13 : 9,
+        eventName: 'endge.program.compiled',
+        attributes: {
+          'endge.diagnostics.error.count': errorCount,
+          'endge.diagnostics.warning.count': warningCount,
+        },
+      })
+      compileSpan?.end({ status: errorCount > 0 ? 'error' : 'ok' })
+      this._compileSpan = null
+    }
+    catch (error: unknown) {
+      this._compileSpan?.recordException(error, { eventName: 'endge.compiler.exception' })
+      this._compileSpan?.end({ status: 'error', message: 'Необработанная ошибка compiler pipeline' })
+      this._compileSpan = null
+      Endge.program.setStatus('error')
+    }
+  }
+
+  /** Компилирует один query source в Endge.program без запуска остальных compiler-фаз. */
+  public buildQuery(entity: RQuery): ProgramArtifact<QueryProgramPayload> {
+    const context = this._createCompileContext()
+    return this._compileEntity('query', entity, context) as ProgramArtifact<QueryProgramPayload>
+  }
+
+  /** Компилирует один Vocab source в Endge.program. */
+  public buildVocab(entity: RVocabs): ProgramArtifact<VocabProgramPayload> {
+    return this._compileEntity('vocab', entity, this._createCompileContext()) as ProgramArtifact<VocabProgramPayload>
+  }
+
+  /** Компилирует одну Computation в безопасный runtime artifact. */
+  public buildComputation(entity: RComputation): ProgramArtifact<ComputationProgramPayload> {
+    const context = this._createCompileContext()
+    const artifact = this._compileEntity('computation', entity, context) as ProgramArtifact<ComputationProgramPayload>
+    this._linkComputations()
+    return artifact
+  }
+
+  /** Компилирует один Type Source в общий Type Registry. */
+  public buildType(entity: RType): ProgramArtifact<TypeProgramPayload> {
+    return this._compileEntity('type', entity, this._createCompileContext()) as ProgramArtifact<TypeProgramPayload>
+  }
+
+  /** Компилирует один сохранённый Action в неизменяемый артефакт Program. */
+  public buildAction(entity: RAction): ProgramArtifact<ActionProgramPayload> {
+    return this._compileEntity('action', entity, this._createCompileContext()) as ProgramArtifact<ActionProgramPayload>
+  }
+
+  /** Компилирует один ComponentSFC без запуска полного domain build. */
+  public buildComponentSFC(entity: RComponentSFC): ProgramArtifact<ComponentSFCProgramPayload> {
+    const context = this._createCompileContext()
+    this._prepareComponentTagRegistry(Endge.domain.getComponentSFCs())
+    return this._compileEntity('component-sfc', entity, context) as ProgramArtifact<ComponentSFCProgramPayload>
+  }
+
+  /** Компилирует один DataView source в Endge.program без запуска остальных compiler-фаз. */
+  public buildDataView(entity: RDataView): ProgramArtifact<DataViewProgramPayload> {
+    const context = this._createCompileContext()
+    return this._compileEntity('data-view', entity, context) as ProgramArtifact<DataViewProgramPayload>
+  }
+
+  /** Компилирует один Store source в Endge.program. */
+  public buildStore(entity: RStore): ProgramArtifact<StoreSourceArtifact> {
+    const context = this._createCompileContext()
+    return this._compileEntity('store', entity, context) as ProgramArtifact<StoreSourceArtifact>
+  }
+
+  /** Компилирует один Stream source в Endge.program. */
+  public buildStream(entity: RStream): ProgramArtifact<StreamSourceArtifact> {
+    return this._compileEntity('stream', entity, this._createCompileContext()) as ProgramArtifact<StreamSourceArtifact>
+  }
+
+  /** Компилирует один дочерний Update source в Endge.program. */
+  public buildUpdate(entity: RUpdate): ProgramArtifact<UpdateSourceArtifact> {
+    return this._compileEntity('update', entity, this._createCompileContext()) as ProgramArtifact<UpdateSourceArtifact>
+  }
+
+  /** Компилирует один Filter source в Endge.program. */
+  public buildFilter(entity: RFilter): ProgramArtifact<FilterProgramPayload> {
+    const context = this._createCompileContext()
+    return this._compileEntity('filter', entity, context) as ProgramArtifact<FilterProgramPayload>
+  }
+
+  /** Компилирует один Composition source в Endge.program. */
+  public buildComposition(entity: RComposition): ProgramArtifact<CompositionProgramPayload> {
+    const context = this._createCompileContext()
+    return this._compileEntity('composition', entity, context) as ProgramArtifact<CompositionProgramPayload>
+  }
+
+  /**
+   * Компилирует transient Composition artifact без публикации в Endge.program.
+   * Используется runtime session overlays, которым нельзя менять общий build.
+   */
+  public compileCompositionArtifact(entity: RComposition): ProgramArtifact<CompositionProgramPayload> {
+    const handler = this._handlers.get('composition') as EntityCompilerHandler<RComposition, CompositionProgramPayload> | undefined
+    if (!handler) {
+      throw new Error('Compiler handler is not registered for "composition"')
+    }
+    return handler.compile(entity, this._createCompileContext())
+  }
+
+  /** Компилирует один глобальный source-first документ EndgeCSS. */
+  public buildStyle(entity: RStyle): ProgramArtifact<EndgeStyleProgramPayload> {
+    const context = this._createCompileContext()
+    return this._compileEntity('style', entity, context) as ProgramArtifact<EndgeStyleProgramPayload>
+  }
+
+  /**
+   * Регистрирует built-in handlers для SFC-компонентов.
+   *
+   * Сейчас compiler сознательно строит program artifacts только для новой
+   * source-first ветки `component-sfc`.
+   */
+  private _registerDefaultHandlers(): void {
+
+    //
+    // Обработчик для RType
+    this._registerHandler<RType, TypeProgramPayload>({
+      //
+      entityType: 'type',
+
+      //
+      compile: (entity, context) => {
+        const primitiveKind = String(entity.meta?.primitiveKind ?? '').trim()
+        const category: TypeProgramPayload['category'] = primitiveKind === 'reference'
+            ? 'reference'
+            : entity.isPrimitive
+                ? 'primitive'
+                : 'user'
+
+        if (entity.isPrimitive || category === 'reference') {
+          const target = String(entity.meta?.target ?? '').trim()
+          const storage = entity.meta?.storage === 'identity' ? 'identity' as const : 'id' as const
+          const storageCollision = entity.origin.kind === 'builtin'
+              ? Endge.domain.getType(entity.identity)
+              : null
+          return this._makeArtifact(entity, 'type', context, {
+            capabilities: ['compilable', 'configuration'],
+            payload: {
+              type: 'type',
+              identity: entity.identity,
+              displayName: entity.displayName || entity.name || entity.identity,
+              category,
+              sourceVersion: Number(entity.sourceVersion ?? 1) || 1,
+              definition: null,
+              runtimeType: String(entity.meta?.runtimeType ?? entity.identity),
+              ...(category === 'reference' && target
+                  ? { entityReference: { target, storage } }
+                  : {}),
+            },
+            diagnostics: storageCollision && !storageCollision.isPrimitive
+                ? [{
+                  severity: 'error',
+                  code: 'type-identity-collision',
+                  message: `Persisted Type "${entity.identity}" collides with built-in Type from code.`,
+                  sourcePath: 'identity',
+                }]
+                : [],
+          })
+        }
+
+        const result = compileTypeSource(entity.source, entity.sourceVersion)
+        const definition = result.document?.definition ?? null
+        const knownIdentities = new Set(Endge.types.listResolved().map(type => type.identity))
+        const semanticDiagnostics = validateTypeDefinitionReferences(definition, knownIdentities)
+        const dependencies = collectTypeDefinitionReferences(definition)
+            .filter(identity => identity !== 'Any')
+            .map((identity) => {
+              const target = Endge.types.getDefinition(identity)
+              return {
+                entityType: 'type' as const,
+                id: target?.id ?? identity,
+                identity,
+                role: 'type-reference',
+              }
+            })
+        const diagnostics = [
+          ...result.diagnostics,
+          ...semanticDiagnostics,
+          ...(!String(entity.source ?? '').trim()
+              ? [{
+                severity: 'warning' as const,
+                code: 'type-source-empty',
+                message: `Type "${entity.identity}" пока не содержит Type Source.`,
+                sourcePath: 'source',
+              }]
+              : []),
+        ]
+
+        //
+        //
+        return this._makeArtifact(entity, 'type', context, {
+          capabilities: ['compilable', 'configuration'],
+          payload: {
+            type: 'type',
+            identity: entity.identity,
+            displayName: entity.displayName || entity.name || entity.identity,
+            category: 'user',
+            sourceVersion: Number(entity.sourceVersion ?? 1) || 1,
+            definition,
+          },
+          dependencies,
+          diagnostics,
+        })
+      },
+    })
+
+
+    //
+    // Обработчик для RConfiguration
+    this._registerHandler<RConfiguration, ConfigurationProgramPayload>({
+      entityType: 'configuration',
+      compile: (entity, context) => {
+        const schema = Endge.configurationSchema.get(entity.identity)
+        const values = schema?.document?.values ?? []
+        const dependencies = [...new Set(values.flatMap(value => collectTypeSourceExpressionReferences(value.type)))]
+            .filter(identity => identity !== 'Any')
+            .map((identity) => {
+              const target = Endge.types.getDefinition(identity)
+              return {
+                entityType: 'type' as const,
+                id: target?.id ?? identity,
+                identity,
+                role: 'configuration-value-type',
+              }
+            })
+        return this._makeArtifact(entity, 'configuration', context, {
+          capabilities: ['compilable', 'configuration'],
+          payload: {
+            type: 'configuration',
+            identity: entity.identity,
+            displayName: entity.displayName || entity.name || entity.identity,
+            sourceVersion: 1,
+            values,
+          },
+          diagnostics: schema?.diagnostics ?? [{
+            severity: 'error',
+            code: 'configuration-schema-missing',
+            message: `Configuration schema "${entity.identity}" was not prepared.`,
+            sourcePath: 'source',
+          }],
+          dependencies,
+        })
+      },
+    })
+
+    this._registerHandler<RAction, ActionProgramPayload>({
+      entityType: 'action',
+      compile: (entity, context) => {
+        const result = compileAction(entity)
+        const codeCollision = Endge.actions.getCodeDefinition(entity.identity)
+        const linkedDependencies = this._linkActionDependencies(result.dependencies)
+        return this._makeArtifact(entity, 'action', context, {
+          capabilities: result.payload.sourceDocument ? ['compilable', 'runnable', 'executable'] : ['compilable'],
+          payload: result.payload,
+          diagnostics: [
+            ...result.diagnostics,
+            ...(codeCollision
+                ? [{
+                  severity: 'error' as const,
+                  code: 'action-identity-collision',
+                  message: `Persisted Action "${entity.identity}" collides with ${codeCollision.origin.kind} Action from code.`,
+                  sourcePath: 'identity',
+                }]
+                : []),
+            ...linkedDependencies.diagnostics,
+            ...this._typeContractDiagnostics(result.payload.sourceDocument?.contract.input?.type, 'contract.input.type'),
+            ...this._typeContractDiagnostics(result.payload.sourceDocument?.contract.output?.type, 'contract.output.type'),
+          ],
+          dependencies: [
+            ...linkedDependencies.dependencies,
+            ...this._typeDependencies([
+              result.payload.sourceDocument?.contract.input?.type,
+              result.payload.sourceDocument?.contract.output?.type,
+            ]),
+          ],
+        })
+      },
+    })
+
+    this._registerHandler<RComputation, ComputationProgramPayload>({
+      entityType: 'computation',
+      compile: (entity, context) => {
+        const result = compileComputation({ source: entity.source })
+        return this._makeArtifact(entity, 'computation', context, {
+          capabilities: ['compilable', 'runnable'],
+          payload: result.payload,
+          diagnostics: [
+            ...result.diagnostics,
+            ...this._typeContractDiagnostics(result.payload.input?.type, 'input.type'),
+            ...this._typeContractDiagnostics(result.payload.output?.type, 'output.type'),
+          ],
+          dependencies: [
+            ...this._computationDependencies(result.payload),
+            ...this._typeDependencies([result.payload.input?.type, result.payload.output?.type]),
+          ],
+        })
+      },
+    })
+
+    this._registerHandler<RComponentSFC, ComponentSFCProgramPayload>({
+      entityType: 'component-sfc',
+      compile: (entity, context) => {
+        const result = this._compileComponentSFCSource(entity, context.buildContext.configuration.sfcEditing)
+        const knownComponentTypes = new Set([
+          ...collectLocalTypeDeclarations(entity.source),
+          ...COMPONENT_SFC_BUILTIN_EVENT_PAYLOAD_TYPES,
+        ])
+        return this._makeArtifact(entity, 'component-sfc', context, {
+          capabilities: result.ir ? ['compilable', 'runnable', 'renderable'] : ['compilable'],
+          metadata: result.metadata,
+          payload: {
+            sourceParts: result.sourceParts,
+            sections: result.sections,
+            contract: result.contract,
+            dependencies: result.dependencies,
+            runtimeDependencies: result.runtimeDependencies,
+            previewProps: result.previewProps,
+            previewOptions: result.previewOptions,
+            ast: result.ast,
+            ir: result.ir,
+          },
+          diagnostics: [
+            ...(this._componentTagDiagnosticsByIdentity.get(entity.identity) ?? []),
+            ...result.diagnostics,
+            ...this._typeContractDiagnostics(result.ast?.script?.props?.source, 'script.defineProps', knownComponentTypes),
+            ...result.contract.inputs.flatMap(input => this._typeContractDiagnostics(input.type, `script.defineProps.${input.name}`, knownComponentTypes)),
+            ...(result.ir?.script.ports.require.computations.flatMap(port => [
+              ...this._typeContractDiagnostics(port.inputType, `script.ports.require.${port.name}.input`, knownComponentTypes),
+              ...this._typeContractDiagnostics(port.outputType, `script.ports.require.${port.name}.output`, knownComponentTypes),
+            ]) ?? []),
+            ...(result.ir?.script.ports.require.actions.flatMap(port => [
+              ...this._typeContractDiagnostics(port.inputType, `script.ports.require.${port.name}.input`, knownComponentTypes),
+              ...this._typeContractDiagnostics(port.outputType, `script.ports.require.${port.name}.output`, knownComponentTypes),
+            ]) ?? []),
+            ...(result.ir?.script.ports.require.queries.flatMap(port => [
+              ...this._typeContractDiagnostics(port.inputType, `script.ports.require.${port.name}.input`, knownComponentTypes),
+              ...this._typeContractDiagnostics(port.outputType, `script.ports.require.${port.name}.output`, knownComponentTypes),
+            ]) ?? []),
+            ...(result.ir?.script.ports.require.components.flatMap(port =>
+                this._typeContractDiagnostics(port.propsType, `script.ports.require.${port.name}.props`, knownComponentTypes)) ?? []),
+            ...(result.ir?.script.ports.provides.actions.flatMap(port => [
+              ...this._typeContractDiagnostics(port.inputType, `script.ports.provides.${port.name}.input`, knownComponentTypes),
+              ...this._typeContractDiagnostics(port.outputType, `script.ports.provides.${port.name}.output`, knownComponentTypes),
+            ]) ?? []),
+            ...(result.ir?.script.ports.emits.events.flatMap(port =>
+                this._typeContractDiagnostics(port.payloadType, `script.ports.emits.${port.name}`, knownComponentTypes)) ?? []),
+          ],
+          dependencies: [
+            ...result.dependencies.components.map(dependency => ({
+              entityType: 'component-sfc',
+              id: dependency.id,
+              identity: String(dependency.id),
+              role: dependency.role ?? 'child-component',
+            })),
+            ...result.dependencies.computations.map(dependency => ({
+              entityType: 'computation',
+              id: dependency.id,
+              identity: String(dependency.id),
+              role: dependency.role,
+            })),
+            ...result.dependencies.actions.map(identity => ({
+              entityType: 'action',
+              id: identity,
+              identity,
+              role: result.ir?.script.ports.require.actions.some(port => port.defaultIdentity === identity)
+                  ? 'port-default-action'
+                  : 'component-action',
+            })),
+            ...result.dependencies.queries.map(identity => ({
+              entityType: 'query',
+              id: identity,
+              identity,
+              role: result.ir?.script.ports.require.queries.some(port => port.defaultIdentity === identity)
+                  ? 'port-default-query'
+                  : result.ir?.template.roots.some(node => node.kind === 'element' && node.portBindings?.some(binding => binding.kind === 'query' && binding.identity === identity))
+                      ? 'port-override-query'
+                      : 'event-query',
+            })),
+            ...this._typeDependencies([
+              result.ast?.script?.props?.source,
+              ...result.contract.inputs.map(input => input.type),
+              ...(result.ir?.script.ports.require.computations.flatMap(port => [port.inputType, port.outputType]) ?? []),
+              ...(result.ir?.script.ports.require.actions.flatMap(port => [port.inputType, port.outputType]) ?? []),
+              ...(result.ir?.script.ports.require.queries.flatMap(port => [port.inputType, port.outputType]) ?? []),
+              ...(result.ir?.script.ports.require.components.map(port => port.propsType) ?? []),
+              ...(result.ir?.script.ports.provides.actions.flatMap(port => [port.inputType, port.outputType]) ?? []),
+              ...(result.ir?.script.ports.emits.events.map(port => port.payloadType) ?? []),
+            ], knownComponentTypes),
+          ],
+          nonBlockingSourcePaths: ['style'],
+        })
+      },
+    })
+
+    this._registerHandler<RStyle, EndgeStyleProgramPayload>({
+      entityType: 'style',
+      compile: (entity, context) => {
+        const result = compileEndgeCSS(entity.source, { identity: entity.identity, scope: 'global' })
+        const stylesheet: EndgeStyleSheetArtifact = result.artifact ?? {
+          language: 'endgecss',
+          version: 1,
+          identity: entity.identity,
+          sourceHash: this._hashString(entity.source),
+          scope: 'global',
+          rules: [],
+          themes: [],
+          indexes: { universal: [], tags: {}, classes: {}, ids: {}, components: {}, identities: {}, states: {}, parts: {} },
+        }
+        return this._makeArtifact(entity, 'style', context, {
+          capabilities: ['compilable', 'configuration'],
+          payload: {
+            stylesheet,
+            themes: stylesheet.themes.map(theme => theme.id),
+            dependencies: [],
+          },
+          diagnostics: result.diagnostics.map(diagnostic => ({
+            severity: diagnostic.severity,
+            code: diagnostic.code,
+            message: diagnostic.message,
+            sourcePath: 'source',
+            start: diagnostic.range?.start,
+            end: diagnostic.range?.end,
+          })),
+        })
+      },
+    })
+
+    this._registerHandler<RQuery, QueryProgramPayload>({
+      entityType: 'query',
+      compile: (entity, context) => {
+        const source = this._resolveQuerySource(entity)
+        const result = Endge.source.compile('query', source)
+        const artifact = result.artifact as QueryProgramPayload | undefined
+        const localDataViews = artifact
+            ? this._materializeResponseOutputDataViews(artifact, entity, context, 'query')
+            : { payload: undefined, children: [], diagnostics: [], dependencies: [] }
+        const local = localDataViews.payload
+            ? this._materializeQueryLocalFilters(localDataViews.payload, entity, context, localDataViews)
+            : localDataViews
+
+        return this._makeArtifact(entity, 'query', context, {
+          capabilities: ['compilable', 'runnable', 'data-provider'],
+          metadata: { self: result.metadata ?? {}, nodes: [] },
+          payload: {
+            ...this._makeEmptyQueryPayload(),
+            ...(local.payload ?? artifact ?? {}),
+            sourceVersion: Number(entity.sourceVersion ?? 2) || 2,
+            ast: result.ast ?? null,
+            sourceDocument: result.document ?? null,
+          },
+          diagnostics: [
+            ...((result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]),
+            ...local.diagnostics,
+            ...(local.payload ?? artifact)?.props.flatMap(prop => [
+              ...this._typeContractDiagnostics(prop.type, `props.${prop.key}.type`),
+              ...this._typeContractDiagnostics(prop.typeExpression, `props.${prop.key}.typeExpression`),
+            ]) ?? [],
+            ...(local.payload ?? artifact)?.outputs.flatMap(output => [
+              ...this._typeContractDiagnostics(output.contract?.type, `outputs.${output.key}.contract.type`),
+              ...this._typeContractDiagnostics(output.contract?.typeExpression, `outputs.${output.key}.contract.typeExpression`),
+            ]) ?? [],
+          ],
+          dependencies: [
+            ...local.dependencies,
+            ...this._typeDependencies((local.payload ?? artifact)?.props.flatMap(prop => [prop.type, prop.typeExpression]) ?? []),
+            ...this._typeDependencies((local.payload ?? artifact)?.outputs.flatMap(output => [
+              output.contract?.type,
+              output.contract?.typeExpression,
+            ]) ?? []),
+            ...this._queryAuthDependencies(local.payload ?? artifact),
+          ],
+          children: local.children,
+        })
+      },
+    })
+
+    this._registerHandler<RVocabs, VocabProgramPayload>({
+      entityType: 'vocab',
+      compile: (entity, context) => {
+        const result = Endge.source.compile('vocab', entity.source)
+        const artifact = result.artifact as VocabProgramPayload | undefined
+        const local = artifact
+            ? this._materializeResponseOutputDataViews(artifact, entity, context, 'vocab')
+            : { payload: undefined, children: [], diagnostics: [], dependencies: [] }
+        const payload = local.payload ?? artifact
+        const dependencies = [...local.dependencies]
+        const diagnostics = [
+          ...((result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]),
+          ...local.diagnostics,
+        ]
+
+        if (payload?.provider?.auth.mode === 'profile') {
+          const identity = String(payload.provider.auth.profile ?? '').trim()
+          dependencies.push({ entityType: 'auth-profile', id: identity, identity, role: 'vocab-provider-auth' })
+          if (!identity || !Endge.domain.getAuthProfile(identity)) {
+            diagnostics.push({
+              severity: 'error',
+              code: 'vocab-auth-profile-missing',
+              message: `Auth profile "${identity}" не найден.`,
+              sourcePath: 'provider.auth.profile',
+            })
+          }
+        }
+        if (payload?.mock) {
+          const mock = Endge.domain.getMock(payload.mock.identity)
+          dependencies.push({ entityType: 'mock', id: mock?.id ?? payload.mock.identity, identity: payload.mock.identity, role: 'vocab-mock' })
+          if (!mock || mock.active === false || mock.deletedAt) {
+            diagnostics.push({
+              severity: 'error',
+              code: 'vocab-mock-missing',
+              message: `Mock "${payload.mock.identity}" не найден или неактивен.`,
+              sourcePath: 'mock',
+            })
+          }
+          else if (mock.contentType !== 'application/json') {
+            diagnostics.push({
+              severity: 'error',
+              code: 'vocab-mock-content-type',
+              message: `Mock "${payload.mock.identity}" должен иметь contentType application/json.`,
+              sourcePath: 'mock',
+            })
+          }
+          else if (payload.mock.path && mock.contentSource === 'document') {
+            try {
+              const value = readStaticDotPath(JSON.parse(mock.source), payload.mock.path)
+              if (value === MISSING_STATIC_PATH) {
+                diagnostics.push({
+                  severity: 'error',
+                  code: 'vocab-mock-path-missing',
+                  message: `Путь "${payload.mock.path}" отсутствует в Mock "${payload.mock.identity}".`,
+                  sourcePath: 'mock.path',
+                })
+              }
+            }
+            catch {
+              diagnostics.push({
+                severity: 'error',
+                code: 'vocab-mock-json-invalid',
+                message: `Mock "${payload.mock.identity}" содержит некорректный JSON.`,
+                sourcePath: 'mock',
+              })
+            }
+          }
+        }
+
+        return this._makeArtifact(entity, 'vocab', context, {
+          capabilities: ['compilable', 'runnable', 'data-provider'],
+          metadata: { self: result.metadata ?? {}, nodes: [] },
+          payload: {
+            sourceVersion: 1,
+            provider: null,
+            mock: null,
+            outputs: [],
+            ...(payload ?? {}),
+            ast: result.ast ?? null,
+            sourceDocument: (result.document as VocabProgramPayload['sourceDocument']) ?? null,
+          },
+          diagnostics,
+          dependencies,
+          children: local.children,
+        })
+      },
+    })
+
+    this._registerHandler<RDataView, DataViewProgramPayload>({
+      entityType: 'data-view',
+      compile: (entity, context) => {
+        const source = this._resolveDataViewSource(entity)
+        const result = Endge.source.compile('data-view', source)
+        const artifact = result.artifact as DataViewProgramPayload | undefined
+        const local = artifact
+            ? this._materializeDataViewLocalDataViews(artifact, entity, context)
+            : { payload: undefined, children: [], diagnostics: [], dependencies: [] }
+
+        return this._makeArtifact(entity, 'data-view', context, {
+          capabilities: ['compilable', 'runnable', 'data-provider'],
+          metadata: { self: result.metadata ?? {}, nodes: [] },
+          payload: {
+            ...this._makeEmptyDataViewPayload(),
+            ...(local.payload ?? artifact ?? {}),
+            sourceDocument: (result.document as DataViewProgramPayload['sourceDocument']) ?? null,
+          },
+          dependencies: [
+            ...local.dependencies,
+            ...this._typeDependencies([
+              (local.payload ?? artifact)?.contract?.input.type,
+              (local.payload ?? artifact)?.contract?.input.typeExpression,
+              (local.payload ?? artifact)?.contract?.output.type,
+              (local.payload ?? artifact)?.contract?.output.typeExpression,
+            ]),
+          ],
+          diagnostics: [
+            ...((result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]),
+            ...local.diagnostics,
+            ...this._typeContractDiagnostics((local.payload ?? artifact)?.contract?.input.type, 'contract.input.type'),
+            ...this._typeContractDiagnostics((local.payload ?? artifact)?.contract?.input.typeExpression, 'contract.input.typeExpression'),
+            ...this._typeContractDiagnostics((local.payload ?? artifact)?.contract?.output.type, 'contract.output.type'),
+            ...this._typeContractDiagnostics((local.payload ?? artifact)?.contract?.output.typeExpression, 'contract.output.typeExpression'),
+          ],
+          children: local.children,
+        })
+      },
+    })
+
+    this._registerHandler<RUpdate, UpdateSourceArtifact>({
+      entityType: 'update',
+      compile: (entity, context) => {
+        const result = Endge.source.compile('update', entity.source)
+        const compiled = result.artifact as Omit<UpdateSourceArtifact, 'storeIdentity'> | undefined
+        const diagnostics = (result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]
+        const store = Endge.domain.getStore(entity.storeIdentity)
+        if (!entity.storeIdentity || !store) {
+          diagnostics.push({
+            severity: 'error',
+            code: 'update-store-owner-missing',
+            message: `Update "${entity.identity}" должен принадлежать существующему Store.`,
+            sourcePath: 'store',
+          })
+        }
+        return this._makeArtifact(entity, 'update', context, {
+          capabilities: ['compilable', 'executable'],
+          metadata: createEmptyProgramMetadata(),
+          payload: {
+            type: 'update',
+            sourceVersion: Number(entity.sourceVersion ?? 1) || 1,
+            handles: [],
+            mutations: [],
+            ...(compiled ?? {}),
+            storeIdentity: entity.storeIdentity,
+          },
+          dependencies: store
+              ? [{ entityType: 'store', id: store.id, identity: store.identity, role: 'update-owner' }]
+              : [],
+          diagnostics,
+        })
+      },
+    })
+
+    this._registerHandler<RStore, StoreSourceArtifact>({
+      entityType: 'store',
+      compile: (entity, context) => {
+        const result = Endge.source.compile('store', entity.source)
+        const payload = result.artifact as StoreSourceArtifact | undefined
+        const dependencies: ProgramArtifact['dependencies'] = []
+        const updateHandlers = Endge.domain.getUpdatesByStoreIdentity(entity.identity)
+            .map((update) => {
+              const artifact = Endge.program.getUpdateArtifact(update.identity)
+              if (!artifact || artifact.status === 'error') {
+                ;(result.diagnostics ??= []).push({
+                  severity: 'error',
+                  code: 'store-update-invalid',
+                  message: `Update "${update.identity}" отсутствует в compiled program или содержит ошибки.`,
+                  sourcePath: `updates.${update.identity}`,
+                })
+              }
+              const writable = new Set(payload?.data
+                  .filter(field => field.kind === 'value')
+                  .map(field => field.key) ?? [])
+              for (const [mutationIndex, mutation] of (artifact?.payload.mutations ?? []).entries()) {
+                const targetRoot = String(mutation.target ?? '').split(/[.[\]]/)[0] ?? ''
+                if (targetRoot && !writable.has(targetRoot)) {
+                  ;(result.diagnostics ??= []).push({
+                    severity: 'error',
+                    code: 'store-update-target-invalid',
+                    message: `Update "${update.identity}" пишет в отсутствующее или derived поле "${targetRoot}".`,
+                    sourcePath: `updates.${update.identity}.mutations.${mutationIndex}.target`,
+                  })
+                }
+              }
+              return {
+                identity: update.identity,
+                eventTypes: artifact?.payload.handles ?? [],
+              }
+            })
+        const handlersByType = new Map<string, string>()
+        for (const handler of updateHandlers) {
+          dependencies.push({
+            entityType: 'update',
+            id: Endge.domain.getUpdate(handler.identity)?.id ?? handler.identity,
+            identity: handler.identity,
+            role: handler.eventTypes.length ? `store-update:${handler.eventTypes.join(',')}` : 'store-update:named',
+          })
+          for (const eventType of handler.eventTypes) {
+            const previous = handlersByType.get(eventType)
+            if (previous) {
+              ;(result.diagnostics ??= []).push({
+                severity: 'error',
+                code: 'store-update-event-duplicate',
+                message: `Store "${entity.identity}" содержит два Update для события "${eventType}": "${previous}" и "${handler.identity}".`,
+                sourcePath: `updates.${handler.identity}`,
+              })
+            }
+            else {
+              handlersByType.set(eventType, handler.identity)
+            }
+          }
+        }
+        dependencies.push(...this._typeDependencies(
+            payload?.data.flatMap(field => [
+              field.contract?.type,
+              field.contract?.typeExpression,
+            ]) ?? [],
+        ))
+        for (const field of payload?.data ?? []) {
+          ;(result.diagnostics ??= []).push(
+              ...this._typeContractDiagnostics(field.contract?.type, `data.${field.key}.contract.type`),
+              ...this._typeContractDiagnostics(field.contract?.typeExpression, `data.${field.key}.contract.typeExpression`),
+          )
+          if (field.kind === 'value' && field.initial.kind === 'mock') {
+            dependencies.push({
+              entityType: 'mock-data',
+              id: field.initial.identity,
+              identity: field.initial.identity,
+              role: `store-initial:${field.key}`,
+            })
+            const mockStatus = Endge.mock.getBindingStatus(field.initial.identity)
+            if (mockStatus !== 'document' && mockStatus !== 'connected') {
+              const code = mockStatus === 'missing-document'
+                  ? 'store-mock-document-missing'
+                  : mockStatus === 'missing-provider'
+                      ? 'store-mock-provider-missing'
+                      : 'store-mock-invalid-content'
+              ;(result.diagnostics ??= []).push({
+                severity: 'error',
+                code,
+                message: `Mock "${field.initial.identity}" для Store field "${field.key}" недоступен: ${mockStatus}.`,
+                sourcePath: `data.${field.key}`,
+              })
+            }
+          }
+          if (field.kind !== 'derived') {
+            continue
+          }
+          field.materializationStrategy = this._resolveDataViewChainStrategy(field.dataViews, [])
+          for (const ref of field.dataViews) {
+            if (ref.kind !== 'external') {
+              continue
+            }
+            dependencies.push({
+              entityType: 'data-view',
+              id: ref.identity,
+              identity: ref.identity,
+              role: `store-derived:${field.key}`,
+            })
+            const dataViewArtifact = Endge.program.getDataViewArtifact(ref.identity)
+            if (!dataViewArtifact || dataViewArtifact.status === 'error') {
+              ;(result.diagnostics ??= []).push({
+                severity: 'error',
+                code: 'store-data-view-invalid',
+                message: `DataView "${ref.identity}" для Store field "${field.key}" отсутствует или содержит compile errors.`,
+                sourcePath: `data.${field.key}`,
+              })
+            }
+          }
+        }
+        return this._makeArtifact(entity, 'store', context, {
+          capabilities: ['compilable', 'executable', 'data-provider'],
+          metadata: createEmptyProgramMetadata(),
+          payload: {
+            ...(payload ?? { type: 'store', sourceVersion: Number(entity.sourceVersion ?? 1) || 1, data: [] }),
+            updateHandlers,
+          },
+          dependencies,
+          diagnostics: (result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[],
+        })
+      },
+    })
+
+    this._registerHandler<RStream, StreamSourceArtifact>({
+      entityType: 'stream',
+      compile: (entity, context) => {
+        const result = Endge.source.compile('stream', entity.source)
+        const payload = result.artifact as StreamSourceArtifact | undefined
+        return this._makeArtifact(entity, 'stream', context, {
+          capabilities: ['compilable', 'runnable', 'data-provider'],
+          metadata: createEmptyProgramMetadata(),
+          payload: payload ?? {
+            type: 'stream',
+            sourceVersion: Number(entity.sourceVersion ?? 1) || 1,
+            transport: {
+              kind: 'sse',
+              url: '',
+              withCredentials: false,
+              authMode: 'inherit',
+              authProfileIdentity: null,
+            },
+            events: [],
+          },
+          diagnostics: (result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[],
+        })
+      },
+    })
+
+    this._registerHandler<RFilter, FilterProgramPayload>({
+      entityType: 'filter',
+      compile: (entity, context) => {
+        const result = Endge.source.compile('filter', this._resolveFilterSource(entity))
+        const compiledPayload = result.artifact as FilterProgramPayload | undefined
+        const payload = compiledPayload
+            ? { ...compiledPayload, sourceVersion: Number(entity.sourceVersion ?? 1) || 1 }
+            : undefined
+        const dependencies: ProgramArtifact['dependencies'] = []
+        for (const field of payload?.fields ?? []) {
+          if (field.vocab) {
+            dependencies.push({
+              entityType: 'vocab',
+              id: field.vocab.identity,
+              identity: field.vocab.identity,
+              role: 'vocab',
+            })
+            if (!Endge.domain.getVocab(field.vocab.identity)) {
+              ;(result.diagnostics ??= []).push({
+                severity: 'error',
+                code: 'filter-vocab-missing',
+                message: `Vocab "${field.vocab.identity}" не найден.`,
+                sourcePath: `fields.${field.key}.vocab`,
+              })
+            }
+          }
+        }
+        return this._makeArtifact(entity, 'filter', context, {
+          capabilities: ['compilable', 'executable', 'data-provider', 'configuration'],
+          metadata: { self: result.metadata ?? {}, nodes: [] },
+          payload: payload ?? this._makeEmptyFilterPayload(entity.sourceVersion),
+          dependencies: [
+            ...dependencies,
+            ...this._typeDependencies(payload?.fields.map(field => field.type) ?? []),
+          ],
+          diagnostics: [
+            ...((result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]),
+            ...(payload?.fields.flatMap(field =>
+                this._typeContractDiagnostics(field.type, `fields.${field.key}.type`)) ?? []),
+          ],
+        })
+      },
+    })
+
+    this._registerHandler<RComposition, CompositionProgramPayload>({
+      entityType: 'composition',
+      compile: (entity, context) => {
+        const result = Endge.source.compile('composition', this._resolveCompositionSource(entity))
+        const compiledPayload = result.artifact as CompositionProgramPayload | undefined
+        const sourcePayload = compiledPayload
+            ? { ...compiledPayload, sourceVersion: Number(entity.sourceVersion ?? 1) || 1 }
+            : undefined
+        const i18n = sourcePayload
+            ? this._materializeCompositionI18n(sourcePayload)
+            : { payload: undefined, diagnostics: [], dependencies: [] }
+        const payload = i18n.payload
+        const validation = payload ? this._validateComposition(payload, entity) : { diagnostics: [], dependencies: [] }
+        return this._makeArtifact(entity, 'composition', context, {
+          capabilities: ['compilable', 'executable', 'configuration'],
+          metadata: { self: result.metadata ?? {}, nodes: [] },
+          payload: payload ?? this._makeEmptyCompositionPayload(entity.sourceVersion),
+          dependencies: [
+            ...i18n.dependencies,
+            ...validation.dependencies,
+            ...this._typeDependencies(payload?.props.map(prop => prop.type) ?? []),
+            ...this._compositionPreviewDependencies(payload),
+          ],
+          diagnostics: [
+            ...((result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]),
+            ...i18n.diagnostics,
+            ...validation.diagnostics,
+            ...(payload?.props.flatMap(prop =>
+                this._typeContractDiagnostics(prop.type, `props.${prop.key}.type`)) ?? []),
+            ...this._compositionPreviewDiagnostics(payload),
+          ],
+        })
+      },
+    })
+  }
+
+  /**
+   * Регистрирует handler компиляции для поддерживаемого program entity.
+   *
+   * Сейчас используется только для встроенной SFC-регистрации.
+   */
+  private _registerHandler<TEntity, TPayload>(handler: EntityCompilerHandler<TEntity, TPayload>): void {
+    this._handlers.set(handler.entityType, handler as EntityCompilerHandler<any, any>)
+  }
+
+  /** Создаёт единый immutable context для полного и точечного compiler entry points. */
+  private _createCompileContext(): ProgramCompileContext {
+    return {
+      compilerVersion: ENDGE_COMPILER_VERSION,
+      buildContext: Endge.configuration.buildContext,
+    }
+  }
+
+  /**
+   * Компилирует однотипную фазу доменных сущностей через зарегистрированный handler.
+   *
+   * Метод отвечает за единый diagnostics span, обработку ошибок и перевод
+   * `Endge.program` в error status при неуспешной фазе.
+   */
+  private _compilePhase<TEntity>(
+    entityType: ProgramEntityType,
+    lane: string,
+    title: string,
+    entities: TEntity[],
+    context: ProgramCompileContext,
+    failTraceOnError = true,
+  ): boolean {
+    const span = this._compileSpan?.startChild(`compile.${entityType}`, {
+      attributes: {
+        'endge.compiler.group': lane,
+        'endge.compiler.entity.type': entityType,
+        'endge.compiler.entity.count': entities.length,
+      },
+    }) ?? Endge.diagnostics.startSpan(`compile.${entityType}`, {
+      scope: { name: 'endge.compiler', version: ENDGE_COMPILER_VERSION },
+      phase: 'build',
+    })
+    span.log({
+      body: `Начата компиляция ${title}`,
+      severityNumber: 9,
+      eventName: 'endge.compiler.phase.started',
+    })
+
+    try {
+      for (const entity of entities) {
+        this._compileEntity(entityType, entity, context)
+      }
+
+      span.log({
+        body: `Компиляция ${title} завершена`,
+        severityNumber: 9,
+        eventName: 'endge.compiler.phase.completed',
+      })
+      span.end({ status: 'ok' })
+      return true
+    }
+    catch (error: unknown) {
+      span.recordException(error, { eventName: 'endge.compiler.phase.exception' })
+      span.end({ status: 'error', message: `Ошибка компиляции ${title}` })
+      if (failTraceOnError) {
+        this._compileSpan?.end({ status: 'error', message: `Неуспешная compiler phase: ${entityType}` })
+        this._compileSpan = null
+      }
+      Endge.program.setStatus('error')
+      return false
+    }
+  }
+
+  /**
+   * Компилирует одну доменную сущность и добавляет artifact в активный `Endge.program`.
+   *
+   * Само преобразование делегируется handler-у, зарегистрированному для
+   * конкретного `ProgramEntityType`.
+   */
+  private _compileEntity<TEntity>(
+    entityType: ProgramEntityType,
+    entity: TEntity,
+    context: ProgramCompileContext,
+  ): ProgramArtifact {
+    const handler = this._handlers.get(entityType)
+    if (!handler) {
+      throw new Error(`Compiler handler is not registered for "${entityType}"`)
+    }
+
+    const artifact = Endge.program.addArtifact(handler.compile(entity, context))
+    const owner = createDiagnosticsEntityOwner(artifact.ref, 'build')
+    const problems = artifact.diagnostics.map((diagnostic) => {
+      const record = this._compileSpan?.log({
+        body: diagnostic.message,
+        severityNumber: diagnostic.severity === 'error' ? 17 : diagnostic.severity === 'warning' ? 13 : 9,
+        eventName: 'endge.compiler.diagnostic',
+        attributes: {
+          'endge.phase': 'build',
+          'endge.entity.type': artifact.ref.entityType,
+          'endge.entity.id': String(artifact.ref.id),
+          'endge.entity.identity': artifact.ref.identity,
+          'endge.diagnostic.code': diagnostic.code,
+          ...(diagnostic.sourcePath ? { 'endge.source.path': diagnostic.sourcePath } : {}),
+          ...(diagnostic.start != null ? { 'endge.source.start': diagnostic.start } : {}),
+          ...(diagnostic.end != null ? { 'endge.source.end': diagnostic.end } : {}),
+        },
+      })
+      return {
+        severity: diagnostic.severity,
+        code: diagnostic.code,
+        message: diagnostic.message,
+        sourcePath: diagnostic.sourcePath,
+        start: diagnostic.start,
+        end: diagnostic.end,
+        traceId: record?.traceId ?? this._compileSpan?.traceId,
+        recordId: record?.id,
+      }
+    })
+    Endge.diagnostics.problems.replace(owner, problems)
+    return artifact
+  }
+
+  /** Стабильный порядок исходников: сначала системные документы, затем авторские по identity. */
+  private _orderedStyles(): RStyle[] {
+    const rank = (style: RStyle) => style.managedBy === 'system' ? 0 : 1
+    return Endge.domain.getStyles()
+      .filter(style => style.active !== false && !style.deletedAt)
+      .sort((left, right) => rank(left) - rank(right) || left.identity.localeCompare(right.identity))
+  }
+
+  /** Возвращает static artifact dependencies внешних computation calls. */
+  private _computationDependencies(payload: ComputationProgramPayload): ProgramArtifact['dependencies'] {
+    const identities = new Set<string>()
+    const dependencies: ProgramArtifact['dependencies'] = []
+    for (const node of payload.nodes) {
+      if (node.kind !== 'computation' || identities.has(node.identity)) {
+        continue
+      }
+      identities.add(node.identity)
+      const target = Endge.domain.getComputation(node.identity)
+      dependencies.push({
+        entityType: 'computation',
+        id: target?.id ?? node.identity,
+        identity: node.identity,
+        role: 'computation-call',
+      })
+    }
+    return dependencies
+  }
+
+  /** Проверяет контракт одного владельца по Type Registry, построенному из исходников. */
+  private _typeContractDiagnostics(
+    expression: string | TypeSourceExpression | null | undefined,
+    sourcePath: string,
+    localTypes: ReadonlySet<string> = new Set(),
+  ): Omit<ProgramDiagnostic, 'entityRef'>[] {
+    const compiledCatalog = Endge.program.getTypeCatalog()
+    const catalog: TypeProgramCatalogEntry[] = compiledCatalog.length
+      ? compiledCatalog
+      : Endge.types.listResolved().map((type) => {
+          const primitiveKind = String(type.meta?.primitiveKind ?? '').trim()
+          const category: TypeProgramCatalogEntry['category'] = primitiveKind === 'reference'
+            ? 'reference'
+            : type.isPrimitive
+              ? 'primitive'
+              : 'user'
+          const target = String(type.meta?.target ?? '').trim()
+          return {
+            id: type.id,
+            identity: type.identity,
+            displayName: type.displayName || type.name || type.identity,
+            category,
+            sourceVersion: Number(type.sourceVersion ?? 1) || 1,
+            definition: null,
+            runtimeType: type.isPrimitive ? String(type.meta?.runtimeType ?? type.identity) : undefined,
+            entityReference: category === 'reference' && target
+              ? { target, storage: type.meta?.storage === 'identity' ? 'identity' : 'id' }
+              : undefined,
+            status: 'valid',
+          }
+        })
+    const catalogWithLocals = localTypes.size
+      ? [
+          ...catalog,
+          ...[...localTypes].map((identity, index): TypeProgramCatalogEntry => ({
+            id: `local:${index}:${identity}`,
+            identity,
+            displayName: identity,
+            category: 'user',
+            sourceVersion: 1,
+            definition: null,
+            status: 'valid',
+          })),
+        ]
+      : catalog
+    return typeof expression === 'string' || expression == null
+      ? validateTypeExpressionUsage(expression, catalogWithLocals, sourcePath)
+      : validateTypeSourceExpressionUsage(expression, catalogWithLocals, sourcePath)
+  }
+
+  /** Создаёт стабильные зависимости Program для каждого выражения пользовательского типа. */
+  private _typeDependencies(
+    expressions: Array<string | TypeSourceExpression | null | undefined>,
+    excluded: ReadonlySet<string> = new Set(),
+  ): ProgramArtifact['dependencies'] {
+    const identities = new Set<string>()
+    for (const expression of expressions) {
+      const referenced = typeof expression === 'string' || expression == null
+        ? collectTypeExpressionReferences(expression)
+        : new Set(collectTypeSourceExpressionReferences(expression)
+            .filter(identity => collectTypeExpressionReferences(identity).has(identity)))
+      for (const identity of referenced) {
+        if (!excluded.has(identity)) {
+          identities.add(identity)
+        }
+      }
+    }
+    return [...identities].map((identity) => {
+      const type = Endge.types.getDefinition(identity)
+      return {
+        entityType: 'type' as const,
+        id: type?.id ?? identity,
+        identity,
+        role: 'type-contract',
+      }
+    })
+  }
+
+  /** Публикует статическую ссылку Query на профиль авторизации в общем графе Program. */
+  private _queryAuthDependencies(
+    payload: QueryProgramPayload | undefined,
+  ): ProgramArtifact['dependencies'] {
+    const auth = payload?.auth
+    if (!auth || typeof auth !== 'object' || Array.isArray(auth) || 'type' in auth) {
+      return []
+    }
+    const record = auth as Record<string, unknown>
+    const identity = String(record.profile ?? '').trim()
+    if (!identity) {
+      return []
+    }
+    const profile = Endge.domain.getAuthProfile(identity)
+    return [{
+      entityType: 'auth-profile',
+      id: profile?.id ?? identity,
+      identity,
+      role: 'query-auth',
+    }]
+  }
+
+  /** Добавляет явные зависимости RMock, используемые только fixtures preview для Composition. */
+  private _compositionPreviewDependencies(
+    payload: CompositionProgramPayload | undefined,
+  ): ProgramArtifact['dependencies'] {
+    return Object.entries(payload?.previewProps ?? {}).flatMap(([prop, value]) => value.kind === 'mock'
+      ? [{
+          entityType: 'mock-data',
+          id: value.identity,
+          identity: value.identity,
+          role: `composition-preview:${prop}`,
+        }]
+      : [])
+  }
+
+  /** Диагностика preview остаётся предупреждением, чтобы сломанный fixture не делал production-выполнение невалидным. */
+  private _compositionPreviewDiagnostics(
+    payload: CompositionProgramPayload | undefined,
+  ): Omit<ProgramDiagnostic, 'entityRef'>[] {
+    if (!payload?.previewProps) {
+      return []
+    }
+    const diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[] = []
+    const props = new Map(payload.props.map(prop => [prop.key, prop]))
+    const catalog = Endge.program.getTypeCatalog()
+    for (const [key, value] of Object.entries(payload.previewProps)) {
+      const prop = props.get(key)
+      if (!prop) {
+        continue
+      }
+      if (value.kind === 'literal') {
+        diagnostics.push(...validatePreviewPropValue(prop, value.value, catalog, `previewProps.${key}`))
+        continue
+      }
+      const status = Endge.mock.getBindingStatus(value.identity)
+      if (status === 'document' || status === 'connected') {
+        continue
+      }
+      diagnostics.push({
+        severity: 'warning',
+        code: status === 'missing-document'
+          ? 'composition-preview-mock-document-missing'
+          : status === 'missing-provider'
+            ? 'composition-preview-mock-provider-missing'
+            : 'composition-preview-mock-invalid-content',
+        message: `Preview mock "${value.identity}" для prop "${key}" недоступен: ${status}.`,
+        sourcePath: `previewProps.${key}`,
+      })
+    }
+    return diagnostics
+  }
+
+  /** Связывает computation artifacts, запрещает missing/invalid/cyclic references и выводит effective execution mode. */
+  private _linkComputations(): void {
+    const artifacts = Endge.program.getArtifacts()
+      .filter((artifact): artifact is ComputationArtifact => artifact.ref.entityType === 'computation')
+    const byIdentity = new Map(artifacts.map(artifact => [artifact.ref.identity, artifact]))
+
+    for (const artifact of artifacts) {
+      artifact.diagnostics = artifact.diagnostics.filter(item => !COMPUTATION_LINK_DIAGNOSTICS.has(item.code))
+      artifact.status = statusFromDiagnostics(artifact.diagnostics)
+      artifact.dependencies = this._computationDependencies(artifact.payload)
+      artifact.payload.execution = artifact.payload.nodes.some(node => node.kind === 'typescript') ? 'async' : 'sync'
+    }
+
+    for (const artifact of artifacts) {
+      for (const node of artifact.payload.nodes) {
+        if (node.kind !== 'computation' || byIdentity.has(node.identity)) {
+          continue
+        }
+        this._addComputationLinkDiagnostic(artifact, {
+          severity: 'error',
+          code: 'computation-reference-missing',
+          message: `Computation "${artifact.ref.identity}" ссылается на отсутствующий computation "${node.identity}".`,
+          sourcePath: `outputs.${node.name}`,
+        })
+      }
+    }
+
+    const graph = new Map(artifacts.map(artifact => [
+      artifact.ref.identity,
+      uniqueComputationReferences(artifact.payload).filter(identity => byIdentity.has(identity)),
+    ]))
+    for (const component of this._findComputationCycles(graph)) {
+      const cycle = this._findCyclePath(component, graph)
+      const message = `Обнаружен cycle между computations: ${cycle.join(' -> ')}.`
+      for (const identity of component) {
+        const artifact = byIdentity.get(identity)!
+        this._addComputationLinkDiagnostic(artifact, {
+          severity: 'error',
+          code: 'computation-reference-cycle',
+          message,
+          sourcePath: 'source',
+        })
+      }
+    }
+
+    let changed = true
+    while (changed) {
+      changed = false
+      for (const artifact of artifacts) {
+        for (const identity of uniqueComputationReferences(artifact.payload)) {
+          const target = byIdentity.get(identity)
+          if (!target || target.status !== 'error' || artifact.status === 'error') {
+            continue
+          }
+          this._addComputationLinkDiagnostic(artifact, {
+            severity: 'error',
+            code: 'computation-reference-invalid',
+            message: `Computation "${artifact.ref.identity}" зависит от invalid computation "${identity}".`,
+            sourcePath: 'source',
+          })
+          changed = true
+        }
+      }
+    }
+
+    changed = true
+    while (changed) {
+      changed = false
+      for (const artifact of artifacts) {
+        if (artifact.payload.execution === 'async') {
+          continue
+        }
+        const hasAsyncDependency = uniqueComputationReferences(artifact.payload)
+          .some(identity => byIdentity.get(identity)?.payload.execution === 'async')
+        if (hasAsyncDependency) {
+          artifact.payload.execution = 'async'
+          changed = true
+        }
+      }
+    }
+
+    Endge.program.recalculateStatus()
+  }
+
+  /** Добавляет linker diagnostic без duplicate сообщений и обновляет artifact status. */
+  private _addComputationLinkDiagnostic(
+    artifact: ComputationArtifact,
+    value: Omit<ProgramDiagnostic, 'entityRef'>,
+  ): void {
+    if (artifact.diagnostics.some(item => item.code === value.code && item.message === value.message)) {
+      return
+    }
+    artifact.diagnostics.push({ ...value, entityRef: artifact.ref })
+    artifact.status = statusFromDiagnostics(artifact.diagnostics)
+  }
+
+  /** Находит strongly connected components, которые образуют реальные cycles. */
+  private _findComputationCycles(graph: Map<string, string[]>): string[][] {
+    let index = 0
+    const indexes = new Map<string, number>()
+    const lowLinks = new Map<string, number>()
+    const stack: string[] = []
+    const onStack = new Set<string>()
+    const cycles: string[][] = []
+
+    const visit = (identity: string) => {
+      indexes.set(identity, index)
+      lowLinks.set(identity, index++)
+      stack.push(identity)
+      onStack.add(identity)
+
+      for (const dependency of graph.get(identity) ?? []) {
+        if (!indexes.has(dependency)) {
+          visit(dependency)
+          lowLinks.set(identity, Math.min(lowLinks.get(identity)!, lowLinks.get(dependency)!))
+        }
+        else if (onStack.has(dependency)) {
+          lowLinks.set(identity, Math.min(lowLinks.get(identity)!, indexes.get(dependency)!))
+        }
+      }
+
+      if (lowLinks.get(identity) !== indexes.get(identity)) {
+        return
+      }
+      const component: string[] = []
+      let member = ''
+      do {
+        member = stack.pop()!
+        onStack.delete(member)
+        component.push(member)
+      } while (member !== identity)
+      if (component.length > 1 || (graph.get(identity) ?? []).includes(identity)) {
+        cycles.push(component)
+      }
+    }
+
+    for (const identity of graph.keys()) {
+      if (!indexes.has(identity)) {
+        visit(identity)
+      }
+    }
+    return cycles
+  }
+
+  /** Восстанавливает один точный cycle path внутри strongly connected component. */
+  private _findCyclePath(component: string[], graph: Map<string, string[]>): string[] {
+    const members = new Set(component)
+    const search = (current: string, path: string[]): string[] | null => {
+      for (const next of graph.get(current) ?? []) {
+        if (!members.has(next)) {
+          continue
+        }
+        const cycleStart = path.indexOf(next)
+        if (cycleStart >= 0) {
+          return [...path.slice(cycleStart), next]
+        }
+        const found = search(next, [...path, next])
+        if (found) {
+          return found
+        }
+      }
+      return null
+    }
+    return search(component[0]!, [component[0]!]) ?? [...component, component[0]!]
+  }
+
+  /** Компилирует один исходник SFC и кеширует его вычисленный манифест публичных портов для проброса родителем. */
+  private _compileComponentSFCSource(
+    entity: RComponentSFC,
+    sfcEditing: EndgeSFCEditingConfiguration,
+  ): ComponentSFCCompileResult {
+    const ownsResolvingMarker = !this._componentPortManifestResolving.has(entity.identity)
+    if (ownsResolvingMarker) {
+      this._componentPortManifestResolving.add(entity.identity)
+    }
+    try {
+      const result = compileComponentSFC(entity.source, {
+        identity: entity.identity,
+        resolveComponentTag: tag => Endge.program.resolveComponentTag(tag),
+        hasComponentIdentity: identity => Endge.domain.getComponentSFC(identity) != null,
+        resolvePortProvider: (identity, expectedKind) => this._resolvePortProvider(identity, expectedKind),
+        resolveComponentPortManifest: identity => this._resolveComponentPortManifest(identity, sfcEditing),
+        resolveComponentVariants: identity => this._resolveComponentVariantNames(identity),
+        resolveTypeDefinition: identity => this._resolveTypeDefinition(identity),
+        sfcEditing,
+      })
+      if (result.ir) {
+        this._componentPortManifestCache.set(entity.identity, result.ir.script.ports)
+      }
+      return result
+    }
+    finally {
+      if (ownsResolvingMarker) {
+        this._componentPortManifestResolving.delete(entity.identity)
+      }
+    }
+  }
+
+  /** Читает явные имена корневых Variant без рекурсивной компиляции дочернего элемента. */
+  private _resolveComponentVariantNames(identity: string): string[] | null {
+    const component = Endge.domain.getComponentSFC(identity)
+    if (!component) {
+      return null
+    }
+    const template = parseComponentSFC(component.source).ast?.template
+    if (!template) {
+      return null
+    }
+    const roots = template.roots.filter(node => node.kind !== 'text' || node.content.trim())
+    const variants = roots.flatMap((node) => {
+      if (node.kind !== 'element' || node.tag !== 'Variant') {
+        return []
+      }
+      const name = node.attributes.find(attribute => attribute.name === 'name' && !attribute.dynamic)?.value?.trim()
+      return name ? [name] : []
+    })
+    return variants.length ? variants : []
+  }
+
+  /** Вычисляет публичные порты дочернего элемента независимо от порядка компиляции доменных компонентов. */
+  private _resolveComponentPortManifest(
+    identity: string,
+    sfcEditing: EndgeSFCEditingConfiguration,
+  ): ComponentSFCPortManifest | null {
+    const cached = this._componentPortManifestCache.get(identity)
+    if (cached) {
+      return cached
+    }
+    if (this._componentPortManifestResolving.has(identity)) {
+      return null
+    }
+    const component = Endge.domain.getComponentSFC(identity)
+    if (!component) {
+      return null
+    }
+    return this._compileComponentSFCSource(component, sfcEditing).ir?.script.ports ?? null
+  }
+
+  /** Вычисляет Type Source независимо от порядка компиляции типов и компонентов. */
+  private _resolveTypeDefinition(identity: string): TypeSourceDefinition | null {
+    const compiled = Endge.program.getTypeArtifact(identity)?.payload.definition
+    if (compiled) {
+      return compiled
+    }
+
+    const type = Endge.domain.getType(identity)
+    if (!type || type.isPrimitive) {
+      return null
+    }
+    return compileTypeSource(type.source, type.sourceVersion).document?.definition ?? null
+  }
+
+  /** Материализует итоговые предоставленные и проброшенные порты SFC Action как производные дескрипторы. */
+  private _materializeProvidedActions(components: readonly RComponentSFC[]): void {
+    for (const component of components) {
+      const artifact = Endge.program.getArtifact<ComponentSFCProgramPayload>('component-sfc', component.identity)
+      const ports = artifact?.payload.ir?.script.ports.provides.actions ?? []
+      for (const port of ports) {
+        const identity = `${component.identity}.${port.name}`
+        if (Endge.domain.getAction(identity) || Endge.domain.resolved.get('action', identity)) {
+          artifact?.diagnostics.push({
+            severity: 'error',
+            code: 'component-sfc-provided-action-collision',
+            message: `Derived Action identity collision: ${identity}.`,
+            entityRef: artifact.ref,
+            sourcePath: 'script.ports.provides',
+          })
+          if (artifact) {
+            artifact.status = 'error'
+          }
+          continue
+        }
+        const action = new RAction()
+        action.identity = identity
+        action.name = port.name
+        action.displayName = port.name
+        action.origin = { kind: 'derived', source: { type: 'component-sfc', identity: component.identity } }
+        action.owner = { type: 'component-sfc', identity: component.identity }
+        action.managedBy = component.managedBy
+        action.target = [{ type: 'component-sfc', identity: component.identity }]
+        action.contract = {
+          input: new RField('input', port.inputType),
+          output: new RField('output', port.outputType),
+        }
+        action.defaultImplementation = { kind: 'component-port', portName: port.name }
+        action.active = component.active !== false
+        Endge.domain.resolved.set('action', action)
+      }
+    }
+    Endge.program.recalculateStatus()
+  }
+
+  /** Вычисляет дескриптор доменного provider без зависимости от порядка компиляции SFC. */
+  private _resolvePortProvider(
+    identity: string,
+    expectedKind: 'computation' | 'component' | 'action' | 'query',
+  ) {
+    const computation = Endge.domain.getComputation(identity)
+    const component = Endge.domain.getComponentSFC(identity)
+    const action = Endge.domain.getAction(identity)
+    const query = Endge.domain.getQuery(identity)
+    const target = expectedKind === 'computation'
+      ? computation ?? component ?? action ?? query
+      : expectedKind === 'component'
+        ? component ?? computation ?? action ?? query
+        : expectedKind === 'action'
+          ? action ?? computation ?? component ?? query
+          : query ?? action ?? computation ?? component
+
+    if (target instanceof RComputation) {
+      const contract = compileComputation({ source: target.source }).payload
+      return {
+        kind: 'computation' as const,
+        identity: target.identity,
+        active: target.active !== false && !target.deletedAt,
+        input: contract.input,
+        output: contract.output,
+      }
+    }
+    if (target instanceof RComponentSFC) {
+      const parsed = parseComponentSFC(target.source)
+      const contract = analyzeComponentSFCScript(parsed.ast?.script ?? null, {
+        resolveTypeDefinition: identity => this._resolveTypeDefinition(identity),
+      }).contract
+      return {
+        kind: 'component' as const,
+        identity: target.identity,
+        active: target.active !== false && !target.deletedAt,
+        inputs: contract.inputs,
+      }
+    }
+    if (target instanceof RAction) {
+      return {
+        kind: 'action' as const,
+        identity: target.identity,
+        active: target.active !== false && !target.deletedAt,
+        input: fieldContract(target.contract.input as RField | null),
+        output: fieldContract(target.contract.output as RField | null),
+      }
+    }
+    if (target instanceof RQuery) {
+      const result = Endge.source.compile('query', this._resolveQuerySource(target))
+      const payload = result.artifact as QueryProgramPayload | undefined
+      return {
+        kind: 'query' as const,
+        identity: target.identity,
+        active: target.active !== false && !target.deletedAt,
+        inputs: payload?.props.map(field => queryFieldContract(field)) ?? [],
+        outputs: payload?.outputs.map(output => queryFieldContract(output.contract, output.key)) ?? [],
+      }
+    }
+    return null
+  }
+
+  /**
+   * Строит registry пользовательских SFC tags до компиляции templates.
+   *
+   * В registry попадают только однозначные tags. Конфликты остаются persisted,
+   * но превращают artifacts всех владельцев tag в error на build-фазе.
+   */
+  private _prepareComponentTagRegistry(components: RComponentSFC[]): void {
+    this._componentTagDiagnosticsByIdentity.clear()
+    const componentsByTag = new Map<string, RComponentSFC[]>()
+
+    for (const component of components) {
+      const tag = typeof component.tag === 'string' ? component.tag.trim() : ''
+      if (!tag) {
+        continue
+      }
+      const owners = componentsByTag.get(tag) ?? []
+      owners.push(component)
+      componentsByTag.set(tag, owners)
+    }
+
+    const entries: ComponentSFCTagRegistryEntry[] = []
+    for (const [tag, owners] of componentsByTag) {
+      if (isComponentSFCBuiltInTag(tag)) {
+        for (const owner of owners) {
+          this._addComponentTagDiagnostic(owner.identity, {
+            severity: 'error',
+            code: 'component-sfc-tag-reserved',
+            message: `SFC tag "${tag}" совпадает со встроенным primitive и не может быть зарегистрирован.`,
+            sourcePath: 'tag',
+          })
+        }
+        continue
+      }
+
+      if (owners.length > 1) {
+        const identities = owners.map(owner => owner.identity).join(', ')
+        for (const owner of owners) {
+          this._addComponentTagDiagnostic(owner.identity, {
+            severity: 'error',
+            code: 'component-sfc-tag-duplicate',
+            message: `SFC tag "${tag}" повторяется у компонентов: ${identities}.`,
+            sourcePath: 'tag',
+          })
+        }
+        continue
+      }
+
+      entries.push({ tag, identity: owners[0].identity })
+    }
+
+    Endge.program.setComponentTags(entries)
+  }
+
+  /** Добавляет build diagnostic владельцу persisted SFC tag. */
+  private _addComponentTagDiagnostic(
+    identity: string,
+    diagnostic: Omit<ProgramDiagnostic, 'entityRef'>,
+  ): void {
+    const diagnostics = this._componentTagDiagnosticsByIdentity.get(identity) ?? []
+    diagnostics.push(diagnostic)
+    this._componentTagDiagnosticsByIdentity.set(identity, diagnostics)
+  }
+
+  /** Связывает каждый внешний шаг Action с каталогами storage или установленного кода. */
+  private _linkActionDependencies(seed: ProgramDependency[]): {
+    dependencies: ProgramDependency[]
+    diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
+  } {
+    const dependencies: ProgramDependency[] = []
+    const diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[] = []
+    for (const dependency of seed) {
+      const identity = String(dependency.identity ?? dependency.id)
+      const entity = dependency.entityType === 'action'
+        ? Endge.actions.getDefinition(identity)
+        : dependency.entityType === 'query'
+          ? Endge.domain.getQuery(identity)
+          : dependency.entityType === 'update'
+            ? Endge.domain.getUpdate(identity)
+            : dependency.entityType === 'computation'
+              ? Endge.domain.getComputation(identity)
+              : dependency.entityType === 'data-view'
+                ? Endge.domain.getDataView(identity)
+                : dependency.entityType === 'converter'
+                  ? Endge.domain.getConverter(identity)
+                  : null
+      const codeDefinitionExists = dependency.entityType === 'computation'
+        ? Endge.computations.hasDefinition(identity)
+        : dependency.entityType === 'converter'
+          ? Endge.converters.has(identity)
+          : false
+      if (!entity && !codeDefinitionExists) {
+        diagnostics.push({
+          severity: 'error',
+          code: `action-${dependency.entityType}-missing`,
+          message: `${dependency.entityType} "${identity}" referenced by Action is not installed.`,
+          sourcePath: dependency.sourcePath ?? 'steps',
+          start: dependency.start,
+          end: dependency.end,
+        })
+        continue
+      }
+      dependencies.push({
+        ...dependency,
+        id: entity && 'id' in entity ? entity.id ?? identity : identity,
+      })
+    }
+    return { dependencies, diagnostics }
+  }
+
+  /**
+   * Создает унифицированный `ProgramArtifact` из доменной сущности и payload.
+   *
+   * Метод централизует ref, source hash, diagnostics, status, capabilities
+   * и compiler version, чтобы handlers описывали только payload-специфику.
+   */
+  private _makeArtifact<TEntity, TPayload>(
+    entity: TEntity,
+    entityType: ProgramEntityType,
+    context: ProgramCompileContext,
+    options: {
+      payload: TPayload
+      capabilities: ProgramCapability[]
+      metadata?: ProgramMetadata
+      dependencies?: ProgramArtifact<TPayload>['dependencies']
+      diagnostics?: Omit<ProgramDiagnostic, 'entityRef'>[]
+      children?: ProgramArtifact[]
+      nonBlockingSourcePaths?: string[]
+    },
+  ): ProgramArtifact<TPayload> {
+    const ref = this._makeRef(entity, entityType)
+    const diagnostics = [
+      ...this._collectEntityDiagnostics(entity),
+      ...(options.diagnostics ?? []),
+    ].map(diagnostic => ({ ...diagnostic, entityRef: ref }))
+    const blockingDiagnostics = diagnostics.filter(diagnostic => !options.nonBlockingSourcePaths?.includes(diagnostic.sourcePath ?? ''))
+    const status = blockingDiagnostics.some(diagnostic => diagnostic.severity === 'error')
+      ? 'error'
+      : (diagnostics.length ? 'warning' : 'valid')
+
+    return {
+      ref,
+      sourceHash: this._hashString(JSON.stringify(this._toStableSource(entity))),
+      compilerVersion: context.compilerVersion,
+      contextHash: context.buildContext.contextHash,
+      status,
+      diagnostics,
+      dependencies: options.dependencies ?? [],
+      capabilities: options.capabilities,
+      metadata: options.metadata ?? createEmptyProgramMetadata(),
+      payload: options.payload,
+      children: options.children?.length ? options.children : undefined,
+    }
+  }
+
+  /** Материализует локальные DataView внутри query output graph в child artifacts. */
+  private _materializeResponseOutputDataViews<TPayload extends { outputs: QueryProgramOutput[] }>(
+    payload: TPayload,
+    entity: RQuery | RVocabs,
+    context: ProgramCompileContext,
+    entityType: 'query' | 'vocab',
+  ): {
+    payload: TPayload
+    children: ProgramArtifact[]
+    diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
+    dependencies: ProgramArtifact['dependencies']
+  } {
+    const ownerRef = this._makeRef(entity, entityType)
+    const children: ProgramArtifact[] = []
+    const diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[] = []
+    const dependencies: ProgramArtifact['dependencies'] = []
+
+    const strategies = new Map<string, DataViewMaterializationStrategy>()
+    const outputs: QueryProgramOutput[] = []
+    for (const output of payload.outputs) {
+      const dataViews = this._materializeDataViewRefs(
+        output.dataViews,
+        ownerRef.identity,
+        `outputs.${output.key}.dataView`,
+        context,
+        children,
+        diagnostics,
+        dependencies,
+      )
+      let dataViewIndex = 0
+      const sourceTransforms = output.transforms
+        ?? output.dataViews.map(ref => ({ kind: 'data-view' as const, ref }))
+      const transforms: ResponseOutputTransform[] = sourceTransforms.map((transform) => {
+        if (transform.kind === 'data-view') {
+          return { ...transform, ref: dataViews[dataViewIndex++] ?? transform.ref }
+        }
+
+        const converter = Endge.domain.getConverter(transform.identity)
+        if (!converter) {
+          diagnostics.push({
+            severity: 'error',
+            code: 'response-output-converter-missing',
+            message: `Converter "${transform.identity}" не найден.`,
+            sourcePath: `outputs.${output.key}.convert`,
+          })
+        }
+        else {
+          dependencies.push({
+            entityType: 'converter',
+            id: converter.id ?? converter.identity,
+            identity: converter.identity,
+            role: 'output-converter',
+          })
+        }
+        return transform
+      })
+      let materialization: QueryProgramOutput['materialization']
+      if (output.source.type === 'response' && transforms.length === 0) {
+        materialization = { kind: 'source' }
+      }
+      else {
+        const hasConverter = transforms.some(transform => transform.kind === 'converter')
+        const strategy: DataViewMaterializationStrategy = hasConverter
+          ? { kind: 'full' }
+          : dataViews.length
+            ? this._resolveDataViewChainStrategy(dataViews, children)
+            : output.source.type === 'output'
+              ? strategies.get(output.source.key) ?? { kind: 'full' }
+              : { kind: 'full' }
+        materialization = { kind: 'derived', strategy }
+        strategies.set(output.key, strategy)
+      }
+      outputs.push({ ...output, transforms, dataViews, materialization })
+    }
+
+    return {
+      payload: { ...payload, outputs },
+      children,
+      diagnostics,
+      dependencies,
+    }
+  }
+
+  /** Сворачивает цепочку DataView: byKey допустим только при одинаковом доказанном ключе. */
+  private _resolveDataViewChainStrategy(
+    refs: DataViewRef[],
+    localChildren: ProgramArtifact[],
+  ): DataViewMaterializationStrategy {
+    let strategy: Exclude<DataViewMaterializationStrategy, { kind: 'full' }> | null = null
+    for (const ref of refs) {
+      let artifact: ProgramArtifact<DataViewProgramPayload> | null = null
+      if (ref.kind === 'local') {
+        artifact = this._findDataViewChild(localChildren, ref.ref.id, ref.ref.identity)
+      }
+      else if (ref.kind === 'external') {
+        artifact = Endge.program.getDataViewArtifact(ref.identity)
+      }
+      if (!artifact || artifact.status === 'error' || artifact.payload.materializationStrategy.kind === 'full') {
+        return { kind: 'full' }
+      }
+      const current = artifact.payload.materializationStrategy
+      if (strategy != null && (strategy.kind !== current.kind || strategy.key !== current.key)) {
+        return { kind: 'full' }
+      }
+      strategy = current
+    }
+    return strategy ?? { kind: 'full' }
+  }
+
+  /** Рекурсивно ищет локальный DataView artifact среди дочерних artifacts. */
+  private _findDataViewChild(
+    children: ProgramArtifact[],
+    id: string | number,
+    identity: string,
+  ): ProgramArtifact<DataViewProgramPayload> | null {
+    for (const child of children) {
+      if (child.ref.entityType === 'data-view' && (child.ref.id === id || child.ref.identity === identity)) {
+        return child as ProgramArtifact<DataViewProgramPayload>
+      }
+      const nested = this._findDataViewChild(child.children ?? [], id, identity)
+      if (nested) {
+        return nested
+      }
+    }
+    return null
+  }
+
+  /** Материализует локальные Filter defaults query props в child artifacts. */
+  private _materializeQueryLocalFilters(
+    payload: QueryProgramPayload,
+    entity: RQuery,
+    context: ProgramCompileContext,
+    seed: {
+      children: ProgramArtifact[]
+      diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
+      dependencies: ProgramArtifact['dependencies']
+    },
+  ): {
+    payload: QueryProgramPayload
+    children: ProgramArtifact[]
+    diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
+    dependencies: ProgramArtifact['dependencies']
+  } {
+    const children = [...seed.children]
+    const diagnostics = [...seed.diagnostics]
+    const dependencies = [...seed.dependencies]
+    const ownerIdentity = String(entity.identity ?? entity.id)
+
+    const props = payload.props.map((prop) => {
+      const source = prop.defaultSource
+      if (!source) {
+        return prop
+      }
+
+      if (source.kind === 'filter') {
+        if (prop.type !== 'Object') {
+          diagnostics.push({
+            severity: 'error',
+            code: 'query-filter-default-prop-type',
+            message: `Filter output default поддерживается только для Object prop; "${prop.key}" имеет тип ${prop.type}.`,
+            sourcePath: `props.${prop.key}.from`,
+          })
+        }
+        dependencies.push({
+          entityType: 'filter',
+          id: source.identity,
+          identity: source.identity,
+          role: 'query-prop-default',
+        })
+        const filterArtifact = Endge.program.getFilterArtifact(source.identity)
+        if (!filterArtifact) {
+          diagnostics.push({
+            severity: 'error',
+            code: 'query-filter-default-missing',
+            message: `Filter "${source.identity}" не найден в compiled program.`,
+            sourcePath: `props.${prop.key}.from`,
+          })
+        }
+        else if (filterArtifact.status === 'error') {
+          diagnostics.push({
+            severity: 'error',
+            code: 'query-filter-default-invalid',
+            message: `Filter "${source.identity}" содержит compile errors.`,
+            sourcePath: `props.${prop.key}.from`,
+          })
+        }
+        else if (!filterArtifact.payload.outputs.some(output => output.key === source.output)) {
+          diagnostics.push({
+            severity: 'error',
+            code: 'query-filter-default-output-missing',
+            message: `Filter "${source.identity}" не содержит output "${source.output}".`,
+            sourcePath: `props.${prop.key}.from`,
+          })
+        }
+        else if (filterArtifact.payload.outputs.find(output => output.key === source.output)?.kind !== 'json') {
+          diagnostics.push({
+            severity: 'error',
+            code: 'query-filter-default-output-kind',
+            message: `Filter output "${source.identity}.${source.output}" должен иметь kind json.`,
+            sourcePath: `props.${prop.key}.from`,
+          })
+        }
+        return prop
+      }
+
+      if (source.kind === 'local-filter') {
+        return prop
+      }
+
+      const child = this._compileLocalFilterArtifact(
+        source.source,
+        ownerIdentity,
+        `props.${prop.key}.from`,
+        context,
+      )
+      children.push(child)
+      if (prop.type !== 'Object') {
+        diagnostics.push({
+          severity: 'error',
+          code: 'query-filter-default-prop-type',
+          message: `Локальный Filter output default поддерживается только для Object prop; "${prop.key}" имеет тип ${prop.type}.`,
+          sourcePath: `props.${prop.key}.from`,
+        })
+      }
+      diagnostics.push(...child.diagnostics.map(item => ({
+        severity: item.severity,
+        code: item.code,
+        message: item.message,
+        sourcePath: `props.${prop.key}.from${item.sourcePath ? `.${item.sourcePath}` : ''}`,
+        start: item.start,
+        end: item.end,
+      })))
+      if (!child.payload.outputs.some(output => output.key === source.output)) {
+        diagnostics.push({
+          severity: 'error',
+          code: 'query-local-filter-default-output-missing',
+          message: `Локальный Filter не содержит output "${source.output}".`,
+          sourcePath: `props.${prop.key}.from`,
+        })
+      }
+      else if (child.payload.outputs.find(output => output.key === source.output)?.kind !== 'json') {
+        diagnostics.push({
+          severity: 'error',
+          code: 'query-local-filter-default-output-kind',
+          message: `Локальный Filter output "${source.output}" должен иметь kind json.`,
+          sourcePath: `props.${prop.key}.from`,
+        })
+      }
+      return {
+        ...prop,
+        defaultSource: {
+          kind: 'local-filter' as const,
+          ref: child.ref as { entityType: 'filter', id: string | number, identity: string },
+          output: source.output,
+        },
+      }
+    })
+
+    return { payload: { ...payload, props }, children, diagnostics, dependencies }
+  }
+
+  /** Компилирует owned Filter artifact без регистрации в Endge.program. */
+  private _compileLocalFilterArtifact(
+    source: string,
+    ownerIdentity: string,
+    sourcePath: string,
+    context: ProgramCompileContext,
+  ): ProgramArtifact<FilterProgramPayload> {
+    const result = Endge.source.compile('filter', source)
+    const payload = result.artifact as FilterProgramPayload | undefined
+    const diagnostics = [
+      ...((result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]),
+    ]
+    for (const field of payload?.fields ?? []) {
+      if (field.vocab && !Endge.domain.getVocab(field.vocab.identity)) {
+        diagnostics.push({
+          severity: 'error',
+          code: 'filter-vocab-missing',
+          message: `Vocab "${field.vocab.identity}" не найден.`,
+          sourcePath: `fields.${field.key}.vocab`,
+        })
+      }
+    }
+    const entity = {
+      id: `${ownerIdentity}::${sourcePath}::${this._localFilterCounter += 1}`,
+      identity: `${ownerIdentity}::${sourcePath}`,
+      name: `${ownerIdentity}::${sourcePath}`,
+      source,
+      sourceVersion: 1,
+    }
+    return this._makeArtifact(entity, 'filter', context, {
+      capabilities: ['compilable', 'executable', 'data-provider', 'configuration'],
+      metadata: { self: result.metadata ?? {}, nodes: [] },
+      payload: payload ?? this._makeEmptyFilterPayload(1),
+      diagnostics,
+      dependencies: (payload?.fields ?? [])
+        .filter(field => field.vocab)
+        .map(field => ({
+          entityType: 'vocab',
+          id: field.vocab!.identity,
+          identity: field.vocab!.identity,
+          role: 'vocab',
+        })),
+    })
+  }
+
+  /** Материализует i18n resources в Composition program artifact. */
+  private _materializeCompositionI18n(payload: CompositionProgramPayload): {
+    payload: CompositionProgramPayload
+    diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
+    dependencies: ProgramArtifact['dependencies']
+  } {
+    const diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[] = []
+    const dependencies: ProgramArtifact['dependencies'] = []
+    const i18nResources: NonNullable<CompositionProgramPayload['i18nResources']> = []
+
+    for (const resource of payload.resources) {
+      if (resource.kind !== 'i18n') {
+        continue
+      }
+      const bundle = Endge.domain.getI18nBundleByIdentity(resource.identity)
+      if (!bundle) {
+        diagnostics.push({
+          severity: 'error',
+          code: 'composition-i18n-missing',
+          message: `I18n bundle "${resource.identity}" не найден.`,
+          sourcePath: `resources.${resource.path}`,
+        })
+        continue
+      }
+      if (bundle.active === false) {
+        diagnostics.push({
+          severity: 'error',
+          code: 'composition-i18n-inactive',
+          message: `I18n bundle "${resource.identity}" выключен.`,
+          sourcePath: `resources.${resource.path}`,
+        })
+        continue
+      }
+      dependencies.push({
+        entityType: 'i18n-bundles',
+        id: bundle.id,
+        identity: bundle.identity,
+        role: 'composition-resource',
+      })
+      i18nResources.push({
+        name: resource.name,
+        path: resource.path,
+        scopePath: resource.scopePath,
+        identity: resource.identity,
+        sourceOrder: resource.sourceOrder,
+        messages: compileI18nLocales(bundle.locales ?? {}),
+      })
+    }
+
+    return {
+      payload: { ...payload, i18nResources },
+      diagnostics,
+      dependencies,
+    }
+  }
+
+  /**
+   * Запрещает неявный override одного public translation key вдоль
+   * Composition/scope ancestry. Разные aliases остаются независимыми.
+   */
+  private _compositionI18nCollisionDiagnostics(
+    payload: CompositionProgramPayload,
+    owner: RComposition,
+  ): Omit<ProgramDiagnostic, 'entityRef'>[] {
+    interface TranslationOrigin {
+      composition: string
+      resource: string
+    }
+
+    const diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[] = []
+    const visitPayload = (
+      current: CompositionProgramPayload,
+      inherited: Map<string, TranslationOrigin>,
+      compositionIdentity: string,
+      ownerBoundaryPath: string | null,
+      ancestry: Set<string>,
+    ): void => {
+      const visitScope = (scopePath: string, parentCatalog: Map<string, TranslationOrigin>): void => {
+        const catalog = new Map(parentCatalog)
+        for (const resource of (current.i18nResources ?? [])
+          .filter(item => item.scopePath === scopePath)
+          .sort((left, right) => left.sourceOrder - right.sourceOrder)) {
+          for (const key of collectI18nMessageKeys(resource.messages)) {
+            const publicKey = `${resource.name}:${key}`
+            const previous = catalog.get(publicKey)
+            if (previous) {
+              diagnostics.push({
+                severity: 'error',
+                code: 'composition-i18n-key-collision',
+                message: `Ключ перевода "${publicKey}" из "${compositionIdentity}:${resource.identity}" дублирует ключ вышестоящего ресурса "${previous.composition}:${previous.resource}". Translation override в Composition пока запрещён.`,
+                sourcePath: ownerBoundaryPath ?? `resources.${resource.path}`,
+              })
+              continue
+            }
+            catalog.set(publicKey, { composition: compositionIdentity, resource: resource.identity })
+          }
+        }
+
+        for (const runtime of current.runtimes.filter(item => item.kind === 'composition' && item.scopePath === scopePath)) {
+          const artifact = Endge.program.getCompositionArtifact(runtime.identity)
+          if (!artifact || artifact.status === 'error' || ancestry.has(runtime.identity)) {
+            continue
+          }
+          const nextAncestry = new Set(ancestry)
+          nextAncestry.add(runtime.identity)
+          visitPayload(
+            artifact.payload,
+            catalog,
+            runtime.identity,
+            ownerBoundaryPath ?? `runtimes.${runtime.path}`,
+            nextAncestry,
+          )
+        }
+
+        for (const child of current.scopes
+          .filter(item => item.parentPath === scopePath)
+          .sort((left, right) => left.sourceOrder - right.sourceOrder)) {
+          visitScope(child.path, catalog)
+        }
+      }
+
+      visitScope('scope_default', inherited)
+    }
+
+    visitPayload(payload, new Map(), owner.identity, null, new Set([owner.identity]))
+    return diagnostics
+  }
+
+  /** Проверяет domain/program references и stable-prop bindings Composition. */
+  private _validateComposition(payload: CompositionProgramPayload, owner: RComposition): {
+    diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
+    dependencies: ProgramArtifact['dependencies']
+  } {
+    const diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[] = []
+    const dependencies: ProgramArtifact['dependencies'] = []
+    const storeArtifacts = new Map<string, StoreSourceArtifact>()
+    diagnostics.push(...this._compositionI18nCollisionDiagnostics(payload, owner))
+
+    if (owner.kind === 'project' && !payload.activation) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'composition-project-activation-required',
+        message: 'Project Composition должна явно объявлять activateOn: startup() или manual().',
+        sourcePath: 'activateOn',
+      })
+    }
+
+    for (const resource of payload.resources) {
+      if (resource.kind !== 'style') {
+        continue
+      }
+      const style = Endge.domain.getStyle(resource.identity)
+      const artifact = Endge.program.getStyleArtifact(resource.identity)
+      if (!style) {
+        diagnostics.push({ severity: 'error', code: 'composition-style-missing', message: `Style "${resource.identity}" не найден.`, sourcePath: `resources.${resource.path}` })
+        continue
+      }
+      if (!artifact || artifact.status === 'error') {
+        diagnostics.push({ severity: 'error', code: 'composition-style-invalid', message: `Style "${resource.identity}" не собран или содержит compile errors.`, sourcePath: `resources.${resource.path}` })
+        continue
+      }
+      dependencies.push({ entityType: 'style', id: style.id, identity: style.identity, role: 'composition-resource' })
+    }
+
+    for (const data of payload.data) {
+      const dataPath = data.path ?? data.name
+      if (data.kind === 'store') {
+        const store = Endge.domain.getStore(data.identity)
+        if (!store) {
+          diagnostics.push({ severity: 'error', code: 'composition-store-missing', message: `Store "${data.identity}" не найден.`, sourcePath: `data.${dataPath}` })
+          continue
+        }
+        const compiled = Endge.program.getStoreArtifact(store.id ?? store.identity)
+        if (!compiled || compiled.status === 'error') {
+          diagnostics.push({ severity: 'error', code: 'composition-store-invalid', message: `Store "${data.identity}" содержит compile errors.`, sourcePath: `data.${dataPath}` })
+        }
+        else { storeArtifacts.set(dataPath, compiled.payload) }
+        dependencies.push({ entityType: 'store', id: store.id, identity: store.identity, role: 'composition-data' })
+      }
+      else {
+        const vocab = Endge.domain.getVocab(data.identity)
+        if (!vocab) {
+          diagnostics.push({ severity: 'error', code: 'composition-vocab-missing', message: `Vocab "${data.identity}" не найден.`, sourcePath: `data.${dataPath}` })
+        }
+        else { dependencies.push({ entityType: 'vocab', id: vocab.id, identity: vocab.identity, role: 'composition-data' }) }
+      }
+    }
+
+    /** Проверяет публикацию публичных runtime outputs в writable Store fields. */
+    const validateStoreTo = (
+      runtime: CompositionProgramPayload['runtimes'][number],
+      outputNames: Set<string>,
+      runtimeTitle: string,
+    ): void => {
+      for (const publication of runtime.storeTo) {
+        const storeArtifact = storeArtifacts.get(publication.data)
+        const writableFields = new Set(
+          storeArtifact?.data.filter(field => field.kind === 'value').map(field => field.key) ?? [],
+        )
+        for (const target of Object.keys(publication.fields)) {
+          const root = target.split('.')[0] ?? ''
+          if (storeArtifact && !writableFields.has(root)) {
+            diagnostics.push({
+              severity: 'error',
+              code: 'composition-store-to-target-readonly',
+              message: `Store target "${publication.data}.${target}" отсутствует или является derived.`,
+              sourcePath: `runtimes.${runtime.name}.storeTo`,
+            })
+          }
+        }
+        for (const output of Object.values(publication.fields)) {
+          if (!outputNames.has(output)) {
+            diagnostics.push({
+              severity: 'error',
+              code: 'composition-store-to-output-missing',
+              message: `${runtimeTitle} "${runtime.identity}" не содержит output "${output}".`,
+              sourcePath: `runtimes.${runtime.name}.storeTo`,
+            })
+          }
+        }
+      }
+    }
+
+    for (const runtime of payload.runtimes) {
+      const dependencySource = runtime.kind === 'filter-view'
+        ? payload.runtimes.find(item => item.name === runtime.identity)
+        : runtime
+      dependencies.push({
+        entityType: runtime.kind === 'filter-view'
+          ? 'filter'
+          : runtime.kind === 'component'
+            ? 'component-sfc'
+            : runtime.kind,
+        id: dependencySource?.identity ?? runtime.identity,
+        identity: dependencySource?.identity ?? runtime.identity,
+        role: 'composition-runtime',
+      })
+
+      if (runtime.kind === 'filter-view') {
+        const source = payload.runtimes.find(item => item.name === runtime.identity)
+        if (!source || source.kind !== 'filter') {
+          diagnostics.push({ severity: 'error', code: 'composition-filter-view-source-kind', message: `filterView source "${runtime.identity}" должен быть Filter runtime.`, sourcePath: `runtimes.${runtime.name}` })
+          continue
+        }
+        const artifact = Endge.program.getFilterArtifact(source.identity)
+        if (artifact) {
+          const keys = new Set(artifact.payload.fields.map(field => field.key))
+          for (const key of runtime.fields ?? []) {
+            if (!keys.has(key)) {
+              diagnostics.push({ severity: 'error', code: 'composition-filter-view-field-missing', message: `Filter "${source.identity}" не содержит field "${key}".`, sourcePath: `runtimes.${runtime.name}.fields` })
+            }
+          }
+          for (const key of Object.keys(runtime.controls ?? {})) {
+            if (!keys.has(key)) {
+              diagnostics.push({ severity: 'error', code: 'composition-filter-view-control-field-missing', message: `Filter "${source.identity}" не содержит field "${key}" из controls.`, sourcePath: `runtimes.${runtime.name}.controls.${key}` })
+            }
+          }
+        }
+        if (runtime.componentIdentity) {
+          const componentSFC = Endge.domain.getComponentSFC(runtime.componentIdentity)
+          if (!componentSFC) {
+            diagnostics.push({ severity: 'error', code: 'composition-filter-view-component-missing', message: `Executable SFC component "${runtime.componentIdentity}" не найден.`, sourcePath: `runtimes.${runtime.name}.component` })
+          }
+          else {
+            dependencies.push({
+              entityType: 'component-sfc',
+              id: componentSFC.id,
+              identity: componentSFC.identity,
+              role: 'filter-view-component',
+            })
+          }
+        }
+        continue
+      }
+
+      if (runtime.kind === 'filter') {
+        const model = Endge.domain.getFilter(runtime.identity)
+        const artifact = Endge.program.getFilterArtifact(runtime.identity)
+        if (!model) {
+          diagnostics.push({ severity: 'error', code: 'composition-filter-missing', message: `Filter "${runtime.identity}" не найден.`, sourcePath: `runtimes.${runtime.name}` })
+        }
+        else if (!artifact) {
+          diagnostics.push({ severity: 'error', code: 'composition-filter-artifact-missing', message: `Filter "${runtime.identity}" найден в домене, но не собран в compiled program. Проверьте source фильтра или предыдущие ошибки build.`, sourcePath: `runtimes.${runtime.name}` })
+        }
+        else if (artifact.status === 'error') {
+          diagnostics.push({ severity: 'error', code: 'composition-filter-invalid', message: `Filter "${runtime.identity}" содержит compile errors.`, sourcePath: `runtimes.${runtime.name}` })
+        }
+      }
+      else if (runtime.kind === 'query') {
+        const model = Endge.domain.getQuery(runtime.identity)
+        const artifact = Endge.program.getQueryArtifact(runtime.identity)
+        if (!model) {
+          diagnostics.push({ severity: 'error', code: 'composition-query-missing', message: `Query "${runtime.identity}" не найден.`, sourcePath: `runtimes.${runtime.name}` })
+          continue
+        }
+        if (!artifact) {
+          diagnostics.push({ severity: 'error', code: 'composition-query-artifact-missing', message: `Query "${runtime.identity}" найден в домене, но не собран в compiled program. Проверьте source запроса или предыдущие ошибки build.`, sourcePath: `runtimes.${runtime.name}` })
+          continue
+        }
+        if (artifact.status === 'error') {
+          diagnostics.push({ severity: 'error', code: 'composition-query-invalid', message: `Query "${runtime.identity}" содержит compile errors.`, sourcePath: `runtimes.${runtime.name}` })
+          continue
+        }
+        const propNames = new Set(artifact.payload.props.map(prop => prop.key))
+        for (const propName of Object.keys(runtime.props)) {
+          if ((artifact.payload.requestBody || artifact.payload.requestVariables) && !propNames.has(propName)) {
+            diagnostics.push({
+              severity: 'error',
+              code: 'composition-query-prop-missing',
+              message: `Query "${runtime.identity}" не объявляет prop "${propName}".`,
+              sourcePath: `runtimes.${runtime.name}.withProps.${propName}`,
+            })
+          }
+        }
+        const outputNames = new Set(artifact.payload.outputs.map(output => output.key))
+        validateStoreTo(runtime, outputNames, 'Query')
+      }
+      else if (runtime.kind === 'stream') {
+        const model = Endge.domain.getStream(runtime.identity)
+        const artifact = Endge.program.getStreamArtifact(runtime.identity)
+        if (!model) {
+          diagnostics.push({ severity: 'error', code: 'composition-stream-missing', message: `Stream "${runtime.identity}" не найден.`, sourcePath: `runtimes.${runtime.name}` })
+        }
+        else if (!artifact || artifact.status === 'error') {
+          diagnostics.push({ severity: 'error', code: 'composition-stream-invalid', message: `Stream "${runtime.identity}" не собран или содержит compile errors.`, sourcePath: `runtimes.${runtime.name}` })
+        }
+        if (!runtime.dispatchTo?.length) {
+          diagnostics.push({ severity: 'warning', code: 'composition-stream-dispatch-missing', message: `Stream "${runtime.name}" не маршрутизирует события в Store.`, sourcePath: `runtimes.${runtime.name}` })
+        }
+        else {
+          for (const dataAlias of runtime.dispatchTo) {
+            if (!storeArtifacts.has(dataAlias)) {
+              diagnostics.push({ severity: 'error', code: 'composition-stream-store-missing', message: `Stream "${runtime.name}" ссылается на отсутствующий Store data alias "${dataAlias}".`, sourcePath: `runtimes.${runtime.name}.dispatchTo` })
+            }
+          }
+        }
+      }
+      else if (runtime.kind === 'composition') {
+        const model = Endge.domain.getComposition(runtime.identity)
+        const artifact = Endge.program.getCompositionArtifact(runtime.identity)
+        if (runtime.identity === owner.identity) {
+          diagnostics.push({ severity: 'error', code: 'composition-self-reference', message: `Composition "${owner.identity}" не может запускать саму себя.`, sourcePath: `runtimes.${runtime.name}` })
+          continue
+        }
+        if (this._compositionDependsOn(runtime.identity, owner.identity)) {
+          diagnostics.push({ severity: 'error', code: 'composition-reference-cycle', message: `Composition dependency cycle: "${owner.identity}" - "${runtime.identity}" - "${owner.identity}".`, sourcePath: `runtimes.${runtime.name}` })
+          continue
+        }
+        if (!model) {
+          diagnostics.push({ severity: 'error', code: 'composition-composition-missing', message: `Composition "${runtime.identity}" не найдена.`, sourcePath: `runtimes.${runtime.name}` })
+          continue
+        }
+        if (!artifact) {
+          diagnostics.push({ severity: 'error', code: 'composition-composition-artifact-missing', message: `Composition "${runtime.identity}" найдена в домене, но не собрана в compiled program. Проверьте source композиции или предыдущие ошибки build.`, sourcePath: `runtimes.${runtime.name}` })
+          continue
+        }
+        if (artifact.status === 'error') {
+          diagnostics.push({ severity: 'error', code: 'composition-composition-invalid', message: `Composition "${runtime.identity}" содержит compile errors.`, sourcePath: `runtimes.${runtime.name}` })
+          continue
+        }
+        runtime.effectiveActivation = resolveCompositionActivation(
+          runtime.activationOverride,
+          artifact.payload.activation,
+          payload.scopes.find(scope => scope.path === runtime.scopePath)?.effectiveActivation,
+        )
+        const propNames = new Set(artifact.payload.props.map(prop => prop.key))
+        for (const propName of Object.keys(runtime.props)) {
+          if (!propNames.has(propName)) {
+            diagnostics.push({
+              severity: 'error',
+              code: 'composition-with-props-target-missing',
+              message: `Composition "${runtime.identity}" не объявляет prop "${propName}".`,
+              sourcePath: `runtimes.${runtime.name}.withProps.${propName}`,
+            })
+          }
+        }
+        for (const prop of artifact.payload.props) {
+          if (!prop.optional && prop.defaultValue === undefined && !Object.hasOwn(runtime.props, prop.key)) {
+            diagnostics.push({
+              severity: 'error',
+              code: 'composition-with-props-required',
+              message: `Composition "${runtime.identity}" требует prop "${prop.key}".`,
+              sourcePath: `runtimes.${runtime.name}.withProps.${prop.key}`,
+            })
+          }
+        }
+        for (const [targetDataName, sourceDataName] of Object.entries(runtime.dataBindings ?? {})) {
+          const sourceData = payload.data.find(item => (item.path ?? item.name) === sourceDataName)
+          const targetData = artifact.payload.data.find(item => item.name === targetDataName)
+          if (!targetData) {
+            diagnostics.push({
+              severity: 'error',
+              code: 'composition-with-data-target-missing',
+              message: `Composition "${runtime.identity}" не объявляет data alias "${targetDataName}".`,
+              sourcePath: `runtimes.${runtime.name}.withData.${targetDataName}`,
+            })
+            continue
+          }
+          if (!sourceData || sourceData.kind !== 'store' || targetData.kind !== 'store') {
+            diagnostics.push({
+              severity: 'error',
+              code: 'composition-with-data-kind',
+              message: `withData binding "${sourceDataName}" - "${targetDataName}" должен связывать два Store data alias.`,
+              sourcePath: `runtimes.${runtime.name}.withData.${targetDataName}`,
+            })
+            continue
+          }
+          if (sourceData.identity !== targetData.identity) {
+            diagnostics.push({
+              severity: 'error',
+              code: 'composition-with-data-identity',
+              message: `Store identity "${sourceData.identity}" несовместима с ожидаемой "${targetData.identity}".`,
+              sourcePath: `runtimes.${runtime.name}.withData.${targetDataName}`,
+            })
+          }
+        }
+        const outputNames = new Set(artifact.payload.outputs.map(output => output.key))
+        validateStoreTo(runtime, outputNames, 'Composition')
+      }
+      else {
+        const componentSFC = Endge.domain.getComponentSFC(runtime.identity)
+        const componentArtifact = Endge.program.getArtifact<ComponentSFCProgramPayload>('component-sfc', runtime.identity)
+        if (!componentSFC) {
+          diagnostics.push({ severity: 'error', code: 'composition-component-sfc-missing', message: `SFC component "${runtime.identity}" не найден. Legacy Table/DSL documents are data-only and cannot be executed.`, sourcePath: `runtimes.${runtime.name}` })
+        }
+        else if (!componentArtifact || componentArtifact.status === 'error') {
+          diagnostics.push({ severity: 'error', code: 'composition-component-sfc-invalid', message: `SFC component "${runtime.identity}" не собран или содержит compile errors.`, sourcePath: `runtimes.${runtime.name}` })
+        }
+        if (runtime.dispatchTo?.length) {
+          const eventNames = new Set(componentArtifact?.payload.ir?.script.ports.emits.events.map(event => event.name) ?? [])
+          for (const dataAlias of runtime.dispatchTo) {
+            const storeArtifact = storeArtifacts.get(dataAlias)
+            if (!storeArtifact) {
+              diagnostics.push({ severity: 'error', code: 'composition-component-store-missing', message: `Component "${runtime.name}" ссылается на отсутствующий Store data alias "${dataAlias}".`, sourcePath: `runtimes.${runtime.name}.dispatchTo` })
+              continue
+            }
+            const matched = storeArtifact.updateHandlers.some(handler => handler.eventTypes.some(type => eventNames.has(type)))
+            if (!matched) {
+              diagnostics.push({ severity: 'error', code: 'composition-component-dispatch-unmatched', message: `Component "${runtime.name}" не публикует Event, обрабатываемый Store "${dataAlias}".`, sourcePath: `runtimes.${runtime.name}.dispatchTo` })
+            }
+          }
+        }
+      }
+    }
+
+    for (const hook of payload.hooks) {
+      if (hook.kind !== 'event') {
+        continue
+      }
+      const effect = hook.effect
+      const runtime = payload.runtimes.find(item => item.name === hook.runtime)
+      const componentArtifact = runtime?.kind === 'component'
+        ? Endge.program.getArtifact<ComponentSFCProgramPayload>('component-sfc', runtime.identity)
+        : null
+      if (!componentArtifact?.payload.ir?.script.ports.emits.events.some(event => event.name === hook.event)) {
+        diagnostics.push({ severity: 'error', code: 'composition-event-port-missing', message: `Component runtime "${hook.runtime}" не публикует Event "${hook.event}".`, sourcePath: `hooks.${hook.runtime}.${hook.event}` })
+      }
+      if (effect.kind === 'execute-action') {
+        const action = Endge.domain.getAction(effect.action)
+        if (!action) {
+          diagnostics.push({ severity: 'error', code: 'composition-event-action-missing', message: `Action "${effect.action}" не найден.`, sourcePath: `hooks.${hook.runtime}.${hook.event}.executeAction` })
+        }
+        else { dependencies.push({ entityType: 'action', id: action.id, identity: action.identity, role: 'composition-event-action' }) }
+        continue
+      }
+      const data = payload.data.find(item => (item.path ?? item.name) === effect.data)
+      const storeArtifact = storeArtifacts.get(effect.data)
+      if (!data || data.kind !== 'store' || !storeArtifact) {
+        diagnostics.push({ severity: 'error', code: 'composition-event-store-missing', message: `Event hook ссылается на отсутствующий Store data alias "${effect.data}".`, sourcePath: `hooks.${hook.runtime}.${hook.event}` })
+        continue
+      }
+      if (
+        runtime?.dispatchTo?.includes(effect.data)
+        && storeArtifact.updateHandlers.some(handler => handler.eventTypes.includes(hook.event))
+      ) {
+        diagnostics.push({ severity: 'error', code: 'composition-event-store-double-mutation', message: `Event "${hook.runtime}.${hook.event}" одновременно использует dispatchTo и ручную Store mutation для "${effect.data}".`, sourcePath: `hooks.${hook.runtime}.${hook.event}` })
+      }
+      if (effect.kind === 'apply-update') {
+        const update = Endge.domain.getUpdate(effect.update)
+        const updateArtifact = Endge.program.getUpdateArtifact(effect.update)
+        if (!update || !updateArtifact || updateArtifact.status === 'error') {
+          diagnostics.push({ severity: 'error', code: 'composition-event-update-missing', message: `Update "${effect.update}" не найден или содержит compile errors.`, sourcePath: `hooks.${hook.runtime}.${hook.event}.applyUpdate` })
+        }
+        else if (update.storeIdentity !== data.identity) {
+          diagnostics.push({ severity: 'error', code: 'composition-event-update-owner', message: `Update "${effect.update}" не принадлежит Store "${data.identity}".`, sourcePath: `hooks.${hook.runtime}.${hook.event}.applyUpdate` })
+        }
+        else {
+          dependencies.push({ entityType: 'update', id: update.id, identity: update.identity, role: 'composition-event-update' })
+        }
+      }
+      else {
+        const root = effect.mutation.path.split(/[.[\]]/)[0] ?? ''
+        const writable = new Set(storeArtifact.data.filter(field => field.kind === 'value').map(field => field.key))
+        if (!writable.has(root)) {
+          diagnostics.push({ severity: 'error', code: 'composition-event-mutation-readonly', message: `Store target "${effect.data}.${effect.mutation.path}" отсутствует или является derived.`, sourcePath: `hooks.${hook.runtime}.${hook.event}.mutate` })
+        }
+      }
+    }
+
+    const runtimeOutputNames = (runtime: CompositionProgramPayload['runtimes'][number] | undefined): string[] | null => {
+      if (runtime?.kind === 'filter') {
+        const artifact = Endge.program.getFilterArtifact(runtime.identity)
+        return artifact && artifact.status !== 'error'
+          ? artifact.payload.outputs.map(item => item.key)
+          : null
+      }
+      if (runtime?.kind === 'query') {
+        const artifact = Endge.program.getQueryArtifact(runtime.identity)
+        return artifact && artifact.status !== 'error'
+          ? artifact.payload.outputs.map(item => item.key)
+          : null
+      }
+      if (runtime?.kind === 'composition') {
+        const artifact = Endge.program.getCompositionArtifact(runtime.identity)
+        return artifact && artifact.status !== 'error'
+          ? artifact.payload.outputs.map(item => item.key)
+          : null
+      }
+      return []
+    }
+    const runtimeHasOutput = (runtime: CompositionProgramPayload['runtimes'][number] | undefined, output: string): boolean => {
+      return runtimeOutputNames(runtime)?.includes(output) ?? false
+    }
+    const collectCompositionOutputReads = (expression: SourceExpressionIR): Array<Extract<SourceExpressionIR, { type: 'read' }>> => {
+      if (expression.type === 'read') {
+        return expression.source === 'composition-output' || expression.source === 'composition-outputs' ? [expression] : []
+      }
+      if (expression.type === 'operation') {
+        return expression.arguments.flatMap(collectCompositionOutputReads)
+      }
+      if (expression.type === 'array') {
+        return expression.items.flatMap(collectCompositionOutputReads)
+      }
+      if (expression.type === 'object') {
+        return Object.values(expression.properties).flatMap(collectCompositionOutputReads)
+      }
+      return []
+    }
+
+    for (const output of payload.outputs) {
+      if (output.kind !== 'runtime' || !output.output) {
+        continue
+      }
+      const runtime = payload.runtimes.find(item => item.name === output.runtime)
+      const outputExists = runtimeHasOutput(runtime, output.output)
+      if (!outputExists) {
+        diagnostics.push({
+          severity: 'error',
+          code: 'composition-output-selection-missing',
+          message: `Runtime "${runtime?.identity ?? output.runtime}" не содержит output "${output.output}".`,
+          sourcePath: `outputs.${output.key}`,
+        })
+      }
+    }
+
+    const linkedDataViews = new Set<string>()
+    const validateBinding = (
+      binding: CompositionBindingValue,
+      sourcePath: string,
+    ): void => {
+      if (binding.kind === 'data-view') {
+        const model = Endge.domain.getDataView(binding.identity)
+        const artifact = Endge.program.getDataViewArtifact(binding.identity)
+        if (!model || !artifact || artifact.status === 'error') {
+          diagnostics.push({
+            severity: 'error',
+            code: 'composition-binding-data-view-missing',
+            message: `DataView "${binding.identity}" не найден или содержит compile errors.`,
+            sourcePath,
+          })
+        }
+        else if (!linkedDataViews.has(binding.identity)) {
+          linkedDataViews.add(binding.identity)
+          dependencies.push({ entityType: 'data-view', id: model.id, identity: model.identity, role: 'composition-binding' })
+        }
+        const declaredProps = new Map((artifact?.payload.props ?? []).map(prop => [prop.key, prop]))
+        for (const propName of Object.keys(binding.props)) {
+          if (!declaredProps.has(propName)) {
+            diagnostics.push({
+              severity: 'error',
+              code: 'composition-binding-data-view-prop-missing',
+              message: `DataView "${binding.identity}" не объявляет prop "${propName}".`,
+              sourcePath: `${sourcePath}.${propName}`,
+            })
+          }
+        }
+        for (const field of declaredProps.values()) {
+          if (!field.optional && !field.defaultValue && !(field.key in binding.props)) {
+            diagnostics.push({
+              severity: 'error',
+              code: 'composition-binding-data-view-prop-required',
+              message: `DataView "${binding.identity}" требует prop "${field.key}".`,
+              sourcePath,
+            })
+          }
+        }
+        for (const [propName, propBinding] of Object.entries(binding.props)) {
+          validateBinding(propBinding, `${sourcePath}.${propName}`)
+        }
+        return
+      }
+      if (binding.kind === 'expression') {
+        for (const read of collectCompositionOutputReads(binding.expression)) {
+          const runtimeName = read.parameters?.[0] ?? ''
+          const source = payload.runtimes.find(item => item.name === runtimeName)
+          if (read.source === 'composition-outputs') {
+            const outputNames = runtimeOutputNames(source)
+            if (outputNames != null) {
+              read.parameters = [runtimeName, ...outputNames]
+            }
+            continue
+          }
+          const outputName = read.parameters?.[1] ?? ''
+          if (!runtimeHasOutput(source, outputName)) {
+            diagnostics.push({
+              severity: 'error',
+              code: 'composition-binding-output-missing',
+              message: `Runtime "${runtimeName}" не содержит output "${outputName}".`,
+              sourcePath,
+            })
+          }
+        }
+        return
+      }
+      if (binding.kind === 'outputs') {
+        const source = payload.runtimes.find(item => item.name === binding.runtime)
+        const outputNames = runtimeOutputNames(source)
+        if (outputNames != null) {
+          binding.outputs = outputNames
+        }
+        return
+      }
+      if (binding.kind !== 'output') {
+        return
+      }
+      const source = payload.runtimes.find(item => item.name === binding.runtime)
+      if (!source) {
+        return
+      }
+      const outputExists = runtimeHasOutput(source, binding.output)
+      if (!outputExists) {
+        diagnostics.push({
+          severity: 'error',
+          code: 'composition-binding-output-missing',
+          message: `Runtime "${binding.runtime}" не содержит output "${binding.output}".`,
+          sourcePath,
+        })
+      }
+    }
+
+    for (const target of payload.runtimes) {
+      for (const [propName, binding] of Object.entries(target.props)) {
+        validateBinding(binding, `runtimes.${target.name}.withProps.${propName}`)
+      }
+    }
+
+    for (const hook of payload.hooks) {
+      if (hook.kind !== 'change') {
+        continue
+      }
+      const hookSource = hook.source
+      if (hookSource.kind === 'prop') {
+        const prop = hookSource.path.split('.')[0]
+        if (!payload.props.some(item => item.key === prop)) {
+          diagnostics.push({
+            severity: 'error',
+            code: 'composition-hook-prop-missing',
+            message: `Hook source prop "${prop}" не существует.`,
+            sourcePath: `hooks.prop.${hookSource.path}`,
+          })
+        }
+        continue
+      }
+      const source = payload.runtimes.find(item => item.name === hookSource.runtime)
+      const outputExists = runtimeHasOutput(source, hookSource.output)
+      if (!outputExists) {
+        diagnostics.push({
+          severity: 'error',
+          code: 'composition-hook-output-missing',
+          message: `Hook source "${hookSource.runtime}.${hookSource.output}" не существует.`,
+          sourcePath: `hooks.${hookSource.runtime}.${hookSource.output}`,
+        })
+      }
+    }
+
+    return { diagnostics, dependencies }
+  }
+
+  /** Сортирует Composition так, чтобы compiled artifact зависимости появился раньше consumer. */
+  private _orderCompositionsForCompile(compositions: RComposition[]): RComposition[] {
+    const byIdentity = new Map(compositions.map(composition => [composition.identity, composition]))
+    const ordered: RComposition[] = []
+    const visiting = new Set<string>()
+    const visited = new Set<string>()
+
+    const visit = (composition: RComposition): void => {
+      const identity = String(composition.identity ?? composition.id)
+      if (visited.has(identity)) {
+        return
+      }
+      if (visiting.has(identity)) {
+        return
+      }
+      visiting.add(identity)
+      for (const dependency of this._compositionDependencies(composition)) {
+        const child = byIdentity.get(dependency)
+        if (child) {
+          visit(child)
+        }
+      }
+      visiting.delete(identity)
+      visited.add(identity)
+      ordered.push(composition)
+    }
+
+    for (const composition of compositions) {
+      visit(composition)
+    }
+    return ordered
+  }
+
+  /** Проверяет достижимость Composition dependency для compile-time cycle diagnostics. */
+  private _compositionDependsOn(fromIdentity: string, targetIdentity: string, visited = new Set<string>()): boolean {
+    if (fromIdentity === targetIdentity) {
+      return true
+    }
+    if (visited.has(fromIdentity)) {
+      return false
+    }
+    visited.add(fromIdentity)
+    const model = Endge.domain.getComposition(fromIdentity)
+    if (!model) {
+      return false
+    }
+    return this._compositionDependencies(model)
+      .some(identity => this._compositionDependsOn(identity, targetIdentity, visited))
+  }
+
+  /** Читает только прямые Composition dependencies из source без создания Program artifact. */
+  private _compositionDependencies(composition: RComposition): string[] {
+    const result = Endge.source.compile('composition', this._resolveCompositionSource(composition))
+    const payload = result.artifact as CompositionProgramPayload | undefined
+    return [...new Set(
+      (payload?.runtimes ?? [])
+        .filter(runtime => runtime.kind === 'composition')
+        .map(runtime => runtime.identity),
+    )]
+  }
+
+  /** Материализует локальные DataView внутри DataView pipeline steps в child artifacts. */
+  private _materializeDataViewLocalDataViews(
+    payload: DataViewProgramPayload,
+    entity: RDataView | { id?: string | number, identity?: string, name?: string },
+    context: ProgramCompileContext,
+  ): {
+    payload: DataViewProgramPayload
+    children: ProgramArtifact[]
+    diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
+    dependencies: ProgramArtifact['dependencies']
+  } {
+    const ownerRef = this._makeRef(entity, 'data-view')
+    const children: ProgramArtifact[] = []
+    const diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[] = []
+    const dependencies: ProgramArtifact['dependencies'] = []
+
+    const steps = this._materializeDataViewRefsInSteps(
+      payload.steps,
+      ownerRef.identity,
+      'steps',
+      context,
+      children,
+      diagnostics,
+      dependencies,
+    )
+
+    return {
+      payload: { ...payload, steps },
+      children,
+      diagnostics,
+      dependencies,
+    }
+  }
+
+  /** Материализует локальные DataView refs внутри pipeline steps. */
+  private _materializeDataViewRefsInSteps(
+    steps: DataViewPipelineStep[],
+    ownerIdentity: string,
+    sourcePath: string,
+    context: ProgramCompileContext,
+    children: ProgramArtifact[],
+    diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[],
+    dependencies: ProgramArtifact['dependencies'],
+  ): DataViewPipelineStep[] {
+    return steps.map((step, index) => {
+      if (step.type !== 'from' || !step.dataViews?.length) {
+        return step
+      }
+
+      return {
+        ...step,
+        dataViews: this._materializeDataViewRefs(
+          step.dataViews,
+          ownerIdentity,
+          `${sourcePath}.${index}.dataView`,
+          context,
+          children,
+          diagnostics,
+          dependencies,
+        ),
+      }
+    })
+  }
+
+  /** Заменяет inline DataView refs на local refs и собирает external dependencies. */
+  private _materializeDataViewRefs(
+    refs: DataViewRef[],
+    ownerIdentity: string,
+    sourcePath: string,
+    context: ProgramCompileContext,
+    children: ProgramArtifact[],
+    diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[],
+    dependencies: ProgramArtifact['dependencies'],
+  ): DataViewRef[] {
+    return refs.map((ref, index) => {
+      if (ref.kind === 'external') {
+        dependencies.push({
+          entityType: 'data-view',
+          id: ref.identity,
+          identity: ref.identity,
+          role: 'data-view',
+        })
+        return ref
+      }
+
+      if (ref.kind === 'local') {
+        return ref
+      }
+
+      const child = this._compileLocalDataViewArtifact(
+        ref.source,
+        ownerIdentity,
+        `${sourcePath}.${index}`,
+        context,
+      )
+      children.push(child)
+      diagnostics.push(...child.diagnostics.map(diagnostic => ({
+        severity: diagnostic.severity,
+        code: diagnostic.code,
+        message: diagnostic.message,
+        sourcePath: `${sourcePath}.${index}${diagnostic.sourcePath ? `.${diagnostic.sourcePath}` : ''}`,
+        start: diagnostic.start,
+        end: diagnostic.end,
+      })))
+
+      return {
+        kind: 'local',
+        ref: {
+          entityType: 'data-view',
+          id: child.ref.id,
+          identity: child.ref.identity,
+        },
+      }
+    })
+  }
+
+  /** Компилирует локальный DataView source в child artifact без записи в Endge.program. */
+  private _compileLocalDataViewArtifact(
+    source: string,
+    ownerIdentity: string,
+    sourcePath: string,
+    context: ProgramCompileContext,
+  ): ProgramArtifact<DataViewProgramPayload> {
+    const result = Endge.source.compile('data-view', source)
+    const artifact = result.artifact as DataViewProgramPayload | undefined
+    const entity = {
+      id: `${ownerIdentity}::${sourcePath}::${this._localDataViewCounter += 1}`,
+      identity: `${ownerIdentity}::${sourcePath}`,
+      name: `${ownerIdentity}::${sourcePath}`,
+      source,
+      sourceVersion: 1,
+    }
+    const children: ProgramArtifact[] = []
+    const diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[] = [
+      ...((result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]),
+    ]
+    const dependencies: ProgramArtifact['dependencies'] = []
+    let payload: DataViewProgramPayload = {
+      ...this._makeEmptyDataViewPayload(),
+      ...(artifact ?? {}),
+      sourceDocument: (result.document as DataViewProgramPayload['sourceDocument']) ?? null,
+    }
+
+    if (artifact) {
+      const local = this._materializeDataViewLocalDataViews(payload, entity, context)
+      payload = local.payload
+      children.push(...local.children)
+      diagnostics.push(...local.diagnostics)
+      dependencies.push(...local.dependencies)
+    }
+
+    return this._makeArtifact(entity, 'data-view', context, {
+      capabilities: ['compilable', 'runnable', 'data-provider'],
+      metadata: { self: result.metadata ?? {}, nodes: [] },
+      payload,
+      diagnostics,
+      dependencies,
+      children,
+    })
+  }
+
+  /**
+   * Строит стабильную ссылку artifact на исходную доменную сущность.
+   *
+   * Ссылка используется для diagnostics, indexes и поиска в read-model.
+   */
+  private _makeRef(entity: any, entityType: ProgramEntityType): ProgramArtifactRef {
+    const id = entity?.id ?? entity?.identity ?? entity?.name ?? ''
+    const identity = String(entity?.identity ?? entity?.name ?? id)
+    return { entityType, id, identity }
+  }
+
+  /** Переносит pure entity validation result в diagnostics compiled artifact. */
+  private _collectEntityDiagnostics(entity: any): Omit<ProgramDiagnostic, 'entityRef'>[] {
+    const problems = typeof entity?.getDiagnosticProblems === 'function' ? entity.getDiagnosticProblems() : []
+    return Array.isArray(problems)
+      ? problems.map(problem => ({
+          severity: problem.severity === 'fatal' ? 'error' : problem.severity,
+          code: String(problem.code ?? 'entity.validation'),
+          message: String(problem.message ?? ''),
+          sourcePath: problem.sourcePath,
+          start: problem.start,
+          end: problem.end,
+        }))
+      : []
+  }
+
+  /**
+   * Формирует стабильный input для hash-а artifact.
+   *
+   * Сюда входят только поля, изменение которых должно инвалидировать
+   * compiled artifact на уровне program read-model.
+   */
+  private _toStableSource(entity: any): unknown {
+    if (entity instanceof RQuery || entity instanceof RDataView || entity instanceof RFilter || entity instanceof RComposition) {
+      return {
+        id: entity?.id ?? null,
+        identity: entity?.identity ?? null,
+        name: entity?.name ?? null,
+        source: entity?.source ?? null,
+        sourceVersion: entity?.sourceVersion ?? null,
+      }
+    }
+
+    return {
+      id: entity?.id ?? null,
+      identity: entity?.identity ?? null,
+      name: entity?.name ?? null,
+      type: entity?.type ?? null,
+      kind: entity?.kind ?? null,
+      tag: entity?.tag ?? null,
+      source: entity?.source ?? null,
+      sourceVersion: entity?.sourceVersion ?? null,
+      definition: entity?.definition ?? null,
+      updatedAt: entity?.updatedAt ?? null,
+    }
+  }
+
+  /** Возвращает сохраненный query source. Legacy generation больше не используется runtime compiler-ом. */
+  private _resolveQuerySource(entity: RQuery): string {
+    const source = typeof entity.source === 'string' ? entity.source.trim() : ''
+    if (source) {
+      return source
+    }
+
+    throw new Error(`Query source is required for "${entity.identity ?? entity.name ?? entity.id}".`)
+  }
+
+  /** Возвращает сохраненный DataView source. */
+  private _resolveDataViewSource(entity: RDataView): string {
+    const source = typeof entity.source === 'string' ? entity.source.trim() : ''
+    if (source) {
+      return source
+    }
+
+    throw new Error(`DataView source is required for "${entity.identity ?? entity.name ?? entity.id}".`)
+  }
+
+  /** Возвращает Filter source без fallback на legacy fields. */
+  private _resolveFilterSource(entity: RFilter): string {
+    return typeof entity.source === 'string' ? entity.source : ''
+  }
+
+  /** Возвращает сохраненный Composition source. */
+  private _resolveCompositionSource(entity: RComposition): string {
+    return typeof entity.source === 'string' ? entity.source : ''
+  }
+
+  /** Создает пустой query payload для error-artifact. */
+  private _makeEmptyQueryPayload(): QueryProgramPayload {
+    return {
+      type: 'query-rest',
+      sourceVersion: 2,
+      endpoint: '',
+      query: '',
+      props: [],
+      requestBody: null,
+      outputs: [],
+    }
+  }
+
+  /** Создает пустой Filter payload для error-artifact. */
+  private _makeEmptyFilterPayload(sourceVersion = 1): FilterProgramPayload {
+    return {
+      type: 'filter',
+      sourceVersion,
+      fields: [],
+      defaults: {},
+      outputs: [],
+    }
+  }
+
+  /** Создает пустой Composition payload для error-artifact. */
+  private _makeEmptyCompositionPayload(sourceVersion = 1): CompositionProgramPayload {
+    return {
+      type: 'composition',
+      sourceVersion,
+      dataMode: null,
+      activation: null,
+      props: [],
+      previewProps: null,
+      data: [],
+      resources: [],
+      scopes: [{
+        name: 'scope_default',
+        path: 'scope_default',
+        parentPath: null,
+        activationOverride: null,
+        effectiveActivation: { mode: 'startup' },
+        data: [],
+        resources: [],
+        runtimes: [],
+        children: [],
+        sourceOrder: 0,
+      }],
+      runtimes: [],
+      hooks: [],
+      outputs: [],
+      i18nResources: [],
+      graph: { inputs: [], dataInputs: [], updates: [], publications: [], mounts: [] },
+    }
+  }
+
+  /** Создает пустой DataView payload для error-artifact. */
+  private _makeEmptyDataViewPayload(): DataViewProgramPayload {
+    return {
+      type: 'data-view',
+      mode: 'manual',
+      materializationStrategy: { kind: 'full' },
+      sourceDocument: null,
+      contract: null,
+      transform: null,
+      steps: [],
+      output: {},
+      expression: null,
+    }
+  }
+
+  /**
+   * Возвращает короткий deterministic hash для source snapshot artifact.
+   *
+   * Хеш не является криптографическим; он нужен только как дешёвый marker
+   * изменения входных данных компиляции.
+   */
+  private _hashString(value: string): string {
+    let hash = 0
+    for (let index = 0; index < value.length; index += 1) {
+      hash = ((hash << 5) - hash + value.charCodeAt(index)) | 0
+    }
+    return Math.abs(hash).toString(36)
+  }
+}
+
+function collectLocalTypeDeclarations(source: string): Set<string> {
+  const identities = new Set<string>()
+  for (const match of String(source ?? '').matchAll(/\b(?:interface|type|class|enum)\s+([A-Za-z_$][\w$]*)/g)) {
+    if (match[1]) {
+      identities.add(match[1])
+    }
+  }
+  return identities
+}
+
+function validatePreviewPropValue(
+  field: SourceFieldDefinition,
+  value: unknown,
+  catalog: readonly TypeProgramCatalogEntry[],
+  sourcePath: string,
+): Omit<ProgramDiagnostic, 'entityRef'>[] {
+  if (field.array) {
+    if (!Array.isArray(value)) {
+      return [previewTypeDiagnostic(sourcePath, `ожидался массив значений типа "${field.type}"`)]
+    }
+    return value.flatMap((item, index) => validatePreviewTypeExpression(
+      { kind: 'reference', identity: field.type },
+      item,
+      catalog,
+      `${sourcePath}.${index}`,
+      new Set(),
+    ))
+  }
+  return validatePreviewTypeExpression(
+    { kind: 'reference', identity: field.type },
+    value,
+    catalog,
+    sourcePath,
+    new Set(),
+  )
+}
+
+function validatePreviewTypeExpression(
+  expression: TypeSourceExpression,
+  value: unknown,
+  catalog: readonly TypeProgramCatalogEntry[],
+  sourcePath: string,
+  visiting: Set<string>,
+): Omit<ProgramDiagnostic, 'entityRef'>[] {
+  if (expression.kind === 'reference') {
+    const primitive = validatePreviewPrimitive(expression.identity, value, sourcePath)
+    if (primitive) {
+      return primitive
+    }
+    const type = catalog.find(item => item.identity === expression.identity)
+    if (!type?.definition || visiting.has(expression.identity)) {
+      return []
+    }
+    visiting.add(expression.identity)
+    const diagnostics = validatePreviewTypeExpression(type.definition, value, catalog, sourcePath, visiting)
+    visiting.delete(expression.identity)
+    return diagnostics
+  }
+  if (expression.kind === 'array') {
+    if (!Array.isArray(value)) {
+      return [previewTypeDiagnostic(sourcePath, 'ожидался массив')]
+    }
+    return value.flatMap((item, index) => validatePreviewTypeExpression(expression.items, item, catalog, `${sourcePath}.${index}`, visiting))
+  }
+  if (expression.kind === 'enum') {
+    return expression.values.some(item => Object.is(item, value))
+      ? []
+      : [previewTypeDiagnostic(sourcePath, `значение не входит в enum: ${expression.values.map(item => JSON.stringify(item)).join(', ')}`)]
+  }
+  if (expression.kind === 'union') {
+    const variants = expression.variants.map(variant => validatePreviewTypeExpression(variant, value, catalog, sourcePath, new Set(visiting)))
+    return variants.some(diagnostics => diagnostics.length === 0)
+      ? []
+      : [previewTypeDiagnostic(sourcePath, 'значение не соответствует ни одному варианту union')]
+  }
+  if (expression.kind === 'record') {
+    if (!isPreviewRecord(value)) {
+      return [previewTypeDiagnostic(sourcePath, 'ожидался объект-словарь')]
+    }
+    return Object.entries(value).flatMap(([key, item]) => validatePreviewTypeExpression(
+      expression.values,
+      item,
+      catalog,
+      `${sourcePath}.${key}`,
+      new Set(visiting),
+    ))
+  }
+  if (!isPreviewRecord(value)) {
+    return [previewTypeDiagnostic(sourcePath, 'ожидался объект')]
+  }
+
+  const diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[] = []
+  for (const field of expression.fields) {
+    if (!Object.hasOwn(value, field.key)) {
+      if (!field.optional) {
+        diagnostics.push(previewTypeDiagnostic(`${sourcePath}.${field.key}`, 'отсутствует обязательное поле'))
+      }
+      continue
+    }
+    const fieldValue = value[field.key]
+    if (field.array) {
+      if (!Array.isArray(fieldValue)) {
+        diagnostics.push(previewTypeDiagnostic(`${sourcePath}.${field.key}`, 'ожидался массив'))
+        continue
+      }
+      diagnostics.push(...fieldValue.flatMap((item, index) => validatePreviewTypeExpression(
+        field.type,
+        item,
+        catalog,
+        `${sourcePath}.${field.key}.${index}`,
+        new Set(visiting),
+      )))
+      continue
+    }
+    diagnostics.push(...validatePreviewTypeExpression(field.type, fieldValue, catalog, `${sourcePath}.${field.key}`, new Set(visiting)))
+  }
+  return diagnostics
+}
+
+function validatePreviewPrimitive(
+  identity: string,
+  value: unknown,
+  sourcePath: string,
+): Omit<ProgramDiagnostic, 'entityRef'>[] | null {
+  if (identity === 'Any' || identity === 'any' || identity === 'unknown') {
+    return []
+  }
+  if (identity === 'String' || identity === 'Date' || identity === 'Time' || identity === 'DateTime') {
+    return typeof value === 'string' ? [] : [previewTypeDiagnostic(sourcePath, `ожидался ${identity}`)]
+  }
+  if (identity === 'Number') {
+    return typeof value === 'number' && Number.isFinite(value) ? [] : [previewTypeDiagnostic(sourcePath, 'ожидался Number')]
+  }
+  if (identity === 'Boolean') {
+    return typeof value === 'boolean' ? [] : [previewTypeDiagnostic(sourcePath, 'ожидался Boolean')]
+  }
+  if (identity === 'ID') {
+    return typeof value === 'string' || typeof value === 'number' ? [] : [previewTypeDiagnostic(sourcePath, 'ожидался ID')]
+  }
+  if (identity === 'Object' || identity === 'Record') {
+    return isPreviewRecord(value) ? [] : [previewTypeDiagnostic(sourcePath, 'ожидался Object')]
+  }
+  return null
+}
+
+function previewTypeDiagnostic(sourcePath: string, detail: string): Omit<ProgramDiagnostic, 'entityRef'> {
+  return {
+    severity: 'warning',
+    code: 'composition-preview-prop-type-mismatch',
+    message: `Preview prop не соответствует объявленному типу: ${detail}.`,
+    sourcePath,
+  }
+}
+
+function isPreviewRecord(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function fieldContract(field: { type: string, isArray?: boolean, optional?: boolean } | null | undefined) {
+  if (!field) {
+    return null
+  }
+  return {
+    type: field.type,
+    isArray: field.isArray === true,
+    optional: field.optional === true,
+  }
+}
+
+function queryFieldContract(
+  field: { key?: string, type: string, array?: boolean, optional?: boolean } | null | undefined,
+  fallbackName?: string,
+) {
+  return {
+    name: String(field?.key ?? fallbackName ?? '').trim(),
+    type: field?.type ?? 'Any',
+    isArray: field?.array === true,
+    optional: field?.optional === true,
+  }
+}
+
+function uniqueComputationReferences(payload: ComputationProgramPayload): string[] {
+  return [...new Set(payload.nodes
+    .filter(node => node.kind === 'computation')
+    .map(node => node.identity))]
+}
+
+function statusFromDiagnostics(diagnostics: ProgramDiagnostic[]): ProgramArtifact['status'] {
+  if (diagnostics.some(item => item.severity === 'error')) {
+    return 'error'
+  }
+  return diagnostics.length ? 'warning' : 'valid'
+}
+
+function readStaticDotPath(source: unknown, path: string): unknown | typeof MISSING_STATIC_PATH {
+  let current = source
+  for (const segment of path.split('.')) {
+    if (current == null || typeof current !== 'object' || !Object.hasOwn(current, segment)) {
+      return MISSING_STATIC_PATH
+    }
+    current = (current as Record<string, unknown>)[segment]
+  }
+  return current
+}

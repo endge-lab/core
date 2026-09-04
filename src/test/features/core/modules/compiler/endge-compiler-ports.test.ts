@@ -1,0 +1,278 @@
+import type { ComponentSFCProgramPayload } from '@/features/core/modules/program/domain/types/program.types'
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Endge } from '@/features/core/kernel/endge'
+import { RAction } from '@/features/core/modules/domain/entities/RAction'
+import { RComponentSFC } from '@/features/core/modules/domain/entities/RComponentSFC'
+import { RComputation } from '@/features/core/modules/domain/entities/RComputation'
+import { REnvironment } from '@/features/core/modules/domain/entities/REnvironment'
+import { RProject } from '@/features/core/modules/domain/entities/RProject'
+import { RQuery } from '@/features/core/modules/domain/entities/RQuery'
+import { RTenant } from '@/features/core/modules/domain/entities/RTenant'
+import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
+
+describe('порты ComponentSFC в EndgeCompiler', () => {
+  beforeEach(() => prepareCompilerContext())
+
+  afterEach(() => {
+    Endge.configuration.reset()
+    Endge.program.clear()
+    Endge.domain.reset()
+    Endge.workspace.reset()
+  })
+
+  it('компилирует computations до компонентов и выполняет артефакт по умолчанию', async () => {
+    const computation = new RComputation()
+    computation.id = 1
+    computation.identity = 'process-state'
+    computation.name = 'process-state'
+    computation.displayName = 'Process state'
+    computation.source = `defineComputation({
+  outputs: {
+    state: { value: input('value'), tone: when(isNil(input('value')), 'muted', 'success') },
+  },
+  result: output('state'),
+})`
+
+    const cell = component(2, 'process-cell', `<script setup lang="ts">
+interface CellProps { point?: ProcessOutput }
+defineProps<CellProps>()
+</script>
+<template><Text>{{ point?.value }}</Text></template>`)
+    const owner = component(3, 'process-owner', `<script setup lang="ts">
+interface Props { value?: string }
+interface ProcessInput { value?: string }
+interface ProcessOutput { value?: string, tone?: string }
+interface CellProps { point?: ProcessOutput }
+const props = defineProps<Props>()
+const ports = definePorts({
+  require: {
+    state: computation<ProcessInput, ProcessOutput>({ default: 'process-state' }),
+    cell: component<CellProps>({ tag: 'Process.Cell', default: 'process-cell' }),
+  },
+})
+const state = ports.require.state({ value: props.value })
+</script>
+<template><Process.Cell :point="state" /></template>`)
+
+    Endge.domain.addComputation(computation)
+    Endge.domain.addComponentSFC(cell)
+    Endge.domain.addComponentSFC(owner)
+    Endge.compiler.build({} as any)
+
+    expect(Endge.program.getComputationArtifact('process-state')?.status).toBe('valid')
+    const ownerArtifact = Endge.program.getArtifact('component-sfc', 'process-owner')
+    expect(ownerArtifact?.status).toBe('valid')
+    expect(ownerArtifact?.dependencies).toEqual(expect.arrayContaining([
+      expect.objectContaining({ entityType: 'computation', role: 'port-default-computation' }),
+      expect.objectContaining({ entityType: 'component-sfc', role: 'port-default-component' }),
+    ]))
+    await expect(Endge.runtime.computation.run('process-state', { value: '07:15' })).resolves.toEqual({
+      value: '07:15',
+      tone: 'success',
+    })
+  })
+
+  it('записывает обязательные значения Action по умолчанию как зависимости Program', () => {
+    const openDetails = new RAction()
+    openDetails.id = 7
+    openDetails.identity = 'flight.open-details'
+    openDetails.name = 'Open details'
+    Endge.domain.addAction(openDetails)
+    Endge.domain.addComponentSFC(component(8, 'flight-table', `<script setup lang="ts">
+const ports = definePorts({
+  require: {
+    openDetails: action<{ id: string }, void>({ default: 'flight.open-details' }),
+  },
+})
+</script>
+<template><Text>Flights</Text></template>`))
+
+    Endge.compiler.build({} as any)
+
+    expect(Endge.program.getArtifact('component-sfc', 'flight-table')?.dependencies).toContainEqual({
+      entityType: 'action',
+      id: 'flight.open-details',
+      identity: 'flight.open-details',
+      role: 'port-default-action',
+    })
+  })
+
+  it('записывает прямой Action MenuItem как зависимость компонента', () => {
+    const openDetails = new RAction()
+    openDetails.id = 9
+    openDetails.identity = 'flight.open-details'
+    openDetails.name = 'Open details'
+    Endge.domain.addAction(openDetails)
+    Endge.domain.addComponentSFC(component(10, 'flight-menu', `<template>
+  <Table :rows="[]">
+    <RowMenu><MenuItem action="flight.open-details" label="Открыть" /></RowMenu>
+  </Table>
+</template>`))
+
+    Endge.compiler.build({} as any)
+
+    expect(Endge.program.getArtifact('component-sfc', 'flight-menu')?.dependencies).toContainEqual({
+      entityType: 'action',
+      id: 'flight.open-details',
+      identity: 'flight.open-details',
+      role: 'component-action',
+    })
+  })
+
+  it('записывает прямые реакции Event Query как зависимости Program', () => {
+    const query = new RQuery()
+    query.id = 8
+    query.identity = 'schedule-sandbox-update-leg'
+    query.name = 'Update schedule leg'
+    query.source = `defineQuery({
+      kind: 'rest',
+      request: { endpoint: '', path: '/sandbox/schedule', method: 'PUT' },
+      outputs: { raw: output().from(response()) },
+    })`
+    Endge.domain.addQuery(query)
+    Endge.domain.addComponentSFC(component(9, 'schedule-table', `<template>
+  <Text value="A320" editable @edited="query({ identity: 'schedule-sandbox-update-leg', input: { id: rowKey } })" />
+</template>`))
+
+    Endge.compiler.build({} as any)
+
+    expect(Endge.program.getArtifact('component-sfc', 'schedule-table')?.dependencies).toContainEqual({
+      entityType: 'query',
+      id: 'schedule-sandbox-update-leg',
+      identity: 'schedule-sandbox-update-leg',
+      role: 'event-query',
+    })
+  })
+
+  it('публикует конфликты forward в систему диагностики сборки', () => {
+    Endge.domain.addComponentSFC(component(9, 'table-collision', `<script setup lang="ts">
+const ports = definePorts({
+  forward: '*',
+})
+</script>
+<template>
+  <Table ref="departures" :rows="[]" />
+  <Table ref="arrivals" :rows="[]" />
+</template>`))
+
+    Endge.compiler.build({} as any)
+
+    expect(Endge.program.getArtifact('component-sfc', 'table-collision')?.status).toBe('error')
+    expect(Endge.diagnostics.problems.query({ entityIdentity: 'table-collision' })).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'sfc-port-forward-collision', severity: 'error' }),
+    ]))
+  })
+
+  it('принимает принадлежащие Core типы payload Event, не скрывая отсутствующие пользовательские типы', () => {
+    Endge.domain.addComponentSFC(component(10, 'table-events', `<script setup lang="ts">
+const ports = definePorts({ forward: { from: 'table', ports: { emits: '*' } } })
+</script>
+<template><Table ref="table" :rows="[]" /></template>`))
+    Endge.domain.addComponentSFC(component(11, 'unknown-event', `<script setup lang="ts">
+const ports = definePorts({ emits: { changed: event<MissingUserEvent>() } })
+</script>
+<template><Text>Unknown</Text></template>`))
+
+    Endge.compiler.build({} as any)
+
+    const tableArtifact = Endge.program.getArtifact('component-sfc', 'table-events')
+    expect(tableArtifact?.status).toBe('valid')
+    expect(tableArtifact?.diagnostics).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'type-reference-missing' }),
+    ]))
+    expect(tableArtifact?.dependencies).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ entityType: 'type' }),
+    ]))
+
+    const unknownArtifact = Endge.program.getArtifact('component-sfc', 'unknown-event')
+    expect(unknownArtifact?.status).toBe('error')
+    expect(unknownArtifact?.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'type-reference-missing',
+        message: expect.stringContaining('MissingUserEvent'),
+      }),
+    ]))
+  })
+
+  it('разрешает перенаправленные дочерние manifests независимо от порядка компиляции компонентов', () => {
+    const parent = component(10, 'parent-public', `<script setup lang="ts">
+const ports = definePorts({
+  forward: '*',
+})
+</script>
+<template><Component ref="child" is="child-public" /></template>`)
+    const child = component(11, 'child-public', `<script setup lang="ts">
+const ports = definePorts({
+  provides: {
+    refresh: action<void, void>(),
+  },
+  emits: {
+    changed: event<{ id: string }>(),
+  },
+})
+</script>
+<template><Text>Child</Text></template>`)
+    Endge.domain.addComponentSFC(parent)
+    Endge.domain.addComponentSFC(child)
+
+    Endge.compiler.build({} as any)
+
+    const parentArtifact = Endge.program.getArtifact<ComponentSFCProgramPayload>('component-sfc', 'parent-public')
+    expect(parentArtifact?.status).toBe('valid')
+    expect(parentArtifact?.payload.ir?.script.ports).toMatchObject({
+      provides: { actions: [{ name: 'refresh', forwardedFrom: { ref: 'child' } }] },
+      emits: { events: [{ name: 'changed', forwardedFrom: { ref: 'child' } }] },
+    })
+    expect(Endge.domain.resolved.get<RAction>('action', 'parent-public.refresh')).toMatchObject({
+      origin: { kind: 'derived', source: { type: 'component-sfc', identity: 'parent-public' } },
+      target: [{ type: 'component-sfc', identity: 'parent-public' }],
+      defaultImplementation: { kind: 'component-port', portName: 'refresh' },
+    })
+  })
+
+  it('направляет производный Action порта компонента в конкретную runtime-цель', async () => {
+    Endge.domain.addComponentSFC(component(12, 'action-owner', `<script setup lang="ts">
+const ports = definePorts({ provides: { refresh: action<{ force: boolean }, void>() } })
+</script>
+<template><Text>Owner</Text></template>`))
+    Endge.compiler.build({} as any)
+    const invokeAction = vi.fn()
+
+    await Endge.actions.execute('action-owner.refresh', {
+      input: { force: true },
+      target: { type: 'component-sfc', identity: 'action-owner', value: { invokeAction } },
+    })
+
+    expect(invokeAction).toHaveBeenCalledWith('refresh', { force: true })
+  })
+})
+
+function component(id: number, identity: string, source: string): RComponentSFC {
+  const model = new RComponentSFC()
+  model.id = id
+  model.identity = identity
+  model.name = identity
+  model.displayName = identity
+  model.source = source
+  return model
+}
+
+function prepareCompilerContext(): void {
+  Endge.domain.reset()
+  Endge.workspace.apply(TEST_ENDGE_WORKSPACE)
+  Endge.domain.addProject(RProject.fromPlain({ id: 101, identity: 'project', name: 'Project' }))
+  Endge.domain.addEnvironment(REnvironment.fromPlain({ id: 102, identity: 'environment', name: 'Environment' }))
+  const tenant = new RTenant()
+  tenant.id = 103
+  tenant.identity = 'tenant'
+  tenant.name = 'Tenant'
+  tenant.code = 'tenant'
+  Endge.domain.addTenant(tenant)
+  Endge.configuration.build({
+    dataProvider: 'plain',
+    scope: {},
+    vars: {},
+    context: { projectIdentity: 'project', environmentIdentity: 'environment', tenantIdentity: 'tenant' },
+  })
+}

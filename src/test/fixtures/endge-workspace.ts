@@ -1,4 +1,4 @@
-import type { EndgeWorkspaceDefinition } from '@/modules/workspace/domain/workspace.types'
+import type { EndgeWorkspaceDefinition } from '@/features/core/modules/workspace/domain/workspace.types'
 
 export const TEST_ENDGE_WORKSPACE: EndgeWorkspaceDefinition = {
   identity: 'workspace-test',

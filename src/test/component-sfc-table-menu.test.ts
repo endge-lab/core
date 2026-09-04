@@ -1,11 +1,11 @@
-import type { RComponentSFC_IR_ElementNode } from '@/modules/domain/types/component/sfc/ir.types'
+import type { RComponentSFC_IR_ElementNode } from '@/features/core/modules/domain/types/component/sfc/ir.types'
 
 import { describe, expect, it } from 'vitest'
-import { compileComponentSFC } from '@/modules/compiler/services/component-sfc/component-sfc-compile'
+import { compileComponentSFC } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-compile'
 import {
   normalizeComponentSFCTableColumnMenu,
   normalizeComponentSFCTableRowMenu,
-} from '@/modules/compiler/services/component-sfc/component-sfc-table-menu'
+} from '@/features/core/modules/compiler/services/component-sfc/component-sfc-table-menu'
 
 describe('меню колонки таблицы Component SFC', () => {
   it('компилирует Table > ColumnMenu в дескриптор контекстного меню', () => {

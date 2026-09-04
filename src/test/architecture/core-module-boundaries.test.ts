@@ -4,8 +4,13 @@ import { extname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const SRC_ROOT = join(process.cwd(), 'src')
-const MODULES_ROOT = join(SRC_ROOT, 'modules')
-const LEGACY_PRODUCTION_ROOTS = ['domain', 'model', 'tools'].map(segment => join(SRC_ROOT, segment))
+const CORE_ROOT = join(SRC_ROOT, 'features', 'core')
+const FEDERATION_ROOT = join(SRC_ROOT, 'features', 'federation')
+const MODULES_ROOT = join(CORE_ROOT, 'modules')
+const FEDERATION_ROOT_FILES = new Set(['EndgeFederation.ts', 'EndgeModule.ts'])
+const FEDERATION_ROLE_DIRECTORIES = new Set(['constants', 'services', 'tools', 'types'])
+const LEGACY_PRODUCTION_ROOTS = ['domain', 'kernel', 'model', 'modules', 'tools']
+  .map(segment => join(SRC_ROOT, segment))
 
 /** Собирает production TypeScript-файлы без test tree. */
 function collectTypeScriptFiles(root: string): string[] {
@@ -46,7 +51,7 @@ describe('границы Core с приоритетом модулей', () => {
       join(MODULES_ROOT, 'domain', 'entities'),
       join(MODULES_ROOT, 'domain', 'types'),
     ])
-    const forbiddenImport = /(?:from\s+|import\()['"]@\/(?:kernel\/endge|modules\/[^/'"]+\/(?:adapters|services)\/)/
+    const forbiddenImport = /(?:from\s+|import\()['"]@\/features\/core\/(?:kernel\/endge|modules\/[^/'"]+\/(?:adapters|services)\/)/
     const violations = [...domainRoots]
       .filter(existsSync)
       .flatMap(collectTypeScriptFiles)
@@ -71,5 +76,23 @@ describe('границы Core с приоритетом модулей', () => {
 
     expect(invalidLeafFiles).toEqual([])
     expect(ownerlessFolders).toEqual([])
+  })
+
+  it('сохраняет Federation framework независимым от Core implementation', () => {
+    const coreImport = /(?:from\s+|import\()['"]@\/features\/core\//
+    const violations = collectTypeScriptFiles(FEDERATION_ROOT)
+      .filter(path => coreImport.test(readFileSync(path, 'utf8')))
+
+    expect(violations).toEqual([])
+  })
+
+  it('использует owner-first slices для Federation framework', () => {
+    const violations = readdirSync(FEDERATION_ROOT, { withFileTypes: true })
+      .filter(entry => entry.isDirectory()
+        ? !FEDERATION_ROLE_DIRECTORIES.has(entry.name)
+        : !FEDERATION_ROOT_FILES.has(entry.name))
+      .map(entry => entry.name)
+
+    expect(violations).toEqual([])
   })
 })

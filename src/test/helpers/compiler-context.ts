@@ -1,7 +1,7 @@
-import { Endge } from '@/kernel/endge'
-import { REnvironment } from '@/modules/domain/entities/REnvironment'
-import { RProject } from '@/modules/domain/entities/RProject'
-import { RTenant } from '@/modules/domain/entities/RTenant'
+import { Endge } from '@/features/core/kernel/endge'
+import { REnvironment } from '@/features/core/modules/domain/entities/REnvironment'
+import { RProject } from '@/features/core/modules/domain/entities/RProject'
+import { RTenant } from '@/features/core/modules/domain/entities/RTenant'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
 /** Подготавливает минимальный resolved build context для compiler contract tests. */

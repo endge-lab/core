@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { compileComponentSFC } from '@/modules/compiler/services/component-sfc/component-sfc-compile'
+import { compileComponentSFC } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-compile'
 
 describe('свойства предварительного просмотра Component SFC', () => {
   it('сохраняет обратную совместимость литерального definePreviewProps', () => {

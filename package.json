@@ -1,7 +1,7 @@
 {
   "name": "@endge/core",
   "type": "module",
-  "version": "10.0.1",
+  "version": "11.0.0",
   "private": false,
   "packageManager": "pnpm@8.8.0",
   "license": "Apache-2.0",
@@ -38,7 +38,7 @@
   "dependencies": {
     "@babel/parser": "^7.27.2",
     "@babel/types": "^7.27.1",
-    "@endge/utils": "^0.25.0",
+    "@endge/utils": "^0.26.0",
     "@vue/compiler-dom": "^3.5.24",
     "@vue/compiler-sfc": "^3.5.24",
     "axios": "^1.13.2",

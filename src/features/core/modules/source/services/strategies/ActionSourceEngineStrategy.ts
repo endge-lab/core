@@ -1,0 +1,20 @@
+import type { SourceEngineCompileResult, SourceEngineStrategy, SourceKind } from '@/features/core/modules/source/domain/types/source-engine.types'
+import { compileActionSource } from '@/features/core/modules/source/services/compilers/action-source-compile'
+
+export class ActionSourceEngineStrategy implements SourceEngineStrategy {
+  public readonly id = 'source:action'
+  public readonly sourceKind: SourceKind = 'action'
+  public supports(sourceKind: SourceKind | string): boolean { return sourceKind === this.sourceKind }
+  public compile(source: string): SourceEngineCompileResult {
+    const result = compileActionSource({ source })
+    const ok = !result.diagnostics.some(item => item.severity === 'error')
+    return {
+      ok,
+      document: result.payload.sourceDocument ?? undefined,
+      artifact: result.payload,
+      diagnostics: result.diagnostics,
+      dependencies: result.dependencies,
+      message: ok ? undefined : 'Action source contains compilation errors.',
+    }
+  }
+}
