@@ -11,7 +11,7 @@ describe('зависимости computation в EndgeCompiler', () => {
   beforeEach(() => prepareCompilerContext())
 
   afterEach(() => {
-    Endge.runtime.computation.setSandboxAdapter(null)
+    Endge.computations.setSandboxAdapter(null)
     Endge.configuration.reset()
     Endge.program.clear()
     Endge.domain.reset()
@@ -46,7 +46,7 @@ describe('зависимости computation в EndgeCompiler', () => {
         role: 'computation-call',
       }),
     ])
-    expect(Endge.runtime.computation.runSync('feature.label', { name: '  endge  ' })).toBe('ENDGE')
+    expect(Endge.computations.runSync('feature.label', { name: '  endge  ' })).toBe('ENDGE')
   })
 
   it('распространяет асинхронное выполнение через вызовы внешних computations', async () => {
@@ -65,15 +65,15 @@ describe('зависимости computation в EndgeCompiler', () => {
       },
       result: output('total'),
     })`))
-    Endge.runtime.computation.setSandboxAdapter({
+    Endge.computations.setSandboxAdapter({
       execute: async request => Number(request.inputs.value) * 2,
     })
 
     Endge.compiler.build({} as any)
 
     expect(Endge.program.getComputationArtifact('feature.total')?.payload.execution).toBe('async')
-    await expect(Endge.runtime.computation.run('feature.total', { value: 5 })).resolves.toBe(11)
-    expect(() => Endge.runtime.computation.runSync('feature.total', { value: 5 })).toThrow('requires asynchronous')
+    await expect(Endge.computations.run('feature.total', { value: 5 })).resolves.toBe(11)
+    expect(() => Endge.computations.runSync('feature.total', { value: 5 })).toThrow('requires asynchronous')
   })
 
   it('отклоняет отсутствующие ссылки и непрямые циклы computation во время связывания', () => {
@@ -93,7 +93,7 @@ describe('зависимости computation в EndgeCompiler', () => {
           message: expect.stringContaining('cycle.a'),
         }),
       ]))
-      expect(() => Endge.runtime.computation.runSync(identity, {})).toThrow('contains compile errors')
+      expect(() => Endge.computations.runSync(identity, {})).toThrow('contains compile errors')
     }
 
     expect(Endge.program.getComputationArtifact('missing.owner')).toEqual(expect.objectContaining({

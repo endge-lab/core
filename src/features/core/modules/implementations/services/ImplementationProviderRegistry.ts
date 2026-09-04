@@ -1,5 +1,5 @@
-import type { ImplementationProvider } from '@/features/core/modules/runtime/domain/implementation.types'
-import { ImplementationError } from '@/features/core/modules/runtime/domain/implementation.types'
+import type { ImplementationProvider } from '@/features/core/modules/implementations/domain/implementation.types'
+import { ImplementationError } from '@/features/core/modules/implementations/domain/implementation.types'
 
 /** Владеет исполняемыми функциями провайдеров; провайдеры никогда не сохраняются. */
 export class ImplementationProviderRegistry {

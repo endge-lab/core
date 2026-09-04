@@ -33,11 +33,11 @@ import type {
   ComponentSFCVisualSourceValue,
 } from '@/features/core/modules/domain/types/component/sfc/visual-projection.types'
 import { parseExpression } from '@babel/parser'
+import { BUILTIN_ACTION_IDS, TABLE_RUNTIME_ACTION_IDS } from '@/features/core/modules/actions/domain/action.types'
 import { compileComponentSFC } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-compile'
 import { readComponentSFCTableMenuActionPortReference } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-table-menu'
 import { isComponentSFCBuiltInTag } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-template'
 import { normalizeComponentSFCInteractionTriggers } from '@/features/core/modules/domain/component/component-sfc-edit-trigger'
-import { BUILTIN_ACTION_IDS, TABLE_RUNTIME_ACTION_IDS } from '@/features/core/modules/runtime/domain/action.types'
 
 const NON_VISUAL_CELL_TAGS = new Set([
   'Component',

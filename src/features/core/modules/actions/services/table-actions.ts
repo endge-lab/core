@@ -4,8 +4,8 @@ import type {
   TableColumnPinSide,
   TableRuntimeActionTarget,
   TableSortDirection,
-} from '@/features/core/modules/runtime/domain/action.types'
-import { TABLE_RUNTIME_ACTION_IDS } from '@/features/core/modules/runtime/domain/action.types'
+} from '@/features/core/modules/actions/domain/action.types'
+import { TABLE_RUNTIME_ACTION_IDS } from '@/features/core/modules/actions/domain/action.types'
 
 type TableTargetMethodName = keyof TableRuntimeActionTarget
 

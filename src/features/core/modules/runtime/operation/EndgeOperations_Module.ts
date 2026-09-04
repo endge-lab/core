@@ -6,12 +6,19 @@ import {
   matchesComponentSFCInteractionTrigger,
   resolveComponentSFCInteractionTriggerPlatform,
 } from '@/features/core/modules/domain/component/component-sfc-edit-trigger'
+import { EndgeModule } from '@/features/federation/EndgeModule'
 
 /** Определяет ближайшую активную Operation History по иерархии runtime-scope. */
-export class EndgeOperations {
+export class EndgeOperations_Module extends EndgeModule {
   private readonly _histories = new Map<string, { scope: RuntimeScope, history: OperationHistory }>()
   private _latestScopeId: string | null = null
   private _keydownDisposer: (() => void) | null = null
+
+  /**
+   * ----------------------------------------
+   * PUBLIC
+   * ----------------------------------------
+   */
 
   public register(scope: RuntimeScope, history: OperationHistory): () => void {
     if (this._histories.has(scope.id)) {
@@ -59,6 +66,19 @@ export class EndgeOperations {
   public redo(): Promise<unknown> { return this.getActiveHistory()?.redo() ?? Promise.resolve(undefined) }
   public canUndo(): boolean { return this.getActiveHistory()?.canUndo() ?? false }
   public canRedo(): boolean { return this.getActiveHistory()?.canRedo() ?? false }
+
+  /** Освобождает histories и глобальный keyboard listener текущего Runtime. */
+  public override reset(): void {
+    this._histories.clear()
+    this._latestScopeId = null
+    this._disposeShortcuts()
+  }
+
+  /**
+   * ----------------------------------------
+   * PRIVATE
+   * ----------------------------------------
+   */
 
   private _ensureShortcuts(): void {
     if (this._keydownDisposer || typeof globalThis.addEventListener !== 'function') {

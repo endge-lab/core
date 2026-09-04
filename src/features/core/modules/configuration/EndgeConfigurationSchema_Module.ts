@@ -32,7 +32,7 @@ const PUBLIC_SYSTEM_KEYS = new Set([
 ])
 
 /** Компилирует схемы Configuration до разрешения фактического контекста. */
-export class EndgeConfigurationSchema_Module extends EndgeModule {
+export class EndgeConfigurationSchema_Module extends EndgeModule<EndgeBootContext> {
   private _entries: EndgeConfigurationSchemaEntry[] = []
   private _types: TypeProgramCatalogEntry[] = []
   private _valueDiagnostics = new Map<string, Omit<ProgramDiagnostic, 'entityRef'>[]>()

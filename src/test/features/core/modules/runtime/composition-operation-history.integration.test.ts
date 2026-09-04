@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { Endge } from '@/features/core/kernel/endge'
-import { EndgeOperations } from '@/features/core/modules/runtime/operation/endge-operations'
+import { EndgeOperations_Module } from '@/features/core/modules/runtime/operation/EndgeOperations_Module'
 import { OperationHistory } from '@/features/core/modules/runtime/operation/operation-history'
 import { RuntimeScope } from '@/features/core/modules/runtime/RuntimeScope'
 import { compileCompositionSource } from '@/features/core/modules/source/services/compilers/composition-source-compile'
@@ -55,7 +55,7 @@ describe('интеграция Composition с историей операций'
     const child = new RuntimeScope({ id: 'child', path: 'root.child', parent: root })
     const rootHistory = new OperationHistory({ id: 'root-history' })
     const childHistory = new OperationHistory({ id: 'child-history' })
-    const operations = new EndgeOperations()
+    const operations = new EndgeOperations_Module()
     const removeRoot = operations.register(root, rootHistory)
     const removeChild = operations.register(child, childHistory)
     vi.spyOn(Endge.runtime, 'getRuntimeScopeByHost').mockReturnValue(child)
@@ -88,7 +88,7 @@ describe('интеграция Composition с историей операций'
       }],
     })
     history.commit({ id: 'entry', input: {}, runOutput: null, undo, redo: vi.fn() })
-    const operations = new EndgeOperations()
+    const operations = new EndgeOperations_Module()
     const remove = operations.register(scope, history)
     const preventDefault = vi.fn()
     const dispatch = listeners.keydown

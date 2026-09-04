@@ -1,4 +1,3 @@
-import type { EntityOrigin } from '@/features/core/modules/domain/types/document/entity-management.type'
 import type {
   ActionDefinitionInput,
   ActionExecuteOptions,
@@ -10,17 +9,18 @@ import type {
   RuntimeActionId,
   RuntimeActionRegistrySnapshot,
   TableColumnActionContext,
-} from '@/features/core/modules/runtime/domain/action.types'
-import type { ImplementationInvocation, ImplementationProvider } from '@/features/core/modules/runtime/domain/implementation.types'
-import type { EndgeImplementations } from '@/features/core/modules/runtime/implementation/endge-implementations'
-import { Subscribable } from '@endge/utils'
+} from '@/features/core/modules/actions/domain/action.types'
+import type { EntityOrigin } from '@/features/core/modules/domain/types/document/entity-management.type'
+import type { ImplementationInvocation, ImplementationProvider } from '@/features/core/modules/implementations/domain/implementation.types'
+import type { EndgeImplementations_Module } from '@/features/core/modules/implementations/EndgeImplementations_Module'
 import { Endge } from '@/features/core/kernel/endge'
+import { BUILTIN_ACTION_IDS } from '@/features/core/modules/actions/domain/action.types'
+import { ActionProgramExecutor } from '@/features/core/modules/actions/services/ActionProgramExecutor'
+import { createTableRuntimeActions } from '@/features/core/modules/actions/services/table-actions'
 import { normalizeActionTargets, validateActionTarget } from '@/features/core/modules/compiler/services/action/action-target-validation'
 import { RAction } from '@/features/core/modules/domain/entities/RAction'
 import { RField } from '@/features/core/modules/domain/entities/RField'
-import { BUILTIN_ACTION_IDS } from '@/features/core/modules/runtime/domain/action.types'
-import { ActionProgramExecutor } from '@/features/core/modules/runtime/execution/action/action-program-executor'
-import { createTableRuntimeActions } from '@/features/core/modules/runtime/services/table-actions'
+import { EndgeModule } from '@/features/federation/EndgeModule'
 
 const SOURCE_PROVIDER_KEY = 'core.action.source'
 const COMPONENT_PORT_PROVIDER_KEY = 'core.action.component-port'
@@ -51,7 +51,7 @@ export interface ActionProviderDescriptor extends Omit<ImplementationProvider, '
 }
 
 /** Координирует semantic definitions и generic implementations для Actions. */
-export class EndgeActions extends Subscribable {
+export class EndgeActions_Module extends EndgeModule {
   private readonly _codeActions = new Map<string, RAction>()
   private readonly _catalogPaths = new Map<string, string[]>()
   private readonly _codeActionDisposers = new Map<string, () => void>()
@@ -59,8 +59,14 @@ export class EndgeActions extends Subscribable {
   private _hasSynchronizedResolvedIndex = false
   private readonly _sourceExecutor: ActionProgramExecutor
 
+  /**
+   * ----------------------------------------
+   * PUBLIC
+   * ----------------------------------------
+   */
+
   public constructor(
-    private readonly _implementations: EndgeImplementations,
+    private readonly _implementations: EndgeImplementations_Module,
   ) {
     super()
     this._sourceExecutor = new ActionProgramExecutor({
@@ -70,17 +76,23 @@ export class EndgeActions extends Subscribable {
         input,
         context: { parentRuntimeId },
       }),
-      runComputation: async (identity, input) => await Endge.runtime.computation.run(identity, input),
-      executeSandbox: async request => await Endge.runtime.computation.executeSandbox(request),
+      runComputation: async (identity, input) => await Endge.computations.run(identity, input),
+      executeSandbox: async request => await Endge.computations.executeSandbox(request),
       resolveOperationHistory: parent => Endge.runtime.operations.resolveForHost(parent),
       runDataView: (identity, input, props) => Endge.runtime.dataView.run(identity, input, undefined, { props }),
       executeConverter: (identity, input, options) => Endge.converters.execute(identity, input, options),
     })
-    this.reset()
   }
 
-  /** Перестраивает defaults из кода. Локальный код приложения регистрирует их заново после reset. */
-  public reset(): void {
+  /** Регистрирует встроенные definitions и providers до compiler build. */
+  public override setup(): void {
+    this._registerCoreProviders()
+    this._registerCoreActions()
+    this._registerTableActions()
+  }
+
+  /** Освобождает definitions и providers текущего lifecycle поколения. */
+  public override reset(): void {
     if (this._hasSynchronizedResolvedIndex) {
       for (const identity of this._codeActions.keys()) {
         Endge.domain.resolved.delete('action', identity)
@@ -93,9 +105,7 @@ export class EndgeActions extends Subscribable {
     this._codeActions.clear()
     this._catalogPaths.clear()
     this._codeActionDisposers.clear()
-    this._registerCoreProviders()
-    this._registerCoreActions()
-    this._registerTableActions()
+    this._hasSynchronizedResolvedIndex = false
     this.notify()
   }
 
@@ -263,6 +273,12 @@ export class EndgeActions extends Subscribable {
       })),
     }
   }
+
+  /**
+   * ----------------------------------------
+   * PRIVATE
+   * ----------------------------------------
+   */
 
   private _defineCodeAction(definition: CodeActionDefinition, origin: RAction['origin']): () => void {
     const identity = String(definition.identity ?? '').trim()

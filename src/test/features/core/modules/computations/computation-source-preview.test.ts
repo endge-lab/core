@@ -4,7 +4,7 @@ import { Endge } from '@/features/core/kernel/endge'
 
 describe('временный preview Source для Computation', () => {
   afterEach(() => {
-    Endge.runtime.computation.setSandboxAdapter(null)
+    Endge.computations.setSandboxAdapter(null)
   })
 
   it('выполняет декларативный черновик без публикации артефакта', async () => {
@@ -19,7 +19,7 @@ describe('временный preview Source для Computation', () => {
       result: output('state'),
     })`
 
-    await expect(Endge.runtime.computation.runSource(
+    await expect(Endge.computations.runSource(
       source,
       { value: '  preview  ' },
       'draft-preview',
@@ -32,9 +32,9 @@ describe('временный preview Source для Computation', () => {
 
   it('использует зарегистрированный sandbox для асинхронного узла TypeScript', async () => {
     const execute = vi.fn(async request => Number(request.inputs.value) * 2)
-    Endge.runtime.computation.setSandboxAdapter({ execute })
+    Endge.computations.setSandboxAdapter({ execute })
 
-    await expect(Endge.runtime.computation.runSource(
+    await expect(Endge.computations.runSource(
       `defineComputation({
         outputs: {
           doubled: typescript({
@@ -50,7 +50,7 @@ describe('временный preview Source для Computation', () => {
   })
 
   it('возвращает первую диагностику компилятора как runtime-ошибку', async () => {
-    await expect(Endge.runtime.computation.runSource(
+    await expect(Endge.computations.runSource(
       'defineComputation({ outputs: {}, result: output(\'missing\') })',
       {},
       'invalid-preview',

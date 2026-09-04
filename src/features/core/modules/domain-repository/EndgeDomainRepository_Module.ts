@@ -40,7 +40,7 @@ export class EndgeDomainRepositoryReadOnlyError extends Error {
 }
 
 /** Граница persistence для live service-backend и локальных источников только для чтения. */
-export class EndgeDomainRepository_Module extends EndgeModule {
+export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> {
   private _loadedSnapshot: EndgeLiveDomainSnapshot | null = null
   private _domainProvider: EndgeDomainProvider | null = null
   private _domainETag: string | null = null

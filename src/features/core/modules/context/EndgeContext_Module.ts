@@ -50,7 +50,7 @@ const LEGACY_STORAGE_ADAPTER = new LocalStorageContextAdapter()
  * Контекст выполнения Endge: текущий workspace/project/environment/user scope
  * и координатор persistence-инфраструктуры приложения.
  */
-export class EndgeContext_Module extends EndgeModule {
+export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
   private readonly _adapters = new EndgeStorageAdapterRegistry()
   private readonly _runtimeControllers = new Map<string, RuntimeStateController>()
 

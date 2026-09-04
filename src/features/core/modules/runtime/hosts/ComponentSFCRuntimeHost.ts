@@ -47,9 +47,9 @@ import { DataPath, Raph, RaphNode } from '@endge/raph'
 
 import { ENDGE_CONTEXT_RAPH_PATH } from '@/features/core/kernel/config/kernel.config'
 import { Endge } from '@/features/core/kernel/endge'
+import { ComputationResourceRegistry } from '@/features/core/modules/computations/model/ComputationResourceRegistry'
 import { createEmptyComponentSFCRuntimeDependencies } from '@/features/core/modules/domain/types/component/sfc/dependencies.types'
 import { RUNTIME_BOUNDARY_UPDATE_PHASE_NAME } from '@/features/core/modules/runtime/domain/runtime-host.types'
-import { ComputationResourceRegistry } from '@/features/core/modules/runtime/execution/computation/ComputationResourceRegistry'
 import { executeRuntimeOperation } from '@/features/core/modules/runtime/operation/operation-executor'
 import { RuntimeHostBase } from '@/features/core/modules/runtime/RuntimeHostBase'
 
@@ -454,7 +454,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
         key,
         read.path == null ? payload : readPath(payload, read.path),
       ]))
-      const result = await Endge.runtime.computation.executeSandbox({
+      const result = await Endge.computations.executeSandbox({
         computationIdentity: `${ownerIdentity}.${port.name}`,
         outputName: 'event-action',
         moduleKey: `event:${ownerIdentity}:${port.name}:${hashSource(port.action.source)}`,
@@ -576,7 +576,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     resource = this._computationResources.getOrCreate(
       consumerKey,
       input,
-      () => Endge.runtime.computation.createResource(identity, input, consumerKey),
+      () => Endge.computations.createResource(identity, input, consumerKey),
       () => {
         if (resource) {
           this._reportComputationError(resource, identity, consumerKey, portName)

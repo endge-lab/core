@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { compileComputation } from '@/features/core/modules/compiler/services/computation/computation-compile'
-import { ComputationGraphExecutor } from '@/features/core/modules/runtime/execution/computation/ComputationGraphExecutor'
+import { ComputationGraphExecutor } from '@/features/core/modules/computations/services/ComputationGraphExecutor'
 
 describe('граф compileComputation', () => {
   it('компилирует опережающие ссылки и однократно вычисляет безопасный граф', () => {

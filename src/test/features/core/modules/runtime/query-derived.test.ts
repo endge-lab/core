@@ -7,14 +7,14 @@ import {
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Endge } from '@/features/core/kernel/endge'
+import { timeStringToDate } from '@/features/core/modules/converters/tools/date/time-string-to-date'
+import { weekdaysRange } from '@/features/core/modules/converters/tools/date/weekdays-range'
 import { RConverter } from '@/features/core/modules/domain/entities/RConverter'
 import { REnvironment } from '@/features/core/modules/domain/entities/REnvironment'
 import { RFilter } from '@/features/core/modules/domain/entities/RFilter'
 import { RProject } from '@/features/core/modules/domain/entities/RProject'
 import { RQuery } from '@/features/core/modules/domain/entities/RQuery'
 import { RTenant } from '@/features/core/modules/domain/entities/RTenant'
-import { timeStringToDate } from '@/features/core/modules/runtime/converters/date/time-string-to-date'
-import { weekdaysRange } from '@/features/core/modules/runtime/converters/date/weekdays-range'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
 describe('интеграция Query с производными данными Raph', () => {

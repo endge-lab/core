@@ -336,7 +336,7 @@ function replaceMapEntry<K, V>(
 }
 
 /** Модуль хранения, индексации и изменения документов домена. */
-export class EndgeDomain_Module extends EndgeModule {
+export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   /** Несохраняемые дескрипторы, материализованные ядром, плагинами и компилятором. */
   public readonly resolved = new ResolvedEntityIndex()
   private _projectsById: Map<number, RProject> = new Map()

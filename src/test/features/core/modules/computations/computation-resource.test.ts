@@ -4,8 +4,8 @@ import type { ProgramArtifact } from '@/features/core/modules/program/domain/typ
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Endge } from '@/features/core/kernel/endge'
 import { compileComputation } from '@/features/core/modules/compiler/services/computation/computation-compile'
-import { ComputationResourceState } from '@/features/core/modules/runtime/execution/computation/ComputationResource'
-import { ComputationResourceRegistry } from '@/features/core/modules/runtime/execution/computation/ComputationResourceRegistry'
+import { ComputationResourceState } from '@/features/core/modules/computations/model/ComputationResource'
+import { ComputationResourceRegistry } from '@/features/core/modules/computations/model/ComputationResourceRegistry'
 
 describe('состояние ресурса Computation', () => {
   afterEach(() => Endge.program.clear())
@@ -104,10 +104,10 @@ describe('состояние ресурса Computation', () => {
       implementation: { execution: 'sync', run: () => 5 },
     })
     const unbind = Endge.computations.override({ identity: 'override-demo', providerKey: 'test.override-demo' })
-    expect(Endge.runtime.computation.runSync(17, {})).toBe(5)
+    expect(Endge.computations.runSync(17, {})).toBe(5)
     unbind()
     removeProvider()
-    expect(Endge.runtime.computation.runSync(17, {})).toBe(1)
+    expect(Endge.computations.runSync(17, {})).toBe(1)
 
     const removeThrowingProvider = Endge.computations.provide({
       identity: 'override-demo',
@@ -115,8 +115,8 @@ describe('состояние ресурса Computation', () => {
       implementation: { execution: 'sync', run: () => { throw new Error('override failed') } },
     })
     const removeThrowing = Endge.computations.override({ identity: 'override-demo', providerKey: 'test.override-demo.throwing' })
-    expect(() => Endge.runtime.computation.runSync('override-demo', {})).toThrow('override failed')
-    expect(Endge.runtime.computation.createResource('override-demo', {}, 'test').error).toEqual(expect.objectContaining({
+    expect(() => Endge.computations.runSync('override-demo', {})).toThrow('override failed')
+    expect(Endge.computations.createResource('override-demo', {}, 'test').error).toEqual(expect.objectContaining({
       computationIdentity: 'override-demo',
       kind: 'override-execution',
     }))

@@ -1,29 +1,30 @@
 import type { RuntimeHost } from '@/features/core/modules/runtime/domain/runtime-host.types'
 
 import type { RuntimeScope } from '@/features/core/modules/runtime/RuntimeScope'
+import { EndgeModule } from '@/features/federation/EndgeModule'
 
 /** Индексирует runtime scopes и membership RuntimeHost. */
-export class RuntimeScopeRegistry {
+export class EndgeRuntimeScopes_Module extends EndgeModule {
   private readonly _scopes = new Map<string, RuntimeScope>()
   private readonly _scopeByRuntime = new Map<string, string>()
   private readonly _scopeDisposers = new Map<string, () => void>()
-  private readonly _listeners = new Set<() => void>()
   private _transactionDepth = 0
   private _notificationPending = false
 
+  /**
+   * ----------------------------------------
+   * PUBLIC
+   * ----------------------------------------
+   */
+
   public register(scope: RuntimeScope): RuntimeScope {
     if (this._scopes.has(scope.id)) {
-      throw new Error(`[RuntimeScopeRegistry] Scope "${scope.id}" is already registered.`)
+      throw new Error(`[EndgeRuntimeScopes_Module] Scope "${scope.id}" is already registered.`)
     }
     this._scopes.set(scope.id, scope)
     this._scopeDisposers.set(scope.id, scope.subscribe(() => this._changed()))
     this._changed()
     return scope
-  }
-
-  public subscribe(listener: () => void): () => void {
-    this._listeners.add(listener)
-    return () => this._listeners.delete(listener)
   }
 
   public transaction<T>(operation: () => T): T {
@@ -32,7 +33,7 @@ export class RuntimeScopeRegistry {
       this._transactionDepth -= 1
       if (!this._transactionDepth && this._notificationPending) {
         this._notificationPending = false
-        this._notify()
+        this.notify()
       }
     }
     try {
@@ -64,11 +65,11 @@ export class RuntimeScopeRegistry {
   public attachRuntime(scopeId: string, host: RuntimeHost<any, any>): void {
     const scope = this.get(scopeId)
     if (!scope) {
-      throw new Error(`[RuntimeScopeRegistry] Scope "${scopeId}" is missing.`)
+      throw new Error(`[EndgeRuntimeScopes_Module] Scope "${scopeId}" is missing.`)
     }
     const previous = this._scopeByRuntime.get(host.id)
     if (previous && previous !== scope.id) {
-      throw new Error(`[RuntimeScopeRegistry] Runtime "${host.id}" already belongs to scope "${previous}".`)
+      throw new Error(`[EndgeRuntimeScopes_Module] Runtime "${host.id}" already belongs to scope "${previous}".`)
     }
     scope.addRuntime(host)
     this._scopeByRuntime.set(host.id, scope.id)
@@ -105,7 +106,7 @@ export class RuntimeScopeRegistry {
     this._changed()
   }
 
-  public async reset(): Promise<void> {
+  public override async reset(): Promise<void> {
     const roots = this.getAll().filter(scope => !scope.parent)
     this._scopes.clear()
     this._scopeByRuntime.clear()
@@ -119,16 +120,16 @@ export class RuntimeScopeRegistry {
     }
   }
 
+  /**
+   * ----------------------------------------
+   * PRIVATE
+   * ----------------------------------------
+   */
+
   private _changed(): void {
     if (this._transactionDepth) {
       this._notificationPending = true
     }
-    else { this._notify() }
-  }
-
-  private _notify(): void {
-    for (const listener of this._listeners) {
-      listener()
-    }
+    else { this.notify() }
   }
 }

@@ -16,13 +16,13 @@ import type {
   ComponentSFCPortRole,
   ComponentSFCQueryPort,
 } from '@/features/core/modules/domain/types/component/sfc/ports.types'
+import { TABLE_RUNTIME_ACTION_IDS } from '@/features/core/modules/actions/domain/action.types'
 import {
   getComponentSFCIntrinsicEventDefinitions,
   listComponentSFCEventCapableTags,
 } from '@/features/core/modules/domain/types/component/sfc/intrinsic-events.types'
 import { createEmptyComponentSFCPortManifest } from '@/features/core/modules/domain/types/component/sfc/ports.types'
 import { TABLE_EVENT_DEFINITIONS } from '@/features/core/modules/domain/types/component/sfc/table-events.types'
-import { TABLE_RUNTIME_ACTION_IDS } from '@/features/core/modules/runtime/domain/action.types'
 
 type ForwardablePort = ComponentSFCComputationPort | ComponentSFCComponentPort | ComponentSFCActionPort | ComponentSFCQueryPort | ComponentSFCEventPort
 

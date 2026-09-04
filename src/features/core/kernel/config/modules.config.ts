@@ -1,9 +1,12 @@
 import type { EndgeModuleDefinition } from '@/features/federation/types/endge-modules.types'
+import { EndgeActions_Module } from '@/features/core/modules/actions/EndgeActions_Module'
 import { EndgeAuth_Module } from '@/features/core/modules/auth/EndgeAuth_Module'
 import { EndgeCompiler_Module } from '@/features/core/modules/compiler/EndgeCompiler_Module'
+import { EndgeComputations_Module } from '@/features/core/modules/computations/EndgeComputations_Module'
 import { EndgeConfiguration_Module } from '@/features/core/modules/configuration/EndgeConfiguration_Module'
 import { EndgeConfigurationSchema_Module } from '@/features/core/modules/configuration/EndgeConfigurationSchema_Module'
 import { EndgeContext_Module } from '@/features/core/modules/context/EndgeContext_Module'
+import { EndgeConverters_Module } from '@/features/core/modules/converters/EndgeConverters_Module'
 import { EndgeDiagnostics_Module } from '@/features/core/modules/diagnostics/EndgeDiagnostics_Module'
 import { EndgeDocumentImport_Module } from '@/features/core/modules/document-import/EndgeDocumentImport_Module'
 import { EndgeDomainRepository_Module } from '@/features/core/modules/domain-repository/EndgeDomainRepository_Module'
@@ -13,6 +16,7 @@ import { EndgeTypes_Module } from '@/features/core/modules/EndgeTypes_Module'
 import { EndgeVocabs_Module } from '@/features/core/modules/EndgeVocabs_Module'
 import { EndgeEvents_Module } from '@/features/core/modules/events/EndgeEvents_Module'
 import { EndgeI18n_Module } from '@/features/core/modules/i18n/EndgeI18n_Module'
+import { EndgeImplementations_Module } from '@/features/core/modules/implementations/EndgeImplementations_Module'
 import { EndgeMock_Module } from '@/features/core/modules/mock/EndgeMock_Module'
 import { EndgeProgram_Module } from '@/features/core/modules/program/EndgeProgram_Module'
 import { EndgeRuntime_Module } from '@/features/core/modules/runtime/EndgeRuntime_Module'
@@ -37,7 +41,27 @@ export const ENDGE_CORE_MODULES = [
   { key: 'source', create: () => new EndgeSource_Module(), after: 'domain' },
   { key: 'documentImport', create: () => new EndgeDocumentImport_Module(), after: ['domain', 'domainRepository', 'source', 'types'] },
   { key: 'program', create: () => new EndgeProgram_Module(), after: 'domain' },
-  { key: 'compiler', create: () => new EndgeCompiler_Module(), after: ['domain', 'types', 'configuration', 'diagnostics', 'source', 'program', 'mock'] },
+  { key: 'implementations', create: () => new EndgeImplementations_Module(), after: 'context' },
+  {
+    key: 'actions',
+    create: ({ getModule }) => new EndgeActions_Module(getModule<EndgeImplementations_Module>('implementations')),
+    after: ['domain', 'implementations'],
+  },
+  {
+    key: 'computations',
+    create: ({ getModule }) => new EndgeComputations_Module(getModule<EndgeImplementations_Module>('implementations')),
+    after: ['domain', 'program', 'implementations'],
+  },
+  {
+    key: 'converters',
+    create: ({ getModule }) => new EndgeConverters_Module(getModule<EndgeImplementations_Module>('implementations')),
+    after: ['domain', 'implementations'],
+  },
+  {
+    key: 'compiler',
+    create: () => new EndgeCompiler_Module(),
+    after: ['domain', 'types', 'configuration', 'diagnostics', 'source', 'program', 'mock', 'actions', 'computations', 'converters'],
+  },
   { key: 'auth', create: () => new EndgeAuth_Module(), after: ['configuration', 'domain'] },
   { key: 'vocabs', create: () => new EndgeVocabs_Module(), after: ['domain', 'auth'] },
   { key: 'i18n', create: () => new EndgeI18n_Module(), after: ['domain', 'configuration'] },

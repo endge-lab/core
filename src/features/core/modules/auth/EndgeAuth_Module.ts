@@ -20,7 +20,7 @@ import { EndgeModule } from '@/features/federation/EndgeModule'
 export type AuthInteractionRequiredListener = (error: AuthInteractionRequiredError) => void
 
 /** Единый lifecycle owner runtime auth profile sessions и request authentication. */
-export class EndgeAuth_Module extends EndgeModule {
+export class EndgeAuth_Module extends EndgeModule<EndgeBootContext> {
   public readonly adapters: AuthAdapterRegistry
   public readonly profiles: AuthProfileRegistry
   public readonly session: AuthSessionManager

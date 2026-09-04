@@ -67,7 +67,7 @@ const state = ports.require.state({ value: props.value })
       expect.objectContaining({ entityType: 'computation', role: 'port-default-computation' }),
       expect.objectContaining({ entityType: 'component-sfc', role: 'port-default-component' }),
     ]))
-    await expect(Endge.runtime.computation.run('process-state', { value: '07:15' })).resolves.toEqual({
+    await expect(Endge.computations.run('process-state', { value: '07:15' })).resolves.toEqual({
       value: '07:15',
       tone: 'success',
     })

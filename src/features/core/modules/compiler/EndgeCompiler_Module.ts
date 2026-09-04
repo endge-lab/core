@@ -98,7 +98,8 @@ const COMPONENT_SFC_BUILTIN_EVENT_PAYLOAD_TYPES = new Set([
 /**
  * Компилятор persisted domain model в compiled program artifacts.
  */
-export class EndgeCompiler_Module extends EndgeModule {
+export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
+  /** Хранит compiler handlers, локальные counters, component caches и активный diagnostics span. */
   private readonly _handlers = new Map<ProgramEntityType, EntityCompilerHandler<any, any>>()
   private _localDataViewCounter = 0
   private _localFilterCounter = 0
@@ -106,6 +107,12 @@ export class EndgeCompiler_Module extends EndgeModule {
   private _componentPortManifestCache = new Map<string, ComponentSFCPortManifest>()
   private _componentPortManifestResolving = new Set<string>()
   private _compileSpan: DiagnosticsSpanHandle | null = null
+
+  /**
+   * ----------------------------------------
+   * PUBLIC
+   * ----------------------------------------
+   */
 
   /**
    * Создает singleton-bound compiler module и регистрирует стандартные handlers.
@@ -203,11 +210,11 @@ export class EndgeCompiler_Module extends EndgeModule {
       }
 
       if (!this._compilePhase(
-        'composition',
-        ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS,
-        'compositions',
-        this._orderCompositionsForCompile(Endge.domain.getCompositions()),
-        context,
+          'composition',
+          ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS,
+          'compositions',
+          this._orderCompositionsForCompile(Endge.domain.getCompositions()),
+          context,
       )) {
         return
       }
@@ -325,19 +332,19 @@ export class EndgeCompiler_Module extends EndgeModule {
   }
 
   /**
-   * Регистрирует built-in handlers для SFC-компонентов.
-   *
-   * Сейчас compiler сознательно строит program artifacts только для новой
-   * source-first ветки `component-sfc`.
+   * ----------------------------------------
+   * PRIVATE
+   * ----------------------------------------
    */
-  private _registerDefaultHandlers(): void {
 
+  /** Собирает полный registry встроенных compiler handlers для поддерживаемых Domain documents. */
+  private _registerDefaultHandlers(): void {
     //
-    // Обработчик для RType
+    //
+    // Объединяет built-in references и пользовательские Type Source в единый Type catalog.
     this._registerHandler<RType, TypeProgramPayload>({
       //
       entityType: 'type',
-
       //
       compile: (entity, context) => {
         const primitiveKind = String(entity.meta?.primitiveKind ?? '').trim()
@@ -424,11 +431,13 @@ export class EndgeCompiler_Module extends EndgeModule {
       },
     })
 
-
     //
-    // Обработчик для RConfiguration
+    //
+    // Связывает Configuration со schema и зависимостями её Type expressions.
     this._registerHandler<RConfiguration, ConfigurationProgramPayload>({
+      //
       entityType: 'configuration',
+      //
       compile: (entity, context) => {
         const schema = Endge.configurationSchema.get(entity.identity)
         const values = schema?.document?.values ?? []
@@ -443,6 +452,8 @@ export class EndgeCompiler_Module extends EndgeModule {
                 role: 'configuration-value-type',
               }
             })
+        //
+        //
         return this._makeArtifact(entity, 'configuration', context, {
           capabilities: ['compilable', 'configuration'],
           payload: {
@@ -463,12 +474,19 @@ export class EndgeCompiler_Module extends EndgeModule {
       },
     })
 
+    //
+    //
+    // Компилирует Action contract и связывает его с code-defined actions и Type dependencies.
     this._registerHandler<RAction, ActionProgramPayload>({
+      //
       entityType: 'action',
+      //
       compile: (entity, context) => {
         const result = compileAction(entity)
         const codeCollision = Endge.actions.getCodeDefinition(entity.identity)
         const linkedDependencies = this._linkActionDependencies(result.dependencies)
+        //
+        //
         return this._makeArtifact(entity, 'action', context, {
           capabilities: result.payload.sourceDocument ? ['compilable', 'runnable', 'executable'] : ['compilable'],
           payload: result.payload,
@@ -497,10 +515,17 @@ export class EndgeCompiler_Module extends EndgeModule {
       },
     })
 
+    //
+    //
+    // Собирает Computation artifact вместе с computation и Type dependencies.
     this._registerHandler<RComputation, ComputationProgramPayload>({
+      //
       entityType: 'computation',
+      //
       compile: (entity, context) => {
         const result = compileComputation({ source: entity.source })
+        //
+        //
         return this._makeArtifact(entity, 'computation', context, {
           capabilities: ['compilable', 'runnable'],
           payload: result.payload,
@@ -517,14 +542,21 @@ export class EndgeCompiler_Module extends EndgeModule {
       },
     })
 
+    //
+    //
+    // Компилирует SFC, проверяет port contracts и связывает runtime dependencies компонента.
     this._registerHandler<RComponentSFC, ComponentSFCProgramPayload>({
+      //
       entityType: 'component-sfc',
+      //
       compile: (entity, context) => {
         const result = this._compileComponentSFCSource(entity, context.buildContext.configuration.sfcEditing)
         const knownComponentTypes = new Set([
           ...collectLocalTypeDeclarations(entity.source),
           ...COMPONENT_SFC_BUILTIN_EVENT_PAYLOAD_TYPES,
         ])
+        //
+        //
         return this._makeArtifact(entity, 'component-sfc', context, {
           capabilities: result.ir ? ['compilable', 'runnable', 'renderable'] : ['compilable'],
           metadata: result.metadata,
@@ -612,8 +644,13 @@ export class EndgeCompiler_Module extends EndgeModule {
       },
     })
 
+    //
+    //
+    // Преобразует EndgeCSS Source в renderer-neutral stylesheet artifact.
     this._registerHandler<RStyle, EndgeStyleProgramPayload>({
+      //
       entityType: 'style',
+      //
       compile: (entity, context) => {
         const result = compileEndgeCSS(entity.source, { identity: entity.identity, scope: 'global' })
         const stylesheet: EndgeStyleSheetArtifact = result.artifact ?? {
@@ -626,6 +663,8 @@ export class EndgeCompiler_Module extends EndgeModule {
           themes: [],
           indexes: { universal: [], tags: {}, classes: {}, ids: {}, components: {}, identities: {}, states: {}, parts: {} },
         }
+        //
+        //
         return this._makeArtifact(entity, 'style', context, {
           capabilities: ['compilable', 'configuration'],
           payload: {
@@ -645,8 +684,13 @@ export class EndgeCompiler_Module extends EndgeModule {
       },
     })
 
+    //
+    //
+    // Материализует Query outputs, локальные DataView и Filter dependencies.
     this._registerHandler<RQuery, QueryProgramPayload>({
+      //
       entityType: 'query',
+      //
       compile: (entity, context) => {
         const source = this._resolveQuerySource(entity)
         const result = Endge.source.compile('query', source)
@@ -658,6 +702,8 @@ export class EndgeCompiler_Module extends EndgeModule {
             ? this._materializeQueryLocalFilters(localDataViews.payload, entity, context, localDataViews)
             : localDataViews
 
+        //
+        //
         return this._makeArtifact(entity, 'query', context, {
           capabilities: ['compilable', 'runnable', 'data-provider'],
           metadata: { self: result.metadata ?? {}, nodes: [] },
@@ -694,8 +740,13 @@ export class EndgeCompiler_Module extends EndgeModule {
       },
     })
 
+    //
+    //
+    // Собирает Vocab provider, его local outputs, auth profile и Mock dependencies.
     this._registerHandler<RVocabs, VocabProgramPayload>({
+      //
       entityType: 'vocab',
+      //
       compile: (entity, context) => {
         const result = Endge.source.compile('vocab', entity.source)
         const artifact = result.artifact as VocabProgramPayload | undefined
@@ -763,6 +814,8 @@ export class EndgeCompiler_Module extends EndgeModule {
           }
         }
 
+        //
+        //
         return this._makeArtifact(entity, 'vocab', context, {
           capabilities: ['compilable', 'runnable', 'data-provider'],
           metadata: { self: result.metadata ?? {}, nodes: [] },
@@ -782,8 +835,13 @@ export class EndgeCompiler_Module extends EndgeModule {
       },
     })
 
+    //
+    //
+    // Материализует DataView pipeline и его локальные дочерние artifacts.
     this._registerHandler<RDataView, DataViewProgramPayload>({
+      //
       entityType: 'data-view',
+      //
       compile: (entity, context) => {
         const source = this._resolveDataViewSource(entity)
         const result = Endge.source.compile('data-view', source)
@@ -792,6 +850,8 @@ export class EndgeCompiler_Module extends EndgeModule {
             ? this._materializeDataViewLocalDataViews(artifact, entity, context)
             : { payload: undefined, children: [], diagnostics: [], dependencies: [] }
 
+        //
+        //
         return this._makeArtifact(entity, 'data-view', context, {
           capabilities: ['compilable', 'runnable', 'data-provider'],
           metadata: { self: result.metadata ?? {}, nodes: [] },
@@ -822,8 +882,13 @@ export class EndgeCompiler_Module extends EndgeModule {
       },
     })
 
+    //
+    //
+    // Компилирует Store-owned Update и сохраняет явную dependency на owner Store.
     this._registerHandler<RUpdate, UpdateSourceArtifact>({
+      //
       entityType: 'update',
+      //
       compile: (entity, context) => {
         const result = Endge.source.compile('update', entity.source)
         const compiled = result.artifact as Omit<UpdateSourceArtifact, 'storeIdentity'> | undefined
@@ -837,6 +902,8 @@ export class EndgeCompiler_Module extends EndgeModule {
             sourcePath: 'store',
           })
         }
+        //
+        //
         return this._makeArtifact(entity, 'update', context, {
           capabilities: ['compilable', 'executable'],
           metadata: createEmptyProgramMetadata(),
@@ -856,8 +923,13 @@ export class EndgeCompiler_Module extends EndgeModule {
       },
     })
 
+    //
+    //
+    // Связывает Store fields с Update handlers, Mock data и derived DataView artifacts.
     this._registerHandler<RStore, StoreSourceArtifact>({
+      //
       entityType: 'store',
+      //
       compile: (entity, context) => {
         const result = Endge.source.compile('store', entity.source)
         const payload = result.artifact as StoreSourceArtifact | undefined
@@ -866,7 +938,7 @@ export class EndgeCompiler_Module extends EndgeModule {
             .map((update) => {
               const artifact = Endge.program.getUpdateArtifact(update.identity)
               if (!artifact || artifact.status === 'error') {
-                ;(result.diagnostics ??= []).push({
+                ; (result.diagnostics ??= []).push({
                   severity: 'error',
                   code: 'store-update-invalid',
                   message: `Update "${update.identity}" отсутствует в compiled program или содержит ошибки.`,
@@ -879,7 +951,7 @@ export class EndgeCompiler_Module extends EndgeModule {
               for (const [mutationIndex, mutation] of (artifact?.payload.mutations ?? []).entries()) {
                 const targetRoot = String(mutation.target ?? '').split(/[.[\]]/)[0] ?? ''
                 if (targetRoot && !writable.has(targetRoot)) {
-                  ;(result.diagnostics ??= []).push({
+                  ; (result.diagnostics ??= []).push({
                     severity: 'error',
                     code: 'store-update-target-invalid',
                     message: `Update "${update.identity}" пишет в отсутствующее или derived поле "${targetRoot}".`,
@@ -903,7 +975,7 @@ export class EndgeCompiler_Module extends EndgeModule {
           for (const eventType of handler.eventTypes) {
             const previous = handlersByType.get(eventType)
             if (previous) {
-              ;(result.diagnostics ??= []).push({
+              ; (result.diagnostics ??= []).push({
                 severity: 'error',
                 code: 'store-update-event-duplicate',
                 message: `Store "${entity.identity}" содержит два Update для события "${eventType}": "${previous}" и "${handler.identity}".`,
@@ -922,7 +994,7 @@ export class EndgeCompiler_Module extends EndgeModule {
             ]) ?? [],
         ))
         for (const field of payload?.data ?? []) {
-          ;(result.diagnostics ??= []).push(
+          ; (result.diagnostics ??= []).push(
               ...this._typeContractDiagnostics(field.contract?.type, `data.${field.key}.contract.type`),
               ...this._typeContractDiagnostics(field.contract?.typeExpression, `data.${field.key}.contract.typeExpression`),
           )
@@ -940,12 +1012,12 @@ export class EndgeCompiler_Module extends EndgeModule {
                   : mockStatus === 'missing-provider'
                       ? 'store-mock-provider-missing'
                       : 'store-mock-invalid-content'
-              ;(result.diagnostics ??= []).push({
-                severity: 'error',
-                code,
-                message: `Mock "${field.initial.identity}" для Store field "${field.key}" недоступен: ${mockStatus}.`,
-                sourcePath: `data.${field.key}`,
-              })
+                ; (result.diagnostics ??= []).push({
+                  severity: 'error',
+                  code,
+                  message: `Mock "${field.initial.identity}" для Store field "${field.key}" недоступен: ${mockStatus}.`,
+                  sourcePath: `data.${field.key}`,
+                })
             }
           }
           if (field.kind !== 'derived') {
@@ -964,7 +1036,7 @@ export class EndgeCompiler_Module extends EndgeModule {
             })
             const dataViewArtifact = Endge.program.getDataViewArtifact(ref.identity)
             if (!dataViewArtifact || dataViewArtifact.status === 'error') {
-              ;(result.diagnostics ??= []).push({
+              ; (result.diagnostics ??= []).push({
                 severity: 'error',
                 code: 'store-data-view-invalid',
                 message: `DataView "${ref.identity}" для Store field "${field.key}" отсутствует или содержит compile errors.`,
@@ -973,6 +1045,8 @@ export class EndgeCompiler_Module extends EndgeModule {
             }
           }
         }
+        //
+        //
         return this._makeArtifact(entity, 'store', context, {
           capabilities: ['compilable', 'executable', 'data-provider'],
           metadata: createEmptyProgramMetadata(),
@@ -986,11 +1060,18 @@ export class EndgeCompiler_Module extends EndgeModule {
       },
     })
 
+    //
+    //
+    // Собирает Stream transport и event contract для runtime execution.
     this._registerHandler<RStream, StreamSourceArtifact>({
+      //
       entityType: 'stream',
+      //
       compile: (entity, context) => {
         const result = Endge.source.compile('stream', entity.source)
         const payload = result.artifact as StreamSourceArtifact | undefined
+        //
+        //
         return this._makeArtifact(entity, 'stream', context, {
           capabilities: ['compilable', 'runnable', 'data-provider'],
           metadata: createEmptyProgramMetadata(),
@@ -1011,8 +1092,13 @@ export class EndgeCompiler_Module extends EndgeModule {
       },
     })
 
+    //
+    //
+    // Проверяет Vocab bindings Filter fields и собирает их Type dependencies.
     this._registerHandler<RFilter, FilterProgramPayload>({
+      //
       entityType: 'filter',
+      //
       compile: (entity, context) => {
         const result = Endge.source.compile('filter', this._resolveFilterSource(entity))
         const compiledPayload = result.artifact as FilterProgramPayload | undefined
@@ -1029,7 +1115,7 @@ export class EndgeCompiler_Module extends EndgeModule {
               role: 'vocab',
             })
             if (!Endge.domain.getVocab(field.vocab.identity)) {
-              ;(result.diagnostics ??= []).push({
+              ; (result.diagnostics ??= []).push({
                 severity: 'error',
                 code: 'filter-vocab-missing',
                 message: `Vocab "${field.vocab.identity}" не найден.`,
@@ -1038,6 +1124,8 @@ export class EndgeCompiler_Module extends EndgeModule {
             }
           }
         }
+        //
+        //
         return this._makeArtifact(entity, 'filter', context, {
           capabilities: ['compilable', 'executable', 'data-provider', 'configuration'],
           metadata: { self: result.metadata ?? {}, nodes: [] },
@@ -1055,8 +1143,13 @@ export class EndgeCompiler_Module extends EndgeModule {
       },
     })
 
+    //
+    //
+    // Материализует Composition i18n, preview contracts и runtime dependencies.
     this._registerHandler<RComposition, CompositionProgramPayload>({
+      //
       entityType: 'composition',
+      //
       compile: (entity, context) => {
         const result = Endge.source.compile('composition', this._resolveCompositionSource(entity))
         const compiledPayload = result.artifact as CompositionProgramPayload | undefined
@@ -1068,6 +1161,8 @@ export class EndgeCompiler_Module extends EndgeModule {
             : { payload: undefined, diagnostics: [], dependencies: [] }
         const payload = i18n.payload
         const validation = payload ? this._validateComposition(payload, entity) : { diagnostics: [], dependencies: [] }
+        //
+        //
         return this._makeArtifact(entity, 'composition', context, {
           capabilities: ['compilable', 'executable', 'configuration'],
           metadata: { self: result.metadata ?? {}, nodes: [] },
@@ -1216,8 +1311,8 @@ export class EndgeCompiler_Module extends EndgeModule {
   private _orderedStyles(): RStyle[] {
     const rank = (style: RStyle) => style.managedBy === 'system' ? 0 : 1
     return Endge.domain.getStyles()
-      .filter(style => style.active !== false && !style.deletedAt)
-      .sort((left, right) => rank(left) - rank(right) || left.identity.localeCompare(right.identity))
+        .filter(style => style.active !== false && !style.deletedAt)
+        .sort((left, right) => rank(left) - rank(right) || left.identity.localeCompare(right.identity))
   }
 
   /** Возвращает static artifact dependencies внешних computation calls. */
@@ -1248,14 +1343,14 @@ export class EndgeCompiler_Module extends EndgeModule {
   ): Omit<ProgramDiagnostic, 'entityRef'>[] {
     const compiledCatalog = Endge.program.getTypeCatalog()
     const catalog: TypeProgramCatalogEntry[] = compiledCatalog.length
-      ? compiledCatalog
-      : Endge.types.listResolved().map((type) => {
+        ? compiledCatalog
+        : Endge.types.listResolved().map((type) => {
           const primitiveKind = String(type.meta?.primitiveKind ?? '').trim()
           const category: TypeProgramCatalogEntry['category'] = primitiveKind === 'reference'
-            ? 'reference'
-            : type.isPrimitive
-              ? 'primitive'
-              : 'user'
+              ? 'reference'
+              : type.isPrimitive
+                  ? 'primitive'
+                  : 'user'
           const target = String(type.meta?.target ?? '').trim()
           return {
             id: type.id,
@@ -1266,13 +1361,13 @@ export class EndgeCompiler_Module extends EndgeModule {
             definition: null,
             runtimeType: type.isPrimitive ? String(type.meta?.runtimeType ?? type.identity) : undefined,
             entityReference: category === 'reference' && target
-              ? { target, storage: type.meta?.storage === 'identity' ? 'identity' : 'id' }
-              : undefined,
+                ? { target, storage: type.meta?.storage === 'identity' ? 'identity' : 'id' }
+                : undefined,
             status: 'valid',
           }
         })
     const catalogWithLocals = localTypes.size
-      ? [
+        ? [
           ...catalog,
           ...[...localTypes].map((identity, index): TypeProgramCatalogEntry => ({
             id: `local:${index}:${identity}`,
@@ -1284,10 +1379,10 @@ export class EndgeCompiler_Module extends EndgeModule {
             status: 'valid',
           })),
         ]
-      : catalog
+        : catalog
     return typeof expression === 'string' || expression == null
-      ? validateTypeExpressionUsage(expression, catalogWithLocals, sourcePath)
-      : validateTypeSourceExpressionUsage(expression, catalogWithLocals, sourcePath)
+        ? validateTypeExpressionUsage(expression, catalogWithLocals, sourcePath)
+        : validateTypeSourceExpressionUsage(expression, catalogWithLocals, sourcePath)
   }
 
   /** Создаёт стабильные зависимости Program для каждого выражения пользовательского типа. */
@@ -1298,9 +1393,9 @@ export class EndgeCompiler_Module extends EndgeModule {
     const identities = new Set<string>()
     for (const expression of expressions) {
       const referenced = typeof expression === 'string' || expression == null
-        ? collectTypeExpressionReferences(expression)
-        : new Set(collectTypeSourceExpressionReferences(expression)
-            .filter(identity => collectTypeExpressionReferences(identity).has(identity)))
+          ? collectTypeExpressionReferences(expression)
+          : new Set(collectTypeSourceExpressionReferences(expression)
+              .filter(identity => collectTypeExpressionReferences(identity).has(identity)))
       for (const identity of referenced) {
         if (!excluded.has(identity)) {
           identities.add(identity)
@@ -1345,13 +1440,13 @@ export class EndgeCompiler_Module extends EndgeModule {
     payload: CompositionProgramPayload | undefined,
   ): ProgramArtifact['dependencies'] {
     return Object.entries(payload?.previewProps ?? {}).flatMap(([prop, value]) => value.kind === 'mock'
-      ? [{
+        ? [{
           entityType: 'mock-data',
           id: value.identity,
           identity: value.identity,
           role: `composition-preview:${prop}`,
         }]
-      : [])
+        : [])
   }
 
   /** Диагностика preview остаётся предупреждением, чтобы сломанный fixture не делал production-выполнение невалидным. */
@@ -1380,10 +1475,10 @@ export class EndgeCompiler_Module extends EndgeModule {
       diagnostics.push({
         severity: 'warning',
         code: status === 'missing-document'
-          ? 'composition-preview-mock-document-missing'
-          : status === 'missing-provider'
-            ? 'composition-preview-mock-provider-missing'
-            : 'composition-preview-mock-invalid-content',
+            ? 'composition-preview-mock-document-missing'
+            : status === 'missing-provider'
+                ? 'composition-preview-mock-provider-missing'
+                : 'composition-preview-mock-invalid-content',
         message: `Preview mock "${value.identity}" для prop "${key}" недоступен: ${status}.`,
         sourcePath: `previewProps.${key}`,
       })
@@ -1394,7 +1489,7 @@ export class EndgeCompiler_Module extends EndgeModule {
   /** Связывает computation artifacts, запрещает missing/invalid/cyclic references и выводит effective execution mode. */
   private _linkComputations(): void {
     const artifacts = Endge.program.getArtifacts()
-      .filter((artifact): artifact is ComputationArtifact => artifact.ref.entityType === 'computation')
+        .filter((artifact): artifact is ComputationArtifact => artifact.ref.entityType === 'computation')
     const byIdentity = new Map(artifacts.map(artifact => [artifact.ref.identity, artifact]))
 
     for (const artifact of artifacts) {
@@ -1464,7 +1559,7 @@ export class EndgeCompiler_Module extends EndgeModule {
           continue
         }
         const hasAsyncDependency = uniqueComputationReferences(artifact.payload)
-          .some(identity => byIdentity.get(identity)?.payload.execution === 'async')
+            .some(identity => byIdentity.get(identity)?.payload.execution === 'async')
         if (hasAsyncDependency) {
           artifact.payload.execution = 'async'
           changed = true
@@ -1693,12 +1788,12 @@ export class EndgeCompiler_Module extends EndgeModule {
     const action = Endge.domain.getAction(identity)
     const query = Endge.domain.getQuery(identity)
     const target = expectedKind === 'computation'
-      ? computation ?? component ?? action ?? query
-      : expectedKind === 'component'
-        ? component ?? computation ?? action ?? query
-        : expectedKind === 'action'
-          ? action ?? computation ?? component ?? query
-          : query ?? action ?? computation ?? component
+        ? computation ?? component ?? action ?? query
+        : expectedKind === 'component'
+            ? component ?? computation ?? action ?? query
+            : expectedKind === 'action'
+                ? action ?? computation ?? component ?? query
+                : query ?? action ?? computation ?? component
 
     if (target instanceof RComputation) {
       const contract = compileComputation({ source: target.source }).payload
@@ -1818,23 +1913,23 @@ export class EndgeCompiler_Module extends EndgeModule {
     for (const dependency of seed) {
       const identity = String(dependency.identity ?? dependency.id)
       const entity = dependency.entityType === 'action'
-        ? Endge.actions.getDefinition(identity)
-        : dependency.entityType === 'query'
-          ? Endge.domain.getQuery(identity)
-          : dependency.entityType === 'update'
-            ? Endge.domain.getUpdate(identity)
-            : dependency.entityType === 'computation'
-              ? Endge.domain.getComputation(identity)
-              : dependency.entityType === 'data-view'
-                ? Endge.domain.getDataView(identity)
-                : dependency.entityType === 'converter'
-                  ? Endge.domain.getConverter(identity)
-                  : null
+          ? Endge.actions.getDefinition(identity)
+          : dependency.entityType === 'query'
+              ? Endge.domain.getQuery(identity)
+              : dependency.entityType === 'update'
+                  ? Endge.domain.getUpdate(identity)
+                  : dependency.entityType === 'computation'
+                      ? Endge.domain.getComputation(identity)
+                      : dependency.entityType === 'data-view'
+                          ? Endge.domain.getDataView(identity)
+                          : dependency.entityType === 'converter'
+                              ? Endge.domain.getConverter(identity)
+                              : null
       const codeDefinitionExists = dependency.entityType === 'computation'
-        ? Endge.computations.hasDefinition(identity)
-        : dependency.entityType === 'converter'
-          ? Endge.converters.has(identity)
-          : false
+          ? Endge.computations.hasDefinition(identity)
+          : dependency.entityType === 'converter'
+              ? Endge.converters.has(identity)
+              : false
       if (!entity && !codeDefinitionExists) {
         diagnostics.push({
           severity: 'error',
@@ -1881,8 +1976,8 @@ export class EndgeCompiler_Module extends EndgeModule {
     ].map(diagnostic => ({ ...diagnostic, entityRef: ref }))
     const blockingDiagnostics = diagnostics.filter(diagnostic => !options.nonBlockingSourcePaths?.includes(diagnostic.sourcePath ?? ''))
     const status = blockingDiagnostics.some(diagnostic => diagnostic.severity === 'error')
-      ? 'error'
-      : (diagnostics.length ? 'warning' : 'valid')
+        ? 'error'
+        : (diagnostics.length ? 'warning' : 'valid')
 
     return {
       ref,
@@ -1920,17 +2015,17 @@ export class EndgeCompiler_Module extends EndgeModule {
     const outputs: QueryProgramOutput[] = []
     for (const output of payload.outputs) {
       const dataViews = this._materializeDataViewRefs(
-        output.dataViews,
-        ownerRef.identity,
-        `outputs.${output.key}.dataView`,
-        context,
-        children,
-        diagnostics,
-        dependencies,
+          output.dataViews,
+          ownerRef.identity,
+          `outputs.${output.key}.dataView`,
+          context,
+          children,
+          diagnostics,
+          dependencies,
       )
       let dataViewIndex = 0
       const sourceTransforms = output.transforms
-        ?? output.dataViews.map(ref => ({ kind: 'data-view' as const, ref }))
+          ?? output.dataViews.map(ref => ({ kind: 'data-view' as const, ref }))
       const transforms: ResponseOutputTransform[] = sourceTransforms.map((transform) => {
         if (transform.kind === 'data-view') {
           return { ...transform, ref: dataViews[dataViewIndex++] ?? transform.ref }
@@ -1962,12 +2057,12 @@ export class EndgeCompiler_Module extends EndgeModule {
       else {
         const hasConverter = transforms.some(transform => transform.kind === 'converter')
         const strategy: DataViewMaterializationStrategy = hasConverter
-          ? { kind: 'full' }
-          : dataViews.length
-            ? this._resolveDataViewChainStrategy(dataViews, children)
-            : output.source.type === 'output'
-              ? strategies.get(output.source.key) ?? { kind: 'full' }
-              : { kind: 'full' }
+            ? { kind: 'full' }
+            : dataViews.length
+                ? this._resolveDataViewChainStrategy(dataViews, children)
+                : output.source.type === 'output'
+                    ? strategies.get(output.source.key) ?? { kind: 'full' }
+                    : { kind: 'full' }
         materialization = { kind: 'derived', strategy }
         strategies.set(output.key, strategy)
       }
@@ -2109,10 +2204,10 @@ export class EndgeCompiler_Module extends EndgeModule {
       }
 
       const child = this._compileLocalFilterArtifact(
-        source.source,
-        ownerIdentity,
-        `props.${prop.key}.from`,
-        context,
+          source.source,
+          ownerIdentity,
+          `props.${prop.key}.from`,
+          context,
       )
       children.push(child)
       if (prop.type !== 'Object') {
@@ -2195,13 +2290,13 @@ export class EndgeCompiler_Module extends EndgeModule {
       payload: payload ?? this._makeEmptyFilterPayload(1),
       diagnostics,
       dependencies: (payload?.fields ?? [])
-        .filter(field => field.vocab)
-        .map(field => ({
-          entityType: 'vocab',
-          id: field.vocab!.identity,
-          identity: field.vocab!.identity,
-          role: 'vocab',
-        })),
+          .filter(field => field.vocab)
+          .map(field => ({
+            entityType: 'vocab',
+            id: field.vocab!.identity,
+            identity: field.vocab!.identity,
+            role: 'vocab',
+          })),
     })
   }
 
@@ -2285,8 +2380,8 @@ export class EndgeCompiler_Module extends EndgeModule {
       const visitScope = (scopePath: string, parentCatalog: Map<string, TranslationOrigin>): void => {
         const catalog = new Map(parentCatalog)
         for (const resource of (current.i18nResources ?? [])
-          .filter(item => item.scopePath === scopePath)
-          .sort((left, right) => left.sourceOrder - right.sourceOrder)) {
+            .filter(item => item.scopePath === scopePath)
+            .sort((left, right) => left.sourceOrder - right.sourceOrder)) {
           for (const key of collectI18nMessageKeys(resource.messages)) {
             const publicKey = `${resource.name}:${key}`
             const previous = catalog.get(publicKey)
@@ -2311,17 +2406,17 @@ export class EndgeCompiler_Module extends EndgeModule {
           const nextAncestry = new Set(ancestry)
           nextAncestry.add(runtime.identity)
           visitPayload(
-            artifact.payload,
-            catalog,
-            runtime.identity,
-            ownerBoundaryPath ?? `runtimes.${runtime.path}`,
-            nextAncestry,
+              artifact.payload,
+              catalog,
+              runtime.identity,
+              ownerBoundaryPath ?? `runtimes.${runtime.path}`,
+              nextAncestry,
           )
         }
 
         for (const child of current.scopes
-          .filter(item => item.parentPath === scopePath)
-          .sort((left, right) => left.sourceOrder - right.sourceOrder)) {
+            .filter(item => item.parentPath === scopePath)
+            .sort((left, right) => left.sourceOrder - right.sourceOrder)) {
           visitScope(child.path, catalog)
         }
       }
@@ -2402,7 +2497,7 @@ export class EndgeCompiler_Module extends EndgeModule {
       for (const publication of runtime.storeTo) {
         const storeArtifact = storeArtifacts.get(publication.data)
         const writableFields = new Set(
-          storeArtifact?.data.filter(field => field.kind === 'value').map(field => field.key) ?? [],
+            storeArtifact?.data.filter(field => field.kind === 'value').map(field => field.key) ?? [],
         )
         for (const target of Object.keys(publication.fields)) {
           const root = target.split('.')[0] ?? ''
@@ -2430,14 +2525,14 @@ export class EndgeCompiler_Module extends EndgeModule {
 
     for (const runtime of payload.runtimes) {
       const dependencySource = runtime.kind === 'filter-view'
-        ? payload.runtimes.find(item => item.name === runtime.identity)
-        : runtime
+          ? payload.runtimes.find(item => item.name === runtime.identity)
+          : runtime
       dependencies.push({
         entityType: runtime.kind === 'filter-view'
-          ? 'filter'
-          : runtime.kind === 'component'
-            ? 'component-sfc'
-            : runtime.kind,
+            ? 'filter'
+            : runtime.kind === 'component'
+                ? 'component-sfc'
+                : runtime.kind,
         id: dependencySource?.identity ?? runtime.identity,
         identity: dependencySource?.identity ?? runtime.identity,
         role: 'composition-runtime',
@@ -2566,9 +2661,9 @@ export class EndgeCompiler_Module extends EndgeModule {
           continue
         }
         runtime.effectiveActivation = resolveCompositionActivation(
-          runtime.activationOverride,
-          artifact.payload.activation,
-          payload.scopes.find(scope => scope.path === runtime.scopePath)?.effectiveActivation,
+            runtime.activationOverride,
+            artifact.payload.activation,
+            payload.scopes.find(scope => scope.path === runtime.scopePath)?.effectiveActivation,
         )
         const propNames = new Set(artifact.payload.props.map(prop => prop.key))
         for (const propName of Object.keys(runtime.props)) {
@@ -2657,8 +2752,8 @@ export class EndgeCompiler_Module extends EndgeModule {
       const effect = hook.effect
       const runtime = payload.runtimes.find(item => item.name === hook.runtime)
       const componentArtifact = runtime?.kind === 'component'
-        ? Endge.program.getArtifact<ComponentSFCProgramPayload>('component-sfc', runtime.identity)
-        : null
+          ? Endge.program.getArtifact<ComponentSFCProgramPayload>('component-sfc', runtime.identity)
+          : null
       if (!componentArtifact?.payload.ir?.script.ports.emits.events.some(event => event.name === hook.event)) {
         diagnostics.push({ severity: 'error', code: 'composition-event-port-missing', message: `Component runtime "${hook.runtime}" не публикует Event "${hook.event}".`, sourcePath: `hooks.${hook.runtime}.${hook.event}` })
       }
@@ -2678,7 +2773,7 @@ export class EndgeCompiler_Module extends EndgeModule {
       }
       if (
         runtime?.dispatchTo?.includes(effect.data)
-        && storeArtifact.updateHandlers.some(handler => handler.eventTypes.includes(hook.event))
+          && storeArtifact.updateHandlers.some(handler => handler.eventTypes.includes(hook.event))
       ) {
         diagnostics.push({ severity: 'error', code: 'composition-event-store-double-mutation', message: `Event "${hook.runtime}.${hook.event}" одновременно использует dispatchTo и ручную Store mutation для "${effect.data}".`, sourcePath: `hooks.${hook.runtime}.${hook.event}` })
       }
@@ -2708,20 +2803,20 @@ export class EndgeCompiler_Module extends EndgeModule {
       if (runtime?.kind === 'filter') {
         const artifact = Endge.program.getFilterArtifact(runtime.identity)
         return artifact && artifact.status !== 'error'
-          ? artifact.payload.outputs.map(item => item.key)
-          : null
+            ? artifact.payload.outputs.map(item => item.key)
+            : null
       }
       if (runtime?.kind === 'query') {
         const artifact = Endge.program.getQueryArtifact(runtime.identity)
         return artifact && artifact.status !== 'error'
-          ? artifact.payload.outputs.map(item => item.key)
-          : null
+            ? artifact.payload.outputs.map(item => item.key)
+            : null
       }
       if (runtime?.kind === 'composition') {
         const artifact = Endge.program.getCompositionArtifact(runtime.identity)
         return artifact && artifact.status !== 'error'
-          ? artifact.payload.outputs.map(item => item.key)
-          : null
+            ? artifact.payload.outputs.map(item => item.key)
+            : null
       }
       return []
     }
@@ -2940,7 +3035,7 @@ export class EndgeCompiler_Module extends EndgeModule {
       return false
     }
     return this._compositionDependencies(model)
-      .some(identity => this._compositionDependsOn(identity, targetIdentity, visited))
+        .some(identity => this._compositionDependsOn(identity, targetIdentity, visited))
   }
 
   /** Читает только прямые Composition dependencies из source без создания Program artifact. */
@@ -2948,9 +3043,9 @@ export class EndgeCompiler_Module extends EndgeModule {
     const result = Endge.source.compile('composition', this._resolveCompositionSource(composition))
     const payload = result.artifact as CompositionProgramPayload | undefined
     return [...new Set(
-      (payload?.runtimes ?? [])
-        .filter(runtime => runtime.kind === 'composition')
-        .map(runtime => runtime.identity),
+        (payload?.runtimes ?? [])
+            .filter(runtime => runtime.kind === 'composition')
+            .map(runtime => runtime.identity),
     )]
   }
 
@@ -2971,13 +3066,13 @@ export class EndgeCompiler_Module extends EndgeModule {
     const dependencies: ProgramArtifact['dependencies'] = []
 
     const steps = this._materializeDataViewRefsInSteps(
-      payload.steps,
-      ownerRef.identity,
-      'steps',
-      context,
-      children,
-      diagnostics,
-      dependencies,
+        payload.steps,
+        ownerRef.identity,
+        'steps',
+        context,
+        children,
+        diagnostics,
+        dependencies,
     )
 
     return {
@@ -3006,13 +3101,13 @@ export class EndgeCompiler_Module extends EndgeModule {
       return {
         ...step,
         dataViews: this._materializeDataViewRefs(
-          step.dataViews,
-          ownerIdentity,
-          `${sourcePath}.${index}.dataView`,
-          context,
-          children,
-          diagnostics,
-          dependencies,
+            step.dataViews,
+            ownerIdentity,
+            `${sourcePath}.${index}.dataView`,
+            context,
+            children,
+            diagnostics,
+            dependencies,
         ),
       }
     })
@@ -3044,10 +3139,10 @@ export class EndgeCompiler_Module extends EndgeModule {
       }
 
       const child = this._compileLocalDataViewArtifact(
-        ref.source,
-        ownerIdentity,
-        `${sourcePath}.${index}`,
-        context,
+          ref.source,
+          ownerIdentity,
+          `${sourcePath}.${index}`,
+          context,
       )
       children.push(child)
       diagnostics.push(...child.diagnostics.map(diagnostic => ({
@@ -3130,7 +3225,7 @@ export class EndgeCompiler_Module extends EndgeModule {
   private _collectEntityDiagnostics(entity: any): Omit<ProgramDiagnostic, 'entityRef'>[] {
     const problems = typeof entity?.getDiagnosticProblems === 'function' ? entity.getDiagnosticProblems() : []
     return Array.isArray(problems)
-      ? problems.map(problem => ({
+        ? problems.map(problem => ({
           severity: problem.severity === 'fatal' ? 'error' : problem.severity,
           code: String(problem.code ?? 'entity.validation'),
           message: String(problem.message ?? ''),
@@ -3138,7 +3233,7 @@ export class EndgeCompiler_Module extends EndgeModule {
           start: problem.start,
           end: problem.end,
         }))
-      : []
+        : []
   }
 
   /**
@@ -3308,19 +3403,19 @@ function validatePreviewPropValue(
       return [previewTypeDiagnostic(sourcePath, `ожидался массив значений типа "${field.type}"`)]
     }
     return value.flatMap((item, index) => validatePreviewTypeExpression(
-      { kind: 'reference', identity: field.type },
-      item,
-      catalog,
-      `${sourcePath}.${index}`,
-      new Set(),
+        { kind: 'reference', identity: field.type },
+        item,
+        catalog,
+        `${sourcePath}.${index}`,
+        new Set(),
     ))
   }
   return validatePreviewTypeExpression(
-    { kind: 'reference', identity: field.type },
-    value,
-    catalog,
-    sourcePath,
-    new Set(),
+      { kind: 'reference', identity: field.type },
+      value,
+      catalog,
+      sourcePath,
+      new Set(),
   )
 }
 
@@ -3353,25 +3448,25 @@ function validatePreviewTypeExpression(
   }
   if (expression.kind === 'enum') {
     return expression.values.some(item => Object.is(item, value))
-      ? []
-      : [previewTypeDiagnostic(sourcePath, `значение не входит в enum: ${expression.values.map(item => JSON.stringify(item)).join(', ')}`)]
+        ? []
+        : [previewTypeDiagnostic(sourcePath, `значение не входит в enum: ${expression.values.map(item => JSON.stringify(item)).join(', ')}`)]
   }
   if (expression.kind === 'union') {
     const variants = expression.variants.map(variant => validatePreviewTypeExpression(variant, value, catalog, sourcePath, new Set(visiting)))
     return variants.some(diagnostics => diagnostics.length === 0)
-      ? []
-      : [previewTypeDiagnostic(sourcePath, 'значение не соответствует ни одному варианту union')]
+        ? []
+        : [previewTypeDiagnostic(sourcePath, 'значение не соответствует ни одному варианту union')]
   }
   if (expression.kind === 'record') {
     if (!isPreviewRecord(value)) {
       return [previewTypeDiagnostic(sourcePath, 'ожидался объект-словарь')]
     }
     return Object.entries(value).flatMap(([key, item]) => validatePreviewTypeExpression(
-      expression.values,
-      item,
-      catalog,
-      `${sourcePath}.${key}`,
-      new Set(visiting),
+        expression.values,
+        item,
+        catalog,
+        `${sourcePath}.${key}`,
+        new Set(visiting),
     ))
   }
   if (!isPreviewRecord(value)) {
@@ -3393,11 +3488,11 @@ function validatePreviewTypeExpression(
         continue
       }
       diagnostics.push(...fieldValue.flatMap((item, index) => validatePreviewTypeExpression(
-        field.type,
-        item,
-        catalog,
-        `${sourcePath}.${field.key}.${index}`,
-        new Set(visiting),
+          field.type,
+          item,
+          catalog,
+          `${sourcePath}.${field.key}.${index}`,
+          new Set(visiting),
       )))
       continue
     }
@@ -3470,8 +3565,8 @@ function queryFieldContract(
 
 function uniqueComputationReferences(payload: ComputationProgramPayload): string[] {
   return [...new Set(payload.nodes
-    .filter(node => node.kind === 'computation')
-    .map(node => node.identity))]
+      .filter(node => node.kind === 'computation')
+      .map(node => node.identity))]
 }
 
 function statusFromDiagnostics(diagnostics: ProgramDiagnostic[]): ProgramArtifact['status'] {

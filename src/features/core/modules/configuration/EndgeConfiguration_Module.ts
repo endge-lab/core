@@ -17,7 +17,7 @@ import { EndgeModule } from '@/features/federation/EndgeModule'
 const EMPTY_CONTRIBUTION: EndgeConfigurationContribution = { mode: 'inherit', patch: {} }
 
 /** Владеет effective configuration и immutable build context одного boot lifecycle. */
-export class EndgeConfiguration_Module extends EndgeModule {
+export class EndgeConfiguration_Module extends EndgeModule<EndgeBootContext> {
   private _current: EndgeConfiguration | null = null
   private _buildContext: EndgeBuildContext | null = null
 

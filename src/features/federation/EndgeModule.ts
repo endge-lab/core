@@ -5,34 +5,39 @@ import { Subscribable } from '@endge/utils'
  * Базовый модуль федерации.
  * Все модули являются `Subscribable` и при необходимости могут уведомлять подписчиков через `notify()`.
  */
-export abstract class EndgeModule extends Subscribable {
+export abstract class EndgeModule<
+  TContext extends EndgeFederationContext = EndgeFederationContext,
+> extends Subscribable {
+  /** Сохраняет требуемый lifecycle context в type system без runtime state. */
+  protected declare readonly _contextType: TContext
+
   /**
    * Подготавливает модуль до загрузки данных.
    * Используется для настройки зависимостей, клиентов, registry и базовых опций.
    * Метод можно не переопределять.
    */
-  public setup(_ctx: EndgeFederationContext): void | Promise<void> {}
+  public setup(_ctx: TContext): void | Promise<void> {}
 
   /**
    * Участвует в загрузке данных движка.
    * Модуль выполняет только свою часть загрузки или принятия данных.
    * Метод можно не переопределять.
    */
-  public load(_ctx: EndgeFederationContext): void | Promise<void> {}
+  public load(_ctx: TContext): void | Promise<void> {}
 
   /**
    * Строит производные структуры из загруженных данных.
    * Здесь уместны normalize, validate, index и compile.
    * Метод можно не переопределять.
    */
-  public build(_ctx: EndgeFederationContext): void | Promise<void> {}
+  public build(_ctx: TContext): void | Promise<void> {}
 
   /**
    * Запускает живую инфраструктуру модуля после `load/build`.
    * Здесь уместны subscriptions, runtime phases, watchers, adapters и debug hooks.
    * Метод можно не переопределять.
    */
-  public start(_ctx: EndgeFederationContext): void | Promise<void> {}
+  public start(_ctx: TContext): void | Promise<void> {}
 
   /**
    * Сбрасывает runtime-состояние модуля.

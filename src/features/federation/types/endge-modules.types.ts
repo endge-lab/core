@@ -1,16 +1,19 @@
 import type { EndgeModule } from '@/features/federation/EndgeModule'
+import type { EndgeFederationContext } from '@/features/federation/types/federation.types'
+
+export type AnyEndgeModule = EndgeModule<any>
 
 export type EndgeModuleOrder = string | readonly string[]
 
 /** Доступ к уже объявленным модулям во время создания graph dependencies. */
 export interface EndgeModuleFactoryContext {
-  getModule: <T extends EndgeModule = EndgeModule>(key: string) => T
+  getModule: <T extends AnyEndgeModule = AnyEndgeModule>(key: string) => T
 }
 
 /** Декларативное описание лениво создаваемого модуля федерации. */
 export interface EndgeModuleDefinition<
   TKey extends string = string,
-  TModule extends EndgeModule = EndgeModule,
+  TModule extends AnyEndgeModule = AnyEndgeModule,
 > {
   readonly key: TKey
   readonly create: (context: EndgeModuleFactoryContext) => TModule
@@ -18,7 +21,7 @@ export interface EndgeModuleDefinition<
   readonly after?: EndgeModuleOrder
 }
 
-export interface EndgeModuleDescriptor<T extends EndgeModule = EndgeModule> {
+export interface EndgeModuleDescriptor<T extends AnyEndgeModule = AnyEndgeModule> {
   key: string
   module: T
   before?: EndgeModuleOrder
@@ -26,6 +29,21 @@ export interface EndgeModuleDescriptor<T extends EndgeModule = EndgeModule> {
 }
 
 export type EndgeModuleDefinitions = readonly EndgeModuleDefinition[]
+
+/** Lifecycle context, объявленный concrete Module. */
+export type EndgeModuleContext<TModule extends AnyEndgeModule>
+  = TModule extends EndgeModule<infer TContext> ? TContext : never
+
+type UnionToIntersection<TValue>
+  = (TValue extends unknown ? (value: TValue) => void : never) extends ((value: infer TResult) => void)
+    ? TResult
+    : never
+
+/** Наиболее строгий lifecycle context, требуемый всеми Modules федерации. */
+export type EndgeFederationContextOf<TDefinitions extends EndgeModuleDefinitions>
+  = UnionToIntersection<EndgeModuleContext<ReturnType<TDefinitions[number]['create']>>> extends infer TContext extends EndgeFederationContext
+    ? TContext
+    : EndgeFederationContext
 
 /** Readonly module accessors, выведенные из literal keys и factory return types. */
 export type EndgeFederationModuleAccessors<TDefinitions extends EndgeModuleDefinitions> = {

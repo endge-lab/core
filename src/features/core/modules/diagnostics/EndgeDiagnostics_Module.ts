@@ -33,7 +33,7 @@ import { EndgeModule } from '@/features/federation/EndgeModule'
  * Родительский diagnostics-модуль ядра.
  * Объединяет append-only telemetry history и replaceable registry актуальных problems.
  */
-export class EndgeDiagnostics_Module extends EndgeModule {
+export class EndgeDiagnostics_Module extends EndgeModule<EndgeBootContext> {
   /** Registry системных и внешних adapter factories. */
   public readonly adapters: DiagnosticsAdapterRegistry
 

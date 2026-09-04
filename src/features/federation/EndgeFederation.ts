@@ -1,5 +1,6 @@
-import type { EndgeModule } from '@/features/federation/EndgeModule'
 import type {
+  AnyEndgeModule,
+  EndgeFederationContextOf,
   EndgeFederationModuleAccessors,
   EndgeModuleDefinition,
   EndgeModuleDefinitions,
@@ -25,8 +26,20 @@ function toArray(value: string | readonly string[] | undefined): string[] {
   return typeof value === 'string' ? [value] : [...value]
 }
 
-export type DefinedEndgeFederation<TDefinitions extends EndgeModuleDefinitions>
-  = typeof EndgeFederation & EndgeFederationModuleAccessors<TDefinitions>
+type EndgeFederationConstructor = abstract new (...args: any[]) => EndgeFederation
+type EndgeFederationStatics = Omit<typeof EndgeFederation, 'prototype' | 'boot' | 'build'>
+
+export type DefinedEndgeFederation<
+  TDefinitions extends EndgeModuleDefinitions,
+  TContext extends EndgeFederationContext = EndgeFederationContextOf<TDefinitions>,
+> = EndgeFederationConstructor
+  & EndgeFederationStatics
+  & EndgeFederationModuleAccessors<TDefinitions>
+  & {
+    readonly prototype: EndgeFederation
+    boot: (ctx: TContext) => Promise<void>
+    build: (ctx?: TContext) => Promise<void>
+  }
 
 /**
  * Общая статическая федерация модулей.
@@ -42,7 +55,7 @@ export abstract class EndgeFederation {
    */
   public static define<const TDefinitions extends EndgeModuleDefinitions>(
     definition: EndgeFederationDefinition<TDefinitions>,
-  ): DefinedEndgeFederation<TDefinitions> {
+  ): DefinedEndgeFederation<TDefinitions, EndgeFederationContextOf<TDefinitions>> {
     const federationId = String(definition.id ?? '').trim()
     if (!federationId) {
       throw new Error('[EndgeFederation.define] federation id is required')
@@ -55,11 +68,11 @@ export abstract class EndgeFederation {
 
       protected static override configureFederation(): void {
         const definitionsByKey = new Map(moduleDefinitions.map(item => [item.key, item]))
-        const instances = new Map<string, EndgeModule>()
+        const instances = new Map<string, AnyEndgeModule>()
         const creating = new Set<string>()
         const federationName = this.name
 
-        function createModule(key: string): EndgeModule {
+        function createModule(key: string): AnyEndgeModule {
           const normalizedKey = String(key ?? '').trim()
           const existing = instances.get(normalizedKey)
           if (existing) {
@@ -77,7 +90,7 @@ export abstract class EndgeFederation {
           creating.add(normalizedKey)
           try {
             const module = moduleDefinition.create({
-              getModule<T extends EndgeModule = EndgeModule>(moduleKey: string): T {
+              getModule<T extends AnyEndgeModule = AnyEndgeModule>(moduleKey: string): T {
                 return createModule(moduleKey) as T
               },
             })
@@ -115,13 +128,13 @@ export abstract class EndgeFederation {
 
       Object.defineProperty(DefinedFederation, item.key, {
         enumerable: true,
-        get: function getModuleAccessor(this: typeof EndgeFederation): EndgeModule {
+        get: function getModuleAccessor(this: typeof EndgeFederation): AnyEndgeModule {
           return this.getModule(item.key)
         },
       })
     }
 
-    return DefinedFederation as DefinedEndgeFederation<TDefinitions>
+    return DefinedFederation as DefinedEndgeFederation<TDefinitions, EndgeFederationContextOf<TDefinitions>>
   }
 
   public static get isInitialized(): boolean {
@@ -183,7 +196,7 @@ export abstract class EndgeFederation {
   }
 
   private static async _runBoot(ctx: EndgeFederationContext, host: EndgeFederationHost): Promise<void> {
-    const touchedModules = new Set<EndgeModule>()
+    const touchedModules = new Set<AnyEndgeModule>()
 
     try {
       await this.setup(ctx, touchedModules)
@@ -250,7 +263,7 @@ export abstract class EndgeFederation {
    * Декларирует модуль федерации.
    * Итоговый порядок строится после установки plugin-модулей.
    */
-  public static defineModule<T extends EndgeModule>(descriptor: EndgeModuleDescriptor<T>): T {
+  public static defineModule<T extends AnyEndgeModule>(descriptor: EndgeModuleDescriptor<T>): T {
     const host = this._getOrCreateHost()
     if (!host.isConfiguring) {
       throw new Error(`[${this.name}] defineModule() can be used only during federation configuration`)
@@ -312,7 +325,7 @@ export abstract class EndgeFederation {
    */
   protected static async setup(
     ctx: EndgeFederationContext = this._requireBootContext(),
-    touchedModules?: Set<EndgeModule>,
+    touchedModules?: Set<AnyEndgeModule>,
   ): Promise<void> {
     const host = this.host
     if (host.isSetup) {
@@ -326,7 +339,7 @@ export abstract class EndgeFederation {
 
   protected static async load(
     ctx: EndgeFederationContext = this._requireBootContext(),
-    touchedModules?: Set<EndgeModule>,
+    touchedModules?: Set<AnyEndgeModule>,
   ): Promise<void> {
     await this._runPhase('load', ctx, touchedModules)
   }
@@ -366,7 +379,7 @@ export abstract class EndgeFederation {
 
   protected static async start(
     ctx: EndgeFederationContext = this._requireBootContext(),
-    touchedModules?: Set<EndgeModule>,
+    touchedModules?: Set<AnyEndgeModule>,
   ): Promise<void> {
     await this._runPhase('start', ctx, touchedModules)
   }
@@ -420,7 +433,7 @@ export abstract class EndgeFederation {
 
   private static async _buildPhase(
     ctx: EndgeFederationContext,
-    touchedModules?: Set<EndgeModule>,
+    touchedModules?: Set<AnyEndgeModule>,
   ): Promise<void> {
     await this._runPhase('build', ctx, touchedModules)
   }
@@ -428,7 +441,7 @@ export abstract class EndgeFederation {
   private static async _runPhase(
     phase: EndgeFederationPhase,
     ctx: EndgeFederationContext,
-    touchedModules?: Set<EndgeModule>,
+    touchedModules?: Set<AnyEndgeModule>,
   ): Promise<void> {
     for (const [key, module] of this.host.modules.entries()) {
       touchedModules?.add(module)
@@ -444,7 +457,7 @@ export abstract class EndgeFederation {
     }
   }
 
-  private static async _resetModules(touchedModules: Set<EndgeModule>): Promise<unknown[]> {
+  private static async _resetModules(touchedModules: Set<AnyEndgeModule>): Promise<unknown[]> {
     const errors: unknown[] = []
     const modules = [...this.host.modules.entries()]
       .filter(([, module]) => touchedModules.has(module))
@@ -472,7 +485,7 @@ export abstract class EndgeFederation {
     }
   }
 
-  public static getModule<T extends EndgeModule = EndgeModule>(key: string): T {
+  public static getModule<T extends AnyEndgeModule = AnyEndgeModule>(key: string): T {
     const normalizedKey = String(key ?? '').trim()
     const module = this.host.modules.get(normalizedKey)
 
@@ -483,7 +496,7 @@ export abstract class EndgeFederation {
     return module as T
   }
 
-  public static tryGetModule<T extends EndgeModule = EndgeModule>(key: string): T | null {
+  public static tryGetModule<T extends AnyEndgeModule = AnyEndgeModule>(key: string): T | null {
     const normalizedKey = String(key ?? '').trim()
     if (!normalizedKey) {
       return null
@@ -541,7 +554,7 @@ export abstract class EndgeFederation {
       buildQueue: Promise.resolve(),
       pendingBuilds: 0,
       moduleDescriptors: [],
-      modules: new Map<string, EndgeModule>(),
+      modules: new Map<string, AnyEndgeModule>(),
       plugins: [],
       installedPluginIds: new Set<string>(),
     }

@@ -32,7 +32,7 @@ export interface EndgeFederationHost {
   buildQueue: Promise<void>
   pendingBuilds: number
   moduleDescriptors: EndgeModuleDescriptor[]
-  modules: Map<string, EndgeModule>
+  modules: Map<string, EndgeModule<any>>
   plugins: EndgePlugin[]
   installedPluginIds: Set<string>
 }

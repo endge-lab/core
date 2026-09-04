@@ -1,7 +1,7 @@
 import type {
   ActionExecutionTarget,
   ActionTargetSelector,
-} from '@/features/core/modules/runtime/domain/action.types'
+} from '@/features/core/modules/actions/domain/action.types'
 
 export type ActionTargetErrorCode
   = 'action-target-required'

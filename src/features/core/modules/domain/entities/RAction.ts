@@ -1,7 +1,7 @@
+import type { ActionImplementation, ActionTargetSelector } from '@/features/core/modules/actions/domain/action.types'
 import type { DuplicateOptions } from '@/features/core/modules/domain/entities/REntity'
-import type { EntityRef } from '@/features/core/modules/domain/types/document/entity-management.type'
 
-import type { ActionImplementation, ActionTargetSelector } from '@/features/core/modules/runtime/domain/action.types'
+import type { EntityRef } from '@/features/core/modules/domain/types/document/entity-management.type'
 import { Serialize } from '@endge/utils'
 
 import { Expose } from 'class-transformer'

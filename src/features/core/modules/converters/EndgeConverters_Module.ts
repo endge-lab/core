@@ -1,27 +1,28 @@
+import type { ImplementationBindingScope } from '@/features/core/modules/actions/domain/action.types'
 import type { EntityOrigin } from '@/features/core/modules/domain/types/document/entity-management.type'
-import type { ImplementationBindingScope } from '@/features/core/modules/runtime/domain/action.types'
-import type { ImplementationProvider } from '@/features/core/modules/runtime/domain/implementation.types'
-import type { EndgeImplementations } from '@/features/core/modules/runtime/implementation/endge-implementations'
+import type { ImplementationProvider } from '@/features/core/modules/implementations/domain/implementation.types'
+import type { EndgeImplementations_Module } from '@/features/core/modules/implementations/EndgeImplementations_Module'
 import { Endge } from '@/features/core/kernel/endge'
-import { split } from '@/features/core/modules/runtime/converters/arrays/split'
-import { toArray } from '@/features/core/modules/runtime/converters/arrays/to-array'
-import { dateToDateString } from '@/features/core/modules/runtime/converters/date/date-to-date-string'
-import { dateToIsoString } from '@/features/core/modules/runtime/converters/date/date-to-iso-string'
-import { dateToIsoZ } from '@/features/core/modules/runtime/converters/date/date-to-iso-z'
-import { dateToTimeString } from '@/features/core/modules/runtime/converters/date/date-to-time-string'
-import { isoStringToDate } from '@/features/core/modules/runtime/converters/date/iso-string-to-date'
-import { isoStringToTimeString } from '@/features/core/modules/runtime/converters/date/iso-string-to-time-string'
-import { stringToDate } from '@/features/core/modules/runtime/converters/date/string-to-date'
-import { timeStringToDate } from '@/features/core/modules/runtime/converters/date/time-string-to-date'
-import { timestampToDate } from '@/features/core/modules/runtime/converters/date/timestamp-to-date'
-import { weekdaysRange } from '@/features/core/modules/runtime/converters/date/weekdays-range'
-import { jsonParse } from '@/features/core/modules/runtime/converters/json/json-parse'
-import { jsonStringify } from '@/features/core/modules/runtime/converters/json/json-stringify'
-import { numberToString } from '@/features/core/modules/runtime/converters/numbers/number-to-string'
-import { stringToNumber } from '@/features/core/modules/runtime/converters/numbers/string-to-number'
-import { defaultIfEmpty } from '@/features/core/modules/runtime/converters/strings/default-if-empty'
-import { stringToBoolean } from '@/features/core/modules/runtime/converters/strings/string-to-boolean'
-import { stringTrim } from '@/features/core/modules/runtime/converters/strings/string-trim'
+import { split } from '@/features/core/modules/converters/tools/arrays/split'
+import { toArray } from '@/features/core/modules/converters/tools/arrays/to-array'
+import { dateToDateString } from '@/features/core/modules/converters/tools/date/date-to-date-string'
+import { dateToIsoString } from '@/features/core/modules/converters/tools/date/date-to-iso-string'
+import { dateToIsoZ } from '@/features/core/modules/converters/tools/date/date-to-iso-z'
+import { dateToTimeString } from '@/features/core/modules/converters/tools/date/date-to-time-string'
+import { isoStringToDate } from '@/features/core/modules/converters/tools/date/iso-string-to-date'
+import { isoStringToTimeString } from '@/features/core/modules/converters/tools/date/iso-string-to-time-string'
+import { stringToDate } from '@/features/core/modules/converters/tools/date/string-to-date'
+import { timeStringToDate } from '@/features/core/modules/converters/tools/date/time-string-to-date'
+import { timestampToDate } from '@/features/core/modules/converters/tools/date/timestamp-to-date'
+import { weekdaysRange } from '@/features/core/modules/converters/tools/date/weekdays-range'
+import { jsonParse } from '@/features/core/modules/converters/tools/json/json-parse'
+import { jsonStringify } from '@/features/core/modules/converters/tools/json/json-stringify'
+import { numberToString } from '@/features/core/modules/converters/tools/numbers/number-to-string'
+import { stringToNumber } from '@/features/core/modules/converters/tools/numbers/string-to-number'
+import { defaultIfEmpty } from '@/features/core/modules/converters/tools/strings/default-if-empty'
+import { stringToBoolean } from '@/features/core/modules/converters/tools/strings/string-to-boolean'
+import { stringTrim } from '@/features/core/modules/converters/tools/strings/string-trim'
+import { EndgeModule } from '@/features/federation/EndgeModule'
 
 type ConverterProvider = (value: unknown, options?: Record<string, unknown>) => unknown
 
@@ -48,13 +49,21 @@ const BUILTIN_CONVERTERS: Record<string, (...args: any[]) => unknown> = {
 }
 
 /** Синхронно координирует definitions, providers и bindings конвертеров. */
-export class EndgeConverters {
+export class EndgeConverters_Module extends EndgeModule {
   private readonly _definitions = new Map<string, { identity: string, origin: EntityOrigin, defaultProviderKey?: string }>()
   private readonly _providerDisposers = new Set<VoidFunction>()
   private readonly _definitionDisposers = new Set<VoidFunction>()
   private _started = false
 
-  public constructor(private readonly _implementations: EndgeImplementations) {}
+  /**
+   * ----------------------------------------
+   * PUBLIC
+   * ----------------------------------------
+   */
+
+  public constructor(private readonly _implementations: EndgeImplementations_Module) {
+    super()
+  }
 
   public has(identity: string): boolean {
     return Endge.domain.getConverter(identity) != null
@@ -144,7 +153,7 @@ export class EndgeConverters {
     return result
   }
 
-  public start(): void {
+  public override start(): void {
     if (this._started) {
       return
     }
@@ -163,7 +172,7 @@ export class EndgeConverters {
     }
   }
 
-  public reset(): void {
+  public override reset(): void {
     for (const dispose of [...this._providerDisposers]) {
       dispose()
     }

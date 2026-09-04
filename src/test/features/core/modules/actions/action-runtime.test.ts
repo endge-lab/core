@@ -1,8 +1,8 @@
+import type { ActionProgramExecutorDependencies } from '@/features/core/modules/actions/services/ActionProgramExecutor'
 import type { RQuery } from '@/features/core/modules/domain/entities/RQuery'
-import type { ActionProgramExecutorDependencies } from '@/features/core/modules/runtime/execution/action/action-program-executor'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { ActionProgramExecutor } from '@/features/core/modules/runtime/execution/action/action-program-executor'
+import { ActionProgramExecutor } from '@/features/core/modules/actions/services/ActionProgramExecutor'
 import { OperationHistory } from '@/features/core/modules/runtime/operation/operation-history'
 import { compileActionSource } from '@/features/core/modules/source/services/compilers/action-source-compile'
 

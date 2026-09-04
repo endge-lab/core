@@ -3,7 +3,7 @@ import type {
   ComputationRuntimeErrorShape,
 } from '@/features/core/modules/domain/types/computation/computation-runtime.types'
 
-import { ComputationRuntimeError } from './ComputationGraphExecutor'
+import { ComputationRuntimeError } from '@/features/core/modules/computations/services/ComputationGraphExecutor'
 
 type AsyncRunner<T> = (input: unknown) => Promise<T>
 type SyncRunner<T> = (input: unknown) => T

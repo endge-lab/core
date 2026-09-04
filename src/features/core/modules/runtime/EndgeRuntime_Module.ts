@@ -11,21 +11,17 @@ import type { EndgeDataMode } from '@/features/core/modules/workspace/domain/wor
 import { Raph, RaphNode } from '@endge/raph'
 import { STORAGE_VARS_KEY } from '@/features/core/kernel/config/kernel.config'
 import { Endge } from '@/features/core/kernel/endge'
-import { EndgeActions } from '@/features/core/modules/runtime/endge-actions'
+import { EndgeRuntimeScopes_Module } from '@/features/core/modules/runtime/EndgeRuntimeScopes_Module'
 import { EndgeComposition } from '@/features/core/modules/runtime/execution/endge-composition'
-import { EndgeComputation } from '@/features/core/modules/runtime/execution/endge-computation'
-import { EndgeConverters } from '@/features/core/modules/runtime/execution/endge-converters'
 import { EndgeDataView } from '@/features/core/modules/runtime/execution/endge-data-view'
 import { EndgeProject } from '@/features/core/modules/runtime/execution/endge-project'
 import { EndgeQuery } from '@/features/core/modules/runtime/execution/endge-query'
 import { RuntimeBoundaryUpdatePhase } from '@/features/core/modules/runtime/helpers/raph-phases/runtime-boundary-update-phase'
 import { RuntimeNodeUpdatePhase } from '@/features/core/modules/runtime/helpers/raph-phases/runtime-node-update-phase'
-import { EndgeImplementations } from '@/features/core/modules/runtime/implementation/endge-implementations'
-import { EndgeOperations } from '@/features/core/modules/runtime/operation/endge-operations'
+import { EndgeOperations_Module } from '@/features/core/modules/runtime/operation/EndgeOperations_Module'
 import { RuntimeAppScope } from '@/features/core/modules/runtime/RuntimeAppScope'
 import { RuntimeHostRegistry } from '@/features/core/modules/runtime/RuntimeHostRegistry'
 import { RuntimeScope } from '@/features/core/modules/runtime/RuntimeScope'
-import { RuntimeScopeRegistry } from '@/features/core/modules/runtime/RuntimeScopeRegistry'
 import { RuntimeStrategyRegistry } from '@/features/core/modules/runtime/services/RuntimeStrategyRegistry'
 import { ActionRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/ActionRuntimeStrategy'
 import { ComponentSFCRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/ComponentSFCRuntimeStrategy'
@@ -40,16 +36,12 @@ import { EndgeModule } from '@/features/federation/EndgeModule'
 
 /** Модуль создания, регистрации и уничтожения runtime hosts и app scopes. */
 export class EndgeRuntime_Module extends EndgeModule {
-  public readonly implementations = new EndgeImplementations()
-  public readonly computation = new EndgeComputation(this.implementations)
-  public readonly converters = new EndgeConverters(this.implementations)
   public readonly query = new EndgeQuery()
   public readonly dataView = new EndgeDataView()
   public readonly composition = new EndgeComposition()
   public readonly project = new EndgeProject()
-  public readonly actions = new EndgeActions(this.implementations)
-  public readonly operations = new EndgeOperations()
-  public readonly scopes = new RuntimeScopeRegistry()
+  public readonly operations = new EndgeOperations_Module()
+  public readonly scopes = new EndgeRuntimeScopes_Module()
 
   private _hosts = new RuntimeHostRegistry()
   private _strategies = new RuntimeStrategyRegistry()
@@ -107,8 +99,6 @@ export class EndgeRuntime_Module extends EndgeModule {
       return
     }
     this._inited = true
-    this.converters.start()
-
     this._appNode = new RaphNode(Raph.app, {
       id: '__endge.runtime.app',
       meta: { type: 'runtime-scope', kind: 'app' },
@@ -412,6 +402,7 @@ export class EndgeRuntime_Module extends EndgeModule {
    */
   public override async reset(): Promise<void> {
     const hostIds = this._hosts.getAll().map(host => host.id)
+    this.operations.reset()
     // Синхронно отсоединяем старый реестр scope. Существующие вызывающие стороны, которые
     // не ожидают reset, больше не смогут подключить новый runtime к scope, который
     // освобождается текущим поколением reset.
@@ -434,10 +425,6 @@ export class EndgeRuntime_Module extends EndgeModule {
     this._unsubscribeWorkspace = null
     this._unsubscribeContext?.()
     this._unsubscribeContext = null
-    this.computation.reset()
-    this.converters.reset()
-    this.implementations.clear()
-    this.actions.reset()
     this._hosts.clearDeleted()
 
     await scopesReset

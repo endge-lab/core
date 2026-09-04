@@ -1,3 +1,4 @@
+import type { ImplementationBindingScope } from '@/features/core/modules/actions/domain/action.types'
 import type { ComputationProgramPayload } from '@/features/core/modules/domain/types/computation/computation-program.types'
 import type {
   ComputationExecutionApi,
@@ -7,10 +8,9 @@ import type {
   ComputationSandboxRequest,
 } from '@/features/core/modules/domain/types/computation/computation-runtime.types'
 import type { EntityOrigin } from '@/features/core/modules/domain/types/document/entity-management.type'
-import type { ProgramArtifact } from '@/features/core/modules/program/domain/types/program.types'
-import type { ImplementationBindingScope } from '@/features/core/modules/runtime/domain/action.types'
+import type { EndgeImplementations_Module } from '@/features/core/modules/implementations/EndgeImplementations_Module'
 
-import type { EndgeImplementations } from '@/features/core/modules/runtime/implementation/endge-implementations'
+import type { ProgramArtifact } from '@/features/core/modules/program/domain/types/program.types'
 import {
   ENDGE_COMPUTATION_MAX_CALL_DEPTH,
   ENDGE_COMPUTATION_MAX_CALLS,
@@ -18,12 +18,13 @@ import {
 import { Endge } from '@/features/core/kernel/endge'
 import { compileComputation } from '@/features/core/modules/compiler/services/computation/computation-compile'
 
+import { ComputationResourceState } from '@/features/core/modules/computations/model/ComputationResource'
+import { ComputationGraphExecutor, ComputationRuntimeError } from '@/features/core/modules/computations/services/ComputationGraphExecutor'
 import { evaluateSourceExpression } from '@/features/core/modules/source/services/source-expression-evaluate'
-import { ComputationGraphExecutor, ComputationRuntimeError } from './ComputationGraphExecutor'
-import { ComputationResourceState } from './ComputationResource'
+import { EndgeModule } from '@/features/federation/EndgeModule'
 
 /** Выполняет скомпилированные графы computation и создаёт нейтральные к renderer ресурсы. */
-export class EndgeComputation {
+export class EndgeComputations_Module extends EndgeModule {
   private readonly _definitions = new Map<string, { identity: string, origin: EntityOrigin, defaultProviderKey?: string, execution?: 'sync' | 'async' }>()
   private readonly _providers = new Map<string, ComputationOverride>()
   private readonly _providerDisposers = new Set<VoidFunction>()
@@ -42,7 +43,15 @@ export class EndgeComputation {
     evaluate: (expression, scope) => evaluateSourceExpression(expression, { scope }),
   }
 
-  public constructor(private readonly _implementations: EndgeImplementations) {}
+  /**
+   * ----------------------------------------
+   * PUBLIC
+   * ----------------------------------------
+   */
+
+  public constructor(private readonly _implementations: EndgeImplementations_Module) {
+    super()
+  }
 
   public hasDefinition(identity: string): boolean {
     return Endge.domain.getComputation(identity) != null
@@ -191,6 +200,46 @@ export class EndgeComputation {
     return this._executor.runSync(artifact.payload, input, artifact.ref.identity, scope)
   }
 
+  public createResource(identity: string, input: unknown, _consumerKey: string): ComputationResourceState {
+    let isSync = true
+    try {
+      const override = this._resolveProvider(identity)
+      const artifact = override ? null : this._requireArtifact(identity)
+      isSync = override ? override.execution === 'sync' : artifact!.payload.execution === 'sync'
+    }
+    catch (error) {
+      return new ComputationResourceState(
+        input,
+        async () => { throw error },
+        () => { throw error },
+      )
+    }
+    return new ComputationResourceState(
+      input,
+      next => this.run(identity, next),
+      isSync ? next => this.runSync(identity, next) : null,
+    )
+  }
+
+  public override reset(): void {
+    for (const dispose of [...this._bindingDisposers]) {
+      dispose()
+    }
+    for (const dispose of [...this._providerDisposers]) {
+      dispose()
+    }
+    for (const dispose of [...this._definitionDisposers]) {
+      dispose()
+    }
+    this.setSandboxAdapter(null)
+  }
+
+  /**
+   * ----------------------------------------
+   * PRIVATE
+   * ----------------------------------------
+   */
+
   private async _run(
     idOrIdentity: string | number,
     input: unknown,
@@ -233,27 +282,6 @@ export class EndgeComputation {
     }
     this._assertArtifact(artifact)
     return this._executor.runSync(artifact.payload, input, identity, scope)
-  }
-
-  public createResource(identity: string, input: unknown, _consumerKey: string): ComputationResourceState {
-    let isSync = true
-    try {
-      const override = this._resolveProvider(identity)
-      const artifact = override ? null : this._requireArtifact(identity)
-      isSync = override ? override.execution === 'sync' : artifact!.payload.execution === 'sync'
-    }
-    catch (error) {
-      return new ComputationResourceState(
-        input,
-        async () => { throw error },
-        () => { throw error },
-      )
-    }
-    return new ComputationResourceState(
-      input,
-      next => this.run(identity, next),
-      isSync ? next => this.runSync(identity, next) : null,
-    )
   }
 
   private _requireArtifact(idOrIdentity: string | number): ProgramArtifact<ComputationProgramPayload> {
@@ -355,18 +383,6 @@ export class EndgeComputation {
       defaultProviderKey: definition?.defaultProviderKey ?? null,
     })
     return resolved ? this._providers.get(resolved.provider.key) ?? null : null
-  }
-
-  public reset(): void {
-    for (const dispose of [...this._bindingDisposers]) {
-      dispose()
-    }
-    for (const dispose of [...this._providerDisposers]) {
-      dispose()
-    }
-    for (const dispose of [...this._definitionDisposers]) {
-      dispose()
-    }
   }
 }
 

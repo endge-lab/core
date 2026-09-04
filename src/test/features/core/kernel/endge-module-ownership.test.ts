@@ -16,21 +16,22 @@ describe('владение модулями Endge', () => {
     expect(Endge.auth.requests).toBeDefined()
   })
 
-  it('владеет сервисами выполнения через EndgeRuntime_Module', () => {
-    for (const key of ['query', 'dataView', 'composition', 'actions', 'computations', 'converters']) {
+  it('публикует stateful execution registries как корневые Modules', () => {
+    for (const key of ['implementations', 'actions', 'computations', 'converters']) {
+      expect(Endge.hasModule(key)).toBe(true)
+    }
+
+    for (const key of ['query', 'dataView', 'composition']) {
       expect(Endge.hasModule(key)).toBe(false)
     }
 
-    expect(Endge.query).toBe(Endge.runtime.query)
-    expect(Endge.dataView).toBe(Endge.runtime.dataView)
-    expect(Endge.composition).toBe(Endge.runtime.composition)
-    expect(Endge.actions).toBe(Endge.runtime.actions)
-    expect(Endge.computations).toBe(Endge.runtime.computation)
-    expect(Endge.converters).toBe(Endge.runtime.converters)
+    expect(Endge.runtime.query).toBeDefined()
+    expect(Endge.runtime.dataView).toBeDefined()
+    expect(Endge.runtime.composition).toBeDefined()
   })
 
-  it('владеет эффективными переменными через EndgeWorkspace_Module', () => {
+  it('не дублирует effective variables на уровне федерации', () => {
     expect(Endge.hasModule('vars')).toBe(false)
-    expect(Endge.vars).toBe(Endge.workspace.variables)
+    expect(Endge.workspace.variables).toBeDefined()
   })
 })

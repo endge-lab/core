@@ -1,4 +1,4 @@
-import type { RuntimeActionId } from '@/features/core/modules/runtime/domain/action.types'
+import type { RuntimeActionId } from '@/features/core/modules/actions/domain/action.types'
 
 export type ContextMenuItemKind = 'item' | 'separator'
 

@@ -1,9 +1,9 @@
-import type { TableColumnActionContext } from '@/features/core/modules/runtime/domain/action.types'
+import type { TableColumnActionContext } from '@/features/core/modules/actions/domain/action.types'
 
 import { describe, expect, it, vi } from 'vitest'
-import { TABLE_RUNTIME_ACTION_IDS } from '@/features/core/modules/runtime/domain/action.types'
+import { TABLE_RUNTIME_ACTION_IDS } from '@/features/core/modules/actions/domain/action.types'
+import { createTableRuntimeActions } from '@/features/core/modules/actions/services/table-actions'
 import { RuntimeActionRegistry } from '@/features/core/modules/runtime/RuntimeActionRegistry'
-import { createTableRuntimeActions } from '@/features/core/modules/runtime/services/table-actions'
 
 describe('проверка Actions runtime-таблицы', () => {
   it('скрывает доступный для скрытия столбец через смонтированную цель таблицы', async () => {

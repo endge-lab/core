@@ -4,7 +4,7 @@ import type {
   RuntimeActionContext,
   RuntimeActionId,
   RuntimeActionRegistrySnapshot,
-} from '@/features/core/modules/runtime/domain/action.types'
+} from '@/features/core/modules/actions/domain/action.types'
 
 /** Реестр вызываемых runtime-провайдеров Action. */
 export class RuntimeActionRegistry {

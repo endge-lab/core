@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { EndgeImplementations } from '@/features/core/modules/runtime/implementation/endge-implementations'
+import { EndgeImplementations_Module } from '@/features/core/modules/implementations/EndgeImplementations_Module'
 
 describe('реализации Endge', () => {
   it('выбирает переопределение в scope и сразу возвращается к стандартной реализации после освобождения', async () => {
-    const implementations = new EndgeImplementations()
+    const implementations = new EndgeImplementations_Module()
     implementations.registerProvider({
       key: 'default',
       origin: { kind: 'local', owner: 'default' },
@@ -32,7 +32,7 @@ describe('реализации Endge', () => {
   })
 
   it('отклоняет несовместимый контракт provider до выполнения', () => {
-    const implementations = new EndgeImplementations()
+    const implementations = new EndgeImplementations_Module()
     const execute = vi.fn()
     implementations.registerProvider({
       key: 'provider',
@@ -49,7 +49,7 @@ describe('реализации Endge', () => {
   })
 
   it('не скрывает отсутствие явно привязанного provider', () => {
-    const implementations = new EndgeImplementations()
+    const implementations = new EndgeImplementations_Module()
     implementations.bind({
       executableType: 'computation',
       executableIdentity: 'total',

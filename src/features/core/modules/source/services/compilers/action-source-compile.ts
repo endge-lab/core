@@ -1,7 +1,7 @@
+import type { ActionTargetSelector } from '@/features/core/modules/actions/domain/action.types'
 import type { ActionProgramPayload } from '@/features/core/modules/program/domain/types/action-program.types'
-import type { ProgramDependency, ProgramDiagnostic } from '@/features/core/modules/program/domain/types/program.types'
 
-import type { ActionTargetSelector } from '@/features/core/modules/runtime/domain/action.types'
+import type { ProgramDependency, ProgramDiagnostic } from '@/features/core/modules/program/domain/types/program.types'
 import type {
   ActionSourceBlock,
   ActionSourceDocument,

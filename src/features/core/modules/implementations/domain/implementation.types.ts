@@ -1,9 +1,9 @@
-import type { EntityOrigin } from '@/features/core/modules/domain/types/document/entity-management.type'
 import type {
   ActionExecutionTarget,
   ActionTargetSelector,
   ImplementationBindingScope,
-} from '@/features/core/modules/runtime/domain/action.types'
+} from '@/features/core/modules/actions/domain/action.types'
+import type { EntityOrigin } from '@/features/core/modules/domain/types/document/entity-management.type'
 
 export interface ImplementationContract {
   target?: ActionTargetSelector[] | null

@@ -19,7 +19,7 @@ import { EndgeModule } from '@/features/federation/EndgeModule'
  * Модуль workspace-профиля frontend-приложения.
  * Владеет workspace, загруженным из service-backend или release bundle.
  */
-export class EndgeWorkspace_Module extends EndgeModule {
+export class EndgeWorkspace_Module extends EndgeModule<EndgeBootContext> {
   private _current: EndgeWorkspaceDefinition | null = null
   public readonly variables = new WorkspaceVariables(() => this._configurationOrNull()?.vars ?? [])
 

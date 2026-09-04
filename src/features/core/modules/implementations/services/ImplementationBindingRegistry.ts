@@ -1,8 +1,8 @@
 import type {
   ImplementationBinding,
   ImplementationResolutionRequest,
-} from '@/features/core/modules/runtime/domain/implementation.types'
-import { ImplementationError } from '@/features/core/modules/runtime/domain/implementation.types'
+} from '@/features/core/modules/implementations/domain/implementation.types'
+import { ImplementationError } from '@/features/core/modules/implementations/domain/implementation.types'
 
 const SCOPE_WEIGHT = {
   application: 1,

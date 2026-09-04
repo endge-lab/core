@@ -1,9 +1,9 @@
+import type { TableColumnPinSide } from '@/features/core/modules/actions/domain/action.types'
 import type { RComponentDiagnostic } from '@/features/core/modules/domain/types/component/component-core.types'
 import type {
   RComponentSFC_IR_ElementNode,
   RComponentSFC_IR_Value,
 } from '@/features/core/modules/domain/types/component/sfc/ir.types'
-import type { TableColumnPinSide } from '@/features/core/modules/runtime/domain/action.types'
 import { ENDGE_SFC_TABLE_COLUMN_PIN_MODES } from '@/features/core/modules/domain/types/component/sfc/tag-attribute-contract.types'
 
 export const SFC_TABLE_COLUMN_PIN_MODES = ENDGE_SFC_TABLE_COLUMN_PIN_MODES
