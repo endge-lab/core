@@ -15,7 +15,9 @@ import type {
   DiagnosticsRecord,
   DiagnosticsResource,
   DiagnosticsSnapshot,
+  DiagnosticsSnapshotCaptureError,
   DiagnosticsSnapshotOptions,
+  DiagnosticsSnapshotProviders,
   DiagnosticsSpanHandle,
   DiagnosticsSpanOptions,
   DiagnosticsSpanRecord,
@@ -25,6 +27,8 @@ import type {
 import { CONSOLE_DIAGNOSTICS_ADAPTER_FACTORY } from '@/features/core/modules/diagnostics/adapters/ConsoleDiagnosticsAdapter'
 import { DiagnosticsAdapterRegistry } from '@/features/core/modules/diagnostics/adapters/DiagnosticsAdapterRegistry'
 import { SENTRY_DIAGNOSTICS_ADAPTER_FACTORY } from '@/features/core/modules/diagnostics/adapters/SentryDiagnosticsAdapter'
+import { DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION } from '@/features/core/modules/diagnostics/config/diagnostics.config'
+import { serializeDiagnosticsJson } from '@/features/core/modules/diagnostics/domain/diagnostics-snapshot'
 import { EndgeProblems_Module } from '@/features/core/modules/diagnostics/EndgeProblems_Module'
 import { EndgeTelemetry_Module } from '@/features/core/modules/diagnostics/EndgeTelemetry_Module'
 import { EndgeModule } from '@/features/federation/EndgeModule'
@@ -55,7 +59,7 @@ export class EndgeDiagnostics_Module extends EndgeModule<EndgeBootContext> {
    */
 
   /** Связывает независимые уведомления подмодулей с родительским diagnostics-модулем. */
-  public constructor() {
+  public constructor(private readonly _snapshotProviders: DiagnosticsSnapshotProviders = {}) {
     super()
     this.adapters = new DiagnosticsAdapterRegistry()
     this.adapters.register(CONSOLE_DIAGNOSTICS_ADAPTER_FACTORY)
@@ -189,13 +193,66 @@ export class EndgeDiagnostics_Module extends EndgeModule<EndgeBootContext> {
     const includeTelemetry = options.includeTelemetry ?? content.telemetry
     const includeProblems = options.includeProblems ?? content.problems
     const includeConfiguration = options.includeConfiguration ?? content.configuration
-    return {
+    const defaults = DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION.snapshots.content
+    const includeEffectiveConfiguration = options.includeEffectiveConfiguration
+      ?? content.effectiveConfiguration
+      ?? defaults.effectiveConfiguration
+      ?? false
+    const includeDomain = options.includeDomain ?? content.domain ?? defaults.domain ?? false
+    const includeProgram = options.includeProgram ?? content.program ?? defaults.program ?? false
+    const includeRuntime = options.includeRuntime ?? content.runtime ?? defaults.runtime ?? false
+    const includeRaphData = options.includeRaphData ?? content.raphData ?? defaults.raphData ?? false
+    const includeRaphGraph = options.includeRaphGraph ?? content.raphGraph ?? defaults.raphGraph ?? false
+    const captureErrors: DiagnosticsSnapshotCaptureError[] = []
+    const rawSnapshot: Record<string, unknown> = {
+      format: 'endge-diagnostics-snapshot',
+      version: 1,
       generatedAt: Date.now(),
       trigger: options.trigger ?? 'manual',
       ...(includeTelemetry ? { telemetry: this.telemetry.snapshot(options.filter) } : {}),
       ...(includeProblems ? { problems: this.problems.snapshot() } : {}),
       ...(includeConfiguration ? { configuration: this.configuration } : {}),
+      ...(includeEffectiveConfiguration
+        ? {
+            effectiveConfiguration: this._captureSnapshotSection(
+              'effectiveConfiguration',
+              this._snapshotProviders.effectiveConfiguration,
+              captureErrors,
+            ),
+          }
+        : {}),
+      ...(includeDomain
+        ? { domain: this._captureSnapshotSection('domain', this._snapshotProviders.domain, captureErrors) }
+        : {}),
+      ...(includeProgram
+        ? { program: this._captureSnapshotSection('program', this._snapshotProviders.program, captureErrors) }
+        : {}),
+      ...(includeRuntime
+        ? { runtime: this._captureSnapshotSection('runtime', this._snapshotProviders.runtime, captureErrors) }
+        : {}),
+      ...(includeRaphData || includeRaphGraph
+        ? {
+            raph: this._captureSnapshotSection(
+              'raph',
+              this._snapshotProviders.raph
+                ? () => this._snapshotProviders.raph!({
+                    includeData: includeRaphData,
+                    includeGraph: includeRaphGraph,
+                  })
+                : undefined,
+              captureErrors,
+            ),
+          }
+        : {}),
+      ...(captureErrors.length ? { captureErrors } : {}),
     }
+    const serialized = serializeDiagnosticsJson(rawSnapshot)
+    const snapshot = serialized.value as unknown as DiagnosticsSnapshot
+    snapshot.redaction = {
+      applied: true,
+      fields: serialized.redactedFields,
+    }
+    return snapshot
   }
 
   /** Создаёт snapshot и доставляет его в выбранные configured outputs. */
@@ -259,6 +316,28 @@ export class EndgeDiagnostics_Module extends EndgeModule<EndgeBootContext> {
       { signals: ['log'], minSeverity: 17 },
       record => this._handleAutomaticSnapshotRecord(record),
     )
+  }
+
+  /** Читает одну часть snapshot из её state owner и локализует возможный сбой. */
+  private _captureSnapshotSection(
+    section: DiagnosticsSnapshotCaptureError['section'],
+    provider: (() => unknown) | undefined,
+    errors: DiagnosticsSnapshotCaptureError[],
+  ): unknown {
+    if (!provider) {
+      errors.push({ section, message: 'Snapshot provider is not configured' })
+      return null
+    }
+    try {
+      return provider()
+    }
+    catch (error) {
+      errors.push({
+        section,
+        message: error instanceof Error ? error.message : String(error),
+      })
+      return null
+    }
   }
 
   /** Применяет sliding window и cooldown политики автоматического snapshot. */

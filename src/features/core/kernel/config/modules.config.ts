@@ -37,7 +37,17 @@ export const ENDGE_CORE_MODULES = [
   { key: 'types', create: () => new EndgeTypes_Module(), after: 'domain' },
   { key: 'configurationSchema', create: () => new EndgeConfigurationSchema_Module(), after: ['workspace', 'domain', 'types', 'source'] },
   { key: 'configuration', create: () => new EndgeConfiguration_Module(), after: ['workspace', 'domain', 'context', 'configurationSchema'] },
-  { key: 'diagnostics', create: () => new EndgeDiagnostics_Module(), after: 'configuration' },
+  {
+    key: 'diagnostics',
+    create: ({ getModule }) => new EndgeDiagnostics_Module({
+      effectiveConfiguration: () => getModule<EndgeConfiguration_Module>('configuration').current,
+      domain: () => getModule<EndgeDomain_Module>('domain').toPlain(),
+      program: () => getModule<EndgeProgram_Module>('program').snapshot(),
+      runtime: () => getModule<EndgeRuntime_Module>('runtime').snapshot(),
+      raph: options => getModule<EndgeRuntime_Module>('runtime').snapshotRaph(options),
+    }),
+    after: 'configuration',
+  },
   { key: 'source', create: () => new EndgeSource_Module(), after: 'domain' },
   { key: 'documentImport', create: () => new EndgeDocumentImport_Module(), after: ['domain', 'domainRepository', 'source', 'types'] },
   { key: 'program', create: () => new EndgeProgram_Module(), after: 'domain' },

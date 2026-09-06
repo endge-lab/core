@@ -161,6 +161,15 @@ export type DiagnosticsAdapterOptionValue
     | DiagnosticsAdapterOptionValue[]
     | { [key: string]: DiagnosticsAdapterOptionValue }
 
+/** Рекурсивное JSON-safe значение диагностического snapshot. */
+export type DiagnosticsJsonValue
+  = | string
+    | number
+    | boolean
+    | null
+    | DiagnosticsJsonValue[]
+    | { [key: string]: DiagnosticsJsonValue }
+
 /** Именованный канал вывода, создаваемый через adapter registry. */
 export interface EndgeDiagnosticsOutputConfiguration {
   id: string
@@ -206,6 +215,12 @@ export interface EndgeDiagnosticsSnapshotContentConfiguration {
   telemetry: boolean
   problems: boolean
   configuration: boolean
+  effectiveConfiguration?: boolean
+  domain?: boolean
+  program?: boolean
+  runtime?: boolean
+  raphData?: boolean
+  raphGraph?: boolean
 }
 
 /** Условия автоматического snapshot по ERROR/FATAL records. */
@@ -312,7 +327,34 @@ export interface DiagnosticsSnapshotOptions {
   includeTelemetry?: boolean
   includeProblems?: boolean
   includeConfiguration?: boolean
+  includeEffectiveConfiguration?: boolean
+  includeDomain?: boolean
+  includeProgram?: boolean
+  includeRuntime?: boolean
+  includeRaphData?: boolean
+  includeRaphGraph?: boolean
   filter?: DiagnosticsFilter
+}
+
+/** Параметры диагностической проекции Raph, принадлежащей runtime-модулю. */
+export interface DiagnosticsRaphSnapshotOptions {
+  includeData: boolean
+  includeGraph: boolean
+}
+
+/** Lazy providers state owners, подключаемые composition root ядра. */
+export interface DiagnosticsSnapshotProviders {
+  effectiveConfiguration?: () => unknown
+  domain?: () => unknown
+  program?: () => unknown
+  runtime?: () => unknown
+  raph?: (options: DiagnosticsRaphSnapshotOptions) => unknown
+}
+
+/** Ошибка чтения одной запрошенной части snapshot без отмены остальных частей. */
+export interface DiagnosticsSnapshotCaptureError {
+  section: 'effectiveConfiguration' | 'domain' | 'program' | 'runtime' | 'raph'
+  message: string
 }
 
 /** Telemetry-часть диагностического snapshot. */
@@ -325,11 +367,23 @@ export interface DiagnosticsTelemetrySnapshot {
 
 /** JSON-safe snapshot текущего состояния diagnostics-модуля. */
 export interface DiagnosticsSnapshot {
+  format?: 'endge-diagnostics-snapshot'
+  version?: 1
   generatedAt: number
   trigger: 'manual' | 'automatic'
   telemetry?: DiagnosticsTelemetrySnapshot
   problems?: DiagnosticsProblemsSnapshot
   configuration?: EndgeDiagnosticsConfiguration
+  effectiveConfiguration?: DiagnosticsJsonValue
+  domain?: DiagnosticsJsonValue
+  program?: DiagnosticsJsonValue
+  runtime?: DiagnosticsJsonValue
+  raph?: DiagnosticsJsonValue
+  captureErrors?: DiagnosticsSnapshotCaptureError[]
+  redaction?: {
+    applied: true
+    fields: number
+  }
 }
 
 /** Обработчик одной принятой диагностической записи. */

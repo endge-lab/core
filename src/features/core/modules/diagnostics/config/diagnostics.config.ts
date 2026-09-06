@@ -46,6 +46,12 @@ export const DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION: Readonly<EndgeDiagnosticsC
       telemetry: true,
       problems: true,
       configuration: false,
+      effectiveConfiguration: true,
+      domain: true,
+      program: true,
+      runtime: true,
+      raphData: true,
+      raphGraph: true,
     },
     automatic: {
       enabled: false,

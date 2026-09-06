@@ -11,6 +11,10 @@ import type {
   EndgeSessionIdentityProvider,
   EndgeStorageAdapter,
 } from '@/features/core/modules/context/domain/context-persistence.types'
+import type {
+  EndgeContextStateListener,
+  EndgeContextStateTransform,
+} from '@/features/core/modules/context/domain/context-state.types'
 import type { EndgePersistenceInput } from '@/features/core/modules/context/persistence/EndgeStorageAdapterRegistry'
 import type {
   EndgeExecutionContext,
@@ -36,7 +40,12 @@ import { createEndgePublicConfigurationSnapshot } from '@/features/core/modules/
 import { DisabledContextAdapter } from '@/features/core/modules/context/persistence/adapters/DisabledContextAdapter'
 import { LocalStorageContextAdapter } from '@/features/core/modules/context/persistence/adapters/LocalStorageContextAdapter'
 import {
-
+  buildContextStateStorageKey,
+  deserializeContextState,
+  normalizeContextStateKey,
+  serializeContextState,
+} from '@/features/core/modules/context/persistence/context-state'
+import {
   EndgeStorageAdapterRegistry,
   normalizePersistence,
 } from '@/features/core/modules/context/persistence/EndgeStorageAdapterRegistry'
@@ -53,6 +62,7 @@ const LEGACY_STORAGE_ADAPTER = new LocalStorageContextAdapter()
 export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
   private readonly _adapters = new EndgeStorageAdapterRegistry()
   private readonly _runtimeControllers = new Map<string, RuntimeStateController>()
+  private readonly _stateListeners = new Map<string, Set<EndgeContextStateListener>>()
 
   private _contextPersistence: EndgePersistenceOptions = { driver: 'local' }
   private _currentWorkspace: string | null = null
@@ -270,6 +280,75 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
       projectId: this._currentProject,
       environmentId: this._currentEnvironment,
       userId: session.userId,
+    }
+  }
+
+  /** Возвращает dynamic state текущего полного context scope. */
+  public getState<T>(
+    key: string,
+    transform?: EndgeContextStateTransform<T>,
+  ): T | undefined {
+    const normalizedKey = normalizeContextStateKey(key)
+    if (!this._currentWorkspace) {
+      return undefined
+    }
+    try {
+      const storageKey = buildContextStateStorageKey(this.getPersistenceScope(), normalizedKey)
+      const value = this._resolveAdapter(this._contextPersistence).read<unknown>(storageKey)
+      return value === undefined ? undefined : deserializeContextState(value, transform)
+    }
+    catch (error) {
+      this._warnStateFailure('read', normalizedKey, error)
+      return undefined
+    }
+  }
+
+  /** Сохраняет dynamic state в scope текущих workspace/tenant/project/environment/user. */
+  public setState<T>(
+    key: string,
+    state: T,
+    transform?: EndgeContextStateTransform<T>,
+  ): void {
+    const normalizedKey = normalizeContextStateKey(key)
+    try {
+      const storageKey = buildContextStateStorageKey(this.getPersistenceScope(), normalizedKey)
+      const value = serializeContextState(state, transform)
+      if (value === undefined) {
+        throw new Error('State serializer returned undefined. Use removeState() to delete a value.')
+      }
+      this._resolveAdapter(this._contextPersistence).write(storageKey, value)
+      this._notifyState(normalizedKey)
+    }
+    catch (error) {
+      this._warnStateFailure('write', normalizedKey, error)
+    }
+  }
+
+  /** Удаляет dynamic state только из текущего полного context scope. */
+  public removeState(key: string): void {
+    const normalizedKey = normalizeContextStateKey(key)
+    try {
+      const storageKey = buildContextStateStorageKey(this.getPersistenceScope(), normalizedKey)
+      this._resolveAdapter(this._contextPersistence).remove(storageKey)
+      this._notifyState(normalizedKey)
+    }
+    catch (error) {
+      this._warnStateFailure('remove', normalizedKey, error)
+    }
+  }
+
+  /** Подписывает потребителя на изменения одного dynamic state key. */
+  public subscribeState(key: string, listener: EndgeContextStateListener): () => void {
+    const normalizedKey = normalizeContextStateKey(key)
+    const listeners = this._stateListeners.get(normalizedKey) ?? new Set<EndgeContextStateListener>()
+    listeners.add(listener)
+    this._stateListeners.set(normalizedKey, listeners)
+
+    return () => {
+      listeners.delete(listener)
+      if (listeners.size === 0) {
+        this._stateListeners.delete(normalizedKey)
+      }
     }
   }
 
@@ -669,6 +748,29 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
   /** Выбирает storage adapter для заданной persistence policy. */
   private _resolveAdapter(persistence: EndgePersistenceInput): EndgeStorageAdapter {
     return this._adapters.resolve(persistence)
+  }
+
+  private _notifyState(key: string): void {
+    for (const listener of [...(this._stateListeners.get(key) ?? [])]) {
+      try {
+        listener()
+      }
+      catch (error) {
+        console.error(
+          `[EndgeContext] State listener failed for "${key}": ${error instanceof Error ? error.message : String(error)}`,
+        )
+      }
+    }
+  }
+
+  private _warnStateFailure(
+    operation: 'read' | 'write' | 'remove',
+    key: string,
+    error: unknown,
+  ): void {
+    console.warn(
+      `[EndgeContext] Failed to ${operation} state "${key}": ${error instanceof Error ? error.message : String(error)}`,
+    )
   }
 
   private _syncPersistentContextToRaph(): void {

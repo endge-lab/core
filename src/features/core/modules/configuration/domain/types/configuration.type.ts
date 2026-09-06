@@ -150,6 +150,12 @@ export interface EndgeDiagnosticsSnapshotContentPatch {
   telemetry?: EndgeValueOverride<boolean>
   problems?: EndgeValueOverride<boolean>
   configuration?: EndgeValueOverride<boolean>
+  effectiveConfiguration?: EndgeValueOverride<boolean>
+  domain?: EndgeValueOverride<boolean>
+  program?: EndgeValueOverride<boolean>
+  runtime?: EndgeValueOverride<boolean>
+  raphData?: EndgeValueOverride<boolean>
+  raphGraph?: EndgeValueOverride<boolean>
 }
 
 /** Patch условий автоматического snapshot. */

@@ -54,7 +54,10 @@ export class EndgeAuth_Module extends EndgeModule<EndgeBootContext> {
     this._store = new AuthSessionStore()
     this.session = new AuthSessionManager(this.profiles, this.adapters, this._store, {
       getWorkspaceIdentity: () => Endge.context.getCurrentWorkspace() ?? '',
-      onSessionChange: () => this.notify(),
+      onSessionChange: () => {
+        Endge.context.notify()
+        this.notify()
+      },
     })
     this.requests = new AuthRequestResolver(
       this.profiles,

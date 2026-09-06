@@ -2,7 +2,7 @@ import type { RuntimeEntityType } from '@/features/core/modules/runtime/domain/r
 import type { RuntimeExecuteOptions } from '@/features/core/modules/runtime/domain/runtime-execute.type'
 import type { DestroyedRuntimeHostSnapshot, RuntimeArtifactReader, RuntimeHost, RuntimeInspectionLease } from '@/features/core/modules/runtime/domain/runtime-host.types'
 import type { AnyRuntimeHost, AnyRuntimeStrategy } from '@/features/core/modules/runtime/domain/runtime-strategy.types'
-import type { EndgeRuntimeSnapshot, RuntimeExecutableModel } from '@/features/core/modules/runtime/domain/runtime.types'
+import type { EndgeRuntimeRaphSnapshot, EndgeRuntimeSnapshot, RuntimeExecutableModel } from '@/features/core/modules/runtime/domain/runtime.types'
 import type { RuntimeAppScopeOptions } from '@/features/core/modules/runtime/RuntimeAppScope'
 
 import type { CompositionProgramPayload } from '@/features/core/modules/source/domain/types/composition-source.types'
@@ -346,6 +346,32 @@ export class EndgeRuntime_Module extends EndgeModule {
     }
   }
 
+  /** Формирует принадлежащую runtime-модулю диагностическую проекцию Raph. */
+  public snapshotRaph(options: { includeData: boolean, includeGraph: boolean }): EndgeRuntimeRaphSnapshot {
+    const result: EndgeRuntimeRaphSnapshot = {}
+    if (options.includeData) {
+      result.data = Raph.data
+    }
+    if (options.includeGraph) {
+      const lease = Raph.debug.acquire()
+      try {
+        Raph.debug.refresh()
+        result.graph = {
+          runtimeId: Raph.app.id,
+          loopEnabled: Raph.app.loopEnabled,
+          frame: { ...Raph.app.frame },
+          nodes: Raph.debug.getFlat(),
+          tree: Raph.debug.getTree(),
+          derived: Raph.app.getDerivedSnapshot(),
+        }
+      }
+      finally {
+        lease.release()
+      }
+    }
+    return result
+  }
+
   /**
    * Корректно разрушает runtime-host по runtime-id.
    */
@@ -450,17 +476,9 @@ export class EndgeRuntime_Module extends EndgeModule {
 
   /** Восстанавливает сохранённые значения runtime-фильтров независимо от переменных workspace. */
   private _hydrateRuntimeFilters(): void {
-    if (typeof localStorage === 'undefined') {
-      return
-    }
-
     try {
-      const raw = localStorage.getItem('endge:parameters')
-      if (!raw) {
-        return
-      }
-
-      const store = JSON.parse(raw) as Record<string, unknown>
+      const store = Endge.context.getState<Record<string, unknown>>('endge.runtime.parameters')
+        ?? this._migrateLegacyRuntimeFilters()
       if (!store || typeof store !== 'object') {
         return
       }
@@ -477,6 +495,31 @@ export class EndgeRuntime_Module extends EndgeModule {
     }
     catch (error) {
       console.error(`[EndgeRuntime] Failed to hydrate runtime filters: ${errorText(error)}`)
+    }
+  }
+
+  /** Однократно переносит прежний глобальный storage runtime-фильтров. */
+  private _migrateLegacyRuntimeFilters(): Record<string, unknown> | undefined {
+    if (typeof localStorage === 'undefined') {
+      return undefined
+    }
+    try {
+      const raw = localStorage.getItem('endge:parameters')
+      if (!raw) {
+        return undefined
+      }
+      const store = JSON.parse(raw) as Record<string, unknown>
+      if (!store || typeof store !== 'object' || Array.isArray(store)) {
+        return undefined
+      }
+      Endge.context.setState('endge.runtime.parameters', store)
+      if (Endge.context.getState('endge.runtime.parameters') !== undefined) {
+        localStorage.removeItem('endge:parameters')
+      }
+      return store
+    }
+    catch {
+      return undefined
     }
   }
 

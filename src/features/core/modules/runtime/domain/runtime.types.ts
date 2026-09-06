@@ -30,6 +30,19 @@ export interface EndgeRuntimeSnapshot extends RuntimeHostRegistrySnapshot {
   scopes: import('@/features/core/modules/runtime/domain/runtime-scope.types').RuntimeScopeSnapshot[]
 }
 
+/** Опциональные данные и graph-состояние Raph для диагностического snapshot. */
+export interface EndgeRuntimeRaphSnapshot {
+  data?: unknown
+  graph?: {
+    runtimeId: string
+    loopEnabled: boolean
+    frame: unknown
+    nodes: unknown[]
+    tree: unknown[]
+    derived: unknown
+  }
+}
+
 /**
  * Событие для query: изменение фильтра
  */

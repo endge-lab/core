@@ -471,6 +471,12 @@ function applyDiagnosticsPatch(
   applyDiagnosticsRequiredValue(next.snapshots.content, 'telemetry', snapshots?.content?.telemetry)
   applyDiagnosticsRequiredValue(next.snapshots.content, 'problems', snapshots?.content?.problems)
   applyDiagnosticsRequiredValue(next.snapshots.content, 'configuration', snapshots?.content?.configuration)
+  applyDiagnosticsRequiredValue(next.snapshots.content, 'effectiveConfiguration', snapshots?.content?.effectiveConfiguration)
+  applyDiagnosticsRequiredValue(next.snapshots.content, 'domain', snapshots?.content?.domain)
+  applyDiagnosticsRequiredValue(next.snapshots.content, 'program', snapshots?.content?.program)
+  applyDiagnosticsRequiredValue(next.snapshots.content, 'runtime', snapshots?.content?.runtime)
+  applyDiagnosticsRequiredValue(next.snapshots.content, 'raphData', snapshots?.content?.raphData)
+  applyDiagnosticsRequiredValue(next.snapshots.content, 'raphGraph', snapshots?.content?.raphGraph)
   applyDiagnosticsRequiredValue(next.snapshots.automatic, 'enabled', snapshots?.automatic?.enabled)
   applyDiagnosticsRequiredValue(next.snapshots.automatic, 'errorCount', snapshots?.automatic?.errorCount)
   applyDiagnosticsRequiredValue(next.snapshots.automatic, 'windowSeconds', snapshots?.automatic?.windowSeconds)
@@ -693,6 +699,15 @@ function normalizeDiagnosticsConfiguration(input: unknown): EndgeDiagnosticsConf
         telemetry: normalizeBoolean(rawContent.telemetry, defaults.snapshots.content.telemetry),
         problems: normalizeBoolean(rawContent.problems, defaults.snapshots.content.problems),
         configuration: normalizeBoolean(rawContent.configuration, defaults.snapshots.content.configuration),
+        effectiveConfiguration: normalizeBoolean(
+          rawContent.effectiveConfiguration,
+          defaults.snapshots.content.effectiveConfiguration ?? true,
+        ),
+        domain: normalizeBoolean(rawContent.domain, defaults.snapshots.content.domain ?? true),
+        program: normalizeBoolean(rawContent.program, defaults.snapshots.content.program ?? true),
+        runtime: normalizeBoolean(rawContent.runtime, defaults.snapshots.content.runtime ?? true),
+        raphData: normalizeBoolean(rawContent.raphData, defaults.snapshots.content.raphData ?? true),
+        raphGraph: normalizeBoolean(rawContent.raphGraph, defaults.snapshots.content.raphGraph ?? true),
       },
       automatic: {
         enabled: normalizeBoolean(rawAutomatic.enabled, defaults.snapshots.automatic.enabled),

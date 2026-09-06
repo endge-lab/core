@@ -64,6 +64,7 @@ export * from '@/features/core/modules/diagnostics/domain/entities/DiagnosticsSp
 //
 
 export * from '@/features/core/modules/auth/domain/types/auth-profile.types'
+export * from '@/features/core/modules/auth/services/auth-context'
 export * from '@/features/core/modules/domain/types/component/component-core.types'
 export * from '@/features/core/modules/domain/types/component/component.types'
 export * from '@/features/core/modules/domain/types/component/sfc/source.types'
@@ -110,6 +111,7 @@ export * from '@/features/core/modules/runtime/domain/vocab-cache.types'
 export * from '@/features/core/modules/implementations/domain/implementation.types'
 export * from '@/features/core/modules/source/domain/types/action-source.types'
 export * from '@/features/core/modules/context/domain/context-persistence.types'
+export * from '@/features/core/modules/context/domain/context-state.types'
 export * from '@/features/core/modules/runtime/domain/execution-context.types'
 export * from '@/features/core/modules/runtime/domain/query-execution.types'
 export * from '@/features/core/modules/runtime/domain/runtime-entity-map.types'

@@ -16,6 +16,7 @@ import { EndgeModule } from '@/features/federation/EndgeModule'
  */
 export class EndgeUI_Module extends EndgeModule {
   private _offContext: (() => void) | null = null
+  private _offZoomState: (() => void) | null = null
   private _offWorkspace: (() => void) | null = null
   //
   // Настройки zoom
@@ -23,19 +24,20 @@ export class EndgeUI_Module extends EndgeModule {
   private readonly _MAX_ZOOM: number = 150
   private readonly _STEP_ZOOM: number = 25
   private readonly _DEFAULT_ZOOM: number = 100
-  private readonly _LS_KEY_ZOOM: string = 'zoom'
+  private readonly _ZOOM_STATE_KEY: string = 'endge.ui.zoom'
+  private readonly _LEGACY_LS_KEY_ZOOM: string = 'zoom'
 
   // Состояние
   private _zoom: number
   private _theme: string
 
   /**
-   * Восстанавливает UI-настройки из localStorage и применяет тему к document.
+   * Создаёт UI-модуль с безопасными bootstrap defaults и применяет тему к document.
    */
   public constructor() {
     super()
 
-    this._zoom = this._readZoomFromLS()
+    this._zoom = this._DEFAULT_ZOOM
     this._theme = themeConfig.defaultTheme
 
     // сразу применим (как immediate watch)
@@ -45,25 +47,35 @@ export class EndgeUI_Module extends EndgeModule {
   /** Подключает UI projection к пользовательскому контексту после загрузки workspace. */
   public override start(): void {
     this._offContext?.()
+    this._offZoomState?.()
     this._offWorkspace?.()
     this._offContext = Endge.context.subscribe(() => {
-      if (!this._syncThemeFromContext()) {
+      const zoomChanged = this._syncZoomFromContext()
+      const themeChanged = this._syncThemeFromContext()
+      if (!zoomChanged && !themeChanged) {
         this.notify()
       }
+    })
+    this._offZoomState = Endge.context.subscribeState(this._ZOOM_STATE_KEY, () => {
+      this._syncZoomFromContext()
     })
     this._offWorkspace = Endge.workspace.subscribe(() => {
       if (!this._syncThemeFromContext()) {
         this.notify()
       }
     })
+    this._migrateLegacyZoom()
+    this._syncZoomFromContext()
     this._syncThemeFromContext()
   }
 
   /** Отключает runtime subscription; пользовательское значение остаётся в EndgeContext_Module. */
   public override reset(): void {
     this._offContext?.()
+    this._offZoomState?.()
     this._offWorkspace?.()
     this._offContext = null
+    this._offZoomState = null
     this._offWorkspace = null
   }
 
@@ -112,7 +124,7 @@ export class EndgeUI_Module extends EndgeModule {
     }
 
     this._zoom = next
-    this._writeZoomToLS(next)
+    Endge.context.setState(this._ZOOM_STATE_KEY, next)
     this.notify()
   }
 
@@ -152,26 +164,39 @@ export class EndgeUI_Module extends EndgeModule {
     return Math.min(this._MAX_ZOOM, Math.max(this._MIN_ZOOM, n))
   }
 
-  /**
-   * Считывает Zoom From LS.
-   */
-  private _readZoomFromLS(): number {
-    if (typeof localStorage === 'undefined') {
-      return this._DEFAULT_ZOOM
+  private _syncZoomFromContext(): boolean {
+    const next = this._clampZoom(
+      Endge.context.getState<number>(this._ZOOM_STATE_KEY) ?? this._DEFAULT_ZOOM,
+    )
+    if (next === this._zoom) {
+      return false
     }
-    const raw: string | null = localStorage.getItem(this._LS_KEY_ZOOM)
-    const n: number = raw == null ? this._DEFAULT_ZOOM : Number(raw)
-    return this._clampZoom(n)
+    this._zoom = next
+    this.notify()
+    return true
   }
 
-  /**
-   * Записывает Zoom To LS.
-   */
-  private _writeZoomToLS(value: number): void {
-    if (typeof localStorage === 'undefined') {
+  /** Однократно переносит прежний глобальный zoom в user-scoped context state. */
+  private _migrateLegacyZoom(): void {
+    if (
+      Endge.context.getState<number>(this._ZOOM_STATE_KEY) !== undefined
+      || typeof localStorage === 'undefined'
+    ) {
       return
     }
-    localStorage.setItem(this._LS_KEY_ZOOM, String(value))
+    try {
+      const raw = localStorage.getItem(this._LEGACY_LS_KEY_ZOOM)
+      if (raw == null) {
+        return
+      }
+      Endge.context.setState(this._ZOOM_STATE_KEY, this._clampZoom(Number(raw)))
+      if (Endge.context.getState(this._ZOOM_STATE_KEY) !== undefined) {
+        localStorage.removeItem(this._LEGACY_LS_KEY_ZOOM)
+      }
+    }
+    catch {
+      // Legacy migration не должна блокировать UI lifecycle.
+    }
   }
 
   //
