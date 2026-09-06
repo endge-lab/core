@@ -147,6 +147,19 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
   }
 
   /** Сериализует текущий execution scope в snapshot. */
+  public override createDiagnosticsSnapshot(): Record<string, unknown> {
+    return {
+      ...this.serialize(),
+      tenant: this.getCurrentTenant(),
+      user: this.getCurrentUser(),
+      execution: this.getExecutionContext(),
+      dataMode: this.dataMode,
+      input: {
+        keyboard: this.getKeyboardState(),
+      },
+    }
+  }
+
   public override serialize(): EndgeContextSnapshot {
     return {
       workspace: this._currentWorkspace,

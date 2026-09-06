@@ -13,6 +13,9 @@ import type {
   EndgeChildFederationDefinitions,
   EndgeFederationContext,
   EndgeFederationDefinition,
+  EndgeFederationDiagnosticsSnapshot,
+  EndgeFederationDiagnosticsSnapshotNode,
+  EndgeFederationDiagnosticsSnapshotOptions,
   EndgeFederationHost,
   EndgeFederationState,
   EndgeLifecycleNodeDescriptor,
@@ -74,6 +77,10 @@ export type DefinedEndgeFederation<
 interface EndgeFederationControl {
   readonly id: string
   attach: (parentFederationId: string) => void
+  createDiagnosticsSnapshot: (
+    path: string[],
+    options: EndgeFederationDiagnosticsSnapshotOptions,
+  ) => EndgeFederationDiagnosticsSnapshot
   configure: () => void
   runPhase: (phase: EndgeFederationPhase, ctx: EndgeFederationContext) => Promise<void>
   reset: () => Promise<void>
@@ -143,6 +150,14 @@ export abstract class EndgeFederation {
 
   public static get lastError(): unknown | null {
     return this._getOrCreateHost().lastError
+  }
+
+  /** Рекурсивно снимает диагностическое состояние явного Federation graph. */
+  public static createDiagnosticsSnapshot(
+    options: EndgeFederationDiagnosticsSnapshotOptions = {},
+  ): EndgeFederationDiagnosticsSnapshot {
+    this._ensureConfigured()
+    return this._createDiagnosticsSnapshot([this.id], options)
   }
 
   /** Хук одноразовой декларации собственных lifecycle-узлов Federation. */
@@ -811,6 +826,7 @@ export abstract class EndgeFederation {
       creating.add(normalizedKey)
       try {
         const module = definition.create({
+          createDiagnosticsSnapshot: options => this.createDiagnosticsSnapshot(options),
           getModule<T extends AnyEndgeModule = AnyEndgeModule>(moduleKey: string): T {
             return createModule(moduleKey) as T
           },
@@ -991,9 +1007,73 @@ export abstract class EndgeFederation {
     return {
       id: this.id,
       attach: parentFederationId => this._attachToParent(parentFederationId),
+      createDiagnosticsSnapshot: (path, options) => this._createDiagnosticsSnapshot(path, options),
       configure: () => this._ensureConfigured(),
       runPhase: (phase, ctx) => this._runAttachedPhase(phase, ctx),
       reset: () => this._resetAttached(),
+    }
+  }
+
+  private static _createDiagnosticsSnapshot(
+    path: string[],
+    options: EndgeFederationDiagnosticsSnapshotOptions,
+  ): EndgeFederationDiagnosticsSnapshot {
+    const host = this.host
+    const nodes: EndgeFederationDiagnosticsSnapshotNode[] = host.nodes.map((node) => {
+      const nodePath = [...path, node.key]
+      if (node.kind === 'federation') {
+        try {
+          return {
+            kind: 'federation',
+            key: node.key,
+            path: nodePath,
+            status: 'captured',
+            federation: this._getFederationControl(node.federation).createDiagnosticsSnapshot(nodePath, options),
+          }
+        }
+        catch (error) {
+          return {
+            kind: 'federation',
+            key: node.key,
+            path: nodePath,
+            status: 'failed',
+            error: error instanceof Error ? error.message : String(error),
+          }
+        }
+      }
+
+      const reference = {
+        federationId: this.id,
+        key: node.key,
+        path: nodePath,
+        moduleName: node.module.constructor.name || node.key,
+      }
+      try {
+        if (options.shouldCaptureModule?.(reference) === false) {
+          return { kind: 'module', ...reference, status: 'skipped' }
+        }
+        const snapshot = node.module.createDiagnosticsSnapshot()
+        return snapshot === undefined
+          ? { kind: 'module', ...reference, status: 'empty' }
+          : { kind: 'module', ...reference, status: 'captured', snapshot }
+      }
+      catch (error) {
+        return {
+          kind: 'module',
+          ...reference,
+          status: 'failed',
+          error: error instanceof Error ? error.message : String(error),
+        }
+      }
+    })
+
+    return {
+      id: this.id,
+      name: this.name,
+      path: [...path],
+      state: host.state,
+      plugins: [...host.installedPluginIds],
+      nodes,
     }
   }
 

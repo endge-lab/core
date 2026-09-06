@@ -10,6 +10,11 @@ import type {
 } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
 import type { EndgeProblems_Module } from '@/features/core/modules/diagnostics/EndgeProblems_Module'
 import type { EndgeTelemetry_Module } from '@/features/core/modules/diagnostics/EndgeTelemetry_Module'
+import type {
+  EndgeFederationDiagnosticsSnapshot,
+  EndgeFederationDiagnosticsSnapshotOptions,
+  EndgeModuleDiagnosticsSnapshotNode,
+} from '@/features/federation/types/federation.types'
 import { BrowserDiagnosticsSnapshot_Adapter } from '@/features/core/modules/diagnostics/adapters/BrowserDiagnosticsSnapshot_Adapter'
 import { DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION } from '@/features/core/modules/diagnostics/config/diagnostics.config'
 import { serializeDiagnosticsJson } from '@/features/core/modules/diagnostics/domain/diagnostics-snapshot'
@@ -85,20 +90,46 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
     const includeRaphData = options.includeRaphData ?? content.raphData ?? defaults.raphData ?? false
     const includeRaphGraph = options.includeRaphGraph ?? content.raphGraph ?? defaults.raphGraph ?? false
     const captureErrors: DiagnosticsSnapshotCaptureError[] = []
+    const usesFederationTree = this._providers.federation != null
+    const federation = usesFederationTree
+      ? this._captureSection(
+        'federation',
+        () => this._providers.federation!(this._federationOptions({
+          effectiveConfiguration: includeEffectiveConfiguration,
+          domain: includeDomain,
+          program: includeProgram,
+          runtime: includeRuntime,
+        })),
+        captureErrors,
+      ) as EndgeFederationDiagnosticsSnapshot | null
+      : null
+    const ownerSections = usesFederationTree
+      ? this._federationOwnerSections(federation, {
+          effectiveConfiguration: includeEffectiveConfiguration,
+          domain: includeDomain,
+          program: includeProgram,
+          runtime: includeRuntime,
+        }, captureErrors)
+      : this._legacyOwnerSections({
+          effectiveConfiguration: includeEffectiveConfiguration,
+          domain: includeDomain,
+          program: includeProgram,
+          runtime: includeRuntime,
+        }, captureErrors)
+
+    if (federation) {
+      this._referenceDiagnosticsModule(federation)
+    }
     const rawSnapshot: Record<string, unknown> = {
       format: 'endge-diagnostics-snapshot',
-      version: 1,
+      version: usesFederationTree ? 2 : 1,
       generatedAt: Date.now(),
       trigger: options.trigger ?? 'manual',
       ...(includeTelemetry ? { telemetry: this._telemetry.snapshot(options.filter) } : {}),
       ...(includeProblems ? { problems: this._problems.snapshot() } : {}),
       ...(includeConfiguration ? { configuration: this._telemetry.configuration } : {}),
-      ...(includeEffectiveConfiguration
-        ? { effectiveConfiguration: this._captureSection('effectiveConfiguration', this._providers.effectiveConfiguration, captureErrors) }
-        : {}),
-      ...(includeDomain ? { domain: this._captureSection('domain', this._providers.domain, captureErrors) } : {}),
-      ...(includeProgram ? { program: this._captureSection('program', this._providers.program, captureErrors) } : {}),
-      ...(includeRuntime ? { runtime: this._captureSection('runtime', this._providers.runtime, captureErrors) } : {}),
+      ...ownerSections,
+      ...(usesFederationTree ? { federation } : {}),
       ...(includeRaphData || includeRaphGraph
         ? {
             raph: this._captureSection(
@@ -110,7 +141,9 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
             ),
           }
         : {}),
-      ...(captureErrors.length ? { captureErrors } : {}),
+    }
+    if (captureErrors.length) {
+      rawSnapshot.captureErrors = captureErrors
     }
     const serialized = serializeDiagnosticsJson(rawSnapshot)
     const snapshot = serialized.value as unknown as DiagnosticsSnapshot
@@ -196,6 +229,131 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
       errors.push({ section, message: error instanceof Error ? error.message : String(error) })
       return null
     }
+  }
+
+  /** Сохраняет прежние top-level поля, получая их из нового дерева владельцев. */
+  private _federationOwnerSections(
+    federation: EndgeFederationDiagnosticsSnapshot | null,
+    content: Pick<
+      EndgeDiagnosticsSnapshotContentConfiguration,
+      'effectiveConfiguration' | 'domain' | 'program' | 'runtime'
+    >,
+    errors: DiagnosticsSnapshotCaptureError[],
+  ): Record<string, unknown> {
+    return {
+      ...(content.effectiveConfiguration
+        ? { effectiveConfiguration: this._takeModuleSnapshot(federation, 'configuration', 'effectiveConfiguration', errors) }
+        : {}),
+      ...(content.domain
+        ? { domain: this._takeModuleSnapshot(federation, 'domain', 'domain', errors) }
+        : {}),
+      ...(content.program
+        ? { program: this._takeModuleSnapshot(federation, 'program', 'program', errors) }
+        : {}),
+      ...(content.runtime
+        ? { runtime: this._takeModuleSnapshot(federation, 'runtime', 'runtime', errors) }
+        : {}),
+    }
+  }
+
+  /** Поддерживает независимое использование Diagnostics без владеющей Federation. */
+  private _legacyOwnerSections(
+    content: Pick<
+      EndgeDiagnosticsSnapshotContentConfiguration,
+      'effectiveConfiguration' | 'domain' | 'program' | 'runtime'
+    >,
+    errors: DiagnosticsSnapshotCaptureError[],
+  ): Record<string, unknown> {
+    return {
+      ...(content.effectiveConfiguration
+        ? { effectiveConfiguration: this._captureSection('effectiveConfiguration', this._providers.effectiveConfiguration, errors) }
+        : {}),
+      ...(content.domain
+        ? { domain: this._captureSection('domain', this._providers.domain, errors) }
+        : {}),
+      ...(content.program
+        ? { program: this._captureSection('program', this._providers.program, errors) }
+        : {}),
+      ...(content.runtime
+        ? { runtime: this._captureSection('runtime', this._providers.runtime, errors) }
+        : {}),
+    }
+  }
+
+  /** Применяет существующие content toggles к тяжёлым Core Modules до чтения их состояния. */
+  private _federationOptions(
+    content: Pick<
+      EndgeDiagnosticsSnapshotContentConfiguration,
+      'effectiveConfiguration' | 'domain' | 'program' | 'runtime'
+    >,
+  ): EndgeFederationDiagnosticsSnapshotOptions {
+    return {
+      shouldCaptureModule: ({ federationId, key }) => {
+        if (federationId !== 'endge') {
+          return true
+        }
+        if (key === 'diagnostics') {
+          return false
+        }
+        if (key === 'configuration') {
+          return content.effectiveConfiguration !== false
+        }
+        if (key === 'domain') {
+          return content.domain !== false
+        }
+        if (key === 'program') {
+          return content.program !== false
+        }
+        if (key === 'runtime') {
+          return content.runtime !== false
+        }
+        return true
+      },
+    }
+  }
+
+  /** Переносит snapshot Core Module в совместимое top-level поле без повторного сбора. */
+  private _takeModuleSnapshot(
+    federation: EndgeFederationDiagnosticsSnapshot | null,
+    key: string,
+    section: DiagnosticsSnapshotCaptureError['section'],
+    errors: DiagnosticsSnapshotCaptureError[],
+  ): unknown {
+    const node = federation?.nodes.find(
+      (candidate): candidate is EndgeModuleDiagnosticsSnapshotNode =>
+        candidate.kind === 'module' && candidate.key === key,
+    )
+    if (!node) {
+      errors.push({ section, message: `Module "${key}" is absent from the federation snapshot` })
+      return null
+    }
+    if (node.status === 'failed') {
+      errors.push({ section, message: node.error ?? `Module "${key}" snapshot failed` })
+      return null
+    }
+    if (node.status !== 'captured') {
+      errors.push({ section, message: `Module "${key}" returned no diagnostic snapshot` })
+      return null
+    }
+
+    const snapshot = node.snapshot
+    delete node.snapshot
+    node.status = 'referenced'
+    node.snapshotRef = `#/${section}`
+    return snapshot
+  }
+
+  /** Показывает, что состояние Diagnostics Module представлено корневыми полями файла. */
+  private _referenceDiagnosticsModule(federation: EndgeFederationDiagnosticsSnapshot): void {
+    const node = federation.nodes.find(
+      (candidate): candidate is EndgeModuleDiagnosticsSnapshotNode =>
+        candidate.kind === 'module' && candidate.key === 'diagnostics',
+    )
+    if (!node) {
+      return
+    }
+    node.status = 'referenced'
+    node.snapshotRef = '#/'
   }
 
   /** Применяет sliding window и cooldown политики автоматического snapshot. */

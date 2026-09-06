@@ -253,9 +253,12 @@ export class EndgeProgram_Module extends EndgeModule {
     this.clear()
   }
 
-  /**
-   * Формирует summary snapshot для диагностики compiled program.
-   */
+  /** Включает summary compiled program в диагностическое дерево Module. */
+  public override createDiagnosticsSnapshot(): EndgeProgramSnapshot {
+    return this.snapshot()
+  }
+
+  /** Формирует summary snapshot для диагностики compiled program. */
   public snapshot(): EndgeProgramSnapshot {
     const artifacts = this.getArtifacts()
     const byStatus: Record<ProgramArtifactStatus, number> = {

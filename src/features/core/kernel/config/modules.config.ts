@@ -39,11 +39,8 @@ export const ENDGE_CORE_MODULES = [
   { key: 'configuration', create: () => new EndgeConfiguration_Module(), after: ['workspace', 'domain', 'context', 'configurationSchema'] },
   {
     key: 'diagnostics',
-    create: ({ getModule }) => new EndgeDiagnostics_Module({
-      effectiveConfiguration: () => getModule<EndgeConfiguration_Module>('configuration').current,
-      domain: () => getModule<EndgeDomain_Module>('domain').toPlain(),
-      program: () => getModule<EndgeProgram_Module>('program').snapshot(),
-      runtime: () => getModule<EndgeRuntime_Module>('runtime').snapshot(),
+    create: ({ createDiagnosticsSnapshot, getModule }) => new EndgeDiagnostics_Module({
+      federation: createDiagnosticsSnapshot,
       raph: options => getModule<EndgeRuntime_Module>('runtime').snapshotRaph(options),
     }),
     after: 'configuration',

@@ -335,9 +335,15 @@ export class EndgeRuntime_Module extends EndgeModule {
       : hosts
   }
 
-  /**
-   * Возвращает общий snapshot runtime-состояния.
-   */
+  /** Включает hosts, scopes и operation histories в диагностическое дерево Module. */
+  public override createDiagnosticsSnapshot(): EndgeRuntimeSnapshot & { operations: unknown } {
+    return {
+      ...this.snapshot(),
+      operations: this.operations.createDiagnosticsSnapshot(),
+    }
+  }
+
+  /** Возвращает общий snapshot runtime-состояния. */
   public snapshot(): EndgeRuntimeSnapshot {
     return {
       generatedAt: Date.now(),

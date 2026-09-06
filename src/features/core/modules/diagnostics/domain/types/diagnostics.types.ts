@@ -1,4 +1,8 @@
 import type { ComponentSFCInteractionTriggerActivation } from '@/features/core/modules/domain/types/component/sfc/ir.types'
+import type {
+  EndgeFederationDiagnosticsSnapshot,
+  EndgeFederationDiagnosticsSnapshotOptions,
+} from '@/features/federation/types/federation.types'
 
 /** Сигналы, которые поддерживает первая версия модуля диагностики. */
 export type DiagnosticsSignal = 'log' | 'span'
@@ -354,6 +358,7 @@ export interface DiagnosticsRaphSnapshotOptions {
 
 /** Lazy providers state owners, подключаемые composition root ядра. */
 export interface DiagnosticsSnapshotProviders {
+  federation?: (options: EndgeFederationDiagnosticsSnapshotOptions) => EndgeFederationDiagnosticsSnapshot
   effectiveConfiguration?: () => unknown
   domain?: () => unknown
   program?: () => unknown
@@ -363,7 +368,7 @@ export interface DiagnosticsSnapshotProviders {
 
 /** Ошибка чтения одной запрошенной части snapshot без отмены остальных частей. */
 export interface DiagnosticsSnapshotCaptureError {
-  section: 'effectiveConfiguration' | 'domain' | 'program' | 'runtime' | 'raph'
+  section: 'federation' | 'effectiveConfiguration' | 'domain' | 'program' | 'runtime' | 'raph'
   message: string
 }
 
@@ -378,7 +383,7 @@ export interface DiagnosticsTelemetrySnapshot {
 /** JSON-safe snapshot текущего состояния diagnostics-модуля. */
 export interface DiagnosticsSnapshot {
   format?: 'endge-diagnostics-snapshot'
-  version?: 1
+  version?: 1 | 2
   generatedAt: number
   trigger: 'manual' | 'shortcut' | 'automatic'
   telemetry?: DiagnosticsTelemetrySnapshot
@@ -389,6 +394,7 @@ export interface DiagnosticsSnapshot {
   program?: DiagnosticsJsonValue
   runtime?: DiagnosticsJsonValue
   raph?: DiagnosticsJsonValue
+  federation?: DiagnosticsJsonValue
   captureErrors?: DiagnosticsSnapshotCaptureError[]
   redaction?: {
     applied: true

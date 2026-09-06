@@ -92,6 +92,17 @@ export class EndgeRuntimeDebugger_Module extends EndgeModule {
     return this._analysisByTabId[key] ?? []
   }
 
+  /** Возвращает безопасную диагностическую проекцию известных debug-вкладок. */
+  public override createDiagnosticsSnapshot(): unknown {
+    return {
+      listening: this.isListening,
+      tabs: this._tabs.map(tab => ({ ...tab })),
+      analysisByTabId: Object.fromEntries(
+        Object.entries(this._analysisByTabId).map(([tabId, targets]) => [tabId, [...targets]]),
+      ),
+    }
+  }
+
   /**
    * Отправить команду во все подключённые вкладки.
    * Используется админкой для запуска анализа по текущей вкладке.

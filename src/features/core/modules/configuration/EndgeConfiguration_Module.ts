@@ -73,6 +73,11 @@ export class EndgeConfiguration_Module extends EndgeModule<EndgeBootContext> {
     this.notify()
   }
 
+  /** Включает effective configuration текущего build в диагностическое дерево. */
+  public override createDiagnosticsSnapshot(): EndgeConfiguration {
+    return this.current
+  }
+
   /** Возвращает effective configuration текущего build. */
   public get current(): EndgeConfiguration {
     if (!this._current) {

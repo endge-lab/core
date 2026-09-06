@@ -3384,9 +3384,12 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
     return this.hasVersionByIdentity(identity)
   }
 
-  /**
-   * Преобразует EndgeDomain_Module в JSON-объект.
-   */
+  /** Возвращает полный persisted Domain для диагностического дерева. */
+  public override createDiagnosticsSnapshot(): EndgeDomainPlain {
+    return this.toPlain()
+  }
+
+  /** Преобразует EndgeDomain_Module в JSON-объект. */
   public toPlain(): EndgeDomainPlain {
     const persisted = <T extends { isTemporary?: boolean, origin?: { kind?: string } }>(items: T[]): T[] =>
       items.filter(item => item.isTemporary !== true && (item.origin?.kind ?? 'storage') === 'storage')

@@ -1,5 +1,9 @@
 import type { EndgeModule } from '@/features/federation/EndgeModule'
-import type { EndgeFederationContext } from '@/features/federation/types/federation.types'
+import type {
+  EndgeFederationContext,
+  EndgeFederationDiagnosticsSnapshot,
+  EndgeFederationDiagnosticsSnapshotOptions,
+} from '@/features/federation/types/federation.types'
 
 export type AnyEndgeModule = EndgeModule<any>
 
@@ -8,6 +12,7 @@ export type EndgeModuleOrder = string | readonly string[]
 /** Доступ к уже объявленным модулям во время создания graph dependencies. */
 export interface EndgeModuleFactoryContext {
   getModule: <T extends AnyEndgeModule = AnyEndgeModule>(key: string) => T
+  createDiagnosticsSnapshot: (options?: EndgeFederationDiagnosticsSnapshotOptions) => EndgeFederationDiagnosticsSnapshot
 }
 
 /** Декларативное описание лениво создаваемого модуля федерации. */

@@ -67,6 +67,19 @@ export class EndgeOperations_Module extends EndgeModule {
   public canUndo(): boolean { return this.getActiveHistory()?.canUndo() ?? false }
   public canRedo(): boolean { return this.getActiveHistory()?.canRedo() ?? false }
 
+  /** Возвращает безопасное summary зарегистрированных operation histories. */
+  public override createDiagnosticsSnapshot(): unknown {
+    return {
+      activeScopeId: this._latestScopeId,
+      histories: [...this._histories.values()].map(({ scope, history }) => ({
+        scopeId: scope.id,
+        scopePath: scope.path,
+        active: history.active,
+        ...history.snapshot(),
+      })),
+    }
+  }
+
   /** Освобождает histories и глобальный keyboard listener текущего Runtime. */
   public override reset(): void {
     this._histories.clear()

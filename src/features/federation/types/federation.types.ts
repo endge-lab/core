@@ -13,6 +13,54 @@ export interface EndgeFederationContext {
 
 export type EndgeFederationState = 'idle' | 'booting' | 'ready' | 'building' | 'resetting' | 'failed'
 
+export type EndgeModuleDiagnosticsSnapshotStatus = 'captured' | 'empty' | 'skipped' | 'failed' | 'referenced'
+
+/** Стабильная ссылка на Module внутри декларативного дерева Federation. */
+export interface EndgeModuleDiagnosticsSnapshotReference {
+  federationId: string
+  key: string
+  path: string[]
+  moduleName: string
+}
+
+/** Настройки рекурсивного сбора диагностического дерева Federation. */
+export interface EndgeFederationDiagnosticsSnapshotOptions {
+  shouldCaptureModule?: (module: EndgeModuleDiagnosticsSnapshotReference) => boolean
+}
+
+/** Диагностический узел зарегистрированного Module. */
+export interface EndgeModuleDiagnosticsSnapshotNode extends EndgeModuleDiagnosticsSnapshotReference {
+  kind: 'module'
+  status: EndgeModuleDiagnosticsSnapshotStatus
+  snapshot?: unknown
+  snapshotRef?: string
+  error?: string
+}
+
+/** Диагностический узел дочерней Federation. */
+export interface EndgeChildFederationDiagnosticsSnapshotNode {
+  kind: 'federation'
+  key: string
+  path: string[]
+  status: 'captured' | 'failed'
+  federation?: EndgeFederationDiagnosticsSnapshot
+  error?: string
+}
+
+export type EndgeFederationDiagnosticsSnapshotNode
+  = EndgeModuleDiagnosticsSnapshotNode
+    | EndgeChildFederationDiagnosticsSnapshotNode
+
+/** Рекурсивная диагностическая проекция одного декларативного Federation graph. */
+export interface EndgeFederationDiagnosticsSnapshot {
+  id: string
+  name: string
+  path: string[]
+  state: EndgeFederationState
+  plugins: string[]
+  nodes: EndgeFederationDiagnosticsSnapshotNode[]
+}
+
 /** Публичный lifecycle-контракт статического facade Federation. */
 export interface EndgeFederationFacade<in TContext extends EndgeFederationContext = EndgeFederationContext> {
   readonly id: string
@@ -20,6 +68,7 @@ export interface EndgeFederationFacade<in TContext extends EndgeFederationContex
   readonly isInitialized: boolean
   readonly lastError: unknown | null
   readonly state: EndgeFederationState
+  createDiagnosticsSnapshot: (options?: EndgeFederationDiagnosticsSnapshotOptions) => EndgeFederationDiagnosticsSnapshot
   boot: (ctx: TContext) => Promise<void>
   build: (ctx?: TContext) => Promise<void>
   reset: () => Promise<void>

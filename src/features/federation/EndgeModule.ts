@@ -47,6 +47,16 @@ export abstract class EndgeModule<
   public reset(): void | Promise<void> {}
 
   /**
+   * Возвращает состояние Module для общего диагностического snapshot.
+   * По умолчанию используется persistence-проекция `serialize()`; Module может
+   * переопределить метод более подробным или безопасным диагностическим представлением.
+   * Снимки принадлежащих Module submodules явно включает их родитель.
+   */
+  public createDiagnosticsSnapshot(): unknown {
+    return this.serialize()
+  }
+
+  /**
    * Возвращает сериализуемый snapshot состояния модуля.
    * Конкретный persistent Module сам определяет storage contract и момент сохранения.
    * Если сохранять нечего, можно вернуть `undefined` или не переопределять метод.

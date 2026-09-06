@@ -189,6 +189,15 @@ export class EndgeDiagnostics_Module extends EndgeModule<EndgeBootContext> {
     return this.snapshots.snapshot(options)
   }
 
+  /** Включает snapshots собственных submodules без рекурсивного запуска общего сборщика. */
+  public override createDiagnosticsSnapshot(): unknown {
+    return {
+      telemetry: this.telemetry.snapshot(),
+      problems: this.problems.snapshot(),
+      configuration: this.configuration,
+    }
+  }
+
   /** Создаёт snapshot и доставляет его в выбранные configured outputs. */
   public sendSnapshot(outputIds?: readonly string[], options: DiagnosticsSnapshotOptions = {}): DiagnosticsSnapshot {
     return this.snapshots.sendSnapshot(outputIds, options)

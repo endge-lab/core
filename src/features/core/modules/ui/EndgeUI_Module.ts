@@ -82,9 +82,12 @@ export class EndgeUI_Module extends EndgeModule {
   //
   // Снимок состояния
   //
-  /**
-   * Возвращает полный snapshot UI-настроек.
-   */
+  /** Включает текущие UI-настройки в диагностическое дерево. */
+  public override createDiagnosticsSnapshot(): EndgeUISnapshot {
+    return this.snapshot
+  }
+
+  /** Возвращает полный snapshot UI-настроек. */
   public get snapshot(): EndgeUISnapshot {
     return {
       zoom: this._zoom,

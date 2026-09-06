@@ -1,6 +1,10 @@
 import type { EndgeBootContext } from '@/features/core/kernel/types/bootstrap.types'
 import type { AuthInteractionRequiredError } from '@/features/core/modules/auth/domain/AuthInteractionRequiredError'
-import type { AuthProfileSchema, OidcBrowserSessionOptions } from '@/features/core/modules/auth/domain/types/auth-profile.types'
+import type {
+  AuthProfileSchema,
+  EndgeAuthContext,
+  OidcBrowserSessionOptions,
+} from '@/features/core/modules/auth/domain/types/auth-profile.types'
 
 import type { DiagnosticsAttributes } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
 import { Endge } from '@/features/core/kernel/endge'
@@ -70,6 +74,11 @@ export class EndgeAuth_Module extends EndgeModule<EndgeBootContext> {
   public onInteractionRequired(listener: AuthInteractionRequiredListener): () => void {
     this._interactionRequiredListeners.add(listener)
     return () => this._interactionRequiredListeners.delete(listener)
+  }
+
+  /** Возвращает безопасный auth context без tokens, claims и userinfo. */
+  public override createDiagnosticsSnapshot(): EndgeAuthContext {
+    return this.session.context
   }
 
   /** Подключает storage namespace и безопасные context providers. */

@@ -89,6 +89,11 @@ export class EndgeImplementations_Module extends EndgeModule {
     return await resolved.provider.execute(invocation) as TResult
   }
 
+  /** Включает безопасную проекцию implementations в диагностическое дерево. */
+  public override createDiagnosticsSnapshot(): ImplementationSnapshot {
+    return this.snapshot()
+  }
+
   /** Возвращает сериализуемый snapshot инспекции без функций. */
   public snapshot(): ImplementationSnapshot {
     return {
