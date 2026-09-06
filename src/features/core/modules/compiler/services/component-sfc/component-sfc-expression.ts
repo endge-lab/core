@@ -90,8 +90,8 @@ const STATIC_MEMBER_CANDIDATES: Readonly<Record<string, readonly ExpressionCompl
     {
       label: 'metaOf',
       kind: 'property',
-      detail: 'Meta-plane для prop или поля текущей строки',
-      documentation: '$data.metaOf(reference[, namespace]) реактивно читает метаданные DataPath, связанного с входным значением.',
+      detail: 'Meta-plane для prop, строки или поля строки',
+      documentation: '$data.metaOf(reference[, namespace]) реактивно читает метаданные DataPath, связанного с prop, текущей строкой или её полем.',
     },
   ],
   '$row': [
@@ -410,7 +410,7 @@ function collectDataMetaReads(
       diagnostics.push({
         severity: 'error',
         code: 'sfc-data-meta-call-shape',
-        message: '$data.metaOf() принимает ссылку prop/row и optional статический непустой namespace.',
+        message: '$data.metaOf() принимает ссылку prop, row или row.field и optional статический непустой namespace.',
         sourcePath: context.sourcePath,
         start: typeof node.start === 'number' ? node.start : undefined,
         end: typeof node.end === 'number' ? node.end : undefined,
@@ -436,10 +436,10 @@ function normalizeDataMetaReference(
   if (prop && props.has(prop)) {
     return { kind: 'prop', prop, path: normalized.slice(1) }
   }
-  if (normalized[0] === 'row' && normalized.length > 1) {
+  if (normalized[0] === 'row') {
     return { kind: 'table-row', path: normalized.slice(1) }
   }
-  if (normalized[0] === '$row' && normalized[1] === 'data' && normalized.length > 2) {
+  if (normalized[0] === '$row' && normalized[1] === 'data') {
     return { kind: 'table-row', path: normalized.slice(2) }
   }
   return null
