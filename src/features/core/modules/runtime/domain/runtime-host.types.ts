@@ -285,6 +285,12 @@ export interface RuntimeHostLocalInputSource {
 export interface RuntimeHostRaphInputBinding {
   path: string
   wildcardDynamic?: boolean
+  /** Необязательный исходный DataPath для Meta, если value был преобразован. */
+  metaSource?: {
+    path: string
+    key?: string
+    fields?: Record<string, string>
+  }
 }
 
 /** Raph-backed input source runtime-host-а. */

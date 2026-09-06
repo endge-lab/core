@@ -1,11 +1,25 @@
 import type {
   ComponentSFCInteractionKeyboardCondition,
   ComponentSFCInteractionTrigger,
+  ComponentSFCInteractionTriggerActivation,
   ComponentSFCInteractionTriggerEvent,
   ComponentSFCInteractionTriggerHeldKeys,
   ComponentSFCInteractionTriggerModifiers,
   ComponentSFCInteractionTriggerPlatform,
+  ComponentSFCInteractionTriggerSequence,
+  ComponentSFCInteractionTriggerSet,
 } from '@/features/core/modules/domain/types/component/sfc/ir.types'
+
+export const DEFAULT_COMPONENT_SFC_INTERACTION_SEQUENCE_INTERVAL_MS = 1_000
+
+export type ComponentSFCInteractionTriggerActivationMatch
+  = | { status: 'none' }
+    | {
+      status: 'progress' | 'complete'
+      trigger: ComponentSFCInteractionTrigger
+      stepIndex: number
+      triggerIndex: number
+    }
 
 /** Нормализует общее значение trigger `edit-on` или `on`. */
 export function normalizeComponentSFCInteractionTriggers(value: unknown): ComponentSFCInteractionTrigger[] {
@@ -43,6 +57,180 @@ export function normalizeComponentSFCInteractionTriggers(value: unknown): Compon
       ...(source.passive === true ? { passive: true } : {}),
     }]
   })
+}
+
+/** Нормализует legacy TriggerSet или последовательность, не меняя форму обычного набора. */
+export function normalizeComponentSFCInteractionTriggerActivation(
+  value: unknown,
+): ComponentSFCInteractionTriggerActivation {
+  if (!isRecord(value) || value.mode !== 'sequence') {
+    return normalizeComponentSFCInteractionTriggers(value)
+  }
+
+  const steps = Array.isArray(value.steps)
+    ? value.steps.flatMap((item, index) => {
+        if (!isRecord(item)) {
+          return []
+        }
+        const maxIntervalMs = normalizeSequenceInterval(item.maxIntervalMs)
+        return [{
+          triggerSet: normalizeComponentSFCInteractionTriggers(item.triggerSet),
+          ...(index > 0 ? { maxIntervalMs } : {}),
+        }]
+      })
+    : []
+  return { mode: 'sequence', steps }
+}
+
+/** Проверяет, содержит ли активация хотя бы один исполнимый TriggerSet. */
+export function hasComponentSFCInteractionTriggerActivation(
+  activation: ComponentSFCInteractionTriggerActivation,
+): boolean {
+  return Array.isArray(activation)
+    ? activation.length > 0
+    : activation.steps.length > 0 && activation.steps.every(step => step.triggerSet.length > 0)
+}
+
+/** Stateful matcher последовательностей, общий для runtime-владельцев и platform adapters. */
+export class ComponentSFCInteractionTriggerActivationMatcher {
+  private readonly _activation: ComponentSFCInteractionTriggerActivation
+  private readonly _onceTriggered = new Set<string>()
+  private _matchedOnce: string[] = []
+  private _nextStepIndex = 0
+  private _deadline = Number.POSITIVE_INFINITY
+
+  public constructor(value: unknown) {
+    this._activation = normalizeComponentSFCInteractionTriggerActivation(value)
+  }
+
+  /** Принимает очередное событие и возвращает прогресс либо завершение активации. */
+  public match(
+    eventName: string,
+    event: ComponentSFCInteractionTriggerEvent,
+    platform: ComponentSFCInteractionTriggerPlatform,
+    occurredAt = Date.now(),
+  ): ComponentSFCInteractionTriggerActivationMatch {
+    if (Array.isArray(this._activation)) {
+      return this._matchSet(this._activation, 0, eventName, event, platform, true)
+    }
+    return this._matchSequence(this._activation, eventName, event, platform, occurredAt)
+  }
+
+  /** Сбрасывает transient progress и once-состояние при lifecycle/configuration reset. */
+  public reset(): void {
+    this._onceTriggered.clear()
+    this._resetProgress()
+  }
+
+  private _matchSequence(
+    sequence: ComponentSFCInteractionTriggerSequence,
+    eventName: string,
+    event: ComponentSFCInteractionTriggerEvent,
+    platform: ComponentSFCInteractionTriggerPlatform,
+    occurredAt: number,
+  ): ComponentSFCInteractionTriggerActivationMatch {
+    if (sequence.steps.length === 0) {
+      return { status: 'none' }
+    }
+    if (this._nextStepIndex > 0 && occurredAt > this._deadline) {
+      this._resetProgress()
+    }
+
+    const stepIndex = this._nextStepIndex
+    const step = sequence.steps[stepIndex]
+    const match = step
+      ? this._matchSet(step.triggerSet, stepIndex, eventName, event, platform, false)
+      : { status: 'none' as const }
+    if (match.status !== 'none') {
+      const onceKey = this._onceKey(match.stepIndex, match.triggerIndex)
+      if (match.trigger.once) {
+        this._matchedOnce.push(onceKey)
+      }
+      if (stepIndex === sequence.steps.length - 1) {
+        for (const key of this._matchedOnce) {
+          this._onceTriggered.add(key)
+        }
+        this._resetProgress()
+        return { ...match, status: 'complete' }
+      }
+
+      this._nextStepIndex += 1
+      const nextStep = sequence.steps[this._nextStepIndex]
+      this._deadline = occurredAt + (nextStep?.maxIntervalMs
+        ?? DEFAULT_COMPONENT_SFC_INTERACTION_SEQUENCE_INTERVAL_MS)
+      return { ...match, status: 'progress' }
+    }
+
+    if (!step || !this._shouldResetSequence(step.triggerSet, eventName, event)) {
+      return { status: 'none' }
+    }
+
+    this._resetProgress()
+    const restarted = this._matchSet(sequence.steps[0]?.triggerSet ?? [], 0, eventName, event, platform, false)
+    if (restarted.status === 'none') {
+      return restarted
+    }
+    if (sequence.steps.length === 1) {
+      if (restarted.trigger.once) {
+        this._onceTriggered.add(this._onceKey(0, restarted.triggerIndex))
+      }
+      return { ...restarted, status: 'complete' }
+    }
+    if (restarted.trigger.once) {
+      this._matchedOnce.push(this._onceKey(0, restarted.triggerIndex))
+    }
+    this._nextStepIndex = 1
+    this._deadline = occurredAt + (sequence.steps[1]?.maxIntervalMs
+      ?? DEFAULT_COMPONENT_SFC_INTERACTION_SEQUENCE_INTERVAL_MS)
+    return { ...restarted, status: 'progress' }
+  }
+
+  private _matchSet(
+    triggerSet: ComponentSFCInteractionTriggerSet,
+    stepIndex: number,
+    eventName: string,
+    event: ComponentSFCInteractionTriggerEvent,
+    platform: ComponentSFCInteractionTriggerPlatform,
+    complete: boolean,
+  ): ComponentSFCInteractionTriggerActivationMatch {
+    const triggerIndex = triggerSet.findIndex((trigger, index) => (
+      !this._onceTriggered.has(this._onceKey(stepIndex, index))
+      && trigger.event === eventName
+      && matchesComponentSFCInteractionTrigger(trigger, event, platform)
+    ))
+    if (triggerIndex < 0) {
+      return { status: 'none' }
+    }
+    const trigger = triggerSet[triggerIndex]!
+    if (complete && trigger.once) {
+      this._onceTriggered.add(this._onceKey(stepIndex, triggerIndex))
+    }
+    return { status: complete ? 'complete' : 'progress', trigger, stepIndex, triggerIndex }
+  }
+
+  private _shouldResetSequence(
+    triggerSet: ComponentSFCInteractionTriggerSet,
+    eventName: string,
+    event: ComponentSFCInteractionTriggerEvent,
+  ): boolean {
+    if (event.repeat || event.composing) {
+      return false
+    }
+    if (!triggerSet.some(trigger => trigger.event === eventName)) {
+      return false
+    }
+    return !isModifierEvent(event)
+  }
+
+  private _resetProgress(): void {
+    this._matchedOnce = []
+    this._nextStepIndex = 0
+    this._deadline = Number.POSITIVE_INFINITY
+  }
+
+  private _onceKey(stepIndex: number, triggerIndex: number): string {
+    return `${stepIndex}:${triggerIndex}`
+  }
 }
 
 /** Проверяет один нормализованный trigger без зависимости от DOM и конкретного renderer-а. */
@@ -91,6 +279,22 @@ function normalizeStringList(value: unknown): string[] | undefined {
   const values = Array.isArray(value) ? value : value == null ? [] : [value]
   const result = [...new Set(values.map(item => String(item).trim()).filter(Boolean))]
   return result.length ? result : undefined
+}
+
+function normalizeSequenceInterval(value: unknown): number {
+  const interval = Number(value)
+  return Number.isFinite(interval) && interval > 0
+    ? Math.min(60_000, Math.round(interval))
+    : DEFAULT_COMPONENT_SFC_INTERACTION_SEQUENCE_INTERVAL_MS
+}
+
+function isModifierEvent(event: ComponentSFCInteractionTriggerEvent): boolean {
+  return ['Shift', 'Control', 'Alt', 'Meta', 'AltGraph'].includes(event.key ?? '')
+    || /^(?:Shift|Control|Alt|Meta)(?:Left|Right)$/.test(event.code ?? '')
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
 
 export function normalizeComponentSFCInteractionHeldKeys(value: unknown): ComponentSFCInteractionTriggerHeldKeys | undefined {

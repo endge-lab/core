@@ -5,10 +5,11 @@ import type { StoreDataDescriptor, StoreSourceArtifact, StoreValueDescriptor } f
 import type { StreamEventEnvelope } from '@/features/core/modules/source/domain/types/stream-source.types'
 
 import type { StoreMutationPlan, UpdateSourceArtifact } from '@/features/core/modules/source/domain/types/update-source.types'
-import { collectionByKey, filterByKey, full, Raph, RaphNode } from '@endge/raph'
+import { collectionByKey, DefaultDataAdapter, filterByKey, full, Raph, RaphNode } from '@endge/raph'
 
 import { Endge } from '@/features/core/kernel/endge'
 import { RuntimeHostBase } from '@/features/core/modules/runtime/RuntimeHostBase'
+import { evaluateSourceExpression } from '@/features/core/modules/source/services/source-expression-evaluate'
 
 function defaultContext(artifact: StoreSourceArtifact): RuntimeHostContext<'store'> {
   return {
@@ -119,6 +120,12 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
     return this.getFields().some(field => field.kind === 'value' && field.key === root)
   }
 
+  /** Проверяет принадлежность root field этому Store, включая derived field. */
+  public isDeclared(path: string): boolean {
+    const root = String(path ?? '').split(/[.[\]]/)[0] ?? ''
+    return this.getFields().some(field => field.key === root)
+  }
+
   /** Записывает значение в writable Store field и запускает derived graph через Raph. */
   public set(path: string, value: unknown): void {
     const normalizedPath = String(path ?? '').trim()
@@ -161,6 +168,7 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
     }
 
     const plans = this._makeMutationPlans(artifact.payload, payload)
+    this._validateMutationPlans(plans)
     Raph.transaction(() => {
       for (const plan of plans) {
         this._applyMutationPlan(plan)
@@ -171,7 +179,9 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
     this.emit('state:change', {
       update: updateIdentity,
       mutations: plans.map(plan => ({
+        plane: plan.plane ?? 'data',
         path: plan.path,
+        namespace: plan.namespace,
         strategy: plan.strategy,
         value: cloneRuntimeValue(plan.value),
       })),
@@ -184,8 +194,12 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
    */
   public applyMutation(plan: StoreMutationPlan): void {
     const target = String(plan.path ?? '').trim()
-    if (!target || !this.isWritable(target)) {
+    const allowed = plan.plane === 'meta' ? this.isDeclared(target) : this.isWritable(target)
+    if (!target || !allowed) {
       throw new Error(`[StoreRuntimeHost] Store path "${target}" is derived or missing.`)
+    }
+    if (plan.plane === 'meta') {
+      this._validateMetaPlan(plan)
     }
 
     Raph.transaction(() => this._applyMutationPlan(plan))
@@ -286,8 +300,18 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
 
   private _makeMutationPlans(update: UpdateSourceArtifact, payload: unknown): StoreMutationPlan[] {
     return update.mutations.flatMap((mutation) => {
-      if (!mutation.target || !this.isWritable(mutation.target)) {
+      const plane = mutation.plane ?? 'data'
+      const targetAllowed = plane === 'meta'
+        ? this.isDeclared(mutation.target)
+        : this.isWritable(mutation.target)
+      if (!mutation.target || !targetAllowed) {
         throw new Error(`[StoreRuntimeHost] Update "${update.storeIdentity}" targets derived or missing path "${mutation.target}".`)
+      }
+      if (mutation.target.includes('*')) {
+        throw new Error(`[StoreRuntimeHost] Update "${update.storeIdentity}" cannot write wildcard path "${mutation.target}".`)
+      }
+      if (plane === 'meta' && !mutation.namespace?.trim()) {
+        throw new Error(`[StoreRuntimeHost] Update "${update.storeIdentity}" requires Meta namespace.`)
       }
       const contexts = mutation.forEach
         ? expandPayloadContexts(payload, mutation.forEach)
@@ -303,18 +327,54 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
         const options = Object.keys(vars).length ? { vars } : undefined
         if (mutation.ifExists) {
           const guardPath = appendRawStorePath(this.basePath, mutation.ifExists)
-          if (Raph.get(guardPath, options) === undefined) {
+          if (!Raph.has(guardPath, options)) {
             return []
           }
         }
-        return [{
+        const evaluate = (expression: NonNullable<typeof mutation.value>) => evaluateSourceExpression(expression, {
+          current: context.current,
+          read: (read) => {
+            if (read.source === 'update-input') {
+              return readPayloadPath(context.root, read.path)
+            }
+            if (read.source === 'update-item') {
+              return readPayloadPath(context.current, read.path)
+            }
+            if (read.source === 'update-parent') {
+              return readPayloadPath(context.parent, read.path)
+            }
+            const path = appendRawStorePath(this.basePath, read.path)
+            if (read.source === 'update-data') {
+              return Raph.get(path, options)
+            }
+            if (read.source === 'update-has-data') {
+              return Raph.has(path, options)
+            }
+            if (read.source === 'update-meta') {
+              return Raph.meta.get(path, read.parameters?.[0], options)
+            }
+            if (read.source === 'update-has-meta') {
+              return Raph.meta.has(path, read.parameters?.[0], options)
+            }
+            throw new Error(`[StoreRuntimeHost] Unsupported Update read "${read.source}".`)
+          },
+        })
+        if (mutation.when && !evaluate(mutation.when)) {
+          return []
+        }
+        const plan: StoreMutationPlan = {
+          plane,
           strategy: mutation.strategy,
           path: mutation.target,
+          ...(plane === 'meta' ? { namespace: mutation.namespace! } : {}),
           value: mutation.strategy === 'remove'
             ? undefined
-            : readContextPath(context, mutation.valueFrom ?? ''),
+            : mutation.value
+              ? evaluate(mutation.value)
+              : readContextPath(context, mutation.valueFrom ?? ''),
           vars: options?.vars,
-        }]
+        }
+        return [plan]
       })
     })
   }
@@ -322,6 +382,28 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
   private _applyMutationPlan(plan: StoreMutationPlan): void {
     const path = appendRawStorePath(this.basePath, plan.path)
     const options = plan.vars ? { vars: plan.vars } : undefined
+    if (plan.plane === 'meta') {
+      const namespace = plan.namespace!
+      switch (plan.strategy) {
+        case 'merge':
+          Raph.meta.merge(path, namespace, cloneRuntimeValue(plan.value), options)
+          break
+        case 'remove':
+          Raph.meta.delete(path, namespace, options)
+          break
+        case 'append': {
+          const current = Raph.meta.get(path, namespace, options)
+          const additions = Array.isArray(plan.value) ? plan.value : [plan.value]
+          Raph.meta.set(path, namespace, [...(Array.isArray(current) ? current : []), ...cloneRuntimeValue(additions)], options)
+          break
+        }
+        case 'replace':
+        case 'set':
+          Raph.meta.set(path, namespace, cloneRuntimeValue(plan.value), options)
+          break
+      }
+      return
+    }
     switch (plan.strategy) {
       case 'merge':
         Raph.merge(path, cloneRuntimeValue(plan.value), options)
@@ -339,6 +421,53 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
       case 'set':
         Raph.set(path, cloneRuntimeValue(plan.value), options)
         break
+    }
+  }
+
+  private _validateMetaPlan(plan: StoreMutationPlan): void {
+    const namespace = String(plan.namespace ?? '').trim()
+    if (!namespace) {
+      throw new Error('[StoreRuntimeHost] Meta mutation requires namespace.')
+    }
+    const path = appendRawStorePath(this.basePath, plan.path)
+    const options = plan.vars ? { vars: plan.vars } : undefined
+    if (!Raph.has(path, options)) {
+      throw new Error(`[StoreRuntimeHost] Meta owner does not exist: "${plan.path}".`)
+    }
+  }
+
+  private _validateMutationPlans(plans: StoreMutationPlan[]): void {
+    const projected = new DefaultDataAdapter(cloneRuntimeValue(this.getDataSnapshot()))
+    for (const plan of plans) {
+      const options = plan.vars ? { vars: plan.vars } : undefined
+      if (plan.plane === 'meta') {
+        const namespace = String(plan.namespace ?? '').trim()
+        if (!namespace) {
+          throw new Error('[StoreRuntimeHost] Meta mutation requires namespace.')
+        }
+        if (!projected.has(plan.path, options)) {
+          throw new Error(`[StoreRuntimeHost] Meta owner does not exist: "${plan.path}".`)
+        }
+        continue
+      }
+      switch (plan.strategy) {
+        case 'merge':
+          projected.merge(plan.path, cloneRuntimeValue(plan.value), options)
+          break
+        case 'remove':
+          projected.delete(plan.path, options)
+          break
+        case 'append': {
+          const current = projected.get(plan.path, options)
+          const additions = Array.isArray(plan.value) ? plan.value : [plan.value]
+          projected.set(plan.path, [...(Array.isArray(current) ? current : []), ...cloneRuntimeValue(additions)], options)
+          break
+        }
+        case 'replace':
+        case 'set':
+          projected.set(plan.path, cloneRuntimeValue(plan.value), options)
+          break
+      }
     }
   }
 }

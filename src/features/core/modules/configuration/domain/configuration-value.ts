@@ -2,7 +2,7 @@ import type { ProgramDiagnostic } from '@/features/core/modules/program/domain/t
 import type { EndgeJSONValue } from '@/features/core/modules/source/domain/types/configuration-source.types'
 import type { TypeProgramCatalogEntry, TypeSourceExpression } from '@/features/core/modules/source/domain/types/type-source.types'
 
-import { normalizeComponentSFCInteractionTriggers } from '@/features/core/modules/domain/component/component-sfc-edit-trigger'
+import { normalizeComponentSFCInteractionTriggerActivation, normalizeComponentSFCInteractionTriggers } from '@/features/core/modules/domain/component/component-sfc-edit-trigger'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
@@ -45,7 +45,7 @@ export function inferConfigurationDefault(
     if (identity === 'Object' || identity === 'JSON') {
       return { ok: true, value: {} }
     }
-    if (identity === 'TriggerSet') {
+    if (identity === 'TriggerSet' || identity === 'TriggerActivation') {
       return { ok: true, value: [] }
     }
 
@@ -169,6 +169,9 @@ function validateExpression(
       }
       return []
     }
+    if (identity === 'TriggerActivation') {
+      return validateTriggerActivation(value, path)
+    }
 
     const type = catalog.find(item => item.identity === identity)
     if (!type) {
@@ -233,6 +236,48 @@ function validateExpression(
     diagnostics.push(...validateExpression(field.type, fieldValue, catalog, `${path}.${field.key}`, new Set(visiting)))
   }
   return diagnostics
+}
+
+function validateTriggerActivation(value: unknown, path: string): DiagnosticDraft[] {
+  if (Array.isArray(value)) {
+    const normalized = normalizeComponentSFCInteractionTriggers(value)
+    if (normalized.length !== value.length) {
+      return [error(path, 'TriggerActivation contains invalid trigger descriptors')]
+    }
+    return normalized.some(trigger => trigger.passive && trigger.prevent)
+      ? [error(path, 'Trigger cannot combine passive and prevent')]
+      : []
+  }
+  if (!isRecord(value) || value.mode !== 'sequence' || !Array.isArray(value.steps)) {
+    return [error(path, 'Expected legacy TriggerSet array or TriggerActivation sequence')]
+  }
+  if (value.steps.length < 2) {
+    return [error(path, 'Trigger sequence must contain at least two steps')]
+  }
+
+  const normalized = normalizeComponentSFCInteractionTriggerActivation(value)
+  if (Array.isArray(normalized) || normalized.steps.length !== value.steps.length) {
+    return [error(path, 'Trigger sequence contains invalid steps')]
+  }
+  for (const [index, rawStep] of value.steps.entries()) {
+    if (!isRecord(rawStep) || !Array.isArray(rawStep.triggerSet) || rawStep.triggerSet.length === 0) {
+      return [error(`${path}.steps.${index}`, 'Sequence step must contain a non-empty TriggerSet')]
+    }
+    const triggers = normalizeComponentSFCInteractionTriggers(rawStep.triggerSet)
+    if (triggers.length !== rawStep.triggerSet.length) {
+      return [error(`${path}.steps.${index}.triggerSet`, 'Sequence step contains invalid trigger descriptors')]
+    }
+    if (triggers.some(trigger => trigger.passive && trigger.prevent)) {
+      return [error(`${path}.steps.${index}.triggerSet`, 'Trigger cannot combine passive and prevent')]
+    }
+    if (index > 0 && rawStep.maxIntervalMs != null) {
+      const interval = Number(rawStep.maxIntervalMs)
+      if (!Number.isFinite(interval) || interval <= 0 || interval > 60_000) {
+        return [error(`${path}.steps.${index}.maxIntervalMs`, 'Sequence interval must be between 1 and 60000 ms')]
+      }
+    }
+  }
+  return []
 }
 
 function error(sourcePath: string, message: string): DiagnosticDraft {

@@ -852,4 +852,34 @@ defineComposition({
       },
     })
   })
+
+  it('сохраняет явную Meta provenance после DataView binding', () => {
+    const result = compileCompositionSource(`
+defineComposition({
+  data: { schedule: store('schedule') },
+  runtimes: {
+    table: component('schedule-table').withProps({
+      rows: fromData('schedule.sandboxFlights')
+        .dataView('schedule-local-filter')
+        .metaFrom('schedule.sandboxItems', {
+          key: 'id',
+          fields: { flightCarrier: 'flightCarrier' },
+        }),
+    }),
+  },
+})`)
+
+    expect(result.diagnostics).toEqual([])
+    expect(result.artifact?.runtimes.find(runtime => runtime.name === 'table')?.props.rows).toMatchObject({
+      kind: 'data-view',
+      data: 'schedule',
+      path: 'sandboxFlights',
+      metaSource: {
+        data: 'schedule',
+        path: 'sandboxItems',
+        key: 'id',
+        fields: { flightCarrier: 'flightCarrier' },
+      },
+    })
+  })
 })

@@ -8,9 +8,10 @@ import type { RComponentSFC_AST } from '@/features/core/modules/domain/types/com
 import type {
   RComponentSFC_RuntimeBoundaryDependency,
   RComponentSFC_RuntimeDependencies,
+  RComponentSFC_RuntimeMetaDependency,
   RComponentSFC_RuntimeTableColumnDependency,
 } from '@/features/core/modules/domain/types/component/sfc/dependencies.types'
-import type { ComponentSFCEditedEventPayload, RComponentSFC_IR } from '@/features/core/modules/domain/types/component/sfc/ir.types'
+import type { ComponentSFCEditedEventPayload, RComponentSFC_IR, RComponentSFC_IR_DataMetaReference } from '@/features/core/modules/domain/types/component/sfc/ir.types'
 import type {
   ComponentSFCEventInputValue,
   ComponentSFCEventOccurrence,
@@ -604,6 +605,18 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     return this._inputSource
   }
 
+  /** Читает Meta-plane по compiler-known ссылке, не раскрывая SFC физический DataPath. */
+  public readDataMeta(
+    reference: RComponentSFC_IR_DataMetaReference & { boundaryId?: string, rowKey?: unknown },
+    namespace?: string,
+  ): unknown {
+    const resolved = this._resolveDataMetaPath(reference)
+    if (!resolved) {
+      return undefined
+    }
+    return Raph.meta.get(resolved.path, namespace, resolved.vars ? { vars: resolved.vars } : undefined)
+  }
+
   /**
    * Получает runtime update от universal boundary phase.
    *
@@ -985,6 +998,104 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     }
 
     this._bindRaphBoundaryInputSource(input, deps.boundaries)
+    this._bindRaphMetaInputSource(input, deps.meta ?? [])
+  }
+
+  private _bindRaphMetaInputSource(
+    input: Extract<RuntimeHostInputSource, { kind: 'raph' }>,
+    dependencies: RComponentSFC_RuntimeMetaDependency[],
+  ): void {
+    if (!this.node) {
+      return
+    }
+    const seen = new Set<string>()
+    for (const dependency of dependencies) {
+      const observedPath = this._resolveDataMetaObservedPath(input, dependency)
+      if (!observedPath) {
+        continue
+      }
+      const key = `${observedPath}\u0000${dependency.namespace ?? ''}`
+      if (seen.has(key)) {
+        continue
+      }
+      seen.add(key)
+      this._raphInputDisposers.push(Raph.app.observeMeta(this.node, observedPath, {
+        phase: RUNTIME_BOUNDARY_UPDATE_PHASE_NAME,
+        ...(dependency.namespace ? { namespace: dependency.namespace } : {}),
+        wildcardDynamic: true,
+      }))
+    }
+  }
+
+  private _resolveDataMetaObservedPath(
+    input: Extract<RuntimeHostInputSource, { kind: 'raph' }>,
+    dependency: RComponentSFC_RuntimeMetaDependency,
+  ): string {
+    if (dependency.reference.kind === 'prop') {
+      const binding = input.bindings[dependency.reference.prop]
+      if (!binding) {
+        return ''
+      }
+      return this._joinRaphPath(
+        binding.metaSource?.path ?? binding.path,
+        this._mapMetaField(binding.metaSource?.fields, dependency.reference.path),
+      )
+    }
+
+    const boundary = this.getRuntimeDependencies().boundaries.find(item => item.id === dependency.boundaryId)
+    if (!boundary) {
+      return ''
+    }
+    const binding = input.bindings[boundary.sourceProp]
+    if (!binding) {
+      return ''
+    }
+    const collectionPath = binding.metaSource?.path
+      ?? this._joinRaphPath(binding.path, boundary.sourcePath)
+    const fieldPath = this._mapMetaField(binding.metaSource?.fields, dependency.reference.path)
+    return this._joinRaphPath(`${collectionPath}[*]`, fieldPath)
+  }
+
+  private _resolveDataMetaPath(
+    reference: RComponentSFC_IR_DataMetaReference & { boundaryId?: string, rowKey?: unknown },
+  ): { path: string, vars?: Record<string, unknown> } | null {
+    if (this._inputSource?.kind !== 'raph') {
+      return null
+    }
+    if (reference.kind === 'prop') {
+      const binding = this._inputSource.bindings[reference.prop]
+      if (!binding) {
+        return null
+      }
+      return {
+        path: this._joinRaphPath(
+          binding.metaSource?.path ?? binding.path,
+          this._mapMetaField(binding.metaSource?.fields, reference.path),
+        ),
+      }
+    }
+
+    const boundary = this.getRuntimeDependencies().boundaries.find(item => item.id === reference.boundaryId)
+    const binding = boundary ? this._inputSource.bindings[boundary.sourceProp] : null
+    const selectorKey = binding?.metaSource?.key ?? boundary?.rowKey
+    if (!binding || !boundary || !selectorKey || reference.rowKey == null) {
+      return null
+    }
+    const collectionPath = binding.metaSource?.path
+      ?? this._joinRaphPath(binding.path, boundary.sourcePath)
+    return {
+      path: this._joinRaphPath(
+        `${collectionPath}[${selectorKey}=$__endgeMetaRowKey]`,
+        this._mapMetaField(binding.metaSource?.fields, reference.path),
+      ),
+      vars: { __endgeMetaRowKey: reference.rowKey },
+    }
+  }
+
+  private _mapMetaField(fields: Record<string, string> | undefined, path: string[]): string[] {
+    const authored = path.join('.')
+    const mapped = fields?.[authored] ?? authored
+    return mapped.split('.').map(part => part.trim()).filter(Boolean)
   }
 
   /** Зависимости контекста основаны на Raph и не зависят от вида входных props компонента. */

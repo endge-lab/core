@@ -3,6 +3,7 @@ import type {
   RComponentSFC_RuntimeContextDependency,
   RComponentSFC_RuntimeDependencies,
   RComponentSFC_RuntimeDependency,
+  RComponentSFC_RuntimeMetaDependency,
   RComponentSFC_RuntimeTableColumnDependency,
   RComponentSFC_RuntimeVocabDependency,
 } from '@/features/core/modules/domain/types/component/sfc/dependencies.types'
@@ -33,18 +34,75 @@ export function analyzeComponentSFCRuntimeDependencies(
   for (const call of ir.script.portCalls) {
     collectValueDependencies(call.input, props, result, seen, seenVocabs)
     collectContextValueDependency(call.input, result.context, seenContext)
+    collectMetaValueDependencies(call.input, result.meta ??= [], null)
   }
 
   for (const node of ir.template.roots) {
     collectNodeDependencies(node, props, result, seen, seenVocabs)
     collectRootContextDependencies(node, props, result.context, seenContext)
     collectBoundaryDependencies(node, props, result)
+    collectMetaNodeDependencies(node, result.meta ??= [], null)
   }
 
   result.props = prunePrefixDependencies(result.props)
   result.context = pruneContextPrefixDependencies(result.context)
 
   return result
+}
+
+function collectMetaNodeDependencies(
+  node: RComponentSFC_IR_Node,
+  result: RComponentSFC_RuntimeMetaDependency[],
+  inheritedBoundaryId: string | null,
+): void {
+  if (node.kind === 'expression') {
+    collectMetaValueDependencies(node.value, result, inheritedBoundaryId)
+    return
+  }
+  if (node.kind !== 'element') {
+    return
+  }
+
+  const boundaryId = node.tag === 'Table' ? node.id : inheritedBoundaryId
+  for (const value of Object.values(node.props)) {
+    collectMetaValueDependencies(value, result, boundaryId)
+  }
+  for (const value of [
+    node.directives.if,
+    node.directives.elseIf,
+    node.directives.key,
+    node.directives.for?.source,
+    node.editable?.value,
+    node.editable?.triggers,
+  ]) {
+    collectMetaValueDependencies(value, result, boundaryId)
+  }
+  for (const group of node.interactions ?? []) {
+    for (const rule of group.rules) {
+      collectMetaValueDependencies(rule.trigger, result, boundaryId)
+    }
+  }
+  for (const child of node.children) {
+    collectMetaNodeDependencies(child, result, boundaryId)
+  }
+}
+
+function collectMetaValueDependencies(
+  value: RComponentSFC_IR_Value | undefined,
+  result: RComponentSFC_RuntimeMetaDependency[],
+  boundaryId: string | null,
+): void {
+  if (!value || value.kind !== 'expression') {
+    return
+  }
+  for (const read of value.dataMetaReads ?? []) {
+    const resolvedBoundaryId = read.reference.kind === 'table-row' ? boundaryId : null
+    const key = `${resolvedBoundaryId ?? ''}\u0000${JSON.stringify(read.reference)}\u0000${read.namespace ?? ''}`
+    if (result.some(item => `${item.boundaryId ?? ''}\u0000${JSON.stringify(item.reference)}\u0000${item.namespace ?? ''}` === key)) {
+      continue
+    }
+    result.push({ ...read, boundaryId: resolvedBoundaryId })
+  }
 }
 
 function collectRootContextDependencies(

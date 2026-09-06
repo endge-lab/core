@@ -163,7 +163,7 @@ describe('этапы EndgeFederation', () => {
 
     await TestFederation.startForTest(createBootContext())
 
-    expect(calls).toEqual(['compiler', 'vue', 'runtime', 'vars'])
+    expect(calls).toEqual(['compiler', 'vars', 'vue', 'runtime'])
   })
 
   it('устанавливает плагины во время конфигурации федерации', async () => {
@@ -193,13 +193,13 @@ describe('этапы EndgeFederation', () => {
 
     TestFederation.use({
       id: 'test.vue',
-      install(): void {
-        TestFederation.defineModule({
+      modules: [
+        {
           key: 'vue',
-          module: new TestModule('vue'),
+          create: () => new TestModule('vue'),
           before: 'runtime',
-        })
-      },
+        },
+      ],
     })
 
     await TestFederation.startForTest(createBootContext())

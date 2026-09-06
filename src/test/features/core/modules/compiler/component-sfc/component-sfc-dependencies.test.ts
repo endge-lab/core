@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { compileComponentSFC } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-compile'
 import { analyzeComponentSFCRuntimeDependencies } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-dependencies'
+import { resolveComponentSFCExpressionCompletions } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-expression'
 
 describe('анализ runtime-зависимостей Component SFC', () => {
   it('находит чтения props из интерполяций, динамических атрибутов и директив if', () => {
@@ -157,5 +158,50 @@ defineProps<{
     const deps = analyzeComponentSFCRuntimeDependencies(ir)
 
     expect(deps.props).toEqual([])
+  })
+
+  it('компилирует `$data.metaOf` как отдельную Meta dependency', () => {
+    const result = compileComponentSFC(`<script setup lang="ts">
+defineProps<{ flights: FlightLeg[] }>()
+</script>
+<template>
+  <Table :rows="flights" row-key="id">
+    <Column key="flightCarrier">
+      <Cell>
+        <Text>{{ $data.metaOf(row.flightCarrier, 'aodb.optimistic')?.status }}</Text>
+      </Cell>
+    </Column>
+  </Table>
+</template>`)
+
+    expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
+    expect(result.runtimeDependencies.meta).toEqual([
+      expect.objectContaining({
+        boundaryId: result.runtimeDependencies.boundaries[0]?.id,
+        namespace: 'aodb.optimistic',
+        reference: { kind: 'table-row', path: ['flightCarrier'] },
+      }),
+    ])
+  })
+
+  it('отклоняет динамическую ссылку и namespace в `$data.metaOf`', () => {
+    const result = compileComponentSFC(`<script setup lang="ts">
+defineProps<{ flight: FlightLeg; namespace: string }>()
+</script>
+<template><Text>{{ $data.metaOf(getFlight(), namespace) }}</Text></template>`)
+
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'sfc-data-meta-call-shape', severity: 'error' }),
+    ]))
+  })
+
+  it('предлагает `$data.metaOf` в expression completion', () => {
+    expect(resolveComponentSFCExpressionCompletions({
+      source: '$data.',
+      cursor: '$data.'.length,
+      scope: 'table-row-menu',
+    })).toEqual([
+      expect.objectContaining({ label: 'metaOf', kind: 'property' }),
+    ])
   })
 })

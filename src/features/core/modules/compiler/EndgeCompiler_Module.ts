@@ -937,35 +937,61 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
         const payload = result.artifact as StoreSourceArtifact | undefined
         const dependencies: ProgramArtifact['dependencies'] = []
         const updateHandlers = Endge.domain.getUpdatesByStoreIdentity(entity.identity)
-            .map((update) => {
-              const artifact = Endge.program.getUpdateArtifact(update.identity)
-              if (!artifact || artifact.status === 'error') {
+          .map((update) => {
+            const artifact = Endge.program.getUpdateArtifact(update.identity)
+            if (!artifact || artifact.status === 'error') {
+              ; (result.diagnostics ??= []).push({
+                severity: 'error',
+                code: 'store-update-invalid',
+                message: `Update "${update.identity}" отсутствует в compiled program или содержит ошибки.`,
+                sourcePath: `updates.${update.identity}`,
+              })
+            }
+            const writable = new Set(payload?.data
+              .filter(field => field.kind === 'value')
+              .map(field => field.key) ?? [])
+            const declared = new Set(payload?.data.map(field => field.key) ?? [])
+            for (const [mutationIndex, mutation] of (artifact?.payload.mutations ?? []).entries()) {
+              const targetRoot = String(mutation.target ?? '').split(/[.[\]]/)[0] ?? ''
+              const targetAllowed = mutation.plane === 'meta'
+                ? declared.has(targetRoot)
+                : writable.has(targetRoot)
+              if (targetRoot && !targetAllowed) {
                 ; (result.diagnostics ??= []).push({
                   severity: 'error',
-                  code: 'store-update-invalid',
-                  message: `Update "${update.identity}" отсутствует в compiled program или содержит ошибки.`,
-                  sourcePath: `updates.${update.identity}`,
+                  code: 'store-update-target-invalid',
+                  message: mutation.plane === 'meta'
+                    ? `Update "${update.identity}" аннотирует отсутствующее поле "${targetRoot}".`
+                    : `Update "${update.identity}" пишет в отсутствующее или derived поле "${targetRoot}".`,
+                  sourcePath: `updates.${update.identity}.mutations.${mutationIndex}.target`,
                 })
               }
-              const writable = new Set(payload?.data
-                  .filter(field => field.kind === 'value')
-                  .map(field => field.key) ?? [])
-              for (const [mutationIndex, mutation] of (artifact?.payload.mutations ?? []).entries()) {
-                const targetRoot = String(mutation.target ?? '').split(/[.[\]]/)[0] ?? ''
-                if (targetRoot && !writable.has(targetRoot)) {
+              const ifExistsRoot = String(mutation.ifExists ?? '').split(/[.[\]]/)[0] ?? ''
+              if (ifExistsRoot && !declared.has(ifExistsRoot)) {
+                ; (result.diagnostics ??= []).push({
+                  severity: 'error',
+                  code: 'store-update-read-invalid',
+                  message: `Update "${update.identity}" проверяет отсутствующее Store поле "${ifExistsRoot}".`,
+                  sourcePath: `updates.${update.identity}.mutations.${mutationIndex}.ifExists`,
+                })
+              }
+              for (const read of collectUpdateStoreReads(mutation.value, mutation.when)) {
+                const readRoot = read.path.split(/[.[\]]/)[0] ?? ''
+                if (readRoot && !declared.has(readRoot)) {
                   ; (result.diagnostics ??= []).push({
                     severity: 'error',
-                    code: 'store-update-target-invalid',
-                    message: `Update "${update.identity}" пишет в отсутствующее или derived поле "${targetRoot}".`,
-                    sourcePath: `updates.${update.identity}.mutations.${mutationIndex}.target`,
+                    code: 'store-update-read-invalid',
+                    message: `Update "${update.identity}" читает отсутствующее Store поле "${readRoot}".`,
+                    sourcePath: `updates.${update.identity}.mutations.${mutationIndex}.${read.source}`,
                   })
                 }
               }
-              return {
-                identity: update.identity,
-                eventTypes: artifact?.payload.handles ?? [],
-              }
-            })
+            }
+            return {
+              identity: update.identity,
+              eventTypes: artifact?.payload.handles ?? [],
+            }
+          })
         const handlersByType = new Map<string, string>()
         for (const handler of updateHandlers) {
           dependencies.push({
@@ -3569,6 +3595,38 @@ function uniqueComputationReferences(payload: ComputationProgramPayload): string
   return [...new Set(payload.nodes
       .filter(node => node.kind === 'computation')
       .map(node => node.identity))]
+}
+
+function collectUpdateStoreReads(
+  ...expressions: Array<SourceExpressionIR | null | undefined>
+): Array<Extract<SourceExpressionIR, { type: 'read' }>> {
+  const reads: Array<Extract<SourceExpressionIR, { type: 'read' }>> = []
+  const visit = (expression: SourceExpressionIR | null | undefined): void => {
+    if (!expression) {
+      return
+    }
+    if (expression.type === 'read') {
+      if (['update-data', 'update-meta', 'update-has-data', 'update-has-meta'].includes(expression.source)) {
+        reads.push(expression)
+      }
+      return
+    }
+    if (expression.type === 'array') {
+      expression.items.forEach(visit)
+    }
+    else if (expression.type === 'object') {
+      Object.values(expression.properties).forEach(visit)
+    }
+    else if (expression.type === 'operation') {
+      expression.arguments.forEach(visit)
+    }
+    else if (expression.type === 'transform') {
+      visit(expression.input)
+      visit(expression.options)
+    }
+  }
+  expressions.forEach(visit)
+  return reads
 }
 
 function statusFromDiagnostics(diagnostics: ProgramDiagnostic[]): ProgramArtifact['status'] {

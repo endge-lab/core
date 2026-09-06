@@ -136,6 +136,26 @@ export interface ComponentSFCInteractionTrigger extends ComponentSFCInteractionK
   passive?: boolean
 }
 
+/** Альтернативные trigger-условия, любое из которых завершает один шаг активации. */
+export type ComponentSFCInteractionTriggerSet = ComponentSFCInteractionTrigger[]
+
+/** Один шаг последовательной активации и допустимая пауза после предыдущего шага. */
+export interface ComponentSFCInteractionTriggerSequenceStep {
+  triggerSet: ComponentSFCInteractionTriggerSet
+  maxIntervalMs?: number
+}
+
+/** Последовательность TriggerSet-шагов; каждый следующий шаг ожидается в пределах своего интервала. */
+export interface ComponentSFCInteractionTriggerSequence {
+  mode: 'sequence'
+  steps: ComponentSFCInteractionTriggerSequenceStep[]
+}
+
+/** Универсальная активация: legacy TriggerSet либо последовательность таких наборов. */
+export type ComponentSFCInteractionTriggerActivation
+  = | ComponentSFCInteractionTriggerSet
+    | ComponentSFCInteractionTriggerSequence
+
 export type ComponentSFCInteractionTriggerPlatform = 'macos' | 'windows' | 'linux' | 'unknown'
 
 /** Renderer-neutral snapshot нативного события для проверки edit trigger. */
@@ -429,6 +449,21 @@ export interface RComponentSFC_IR_ExpressionValue {
 
   /** Статические обращения к Vocab aliases текущего Composition scope. */
   vocabReads?: RComponentSFC_IR_VocabRead[]
+
+  /** Статические read-only обращения `$data.metaOf(reference[, namespace])`. */
+  dataMetaReads?: RComponentSFC_IR_DataMetaRead[]
+}
+
+/** Ссылка на business value, метаданные которого читает Component SFC. */
+export type RComponentSFC_IR_DataMetaReference
+  = | { kind: 'prop', prop: string, path: string[] }
+    | { kind: 'table-row', path: string[] }
+
+/** Статическое обращение к Raph Meta-plane без публикации DataPath в props. */
+export interface RComponentSFC_IR_DataMetaRead {
+  reference: RComponentSFC_IR_DataMetaReference
+  namespace: string | null
+  raw: string
 }
 
 /** Статическое обращение `vocab(alias, mapping?)` внутри SFC expression. */

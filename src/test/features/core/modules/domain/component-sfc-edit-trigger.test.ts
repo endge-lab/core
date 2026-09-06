@@ -2,8 +2,10 @@ import type { ComponentSFCEditTriggerEvent } from '@/features/core/modules/domai
 
 import { describe, expect, it } from 'vitest'
 import {
+  ComponentSFCInteractionTriggerActivationMatcher,
   matchesComponentSFCEditTrigger,
   normalizeComponentSFCEditTriggers,
+  normalizeComponentSFCInteractionTriggerActivation,
   resolveComponentSFCEditTriggerPlatform,
 } from '@/features/core/modules/domain/component/component-sfc-edit-trigger'
 
@@ -149,5 +151,56 @@ describe('триггер редактирования Component SFC', () => {
     expect(resolveComponentSFCEditTriggerPlatform('Win32')).toBe('windows')
     expect(resolveComponentSFCEditTriggerPlatform('Linux x86_64')).toBe('linux')
     expect(resolveComponentSFCEditTriggerPlatform(undefined)).toBe('unknown')
+  })
+
+  it('сохраняет legacy TriggerSet канонической формой обычной активации', () => {
+    expect(normalizeComponentSFCInteractionTriggerActivation([{
+      event: 'keydown',
+      code: ['KeyE'],
+      modifiers: { mod: true, exact: true },
+    }])).toEqual([{
+      event: 'keydown',
+      code: ['KeyE'],
+      modifiers: { mod: true, exact: true },
+      stop: false,
+      prevent: false,
+      self: false,
+    }])
+  })
+
+  it('завершает последовательность только после всех физических нажатий', () => {
+    const matcher = new ComponentSFCInteractionTriggerActivationMatcher({
+      mode: 'sequence',
+      steps: [
+        { triggerSet: [{ event: 'keydown', code: ['KeyE'], modifiers: { mod: true }, repeat: false }] },
+        { triggerSet: [{ event: 'keydown', code: ['KeyE'], modifiers: { mod: true }, repeat: false }], maxIntervalMs: 800 },
+      ],
+    })
+    const shortcutEvent = {
+      ...baseEvent,
+      modifiers: { ...baseEvent.modifiers, meta: true },
+    }
+
+    expect(matcher.match('keydown', shortcutEvent, 'macos', 100)).toMatchObject({ status: 'progress', stepIndex: 0 })
+    expect(matcher.match('keydown', { ...shortcutEvent, repeat: true }, 'macos', 150)).toEqual({ status: 'none' })
+    expect(matcher.match('keyup', shortcutEvent, 'macos', 180)).toEqual({ status: 'none' })
+    expect(matcher.match('keydown', shortcutEvent, 'macos', 300)).toMatchObject({ status: 'complete', stepIndex: 1 })
+  })
+
+  it('сбрасывает просроченную или нарушенную последовательность и распознаёт новый префикс', () => {
+    const matcher = new ComponentSFCInteractionTriggerActivationMatcher({
+      mode: 'sequence',
+      steps: [
+        { triggerSet: [{ event: 'keydown', code: ['KeyE'] }] },
+        { triggerSet: [{ event: 'keydown', code: ['KeyR'] }], maxIntervalMs: 500 },
+      ],
+    })
+
+    expect(matcher.match('keydown', baseEvent, 'linux', 100)).toMatchObject({ status: 'progress' })
+    expect(matcher.match('keydown', { ...baseEvent, key: 'x', code: 'KeyX' }, 'linux', 200)).toEqual({ status: 'none' })
+    expect(matcher.match('keydown', baseEvent, 'linux', 300)).toMatchObject({ status: 'progress' })
+    expect(matcher.match('keydown', { ...baseEvent, key: 'r', code: 'KeyR' }, 'linux', 900)).toEqual({ status: 'none' })
+    expect(matcher.match('keydown', baseEvent, 'linux', 1_000)).toMatchObject({ status: 'progress' })
+    expect(matcher.match('keydown', { ...baseEvent, key: 'r', code: 'KeyR' }, 'linux', 1_400)).toMatchObject({ status: 'complete' })
   })
 })

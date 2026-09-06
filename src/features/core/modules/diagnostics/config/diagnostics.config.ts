@@ -53,6 +53,20 @@ export const DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION: Readonly<EndgeDiagnosticsC
       raphData: true,
       raphGraph: true,
     },
+    shortcut: {
+      triggerSet: [],
+      content: {
+        telemetry: true,
+        problems: true,
+        configuration: false,
+        effectiveConfiguration: true,
+        domain: true,
+        program: true,
+        runtime: true,
+        raphData: true,
+        raphGraph: true,
+      },
+    },
     automatic: {
       enabled: false,
       errorCount: 10,

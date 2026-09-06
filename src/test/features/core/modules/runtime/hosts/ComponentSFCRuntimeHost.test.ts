@@ -389,6 +389,53 @@ const ports = definePorts({ emits: { opened: event<{ id: string }>() } })
     expect(host.getEditSession('row:2/status')).toBeNull()
     host.destroy()
   })
+
+  it('читает Meta исходной строки через явную provenance преобразованного prop', () => {
+    const source = `<script setup lang="ts">defineProps<{ flights: FlightLeg[] }>()</script>
+<template><Table :rows="flights" row-key="id"><Column key="flightCarrier"><Cell>
+  <Text>{{ $data.metaOf(row.flightCarrier, 'aodb.optimistic')?.status }}</Text>
+</Cell></Column></Table></template>`
+    const compiled = compileComponentSFC(source)
+    const artifact = createSFCArtifact(compiled)
+    const model = RComponentSFC.fromPlain({ id: 91, identity: 'meta-owner', name: 'Meta owner', source })
+    const boundaryId = compiled.runtimeDependencies.boundaries[0]!.id
+
+    Raph.set('test.meta.raw', [{ id: 42, flightCarrier: 'SU' }])
+    Raph.set('test.meta.visible', [{ id: 42, flightCarrier: 'SU' }])
+    Raph.meta.set('test.meta.raw[id=$id].flightCarrier', 'aodb.optimistic', { status: 'waiting' }, { vars: { id: 42 } })
+    let host: ComponentSFCRuntimeHost | null = null
+    Raph.definePhases([
+      RuntimeBoundaryUpdatePhase.make({ resolveHost: runtimeId => runtimeId === 'meta-owner-runtime' ? host as any : null }),
+    ])
+    host = ComponentSFCRuntimeHost.createRuntime({
+      id: 'meta-owner-runtime',
+      model,
+      meta: {
+        input: {
+          kind: 'raph',
+          bindings: {
+            flights: {
+              path: 'test.meta.visible',
+              metaSource: { path: 'test.meta.raw', key: 'id', fields: { flightCarrier: 'flightCarrier' } },
+            },
+          },
+        },
+      },
+      artifactReader: { getArtifact: <TPayload>() => artifact as unknown as ProgramArtifact<TPayload> },
+    })
+
+    expect(host.readDataMeta({
+      kind: 'table-row',
+      path: ['flightCarrier'],
+      boundaryId,
+      rowKey: 42,
+    }, 'aodb.optimistic')).toEqual({ status: 'waiting' })
+    const dirty = vi.fn()
+    host.on('props:dirty', dirty)
+    Raph.meta.merge('test.meta.raw[id=$id].flightCarrier', 'aodb.optimistic', { status: 'synchronized' }, { vars: { id: 42 } })
+    expect(dirty).toHaveBeenCalledTimes(1)
+    host.destroy()
+  })
 })
 
 function createSFCArtifact(

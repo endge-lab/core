@@ -1,5 +1,11 @@
 import type { EndgeModuleDescriptor } from '@/features/federation/types/endge-modules.types'
 
+interface EndgeOrderedDescriptor {
+  readonly key: string
+  readonly before?: string | readonly string[]
+  readonly after?: string | readonly string[]
+}
+
 function toArray(value: string | readonly string[] | undefined): string[] {
   if (!value) {
     return []
@@ -7,23 +13,20 @@ function toArray(value: string | readonly string[] | undefined): string[] {
   return typeof value === 'string' ? [value] : [...value]
 }
 
-export function sortEndgeModuleDescriptors(
-  descriptors: EndgeModuleDescriptor[],
-): EndgeModuleDescriptor[] {
-  const byKey = new Map<string, EndgeModuleDescriptor>()
+export function sortEndgeOrderedDescriptors<TDescriptor extends EndgeOrderedDescriptor>(
+  descriptors: readonly TDescriptor[],
+): TDescriptor[] {
+  const byKey = new Map<string, TDescriptor>()
   const declarationIndex = new Map<string, number>()
 
   descriptors.forEach((descriptor, index) => {
     const key = String(descriptor.key ?? '').trim()
 
     if (!key) {
-      throw new Error('[EndgeFederation] module key is required')
-    }
-    if (!descriptor.module) {
-      throw new Error(`[EndgeFederation] module "${key}" is required`)
+      throw new Error('[EndgeFederation] lifecycle node key is required')
     }
     if (byKey.has(key)) {
-      throw new Error(`[EndgeFederation] module "${key}" is already defined`)
+      throw new Error(`[EndgeFederation] lifecycle node "${key}" is already defined`)
     }
 
     byKey.set(key, { ...descriptor, key })
@@ -40,13 +43,13 @@ export function sortEndgeModuleDescriptors(
 
   const addEdge = (from: string, to: string, owner: string): void => {
     if (!byKey.has(from)) {
-      throw new Error(`[EndgeFederation] module "${owner}" references unknown module "${from}"`)
+      throw new Error(`[EndgeFederation] lifecycle node "${owner}" references unknown node "${from}"`)
     }
     if (!byKey.has(to)) {
-      throw new Error(`[EndgeFederation] module "${owner}" references unknown module "${to}"`)
+      throw new Error(`[EndgeFederation] lifecycle node "${owner}" references unknown node "${to}"`)
     }
     if (from === to) {
-      throw new Error(`[EndgeFederation] module "${owner}" cannot reference itself`)
+      throw new Error(`[EndgeFederation] lifecycle node "${owner}" cannot reference itself`)
     }
 
     const targets = edges.get(from)!
@@ -68,14 +71,14 @@ export function sortEndgeModuleDescriptors(
     }
   }
 
-  const compare = (a: EndgeModuleDescriptor, b: EndgeModuleDescriptor): number =>
+  const compare = (a: TDescriptor, b: TDescriptor): number =>
     declarationIndex.get(a.key)! - declarationIndex.get(b.key)!
 
   const ready = Array.from(byKey.values())
     .filter(item => indegree.get(item.key) === 0)
     .sort(compare)
 
-  const result: EndgeModuleDescriptor[] = []
+  const result: TDescriptor[] = []
 
   while (ready.length) {
     const current = ready.shift()!
@@ -95,8 +98,19 @@ export function sortEndgeModuleDescriptors(
     const resolved = new Set(result.map(item => item.key))
     const unresolved = Array.from(byKey.keys()).filter(key => !resolved.has(key))
 
-    throw new Error(`[EndgeFederation] circular module order dependency: ${unresolved.join(', ')}`)
+    throw new Error(`[EndgeFederation] circular lifecycle order dependency: ${unresolved.join(', ')}`)
   }
 
   return result
+}
+
+export function sortEndgeModuleDescriptors(
+  descriptors: EndgeModuleDescriptor[],
+): EndgeModuleDescriptor[] {
+  for (const descriptor of descriptors) {
+    if (!descriptor.module) {
+      throw new Error(`[EndgeFederation] module "${descriptor.key}" is required`)
+    }
+  }
+  return sortEndgeOrderedDescriptors(descriptors)
 }

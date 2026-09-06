@@ -15,7 +15,6 @@ import type {
   DiagnosticsRecord,
   DiagnosticsResource,
   DiagnosticsSnapshot,
-  DiagnosticsSnapshotCaptureError,
   DiagnosticsSnapshotOptions,
   DiagnosticsSnapshotProviders,
   DiagnosticsSpanHandle,
@@ -27,15 +26,14 @@ import type {
 import { CONSOLE_DIAGNOSTICS_ADAPTER_FACTORY } from '@/features/core/modules/diagnostics/adapters/ConsoleDiagnosticsAdapter'
 import { DiagnosticsAdapterRegistry } from '@/features/core/modules/diagnostics/adapters/DiagnosticsAdapterRegistry'
 import { SENTRY_DIAGNOSTICS_ADAPTER_FACTORY } from '@/features/core/modules/diagnostics/adapters/SentryDiagnosticsAdapter'
-import { DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION } from '@/features/core/modules/diagnostics/config/diagnostics.config'
-import { serializeDiagnosticsJson } from '@/features/core/modules/diagnostics/domain/diagnostics-snapshot'
+import { EndgeDiagnosticsSnapshots_Module } from '@/features/core/modules/diagnostics/EndgeDiagnosticsSnapshots_Module'
 import { EndgeProblems_Module } from '@/features/core/modules/diagnostics/EndgeProblems_Module'
 import { EndgeTelemetry_Module } from '@/features/core/modules/diagnostics/EndgeTelemetry_Module'
 import { EndgeModule } from '@/features/federation/EndgeModule'
 
 /**
  * Родительский diagnostics-модуль ядра.
- * Объединяет append-only telemetry history и replaceable registry актуальных problems.
+ * Объединяет telemetry history, актуальные problems и lifecycle snapshots policy.
  */
 export class EndgeDiagnostics_Module extends EndgeModule<EndgeBootContext> {
   /** Registry системных и внешних adapter factories. */
@@ -47,10 +45,8 @@ export class EndgeDiagnostics_Module extends EndgeModule<EndgeBootContext> {
   /** Подмодуль актуальных authoring/build/runtime problems. */
   public readonly problems: EndgeProblems_Module
 
-  /** Состояние automatic snapshot policy и её внутренней подписки. */
-  private _automaticErrorTimestamps: number[] = []
-  private _automaticCooldownUntil = 0
-  private _unsubscribeAutomaticRecords: (() => void) | null = null
+  /** Подмодуль создания, доставки и browser download диагностических snapshots. */
+  public readonly snapshots: EndgeDiagnosticsSnapshots_Module
 
   /**
    * ----------------------------------------
@@ -59,56 +55,57 @@ export class EndgeDiagnostics_Module extends EndgeModule<EndgeBootContext> {
    */
 
   /** Связывает независимые уведомления подмодулей с родительским diagnostics-модулем. */
-  public constructor(private readonly _snapshotProviders: DiagnosticsSnapshotProviders = {}) {
+  public constructor(snapshotProviders: DiagnosticsSnapshotProviders = {}) {
     super()
     this.adapters = new DiagnosticsAdapterRegistry()
     this.adapters.register(CONSOLE_DIAGNOSTICS_ADAPTER_FACTORY)
     this.adapters.register(SENTRY_DIAGNOSTICS_ADAPTER_FACTORY)
     this.telemetry = new EndgeTelemetry_Module(this.adapters)
     this.problems = new EndgeProblems_Module()
+    this.snapshots = new EndgeDiagnosticsSnapshots_Module(this.telemetry, this.problems, snapshotProviders)
     this.telemetry.subscribe(() => this.notify())
     this.problems.subscribe(() => this.notify())
-    this._subscribeAutomaticSnapshots()
   }
 
   /** Передаёт setup lifecycle подмодулям в порядке их зависимостей. */
   public override async setup(ctx: EndgeBootContext): Promise<void> {
     await this.telemetry.setup(ctx)
     await this.problems.setup(ctx)
+    await this.snapshots.setup(ctx)
   }
 
   /** Передаёт load lifecycle подмодулям в порядке их зависимостей. */
   public override async load(ctx: EndgeBootContext): Promise<void> {
     await this.telemetry.load(ctx)
     await this.problems.load(ctx)
+    await this.snapshots.load(ctx)
   }
 
   /** Передаёт build lifecycle подмодулям в порядке их зависимостей. */
   public override async build(ctx: EndgeBootContext): Promise<void> {
     await this.telemetry.build(ctx)
     await this.problems.build(ctx)
+    await this.snapshots.build(ctx)
   }
 
   /** Передаёт start lifecycle подмодулям в порядке их зависимостей. */
   public override async start(ctx: EndgeBootContext): Promise<void> {
     await this.telemetry.start(ctx)
     await this.problems.start(ctx)
+    await this.snapshots.start(ctx)
   }
 
   /** Сбрасывает подмодули в обратном порядке их запуска. */
   public override async reset(): Promise<void> {
+    await this.snapshots.reset()
     await this.problems.reset()
     await this.telemetry.reset()
-    this._automaticErrorTimestamps = []
-    this._automaticCooldownUntil = 0
-    this._subscribeAutomaticSnapshots()
   }
 
   /** Применяет telemetry, outputs, routes и snapshots configuration. */
   public configure(configuration: EndgeDiagnosticsConfiguration, resource: DiagnosticsResource = this.telemetry.resource): void {
-    this._automaticErrorTimestamps = []
-    this._automaticCooldownUntil = 0
     this.telemetry.configure(configuration, resource)
+    this.snapshots.configure()
   }
 
   /** Записывает один structured log через telemetry-подмодуль. */
@@ -189,78 +186,17 @@ export class EndgeDiagnostics_Module extends EndgeModule<EndgeBootContext> {
 
   /** Возвращает JSON-safe snapshot telemetry, problems и optional configuration. */
   public snapshot(options: DiagnosticsSnapshotOptions = {}): DiagnosticsSnapshot {
-    const content = this.configuration.snapshots.content
-    const includeTelemetry = options.includeTelemetry ?? content.telemetry
-    const includeProblems = options.includeProblems ?? content.problems
-    const includeConfiguration = options.includeConfiguration ?? content.configuration
-    const defaults = DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION.snapshots.content
-    const includeEffectiveConfiguration = options.includeEffectiveConfiguration
-      ?? content.effectiveConfiguration
-      ?? defaults.effectiveConfiguration
-      ?? false
-    const includeDomain = options.includeDomain ?? content.domain ?? defaults.domain ?? false
-    const includeProgram = options.includeProgram ?? content.program ?? defaults.program ?? false
-    const includeRuntime = options.includeRuntime ?? content.runtime ?? defaults.runtime ?? false
-    const includeRaphData = options.includeRaphData ?? content.raphData ?? defaults.raphData ?? false
-    const includeRaphGraph = options.includeRaphGraph ?? content.raphGraph ?? defaults.raphGraph ?? false
-    const captureErrors: DiagnosticsSnapshotCaptureError[] = []
-    const rawSnapshot: Record<string, unknown> = {
-      format: 'endge-diagnostics-snapshot',
-      version: 1,
-      generatedAt: Date.now(),
-      trigger: options.trigger ?? 'manual',
-      ...(includeTelemetry ? { telemetry: this.telemetry.snapshot(options.filter) } : {}),
-      ...(includeProblems ? { problems: this.problems.snapshot() } : {}),
-      ...(includeConfiguration ? { configuration: this.configuration } : {}),
-      ...(includeEffectiveConfiguration
-        ? {
-            effectiveConfiguration: this._captureSnapshotSection(
-              'effectiveConfiguration',
-              this._snapshotProviders.effectiveConfiguration,
-              captureErrors,
-            ),
-          }
-        : {}),
-      ...(includeDomain
-        ? { domain: this._captureSnapshotSection('domain', this._snapshotProviders.domain, captureErrors) }
-        : {}),
-      ...(includeProgram
-        ? { program: this._captureSnapshotSection('program', this._snapshotProviders.program, captureErrors) }
-        : {}),
-      ...(includeRuntime
-        ? { runtime: this._captureSnapshotSection('runtime', this._snapshotProviders.runtime, captureErrors) }
-        : {}),
-      ...(includeRaphData || includeRaphGraph
-        ? {
-            raph: this._captureSnapshotSection(
-              'raph',
-              this._snapshotProviders.raph
-                ? () => this._snapshotProviders.raph!({
-                    includeData: includeRaphData,
-                    includeGraph: includeRaphGraph,
-                  })
-                : undefined,
-              captureErrors,
-            ),
-          }
-        : {}),
-      ...(captureErrors.length ? { captureErrors } : {}),
-    }
-    const serialized = serializeDiagnosticsJson(rawSnapshot)
-    const snapshot = serialized.value as unknown as DiagnosticsSnapshot
-    snapshot.redaction = {
-      applied: true,
-      fields: serialized.redactedFields,
-    }
-    return snapshot
+    return this.snapshots.snapshot(options)
   }
 
   /** Создаёт snapshot и доставляет его в выбранные configured outputs. */
   public sendSnapshot(outputIds?: readonly string[], options: DiagnosticsSnapshotOptions = {}): DiagnosticsSnapshot {
-    const snapshot = this.snapshot(options)
-    const targets = outputIds ?? this.configuration.snapshots.automatic.outputIds
-    this.telemetry.deliverSnapshot(snapshot, targets)
-    return snapshot
+    return this.snapshots.sendSnapshot(outputIds, options)
+  }
+
+  /** Создаёт snapshot и сохраняет его в JSON-файл через platform adapter. */
+  public downloadSnapshot(options: DiagnosticsSnapshotOptions = {}): DiagnosticsSnapshot {
+    return this.snapshots.downloadSnapshot(options)
   }
 
   /** Возвращает telemetry counters текущей session. */
@@ -301,70 +237,6 @@ export class EndgeDiagnostics_Module extends EndgeModule<EndgeBootContext> {
   /** Выполняет best-effort flush всех telemetry adapters. */
   public flush(): Promise<DiagnosticsFlushResult> {
     return this.telemetry.flush()
-  }
-
-  /**
-   * ----------------------------------------
-   * PRIVATE
-   * ----------------------------------------
-   */
-
-  /** Восстанавливает внутреннюю подписку на ERROR/FATAL records после reset. */
-  private _subscribeAutomaticSnapshots(): void {
-    this._unsubscribeAutomaticRecords?.()
-    this._unsubscribeAutomaticRecords = this.telemetry.subscribe(
-      { signals: ['log'], minSeverity: 17 },
-      record => this._handleAutomaticSnapshotRecord(record),
-    )
-  }
-
-  /** Читает одну часть snapshot из её state owner и локализует возможный сбой. */
-  private _captureSnapshotSection(
-    section: DiagnosticsSnapshotCaptureError['section'],
-    provider: (() => unknown) | undefined,
-    errors: DiagnosticsSnapshotCaptureError[],
-  ): unknown {
-    if (!provider) {
-      errors.push({ section, message: 'Snapshot provider is not configured' })
-      return null
-    }
-    try {
-      return provider()
-    }
-    catch (error) {
-      errors.push({
-        section,
-        message: error instanceof Error ? error.message : String(error),
-      })
-      return null
-    }
-  }
-
-  /** Применяет sliding window и cooldown политики автоматического snapshot. */
-  private _handleAutomaticSnapshotRecord(record: DiagnosticsRecord): void {
-    if (record.signal !== 'log') {
-      return
-    }
-    const policy = this.configuration.snapshots.automatic
-    if (!policy.enabled) {
-      return
-    }
-
-    const now = record.timestamp
-    if (now < this._automaticCooldownUntil) {
-      return
-    }
-
-    const windowStart = now - policy.windowSeconds * 1_000
-    this._automaticErrorTimestamps = this._automaticErrorTimestamps.filter(timestamp => timestamp >= windowStart)
-    this._automaticErrorTimestamps.push(now)
-    if (this._automaticErrorTimestamps.length < policy.errorCount) {
-      return
-    }
-
-    this._automaticErrorTimestamps = []
-    this._automaticCooldownUntil = now + policy.cooldownSeconds * 1_000
-    this.sendSnapshot(policy.outputIds, { trigger: 'automatic' })
   }
 
   /**

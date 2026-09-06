@@ -5,7 +5,7 @@ import type {
   EndgeDiagnosticsOutputConfiguration,
   EndgeDiagnosticsRoute,
 } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
-import type { ComponentSFCInteractionKeyboardCondition, ComponentSFCInteractionTrigger } from '@/features/core/modules/domain/types/component/sfc/ir.types'
+import type { ComponentSFCInteractionKeyboardCondition, ComponentSFCInteractionTrigger, ComponentSFCInteractionTriggerActivation } from '@/features/core/modules/domain/types/component/sfc/ir.types'
 import type { EndgeExecutionContext } from '@/features/core/modules/runtime/domain/execution-context.types'
 import type { EndgeJSONValue } from '@/features/core/modules/source/domain/types/configuration-source.types'
 
@@ -167,9 +167,16 @@ export interface EndgeDiagnosticsAutomaticSnapshotPatch {
   outputIds?: EndgeCollectionPatch<string>
 }
 
+/** Patch snapshot, скачиваемого глобальной комбинацией клавиш. */
+export interface EndgeDiagnosticsShortcutSnapshotPatch {
+  triggerSet?: EndgeValueOverride<ComponentSFCInteractionTriggerActivation>
+  content?: EndgeDiagnosticsSnapshotContentPatch
+}
+
 /** Patch snapshots configuration текущего cascade layer. */
 export interface EndgeDiagnosticsSnapshotsPatch {
   content?: EndgeDiagnosticsSnapshotContentPatch
+  shortcut?: EndgeDiagnosticsShortcutSnapshotPatch
   automatic?: EndgeDiagnosticsAutomaticSnapshotPatch
 }
 

@@ -31,6 +31,13 @@ export type SourceExpressionReadKind
     | 'composition-runtime-metadata'
     | 'metadata'
     | 'computation-output'
+    | 'update-input'
+    | 'update-item'
+    | 'update-parent'
+    | 'update-data'
+    | 'update-meta'
+    | 'update-has-data'
+    | 'update-has-meta'
 
 /** Whitelist операций статического expression IR. */
 export type SourceExpressionOperation

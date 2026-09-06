@@ -1,13 +1,18 @@
 import type { ProgramDiagnostic } from '@/features/core/modules/program/domain/types/program.types'
+import type { SourceExpressionIR } from '@/features/core/modules/source/domain/types/source-expression.types'
 
 export type UpdateMutationStrategy = 'set' | 'merge' | 'replace' | 'append' | 'remove'
 
 export interface UpdateMutationDescriptor {
   strategy: UpdateMutationStrategy
   target: string
+  plane?: 'data' | 'meta'
+  namespace?: string | null
   forEach: string | null
   ifExists: string | null
   valueFrom: string | null
+  value?: SourceExpressionIR | null
+  when?: SourceExpressionIR | null
   vars: Record<string, string>
 }
 
@@ -31,8 +36,10 @@ export interface UpdateSourceCompileResult {
 }
 
 export interface StoreMutationPlan {
+  plane?: 'data' | 'meta'
   strategy: UpdateMutationStrategy
   path: string
+  namespace?: string
   value?: unknown
   vars?: Record<string, unknown>
 }

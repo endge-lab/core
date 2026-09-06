@@ -80,7 +80,7 @@ export type CompositionBindingValue
     | { kind: 'output', runtime: string, output: string }
     | { kind: 'outputs', runtime: string, outputs?: string[] }
     | { kind: 'store', key: string }
-    | { kind: 'data', data: string, path: string }
+    | { kind: 'data', data: string, path: string, metaSource?: CompositionMetaSourceBinding }
     | { kind: 'runtime-metadata', runtime: string, namespace?: string }
     | { kind: 'filter-fields', runtime: string, fields: string[] }
     | {
@@ -89,8 +89,17 @@ export type CompositionBindingValue
       path: string
       identity: string
       props: Record<string, CompositionBindingValue>
+      metaSource?: CompositionMetaSourceBinding
     }
     | { kind: 'expression', expression: SourceExpressionIR }
+
+/** Явная provenance-ссылка Meta-plane для преобразованного входного значения. */
+export interface CompositionMetaSourceBinding {
+  data: string
+  path: string
+  key?: string
+  fields?: Record<string, string>
+}
 
 export interface CompositionDataDescriptor {
   name: string

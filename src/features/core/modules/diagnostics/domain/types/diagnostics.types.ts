@@ -1,3 +1,5 @@
+import type { ComponentSFCInteractionTriggerActivation } from '@/features/core/modules/domain/types/component/sfc/ir.types'
+
 /** Сигналы, которые поддерживает первая версия модуля диагностики. */
 export type DiagnosticsSignal = 'log' | 'span'
 
@@ -232,9 +234,17 @@ export interface EndgeDiagnosticsAutomaticSnapshotConfiguration {
   outputIds: string[]
 }
 
-/** Effective configuration ручных и автоматических snapshots. */
+/** Настройки snapshot, скачиваемого глобальной комбинацией клавиш. */
+export interface EndgeDiagnosticsShortcutSnapshotConfiguration {
+  /** Legacy TriggerSet либо sequence-объект; массив сохраняется без миграции persisted документов. */
+  triggerSet: ComponentSFCInteractionTriggerActivation
+  content: EndgeDiagnosticsSnapshotContentConfiguration
+}
+
+/** Effective configuration ручных, shortcut и автоматических snapshots. */
 export interface EndgeDiagnosticsSnapshotsConfiguration {
   content: EndgeDiagnosticsSnapshotContentConfiguration
+  shortcut: EndgeDiagnosticsShortcutSnapshotConfiguration
   automatic: EndgeDiagnosticsAutomaticSnapshotConfiguration
 }
 
@@ -323,7 +333,7 @@ export interface DiagnosticsCounters {
 
 /** Параметры создания JSON-safe snapshot. */
 export interface DiagnosticsSnapshotOptions {
-  trigger?: 'manual' | 'automatic'
+  trigger?: 'manual' | 'shortcut' | 'automatic'
   includeTelemetry?: boolean
   includeProblems?: boolean
   includeConfiguration?: boolean
@@ -370,7 +380,7 @@ export interface DiagnosticsSnapshot {
   format?: 'endge-diagnostics-snapshot'
   version?: 1
   generatedAt: number
-  trigger: 'manual' | 'automatic'
+  trigger: 'manual' | 'shortcut' | 'automatic'
   telemetry?: DiagnosticsTelemetrySnapshot
   problems?: DiagnosticsProblemsSnapshot
   configuration?: EndgeDiagnosticsConfiguration

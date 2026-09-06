@@ -15,6 +15,7 @@ import { CONFIGURATION_DEFAULT_SOURCE } from '@/features/core/modules/source/tem
 const CONFIGURATION_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'defineConfig', kind: 'snippet', insertText: CONFIGURATION_DEFAULT_SOURCE.trimEnd(), detail: 'Configuration category' },
   { label: 'value', kind: 'snippet', insertText: `value(String, '')`, detail: 'Typed configuration value' },
+  { label: 'TriggerActivation', kind: 'value', insertText: 'TriggerActivation', detail: 'Trigger set or ordered sequence' },
   { label: 'TriggerSet', kind: 'value', insertText: 'TriggerSet', detail: 'Interaction trigger array' },
   { label: 'JSON', kind: 'value', insertText: 'JSON', detail: 'Any JSON value' },
   { label: 'label', kind: 'function', insertText: `.label('')`, detail: 'Editor label' },

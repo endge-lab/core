@@ -1,4 +1,4 @@
-import type { RComponentSFC_IR_Read } from './ir.types'
+import type { RComponentSFC_IR_DataMetaReference, RComponentSFC_IR_Read } from './ir.types'
 
 /** Источник runtime-зависимости SFC v1. */
 export type RComponentSFC_RuntimeDependencySource = 'props' | 'context'
@@ -87,6 +87,15 @@ export interface RComponentSFC_RuntimeVocabDependency {
   raw: string
 }
 
+/** Реактивное чтение Meta-plane, разрешаемое через provenance входного prop. */
+export interface RComponentSFC_RuntimeMetaDependency {
+  reference: RComponentSFC_IR_DataMetaReference
+  /** Table boundary для row-reference; null для обычного prop. */
+  boundaryId: string | null
+  namespace: string | null
+  raw: string
+}
+
 /** Набор runtime-зависимостей SFC artifact. */
 export interface RComponentSFC_RuntimeDependencies {
   /** Зависимости от props, которые можно связать с внешним input source. */
@@ -100,6 +109,9 @@ export interface RComponentSFC_RuntimeDependencies {
 
   /** Vocab aliases, которые должен предоставить ближайший Composition scope. */
   vocabs?: RComponentSFC_RuntimeVocabDependency[]
+
+  /** Read-only зависимости `$data.metaOf(...)`. */
+  meta?: RComponentSFC_RuntimeMetaDependency[]
 }
 
 /** Создает пустой dependency artifact SFC runtime. */
@@ -109,5 +121,6 @@ export function createEmptyComponentSFCRuntimeDependencies(): RComponentSFC_Runt
     context: [],
     boundaries: [],
     vocabs: [],
+    meta: [],
   }
 }

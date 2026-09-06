@@ -5,7 +5,7 @@ import type {
   ComponentSFCEventOccurrence,
 } from '@/features/core/modules/domain/types/component/sfc/ports.types'
 import type { I18nRuntimeCatalog } from '@/features/core/modules/i18n/domain/i18n.types'
-import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext, RuntimeHostInputBinding, RuntimeHostInputSource, RuntimeHostUpdateContext } from '@/features/core/modules/runtime/domain/runtime-host.types'
+import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext, RuntimeHostInputBinding, RuntimeHostInputSource, RuntimeHostRaphInputBinding, RuntimeHostUpdateContext } from '@/features/core/modules/runtime/domain/runtime-host.types'
 import type { VocabRuntimeCatalog } from '@/features/core/modules/runtime/domain/vocab-cache.types'
 import type { ComponentSFCRuntimeHost } from '@/features/core/modules/runtime/hosts/ComponentSFCRuntimeHost'
 import type { FilterRuntimeHost } from '@/features/core/modules/runtime/hosts/FilterRuntimeHost'
@@ -1166,14 +1166,17 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     const modelType = String((child.model as any)?.type ?? '')
     if (modelType === 'component-sfc') {
       const literals: Record<string, unknown> = {}
-      const bindings: Record<string, { path: string }> = {}
+      const bindings: Record<string, RuntimeHostRaphInputBinding> = {}
       for (const [prop, binding] of Object.entries(inputBindings)) {
         if (binding.kind === 'literal') {
           literals[prop] = binding.value
           continue
         }
         const path = this._bindingPath(descriptor.name, prop, binding)
-        bindings[prop] = { path }
+        bindings[prop] = {
+          path,
+          ...this._makeMetaSourceInputBinding(binding),
+        }
       }
       const input: RuntimeHostInputSource = Object.keys(bindings).length
         ? { kind: 'raph', bindings, props: literals }
@@ -1558,17 +1561,33 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   /** Материализует authored bindings в единый runtime input source child Composition. */
   private _makeInputSource(runtimeName: string): RuntimeHostInputSource {
     const literals: Record<string, unknown> = {}
-    const bindings: Record<string, { path: string }> = {}
+    const bindings: Record<string, RuntimeHostRaphInputBinding> = {}
     for (const [name, binding] of Object.entries(this._compiledInputs(runtimeName))) {
       if (binding.kind === 'literal') {
         literals[name] = binding.value
         continue
       }
-      bindings[name] = { path: this._bindingPath(runtimeName, name, binding) }
+      bindings[name] = {
+        path: this._bindingPath(runtimeName, name, binding),
+        ...this._makeMetaSourceInputBinding(binding),
+      }
     }
     return Object.keys(bindings).length
       ? { kind: 'raph', bindings, props: literals }
       : { kind: 'local', props: literals }
+  }
+
+  private _makeMetaSourceInputBinding(binding: CompositionBindingValue): Partial<RuntimeHostRaphInputBinding> {
+    if ((binding.kind !== 'data' && binding.kind !== 'data-view') || !binding.metaSource) {
+      return {}
+    }
+    return {
+      metaSource: {
+        path: this._requireDataPath(binding.metaSource.data, binding.metaSource.path),
+        ...(binding.metaSource.key ? { key: binding.metaSource.key } : {}),
+        ...(binding.metaSource.fields ? { fields: binding.metaSource.fields } : {}),
+      },
+    }
   }
 
   private _subscribeBinding(binding: CompositionBindingValue, sync: () => void): void {

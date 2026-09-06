@@ -2,6 +2,7 @@ import type { EndgeRuntimeContextSnapshot } from '@/features/core/modules/contex
 
 import type { RComponentDiagnostic } from '@/features/core/modules/domain/types/component/component-core.types'
 import type {
+  RComponentSFC_IR_DataMetaRead,
   RComponentSFC_IR_Read,
   RComponentSFC_IR_Value,
   RComponentSFC_IR_VocabRead,
@@ -67,6 +68,7 @@ const TABLE_ROW_MENU_EXPRESSION_ROOTS: readonly ExpressionCompletionCandidate[] 
   { label: '$column', kind: 'variable', detail: 'Колонка: key, index, title и metadata' },
   { label: '$table', kind: 'variable', detail: 'Таблица и её runtime state' },
   { label: '$context', kind: 'variable', detail: 'Read-only Endge runtime context' },
+  { label: '$data', kind: 'variable', detail: 'Read-only API метаданных входных данных' },
   { label: 'props', kind: 'variable', detail: 'Входные параметры Component SFC' },
   { label: 'row', kind: 'variable', detail: 'Исходные данные строки' },
   { label: 'rowId', kind: 'variable', detail: 'Identity текущей строки' },
@@ -79,10 +81,19 @@ const TABLE_ROW_MENU_EXPRESSION_ROOTS: readonly ExpressionCompletionCandidate[] 
 const TABLE_COLUMN_MENU_EXPRESSION_ROOTS: readonly ExpressionCompletionCandidate[] = [
   { label: '$table', kind: 'variable', detail: 'Таблица и её runtime state' },
   { label: '$context', kind: 'variable', detail: 'Read-only Endge runtime context' },
+  { label: '$data', kind: 'variable', detail: 'Read-only API метаданных входных данных' },
   { label: 'props', kind: 'variable', detail: 'Входные параметры Component SFC' },
 ]
 
 const STATIC_MEMBER_CANDIDATES: Readonly<Record<string, readonly ExpressionCompletionCandidate[]>> = {
+  '$data': [
+    {
+      label: 'metaOf',
+      kind: 'property',
+      detail: 'Meta-plane для prop или поля текущей строки',
+      documentation: '$data.metaOf(reference[, namespace]) реактивно читает метаданные DataPath, связанного с входным значением.',
+    },
+  ],
   '$row': [
     { label: 'id', kind: 'property', detail: 'Identity строки' },
     { label: 'index', kind: 'property', detail: 'Индекс строки' },
@@ -335,6 +346,7 @@ export function compileComponentSFCExpression(
       plugins: ['typescript'],
     }) as unknown
     const vocabReads = collectVocabReads(ast, expression, diagnostics, context)
+    const dataMetaReads = collectDataMetaReads(ast, expression, diagnostics, context)
 
     return {
       value: {
@@ -342,6 +354,7 @@ export function compileComponentSFCExpression(
         source: expression,
         reads: collectExpressionReads(ast, context),
         ...(vocabReads.length ? { vocabReads } : {}),
+        ...(dataMetaReads.length ? { dataMetaReads } : {}),
       },
       diagnostics,
     }
@@ -364,6 +377,72 @@ export function compileComponentSFCExpression(
       diagnostics,
     }
   }
+}
+
+function collectDataMetaReads(
+  ast: unknown,
+  source: string,
+  diagnostics: RComponentDiagnostic[],
+  context: ComponentSFCExpressionContext,
+): RComponentSFC_IR_DataMetaRead[] {
+  const result: RComponentSFC_IR_DataMetaRead[] = []
+  const props = new Set(context.props ?? [])
+
+  visitExpressionNode(ast, (node) => {
+    if (
+      node.type !== 'CallExpression'
+      || node.callee?.type !== 'MemberExpression'
+      || node.callee.computed
+      || node.callee.object?.type !== 'Identifier'
+      || node.callee.object.name !== '$data'
+      || node.callee.property?.type !== 'Identifier'
+      || node.callee.property.name !== 'metaOf'
+    ) {
+      return
+    }
+
+    const args = Array.isArray(node.arguments) ? node.arguments : []
+    const path = args[0] ? readMemberPath(args[0]) : []
+    const namespace = args[1]?.type === 'StringLiteral' ? String(args[1].value ?? '').trim() : null
+    const reference = normalizeDataMetaReference(path, props)
+    const validNamespace = args.length < 2 || Boolean(namespace)
+    if (!reference || args.length < 1 || args.length > 2 || !validNamespace) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'sfc-data-meta-call-shape',
+        message: '$data.metaOf() принимает ссылку prop/row и optional статический непустой namespace.',
+        sourcePath: context.sourcePath,
+        start: typeof node.start === 'number' ? node.start : undefined,
+        end: typeof node.end === 'number' ? node.end : undefined,
+      })
+      return
+    }
+
+    result.push({ reference, namespace, raw: source })
+  })
+
+  return result
+}
+
+function normalizeDataMetaReference(
+  path: string[],
+  props: Set<string>,
+): RComponentSFC_IR_DataMetaRead['reference'] | null {
+  const normalized = [...path]
+  if (normalized[0] === 'props') {
+    normalized.shift()
+  }
+  const prop = normalized[0]
+  if (prop && props.has(prop)) {
+    return { kind: 'prop', prop, path: normalized.slice(1) }
+  }
+  if (normalized[0] === 'row' && normalized.length > 1) {
+    return { kind: 'table-row', path: normalized.slice(1) }
+  }
+  if (normalized[0] === '$row' && normalized[1] === 'data' && normalized.length > 2) {
+    return { kind: 'table-row', path: normalized.slice(2) }
+  }
+  return null
 }
 
 /**

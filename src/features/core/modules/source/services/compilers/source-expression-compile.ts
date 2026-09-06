@@ -415,6 +415,10 @@ export function compileSourceExpression(
 
   if (t.isCallExpression(node) && t.isIdentifier(node.callee)) {
     const calleeName = node.callee.name
+    const updateRead = compileUpdateRead(node, diagnostics, sourcePath)
+    if (updateRead) {
+      return updateRead
+    }
     const readSource = Object.hasOwn(READ_FUNCTIONS, calleeName)
       ? READ_FUNCTIONS[calleeName]
       : undefined
@@ -460,6 +464,40 @@ export function compileSourceExpression(
     node,
   ))
   return null
+}
+
+function compileUpdateRead(
+  node: t.CallExpression,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+): SourceExpressionIR | null {
+  if (!t.isIdentifier(node.callee)) {
+    return null
+  }
+  const specs: Record<string, { source: SourceExpressionReadKind, arity: number }> = {
+    __updateInput: { source: 'update-input', arity: 1 },
+    __updateItem: { source: 'update-item', arity: 1 },
+    __updateParent: { source: 'update-parent', arity: 1 },
+    __updateData: { source: 'update-data', arity: 1 },
+    __updateMeta: { source: 'update-meta', arity: 2 },
+    __updateHasData: { source: 'update-has-data', arity: 1 },
+    __updateHasMeta: { source: 'update-has-meta', arity: 2 },
+  }
+  if (!Object.hasOwn(specs, node.callee.name)) {
+    return null
+  }
+  const spec = specs[node.callee.name]!
+  const parameters = node.arguments.map((_, index) => readStringArgument(node, index))
+  if (parameters.length !== spec.arity || parameters.some(value => value == null)) {
+    diagnostics.push(diagnostic('error', 'update-expression-read', 'Update read принимает только ожидаемые строковые arguments.', sourcePath, node))
+    return { type: 'literal', value: undefined }
+  }
+  return {
+    type: 'read',
+    source: spec.source,
+    path: parameters[0]!,
+    ...(parameters.length > 1 ? { parameters: parameters.slice(1) as string[] } : {}),
+  }
 }
 
 function compileFilterFieldsRead(

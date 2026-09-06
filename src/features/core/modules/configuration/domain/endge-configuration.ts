@@ -23,12 +23,13 @@ import type {
   EndgeDiagnosticsOutputConfiguration,
   EndgeDiagnosticsRoute,
 } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
+import type { ComponentSFCInteractionTriggerActivation } from '@/features/core/modules/domain/types/component/sfc/ir.types'
 import type { EndgeJSONValue } from '@/features/core/modules/source/domain/types/configuration-source.types'
 import { DEFAULT_FALLBACK_LOCALE, DEFAULT_LOCALE, DEFAULT_THEME, DEFAULT_TIMEZONE } from '@/features/core/kernel/constants/kernel.constants'
 import { isEndgeJSONValue } from '@/features/core/modules/configuration/domain/configuration-value'
 import { DEFAULT_ENDGE_TOOLTIP_CONFIGURATION } from '@/features/core/modules/configuration/domain/tooltip.config'
 import { DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION } from '@/features/core/modules/diagnostics/config/diagnostics.config'
-import { normalizeComponentSFCInteractionKeyboardCondition, normalizeComponentSFCInteractionTriggers } from '@/features/core/modules/domain/component/component-sfc-edit-trigger'
+import { normalizeComponentSFCInteractionKeyboardCondition, normalizeComponentSFCInteractionTriggerActivation, normalizeComponentSFCInteractionTriggers } from '@/features/core/modules/domain/component/component-sfc-edit-trigger'
 import { DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION } from '@/features/core/modules/domain/component/sfc-editing.config'
 
 const LEGACY_SFC_ADAPTER_IDS: Readonly<Record<string, string>> = {
@@ -298,12 +299,12 @@ function isSafeConfigurationKey(value: string): boolean {
 function normalizeSFCEditingConfiguration(input: unknown): EndgeSFCEditingConfiguration {
   const source = isRecord(input) ? input : {}
   return {
-    cancelOn: normalizeSFCEditingTriggers(
+    cancelOn: normalizeTriggerSetConfiguration(
       source.cancelOn,
       DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION.cancelOn,
       'sfcEditing.cancelOn',
     ),
-    commitOn: normalizeSFCEditingTriggers(
+    commitOn: normalizeTriggerSetConfiguration(
       source.commitOn,
       DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION.commitOn,
       'sfcEditing.commitOn',
@@ -311,7 +312,8 @@ function normalizeSFCEditingConfiguration(input: unknown): EndgeSFCEditingConfig
   }
 }
 
-function normalizeSFCEditingTriggers(
+/** Нормализует persisted TriggerSet и проверяет общие несовместимые flags. */
+function normalizeTriggerSetConfiguration(
   input: unknown,
   fallback: readonly EndgeSFCEditingConfiguration['cancelOn'][number][],
   path: string,
@@ -353,6 +355,57 @@ function normalizeSFCEditingTriggers(
     ...(trigger.capture ? { capture: true } : {}),
     ...(trigger.passive ? { passive: true } : {}),
   }))
+}
+
+/** Нормализует универсальную активацию, принимая legacy TriggerSet без mode и migration. */
+function normalizeTriggerActivationConfiguration(
+  input: unknown,
+  fallback: ComponentSFCInteractionTriggerActivation,
+  path: string,
+): ComponentSFCInteractionTriggerActivation {
+  if (input == null) {
+    return structuredCloneSafe(fallback) as ComponentSFCInteractionTriggerActivation
+  }
+
+  const normalized = normalizeComponentSFCInteractionTriggerActivation(input)
+  if (Array.isArray(normalized)) {
+    return normalizeTriggerSetConfiguration(input, [], path)
+  }
+  if (!isRecord(input) || input.mode !== 'sequence' || !Array.isArray(input.steps)) {
+    throw new Error(`[EndgeConfiguration] ${path} must be a TriggerSet or sequence`)
+  }
+  const rawSteps = input.steps
+  if (rawSteps.length < 2 || normalized.steps.length !== rawSteps.length) {
+    throw new Error(`[EndgeConfiguration] ${path}.steps must contain at least two valid steps`)
+  }
+
+  return {
+    mode: 'sequence',
+    steps: normalized.steps.map((step, index) => {
+      const source = rawSteps[index]
+      if (!isRecord(source)) {
+        throw new Error(`[EndgeConfiguration] ${path}.steps.${index} must be an object`)
+      }
+      const triggerSet = normalizeTriggerSetConfiguration(
+        source.triggerSet,
+        [],
+        `${path}.steps.${index}.triggerSet`,
+      )
+      if (triggerSet.length === 0) {
+        throw new Error(`[EndgeConfiguration] ${path}.steps.${index}.triggerSet cannot be empty`)
+      }
+      if (index > 0 && source.maxIntervalMs != null) {
+        const interval = Number(source.maxIntervalMs)
+        if (!Number.isFinite(interval) || interval <= 0 || interval > 60_000) {
+          throw new Error(`[EndgeConfiguration] ${path}.steps.${index}.maxIntervalMs must be between 1 and 60000`)
+        }
+      }
+      return {
+        triggerSet,
+        ...(index > 0 ? { maxIntervalMs: step.maxIntervalMs } : {}),
+      }
+    }),
+  }
 }
 
 function applySFCEditingPatch(
@@ -477,6 +530,16 @@ function applyDiagnosticsPatch(
   applyDiagnosticsRequiredValue(next.snapshots.content, 'runtime', snapshots?.content?.runtime)
   applyDiagnosticsRequiredValue(next.snapshots.content, 'raphData', snapshots?.content?.raphData)
   applyDiagnosticsRequiredValue(next.snapshots.content, 'raphGraph', snapshots?.content?.raphGraph)
+  applyDiagnosticsRequiredValue(next.snapshots.shortcut, 'triggerSet', snapshots?.shortcut?.triggerSet)
+  applyDiagnosticsRequiredValue(next.snapshots.shortcut.content, 'telemetry', snapshots?.shortcut?.content?.telemetry)
+  applyDiagnosticsRequiredValue(next.snapshots.shortcut.content, 'problems', snapshots?.shortcut?.content?.problems)
+  applyDiagnosticsRequiredValue(next.snapshots.shortcut.content, 'configuration', snapshots?.shortcut?.content?.configuration)
+  applyDiagnosticsRequiredValue(next.snapshots.shortcut.content, 'effectiveConfiguration', snapshots?.shortcut?.content?.effectiveConfiguration)
+  applyDiagnosticsRequiredValue(next.snapshots.shortcut.content, 'domain', snapshots?.shortcut?.content?.domain)
+  applyDiagnosticsRequiredValue(next.snapshots.shortcut.content, 'program', snapshots?.shortcut?.content?.program)
+  applyDiagnosticsRequiredValue(next.snapshots.shortcut.content, 'runtime', snapshots?.shortcut?.content?.runtime)
+  applyDiagnosticsRequiredValue(next.snapshots.shortcut.content, 'raphData', snapshots?.shortcut?.content?.raphData)
+  applyDiagnosticsRequiredValue(next.snapshots.shortcut.content, 'raphGraph', snapshots?.shortcut?.content?.raphGraph)
   applyDiagnosticsRequiredValue(next.snapshots.automatic, 'enabled', snapshots?.automatic?.enabled)
   applyDiagnosticsRequiredValue(next.snapshots.automatic, 'errorCount', snapshots?.automatic?.errorCount)
   applyDiagnosticsRequiredValue(next.snapshots.automatic, 'windowSeconds', snapshots?.automatic?.windowSeconds)
@@ -677,6 +740,8 @@ function normalizeDiagnosticsConfiguration(input: unknown): EndgeDiagnosticsConf
   const maxRecords = normalizePositiveInteger(rawCollection.maxRecords, defaults.telemetry.collection.maxRecords)
   const rawSnapshots = isRecord(input.snapshots) ? input.snapshots : {}
   const rawContent = isRecord(rawSnapshots.content) ? rawSnapshots.content : {}
+  const rawShortcut = isRecord(rawSnapshots.shortcut) ? rawSnapshots.shortcut : {}
+  const rawShortcutContent = isRecord(rawShortcut.content) ? rawShortcut.content : {}
   const rawAutomatic = isRecord(rawSnapshots.automatic) ? rawSnapshots.automatic : {}
 
   return {
@@ -708,6 +773,27 @@ function normalizeDiagnosticsConfiguration(input: unknown): EndgeDiagnosticsConf
         runtime: normalizeBoolean(rawContent.runtime, defaults.snapshots.content.runtime ?? true),
         raphData: normalizeBoolean(rawContent.raphData, defaults.snapshots.content.raphData ?? true),
         raphGraph: normalizeBoolean(rawContent.raphGraph, defaults.snapshots.content.raphGraph ?? true),
+      },
+      shortcut: {
+        triggerSet: normalizeTriggerActivationConfiguration(
+          rawShortcut.triggerSet,
+          defaults.snapshots.shortcut.triggerSet,
+          'diagnostics.snapshots.shortcut.triggerSet',
+        ),
+        content: {
+          telemetry: normalizeBoolean(rawShortcutContent.telemetry, defaults.snapshots.shortcut.content.telemetry),
+          problems: normalizeBoolean(rawShortcutContent.problems, defaults.snapshots.shortcut.content.problems),
+          configuration: normalizeBoolean(rawShortcutContent.configuration, defaults.snapshots.shortcut.content.configuration),
+          effectiveConfiguration: normalizeBoolean(
+            rawShortcutContent.effectiveConfiguration,
+            defaults.snapshots.shortcut.content.effectiveConfiguration ?? true,
+          ),
+          domain: normalizeBoolean(rawShortcutContent.domain, defaults.snapshots.shortcut.content.domain ?? true),
+          program: normalizeBoolean(rawShortcutContent.program, defaults.snapshots.shortcut.content.program ?? true),
+          runtime: normalizeBoolean(rawShortcutContent.runtime, defaults.snapshots.shortcut.content.runtime ?? true),
+          raphData: normalizeBoolean(rawShortcutContent.raphData, defaults.snapshots.shortcut.content.raphData ?? true),
+          raphGraph: normalizeBoolean(rawShortcutContent.raphGraph, defaults.snapshots.shortcut.content.raphGraph ?? true),
+        },
       },
       automatic: {
         enabled: normalizeBoolean(rawAutomatic.enabled, defaults.snapshots.automatic.enabled),

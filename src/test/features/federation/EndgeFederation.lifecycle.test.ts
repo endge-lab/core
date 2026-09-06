@@ -28,6 +28,192 @@ function uniqueFederationId(label: string): string {
 }
 
 describe('машина состояний жизненного цикла EndgeFederation', () => {
+  /** Проверяет общий phase-order родителя и дочерней Federation. */
+  it('проводит дочернюю федерацию через единый lifecycle graph', async () => {
+    const calls: string[] = []
+
+    class TestModule extends EndgeModule {
+      public constructor(private readonly _key: string) {
+        super()
+      }
+
+      public override setup(): void {
+        calls.push(`${this._key}:setup`)
+      }
+
+      public override load(): void {
+        calls.push(`${this._key}:load`)
+      }
+
+      public override build(): void {
+        calls.push(`${this._key}:build`)
+      }
+
+      public override start(): void {
+        calls.push(`${this._key}:start`)
+      }
+
+      public override reset(): void {
+        calls.push(`${this._key}:reset`)
+      }
+    }
+
+    const Child = EndgeFederation.define({
+      id: uniqueFederationId('child-tree'),
+      modules: [
+        { key: 'inside', create: () => new TestModule('child') },
+      ],
+    })
+    const Parent = EndgeFederation.define({
+      id: uniqueFederationId('parent-tree'),
+      modules: [
+        { key: 'first', create: () => new TestModule('first') },
+        { key: 'last', create: () => new TestModule('last') },
+      ],
+      federations: [
+        {
+          key: 'child',
+          federation: Child,
+          after: 'first',
+          before: 'last',
+        },
+      ],
+    })
+
+    const context = createBootContext()
+    await Parent.boot(context)
+
+    expect(Parent.child).toBe(Child)
+    expect(calls).toEqual([
+      'first:setup',
+      'child:setup',
+      'last:setup',
+      'first:load',
+      'child:load',
+      'last:load',
+      'first:build',
+      'child:build',
+      'last:build',
+      'first:start',
+      'child:start',
+      'last:start',
+    ])
+    expect(Child.state).toBe('ready')
+    await expect(Child.boot(context)).rejects.toThrow('managed by parent federation')
+
+    await Parent.reset()
+    expect(calls.slice(-3)).toEqual(['last:reset', 'child:reset', 'first:reset'])
+    expect(Child.state).toBe('idle')
+  })
+
+  /** Проверяет plugin-вклад Modules и Federations до общей сортировки graph. */
+  it('добавляет plugin-узлы лениво и сортирует их вместе с federation graph', async () => {
+    const calls: string[] = []
+
+    class TestModule extends EndgeModule {
+      public constructor(private readonly _key: string) {
+        super()
+      }
+
+      public override start(): void {
+        calls.push(this._key)
+      }
+    }
+
+    const Child = EndgeFederation.define({
+      id: uniqueFederationId('plugin-child'),
+      modules: [
+        { key: 'inside', create: () => new TestModule('child') },
+      ],
+    })
+    const Parent = EndgeFederation.define({
+      id: uniqueFederationId('plugin-parent'),
+      modules: [
+        { key: 'runtime', create: () => new TestModule('runtime') },
+      ],
+    })
+
+    Parent.use({
+      id: 'test-extension',
+      modules: [
+        { key: 'pluginModule', create: () => new TestModule('plugin'), before: 'pluginChild' },
+      ],
+      federations: [
+        { key: 'pluginChild', federation: Child, before: 'runtime' },
+      ],
+    })
+
+    expect(Parent.isConfigured).toBe(false)
+    await Parent.boot(createBootContext())
+
+    expect(Parent.getModule('pluginModule')).toBeTruthy()
+    expect(Parent.getFederation('pluginChild')).toBe(Child)
+    expect(calls).toEqual(['plugin', 'child', 'runtime'])
+  })
+
+  /** Проверяет accessor и instance при двух facade-копиях с одним runtime id. */
+  it('синхронизирует plugin accessors между facade-копиями одного federation host', async () => {
+    class TestModule extends EndgeModule {}
+
+    const federationId = uniqueFederationId('shared-facade')
+    const FirstFacade = EndgeFederation.define({
+      id: federationId,
+      modules: [
+        { key: 'base', create: () => new TestModule() },
+      ],
+    })
+    const SecondFacade = EndgeFederation.define({
+      id: federationId,
+      modules: [
+        { key: 'base', create: () => new TestModule() },
+      ],
+    })
+
+    FirstFacade.use({
+      id: 'shared-extension',
+      modules: [
+        { key: 'extension', create: () => new TestModule() },
+      ],
+    })
+
+    void SecondFacade.state
+    await FirstFacade.boot(createBootContext())
+
+    const secondExtension = (SecondFacade as typeof SecondFacade & { readonly extension: TestModule }).extension
+    expect(secondExtension).toBe(FirstFacade.getModule('extension'))
+  })
+
+  /** Проверяет рекурсивную валидацию graph до первого lifecycle side effect. */
+  it('не начинает root lifecycle при некорректном graph дочерней федерации', async () => {
+    const calls: string[] = []
+
+    class RootModule extends EndgeModule {
+      public override setup(): void {
+        calls.push('root:setup')
+      }
+    }
+
+    const BrokenChild = EndgeFederation.define({
+      id: uniqueFederationId('broken-child'),
+      modules: [
+        { key: 'inside', create: () => new RootModule(), after: 'missing' },
+      ],
+    })
+    const Parent = EndgeFederation.define({
+      id: uniqueFederationId('validated-parent'),
+      modules: [
+        { key: 'root', create: () => new RootModule() },
+      ],
+      federations: [
+        { key: 'child', federation: BrokenChild, after: 'root' },
+      ],
+    })
+
+    expect(() => Parent.boot(createBootContext())).toThrow('references unknown node "missing"')
+    expect(calls).toEqual([])
+    expect(Parent.state).toBe('idle')
+  })
+
   /** Проверяет single-flight boot и запрет подмены активного контекста. */
   it('разделяет один запуск для одинакового контекста и отклоняет другой контекст', async () => {
     const setupGate = createDeferred()

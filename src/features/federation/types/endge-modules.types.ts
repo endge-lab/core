@@ -49,8 +49,3 @@ export type EndgeFederationContextOf<TDefinitions extends EndgeModuleDefinitions
 export type EndgeFederationModuleAccessors<TDefinitions extends EndgeModuleDefinitions> = {
   readonly [TDefinition in TDefinitions[number] as TDefinition['key']]: ReturnType<TDefinition['create']>
 }
-
-export interface EndgePlugin {
-  id: string
-  install: () => void
-}

@@ -1173,16 +1173,18 @@ function readBindings(
       continue
     }
     const expression = unwrapExpression(property.value)
-    const dataViewBinding = readCompositionDataViewBinding(expression, diagnostics, `${sourcePath}.${key}`)
+    const metaDecorator = readCompositionMetaSourceDecorator(expression, diagnostics, `${sourcePath}.${key}`)
+    const bindingExpression = metaDecorator?.expression ?? expression
+    const dataViewBinding = readCompositionDataViewBinding(bindingExpression, diagnostics, `${sourcePath}.${key}`)
     if (dataViewBinding) {
-      bindings[key] = dataViewBinding
+      bindings[key] = metaDecorator ? { ...dataViewBinding, metaSource: metaDecorator.metaSource } : dataViewBinding
       continue
     }
-    if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'fromOutput' })) {
-      const runtime = readStringArgument(expression, 0)
-      const output = readStringArgument(expression, 1)
-      if (!runtime || expression.arguments.length < 1 || expression.arguments.length > 2 || (expression.arguments.length === 2 && !output)) {
-        diagnostics.push(diagnostic('error', 'composition-binding-output', 'fromOutput(runtime[, output]) требует одну или две непустые строки.', `${sourcePath}.${key}`, expression))
+    if (t.isCallExpression(bindingExpression) && t.isIdentifier(bindingExpression.callee, { name: 'fromOutput' })) {
+      const runtime = readStringArgument(bindingExpression, 0)
+      const output = readStringArgument(bindingExpression, 1)
+      if (!runtime || bindingExpression.arguments.length < 1 || bindingExpression.arguments.length > 2 || (bindingExpression.arguments.length === 2 && !output)) {
+        diagnostics.push(diagnostic('error', 'composition-binding-output', 'fromOutput(runtime[, output]) требует одну или две непустые строки.', `${sourcePath}.${key}`, bindingExpression))
       }
       else {
         bindings[key] = output
@@ -1191,23 +1193,27 @@ function readBindings(
       }
       continue
     }
-    if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'fromStore' })) {
-      const storeKey = readStringArgument(expression, 0)
+    if (t.isCallExpression(bindingExpression) && t.isIdentifier(bindingExpression.callee, { name: 'fromStore' })) {
+      const storeKey = readStringArgument(bindingExpression, 0)
       if (!storeKey) {
         diagnostics.push(diagnostic('error', 'composition-binding-store', 'fromStore(key) требует непустую строку.', `${sourcePath}.${key}`, expression))
       }
       else { bindings[key] = { kind: 'store', key: storeKey } }
       continue
     }
-    if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'fromData' })) {
-      const ref = readStringArgument(expression, 0) ?? ''
+    if (t.isCallExpression(bindingExpression) && t.isIdentifier(bindingExpression.callee, { name: 'fromData' })) {
+      const ref = readStringArgument(bindingExpression, 0) ?? ''
       const dot = ref.indexOf('.')
       const data = dot > 0 ? ref.slice(0, dot) : ref
       const path = dot > 0 ? ref.slice(dot + 1) : ''
       if (!data) {
         diagnostics.push(diagnostic('error', 'composition-binding-data', 'fromData(path) требует data alias.', `${sourcePath}.${key}`, expression))
       }
-      else { bindings[key] = { kind: 'data', data, path } }
+      else { bindings[key] = { kind: 'data', data, path, ...(metaDecorator ? { metaSource: metaDecorator.metaSource } : {}) } }
+      continue
+    }
+    if (metaDecorator) {
+      diagnostics.push(diagnostic('error', 'composition-binding-meta-source-owner', '.metaFrom(...) поддерживается только после fromData(...) или fromData(...).dataView(...).', `${sourcePath}.${key}`, expression))
       continue
     }
     if (t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'metadataOf' })) {
@@ -1243,6 +1249,60 @@ function readBindings(
   return bindings
 }
 
+function readCompositionMetaSourceDecorator(
+  expression: t.Expression,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+): { expression: t.Expression, metaSource: import('@/features/core/modules/source/domain/types/composition-source.types').CompositionMetaSourceBinding } | null {
+  if (
+    !t.isCallExpression(expression)
+    || !t.isMemberExpression(expression.callee)
+    || propertyName(expression.callee.property) !== 'metaFrom'
+    || !t.isExpression(expression.callee.object)
+  ) {
+    return null
+  }
+  const ref = readStringArgument(expression, 0) ?? ''
+  const dot = ref.indexOf('.')
+  const data = dot > 0 ? ref.slice(0, dot) : ref
+  const path = dot > 0 ? ref.slice(dot + 1) : ''
+  const options = expression.arguments[1]
+  if (!data || expression.arguments.length < 1 || expression.arguments.length > 2 || (options && !t.isObjectExpression(options))) {
+    diagnostics.push(diagnostic('error', 'composition-binding-meta-source-shape', '.metaFrom(dataPath[, { key, fields }]) требует data alias и статические options.', sourcePath, expression))
+    return null
+  }
+  const key = options && t.isObjectExpression(options) ? readStringObjectProperty(options, 'key') ?? undefined : undefined
+  const fieldsNode = options && t.isObjectExpression(options) ? propertyValue(options, 'fields') : null
+  const fields = fieldsNode ? readStaticStringRecord(fieldsNode) : undefined
+  if (fieldsNode && !fields) {
+    diagnostics.push(diagnostic('error', 'composition-binding-meta-source-fields', '.metaFrom fields должен быть object literal со строковыми значениями.', sourcePath, fieldsNode))
+    return null
+  }
+  return {
+    expression: unwrapExpression(expression.callee.object),
+    metaSource: { data, path, ...(key ? { key } : {}), ...(fields ? { fields } : {}) },
+  }
+}
+
+function readStaticStringRecord(node: t.Expression): Record<string, string> | null {
+  if (!t.isObjectExpression(node)) {
+    return null
+  }
+  const result: Record<string, string> = {}
+  for (const property of node.properties) {
+    if (!t.isObjectProperty(property) || property.computed || !t.isStringLiteral(property.value)) {
+      return null
+    }
+    const key = propertyName(property.key)
+    const value = property.value.value.trim()
+    if (!key || !value) {
+      return null
+    }
+    result[key] = value
+  }
+  return result
+}
+
 function resolveVisibleDataBindings(
   bindings: Record<string, CompositionBindingValue>,
   visibleData: ReadonlyMap<string, string>,
@@ -1256,7 +1316,8 @@ function resolveVisibleDataBindings(
         diagnostics.push(diagnostic('error', 'composition-binding-data-missing', `fromData(...) ссылается на недоступный data alias "${binding.data}".`, `${sourcePath}.${key}`))
         return [key, binding]
       }
-      return [key, { ...binding, data: resolved }]
+      const metaSource = resolveMetaSourceBinding(binding.metaSource, visibleData, diagnostics, `${sourcePath}.${key}`)
+      return [key, { ...binding, data: resolved, ...(metaSource ? { metaSource } : {}) }]
     }
     if (binding.kind === 'data-view') {
       const resolved = visibleData.get(binding.data)
@@ -1264,9 +1325,11 @@ function resolveVisibleDataBindings(
         diagnostics.push(diagnostic('error', 'composition-binding-data-missing', `fromData(...) ссылается на недоступный data alias "${binding.data}".`, `${sourcePath}.${key}`))
         return [key, binding]
       }
+      const metaSource = resolveMetaSourceBinding(binding.metaSource, visibleData, diagnostics, `${sourcePath}.${key}`)
       return [key, {
         ...binding,
         data: resolved,
+        ...(metaSource ? { metaSource } : {}),
         props: resolveVisibleDataBindings(binding.props, visibleData, diagnostics, `${sourcePath}.${key}.dataView`),
       }]
     }
@@ -1295,6 +1358,23 @@ function resolveVisibleDataBindings(
     }
     return [key, binding]
   }))
+}
+
+function resolveMetaSourceBinding(
+  metaSource: import('@/features/core/modules/source/domain/types/composition-source.types').CompositionMetaSourceBinding | undefined,
+  visibleData: ReadonlyMap<string, string>,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+) {
+  if (!metaSource) {
+    return undefined
+  }
+  const resolved = visibleData.get(metaSource.data)
+  if (!resolved) {
+    diagnostics.push(diagnostic('error', 'composition-binding-meta-source-missing', `.metaFrom(...) ссылается на недоступный data alias "${metaSource.data}".`, sourcePath))
+    return metaSource
+  }
+  return { ...metaSource, data: resolved }
 }
 
 function mapExpression(
