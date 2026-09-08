@@ -154,7 +154,7 @@ describe('интеграция Query с производными данными 
     second.resolve([scheduleRow(2, 'FV', 'new')])
     await secondRun
     first.resolve([scheduleRow(1, 'SU', 'old')])
-    await firstRun
+    await expect(firstRun).rejects.toMatchObject({ name: 'AbortError' })
 
     expect((Raph.get(rawPath) as any[])[0].flightNumber).toBe('new')
     expect((Raph.get(tablePath) as any[])[0].flightNumber).toBe('new')

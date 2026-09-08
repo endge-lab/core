@@ -3,6 +3,42 @@ import { executeRuntimeOperation } from '@/features/core/modules/runtime/operati
 import { OperationHistory } from '@/features/core/modules/runtime/operation/operation-history'
 
 describe('история операций', () => {
+  /** Каждый повторный run создаёт актуальный результат для последующей отмены. */
+  it('передаёт в повторный undo результат последнего успешного default redo', async () => {
+    const history = new OperationHistory({ id: 'history' })
+    let nextId = 0
+    const deleted: unknown[] = []
+    const run = vi.fn(async () => ++nextId)
+    await executeRuntimeOperation({
+      id: 'create',
+      input: {},
+      history,
+      recordHistory: true,
+      run,
+      undo: async ({ runOutput }) => { deleted.push(runOutput) },
+    })
+    await history.undo()
+    run.mockRejectedValueOnce(new Error('create failed'))
+    await expect(history.redo()).rejects.toThrow('create failed')
+    expect(history.snapshot()).toMatchObject({ size: 1, cursor: 0 })
+    await history.redo()
+    await history.undo()
+    expect(deleted).toEqual([1, 2])
+  })
+
+  /** Явный redo может вернуть служебный результат и не заменяет контракт runOutput. */
+  it('сохраняет исходный runOutput для пользовательского redo', async () => {
+    const history = new OperationHistory({ id: 'history' })
+    const undo = vi.fn(async ({ runOutput }) => runOutput)
+    const redo = vi.fn(async () => ({ status: 'restored' }))
+    await executeRuntimeOperation({ id: 'restore', input: {}, history, recordHistory: true, run: async () => 'id', undo, redo })
+    await history.undo()
+    await history.redo()
+    await history.undo()
+    expect(undo.mock.calls.map(([context]) => context.runOutput)).toEqual(['id', 'id'])
+    expect(redo).toHaveBeenCalledOnce()
+  })
+
   it('serializes the entire next run and commit behind an in-flight undo', async () => {
     const history = new OperationHistory({ id: 'history' })
     let value = 0

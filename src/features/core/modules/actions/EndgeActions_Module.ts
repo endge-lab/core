@@ -10,9 +10,12 @@ import type {
   RuntimeActionRegistrySnapshot,
   TableColumnActionContext,
 } from '@/features/core/modules/actions/domain/action.types'
+import type { ActionProgramExecutionOptions } from '@/features/core/modules/actions/services/ActionProgramExecutor'
 import type { EntityOrigin } from '@/features/core/modules/domain/types/document/entity-management.type'
 import type { ImplementationInvocation, ImplementationProvider } from '@/features/core/modules/implementations/domain/implementation.types'
 import type { EndgeImplementations_Module } from '@/features/core/modules/implementations/EndgeImplementations_Module'
+import type { RuntimeHost } from '@/features/core/modules/runtime/domain/runtime-host.types'
+import type { RuntimeScope } from '@/features/core/modules/runtime/RuntimeScope'
 import { Endge } from '@/features/core/kernel/endge'
 import { BUILTIN_ACTION_IDS } from '@/features/core/modules/actions/domain/action.types'
 import { ActionProgramExecutor } from '@/features/core/modules/actions/services/ActionProgramExecutor'
@@ -72,10 +75,11 @@ export class EndgeActions_Module extends EndgeModule {
     this._sourceExecutor = new ActionProgramExecutor({
       resolveQuery: identity => Endge.domain.getQuery(identity),
       runQuery: async (query, input, parent) => await Endge.runtime.query.run(query, input, parent),
-      executeAction: async (identity, input, parentRuntimeId) => await this.execute(identity, {
+      executeAction: async (identity, input, parentRuntimeId, sourceExecution) => await this.execute(identity, {
         input,
-        context: { parentRuntimeId },
+        context: { parentRuntimeId, sourceExecution },
       }),
+      captureExecutionGuard: parent => this._captureExecutionGuard(parent),
       runComputation: async (identity, input) => await Endge.computations.run(identity, input),
       executeSandbox: async request => await Endge.computations.executeSandbox(request),
       resolveOperationHistory: parent => Endge.runtime.operations.resolveForHost(parent),
@@ -401,6 +405,22 @@ export class EndgeActions_Module extends EndgeModule {
     }
   }
 
+  /** Запоминает поколение владельца, чтобы пауза с последующим resume не оживляла старый Action. */
+  private _captureExecutionGuard(parent: RuntimeHost<any, any> | null): () => void {
+    const scopes: Array<{ scope: RuntimeScope, signal: AbortSignal | null }> = []
+    let scope = parent ? Endge.runtime.getRuntimeScopeByHost(parent.id) : null
+    while (scope) {
+      scopes.push({ scope, signal: scope.signal })
+      scope = scope.parent
+    }
+    return () => {
+      if ((parent && (Endge.runtime.getRuntimeById(parent.id) !== parent || ['pausing', 'paused', 'stopping', 'stopped', 'unmounted', 'destroyed'].includes(parent.status)))
+        || scopes.some(({ scope, signal }) => signal?.aborted || signal !== scope.signal || !['active', 'activating', 'resuming'].includes(scope.state))) {
+        throw new DOMException('Action runtime execution was cancelled.', 'AbortError')
+      }
+    }
+  }
+
   private _registerCoreProviders(): void {
     this._providerDisposers.push(this._implementations.registerProvider({
       key: SOURCE_PROVIDER_KEY,
@@ -413,7 +433,10 @@ export class EndgeActions_Module extends EndgeModule {
         if (!artifact || artifact.status === 'error') {
           throw new Error(`Action artifact is not executable: ${action.identity}.`)
         }
-        return await this._sourceExecutor.run(artifact.payload, invocation.input, parent)
+        if (parentRuntimeId && !parent) {
+          throw new DOMException('Action runtime owner is no longer available.', 'AbortError')
+        }
+        return await this._sourceExecutor.run(artifact.payload, invocation.input, parent, invocation.context?.sourceExecution as ActionProgramExecutionOptions | undefined)
       },
     }))
     this._providerDisposers.push(this._implementations.registerProvider({

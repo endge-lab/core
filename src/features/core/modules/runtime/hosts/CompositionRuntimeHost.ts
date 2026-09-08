@@ -539,7 +539,34 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     descriptor: CompositionProgramPayload['runtimes'][number],
   ): CompositionRuntimeActivationHandle {
     let disposed = false
+    let generation = 0
+    let activation: Promise<RuntimeHost<any, any>> | null = null
+    let transition: Promise<unknown> = Promise.resolve()
     const getRuntime = (): RuntimeHost<any, any> | null => this._children.get(descriptor.path) ?? null
+    const enqueue = <T>(task: () => Promise<T>): Promise<T> => {
+      const next = transition.then(task, task)
+      transition = next.then(() => undefined, () => undefined)
+      return next
+    }
+    const assertCurrent = (version: number) => {
+      if (disposed || generation !== version || this._mountCancelled) {
+        throw new DOMException(`Runtime "${descriptor.path}" activation was cancelled.`, 'AbortError')
+      }
+    }
+    const deactivate = (): Promise<void> => {
+      generation += 1
+      activation = null
+      const runtime = getRuntime()
+      // Отменяем acquire до ожидания transition, иначе незавершённый mount блокирует cleanup.
+      const stopping = runtime ? Endge.runtime.destroyRuntimeTreeAsync(runtime.id) : Promise.resolve()
+      void stopping.catch(() => {})
+      return enqueue(async () => {
+        try {
+          await stopping
+        }
+        finally { this._forgetRuntime(descriptor.path) }
+      })
+    }
     return {
       path: descriptor.path,
       get state() {
@@ -547,48 +574,72 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
           return 'disposed'
         }
         const runtime = getRuntime()
-        if (!runtime) {
+        if (!runtime || activation) {
           return 'inactive'
         }
         return runtime.status === 'paused' ? 'paused' : 'active'
       },
       get runtime() { return getRuntime() },
-      activate: async () => {
+      activate: () => {
         if (disposed) {
-          throw new Error(`[CompositionRuntimeHost] Runtime handle "${descriptor.path}" is disposed.`)
+          return Promise.reject(new Error(`[CompositionRuntimeHost] Runtime handle "${descriptor.path}" is disposed.`))
         }
-        const scope = this._requireScope(descriptor.scopePath)
-        if (scope.state !== 'active') {
-          await scope.activate()
+        if (activation) {
+          return activation
         }
-        let runtime = getRuntime()
-        if (!runtime) {
-          await this._createChild(descriptor)
-          this._bindChild(descriptor)
-          const payload = this.getArtifactPayload()
-          if (payload) {
-            this._bindHooks(payload)
+        const version = generation
+        const next = enqueue(async () => {
+          assertCurrent(version)
+          const scope = this._requireScope(descriptor.scopePath)
+          if (scope.state !== 'active') {
+            await scope.activate()
           }
-          runtime = getRuntime()
+          assertCurrent(version)
+          try {
+            if (!getRuntime()) {
+              await this._createChild(descriptor)
+            }
+            const runtime = getRuntime()
+            if (!runtime) {
+              throw new Error(`[CompositionRuntimeHost] Runtime "${descriptor.path}" cannot be activated.`)
+            }
+            if (runtime.entityType === 'composition') {
+              await (runtime as CompositionRuntimeHost).mountGraph()
+            }
+            assertCurrent(version)
+            this._bindChild(descriptor)
+            const payload = this.getArtifactPayload()
+            if (payload) {
+              this._bindHooks(payload)
+            }
+            return runtime
+          }
+          catch (error) {
+            const runtime = getRuntime()
+            try {
+              if (runtime) {
+                await Endge.runtime.destroyRuntimeTreeAsync(runtime.id)
+              }
+            }
+            finally { this._forgetRuntime(descriptor.path) }
+            throw error
+          }
+        })
+        activation = next
+        const clear = () => {
+          if (activation === next) {
+            activation = null
+          }
         }
-        if (!runtime) {
-          throw new Error(`[CompositionRuntimeHost] Runtime "${descriptor.path}" cannot be activated.`)
-        }
-        return runtime
+        void next.then(clear, clear)
+        return next
       },
-      pause: async () => { await getRuntime()?.pause?.() },
-      resume: async () => { await getRuntime()?.resume?.() },
-      deactivate: async () => {
-        const runtime = getRuntime()
-        if (!runtime) {
-          return
-        }
-        await Endge.runtime.destroyRuntimeTreeAsync(runtime.id)
-        this._forgetRuntime(descriptor.path)
-      },
-      dispose: async () => {
-        await this._runtimeHandles.get(descriptor.path)?.deactivate()
+      pause: () => enqueue(async () => { await getRuntime()?.pause?.() }),
+      resume: () => enqueue(async () => { await getRuntime()?.resume?.() }),
+      deactivate,
+      dispose: () => {
         disposed = true
+        return deactivate()
       },
       getOutput: (name) => {
         const runtime = getRuntime() as any
@@ -710,39 +761,39 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
 
   public override quiesce(): void {
     this._mountCancelled = true
-    super.quiesce()
+    const errors: unknown[] = []
+    const release = (dispose: () => unknown) => {
+      try {
+        dispose()
+      }
+      catch (error) { errors.push(error) }
+    }
+    release(() => super.quiesce())
     for (const timer of this._streamBatchTimers.values()) {
       clearTimeout(timer)
     }
     this._streamBatchTimers.clear()
     this._streamBatches.clear()
     for (const path of this._runtimeDisposers.keys()) {
-      this._disposeRuntimeBindings(path)
+      release(() => this._disposeRuntimeBindings(path))
     }
-    for (const dispose of this._disposers) {
-      dispose()
+    for (const dispose of this._disposers.splice(0)) {
+      release(dispose)
     }
-    this._disposers = []
-    for (const dispose of this._dispatchDisposers.values()) {
-      dispose()
+    for (const disposers of [this._dispatchDisposers, this._outputBridgeDisposers, this._hookDisposers, this._publicationDisposers]) {
+      const owned = [...disposers.values()]
+      disposers.clear()
+      for (const dispose of owned) {
+        release(dispose)
+      }
     }
-    this._dispatchDisposers.clear()
     for (const path of this._bridgePaths) {
-      Raph.delete(path)
+      release(() => Raph.delete(path))
     }
     this._bridgePaths.clear()
-    for (const dispose of this._outputBridgeDisposers.values()) {
-      dispose()
+    if (errors.length) {
+      throw new AggregateError(errors, '[CompositionRuntimeHost] Failed to quiesce resources.')
     }
-    this._outputBridgeDisposers.clear()
-    for (const dispose of this._hookDisposers.values()) {
-      dispose()
-    }
-    this._hookDisposers.clear()
-    for (const dispose of this._publicationDisposers.values()) {
-      dispose()
-    }
-    this._publicationDisposers.clear()
   }
 
   public override destroy(): Promise<void> {
@@ -759,18 +810,25 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   }
 
   private async _destroyOwnedResources(): Promise<void> {
-    this.quiesce()
+    const errors: unknown[] = []
+    const release = async (dispose: () => unknown) => {
+      try {
+        await dispose()
+      }
+      catch (error) { errors.push(error) }
+    }
+    await release(() => this.quiesce())
     for (const child of this._children.values()) {
       if (Endge.runtime.getRuntimeById(child.id)) {
-        await Endge.runtime.destroyRuntimeTreeAsync(child.id)
+        await release(() => Endge.runtime.destroyRuntimeTreeAsync(child.id))
       }
       else if (child.status !== 'destroyed') {
-        await child.destroy()
+        await release(() => child.destroy())
       }
     }
     for (const runtimeId of this._ownedStoreRuntimeIds) {
       if (Endge.runtime.getRuntimeById(runtimeId)) {
-        await Endge.runtime.destroyRuntimeTreeAsync(runtimeId)
+        await release(() => Endge.runtime.destroyRuntimeTreeAsync(runtimeId))
       }
     }
     this._ownedStoreRuntimeIds.clear()
@@ -778,7 +836,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     this._childDescriptors.clear()
     this._publicOutputs = {}
     for (const scope of [...this._scopes.values()].reverse()) {
-      await Endge.runtime.scopes.remove(scope.id)
+      await release(() => Endge.runtime.scopes.remove(scope.id))
     }
     this._scopes.clear()
     this._runtimeHandles.clear()
@@ -793,7 +851,10 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     this._vocabDataModes.clear()
     this._orchestratedQueries.clear()
     this._orchestratedSuccesses.clear()
-    super.destroy()
+    await release(() => super.destroy())
+    if (errors.length) {
+      throw new AggregateError(errors, '[CompositionRuntimeHost] Failed to destroy resources.')
+    }
   }
 
   /** Строит effective catalogs по той же иерархии, что и lifecycle scopes. */
@@ -1587,6 +1648,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       })
     }
     catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return
+      }
       this.emit('event:error', {
         code: 'composition-event-effect-failed',
         runtimeAlias,
@@ -1730,8 +1794,15 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   private _disposeRuntimeBindings(runtimeName: string): void {
     const disposers = this._runtimeDisposers.get(runtimeName) ?? []
     this._runtimeDisposers.delete(runtimeName)
+    const errors: unknown[] = []
     for (const dispose of disposers.reverse()) {
-      dispose()
+      try {
+        dispose()
+      }
+      catch (error) { errors.push(error) }
+    }
+    if (errors.length) {
+      throw new AggregateError(errors, `[CompositionRuntimeHost] Failed to release bindings for "${runtimeName}".`)
     }
   }
 

@@ -239,7 +239,7 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
         signal: this._abortController.signal,
       })
       if (sequence !== this._runSequence) {
-        return this.getOutputs() as Record<string, unknown>
+        throw new DOMException('Query execution was superseded.', 'AbortError')
       }
 
       if (!payload.outputs.length) {
@@ -272,7 +272,7 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     }
     catch (error: any) {
       if (sequence !== this._runSequence || error?.name === 'CanceledError' || error?.name === 'AbortError') {
-        return this.getOutputs() as Record<string, unknown>
+        throw new DOMException('Query execution was cancelled.', 'AbortError')
       }
       const updatedAt = new Date().toISOString()
       if (!this._derivedErrorActive) {

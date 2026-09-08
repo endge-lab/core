@@ -23,6 +23,34 @@ describe('проверка Vocab с приоритетом Source', () => {
     Raph.delete('vocabs.airlines-payload')
   })
 
+  /** Collection другого провайдера не может записать или удалить кэш по чужой identity. */
+  it('изолирует кэш при совпадении collection с identity другого справочника', async () => {
+    const first = makeVocab(`defineVocab({
+      provider: payload({ baseUrl: 'https://payload.invalid', collection: 'primary', auth: { mode: 'none' } }),
+      outputs: { items: output().from(response()) },
+    })`)
+    const second = Object.assign(makeVocab(`defineVocab({
+      provider: payload({ baseUrl: 'https://payload.invalid', collection: 'airlines', auth: { mode: 'none' } }),
+      outputs: { items: output().from(response()) },
+    })`), { id: first.id + 1, identity: 'external-airlines' })
+    for (const vocab of [first, second]) {
+      Endge.domain.addVocab(vocab)
+      publishVocabArtifact(vocab)
+    }
+    Endge.vocabs.init()
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(response({ docs: [{ source: 'primary' }] }))
+      .mockResolvedValueOnce(response({ docs: [{ source: 'external' }] }))
+    await Endge.vocabs.loadVocab('airlines', { throwOnError: true })
+    await Endge.vocabs.loadVocab('external-airlines', { throwOnError: true })
+    expect(Endge.vocabs.getValues('airlines')).toEqual([{ source: 'primary' }])
+    expect(Endge.vocabs.getValues('external-airlines')).toEqual([{ source: 'external' }])
+    expect(Endge.vocabs.getValues('primary')).toEqual([{ source: 'primary' }])
+    Endge.vocabs.clearCacheById(second.id)
+    expect(Endge.vocabs.getValues('airlines')).toEqual([{ source: 'primary' }])
+    expect(Endge.vocabs.getValues('external-airlines')).toEqual([])
+  })
+
   it('компилирует Payload, dot-path Mock и упорядоченные transforms', () => {
     const result = Endge.source.compile('vocab', `
 defineVocab({

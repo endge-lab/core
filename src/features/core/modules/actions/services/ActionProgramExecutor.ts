@@ -11,7 +11,8 @@ import { evaluateSourceExpression } from '@/features/core/modules/source/service
 export interface ActionProgramExecutorDependencies {
   resolveQuery: (identity: string) => RQuery | null
   runQuery: (query: RQuery, input: Record<string, unknown>, parent: RuntimeHost<any, any> | null) => Promise<unknown>
-  executeAction: (identity: string, input: unknown, parentRuntimeId?: string) => Promise<unknown>
+  executeAction: (identity: string, input: unknown, parentRuntimeId?: string, execution?: ActionProgramExecutionOptions) => Promise<unknown>
+  captureExecutionGuard?: (parent: RuntimeHost<any, any> | null) => () => void
   runComputation: (identity: string, input: unknown) => Promise<unknown>
   executeSandbox: (request: ComputationSandboxRequest) => Promise<unknown>
   resolveOperationHistory: (parent: RuntimeHost<any, any> | null) => OperationHistory | null
@@ -19,27 +20,42 @@ export interface ActionProgramExecutorDependencies {
   executeConverter: (identity: string, input: unknown, options?: Record<string, unknown>) => unknown
 }
 
+/** Контекст одного вызова сохраняется через вложенные Source Actions. */
+export interface ActionProgramExecutionOptions {
+  recordHistory?: boolean
+  assertActive?: () => void
+}
+
 interface ExecutionContext {
   input: unknown
   parent: RuntimeHost<any, any> | null
   outputs: Map<string, unknown>
   recordHistory: boolean
+  assertActive: () => void
 }
 
 /** Выполняет созданный компилятором IR Action без интерпретации Source. */
 export class ActionProgramExecutor {
   public constructor(private readonly _dependencies: ActionProgramExecutorDependencies) {}
 
-  public async run(payload: ActionProgramPayload, input: unknown, parent: RuntimeHost<any, any> | null): Promise<unknown> {
+  public async run(payload: ActionProgramPayload, input: unknown, parent: RuntimeHost<any, any> | null, execution: ActionProgramExecutionOptions = {}): Promise<unknown> {
     if (!payload.sourceDocument) {
       throw new Error('Action artifact has no executable source document.')
     }
-    return await this._runBlock(payload.sourceDocument, { input, parent, outputs: new Map(), recordHistory: true })
+    return await this._runBlock(payload.sourceDocument, {
+      input,
+      parent,
+      outputs: new Map(),
+      recordHistory: execution.recordHistory !== false,
+      assertActive: execution.assertActive ?? this._captureExecutionGuard(parent),
+    })
   }
 
   private async _runBlock(block: ActionSourceBlock, context: ExecutionContext): Promise<unknown> {
+    context.assertActive()
     for (const step of block.steps) {
       context.outputs.set(step.name, await this._runStep(step, context))
+      context.assertActive()
     }
     return block.output ? this._evaluate(block.output, context) : undefined
   }
@@ -67,7 +83,10 @@ export class ActionProgramExecutor {
       return input
     }
     if (step.kind === 'action') {
-      return await this._dependencies.executeAction(step.identity, this._evaluate(step.input, context), context.parent?.id)
+      return await this._dependencies.executeAction(step.identity, this._evaluate(step.input, context), context.parent?.id, {
+        recordHistory: context.recordHistory,
+        assertActive: context.assertActive,
+      })
     }
     if (step.kind === 'computation') {
       return await this._dependencies.runComputation(step.identity, this._evaluate(step.input, context))
@@ -90,22 +109,30 @@ export class ActionProgramExecutor {
 
   private async _runOperation(step: ActionSourceOperationStep, outer: ExecutionContext): Promise<unknown> {
     const history = this._dependencies.resolveOperationHistory(outer.parent)
+    let firstRun = true
     return await executeRuntimeOperation({
       id: `${step.name}:${Date.now()}`,
       input: step.input ? this._evaluate(step.input, outer) : outer.input,
       history,
       recordHistory: outer.recordHistory,
-      run: async context => await this._runBlock(step.run, {
-        input: context.input,
-        parent: outer.parent,
-        outputs: new Map(),
-        recordHistory: false,
-      }),
+      run: async (context) => {
+        // Первый run сохраняет отмену ожидания очереди; default redo получает новое поколение.
+        const assertActive = firstRun ? outer.assertActive : this._captureExecutionGuard(outer.parent)
+        firstRun = false
+        return await this._runBlock(step.run, {
+          input: context.input,
+          parent: outer.parent,
+          outputs: new Map(),
+          recordHistory: false,
+          assertActive,
+        })
+      },
       undo: async context => await this._runBlock(step.undo, {
         input: withOperationOutputs(context.input, context.runOutput, undefined),
         parent: outer.parent,
         outputs: new Map(),
         recordHistory: false,
+        assertActive: this._captureExecutionGuard(outer.parent),
       }),
       redo: step.redo
         ? async context => await this._runBlock(step.redo!, {
@@ -113,9 +140,14 @@ export class ActionProgramExecutor {
           parent: outer.parent,
           outputs: new Map(),
           recordHistory: false,
+          assertActive: this._captureExecutionGuard(outer.parent),
         })
         : null,
     })
+  }
+
+  private _captureExecutionGuard(parent: RuntimeHost<any, any> | null): () => void {
+    return this._dependencies.captureExecutionGuard?.(parent) ?? (() => {})
   }
 
   private _evaluate(expression: SourceExpressionIR, context: ExecutionContext): unknown {

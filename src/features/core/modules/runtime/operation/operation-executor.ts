@@ -1,4 +1,4 @@
-import type { OperationHistory } from '@/features/core/modules/runtime/operation/operation-history'
+import type { OperationHistory, OperationHistoryEntry } from '@/features/core/modules/runtime/operation/operation-history'
 
 export interface RuntimeOperationContext {
   input: unknown
@@ -23,21 +23,27 @@ export async function executeRuntimeOperation(options: ExecuteRuntimeOperationOp
     return options.run({ input: snapshot })
   }
   return options.history.execute(async () => {
-    const runOutput = await options.run({ input: snapshot })
+    let runOutput = await options.run({ input: snapshot })
     let undoOutput: unknown
-    return {
-      result: runOutput,
-      entry: {
-        id: options.id,
-        input: snapshot,
-        runOutput,
-        undo: async () => {
-          undoOutput = await options.undo({ input: snapshot, runOutput })
-          return undoOutput
-        },
-        redo: async () => await (options.redo ?? options.run)({ input: snapshot, runOutput, undoOutput }),
+    const entry: OperationHistoryEntry = {
+      id: options.id,
+      input: snapshot,
+      runOutput,
+      undo: async () => {
+        undoOutput = await options.undo({ input: snapshot, runOutput })
+        return undoOutput
+      },
+      redo: async () => {
+        if (options.redo) {
+          return await options.redo({ input: snapshot, runOutput, undoOutput })
+        }
+        // Новый run создаёт новый результат для следующего undo; неудача сохраняет прежний.
+        runOutput = await options.run({ input: snapshot })
+        entry.runOutput = runOutput
+        return runOutput
       },
     }
+    return { result: runOutput, entry }
   })
 }
 

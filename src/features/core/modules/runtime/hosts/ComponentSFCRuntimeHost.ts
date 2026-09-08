@@ -491,6 +491,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
       return true
     }
     catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return false
+      }
       console.error(`[ComponentSFCRuntimeHost] Event reaction failed for "${ownerIdentity}.${port.name}": ${error instanceof Error ? error.message : String(error)}`)
       this.emit('event:error', { code: 'event-reaction-failed', ownerIdentity, event: port.name, error })
       return false
@@ -697,12 +700,14 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     source: ComponentSFCEventRuntimeSource | undefined,
     ownerIdentity: string,
     eventName: string,
+    recordHistory = true,
   ): Promise<unknown> {
     return await Endge.actions.execute(identity, {
       input,
       target: source?.target,
       context: {
         surface: 'component-event',
+        sourceExecution: { recordHistory },
         parentRuntimeId: this.id,
         componentIdentity: ownerIdentity,
         eventName,
@@ -807,7 +812,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     for (const step of block.steps) {
       const result = step.kind === 'query'
         ? await this._executeEventQueryEffect(step.identity, step.input)
-        : await this._executeEventActionEffect(step.identity, step.input, source, ownerIdentity, eventName)
+        : await this._executeEventActionEffect(step.identity, step.input, source, ownerIdentity, eventName, false)
       outputs.set(step.name, result)
     }
     return block.output ? outputs.get(block.output) : undefined

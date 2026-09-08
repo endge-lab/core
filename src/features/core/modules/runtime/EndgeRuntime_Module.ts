@@ -511,35 +511,47 @@ export class EndgeRuntime_Module extends EndgeModule {
   public override async reset(): Promise<void> {
     this._generation += 1
     const hostIds = this._hosts.getAll().map(host => host.id)
-    this.operations.reset()
-    // Синхронно отсоединяем старый реестр scope. Существующие вызывающие стороны, которые
-    // не ожидают reset, больше не смогут подключить новый runtime к scope, который
-    // освобождается текущим поколением reset.
-    const scopesReset = this.scopes.reset()
-    for (const runtimeId of hostIds) {
-      await this._destroyRuntimeInternal(runtimeId, false)
+    const errors: unknown[] = []
+    const release = async (dispose: () => unknown) => {
+      try {
+        await dispose()
+      }
+      catch (error) { errors.push(error) }
     }
+    try {
+      this.operations.reset()
+    }
+    catch (error) { errors.push(error) }
+    // Сразу отсоединяем старый реестр и наблюдаем ошибки параллельного teardown.
+    const scopesReset = this.scopes.reset().catch((error) => {
+      errors.push(error)
+    })
+    for (const runtimeId of hostIds) {
+      await release(() => this._destroyRuntimeInternal(runtimeId, false))
+    }
+    await scopesReset
 
-    Raph.clearPhases()
+    await release(() => Raph.clearPhases())
     if (this._appNode) {
-      Raph.app.removeNode(this._appNode)
+      await release(() => Raph.app.removeNode(this._appNode!))
     }
     this._scopeNodes.clear()
     for (const scope of this._appScopes.values()) {
-      scope.reset()
+      await release(() => scope.reset())
     }
     this._appNode = null
     this._inited = false
-    this._unsubscribeWorkspace?.()
+    const unsubscribeWorkspace = this._unsubscribeWorkspace
+    const unsubscribeContext = this._unsubscribeContext
     this._unsubscribeWorkspace = null
-    this._unsubscribeContext?.()
     this._unsubscribeContext = null
+    await release(() => unsubscribeWorkspace?.())
+    await release(() => unsubscribeContext?.())
     this._hosts.clearDeleted()
-
-    await scopesReset
-
-    // Единый notify после batch-reset.
-    this.notify()
+    await release(() => this.notify())
+    if (errors.length) {
+      throw new AggregateError(errors, '[EndgeRuntime] Reset cleanup failed.')
+    }
   }
 
   /** Проецирует фактические переменные workspace в runtime namespace Raph. */

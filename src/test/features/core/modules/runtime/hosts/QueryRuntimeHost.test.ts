@@ -57,7 +57,7 @@ describe('проверка Host runtime для Query', () => {
     second.resolve({ raw: 'new' })
     await secondRun
     first.resolve({ raw: 'old' })
-    await firstRun
+    await expect(firstRun).rejects.toMatchObject({ name: 'AbortError' })
 
     expect(host.getOutput('raw')).toBe('new')
     expect(host.context.status).toBe('success')
@@ -105,7 +105,7 @@ describe('проверка Host runtime для Query', () => {
 
     const liveRun = host.run()
     Endge.context.setDataMode('mock')
-    await liveRun
+    await expect(liveRun).rejects.toMatchObject({ name: 'AbortError' })
     const result = await host.run()
 
     expect(execute).toHaveBeenCalledTimes(1)

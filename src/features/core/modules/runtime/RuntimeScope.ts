@@ -51,6 +51,7 @@ export class RuntimeScope implements RuntimeScopeHandle {
   }
 
   public get generation(): number { return this._generation }
+  public get signal(): AbortSignal | null { return this._abortController?.signal ?? null }
   public get updateGateOpen(): boolean { return this._updateGateOpen }
   public get stale(): boolean { return this._stale }
 
@@ -176,21 +177,31 @@ export class RuntimeScope implements RuntimeScopeHandle {
       if (this.state === 'disposed') {
         return
       }
+      const errors: unknown[] = []
+      const release = async (dispose: () => unknown) => {
+        try {
+          await dispose()
+        }
+        catch (error) { errors.push(error) }
+      }
       if (this.state !== 'inactive') {
         this._setState('deactivating')
         this._updateGateOpen = false
         this._abortController?.abort()
-        await this._safeDeactivate()
+        await release(() => this._safeDeactivate())
       }
       for (const child of [...this._children.values()].reverse()) {
-        await child.dispose()
+        await release(() => child.dispose())
       }
-      await this._hooks.dispose?.()
+      await release(() => this._hooks.dispose?.())
       this.parent?._children.delete(this.id)
       this._children.clear()
       this._members.clear()
-      this._setState('disposed')
+      await release(() => this._setState('disposed'))
       this._listeners.clear()
+      if (errors.length) {
+        throw new AggregateError(errors, `[RuntimeScope] Failed to dispose "${this.path}".`)
+      }
     })
   }
 

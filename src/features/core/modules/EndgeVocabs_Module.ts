@@ -325,9 +325,6 @@ export class EndgeVocabs_Module extends EndgeModule {
     delete this._byIdCache[cfg.identity]
     Raph.delete(`vocabsByIdentity.${cfg.identity}`)
     Raph.delete(`vocabs.${cfg.identity}`)
-    if (cfg.slug) {
-      Raph.delete(`vocabs.${cfg.slug}`)
-    }
   }
 
   /**
@@ -785,7 +782,7 @@ export class EndgeVocabs_Module extends EndgeModule {
     this._loadedIdentities.add(identity)
   }
 
-  /** Пишет canonical identity cache и переходный alias provider.collection. */
+  /** Пишет кэш только по identity; имя коллекции разрешается отдельным индексом. */
   private _setCache(cfg: VocabRuntimeConfig, docs: any[], dataMode: 'live' | 'mock' = 'live'): void {
     const values = Array.isArray(docs) ? docs : []
     const path = this.getPath(cfg.identity, { dataMode })
@@ -795,10 +792,6 @@ export class EndgeVocabs_Module extends EndgeModule {
       return
     }
     this._setByIdentityCache(cfg.identity, values)
-    if (cfg.slug && cfg.slug !== cfg.identity) {
-      this._ownedCachePaths.add(`vocabs.${cfg.slug}`)
-      Raph.set(`vocabs.${cfg.slug}`, values)
-    }
   }
 
   /** Читает кэш только выбранной identity и режима без данных другого справочника. */

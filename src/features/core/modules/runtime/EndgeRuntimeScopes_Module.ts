@@ -94,16 +94,12 @@ export class EndgeRuntimeScopes_Module extends EndgeModule {
     if (!scope) {
       return
     }
-    await scope.dispose()
-    for (const [runtimeId, scopeId] of this._scopeByRuntime) {
-      if (scopeId === scope.id) {
-        this._scopeByRuntime.delete(runtimeId)
-      }
+    try {
+      await scope.dispose()
     }
-    this._scopes.delete(scope.id)
-    this._scopeDisposers.get(scope.id)?.()
-    this._scopeDisposers.delete(scope.id)
-    this._changed()
+    finally {
+      this._removeScope(scope)
+    }
   }
 
   public override async reset(): Promise<void> {
@@ -115,8 +111,15 @@ export class EndgeRuntimeScopes_Module extends EndgeModule {
     }
     this._scopeDisposers.clear()
     this._changed()
+    const errors: unknown[] = []
     for (const scope of roots.reverse()) {
-      await scope.dispose()
+      try {
+        await scope.dispose()
+      }
+      catch (error) { errors.push(error) }
+    }
+    if (errors.length) {
+      throw new AggregateError(errors, '[EndgeRuntimeScopes] Reset cleanup failed.')
     }
   }
 
@@ -125,6 +128,18 @@ export class EndgeRuntimeScopes_Module extends EndgeModule {
    * PRIVATE
    * ----------------------------------------
    */
+
+  private _removeScope(scope: RuntimeScope): void {
+    for (const [runtimeId, scopeId] of this._scopeByRuntime) {
+      if (scopeId === scope.id) {
+        this._scopeByRuntime.delete(runtimeId)
+      }
+    }
+    this._scopes.delete(scope.id)
+    this._scopeDisposers.get(scope.id)?.()
+    this._scopeDisposers.delete(scope.id)
+    this._changed()
+  }
 
   private _changed(): void {
     if (this._transactionDepth) {
