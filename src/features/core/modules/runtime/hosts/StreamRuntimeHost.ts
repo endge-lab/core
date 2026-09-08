@@ -21,6 +21,9 @@ function defaultContext(): RuntimeHostContext<'stream'> {
 /** Владелец lifecycle runtime для одного скомпилированного транспорта Stream. */
 export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostContext<'stream'>, StreamSourceArtifact> {
   private _connection: StreamTransportConnection | null = null
+  private _generation = 0
+  private _contextOff: (() => void) | null = null
+  private _dataMode: 'live' | 'mock' = 'live'
 
   public constructor(input: {
     id: string
@@ -81,10 +84,22 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
   }
 
   public override start(): void {
+    super.start()
+    if (this.status !== 'active') {
+      return
+    }
+    this._contextOff ??= Endge.context.subscribe(() => {
+      if (Endge.runtime.resolveDataMode(this) === this._dataMode) {
+        return
+      }
+      this._closeConnection()
+      this.start()
+    })
+    this._dataMode = Endge.runtime.resolveDataMode(this) === 'mock' ? 'mock' : 'live'
     if (this._connection) {
       return
     }
-    if (Endge.runtime.resolveDataMode(this) === 'mock') {
+    if (this._dataMode === 'mock') {
       const updatedAt = new Date().toISOString()
       this.setContext({ status: 'success', startedAt: updatedAt, updatedAt })
       this.emit('start:skipped', { reason: 'mock-mode' })
@@ -106,31 +121,72 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
       ...artifact,
       transport: { ...artifact.transport, url: resolvedUrl },
     }
-    this._connection = this._transportFactory.open(runtimeArtifact, {
-      open: () => this.setContext({ status: 'running', updatedAt: new Date().toISOString() }),
+    const generation = ++this._generation
+    const isCurrent = () => generation === this._generation && this.status === 'active'
+    const connection = this._transportFactory.open(runtimeArtifact, {
+      open: () => {
+        if (isCurrent()) {
+          this.setContext({ status: 'running', updatedAt: new Date().toISOString() })
+        }
+      },
       error: (error) => {
+        if (!isCurrent()) {
+          return
+        }
         this.setContext({ status: 'error', updatedAt: new Date().toISOString() })
         this.emit('transport:error', error)
       },
-      message: message => this._receive(message, artifact),
+      message: (message) => {
+        if (isCurrent()) {
+          this._receive(message, artifact)
+        }
+      },
     })
+    if (isCurrent()) {
+      this._connection = connection
+    }
+    else { connection.close() }
+  }
+
+  /** Пауза закрывает transport и инвалидирует уже поставленные callbacks. */
+  public override pause(): void {
+    super.pause()
+    this._closeConnection()
+  }
+
+  /** Возобновляет transport только после восстановления host lifecycle. */
+  public override resume(): void {
+    super.resume()
+    this.start()
   }
 
   public override stop(): void {
-    this._connection?.close()
-    this._connection = null
+    if (this.status === 'destroyed') {
+      return
+    }
+    super.stop()
+    this._closeConnection()
     this.setContext({ status: 'idle', updatedAt: new Date().toISOString() })
   }
 
   public override quiesce(): void {
-    this._connection?.close()
-    this._connection = null
+    this.stop()
+    this._contextOff?.()
+    this._contextOff = null
     super.quiesce()
   }
 
   public override destroy(): void {
     this.quiesce()
     super.destroy()
+  }
+
+  private _closeConnection(): void {
+    this._generation += 1
+    const connection = this._connection
+    this._connection = null
+    connection?.close()
+    this.emit('transport:close', undefined)
   }
 
   private _receive(message: StreamTransportMessage, artifact: StreamSourceArtifact): void {

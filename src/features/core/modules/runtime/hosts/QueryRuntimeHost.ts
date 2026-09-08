@@ -86,35 +86,35 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
       meta: input.meta,
       artifactReader: input.artifacts,
     })
-    const node = new RaphNode(Raph.app, {
-      id: `${input.model.identity}-${input.id}`,
-      meta: {
-        type: 'query',
-        runtimeId: input.id,
-        entityIdentity: input.model.identity,
-        parentRuntimeId: input.parent?.id ?? null,
-      },
-    })
-    Raph.app.addNode(node)
-    host.addRaphNode(node)
-    host.addResource({ id: `node:${node.id}`, kind: 'raph-node', title: node.id })
-    host._props = host._literalDefaults(artifact.payload)
-    host._applyProps(host._props, true)
-    host._applyProps(input.meta?.props ?? {}, true)
-    host._isMockEnabled = Endge.runtime.resolveDataMode(host) === 'mock'
-    host._contextOff = Endge.context.subscribe(() => {
-      const isMockEnabled = Endge.runtime.resolveDataMode(host) === 'mock'
-      if (isMockEnabled === host._isMockEnabled) {
-        return
-      }
-      host._isMockEnabled = isMockEnabled
-      if (!isMockEnabled) {
-        return
-      }
-      host._runSequence += 1
-      host._abortController?.abort()
-    })
     try {
+      const node = new RaphNode(Raph.app, {
+        id: `${input.model.identity}-${input.id}`,
+        meta: {
+          type: 'query',
+          runtimeId: input.id,
+          entityIdentity: input.model.identity,
+          parentRuntimeId: input.parent?.id ?? null,
+        },
+      })
+      Raph.app.addNode(node)
+      host.addRaphNode(node)
+      host.addResource({ id: `node:${node.id}`, kind: 'raph-node', title: node.id })
+      host._props = host._literalDefaults(artifact.payload)
+      host._applyProps(host._props, true)
+      host._applyProps(input.meta?.props ?? {}, true)
+      host._isMockEnabled = Endge.runtime.resolveDataMode(host) === 'mock'
+      host._contextOff = Endge.context.subscribe(() => {
+        const isMockEnabled = Endge.runtime.resolveDataMode(host) === 'mock'
+        if (isMockEnabled === host._isMockEnabled) {
+          return
+        }
+        host._isMockEnabled = isMockEnabled
+        if (!isMockEnabled) {
+          return
+        }
+        host._runSequence += 1
+        host._abortController?.abort()
+      })
       host._mountOutputGraph(artifact)
     }
     catch (error) {

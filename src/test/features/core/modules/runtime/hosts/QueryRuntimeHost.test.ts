@@ -10,13 +10,26 @@ import { QueryRuntimeHost } from '@/features/core/modules/runtime/hosts/QueryRun
 import { compileFilterSource } from '@/features/core/modules/source/services/compilers/filter-source-compile'
 
 describe('проверка Host runtime для Query', () => {
-  afterEach(() => {
+  afterEach(async () => {
     vi.restoreAllMocks()
     Endge.context.setDataMode('live')
-    Endge.runtime.reset()
+    await Endge.runtime.reset()
     Endge.program.clear()
     Endge.domain.reset()
     Raph.app.reset()
+  })
+
+  it('removes every allocated node when initial props are invalid', () => {
+    const subscribe = vi.spyOn(Endge.context, 'subscribe')
+    for (let attempt = 0; attempt < 10; attempt++) {
+      expect(() => createHost({ unknown: true })).toThrow('unknown prop')
+      expect(Raph.app.getNode('test-query-query-runtime')).toBeUndefined()
+    }
+    expect(subscribe).not.toHaveBeenCalled()
+    const host = createHost()
+    expect(Raph.app.getNode('test-query-query-runtime')).toBeDefined()
+    host.destroy()
+    expect(Raph.app.getNode('test-query-query-runtime')).toBeUndefined()
   })
 
   it('использует стратегию latest-wins, отменяет предыдущий transport и игнорирует устаревший результат', async () => {

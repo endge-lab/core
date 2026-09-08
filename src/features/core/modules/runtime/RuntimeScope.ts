@@ -32,6 +32,7 @@ export class RuntimeScope implements RuntimeScopeHandle {
   private readonly _members = new Map<string, RuntimeHost<any, any>>()
   private _transition: Promise<void> = Promise.resolve()
   private _generation = 0
+  private _cancellationVersion = 0
   private _abortController: AbortController | null = null
   private _updateGateOpen = false
   private _stale = false
@@ -59,7 +60,22 @@ export class RuntimeScope implements RuntimeScopeHandle {
   }
 
   public activate(): Promise<void> {
+    const cancellationVersion = this._cancellationVersion
+    const assertCurrent = () => {
+      if (cancellationVersion !== this._cancellationVersion) {
+        throw new DOMException('Runtime scope activation aborted.', 'AbortError')
+      }
+    }
+    // Предок может активировать этого ребёнка сам. Не занимаем очередь ребёнка,
+    // пока ожидаем предка, иначе два перехода будут ждать друг друга.
+    if (this.parent && !['active', 'activating', 'resuming'].includes(this.parent.state)) {
+      return this.parent.activate().then(() => {
+        assertCurrent()
+        return this.activate()
+      })
+    }
     return this._enqueue(async () => {
+      assertCurrent()
       if (this.state === 'active') {
         return
       }
@@ -70,15 +86,13 @@ export class RuntimeScope implements RuntimeScopeHandle {
       if (this.state !== 'inactive' && this.state !== 'error') {
         throw new Error(`[RuntimeScope] Cannot activate "${this.path}" from ${this.state}.`)
       }
-      if (this.parent && this.parent.state !== 'active' && this.parent.state !== 'activating') {
-        await this.parent.activate()
-      }
-      this._setState('activating')
       this._lastError = null
       this._generation += 1
       this._abortController?.abort()
       this._abortController = new AbortController()
+      this._setState('activating')
       try {
+        this._abortController.signal.throwIfAborted()
         await waitForAbortable(
           this._hooks.activate?.(this._abortController.signal, this._generation),
           this._abortController.signal,
@@ -130,10 +144,14 @@ export class RuntimeScope implements RuntimeScopeHandle {
   }
 
   public resume(): Promise<void> {
+    if (this.parent && this.parent.state !== 'active' && this.parent.state !== 'resuming') {
+      return this.parent.resume().then(() => this.resume())
+    }
     return this._enqueue(() => this._resume())
   }
 
   public deactivate(): Promise<void> {
+    this._cancellationVersion += 1
     this._abortController?.abort()
     return this._enqueue(async () => {
       if (this.state === 'inactive' || this.state === 'disposed') {
@@ -152,6 +170,7 @@ export class RuntimeScope implements RuntimeScopeHandle {
   }
 
   public dispose(): Promise<void> {
+    this._cancellationVersion += 1
     this._abortController?.abort()
     return this._enqueue(async () => {
       if (this.state === 'disposed') {
@@ -191,7 +210,7 @@ export class RuntimeScope implements RuntimeScopeHandle {
   }
 
   public acceptsUpdates(): boolean {
-    return this.state === 'active' && this._updateGateOpen
+    return this.state === 'active' && this._updateGateOpen && (this.parent?.acceptsUpdates() ?? true)
   }
 
   public getRuntime(path: string): RuntimeHost<any, any> | null {
@@ -232,16 +251,16 @@ export class RuntimeScope implements RuntimeScopeHandle {
     if (this.state !== 'paused') {
       throw new Error(`[RuntimeScope] Cannot resume "${this.path}" from ${this.state}.`)
     }
-    if (this.parent && this.parent.state !== 'active' && this.parent.state !== 'resuming') {
-      await this.parent.resume()
-    }
-    this._setState('resuming')
     this._generation += 1
     this._abortController = new AbortController()
+    const signal = this._abortController.signal
+    this._setState('resuming')
     try {
       await this.resources.resume()
-      await this._hooks.resume?.()
+      signal.throwIfAborted()
+      await waitForAbortable(this._hooks.resume?.(signal, this._generation), signal)
       for (const host of this._members.values()) {
+        signal.throwIfAborted()
         await host.resume?.()
       }
       for (const childId of this._activeChildrenBeforePause) {
@@ -250,6 +269,7 @@ export class RuntimeScope implements RuntimeScopeHandle {
       if (this._stale) {
         await this._hooks.reconcile?.()
       }
+      signal.throwIfAborted()
       this._stale = false
       this._updateGateOpen = true
       this._setState('active')
@@ -277,7 +297,7 @@ export class RuntimeScope implements RuntimeScopeHandle {
         else {
           await host.stop?.()
           await host.unmount?.()
-          host.destroy()
+          await host.destroy()
         }
       }
       catch (error) { errors.push(error) }

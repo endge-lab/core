@@ -5,11 +5,58 @@ import { Endge } from '@/features/core/kernel/endge'
 import { createUpdateStoreRuntime } from '@/test/fixtures/update-source'
 
 describe('meta mutations StoreRuntimeHost', () => {
-  afterEach(() => {
-    Endge.runtime.reset()
+  afterEach(async () => {
+    await Endge.runtime.reset()
     Endge.program.clear()
     Endge.domain.reset()
     Raph.app.reset()
+  })
+
+  it('не обходит незатронутую коллекцию при обновлении отдельного поля', () => {
+    const runtime = createUpdateStoreRuntime({
+      storeSource: `defineStore({ data: { counter: value(0), archive: value([]) } })`,
+      updates: [{ identity: 'increment', source: `defineUpdate({ mutations: [{ strategy: 'set', target: 'counter', value: 1 }] })` }],
+    })
+    let reads = 0
+    const row = {
+      get payload() {
+        reads += 1
+        return 'large payload'
+      },
+    }
+    const archive = [row]
+    Raph.set(runtime.getDataPath('archive'), archive)
+    reads = 0
+    runtime.applyUpdate('increment', {})
+    expect(Raph.get(runtime.getDataPath('counter'))).toBe(1)
+    expect(Raph.get(runtime.getDataPath('archive'))).toBe(archive)
+    expect(reads).toBe(0)
+  })
+
+  it('does not traverse other rows in the affected collection for a point update', () => {
+    const runtime = createUpdateStoreRuntime({
+      storeSource: `defineStore({ data: { rows: value([]) } })`,
+      updates: [{ identity: 'point', source: `defineUpdate({ mutations: [
+        { strategy: 'set', target: 'rows[id=$id].value', value: input('value'), vars: { id: 'id' } },
+        { strategy: 'set', target: meta('rows[id=$id].value', 'state'), value: true, vars: { id: 'id' } },
+      ] })` }],
+    })
+    const rows = Array.from({ length: 10000 }, (_, id) => ({ id, value: 0 }))
+    Raph.set(runtime.getDataPath('rows'), rows)
+    Raph.get(`${runtime.getDataPath()}.rows[id=5000]`)
+    let reads = 0
+    rows.forEach((row, index) => {
+      if (index !== 5000) {
+        Object.defineProperty(rows, index, { get() {
+          reads++
+          return row
+        }, configurable: true })
+      }
+    })
+    runtime.applyUpdate('point', { id: 5000, value: 7 })
+    expect(rows[5000].value).toBe(7)
+    expect(reads).toBe(0)
+    expect(Raph.meta.get(`${runtime.getDataPath()}.rows[id=5000].value`, 'state')).toBe(true)
   })
 
   it('записывает Data и Meta одним Update и клонирует пользовательское значение', () => {
@@ -132,6 +179,18 @@ describe('meta mutations StoreRuntimeHost', () => {
 
     expect(() => runtime.applyUpdate('removed-owner', {})).toThrow('Meta owner does not exist')
     expect(runtime.getDataSnapshot()).toEqual({ row: { value: 1 } })
+  })
+
+  it('keeps live rows unchanged when a later structural plan is invalid', () => {
+    const runtime = createUpdateStoreRuntime({
+      storeSource: `defineStore({ data: { rows: value([{ id: 1, value: 0 }]) } })`,
+      updates: [{ identity: 'invalid-batch', source: `defineUpdate({ mutations: [
+        { strategy: 'set', target: 'rows[id=1].value', value: 7 },
+        { strategy: 'set', target: 'rows[id=2]', value: 8 },
+      ] })` }],
+    })
+    expect(() => runtime.applyUpdate('invalid-batch', {})).toThrow('plain-object')
+    expect(Raph.get(runtime.getDataPath('rows'))).toEqual([{ id: 1, value: 0 }])
   })
 
   it('совмещает ifExists и when через AND и сохраняет legacy forEach semantics', () => {

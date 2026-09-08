@@ -49,6 +49,37 @@ describe('жизненный цикл RuntimeScope', () => {
     expect(child.state).toBe('active')
   })
 
+  /** Восстановление ребёнка не занимает его очередь до восстановления предка. */
+  it('возобновляет остановленное дерево через ребёнка без взаимного ожидания', async () => {
+    const parent = new RuntimeScope({ id: 'parent', path: 'parent' })
+    const child = new RuntimeScope({ id: 'child', path: 'child', parent })
+    await child.activate()
+    await parent.pause()
+    await child.activate()
+    expect(parent.state).toBe('active')
+    expect(child.state).toBe('active')
+    await parent.pause()
+    await child.resume()
+    expect(parent.state).toBe('active')
+    expect(child.state).toBe('active')
+    await parent.dispose()
+  })
+
+  /** Startup hook родителя может активировать того же ребёнка, который запросил запуск. */
+  it('активирует startup ребёнка через неактивного родителя без цикла очередей', async () => {
+    let child: RuntimeScope
+    const parent: RuntimeScope = new RuntimeScope({
+      id: 'parent',
+      path: 'parent',
+      hooks: { activate: () => child.activate() },
+    })
+    child = new RuntimeScope({ id: 'child', path: 'child', parent })
+    await child.activate()
+    expect(parent.state).toBe('active')
+    expect(child.state).toBe('active')
+    await parent.dispose()
+  })
+
   it('откатывает ресурсы в обратном порядке и идемпотентно выполняет deactivate', async () => {
     const events: string[] = []
     const scope = new RuntimeScope({ id: 'scope', path: 'scope' })
@@ -65,6 +96,38 @@ describe('жизненный цикл RuntimeScope', () => {
 
     expect(events.slice(-2)).toEqual(['dispose:two', 'dispose:one'])
     expect(scope.snapshot()).toMatchObject({ state: 'inactive', resources: { total: 0 } })
+  })
+
+  it('отменяет ожидающий resume до повторного запуска hosts', async () => {
+    let release!: () => void
+    const member = host('member', [])
+    const scope = new RuntimeScope({ id: 'resuming', path: 'resuming', hooks: {
+      resume: () => new Promise<void>((resolve) => {
+        release = resolve
+      }),
+    } })
+    scope.addRuntime(member)
+    await scope.activate()
+    await scope.pause()
+    const resuming = scope.resume()
+    const rejected = expect(resuming).rejects.toMatchObject({ name: 'AbortError' })
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+    await scope.deactivate()
+    await rejected
+    release()
+    expect(member.resume).not.toHaveBeenCalled()
+    expect(scope.state).toBe('inactive')
+  })
+
+  it('отменяет активацию, ещё не начавшую выполняться в очереди', async () => {
+    const activate = vi.fn(() => new Promise<void>(() => {}))
+    const scope = new RuntimeScope({ id: 'queued', path: 'queued', hooks: { activate } })
+    const activation = scope.activate()
+    const deactivation = scope.deactivate()
+    await expect(activation).rejects.toMatchObject({ name: 'AbortError' })
+    await deactivation
+    expect(activate).not.toHaveBeenCalled()
+    expect(scope.state).toBe('inactive')
   })
 
   it('игнорирует поздний результат активации после abort, откатывая scope', async () => {

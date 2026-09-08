@@ -6,7 +6,7 @@ import type { CompositionProgramPayload } from '@/features/core/modules/source/d
 import type { StoreSourceArtifact } from '@/features/core/modules/source/domain/types/store-source.types'
 
 import { Raph } from '@endge/raph'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Endge } from '@/features/core/kernel/endge'
 import { RComposition } from '@/features/core/modules/domain/entities/RComposition'
 import { RStore } from '@/features/core/modules/domain/entities/RStore'
@@ -19,7 +19,7 @@ describe('проверка Scope runtime-приложения', () => {
     Raph.app.reset()
   })
 
-  it('владеет корневым путём preview и заменяет ту же корневую сущность без suffix preview', () => {
+  it('владеет корневым путём preview и заменяет ту же корневую сущность без suffix preview', async () => {
     const store = installStore()
     const preview = Endge.runtime.createAppScope({
       id: 'preview',
@@ -28,19 +28,43 @@ describe('проверка Scope runtime-приложения', () => {
       persistence: 'disabled',
     })
 
-    const first = preview.execute(store) as StoreRuntimeHost
+    const first = await preview.executeAsync(store) as StoreRuntimeHost
     expect(first.id).toBe('preview:store:groundhandling-db')
     expect(first.getDataPath()).toBe('runtime-preview.stores.groundhandling-db')
     expect(Raph.get('runtime-preview.stores.groundhandling-db.raw')).toEqual({ rows: [] })
     expect(Raph.get('runtime-preview.stores.groundhandling-db.table')).toEqual([])
 
     first.set('raw', { rows: [{ id: 1 }] })
-    const second = preview.execute(store) as StoreRuntimeHost
+    const second = await preview.executeAsync(store) as StoreRuntimeHost
     expect(second).not.toBe(first)
     expect(second.id).toBe(first.id)
     expect(second.getDataPath()).toBe(first.getDataPath())
     expect(second.getDataSnapshot()).toEqual({ raw: { rows: [] }, table: [] })
     expect(Endge.runtime.getRuntimeHostsByEntity('store', 'groundhandling-db', 'preview')).toEqual([second])
+  })
+
+  it('retains synchronous replacement for hosts with synchronous teardown', () => {
+    const store = installStore()
+    const scope = Endge.runtime.createAppScope({ id: 'sync-preview', rootPath: 'sync-preview', collisionPolicy: 'replace' })
+    const first = scope.execute(store) as StoreRuntimeHost
+    const second = scope.execute(store) as StoreRuntimeHost
+    expect(first.status).toBe('destroyed')
+    expect(second.id).toBe(first.id)
+    expect(Endge.runtime.getRuntimeById(second.id)).toBe(second)
+  })
+
+  it('serializes several replacements without losing the last runtime', async () => {
+    const model = installComposition()
+    const scope = Endge.runtime.createAppScope({ id: 'queued-preview', rootPath: 'queued-preview', collisionPolicy: 'replace' })
+    const first = await scope.executeAsync(model) as CompositionRuntimeHost
+    const mounting = first.mountGraph()
+    expect(first.mountGraph()).toBe(mounting)
+    await mounting
+    const [second, third] = await Promise.all([scope.executeAsync(model), scope.executeAsync(model)])
+    expect(first.status).toBe('destroyed')
+    expect(second!.status).toBe('destroyed')
+    expect(third!.status).toBe('active')
+    expect(Endge.runtime.getRuntimeHostsByEntity('composition', model.identity, scope.id)).toEqual([third])
   })
 
   it('выделяет локальные ID из identity-index для scope приложения с несколькими экземплярами', () => {
@@ -65,19 +89,55 @@ describe('проверка Scope runtime-приложения', () => {
       persistence: 'disabled',
     })
 
-    const first = preview.execute(composition) as CompositionRuntimeHost
+    const first = await preview.executeAsync(composition) as CompositionRuntimeHost
     await first.mountGraph()
     const scopeId = `${first.id}:scope:scope_default`
     expect(Endge.runtime.scopes.get(scopeId)?.ownerRuntimeId).toBe(first.id)
 
-    await preview.destroyAsync('composition', composition.identity)
-    expect(Endge.runtime.scopes.get(scopeId)).toBeNull()
-
-    const second = preview.execute(composition) as CompositionRuntimeHost
+    const second = await preview.executeAsync(composition) as CompositionRuntimeHost
     await second.mountGraph()
     expect(second).not.toBe(first)
     expect(Endge.runtime.scopes.get(scopeId)?.ownerRuntimeId).toBe(second.id)
     expect(Endge.runtime.getRuntimeHostsByEntity('composition', composition.identity, 'preview')).toEqual([second])
+  })
+
+  it('waits for the same cleanup on repeated destroy and only then replaces the host', async () => {
+    const model = installComposition()
+    const preview = Endge.runtime.createAppScope({ id: 'preview', rootPath: 'runtime-preview', collisionPolicy: 'replace' })
+    const first = await preview.executeAsync(model) as CompositionRuntimeHost
+    await first.mountGraph()
+    let release!: () => void
+    const destroy = first.destroy.bind(first)
+    vi.spyOn(first, 'destroy').mockImplementation(async () => {
+      await new Promise<void>((resolve) => {
+        release = resolve
+      })
+      await destroy()
+    })
+    const firstDestroy = Endge.runtime.destroyRuntimeTreeAsync(first.id)
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+    let secondFinished = false
+    const secondDestroy = Endge.runtime.destroyRuntimeTreeAsync(first.id).then(() => {
+      secondFinished = true
+    })
+    let replacementFinished = false
+    const replacement = preview.executeAsync(model).then((host) => {
+      replacementFinished = true
+      return host as CompositionRuntimeHost
+    })
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(secondFinished).toBe(false)
+    expect(replacementFinished).toBe(false)
+    expect(Endge.runtime.getRuntimeById(first.id)).toBe(first)
+    release()
+    await Promise.all([firstDestroy, secondDestroy])
+    const second = await replacement
+    await second.mountGraph()
+    expect(first.destroy).toHaveBeenCalledTimes(1)
+    expect(Endge.runtime.getRuntimeById(second.id)).toBe(second)
+    expect(second.status).toBe('active')
+    vi.restoreAllMocks()
   })
 
   it('хранит типизированную связь с родителем вне метаданных host', () => {

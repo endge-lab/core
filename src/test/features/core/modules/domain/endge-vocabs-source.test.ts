@@ -13,6 +13,7 @@ import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 describe('проверка Vocab с приоритетом Source', () => {
   afterEach(() => {
     vi.restoreAllMocks()
+    Endge.vocabs.reset()
     Endge.program.clear()
     Endge.domain.reset()
     Endge.mock.reset()
@@ -74,8 +75,101 @@ defineVocab({
 
     await expect(Endge.vocabs.loadVocab('airlines', { dataMode: 'mock', throwOnError: true })).resolves.toEqual([])
     expect(fetchSpy).not.toHaveBeenCalled()
-    expect(Raph.get('vocabs.airlines')).toEqual([])
-    expect(Raph.get('vocabs.airlines-payload')).toEqual([])
+    expect(Raph.get(Endge.vocabs.getPath('airlines', { dataMode: 'mock' }))).toEqual([])
+    expect(Raph.get('vocabs.airlines')).toBeUndefined()
+    expect(Raph.get('vocabs.airlines-payload')).toBeUndefined()
+  })
+
+  /** Один Vocab одновременно обслуживает live и mock consumers без общего значения. */
+  it('разделяет live и mock кэш при последовательных acquire и fallback', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(response({ docs: [{ code: 'LIVE' }] }))
+    const vocab = makeVocab(`defineVocab({
+      provider: payload({ baseUrl: 'https://payload.example', collection: 'airlines-payload', auth: { mode: 'none' } }),
+      outputs: { items: output().from(response()) },
+    })`)
+    Endge.domain.addVocab(vocab)
+    publishVocabArtifact(vocab)
+    await Endge.vocabs.acquire(['airlines'])
+    await Endge.vocabs.acquire(['airlines'], {}, { dataMode: 'mock' })
+    expect(Endge.vocabs.getValues('airlines')).toEqual([{ code: 'LIVE' }])
+    expect(Endge.vocabs.getValues('airlines', { dataMode: 'mock' })).toEqual([])
+    await Endge.vocabs.acquire(['airlines'])
+    expect(fetchSpy).toHaveBeenCalledOnce()
+    fetchSpy.mockRejectedValue(new Error('offline'))
+    await Endge.vocabs.acquire(['airlines'], { strategy: 'network-first', onError: 'use-cache' })
+    expect(Endge.vocabs.getValues('airlines')).toEqual([{ code: 'LIVE' }])
+  })
+
+  /** Даже transport, игнорирующий abort, не может заполнить кэш после reset. */
+  it('отменяет загрузку при reset и не удаляет данные следующего поколения', async () => {
+    let release!: (value: Response) => void
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementationOnce(() => new Promise((resolve) => {
+      release = resolve
+    }))
+    const vocab = makeVocab(`defineVocab({
+      provider: payload({ baseUrl: 'https://payload.example', collection: 'airlines-payload', auth: { mode: 'none' } }),
+      outputs: { items: output().from(response()) },
+    })`)
+    Endge.domain.addVocab(vocab)
+    publishVocabArtifact(vocab)
+    const pending = Endge.vocabs.acquire(['airlines'])
+    const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+    const signal = fetchSpy.mock.calls[0]![1]!.signal!
+    Endge.vocabs.reset()
+    expect(signal.aborted).toBe(true)
+    fetchSpy.mockResolvedValue(response({ docs: [{ code: 'NEW' }] }))
+    await Endge.vocabs.acquire(['airlines'])
+    release(response({ docs: [{ code: 'OLD' }] }))
+    await rejected
+    expect(Endge.vocabs.getValues('airlines')).toEqual([{ code: 'NEW' }])
+    expect(Endge.vocabs.loading).toBe(false)
+  })
+
+  it('не перезаписывает новую загрузку поздним ответом прямого loadVocab', async () => {
+    let release!: (value: Response) => void
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementationOnce(() => new Promise((resolve) => {
+      release = resolve
+    }))
+    const vocab = makeVocab(`defineVocab({
+      provider: payload({ baseUrl: 'https://payload.example', collection: 'airlines-payload', auth: { mode: 'none' } }),
+      outputs: { items: output().from(response()) },
+    })`)
+    Endge.domain.addVocab(vocab)
+    publishVocabArtifact(vocab)
+    const pending = Endge.vocabs.loadVocab('airlines', { throwOnError: true })
+    const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+    fetchSpy.mockResolvedValue(response({ docs: [{ code: 'NEW' }] }))
+    await Endge.vocabs.loadVocab('airlines', { throwOnError: true })
+    release(response({ docs: [{ code: 'OLD' }] }))
+    await rejected
+    expect(Endge.vocabs.getValues('airlines')).toEqual([{ code: 'NEW' }])
+  })
+
+  /** Отмена ожидания одного scope не прерывает загрузку второго consumer. */
+  it('отменяет один acquire и сохраняет общую загрузку другого', async () => {
+    let release!: (value: Response) => void
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise((resolve) => {
+      release = resolve
+    }))
+    const vocab = makeVocab(`defineVocab({
+      provider: payload({ baseUrl: 'https://payload.example', collection: 'airlines-payload', auth: { mode: 'none' } }),
+      outputs: { items: output().from(response()) },
+    })`)
+    Endge.domain.addVocab(vocab)
+    publishVocabArtifact(vocab)
+    const controller = new AbortController()
+    const first = Endge.vocabs.acquire(['airlines'], {}, { signal: controller.signal })
+    const rejected = expect(first).rejects.toMatchObject({ name: 'AbortError' })
+    const second = Endge.vocabs.acquire(['airlines'])
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+    controller.abort()
+    await rejected
+    release(response({ docs: [{ code: 'LIVE' }] }))
+    await second
+    expect(fetchSpy).toHaveBeenCalledOnce()
+    expect(Endge.vocabs.getValues('airlines')).toEqual([{ code: 'LIVE' }])
   })
 
   it('читает явный dot-path Mock и однократно передаёт настройки Converter для всего значения', async () => {

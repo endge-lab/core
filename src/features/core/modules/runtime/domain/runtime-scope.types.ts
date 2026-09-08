@@ -46,7 +46,7 @@ export interface RuntimeScopeHandle {
 export interface RuntimeScopeLifecycleHooks {
   activate?: (signal: AbortSignal, generation: number) => Promise<void> | void
   pause?: () => Promise<void> | void
-  resume?: () => Promise<void> | void
+  resume?: (signal: AbortSignal, generation: number) => Promise<void> | void
   reconcile?: () => Promise<void> | void
   deactivate?: () => Promise<void> | void
   dispose?: () => Promise<void> | void

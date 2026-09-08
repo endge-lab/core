@@ -2,7 +2,7 @@ import type { ProgramArtifact } from '@/features/core/modules/program/domain/typ
 
 import type { RuntimeScopeHandle } from '@/features/core/modules/runtime/domain/runtime-scope.types'
 import type { CompositionProgramPayload } from '@/features/core/modules/source/domain/types/composition-source.types'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Endge } from '@/features/core/kernel/endge'
 import { RComposition } from '@/features/core/modules/domain/entities/RComposition'
 import { RProject } from '@/features/core/modules/domain/entities/RProject'
@@ -12,6 +12,7 @@ describe('проверка Runtime-сессия проекта Endge', () => {
     await Endge.runtime.reset()
     Endge.program.clear()
     Endge.domain.reset()
+    vi.restoreAllMocks()
   })
 
   it('находит Composition проекта и учитывает стартовую либо ручную активацию корней', async () => {
@@ -70,6 +71,59 @@ describe('проверка Runtime-сессия проекта Endge', () => {
     expect(handle.state).toBe('inactive')
     expect(handle.host).toBeNull()
     await session.unmount()
+    expect(Endge.runtime.getRuntimeHosts()).toEqual([])
+  })
+
+  it('shares concurrent activation and cancels a pending mount before publishing the host', async () => {
+    const project = RProject.fromPlain({ id: 520, identity: 'concurrent', name: 'Concurrent' })
+    const entry = composition(521, 'entry', 'concurrent')
+    Endge.domain.addProject(project)
+    Endge.domain.addComposition(entry)
+    Endge.program.addArtifact(artifact(entry, payload('manual')))
+    const session = await Endge.runtime.project.mount('concurrent', { autoActivate: 'none' })
+    const handle = session.compositions.require('entry')
+    const first = handle.activate()
+    const second = handle.activate()
+    const [one, two] = await Promise.all([first, second])
+    expect(one.host).toBe(two.host)
+    expect(Endge.runtime.getRuntimeHostsByEntity('composition', 'entry')).toHaveLength(1)
+    await handle.deactivate()
+    const pending = handle.activate()
+    const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    await handle.deactivate()
+    await rejected
+    expect(handle.host).toBeNull()
+    expect(Endge.runtime.getRuntimeHostsByEntity('composition', 'entry')).toEqual([])
+    await handle.activate()
+    await session.unmount()
+    await expect(handle.activate()).rejects.toThrow('disposed')
+    expect(Endge.runtime.getRuntimeHosts()).toEqual([])
+  })
+
+  it('aborts an unresolved vocab acquire when the project is unmounted', async () => {
+    const project = RProject.fromPlain({ id: 530, identity: 'pending', name: 'Pending' })
+    const entry = composition(531, 'entry', 'pending')
+    Endge.domain.addProject(project)
+    Endge.domain.addComposition(entry)
+    const compiled = Endge.source.compile('composition', 'defineComposition({ data: { dictionary: vocab(\'dictionary\') }, runtimes: {} })')
+    Endge.program.addArtifact(artifact(entry, compiled.artifact as CompositionProgramPayload))
+    let release!: () => void
+    vi.spyOn(Endge.vocabs, 'acquire').mockImplementationOnce(() => new Promise((resolve) => {
+      release = () => resolve([])
+    }))
+    const session = await Endge.runtime.project.mount('pending', { autoActivate: 'none' })
+    const handle = session.compositions.require('entry')
+    const pending = handle.activate()
+    const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+    const closing = session.unmount()
+    expect(session.unmount()).toBe(closing)
+    await closing
+    await rejected
+    release()
+    await Promise.resolve()
+    expect(handle.state).toBe('disposed')
+    expect(handle.host).toBeNull()
     expect(Endge.runtime.getRuntimeHosts()).toEqual([])
   })
 

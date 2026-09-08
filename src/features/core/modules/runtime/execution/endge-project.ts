@@ -16,6 +16,10 @@ class ProjectCompositionHandleImpl implements ProjectCompositionHandle<Compositi
   public readonly identity: string
   private _host: CompositionRuntimeHost | null = null
   private _disposed = false
+  private _generation = 0
+  private _pendingHost: CompositionRuntimeHost | null = null
+  private _activation: Promise<CompositionSession<CompositionRuntimeHost>> | null = null
+  private _transition: Promise<unknown> = Promise.resolve()
 
   public constructor(
     identity: string,
@@ -40,51 +44,91 @@ class ProjectCompositionHandleImpl implements ProjectCompositionHandle<Compositi
   public get host(): CompositionRuntimeHost | null { return this._host }
   public get outputs() { return this._host?.getOutputs() ?? {} }
 
-  public async activate(): Promise<CompositionSession<CompositionRuntimeHost>> {
+  public activate(): Promise<CompositionSession<CompositionRuntimeHost>> {
     if (this._disposed) {
-      throw new Error(`[EndgeProject] Composition "${this.identity}" handle is disposed.`)
+      return Promise.reject(new Error(`[EndgeProject] Composition "${this.identity}" handle is disposed.`))
     }
-    if (!this._host) {
-      const model = Endge.domain.getComposition(this.identity)
-      const artifact = this._artifactReader.getArtifact<CompositionProgramPayload>('composition', this.identity)
-      if (!model || !artifact || artifact.status === 'error') {
-        throw new Error(`[EndgeProject] Composition "${this.identity}" is unavailable.`)
-      }
-      const host = Endge.runtime.execute(model, {
-        parent: this._projectHost,
-        artifactReader: this._artifactReader,
-        persistence: 'disabled',
-        meta: { runtimeScopeId: this._projectScope.id, projectSession: this._projectHost.id },
-      }) as CompositionRuntimeHost | null
+    if (this._activation) {
+      return this._activation
+    }
+    const generation = this._generation
+    const activation = this._enqueue(async () => {
+      this._assertCurrent(generation)
+      let host = this._host
       if (!host) {
-        throw new Error(`[EndgeProject] Composition "${this.identity}" cannot be created.`)
+        const model = Endge.domain.getComposition(this.identity)
+        const artifact = this._artifactReader.getArtifact<CompositionProgramPayload>('composition', this.identity)
+        if (!model || !artifact || artifact.status === 'error') {
+          throw new Error(`[EndgeProject] Composition "${this.identity}" is unavailable.`)
+        }
+        host = Endge.runtime.execute(model, {
+          parent: this._projectHost,
+          artifactReader: this._artifactReader,
+          persistence: 'disabled',
+          meta: { runtimeScopeId: this._projectScope.id, projectSession: this._projectHost.id },
+        }) as CompositionRuntimeHost | null
+        if (!host) {
+          throw new Error(`[EndgeProject] Composition "${this.identity}" cannot be created.`)
+        }
+        this._pendingHost = host
       }
       try {
         await host.mountGraph()
+        this._assertCurrent(generation)
+        await host.getScope('scope_default')?.activate()
+        this._assertCurrent(generation)
+        this._host = host
+        return {
+          id: host.id,
+          host,
+          outputs: host.getOutputs(),
+          output: <T = unknown>(name: string) => host.getOutput(name) as T | undefined,
+          unmount: () => this.deactivate(),
+        }
       }
       catch (error) {
         await Endge.runtime.destroyRuntimeTreeAsync(host.id)
+        if (this._host === host) {
+          this._host = null
+        }
         throw error
       }
-      this._host = host
+      finally {
+        this._pendingHost = null
+      }
+    })
+    this._activation = activation
+    const clear = () => {
+      if (this._activation === activation) {
+        this._activation = null
+      }
     }
-    const host = this._host
-    await host.getScope('scope_default')?.activate()
-    return {
-      id: host.id,
-      host,
-      outputs: host.getOutputs(),
-      output: <T = unknown>(name: string) => host.getOutput(name) as T | undefined,
-      unmount: () => this.deactivate(),
+    void activation.then(clear, clear)
+    return activation
+  }
+
+  private _assertCurrent(generation: number): void {
+    if (this._disposed || this._generation !== generation) {
+      throw new DOMException(`[EndgeProject] Composition "${this.identity}" activation was cancelled.`, 'AbortError')
     }
+  }
+
+  private _enqueue<T>(task: () => Promise<T>): Promise<T> {
+    const result = this._transition.then(task, task)
+    this._transition = result.then(() => undefined, () => undefined)
+    return result
   }
 
   public async pause(): Promise<void> {
-    await this._host?.getScope('scope_default')?.pause()
+    await this._enqueue(async () => {
+      await this._host?.getScope('scope_default')?.pause()
+    })
   }
 
   public async resume(): Promise<void> {
-    await this._host?.getScope('scope_default')?.activate()
+    await this._enqueue(async () => {
+      await this._host?.getScope('scope_default')?.activate()
+    })
   }
 
   public async restart(): Promise<CompositionSession<CompositionRuntimeHost>> {
@@ -92,14 +136,25 @@ class ProjectCompositionHandleImpl implements ProjectCompositionHandle<Compositi
     return this.activate()
   }
 
-  public async deactivate(): Promise<void> {
-    const host = this._host
-    if (!host) {
-      return
-    }
-    await host.getScope('scope_default')?.dispose()
-    await Endge.runtime.destroyRuntimeTreeAsync(host.id)
-    this._host = null
+  public deactivate(): Promise<void> {
+    this._generation += 1
+    this._activation = null
+    // Abort acquisition immediately; waiting for the transition first would deadlock on it.
+    this._pendingHost?.quiesce()
+    const stopping = (this._pendingHost ?? this._host)?.getScope('scope_default')?.deactivate()
+    void stopping?.catch(() => {})
+    return this._enqueue(async () => {
+      try {
+        await stopping
+      }
+      finally {
+        const host = this._host
+        this._host = null
+        if (host) {
+          await Endge.runtime.destroyRuntimeTreeAsync(host.id)
+        }
+      }
+    })
   }
 
   public output<T = unknown>(name: string): T | undefined {
@@ -107,8 +162,8 @@ class ProjectCompositionHandleImpl implements ProjectCompositionHandle<Compositi
   }
 
   public async dispose(): Promise<void> {
-    await this.deactivate()
     this._disposed = true
+    await this.deactivate()
   }
 }
 
@@ -193,7 +248,7 @@ export class EndgeProject {
       throw error
     }
 
-    let mounted = true
+    let unmounting: Promise<void> | null = null
     return {
       id: host.id,
       compositions: new ProjectCompositionRegistryImpl(handles),
@@ -226,16 +281,22 @@ export class EndgeProject {
           throw error
         }
       },
-      unmount: async () => {
-        if (!mounted) {
-          return
-        }
-        mounted = false
-        for (const handle of [...handles.values()].reverse()) {
-          await handle.dispose()
-        }
-        await Endge.runtime.scopes.remove(projectScope.id)
-        await Endge.runtime.destroyRuntimeTreeAsync(host.id)
+      unmount: () => {
+        unmounting ??= (async () => {
+          // Dispose marks every handle synchronously before waiting for any teardown.
+          const results = await Promise.allSettled([...handles.values()].reverse().map(handle => handle.dispose()))
+          try {
+            await Endge.runtime.scopes.remove(projectScope.id)
+          }
+          finally {
+            await Endge.runtime.destroyRuntimeTreeAsync(host.id)
+          }
+          const errors = results.filter(result => result.status === 'rejected').map(result => result.reason)
+          if (errors.length) {
+            throw new AggregateError(errors, '[EndgeProject] Composition cleanup failed.')
+          }
+        })()
+        return unmounting
       },
     }
   }

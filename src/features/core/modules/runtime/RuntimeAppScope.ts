@@ -23,6 +23,7 @@ export interface RuntimeAppScopeAddress {
 }
 
 interface RuntimeAppScopeOwner {
+  executeAsync: (model: RuntimeExecutableModel, options?: RuntimeExecuteOptions) => Promise<AnyRuntimeHost | null>
   execute: (model: RuntimeExecutableModel, options?: RuntimeExecuteOptions) => AnyRuntimeHost | null
   getRuntimeHostsByEntity: (
     entityType: RuntimeEntityType,
@@ -66,6 +67,14 @@ export class RuntimeAppScope {
       ...options,
       appScope: this,
     })
+  }
+
+  /** Запускает entity, ожидая завершения teardown при collisionPolicy: replace. */
+  public executeAsync(
+    model: RuntimeExecutableModel,
+    options: RuntimeAppScopeExecuteOptions = {},
+  ): Promise<AnyRuntimeHost | null> {
+    return this._owner.executeAsync(model, { ...options, appScope: this })
   }
 
   /** Возвращает активный root runtime entity по domain identity. */

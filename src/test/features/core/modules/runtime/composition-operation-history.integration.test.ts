@@ -87,7 +87,7 @@ describe('интеграция Composition с историей операций'
         triggers: [{ event: 'keydown', key: ['u'], modifiers: { ctrl: true }, prevent: true }],
       }],
     })
-    history.commit({ id: 'entry', input: {}, runOutput: null, undo, redo: vi.fn() })
+    await history.commit({ id: 'entry', input: {}, runOutput: null, undo, redo: vi.fn() })
     const operations = new EndgeOperations_Module()
     const remove = operations.register(scope, history)
     const preventDefault = vi.fn()

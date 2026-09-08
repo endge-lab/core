@@ -53,7 +53,10 @@ export class EndgeRuntime_Module extends EndgeModule {
   private _unsubscribeWorkspace: (() => void) | null = null
   private _unsubscribeContext: (() => void) | null = null
   private _destroyedSnapshotLeases = new Map<symbol, number>()
-  private _destroyingRuntimeIds = new Set<string>()
+  private _destroyingRuntimes = new Map<string, Promise<void>>()
+  private _destroyingTrees = new Map<string, Promise<void>>()
+  private _generation = 0
+  private _executions = new Map<string, Promise<unknown>>()
 
   /** Сохраняет только ограниченные лёгкие описатели для явного inspector. */
   public acquireDestroyedHostSnapshots(limit: number): RuntimeInspectionLease {
@@ -158,14 +161,13 @@ export class EndgeRuntime_Module extends EndgeModule {
     })
     const runtimeId = address.runtimeId
     const existing = this._hosts.getById(runtimeId)
-    if (existing) {
-      if (scopeRoot && appScope.collisionPolicy === 'replace') {
-        this.destroyRuntimeTree(runtimeId)
-      }
-      else {
-        console.error(`[EndgeRuntime] Runtime host "${runtimeId}" is already active.`)
-        return null
-      }
+    if (existing && scopeRoot && appScope.collisionPolicy === 'replace') {
+      this.destroyRuntimeTree(runtimeId)
+    }
+    // Synchronous hosts retain synchronous replacement. Never create over async cleanup.
+    if (this._hosts.getById(runtimeId) || this._destroyingRuntimes.has(runtimeId)) {
+      console.error(`[EndgeRuntime] Runtime host "${runtimeId}" is occupied. Use executeAsync() to await replacement.`)
+      return null
     }
     hostMeta.appScopeId = appScope.id
     hostMeta.appScopeRootPath = appScope.rootPath
@@ -196,6 +198,59 @@ export class EndgeRuntime_Module extends EndgeModule {
 
     this.notify()
     return host
+  }
+
+  /** Awaits teardown before reusing a root address; serializes competing replacements. */
+  public async executeAsync(
+    model: RuntimeExecutableModel,
+    options: RuntimeExecuteOptions = {},
+  ): Promise<AnyRuntimeHost | null> {
+    const strategy = this._strategies.resolve(model)
+    if (!strategy) {
+      return this.execute(model, options)
+    }
+    const parent = this._resolveParentHost(options.parent)
+    const appScope = this._resolveAppScope(options.appScope, parent)
+    const identity = String((model as any)?.identity ?? (model as any)?.id ?? strategy.entityType)
+    const address = appScope.allocate({
+      entityType: strategy.entityType,
+      identity,
+      explicitRuntimeId: options.id,
+      requestedLocalId: options.instanceId,
+      scopeRoot: !parent,
+    })
+    const id = address.runtimeId
+    const generation = this._generation
+    const previous = this._executions.get(id) ?? Promise.resolve()
+    const execution = previous.catch(() => {}).then(async () => {
+      if (generation !== this._generation) {
+        throw new DOMException('Runtime was reset.', 'AbortError')
+      }
+      if (!parent && appScope.collisionPolicy === 'replace') {
+        do {
+          await this.destroyRuntimeTreeAsync(id)
+          if (generation !== this._generation) {
+            throw new DOMException('Runtime was reset.', 'AbortError')
+          }
+        } while (this._hosts.getById(id) || this._destroyingRuntimes.has(id))
+      }
+      else {
+        await this._destroyingRuntimes.get(id)
+      }
+      if (generation !== this._generation) {
+        throw new DOMException('Runtime was reset.', 'AbortError')
+      }
+      return this.execute(model, { ...options, appScope, id, instanceId: address.localId })
+    })
+    this._executions.set(id, execution)
+    try {
+      return await execution
+    }
+    finally {
+      if (this._executions.get(id) === execution) {
+        this._executions.delete(id)
+      }
+    }
   }
 
   /** Разрешает data mode по ближайшему Composition override с fallback на общий Endge context. */
@@ -382,57 +437,79 @@ export class EndgeRuntime_Module extends EndgeModule {
    * Корректно разрушает runtime-host по runtime-id.
    */
   public destroyRuntime(runtimeId: string): void {
-    void this._destroyRuntimeInternal(runtimeId, true)
+    void this._destroyRuntimeInternal(runtimeId, true).catch(error => console.error('[EndgeRuntime] Cleanup failed:', error))
   }
 
   /**
    * Корректно разрушает runtime-host и всех его дочерних host.
    */
   public destroyRuntimeTree(runtimeId: string): void {
-    const rootId = String(runtimeId ?? '').trim()
-    if (!rootId) {
-      return
-    }
-
-    if (!this._hosts.getById(rootId)) {
-      return
-    }
-
-    const postOrder = this._hosts.getTreePostOrder(rootId)
-    for (const id of [...postOrder].reverse()) {
-      void this._hosts.getById(id)?.quiesce()
-    }
-
-    for (const id of postOrder) {
-      void this._destroyRuntimeInternal(id, false)
-    }
-
-    this.notify()
+    void this.destroyRuntimeTreeAsync(runtimeId).catch(error => console.error('[EndgeRuntime] Tree cleanup failed:', error))
   }
 
-  /** Корректно разрушает runtime tree и ждёт завершения всего teardown. */
-  public async destroyRuntimeTreeAsync(runtimeId: string): Promise<void> {
+  /** Concurrent callers await the same tree, including every child's async cleanup. */
+  public destroyRuntimeTreeAsync(runtimeId: string): Promise<void> {
     const rootId = String(runtimeId ?? '').trim()
-    if (!rootId || !this._hosts.getById(rootId)) {
-      return
+    const pending = this._destroyingTrees.get(rootId)
+    if (pending) {
+      return pending
     }
-
-    const postOrder = this._hosts.getTreePostOrder(rootId)
-    for (const id of [...postOrder].reverse()) {
-      await this._hosts.getById(id)?.quiesce()
+    const hosts = this._hosts.getTreePostOrder(rootId).map(id => this._hosts.getById(id)).filter(host => host !== null)
+    if (!hosts.length) {
+      return this._destroyingRuntimes.get(rootId) ?? Promise.resolve()
     }
-
-    for (const id of postOrder) {
-      await this._destroyRuntimeInternal(id, false)
+    let resolve!: () => void
+    let reject!: (error: unknown) => void
+    const cleanup = new Promise<void>((done, fail) => {
+      resolve = done
+      reject = fail
+    })
+    this._destroyingTrees.set(rootId, cleanup)
+    const dispose = async () => {
+      const errors: unknown[] = []
+      for (const host of [...hosts].reverse()) {
+        try {
+          const stopping = host.quiesce()
+          if (stopping) {
+            await stopping
+          }
+        }
+        catch (error) { errors.push(error) }
+      }
+      for (const host of hosts) {
+        try {
+          // A delayed caller must never destroy a later host that reused the same id.
+          if (this._hosts.getById(host.id) === host) {
+            await this._destroyRuntimeInternal(host.id, false)
+          }
+        }
+        catch (error) { errors.push(error) }
+      }
+      if (errors.length) {
+        throw new AggregateError(errors, `[EndgeRuntime] Cleanup failed for "${rootId}".`)
+      }
     }
-
-    this.notify()
+    const finish = () => {
+      if (this._destroyingTrees.get(rootId) === cleanup) {
+        this._destroyingTrees.delete(rootId)
+      }
+      this.notify()
+    }
+    void dispose().then(() => {
+      finish()
+      resolve()
+    }, (error) => {
+      finish()
+      reject(error)
+    })
+    return cleanup
   }
 
   /**
    * Корректно разрушает все зарегистрированные runtime-host.
    */
   public override async reset(): Promise<void> {
+    this._generation += 1
     const hostIds = this._hosts.getAll().map(host => host.id)
     this.operations.reset()
     // Синхронно отсоединяем старый реестр scope. Существующие вызывающие стороны, которые
@@ -532,27 +609,42 @@ export class EndgeRuntime_Module extends EndgeModule {
   /**
    * Внутренний destroy для host с контролем уведомления подписчиков.
    */
-  private async _destroyRuntimeInternal(
-    runtimeId: string,
-    shouldNotify: boolean,
-  ): Promise<void> {
+  private _destroyRuntimeInternal(runtimeId: string, shouldNotify: boolean): Promise<void> {
     const id = String(runtimeId ?? '').trim()
-    if (!id || this._destroyingRuntimeIds.has(id)) {
-      return
+    const pending = this._destroyingRuntimes.get(id)
+    if (pending) {
+      return pending
     }
-
     const host = this._hosts.getById(id)
     if (!host) {
-      return
+      return Promise.resolve()
     }
-    this._destroyingRuntimeIds.add(id)
+    // Install ownership before invoking any cleanup, including synchronous re-entry.
+    let resolve!: () => void
+    let reject!: (error: unknown) => void
+    const cleanup = new Promise<void>((done, fail) => {
+      resolve = done
+      reject = fail
+    })
+    this._destroyingRuntimes.set(id, cleanup)
+    void this._disposeHost(host, shouldNotify).then(resolve, reject)
+    return cleanup
+  }
+
+  private async _disposeHost(host: AnyRuntimeHost, shouldNotify: boolean): Promise<void> {
+    const id = host.id
     const destroyedSnapshot = this._createDestroyedSnapshot(host)
 
     let cleanupError: unknown = null
     try {
-      const quiesceCleanup = host.quiesce()
-      if (quiesceCleanup) {
-        await quiesceCleanup
+      try {
+        const stopping = host.quiesce()
+        if (stopping) {
+          await stopping
+        }
+      }
+      catch (error) {
+        cleanupError = error
       }
       try {
         const strategyCleanup = this._strategies.resolve(host.model)?.destroy?.({ host })
@@ -578,7 +670,7 @@ export class EndgeRuntime_Module extends EndgeModule {
       this._hosts.rememberDeletedSnapshot(destroyedSnapshot)
     }
     finally {
-      this._destroyingRuntimeIds.delete(id)
+      this._destroyingRuntimes.delete(id)
       if (shouldNotify) {
         this.notify()
       }

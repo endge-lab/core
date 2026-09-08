@@ -24,6 +24,9 @@ export class AuthSessionManager {
   private readonly _states = new Map<string, AuthSessionState>()
   private readonly _operations = new Map<string, Promise<AuthTokenSet | null>>()
   private readonly _sources = new Map<string, AuthSessionSource>()
+  private readonly _sessionVersions = new Map<string, symbol>()
+  private readonly _loggingOut = new Set<string>()
+  private _generation = 0
   private readonly _now: () => number
   private _defaultProfile: AuthProfileSchema | null = null
 
@@ -98,6 +101,8 @@ export class AuthSessionManager {
   /** Подключает host-owned session source и запрещает смешивание с persisted snapshot profile. */
   public connect(profileIdentity: string, source: AuthSessionSource): void {
     const profile = this._profiles.requireActive(profileIdentity)
+    this._invalidateSession(profile.identity)
+    this._loggingOut.delete(profile.identity)
     this._sources.set(profile.identity, source)
     this._states.delete(profile.identity)
     this._operations.delete(profile.identity)
@@ -123,8 +128,9 @@ export class AuthSessionManager {
     if (!profile) {
       return null
     }
+    const isCurrent = this._sessionGuard(profile.identity)
     const token = await this.ensureProfile(profile)
-    if (!token) {
+    if (!token || !isCurrent()) {
       return null
     }
     const state = this._states.get(profile.identity)
@@ -134,6 +140,9 @@ export class AuthSessionManager {
     const source = this._sources.get(profile.identity)
     if (source?.loadUserInfo) {
       const userInfo = await source.loadUserInfo()
+      if (!isCurrent() || this._states.get(profile.identity)?.token !== token) {
+        return null
+      }
       this._states.set(profile.identity, { token, userInfo })
       this._dependencies.onSessionChange()
       return userInfo
@@ -146,6 +155,9 @@ export class AuthSessionManager {
       ...this._profiles.createAdapterContext(profile),
       token,
     })
+    if (!isCurrent() || this._states.get(profile.identity)?.token !== token) {
+      return null
+    }
     this._states.set(profile.identity, { token, userInfo })
     this._dependencies.onSessionChange()
     return userInfo
@@ -159,13 +171,15 @@ export class AuthSessionManager {
     }
     const state = this._states.get(profile.identity)
     const source = this._sources.get(profile.identity)
-    if (source) {
-      this._clearState(profile)
-      await source.logout?.()
-      return
-    }
+    this._invalidateSession(profile.identity)
+    const isCurrent = this._sessionGuard(profile.identity)
+    this._loggingOut.add(profile.identity)
+    this._clearState(profile)
     try {
-      if (state) {
+      if (source) {
+        await source.logout?.()
+      }
+      else if (state) {
         await this._adapters.require(profile).logout?.({
           ...this._profiles.createAdapterContext(profile),
           token: state.token,
@@ -176,34 +190,33 @@ export class AuthSessionManager {
       // Серверный logout не блокирует обязательную локальную очистку.
     }
     finally {
-      this._clearState(profile)
+      if (isCurrent()) {
+        this._loggingOut.delete(profile.identity)
+      }
     }
   }
 
   /** Гарантирует session указанного profile, не меняя default profile. */
   public async ensureProfile(profileInput: AuthProfileSchema, options: AuthEnsureOptions = {}): Promise<AuthTokenSet | null> {
     const profile = this._profiles.requireActive(profileInput)
+    if (this._loggingOut.has(profile.identity)) {
+      return null
+    }
     const source = this._sources.get(profile.identity)
     if (source) {
-      return this._singleFlight(profile.identity, async () => {
+      return this._singleFlight(profile, async () => {
         const token = await source.resolveToken({
           forceRefresh: options.forceRefresh === true,
           minValiditySeconds: Math.ceil(this._refreshSkewMs(profile) / 1000),
         })
         if (!token || !this._isSessionUsable(token)) {
-          this._clearState(profile)
           return null
         }
-        this._setState(profile, token, false)
         return token
-      })
+      }, false)
     }
     if (profile.adapterId === 'bearer' || profile.adapterId === 'basic') {
-      return this._singleFlight(profile.identity, async () => {
-        const token = await this._authenticate(profile)
-        this._setState(profile, token)
-        return token
-      })
+      return this._singleFlight(profile, () => this._authenticate(profile))
     }
 
     let state = this._states.get(profile.identity)
@@ -221,19 +234,21 @@ export class AuthSessionManager {
 
     const adapter = this._adapters.require(profile)
     if (state?.token.refreshToken && !this._isRefreshExpired(state.token) && adapter.refresh) {
-      return this._singleFlight(profile.identity, async () => {
+      return this._singleFlight(profile, async (isCurrent) => {
         try {
           const token = await adapter.refresh!({
             ...this._profiles.createAdapterContext(profile),
             token: state!.token,
           })
-          this._setState(profile, token)
           return token
         }
         catch (error) {
+          if (!isCurrent()) {
+            return null
+          }
           if (isInvalidGrant(error)) {
             this._clearState(profile)
-            return this._authenticateWhenAllowed(profile)
+            return this._authenticate(profile)
           }
           if (this._isAccessTokenUsable(state!.token)) {
             return state!.token
@@ -246,7 +261,7 @@ export class AuthSessionManager {
     if (state && this._isRefreshExpired(state.token)) {
       this._clearState(profile)
     }
-    return this._singleFlight(profile.identity, () => this._authenticateWhenAllowed(profile))
+    return this._singleFlight(profile, () => this._authenticate(profile))
   }
 
   /** Преобразует token set в transport-neutral request session. */
@@ -271,18 +286,15 @@ export class AuthSessionManager {
 
   /** Сбрасывает runtime state, сохраняя local/sessionStorage snapshots. */
   public resetRuntime(): void {
+    this._generation += 1
+    this._sessionVersions.clear()
+    this._loggingOut.clear()
     this._states.clear()
     this._operations.clear()
     this._sources.clear()
     this._defaultProfile = null
     this._store.resetRuntime()
     this._dependencies.onSessionChange()
-  }
-
-  private async _authenticateWhenAllowed(profile: AuthProfileSchema): Promise<AuthTokenSet | null> {
-    const token = await this._authenticate(profile)
-    this._setState(profile, token)
-    return token
   }
 
   private async _authenticate(profile: AuthProfileSchema): Promise<AuthTokenSet> {
@@ -362,20 +374,57 @@ export class AuthSessionManager {
   }
 
   private async _singleFlight(
-    profileIdentity: string,
-    operation: () => Promise<AuthTokenSet | null>,
+    profile: AuthProfileSchema,
+    operation: (isCurrent: () => boolean) => Promise<AuthTokenSet | null>,
+    persist = true,
   ): Promise<AuthTokenSet | null> {
+    const profileIdentity = profile.identity
     const existing = this._operations.get(profileIdentity)
     if (existing) {
       return existing
     }
-    const promise = operation().finally(() => {
+    const isCurrent = this._sessionGuard(profileIdentity)
+    const promise = Promise.resolve().then(async () => {
+      if (!isCurrent()) {
+        return null
+      }
+      const token = await operation(isCurrent)
+      if (!isCurrent()) {
+        return null
+      }
+      if (token) {
+        this._setState(profile, token, persist)
+      }
+      else { this._clearState(profile) }
+      return token
+    }).catch((error) => {
+      if (!isCurrent()) {
+        return null
+      }
+      throw error
+    }).finally(() => {
       if (this._operations.get(profileIdentity) === promise) {
         this._operations.delete(profileIdentity)
       }
     })
     this._operations.set(profileIdentity, promise)
     return promise
+  }
+
+  /** Отсоединяет старую operation до изменения session owner. */
+  private _invalidateSession(identity: string): void {
+    this._sessionVersions.set(identity, Symbol(identity))
+    this._operations.delete(identity)
+  }
+
+  /** Поздний ответ не должен менять новую сессию или другой workspace. */
+  private _sessionGuard(identity: string): () => boolean {
+    const generation = this._generation
+    const version = this._sessionVersions.get(identity)
+    const workspace = this._dependencies.getWorkspaceIdentity()
+    return () => generation === this._generation
+      && version === this._sessionVersions.get(identity)
+      && workspace === this._dependencies.getWorkspaceIdentity()
   }
 }
 

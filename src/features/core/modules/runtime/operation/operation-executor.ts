@@ -19,23 +19,26 @@ export interface ExecuteRuntimeOperationOptions {
 /** Выполняет один неизменяемый snapshot Operation и владеет общей семантикой курсора History. */
 export async function executeRuntimeOperation(options: ExecuteRuntimeOperationOptions): Promise<unknown> {
   const snapshot = cloneAndFreeze(options.input)
-  const runOutput = await options.run({ input: snapshot })
-  if (!options.recordHistory) {
-    return runOutput
+  if (!options.recordHistory || !options.history) {
+    return options.run({ input: snapshot })
   }
-
-  let undoOutput: unknown
-  options.history?.commit({
-    id: options.id,
-    input: snapshot,
-    runOutput,
-    undo: async () => {
-      undoOutput = await options.undo({ input: snapshot, runOutput })
-      return undoOutput
-    },
-    redo: async () => await (options.redo ?? options.run)({ input: snapshot, runOutput, undoOutput }),
+  return options.history.execute(async () => {
+    const runOutput = await options.run({ input: snapshot })
+    let undoOutput: unknown
+    return {
+      result: runOutput,
+      entry: {
+        id: options.id,
+        input: snapshot,
+        runOutput,
+        undo: async () => {
+          undoOutput = await options.undo({ input: snapshot, runOutput })
+          return undoOutput
+        },
+        redo: async () => await (options.redo ?? options.run)({ input: snapshot, runOutput, undoOutput }),
+      },
+    }
   })
-  return runOutput
 }
 
 function cloneAndFreeze<T>(value: T): T {

@@ -51,6 +51,7 @@ function selectPath(source: unknown, path: string | null): unknown {
 
 export interface VocabAcquireOptions {
   dataMode?: 'live' | 'mock'
+  signal?: AbortSignal
 }
 /**
  * Модуль загрузки и чтения external vocabs в Raph cache.
@@ -64,11 +65,38 @@ export class EndgeVocabs_Module extends EndgeModule {
   private _byIdCache: Record<string, any[]> = {}
   private readonly _loadedIdentities = new Set<string>()
   private readonly _loadedAtByIdentity = new Map<string, number>()
-  private readonly _loadedModeByIdentity = new Map<string, 'live' | 'mock'>()
   private readonly _inFlight = new Map<string, Promise<any[]>>()
   private readonly _cacheVersions = new Map<string, number>()
+  private readonly _loadVersions = new Map<string, symbol>()
+  private readonly _ownedCachePaths = new Set<string>()
+  private _abortController = new AbortController()
   private _loadingRequests: number = 0
   public loading: boolean = false
+
+  /** Освобождает кэш и запрещает ответы предыдущего lifecycle поколения. */
+  public override reset(): void {
+    this._abortController.abort()
+    this._abortController = new AbortController()
+    this._inFlight.clear()
+    this._cacheVersions.clear()
+    this._loadVersions.clear()
+    this._loadedAtByIdentity.clear()
+    this._loadedIdentities.clear()
+    this._byIdCache = {}
+    this._index = {}
+    for (const path of this._ownedCachePaths) {
+      Raph.delete(path)
+    }
+    this._ownedCachePaths.clear()
+    this._loadingRequests = 0
+    this.loading = false
+    this.notify()
+  }
+
+  /** Возвращает отдельный реактивный путь для выбранного режима данных. */
+  public getPath(identity: string, options: Pick<VocabAcquireOptions, 'dataMode'> = {}): string {
+    return `${options.dataMode === 'mock' ? 'vocabsMock' : 'vocabs'}.${identity}`
+  }
 
   /**
    * Строит индекс collectionSlug -> vocab identity из доменных документов vocabs.
@@ -112,17 +140,24 @@ export class EndgeVocabs_Module extends EndgeModule {
       return
     }
 
+    const signal = this._abortController.signal
+    const assertCurrent = this._beginCacheWrite(cfg)
     const headers = await this._resolveAuthHeaders(cfg)
+    signal.throwIfAborted()
 
     try {
-      const res = await fetch(`${base}/${cfg.slug}?limit=10000`, { headers })
+      const res = await fetch(`${base}/${cfg.slug}?limit=10000`, { headers, signal })
       const json = await res.json()
+      assertCurrent()
       const docs = this._extractDocs(json)
 
       this._setCache(cfg, docs)
       this._markLoaded(cfg.identity)
     }
     catch (e: any) {
+      if (signal.aborted || e?.name === 'AbortError') {
+        throw e
+      }
       const msg = e?.message ?? String(e)
       console.warn(`Ошибка при загрузке "${cfg.identity}/${cfg.slug}": ${msg}`)
     }
@@ -171,14 +206,14 @@ export class EndgeVocabs_Module extends EndgeModule {
    *
    * Индекс больше не обязателен для чтения - оставлен только для других сценариев.
    */
-  public getValues(vocabs: string): Array<any> {
+  public getValues(vocabs: string, options: Pick<VocabAcquireOptions, 'dataMode'> = {}): Array<any> {
     const vb: string = String(vocabs ?? '').trim()
     if (!vb) {
       return []
     }
 
     const cfg = this._resolveVocabConfigByIdentityOrSlug(vb, vb)
-    const data = cfg ? this._getCache(cfg) : Raph.get(`vocabs.${vb}`)
+    const data = cfg ? this._getCache(cfg, options.dataMode) : Raph.get(this.getPath(vb, options))
     return Array.isArray(data) ? data : []
   }
 
@@ -213,16 +248,23 @@ export class EndgeVocabs_Module extends EndgeModule {
       return []
     }
 
+    const signal = this._abortController.signal
+    const version = this._cacheVersions.get(cfg.identity) ?? 0
     const headers = await this._resolveAuthHeaders(cfg)
+    signal.throwIfAborted()
 
     try {
       const url = `${base}/${cfg.slug}?limit=${Math.max(1, limit)}`
-      const res = await fetch(url, { headers })
+      const res = await fetch(url, { headers, signal })
       const json = await res.json()
+      this._assertCacheRequest(cfg, signal, version)
       const docs = this._extractDocs(json)
       return docs.slice(0, limit)
     }
     catch (e: any) {
+      if (signal.aborted || e?.name === 'AbortError') {
+        throw e
+      }
       console.warn(`[EndgeVocabs.getSample] ${cfg.identity}/${cfg.slug}: ${e instanceof Error ? e.message : String(e)}`)
       return []
     }
@@ -274,8 +316,12 @@ export class EndgeVocabs_Module extends EndgeModule {
 
     this._bumpCacheVersion(cfg.identity)
     this._loadedIdentities.delete(cfg.identity)
-    this._loadedAtByIdentity.delete(cfg.identity)
-    this._loadedModeByIdentity.delete(cfg.identity)
+    for (const mode of ['live', 'mock'] as const) {
+      this._loadedAtByIdentity.delete(`${mode}:${cfg.identity}`)
+      this._inFlight.delete(`${mode}:${cfg.identity}`)
+      this._loadVersions.delete(`${mode}:${cfg.identity}`)
+      Raph.delete(this.getPath(cfg.identity, { dataMode: mode }))
+    }
     delete this._byIdCache[cfg.identity]
     Raph.delete(`vocabsByIdentity.${cfg.identity}`)
     Raph.delete(`vocabs.${cfg.identity}`)
@@ -294,11 +340,12 @@ export class EndgeVocabs_Module extends EndgeModule {
   ): Promise<VocabCacheOperationResult[]> {
     const effectivePolicy = this._normalizePolicy(policy)
     const dataMode = options.dataMode ?? 'live'
+    options.signal?.throwIfAborted()
     return await Promise.all(this._normalizeReferences(vocabs).map(async (reference) => {
       const cfg = this._requireVocabConfig(reference)
-      const cached = this._getCache(cfg)
-      const hasCache = this._loadedModeByIdentity.get(cfg.identity) === dataMode && Array.isArray(cached)
-      const isFresh = hasCache && this._isFresh(cfg.identity, effectivePolicy.maxAgeMs)
+      const cached = this._getCache(cfg, dataMode)
+      const hasCache = Array.isArray(cached)
+      const isFresh = hasCache && this._isFresh(`${dataMode}:${cfg.identity}`, effectivePolicy.maxAgeMs)
 
       if (effectivePolicy.strategy === 'cache-first' && isFresh) {
         return {
@@ -327,7 +374,10 @@ export class EndgeVocabs_Module extends EndgeModule {
       }
 
       try {
-        const docs = await this._loadShared(cfg, hasCache || effectivePolicy.strategy === 'network-first', dataMode)
+        const docs = await waitForVocab(
+          this._loadShared(cfg, hasCache || effectivePolicy.strategy === 'network-first', dataMode),
+          options.signal,
+        )
         return {
           identity: cfg.identity,
           status: hasCache ? 'refreshed' : 'loaded',
@@ -335,7 +385,10 @@ export class EndgeVocabs_Module extends EndgeModule {
         }
       }
       catch (error) {
-        const fallback = this._getCache(cfg)
+        if (options.signal?.aborted || (error as Error)?.name === 'AbortError') {
+          throw error
+        }
+        const fallback = this._getCache(cfg, dataMode)
         if (effectivePolicy.onError === 'use-cache' && Array.isArray(fallback)) {
           return {
             identity: cfg.identity,
@@ -388,7 +441,10 @@ export class EndgeVocabs_Module extends EndgeModule {
     if (!cfg) {
       return
     }
+    const signal = this._abortController.signal
+    const assertCurrent = this._beginCacheWrite(cfg)
     const headers = await this._resolveAuthHeaders(cfg)
+    signal.throwIfAborted()
 
     const maxLimit = Math.max(1, Number(limit) || 10000)
     const baseUrl = this._resolveBaseUrl(cfg.baseApiUrl)
@@ -398,13 +454,17 @@ export class EndgeVocabs_Module extends EndgeModule {
 
     const url = `${baseUrl}/${cfg.slug}?limit=${maxLimit}`
     try {
-      const res = await fetch(url, { headers })
+      const res = await fetch(url, { headers, signal })
       const json = await res.json()
+      assertCurrent()
       const docs = this._extractDocs(json)
       this._setCache(cfg, docs)
       this._markLoaded(cfg.identity)
     }
     catch (e: any) {
+      if (signal.aborted || e?.name === 'AbortError') {
+        throw e
+      }
       console.warn(`[EndgeVocabs.loadById] ${cfg.idKey}/${cfg.slug}: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
@@ -430,7 +490,10 @@ export class EndgeVocabs_Module extends EndgeModule {
       return bySlugCached.slice(0, maxLimit)
     }
 
+    const signal = this._abortController.signal
+    const assertCurrent = this._beginCacheWrite(cfg)
     const headers = await this._resolveAuthHeaders(cfg)
+    signal.throwIfAborted()
 
     const baseUrl = this._resolveBaseUrl(cfg.baseApiUrl)
     if (!baseUrl) {
@@ -439,13 +502,17 @@ export class EndgeVocabs_Module extends EndgeModule {
 
     try {
       const url = `${baseUrl}/${cfg.slug}?limit=${maxLimit}`
-      const res = await fetch(url, { headers })
+      const res = await fetch(url, { headers, signal })
       const json = await res.json()
+      assertCurrent()
       const docs = this._extractDocs(json)
       this._setCache(cfg, docs)
       return docs.slice(0, maxLimit)
     }
     catch (e: any) {
+      if (signal.aborted || e?.name === 'AbortError') {
+        throw e
+      }
       console.warn(`[EndgeVocabs.getSampleById] ${cfg.idKey}/${cfg.slug}: ${e instanceof Error ? e.message : String(e)}`)
       return []
     }
@@ -465,17 +532,24 @@ export class EndgeVocabs_Module extends EndgeModule {
       }
       return []
     }
+    const signal = this._abortController.signal
+    const assertCurrent = this._beginCacheWrite(cfg, options.dataMode)
     this._setLoadingState(true)
     try {
       const raw = options.dataMode === 'mock'
         ? this._resolveMockValue(cfg)
         : await this.loadRawVocab(cfg.identity, { throwOnError: true })
+      assertCurrent()
       const items = this._applyOutputs(cfg, raw)
-      this._setCache(cfg, items)
+      assertCurrent()
+      this._setCache(cfg, items, options.dataMode)
       this._markLoaded(cfg.identity, options.dataMode ?? 'live')
       return items
     }
     catch (e: any) {
+      if (e?.name === 'AbortError') {
+        throw e
+      }
       console.warn(`[EndgeVocabs.loadVocab] ${cfg.idKey}/${cfg.slug}: ${e instanceof Error ? e.message : String(e)}`)
       if (options.throwOnError) {
         throw e
@@ -483,7 +557,9 @@ export class EndgeVocabs_Module extends EndgeModule {
       return []
     }
     finally {
-      this._setLoadingState(false)
+      if (!signal.aborted) {
+        this._setLoadingState(false)
+      }
     }
   }
 
@@ -513,7 +589,9 @@ export class EndgeVocabs_Module extends EndgeModule {
       return []
     }
 
+    const signal = this._abortController.signal
     const headers = await this._resolveAuthHeaders(cfg)
+    signal.throwIfAborted()
     const requestedLimit = options.limit == null ? null : Math.max(1, Math.floor(options.limit))
     const pageSize = requestedLimit == null ? 1000 : Math.min(1000, requestedLimit)
     const allDocs: unknown[] = []
@@ -521,11 +599,13 @@ export class EndgeVocabs_Module extends EndgeModule {
     try {
       while (true) {
         const url = `${baseUrl}/${cfg.slug}?limit=${pageSize}&page=${page}`
-        const response = await fetch(url, { headers })
+        signal.throwIfAborted()
+        const response = await fetch(url, { headers, signal })
         if (!response.ok) {
           throw new Error(`HTTP ${response.status} ${response.statusText}`.trim())
         }
         const json = await response.json()
+        signal.throwIfAborted()
         const docs = this._extractDocs(json)
         allDocs.push(...docs)
         if (requestedLimit != null && allDocs.length >= requestedLimit) {
@@ -552,6 +632,9 @@ export class EndgeVocabs_Module extends EndgeModule {
       return allDocs
     }
     catch (error) {
+      if (signal.aborted) {
+        throw error
+      }
       if (options.throwOnError) {
         throw error
       }
@@ -626,28 +709,13 @@ export class EndgeVocabs_Module extends EndgeModule {
     }
 
     if (!force) {
-      const cached = this._getCache(cfg)
+      const cached = this._getCache(cfg, dataMode)
       if (Array.isArray(cached)) {
         return cached
       }
     }
 
-    const version = this._cacheVersions.get(cfg.identity) ?? 0
     const request = this.loadVocab(cfg.identity, { throwOnError: true, dataMode })
-      .then((docs) => {
-        if ((this._cacheVersions.get(cfg.identity) ?? 0) !== version) {
-          delete this._byIdCache[cfg.identity]
-          this._loadedIdentities.delete(cfg.identity)
-          this._loadedAtByIdentity.delete(cfg.identity)
-          this._loadedModeByIdentity.delete(cfg.identity)
-          Raph.delete(`vocabsByIdentity.${cfg.identity}`)
-          Raph.delete(`vocabs.${cfg.identity}`)
-          if (cfg.slug) {
-            Raph.delete(`vocabs.${cfg.slug}`)
-          }
-        }
-        return docs
-      })
       .finally(() => {
         if (this._inFlight.get(requestKey) === request) {
           this._inFlight.delete(requestKey)
@@ -656,6 +724,29 @@ export class EndgeVocabs_Module extends EndgeModule {
 
     this._inFlight.set(requestKey, request)
     return await request
+  }
+
+  /** Прямые загрузки одного cache key используют latest-wins; acquire разделяет один запуск. */
+  private _beginCacheWrite(cfg: VocabRuntimeConfig, dataMode: 'live' | 'mock' = 'live'): () => void {
+    const signal = this._abortController.signal
+    const cacheVersion = this._cacheVersions.get(cfg.identity) ?? 0
+    const key = `${dataMode}:${cfg.identity}`
+    const loadVersion = Symbol(key)
+    this._loadVersions.set(key, loadVersion)
+    return () => {
+      this._assertCacheRequest(cfg, signal, cacheVersion)
+      if (this._loadVersions.get(key) !== loadVersion) {
+        throw new DOMException('Vocab load was superseded.', 'AbortError')
+      }
+    }
+  }
+
+  /** Проверяет актуальность загрузки до первой записи в observable cache. */
+  private _assertCacheRequest(cfg: VocabRuntimeConfig, signal: AbortSignal, version: number): void {
+    signal.throwIfAborted()
+    if ((this._cacheVersions.get(cfg.identity) ?? 0) !== version) {
+      throw new DOMException('Vocab cache was invalidated.', 'AbortError')
+    }
   }
 
   private _bumpCacheVersion(identity: string): void {
@@ -681,8 +772,7 @@ export class EndgeVocabs_Module extends EndgeModule {
   }
 
   private _markLoaded(identity: string, dataMode: 'live' | 'mock' = 'live'): void {
-    this._loadedAtByIdentity.set(identity, Date.now())
-    this._loadedModeByIdentity.set(identity, dataMode)
+    this._loadedAtByIdentity.set(`${dataMode}:${identity}`, Date.now())
   }
 
   /**
@@ -691,23 +781,29 @@ export class EndgeVocabs_Module extends EndgeModule {
   private _setByIdentityCache(identity: string, docs: any[]): void {
     this._byIdCache[identity] = Array.isArray(docs) ? docs : []
     Raph.set(`vocabsByIdentity.${identity}`, this._byIdCache[identity])
+    this._ownedCachePaths.add(`vocabsByIdentity.${identity}`)
     this._loadedIdentities.add(identity)
   }
 
   /** Пишет canonical identity cache и переходный alias provider.collection. */
-  private _setCache(cfg: VocabRuntimeConfig, docs: any[]): void {
+  private _setCache(cfg: VocabRuntimeConfig, docs: any[], dataMode: 'live' | 'mock' = 'live'): void {
     const values = Array.isArray(docs) ? docs : []
+    const path = this.getPath(cfg.identity, { dataMode })
+    this._ownedCachePaths.add(path)
+    Raph.set(path, values)
+    if (dataMode === 'mock') {
+      return
+    }
     this._setByIdentityCache(cfg.identity, values)
-    Raph.set(`vocabs.${cfg.identity}`, values)
     if (cfg.slug && cfg.slug !== cfg.identity) {
+      this._ownedCachePaths.add(`vocabs.${cfg.slug}`)
       Raph.set(`vocabs.${cfg.slug}`, values)
     }
   }
 
-  /** Читает canonical identity cache с переходным fallback на collection alias. */
-  private _getCache(cfg: VocabRuntimeConfig): unknown {
-    const canonical = Raph.get(`vocabs.${cfg.identity}`)
-    return canonical !== undefined ? canonical : cfg.slug ? Raph.get(`vocabs.${cfg.slug}`) : undefined
+  /** Читает кэш только выбранной identity и режима без данных другого справочника. */
+  private _getCache(cfg: VocabRuntimeConfig, dataMode: 'live' | 'mock' = 'live'): unknown {
+    return Raph.get(this.getPath(cfg.identity, { dataMode }))
   }
 
   /**
@@ -849,4 +945,27 @@ export class EndgeVocabs_Module extends EndgeModule {
     this.loading = value
     this.notify()
   }
+}
+
+/** Отмена одного consumer прекращает ожидание, сохраняя общую загрузку других scopes. */
+async function waitForVocab<T>(request: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) {
+    return request
+  }
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => reject(signal.reason ?? new DOMException('Vocab acquisition aborted.', 'AbortError'))
+    const cleanup = () => signal.removeEventListener('abort', abort)
+    signal.addEventListener('abort', abort, { once: true })
+    request.then((value) => {
+      cleanup()
+      resolve(value)
+    }, (error) => {
+      cleanup()
+      reject(error)
+    })
+    if (signal.aborted) {
+      cleanup()
+      abort()
+    }
+  })
 }

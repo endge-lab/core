@@ -1,4 +1,3 @@
-import type { RaphDerivedHandle } from '@endge/raph'
 import type { RComposition } from '@/features/core/modules/domain/entities/RComposition'
 import type {
   ComponentSFCEventInputValue,
@@ -85,6 +84,8 @@ function evaluateComponentEventInput(
 
 /** Runtime orchestration host: children, bindings, hooks и public handles. */
 export class CompositionRuntimeHost extends RuntimeHostBase<'composition', RuntimeHostContext<'composition'>, CompositionProgramPayload> {
+  private _mountPromise: Promise<void> | null = null
+  private _destroyPromise: Promise<void> | null = null
   private _children = new Map<string, RuntimeHost<any, any>>()
   private _childDescriptors = new Map<string, CompositionProgramPayload['runtimes'][number]>()
   private _publicOutputs: Record<string, CompositionPublicOutputHandle> = {}
@@ -96,8 +97,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   private _hookDisposers = new Map<string, () => void>()
   private _publicationDisposers = new Map<string, () => void>()
   private _disposers: Array<() => void> = []
+  private readonly _dispatchDisposers = new Map<string, () => void>()
   private _bridgePaths = new Set<string>()
-  private _bindingDerivedHandles: RaphDerivedHandle[] = []
+  private readonly _runtimeDisposers = new Map<string, Array<() => void>>()
   private _dataPaths = new Map<string, string>()
   private _storeRuntimeIds = new Map<string, string>()
   private _storeProviderRuntimeIds = new Map<string, Set<string>>()
@@ -105,11 +107,12 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   private _compositionInputBindings = new Map<string, RuntimeHostInputBinding>()
   private _i18nCatalogs = new Map<string, I18nRuntimeCatalog>()
   private _vocabCatalogs = new Map<string, VocabRuntimeCatalog>()
+  private readonly _vocabDataModes = new Map<string, 'live' | 'mock'>()
   private _orchestratedQueries = new Set<string>()
   private _orchestratedSuccesses = new Set<string>()
   private _streamBatches = new Map<string, StreamEventEnvelope[]>()
   private _streamBatchTimers = new Map<string, ReturnType<typeof setTimeout>>()
-  private _mounted = false
+  private _mountCancelled = false
 
   public constructor(input: {
     id: string
@@ -165,10 +168,23 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   }
 
   /** Создает children, bindings и hooks. Повторный mount является no-op. */
-  public async mountGraph(): Promise<void> {
-    if (this._mounted) {
-      return
+  public mountGraph(): Promise<void> {
+    if (this._mountCancelled) {
+      return Promise.reject(new DOMException('[CompositionRuntimeHost] Mount was cancelled.', 'AbortError'))
     }
+    if (!this._mountPromise) {
+      let resolve!: () => void
+      let reject!: (error: unknown) => void
+      this._mountPromise = new Promise<void>((done, fail) => {
+        resolve = done
+        reject = fail
+      })
+      void this._mountGraph().then(resolve, reject)
+    }
+    return this._mountPromise
+  }
+
+  private async _mountGraph(): Promise<void> {
     const payload = this.getArtifactPayload()
     if (!payload) {
       throw new Error(`[CompositionRuntimeHost] artifact is missing for "${this.entityIdentity}".`)
@@ -183,8 +199,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       this._buildLifecycleScopes(payload)
       const rootScope = this._requireScope('scope_default')
       await rootScope.activate()
+      this._assertMountCurrent()
       this._makeOutputs(payload)
-      this._mounted = true
       const now = new Date().toISOString()
       this.setContext({ status: 'success', startedAt: now, updatedAt: now, mountedChildren: this._children.size })
 
@@ -195,10 +211,17 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         }
       }
       await this._runQueries(payload.graph.mounts.map(mount => mount.targetRuntime))
+      this._assertMountCurrent()
     }
     catch (error) {
-      this.destroy()
+      await this.destroy()
       throw error
+    }
+  }
+
+  private _assertMountCurrent(): void {
+    if (this._mountCancelled) {
+      throw new DOMException('[CompositionRuntimeHost] Mount was cancelled.', 'AbortError')
     }
   }
 
@@ -369,7 +392,12 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         parent,
         ownerRuntimeId: this.id,
         hooks: {
-          activate: () => this._activateScope(descriptor, payload),
+          activate: (signal, generation) => this._activateScope(descriptor, payload, signal, generation),
+          resume: (signal) => {
+            if (this._vocabDataModes.get(descriptor.path) !== Endge.runtime.resolveDataMode(this)) {
+              return this._acquireScopeVocabs(descriptor, payload, signal)
+            }
+          },
           reconcile: async () => {
             for (const runtimePath of descriptor.runtimes) {
               await this._children.get(runtimePath)?.reconcile?.()
@@ -392,19 +420,19 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   private async _activateScope(
     descriptor: CompositionProgramPayload['scopes'][number],
     payload: CompositionProgramPayload,
+    signal: AbortSignal,
+    generation: number,
   ): Promise<void> {
     const scope = this._requireScope(descriptor.path)
-    const dataMode = Endge.runtime.resolveDataMode(this) === 'mock' ? 'mock' : 'live'
-    const scopeData = descriptor.data ?? payload.data
-      .filter(data => (data.scopePath ?? 'scope_default') === descriptor.path)
-      .map(data => data.path ?? data.name)
-    await Promise.all(scopeData.map(async (dataPath) => {
-      const data = payload.data.find(item => (item.path ?? item.name) === dataPath)
-      if (!data || data.kind !== 'vocab') {
-        return
+    const assertCurrent = (): void => {
+      signal.throwIfAborted()
+      if (scope.generation !== generation || scope.state !== 'activating') {
+        throw new DOMException('Composition scope activation is no longer current.', 'AbortError')
       }
-      await Endge.vocabs.acquire([data.identity], data.policy, { dataMode })
-    }))
+    }
+    assertCurrent()
+    await this._acquireScopeVocabs(descriptor, payload, signal)
+    assertCurrent()
 
     Endge.styles.transaction(() => {
       for (const resourcePath of descriptor.resources) {
@@ -448,10 +476,12 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       payload.runtimes.filter(item => item.scopePath === descriptor.path && item.effectiveActivation.mode === 'startup'),
     )
     for (const runtime of runtimeDescriptors) {
+      assertCurrent()
       if (!this._children.has(runtime.path)) {
         await this._createChild(runtime)
       }
     }
+    assertCurrent()
     for (const runtime of runtimeDescriptors) {
       this._bindChild(runtime)
     }
@@ -460,12 +490,15 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       .filter(item => item.parentPath === descriptor.path && item.effectiveActivation.mode === 'startup')
       .sort((left, right) => left.sourceOrder - right.sourceOrder)
     for (const child of childScopes) {
+      assertCurrent()
       await this._requireScope(child.path).activate()
     }
+    assertCurrent()
     this._bindHooks(payload)
   }
 
   private _forgetScopeRuntimes(scopePath: string): void {
+    this._vocabDataModes.delete(scopePath)
     for (const [path, descriptor] of this._childDescriptors) {
       if (descriptor.scopePath !== scopePath) {
         continue
@@ -475,6 +508,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   }
 
   private _forgetRuntime(path: string): void {
+    this._disposeRuntimeBindings(path)
+    this._dispatchDisposers.get(path)?.()
+    this._dispatchDisposers.delete(path)
     for (const connection of this.getArtifactPayload()?.graph.updates ?? []) {
       if (connection.targetRuntime !== path) {
         continue
@@ -673,20 +709,24 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   }
 
   public override quiesce(): void {
+    this._mountCancelled = true
     super.quiesce()
     for (const timer of this._streamBatchTimers.values()) {
       clearTimeout(timer)
     }
     this._streamBatchTimers.clear()
     this._streamBatches.clear()
-    for (const handle of [...this._bindingDerivedHandles].reverse()) {
-      handle.dispose()
+    for (const path of this._runtimeDisposers.keys()) {
+      this._disposeRuntimeBindings(path)
     }
-    this._bindingDerivedHandles = []
     for (const dispose of this._disposers) {
       dispose()
     }
     this._disposers = []
+    for (const dispose of this._dispatchDisposers.values()) {
+      dispose()
+    }
+    this._dispatchDisposers.clear()
     for (const path of this._bridgePaths) {
       Raph.delete(path)
     }
@@ -705,7 +745,20 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     this._publicationDisposers.clear()
   }
 
-  public override async destroy(): Promise<void> {
+  public override destroy(): Promise<void> {
+    if (!this._destroyPromise) {
+      let resolve!: () => void
+      let reject!: (error: unknown) => void
+      this._destroyPromise = new Promise<void>((done, fail) => {
+        resolve = done
+        reject = fail
+      })
+      void this._destroyOwnedResources().then(resolve, reject)
+    }
+    return this._destroyPromise
+  }
+
+  private async _destroyOwnedResources(): Promise<void> {
     this.quiesce()
     for (const child of this._children.values()) {
       if (Endge.runtime.getRuntimeById(child.id)) {
@@ -737,9 +790,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     this._compositionInputBindings.clear()
     this._i18nCatalogs.clear()
     this._vocabCatalogs.clear()
+    this._vocabDataModes.clear()
     this._orchestratedQueries.clear()
     this._orchestratedSuccesses.clear()
-    this._mounted = false
     super.destroy()
   }
 
@@ -779,6 +832,28 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }
   }
 
+  /** Дожидается cache текущего режима, включая его смену во время acquisition. */
+  private async _acquireScopeVocabs(
+    descriptor: CompositionProgramPayload['scopes'][number],
+    payload: CompositionProgramPayload,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const paths = descriptor.data ?? payload.data
+      .filter(data => (data.scopePath ?? 'scope_default') === descriptor.path)
+      .map(data => data.path ?? data.name)
+    const vocabs = payload.data.filter(data => data.kind === 'vocab').filter(data => paths.includes(data.path ?? data.name))
+    while (true) {
+      signal.throwIfAborted()
+      const dataMode = Endge.runtime.resolveDataMode(this) === 'mock' ? 'mock' : 'live'
+      await Promise.all(vocabs.map(data => Endge.vocabs.acquire([data.identity], data.policy, { dataMode, signal })))
+      signal.throwIfAborted()
+      if (dataMode === Endge.runtime.resolveDataMode(this)) {
+        this._vocabDataModes.set(descriptor.path, dataMode)
+        return
+      }
+    }
+  }
+
   /** Регистрирует shared Vocab paths и разрешает Store aliases через explicit, ancestor или local provider. */
   private _mountData(payload: CompositionProgramPayload): void {
     const explicitStoreRuntimes = (
@@ -790,7 +865,39 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       const descriptorPath = descriptor.path ?? descriptor.name
 
       if (descriptor.kind === 'vocab') {
-        const vocabPath = `vocabs.${descriptor.identity}`
+        const vocabPath = `${this.basePath}.vocabs.${encodePathPart(descriptorPath)}`
+        let dataMode = Endge.runtime.resolveDataMode(this) === 'mock' ? 'mock' as const : 'live' as const
+        const sync = () => {
+          const value = Raph.get(Endge.vocabs.getPath(descriptor.identity, { dataMode }))
+          if (value === undefined) {
+            Raph.delete(vocabPath)
+          }
+          else { Raph.set(vocabPath, value) }
+        }
+        const paths = (['live', 'mock'] as const).flatMap((mode) => {
+          const path = Endge.vocabs.getPath(descriptor.identity, { dataMode: mode })
+          return [path, `${path}.*`]
+        })
+        this._disposers.push(Raph.watch(paths, sync))
+        this._disposers.push(Endge.context.subscribe(() => {
+          const next = Endge.runtime.resolveDataMode(this) === 'mock' ? 'mock' : 'live'
+          if (next === dataMode) {
+            return
+          }
+          dataMode = next
+          sync()
+          const scope = this._scopes.get(descriptor.scopePath ?? 'scope_default')
+          if (scope?.state === 'active') {
+            void Endge.vocabs.acquire([descriptor.identity], descriptor.policy, { dataMode }).catch((error) => {
+              if (scope.acceptsUpdates() && next === dataMode) {
+                this.setContext({ status: 'error', updatedAt: new Date().toISOString() })
+                this.emit('vocab:error', error)
+              }
+            })
+          }
+        }))
+        sync()
+        this._bridgePaths.add(vocabPath)
         this._dataPaths.set(descriptorPath, vocabPath)
         this.addResource({
           id: `data:${descriptorPath}`,
@@ -1131,7 +1238,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         }
         const sync = () => filterView.setProps({ [prop]: this._readBinding(binding) })
         sync()
-        this._subscribeBinding(binding, sync)
+        this._subscribeBinding(descriptor.path, binding, sync)
       }
       return
     }
@@ -1193,7 +1300,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }
     syncLegacy()
     for (const binding of Object.values(inputBindings)) {
-      this._subscribeBinding(binding, syncLegacy)
+      this._subscribeBinding(descriptor.path, binding, syncLegacy)
     }
   }
 
@@ -1214,6 +1321,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     })
 
     const receive = (event: StreamEventEnvelope) => {
+      if (!this._requireScope(descriptor.scopePath).acceptsUpdates()) {
+        return
+      }
       const batch = descriptor.batch
       if (!batch || (batch.maxItems === 1 && batch.maxWaitMs === 0)) {
         Raph.transaction(() => {
@@ -1238,7 +1348,21 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       }
     }
     stream.on('event', receive)
-    this._disposers.push(() => stream.off('event', receive))
+    const stopBatch = () => {
+      const timer = this._streamBatchTimers.get(descriptor.name)
+      if (timer) {
+        clearTimeout(timer)
+      }
+      this._streamBatchTimers.delete(descriptor.name)
+      this._streamBatches.delete(descriptor.name)
+    }
+    stream.on('transport:close', stopBatch)
+    this._dispatchDisposers.get(descriptor.path)?.()
+    this._dispatchDisposers.set(descriptor.path, () => {
+      stream.off('event', receive)
+      stream.off('transport:close', stopBatch)
+      stopBatch()
+    })
   }
 
   private _bindComponentDispatch(
@@ -1249,8 +1373,12 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       return
     }
     const stores = descriptor.dispatchTo.map(dataAlias => this._requireStoreRuntime(dataAlias))
+    const disposers: Array<() => void> = []
     for (const port of component.getIr()?.script.ports.emits.events ?? []) {
       const dispose = component.onEventPort(port.name, (occurrence) => {
+        if (!this._requireScope(descriptor.scopePath).acceptsUpdates()) {
+          return
+        }
         const envelope: StreamEventEnvelope = {
           type: occurrence.event,
           payload: occurrence.payload,
@@ -1267,8 +1395,10 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
           }
         })
       })
-      this._disposers.push(dispose)
+      disposers.push(dispose)
     }
+    this._dispatchDisposers.get(descriptor.path)?.()
+    this._dispatchDisposers.set(descriptor.path, () => disposers.forEach(dispose => dispose()))
   }
 
   private _flushStreamBatch(name: string, stores: StoreRuntimeHost[]): void {
@@ -1590,18 +1720,41 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }
   }
 
-  private _subscribeBinding(binding: CompositionBindingValue, sync: () => void): void {
+  /** Подписки и materializations живут столько же, сколько их child runtime. */
+  private _addRuntimeDisposer(runtimeName: string, dispose: () => void): void {
+    const disposers = this._runtimeDisposers.get(runtimeName) ?? []
+    disposers.push(dispose)
+    this._runtimeDisposers.set(runtimeName, disposers)
+  }
+
+  private _disposeRuntimeBindings(runtimeName: string): void {
+    const disposers = this._runtimeDisposers.get(runtimeName) ?? []
+    this._runtimeDisposers.delete(runtimeName)
+    for (const dispose of disposers.reverse()) {
+      dispose()
+    }
+  }
+
+  private _ownBindingPath(runtimeName: string, path: string): void {
+    this._bridgePaths.add(path)
+    this._addRuntimeDisposer(runtimeName, () => {
+      Raph.delete(path)
+      this._bridgePaths.delete(path)
+    })
+  }
+
+  private _subscribeBinding(runtimeName: string, binding: CompositionBindingValue, sync: () => void): void {
     if (binding.kind === 'literal') {
       return
     }
     if (binding.kind === 'store') {
       const dispose = Raph.watch(binding.key, sync)
-      this._disposers.push(dispose)
+      this._addRuntimeDisposer(runtimeName, dispose)
       return
     }
     if (binding.kind === 'data') {
       const dispose = Raph.watch(`${this._requireDataPath(binding.data, binding.path)}.*`, sync)
-      this._disposers.push(dispose)
+      this._addRuntimeDisposer(runtimeName, dispose)
       return
     }
     if (binding.kind === 'runtime-metadata') {
@@ -1615,7 +1768,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       if (!runtime) {
         return
       }
-      this._disposers.push(Raph.watch([
+      this._addRuntimeDisposer(runtimeName, Raph.watch([
         runtime.statePath(),
         `${runtime.statePath()}.*`,
       ], sync))
@@ -1629,7 +1782,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
           continue
         }
         seen.add(key)
-        this._subscribeExpressionRead(read, sync)
+        this._subscribeExpressionRead(runtimeName, read, sync)
       }
       return
     }
@@ -1640,12 +1793,12 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
           return [path, `${path}.*`]
         })
       if (paths.length) {
-        this._disposers.push(Raph.watch(paths, sync))
+        this._addRuntimeDisposer(runtimeName, Raph.watch(paths, sync))
       }
       return
     }
     const path = this._requireOutputBridge(binding.runtime, binding.output)
-    this._disposers.push(Raph.watch([path, `${path}.*`], sync))
+    this._addRuntimeDisposer(runtimeName, Raph.watch([path, `${path}.*`], sync))
   }
 
   private _bindingPath(
@@ -1676,8 +1829,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     const path = `${this.basePath}.bindings.${encodePathPart(runtimeName)}.${encodePathPart(prop)}`
     const sync = () => Raph.set(path, this._readBinding(binding))
     sync()
-    this._subscribeBinding(binding, sync)
-    this._bridgePaths.add(path)
+    this._ownBindingPath(runtimeName, path)
+    this._subscribeBinding(runtimeName, binding, sync)
     return path
   }
 
@@ -1713,11 +1866,14 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       }),
     })
     this.node?.addChild(handle.node, { invalidate: false })
-    this._bindingDerivedHandles.push(handle)
-    for (const propBinding of Object.values(binding.props)) {
-      this._subscribeBinding(propBinding, () => handle.recompute())
-    }
     this._bridgePaths.add(to)
+    this._addRuntimeDisposer(runtimeName, () => {
+      handle.dispose()
+      this._bridgePaths.delete(to)
+    })
+    for (const propBinding of Object.values(binding.props)) {
+      this._subscribeBinding(runtimeName, propBinding, () => handle.recompute())
+    }
     return to
   }
 
@@ -1829,6 +1985,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   }
 
   private _subscribeExpressionRead(
+    runtimeName: string,
     read: Extract<import('@/features/core/modules/source/domain/types/source-expression.types').SourceExpressionIR, { type: 'read' }>,
     sync: () => void,
   ): void {
@@ -1841,13 +1998,13 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       const prop = dot > 0 ? read.path.slice(0, dot) : read.path
       const source = this._compositionInputBindings.get(prop)
       if (source?.kind === 'raph') {
-        this._disposers.push(Raph.watch([source.path, `${source.path}.*`], sync))
+        this._addRuntimeDisposer(runtimeName, Raph.watch([source.path, `${source.path}.*`], sync))
       }
       return
     }
     if (read.source === 'composition-output') {
       const path = this._requireOutputBridge(parameters[0], parameters[1])
-      this._disposers.push(Raph.watch([path, `${path}.*`], sync))
+      this._addRuntimeDisposer(runtimeName, Raph.watch([path, `${path}.*`], sync))
       return
     }
     if (read.source === 'composition-outputs') {
@@ -1857,19 +2014,19 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         return [path, `${path}.*`]
       })
       if (paths.length) {
-        this._disposers.push(Raph.watch(paths, sync))
+        this._addRuntimeDisposer(runtimeName, Raph.watch(paths, sync))
       }
       return
     }
     if (read.source === 'composition-filter-fields') {
       const runtime = this._children.get(parameters[0])
       if (runtime) {
-        this._disposers.push(Raph.watch([runtime.statePath(), `${runtime.statePath()}.*`], sync))
+        this._addRuntimeDisposer(runtimeName, Raph.watch([runtime.statePath(), `${runtime.statePath()}.*`], sync))
       }
       return
     }
     if (read.source === 'composition-store' || read.source === 'store') {
-      this._disposers.push(Raph.watch(read.source === 'store' ? read.path : parameters[0], sync))
+      this._addRuntimeDisposer(runtimeName, Raph.watch(read.source === 'store' ? read.path : parameters[0], sync))
       return
     }
     if (read.source === 'composition-data') {
@@ -1879,7 +2036,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         throw new Error(`[CompositionRuntimeHost] Data reference "${ref}" is missing.`)
       }
       const path = this._requireDataPath(resolved.data, resolved.path)
-      this._disposers.push(Raph.watch(`${path}.*`, sync))
+      this._addRuntimeDisposer(runtimeName, Raph.watch(`${path}.*`, sync))
     }
   }
 

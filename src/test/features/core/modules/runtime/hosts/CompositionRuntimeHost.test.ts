@@ -28,11 +28,11 @@ import { compileDataViewSource } from '@/features/core/modules/source/services/c
 import { compileFilterSource } from '@/features/core/modules/source/services/compilers/filter-source-compile'
 
 describe('проверка Runtime-сессия Composition', () => {
-  afterEach(() => {
+  afterEach(async () => {
     Endge.context.setDataMode('live')
     vi.useRealTimers()
     vi.restoreAllMocks()
-    Endge.runtime.reset()
+    await Endge.runtime.reset()
     Endge.program.clear()
     Endge.domain.reset()
     Raph.app.reset()
@@ -140,6 +140,25 @@ describe('проверка Runtime-сессия Composition', () => {
     await vi.advanceTimersByTimeAsync(20)
     expect(run).toHaveBeenCalledTimes(2)
     expect(Endge.runtime.getRuntimeHosts()).toEqual([])
+    await session.unmount()
+  })
+
+  it('освобождает подписки входных данных при повторной деактивации runtime', async () => {
+    vi.spyOn(QueryRuntimeHost.prototype, 'run').mockResolvedValue({})
+    installDomainAndProgram()
+    const session = await Endge.runtime.composition.mount('schedule-page')
+    const filter = session.host.getChild('filter') as FilterRuntimeHost
+    const handle = session.host.getRuntimeHandle('dateFilter')!
+    for (let i = 0; i < 3; i += 1) {
+      const view = handle.runtime as FilterViewRuntimeHost
+      const setProps = vi.spyOn(view, 'setProps')
+      await handle.deactivate()
+      setProps.mockClear()
+      await filter.action('set').run({ key: 'search', value: String(i) })
+      expect(setProps).not.toHaveBeenCalled()
+      await handle.activate()
+      expect((handle.runtime as FilterViewRuntimeHost).getProps().requestPreview).toEqual({ where: { search: String(i) } })
+    }
     await session.unmount()
   })
 

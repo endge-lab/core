@@ -437,35 +437,40 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
   }
 
   private _validateMutationPlans(plans: StoreMutationPlan[]): void {
-    const projected = new DefaultDataAdapter(cloneRuntimeValue(this.getDataSnapshot()))
+    if (!plans.length) {
+      return
+    }
+    const adapter = Raph.app.dataAdapter
+    const projected = (adapter instanceof DefaultDataAdapter ? adapter : new DefaultDataAdapter(adapter.root())).fork()
     for (const plan of plans) {
+      const path = appendRawStorePath(this.getDataPath(), plan.path)
       const options = plan.vars ? { vars: plan.vars } : undefined
       if (plan.plane === 'meta') {
         const namespace = String(plan.namespace ?? '').trim()
         if (!namespace) {
           throw new Error('[StoreRuntimeHost] Meta mutation requires namespace.')
         }
-        if (!projected.has(plan.path, options)) {
+        if (!projected.has(path, options)) {
           throw new Error(`[StoreRuntimeHost] Meta owner does not exist: "${plan.path}".`)
         }
         continue
       }
       switch (plan.strategy) {
         case 'merge':
-          projected.merge(plan.path, cloneRuntimeValue(plan.value), options)
+          projected.merge(path, cloneRuntimeValue(plan.value), options)
           break
         case 'remove':
-          projected.delete(plan.path, options)
+          projected.delete(path, options)
           break
         case 'append': {
-          const current = projected.get(plan.path, options)
+          const current = projected.get(path, options)
           const additions = Array.isArray(plan.value) ? plan.value : [plan.value]
-          projected.set(plan.path, [...(Array.isArray(current) ? current : []), ...cloneRuntimeValue(additions)], options)
+          projected.set(path, [...(Array.isArray(current) ? current : []), ...cloneRuntimeValue(additions)], options)
           break
         }
         case 'replace':
         case 'set':
-          projected.set(plan.path, cloneRuntimeValue(plan.value), options)
+          projected.set(path, cloneRuntimeValue(plan.value), options)
           break
       }
     }

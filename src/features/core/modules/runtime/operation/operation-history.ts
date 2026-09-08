@@ -31,6 +31,7 @@ export class OperationHistory implements RuntimeOwnedResource {
   private _paused = false
   private _disposed = false
   private _queue: Promise<unknown> = Promise.resolve()
+  private _pending = 0
   private _limit: number
 
   public constructor(private readonly _options: OperationHistoryOptions) {
@@ -49,11 +50,33 @@ export class OperationHistory implements RuntimeOwnedResource {
 
   public setLimit(value: number): void {
     this._limit = normalizeLimit(value)
-    this._trim()
+    if (!this._pending) {
+      this._trim()
+    }
     this._options.onChange?.()
   }
 
-  public commit(entry: OperationHistoryEntry): void {
+  public commit(entry: OperationHistoryEntry): Promise<void> {
+    if (!this._pending) {
+      this._commit(entry)
+      return Promise.resolve()
+    }
+    return this._enqueue(async () => this._commit(entry))
+  }
+
+  /** Serializes the data mutation and its history entry with undo/redo. */
+  public execute<T>(operation: () => Promise<{ result: T, entry: OperationHistoryEntry }>): Promise<T> {
+    return this._enqueue(async () => {
+      if (this._disposed) {
+        throw new Error('[OperationHistory] History is disposed.')
+      }
+      const { result, entry } = await operation()
+      this._commit(entry)
+      return result
+    })
+  }
+
+  private _commit(entry: OperationHistoryEntry): void {
     if (!this.active) {
       return
     }
@@ -73,9 +96,11 @@ export class OperationHistory implements RuntimeOwnedResource {
       }
       const entry = this._entries[this._cursor - 1]!
       const result = await entry.undo()
-      entry.undoOutput = result
-      this._cursor -= 1
-      this._options.onChange?.()
+      if (!this._disposed) {
+        entry.undoOutput = result
+        this._cursor -= 1
+        this._options.onChange?.()
+      }
       return result
     })
   }
@@ -87,8 +112,10 @@ export class OperationHistory implements RuntimeOwnedResource {
       }
       const entry = this._entries[this._cursor]!
       const result = await entry.redo()
-      this._cursor += 1
-      this._options.onChange?.()
+      if (!this._disposed) {
+        this._cursor += 1
+        this._options.onChange?.()
+      }
       return result
     })
   }
@@ -112,7 +139,11 @@ export class OperationHistory implements RuntimeOwnedResource {
   }
 
   private _enqueue<T>(task: () => Promise<T>): Promise<T> {
-    const result = this._queue.then(task, task)
+    this._pending += 1
+    const result = this._queue.then(task, task).finally(() => {
+      this._pending -= 1
+      this._trim()
+    })
     this._queue = result.then(() => undefined, () => undefined)
     return result
   }

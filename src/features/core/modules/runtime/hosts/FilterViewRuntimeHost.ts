@@ -35,6 +35,7 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
   private readonly _onSourceChange: () => void
   private readonly _disposeSourceWatch: () => void
   private readonly _disposeVocabWatch: () => void
+  private readonly _disposeContextWatch: () => void
   private _props: Record<string, unknown>
 
   public constructor(input: {
@@ -95,11 +96,19 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
     const vocabPaths = [...new Set(this._sourceRuntime.getFields()
       .filter(field => this._fieldKeys.includes(field.key))
       .flatMap((field) => {
-        const path = this._resolveVocabPath(field)
-        return path ? [path, `${path}.*`] : []
+        if (!field.vocab?.identity) {
+          return []
+        }
+        return (['live', 'mock'] as const).flatMap((dataMode) => {
+          const path = Endge.vocabs.getPath(field.vocab!.identity, { dataMode })
+          return [path, `${path}.*`]
+        })
       }))]
     this._disposeVocabWatch = vocabPaths.length
       ? Raph.watch(vocabPaths, this._onSourceChange)
+      : () => {}
+    this._disposeContextWatch = vocabPaths.length
+      ? Endge.context.subscribe(this._onSourceChange)
       : () => {}
   }
 
@@ -161,6 +170,7 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
   public override destroy(): void {
     this._disposeSourceWatch()
     this._disposeVocabWatch()
+    this._disposeContextWatch()
     super.destroy()
   }
 
@@ -187,8 +197,8 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
       return field.options ?? []
     }
 
-    const rows = Endge.vocabs.getValues(config.identity)
-    return rows.map((row) => {
+    const rows = Raph.get(this._resolveVocabPath(field)!) as unknown[] | undefined
+    return (Array.isArray(rows) ? rows : []).map((row) => {
       const rawValue = this._readPath(row, config.valuePath)
       const value = typeof rawValue === 'string' || typeof rawValue === 'number' || typeof rawValue === 'boolean'
         ? rawValue
@@ -208,7 +218,9 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
     if (!identity) {
       return null
     }
-    return `vocabs.${identity}`
+    return Endge.vocabs.getPath(identity, {
+      dataMode: Endge.runtime.resolveDataMode(this) === 'mock' ? 'mock' : 'live',
+    })
   }
 
   /**
