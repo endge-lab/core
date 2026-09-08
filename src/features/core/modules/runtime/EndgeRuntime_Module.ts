@@ -132,6 +132,13 @@ export class EndgeRuntime_Module extends EndgeModule {
       return null
     }
 
+    const artifactReader = this._resolveArtifactReader(options.artifactReader)
+    if (strategy.entityType !== 'project' && strategy.entityType !== 'page') {
+      const artifact = (options.meta?.artifact as import('@/features/core/modules/program/domain/types/program.types').ProgramArtifact | undefined) ?? artifactReader.getArtifact(strategy.entityType, model.id ?? model.identity)
+      if (artifact?.diagnostics?.some((item: { code: string }) => item.code === 'program-artifact-stale' || item.code === 'program-dependency-stale')) {
+        return null
+      }
+    }
     this.start()
 
     const {
@@ -139,7 +146,6 @@ export class EndgeRuntime_Module extends EndgeModule {
       instanceId: requestedLocalId,
       parent: parentRef,
       appScope: appScopeRef,
-      artifactReader: artifactReaderRef,
       persistence,
       persistenceKey,
       meta,
@@ -147,7 +153,6 @@ export class EndgeRuntime_Module extends EndgeModule {
     const parent = this._resolveParentHost(parentRef)
     const appScope = this._resolveAppScope(appScopeRef, parent)
     this._ensureLifecycleAppScope(appScope)
-    const artifactReader = this._resolveArtifactReader(artifactReaderRef)
     const hostMeta: Record<string, any> = { ...(meta ?? {}) }
 
     const scopeRoot = !parent

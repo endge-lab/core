@@ -491,7 +491,8 @@ export abstract class RuntimeHostBase<
    * ACCESS
    */
   public getArtifactPayload(): TArtifactPayload | null {
-    return this.getArtifact()?.payload ?? null
+    const artifact = this.getArtifact()
+    return artifact && artifact.status !== 'error' ? artifact.payload : null
   }
 
   /**

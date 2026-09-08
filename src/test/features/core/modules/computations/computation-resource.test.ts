@@ -81,6 +81,45 @@ describe('состояние ресурса Computation', () => {
     registry.dispose()
   })
 
+  it('освобождает исчезнувшие строки вместе с payload, сохраняя соседние scopes', () => {
+    const registry = new ComputationResourceRegistry()
+    const resources = Array.from({ length: 1_000 }, (_, index) => {
+      const input = { index }
+      const resource = new ComputationResourceState(input, async value => value, value => value)
+      registry.getOrCreate(`table/row:${index}:port`, input, () => resource)
+      return resource
+    })
+    const sibling = new ComputationResourceState('sibling', async value => value, value => value)
+    registry.getOrCreate('table-other/row:0:port', 'sibling', () => sibling)
+    registry.releaseScope('table', key => key === 'table/row:999:port')
+    expect(resources.slice(0, 999).every(resource => resource.value === undefined)).toBe(true)
+    expect(resources[999]?.value).toEqual({ index: 999 })
+    expect(sibling.value).toBe('sibling')
+    const fresh = new ComputationResourceState(5, async value => value, value => value)
+    expect(registry.getOrCreate('table/row:0:port', 5, () => fresh)).toBe(fresh)
+    registry.dispose()
+    expect(fresh.value).toBeUndefined()
+  })
+
+  it('не возвращает результат удалённого async consumer и не удерживает новые input после dispose', async () => {
+    let resolve!: (value: number) => void
+    const onChange = vi.fn()
+    const run = vi.fn(() => new Promise<number>((done) => {
+      resolve = done
+    }))
+    const resource = new ComputationResourceState(1, run)
+    const registry = new ComputationResourceRegistry()
+    registry.getOrCreate('root/row:1', 1, () => resource, onChange)
+    registry.releaseScope('root')
+    resource.updateInput({ large: 'payload' })
+    resource.subscribe(onChange)
+    resolve(42)
+    await Promise.resolve()
+    expect(resource.value).toBeUndefined()
+    expect(onChange).not.toHaveBeenCalled()
+    expect(run).toHaveBeenCalledOnce()
+  })
+
   it('использует локальное переопределение identity как полную замену без fallback', () => {
     const compiled = compileComputation({
       source: 'defineComputation({ outputs: { value: 1 }, result: output(\'value\') })',

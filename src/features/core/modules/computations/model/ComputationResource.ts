@@ -36,7 +36,7 @@ export class ComputationResourceState<T = unknown> implements ComputationResourc
   get error() { return this._error }
 
   updateInput(input: unknown): void {
-    if (Object.is(input, this._input)) {
+    if (this._disposed || Object.is(input, this._input)) {
       return
     }
     this._input = input
@@ -78,6 +78,9 @@ export class ComputationResourceState<T = unknown> implements ComputationResourc
   }
 
   subscribe(listener: VoidFunction): VoidFunction {
+    if (this._disposed) {
+      return () => undefined
+    }
     this._listeners.add(listener)
     return () => this._listeners.delete(listener)
   }
@@ -86,6 +89,9 @@ export class ComputationResourceState<T = unknown> implements ComputationResourc
     this._disposed = true
     this._revision++
     this._listeners.clear()
+    this._input = undefined
+    this._value = undefined
+    this._error = null
   }
 
   private _runSync(): void {

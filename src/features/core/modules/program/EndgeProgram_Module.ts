@@ -27,6 +27,8 @@ import { EndgeModule } from '@/features/federation/EndgeModule'
  */
 export class EndgeProgram_Module extends EndgeModule {
   private _artifacts = new Map<ProgramArtifactKey, ProgramArtifact>()
+  private readonly _freshnessChecks = new Map<ProgramArtifactKey, () => boolean>()
+  private readonly _validating = new Set<ProgramArtifactKey>()
   private _indexByIdentity = new Map<ProgramArtifactKey, ProgramArtifactKey>()
 
   // Для компонентов в пользовательским SFC <Тегом>
@@ -76,12 +78,39 @@ export class EndgeProgram_Module extends EndgeModule {
   /**
    * Добавляет compiled artifact и индексирует его по id и identity.
    */
-  public addArtifact<TPayload>(artifact: ProgramArtifact<TPayload>): ProgramArtifact<TPayload> {
+  public addArtifact<TPayload>(artifact: ProgramArtifact<TPayload>, isCurrent?: () => boolean): ProgramArtifact<TPayload> {
     const key = this._keyFor(artifact.ref.entityType, artifact.ref.id)
+    const previous = this._artifacts.get(key)
+    if (previous) {
+      const oldIdentityKey = this._keyFor(previous.ref.entityType, previous.ref.identity)
+      if (this._indexByIdentity.get(oldIdentityKey) === key) {
+        this._indexByIdentity.delete(oldIdentityKey)
+      }
+      if (previous.sourceHash !== artifact.sourceHash || previous.contextHash !== artifact.contextHash
+        || previous.compilerVersion !== artifact.compilerVersion) {
+        for (const dependent of this._artifacts.values()) {
+          if (dependent !== previous && dependent.dependencies.some(dependency =>
+            dependency.entityType === previous.ref.entityType
+            && (dependency.identity === previous.ref.identity || String(dependency.id) === String(previous.ref.id)),
+          )) {
+            this._markStale(dependent, 'program-dependency-stale')
+          }
+        }
+      }
+    }
+    this._freshnessChecks.delete(key)
+    if (isCurrent) {
+      this._freshnessChecks.set(key, isCurrent)
+    }
     this._artifacts.set(key, artifact as ProgramArtifact)
     this._indexByIdentity.set(this._keyFor(artifact.ref.entityType, artifact.ref.identity), key)
-    this.setStatus(artifact.status)
-    this.notify()
+    if (previous) {
+      this.recalculateStatus()
+    }
+    else {
+      this.setStatus(artifact.status)
+      this.notify()
+    }
     return artifact
   }
 
@@ -115,7 +144,27 @@ export class EndgeProgram_Module extends EndgeModule {
     const resolvedKey = this._artifacts.has(key)
       ? key
       : this._indexByIdentity.get(key)
-    return resolvedKey ? (this._artifacts.get(resolvedKey) as ProgramArtifact<TPayload> | undefined) ?? null : null
+    const artifact = resolvedKey ? this._artifacts.get(resolvedKey) : null
+    if (artifact && resolvedKey && artifact.status !== 'error' && !this._validating.has(resolvedKey)) {
+      this._validating.add(resolvedKey)
+      try {
+        if (this._freshnessChecks.get(resolvedKey)?.() === false) {
+          this._markStale(artifact, 'program-artifact-stale')
+        }
+        else {
+          for (const dependency of artifact.dependencies) {
+            const target = this.getArtifact(dependency.entityType as ProgramEntityType, dependency.id ?? dependency.identity)
+              ?? (dependency.identity ? this.getArtifact(dependency.entityType as ProgramEntityType, dependency.identity) : null)
+            if (target?.diagnostics.some(diagnostic => diagnostic.code === 'program-artifact-stale' || diagnostic.code === 'program-dependency-stale')) {
+              this._markStale(artifact, 'program-dependency-stale')
+              break
+            }
+          }
+        }
+      }
+      finally { this._validating.delete(resolvedKey) }
+    }
+    return (artifact as ProgramArtifact<TPayload> | null) ?? null
   }
 
   /**
@@ -240,6 +289,8 @@ export class EndgeProgram_Module extends EndgeModule {
    */
   public clear(): void {
     this._artifacts.clear()
+    this._freshnessChecks.clear()
+    this._validating.clear()
     this._indexByIdentity.clear()
     this._componentIdentityByTag.clear()
     this._status = 'valid'
@@ -296,6 +347,22 @@ export class EndgeProgram_Module extends EndgeModule {
   /**
    * Внутренний helper модуля: key For.
    */
+  private _markStale(artifact: ProgramArtifact, code: string): void {
+    if (artifact.diagnostics.some(item => item.code === code)) {
+      return
+    }
+    artifact.status = 'error'
+    artifact.capabilities = []
+    artifact.diagnostics.push({
+      severity: 'error',
+      code,
+      entityRef: artifact.ref,
+      message: `Artifact "${artifact.ref.identity}" is stale. Rebuild the program before execution.`,
+    })
+    this._status = 'error'
+    this.notify()
+  }
+
   private _keyFor(entityType: ProgramEntityType, idOrIdentity: string | number): ProgramArtifactKey {
     return `${entityType}:${String(idOrIdentity ?? '').trim()}`
   }

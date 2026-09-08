@@ -41,6 +41,9 @@ export class EndgeDomainRepositoryReadOnlyError extends Error {
 
 /** Граница persistence для live service-backend и локальных источников только для чтения. */
 export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> {
+  private _generation = 0
+  private _snapshotSequence = 0
+  private _abortController = new AbortController()
   private _loadedSnapshot: EndgeLiveDomainSnapshot | null = null
   private _domainProvider: EndgeDomainProvider | null = null
   private _domainETag: string | null = null
@@ -52,6 +55,9 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     softDelete: false,
     restore: false,
   }
+
+  /** Версия контекста persistence для составных операций, включая импорт. */
+  public get generation(): number { return this._generation }
 
   public get capabilities(): EndgeDomainRepositoryCapabilities {
     return { ...this._capabilities }
@@ -70,6 +76,7 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
   }
 
   public override async setup(ctx: EndgeBootContext): Promise<void> {
+    this.reset()
     if (ctx.dataProvider === 'default') {
       if (!ctx.domainProvider) {
         throw new Error('[EndgeDomainRepository] domainProvider is required for default data provider')
@@ -105,6 +112,8 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     if (ctx.dataProvider !== 'default') {
       throw new Error('[EndgeDomainRepository] Live snapshot is available only for default data provider')
     }
+    const assertCurrent = this._captureGeneration()
+    const sequence = ++this._snapshotSequence
     const provider = this._serviceProvider()
     const workspaceIdentity = String(ctx.scope.workspaceIdentity ?? '').trim()
     if (!provider) {
@@ -115,6 +124,11 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     }
 
     const snapshot = await provider.loadWorkspace({ workspaceIdentity, signal: ctx.signal })
+    assertCurrent()
+    ctx.signal?.throwIfAborted()
+    if (sequence !== this._snapshotSequence) {
+      throw new DOMException('Domain snapshot was superseded.', 'AbortError')
+    }
     this._loadedSnapshot = snapshot
     this._domainETag = provider.etag
     this._workspaceServerState = { ...snapshot.workspace.state }
@@ -134,6 +148,11 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
   }
 
   public override reset(): void {
+    this._generation += 1
+    this._snapshotSequence += 1
+    this._abortController.abort()
+    this._abortController = new AbortController()
+    this._capabilities = { provider: 'service-backend', mutations: false, softDelete: false, restore: false }
     this._loadedSnapshot = null
     this._domainProvider = null
     this._domainETag = null
@@ -151,6 +170,7 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
   }
 
   public async createDocument(request: DocumentCreateRequest): Promise<DocumentCreateResult> {
+    const assertCurrent = this._captureGeneration()
     this._assertMutationsSupported()
     const identity = request.identity.trim()
     if (!identity) {
@@ -160,8 +180,10 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
       throw new Error(`Документ "${identity}" уже существует`)
     }
 
+    assertCurrent()
     const model = request.mode === 'model' ? request.model : request.document
     await this.saveDocument(identity, request.documentType, { model })
+    assertCurrent()
     return { documentType: request.documentType, identity }
   }
 
@@ -183,19 +205,23 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
       throw new EndgeDomainRepositoryReadOnlyError(this._capabilities.provider)
     }
 
+    const assertCurrent = this._captureGeneration()
     const provider = this._requireServiceProvider()
     const identity = this._resolveDocumentIdentity(documentIdOrIdentity, documentType)
     const collection = resolveEndgeServiceCollection(documentType)
     const state = this._requireDocumentServerState(collection, identity)
     const result = await provider.softDeleteDocument({
       workspaceIdentity: this._serviceWorkspaceIdentity(),
+      signal: this._abortController.signal,
       collection,
       identity,
       expectedRevision: state.revision,
     })
+    assertCurrent()
     if (!result.document.state.deletedAt) {
       throw new Error('[EndgeDomainRepository] Delete response does not contain a tombstone')
     }
+    assertCurrent()
     this._domainETag = result.etag
     this._removeDomainDocumentByType(documentType, documentIdOrIdentity)
     this._documentServerState.set(this._serverStateKey(collection, identity), { ...result.document.state })
@@ -211,16 +237,19 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
       throw new EndgeDomainRepositoryReadOnlyError(this._capabilities.provider)
     }
 
+    const assertCurrent = this._captureGeneration()
     const provider = this._requireServiceProvider()
     const identity = this._resolveDocumentIdentity(documentIdOrIdentity, documentType)
     const collection = resolveEndgeServiceCollection(documentType)
     const state = this._requireDocumentServerState(collection, identity)
     const result = await provider.restoreDocument({
       workspaceIdentity: this._serviceWorkspaceIdentity(),
+      signal: this._abortController.signal,
       collection,
       identity,
       expectedRevision: state.revision,
     })
+    assertCurrent()
     this._domainETag = result.etag
     this._applyServiceDocument(documentType, result.document, documentIdOrIdentity)
   }
@@ -254,6 +283,7 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
       return 0
     }
 
+    const assertCurrent = this._captureGeneration()
     const provider = this._requireServiceProvider()
     if (!provider.moveDocuments) {
       throw new Error('[EndgeDomainRepository] Domain provider does not support atomic document moves')
@@ -276,9 +306,11 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     })
     const result = await provider.moveDocuments({
       workspaceIdentity: this._serviceWorkspaceIdentity(),
+      signal: this._abortController.signal,
       documents: requests,
       folderIdentity,
     })
+    assertCurrent()
     if (result.documents.length !== documents.length) {
       throw new Error('[EndgeDomainRepository] Bulk move response does not match request')
     }
@@ -291,6 +323,7 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
       }
     })
     result.documents.forEach((item, index) => {
+      assertCurrent()
       const source = documents[index]!
       this._applyServiceDocument(source.documentType, item.document, source.documentId)
     })
@@ -299,6 +332,7 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
 
   public async saveFolder(folderId: string): Promise<void> {
     this._assertMutationsSupported()
+    const assertCurrent = this._captureGeneration()
     const provider = this._requireServiceProvider()
     const folder = Endge.domain.getFolder(folderId)
     if (!folder) {
@@ -311,6 +345,7 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     const state = this._documentServerState.get(this._serverStateKey('folders', persistedIdentity))
     const request = {
       workspaceIdentity: this._serviceWorkspaceIdentity(),
+      signal: this._abortController.signal,
       collection: 'folders' as const,
       identity: persistedIdentity,
       document,
@@ -318,6 +353,7 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     const result = state
       ? await provider.updateDocument({ ...request, expectedRevision: state.revision })
       : await provider.createDocument(request)
+    assertCurrent()
     this._domainETag = result.etag
     this._applyServiceFolder(result.document, folderId)
   }
@@ -328,19 +364,23 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
       throw new EndgeDomainRepositoryReadOnlyError(this._capabilities.provider)
     }
 
+    const assertCurrent = this._captureGeneration()
     const provider = this._requireServiceProvider()
     const folder = Endge.domain.getFolder(folderIdentity)
     const identity = String((folder as any)?.identity ?? folderIdentity).trim()
     const state = this._requireDocumentServerState('folders', identity)
     const result = await provider.softDeleteDocument({
       workspaceIdentity: this._serviceWorkspaceIdentity(),
+      signal: this._abortController.signal,
       collection: 'folders',
       identity,
       expectedRevision: state.revision,
     })
+    assertCurrent()
     if (!result.document.state.deletedAt) {
       throw new Error('[EndgeDomainRepository] Delete response does not contain a folder tombstone')
     }
+    assertCurrent()
     this._domainETag = result.etag
     if (folder) {
       Endge.domain.removeFolderById(folder.id)
@@ -355,16 +395,19 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
       throw new EndgeDomainRepositoryReadOnlyError(this._capabilities.provider)
     }
 
+    const assertCurrent = this._captureGeneration()
     const provider = this._requireServiceProvider()
     const folder = Endge.domain.getFolder(folderIdentity)
     const identity = String((folder as any)?.identity ?? folderIdentity).trim()
     const state = this._requireDocumentServerState('folders', identity)
     const result = await provider.restoreDocument({
       workspaceIdentity: this._serviceWorkspaceIdentity(),
+      signal: this._abortController.signal,
       collection: 'folders',
       identity,
       expectedRevision: state.revision,
     })
+    assertCurrent()
     this._domainETag = result.etag
     this._applyServiceFolder(result.document, folderIdentity)
   }
@@ -374,6 +417,17 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
       isHealthy: this.isHealthy,
       capabilities: this.capabilities,
       domainETag: this.domainETag,
+    }
+  }
+
+  /** Не позволяет позднему ответу предыдущего контекста изменить новый Domain. */
+  private _captureGeneration(): () => void {
+    const generation = this._generation
+    const signal = this._abortController.signal
+    return () => {
+      if (generation !== this._generation || signal.aborted) {
+        throw new DOMException('Domain repository context was reset.', 'AbortError')
+      }
     }
   }
 
@@ -461,6 +515,7 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     documentType: DomainDocumentType,
     opts?: { model?: unknown, previousIdentity?: string, serializedDocument?: Record<string, unknown> },
   ): Promise<void> {
+    const assertCurrent = this._captureGeneration()
     const provider = this._requireServiceProvider()
 
     if (documentType === 'workspace') {
@@ -471,6 +526,7 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
       }
       const result = await provider.updateWorkspace({
         workspaceIdentity: this._serviceWorkspaceIdentity(),
+        signal: this._abortController.signal,
         expectedRevision: state.revision,
         document: {
           identity: workspace.identity,
@@ -480,6 +536,7 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
           meta: normalizeEntityMeta(workspace.meta),
         },
       })
+      assertCurrent()
       this._workspaceServerState = { ...result.workspace.state }
       this._domainETag = result.etag
       Endge.workspace.apply(normalizeEndgeWorkspaceDefinition({
@@ -503,6 +560,7 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     const state = this._documentServerState.get(this._serverStateKey(collection, persistedIdentity))
     const request = {
       workspaceIdentity: this._serviceWorkspaceIdentity(),
+      signal: this._abortController.signal,
       collection,
       identity: persistedIdentity || identity,
       document,
@@ -510,6 +568,7 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     const result = state
       ? await provider.updateDocument({ ...request, expectedRevision: state.revision })
       : await provider.createDocument(request)
+    assertCurrent()
     this._domainETag = result.etag
     this._applyServiceDocument(documentType, result.document, documentId, state ? persistedIdentity : undefined)
   }

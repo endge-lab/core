@@ -470,6 +470,7 @@ describe('провайдер Core для service backend', () => {
     expect(moveDocuments).toHaveBeenCalledOnce()
     expect(moveDocuments).toHaveBeenCalledWith({
       workspaceIdentity: 'workspace-a',
+      signal: expect.any(AbortSignal),
       folderIdentity: 'folder-target',
       documents: [
         { collection: 'actions', identity: 'action-a', expectedRevision: 7 },
@@ -572,5 +573,106 @@ describe('провайдер Core для service backend', () => {
     })
     expect(Endge.workspace.current.identity).toBe('workspace-a')
     expect(Endge.workspace.current.dataMode).toBe('mock')
+  })
+})
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((done) => {
+    resolve = done
+  })
+  return { promise, resolve }
+}
+
+function mutableProvider(snapshot = liveSnapshot()): EndgeDomainProvider {
+  return {
+    id: 'service-backend',
+    capabilities: { snapshot: true, mutations: true, softDelete: true, restore: true },
+    etag: 'current',
+    loadWorkspace: vi.fn().mockResolvedValue(snapshot),
+    createDocument: vi.fn(),
+    updateDocument: vi.fn(),
+    softDeleteDocument: vi.fn(),
+    restoreDocument: vi.fn(),
+    moveDocuments: vi.fn(),
+    updateWorkspace: vi.fn(),
+  }
+}
+
+describe('изоляция поколений DomainRepository', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    Endge.domain.reset()
+  })
+
+  /** Старый snapshot не должен заменять актуальные revisions после setup/reset. */
+  it.each([false, true])('отклоняет старый snapshot, reset=%s', async (reset) => {
+    const repository = new EndgeDomainRepository_Module()
+    const old = deferred<EndgeLiveDomainSnapshot>()
+    const provider = mutableProvider()
+    await repository.setup(defaultContext(provider))
+    vi.mocked(provider.loadWorkspace).mockReturnValueOnce(old.promise)
+    const pending = repository.loadSnapshot(defaultContext(provider))
+    const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    if (reset) {
+      await repository.setup(defaultContext(provider))
+    }
+    const current = liveSnapshot()
+    current.workspace.state.revision = 9
+    vi.mocked(provider.loadWorkspace).mockResolvedValueOnce(current)
+    await repository.loadSnapshot(defaultContext(provider))
+    old.resolve(liveSnapshot())
+    await rejected
+    expect(repository.getLoadedSnapshot()?.workspace.state.revision).toBe(9)
+  })
+
+  /** Все виды mutation должны игнорировать транспорт, не подчинившийся AbortSignal. */
+  it.each(['save', 'delete', 'restore', 'workspace', 'folder'] as const)('не применяет поздний ответ %s после setup нового контекста', async (operation) => {
+    const repository = new EndgeDomainRepository_Module()
+    const provider = mutableProvider()
+    await repository.setup(defaultContext(provider))
+    await repository.loadSnapshot(defaultContext(provider))
+    Endge.domain.mergeFromSnapshot(liveSnapshot())
+    const response = deferred<any>()
+    vi.mocked(provider.updateDocument).mockReturnValue(response.promise)
+    vi.mocked(provider.softDeleteDocument).mockReturnValue(response.promise)
+    vi.mocked(provider.restoreDocument).mockReturnValue(response.promise)
+    vi.mocked(provider.updateWorkspace).mockReturnValue(response.promise)
+    const pending = operation === 'save'
+      ? repository.saveDocument('project-a', 'project')
+      : operation === 'delete'
+        ? repository.deleteDocument('project-a', 'project')
+        : operation === 'restore'
+          ? repository.restoreDocument('project-a', 'project')
+          : operation === 'workspace'
+            ? repository.saveDocument('workspace-a', 'workspace', { model: TEST_ENDGE_WORKSPACE })
+            : repository.saveFolder('folder-root')
+    const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    const calls = [...vi.mocked(provider.updateDocument).mock.calls, ...vi.mocked(provider.softDeleteDocument).mock.calls, ...vi.mocked(provider.restoreDocument).mock.calls, ...vi.mocked(provider.updateWorkspace).mock.calls]
+    const signal = calls[0]?.[0].signal
+    expect(signal?.aborted).toBe(false)
+    const next = mutableProvider()
+    await repository.setup(defaultContext(next))
+    await repository.loadSnapshot(defaultContext(next))
+    const before = Endge.domain.toPlain()
+    expect(signal?.aborted).toBe(true)
+    response.resolve({ document: liveDocument('project-a', { displayName: 'stale' }), workspace: liveSnapshot().workspace, etag: 'stale' })
+    await rejected
+    expect(Endge.domain.toPlain()).toEqual(before)
+    expect(repository.domainETag).toBe('current')
+  })
+
+  it('не начинает create в другом контексте после ожидания проверки identity', async () => {
+    const repository = new EndgeDomainRepository_Module()
+    const provider = mutableProvider()
+    await repository.setup(defaultContext(provider))
+    const available = deferred<boolean>()
+    vi.spyOn(repository, 'isDocumentIdentityAvailable').mockReturnValue(available.promise)
+    const pending = repository.createDocument({ documentType: 'type', identity: 'Next', mode: 'model', model: {} })
+    const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    await repository.setup(defaultContext(provider))
+    available.resolve(true)
+    await rejected
+    expect(provider.createDocument).not.toHaveBeenCalled()
   })
 })

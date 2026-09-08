@@ -1302,7 +1302,8 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
       throw new Error(`Compiler handler is not registered for "${entityType}"`)
     }
 
-    const artifact = Endge.program.addArtifact(handler.compile(entity, context))
+    const artifact = handler.compile(entity, context)
+    Endge.program.addArtifact(artifact, this._createFreshnessCheck(entity, artifact))
     const owner = createDiagnosticsEntityOwner(artifact.ref, 'build')
     const problems = artifact.diagnostics.map((diagnostic) => {
       const record = this._compileSpan?.log({
@@ -1333,6 +1334,54 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     })
     Endge.diagnostics.problems.replace(owner, problems)
     return artifact
+  }
+
+  /** Сравнивает inputs без повторного parser/compiler вызова и hash большого Source на каждой строке UI. */
+  private _createFreshnessCheck(entity: unknown, artifact: ProgramArtifact): () => boolean {
+    const input = this._toStableSource(entity) as Record<string, unknown>
+    const expected = Object.entries(input).map(([key, value]) => ({
+      key,
+      value,
+      serialized: value != null && typeof value === 'object' ? JSON.stringify(value) : undefined,
+    }))
+    const persisted = this._resolveArtifactEntity(artifact.ref) != null
+    const contextHash = artifact.contextHash
+    return () => {
+      if (artifact.compilerVersion !== ENDGE_COMPILER_VERSION || !Endge.configuration.isResolved
+        || Endge.configuration.buildContext.contextHash !== contextHash) {
+        return false
+      }
+      const current = this._resolveArtifactEntity(artifact.ref) ?? (persisted ? null : entity)
+      if (!current) {
+        return false
+      }
+      const source = this._toStableSource(current) as Record<string, unknown>
+      return expected.every(({ key, value, serialized }) => serialized === undefined
+        ? Object.is(source[key], value)
+        : JSON.stringify(source[key]) === serialized)
+    }
+  }
+
+  /** Читает текущую Domain-сущность, включая замену объекта ответом persistence. */
+  private _resolveArtifactEntity(ref: ProgramArtifactRef): unknown {
+    const domain = Endge.domain
+    const id = ref.id
+    switch (ref.entityType) {
+      case 'type': return domain.getType(id)
+      case 'query': return domain.getQuery(id)
+      case 'vocab': return domain.getVocab(id)
+      case 'data-view': return domain.getDataView(id)
+      case 'filter': return domain.getFilter(id)
+      case 'store': return domain.getStore(id)
+      case 'stream': return domain.getStream(id)
+      case 'update': return domain.getUpdate(id)
+      case 'composition': return domain.getComposition(id)
+      case 'component-sfc': return domain.getComponentSFC(id)
+      case 'computation': return domain.getComputation(id)
+      case 'action': return domain.getAction(id)
+      case 'style': return domain.getStyle(id)
+      case 'configuration': return domain.getConfiguration(id)
+    }
   }
 
   /** Стабильный порядок исходников: сначала системные документы, затем авторские по identity. */

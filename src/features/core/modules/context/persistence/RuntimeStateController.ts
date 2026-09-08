@@ -68,7 +68,7 @@ export class RuntimeStateController implements RuntimeStateControllerLike {
     const normalizedSection = normalizeRequiredId(section, 'section')
     const document = this._readDocument()
 
-    document.state[normalizedEntityKey] ??= {}
+    document.state[normalizedEntityKey] ??= Object.create(null)
     document.state[normalizedEntityKey][normalizedSection] = value
 
     this._adapter.write(this.storageKey, document)
@@ -101,11 +101,27 @@ export class RuntimeStateController implements RuntimeStateControllerLike {
   }
 
   private _readDocument(): RuntimeStateDocument {
+    const document = this._createDefaultDocument()
     try {
-      return this._adapter.read<RuntimeStateDocument>(this.storageKey) ?? this._createDefaultDocument()
+      const stored = this._adapter.read<unknown>(this.storageKey)
+      if (!isRecord(stored) || stored.version !== 1 || !isRecord(stored.state)
+        || typeof stored.runtimeId !== 'string' || !isRecord(stored.scope)) {
+        return document
+      }
+      const storedScope = stored.scope
+      if (Object.entries(document.scope).some(([key, value]) => storedScope[key] !== value)) {
+        return document
+      }
+      // Оба уровня ключей принадлежат consumer: __proto__ и constructor тоже обычные данные.
+      for (const [key, sections] of Object.entries(stored.state)) {
+        if (isRecord(sections)) {
+          document.state[key] = Object.assign(Object.create(null), sections)
+        }
+      }
+      return document
     }
     catch {
-      return this._createDefaultDocument()
+      return document
     }
   }
 
@@ -114,9 +130,17 @@ export class RuntimeStateController implements RuntimeStateControllerLike {
       version: 1,
       scope: { ...this.scope },
       runtimeId: this.runtimeId,
-      state: {},
+      state: Object.create(null),
     }
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  if (value == null || typeof value !== 'object' || Array.isArray(value)) {
+    return false
+  }
+  const prototype = Object.getPrototypeOf(value)
+  return prototype === Object.prototype || prototype === null
 }
 
 function encodeScopePart(value: string): string {

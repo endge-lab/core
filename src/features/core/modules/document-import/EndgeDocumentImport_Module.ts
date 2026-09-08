@@ -29,7 +29,7 @@ export class EndgeDocumentImport_Module extends EndgeModule {
   private readonly _openAPIParser = new OpenAPIDocumentImportParser()
   private _activePlan: InternalDocumentImportPlan | null = null
   private _planSequence = 0
-  private _applying = false
+  private _applyingPlan: InternalDocumentImportPlan | null = null
 
   /**
    * ----------------------------------------
@@ -39,6 +39,9 @@ export class EndgeDocumentImport_Module extends EndgeModule {
 
   /** Разбирает внешний документ и создаёт renderer-neutral plan без изменения Domain. */
   public prepare(request: DocumentImportPrepareRequest): DocumentImportPlan {
+    if (this._applyingPlan) {
+      throw new Error('Document import is already running.')
+    }
     const source = request.source.trim()
     const parser = this._resolveParser(request.format)
     const parsed = source
@@ -94,7 +97,7 @@ export class EndgeDocumentImport_Module extends EndgeModule {
     if (!plan || plan.publicPlan.id !== request.planId) {
       throw new Error('Document import plan is no longer active. Prepare the source again.')
     }
-    if (this._applying) {
+    if (this._applyingPlan) {
       throw new Error('Document import is already running.')
     }
     if (!Endge.domainRepository.capabilities.mutations) {
@@ -112,10 +115,19 @@ export class EndgeDocumentImport_Module extends EndgeModule {
       }
     }
 
-    this._applying = true
+    const repositoryGeneration = Endge.domainRepository.generation
+    const folderId = request.destination.folderId
+    const assertCurrent = () => {
+      if (this._activePlan !== plan || this._applyingPlan !== plan
+        || Endge.domainRepository.generation !== repositoryGeneration) {
+        throw new DOMException('Document import was cancelled.', 'AbortError')
+      }
+    }
+    this._applyingPlan = plan
     const items: DocumentImportApplyItemResult[] = []
     try {
       for (const candidateId of selectedCandidateIds) {
+        assertCurrent()
         const candidate = plan.publicPlan.candidates.find(item => item.id === candidateId)!
         const draft = plan.drafts.get(candidateId)!
         if (candidate.status === 'invalid') {
@@ -141,7 +153,7 @@ export class EndgeDocumentImport_Module extends EndgeModule {
           const type = createNewDomainDocument('type', {
             identity: draft.identity,
             name: draft.displayName,
-            folderId: request.destination.folderId,
+            folderId,
           }) as RType
           type.description = draft.description ?? null
           type.source = draft.source
@@ -152,9 +164,11 @@ export class EndgeDocumentImport_Module extends EndgeModule {
             mode: 'model',
             model: type,
           })
+          assertCurrent()
           items.push({ candidateId, identity: draft.identity, status: 'imported' })
         }
         catch (error) {
+          assertCurrent()
           items.push({
             candidateId,
             identity: draft.identity,
@@ -165,9 +179,13 @@ export class EndgeDocumentImport_Module extends EndgeModule {
       }
     }
     finally {
-      this._applying = false
-      this._activePlan = null
-      this.notify()
+      if (this._applyingPlan === plan) {
+        this._applyingPlan = null
+        if (this._activePlan === plan) {
+          this._activePlan = null
+        }
+        this.notify()
+      }
     }
 
     return {
@@ -182,7 +200,7 @@ export class EndgeDocumentImport_Module extends EndgeModule {
   /** Сбрасывает неподтверждённый import plan при reset Core context. */
   public override reset(): void {
     this._activePlan = null
-    this._applying = false
+    this._applyingPlan = null
     this.notify()
   }
 

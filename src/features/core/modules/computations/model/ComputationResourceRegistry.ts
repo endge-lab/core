@@ -43,6 +43,19 @@ export class ComputationResourceRegistry {
     return resource
   }
 
+  /** Renderer освобождает завершившихся consumers, не затрагивая соседние scopes. */
+  releaseScope(scope: string, keep?: (key: string) => boolean): void {
+    for (const [key, resource] of this._resources) {
+      if ((key === scope || key.startsWith(`${scope}/`) || key.startsWith(`${scope}:`)) && !keep?.(key)) {
+        this._disposers.get(key)?.()
+        resource.dispose()
+        this._disposers.delete(key)
+        this._resources.delete(key)
+        this._updatingInputs.delete(key)
+      }
+    }
+  }
+
   dispose(): void {
     for (const dispose of this._disposers.values()) {
       dispose()

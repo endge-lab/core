@@ -592,6 +592,11 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     return resource
   }
 
+  /** Завершает ресурсы исчезнувших renderer consumers; host сохраняет остальных. */
+  public releaseComputationResources(consumerScope: string, keep?: (key: string) => boolean): void {
+    this._computationResources.releaseScope(consumerScope, keep)
+  }
+
   /** Обновляет input source и пересобирает Raph subscriptions host-а. */
   public setInputSource(input: RuntimeHostInputSource | null | undefined): void {
     this._clearRaphInputSubscriptions()
