@@ -852,7 +852,6 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
   private _serializationContext() {
     return {
       resolveFolderIdentity: (value: string | number) => Endge.domain.getFolder(value)?.identity ?? null,
-      resolveNavigationIdentity: (value: string | number) => Endge.domain.getNavigation(value)?.identity ?? null,
       resolveEnvironmentIdentity: (value: string | number) => Endge.domain.getEnvironment(value)?.identity ?? null,
     }
   }

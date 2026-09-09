@@ -15,46 +15,47 @@ describe('проверка Runtime-сессия проекта Endge', () => {
     vi.restoreAllMocks()
   })
 
-  it('находит Composition проекта и учитывает стартовую либо ручную активацию корней', async () => {
+  /** Самостоятельные документы не становятся неявными корнями запуска проекта. */
+  it('запускает собственный артефакт проекта и не активирует несвязанные композиции', async () => {
     const project = RProject.fromPlain({ id: 501, identity: 'airport', name: 'Airport' })
     Endge.domain.addProject(project)
-    const startup = composition(502, 'project-startup', 'airport')
-    const manual = composition(503, 'project-manual', 'airport')
-    const foreign = composition(504, 'foreign-entry', 'another-project')
-    Endge.domain.addComposition(startup)
-    Endge.domain.addComposition(manual)
-    Endge.domain.addComposition(foreign)
-    Endge.program.addArtifact(artifact(startup, payload('startup')))
-    Endge.program.addArtifact(artifact(manual, payload('manual')))
-    Endge.program.addArtifact(artifact(foreign, payload('startup')))
+    const legacy = composition(502, 'standalone')
+    Endge.domain.addComposition(legacy)
+    Endge.program.addArtifact(artifact(legacy, payload('startup')))
+    Endge.program.addArtifact(artifact(project, payload('startup')))
 
     const session = await Endge.runtime.project.mount('airport')
-    expect(session.compositions.getAll().map(item => item.identity)).toEqual(['project-manual', 'project-startup'])
-    expect(session.compositions.require('project-startup').state).toBe('active')
-    expect(session.compositions.require('project-manual').state).toBe('inactive')
-    expect(session.compositions.get('foreign-entry')).toBeNull()
-
-    await session.compositions.require('project-manual').activate()
-    expect(session.compositions.require('project-manual').state).toBe('active')
-    await session.compositions.require('project-manual').deactivate()
-    expect(session.compositions.require('project-manual').state).toBe('inactive')
+    expect(session.composition.identity).toBe('airport')
+    expect(session.composition.state).toBe('active')
+    expect(session.composition.host?.entityType).toBe('project')
+    expect(Endge.runtime.getRuntimeHostsByEntity('composition', legacy.identity)).toEqual([])
+    expect(Endge.domain.getComposition(legacy.identity)).toBe(legacy)
 
     await session.unmount()
     expect(Endge.runtime.getRuntimeHosts()).toEqual([])
     expect(Endge.runtime.scopes.getAll().filter(scope => scope.ownerRuntimeId === session.id)).toEqual([])
   })
 
+  /** Наличие Composition не маскирует отсутствие project artifact. */
+  it('отклоняет запуск без артефакта проекта даже при наличии самостоятельной композиции', async () => {
+    const project = RProject.fromPlain({ id: 507, identity: 'missing', name: 'Missing' })
+    const legacy = composition(508, 'standalone')
+    Endge.domain.addProject(project)
+    Endge.domain.addComposition(legacy)
+    Endge.program.addArtifact(artifact(legacy, payload('startup')))
+    await expect(Endge.runtime.project.mount('missing')).rejects.toThrow('cannot be mounted')
+    expect(Endge.runtime.getRuntimeHosts()).toEqual([])
+  })
+
   it('поддерживает отладочное монтирование без автоактивации и повторное использование handles pause/resume/restart', async () => {
     const project = RProject.fromPlain({ id: 505, identity: 'debug-project', name: 'Debug project' })
-    const entry = composition(506, 'debug-entry', 'debug-project')
     Endge.domain.addProject(project)
-    Endge.domain.addComposition(entry)
-    Endge.program.addArtifact(artifact(entry, payload('startup')))
+    Endge.program.addArtifact(artifact(project, payload('startup')))
 
     const session = await Endge.runtime.project.mount('debug-project', { autoActivate: 'none' })
-    const handle = session.compositions.require('debug-entry')
+    const handle = session.composition
     expect(handle.state).toBe('inactive')
-    expect(handle.host).toBeNull()
+    expect(handle.host?.entityType).toBe('project')
 
     const first = await handle.activate()
     expect(handle.state).toBe('active')
@@ -74,45 +75,41 @@ describe('проверка Runtime-сессия проекта Endge', () => {
     expect(Endge.runtime.getRuntimeHosts()).toEqual([])
   })
 
-  it('shares concurrent activation and cancels a pending mount before publishing the host', async () => {
+  it('объединяет параллельную активацию и отменяет незавершённый запуск', async () => {
     const project = RProject.fromPlain({ id: 520, identity: 'concurrent', name: 'Concurrent' })
-    const entry = composition(521, 'entry', 'concurrent')
     Endge.domain.addProject(project)
-    Endge.domain.addComposition(entry)
-    Endge.program.addArtifact(artifact(entry, payload('manual')))
+    Endge.program.addArtifact(artifact(project, payload('manual')))
     const session = await Endge.runtime.project.mount('concurrent', { autoActivate: 'none' })
-    const handle = session.compositions.require('entry')
+    const handle = session.composition
     const first = handle.activate()
     const second = handle.activate()
     const [one, two] = await Promise.all([first, second])
     expect(one.host).toBe(two.host)
-    expect(Endge.runtime.getRuntimeHostsByEntity('composition', 'entry')).toHaveLength(1)
+    expect(Endge.runtime.getRuntimeHostsByEntity('project', 'concurrent')).toHaveLength(1)
     await handle.deactivate()
     const pending = handle.activate()
     const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
     await handle.deactivate()
     await rejected
     expect(handle.host).toBeNull()
-    expect(Endge.runtime.getRuntimeHostsByEntity('composition', 'entry')).toEqual([])
+    expect(Endge.runtime.getRuntimeHostsByEntity('project', 'concurrent')).toEqual([])
     await handle.activate()
     await session.unmount()
     await expect(handle.activate()).rejects.toThrow('disposed')
     expect(Endge.runtime.getRuntimeHosts()).toEqual([])
   })
 
-  it('aborts an unresolved vocab acquire when the project is unmounted', async () => {
+  it('отменяет ожидание Vocab при закрытии проекта', async () => {
     const project = RProject.fromPlain({ id: 530, identity: 'pending', name: 'Pending' })
-    const entry = composition(531, 'entry', 'pending')
     Endge.domain.addProject(project)
-    Endge.domain.addComposition(entry)
     const compiled = Endge.source.compile('composition', 'defineComposition({ data: { dictionary: vocab(\'dictionary\') }, runtimes: {} })')
-    Endge.program.addArtifact(artifact(entry, compiled.artifact as CompositionProgramPayload))
+    Endge.program.addArtifact(artifact(project, compiled.artifact as CompositionProgramPayload))
     let release!: () => void
     vi.spyOn(Endge.vocabs, 'acquire').mockImplementationOnce(() => new Promise((resolve) => {
       release = () => resolve([])
     }))
     const session = await Endge.runtime.project.mount('pending', { autoActivate: 'none' })
-    const handle = session.compositions.require('entry')
+    const handle = session.composition
     const pending = handle.activate()
     const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
     await vi.waitFor(() => expect(release).toBeTypeOf('function'))
@@ -129,13 +126,11 @@ describe('проверка Runtime-сессия проекта Endge', () => {
 
   it('атомарно переключает именованные scopes и отклоняет handles другой сессии проекта', async () => {
     const project = RProject.fromPlain({ id: 510, identity: 'airport', name: 'Airport' })
-    const entry = composition(511, 'project-entry', 'airport')
     Endge.domain.addProject(project)
-    Endge.domain.addComposition(entry)
-    Endge.program.addArtifact(artifact(entry, payloadWithPages()))
+    Endge.program.addArtifact(artifact(project, payloadWithPages()))
 
     const firstSession = await Endge.runtime.project.mount('airport')
-    const firstEntry = firstSession.compositions.require('project-entry')
+    const firstEntry = firstSession.composition
     const pageA = firstEntry.output<RuntimeScopeHandle>('pageA')!
     const pageB = firstEntry.output<RuntimeScopeHandle>('pageB')!
     await pageA.activate()
@@ -149,8 +144,7 @@ describe('проверка Runtime-сессия проекта Endge', () => {
     expect(pageB.state).toBe('inactive')
 
     const secondSession = await Endge.runtime.project.mount('airport')
-    const foreignPage = secondSession.compositions
-      .require('project-entry')
+    const foreignPage = secondSession.composition
       .output<RuntimeScopeHandle>('pageA')!
     await expect(firstSession.switchScope({ to: foreignPage })).rejects.toThrow('another or disposed session')
 
@@ -160,13 +154,11 @@ describe('проверка Runtime-сессия проекта Endge', () => {
   })
 })
 
-function composition(id: number, identity: string, project: string): RComposition {
+function composition(id: number, identity: string): RComposition {
   const value = new RComposition()
   value.id = id
   value.identity = identity
   value.name = identity
-  value.kind = 'project'
-  value.kindIdentity = project
   return value
 }
 
@@ -249,9 +241,9 @@ function payloadWithPages(): CompositionProgramPayload {
   }
 }
 
-function artifact(model: RComposition, value: CompositionProgramPayload): ProgramArtifact<CompositionProgramPayload> {
+function artifact(model: RComposition | RProject, value: CompositionProgramPayload): ProgramArtifact<CompositionProgramPayload> {
   return {
-    ref: { entityType: 'composition' as const, id: model.id, identity: model.identity },
+    ref: { entityType: model instanceof RProject ? 'project' : 'composition', id: model.id, identity: model.identity },
     sourceHash: `test:${model.identity}`,
     compilerVersion: 'test',
     contextHash: 'test',

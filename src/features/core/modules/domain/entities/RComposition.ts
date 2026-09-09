@@ -10,7 +10,6 @@ export const R_COMPOSITION_KINDS = [
   'query',
   'workspace',
   'tenant',
-  'project',
   'environment',
 ] as const
 
@@ -53,7 +52,7 @@ export class RComposition extends REntity {
   static fromPlain(input: Record<string, unknown>): RComposition {
     const composition = Serialize.fromJSON(RComposition, input)
     composition.kind = normalizeRCompositionKind(input.kind)
-    composition.kindIdentity = normalizeRCompositionKindIdentity(input.kindIdentity)
+    composition.kindIdentity = composition.kind === 'library' ? null : normalizeRCompositionKindIdentity(input.kindIdentity)
     return composition
   }
 

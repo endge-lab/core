@@ -11,11 +11,12 @@ export class ProjectRuntimeStrategy implements RuntimeStrategy<RProject> {
   }
 
   public create(ctx: Parameters<RuntimeStrategy<RProject>['create']>[0]) {
-    return ProjectRuntimeHost.createRuntime({
+    return ProjectRuntimeHost.createProjectRuntime({
       id: ctx.id,
       model: ctx.model,
       meta: ctx.meta,
       parent: ctx.parent,
+      artifacts: ctx.artifacts,
     })
   }
 }

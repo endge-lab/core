@@ -1,24 +1,22 @@
 import type { RuntimeArtifactReader } from '@/features/core/modules/runtime/domain/runtime-host.types'
 import type {
   ProjectCompositionHandle,
-  ProjectCompositionRegistry,
   ProjectRuntimeMountOptions,
   ProjectRuntimeSession,
 } from '@/features/core/modules/runtime/domain/runtime-project-session.types'
-import type { CompositionRuntimeHost } from '@/features/core/modules/runtime/hosts/CompositionRuntimeHost'
 
 import type { ProjectRuntimeHost } from '@/features/core/modules/runtime/hosts/ProjectRuntimeHost'
 import type { CompositionProgramPayload, CompositionSession } from '@/features/core/modules/source/domain/types/composition-source.types'
 import { Endge } from '@/features/core/kernel/endge'
 import { RuntimeScope } from '@/features/core/modules/runtime/RuntimeScope'
 
-class ProjectCompositionHandleImpl implements ProjectCompositionHandle<CompositionRuntimeHost> {
+class ProjectCompositionHandleImpl implements ProjectCompositionHandle<ProjectRuntimeHost> {
   public readonly identity: string
-  private _host: CompositionRuntimeHost | null = null
+  private _host: ProjectRuntimeHost | null = null
   private _disposed = false
   private _generation = 0
-  private _pendingHost: CompositionRuntimeHost | null = null
-  private _activation: Promise<CompositionSession<CompositionRuntimeHost>> | null = null
+  private _pendingHost: ProjectRuntimeHost | null = null
+  private _activation: Promise<CompositionSession<ProjectRuntimeHost>> | null = null
   private _transition: Promise<unknown> = Promise.resolve()
 
   public constructor(
@@ -28,6 +26,7 @@ class ProjectCompositionHandleImpl implements ProjectCompositionHandle<Compositi
     private readonly _artifactReader: RuntimeArtifactReader,
   ) {
     this.identity = identity
+    this._host = _projectHost
   }
 
   public get state(): 'inactive' | 'active' | 'paused' | 'disposed' {
@@ -41,10 +40,10 @@ class ProjectCompositionHandleImpl implements ProjectCompositionHandle<Compositi
     return scope.state === 'paused' ? 'paused' : 'active'
   }
 
-  public get host(): CompositionRuntimeHost | null { return this._host }
+  public get host(): ProjectRuntimeHost | null { return this._host }
   public get outputs() { return this._host?.getOutputs() ?? {} }
 
-  public activate(): Promise<CompositionSession<CompositionRuntimeHost>> {
+  public activate(): Promise<CompositionSession<ProjectRuntimeHost>> {
     if (this._disposed) {
       return Promise.reject(new Error(`[EndgeProject] Composition "${this.identity}" handle is disposed.`))
     }
@@ -56,22 +55,21 @@ class ProjectCompositionHandleImpl implements ProjectCompositionHandle<Compositi
       this._assertCurrent(generation)
       let host = this._host
       if (!host) {
-        const model = Endge.domain.getComposition(this.identity)
-        const artifact = this._artifactReader.getArtifact<CompositionProgramPayload>('composition', this.identity)
+        const model = Endge.domain.getProject(this.identity)
+        const artifact = this._artifactReader.getArtifact<CompositionProgramPayload>('project', this.identity)
         if (!model || !artifact || artifact.status === 'error') {
           throw new Error(`[EndgeProject] Composition "${this.identity}" is unavailable.`)
         }
         host = Endge.runtime.execute(model, {
-          parent: this._projectHost,
           artifactReader: this._artifactReader,
           persistence: 'disabled',
           meta: { runtimeScopeId: this._projectScope.id, projectSession: this._projectHost.id },
-        }) as CompositionRuntimeHost | null
+        }) as ProjectRuntimeHost | null
         if (!host) {
           throw new Error(`[EndgeProject] Composition "${this.identity}" cannot be created.`)
         }
-        this._pendingHost = host
       }
+      this._pendingHost = host
       try {
         await host.mountGraph()
         this._assertCurrent(generation)
@@ -131,7 +129,7 @@ class ProjectCompositionHandleImpl implements ProjectCompositionHandle<Compositi
     })
   }
 
-  public async restart(): Promise<CompositionSession<CompositionRuntimeHost>> {
+  public async restart(): Promise<CompositionSession<ProjectRuntimeHost>> {
     await this.deactivate()
     return this.activate()
   }
@@ -167,26 +165,9 @@ class ProjectCompositionHandleImpl implements ProjectCompositionHandle<Compositi
   }
 }
 
-class ProjectCompositionRegistryImpl implements ProjectCompositionRegistry<CompositionRuntimeHost> {
-  public constructor(private readonly _handles: Map<string, ProjectCompositionHandleImpl>) {}
-  public get(identity: string): ProjectCompositionHandle<CompositionRuntimeHost> | null {
-    return this._handles.get(String(identity ?? '').trim()) ?? null
-  }
-
-  public require(identity: string): ProjectCompositionHandle<CompositionRuntimeHost> {
-    const handle = this.get(identity)
-    if (!handle) {
-      throw new Error(`[EndgeProject] Project Composition "${identity}" is missing.`)
-    }
-    return handle
-  }
-
-  public getAll(): ProjectCompositionHandle<CompositionRuntimeHost>[] { return [...this._handles.values()] }
-}
-
 /** Монтирует один project в изолированную runtime-сессию. */
 export class EndgeProject {
-  public async mount(identity: string, options: ProjectRuntimeMountOptions = {}): Promise<ProjectRuntimeSession<CompositionRuntimeHost>> {
+  public async mount(identity: string, options: ProjectRuntimeMountOptions = {}): Promise<ProjectRuntimeSession<ProjectRuntimeHost>> {
     const normalized = String(identity ?? '').trim()
     const model = Endge.domain.getProject(normalized)
     if (!model) {
@@ -215,43 +196,34 @@ export class EndgeProject {
     }))
     await projectScope.activate()
 
-    const handles = new Map<string, ProjectCompositionHandleImpl>()
-    const compositions = Endge.domain.getCompositions()
-      .filter(item => item.kind === 'project' && item.kindIdentity === normalized && item.active !== false && !item.deletedAt)
-      .sort((left, right) => left.identity.localeCompare(right.identity))
-    for (const composition of compositions) {
-      handles.set(composition.identity, new ProjectCompositionHandleImpl(
-        composition.identity,
-        host,
-        projectScope,
-        artifactReader,
-      ))
-    }
-
+    Endge.runtime.scopes.detachRuntime(host.id)
+    host.meta.runtimeScopeId = projectScope.id
+    host.meta.projectSession = host.id
+    Endge.runtime.scopes.attachRuntime(projectScope.id, host)
+    const composition = new ProjectCompositionHandleImpl(normalized, host, projectScope, artifactReader)
     try {
-      for (const composition of compositions) {
-        const artifact = artifactReader.getArtifact<CompositionProgramPayload>('composition', composition.identity)
-        if (!artifact || artifact.status === 'error') {
-          throw new Error(`[EndgeProject] Project Composition "${composition.identity}" is invalid.`)
-        }
-        if (options.autoActivate !== 'none' && artifact.payload.activation?.mode === 'startup') {
-          await handles.get(composition.identity)?.activate()
-        }
+      const artifact = artifactReader.getArtifact<CompositionProgramPayload>('project', normalized)
+      if (!artifact || artifact.status === 'error') {
+        throw new Error(`[EndgeProject] Project "${normalized}" artifact is invalid.`)
+      }
+      if (options.autoActivate !== 'none' && artifact.payload.activation?.mode === 'startup') {
+        await composition.activate()
       }
     }
     catch (error) {
-      for (const handle of [...handles.values()].reverse()) {
-        await handle.dispose()
+      try {
+        await composition.dispose()
       }
-      await Endge.runtime.scopes.remove(projectScope.id)
-      await Endge.runtime.destroyRuntimeTreeAsync(host.id)
+      finally {
+        await Endge.runtime.scopes.remove(projectScope.id)
+      }
       throw error
     }
 
     let unmounting: Promise<void> | null = null
     return {
       id: host.id,
-      compositions: new ProjectCompositionRegistryImpl(handles),
+      composition,
       switchScope: async ({ from = null, to, previous = 'pause' }) => {
         const target = Endge.runtime.scopes.get(to.id)
         const source = from ? Endge.runtime.scopes.get(from.id) : null
@@ -283,17 +255,11 @@ export class EndgeProject {
       },
       unmount: () => {
         unmounting ??= (async () => {
-          // Dispose marks every handle synchronously before waiting for any teardown.
-          const results = await Promise.allSettled([...handles.values()].reverse().map(handle => handle.dispose()))
           try {
-            await Endge.runtime.scopes.remove(projectScope.id)
+            await composition.dispose()
           }
           finally {
-            await Endge.runtime.destroyRuntimeTreeAsync(host.id)
-          }
-          const errors = results.filter(result => result.status === 'rejected').map(result => result.reason)
-          if (errors.length) {
-            throw new AggregateError(errors, '[EndgeProject] Composition cleanup failed.')
+            await Endge.runtime.scopes.remove(projectScope.id)
           }
         })()
         return unmounting

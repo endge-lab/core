@@ -10,12 +10,30 @@ import { RComponentSFC } from '@/features/core/modules/domain/entities/RComponen
 import { RComposition } from '@/features/core/modules/domain/entities/RComposition'
 import { RComputation } from '@/features/core/modules/domain/entities/RComputation'
 import { RMock } from '@/features/core/modules/domain/entities/RMock'
+import { RProject } from '@/features/core/modules/domain/entities/RProject'
 import { RQuery } from '@/features/core/modules/domain/entities/RQuery'
 import { ENDGE_STYLE_DEFAULT_SOURCE, RStyle } from '@/features/core/modules/domain/entities/RStyle'
 import { RType } from '@/features/core/modules/domain/entities/RType'
 import { ComponentType, DOMAIN_DOCUMENT_TYPES, QueryType } from '@/features/core/modules/domain/types/document/document.types'
 
 describe('дескрипторы документов домена', () => {
+  /** Source и версия принадлежат Project и не теряются на persistence boundary. */
+  it('сохраняет Source проекта и metadata при domain и service round-trip', () => {
+    const source = 'defineComposition({ activateOn: startup(), runtimes: {} })'
+    const project = RProject.fromPlain({ id: 41, identity: 'airport', name: 'Airport', source, sourceVersion: 1 })
+    project.meta = { configurator: { workflow: { schemaVersion: 1, positions: {} } } }
+    const plain = project.toPlain()
+    const restored = RProject.fromPlain(plain)
+    const payload = getDomainDocumentDescriptor('project').persistence!.serialize(restored, {
+      resolveFolderIdentity: () => null,
+      resolveEnvironmentIdentity: () => null,
+    })
+    expect(plain).toMatchObject({ source, sourceVersion: 1, meta: project.meta })
+    expect(payload).toMatchObject({ identity: 'airport', source, sourceVersion: 1 })
+    expect(getDomainDocumentDescriptor('project').capabilities)
+      .toEqual({ source: 'composition', program: 'project', runtime: 'project' })
+  })
+
   it('создаёт черновик Query с приоритетом Source без сохранённого ID', () => {
     const draft = createNewDomainDocument(QueryType.REST, {
       identity: 'flight-list',
@@ -176,7 +194,6 @@ describe('дескрипторы документов домена', () => {
     })
     const serialized = descriptor.persistence?.serialize(draft, {
       resolveFolderIdentity: value => String(value),
-      resolveNavigationIdentity: value => String(value),
       resolveEnvironmentIdentity: value => String(value),
     })
     const materialized = descriptor.materialize(serialized ?? {})

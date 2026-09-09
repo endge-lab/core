@@ -389,7 +389,7 @@ export interface CompositionRuntimeOutputHandle {
 }
 
 /** Публичный контракт Composition host без зависимости Domain от concrete Model runtime. */
-export interface CompositionRuntimeHostHandle extends RuntimeHost<'composition', any, CompositionProgramPayload> {
+export interface CompositionRuntimeHostHandle<TType extends 'composition' | 'project' = 'composition' | 'project'> extends RuntimeHost<TType, any, CompositionProgramPayload> {
   mountGraph: () => Promise<void>
   getChild: (name: string) => RuntimeHost<any, any> | null
   getChildren: () => CompositionRuntimeChildHandle[]

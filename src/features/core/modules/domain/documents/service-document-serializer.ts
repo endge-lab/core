@@ -7,7 +7,6 @@ type RecordValue = Record<string, any>
 /** Явные Domain lookup-зависимости чистой сериализации persisted-документа. */
 export interface DocumentSerializationContext {
   resolveFolderIdentity: (value: string | number) => string | null
-  resolveNavigationIdentity: (value: string | number) => string | null
   resolveEnvironmentIdentity: (value: string | number) => string | null
 }
 
@@ -135,11 +134,12 @@ export function serializeServiceDocument(
     })
   }
   if (documentType === 'project') {
-    return withFields(common, value, ['configuration', 'slug', 'order'], {
+    return withFields(common, value, ['configuration', 'slug', 'order', 'source', 'sourceVersion'], {
       configuration: objectValue(value.configuration),
+      source: text(value.source),
+      sourceVersion: positiveInteger(value.sourceVersion, 1),
       slug: nullableText(value.slug),
       order: nullableNumber(value.order),
-      navigationIdentity: resolveNullableIdentity(value.navigationIdentity ?? value.navigationId, context.resolveNavigationIdentity),
       allowedEnvironments: resolveIdentities(value.allowedEnvironmentIdentities ?? value.allowedEnvironmentIds ?? value.allowedEnvironments, context.resolveEnvironmentIdentity),
     })
   }
@@ -192,16 +192,6 @@ function resolveIdentity(
     return ''
   }
   return text(resolver(value as string | number) ?? value)
-}
-
-function resolveNullableIdentity(
-  value: unknown,
-  resolver: (value: string | number) => string | null,
-): string | null {
-  if (value == null || value === '') {
-    return null
-  }
-  return nullableText(resolver(value as string | number) ?? value)
 }
 
 function resolveIdentities(

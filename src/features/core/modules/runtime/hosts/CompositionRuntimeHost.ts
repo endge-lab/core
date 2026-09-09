@@ -4,6 +4,7 @@ import type {
   ComponentSFCEventOccurrence,
 } from '@/features/core/modules/domain/types/component/sfc/ports.types'
 import type { I18nRuntimeCatalog } from '@/features/core/modules/i18n/domain/i18n.types'
+import type { RuntimeEntityModelMap } from '@/features/core/modules/runtime/domain/runtime-entity-map.types'
 import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext, RuntimeHostInputBinding, RuntimeHostInputSource, RuntimeHostRaphInputBinding, RuntimeHostUpdateContext } from '@/features/core/modules/runtime/domain/runtime-host.types'
 import type { VocabRuntimeCatalog } from '@/features/core/modules/runtime/domain/vocab-cache.types'
 import type { ComponentSFCRuntimeHost } from '@/features/core/modules/runtime/hosts/ComponentSFCRuntimeHost'
@@ -39,11 +40,12 @@ import { RuntimeHostBase } from '@/features/core/modules/runtime/RuntimeHostBase
 import { RuntimeScope } from '@/features/core/modules/runtime/RuntimeScope'
 import { evaluateSourceExpression } from '@/features/core/modules/source/services/source-expression-evaluate'
 
-function defaultContext(): RuntimeHostContext<'composition'> {
+function defaultContext(): RuntimeHostContext<'composition'> & RuntimeHostContext<'project'> {
   return {
     status: 'idle',
     startedAt: null,
     updatedAt: null,
+    lastRefreshAt: null,
     mountedChildren: 0,
     lastHookAt: null,
   }
@@ -83,7 +85,7 @@ function evaluateComponentEventInput(
 }
 
 /** Runtime orchestration host: children, bindings, hooks и public handles. */
-export class CompositionRuntimeHost extends RuntimeHostBase<'composition', RuntimeHostContext<'composition'>, CompositionProgramPayload> {
+export class CompositionRuntimeHost<TType extends 'composition' | 'project' = 'composition'> extends RuntimeHostBase<TType, RuntimeHostContext<'composition'> & RuntimeHostContext<'project'>, CompositionProgramPayload> {
   private _mountPromise: Promise<void> | null = null
   private _destroyPromise: Promise<void> | null = null
   private _children = new Map<string, RuntimeHost<any, any>>()
@@ -116,7 +118,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
 
   public constructor(input: {
     id: string
-    model: RComposition
+    model: RuntimeEntityModelMap[TType]
+    entityType?: TType
     parent?: RuntimeHost<any, any> | null
     meta?: Record<string, unknown>
     artifactReader: RuntimeArtifactReader
@@ -127,13 +130,13 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       parent: input.parent,
       meta: input.meta,
       kind: 'composition',
-      runtimeType: 'composition-runtime-host',
-      entityType: 'composition',
+      runtimeType: `${input.entityType ?? 'composition'}-runtime-host`,
+      entityType: input.entityType ?? 'composition' as TType,
       entityIdentity: input.model.identity ?? String(input.model.id),
       title: input.model.displayName ?? input.model.name ?? input.model.identity,
       context: defaultContext(),
       artifactReader: input.artifactReader,
-      artifactRef: { entityType: 'composition', id: input.model.id, identity: input.model.identity },
+      artifactRef: { entityType: input.entityType ?? 'composition', id: input.model.id, identity: input.model.identity },
     })
   }
 
@@ -1515,7 +1518,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
 
   /** Не допускает прямые и транзитивные циклы Composition runtime tree. */
   private _assertCompositionCycle(identity: string): void {
-    if (this.entityIdentity === identity) {
+    if (this.entityType === 'composition' && this.entityIdentity === identity) {
       throw new Error(`[CompositionRuntimeHost] composition cycle detected for "${identity}".`)
     }
     let current: RuntimeHost<any, any> | null = this.parent

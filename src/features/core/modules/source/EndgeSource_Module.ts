@@ -204,7 +204,7 @@ export class EndgeSource_Module extends EndgeModule {
     const inputs = (entities: Array<SimulationSourceInput & { deletedAt?: unknown }>): SimulationSourceInput[] => entities
       .filter(entity => !entity.deletedAt)
       .map(entity => ({ id: entity.id, identity: entity.identity, displayName: entity.displayName, source: entity.source, sourceVersion: entity.sourceVersion, isPrimitive: entity.isPrimitive }))
-    return { compositions: inputs(Endge.domain.getCompositions()), queries: inputs(Endge.domain.getQueries()), types: inputs(Endge.domain.getTypes()) }
+    return { projects: inputs(Endge.domain.getProjects()), compositions: inputs(Endge.domain.getCompositions()), queries: inputs(Endge.domain.getQueries()), types: inputs(Endge.domain.getTypes()) }
   }
 
   /** Регистрирует встроенные strategies ядра. */

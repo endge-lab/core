@@ -1,5 +1,5 @@
 import type { RuntimeEntityModelMap, RuntimeEntityType } from '@/features/core/modules/runtime/domain/runtime-entity-map.types'
-import type { RuntimeHost } from '@/features/core/modules/runtime/domain/runtime-host.types'
+import type { RuntimeArtifactReader, RuntimeHost } from '@/features/core/modules/runtime/domain/runtime-host.types'
 
 import { ActionRuntimeHost } from '@/features/core/modules/runtime/hosts/ActionRuntimeHost'
 import { ComponentSFCRuntimeHost } from '@/features/core/modules/runtime/hosts/ComponentSFCRuntimeHost'
@@ -15,6 +15,7 @@ export interface RuntimeHostFactoryInput<TType extends RuntimeEntityType> {
   entityIdentity: string
   title?: string
   meta?: Record<string, unknown>
+  artifactReader?: RuntimeArtifactReader
 }
 
 export type RuntimeHostFactoryAnyInput = RuntimeHostFactoryInput<RuntimeEntityType>
@@ -25,15 +26,17 @@ export type RuntimeHostFactoryAnyInput = RuntimeHostFactoryInput<RuntimeEntityTy
 export function createRuntimeHost(
   input: RuntimeHostFactoryAnyInput,
 ): RuntimeHost<any> {
-  const { id, entityType, model, entityIdentity, title, meta } = input
+  const { id, entityType, model, entityIdentity, title, meta, artifactReader } = input
 
   switch (entityType) {
     case 'project':
+      if (!artifactReader) {
+        throw new Error('Project runtime requires an artifact reader.')
+      }
       return new ProjectRuntimeHost({
         id,
         model: model as RuntimeEntityModelMap['project'],
-        entityIdentity,
-        title,
+        artifactReader,
         meta,
       })
     case 'page':

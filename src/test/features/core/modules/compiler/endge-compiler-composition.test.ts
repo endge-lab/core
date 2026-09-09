@@ -22,6 +22,55 @@ describe('проверка Composition в EndgeCompiler', () => {
     Endge.workspace.reset()
   })
 
+  /** Project и Composition с одинаковой identity остаются разными artifact owners. */
+  it('компилирует собственный граф проекта и допускает вложенную композицию с такой же identity', () => {
+    const project = Endge.domain.getProject('project')!
+    const child = RComposition.fromPlain({
+      id: 801,
+      identity: 'project',
+      name: 'Child',
+      source: 'defineComposition({ runtimes: {} })',
+      sourceVersion: 1,
+    })
+    Endge.domain.addComposition(child)
+    Endge.compiler.buildComposition(child)
+    project.source = 'defineComposition({ activateOn: startup(), runtimes: { child: composition(\'project\') } })'
+
+    const artifact = Endge.compiler.buildProject(project)
+    expect(artifact.ref).toMatchObject({ entityType: 'project', identity: 'project' })
+    expect(artifact.status).not.toBe('error')
+    expect(artifact.dependencies).toContainEqual(expect.objectContaining({ entityType: 'composition', identity: 'project' }))
+    expect(Endge.program.getArtifact('project', project.id)).toBe(artifact)
+    expect(Endge.program.getCompositionArtifact('project')?.ref.id).toBe(child.id)
+  })
+
+  /** Изменение Source требует rebuild и не разрешает исполнять старый граф. */
+  it('инвалидирует артефакт проекта после изменения его Source', () => {
+    const project = Endge.domain.getProject('project')!
+    expect(Endge.compiler.buildProject(project).status).not.toBe('error')
+    project.source = 'defineComposition({ activateOn: manual(), runtimes: {} })'
+    const stale = Endge.program.getArtifact('project', project.id)
+    expect(stale?.status).toBe('error')
+    expect(stale?.diagnostics).toContainEqual(expect.objectContaining({ code: 'program-artifact-stale' }))
+    const rebuilt = Endge.compiler.buildProject(project)
+    expect(rebuilt.status).not.toBe('error')
+    expect(rebuilt.payload.activation?.mode).toBe('manual')
+  })
+
+  /** Изолированная компиляция draft не подменяет опубликованный граф проекта. */
+  it('компилирует черновик проекта без записи в общую program', () => {
+    const project = Endge.domain.getProject('project')!
+    const persisted = Endge.compiler.buildProject(project)
+    const draft = RProject.fromPlain({ ...project.toPlain(), source: 'defineComposition({ activateOn: manual(), runtimes: {} })' })
+    const isolated = Endge.compiler.compileProjectArtifact(draft)
+    expect(isolated.status).not.toBe('error')
+    expect(isolated.payload.activation?.mode).toBe('manual')
+    expect(Endge.program.getArtifact('project', project.id)).toBe(persisted)
+    draft.sourceVersion = 2
+    expect(Endge.compiler.compileProjectArtifact(draft).diagnostics)
+      .toContainEqual(expect.objectContaining({ code: 'project.source-version.unsupported' }))
+  })
+
   it('отличает отсутствие модели Query от отсутствия артефакта Query', () => {
     const composition = createComposition()
 

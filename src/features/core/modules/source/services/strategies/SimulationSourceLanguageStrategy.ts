@@ -17,8 +17,8 @@ export class SimulationSourceLanguageStrategy implements SourceLanguageStrategy 
   public readonly syntax = createTypeScriptLikeSourceSyntax({
     alias: 'Endge Simulation Source',
     extension: '.endge-simulation.ts',
-    keywords: ['defineSimulation', 'composition', 'mockRequest'],
-    functions: ['defineSimulation', 'composition', 'mockRequest'],
+    keywords: ['defineSimulation', 'composition', 'project', 'mockRequest'],
+    functions: ['defineSimulation', 'composition', 'project', 'mockRequest'],
     properties: ['target', 'overrides', 'runtimes', 'request', 'seed', 'arrays'],
   })
 
@@ -41,10 +41,13 @@ export class SimulationSourceLanguageStrategy implements SourceLanguageStrategy 
     if (/\bcomposition\s*\(\s*['"][^'"]*$/.test(prefix)) {
       return catalog.compositions.map(item => ({ label: item.identity, kind: 'value', insertText: item.identity, detail: item.displayName || 'Composition' }))
     }
+    if (/\bproject\s*\(\s*['"][^'"]*$/.test(prefix)) {
+      return catalog.projects.map(item => ({ label: item.identity, kind: 'value', insertText: item.identity, detail: item.displayName || 'Project' }))
+    }
     const location = objectAt(context.source, offset)
     const definition = compileSimulationSource(context.source).document
     const resolver = new SimulationSourceResolver(catalog)
-    if (location && definition?.target && location.path[0] === 'overrides') {
+    if (location && definition?.target.identity && location.path[0] === 'overrides') {
       const aliases: string[] = []
       let index = 1
       while (location.path[index] === 'runtimes' && index + 1 < location.path.length) {
@@ -75,7 +78,9 @@ export class SimulationSourceLanguageStrategy implements SourceLanguageStrategy 
     }
     return [
       { label: 'defineSimulation', kind: 'snippet', insertText: SIMULATION_DEFAULT_SOURCE, detail: 'Создать Simulation Source' },
-      { label: 'target', kind: 'property', insertText: 'target: composition(\'\'),', detail: 'Целевая Composition' },
+      { label: 'target', kind: 'property', insertText: 'target: composition(\'\'),', detail: 'Целевая Composition или Project' },
+      { label: 'project', kind: 'function', insertText: 'project(\'\')', detail: 'Собственный граф проекта' },
+      { label: 'composition', kind: 'function', insertText: 'composition(\'\')', detail: 'Граф отдельной Composition' },
       { label: 'overrides', kind: 'property', insertText: 'overrides: { runtimes: {} },', detail: 'Дерево подмен' },
       { label: 'mockRequest', kind: 'function', insertText: 'mockRequest({ arrays: {} })', detail: 'Описание подмены запроса' },
       { label: 'seed', kind: 'property', insertText: 'seed: \'simulation\',', detail: 'Seed будущей генерации' },
@@ -84,7 +89,7 @@ export class SimulationSourceLanguageStrategy implements SourceLanguageStrategy 
   }
 
   public resolveReference(context: SourceLanguageContext) {
-    return resolveSourceDocumentReference(context, { functions: { composition: 'composition' } })
+    return resolveSourceDocumentReference(context, { functions: { composition: 'composition', project: 'project' } })
   }
 }
 

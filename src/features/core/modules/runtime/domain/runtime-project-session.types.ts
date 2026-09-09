@@ -2,12 +2,6 @@ import type { RuntimeArtifactReader } from '@/features/core/modules/runtime/doma
 import type { RuntimeScopeHandle } from '@/features/core/modules/runtime/domain/runtime-scope.types'
 import type { CompositionPublicOutputHandle, CompositionRuntimeHostHandle, CompositionSession } from '@/features/core/modules/source/domain/types/composition-source.types'
 
-export interface ProjectCompositionRegistry<THost extends CompositionRuntimeHostHandle = CompositionRuntimeHostHandle> {
-  get: (identity: string) => ProjectCompositionHandle<THost> | null
-  require: (identity: string) => ProjectCompositionHandle<THost>
-  getAll: () => ProjectCompositionHandle<THost>[]
-}
-
 export interface ProjectCompositionHandle<THost extends CompositionRuntimeHostHandle = CompositionRuntimeHostHandle> {
   readonly identity: string
   readonly state: 'inactive' | 'active' | 'paused' | 'disposed'
@@ -30,7 +24,7 @@ export interface ProjectRuntimeMountOptions {
 
 export interface ProjectRuntimeSession<THost extends CompositionRuntimeHostHandle = CompositionRuntimeHostHandle> {
   readonly id: string
-  readonly compositions: ProjectCompositionRegistry<THost>
+  readonly composition: ProjectCompositionHandle<THost>
   switchScope: (options: {
     from?: RuntimeScopeHandle | null
     to: RuntimeScopeHandle

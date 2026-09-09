@@ -4,6 +4,7 @@ import type { DiagnosticsProblemInput } from '@/features/core/modules/diagnostic
 import { Expose } from 'class-transformer'
 import { normalizeEndgeConfigurationContribution } from '@/features/core/modules/configuration/domain/endge-configuration'
 import { REntity } from '@/features/core/modules/domain/entities/REntity'
+import { PROJECT_DEFAULT_SOURCE } from '@/features/core/modules/source/templates/project.default.source'
 
 function normalizeRelationId(value: unknown): number | null {
   if (value == null) {
@@ -45,6 +46,13 @@ function normalizeRelationIds(value: unknown): number[] {
  *  - createdAt, updatedAt, deletedAt, author, active
  */
 export class RProject extends REntity {
+  /** Source единственного корневого графа принадлежит документу проекта. */
+  @Expose()
+  source: string = PROJECT_DEFAULT_SOURCE
+
+  @Expose()
+  sourceVersion: number = 1
+
   /** Project-level contribution к effective configuration. */
   @Expose()
   configuration: EndgeConfigurationContribution = { mode: 'inherit', patch: {} }
@@ -60,10 +68,6 @@ export class RProject extends REntity {
   /** Порядок сортировки в списке */
   @Expose()
   order?: number | null = null
-
-  /** Id навигации (relationship - navigations) */
-  @Expose()
-  navigationId?: number | null = null
 
   /** Список разрешённых окружений проекта (relationship[] - environments). */
   @Expose()
@@ -106,9 +110,10 @@ export class RProject extends REntity {
     p.description = json.description ?? null
     p.slug = json.slug ?? null
     p.order = json.order != null ? Number(json.order) : null
-    p.navigationId = normalizeRelationId(json.navigationId ?? json.navigation ?? null)
     p.allowedEnvironmentIds = normalizeRelationIds(json.allowedEnvironmentIds ?? json.allowedEnvironments ?? [])
     p.configuration = normalizeEndgeConfigurationContribution(json.configuration)
+    p.source = typeof json.source === 'string' ? json.source : PROJECT_DEFAULT_SOURCE
+    p.sourceVersion = Number(json.sourceVersion ?? 1)
 
     return p
   }
@@ -127,9 +132,10 @@ export class RProject extends REntity {
       description: this.description ?? null,
       slug: this.slug ?? null,
       order: this.order ?? null,
-      navigationId: this.navigationId ?? null,
       allowedEnvironmentIds: [...(this.allowedEnvironmentIds ?? [])],
       configuration: this.configuration,
+      source: this.source,
+      sourceVersion: this.sourceVersion,
       meta: { ...this.meta },
     }
   }
@@ -137,6 +143,9 @@ export class RProject extends REntity {
   /** Возвращает validation problems проекта без сохранения их внутри entity. */
   override getDiagnosticProblems(): DiagnosticsProblemInput[] {
     const problems: DiagnosticsProblemInput[] = []
+    if (this.sourceVersion !== 1) {
+      problems.push({ severity: 'error', code: 'project.source-version.unsupported', message: 'Project.sourceVersion должен быть равен 1', sourcePath: 'sourceVersion' })
+    }
     if (!this.id) {
       problems.push({ severity: 'warning', code: 'project.id.required', message: 'Project.id не задан' })
     }

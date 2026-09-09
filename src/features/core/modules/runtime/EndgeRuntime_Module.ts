@@ -133,7 +133,7 @@ export class EndgeRuntime_Module extends EndgeModule {
     }
 
     const artifactReader = this._resolveArtifactReader(options.artifactReader)
-    if (strategy.entityType !== 'project' && strategy.entityType !== 'page') {
+    if (strategy.entityType !== 'page') {
       const artifact = (options.meta?.artifact as import('@/features/core/modules/program/domain/types/program.types').ProgramArtifact | undefined) ?? artifactReader.getArtifact(strategy.entityType, model.id ?? model.identity)
       if (artifact?.diagnostics?.some((item: { code: string }) => item.code === 'program-artifact-stale' || item.code === 'program-dependency-stale')) {
         return null
@@ -262,7 +262,7 @@ export class EndgeRuntime_Module extends EndgeModule {
   public resolveDataMode(host: RuntimeHost<any, any> | null | undefined): EndgeDataMode {
     let current = host ?? null
     while (current) {
-      if (current.entityType === 'composition') {
+      if (current.entityType === 'composition' || current.entityType === 'project') {
         const mode = (current.getArtifactPayload() as CompositionProgramPayload | null)?.dataMode
         if (mode === 'mock' || mode === 'live') {
           return mode

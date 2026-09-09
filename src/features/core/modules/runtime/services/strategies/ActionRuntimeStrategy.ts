@@ -7,7 +7,7 @@ export class ActionRuntimeStrategy implements RuntimeStrategy<RAction> {
   public readonly entityType = 'action'
 
   public supports(model: unknown): model is RAction {
-    return model instanceof RAction || typeof (model as any)?.source === 'string'
+    return model instanceof RAction || (model as any)?.type === 'action'
   }
 
   public create(ctx: Parameters<RuntimeStrategy<RAction>['create']>[0]) {

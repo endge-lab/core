@@ -1,5 +1,5 @@
 import type { ProgramDiagnostic } from '@/features/core/modules/program/domain/types/program.types'
-import type { SimulationMockRequest, SimulationRuntimeOverride, SimulationSourceCompileResult } from '@/features/core/modules/source/domain/types/simulation-source.types'
+import type { SimulationMockRequest, SimulationRuntimeOverride, SimulationSourceCompileResult, SimulationTargetReference } from '@/features/core/modules/source/domain/types/simulation-source.types'
 
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
@@ -28,12 +28,12 @@ export function compileSimulationSource(source: string, sourceVersion = 1): Simu
     }
     const definition = object(expression.arguments[0], 'defineSimulation', ['target', 'overrides'])
     const targetCall = definition.get('target')
-    let target = ''
-    if (!isCall(targetCall, 'composition') || !t.isStringLiteral(targetCall.arguments[0]) || !targetCall.arguments[0].value.trim()) {
-      diagnostics.push(diagnostic('error', 'simulation-target-required', 'Выберите target: composition(\'identity\').', 'target', targetCall ?? expression))
+    let target: SimulationTargetReference = { entityType: 'composition', identity: '' }
+    if ((!isCall(targetCall, 'composition') && !isCall(targetCall, 'project')) || !t.isStringLiteral(targetCall.arguments[0]) || !targetCall.arguments[0].value.trim()) {
+      diagnostics.push(diagnostic('error', 'simulation-target-required', 'Выберите target: composition(\'identity\') или project(\'identity\').', 'target', targetCall ?? expression))
     }
     else {
-      target = targetCall.arguments[0].value.trim()
+      target = { entityType: isCall(targetCall, 'project') ? 'project' : 'composition', identity: targetCall.arguments[0].value.trim() }
     }
     const overrides = object(definition.get('overrides'), 'overrides', ['runtimes'])
     const runtimes = readRuntimes(overrides.get('runtimes'), 'overrides.runtimes')

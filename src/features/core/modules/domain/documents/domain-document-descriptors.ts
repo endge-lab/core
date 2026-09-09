@@ -276,7 +276,7 @@ const CAPABILITIES_BY_TYPE: Partial<Record<DomainDocumentType, Partial<DomainDoc
   [QueryType.REST]: { source: 'query', program: 'query', runtime: 'query' },
   [FilterType.DefaultFilter]: { source: 'filter', program: 'filter', runtime: 'filter' },
   'page': { runtime: 'page' },
-  'project': { runtime: 'project' },
+  'project': { source: 'composition', program: 'project', runtime: 'project' },
 }
 
 const CREATE_NEW_BY_TYPE: Partial<{ [TType in DomainDocumentType]: (options: DocumentDraftOptions) => DomainDocumentModelMap[TType] }> = {

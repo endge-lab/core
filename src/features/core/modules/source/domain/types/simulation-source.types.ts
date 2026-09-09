@@ -13,8 +13,12 @@ export interface SimulationRuntimeOverride {
   request?: SimulationMockRequest
 }
 
+export type SimulationTargetReference
+  = | { entityType: 'composition', identity: string }
+    | { entityType: 'project', identity: string }
+
 export interface SimulationSourceDocument {
-  target: string
+  target: SimulationTargetReference
   runtimes: SimulationRuntimeOverride[]
 }
 
@@ -43,6 +47,7 @@ export interface SimulationSourceInput {
 }
 
 export interface SimulationSourceCatalog {
+  projects: readonly SimulationSourceInput[]
   compositions: readonly SimulationSourceInput[]
   queries: readonly SimulationSourceInput[]
   types: readonly SimulationSourceInput[]

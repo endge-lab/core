@@ -68,6 +68,7 @@ import { RComputation } from '@/features/core/modules/domain/entities/RComputati
 import { RDataView } from '@/features/core/modules/domain/entities/RDataView'
 import { RField } from '@/features/core/modules/domain/entities/RField'
 import { RFilter } from '@/features/core/modules/domain/entities/RFilter'
+import { RProject } from '@/features/core/modules/domain/entities/RProject'
 import { RQuery } from '@/features/core/modules/domain/entities/RQuery'
 import {
   COMPONENT_SFC_FORM_EVENT_DEFINITIONS,
@@ -221,6 +222,10 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
         return
       }
 
+      if (!this._compilePhase('project', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'projects', Endge.domain.getProjects(), context)) {
+        return
+      }
+
       if (!this._compilePhase('simulation', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'simulations', Endge.domain.getSimulations(), context)) {
         return
       }
@@ -322,6 +327,20 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
   public buildComposition(entity: RComposition): ProgramArtifact<CompositionProgramPayload> {
     const context = this._createCompileContext()
     return this._compileEntity('composition', entity, context) as ProgramArtifact<CompositionProgramPayload>
+  }
+
+  /** Компилирует корневой граф проекта под собственной project identity. */
+  public buildProject(entity: RProject): ProgramArtifact<CompositionProgramPayload> {
+    return this._compileEntity('project', entity, this._createCompileContext()) as ProgramArtifact<CompositionProgramPayload>
+  }
+
+  /** Создаёт isolated project artifact для Preview без публикации в общей program. */
+  public compileProjectArtifact(entity: RProject): ProgramArtifact<CompositionProgramPayload> {
+    const handler = this._handlers.get('project') as EntityCompilerHandler<RProject, CompositionProgramPayload> | undefined
+    if (!handler) {
+      throw new Error('Compiler handler is not registered for "project"')
+    }
+    return handler.compile(entity, this._createCompileContext())
   }
 
   /**
@@ -1113,7 +1132,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
         return this._makeArtifact(entity, 'simulation', context, {
           capabilities: ['compilable'],
           metadata: createEmptyProgramMetadata(),
-          payload: (result.artifact as SimulationSourceArtifact | undefined) ?? { type: 'simulation', sourceVersion: 1, target: '', runtimes: [] },
+          payload: (result.artifact as SimulationSourceArtifact | undefined) ?? { type: 'simulation', sourceVersion: 1, target: { entityType: 'composition', identity: '' }, runtimes: [] },
           dependencies: result.dependencies ?? [],
           diagnostics,
         })
@@ -1204,44 +1223,46 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     //
     //
     // Материализует Composition i18n, preview contracts и runtime dependencies.
-    this._registerHandler<RComposition, CompositionProgramPayload>({
-      //
-      entityType: 'composition',
-      //
-      compile: (entity, context) => {
-        const result = Endge.source.compile('composition', this._resolveCompositionSource(entity))
-        const compiledPayload = result.artifact as CompositionProgramPayload | undefined
-        const sourcePayload = compiledPayload
-            ? { ...compiledPayload, sourceVersion: Number(entity.sourceVersion ?? 1) || 1 }
-            : undefined
-        const i18n = sourcePayload
-            ? this._materializeCompositionI18n(sourcePayload)
-            : { payload: undefined, diagnostics: [], dependencies: [] }
-        const payload = i18n.payload
-        const validation = payload ? this._validateComposition(payload, entity) : { diagnostics: [], dependencies: [] }
+    for (const entityType of ['composition', 'project'] as const) {
+      this._registerHandler<RComposition | RProject, CompositionProgramPayload>({
         //
+        entityType,
         //
-        return this._makeArtifact(entity, 'composition', context, {
-          capabilities: ['compilable', 'executable', 'configuration'],
-          metadata: { self: result.metadata ?? {}, nodes: [] },
-          payload: payload ?? this._makeEmptyCompositionPayload(entity.sourceVersion),
-          dependencies: [
-            ...i18n.dependencies,
-            ...validation.dependencies,
-            ...this._typeDependencies(payload?.props.map(prop => prop.type) ?? []),
-            ...this._compositionPreviewDependencies(payload),
-          ],
-          diagnostics: [
-            ...((result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]),
-            ...i18n.diagnostics,
-            ...validation.diagnostics,
-            ...(payload?.props.flatMap(prop =>
-                this._typeContractDiagnostics(prop.type, `props.${prop.key}.type`)) ?? []),
-            ...this._compositionPreviewDiagnostics(payload),
-          ],
-        })
-      },
-    })
+        compile: (entity, context) => {
+          const result = Endge.source.compile('composition', this._resolveCompositionSource(entity))
+          const compiledPayload = result.artifact as CompositionProgramPayload | undefined
+          const sourcePayload = compiledPayload
+              ? { ...compiledPayload, sourceVersion: Number(entity.sourceVersion ?? 1) || 1 }
+              : undefined
+          const i18n = sourcePayload
+              ? this._materializeCompositionI18n(sourcePayload)
+              : { payload: undefined, diagnostics: [], dependencies: [] }
+          const payload = i18n.payload
+          const validation = payload ? this._validateComposition(payload, entity) : { diagnostics: [], dependencies: [] }
+          //
+          //
+          return this._makeArtifact(entity, entityType, context, {
+            capabilities: ['compilable', 'executable', 'configuration'],
+            metadata: { self: result.metadata ?? {}, nodes: [] },
+            payload: payload ?? this._makeEmptyCompositionPayload(entity.sourceVersion),
+            dependencies: [
+              ...i18n.dependencies,
+              ...validation.dependencies,
+              ...this._typeDependencies(payload?.props.map(prop => prop.type) ?? []),
+              ...this._compositionPreviewDependencies(payload),
+            ],
+            diagnostics: [
+              ...((result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]),
+              ...i18n.diagnostics,
+              ...validation.diagnostics,
+              ...(payload?.props.flatMap(prop =>
+                  this._typeContractDiagnostics(prop.type, `props.${prop.key}.type`)) ?? []),
+              ...this._compositionPreviewDiagnostics(payload),
+            ],
+          })
+        },
+      })
+    }
   }
 
   /**
@@ -1407,6 +1428,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
       case 'simulation': return domain.getSimulation(id)
       case 'update': return domain.getUpdate(id)
       case 'composition': return domain.getComposition(id)
+      case 'project': return domain.getProject(id)
       case 'component-sfc': return domain.getComponentSFC(id)
       case 'computation': return domain.getComputation(id)
       case 'action': return domain.getAction(id)
@@ -2470,7 +2492,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
    */
   private _compositionI18nCollisionDiagnostics(
     payload: CompositionProgramPayload,
-    owner: RComposition,
+    owner: RComposition | RProject,
   ): Omit<ProgramDiagnostic, 'entityRef'>[] {
     interface TranslationOrigin {
       composition: string
@@ -2532,12 +2554,12 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
       visitScope('scope_default', inherited)
     }
 
-    visitPayload(payload, new Map(), owner.identity, null, new Set([owner.identity]))
+    visitPayload(payload, new Map(), owner.identity, null, new Set(owner instanceof RComposition ? [owner.identity] : []))
     return diagnostics
   }
 
   /** Проверяет domain/program references и stable-prop bindings Composition. */
-  private _validateComposition(payload: CompositionProgramPayload, owner: RComposition): {
+  private _validateComposition(payload: CompositionProgramPayload, owner: RComposition | RProject): {
     diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
     dependencies: ProgramArtifact['dependencies']
   } {
@@ -2546,7 +2568,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     const storeArtifacts = new Map<string, StoreSourceArtifact>()
     diagnostics.push(...this._compositionI18nCollisionDiagnostics(payload, owner))
 
-    if (owner.kind === 'project' && !payload.activation) {
+    if (owner instanceof RProject && !payload.activation) {
       diagnostics.push({
         severity: 'error',
         code: 'composition-project-activation-required',
@@ -2748,11 +2770,11 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
       else if (runtime.kind === 'composition') {
         const model = Endge.domain.getComposition(runtime.identity)
         const artifact = Endge.program.getCompositionArtifact(runtime.identity)
-        if (runtime.identity === owner.identity) {
+        if (owner instanceof RComposition && runtime.identity === owner.identity) {
           diagnostics.push({ severity: 'error', code: 'composition-self-reference', message: `Composition "${owner.identity}" не может запускать саму себя.`, sourcePath: `runtimes.${runtime.name}` })
           continue
         }
-        if (this._compositionDependsOn(runtime.identity, owner.identity)) {
+        if (owner instanceof RComposition && this._compositionDependsOn(runtime.identity, owner.identity)) {
           diagnostics.push({ severity: 'error', code: 'composition-reference-cycle', message: `Composition dependency cycle: "${owner.identity}" - "${runtime.identity}" - "${owner.identity}".`, sourcePath: `runtimes.${runtime.name}` })
           continue
         }
@@ -3351,7 +3373,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
    * compiled artifact на уровне program read-model.
    */
   private _toStableSource(entity: any): unknown {
-    if (entity instanceof RQuery || entity instanceof RDataView || entity instanceof RFilter || entity instanceof RComposition) {
+    if (entity instanceof RQuery || entity instanceof RDataView || entity instanceof RFilter || entity instanceof RComposition || entity instanceof RProject) {
       return {
         id: entity?.id ?? null,
         identity: entity?.identity ?? null,
@@ -3401,7 +3423,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
   }
 
   /** Возвращает сохраненный Composition source. */
-  private _resolveCompositionSource(entity: RComposition): string {
+  private _resolveCompositionSource(entity: RComposition | RProject): string {
     return typeof entity.source === 'string' ? entity.source : ''
   }
 

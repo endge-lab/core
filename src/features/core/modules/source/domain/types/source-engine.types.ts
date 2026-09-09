@@ -106,6 +106,7 @@ export type SourceDocumentReferenceTarget
     | 'data-view'
     | 'filter'
     | 'i18n-bundles'
+    | 'project'
     | 'mock'
     | 'query'
     | 'store'

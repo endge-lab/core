@@ -1,6 +1,6 @@
 import type { ProgramDependency } from '@/features/core/modules/program/domain/types/program.types'
 import type { CompositionSourceDocument } from '@/features/core/modules/source/domain/types/composition-source.types'
-import type { SimulationRuntimeOverride, SimulationSourceCatalog, SimulationSourceCompileResult, SimulationSourceInput } from '@/features/core/modules/source/domain/types/simulation-source.types'
+import type { SimulationRuntimeOverride, SimulationSourceCatalog, SimulationSourceCompileResult, SimulationSourceInput, SimulationTargetReference } from '@/features/core/modules/source/domain/types/simulation-source.types'
 import type { TypeSourceExpression } from '@/features/core/modules/source/domain/types/type-source.types'
 
 import { compileCompositionSource } from '@/features/core/modules/source/services/compilers/composition-source-compile'
@@ -15,7 +15,7 @@ interface SimulationCompositionBranch {
 
 export interface SimulationSourceTarget {
   alias: string
-  kind: 'composition' | 'scope' | 'query' | 'unsupported'
+  kind: 'project' | 'composition' | 'scope' | 'query' | 'unsupported'
   identity: string
   branch: SimulationCompositionBranch | null
 }
@@ -28,20 +28,26 @@ interface QueryArrayContract {
 
 /** Read-only разрешение aliases и контрактов; не создаёт RuntimeHost или generator payload. */
 export class SimulationSourceResolver {
-  private readonly _compositions = new Map<string, SimulationCompositionBranch | null>()
+  private readonly _branches = new Map<string, SimulationCompositionBranch | null>()
   private readonly _queryContracts = new Map<string, QueryArrayContract>()
 
   public constructor(private readonly _catalog: SimulationSourceCatalog) {}
 
   public composition(identity: string): SimulationCompositionBranch | null {
-    if (this._compositions.has(identity)) {
-      return this._compositions.get(identity) ?? null
+    return this.graph({ entityType: 'composition', identity })
+  }
+
+  public graph(reference: SimulationTargetReference): SimulationCompositionBranch | null {
+    const key = `${reference.entityType}:${reference.identity}`
+    if (this._branches.has(key)) {
+      return this._branches.get(key) ?? null
     }
-    const owner = this._catalog.compositions.find(item => item.identity === identity)
+    const catalog = reference.entityType === 'project' ? this._catalog.projects : this._catalog.compositions
+    const owner = catalog.find(item => item.identity === reference.identity)
     const compiled = owner ? compileCompositionSource(owner.source, owner.sourceVersion) : null
     const document = compiled?.diagnostics.some(item => item.severity === 'error') ? null : compiled?.document ?? null
     const branch = owner && document ? { owner, document, scopePath: 'scope_default' } : null
-    this._compositions.set(identity, branch)
+    this._branches.set(key, branch)
     return branch
   }
 
@@ -60,9 +66,9 @@ export class SimulationSourceResolver {
     return [...runtimes, ...scopes]
   }
 
-  public target(identity: string, aliases: readonly string[]): SimulationSourceTarget | null {
-    let branch = this.composition(identity)
-    let target: SimulationSourceTarget | null = branch ? { alias: '', kind: 'composition', identity, branch } : null
+  public target(reference: SimulationTargetReference, aliases: readonly string[]): SimulationSourceTarget | null {
+    let branch = this.graph(reference)
+    let target: SimulationSourceTarget | null = branch ? { alias: '', kind: reference.entityType, identity: reference.identity, branch } : null
     for (const alias of aliases) {
       if (!branch) {
         return null
@@ -164,15 +170,16 @@ export class SimulationSourceResolver {
     const report = (code: string, message: string, sourcePath: string): void => {
       diagnostics.push({ severity: 'error', code, message, sourcePath, ...result.locations[sourcePath] })
     }
-    const addComposition = (identity: string): void => {
-      const owner = this._catalog.compositions.find(item => item.identity === identity)
-      dependencies.push({ entityType: 'composition', id: owner?.id ?? identity, identity, role: 'simulation-target' })
+    const addReference = (reference: SimulationTargetReference): void => {
+      const catalog = reference.entityType === 'project' ? this._catalog.projects : this._catalog.compositions
+      const owner = catalog.find(item => item.identity === reference.identity)
+      dependencies.push({ ...reference, id: owner?.id ?? reference.identity, role: 'simulation-target' })
     }
-    const root = this.composition(result.document.target)
-    if (result.document.target) {
-      addComposition(result.document.target)
+    const root = this.graph(result.document.target)
+    if (result.document.target.identity) {
+      addReference(result.document.target)
       if (!root) {
-        report('simulation-target-unresolved', `Composition "${result.document.target}" отсутствует или содержит ошибки Source.`, 'target')
+        report('simulation-target-unresolved', `${result.document.target.entityType === 'project' ? 'Project' : 'Composition'} "${result.document.target.identity}" отсутствует или содержит ошибки Source.`, 'target')
       }
     }
     const visit = (overrides: SimulationRuntimeOverride[], branch: SimulationCompositionBranch, path: string): void => {
@@ -185,7 +192,7 @@ export class SimulationSourceResolver {
           continue
         }
         if (target.kind === 'composition') {
-          addComposition(target.identity)
+          addReference({ entityType: 'composition', identity: target.identity })
         }
         if (target.kind === 'unsupported') {
           report('simulation-runtime-unsupported', `Подмена "${override.alias}" не поддерживается: Simulation v1 описывает только Query request.`, currentPath)

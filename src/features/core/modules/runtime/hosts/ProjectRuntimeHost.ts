@@ -1,89 +1,43 @@
 import type { RProject } from '@/features/core/modules/domain/entities/RProject'
-import type { RuntimeHost, RuntimeHostContext } from '@/features/core/modules/runtime/domain/runtime-host.types'
+import type { RuntimeArtifactReader, RuntimeHost } from '@/features/core/modules/runtime/domain/runtime-host.types'
+import type { CompositionProgramPayload } from '@/features/core/modules/source/domain/types/composition-source.types'
 
 import { Raph, RaphNode } from '@endge/raph'
+import { CompositionRuntimeHost } from '@/features/core/modules/runtime/hosts/CompositionRuntimeHost'
 
-import { RuntimeHostBase } from '@/features/core/modules/runtime/RuntimeHostBase'
-
-function createDefaultProjectContext(): RuntimeHostContext<'project'> {
-  return {
-    status: 'idle',
-    startedAt: null,
-    updatedAt: null,
-    lastRefreshAt: null,
-  }
-}
-
-export class ProjectRuntimeHost extends RuntimeHostBase<'project'> {
-  constructor(input: {
+/** Исполняет собственный корневой граф проекта через общий механизм Composition. */
+export class ProjectRuntimeHost extends CompositionRuntimeHost<'project'> {
+  public constructor(input: {
     id: string
     model: RProject
-    entityIdentity: string
     parent?: RuntimeHost<any, any> | null
-    title?: string
     meta?: Record<string, unknown>
+    artifactReader: RuntimeArtifactReader
   }) {
-    super({
-      ...input,
-      kind: 'runtime',
-      runtimeType: 'project-runtime-host',
-      entityType: 'project',
-      context: createDefaultProjectContext(),
-    })
+    super({ ...input, entityType: 'project' })
   }
 
-  /**
-   * LIFECYCLE
-   */
-  public static createRuntime(input: {
+  /** Создаёт host только из валидного артефакта проекта; старые композиции не участвуют. */
+  public static createProjectRuntime(input: {
     id: string
     model: RProject
     meta?: Record<string, any>
     parent?: RuntimeHost<any, any> | null
-  }): RuntimeHost<'project'> {
-    const { id, model } = input
-    const meta = input.meta ?? {}
-    const parent = input.parent ?? null
-
+    artifacts: RuntimeArtifactReader
+  }): ProjectRuntimeHost | null {
+    const artifact = input.artifacts.getArtifact<CompositionProgramPayload>('project', input.model.id ?? input.model.identity)
+    if (!artifact || artifact.status === 'error') {
+      return null
+    }
+    const host = new ProjectRuntimeHost({ ...input, artifactReader: input.artifacts })
     const node = new RaphNode(Raph.app, {
-      id: `${model.identity || model.id}-${id}`,
-      meta: {
-        type: 'project',
-        kind: 'root',
-        entityId: model.id,
-        projectIdentity: model.identity,
-        parentRuntimeId: parent?.id ?? null,
-        ...meta,
-      },
+      id: `${input.model.identity}-${input.id}`,
+      meta: { type: 'project', runtimeId: input.id, entityIdentity: input.model.identity },
     })
-
-    const host = new ProjectRuntimeHost({
-      id,
-      model,
-      entityIdentity: model.identity ?? String(model.id),
-      parent,
-      title: model.displayName ?? model.name ?? model.identity ?? `Project ${model.id}`,
-      meta: { ...meta, runtimeKind: 'runtime', parentRuntimeId: parent?.id ?? null },
-    })
-
     Raph.app.addNode(node)
-    node.meta.runtimeId = host.id
-    node.meta.runtimeKind = 'runtime'
     host.addRaphNode(node)
-    host.addResource({
-      id: `node:${node.id}`,
-      kind: 'raph-node',
-      title: node.id,
-      subtitle: `${node.meta?.type ?? 'node'}:${node.meta?.kind ?? 'root'}`,
-      payload: { meta: node.meta ?? {} },
-    })
-    host.addChannel({
-      id: 'channel:event-bus',
-      kind: 'event-bus',
-      name: 'Endge.events',
-      direction: 'both',
-      subtitle: 'Публикация и подписка runtime-событий',
-    })
+    host.addResource({ id: `node:${node.id}`, kind: 'raph-node', title: node.id })
+    host.setInputSource(input.meta?.input)
     return host
   }
 }
