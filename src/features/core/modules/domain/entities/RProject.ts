@@ -114,6 +114,7 @@ export class RProject extends REntity {
     p.configuration = normalizeEndgeConfigurationContribution(json.configuration)
     p.source = typeof json.source === 'string' ? json.source : PROJECT_DEFAULT_SOURCE
     p.sourceVersion = Number(json.sourceVersion ?? 1)
+    p.applyEntityMeta(json)
 
     return p
   }

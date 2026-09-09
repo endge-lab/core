@@ -187,6 +187,9 @@ function resolveGraphQLScalar(identity: string): string {
   if (['id', 'uuid', 'guid'].includes(normalized)) {
     return 'ID'
   }
+  if (['date', 'localdate'].includes(normalized)) {
+    return 'Date'
+  }
   if (['datetime', 'instant', 'timestamp'].includes(normalized)) {
     return 'DateTime'
   }
@@ -196,7 +199,7 @@ function resolveGraphQLScalar(identity: string): string {
   if (['json', 'jsonobject'].includes(normalized)) {
     return 'JSON'
   }
-  if (['string', 'date', 'localdate', 'duration', 'url', 'uri', 'email'].includes(normalized)) {
+  if (['string', 'duration', 'url', 'uri', 'email'].includes(normalized)) {
     return 'String'
   }
   return 'Any'

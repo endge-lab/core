@@ -30,7 +30,7 @@ export function inferConfigurationDefault(
 ): { ok: true, value: EndgeJSONValue } | { ok: false, reason: string } {
   if (expression.kind === 'reference') {
     const identity = expression.identity
-    if (identity === 'String' || identity === 'ID' || identity === 'Time' || identity === 'DateTime') {
+    if (identity === 'String' || identity === 'ID' || identity === 'Date' || identity === 'Time' || identity === 'DateTime') {
       return { ok: true, value: '' }
     }
     if (identity === 'Number') {
@@ -138,7 +138,7 @@ function validateExpression(
     if (identity === 'Any' || identity === 'JSON') {
       return []
     }
-    if (identity === 'String' || identity === 'Time' || identity === 'DateTime') {
+    if (identity === 'String' || identity === 'Date' || identity === 'Time' || identity === 'DateTime') {
       return typeof value === 'string' ? [] : [error(path, `Expected ${identity}`)]
     }
     if (identity === 'Number') {

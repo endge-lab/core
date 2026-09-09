@@ -198,6 +198,9 @@ function resolveOpenAPIType(
     if (schema.format === 'uuid') {
       return 'ID'
     }
+    if (schema.format === 'date') {
+      return 'Date'
+    }
     if (schema.format === 'date-time') {
       return 'DateTime'
     }
