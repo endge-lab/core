@@ -5,7 +5,6 @@ import type {
   DiagnosticsSnapshot,
   DiagnosticsSnapshotCaptureError,
   DiagnosticsSnapshotOptions,
-  DiagnosticsSnapshotProviders,
   EndgeDiagnosticsSnapshotContentConfiguration,
 } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
 import type { EndgeProblems_Module } from '@/features/core/modules/diagnostics/EndgeProblems_Module'
@@ -15,6 +14,7 @@ import type {
   EndgeFederationDiagnosticsSnapshotOptions,
   EndgeModuleDiagnosticsSnapshotNode,
 } from '@/features/federation/types/federation.types'
+import { Endge } from '@/features/core/kernel/endge'
 import { BrowserDiagnosticsSnapshot_Adapter } from '@/features/core/modules/diagnostics/adapters/BrowserDiagnosticsSnapshot_Adapter'
 import { DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION } from '@/features/core/modules/diagnostics/config/diagnostics.config'
 import { serializeDiagnosticsJson } from '@/features/core/modules/diagnostics/domain/diagnostics-snapshot'
@@ -34,7 +34,6 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
   public constructor(
     private readonly _telemetry: EndgeTelemetry_Module,
     private readonly _problems: EndgeProblems_Module,
-    private readonly _providers: DiagnosticsSnapshotProviders = {},
     private readonly _runtimeAdapter: DiagnosticsSnapshotRuntimeAdapter = new BrowserDiagnosticsSnapshot_Adapter(),
   ) {
     super()
@@ -90,53 +89,41 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
     const includeRaphData = options.includeRaphData ?? content.raphData ?? defaults.raphData ?? false
     const includeRaphGraph = options.includeRaphGraph ?? content.raphGraph ?? defaults.raphGraph ?? false
     const captureErrors: DiagnosticsSnapshotCaptureError[] = []
-    const usesFederationTree = this._providers.federation != null
-    const federation = usesFederationTree
-      ? this._captureSection(
-        'federation',
-        () => this._providers.federation!(this._federationOptions({
-          effectiveConfiguration: includeEffectiveConfiguration,
-          domain: includeDomain,
-          program: includeProgram,
-          runtime: includeRuntime,
-        })),
-        captureErrors,
-      ) as EndgeFederationDiagnosticsSnapshot | null
-      : null
-    const ownerSections = usesFederationTree
-      ? this._federationOwnerSections(federation, {
-          effectiveConfiguration: includeEffectiveConfiguration,
-          domain: includeDomain,
-          program: includeProgram,
-          runtime: includeRuntime,
-        }, captureErrors)
-      : this._legacyOwnerSections({
-          effectiveConfiguration: includeEffectiveConfiguration,
-          domain: includeDomain,
-          program: includeProgram,
-          runtime: includeRuntime,
-        }, captureErrors)
+    const federation = this._captureSection(
+      'federation',
+      () => Endge.createDiagnosticsSnapshot(this._federationOptions({
+        effectiveConfiguration: includeEffectiveConfiguration,
+        domain: includeDomain,
+        program: includeProgram,
+        runtime: includeRuntime,
+      })),
+      captureErrors,
+    ) as EndgeFederationDiagnosticsSnapshot | null
+    const ownerSections = this._federationOwnerSections(federation, {
+      effectiveConfiguration: includeEffectiveConfiguration,
+      domain: includeDomain,
+      program: includeProgram,
+      runtime: includeRuntime,
+    }, captureErrors)
 
     if (federation) {
       this._referenceDiagnosticsModule(federation)
     }
     const rawSnapshot: Record<string, unknown> = {
       format: 'endge-diagnostics-snapshot',
-      version: usesFederationTree ? 2 : 1,
+      version: 2,
       generatedAt: Date.now(),
       trigger: options.trigger ?? 'manual',
       ...(includeTelemetry ? { telemetry: this._telemetry.snapshot(options.filter) } : {}),
       ...(includeProblems ? { problems: this._problems.snapshot() } : {}),
       ...(includeConfiguration ? { configuration: this._telemetry.configuration } : {}),
       ...ownerSections,
-      ...(usesFederationTree ? { federation } : {}),
+      federation,
       ...(includeRaphData || includeRaphGraph
         ? {
             raph: this._captureSection(
               'raph',
-              this._providers.raph
-                ? () => this._providers.raph!({ includeData: includeRaphData, includeGraph: includeRaphGraph })
-                : undefined,
+              () => Endge.runtime.snapshotRaph({ includeData: includeRaphData, includeGraph: includeRaphGraph }),
               captureErrors,
             ),
           }
@@ -215,15 +202,11 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
   /** Читает одну часть snapshot из её state owner и локализует возможный сбой. */
   private _captureSection(
     section: DiagnosticsSnapshotCaptureError['section'],
-    provider: (() => unknown) | undefined,
+    capture: () => unknown,
     errors: DiagnosticsSnapshotCaptureError[],
   ): unknown {
-    if (!provider) {
-      errors.push({ section, message: 'Snapshot provider is not configured' })
-      return null
-    }
     try {
-      return provider()
+      return capture()
     }
     catch (error) {
       errors.push({ section, message: error instanceof Error ? error.message : String(error) })
@@ -252,30 +235,6 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
         : {}),
       ...(content.runtime
         ? { runtime: this._takeModuleSnapshot(federation, 'runtime', 'runtime', errors) }
-        : {}),
-    }
-  }
-
-  /** Поддерживает независимое использование Diagnostics без владеющей Federation. */
-  private _legacyOwnerSections(
-    content: Pick<
-      EndgeDiagnosticsSnapshotContentConfiguration,
-      'effectiveConfiguration' | 'domain' | 'program' | 'runtime'
-    >,
-    errors: DiagnosticsSnapshotCaptureError[],
-  ): Record<string, unknown> {
-    return {
-      ...(content.effectiveConfiguration
-        ? { effectiveConfiguration: this._captureSection('effectiveConfiguration', this._providers.effectiveConfiguration, errors) }
-        : {}),
-      ...(content.domain
-        ? { domain: this._captureSection('domain', this._providers.domain, errors) }
-        : {}),
-      ...(content.program
-        ? { program: this._captureSection('program', this._providers.program, errors) }
-        : {}),
-      ...(content.runtime
-        ? { runtime: this._captureSection('runtime', this._providers.runtime, errors) }
         : {}),
     }
   }

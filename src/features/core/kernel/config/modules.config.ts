@@ -91,10 +91,7 @@ export const ENDGE_CORE_MODULES = [
    */
   {
     key: 'diagnostics',
-    create: ({ createDiagnosticsSnapshot, getModule }) => new EndgeDiagnostics_Module({
-      federation: createDiagnosticsSnapshot,
-      raph: options => getModule<EndgeRuntime_Module>('runtime').snapshotRaph(options),
-    }),
+    create: () => new EndgeDiagnostics_Module(),
     after: 'configuration',
   },
 
@@ -220,20 +217,7 @@ export const ENDGE_CORE_MODULES = [
    */
   {
     key: 'bridge',
-    create: ({ getModule }) => new EndgeBridge_Module({
-      getSimulation: identity => getModule<EndgeDomain_Module>('domain').getSimulationByIdentity(identity),
-      snapshot: () => getModule<EndgeDiagnostics_Module>('diagnostics').snapshot({
-        includeTelemetry: true,
-        includeProblems: true,
-        includeConfiguration: true,
-        includeEffectiveConfiguration: true,
-        includeDomain: true,
-        includeProgram: true,
-        includeRuntime: true,
-        includeRaphData: true,
-        includeRaphGraph: true,
-      }),
-    }),
+    create: () => new EndgeBridge_Module(),
     after: ['diagnostics', 'runtime', 'domain'],
   },
 

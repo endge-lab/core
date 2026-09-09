@@ -1,5 +1,5 @@
 import type { EndgeBootContext } from '@/features/core/kernel/types/bootstrap.types'
-import type { BridgeConnectionState, BridgeDebugProviders, BridgeMessage, ConfiguratorConnection, EndgeBridgeBootOptions } from '@/features/core/modules/bridge/domain/bridge.type'
+import type { BridgeConnectionState, BridgeMessage, ConfiguratorConnection, EndgeBridgeBootOptions } from '@/features/core/modules/bridge/domain/bridge.type'
 import { BrowserBridge_Adapter } from '@/features/core/modules/bridge/adapters/BrowserBridge_Adapter'
 import { BRIDGE_CONFIG, normalizeBridgeServer } from '@/features/core/modules/bridge/config/bridge.config'
 import { EndgeBridgeConfigurator_Module } from '@/features/core/modules/bridge/configurator/EndgeBridgeConfigurator_Module'
@@ -27,12 +27,12 @@ export class EndgeBridge_Module extends EndgeModule<EndgeBootContext> {
    */
 
   /** Создаёт owner и его явные зависимости без запуска транспорта. */
-  public constructor(providers: BridgeDebugProviders, private readonly _adapter = new BrowserBridge_Adapter()) {
+  public constructor(private readonly _adapter = new BrowserBridge_Adapter()) {
     super()
     this.debug = new EndgeBridgeDebug_Module({
       request: (serverUrl, message) => this._connection(serverUrl).request(message),
       send: (serverUrl, message) => this._connection(serverUrl).send(message),
-    }, providers, _adapter)
+    }, _adapter)
   }
 
   /** Принимает optional host policy без network/DOM side effects. */

@@ -16,7 +16,6 @@ import type {
   DiagnosticsResource,
   DiagnosticsSnapshot,
   DiagnosticsSnapshotOptions,
-  DiagnosticsSnapshotProviders,
   DiagnosticsSpanHandle,
   DiagnosticsSpanOptions,
   DiagnosticsSpanRecord,
@@ -55,14 +54,14 @@ export class EndgeDiagnostics_Module extends EndgeModule<EndgeBootContext> {
    */
 
   /** Связывает независимые уведомления подмодулей с родительским diagnostics-модулем. */
-  public constructor(snapshotProviders: DiagnosticsSnapshotProviders = {}) {
+  public constructor() {
     super()
     this.adapters = new DiagnosticsAdapterRegistry()
     this.adapters.register(CONSOLE_DIAGNOSTICS_ADAPTER_FACTORY)
     this.adapters.register(SENTRY_DIAGNOSTICS_ADAPTER_FACTORY)
     this.telemetry = new EndgeTelemetry_Module(this.adapters)
     this.problems = new EndgeProblems_Module()
-    this.snapshots = new EndgeDiagnosticsSnapshots_Module(this.telemetry, this.problems, snapshotProviders)
+    this.snapshots = new EndgeDiagnosticsSnapshots_Module(this.telemetry, this.problems)
     this.telemetry.subscribe(() => this.notify())
     this.problems.subscribe(() => this.notify())
   }

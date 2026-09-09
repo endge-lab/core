@@ -1,5 +1,3 @@
-import type { DiagnosticsSnapshot } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
-
 /** Локальная политика host, не сохраняемая в Domain. URL включает backend base path. */
 export type EndgeBridgeBootOptions
   = | { role: 'client', allowedServers: readonly string[], debug?: boolean, label?: string }
@@ -63,11 +61,6 @@ export interface BridgeMessage {
   accepted?: boolean
   data?: unknown
   error?: string
-}
-
-export interface BridgeDebugProviders {
-  getSimulation: (identity: string) => { source: string, sourceVersion: number } | null
-  snapshot: () => DiagnosticsSnapshot
 }
 
 /** Внутренний порт подмодулей к единственному владельцу соединений. */

@@ -1,8 +1,4 @@
 import type { ComponentSFCInteractionTriggerActivation } from '@/features/core/modules/domain/types/component/sfc/ir.types'
-import type {
-  EndgeFederationDiagnosticsSnapshot,
-  EndgeFederationDiagnosticsSnapshotOptions,
-} from '@/features/federation/types/federation.types'
 
 /** Сигналы, которые поддерживает первая версия модуля диагностики. */
 export type DiagnosticsSignal = 'log' | 'span'
@@ -354,16 +350,6 @@ export interface DiagnosticsSnapshotOptions {
 export interface DiagnosticsRaphSnapshotOptions {
   includeData: boolean
   includeGraph: boolean
-}
-
-/** Lazy providers state owners, подключаемые composition root ядра. */
-export interface DiagnosticsSnapshotProviders {
-  federation?: (options: EndgeFederationDiagnosticsSnapshotOptions) => EndgeFederationDiagnosticsSnapshot
-  effectiveConfiguration?: () => unknown
-  domain?: () => unknown
-  program?: () => unknown
-  runtime?: () => unknown
-  raph?: (options: DiagnosticsRaphSnapshotOptions) => unknown
 }
 
 /** Ошибка чтения одной запрошенной части snapshot без отмены остальных частей. */

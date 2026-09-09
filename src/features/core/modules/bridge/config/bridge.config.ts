@@ -1,3 +1,5 @@
+import type { DiagnosticsSnapshotOptions } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
+
 /** Ограничения протокола и ресурсов bridge v1. */
 export const BRIDGE_CONFIG = {
   protocol: 1,
@@ -8,6 +10,19 @@ export const BRIDGE_CONFIG = {
   maxMessageBytes: 16 * 1024 * 1024,
   maxPendingRequests: 16,
 } as const
+
+/** Полный диагностический снимок для согласованной debug session. */
+export const BRIDGE_SNAPSHOT_OPTIONS = {
+  includeTelemetry: true,
+  includeProblems: true,
+  includeConfiguration: true,
+  includeEffectiveConfiguration: true,
+  includeDomain: true,
+  includeProgram: true,
+  includeRuntime: true,
+  includeRaphData: true,
+  includeRaphGraph: true,
+} as const satisfies DiagnosticsSnapshotOptions
 
 /** Нормализует точный backend URL без credentials, query и fragment. */
 export function normalizeBridgeServer(raw: string): string {

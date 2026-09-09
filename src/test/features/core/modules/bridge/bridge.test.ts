@@ -2,9 +2,11 @@ import type { EndgeBootContext } from '@/features/core/kernel/types/bootstrap.ty
 import type { BridgeMessage, EndgeBridgeBootOptions } from '@/features/core/modules/bridge/domain/bridge.type'
 import type { DiagnosticsSnapshot } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { Endge } from '@/features/core/kernel/endge'
 import { BrowserBridge_Adapter } from '@/features/core/modules/bridge/adapters/BrowserBridge_Adapter'
 import { parseBridgeAllowedServers } from '@/features/core/modules/bridge/config/bridge.config'
 import { EndgeBridge_Module } from '@/features/core/modules/bridge/EndgeBridge_Module'
+import { RSimulation } from '@/features/core/modules/domain/entities/RSimulation'
 
 class FakeSocket {
   public readyState = 1
@@ -43,14 +45,14 @@ const modules: EndgeBridge_Module[] = []
 
 function fixture(options?: EndgeBridgeBootOptions) {
   const adapter = new FakeAdapter()
-  const simulation = { source: 'simulation source', sourceVersion: 1 }
-  const snapshot = vi.fn(() => ({ generatedAt: 1, trigger: 'manual' } satisfies DiagnosticsSnapshot))
-  const providers = { getSimulation: vi.fn((identity: string) => identity === 'sim' ? simulation : null), snapshot }
-  const module = new EndgeBridge_Module(providers, adapter)
+  const simulation = Object.assign(new RSimulation(), { source: 'simulation source', sourceVersion: 1 })
+  const snapshot = vi.spyOn(Endge.diagnostics, 'snapshot').mockImplementation(() => ({ generatedAt: 1, trigger: 'manual' } satisfies DiagnosticsSnapshot))
+  vi.spyOn(Endge.domain, 'getSimulationByIdentity').mockImplementation(identity => identity === 'sim' ? simulation : null)
+  const module = new EndgeBridge_Module(adapter)
   modules.push(module)
   module.setup({ scope: { workspaceIdentity: 'workspace' }, bridge: options } as EndgeBootContext)
   module.start()
-  return { module, adapter, simulation, providers }
+  return { module, adapter, simulation, snapshot }
 }
 
 async function tick() {
@@ -129,7 +131,7 @@ describe('политика и lifecycle bridge', () => {
 
   it('проверяет source до mock и делегирует сбор snapshot диагностике', async () => {
     const log = vi.spyOn(console, 'info').mockImplementation(() => {})
-    const { module, adapter, providers } = fixture({ role: 'client', allowedServers: [server], debug: true })
+    const { module, adapter, snapshot } = fixture({ role: 'client', allowedServers: [server], debug: true })
     const socket = await approve(adapter)
     socket.receive({ type: 'runSimulation', id: 'missing', sessionId: 'session', identity: 'missing', expectedHash: 'x' })
     await tick()
@@ -144,7 +146,18 @@ describe('политика и lifecycle bridge', () => {
     expect(socket.sent.at(-1)?.data).toEqual({ status: 'mocked', identity: 'sim', hash })
     expect(log).toHaveBeenCalledOnce()
     socket.receive({ type: 'getSnapshot', id: 'snapshot', sessionId: 'session' })
-    expect(providers.snapshot).toHaveBeenCalledOnce()
+    expect(snapshot).toHaveBeenCalledOnce()
+    expect(snapshot).toHaveBeenCalledWith({
+      includeTelemetry: true,
+      includeProblems: true,
+      includeConfiguration: true,
+      includeEffectiveConfiguration: true,
+      includeDomain: true,
+      includeProgram: true,
+      includeRuntime: true,
+      includeRaphData: true,
+      includeRaphGraph: true,
+    })
     expect(socket.sent.at(-1)?.data).toEqual({ generatedAt: 1, trigger: 'manual' })
     module.disconnect(server)
     expect(module.debug.sessions).toEqual([])

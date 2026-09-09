@@ -1,7 +1,8 @@
 import type { BrowserBridge_Adapter } from '@/features/core/modules/bridge/adapters/BrowserBridge_Adapter'
-import type { BridgeCommands, BridgeDebugClient, BridgeDebugProviders, BridgeDebugSession, BridgeMessage, DebugConnectionRequest, SimulationRunResult } from '@/features/core/modules/bridge/domain/bridge.type'
+import type { BridgeCommands, BridgeDebugClient, BridgeDebugSession, BridgeMessage, DebugConnectionRequest, SimulationRunResult } from '@/features/core/modules/bridge/domain/bridge.type'
 import type { DiagnosticsSnapshot } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
-import { normalizeBridgeServer } from '@/features/core/modules/bridge/config/bridge.config'
+import { Endge } from '@/features/core/kernel/endge'
+import { BRIDGE_SNAPSHOT_OPTIONS, normalizeBridgeServer } from '@/features/core/modules/bridge/config/bridge.config'
 import { EndgeModule } from '@/features/federation/EndgeModule'
 
 /** Debug policy и единственная client reservation сразу для всех backend. */
@@ -22,7 +23,6 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
   /** Создаёт owner и его явные зависимости без запуска транспорта. */
   public constructor(
     private readonly _commands: BridgeCommands,
-    private readonly _providers: BridgeDebugProviders,
     private readonly _adapter: BrowserBridge_Adapter,
   ) {
     super()
@@ -77,7 +77,7 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
 
   /** Вычисляет hash локальной симуляции для передачи expectedHash. */
   public async getSimulationHash(identity: string): Promise<string> {
-    const simulation = this._providers.getSimulation(identity)
+    const simulation = Endge.domain.getSimulationByIdentity(identity)
     if (!simulation) {
       throw new Error(`[Endge Bridge] Simulation not found: ${identity}`)
     }
@@ -180,11 +180,11 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     try {
       let data: unknown
       if (message.type === 'getSnapshot') {
-        data = this._providers.snapshot()
+        data = Endge.diagnostics.snapshot(BRIDGE_SNAPSHOT_OPTIONS)
       }
       else {
         const identity = message.identity ?? ''
-        const simulation = this._providers.getSimulation(identity)
+        const simulation = Endge.domain.getSimulationByIdentity(identity)
         if (!simulation) {
           data = { status: 'rejected', reason: 'not-found' }
         }
@@ -194,7 +194,7 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
           if (this._sessions.get(session.sessionId) !== session) {
             return
           }
-          const current = this._providers.getSimulation(identity)
+          const current = Endge.domain.getSimulationByIdentity(identity)
           if (!current) {
             data = { status: 'rejected', reason: 'not-found' }
           }
