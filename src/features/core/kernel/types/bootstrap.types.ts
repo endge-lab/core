@@ -25,6 +25,10 @@ export interface EndgeLoadScope {
 }
 
 export interface EndgeUIBootOptions {
+  /** Локаль host при отсутствии сохранённого выбора, если она доступна в Workspace. */
+  defaultLocale?: string
+  /** Тема host при отсутствии сохранённого выбора, если она доступна в Workspace. */
+  defaultTheme?: string
   /** Локальный для host порядок fallback, когда настроенная реализация адаптера недоступна. */
   adapterFallbackIds?: readonly string[]
 }

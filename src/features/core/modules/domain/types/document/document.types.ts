@@ -18,6 +18,7 @@ import type { RParameter } from '@/features/core/modules/domain/entities/RParame
 import type { RPolicy } from '@/features/core/modules/domain/entities/RPolicy'
 import type { RProject } from '@/features/core/modules/domain/entities/RProject'
 import type { RQuery } from '@/features/core/modules/domain/entities/RQuery'
+import type { RSimulation } from '@/features/core/modules/domain/entities/RSimulation'
 import type { RStore } from '@/features/core/modules/domain/entities/RStore'
 import type { RStream } from '@/features/core/modules/domain/entities/RStream'
 import type { RStyle } from '@/features/core/modules/domain/entities/RStyle'
@@ -69,6 +70,7 @@ export enum DomainSectionType {
   Query = 'query',
   DataView = 'data-view',
   Composition = 'composition',
+  Simulation = 'simulation',
   Store = 'store',
   Mock = 'mock',
   Action = 'action',
@@ -104,6 +106,7 @@ export const DOMAIN_DOCUMENT_TYPES = [
   'composition',
   'store',
   'stream',
+  'simulation',
   'update',
   'mock',
   'integration',
@@ -150,4 +153,4 @@ export interface Document {
 /**
  * Описывает любой документ рефлекцию
  */
-export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RComposition | RStore | RStream | RUpdate | RMock | RAction | RConverter | RComputation | RIntegration | RParameter | RFilter | RPolicy | RStyle | RConfiguration | RType | RVocabs | RI18nBundle | RAuthProfile | RWorkspace | RTenant | RProject | REnvironment | RPageTemplate | RPage | RNavigation
+export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RComposition | RStore | RStream | RSimulation | RUpdate | RMock | RAction | RConverter | RComputation | RIntegration | RParameter | RFilter | RPolicy | RStyle | RConfiguration | RType | RVocabs | RI18nBundle | RAuthProfile | RWorkspace | RTenant | RProject | REnvironment | RPageTemplate | RPage | RNavigation

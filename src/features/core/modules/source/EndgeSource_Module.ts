@@ -1,3 +1,4 @@
+import type { SimulationSourceCatalog, SimulationSourceInput } from '@/features/core/modules/source/domain/types/simulation-source.types'
 import type {
   SourceDocumentReference,
   SourceEngineCompileResult,
@@ -16,8 +17,10 @@ import type {
   SourcePatchStrategy,
 } from '@/features/core/modules/source/domain/types/source-engine.types'
 
+import { Endge } from '@/features/core/kernel/endge'
 import { SourceEngineRegistry } from '@/features/core/modules/source/services/SourceEngineRegistry'
 import { SourceLanguageRegistry } from '@/features/core/modules/source/services/SourceLanguageRegistry'
+
 import { SourcePatchRegistry } from '@/features/core/modules/source/services/SourcePatchRegistry'
 import { ActionSourceEngineStrategy } from '@/features/core/modules/source/services/strategies/ActionSourceEngineStrategy'
 import { ActionSourceLanguageStrategy } from '@/features/core/modules/source/services/strategies/ActionSourceLanguageStrategy'
@@ -36,6 +39,8 @@ import { FilterSourcePatchStrategy } from '@/features/core/modules/source/servic
 import { QuerySourceEngineStrategy } from '@/features/core/modules/source/services/strategies/QuerySourceEngineStrategy'
 import { QuerySourceLanguageStrategy } from '@/features/core/modules/source/services/strategies/QuerySourceLanguageStrategy'
 import { QuerySourcePatchStrategy } from '@/features/core/modules/source/services/strategies/QuerySourcePatchStrategy'
+import { SimulationSourceEngineStrategy } from '@/features/core/modules/source/services/strategies/SimulationSourceEngineStrategy'
+import { SimulationSourceLanguageStrategy } from '@/features/core/modules/source/services/strategies/SimulationSourceLanguageStrategy'
 import { StoreSourceEngineStrategy } from '@/features/core/modules/source/services/strategies/StoreSourceEngineStrategy'
 import { StoreSourceLanguageStrategy } from '@/features/core/modules/source/services/strategies/StoreSourceLanguageStrategy'
 import { StreamSourceEngineStrategy } from '@/features/core/modules/source/services/strategies/StreamSourceEngineStrategy'
@@ -194,6 +199,14 @@ export class EndgeSource_Module extends EndgeModule {
     return this._resolveRequiredLanguageStrategy(sourceKind).inlineHints?.(context) ?? []
   }
 
+  /** Source owner передаёт strategies только актуальные read-only authoring inputs. */
+  private _simulationCatalog(): SimulationSourceCatalog {
+    const inputs = (entities: Array<SimulationSourceInput & { deletedAt?: unknown }>): SimulationSourceInput[] => entities
+      .filter(entity => !entity.deletedAt)
+      .map(entity => ({ id: entity.id, identity: entity.identity, displayName: entity.displayName, source: entity.source, sourceVersion: entity.sourceVersion, isPrimitive: entity.isPrimitive }))
+    return { compositions: inputs(Endge.domain.getCompositions()), queries: inputs(Endge.domain.getQueries()), types: inputs(Endge.domain.getTypes()) }
+  }
+
   /** Регистрирует встроенные strategies ядра. */
   private _registerDefaultStrategies(): void {
     this._strategies.register(new ActionSourceEngineStrategy())
@@ -204,6 +217,7 @@ export class EndgeSource_Module extends EndgeModule {
     this._strategies.register(new CompositionSourceEngineStrategy())
     this._strategies.register(new StoreSourceEngineStrategy())
     this._strategies.register(new StreamSourceEngineStrategy())
+    this._strategies.register(new SimulationSourceEngineStrategy(() => this._simulationCatalog()))
     this._strategies.register(new UpdateSourceEngineStrategy())
     this._strategies.register(new ComputationSourceEngineStrategy())
     this._strategies.register(new StyleSourceEngineStrategy())
@@ -217,6 +231,7 @@ export class EndgeSource_Module extends EndgeModule {
     this._languageStrategies.register(new CompositionSourceLanguageStrategy())
     this._languageStrategies.register(new StoreSourceLanguageStrategy())
     this._languageStrategies.register(new StreamSourceLanguageStrategy())
+    this._languageStrategies.register(new SimulationSourceLanguageStrategy(() => this._simulationCatalog()))
     this._languageStrategies.register(new UpdateSourceLanguageStrategy())
     this._languageStrategies.register(new ComputationSourceLanguageStrategy())
     this._languageStrategies.register(new StyleSourceLanguageStrategy())

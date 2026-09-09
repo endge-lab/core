@@ -3,7 +3,7 @@ import type { EndgeLiveDomainDocument, EndgeLiveDomainSnapshot, EndgeWorkspaceSe
 /** Канонические коллекции persisted-домена нового backend. */
 export type EndgeDomainCollection
   = | 'projects' | 'tenants' | 'environments' | 'folders' | 'types' | 'queries'
-    | 'data-views' | 'compositions' | 'stores' | 'streams' | 'updates' | 'mocks'
+    | 'data-views' | 'compositions' | 'stores' | 'streams' | 'simulations' | 'updates' | 'mocks'
     | 'components' | 'actions' | 'filters' | 'converters' | 'computations' | 'vocabs'
     | 'i18n-bundles' | 'auth-profiles' | 'navigations' | 'styles' | 'configurations'
 

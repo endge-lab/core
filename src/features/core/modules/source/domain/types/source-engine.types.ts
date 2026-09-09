@@ -2,7 +2,7 @@ import type { I18nCatalogProvenance, I18nRuntimeCatalog } from '@/features/core/
 import type { TypeSourceDefinition } from '@/features/core/modules/source/domain/types/type-source.types'
 
 /** Канонический тип source-документа, для которого выбирается source strategy. */
-export type SourceKind = 'action' | 'query' | 'vocab' | 'data-view' | 'filter' | 'composition' | 'store' | 'stream' | 'update' | 'computation' | 'style' | 'type' | 'configuration'
+export type SourceKind = 'action' | 'query' | 'vocab' | 'data-view' | 'filter' | 'composition' | 'store' | 'stream' | 'simulation' | 'update' | 'computation' | 'style' | 'type' | 'configuration'
 
 /** Тип нейтральной source completion без привязки к Monaco или другому editor API. */
 export type SourceLanguageCompletionKind

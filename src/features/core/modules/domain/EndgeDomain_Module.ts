@@ -22,6 +22,7 @@ import type { RParameter } from '@/features/core/modules/domain/entities/RParame
 import type { RPolicy } from '@/features/core/modules/domain/entities/RPolicy'
 import type { RProject } from '@/features/core/modules/domain/entities/RProject'
 import type { RQuery } from '@/features/core/modules/domain/entities/RQuery'
+import type { RSimulation } from '@/features/core/modules/domain/entities/RSimulation'
 import type { RStore } from '@/features/core/modules/domain/entities/RStore'
 import type { RStream } from '@/features/core/modules/domain/entities/RStream'
 import type { RStyle } from '@/features/core/modules/domain/entities/RStyle'
@@ -264,6 +265,7 @@ export interface EndgeDomainParsed {
   compositions: RComposition[]
   stores: RStore[]
   streams: RStream[]
+  simulations: RSimulation[]
   updates: RUpdate[]
   mocks: RMock[]
   computations: RComputation[]
@@ -358,7 +360,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   private _storesByIdentity: Map<string, RStore> = new Map()
 
   private _streamsById: Map<string | number, RStream> = new Map()
+  private _simulationsById: Map<string | number, RSimulation> = new Map()
   private _streamsByIdentity: Map<string, RStream> = new Map()
+  private _simulationsByIdentity: Map<string, RSimulation> = new Map()
 
   private _updatesById: Map<string | number, RUpdate> = new Map()
   private _updatesByIdentity: Map<string, RUpdate> = new Map()
@@ -516,7 +520,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
     this._storesById.clear()
     this._storesByIdentity.clear()
     this._streamsById.clear()
+    this._simulationsById.clear()
     this._streamsByIdentity.clear()
+    this._simulationsByIdentity.clear()
     this._updatesById.clear()
     this._updatesByIdentity.clear()
     this._updatesByStoreIdentity.clear()
@@ -612,6 +618,7 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
       domainEntityIndex(this._compositionsById, this._compositionsByIdentity),
       domainEntityIndex(this._storesById, this._storesByIdentity),
       domainEntityIndex(this._streamsById, this._streamsByIdentity),
+      domainEntityIndex(this._simulationsById, this._simulationsByIdentity),
       domainEntityIndex(this._updatesById, this._updatesByIdentity, 'update'),
       domainEntityIndex(this._mocksById, this._mocksByIdentity),
       domainEntityIndex(this._computationsById, this._computationsByIdentity),
@@ -675,6 +682,7 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
       compositions: normalizeSnapshotDocuments(documents.compositions, folderIds),
       stores: normalizeSnapshotDocuments(documents.stores, folderIds),
       streams: normalizeSnapshotDocuments(documents.streams, folderIds),
+      simulations: normalizeSnapshotDocuments(documents.simulations, folderIds),
       updates: normalizeSnapshotDocuments(documents.updates, folderIds),
       mocks: normalizeSnapshotDocuments(documents.mocks, folderIds),
       components: [],
@@ -717,6 +725,7 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
       compositions: bundleDocuments(documents.compositions, 'compositions'),
       stores: bundleDocuments(documents.stores, 'stores'),
       streams: bundleDocuments(documents.streams, 'streams'),
+      simulations: bundleDocuments(documents.simulations, 'simulations'),
       updates: bundleDocuments(documents.updates, 'updates'),
       mocks: bundleDocuments(documents.mocks, 'mocks'),
       componentSFCs: bundleDocuments(documents.components, 'components'),
@@ -747,6 +756,7 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
       compositions: normalizeBundleDocuments(normalized.compositions, folderIds),
       stores: normalizeBundleDocuments(normalized.stores, folderIds),
       streams: normalizeBundleDocuments(normalized.streams, folderIds),
+      simulations: normalizeBundleDocuments(normalized.simulations, folderIds),
       updates: normalizeBundleDocuments(normalized.updates, folderIds),
       mocks: normalizeBundleDocuments(normalized.mocks, folderIds),
       components: [],
@@ -1333,6 +1343,58 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
     const stream = this.getStream(idOrIdentity)
     if (stream) {
       this.removeStreamById(stream.id)
+    }
+  }
+
+  /** Возвращает все Simulation-документы. */
+  public getSimulations(): RSimulation[] {
+    return Array.from(this._simulationsByIdentity.values())
+  }
+
+  public getSimulationById(id: string | number): RSimulation | null {
+    return this._simulationsById.get(id) ?? null
+  }
+
+  public getSimulationByIdentity(identity: string): RSimulation | null {
+    return this._simulationsByIdentity.get(identity) ?? null
+  }
+
+  public getSimulation(idOrIdentity: string | number): RSimulation | null {
+    return this.getSimulationById(idOrIdentity)
+      ?? this.getSimulationById(Number(idOrIdentity))
+      ?? this.getSimulationByIdentity(String(idOrIdentity))
+  }
+
+  public addSimulation(simulation: RSimulation): void {
+    if (this._simulationsByIdentity.has(simulation.identity) || this._simulationsById.has(simulation.id)) {
+      return
+    }
+    this._simulationsById.set(simulation.id, simulation)
+    this._simulationsByIdentity.set(simulation.identity, simulation)
+    this.notify()
+  }
+
+  public removeSimulationById(id: string | number): void {
+    const simulation = this.getSimulationById(id)
+    if (!simulation) {
+      return
+    }
+    this._simulationsById.delete(simulation.id)
+    this._simulationsByIdentity.delete(simulation.identity)
+    this.notify()
+  }
+
+  public removeSimulationByIdentity(identity: string): void {
+    const simulation = this.getSimulationByIdentity(identity)
+    if (simulation) {
+      this.removeSimulationById(simulation.id)
+    }
+  }
+
+  public removeSimulation(idOrIdentity: string | number): void {
+    const simulation = this.getSimulation(idOrIdentity)
+    if (simulation) {
+      this.removeSimulationById(simulation.id)
     }
   }
 
@@ -3402,6 +3464,7 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
       compositions: persisted(this.getCompositions()).map(x => Serialize.toPlain(x)),
       stores: persisted(this.getStores()).map(x => Serialize.toPlain(x)),
       streams: persisted(this.getStreams()).map(x => Serialize.toPlain(x)),
+      simulations: persisted(this.getSimulations()).map(x => Serialize.toPlain(x)),
       updates: persisted(this.getUpdates()).map(x => Serialize.toPlain(x)),
       mocks: persisted(this.getMocks()).map(x => x.toPlain()),
       computations: persisted(this.getComputations()).map(x => x.toPlain()),
@@ -3493,6 +3556,7 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
       compositions: [],
       stores: [],
       streams: [],
+      simulations: [],
       updates: [],
       mocks: [],
       computations: [],
@@ -3535,6 +3599,7 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
     out.compositions.push(...materializeDomainDocumentsOfType(json.compositions, 'composition'))
     out.stores.push(...materializeDomainDocumentsOfType(json.stores, 'store'))
     out.streams.push(...materializeDomainDocumentsOfType(json.streams, 'stream'))
+    out.simulations.push(...materializeDomainDocumentsOfType(json.simulations, 'simulation'))
     out.updates.push(...materializeDomainDocumentsOfType(json.updates, 'update'))
     out.mocks.push(...materializeDomainDocumentsOfType(json.mocks, 'mock'))
     out.computations.push(...materializeDomainDocumentsOfType(json.computations, 'computation'))
@@ -3584,6 +3649,7 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
     parsed.compositions.forEach(composition => this.addComposition(composition))
     parsed.stores.forEach(store => this.addStore(store))
     parsed.streams.forEach(stream => this.addStream(stream))
+    parsed.simulations.forEach(simulation => this.addSimulation(simulation))
     parsed.updates.forEach(update => this.addUpdate(update))
     parsed.mocks.forEach(mock => this.addMock(mock))
     parsed.computations.forEach(computation => this.addComputation(computation))

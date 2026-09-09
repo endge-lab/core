@@ -72,8 +72,10 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
   private _currentUser: string = DEFAULT_SCOPE.userId
   private _currentLocale = DEFAULT_LOCALE
   private _pendingLocale: string | null = null
+  private _hasLocalePreference = false
   private _currentTheme = DEFAULT_THEME
   private _themePreference: string | null = null
+  private _hostDefaultTheme: string | null = null
   private _currentTimezone = DEFAULT_TIMEZONE
   private _pendingTimezone: string | null = null
   private _workspaceDataMode: EndgeDataMode = 'live'
@@ -93,6 +95,12 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
   /** Применяет explicit structural context до load/build остальных модулей. */
   public override setup(ctx: EndgeBootContext): void {
     this._executionContextLocked = false
+    const defaultLocale = normalizeOptionalText(ctx.ui?.defaultLocale)
+    if (!this._hasLocalePreference && defaultLocale) {
+      this._currentLocale = defaultLocale
+      this._pendingLocale = defaultLocale
+    }
+    this._hostDefaultTheme = normalizeOptionalText(ctx.ui?.defaultTheme)
     const input = ctx.context
     if (input) {
       if (input.tenantIdentity != null) {
@@ -221,6 +229,7 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     this._currentEnvironment = normalizeScopePart(payload?.environment, DEFAULT_SCOPE.environmentId)
     this._currentUser = normalizeScopePart(payload?.user, DEFAULT_SCOPE.userId)
     const rawLocale = normalizeOptionalText(payload?.locale)
+    this._hasLocalePreference = rawLocale != null
     const rawTheme = normalizeOptionalText(payload?.theme) ?? readLegacyThemePreference()
     const rawTimezone = normalizeOptionalText(payload?.timezone) ?? readLegacyTimezonePreference()
     this._dataModeOverride = null
@@ -586,6 +595,7 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
 
   /** Нормализует, сохраняет и публикует новую locale. */
   public setCurrentLocale(locale: string | null): void {
+    this._hasLocalePreference = true
     const configuration = this._activeConfiguration()
     const raw = normalizeOptionalText(locale) ?? DEFAULT_LOCALE
     const next = this._normalizeLocale(raw, configuration)
@@ -655,7 +665,7 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
       ? null
       : this._normalizeTheme(preference, activeConfiguration)
     const next = normalizedPreference == null || normalizedPreference !== preference
-      ? activeConfiguration.defaultTheme
+      ? this._normalizeTheme(this._hostDefaultTheme ?? activeConfiguration.defaultTheme, activeConfiguration)
       : normalizedPreference
     const preferenceChanged = preference != null && normalizedPreference !== preference
     const themeChanged = next !== this._currentTheme

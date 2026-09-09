@@ -33,6 +33,7 @@ import { RParameter } from '@/features/core/modules/domain/entities/RParameter'
 import { RPolicy } from '@/features/core/modules/domain/entities/RPolicy'
 import { RProject } from '@/features/core/modules/domain/entities/RProject'
 import { RQuery } from '@/features/core/modules/domain/entities/RQuery'
+import { RSimulation } from '@/features/core/modules/domain/entities/RSimulation'
 import { RStore } from '@/features/core/modules/domain/entities/RStore'
 import { RStream } from '@/features/core/modules/domain/entities/RStream'
 import { RStyle } from '@/features/core/modules/domain/entities/RStyle'
@@ -49,6 +50,7 @@ import { COMPUTATION_DEFAULT_SOURCE } from '@/features/core/modules/source/templ
 import { DATA_VIEW_DEFAULT_SOURCE } from '@/features/core/modules/source/templates/data-view.default.source'
 import { FILTER_DEFAULT_SOURCE } from '@/features/core/modules/source/templates/filter.default.source'
 import { QUERY_DEFAULT_SOURCE, QUERY_GRAPHQL_DEFAULT_SOURCE } from '@/features/core/modules/source/templates/query.default.source'
+import { SIMULATION_DEFAULT_SOURCE } from '@/features/core/modules/source/templates/simulation.default.source'
 import { STORE_DEFAULT_SOURCE } from '@/features/core/modules/source/templates/store.default.source'
 import { STREAM_DEFAULT_SOURCE } from '@/features/core/modules/source/templates/stream.default.source'
 import { TYPE_DEFAULT_SOURCE } from '@/features/core/modules/source/templates/type.default.source'
@@ -56,7 +58,7 @@ import { UPDATE_DEFAULT_SOURCE } from '@/features/core/modules/source/templates/
 
 export type DomainCollectionKey
   = | 'projects' | 'types' | 'queries' | 'dataViews' | 'compositions' | 'stores'
-    | 'streams' | 'updates' | 'mocks' | 'componentSFCs' | 'actions' | 'filters'
+    | 'streams' | 'simulations' | 'updates' | 'mocks' | 'componentSFCs' | 'actions' | 'filters'
     | 'converters' | 'computations' | 'environments' | 'tenants' | 'styles' | 'configurations'
     | 'vocabs' | 'authProfiles' | 'i18nBundles' | 'navigations'
 
@@ -71,6 +73,7 @@ export interface DomainDocumentModelMap {
   'composition': RComposition
   'store': RStore
   'stream': RStream
+  'simulation': RSimulation
   'update': RUpdate
   'mock': RMock
   'integration': RIntegration
@@ -131,6 +134,7 @@ const MATERIALIZERS: MaterializerMap = {
   'composition': source => RComposition.fromPlain(source),
   'store': source => Serialize.fromJSON(RStore, source),
   'stream': source => Serialize.fromJSON(RStream, source),
+  'simulation': source => Serialize.fromJSON(RSimulation, source),
   'update': source => Serialize.fromJSON(RUpdate, source),
   'mock': source => RMock.fromPlain(source),
   'integration': source => Serialize.fromJSON(RIntegration, source),
@@ -167,6 +171,7 @@ const SECTION_BY_TYPE: Record<DomainDocumentType, DomainSectionType> = {
   'composition': DomainSectionType.Composition,
   'store': DomainSectionType.Store,
   'stream': DomainSectionType.Integration,
+  'simulation': DomainSectionType.Simulation,
   'update': DomainSectionType.Store,
   'mock': DomainSectionType.Mock,
   'integration': DomainSectionType.Integration,
@@ -203,6 +208,7 @@ const DOMAIN_COLLECTION_BY_TYPE: Partial<Record<DomainDocumentType, DomainCollec
   'composition': 'compositions',
   'store': 'stores',
   'stream': 'streams',
+  'simulation': 'simulations',
   'update': 'updates',
   'mock': 'mocks',
   'navigation': 'navigations',
@@ -231,6 +237,7 @@ const PERSISTENCE_COLLECTION_BY_TYPE: Partial<Record<DomainDocumentType, EndgeDo
   'composition': 'compositions',
   'store': 'stores',
   'stream': 'streams',
+  'simulation': 'simulations',
   'update': 'updates',
   'mock': 'mocks',
   'navigation': 'navigations',
@@ -258,6 +265,7 @@ const CAPABILITIES_BY_TYPE: Partial<Record<DomainDocumentType, Partial<DomainDoc
   'composition': { source: 'composition', program: 'composition', runtime: 'composition' },
   'store': { source: 'store', program: 'store', runtime: 'store' },
   'stream': { source: 'stream', program: 'stream', runtime: 'stream' },
+  'simulation': { source: 'simulation', program: 'simulation' },
   'update': { source: 'update', program: 'update' },
   'style': { source: 'style', program: 'style' },
   'configuration': { source: 'configuration', program: 'configuration' },
@@ -291,6 +299,7 @@ const CREATE_NEW_BY_TYPE: Partial<{ [TType in DomainDocumentType]: (options: Doc
   }),
   'store': options => initialize(new RStore(), options, { source: STORE_DEFAULT_SOURCE, sourceVersion: 1 }),
   'stream': options => initialize(new RStream(), options, { source: STREAM_DEFAULT_SOURCE, sourceVersion: 1 }),
+  'simulation': options => initialize(new RSimulation(), options, { source: SIMULATION_DEFAULT_SOURCE, sourceVersion: 1 }),
   'update': options => initialize(new RUpdate(), options, { source: UPDATE_DEFAULT_SOURCE, sourceVersion: 1, omitFolder: true }),
   'mock': options => initialize(new RMock(), options, { contentSource: 'document', contentType: 'application/json', source: '{}' }),
   'computation': options => initialize(new RComputation(), options, { source: COMPUTATION_DEFAULT_SOURCE, sourceVersion: 1, contractVersion: 1 }),

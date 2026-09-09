@@ -32,6 +32,7 @@ export type ProgramEntityType
     | 'data-view'
     | 'store'
     | 'stream'
+    | 'simulation'
     | 'update'
     | 'filter'
     | 'composition'

@@ -15,6 +15,7 @@ import type {
 } from '@/features/core/modules/program/domain/types/program.types'
 import type { CompositionProgramPayload } from '@/features/core/modules/source/domain/types/composition-source.types'
 import type { FilterProgramPayload } from '@/features/core/modules/source/domain/types/filter-source.types'
+import type { SimulationSourceArtifact } from '@/features/core/modules/source/domain/types/simulation-source.types'
 import type { StoreSourceArtifact } from '@/features/core/modules/source/domain/types/store-source.types'
 import type { StreamSourceArtifact } from '@/features/core/modules/source/domain/types/stream-source.types'
 import type { TypeProgramCatalogEntry, TypeProgramPayload } from '@/features/core/modules/source/domain/types/type-source.types'
@@ -213,6 +214,11 @@ export class EndgeProgram_Module extends EndgeModule {
   /** Возвращает compiled Stream artifact по id или identity. */
   public getStreamArtifact(idOrIdentity: string | number): ProgramArtifact<StreamSourceArtifact> | null {
     return this.getArtifact<StreamSourceArtifact>('stream', idOrIdentity)
+  }
+
+  /** Возвращает compiled Simulation artifact по id или identity. */
+  public getSimulationArtifact(idOrIdentity: string | number): ProgramArtifact<SimulationSourceArtifact> | null {
+    return this.getArtifact<SimulationSourceArtifact>('simulation', idOrIdentity)
   }
 
   /** Возвращает compiled Update artifact по id или identity. */

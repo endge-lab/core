@@ -3,6 +3,7 @@ import type { ComponentSFCCompileResult } from '@/features/core/modules/compiler
 import type { EndgeSFCEditingConfiguration } from '@/features/core/modules/configuration/domain/types/configuration.type'
 import type { DiagnosticsSpanHandle } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
 import type { RConfiguration } from '@/features/core/modules/domain/entities/RConfiguration'
+import type { RSimulation } from '@/features/core/modules/domain/entities/RSimulation'
 import type { RStore } from '@/features/core/modules/domain/entities/RStore'
 import type { RStream } from '@/features/core/modules/domain/entities/RStream'
 import type { RStyle } from '@/features/core/modules/domain/entities/RStyle'
@@ -35,6 +36,7 @@ import type { CompositionBindingValue, CompositionProgramPayload } from '@/featu
 import type { DataViewMaterializationStrategy, DataViewPipelineStep, DataViewRef } from '@/features/core/modules/source/domain/types/data-view-source.types'
 import type { FilterProgramPayload } from '@/features/core/modules/source/domain/types/filter-source.types'
 import type { ResponseOutputTransform } from '@/features/core/modules/source/domain/types/response-output.types'
+import type { SimulationSourceArtifact } from '@/features/core/modules/source/domain/types/simulation-source.types'
 import type { SourceExpressionIR, SourceFieldDefinition } from '@/features/core/modules/source/domain/types/source-expression.types'
 import type { StoreSourceArtifact } from '@/features/core/modules/source/domain/types/store-source.types'
 import type { StreamSourceArtifact } from '@/features/core/modules/source/domain/types/stream-source.types'
@@ -219,6 +221,10 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
         return
       }
 
+      if (!this._compilePhase('simulation', ENDGE_COMPILER_SPAN_GROUPS.COMPONENTS, 'simulations', Endge.domain.getSimulations(), context)) {
+        return
+      }
+
       const diagnostics = Endge.program.getDiagnostics()
       const errorCount = diagnostics.filter(diagnostic => diagnostic.severity === 'error').length
       const warningCount = diagnostics.filter(diagnostic => diagnostic.severity === 'warning').length
@@ -294,6 +300,11 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
   /** Компилирует один Stream source в Endge.program. */
   public buildStream(entity: RStream): ProgramArtifact<StreamSourceArtifact> {
     return this._compileEntity('stream', entity, this._createCompileContext()) as ProgramArtifact<StreamSourceArtifact>
+  }
+
+  /** Компилирует один Simulation source в Endge.program. */
+  public buildSimulation(entity: RSimulation): ProgramArtifact<SimulationSourceArtifact> {
+    return this._compileEntity('simulation', entity, this._createCompileContext()) as ProgramArtifact<SimulationSourceArtifact>
   }
 
   /** Компилирует один дочерний Update source в Endge.program. */
@@ -1090,6 +1101,25 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
 
     //
     //
+    // Simulation публикует только декларативный artifact и зависимости authoring.
+    this._registerHandler<RSimulation, SimulationSourceArtifact>({
+      entityType: 'simulation',
+      compile: (entity, context) => {
+        const result = Endge.source.compile('simulation', entity.source)
+        const diagnostics = (result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]
+        if (entity.sourceVersion !== 1) {
+          diagnostics.push({ severity: 'error', code: 'simulation-source-version', message: 'Simulation поддерживает sourceVersion 1.' })
+        }
+        return this._makeArtifact(entity, 'simulation', context, {
+          capabilities: ['compilable'],
+          metadata: createEmptyProgramMetadata(),
+          payload: (result.artifact as SimulationSourceArtifact | undefined) ?? { type: 'simulation', sourceVersion: 1, target: '', runtimes: [] },
+          dependencies: result.dependencies ?? [],
+          diagnostics,
+        })
+      },
+    })
+
     // Собирает Stream transport и event contract для runtime execution.
     this._registerHandler<RStream, StreamSourceArtifact>({
       //
@@ -1374,6 +1404,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
       case 'filter': return domain.getFilter(id)
       case 'store': return domain.getStore(id)
       case 'stream': return domain.getStream(id)
+      case 'simulation': return domain.getSimulation(id)
       case 'update': return domain.getUpdate(id)
       case 'composition': return domain.getComposition(id)
       case 'component-sfc': return domain.getComponentSFC(id)

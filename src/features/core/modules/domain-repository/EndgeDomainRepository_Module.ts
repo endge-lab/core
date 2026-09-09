@@ -657,6 +657,9 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     if (documentType === 'stream') {
       return domain.getStream(documentIdOrIdentity)
     }
+    if (documentType === 'simulation') {
+      return domain.getSimulation(documentIdOrIdentity)
+    }
     if (documentType === 'update') {
       return domain.getUpdate(documentIdOrIdentity)
     }
@@ -764,6 +767,9 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     }
     if (documentType === 'stream') {
       return remove(x => domain.removeStreamById(x), x => domain.removeStream(x))
+    }
+    if (documentType === 'simulation') {
+      return remove(x => domain.removeSimulationById(x), x => domain.removeSimulation(x))
     }
     if (documentType === 'update') {
       return remove(x => domain.removeUpdateById(x), x => domain.removeUpdate(x))
