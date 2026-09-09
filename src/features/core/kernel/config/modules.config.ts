@@ -1,6 +1,7 @@
 import type { EndgeModuleDefinition } from '@/features/federation/types/endge-modules.types'
 import { EndgeActions_Module } from '@/features/core/modules/actions/EndgeActions_Module'
 import { EndgeAuth_Module } from '@/features/core/modules/auth/EndgeAuth_Module'
+import { EndgeBridge_Module } from '@/features/core/modules/bridge/EndgeBridge_Module'
 import { EndgeCompiler_Module } from '@/features/core/modules/compiler/EndgeCompiler_Module'
 import { EndgeComputations_Module } from '@/features/core/modules/computations/EndgeComputations_Module'
 import { EndgeConfiguration_Module } from '@/features/core/modules/configuration/EndgeConfiguration_Module'
@@ -11,7 +12,6 @@ import { EndgeDiagnostics_Module } from '@/features/core/modules/diagnostics/End
 import { EndgeDocumentImport_Module } from '@/features/core/modules/document-import/EndgeDocumentImport_Module'
 import { EndgeDomainRepository_Module } from '@/features/core/modules/domain-repository/EndgeDomainRepository_Module'
 import { EndgeDomain_Module } from '@/features/core/modules/domain/EndgeDomain_Module'
-import { EndgeRuntimeDebugger_Module } from '@/features/core/modules/EndgeRuntimeDebugger_Module'
 import { EndgeTypes_Module } from '@/features/core/modules/EndgeTypes_Module'
 import { EndgeVocabs_Module } from '@/features/core/modules/EndgeVocabs_Module'
 import { EndgeEvents_Module } from '@/features/core/modules/events/EndgeEvents_Module'
@@ -77,6 +77,23 @@ export const ENDGE_CORE_MODULES = [
   { key: 'updates', create: () => new EndgeUpdates_Module(), after: 'runtime' },
   { key: 'ui', create: () => new EndgeUI_Module(), after: ['configuration', 'context'] },
   { key: 'uiRegistry', create: () => new EndgeUIRegistry_Module(), after: 'ui' },
-  { key: 'runtimeDebugger', create: () => new EndgeRuntimeDebugger_Module(), after: ['diagnostics', 'runtime'] },
+  {
+    key: 'bridge',
+    create: ({ getModule }) => new EndgeBridge_Module({
+      getSimulation: identity => getModule<EndgeDomain_Module>('domain').getSimulationByIdentity(identity),
+      snapshot: () => getModule<EndgeDiagnostics_Module>('diagnostics').snapshot({
+        includeTelemetry: true,
+        includeProblems: true,
+        includeConfiguration: true,
+        includeEffectiveConfiguration: true,
+        includeDomain: true,
+        includeProgram: true,
+        includeRuntime: true,
+        includeRaphData: true,
+        includeRaphGraph: true,
+      }),
+    }),
+    after: ['diagnostics', 'runtime', 'domain'],
+  },
   { key: 'styles', create: () => new EndgeStyles_Module(), after: ['ui', 'domain', 'program', 'compiler'] },
 ] as const satisfies readonly EndgeModuleDefinition[]

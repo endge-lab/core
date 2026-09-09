@@ -1,4 +1,5 @@
 import type { EndgeAuthBootOptions } from '@/features/core/modules/auth/domain/types/auth-profile.types'
+import type { EndgeBridgeBootOptions } from '@/features/core/modules/bridge/domain/bridge.type'
 import type { EndgeDomainBundle } from '@/features/core/modules/domain/types/document/domain-export.type'
 import type { EndgeDomainProvider } from '@/features/core/modules/domain/types/document/domain-provider.type'
 import type { EndgeExecutionContext } from '@/features/core/modules/runtime/domain/execution-context.types'
@@ -57,6 +58,9 @@ export interface EndgeBootContext extends EndgeFederationContext {
 
   /** Пространство имён браузерной сессии, принадлежащее host. */
   auth?: EndgeAuthBootOptions
+
+  /** Optional host-owned bridge policy; отсутствие отключает соединения. */
+  bridge?: EndgeBridgeBootOptions
 
   /**
    * Для plain provider.

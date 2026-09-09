@@ -1,0 +1,250 @@
+import type { BrowserBridge_Adapter } from '@/features/core/modules/bridge/adapters/BrowserBridge_Adapter'
+import type { BridgeCommands, BridgeDebugClient, BridgeDebugProviders, BridgeDebugSession, BridgeMessage, DebugConnectionRequest, SimulationRunResult } from '@/features/core/modules/bridge/domain/bridge.type'
+import type { DiagnosticsSnapshot } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
+import { normalizeBridgeServer } from '@/features/core/modules/bridge/config/bridge.config'
+import { EndgeModule } from '@/features/federation/EndgeModule'
+
+/** Debug policy и единственная client reservation сразу для всех backend. */
+export class EndgeBridgeDebug_Module extends EndgeModule {
+  private _role: 'client' | 'configurator' = 'client'
+  private _enabled = false
+  private _reservation: { serverUrl: string, sessionId: string } | null = null
+  private readonly _requests = new Map<string, object>()
+  private readonly _clients = new Map<string, readonly BridgeDebugClient[]>()
+  private readonly _sessions = new Map<string, BridgeDebugSession>()
+
+  /**
+   * ----------------------------------------
+   * PUBLIC
+   * ----------------------------------------
+   */
+
+  /** Создаёт owner и его явные зависимости без запуска транспорта. */
+  public constructor(
+    private readonly _commands: BridgeCommands,
+    private readonly _providers: BridgeDebugProviders,
+    private readonly _adapter: BrowserBridge_Adapter,
+  ) {
+    super()
+  }
+
+  /** Настраивается только родителем из host boot options. */
+  public configure(role: 'client' | 'configurator', enabled: boolean): void {
+    this._role = role
+    this._enabled = enabled
+  }
+
+  /** Запрашивает сессию; Promise завершается после подтверждения в приложении. */
+  public async requestSession(input: { serverUrl: string, instanceId: string }): Promise<BridgeDebugSession> {
+    this._requireConfigurator()
+    const serverUrl = normalizeBridgeServer(input.serverUrl)
+    const generation = this._requests.get(serverUrl) ?? {}
+    this._requests.set(serverUrl, generation)
+    const data = await this._commands.request(serverUrl, { type: 'requestSession', targetId: input.instanceId }) as Omit<BridgeDebugSession, 'serverUrl'>
+    if (this._requests.get(serverUrl) !== generation || !this._enabled) {
+      throw new Error('[Endge Bridge] Connection changed during session request')
+    }
+    const session = { ...data, serverUrl }
+    this._sessions.set(session.sessionId, session)
+    this.notify()
+    return { ...session }
+  }
+
+  /** Завершает выбранную сессию с любой её стороны. */
+  public async endSession(sessionId: string): Promise<void> {
+    const session = this._requireSession(sessionId)
+    await this._commands.request(session.serverUrl, { type: 'endSession', sessionId })
+    this._sessions.delete(sessionId)
+    if (this._reservation?.sessionId === sessionId) {
+      this._reservation = null
+    }
+    this.notify()
+  }
+
+  /** Запрашивает snapshot существующего diagnostics collector без скачивания файла. */
+  public async getSnapshot(sessionId: string): Promise<DiagnosticsSnapshot> {
+    this._requireConfigurator()
+    const session = this._requireSession(sessionId)
+    return await this._commands.request(session.serverUrl, { type: 'getSnapshot', sessionId }) as DiagnosticsSnapshot
+  }
+
+  /** Пока выполняет только existence/hash check и console mock на стороне клиента. */
+  public async runSimulation(sessionId: string, input: { identity: string, expectedHash: string }): Promise<SimulationRunResult> {
+    this._requireConfigurator()
+    const session = this._requireSession(sessionId)
+    return await this._commands.request(session.serverUrl, { type: 'runSimulation', sessionId, ...input }) as SimulationRunResult
+  }
+
+  /** Вычисляет hash локальной симуляции для передачи expectedHash. */
+  public async getSimulationHash(identity: string): Promise<string> {
+    const simulation = this._providers.getSimulation(identity)
+    if (!simulation) {
+      throw new Error(`[Endge Bridge] Simulation not found: ${identity}`)
+    }
+    return this._adapter.hashSimulation({ source: simulation.source, sourceVersion: simulation.sourceVersion })
+  }
+
+  /** Применяет сообщение только из принадлежащего родителю соединения. */
+  public async receive(serverUrl: string, message: BridgeMessage): Promise<void> {
+    if (message.type === 'clients') {
+      this._clients.set(serverUrl, (message.data as Omit<BridgeDebugClient, 'serverUrl'>[]).map(value => ({ ...value, serverUrl })))
+      this.notify()
+    }
+    else if (message.type === 'sessionRequested') {
+      await this._confirm(serverUrl, message.data as Omit<DebugConnectionRequest, 'serverUrl'>)
+    }
+    else if (message.type === 'sessionStarted') {
+      const data = message.data as Omit<BridgeDebugSession, 'serverUrl'>
+      if (this._role === 'client' && this._reservation?.serverUrl === serverUrl && this._reservation.sessionId === data.sessionId) {
+        this._sessions.set(data.sessionId, { ...data, serverUrl })
+        this.notify()
+      }
+    }
+    else if (message.type === 'sessionEnded' && message.sessionId) {
+      const session = this._sessions.get(message.sessionId)
+      if (session?.serverUrl === serverUrl) {
+        this._sessions.delete(message.sessionId)
+      }
+      if (this._reservation?.serverUrl === serverUrl && this._reservation.sessionId === message.sessionId) {
+        this._reservation = null
+      }
+      this.notify()
+    }
+    else if (message.type === 'getSnapshot' || message.type === 'runSimulation') {
+      await this._execute(serverUrl, message)
+    }
+  }
+
+  /** Потеря транспорта окончательно отзывает сессию и согласие. */
+  public disconnect(serverUrl: string): void {
+    this._requests.delete(serverUrl)
+    this._clients.delete(serverUrl)
+    for (const [id, session] of this._sessions) {
+      if (session.serverUrl === serverUrl) {
+        this._sessions.delete(id)
+      }
+    }
+    if (this._reservation?.serverUrl === serverUrl) {
+      this._reservation = null
+    }
+    this.notify()
+  }
+
+  /** Отзывает текущий lifecycle и освобождает принадлежащее модулю состояние. */
+  public override reset(): void {
+    this._enabled = false
+    this._reservation = null
+    this._requests.clear()
+    this._clients.clear()
+    this._sessions.clear()
+    this.notify()
+  }
+
+  /**
+   * ----------------------------------------
+   * PRIVATE
+   * ----------------------------------------
+   */
+
+  /** Резервирует единственное согласие и проверяет его актуальность после диалога. */
+  private async _confirm(serverUrl: string, request: Omit<DebugConnectionRequest, 'serverUrl'>): Promise<void> {
+    if (!this._enabled || this._role !== 'client' || this._reservation || request.expiresAt <= Date.now()) {
+      this._commands.send(serverUrl, { type: 'acceptSession', sessionId: request.sessionId, accepted: false })
+      return
+    }
+    const reservation = { serverUrl, sessionId: request.sessionId }
+    this._reservation = reservation
+    let accepted = false
+    try {
+      accepted = await this._adapter.confirmDebugConnection({ ...request, serverUrl })
+    }
+    catch {
+      accepted = false
+    }
+    if (this._reservation !== reservation) {
+      return
+    }
+    accepted = accepted && request.expiresAt > Date.now() && this._enabled
+    if (!accepted) {
+      this._reservation = null
+    }
+    this._commands.send(serverUrl, { type: 'acceptSession', sessionId: request.sessionId, accepted })
+  }
+
+  /** Проверяет активную сессию и выполняет только snapshot либо simulation mock. */
+  private async _execute(serverUrl: string, message: BridgeMessage): Promise<void> {
+    const session = this._sessions.get(message.sessionId ?? '')
+    if (!this._enabled || this._role !== 'client' || !session || session.serverUrl !== serverUrl || !message.id) {
+      return
+    }
+    try {
+      let data: unknown
+      if (message.type === 'getSnapshot') {
+        data = this._providers.snapshot()
+      }
+      else {
+        const identity = message.identity ?? ''
+        const simulation = this._providers.getSimulation(identity)
+        if (!simulation) {
+          data = { status: 'rejected', reason: 'not-found' }
+        }
+        else {
+          const captured = { source: simulation.source, sourceVersion: simulation.sourceVersion }
+          const hash = await this._adapter.hashSimulation(captured)
+          if (this._sessions.get(session.sessionId) !== session) {
+            return
+          }
+          const current = this._providers.getSimulation(identity)
+          if (!current) {
+            data = { status: 'rejected', reason: 'not-found' }
+          }
+          else if (current.source !== captured.source || current.sourceVersion !== captured.sourceVersion || hash !== message.expectedHash) {
+            data = { status: 'rejected', reason: 'hash-mismatch' }
+          }
+          else {
+            console.info('[Endge Bridge] Simulation mock', { identity, hash })
+            data = { status: 'mocked', identity, hash }
+          }
+        }
+      }
+      this._commands.send(serverUrl, { type: 'commandResult', id: message.id, sessionId: session.sessionId, data })
+    }
+    catch (error) {
+      if (this._sessions.get(session.sessionId) === session) {
+        this._commands.send(serverUrl, { type: 'commandResult', id: message.id, sessionId: session.sessionId, error: error instanceof Error ? error.message : 'Client command failed' })
+      }
+    }
+  }
+
+  /** Проверяет локальную роль и явное разрешение отладки. */
+  private _requireConfigurator(): void {
+    if (!this._enabled || this._role !== 'configurator') {
+      throw new Error('[Endge Bridge] Configurator debug is disabled')
+    }
+  }
+
+  /** Разрешает только существующую активную сессию. */
+  private _requireSession(id: string): BridgeDebugSession {
+    const session = this._sessions.get(id)
+    if (!session) {
+      throw new Error('[Endge Bridge] Debug session is not active')
+    }
+    return session
+  }
+
+  /**
+   * ----------------------------------------
+   * ACCESS
+   * ----------------------------------------
+   */
+
+  /** Возвращает доступные приложения из актуальных server rosters. */
+  public get clients(): readonly BridgeDebugClient[] {
+    return Array.from(this._clients.values()).flat().map(value => ({ ...value }))
+  }
+
+  /** Возвращает копии активных согласованных сессий. */
+  public get sessions(): readonly BridgeDebugSession[] {
+    return Array.from(this._sessions.values(), value => ({ ...value }))
+  }
+}

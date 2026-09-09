@@ -17,6 +17,9 @@ export * from '@/features/federation/types/federation.types'
 //
 
 export * from '@/features/core/kernel/endge'
+export * from '@/features/core/modules/bridge/EndgeBridge_Module'
+export * from '@/features/core/modules/bridge/domain/bridge.type'
+export { parseBridgeAllowedServers } from '@/features/core/modules/bridge/config/bridge.config'
 export * from '@/features/core/modules/domain/EndgeDomain_Module'
 export * from '@/features/core/modules/document-import/EndgeDocumentImport_Module'
 export { EndgeDomainRepository_Module, EndgeDomainRepositoryReadOnlyError } from '@/features/core/modules/domain-repository/EndgeDomainRepository_Module'
