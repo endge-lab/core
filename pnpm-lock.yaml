@@ -12,11 +12,11 @@ dependencies:
     specifier: ^7.27.1
     version: 7.29.7
   '@endge/raph':
-    specifier: ^3.2.0
-    version: 3.2.0
+    specifier: ^3.3.0
+    version: 3.3.0
   '@endge/utils':
-    specifier: ^0.26.0
-    version: 0.26.0
+    specifier: ^0.26.1
+    version: 0.26.1
   '@vue/compiler-dom':
     specifier: ^3.5.24
     version: 3.5.39
@@ -282,12 +282,12 @@ packages:
       semver: 7.8.5
     dev: true
 
-  /@endge/raph@3.2.0:
-    resolution: {integrity: sha512-e3PPuN+0+Wz8gqibtJzV8DO0Rr4oxocNJO9rS/o7c+oit/Dp8G+Jx8O7O/KO0HzIu0rOFE1zAFa967R1uT2xNA==}
+  /@endge/raph@3.3.0:
+    resolution: {integrity: sha512-1tiytJD2XYD3sdIVU6c3KittLH/bqPz7ovlHyIJVjbebC49ZKpI60cyFBteEK7eF+F4poYesfee95iiZZbFrIA==}
     dev: false
 
-  /@endge/utils@0.26.0:
-    resolution: {integrity: sha512-YmHQPFRsL2EWSND+Xqv7EyB49Zdixn0qmztWOTXa2bTNlFfvG2wufllCIaqJ54BI9bObjWY5k6dw/S1EyOkn0Q==}
+  /@endge/utils@0.26.1:
+    resolution: {integrity: sha512-En8ITSHpovt68Dy0v/xSqoXJN7oO5eylIsZ54k8AjM74L0jF09OAOg+s2bVsb9DEZiVzMf37FcoFx0pF9RZLGg==}
     dependencies:
       '@microsoft/fetch-event-source': 2.0.1
       class-transformer: 0.5.1
