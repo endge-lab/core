@@ -17,9 +17,9 @@ export class SimulationSourceLanguageStrategy implements SourceLanguageStrategy 
   public readonly syntax = createTypeScriptLikeSourceSyntax({
     alias: 'Endge Simulation Source',
     extension: '.endge-simulation.ts',
-    keywords: ['defineSimulation', 'composition', 'project', 'mockRequest'],
-    functions: ['defineSimulation', 'composition', 'project', 'mockRequest'],
-    properties: ['target', 'dataMode', 'overrides', 'runtimes', 'request', 'seed', 'arrays'],
+    keywords: ['defineSimulation', 'composition', 'project', 'mockRequest', 'mockStream'],
+    functions: ['defineSimulation', 'composition', 'project', 'mockRequest', 'mockStream'],
+    properties: ['target', 'dataMode', 'overrides', 'runtimes', 'request', 'seed', 'arrays', 'stream', 'type', 'event', 'intervalMs', 'itemsPerMessage', 'fields'],
   })
 
   public constructor(private readonly _catalog: () => SimulationSourceCatalog) {}
@@ -44,6 +44,9 @@ export class SimulationSourceLanguageStrategy implements SourceLanguageStrategy 
     if (/\bproject\s*\(\s*['"][^'"]*$/.test(prefix)) {
       return catalog.projects.map(item => ({ label: item.identity, kind: 'value', insertText: item.identity, detail: item.displayName || 'Project' }))
     }
+    if (/\btype\s*:\s*[$\w]*$/.test(prefix)) {
+      return catalog.types.map(item => ({ label: item.identity, kind: 'value', insertText: item.identity, detail: item.displayName || 'Type' }))
+    }
     const location = objectAt(context.source, offset)
     const definition = compileSimulationSource(context.source).document
     const resolver = new SimulationSourceResolver(catalog)
@@ -62,12 +65,15 @@ export class SimulationSourceLanguageStrategy implements SourceLanguageStrategy 
           .map(child => ({
             label: child.alias,
             kind: 'property',
-            insertText: `${sourceKey(child.alias)}: ${child.kind === 'query' ? '{\n  request: mockRequest({ arrays: {} }),\n}' : '{\n  runtimes: {},\n}'},`,
+            insertText: `${sourceKey(child.alias)}: ${child.kind === 'query' ? '{\n  request: mockRequest({ arrays: {} }),\n}' : child.kind === 'stream' ? '{\n  stream: mockStream({ type: \'\', event: \'\', intervalMs: 1000, itemsPerMessage: 1 }),\n}' : '{\n  runtimes: {},\n}'},`,
             detail: `${child.kind}: ${child.identity}`,
           }))
       }
       if (target?.kind === 'query' && remaining.join('.') === 'request.arrays') {
         return resolver.queryContract(target.identity).paths.filter(path => !location.keys.includes(path)).map(path => ({ label: path || '(корневой массив)', kind: 'property', insertText: `${sourceKey(path)}: 50,`, detail: 'Количество элементов массива ответа Query' }))
+      }
+      if (target?.kind === 'stream' && remaining.length === 0) {
+        return [{ label: 'stream', kind: 'snippet', insertText: 'stream: mockStream({ type: \'\', event: \'\', intervalMs: 1000, itemsPerMessage: 1 }),', detail: 'Подмена SSE через mock generator' }]
       }
       if (target?.kind === 'query' && remaining.length === 0) {
         return [{ label: 'request', kind: 'snippet', insertText: 'request: mockRequest({\n  arrays: {},\n}),', detail: 'Описание подмены Query request' }].filter(item => !location.keys.includes(item.label)) as SourceLanguageCompletion[]
@@ -83,6 +89,7 @@ export class SimulationSourceLanguageStrategy implements SourceLanguageStrategy 
       { label: 'project', kind: 'function', insertText: 'project(\'\')', detail: 'Собственный граф проекта' },
       { label: 'composition', kind: 'function', insertText: 'composition(\'\')', detail: 'Граф отдельной Composition' },
       { label: 'overrides', kind: 'property', insertText: 'overrides: { runtimes: {} },', detail: 'Дерево подмен' },
+      { label: 'mockStream', kind: 'function', insertText: 'mockStream({ type: \'\', event: \'\', intervalMs: 1000, itemsPerMessage: 1 })', detail: 'SSE генератор существующего Type' },
       { label: 'mockRequest', kind: 'function', insertText: 'mockRequest({ arrays: {} })', detail: 'Описание подмены запроса' },
       { label: 'seed', kind: 'property', insertText: 'seed: \'simulation\',', detail: 'Seed воспроизводимой генерации ответа' },
       { label: 'arrays', kind: 'property', insertText: 'arrays: {},', detail: 'Количество элементов массивов ответа' },

@@ -254,6 +254,13 @@ defineProps<{ rows: Array<{ id: number, flightNumber: string }> }>()
       { id: 1, flightNumber: 'SU101' },
       { id: 2, flightNumber: 'S7202' },
     ])
+    const handle = session.host.getRuntimeHandle('table')!
+    expect(await handle.activate()).toBe(table)
+    expect(await handle.activate()).toBe(table)
+    await handle.pause()
+    expect(table.status).toBe('paused')
+    expect(await handle.activate()).toBe(table)
+    expect(table.status).toBe('active')
     await filterRuntime.action('set').run({ key: 'search', value: ' su ' })
     expect(rowsPath && Raph.get(rowsPath)).toEqual([{ id: 1, flightNumber: 'SU101' }])
 

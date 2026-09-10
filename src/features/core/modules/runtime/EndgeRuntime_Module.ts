@@ -1,7 +1,10 @@
+import type { EndgeBootContext } from '@/features/core/kernel/types/bootstrap.types'
 import type { EndgeCoreEventMap } from '@/features/core/modules/events/domain/events.types'
 import type { RuntimeEntityType } from '@/features/core/modules/runtime/domain/runtime-entity-map.types'
 import type { RuntimeExecuteOptions } from '@/features/core/modules/runtime/domain/runtime-execute.type'
 import type { DestroyedRuntimeHostSnapshot, RuntimeArtifactReader, RuntimeHost, RuntimeInspectionLease } from '@/features/core/modules/runtime/domain/runtime-host.types'
+import type { RuntimeControlOperation, RuntimeControlTarget, RuntimeInspectionSnapshot, RuntimeStatusChange } from '@/features/core/modules/runtime/domain/runtime-inspection.types'
+import type { RuntimeRenderInspection } from '@/features/core/modules/runtime/domain/runtime-render-inspection.types'
 import type { AnyRuntimeHost, AnyRuntimeStrategy } from '@/features/core/modules/runtime/domain/runtime-strategy.types'
 import type { EndgeRuntimeRaphSnapshot, EndgeRuntimeSnapshot, RuntimeExecutableModel } from '@/features/core/modules/runtime/domain/runtime.types'
 import type { RuntimeAppScopeOptions } from '@/features/core/modules/runtime/RuntimeAppScope'
@@ -12,6 +15,7 @@ import type { EndgeDataMode } from '@/features/core/modules/workspace/domain/wor
 import { Raph, RaphNode } from '@endge/raph'
 import { STORAGE_VARS_KEY } from '@/features/core/kernel/config/kernel.config'
 import { Endge } from '@/features/core/kernel/endge'
+import { serializeDiagnosticsJson } from '@/features/core/modules/diagnostics/domain/diagnostics-snapshot'
 import { EndgeRuntimeScopes_Module } from '@/features/core/modules/runtime/EndgeRuntimeScopes_Module'
 import { EndgeComposition } from '@/features/core/modules/runtime/execution/endge-composition'
 import { EndgeDataView } from '@/features/core/modules/runtime/execution/endge-data-view'
@@ -36,10 +40,11 @@ import { QueryRuntimeStrategy } from '@/features/core/modules/runtime/services/s
 import { SimulationRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/SimulationRuntimeStrategy'
 import { StoreRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/StoreRuntimeStrategy'
 import { StreamRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/StreamRuntimeStrategy'
+import { emptyRuntimeInspection, readRuntimeControlTarget, readRuntimeInspectionSnapshot, readRuntimeRenderInspection } from '@/features/core/modules/runtime/tools/runtime-inspection'
 import { EndgeModule } from '@/features/federation/EndgeModule'
 
 /** Модуль создания, регистрации и уничтожения runtime hosts и app scopes. */
-export class EndgeRuntime_Module extends EndgeModule {
+export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
   public readonly query = new EndgeQuery()
   public readonly dataView = new EndgeDataView()
   public readonly composition = new EndgeComposition()
@@ -55,6 +60,19 @@ export class EndgeRuntime_Module extends EndgeModule {
   private readonly _onHostStatusChanged = (change: EndgeCoreEventMap['runtime:host-status-changed']): void => {
     Endge.events.emitEvent('runtime:host-status-changed', change)
   }
+
+  private readonly _onRenderChanged = (): void => {
+    if (this._dataLeases.size) {
+      Endge.events.emitEvent('runtime:data-changed', { revision: ++this._dataRevision })
+    }
+  }
+
+  private _inspectionMode = false
+  private _inspection: RuntimeInspectionSnapshot = { version: 1, runtime: emptyRuntimeInspection() }
+  private readonly _dataLeases = new Set<symbol>()
+  private _unsubscribeData: (() => void) | null = null
+  private _dataRevision = 0
+  private readonly _renderDataOff = new Map<string, () => void>()
 
   private _hosts = new RuntimeHostRegistry()
   private _strategies = new RuntimeStrategyRegistry()
@@ -110,14 +128,16 @@ export class EndgeRuntime_Module extends EndgeModule {
   /**
    * Настраивает Raph runtime до загрузки и сборки домена.
    */
-  public override setup(): void {
+  public override setup(ctx: EndgeBootContext): void {
+    this._inspectionMode = ctx.mode === 'debugger'
+    this.clearInspection()
   }
 
   /**
    * Регистрирует runtime-фазы в Raph один раз.
    */
   public override start(): void {
-    if (this._inited) {
+    if (this._inspectionMode || this._inited) {
       return
     }
     this._inited = true
@@ -155,7 +175,9 @@ export class EndgeRuntime_Module extends EndgeModule {
     const artifactReader = this._resolveArtifactReader(options.artifactReader)
     if (strategy.entityType !== 'page') {
       const artifact = (options.meta?.artifact as import('@/features/core/modules/program/domain/types/program.types').ProgramArtifact | undefined) ?? artifactReader.getArtifact(strategy.entityType, model.id ?? model.identity)
-      if (artifact?.diagnostics?.some((item: { code: string }) => item.code === 'program-artifact-stale' || item.code === 'program-dependency-stale')) {
+      if (artifact?.diagnostics?.some((item: {
+        code: string
+      }) => item.code === 'program-artifact-stale' || item.code === 'program-dependency-stale')) {
         return null
       }
     }
@@ -384,6 +406,10 @@ export class EndgeRuntime_Module extends EndgeModule {
 
   /** Регистрирует host, созданный владельцем составной runtime-сущности. */
   public registerRuntimeHost(host: AnyRuntimeHost): boolean {
+    Endge.assertWritable()
+    if (this._inspectionMode) {
+      throw new Error('[Endge Runtime] Local hosts are unavailable in debugger')
+    }
     this.start()
     const registered = this._registerAndActivateHost(host, host.parent)
     if (registered) {
@@ -441,6 +467,9 @@ export class EndgeRuntime_Module extends EndgeModule {
 
   /** Возвращает общий snapshot runtime-состояния. */
   public snapshot(): EndgeRuntimeSnapshot {
+    if (this._inspectionMode) {
+      return this._inspection.runtime
+    }
     return {
       generatedAt: Date.now(),
       ...this._hosts.snapshot(),
@@ -450,9 +479,19 @@ export class EndgeRuntime_Module extends EndgeModule {
 
   /** Формирует принадлежащую runtime-модулю диагностическую проекцию Raph. */
   public snapshotRaph(options: { includeData: boolean, includeGraph: boolean }): EndgeRuntimeRaphSnapshot {
+    if (this._inspectionMode) {
+      return options.includeData ? { data: this._inspection.data, render: this._inspection.render } : {}
+    }
     const result: EndgeRuntimeRaphSnapshot = {}
     if (options.includeData) {
       result.data = Raph.data
+      result.render = {
+        hosts: Object.fromEntries(this._hosts.getAll().flatMap((host) => {
+          const render = host.captureRenderInspection?.()
+          return render ? [[host.id, render]] : []
+        })),
+        styles: Endge.styles.getActiveArtifacts(),
+      }
     }
     if (options.includeGraph) {
       const lease = Raph.debug.acquire()
@@ -472,6 +511,185 @@ export class EndgeRuntime_Module extends EndgeModule {
       }
     }
     return result
+  }
+
+  /** JSON-safe проекция owner-а; Bridge задаёт частоту и набор передаваемых частей. */
+  public captureInspection(includeData = false): RuntimeInspectionSnapshot {
+    if (this._inspectionMode) {
+      return this._inspection
+    }
+    return serializeDiagnosticsJson({
+      version: 1,
+      runtime: this.snapshot(),
+      ...(includeData ? { ...this.snapshotRaph({ includeData: true, includeGraph: false }), dataGeneratedAt: Date.now() } : {}),
+    }).value as unknown as RuntimeInspectionSnapshot
+  }
+
+  /** Прямой импорт факта: не создаёт hosts, не пишет Raph и не выполняет Commands. */
+  public applyInspectionSnapshot(value: unknown): void {
+    this._requireInspection()
+    const snapshot = readRuntimeInspectionSnapshot(value)
+    this._inspection = {
+      ...snapshot,
+      ...(!Object.hasOwn(snapshot, 'data') && Object.hasOwn(this._inspection, 'data')
+        ? { data: this._inspection.data, render: this._inspection.render, dataGeneratedAt: this._inspection.dataGeneratedAt, dataError: this._inspection.dataError }
+        : {}),
+    }
+    super.notify()
+  }
+
+  /** Событие обновляет только известный экземпляр; новую структуру приносит следующий snapshot. */
+  public applyInspectionEvent(change: RuntimeStatusChange): void {
+    this._requireInspection()
+    const runtime = this._inspection.runtime
+    if (!runtime.hosts.some(host => host.id === change.id)) {
+      return
+    }
+    const hosts = runtime.hosts.map(host => host.id === change.id ? { ...host, status: change.value } : host)
+    const byStatus: Record<string, number> = {}
+    for (const host of hosts) {
+      byStatus[host.status] = (byStatus[host.status] ?? 0) + 1
+    }
+    this._inspection = { ...this._inspection, runtime: { ...runtime, hosts, byStatus } }
+    super.notify()
+  }
+
+  /** Данные остаются снимком для чтения, даже когда локальный Raph уже существует. */
+  public applyInspectionData(data: unknown, generatedAt: number, render?: RuntimeRenderInspection): void {
+    this._requireInspection()
+    if (!Number.isFinite(generatedAt) || generatedAt < 0) {
+      throw new Error('[Endge Runtime] Invalid data capture time')
+    }
+    if (render !== undefined) {
+      readRuntimeRenderInspection(render)
+    }
+    this._inspection = { ...this._inspection, data, render, dataGeneratedAt: generatedAt, dataError: undefined }
+    super.notify()
+  }
+
+  /** Ошибка передачи не маскируется под свежий или пустой снимок данных. */
+  public applyInspectionDataError(message: string): void {
+    this._requireInspection()
+    this._inspection = { ...this._inspection, dataError: message }
+    super.notify()
+  }
+
+  /** JSON-safe снимок только данных, без пересборки структуры и Raph graph. */
+  public captureInspectionData(): { data: unknown, render?: RuntimeRenderInspection, generatedAt: number } {
+    if (this._inspectionMode) {
+      return { data: this._inspection.data, render: this._inspection.render, generatedAt: this._inspection.dataGeneratedAt ?? 0 }
+    }
+    const captured = serializeDiagnosticsJson(this.snapshotRaph({ includeData: true, includeGraph: false })).value as unknown as EndgeRuntimeRaphSnapshot
+    return { data: captured.data, render: captured.render, generatedAt: Date.now() }
+  }
+
+  /** Смена debug session удаляет прошлые данные, не затрагивая локальный runtime. */
+  public clearInspection(): void {
+    this._inspection = { version: 1, runtime: emptyRuntimeInspection() }
+    if (this._inspectionMode) {
+      super.notify()
+    }
+  }
+
+  public get inspection(): Readonly<RuntimeInspectionSnapshot> {
+    return this._inspection
+  }
+
+  /** Наблюдение Raph существует только пока у Runtime есть явный consumer. */
+  public acquireDataChanges(): RuntimeInspectionLease {
+    if (this._inspectionMode) {
+      throw new Error('[Endge Runtime] Cannot observe local Raph in debugger')
+    }
+    const token = Symbol('runtime-data-changes')
+    this._dataLeases.add(token)
+    if (!this._unsubscribeData) {
+      const offData = Raph.watch('*', this._onRenderChanged)
+      const offMeta = Raph.meta.watch('*', this._onRenderChanged)
+      this._hosts.getAll().forEach(host => this._observeRenderChanges(host))
+      this._unsubscribeData = () => {
+        offData()
+        offMeta()
+        this._renderDataOff.forEach(off => off())
+        this._renderDataOff.clear()
+      }
+    }
+    return { release: () => {
+      if (!this._dataLeases.delete(token)) {
+        return
+      }
+      if (!this._dataLeases.size) {
+        this._unsubscribeData?.()
+        this._unsubscribeData = null
+      }
+    } }
+  }
+
+  /** Локальная операция над конкретным экземпляром; удалённый вызов идёт через Commands. */
+  public async control(operation: RuntimeControlOperation, input: RuntimeControlTarget): Promise<void> {
+    Endge.assertWritable()
+    if (this._inspectionMode) {
+      throw new Error('[Endge Runtime] Local control is unavailable in debugger')
+    }
+    const target = readRuntimeControlTarget(input)
+    if (target.kind === 'scope') {
+      const scope = this.scopes.get(target.id)
+      if (!scope || scope.snapshot().generation !== target.generation) {
+        throw new Error('[Endge Runtime] Scope instance changed')
+      }
+      if (operation === 'pause') {
+        await scope.pause()
+      }
+      else if (operation === 'resume') {
+        await scope.activate()
+      }
+      else {
+        await scope.deactivate()
+      }
+      return
+    }
+    const host = this._hosts.getById(target.id)
+    if (!host || host.createdAt !== target.createdAt) {
+      throw new Error('[Endge Runtime] Host instance changed')
+    }
+    const graphScope = this.scopes.getAll().find((scope) => {
+      const descriptor = scope.snapshot()
+      return descriptor.ownerRuntimeId === host.id && descriptor.path === 'scope_default'
+    })
+    if (graphScope) {
+      if (operation === 'pause') {
+        await graphScope.pause()
+      }
+      else if (operation === 'resume') {
+        await graphScope.activate()
+      }
+      else {
+        await graphScope.deactivate()
+      }
+    }
+    else if (operation === 'pause') {
+      await host.pause()
+    }
+    else if (operation === 'resume') {
+      await host.resume()
+    }
+    else {
+      await host.stop()
+    }
+  }
+
+  private _requireInspection(): void {
+    if (!this._inspectionMode) {
+      throw new Error('[Endge Runtime] Inspection import requires debugger mode')
+    }
+  }
+
+  private _observeRenderChanges(host: AnyRuntimeHost): void {
+    if (!this._dataLeases.size || !host.captureRenderInspection || this._renderDataOff.has(host.id)) {
+      return
+    }
+    const events = ['computation:dirty', 'render:change', 'resource:dirty', 'render-input:changed']
+    events.forEach(event => host.on(event, this._onRenderChanged))
+    this._renderDataOff.set(host.id, () => events.forEach(event => host.off(event, this._onRenderChanged)))
   }
 
   /**
@@ -551,6 +769,14 @@ export class EndgeRuntime_Module extends EndgeModule {
    */
   public override async reset(): Promise<void> {
     this._generation += 1
+    this._unsubscribeData?.()
+    this._unsubscribeData = null
+    this._dataLeases.clear()
+    this._dataRevision = 0
+    this.clearInspection()
+    if (this._inspectionMode) {
+      return
+    }
     const hostIds = this._hosts.getAll().map(host => host.id)
     const errors: unknown[] = []
     const release = async (dispose: () => unknown) => {
@@ -721,6 +947,8 @@ export class EndgeRuntime_Module extends EndgeModule {
       }
       host.off('status-changed', this._onHostStatusChanged)
       this._hosts.removeById(id)
+      this._renderDataOff.get(id)?.()
+      this._renderDataOff.delete(id)
       this._hosts.rememberDeletedSnapshot(destroyedSnapshot)
     }
     finally {
@@ -782,12 +1010,15 @@ export class EndgeRuntime_Module extends EndgeModule {
     try {
       this._hosts.register(host)
       host.on('status-changed', this._onHostStatusChanged)
+      this._observeRenderChanges(host)
       this.scopes.attachRuntime(String(host.meta.runtimeScopeId ?? ''), host)
     }
     catch (error) {
       console.error(`[EndgeRuntime] Failed to register runtime host "${host.id}": ${errorText(error)}`)
       this.scopes.detachRuntime(host.id)
       host.off('status-changed', this._onHostStatusChanged)
+      this._renderDataOff.get(host.id)?.()
+      this._renderDataOff.delete(host.id)
       this._hosts.removeById(host.id)
       return false
     }

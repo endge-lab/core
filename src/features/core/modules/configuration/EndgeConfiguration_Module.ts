@@ -102,6 +102,12 @@ export class EndgeConfiguration_Module extends EndgeModule<EndgeBootContext> {
   /** Возвращает immutable compiler input текущего build. */
   public get buildContext(): EndgeBuildContext {
     if (!this._buildContext) {
+      if (Endge.mode === 'debugger' && this._current) {
+        const workspaceIdentity = Endge.workspace.current.identity
+        const execution = Endge.context.getExecutionContext()
+        const configuration = this._current
+        return { workspaceIdentity, execution, configuration, contextHash: createEndgeContextHash({ workspaceIdentity, execution, configuration }) }
+      }
       throw new Error('[EndgeConfiguration] Build context has not been resolved')
     }
     return this._buildContext

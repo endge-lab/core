@@ -29,6 +29,12 @@ class EndgeCore extends EndgeFederation.define({
     this.workspace.applyInspection(prepared.workspace)
     this.configuration.applyInspection(prepared.configuration)
     this.context.applyInspection(prepared.context)
+    if (prepared.runtime) {
+      this.runtime.applyInspectionSnapshot(prepared.runtime)
+    }
+    else {
+      this.runtime.clearInspection()
+    }
   }
 
   /** Shared guard before user mutations, including editor synchronization. */

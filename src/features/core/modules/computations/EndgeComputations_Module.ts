@@ -212,12 +212,14 @@ export class EndgeComputations_Module extends EndgeModule {
         input,
         async () => { throw error },
         () => { throw error },
+        identity,
       )
     }
     return new ComputationResourceState(
       input,
       next => this.run(identity, next),
       isSync ? next => this.runSync(identity, next) : null,
+      identity,
     )
   }
 

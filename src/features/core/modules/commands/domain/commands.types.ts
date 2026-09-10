@@ -1,7 +1,11 @@
+import type { RuntimeControlTarget } from '@/features/core/modules/runtime/domain/runtime-inspection.types'
 import type { EndgeDataMode } from '@/features/core/modules/workspace/domain/workspace.types'
 
 /** Параметры явных команд Core; это запросы на изменение, а не произошедшие события. */
 export interface EndgeCommandMap {
+  'runtime:pause': RuntimeControlTarget
+  'runtime:resume': RuntimeControlTarget
+  'runtime:stop': RuntimeControlTarget
   'context:set-workspace': { workspace: string | null }
   'context:set-tenant': { tenant: string }
   'context:set-project': { project: string }

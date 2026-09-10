@@ -1,6 +1,8 @@
-import type { BridgeInspectionSnapshot, BridgeStreamEvent } from '@/features/core/modules/bridge/domain/bridge-sync.type'
+import type { BridgeInspectionSnapshot, BridgeInspectionUpdate, BridgeStreamEvent } from '@/features/core/modules/bridge/domain/bridge-sync.type'
 import type { EndgeCommand } from '@/features/core/modules/commands/domain/commands.types'
 import type { ContextEvent } from '@/features/core/modules/context/domain/context-events.types'
+import type { RuntimeStatusChange } from '@/features/core/modules/runtime/domain/runtime-inspection.types'
+import { readRuntimeInspectionSnapshot, readRuntimeRenderInspection } from '@/features/core/modules/runtime/tools/runtime-inspection'
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -71,4 +73,41 @@ export function readBridgeCommand(value: unknown): EndgeCommand {
     throw new Error('[Endge Bridge] Invalid command envelope')
   }
   return source as unknown as EndgeCommand
+}
+
+/** Проверяет крупный snapshot до буферизации в согласованном потоке. */
+export function readBridgeInspectionUpdate(value: unknown): BridgeInspectionUpdate {
+  const source = record(value)
+  const update = record(source?.update)
+  if (!source || !Number.isSafeInteger(source.sequence) || Number(source.sequence) < 1 || !update) {
+    throw new Error('[Endge Bridge] Invalid inspection update')
+  }
+  if (update.kind === 'runtime') {
+    readRuntimeInspectionSnapshot(update.snapshot)
+  }
+  else if (update.kind === 'data') {
+    if (!Object.hasOwn(update, 'data') || typeof update.generatedAt !== 'number' || !Number.isFinite(update.generatedAt) || update.generatedAt < 0) {
+      throw new Error('[Endge Bridge] Invalid inspection data')
+    }
+    if (update.render !== undefined) {
+      readRuntimeRenderInspection(update.render)
+    }
+  }
+  else if (update.kind !== 'data-error' || typeof update.message !== 'string' || update.message.length > 1024) {
+    throw new Error('[Endge Bridge] Invalid inspection update kind')
+  }
+  return source as unknown as BridgeInspectionUpdate
+}
+
+/** Runtime facts применяются только после проверки статусов и адреса host. */
+export function readBridgeRuntimeEvent(event: BridgeStreamEvent['event']): RuntimeStatusChange | null {
+  if (event.name !== 'runtime:host-status-changed') {
+    return null
+  }
+  const payload = record(event.payload)
+  const statuses = ['created', 'mounted', 'running', 'active', 'pausing', 'paused', 'stopping', 'stopped', 'unmounted', 'destroyed', 'error']
+  if (!payload || typeof payload.id !== 'string' || !payload.id || !statuses.includes(String(payload.previous)) || !statuses.includes(String(payload.value))) {
+    throw new Error('[Endge Bridge] Invalid runtime event')
+  }
+  return payload as unknown as RuntimeStatusChange
 }

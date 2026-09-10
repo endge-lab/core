@@ -290,6 +290,17 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     return this._compileEntity('component-sfc', entity, context) as ProgramArtifact<ComponentSFCProgramPayload>
   }
 
+  /** Компилирует наблюдаемый SFC без записи в Program и без запуска runtime. */
+  public compileComponentSFCArtifact(entity: RComponentSFC): ProgramArtifact<ComponentSFCProgramPayload> {
+    this._componentPortManifestCache.clear()
+    this._componentTagDiagnosticsByIdentity.clear()
+    const handler = this._handlers.get('component-sfc') as EntityCompilerHandler<RComponentSFC, ComponentSFCProgramPayload> | undefined
+    if (!handler) {
+      throw new Error('Compiler handler is not registered for "component-sfc"')
+    }
+    return handler.compile(entity, this._createCompileContext())
+  }
+
   /** Компилирует один DataView source в Endge.program без запуска остальных compiler-фаз. */
   public buildDataView(entity: RDataView): ProgramArtifact<DataViewProgramPayload> {
     const context = this._createCompileContext()
@@ -1803,7 +1814,13 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     try {
       const result = compileComponentSFC(entity.source, {
         identity: entity.identity,
-        resolveComponentTag: tag => Endge.program.resolveComponentTag(tag),
+        resolveComponentTag: (tag) => {
+          if (Endge.mode !== 'debugger') {
+            return Endge.program.resolveComponentTag(tag)
+          }
+          const candidates = Endge.domain.getComponentSFCs().filter(component => component.tag === tag && !component.deletedAt)
+          return candidates.length === 1 ? candidates[0]!.identity : null
+        },
         hasComponentIdentity: identity => Endge.domain.getComponentSFC(identity) != null,
         resolvePortProvider: (identity, expectedKind) => this._resolvePortProvider(identity, expectedKind),
         resolveComponentPortManifest: identity => this._resolveComponentPortManifest(identity, sfcEditing),

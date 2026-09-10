@@ -12,7 +12,7 @@ export class EndgeSimulation {
     const host = await Endge.runtime.executeAsync(model, {
       artifactReader: options.artifactReader,
       persistence: 'disabled',
-      meta: { forceMock: options.forceMock === true, targetProps: options.props ?? {} },
+      meta: { forceMock: options.forceMock === true, targetProps: options.props ?? {}, simulationGenerator: options.generator },
     }) as SimulationRuntimeHost | null
     if (!host) {
       throw new Error(`[Simulation] Документ "${identity}" не может быть запущен.`)

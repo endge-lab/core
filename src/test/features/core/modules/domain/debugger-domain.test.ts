@@ -1,4 +1,5 @@
 import type { DiagnosticsSnapshot } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
+import { Raph } from '@endge/raph'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Endge } from '@/features/core/kernel/endge'
 import { EndgeDebuggerReadOnlyError } from '@/features/core/kernel/errors/EndgeDebuggerReadOnlyError'
@@ -17,17 +18,20 @@ afterEach(async () => {
 })
 
 describe('debugger inspection boundary', () => {
-  it('boots without provider, compiler, runtime or renderer activation and resets the same profile', async () => {
+  /** Debugger подключает owner Runtime, сохраняя запрет на исполнение и Raph-фазы. */
+  it('подключает пассивный Runtime без компиляции, hosts и Raph-фаз', async () => {
     const build = vi.spyOn(Endge.program, 'build')
-    const start = vi.spyOn(Endge.runtime, 'start')
-    const reset = vi.spyOn(Endge.runtime, 'reset')
+    const addPhase = vi.spyOn(Raph, 'addPhase')
+    const addNode = vi.spyOn(Raph.app, 'addNode')
     await bootDebugger()
     expect(Endge.mode).toBe('debugger')
     expect(Endge.domain.getProjects()).toEqual([])
     expect(build).not.toHaveBeenCalled()
-    expect(start).not.toHaveBeenCalled()
+    expect(addPhase).not.toHaveBeenCalled()
+    expect(addNode).not.toHaveBeenCalled()
+    expect(Endge.runtime.snapshot().hosts).toEqual([])
     await Endge.reset()
-    expect(reset).not.toHaveBeenCalled()
+    expect(Endge.runtime.inspection.runtime.hosts).toEqual([])
     expect(Endge.mode).toBe('application')
   })
 

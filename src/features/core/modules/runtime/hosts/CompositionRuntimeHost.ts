@@ -599,7 +599,8 @@ export class CompositionRuntimeHost<TType extends 'composition' | 'project' = 'c
           }
           assertCurrent(version)
           try {
-            if (!getRuntime()) {
+            const created = !getRuntime()
+            if (created) {
               await this._createChild(descriptor)
             }
             const runtime = getRuntime()
@@ -610,10 +611,16 @@ export class CompositionRuntimeHost<TType extends 'composition' | 'project' = 'c
               await (runtime as CompositionRuntimeHost).mountGraph()
             }
             assertCurrent(version)
-            this._bindChild(descriptor)
-            const payload = this.getArtifactPayload()
-            if (payload) {
-              this._bindHooks(payload)
+            // Повторная активация сохраняет materializations и подписки живого child.
+            if (created) {
+              this._bindChild(descriptor)
+              const payload = this.getArtifactPayload()
+              if (payload) {
+                this._bindHooks(payload)
+              }
+            }
+            else if (runtime.status === 'paused') {
+              await runtime.resume?.()
             }
             return runtime
           }

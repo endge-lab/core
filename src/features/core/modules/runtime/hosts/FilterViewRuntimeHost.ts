@@ -137,6 +137,11 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
     return { ...this._props }
   }
 
+  /** Включает фактические controls, props и значения именно этого view, а не только Filter document. */
+  public captureRenderInspection() {
+    return { kind: 'filter-view' as const, model: this.getRenderModel() }
+  }
+
   /** Атомарно обновляет presentation props и invalidates renderer. */
   public setProps(patch: Record<string, unknown>): void {
     this._props = { ...this._props, ...patch }

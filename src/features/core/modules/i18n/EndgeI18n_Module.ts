@@ -1,8 +1,9 @@
 import type { RI18nBundle } from '@/features/core/modules/domain/entities/RI18nBundle'
 import type { I18nLocaleMessages, I18nMessagesOptions, I18nRuntimeCatalog, I18nTranslateOptions } from '@/features/core/modules/i18n/domain/i18n.types'
-
 import { DEFAULT_FALLBACK_LOCALE } from '@/features/core/kernel/config/kernel.config'
+
 import { Endge } from '@/features/core/kernel/endge'
+import { resolveRuntimeTranslation } from '@/features/core/modules/i18n/tools/resolve-runtime-translation'
 import { EndgeModule } from '@/features/federation/EndgeModule'
 
 /**
@@ -143,19 +144,7 @@ export class EndgeI18n_Module extends EndgeModule {
    * Физический identity i18n-документа не является частью публичного ключа.
    */
   public translate(catalog: I18nRuntimeCatalog, key: string, fallback?: string): string {
-    const rawKey = String(key ?? '').trim()
-    const separator = rawKey.indexOf(':')
-    if (separator > 0) {
-      const alias = rawKey.slice(0, separator)
-      const messageKey = rawKey.slice(separator + 1)
-      const entry = catalog[alias]
-      const value = entry?.messages[this.locale]?.[messageKey]
-        ?? entry?.messages[this._fallbackLocale]?.[messageKey]
-      if (value != null) {
-        return value
-      }
-    }
-    return fallback ?? `{{${rawKey}}}`
+    return resolveRuntimeTranslation(catalog, key, this.locale, this._fallbackLocale, fallback)
   }
 
   /**

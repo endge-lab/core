@@ -7,6 +7,7 @@ import { EndgeModule } from '@/features/federation/EndgeModule'
 /** Выбирает способ выполнения команд по boot mode, не владея изменяемым контекстом. */
 export class EndgeCommands_Module extends EndgeModule<EndgeBootContext> {
   private readonly _localExecutor: EndgeCommandExecutor
+  private _remote = false
   private _executor: EndgeCommandExecutor | null = null
 
   public constructor(localExecutor: EndgeCommandExecutor) {
@@ -16,7 +17,8 @@ export class EndgeCommands_Module extends EndgeModule<EndgeBootContext> {
 
   /** Клиент выполняет команды локально, дебагер передаёт их через предоставленный host транспорт. */
   public override setup(ctx: EndgeBootContext): void {
-    this._executor = ctx.mode === 'debugger'
+    this._remote = ctx.mode === 'debugger'
+    this._executor = this._remote
       ? new RemoteCommandExecutor(ctx.commands?.remote)
       : ctx.commands?.local ?? this._localExecutor
   }
@@ -26,7 +28,8 @@ export class EndgeCommands_Module extends EndgeModule<EndgeBootContext> {
     if (!this._executor) {
       throw new Error('[Endge Commands] Command execution requires boot setup')
     }
-    return this._executor.execute(command)
+    const executor = !this._remote && command.type.startsWith('runtime:') ? this._localExecutor : this._executor
+    return executor.execute(command)
   }
 
   /** Отзывает выбранного исполнителя и ссылку на транспорт перед следующим boot. */

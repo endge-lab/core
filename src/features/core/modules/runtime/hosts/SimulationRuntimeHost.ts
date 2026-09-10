@@ -1,21 +1,27 @@
 import type { RSimulation } from '@/features/core/modules/domain/entities/RSimulation'
 import type { ProgramArtifact } from '@/features/core/modules/program/domain/types/program.types'
 import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContextBase } from '@/features/core/modules/runtime/domain/runtime-host.types'
+import type { SimulationGenerator } from '@/features/core/modules/runtime/domain/simulation-runtime.types'
+import type { StreamTransportFactory } from '@/features/core/modules/runtime/domain/stream-runtime.types'
 import type { CompositionRuntimeHost } from '@/features/core/modules/runtime/hosts/CompositionRuntimeHost'
+import type { SimulationOverrides } from '@/features/core/modules/runtime/services/simulation/prepare-simulation-overrides'
 import type { SimulationSourceArtifact } from '@/features/core/modules/source/domain/types/simulation-source.types'
 
 import { Raph, RaphNode } from '@endge/raph'
 import { Endge } from '@/features/core/kernel/endge'
 import { RuntimeHostBase } from '@/features/core/modules/runtime/RuntimeHostBase'
 import { RuntimeScope } from '@/features/core/modules/runtime/RuntimeScope'
-import { prepareSimulationRequests } from '@/features/core/modules/runtime/services/simulation/prepare-simulation-requests'
+import { prepareSimulationOverrides } from '@/features/core/modules/runtime/services/simulation/prepare-simulation-overrides'
 
 /** Владелец одного изолированного запуска target через общий runtime registry. */
 export class SimulationRuntimeHost extends RuntimeHostBase<'simulation', RuntimeHostContextBase, SimulationSourceArtifact> {
   public readonly forceMock: boolean
   private _target: CompositionRuntimeHost<'composition' | 'project'> | null = null
   private _scope: RuntimeScope | null = null
-  private _responses: ReadonlyMap<string, unknown>
+  private _responses: ReadonlyMap<string, unknown> = new Map()
+  private readonly _overrides: SimulationOverrides
+  private readonly _generator: SimulationGenerator | undefined
+  private _abortController = new AbortController()
   private _generation = 0
   private _closed = false
   private _transition: Promise<unknown> = Promise.resolve()
@@ -28,7 +34,7 @@ export class SimulationRuntimeHost extends RuntimeHostBase<'simulation', Runtime
     parent: RuntimeHost<any, any> | null
     meta: Record<string, unknown>
     artifacts: RuntimeArtifactReader
-    responses: ReadonlyMap<string, unknown>
+    overrides: SimulationOverrides
   }) {
     super({
       ...input,
@@ -42,7 +48,8 @@ export class SimulationRuntimeHost extends RuntimeHostBase<'simulation', Runtime
       context: { status: 'idle', startedAt: null, updatedAt: null },
     })
     this.forceMock = input.meta.forceMock === true
-    this._responses = input.responses
+    this._overrides = input.overrides
+    this._generator = input.meta.simulationGenerator as SimulationGenerator | undefined
   }
 
   public static createRuntime(input: {
@@ -64,8 +71,8 @@ export class SimulationRuntimeHost extends RuntimeHostBase<'simulation', Runtime
         return root ? artifact as ProgramArtifact<T> : input.artifacts.getArtifact<T>(entityType, id)
       },
     }
-    const responses = prepareSimulationRequests(artifact.payload, artifacts, input.model.identity)
-    const host = new SimulationRuntimeHost({ ...input, artifacts, responses })
+    const overrides = prepareSimulationOverrides(artifact.payload, artifacts, input.model.identity)
+    const host = new SimulationRuntimeHost({ ...input, artifacts, overrides })
     const node = new RaphNode(Raph.app, {
       id: `${input.model.identity}-${input.id}`,
       meta: { type: 'simulation', runtimeId: input.id, entityIdentity: input.model.identity },
@@ -76,7 +83,9 @@ export class SimulationRuntimeHost extends RuntimeHostBase<'simulation', Runtime
     return host
   }
 
-  public get target(): CompositionRuntimeHost<'composition' | 'project'> | null { return this._target }
+  public get target(): CompositionRuntimeHost<'composition' | 'project'> | null {
+    return this._target
+  }
 
   /** Проверяет occurrence, а не глобальную identity Query. */
   public hasRequest(host: RuntimeHost<any, any>): boolean {
@@ -92,8 +101,21 @@ export class SimulationRuntimeHost extends RuntimeHostBase<'simulation', Runtime
       : null
   }
 
+  public streamOverride(host: RuntimeHost<any, any>) {
+    const key = this._requestKey(host)
+    return key == null ? null : this._overrides.streams.get(key) ?? null
+  }
+
+  public openStream(host: RuntimeHost<any, any>, callbacks: Parameters<StreamTransportFactory['open']>[1]) {
+    const override = this.streamOverride(host)
+    if (!override || !this._generator) {
+      throw new Error('[Simulation] Mock generator adapter недоступен.')
+    }
+    return this._generator.openStream(override.schema, override.options, callbacks)
+  }
+
   private _requestKey(host: RuntimeHost<any, any>): string | null {
-    if (host.entityType !== 'query') {
+    if (host.entityType !== 'query' && host.entityType !== 'stream') {
       return null
     }
     const path: string[] = []
@@ -117,12 +139,25 @@ export class SimulationRuntimeHost extends RuntimeHostBase<'simulation', Runtime
       return this._activation
     }
     const generation = this._generation
+    this._abortController = new AbortController()
+    const signal = this._abortController.signal
     const activation = this._enqueue(async () => {
       this._assertCurrent(generation)
       if (this._target) {
         await this._target.getScope('scope_default')?.activate()
         this._assertCurrent(generation)
         return this._target
+      }
+      if ((this._overrides.requests.size || this._overrides.streams.size) && !this._generator) {
+        throw new Error('[Simulation] Для подмен требуется внешний mock generator adapter.')
+      }
+      if (this._overrides.requests.size && !this._responses.size) {
+        const responses = new Map<string, unknown>()
+        for (const [key, request] of this._overrides.requests) {
+          responses.set(key, await this._generator!.generate(request.schema, request.seed, signal))
+          this._assertCurrent(generation)
+        }
+        this._responses = responses
       }
       const payload = this.getArtifactPayload()!
       const model = payload.target.entityType === 'project'
@@ -184,6 +219,7 @@ export class SimulationRuntimeHost extends RuntimeHostBase<'simulation', Runtime
   }
 
   public deactivateTarget(): Promise<void> {
+    this._abortController.abort()
     this._generation += 1
     this._activation = null
     this._target?.quiesce()
@@ -211,6 +247,7 @@ export class SimulationRuntimeHost extends RuntimeHostBase<'simulation', Runtime
 
   public override quiesce(): void {
     this._closed = true
+    this._abortController.abort()
     this._generation += 1
     this._target?.quiesce()
     super.quiesce()
@@ -229,12 +266,16 @@ export class SimulationRuntimeHost extends RuntimeHostBase<'simulation', Runtime
     try {
       await this.deactivateTarget()
     }
-    catch (error) { errors.push(error) }
+    catch (error) {
+      errors.push(error)
+    }
     if (this._scope) {
       try {
         await Endge.runtime.scopes.remove(this._scope.id)
       }
-      catch (error) { errors.push(error) }
+      catch (error) {
+        errors.push(error)
+      }
       this._scope = null
     }
     this._responses = new Map()

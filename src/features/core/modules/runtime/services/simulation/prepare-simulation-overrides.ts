@@ -1,17 +1,23 @@
 import type { QueryProgramPayload } from '@/features/core/modules/program/domain/types/program.types'
 import type { RuntimeArtifactReader } from '@/features/core/modules/runtime/domain/runtime-host.types'
 import type { CompositionProgramPayload } from '@/features/core/modules/source/domain/types/composition-source.types'
-import type { SimulationRuntimeOverride, SimulationSourceArtifact, SimulationTargetReference } from '@/features/core/modules/source/domain/types/simulation-source.types'
+import type { SimulationMockStream, SimulationRuntimeOverride, SimulationSourceArtifact, SimulationTargetReference } from '@/features/core/modules/source/domain/types/simulation-source.types'
 
-import { generateSimulationResponse } from './generate-simulation-response'
+import { createSimulationSchema } from './create-simulation-schema'
+
+export interface SimulationOverrides {
+  requests: ReadonlyMap<string, { schema: Record<string, unknown>, seed: string }>
+  streams: ReadonlyMap<string, { schema: Record<string, unknown>, options: SimulationMockStream }>
+}
 
 /** Подготавливает подмены по occurrence paths до активации target; Program остаётся неизменным. */
-export function prepareSimulationRequests(
+export function prepareSimulationOverrides(
   simulation: SimulationSourceArtifact,
   artifacts: RuntimeArtifactReader,
   seed: string,
-): ReadonlyMap<string, unknown> {
-  const responses = new Map<string, unknown>()
+): SimulationOverrides {
+  const requests = new Map<string, { schema: Record<string, unknown>, seed: string }>()
+  const streams = new Map<string, { schema: Record<string, unknown>, options: SimulationMockStream }>()
   const graph = (ref: SimulationTargetReference): CompositionProgramPayload => {
     const artifact = artifacts.getArtifact<CompositionProgramPayload>(ref.entityType, ref.identity)
     if (!artifact || artifact.status === 'error') {
@@ -43,7 +49,14 @@ export function prepareSimulationRequests(
           throw new Error(`[Simulation] Query "${runtime.identity}" требует однозначный контракт корневого response.`)
         }
         const key = JSON.stringify([...invocation, runtime.path])
-        responses.set(key, generateSimulationResponse([...unique.values()][0]!, override.request, artifacts, `${seed}:${key}`))
+        requests.set(key, { schema: createSimulationSchema([...unique.values()][0]!, artifacts, override.request.arrays), seed: override.request.seed ?? `${seed}:${key}` })
+      }
+      if (override.stream) {
+        if (runtime?.kind !== 'stream') {
+          throw new Error(`[Simulation] Подмена stream требует Stream: "${path}".`)
+        }
+        const key = JSON.stringify([...invocation, runtime.path])
+        streams.set(key, { schema: createSimulationSchema({ type: override.stream.type, array: false }, artifacts, {}, override.stream.fields), options: { ...override.stream, seed: override.stream.seed ?? `${seed}:${key}` } })
       }
       if (override.runtimes) {
         if (scope) {
@@ -59,5 +72,5 @@ export function prepareSimulationRequests(
     }
   }
   visit(simulation.runtimes, graph(simulation.target), 'scope_default', [])
-  return responses
+  return { requests, streams }
 }

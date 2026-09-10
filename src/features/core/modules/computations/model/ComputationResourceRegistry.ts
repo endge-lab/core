@@ -67,4 +67,9 @@ export class ComputationResourceRegistry {
     this._resources.clear()
     this._updatingInputs.clear()
   }
+
+  /** Считывает ресурсы существующих consumers; новые вычисления не создаются. */
+  snapshot() {
+    return [...this._resources.values()].map(resource => resource.snapshot())
+  }
 }

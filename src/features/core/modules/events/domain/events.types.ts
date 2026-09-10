@@ -23,6 +23,7 @@ export interface EndgeCoreEventMap {
   'context:theme-changed': ContextValueChange<string>
   'context:timezone-changed': ContextValueChange<string>
   'context:data-mode-changed': ContextValueChange<EndgeDataMode>
+  'runtime:data-changed': { readonly revision: number }
   'runtime:registry-changed': Record<string, never>
   'runtime:scopes-changed': Record<string, never>
   'runtime:host-status-changed': { readonly id: string, readonly previous: RuntimeHostStatus, readonly value: RuntimeHostStatus }

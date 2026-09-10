@@ -1,4 +1,5 @@
 import type { ProgramArtifact, ProgramEntityType, QueryProgramPayload } from '@/features/core/modules/program/domain/types/program.types'
+import type { SimulationGenerator } from '@/features/core/modules/runtime/domain/simulation-runtime.types'
 import type { CompositionRuntimeHost } from '@/features/core/modules/runtime/hosts/CompositionRuntimeHost'
 import type { QueryRuntimeHost } from '@/features/core/modules/runtime/hosts/QueryRuntimeHost'
 import type { CompositionProgramPayload } from '@/features/core/modules/source/domain/types/composition-source.types'
@@ -13,6 +14,12 @@ import { RProject } from '@/features/core/modules/domain/entities/RProject'
 import { RQuery } from '@/features/core/modules/domain/entities/RQuery'
 import { RSimulation } from '@/features/core/modules/domain/entities/RSimulation'
 
+const generator: SimulationGenerator = {
+  generate: async schema => Array.from({ length: Number(schema.minItems) }, (_, index) => `fixture-${index}`),
+  openStream: () => {
+    throw new Error('No stream in this fixture')
+  },
+}
 const request = (count: number) => ({ kind: 'mock-request' as const, seed: 'fixed', arrays: { '': count } })
 
 describe('simulation runtime isolation and lifecycle', () => {
@@ -27,7 +34,7 @@ describe('simulation runtime isolation and lifecycle', () => {
   it.each(['composition', 'project'] as const)('owns a %s target, overrides each occurrence, and disposes all children', async (kind) => {
     setup(kind)
     const transport = vi.spyOn(Endge.runtime.query, 'executeArtifact').mockResolvedValue(['network'])
-    const session = await Endge.runtime.simulation.mount('scenario')
+    const session = await Endge.runtime.simulation.mount('scenario', { generator })
     const root = session.host.target!
     expect(root.parent).toBe(session.host)
     const first = await root.getRuntimeHandle('first')!.activate() as CompositionRuntimeHost
@@ -61,14 +68,14 @@ describe('simulation runtime isolation and lifecycle', () => {
   it('applies explicit live and forced mock precedence without suppressing an override', async () => {
     setup('composition', 'live')
     const transport = vi.spyOn(Endge.runtime.query, 'executeArtifact').mockResolvedValue(['network'])
-    const live = await Endge.runtime.simulation.mount('scenario')
+    const live = await Endge.runtime.simulation.mount('scenario', { generator })
     const liveQuery = live.host.target!.getChild('uncovered') as QueryRuntimeHost
     expect(Endge.runtime.resolveDataMode(liveQuery)).toBe('live')
     await liveQuery.run()
     expect(liveQuery.getOutput('rows')).toEqual(['network'])
     await live.unmount()
     transport.mockClear()
-    const forced = await Endge.runtime.simulation.mount('scenario', { forceMock: true })
+    const forced = await Endge.runtime.simulation.mount('scenario', { forceMock: true, generator })
     const uncovered = forced.host.target!.getChild('uncovered') as QueryRuntimeHost
     expect(Endge.runtime.resolveDataMode(uncovered)).toBe('mock')
     await uncovered.run()
@@ -83,7 +90,7 @@ describe('simulation runtime isolation and lifecycle', () => {
   it('keeps the running simulation policy when a new artifact is published', async () => {
     setup('composition')
     const transport = vi.spyOn(Endge.runtime.query, 'executeArtifact').mockResolvedValue(['network'])
-    const session = await Endge.runtime.simulation.mount('scenario')
+    const session = await Endge.runtime.simulation.mount('scenario', { generator })
     const original = Endge.program.getArtifact<SimulationSourceArtifact>('simulation', 'scenario')!
     Endge.program.addArtifact({ ...original, payload: { ...original.payload, dataMode: 'live' as const } })
     const query = session.host.target!.getChild('uncovered') as QueryRuntimeHost
@@ -91,22 +98,43 @@ describe('simulation runtime isolation and lifecycle', () => {
     await query.run()
     expect(transport).not.toHaveBeenCalled()
     await session.unmount()
-    const restarted = await Endge.runtime.simulation.mount('scenario')
+    const restarted = await Endge.runtime.simulation.mount('scenario', { generator })
     expect(Endge.runtime.resolveDataMode(restarted.host.target!.getChild('uncovered'))).toBe('live')
     await restarted.unmount()
+  })
+
+  it('aborts pending service generation during runtime reset', async () => {
+    setup('composition')
+    let began!: () => void
+    const ready = new Promise<void>((resolve) => {
+      began = resolve
+    })
+    const pendingGenerator: SimulationGenerator = {
+      ...generator,
+      generate: (_schema, _seed, signal) => new Promise((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(new DOMException('Generation cancelled', 'AbortError')), { once: true })
+        began()
+      }),
+    }
+    const mounting = Endge.runtime.simulation.mount('scenario', { generator: pendingGenerator })
+    const rejected = expect(mounting).rejects.toThrow('Generation cancelled')
+    await ready
+    await Endge.runtime.reset()
+    await rejected
+    expect(Endge.runtime.getRuntimeHosts()).toEqual([])
   })
 
   it('rejects a stale override before allocating hosts', async () => {
     setup('composition')
     const artifact = Endge.program.getArtifact<SimulationSourceArtifact>('simulation', 'scenario')!
     artifact.payload.runtimes = [{ alias: 'missing', request: request(2) }]
-    await expect(Endge.runtime.simulation.mount('scenario')).rejects.toThrow('missing')
+    await expect(Endge.runtime.simulation.mount('scenario', { generator })).rejects.toThrow('missing')
     expect(Endge.runtime.getRuntimeHosts()).toEqual([])
   })
 
   it('cancels target activation and releases the graph during runtime reset', async () => {
     setup('composition')
-    const session = await Endge.runtime.simulation.mount('scenario')
+    const session = await Endge.runtime.simulation.mount('scenario', { generator })
     await session.host.deactivateTarget()
     const activation = session.host.activateTarget()
     const rejection = expect(activation).rejects.toThrow('отменена')

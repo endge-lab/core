@@ -1,16 +1,17 @@
 import type { BrowserBridge_Adapter } from '@/features/core/modules/bridge/adapters/BrowserBridge_Adapter'
-import type { BridgeInspectionSnapshot, BridgeStreamEvent } from '@/features/core/modules/bridge/domain/bridge-sync.type'
+import type { BridgeInspectionMessage, BridgeInspectionSnapshot, BridgeInspectionUpdate } from '@/features/core/modules/bridge/domain/bridge-sync.type'
 import type { BridgeCommands, BridgeDebugClient, BridgeDebugSession, BridgeMessage, DebugConnectionRequest, SimulationRunResult } from '@/features/core/modules/bridge/domain/bridge.type'
 import type { EndgeCommand } from '@/features/core/modules/commands/domain/commands.types'
 import type { DiagnosticsSnapshot } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
 import { Endge } from '@/features/core/kernel/endge'
 import { BRIDGE_CONFIG, BRIDGE_SNAPSHOT_OPTIONS, normalizeBridgeServer } from '@/features/core/modules/bridge/config/bridge.config'
-import { readBridgeCommand, readBridgeContextEvent, readBridgeInspectionSnapshot, readBridgeStreamEvent } from '@/features/core/modules/bridge/tools/bridge-sync'
+import { readBridgeCommand, readBridgeContextEvent, readBridgeInspectionSnapshot, readBridgeInspectionUpdate, readBridgeRuntimeEvent, readBridgeStreamEvent } from '@/features/core/modules/bridge/tools/bridge-sync'
 import { EndgeModule } from '@/features/federation/EndgeModule'
 
 interface IncomingEventStream {
   sequence: number | null
-  readonly buffered: BridgeStreamEvent[]
+  readonly buffered: BridgeInspectionMessage[]
+  bufferedBytes: number
 }
 
 /** Debug policy и единственная client reservation сразу для всех backend. */
@@ -27,6 +28,10 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
   private _outgoingSession: BridgeDebugSession | null = null
   private _outgoingSequence = 0
   private _unsubscribeEvents: (() => void) | null = null
+  private _releaseData: (() => void) | null = null
+  private _dataTimer: ReturnType<typeof setInterval> | null = null
+  private _topologyTimer: ReturnType<typeof setTimeout> | null = null
+  private _dataDirty = false
 
   /**
    * ----------------------------------------
@@ -111,7 +116,7 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
   public async startContextSync(sessionId: string): Promise<BridgeInspectionSnapshot> {
     this._requireConfigurator()
     const session = this._requireSession(sessionId)
-    const stream: IncomingEventStream = { sequence: null, buffered: [] }
+    const stream: IncomingEventStream = { sequence: null, buffered: [], bufferedBytes: 0 }
     this._incoming.set(sessionId, stream)
     try {
       const result = readBridgeInspectionSnapshot(await this._commands.request(session.serverUrl, { type: 'startContextSync', sessionId }))
@@ -140,7 +145,19 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     for (const event of stream.buffered.splice(0)) {
       this._applyIncomingEvent(stream, event)
     }
+    stream.bufferedBytes = 0
     this.notify()
+  }
+
+  /** Обновляет Runtime и данные через тот же упорядоченный поток, что и события. */
+  public async refreshInspection(sessionId: string): Promise<void> {
+    await this._requestInspection(sessionId, 'refreshInspection')
+  }
+
+  /** Ноль оставляет ручное обновление; положительный интервал ограничивает частоту полных данных. */
+  public async setInspectionInterval(sessionId: string, intervalMs: number): Promise<void> {
+    this._validateInterval(intervalMs)
+    await this._requestInspection(sessionId, 'setInspectionOptions', { intervalMs })
   }
 
   /** Отправляет запрос выбранному клиенту только после завершения первичной синхронизации. */
@@ -200,10 +217,10 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
       }
       this.notify()
     }
-    else if (message.type === 'clientEvent') {
+    else if (message.type === 'clientEvent' || message.type === 'inspectionSnapshot') {
       this._receiveEvent(serverUrl, message)
     }
-    else if (message.type === 'getSnapshot' || message.type === 'startContextSync' || message.type === 'executeCommand' || message.type === 'runSimulation') {
+    else if (message.type === 'getSnapshot' || message.type === 'startContextSync' || message.type === 'executeCommand' || message.type === 'runSimulation' || message.type === 'refreshInspection' || message.type === 'setInspectionOptions') {
       await this._execute(serverUrl, message)
     }
   }
@@ -227,6 +244,7 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
 
   /** Отзывает текущий lifecycle и освобождает принадлежащее модулю состояние. */
   public override reset(): void {
+    this._stopInspectionPublishing()
     this._unsubscribeEvents?.()
     this._unsubscribeEvents = null
     this._outgoingSession = null
@@ -291,6 +309,20 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
         await Endge.commands.execute(readBridgeCommand(message.data))
         data = null
       }
+      else if (message.type === 'refreshInspection' || message.type === 'setInspectionOptions') {
+        if (this._outgoingSession !== session) {
+          throw new Error('[Endge Bridge] Inspection stream is not ready')
+        }
+        if (message.type === 'refreshInspection') {
+          this._publishInspection(session, { kind: 'runtime', snapshot: Endge.runtime.captureInspection(true) })
+        }
+        else {
+          const intervalMs = (message.data as { intervalMs?: unknown } | undefined)?.intervalMs
+          this._validateInterval(intervalMs)
+          this._configureDataPublishing(session, intervalMs)
+        }
+        data = null
+      }
       else {
         const identity = message.identity ?? ''
         const simulation = Endge.domain.getSimulationByIdentity(identity)
@@ -322,6 +354,9 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     }
     catch (error) {
       if (this._sessions.get(session.sessionId) === session) {
+        if (message.type === 'refreshInspection') {
+          this._publishSafely(session, () => ({ kind: 'data-error', message: (error instanceof Error ? error.message : 'Snapshot failed').slice(0, 1024) }))
+        }
         this._commands.send(serverUrl, { type: 'commandResult', id: message.id, sessionId: session.sessionId, error: error instanceof Error ? error.message : 'Client command failed' })
       }
     }
@@ -333,11 +368,19 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
       return
     }
     this._unsubscribeEvents?.()
+    this._stopInspectionPublishing()
     this._outgoingSession = session
     this._outgoingSequence = 0
     this._unsubscribeEvents = Endge.events.onAny((event) => {
       if (this._role !== 'client' || this._sessions.get(session.sessionId) !== session || this._outgoingSession !== session) {
         return
+      }
+      if (event.name === 'runtime:data-changed') {
+        this._dataDirty = true
+        return
+      }
+      if (event.name === 'runtime:registry-changed' || event.name === 'runtime:scopes-changed') {
+        this._scheduleTopology(session)
       }
       try {
         this._commands.send(session.serverUrl, {
@@ -367,41 +410,170 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     if (!session || session.serverUrl !== serverUrl || !stream) {
       return
     }
-    const event = readBridgeStreamEvent(message.data)
+    const event = message.type === 'inspectionSnapshot' ? readBridgeInspectionUpdate(message.data) : readBridgeStreamEvent(message.data)
     if (stream.sequence === null) {
-      if (stream.buffered.length >= BRIDGE_CONFIG.maxBufferedEvents) {
+      const bytes = new TextEncoder().encode(JSON.stringify(event)).byteLength
+      if (stream.buffered.length >= BRIDGE_CONFIG.maxBufferedEvents || stream.bufferedBytes + bytes > BRIDGE_CONFIG.maxBufferedBytes) {
         throw new Error('[Endge Bridge] Snapshot event buffer limit exceeded')
       }
       stream.buffered.push(event)
+      stream.bufferedBytes += bytes
       return
     }
     this._applyIncomingEvent(stream, event)
   }
 
   /** Дубликаты и события из снимка пропускаются; разрыв последовательности завершает синхронизацию. */
-  private _applyIncomingEvent(stream: IncomingEventStream, message: BridgeStreamEvent): void {
+  private _applyIncomingEvent(stream: IncomingEventStream, message: BridgeInspectionMessage): void {
     if (stream.sequence === null || message.sequence <= stream.sequence) {
       return
     }
     if (message.sequence !== stream.sequence + 1) {
       throw new Error('[Endge Bridge] Event stream sequence gap')
     }
-    const event = readBridgeContextEvent(message.event)
-    stream.sequence = message.sequence
-    if (event) {
-      Endge.context.applyEvent(event)
+    if ('update' in message) {
+      const update = message.update
+      if (update.kind === 'runtime') {
+        Endge.runtime.applyInspectionSnapshot(update.snapshot)
+      }
+      else if (update.kind === 'data') {
+        Endge.runtime.applyInspectionData(update.data, update.generatedAt, update.render)
+      }
+      else {
+        Endge.runtime.applyInspectionDataError(update.message)
+      }
     }
+    else {
+      const contextEvent = readBridgeContextEvent(message.event)
+      const runtimeEvent = readBridgeRuntimeEvent(message.event)
+      if (contextEvent) {
+        Endge.context.applyEvent(contextEvent)
+      }
+      if (runtimeEvent) {
+        Endge.runtime.applyInspectionEvent(runtimeEvent)
+      }
+    }
+    stream.sequence = message.sequence
   }
 
   /** Снимает буфер и подписку только соответствующего сеанса. */
   private _releaseStream(sessionId: string): void {
     this._incoming.delete(sessionId)
     if (this._outgoingSession?.sessionId === sessionId) {
+      this._stopInspectionPublishing()
       this._unsubscribeEvents?.()
       this._unsubscribeEvents = null
       this._outgoingSession = null
       this._outgoingSequence = 0
     }
+  }
+
+  /** Привязывает запрос наблюдения к готовому сеансу и проверяет его после ответа. */
+  private async _requestInspection(sessionId: string, type: string, data?: unknown): Promise<void> {
+    this._requireConfigurator()
+    const session = this._requireSession(sessionId)
+    if (this._incoming.get(sessionId)?.sequence == null) {
+      throw new Error('[Endge Bridge] Inspection stream is not ready')
+    }
+    await this._commands.request(session.serverUrl, { type, sessionId, data })
+    if (this._sessions.get(sessionId) !== session) {
+      throw new Error('[Endge Bridge] Inspection session ended')
+    }
+  }
+
+  /** Проверяет единый диапазон на обеих сторонах транспорта. */
+  private _validateInterval(value: unknown): asserts value is number {
+    if (!Number.isSafeInteger(value) || (value !== 0 && (Number(value) < BRIDGE_CONFIG.minInspectionIntervalMs || Number(value) > BRIDGE_CONFIG.maxInspectionIntervalMs))) {
+      throw new Error('[Endge Bridge] Invalid inspection interval')
+    }
+  }
+
+  /** Coalescing топологии не зависит от включения периодических снимков данных. */
+  private _scheduleTopology(session: BridgeDebugSession): void {
+    if (this._topologyTimer !== null) {
+      return
+    }
+    this._topologyTimer = setTimeout(() => {
+      this._topologyTimer = null
+      this._publishSafely(session, () => ({ kind: 'runtime', snapshot: Endge.runtime.captureInspection() }))
+    }, 0)
+  }
+
+  /** Fixed interval не голодает при непрерывных изменениях и пропускает неизменившиеся данные. */
+  private _configureDataPublishing(session: BridgeDebugSession, intervalMs: number): void {
+    this._stopDataPublishing()
+    if (intervalMs === 0) {
+      return
+    }
+    const lease = Endge.runtime.acquireDataChanges()
+    this._releaseData = () => lease.release()
+    this._dataDirty = true
+    const publish = () => {
+      if (!this._dataDirty) {
+        return
+      }
+      this._dataDirty = false
+      this._publishSafely(session, () => ({ kind: 'data', ...Endge.runtime.captureInspectionData() }))
+    }
+    publish()
+    if (this._outgoingSession === session && this._sessions.get(session.sessionId) === session) {
+      this._dataTimer = setInterval(publish, intervalMs)
+    }
+  }
+
+  /** Ошибка снимка сохраняет предыдущие данные, но явно помечает их как не обновлённые. */
+  private _publishSafely(session: BridgeDebugSession, capture: () => BridgeInspectionUpdate['update']): void {
+    if (this._outgoingSession !== session || this._sessions.get(session.sessionId) !== session) {
+      return
+    }
+    try {
+      this._publishInspection(session, capture())
+    }
+    catch (error) {
+      try {
+        this._publishInspection(session, { kind: 'data-error', message: (error instanceof Error ? error.message : 'Snapshot failed').slice(0, 1024) })
+      }
+      catch {
+        this.disconnect(session.serverUrl)
+        try {
+          this._commands.send(session.serverUrl, { type: 'endSession', sessionId: session.sessionId })
+        }
+        catch { /* Закрытый транспорт уже отзывает сеанс. */ }
+      }
+    }
+  }
+
+  /** Размер проверяется до выделения sequence: отклонённый payload не создаёт разрыв потока. */
+  private _publishInspection(session: BridgeDebugSession, update: BridgeInspectionUpdate['update']): void {
+    if (this._outgoingSession !== session || this._sessions.get(session.sessionId) !== session) {
+      return
+    }
+    const data = { sequence: this._outgoingSequence + 1, update }
+    if (new TextEncoder().encode(JSON.stringify(data)).byteLength > BRIDGE_CONFIG.maxInspectionBytes) {
+      throw new Error('[Endge Bridge] Inspection snapshot exceeds size limit')
+    }
+    this._commands.send(session.serverUrl, { type: 'inspectionSnapshot', sessionId: session.sessionId, data })
+    this._outgoingSequence = data.sequence
+  }
+
+  /** Последняя lease снимает дорогую подписку на изменения Raph. */
+  private _stopDataPublishing(): void {
+    if (this._dataTimer !== null) {
+      clearInterval(this._dataTimer)
+    }
+    this._dataTimer = null
+    this._releaseData?.()
+    this._releaseData = null
+    this._dataDirty = false
+  }
+
+  /** Все отложенные публикации принадлежат одному сеансу. */
+  private _stopInspectionPublishing(): void {
+    this._stopDataPublishing()
+    if (this._topologyTimer !== null) {
+      clearTimeout(this._topologyTimer)
+    }
+    this._topologyTimer = null
   }
 
   /** Проверяет локальную роль и явное разрешение отладки. */

@@ -2,7 +2,7 @@ import type { EndgeModuleDefinition } from '@/features/federation/types/endge-mo
 import { EndgeActions_Module } from '@/features/core/modules/actions/EndgeActions_Module'
 import { EndgeAuth_Module } from '@/features/core/modules/auth/EndgeAuth_Module'
 import { EndgeBridge_Module } from '@/features/core/modules/bridge/EndgeBridge_Module'
-import { createContextCommandHandlers } from '@/features/core/modules/commands/config/commands.config'
+import { createContextCommandHandlers, createRuntimeCommandHandlers } from '@/features/core/modules/commands/config/commands.config'
 import { EndgeCommands_Module } from '@/features/core/modules/commands/EndgeCommands_Module'
 import { LocalCommandExecutor } from '@/features/core/modules/commands/services/LocalCommandExecutor'
 import { EndgeCompiler_Module } from '@/features/core/modules/compiler/EndgeCompiler_Module'
@@ -45,9 +45,12 @@ export const ENDGE_CORE_MODULES = [
   {
     key: 'commands',
     create: ({ getModule }) => new EndgeCommands_Module(
-      new LocalCommandExecutor(createContextCommandHandlers(getModule<EndgeContext_Module>('context'))),
+      new LocalCommandExecutor([
+        ...createContextCommandHandlers(getModule<EndgeContext_Module>('context')),
+        ...createRuntimeCommandHandlers(getModule<EndgeRuntime_Module>('runtime')),
+      ]),
     ),
-    after: 'context',
+    after: ['context', 'runtime'],
   },
 
   /**

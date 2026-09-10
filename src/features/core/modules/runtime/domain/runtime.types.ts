@@ -35,6 +35,7 @@ export interface EndgeRuntimeSnapshot extends RuntimeHostRegistrySnapshot {
 /** Опциональные данные и graph-состояние Raph для диагностического snapshot. */
 export interface EndgeRuntimeRaphSnapshot {
   data?: unknown
+  render?: import('./runtime-render-inspection.types').RuntimeRenderInspection
   graph?: {
     runtimeId: string
     loopEnabled: boolean

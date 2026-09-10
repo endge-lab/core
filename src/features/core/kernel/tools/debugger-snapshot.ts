@@ -3,6 +3,7 @@ import type { DiagnosticsSnapshot } from '@/features/core/modules/diagnostics/do
 import type { EndgeDataMode } from '@/features/core/modules/workspace/domain/workspace.types'
 import { normalizeEndgeConfiguration } from '@/features/core/modules/configuration/domain/endge-configuration'
 import { normalizeEndgeWorkspaceDefinition } from '@/features/core/modules/domain/entities/RWorkspace'
+import { readRuntimeInspectionSnapshot } from '@/features/core/modules/runtime/tools/runtime-inspection'
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null
@@ -44,5 +45,13 @@ export function prepareDebuggerSnapshot(snapshot: DiagnosticsSnapshot) {
     throw new Error('[Endge] Snapshot workspace and context do not match')
   }
   const configuration = normalizeEndgeConfiguration(captured('configuration') ?? workspace.configuration)
-  return { domain: snapshot.domain, workspace, context, configuration }
+  const raph = record(snapshot.raph)
+  const runtime = snapshot.runtime
+    ? readRuntimeInspectionSnapshot({
+        version: 1,
+        runtime: snapshot.runtime,
+        ...(raph && Object.hasOwn(raph, 'data') ? { data: raph.data, render: raph.render, dataGeneratedAt: snapshot.generatedAt } : {}),
+      })
+    : null
+  return { domain: snapshot.domain, workspace, context, configuration, runtime }
 }

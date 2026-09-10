@@ -7,7 +7,9 @@ export interface StreamTransportMessage {
 }
 
 export interface StreamTransportConnection {
-  close: () => void
+  close: () => void | Promise<void>
+  pause?: () => Promise<void>
+  resume?: () => Promise<void>
 }
 
 /** Нейтральный к браузеру порт, используемый StreamRuntimeHost. */

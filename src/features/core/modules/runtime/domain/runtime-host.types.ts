@@ -529,4 +529,6 @@ export interface RuntimeHost<
 
   /** Сериализовать host в снимок для UI/диагностики. */
   snapshot: () => RuntimeHostSnapshot
+  /** Чистый снимок привязок renderer, без запуска или изменения host. */
+  captureRenderInspection?: () => import('./runtime-render-inspection.types').RuntimeRenderableInspection
 }

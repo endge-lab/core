@@ -7,10 +7,28 @@ export interface SimulationMockRequest {
   arrays: Record<string, number>
 }
 
+/** Ограничения сценария сужают существующий Type, не создавая новый Domain Type. */
+export interface SimulationFieldConstraints {
+  enum?: Array<string | number | boolean>
+  minimum?: number
+  maximum?: number
+}
+
+export interface SimulationMockStream {
+  kind: 'mock-stream'
+  type: string
+  event: string
+  seed?: string
+  intervalMs: number
+  itemsPerMessage: number
+  fields: Record<string, SimulationFieldConstraints>
+}
+
 export interface SimulationRuntimeOverride {
   alias: string
   runtimes?: SimulationRuntimeOverride[]
   request?: SimulationMockRequest
+  stream?: SimulationMockStream
 }
 
 export type SimulationTargetReference

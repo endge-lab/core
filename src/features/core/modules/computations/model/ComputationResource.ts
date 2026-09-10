@@ -22,6 +22,7 @@ export class ComputationResourceState<T = unknown> implements ComputationResourc
     input: unknown,
     private readonly _asyncRunner: AsyncRunner<T>,
     private readonly _syncRunner: SyncRunner<T> | null = null,
+    private readonly _identity = '',
   ) {
     this._input = input
     if (_syncRunner) {
@@ -34,6 +35,11 @@ export class ComputationResourceState<T = unknown> implements ComputationResourc
   get loading() { return this._status === 'pending' }
   get value() { return this._value }
   get error() { return this._error }
+
+  /** Снимок фактического результата для пассивного renderer debugger. */
+  public snapshot() {
+    return { identity: this._identity, input: this._input, status: this.status, loading: this.loading, value: this.value, error: this.error }
+  }
 
   updateInput(input: unknown): void {
     if (this._disposed || Object.is(input, this._input)) {

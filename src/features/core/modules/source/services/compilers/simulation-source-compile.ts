@@ -1,5 +1,5 @@
 import type { ProgramDiagnostic } from '@/features/core/modules/program/domain/types/program.types'
-import type { SimulationMockRequest, SimulationRuntimeOverride, SimulationSourceCompileResult, SimulationTargetReference } from '@/features/core/modules/source/domain/types/simulation-source.types'
+import type { SimulationFieldConstraints, SimulationMockRequest, SimulationMockStream, SimulationRuntimeOverride, SimulationSourceCompileResult, SimulationTargetReference } from '@/features/core/modules/source/domain/types/simulation-source.types'
 
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
@@ -92,7 +92,7 @@ export function compileSimulationSource(source: string, sourceVersion = 1): Simu
   function readRuntimes(node: t.Node | null | undefined, path: string): SimulationRuntimeOverride[] {
     return [...object(node, path)].map(([alias, value]) => {
       const runtimePath = `${path}.${alias}`
-      const properties = object(value, runtimePath, ['runtimes', 'request'])
+      const properties = object(value, runtimePath, ['runtimes', 'request', 'stream'])
       const override: SimulationRuntimeOverride = { alias }
       if (properties.has('runtimes')) {
         override.runtimes = readRuntimes(properties.get('runtimes'), `${runtimePath}.runtimes`)
@@ -100,8 +100,65 @@ export function compileSimulationSource(source: string, sourceVersion = 1): Simu
       if (properties.has('request')) {
         override.request = readRequest(properties.get('request'), `${runtimePath}.request`)
       }
+      if (properties.has('stream')) {
+        override.stream = readStream(properties.get('stream'), `${runtimePath}.stream`)
+      }
       return override
     })
+  }
+
+  function readStream(node: t.Node | null | undefined, path: string): SimulationMockStream | undefined {
+    if (!isCall(node, 'mockStream')) {
+      diagnostics.push(diagnostic('error', 'simulation-stream-shape', 'stream должен иметь вид mockStream({ type, event, intervalMs?, itemsPerMessage?, seed?, fields? }).', path, node))
+      return undefined
+    }
+    const options = object(node.arguments[0], path, ['type', 'event', 'intervalMs', 'itemsPerMessage', 'seed', 'fields'])
+    const type = options.get('type')
+    const event = options.get('event')
+    const identity = t.isIdentifier(type) ? type.name : t.isStringLiteral(type) ? type.value : ''
+    const stream: SimulationMockStream = { kind: 'mock-stream', type: identity, event: t.isStringLiteral(event) ? event.value : '', intervalMs: 1000, itemsPerMessage: 1, fields: Object.create(null) }
+    if (!identity || !stream.event.trim()) {
+      diagnostics.push(diagnostic('error', 'simulation-stream-contract', 'Укажите существующий Type и строковое имя event.', path, node))
+    }
+    for (const [key, min, max] of [['intervalMs', 100, 60000], ['itemsPerMessage', 1, 100]] as const) {
+      const value = options.get(key)
+      if (!value) {
+        continue
+      }
+      if (!t.isNumericLiteral(value) || !Number.isInteger(value.value) || value.value < min || value.value > max) {
+        diagnostics.push(diagnostic('error', 'simulation-stream-range', `${key}: допустимо целое число ${min}…${max}.`, `${path}.${key}`, value))
+      }
+      else {
+        stream[key] = value.value
+      }
+    }
+    const seed = options.get('seed')
+    if (seed) {
+      if (t.isStringLiteral(seed)) {
+        stream.seed = seed.value
+      }
+      else {
+        diagnostics.push(diagnostic('error', 'simulation-seed-shape', 'seed должен быть строкой.', `${path}.seed`, seed))
+      }
+    }
+    if (options.has('fields')) {
+      for (const [field, value] of object(options.get('fields'), `${path}.fields`)) {
+        const constraints: SimulationFieldConstraints = {}
+        for (const [key, literal] of object(value, `${path}.fields.${field}`, ['enum', 'minimum', 'maximum'])) {
+          if (key === 'enum' && t.isArrayExpression(literal) && literal.elements.length && literal.elements.every(item => t.isStringLiteral(item) || t.isNumericLiteral(item) || t.isBooleanLiteral(item))) {
+            constraints.enum = literal.elements.map(item => (item as t.StringLiteral | t.NumericLiteral | t.BooleanLiteral).value)
+          }
+          else if ((key === 'minimum' || key === 'maximum') && (t.isNumericLiteral(literal) || (t.isUnaryExpression(literal, { operator: '-' }) && t.isNumericLiteral(literal.argument)))) {
+            constraints[key] = t.isNumericLiteral(literal) ? literal.value : -(literal.argument as t.NumericLiteral).value
+          }
+          else {
+            diagnostics.push(diagnostic('error', 'simulation-field-constraint', 'Ожидается непустой enum скаляров или числовая граница.', `${path}.fields.${field}.${key}`, literal))
+          }
+        }
+        stream.fields[field] = constraints
+      }
+    }
+    return stream
   }
 
   function readRequest(node: t.Node | null | undefined, path: string): SimulationMockRequest | undefined {
@@ -122,8 +179,8 @@ export function compileSimulationSource(source: string, sourceVersion = 1): Simu
     }
     if (options.has('arrays')) {
       for (const [key, count] of object(options.get('arrays'), `${path}.arrays`)) {
-        if (!t.isNumericLiteral(count) || !Number.isSafeInteger(count.value) || count.value < 0) {
-          diagnostics.push(diagnostic('error', 'simulation-array-count', 'Количество элементов должно быть целым неотрицательным числом.', `${path}.arrays.${key}`, count))
+        if (!t.isNumericLiteral(count) || !Number.isSafeInteger(count.value) || count.value < 0 || count.value > 100) {
+          diagnostics.push(diagnostic('error', 'simulation-array-count', 'Количество элементов должно быть целым числом от 0 до 100.', `${path}.arrays.${key}`, count))
         }
         else {
           request.arrays[key] = count.value

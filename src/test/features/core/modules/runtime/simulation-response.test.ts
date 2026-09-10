@@ -3,7 +3,7 @@ import type { RuntimeArtifactReader } from '@/features/core/modules/runtime/doma
 import type { TypeProgramPayload, TypeSourceField } from '@/features/core/modules/source/domain/types/type-source.types'
 
 import { describe, expect, it } from 'vitest'
-import { generateSimulationResponse } from '@/features/core/modules/runtime/services/simulation/generate-simulation-response'
+import { createSimulationSchema } from '@/features/core/modules/runtime/services/simulation/create-simulation-schema'
 
 function field(key: string, identity: string, extra: Partial<TypeSourceField> = {}): TypeSourceField {
   return {
@@ -32,35 +32,23 @@ const reader: RuntimeArtifactReader = {
     : null,
 }
 
-describe('simulation response generation', () => {
-  it('uses compiled nested array paths, seed, and fractional bounds', () => {
-    const contract = { key: 'result', type: 'Envelope', array: false, optional: false }
-    const request = { kind: 'mock-request' as const, seed: 'fixed', arrays: { 'items': 20, 'items[].children': 2 } }
-    const first = generateSimulationResponse(contract, request, reader, 'a') as { items: { price: number, children: string[] }[] }
-    expect(first).toEqual(generateSimulationResponse(contract, request, reader, 'b'))
-    expect(first.items).toHaveLength(20)
-    for (const row of first.items) {
-      expect(row.children).toHaveLength(2)
-      expect(row.price).toBeGreaterThanOrEqual(0.1)
-      expect(row.price).toBeLessThanOrEqual(0.2)
-    }
+describe('simulation schema projection', () => {
+  it('preserves nested array counts and fractional field constraints for the service', () => {
+    const schema = createSimulationSchema({ type: 'Envelope', array: false }, reader, { 'items': 20, 'items[].children': 2 })
+    expect(schema).toMatchObject({ type: 'object', properties: { items: { minItems: 20, maxItems: 20, items: { properties: {
+      price: { type: 'number', minimum: 0.1, maximum: 0.2 },
+      children: { type: 'array', minItems: 2, maxItems: 2 },
+    } } } } })
   })
 
-  it('rejects required recursion before executing a target', () => {
-    expect(() => generateSimulationResponse(
-      { key: 'result', type: 'Recursive', array: false, optional: false },
-      { kind: 'mock-request', arrays: {} },
-      reader,
-      'a',
-    )).toThrow('рекурсивную')
+  it('rejects recursive types and unknown scenario fields', () => {
+    expect(() => createSimulationSchema({ type: 'Recursive', array: false }, reader)).toThrow('Рекурсивный')
+    expect(() => createSimulationSchema({ type: 'Row', array: false }, reader, {}, { missing: { enum: ['x'] } })).toThrow('отсутствует')
   })
 
-  it('limits multiplied nested arrays even when each size is individually valid', () => {
-    expect(() => generateSimulationResponse(
-      { key: 'result', type: 'Envelope', array: false, optional: false },
-      { kind: 'mock-request', arrays: { 'items': 1000, 'items[].children': 1000 } },
-      reader,
-      'a',
-    )).toThrow()
+  it('narrows constraints and rejects widening enum types and empty ranges', () => {
+    expect(createSimulationSchema({ type: 'Row', array: false }, reader, {}, { price: { minimum: 0.15 } })).toMatchObject({ properties: { price: { minimum: 0.15, maximum: 0.2 } } })
+    expect(() => createSimulationSchema({ type: 'Row', array: false }, reader, {}, { price: { minimum: 1 } })).toThrow('Пустой диапазон')
+    expect(() => createSimulationSchema({ type: 'Row', array: false }, reader, {}, { name: { enum: [1] } })).toThrow('несовместим')
   })
 })

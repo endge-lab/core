@@ -15,7 +15,7 @@ interface SimulationCompositionBranch {
 
 export interface SimulationSourceTarget {
   alias: string
-  kind: 'project' | 'composition' | 'scope' | 'query' | 'unsupported'
+  kind: 'project' | 'composition' | 'scope' | 'query' | 'stream' | 'unsupported'
   identity: string
   branch: SimulationCompositionBranch | null
 }
@@ -56,7 +56,7 @@ export class SimulationSourceResolver {
       .filter(runtime => runtime.scopePath === branch.scopePath)
       .map(runtime => ({
         alias: branch.scopePath === 'scope_default' ? runtime.name : runtime.path.slice(branch.scopePath.length + 1),
-        kind: runtime.kind === 'composition' || runtime.kind === 'query' ? runtime.kind : 'unsupported',
+        kind: runtime.kind === 'composition' || runtime.kind === 'query' || runtime.kind === 'stream' ? runtime.kind : 'unsupported',
         identity: runtime.identity,
         branch: runtime.kind === 'composition' ? this.composition(runtime.identity) : null,
       }))
@@ -195,7 +195,18 @@ export class SimulationSourceResolver {
           addReference({ entityType: 'composition', identity: target.identity })
         }
         if (target.kind === 'unsupported') {
-          report('simulation-runtime-unsupported', `Подмена "${override.alias}" не поддерживается: Simulation v1 описывает только Query request.`, currentPath)
+          report('simulation-runtime-unsupported', `Подмена "${override.alias}" не поддерживается: Simulation v1 поддерживает Query request и Stream events.`, currentPath)
+        }
+        if (override.stream) {
+          if (target.kind !== 'stream') {
+            report('simulation-stream-target', 'stream разрешён только для Stream runtime.', `${currentPath}.stream`)
+          }
+          const type = this._catalog.types.find(item => item.identity === override.stream!.type)
+          dependencies.push({ entityType: 'stream', id: target.identity, identity: target.identity, role: 'simulation-stream' })
+          dependencies.push({ entityType: 'type', id: type?.id ?? override.stream.type, identity: override.stream.type, role: 'simulation-stream-contract' })
+          if (!type || (!type.isPrimitive && compileTypeSource(type.source, type.sourceVersion).diagnostics.some(item => item.severity === 'error'))) {
+            report('simulation-stream-type', `Type "${override.stream.type}" отсутствует или содержит ошибки.`, `${currentPath}.stream.type`)
+          }
         }
         if (override.request) {
           if (target.kind !== 'query') {

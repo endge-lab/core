@@ -4,6 +4,7 @@ import type { ComponentSFCProgramPayload, ProgramArtifact } from '@/features/cor
 import type {
   RuntimeArtifactReader,
   RuntimeBoundaryPatch,
+  RuntimeHost,
   RuntimeHostUpdateContext,
 } from '@/features/core/modules/runtime/domain/runtime-host.types'
 import { Raph } from '@endge/raph'
@@ -23,6 +24,39 @@ describe('проверка Host runtime для ComponentSFC', () => {
     Endge.domain.reset()
     Raph.app.reset()
     Raph.clearPhases()
+  })
+
+  it('обновляет вложенные props при замене объекта отчёта и снимает подписки при destroy', () => {
+    const source = `<script setup lang="ts">
+const props = defineProps<{ report: { total: number, count: number } }>()
+</script>
+<template><Number :value="props.report.total" /><Text>{{ props.report.count }}</Text></template>`
+    const artifact = createSFCArtifact(compileComponentSFC(source))
+    const model = RComponentSFC.fromPlain({ id: 101, identity: 'report-card', name: 'Report', source })
+    let host: ComponentSFCRuntimeHost | null = null
+    Raph.definePhases([
+      RuntimeBoundaryUpdatePhase.make({ resolveHost: runtimeId => runtimeId === 'report-runtime' ? host as unknown as RuntimeHost : null }),
+    ])
+    Raph.set('test.report', { total: 10, count: 1 })
+    host = ComponentSFCRuntimeHost.createRuntime({
+      id: 'report-runtime',
+      model,
+      meta: { input: { kind: 'raph', bindings: { report: { path: 'test.report' } } } },
+      artifactReader: { getArtifact: <TPayload>() => artifact as unknown as ProgramArtifact<TPayload> },
+    })
+    const dirty = vi.fn()
+    host.on('props:dirty', dirty)
+
+    Raph.set('test.report', { total: 25, count: 2 })
+    expect(dirty).toHaveBeenCalledTimes(1)
+    Raph.set('test.report.total', 30)
+    expect(dirty).toHaveBeenCalledTimes(2)
+    Raph.set('test.unrelated', { total: 999 })
+    expect(dirty).toHaveBeenCalledTimes(2)
+
+    host.destroy()
+    Raph.set('test.report', { total: 40, count: 3 })
+    expect(dirty).toHaveBeenCalledTimes(2)
   })
 
   it('получает стиль scope при первом экземпляре и освобождает после последнего', () => {

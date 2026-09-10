@@ -139,6 +139,10 @@ export * from '@/features/core/modules/runtime/domain/sfc-render-inspection.type
 export * from '@/features/core/modules/runtime/domain/runtime-project-session.types'
 export * from '@/features/core/modules/runtime/domain/runtime-strategy.types'
 export * from '@/features/core/modules/runtime/domain/runtime.types'
+export * from '@/features/core/modules/runtime/domain/runtime-inspection.types'
+export * from '@/features/core/modules/runtime/domain/runtime-render-inspection.types'
+export * from '@/features/core/modules/runtime/domain/component-sfc-render-port.types'
+export { runtimeInspectionMetaKey } from '@/features/core/modules/runtime/tools/runtime-render-inspection'
 export * from '@/features/core/modules/runtime/domain/table-binding.types'
 export * from '@/features/core/modules/runtime/domain/table.types'
 export * from '@/features/core/modules/source/domain/types/composition-source.types'
@@ -308,3 +312,6 @@ export * from '@/features/core/modules/runtime/domain/stream-runtime.types'
 export { EndgeDebuggerReadOnlyError } from '@/features/core/kernel/errors/EndgeDebuggerReadOnlyError'
 
 export { readOnlyDocument } from './features/core/kernel/tools/read-only-document'
+
+export { resolveRuntimeTranslation } from '@/features/core/modules/i18n/tools/resolve-runtime-translation'
+export { resolveRuntimeVocabOptions } from '@/features/core/modules/runtime/tools/runtime-render-values'

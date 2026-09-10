@@ -7,6 +7,7 @@ import { Raph, RaphNode } from '@endge/raph'
 
 import { Endge } from '@/features/core/kernel/endge'
 import { RuntimeHostBase } from '@/features/core/modules/runtime/RuntimeHostBase'
+import { findSimulationRuntime } from '@/features/core/modules/runtime/services/simulation/find-simulation-runtime'
 
 function defaultContext(): RuntimeHostContext<'stream'> {
   return {
@@ -22,6 +23,7 @@ function defaultContext(): RuntimeHostContext<'stream'> {
 export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostContext<'stream'>, StreamSourceArtifact> {
   private _connection: StreamTransportConnection | null = null
   private _generation = 0
+  private _closing: Promise<void> = Promise.resolve()
   private _contextOff: (() => void) | null = null
   private _dataMode: 'live' | 'mock' = 'live'
 
@@ -99,6 +101,38 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
     if (this._connection) {
       return
     }
+    const simulation = findSimulationRuntime(this)
+    const override = simulation?.streamOverride(this)
+    if (override) {
+      const generation = ++this._generation
+      const isCurrent = () => generation === this._generation && this.status === 'active'
+      this.setContext({ status: 'running', startedAt: new Date().toISOString() })
+      const connection = simulation!.openStream(this, {
+        open: () => {
+          if (isCurrent()) {
+            this.setContext({ status: 'running', updatedAt: new Date().toISOString() })
+          }
+        },
+        error: (error) => {
+          if (generation === this._generation) {
+            this.setContext({ status: 'error', updatedAt: new Date().toISOString() })
+            this.emit('transport:error', error)
+          }
+        },
+        message: (message) => {
+          if (isCurrent()) {
+            this._dispatch({ type: override.options.event, payload: message.data, meta: { id: message.id, source: this.entityIdentity, sourceEvent: message.sourceEvent, occurredAt: new Date().toISOString() } })
+          }
+        },
+      })
+      if (isCurrent()) {
+        this._connection = connection
+      }
+      else {
+        this._disposeConnection(connection)
+      }
+      return
+    }
     if (this._dataMode === 'mock') {
       const updatedAt = new Date().toISOString()
       this.setContext({ status: 'success', startedAt: updatedAt, updatedAt })
@@ -145,19 +179,31 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
     if (isCurrent()) {
       this._connection = connection
     }
-    else { connection.close() }
+    else {
+      this._disposeConnection(connection)
+    }
   }
 
-  /** Пауза закрывает transport и инвалидирует уже поставленные callbacks. */
-  public override pause(): void {
+  /** Generator сохраняет SSE на паузе; обычный transport закрывает соединение. */
+  public override async pause(): Promise<void> {
     super.pause()
-    this._closeConnection()
+    if (this._connection?.pause) {
+      await this._connection.pause()
+    }
+    else {
+      this._closeConnection()
+    }
   }
 
   /** Возобновляет transport только после восстановления host lifecycle. */
-  public override resume(): void {
+  public override async resume(): Promise<void> {
     super.resume()
-    this.start()
+    if (this._connection?.resume) {
+      await this._connection.resume()
+    }
+    else {
+      this.start()
+    }
   }
 
   public override stop(): void {
@@ -176,17 +222,29 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
     super.quiesce()
   }
 
-  public override destroy(): void {
+  public override async destroy(): Promise<void> {
     this.quiesce()
-    super.destroy()
+    try {
+      await this._closing
+    }
+    finally {
+      super.destroy()
+    }
   }
 
   private _closeConnection(): void {
     this._generation += 1
     const connection = this._connection
     this._connection = null
-    connection?.close()
+    if (connection) {
+      this._disposeConnection(connection)
+    }
     this.emit('transport:close', undefined)
+  }
+
+  private _disposeConnection(connection: StreamTransportConnection): void {
+    this._closing = Promise.all([this._closing, connection.close()]).then(() => undefined)
+    void this._closing.catch(error => this.emit('transport:error', error))
   }
 
   private _receive(message: StreamTransportMessage, artifact: StreamSourceArtifact): void {
@@ -211,6 +269,11 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
         occurredAt: now,
       },
     }
+    this._dispatch(envelope)
+  }
+
+  private _dispatch(envelope: StreamEventEnvelope): void {
+    const now = new Date().toISOString()
     this.setContext({
       status: 'success',
       updatedAt: now,

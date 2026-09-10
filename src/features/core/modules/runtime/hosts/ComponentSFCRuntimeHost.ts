@@ -37,6 +37,7 @@ import type {
   RuntimeHostInputSource,
   RuntimeHostUpdateContext,
 } from '@/features/core/modules/runtime/domain/runtime-host.types'
+import type { RuntimeRenderableInspection } from '@/features/core/modules/runtime/domain/runtime-render-inspection.types'
 import type {
   VocabOptionMapping,
   VocabRuntimeCatalog,
@@ -53,6 +54,8 @@ import { createEmptyComponentSFCRuntimeDependencies } from '@/features/core/modu
 import { RUNTIME_BOUNDARY_UPDATE_PHASE_NAME } from '@/features/core/modules/runtime/domain/runtime-host.types'
 import { executeRuntimeOperation } from '@/features/core/modules/runtime/operation/operation-executor'
 import { RuntimeHostBase } from '@/features/core/modules/runtime/RuntimeHostBase'
+import { runtimeInspectionMetaKey } from '@/features/core/modules/runtime/tools/runtime-render-inspection'
+import { resolveRuntimeVocabOptions } from '@/features/core/modules/runtime/tools/runtime-render-values'
 
 function createDefaultSFCContext(target: RComponentRenderTarget | null): RuntimeHostContext<'component-sfc'> {
   return {
@@ -308,28 +311,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     }
 
     this._ensureVocabSubscription(key, entry.path)
-    const values = Raph.get(entry.path)
-    if (!Array.isArray(values)) {
-      return []
-    }
-
-    const valuePath = String(mapping?.valuePath ?? 'value').trim()
-    const labelPath = String(mapping?.labelPath ?? 'label').trim()
-    if (!valuePath || !labelPath) {
-      throw new Error(`[ComponentSFCRuntimeHost] Vocab alias "${key}" requires non-empty valuePath and labelPath.`)
-    }
-
-    return values.flatMap((item): SourceFieldOption[] => {
-      const value = readPath(item, valuePath)
-      if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
-        return []
-      }
-      const label = readPath(item, labelPath)
-      return [{
-        value,
-        label: label == null ? String(value) : String(label),
-      }]
-    })
+    return resolveRuntimeVocabOptions(Raph.get(entry.path), mapping)
   }
 
   /** Возвращает внешний контракт компонента из compiled artifact. */
@@ -606,11 +588,39 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
       this._bindRaphInputSource(this._inputSource)
     }
     this._bindRaphContextSources()
+    this.emit('render-input:changed', null)
   }
 
   /** Возвращает текущий input source host-а. */
   public getInputSource(): RuntimeHostInputSource | null {
     return this._inputSource
+  }
+
+  /** Наблюдение сохраняет входы и уже вычисленное состояние; compilation и execution не запускаются. */
+  public captureRenderInspection(): RuntimeRenderableInspection {
+    const dataMeta: Record<string, unknown> = {}
+    const dependencies = this.getRuntimeDependencies()
+    for (const dependency of dependencies.meta ?? []) {
+      const namespace = dependency.namespace ?? undefined
+      if (dependency.reference.kind === 'prop') {
+        dataMeta[runtimeInspectionMetaKey(dependency.reference, namespace)] = this.readDataMeta(dependency.reference, namespace)
+        continue
+      }
+      const boundary = dependencies.boundaries.find(item => item.id === dependency.boundaryId)
+      const binding = this._inputSource?.kind === 'raph' && boundary ? this._inputSource.bindings[boundary.sourceProp] : null
+      if (!boundary?.rowKey || !binding) {
+        continue
+      }
+      const rows = Raph.get(this._joinRaphPath(binding.path, boundary.sourcePath))
+      if (!Array.isArray(rows)) {
+        continue
+      }
+      for (const row of rows) {
+        const reference = { ...dependency.reference, boundaryId: boundary.id, rowKey: readPath(row, boundary.rowKey) }
+        dataMeta[runtimeInspectionMetaKey(reference, namespace)] = this.readDataMeta(reference, namespace)
+      }
+    }
+    return { kind: 'component-sfc', input: this._inputSource, computations: this._computationResources.snapshot(), dataMeta }
   }
 
   /** Читает Meta-plane по compiler-known ссылке, не раскрывая SFC физический DataPath. */
@@ -983,6 +993,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     }
 
     const deps = this.getRuntimeDependencies()
+    const observed = new Set<string>()
     for (const dependency of deps.props) {
       if (this._isCoveredByPatchableBoundary(dependency.prop, dependency.path)) {
         continue
@@ -993,12 +1004,12 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
         continue
       }
 
-      const path = this._joinRaphPath(binding.path, dependency.path)
-      if (!path) {
-        continue
-      }
-
-      for (const observedPath of this._makeObservedRaphPaths(path, dependency.path)) {
+      for (const observedPath of this._makeObservedRaphPaths(binding.path, dependency.path)) {
+        const key = `${binding.wildcardDynamic ?? true}:${observedPath}`
+        if (observed.has(key)) {
+          continue
+        }
+        observed.add(key)
         const dispose = Raph.app.observeData(this.node, observedPath, {
           phase: RUNTIME_BOUNDARY_UPDATE_PHASE_NAME,
           wildcardDynamic: binding.wildcardDynamic ?? true,
@@ -1412,9 +1423,11 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     }
   }
 
-  private _makeObservedRaphPaths(path: string, dependencyPath: string[]): string[] {
+  private _makeObservedRaphPaths(basePath: string, dependencyPath: string[]): string[] {
+    const path = this._joinRaphPath(basePath, dependencyPath)
     if (dependencyPath.length > 0) {
-      return [path]
+      // Derived outputs могут заменить весь prop, не публикуя события его полей.
+      return [basePath, path]
     }
 
     return [path, `${path}.*`]

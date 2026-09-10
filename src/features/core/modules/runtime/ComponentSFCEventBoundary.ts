@@ -13,7 +13,7 @@ export class ComponentSFCEventBoundary {
   private readonly _consumedLocalOnce = new Set<string>()
 
   public constructor(
-    private readonly _host: ComponentSFCRuntimeHost | null,
+    private readonly _host: Pick<ComponentSFCRuntimeHost, 'executeEventPortAction' | 'publishEventPort' | 'emit'> | null,
     public readonly componentIdentity: string,
     private readonly _manifest: ComponentSFCPortManifest,
     private readonly _parent: ComponentSFCEventBoundary | null = null,

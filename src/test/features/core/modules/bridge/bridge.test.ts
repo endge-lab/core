@@ -7,6 +7,7 @@ import { BrowserBridge_Adapter } from '@/features/core/modules/bridge/adapters/B
 import { parseBridgeAllowedServers } from '@/features/core/modules/bridge/config/bridge.config'
 import { EndgeBridge_Module } from '@/features/core/modules/bridge/EndgeBridge_Module'
 import { RSimulation } from '@/features/core/modules/domain/entities/RSimulation'
+import { inspectionFixture } from '../runtime/fixtures/runtime-inspection'
 
 class FakeSocket {
   public readyState = 1
@@ -76,6 +77,114 @@ afterEach(() => {
 })
 
 describe('политика и lifecycle bridge', () => {
+  /** Начальный snapshot, данные и статусы имеют общую последовательность без обратных Commands. */
+  it('применяет буферизованные Runtime и данные в порядке потока и отзывает сеанс при разрыве', async () => {
+    const { module, adapter } = fixture({ role: 'configurator', serverUrl: server, debug: true })
+    const socket = adapter.sockets[0]!
+    socket.welcome()
+    const requested = module.debug.requestSession({ serverUrl: server, instanceId: 'client' })
+    socket.receive({ type: 'result', id: socket.sent.at(-1)!.id, data: { sessionId: 'session', clientId: 'client', configuratorId: 'connection' } })
+    await requested
+    const order: string[] = []
+    vi.spyOn(Endge.runtime, 'applyInspectionSnapshot').mockImplementation(() => {
+      order.push('runtime')
+    })
+    vi.spyOn(Endge.runtime, 'applyInspectionData').mockImplementation(() => {
+      order.push('data')
+    })
+    vi.spyOn(Endge.runtime, 'applyInspectionEvent').mockImplementation(() => {
+      order.push('status')
+    })
+    const execute = vi.spyOn(Endge.commands, 'execute')
+    const starting = module.debug.startContextSync('session')
+    const requestId = socket.sent.at(-1)!.id
+    const update = (sequence: number, value: unknown) => socket.receive({ type: 'inspectionSnapshot', sessionId: 'session', data: { sequence, update: value } })
+    update(1, { kind: 'runtime', snapshot: inspectionFixture() })
+    update(2, { kind: 'data', data: { fresh: true }, generatedAt: 20 })
+    socket.receive({ type: 'clientEvent', sessionId: 'session', data: { sequence: 3, event: { sequence: 1, at: 20, name: 'runtime:host-status-changed', payload: { id: 'host-0', previous: 'running', value: 'paused' } } } })
+    expect(order).toEqual([])
+    socket.receive({ type: 'result', id: requestId, data: { snapshot: { format: 'endge-diagnostics-snapshot', version: 2 }, sequence: 0 } })
+    module.debug.activateContextSync('session', (await starting).sequence)
+    expect(order).toEqual(['runtime', 'data', 'status'])
+    update(2, { kind: 'data', data: { old: true }, generatedAt: 10 })
+    expect(order).toHaveLength(3)
+    expect(execute).not.toHaveBeenCalled()
+    update(5, { kind: 'data', data: {}, generatedAt: 30 })
+    await tick()
+    expect(module.debug.sessions).toEqual([])
+  })
+
+  /** Непрерывный поток не отодвигает deadline, а отсутствие изменений не создаёт снимки. */
+  it('ограничивает частоту данных, объединяет топологию и освобождает timers и lease', async () => {
+    const { module, adapter } = fixture({ role: 'client', allowedServers: [server], debug: true })
+    const socket = await approve(module, adapter)
+    socket.receive({ type: 'startContextSync', id: 'start', sessionId: 'session' })
+    vi.useFakeTimers()
+    const release = vi.fn()
+    vi.spyOn(Endge.runtime, 'acquireDataChanges').mockReturnValue({ release })
+    const capture = vi.spyOn(Endge.runtime, 'captureInspectionData').mockReturnValue({ data: { rows: [1] }, generatedAt: 1 })
+    vi.spyOn(Endge.runtime, 'captureInspection').mockReturnValue(inspectionFixture())
+    socket.receive({ type: 'setInspectionOptions', id: 'options', sessionId: 'session', data: { intervalMs: 1000 } })
+    expect(capture).toHaveBeenCalledTimes(1)
+    vi.advanceTimersByTime(1000)
+    expect(capture).toHaveBeenCalledTimes(1)
+    for (let index = 0; index < 10; index++) {
+      Endge.events.emitEvent('runtime:data-changed', { revision: index })
+      vi.advanceTimersByTime(100)
+    }
+    expect(capture).toHaveBeenCalledTimes(2)
+    expect(socket.sent.some(m => m.type === 'clientEvent' && (m.data as any).event.name === 'runtime:data-changed')).toBe(false)
+    for (let index = 0; index < 10; index++) {
+      Endge.events.emitEvent('runtime:scopes-changed', {})
+    }
+    vi.advanceTimersByTime(0)
+    expect(socket.sent.filter(m => m.type === 'inspectionSnapshot' && (m.data as any).update.kind === 'runtime')).toHaveLength(1)
+    socket.receive({ type: 'sessionEnded', sessionId: 'session' })
+    expect(release).toHaveBeenCalledOnce()
+    const count = socket.sent.length
+    Endge.events.emitEvent('runtime:data-changed', { revision: 100 })
+    vi.advanceTimersByTime(2000)
+    expect(socket.sent).toHaveLength(count)
+    module.reset()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  /** Слишком большой snapshot не расходует sequence и не выдаётся за успешное обновление. */
+  it('помечает превышение размера и сохраняет непрерывность после следующего успешного снимка', async () => {
+    const { module, adapter } = fixture({ role: 'client', allowedServers: [server], debug: true })
+    const socket = await approve(module, adapter)
+    socket.receive({ type: 'startContextSync', id: 'start', sessionId: 'session' })
+    const huge = { ...inspectionFixture(), data: 'x'.repeat(15 * 1024 * 1024) }
+    const capture = vi.spyOn(Endge.runtime, 'captureInspection').mockReturnValue(huge)
+    socket.receive({ type: 'refreshInspection', id: 'too-large', sessionId: 'session' })
+    expect(socket.sent.at(-2)).toMatchObject({ type: 'inspectionSnapshot', data: { sequence: 1, update: { kind: 'data-error' } } })
+    expect(socket.sent.at(-1)).toMatchObject({ type: 'commandResult', id: 'too-large', error: expect.stringContaining('size limit') })
+    capture.mockReturnValue(inspectionFixture())
+    socket.receive({ type: 'refreshInspection', id: 'refresh', sessionId: 'session' })
+    expect(socket.sent.at(-2)).toMatchObject({ type: 'inspectionSnapshot', data: { sequence: 2, update: { kind: 'runtime' } } })
+    expect(socket.sent.at(-1)).toMatchObject({ type: 'commandResult', id: 'refresh', data: null })
+  })
+
+  /** Некорректная частота отклоняется до создания подписки на локальный Raph. */
+  it('отклоняет некорректные интервалы и не оставляет автообновление после выключения', async () => {
+    const { module, adapter } = fixture({ role: 'client', allowedServers: [server], debug: true })
+    const socket = await approve(module, adapter)
+    socket.receive({ type: 'startContextSync', id: 'start', sessionId: 'session' })
+    const release = vi.fn()
+    const acquire = vi.spyOn(Endge.runtime, 'acquireDataChanges').mockReturnValue({ release })
+    vi.spyOn(Endge.runtime, 'captureInspectionData').mockReturnValue({ data: {}, generatedAt: 1 })
+    for (const intervalMs of [-1, 1, 999, 1000.5, 60001, '1000']) {
+      socket.receive({ type: 'setInspectionOptions', id: 'invalid', sessionId: 'session', data: { intervalMs } })
+      expect(socket.sent.at(-1)?.error).toContain('interval')
+    }
+    expect(acquire).not.toHaveBeenCalled()
+    socket.receive({ type: 'setInspectionOptions', id: 'on', sessionId: 'session', data: { intervalMs: 1000 } })
+    socket.receive({ type: 'setInspectionOptions', id: 'off', sessionId: 'session', data: { intervalMs: 0 } })
+    expect(release).toHaveBeenCalledOnce()
+    module.reset()
+    expect(release).toHaveBeenCalledOnce()
+  })
+
   it('публикует события только после согласия и начала sync, прекращает после отзыва', async () => {
     const { module, adapter } = fixture({ role: 'client', allowedServers: [server], debug: true })
     const socket = await approve(module, adapter)

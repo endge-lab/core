@@ -5,6 +5,23 @@ import { createContextCommandExecutor } from '@/features/core/modules/commands/c
 import { EndgeCommands_Module } from '@/features/core/modules/commands/EndgeCommands_Module'
 
 describe('context command execution boundary', () => {
+  /** Runtime сохраняет штатный локальный owner при host override Context и уходит в transport в debugger. */
+  it('направляет Runtime в локальный реестр или удалённый transport без Context override', async () => {
+    const local = { execute: vi.fn() }
+    const context = { execute: vi.fn() }
+    const remote = { send: vi.fn() }
+    const module = new EndgeCommands_Module(local)
+    const command: EndgeCommand = { type: 'runtime:pause', payload: { kind: 'host', id: 'instance', createdAt: 1 } }
+    module.setup({ mode: 'application', scope: {}, vars: {}, commands: { local: context } })
+    await module.execute(command)
+    expect(local.execute).toHaveBeenCalledWith(command)
+    expect(context.execute).not.toHaveBeenCalled()
+    module.setup({ mode: 'debugger', scope: {}, vars: {}, commands: { remote } })
+    await module.execute(command)
+    expect(remote.send).toHaveBeenCalledWith(command)
+    expect(local.execute).toHaveBeenCalledTimes(1)
+  })
+
   it('selects remote execution without local fallback and revokes it on reset', async () => {
     const local = { execute: vi.fn() }
     const remote = { send: vi.fn().mockRejectedValue(new Error('client rejected')) }
