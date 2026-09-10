@@ -33,7 +33,7 @@ export const ENDGE_CORE_MODULES = [
    * Хранит текущий контекст workspace, проекта, окружения и пользователя.
    * Координирует сохранение и восстановление состояния приложения.
    */
-  { key: 'context', create: () => new EndgeContext_Module() },
+  { key: 'context', create: () => new EndgeContext_Module(), after: 'events' },
 
   /**
    * Предоставляет тестовые данные из сохранённых mock-документов
@@ -182,10 +182,10 @@ export const ENDGE_CORE_MODULES = [
   { key: 'i18n', create: () => new EndgeI18n_Module(), after: ['domain', 'configuration'] },
 
   /**
-   * Предоставляет шину системных и пользовательских событий
-   * с возможностью хранить ограниченную историю последних событий.
+   * Предоставляет синхронную шину системных и пользовательских событий
+   * без хранения истории; lifecycle не зависит от Context.
    */
-  { key: 'events', create: () => new EndgeEvents_Module(), after: 'context' },
+  { key: 'events', create: () => new EndgeEvents_Module() },
 
   /**
    * Создаёт и уничтожает экземпляры выполнения и области состояния приложения,

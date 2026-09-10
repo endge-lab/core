@@ -294,3 +294,7 @@ export * from '@/features/core/modules/runtime/services/strategies/StoreRuntimeS
 export * from '@/features/core/modules/runtime/services/strategies/StreamRuntimeStrategy'
 export * from '@/features/core/modules/runtime/hosts/StreamRuntimeHost'
 export * from '@/features/core/modules/runtime/domain/stream-runtime.types'
+
+export { EndgeDebuggerReadOnlyError } from '@/features/core/kernel/errors/EndgeDebuggerReadOnlyError'
+
+export { readOnlyDocument } from './features/core/kernel/tools/read-only-document'

@@ -11,6 +11,7 @@ import type {
 } from '@/features/core/modules/workspace/domain/workspace.types'
 
 import { Endge } from '@/features/core/kernel/endge'
+import { readOnlyDocument } from '@/features/core/kernel/tools/read-only-document'
 import { WorkspaceVariables } from '@/features/core/modules/context/endge-vars'
 import { normalizeEndgeWorkspaceDefinition } from '@/features/core/modules/domain/entities/RWorkspace'
 import { EndgeModule } from '@/features/federation/EndgeModule'
@@ -30,6 +31,9 @@ export class EndgeWorkspace_Module extends EndgeModule<EndgeBootContext> {
 
   /** Строит workspace из загруженного source. */
   public override build(ctx: EndgeBootContext): void {
+    if (ctx.mode === 'debugger') {
+      return
+    }
     if (ctx.dataProvider === 'bundle') {
       const bundle = ctx.bundleSource
       if (!bundle) {
@@ -90,7 +94,9 @@ export class EndgeWorkspace_Module extends EndgeModule<EndgeBootContext> {
   public override reset(): void {
     this._current = null
     this.variables.setEnvironment({})
-    Endge.context.setWorkspaceDataMode('live')
+    if (Endge.mode !== 'debugger') {
+      Endge.context.setWorkspaceDataMode('live')
+    }
     this.notify()
   }
 
@@ -147,10 +153,20 @@ export class EndgeWorkspace_Module extends EndgeModule<EndgeBootContext> {
 
   /** Применяет и публикует новую workspace-конфигурацию. */
   public apply(input: unknown): void {
+    Endge.assertWritable()
     const next = normalizeEndgeWorkspaceDefinition(input)
     this._current = next
     Endge.context.setCurrentWorkspace(next.identity)
     Endge.context.setWorkspaceDataMode(next.dataMode)
+    this.notify()
+  }
+
+  /** Applies captured metadata for document inspection without changing authorization or starting integrations. */
+  public applyInspection(input: EndgeWorkspaceDefinition): void {
+    if (Endge.mode !== 'debugger') {
+      throw new Error('[EndgeWorkspace] Inspection requires debugger mode')
+    }
+    this._current = readOnlyDocument(input)
     this.notify()
   }
 

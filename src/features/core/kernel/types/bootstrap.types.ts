@@ -34,11 +34,15 @@ export interface EndgeUIBootOptions {
   adapterFallbackIds?: readonly string[]
 }
 
+export type EndgeBootMode = 'application' | 'debugger'
+
 export interface EndgeBootContext extends EndgeFederationContext {
+  /** Immutable lifecycle profile; application is the default. */
+  mode?: EndgeBootMode
   /**
    * Источник получения доменных данных
    */
-  dataProvider: EndgeDataProvider
+  dataProvider?: EndgeDataProvider
 
   /**
    * Граница загружаемого persisted Domain.

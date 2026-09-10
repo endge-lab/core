@@ -1,4 +1,4 @@
-import type { EndgeBootContext } from '@/features/core/kernel/types/bootstrap.types'
+import type { EndgeBootContext, EndgeBootMode } from '@/features/core/kernel/types/bootstrap.types'
 import type { EndgeConfiguration } from '@/features/core/modules/configuration/domain/types/configuration.type'
 import type {
   EndgeContextPersistenceConfig,
@@ -16,11 +16,12 @@ import type {
   EndgeContextStateTransform,
 } from '@/features/core/modules/context/domain/context-state.types'
 import type { EndgePersistenceInput } from '@/features/core/modules/context/persistence/EndgeStorageAdapterRegistry'
+import type { EndgeCoreEventMap } from '@/features/core/modules/events/domain/events.types'
+
 import type {
   EndgeExecutionContext,
   EndgeExecutionContextResolutionInput,
 } from '@/features/core/modules/runtime/domain/execution-context.types'
-
 import type { EndgeDataMode } from '@/features/core/modules/workspace/domain/workspace.types'
 import { Raph } from '@endge/raph'
 import {
@@ -52,7 +53,20 @@ import {
 import { RuntimeStateController } from '@/features/core/modules/context/persistence/RuntimeStateController'
 import { EndgeModule } from '@/features/federation/EndgeModule'
 
+interface ContextEventValues {
+  workspace: string | null
+  tenant: string
+  project: string
+  environment: string
+  user: string
+  locale: string
+  theme: string
+  timezone: string
+  dataMode: EndgeDataMode
+}
+
 const THEME_PREFERENCE_VERSION = 1 as const
+const MAX_CONTEXT_EVENT_PASSES = 100
 const LEGACY_STORAGE_ADAPTER = new LocalStorageContextAdapter()
 
 /**
@@ -82,7 +96,13 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
   private _dataModeOverride: EndgeDataMode | null = null
   private _sessionProvider: EndgeSessionIdentityProvider | null = null
   private _isHydrating = false
+  private _eventContext: ContextEventValues | null = null
+  private _publishingContextChanges = false
   private _executionContextLocked = false
+  private _bootMode: EndgeBootMode = 'application'
+  private _beforeInspection: { context: EndgeContextSnapshot, dataMode: EndgeDataMode, override: EndgeDataMode | null } | null = null
+
+  public get bootMode(): EndgeBootMode { return this._bootMode }
 
   /** Создаёт контекст, регистрирует storage adapters и восстанавливает snapshot. */
   public constructor() {
@@ -94,7 +114,15 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
 
   /** Применяет explicit structural context до load/build остальных модулей. */
   public override setup(ctx: EndgeBootContext): void {
+    this._bootMode = ctx.mode ?? 'application'
     this._executionContextLocked = false
+    if (this._bootMode === 'debugger') {
+      this._beforeInspection = { context: this.serialize(), dataMode: this._workspaceDataMode, override: this._dataModeOverride }
+      this._sessionProvider = null
+      this._currentWorkspace = null
+      this._executionContextLocked = true
+      return
+    }
     const defaultLocale = normalizeOptionalText(ctx.ui?.defaultLocale)
     if (!this._hasLocalePreference && defaultLocale) {
       this._currentLocale = defaultLocale
@@ -115,10 +143,23 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     }
     this._executionContextLocked = true
     this._syncPersistentContextToRaph()
+    this._publishContextChanges()
   }
 
   /** Разрешает выбрать новый structural context только перед следующим boot. */
   public override reset(): void {
+    if (this._beforeInspection) {
+      const { context, dataMode, override } = this._beforeInspection
+      this._currentWorkspace = context.workspace
+      this._currentTenant = context.tenant ?? DEFAULT_SCOPE.tenantId
+      this._currentProject = context.project ?? DEFAULT_SCOPE.projectId
+      this._currentEnvironment = context.environment ?? DEFAULT_SCOPE.environmentId
+      this._currentUser = context.user ?? DEFAULT_SCOPE.userId
+      this._workspaceDataMode = dataMode
+      this._dataModeOverride = override
+      this._beforeInspection = null
+    }
+    this._bootMode = 'application'
     this._executionContextLocked = false
     this.notify()
   }
@@ -218,6 +259,7 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
   /** Сохраняет подписчиков legacy-модуля и проецирует постоянные поля контекста в Raph. */
   public override notify(): void {
     this._syncPersistentContextToRaph()
+    this._publishContextChanges()
     super.notify()
   }
 
@@ -240,10 +282,30 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     this._currentTimezone = rawTimezone ?? DEFAULT_TIMEZONE
     this._pendingTimezone = rawTimezone ?? DEFAULT_TIMEZONE
     this._syncPersistentContextToRaph()
+    this._publishContextChanges()
+  }
+
+  /** Adopts observed scope only in memory; developer authorization stays with the host session. */
+  public applyInspection(snapshot: EndgeContextSnapshot & { dataMode?: EndgeDataMode }): void {
+    if (this._bootMode !== 'debugger') {
+      throw new Error('[EndgeContext] Inspection requires debugger mode')
+    }
+    this._currentWorkspace = snapshot.workspace
+    this._currentTenant = snapshot.tenant ?? DEFAULT_SCOPE.tenantId
+    this._currentProject = snapshot.project ?? DEFAULT_SCOPE.projectId
+    this._currentEnvironment = snapshot.environment ?? DEFAULT_SCOPE.environmentId
+    this._currentUser = snapshot.user ?? DEFAULT_SCOPE.userId
+    this._workspaceDataMode = snapshot.dataMode ?? 'live'
+    this._dataModeOverride = null
+    // Locale/theme/timezone are displayed from the snapshot; local debugger UI preferences stay local.
+    this.notify()
   }
 
   /** Сохраняет текущий context snapshot через выбранный adapter. */
   public saveToStorage(): void {
+    if (this._bootMode === 'debugger') {
+      return
+    }
     if (this._isHydrating) {
       return
     }
@@ -311,7 +373,7 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     transform?: EndgeContextStateTransform<T>,
   ): T | undefined {
     const normalizedKey = normalizeContextStateKey(key)
-    if (!this._currentWorkspace) {
+    if (this._bootMode === 'debugger' || !this._currentWorkspace) {
       return undefined
     }
     try {
@@ -331,6 +393,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     state: T,
     transform?: EndgeContextStateTransform<T>,
   ): void {
+    if (this._bootMode === 'debugger') {
+      return
+    }
     const normalizedKey = normalizeContextStateKey(key)
     try {
       const storageKey = buildContextStateStorageKey(this.getPersistenceScope(), normalizedKey)
@@ -348,6 +413,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
 
   /** Удаляет dynamic state только из текущего полного context scope. */
   public removeState(key: string): void {
+    if (this._bootMode === 'debugger') {
+      return
+    }
     const normalizedKey = normalizeContextStateKey(key)
     try {
       const storageKey = buildContextStateStorageKey(this.getPersistenceScope(), normalizedKey)
@@ -796,7 +864,79 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     )
   }
 
+  /** Снимок фактических значений: session identities и effective data mode включены. */
+  private _readEventContext(): ContextEventValues {
+    return {
+      workspace: this.getCurrentWorkspace(),
+      tenant: this.getCurrentTenant(),
+      project: this.getCurrentProject(),
+      environment: this.getCurrentEnvironment(),
+      user: this.getCurrentUser(),
+      locale: this.currentLocale,
+      theme: this.currentTheme,
+      timezone: this.currentTimezone,
+      dataMode: this.dataMode,
+    }
+  }
+
+  /** Constructor hydration задаёт baseline; последующие commits публикуют только изменения. */
+  private _publishContextChanges(): void {
+    if (this._publishingContextChanges) {
+      return
+    }
+    const current = this._readEventContext()
+    if (!this._eventContext || this._bootMode === 'debugger') {
+      this._eventContext = current
+      return
+    }
+
+    this._publishingContextChanges = true
+    try {
+      // Изменение Context из подписчика становится следующим согласованным пакетом.
+      // Здесь нет истории или накопления событий между вызовами.
+      let previous: ContextEventValues
+      let next = current
+      let passes = 0
+      do {
+        if (++passes > MAX_CONTEXT_EVENT_PASSES) {
+          // Циклический subscriber не должен навсегда блокировать пользовательский поток.
+          this._eventContext = next
+          console.error('[EndgeContext] Cyclic context changes: event delivery stopped for this update')
+          break
+        }
+        previous = this._eventContext
+        this._eventContext = next
+        this._emitContextChange('context:workspace-changed', previous.workspace, next.workspace)
+        this._emitContextChange('context:tenant-changed', previous.tenant, next.tenant)
+        this._emitContextChange('context:project-changed', previous.project, next.project)
+        this._emitContextChange('context:environment-changed', previous.environment, next.environment)
+        this._emitContextChange('context:user-changed', previous.user, next.user)
+        this._emitContextChange('context:locale-changed', previous.locale, next.locale)
+        this._emitContextChange('context:theme-changed', previous.theme, next.theme)
+        this._emitContextChange('context:timezone-changed', previous.timezone, next.timezone)
+        this._emitContextChange('context:data-mode-changed', previous.dataMode, next.dataMode)
+        next = this._readEventContext()
+      } while (Object.keys(next).some(key => next[key as keyof ContextEventValues] !== this._eventContext![key as keyof ContextEventValues]))
+    }
+    finally {
+      this._publishingContextChanges = false
+    }
+  }
+
+  private _emitContextChange<K extends keyof EndgeCoreEventMap & `context:${string}`>(
+    name: K,
+    previous: EndgeCoreEventMap[K]['previous'],
+    value: EndgeCoreEventMap[K]['value'],
+  ): void {
+    if (previous !== value) {
+      Endge.events.emitEvent(name, Object.freeze({ previous, value }) as EndgeCoreEventMap[K])
+    }
+  }
+
   private _syncPersistentContextToRaph(): void {
+    if (this._bootMode === 'debugger') {
+      return
+    }
     const snapshot = this.serialize()
     Raph.transaction(() => {
       for (const [key, value] of Object.entries(snapshot)) {

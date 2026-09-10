@@ -120,6 +120,10 @@ export abstract class EndgeFederation {
       protected static override readonly federationId = federationId
       protected static override readonly federationDefinitionSignature = definitionSignature
 
+      protected static override selectLifecycleNodes(nodes: readonly EndgeLifecycleNodeDescriptor[], ctx: EndgeFederationContext): readonly EndgeLifecycleNodeDescriptor[] {
+        return definition.selectLifecycleNodes?.(nodes, ctx) ?? nodes
+      }
+
       protected static override configureFederation(): void {
         this.defineModuleDefinitions(moduleDefinitions)
         this.defineFederations(federationDefinitions)
@@ -163,6 +167,11 @@ export abstract class EndgeFederation {
   /** Хук одноразовой декларации собственных lifecycle-узлов Federation. */
   protected static configureFederation(): void {}
 
+  /** Selects the lifecycle graph without creating a second owner for its nodes. */
+  protected static selectLifecycleNodes(nodes: readonly EndgeLifecycleNodeDescriptor[], _ctx: EndgeFederationContext): readonly EndgeLifecycleNodeDescriptor[] {
+    return nodes
+  }
+
   /** Запускает всё дерево Federation по pipeline `setup -> load -> build -> start`. */
   public static boot(ctx: EndgeFederationContext): Promise<void> {
     const host = this._getOrCreateHost()
@@ -205,10 +214,20 @@ export abstract class EndgeFederation {
     return bootPromise
   }
 
+  private static _selectLifecycleNodes(host: EndgeFederationHost, ctx: EndgeFederationContext): void {
+    host.lifecycleNodes = []
+    const selected = new Set(this.selectLifecycleNodes(host.nodes, ctx))
+    if ([...selected].some(node => !host.nodes.includes(node))) {
+      throw new Error(`[${this.name}] Lifecycle profile contains an undeclared node`)
+    }
+    host.lifecycleNodes = host.nodes.filter(node => selected.has(node))
+  }
+
   private static async _runBoot(ctx: EndgeFederationContext, host: EndgeFederationHost): Promise<void> {
     const touchedNodes = new Set<EndgeLifecycleNodeDescriptor>()
 
     try {
+      this._selectLifecycleNodes(host, ctx)
       await this.setup(ctx, touchedNodes)
       await this.load(ctx, touchedNodes)
       await this._buildPhase(ctx, touchedNodes)
@@ -224,6 +243,7 @@ export abstract class EndgeFederation {
       host.isSetup = false
       host.isInitialized = false
       host.bootContext = null
+      host.lifecycleNodes = rollbackErrors.length ? [...touchedNodes] : null
 
       if (rollbackErrors.length > 0) {
         const lifecycleError = new AggregateError(
@@ -418,10 +438,12 @@ export abstract class EndgeFederation {
     try {
       await host.buildQueue
 
-      const resetErrors = await this._resetNodes(new Set(host.nodes))
+      const resetErrors = await this._resetNodes(new Set(host.lifecycleNodes ?? host.nodes))
+      const lifecycleNodes = host.lifecycleNodes
       this._finishReset(host)
 
       if (resetErrors.length > 0) {
+        host.lifecycleNodes = lifecycleNodes
         const lifecycleError = new AggregateError(resetErrors, `[${this.name}] reset was incomplete`)
         host.state = 'failed'
         host.lastError = lifecycleError
@@ -448,7 +470,7 @@ export abstract class EndgeFederation {
     ctx: EndgeFederationContext,
     touchedNodes?: Set<EndgeLifecycleNodeDescriptor>,
   ): Promise<void> {
-    for (const node of this.host.nodes) {
+    for (const node of this.host.lifecycleNodes ?? this.host.nodes) {
       touchedNodes?.add(node)
       try {
         if (node.kind === 'module') {
@@ -502,6 +524,7 @@ export abstract class EndgeFederation {
     host.isSetup = false
     host.isInitialized = false
     host.bootContext = null
+    host.lifecycleNodes = null
     host.attachedTouchedNodes.clear()
   }
 
@@ -607,6 +630,7 @@ export abstract class EndgeFederation {
       state: 'idle',
       lastError: null,
       bootContext: null,
+      lifecycleNodes: null,
       bootPromise: null,
       resetPromise: null,
       buildQueue: Promise.resolve(),
@@ -1111,6 +1135,7 @@ export abstract class EndgeFederation {
       host.bootContext = ctx
       host.lastError = null
       host.attachedTouchedNodes.clear()
+      this._selectLifecycleNodes(host, ctx)
     }
     else if (host.bootContext !== ctx) {
       throw new Error(`[${this.name}] attached lifecycle context differs from the active boot context`)
@@ -1150,11 +1175,14 @@ export abstract class EndgeFederation {
 
     const touchedNodes = host.attachedTouchedNodes.size > 0
       ? new Set(host.attachedTouchedNodes)
-      : new Set(host.nodes)
+      : new Set(host.lifecycleNodes ?? host.nodes)
     const resetErrors = await this._resetNodes(touchedNodes)
+    const lifecycleNodes = host.lifecycleNodes
     this._finishReset(host)
 
     if (resetErrors.length > 0) {
+      host.lifecycleNodes = lifecycleNodes
+      host.attachedTouchedNodes = touchedNodes
       const lifecycleError = new AggregateError(resetErrors, `[${this.name}] reset was incomplete`)
       host.state = 'failed'
       host.lastError = lifecycleError

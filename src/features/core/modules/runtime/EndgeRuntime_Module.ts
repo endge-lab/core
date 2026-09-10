@@ -79,7 +79,7 @@ export class EndgeRuntime_Module extends EndgeModule {
   /** Создаёт default app scope и регистрирует runtime strategies. */
   public constructor() {
     super()
-    this._defaultAppScope = this.createAppScope({
+    this._defaultAppScope = this._createAppScope({
       id: 'app',
       rootPath: 'runtime',
       collisionPolicy: 'multi',
@@ -126,6 +126,7 @@ export class EndgeRuntime_Module extends EndgeModule {
     model: RuntimeExecutableModel,
     options: RuntimeExecuteOptions = {},
   ): AnyRuntimeHost | null {
+    Endge.assertWritable()
     const strategy = this._strategies.resolve(model)
     if (!strategy) {
       console.error(`[EndgeRuntime] Unsupported runtime model "${String((model as any)?.identity ?? (model as any)?.id ?? 'unknown')}"`)
@@ -210,6 +211,7 @@ export class EndgeRuntime_Module extends EndgeModule {
     model: RuntimeExecutableModel,
     options: RuntimeExecuteOptions = {},
   ): Promise<AnyRuntimeHost | null> {
+    Endge.assertWritable()
     const strategy = this._strategies.resolve(model)
     if (!strategy) {
       return this.execute(model, options)
@@ -282,6 +284,11 @@ export class EndgeRuntime_Module extends EndgeModule {
 
   /** Создаёт или возвращает именованный root runtime scope приложения. */
   public createAppScope(options: RuntimeAppScopeOptions): RuntimeAppScope {
+    Endge.assertWritable()
+    return this._createAppScope(options)
+  }
+
+  private _createAppScope(options: RuntimeAppScopeOptions): RuntimeAppScope {
     const scopeId = String(options.id ?? '').trim()
     const existing = this._appScopes.get(scopeId)
     if (existing) {

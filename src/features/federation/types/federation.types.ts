@@ -97,6 +97,8 @@ export interface EndgePlugin<
   readonly id: string
   readonly modules?: TModules
   readonly federations?: TFederations
+  /** Selects an ordered subset once per boot; reset uses the same nodes. */
+  readonly selectLifecycleNodes?: (nodes: readonly EndgeLifecycleNodeDescriptor[], ctx: EndgeFederationContext) => readonly EndgeLifecycleNodeDescriptor[]
 }
 
 /** Полное декларативное описание автоматически собираемой федерации. */
@@ -108,6 +110,8 @@ export interface EndgeFederationDefinition<
   readonly name?: string
   readonly modules: TDefinitions
   readonly federations?: TFederations
+  /** Selects an ordered subset once per boot; reset uses the same nodes. */
+  readonly selectLifecycleNodes?: (nodes: readonly EndgeLifecycleNodeDescriptor[], ctx: EndgeFederationContext) => readonly EndgeLifecycleNodeDescriptor[]
 }
 
 export type EndgeLifecycleNodeDescriptor
@@ -136,6 +140,7 @@ export interface EndgeFederationHost {
   state: EndgeFederationState
   lastError: unknown | null
   bootContext: EndgeFederationContext | null
+  lifecycleNodes: readonly EndgeLifecycleNodeDescriptor[] | null
   bootPromise: Promise<void> | null
   resetPromise: Promise<void> | null
   buildQueue: Promise<void>

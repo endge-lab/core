@@ -9,7 +9,9 @@ import { EndgeModule } from '@/features/federation/EndgeModule'
 export class EndgeBridgeDebug_Module extends EndgeModule {
   private _role: 'client' | 'configurator' = 'client'
   private _enabled = false
-  private _reservation: { serverUrl: string, sessionId: string } | null = null
+  private _reservation: { serverUrl: string, sessionId: string, accepted: boolean } | null = null
+  private _pendingConsent: Readonly<DebugConnectionRequest> | null = null
+  private _consentTimer: ReturnType<typeof setTimeout> | null = null
   private readonly _requests = new Map<string, object>()
   private readonly _clients = new Map<string, readonly BridgeDebugClient[]>()
   private readonly _sessions = new Map<string, BridgeDebugSession>()
@@ -48,6 +50,30 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     this._sessions.set(session.sessionId, session)
     this.notify()
     return { ...session }
+  }
+
+  /** Принимает ответ UI только для текущего непросроченного запроса. */
+  public respondToConsent(request: Pick<DebugConnectionRequest, 'serverUrl' | 'sessionId'>, accepted: boolean): boolean {
+    const pending = this._pendingConsent
+    const reservation = this._reservation
+    if (!pending || !reservation || pending.serverUrl !== request.serverUrl || pending.sessionId !== request.sessionId) {
+      return false
+    }
+    const allowed = accepted && pending.expiresAt > Date.now() && this._enabled && this._role === 'client'
+    this._clearPendingConsent()
+    reservation.accepted = allowed
+    if (!allowed) {
+      this._reservation = null
+    }
+    try {
+      this._commands.send(pending.serverUrl, { type: 'acceptSession', sessionId: pending.sessionId, accepted: allowed })
+    }
+    catch {
+      this.disconnect(pending.serverUrl)
+      return false
+    }
+    this.notify()
+    return true
   }
 
   /** Завершает выбранную сессию с любой её стороны. */
@@ -91,11 +117,11 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
       this.notify()
     }
     else if (message.type === 'sessionRequested') {
-      await this._confirm(serverUrl, message.data as Omit<DebugConnectionRequest, 'serverUrl'>)
+      this._requestConsent(serverUrl, message.data as Omit<DebugConnectionRequest, 'serverUrl'>)
     }
     else if (message.type === 'sessionStarted') {
       const data = message.data as Omit<BridgeDebugSession, 'serverUrl'>
-      if (this._role === 'client' && this._reservation?.serverUrl === serverUrl && this._reservation.sessionId === data.sessionId) {
+      if (this._role === 'client' && this._reservation?.accepted && this._reservation.serverUrl === serverUrl && this._reservation.sessionId === data.sessionId) {
         this._sessions.set(data.sessionId, { ...data, serverUrl })
         this.notify()
       }
@@ -107,6 +133,7 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
       }
       if (this._reservation?.serverUrl === serverUrl && this._reservation.sessionId === message.sessionId) {
         this._reservation = null
+        this._clearPendingConsent()
       }
       this.notify()
     }
@@ -126,6 +153,7 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     }
     if (this._reservation?.serverUrl === serverUrl) {
       this._reservation = null
+      this._clearPendingConsent()
     }
     this.notify()
   }
@@ -134,6 +162,7 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
   public override reset(): void {
     this._enabled = false
     this._reservation = null
+    this._clearPendingConsent()
     this._requests.clear()
     this._clients.clear()
     this._sessions.clear()
@@ -146,29 +175,28 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
    * ----------------------------------------
    */
 
-  /** Резервирует единственное согласие и проверяет его актуальность после диалога. */
-  private async _confirm(serverUrl: string, request: Omit<DebugConnectionRequest, 'serverUrl'>): Promise<void> {
-    if (!this._enabled || this._role !== 'client' || this._reservation || request.expiresAt <= Date.now()) {
+  /** Резервирует запрос для View приложения, не вызывая browser dialog. */
+  private _requestConsent(serverUrl: string, request: Omit<DebugConnectionRequest, 'serverUrl'>): void {
+    if (!this._enabled || this._role !== 'client' || this._reservation || !Number.isFinite(request.expiresAt) || request.expiresAt <= Date.now()) {
       this._commands.send(serverUrl, { type: 'acceptSession', sessionId: request.sessionId, accepted: false })
       return
     }
-    const reservation = { serverUrl, sessionId: request.sessionId }
-    this._reservation = reservation
-    let accepted = false
-    try {
-      accepted = await this._adapter.confirmDebugConnection({ ...request, serverUrl })
+    this._reservation = { serverUrl, sessionId: request.sessionId, accepted: false }
+    const pending = Object.freeze({ ...request, serverUrl })
+    this._pendingConsent = pending
+    this._consentTimer = setTimeout(() => {
+      this.respondToConsent(pending, false)
+    }, Math.max(0, pending.expiresAt - Date.now()))
+    this.notify()
+  }
+
+  /** Снимает View-проекцию и принадлежащий запросу deadline timer. */
+  private _clearPendingConsent(): void {
+    if (this._consentTimer !== null) {
+      clearTimeout(this._consentTimer)
+      this._consentTimer = null
     }
-    catch {
-      accepted = false
-    }
-    if (this._reservation !== reservation) {
-      return
-    }
-    accepted = accepted && request.expiresAt > Date.now() && this._enabled
-    if (!accepted) {
-      this._reservation = null
-    }
-    this._commands.send(serverUrl, { type: 'acceptSession', sessionId: request.sessionId, accepted })
+    this._pendingConsent = null
   }
 
   /** Проверяет активную сессию и выполняет только snapshot либо simulation mock. */
@@ -237,6 +265,11 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
    * ACCESS
    * ----------------------------------------
    */
+
+  /** Показывает приложению текущий запрос без права менять состояние Bridge. */
+  public get pendingConsent(): Readonly<DebugConnectionRequest> | null {
+    return this._pendingConsent
+  }
 
   /** Возвращает доступные приложения из актуальных server rosters. */
   public get clients(): readonly BridgeDebugClient[] {

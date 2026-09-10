@@ -27,6 +27,10 @@ export function serializeDiagnosticsJson(input: unknown): DiagnosticsJsonSeriali
   let redactedFields = 0
 
   const visit = (value: unknown, key?: string): DiagnosticsJsonValue | undefined => {
+    // Auth session policy is a flag, not a refresh-token value; keep its model type.
+    if (key === 'persistRefreshToken' && typeof value === 'boolean') {
+      return value
+    }
     if (key && isSensitiveKey(key)) {
       redactedFields += 1
       return REDACTED_VALUE

@@ -77,6 +77,10 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
 
   public override async setup(ctx: EndgeBootContext): Promise<void> {
     this.reset()
+    if (ctx.mode === 'debugger') {
+      this._capabilities = { provider: 'plain', mutations: false, softDelete: false, restore: false }
+      return
+    }
     if (ctx.dataProvider === 'default') {
       if (!ctx.domainProvider) {
         throw new Error('[EndgeDomainRepository] domainProvider is required for default data provider')
@@ -470,6 +474,7 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
   }
 
   private _assertMutationsSupported(): void {
+    Endge.assertWritable()
     if (!this._capabilities.mutations) {
       throw new EndgeDomainRepositoryReadOnlyError(this._capabilities.provider)
     }

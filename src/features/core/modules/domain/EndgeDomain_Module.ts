@@ -6,10 +6,10 @@ import type { RComponentSFC } from '@/features/core/modules/domain/entities/RCom
 import type { RComposition } from '@/features/core/modules/domain/entities/RComposition'
 import type { RComputation } from '@/features/core/modules/domain/entities/RComputation'
 import type { RConfiguration } from '@/features/core/modules/domain/entities/RConfiguration'
-
 import type { RConverter } from '@/features/core/modules/domain/entities/RConverter'
 
 import type { RDataView } from '@/features/core/modules/domain/entities/RDataView'
+
 import type { REnvironment } from '@/features/core/modules/domain/entities/REnvironment'
 import type { RFilter } from '@/features/core/modules/domain/entities/RFilter'
 import type { RI18nBundle } from '@/features/core/modules/domain/entities/RI18nBundle'
@@ -41,6 +41,7 @@ import type {
 import type { FilterFieldSchema } from '@/features/core/modules/domain/types/document/query.types'
 import { Serialize } from '@endge/utils'
 import { Endge } from '@/features/core/kernel/endge'
+import { readOnlyDocument } from '@/features/core/kernel/tools/read-only-document'
 import { createDiagnosticsEntityOwner } from '@/features/core/modules/diagnostics/EndgeProblems_Module'
 import { getDomainDocumentDescriptor } from '@/features/core/modules/domain/documents/domain-document-descriptors'
 import {
@@ -448,6 +449,10 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   public override async load(ctx: EndgeBootContext): Promise<void> {
     this.reset()
 
+    if (ctx.mode === 'debugger') {
+      return
+    }
+
     if (ctx.dataProvider === 'plain') {
       this.merge(ctx.plainSource)
       return
@@ -474,6 +479,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Завершает domain-level сборку после загрузки данных.
    */
   public override build(): void {
+    if (Endge.mode === 'debugger') {
+      return
+    }
     this._publishEntityValidationProblems()
     this.notify()
   }
@@ -578,14 +586,65 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Объединяет доменные данные из JSON.
    */
   public merge(json: any): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const parsed = EndgeDomain_Module.parsePlain(json)
     this.importFromSchema(parsed)
 
     this.notify()
   }
 
+  /** Atomically replaces all collections after complete materialization; never compiles or executes Source. */
+  public replaceFromPlain(json: unknown): void {
+    if (json === null || typeof json !== 'object' || Array.isArray(json)) {
+      throw new Error('[EndgeDomain] Expected a Domain snapshot object')
+    }
+    const collections = json as Record<string, unknown>
+    for (const key of Object.keys(EndgeDomain_Module.parsePlain({}))) {
+      const collection = collections[key]
+      if (collection !== undefined && (!Array.isArray(collection) || collection.some(item => item === null || typeof item !== 'object' || Array.isArray(item)))) {
+        throw new Error(`[EndgeDomain] Invalid snapshot collection: ${key}`)
+      }
+    }
+    const staged = EndgeDomain_Module.fromPlain(json)
+    const sourceIndexes = staged._entityIndexes()
+    const readonly = Endge.mode === 'debugger'
+    const protectedEntities = new WeakMap<object, IndexedDomainEntity>()
+    const protect = (entity: IndexedDomainEntity): IndexedDomainEntity => {
+      if (!readonly) {
+        return entity
+      }
+      let result = protectedEntities.get(entity)
+      if (!result) {
+        result = readOnlyDocument(entity)
+        protectedEntities.set(entity, result)
+      }
+      return result
+    }
+    const replacements = sourceIndexes.map(index => ({
+      byId: new Map(Array.from(index.byId, ([key, entity]) => [key, protect(entity)])),
+      byIdentity: new Map(Array.from(index.byIdentity, ([key, entity]) => [key, protect(entity)])),
+    }))
+    this.resolved.clearDerived()
+    this._entityIndexes().forEach((index, position) => {
+      index.byId.clear()
+      index.byIdentity.clear()
+      replacements[position].byId.forEach((entity, key) => index.byId.set(key, entity))
+      replacements[position].byIdentity.forEach((entity, key) => index.byIdentity.set(key, entity))
+    })
+    this._updatesByStoreIdentity.clear()
+    staged._updatesByStoreIdentity.forEach((updates, key) => {
+      this._updatesByStoreIdentity.set(key, new Map(Array.from(updates, ([identity, update]) => [identity, protect(update) as RUpdate])))
+    })
+    this.notify()
+  }
+
   /** Заменяет сохранённую сущность, не меняя её позицию в коллекции домена. */
   public replacePersistedEntity(currentEntity: object, nextEntity: object): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const current = currentEntity as IndexedDomainEntity
     const next = nextEntity as IndexedDomainEntity
     const currentIdentity = String(current.identity ?? current.id)
@@ -664,6 +723,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
 
   /** Нормализует live workspace snapshot нового backend и объединяет его с доменом. */
   public mergeFromSnapshot(snapshot: EndgeLiveDomainSnapshot): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const folders = snapshot.documents.folders
     const folderIds = snapshotIdentityToServerID(folders)
     const environmentIds = snapshotIdentityToServerID(snapshot.documents.environments)
@@ -817,6 +879,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Добавляет Project в домен и обновляет индексы.
    */
   public addProject(project: RProject): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     if (this._projectsByIdentity.has(project.identity) || this._projectsById.has(project.id)) {
       return
     }
@@ -829,6 +894,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Project из домена по id.
    */
   public removeProjectById(id: number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const project = this.getProjectById(id)
     if (!project) {
       return
@@ -843,6 +911,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Project из домена по identity.
    */
   public removeProjectByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const project = this._projectsByIdentity.get(identity)
     if (!project) {
       return
@@ -858,6 +929,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Project из домена.
    */
   public removeProject(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     this.removeProjectByIdentity(identity)
   }
 
@@ -915,6 +989,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Добавляет Type в домен и обновляет индексы.
    */
   public addType(type: RType): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     // Типы из API могут приходить с id: null; ключ в Map должен быть валидным (не null)
     const rawId = type.id
     const identity = type.identity ?? (type as any).name ?? rawId
@@ -936,6 +1013,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Type из домена по id.
    */
   public removeTypeById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const type = this._typesById.get(id)
     if (!type) {
       return
@@ -948,6 +1028,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Type из домена по identity.
    */
   public removeTypeByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const type = this._typesByIdentity.get(identity)
     if (!type) {
       return
@@ -973,6 +1056,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Type из домена.
    */
   public removeType(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     this.removeTypeByIdentity(identity)
   }
 
@@ -1029,6 +1115,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Добавляет Query в домен и обновляет индексы.
    */
   public addQuery(query: RQuery): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     if (this._queriesByIdentity.has(query.identity) || this._queriesById.has(query.id)) {
       return
     }
@@ -1041,6 +1130,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Query из домена по id.
    */
   public removeQueryById(id: number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const query = this.getQueryById(id)
     if (!query) {
       return
@@ -1054,6 +1146,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Query из домена по identity.
    */
   public removeQueryByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const query = this._queriesByIdentity.get(identity)
     if (!query) {
       return
@@ -1067,6 +1162,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Query из домена.
    */
   public removeQuery(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     this.removeQueryByIdentity(identity)
   }
 
@@ -1117,6 +1215,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
 
   /** Добавляет DataView в домен и обновляет индексы. */
   public addDataView(dataView: RDataView): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     if (this._dataViewsByIdentity.has(dataView.identity) || this._dataViewsById.has(dataView.id)) {
       return
     }
@@ -1128,6 +1229,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
 
   /** Удаляет DataView из домена по id. */
   public removeDataViewById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const dataView = this.getDataViewById(id)
     if (!dataView) {
       return
@@ -1140,6 +1244,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
 
   /** Удаляет DataView из домена по identity. */
   public removeDataViewByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const dataView = this._dataViewsByIdentity.get(identity)
     if (!dataView) {
       return
@@ -1152,6 +1259,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
 
   /** Удаляет DataView из домена по id или identity. */
   public removeDataView(idOrIdentity: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const dataView = this.getDataView(idOrIdentity)
     if (!dataView) {
       return
@@ -1189,6 +1299,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
 
   /** Добавляет Composition в домен. */
   public addComposition(composition: RComposition): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     if (this._compositionsByIdentity.has(composition.identity) || this._compositionsById.has(composition.id)) {
       return
     }
@@ -1199,6 +1312,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
 
   /** Удаляет Composition по id. */
   public removeCompositionById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const composition = this.getCompositionById(id)
     if (!composition) {
       return
@@ -1210,6 +1326,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
 
   /** Удаляет Composition по identity. */
   public removeCompositionByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const composition = this.getCompositionByIdentity(identity)
     if (!composition) {
       return
@@ -1221,6 +1340,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
 
   /** Удаляет Composition по id или identity. */
   public removeComposition(idOrIdentity: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const composition = this.getComposition(idOrIdentity)
     if (composition) {
       this.removeCompositionById(composition.id)
@@ -1251,6 +1373,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
 
   /** Добавляет Store в доменные indexes. */
   public addStore(store: RStore): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     if (this._storesByIdentity.has(store.identity) || this._storesById.has(store.id)) {
       return
     }
@@ -1261,6 +1386,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
 
   /** Удаляет Store по id. */
   public removeStoreById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const store = this.getStoreById(id)
     if (!store) {
       return
@@ -1277,6 +1405,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
 
   /** Удаляет Store по identity. */
   public removeStoreByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const store = this.getStoreByIdentity(identity)
     if (!store) {
       return
@@ -1288,6 +1419,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
 
   /** Удаляет Store по id или identity. */
   public removeStore(idOrIdentity: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const store = this.getStore(idOrIdentity)
     if (store) {
       this.removeStoreById(store.id)
@@ -1314,6 +1448,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   }
 
   public addStream(stream: RStream): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     if (this._streamsByIdentity.has(stream.identity) || this._streamsById.has(stream.id)) {
       return
     }
@@ -1323,6 +1460,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   }
 
   public removeStreamById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const stream = this.getStreamById(id)
     if (!stream) {
       return
@@ -1333,6 +1473,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   }
 
   public removeStreamByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const stream = this.getStreamByIdentity(identity)
     if (stream) {
       this.removeStreamById(stream.id)
@@ -1340,6 +1483,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   }
 
   public removeStream(idOrIdentity: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const stream = this.getStream(idOrIdentity)
     if (stream) {
       this.removeStreamById(stream.id)
@@ -1366,6 +1512,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   }
 
   public addSimulation(simulation: RSimulation): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     if (this._simulationsByIdentity.has(simulation.identity) || this._simulationsById.has(simulation.id)) {
       return
     }
@@ -1375,6 +1524,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   }
 
   public removeSimulationById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const simulation = this.getSimulationById(id)
     if (!simulation) {
       return
@@ -1385,6 +1537,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   }
 
   public removeSimulationByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const simulation = this.getSimulationByIdentity(identity)
     if (simulation) {
       this.removeSimulationById(simulation.id)
@@ -1392,6 +1547,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   }
 
   public removeSimulation(idOrIdentity: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const simulation = this.getSimulation(idOrIdentity)
     if (simulation) {
       this.removeSimulationById(simulation.id)
@@ -1422,6 +1580,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   }
 
   public addUpdate(update: RUpdate): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     if (this._updatesByIdentity.has(update.identity) || this._updatesById.has(update.id)) {
       return
     }
@@ -1434,6 +1595,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   }
 
   public removeUpdateById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const update = this.getUpdateById(id)
     if (!update) {
       return
@@ -1449,6 +1613,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   }
 
   public removeUpdateByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const update = this.getUpdateByIdentity(identity)
     if (update) {
       this.removeUpdateById(update.id)
@@ -1456,6 +1623,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   }
 
   public removeUpdate(idOrIdentity: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const update = this.getUpdate(idOrIdentity)
     if (update) {
       this.removeUpdateById(update.id)
@@ -1486,6 +1656,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
 
   /** Добавляет Mock в доменные indexes. */
   public addMock(mock: RMock): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     if (this._mocksByIdentity.has(mock.identity) || this._mocksById.has(mock.id)) {
       return
     }
@@ -1496,6 +1669,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
 
   /** Удаляет Mock по id. */
   public removeMockById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const mock = this.getMockById(id)
     if (!mock) {
       return
@@ -1507,6 +1683,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
 
   /** Удаляет Mock по identity. */
   public removeMockByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const mock = this.getMockByIdentity(identity)
     if (!mock) {
       return
@@ -1518,6 +1697,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
 
   /** Удаляет Mock по id или identity. */
   public removeMock(idOrIdentity: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const mock = this.getMock(idOrIdentity)
     if (mock) {
       this.removeMockById(mock.id)
@@ -1544,6 +1726,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   }
 
   public addComputation(computation: RComputation): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     if (this._computationsByIdentity.has(computation.identity) || this._computationsById.has(computation.id)) {
       return
     }
@@ -1553,6 +1738,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   }
 
   public removeComputationById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const computation = this.getComputationById(id)
     if (!computation) {
       return
@@ -1563,6 +1751,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   }
 
   public removeComputationByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const computation = this.getComputationByIdentity(identity)
     if (!computation) {
       return
@@ -1573,6 +1764,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   }
 
   public removeComputation(idOrIdentity: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const computation = this.getComputation(idOrIdentity)
     if (computation) {
       this.removeComputationById(computation.id)
@@ -1611,6 +1805,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Добавляет Component в домен и обновляет индексы.
    */
   public addComponent(component: RComponent): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     if (this._componentsByIdentity.has(component.identity) || this._componentsById.has(component.id)) {
       return
     }
@@ -1623,6 +1820,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Component из домена по id.
    */
   public removeComponentById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const component = this._componentsById.get(id)
     if (!component) {
       return
@@ -1636,6 +1836,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Component из домена по identity.
    */
   public removeComponentByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const component = this._componentsByIdentity.get(identity)
     if (!component) {
       return
@@ -1649,6 +1852,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Component из домена.
    */
   public removeComponent(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     this.removeComponentByIdentity(identity)
   }
 
@@ -1707,6 +1913,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Добавляет Component SFC в домен и обновляет индексы.
    */
   public addComponentSFC(component: RComponentSFC): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     if (this._componentSFCsByIdentity.has(component.identity) || this._componentSFCsById.has(component.id)) {
       return
     }
@@ -1719,6 +1928,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Component SFC из домена по id.
    */
   public removeComponentSFCById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const component = this._componentSFCsById.get(id)
     if (!component) {
       return
@@ -1732,6 +1944,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Component SFC из домена по identity.
    */
   public removeComponentSFCByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const component = this._componentSFCsByIdentity.get(identity)
     if (!component) {
       return
@@ -1745,6 +1960,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Component SFC из домена.
    */
   public removeComponentSFC(idOrIdentity: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const component = this.getComponentSFC(idOrIdentity)
     if (!component) {
       return
@@ -1805,6 +2023,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Добавляет Action в домен и обновляет индексы.
    */
   public addAction(action: RAction): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const identity = action.identity ?? action.id
     if (this._actionsByIdentity.has(identity) || this._actionsById.has(action.id)) {
       return
@@ -1818,6 +2039,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Action из домена по id.
    */
   public removeActionById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const action = this._actionsById.get(id)
     if (!action) {
       return
@@ -1831,6 +2055,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Action из домена по identity.
    */
   public removeActionByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const action = this._actionsByIdentity.get(identity)
     if (!action) {
       return
@@ -1844,6 +2071,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Action из домена.
    */
   public removeAction(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     this.removeActionByIdentity(identity)
   }
 
@@ -1900,6 +2130,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Добавляет Converter в домен и обновляет индексы.
    */
   public addConverter(converter: RConverter): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const identity = (converter as any).identity ?? converter.id
     if (this._convertersByIdentity.has(identity) || this._convertersById.has(converter.id)) {
       return
@@ -1913,6 +2146,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Converter из домена по id.
    */
   public removeConverterById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const converter = this._convertersById.get(id)
     if (!converter) {
       return
@@ -1926,6 +2162,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Converter из домена по identity.
    */
   public removeConverterByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const converter = this._convertersByIdentity.get(identity)
     if (!converter) {
       return
@@ -1939,6 +2178,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Converter из домена.
    */
   public removeConverter(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     this.removeConverterByIdentity(identity)
   }
 
@@ -1995,6 +2237,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Добавляет Integration в домен и обновляет индексы.
    */
   public addIntegration(integration: RIntegration): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const identity = (integration as any).identity ?? integration.id
     if (this._integrationsByIdentity.has(identity) || this._integrationsById.has(integration.id)) {
       return
@@ -2008,6 +2253,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Integration из домена по id.
    */
   public removeIntegrationById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const integration = this._integrationsById.get(id)
     if (!integration) {
       return
@@ -2021,6 +2269,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Integration из домена по identity.
    */
   public removeIntegrationByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const integration = this._integrationsByIdentity.get(identity)
     if (!integration) {
       return
@@ -2034,6 +2285,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Integration из домена.
    */
   public removeIntegration(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     this.removeIntegrationByIdentity(identity)
   }
 
@@ -2090,6 +2344,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Добавляет Environment в домен и обновляет индексы.
    */
   public addEnvironment(environment: REnvironment): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     if (this._environmentsByIdentity.has(environment.identity) || this._environmentsById.has(environment.id)) {
       return
     }
@@ -2102,6 +2359,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Environment из домена по id.
    */
   public removeEnvironmentById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const environment = this._environmentsById.get(id)
     if (!environment) {
       return
@@ -2115,6 +2375,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Environment из домена по identity.
    */
   public removeEnvironmentByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const environment = this._environmentsByIdentity.get(identity)
     if (!environment) {
       return
@@ -2128,6 +2391,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Environment из домена.
    */
   public removeEnvironment(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     this.removeEnvironmentByIdentity(identity)
   }
 
@@ -2184,6 +2450,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Добавляет Tenant в домен и обновляет индексы.
    */
   public addTenant(tenant: RTenant): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     if (this._tenantsByIdentity.has(tenant.identity) || this._tenantsById.has(tenant.id)) {
       return
     }
@@ -2196,6 +2465,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Tenant из домена по id.
    */
   public removeTenantById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const tenant = this._tenantsById.get(id)
     if (!tenant) {
       return
@@ -2209,6 +2481,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Tenant из домена по identity.
    */
   public removeTenantByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const tenant = this._tenantsByIdentity.get(identity)
     if (!tenant) {
       return
@@ -2222,6 +2497,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Tenant из домена.
    */
   public removeTenant(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     this.removeTenantByIdentity(identity)
   }
 
@@ -2278,6 +2556,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Добавляет Policy в домен и обновляет индексы.
    */
   public addPolicy(policy: RPolicy): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     if (this._policiesByIdentity.has(policy.identity) || this._policiesById.has(policy.id)) {
       return
     }
@@ -2290,6 +2571,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Policy из домена по id.
    */
   public removePolicyById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const policy = this._policiesById.get(id)
     if (!policy) {
       return
@@ -2303,6 +2587,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Policy из домена по identity.
    */
   public removePolicyByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const policy = this._policiesByIdentity.get(identity)
     if (!policy) {
       return
@@ -2316,6 +2603,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Policy из домена.
    */
   public removePolicy(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     this.removePolicyByIdentity(identity)
   }
 
@@ -2372,6 +2662,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Добавляет Style в домен и обновляет индексы.
    */
   public addStyle(style: RStyle): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     if (this._stylesByIdentity.has(style.identity) || this._stylesById.has(style.id)) {
       return
     }
@@ -2384,6 +2677,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Style из домена по id.
    */
   public removeStyleById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const style = this._stylesById.get(id)
     if (!style) {
       return
@@ -2397,6 +2693,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Style из домена по identity.
    */
   public removeStyleByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const style = this._stylesByIdentity.get(identity)
     if (!style) {
       return
@@ -2410,6 +2709,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Style из домена.
    */
   public removeStyle(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     this.removeStyleByIdentity(identity)
   }
 
@@ -2454,6 +2756,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   }
 
   public addConfiguration(configuration: RConfiguration): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     if (this._configurationsByIdentity.has(configuration.identity) || this._configurationsById.has(configuration.id)) {
       return
     }
@@ -2463,6 +2768,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   }
 
   public removeConfigurationById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const configuration = this._configurationsById.get(id)
     if (!configuration) {
       return
@@ -2473,6 +2781,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   }
 
   public removeConfigurationByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const configuration = this._configurationsByIdentity.get(identity)
     if (!configuration) {
       return
@@ -2483,6 +2794,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   }
 
   public removeConfiguration(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     this.removeConfigurationByIdentity(identity)
   }
 
@@ -2530,6 +2844,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Добавляет Vocab в домен и обновляет индексы.
    */
   public addVocab(vocab: RVocabs): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     this.addVocabs(vocab)
   }
 
@@ -2537,6 +2854,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Добавляет Vocab в домен.
    */
   public addVocabs(vocab: RVocabs): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     if (this._vocabsByIdentity.has(vocab.identity) || this._vocabsById.has(vocab.id)) {
       return
     }
@@ -2549,6 +2869,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Vocabs из домена по id.
    */
   public removeVocabsById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const vocab = this._vocabsById.get(id)
     if (!vocab) {
       return
@@ -2562,6 +2885,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Vocabs из домена по identity.
    */
   public removeVocabsByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const vocab = this._vocabsByIdentity.get(identity)
     if (!vocab) {
       return
@@ -2575,6 +2901,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Vocab из домена.
    */
   public removeVocabs(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     this.removeVocabsByIdentity(identity)
   }
 
@@ -2582,6 +2911,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Vocab из домена.
    */
   public removeVocab(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     this.removeVocabs(identity)
   }
 
@@ -2623,6 +2955,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
 
   /** Добавляет auth profile в доменные indexes. */
   public addAuthProfile(profile: RAuthProfile): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     if (this._authProfilesByIdentity.has(profile.identity) || this._authProfilesById.has(profile.id)) {
       return
     }
@@ -2633,6 +2968,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
 
   /** Удаляет auth profile по id. */
   public removeAuthProfileById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const profile = this._authProfilesById.get(id)
     if (!profile) {
       return
@@ -2644,6 +2982,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
 
   /** Удаляет auth profile по identity. */
   public removeAuthProfileByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const profile = this._authProfilesByIdentity.get(identity)
     if (!profile) {
       return
@@ -2655,6 +2996,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
 
   /** Удаляет auth profile по identity через публичный alias. */
   public removeAuthProfile(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     this.removeAuthProfileByIdentity(identity)
   }
 
@@ -2697,6 +3041,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Добавляет I18n Bundle в домен и обновляет индексы.
    */
   public addI18nBundle(bundle: RI18nBundle): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     this.addI18nBundles(bundle)
   }
 
@@ -2704,6 +3051,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Добавляет I18n Bundle в домен.
    */
   public addI18nBundles(bundle: RI18nBundle): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     if (this._i18nBundlesByIdentity.has(bundle.identity) || this._i18nBundlesById.has(bundle.id)) {
       return
     }
@@ -2716,6 +3066,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет I18n Bundles из домена по id.
    */
   public removeI18nBundlesById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const bundle = this._i18nBundlesById.get(id)
     if (!bundle) {
       return
@@ -2729,6 +3082,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет I18n Bundles из домена по identity.
    */
   public removeI18nBundlesByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const bundle = this._i18nBundlesByIdentity.get(identity)
     if (!bundle) {
       return
@@ -2742,6 +3098,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет I18n Bundle из домена.
    */
   public removeI18nBundles(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     this.removeI18nBundlesByIdentity(identity)
   }
 
@@ -2791,6 +3150,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Добавляет Page Template в домен и обновляет индексы.
    */
   public addPageTemplate(tpl: RPageTemplate): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     if (this._pageTemplatesByIdentity.has(tpl.identity) || this._pageTemplatesById.has(tpl.id)) {
       return
     }
@@ -2803,6 +3165,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Page Template из домена по id.
    */
   public removePageTemplateById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const tpl = this._pageTemplatesById.get(id)
     if (!tpl) {
       return
@@ -2816,6 +3181,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Page Template из домена по identity.
    */
   public removePageTemplateByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const tpl = this._pageTemplatesByIdentity.get(identity)
     if (!tpl) {
       return
@@ -2829,6 +3197,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Page Template из домена.
    */
   public removePageTemplate(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     this.removePageTemplateByIdentity(identity)
   }
 
@@ -2885,6 +3256,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Добавляет Page в домен и обновляет индексы.
    */
   public addPage(page: RPage): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     if (this._pagesByIdentity.has(page.identity) || this._pagesById.has(page.id)) {
       return
     }
@@ -2897,6 +3271,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Page из домена по id.
    */
   public removePageById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const page = this._pagesById.get(id)
     if (!page) {
       return
@@ -2910,6 +3287,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Page из домена по identity.
    */
   public removePageByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const page = this._pagesByIdentity.get(identity)
     if (!page) {
       return
@@ -2923,6 +3303,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Page из домена.
    */
   public removePage(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     this.removePageByIdentity(identity)
   }
 
@@ -2979,6 +3362,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Добавляет Navigation в домен и обновляет индексы.
    */
   public addNavigation(nav: RNavigation): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     if (this._navigationsByIdentity.has(nav.identity) || this._navigationsById.has(nav.id)) {
       return
     }
@@ -2991,6 +3377,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Navigation из домена по id.
    */
   public removeNavigationById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const nav = this._navigationsById.get(id)
     if (!nav) {
       return
@@ -3004,6 +3393,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Navigation из домена по identity.
    */
   public removeNavigationByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const nav = this._navigationsByIdentity.get(identity)
     if (!nav) {
       return
@@ -3017,6 +3409,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Navigation из домена.
    */
   public removeNavigation(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     this.removeNavigationByIdentity(identity)
   }
 
@@ -3073,6 +3468,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Добавляет Folder в домен и обновляет индексы.
    */
   public addFolder(folder: RFolder): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const identity = (folder as any).identity ?? folder.id
     if (this._foldersByIdentity.has(identity) || this._foldersById.has(folder.id)) {
       return
@@ -3086,6 +3484,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Folder из домена по id.
    */
   public removeFolderById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const folder = this._foldersById.get(id)
     if (!folder) {
       return
@@ -3099,6 +3500,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Folder из домена по identity.
    */
   public removeFolderByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const folder = this._foldersByIdentity.get(identity)
     if (!folder) {
       return
@@ -3112,6 +3516,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Folder из домена.
    */
   public removeFolder(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     this.removeFolderByIdentity(identity)
   }
 
@@ -3182,6 +3589,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Добавляет Parameter в домен и обновляет индексы.
    */
   public addParameter(parameter: RParameter): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     if (this._parametersByIdentity.has(parameter.identity) || this._parametersById.has(parameter.id)) {
       return
     }
@@ -3194,6 +3604,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Parameter из домена по id.
    */
   public removeParameterById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const parameter = this._parametersById.get(id)
     if (!parameter) {
       return
@@ -3207,6 +3620,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Parameter из домена по identity.
    */
   public removeParameterByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const parameter = this._parametersByIdentity.get(identity)
     if (!parameter) {
       return
@@ -3220,6 +3636,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Parameter из домена.
    */
   public removeParameter(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     this.removeParameterByIdentity(identity)
   }
 
@@ -3276,6 +3695,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Добавляет Filter в домен и обновляет индексы.
    */
   public addFilter(filter: RFilter): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     if (this._filtersByIdentity.has(filter.identity) || this._filtersById.has(filter.id)) {
       return
     }
@@ -3288,6 +3710,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Filter из домена по id.
    */
   public removeFilterById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const filter = this._filtersById.get(id)
     if (!filter) {
       return
@@ -3301,6 +3726,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Filter из домена по identity.
    */
   public removeFilterByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const filter = this._filtersByIdentity.get(identity)
     if (!filter) {
       return
@@ -3314,6 +3742,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Filter из домена.
    */
   public removeFilter(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     this.removeFilterByIdentity(identity)
   }
 
@@ -3383,6 +3814,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Добавляет Version в домен и обновляет индексы.
    */
   public addVersion(version: RVersion): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const identity = version.identity ?? version.id
     if (this._versionsByIdentity.has(identity) || this._versionsById.has(version.id)) {
       return
@@ -3396,6 +3830,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Version из домена по id.
    */
   public removeVersionById(id: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const version = this._versionsById.get(id)
     if (!version) {
       return
@@ -3409,6 +3846,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Version из домена по identity.
    */
   public removeVersionByIdentity(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     const version = this._versionsByIdentity.get(identity)
     if (!version) {
       return
@@ -3422,6 +3862,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Удаляет Version из домена.
    */
   public removeVersion(identity: string): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     this.removeVersionByIdentity(identity)
   }
 
@@ -3640,6 +4083,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    * Добавляет в домен все сущности из результата parsePlain.
    */
   public importFromSchema(parsed: EndgeDomainParsed): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
     parsed.parameters.forEach(p => this.addParameter(p))
     parsed.filters.forEach(f => this.addFilter(f))
     parsed.projects.forEach(p => this.addProject(p))

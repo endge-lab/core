@@ -27,7 +27,6 @@ class FakeSocket {
 
 class FakeAdapter extends BrowserBridge_Adapter {
   public sockets: FakeSocket[] = []
-  public confirm = vi.fn(async () => true)
   public unsubscribe = vi.fn()
   public override open(): WebSocket {
     const socket = new FakeSocket()
@@ -35,7 +34,6 @@ class FakeAdapter extends BrowserBridge_Adapter {
     return socket as unknown as WebSocket
   }
 
-  public override confirmDebugConnection(): Promise<boolean> { return this.confirm() }
   public override subscribePage(): () => void { return this.unsubscribe }
 }
 
@@ -59,10 +57,11 @@ async function tick() {
   await new Promise(resolve => setTimeout(resolve, 0))
 }
 
-async function approve(adapter: FakeAdapter, sessionId = 'session') {
+async function approve(module: EndgeBridge_Module, adapter: FakeAdapter, sessionId = 'session') {
   const socket = adapter.sockets[0]
   socket.welcome()
   socket.receive({ type: 'sessionRequested', data: { sessionId, displayName: 'Developer', workspaceIdentity: 'workspace', expiresAt: Date.now() + 45_000 } })
+  module.debug.respondToConsent(module.debug.pendingConsent!, true)
   await tick()
   socket.receive({ type: 'sessionStarted', data: { sessionId, clientId: 'connection', configuratorId: 'config' } })
   return socket
@@ -110,29 +109,99 @@ describe('политика и lifecycle bridge', () => {
 
   it('резервирует одно согласие для всех серверов и отзывает его при disconnect', async () => {
     const { module, adapter } = fixture({ role: 'client', allowedServers: [server, secondServer], debug: true })
-    let resolve!: (value: boolean) => void
-    adapter.confirm.mockImplementation(() => new Promise((r) => {
-      resolve = r
-    }))
     for (const socket of adapter.sockets) {
       socket.welcome()
     }
     const request = { type: 'sessionRequested', data: { sessionId: 'one', displayName: 'Developer', workspaceIdentity: 'workspace', expiresAt: Date.now() + 45_000 } }
     adapter.sockets[0].receive(request)
     adapter.sockets[1].receive({ ...request, data: { ...request.data, sessionId: 'two' } })
-    expect(adapter.confirm).toHaveBeenCalledOnce()
+    const pending = module.debug.pendingConsent!
+    expect(pending).toMatchObject({ serverUrl: server, sessionId: 'one' })
     expect(adapter.sockets[1].sent.at(-1)).toMatchObject({ type: 'acceptSession', accepted: false })
     module.disconnect(server)
-    resolve(true)
+    expect(module.debug.pendingConsent).toBeNull()
+    expect(module.debug.respondToConsent(pending, true)).toBe(false)
     await tick()
     expect(adapter.sockets[0].sent.some(m => m.type === 'acceptSession')).toBe(false)
     expect(module.debug.sessions).toEqual([])
   })
 
+  it('ожидает явного ответа UI и acknowledgement до выполнения команд', () => {
+    const { module, adapter, snapshot } = fixture({ role: 'client', allowedServers: [server], debug: true })
+    const socket = adapter.sockets[0]
+    socket.welcome()
+    socket.receive({ type: 'sessionRequested', data: { sessionId: 'one', displayName: 'Developer', workspaceIdentity: 'workspace', expiresAt: Date.now() + 45_000 } })
+    const pending = module.debug.pendingConsent!
+    expect(Object.isFrozen(pending)).toBe(true)
+    expect(socket.sent.some(message => message.type === 'acceptSession')).toBe(false)
+    const started = { type: 'sessionStarted', data: { sessionId: 'one', clientId: 'connection', configuratorId: 'config' } }
+    socket.receive(started)
+    socket.receive({ type: 'getSnapshot', id: 'premature', sessionId: 'one' })
+    expect(snapshot).not.toHaveBeenCalled()
+    expect(module.debug.respondToConsent({ ...pending, serverUrl: secondServer }, true)).toBe(false)
+    expect(module.debug.respondToConsent(pending, true)).toBe(true)
+    expect(module.debug.pendingConsent).toBeNull()
+    expect(socket.sent.at(-1)).toMatchObject({ type: 'acceptSession', accepted: true })
+    socket.receive({ type: 'getSnapshot', id: 'before-ack', sessionId: 'one' })
+    expect(snapshot).not.toHaveBeenCalled()
+    socket.receive(started)
+    socket.receive({ type: 'getSnapshot', id: 'after-ack', sessionId: 'one' })
+    expect(snapshot).toHaveBeenCalledOnce()
+    expect(module.debug.respondToConsent(pending, true)).toBe(false)
+  })
+
+  it('снимает отказанный и отозванный запрос без сохранения согласия', () => {
+    const { module, adapter } = fixture({ role: 'client', allowedServers: [server], debug: true })
+    const socket = adapter.sockets[0]
+    socket.welcome()
+    const data = { sessionId: 'one', displayName: 'Developer', workspaceIdentity: 'workspace', expiresAt: Date.now() + 45_000 }
+    socket.receive({ type: 'sessionRequested', data })
+    const first = module.debug.pendingConsent!
+    module.debug.respondToConsent(first, false)
+    expect(socket.sent.at(-1)).toMatchObject({ type: 'acceptSession', accepted: false })
+    socket.receive({ type: 'sessionRequested', data: { ...data, sessionId: 'two' } })
+    expect(module.debug.respondToConsent(first, true)).toBe(false)
+    expect(module.debug.pendingConsent?.sessionId).toBe('two')
+    socket.receive({ type: 'sessionEnded', sessionId: 'two' })
+    expect(module.debug.pendingConsent).toBeNull()
+    socket.receive({ type: 'sessionRequested', data: { ...data, sessionId: 'three' } })
+    const third = module.debug.pendingConsent!
+    module.reset()
+    expect(module.debug.pendingConsent).toBeNull()
+    expect(module.debug.respondToConsent(third, true)).toBe(false)
+  })
+
+  it('закрывает запрос по deadline и отвергает поздний клик даже при задержанном timer', () => {
+    vi.useFakeTimers()
+    const { module, adapter } = fixture({ role: 'client', allowedServers: [server], debug: true })
+    const socket = adapter.sockets[0]
+    socket.welcome()
+    const request = (sessionId: string) => socket.receive({ type: 'sessionRequested', data: {
+      sessionId,
+      displayName: 'Developer',
+      workspaceIdentity: 'workspace',
+      expiresAt: Date.now() + 1000,
+    } })
+    request('one')
+    const first = module.debug.pendingConsent!
+    vi.advanceTimersByTime(1000)
+    expect(module.debug.pendingConsent).toBeNull()
+    expect(socket.sent.at(-1)).toMatchObject({ type: 'acceptSession', accepted: false })
+    expect(module.debug.respondToConsent(first, true)).toBe(false)
+    request('two')
+    const second = module.debug.pendingConsent!
+    vi.setSystemTime(Date.now() + 2000)
+    module.debug.respondToConsent(second, true)
+    expect(socket.sent.at(-1)).toMatchObject({ type: 'acceptSession', sessionId: 'two', accepted: false })
+    expect(module.debug.pendingConsent).toBeNull()
+    module.reset()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
   it('проверяет source до mock и делегирует сбор snapshot диагностике', async () => {
     const log = vi.spyOn(console, 'info').mockImplementation(() => {})
     const { module, adapter, snapshot } = fixture({ role: 'client', allowedServers: [server], debug: true })
-    const socket = await approve(adapter)
+    const socket = await approve(module, adapter)
     socket.receive({ type: 'runSimulation', id: 'missing', sessionId: 'session', identity: 'missing', expectedHash: 'x' })
     await tick()
     expect(socket.sent.at(-1)?.data).toEqual({ status: 'rejected', reason: 'not-found' })
@@ -202,7 +271,7 @@ describe('политика и lifecycle bridge', () => {
   it('не логирует mock, если сессия отозвана во время hash', async () => {
     const log = vi.spyOn(console, 'info').mockImplementation(() => {})
     const { module, adapter } = fixture({ role: 'client', allowedServers: [server], debug: true })
-    const socket = await approve(adapter)
+    const socket = await approve(module, adapter)
     let resolve!: (hash: string) => void
     vi.spyOn(adapter, 'hashSimulation').mockImplementation(() => new Promise((r) => {
       resolve = r

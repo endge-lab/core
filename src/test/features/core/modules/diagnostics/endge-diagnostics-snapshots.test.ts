@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Endge } from '@/features/core/kernel/endge'
+import { serializeDiagnosticsJson } from '@/features/core/modules/diagnostics/domain/diagnostics-snapshot'
+import { EndgeDomain_Module } from '@/features/core/modules/domain/EndgeDomain_Module'
 
 const content = {
   includeTelemetry: false,
@@ -16,6 +18,19 @@ const content = {
 afterEach(() => vi.restoreAllMocks())
 
 describe('снимок через public API владельцев Core', () => {
+  it('сохраняет тип политики AuthProfile при redaction токенов и credentials', () => {
+    const result = serializeDiagnosticsJson({ authProfiles: [{
+      id: 1,
+      identity: 'auth',
+      adapterId: 'bearer',
+      credentials: { token: 'private-value' },
+      session: { storage: 'memory', persistRefreshToken: false },
+    }] })
+    const domain = EndgeDomain_Module.fromPlain(result.value)
+    expect(domain.getAuthProfiles()[0]?.session?.persistRefreshToken).toBe(false)
+    expect(JSON.stringify(result.value)).not.toContain('private-value')
+    expect(serializeDiagnosticsJson({ persistRefreshToken: 'private-value' }).value).toEqual({ persistRefreshToken: '[REDACTED]' })
+  })
   it('собирает настоящее дерево без повторного чтения Diagnostics и выключенных секций', () => {
     const diagnostics = vi.spyOn(Endge.diagnostics, 'createDiagnosticsSnapshot')
     const domain = vi.spyOn(Endge.domain, 'createDiagnosticsSnapshot')

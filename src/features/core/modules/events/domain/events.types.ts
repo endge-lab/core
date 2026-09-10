@@ -1,47 +1,43 @@
-/**
- * Связка события и id Действия из домена
- */
+import type { EndgeDataMode } from '@/features/core/modules/workspace/domain/workspace.types'
+
+/** Связка события и identity действия из Domain. */
 export interface EndgeEventBinding {
   event: string
   actionId: string | null
 }
 
-export type AnyEventName = string
-export type AnyPayload = unknown
-
-export interface CachedEvent {
-  name: AnyEventName
-  payload: AnyPayload
-  at: number
+export interface ContextValueChange<T> {
+  readonly previous: T
+  readonly value: T
 }
 
-//
-//
-export interface EndgeCustomEventMap {
-  [event: string]: unknown
-}
-
-/** Статические события Endge Core. */
+/** Статические события Endge Core о фактически произошедших изменениях. */
 export interface EndgeCoreEventMap {
+  'context:workspace-changed': ContextValueChange<string | null>
+  'context:tenant-changed': ContextValueChange<string>
+  'context:project-changed': ContextValueChange<string>
+  'context:environment-changed': ContextValueChange<string>
+  'context:user-changed': ContextValueChange<string>
+  'context:locale-changed': ContextValueChange<string>
+  'context:theme-changed': ContextValueChange<string>
+  'context:timezone-changed': ContextValueChange<string>
+  'context:data-mode-changed': ContextValueChange<EndgeDataMode>
   'updates:message': { type: string, message: unknown }
   'updates:applied': { identity: string, count: number }
 }
 
-//
-//
-export interface EndgeEmitOptions {
-  stopOnCancel?: boolean
+export interface EndgeCustomEventMap {
+  [event: string]: unknown
 }
 
-/**
- * Envelope-событие с возможностью cancel()
- */
-export class EndgeEvent<T> {
-  public isCanceled: boolean = false
+/** Уведомление о свершившемся факте не отменяет операцию owner-а. */
+export interface EndgeEvent<T> {
+  readonly payload: T
+}
 
-  constructor(public readonly payload: T) {}
-
-  cancel(): void {
-    this.isCanceled = true
-  }
+/** Метаданные одной публикации. Историю хранит потребитель, а не шина. */
+export interface EndgePublishedEvent<T = unknown> extends EndgeEvent<T> {
+  readonly name: string
+  readonly at: number
+  readonly sequence: number
 }
