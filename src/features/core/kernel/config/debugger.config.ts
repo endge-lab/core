@@ -1,7 +1,7 @@
 import type { EndgeBootContext } from '@/features/core/kernel/types/bootstrap.types'
 import type { EndgeFederationContext, EndgeLifecycleNodeDescriptor } from '@/features/federation/types/federation.types'
 
-const DEBUGGER_MODULES = new Set(['context', 'workspace', 'domainRepository', 'domain', 'bridge'])
+const DEBUGGER_MODULES = new Set(['events', 'context', 'commands', 'workspace', 'configuration', 'ui', 'domainRepository', 'domain', 'bridge'])
 
 /** Debugger boots an empty Domain and Bridge; it never runs the inspected application. */
 export function selectCoreLifecycleNodes(nodes: readonly EndgeLifecycleNodeDescriptor[], ctx: EndgeFederationContext): readonly EndgeLifecycleNodeDescriptor[] {

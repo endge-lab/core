@@ -27,6 +27,7 @@ class EndgeCore extends EndgeFederation.define({
     const prepared = prepareDebuggerSnapshot(snapshot)
     this.domain.replaceFromPlain(prepared.domain)
     this.workspace.applyInspection(prepared.workspace)
+    this.configuration.applyInspection(prepared.configuration)
     this.context.applyInspection(prepared.context)
   }
 

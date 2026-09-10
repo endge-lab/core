@@ -76,6 +76,70 @@ afterEach(() => {
 })
 
 describe('политика и lifecycle bridge', () => {
+  it('публикует события только после согласия и начала sync, прекращает после отзыва', async () => {
+    const { module, adapter } = fixture({ role: 'client', allowedServers: [server], debug: true })
+    const socket = await approve(module, adapter)
+    const publish = () => Endge.events.emitEvent('context:locale-changed', { previous: 'ru', value: 'en' })
+    publish()
+    expect(socket.sent.filter(m => m.type === 'clientEvent')).toHaveLength(0)
+    socket.receive({ type: 'startContextSync', id: 'snapshot', sessionId: 'session' })
+    expect(socket.sent.at(-1)?.data).toMatchObject({ sequence: 0 })
+    publish()
+    expect(socket.sent.at(-1)).toMatchObject({ type: 'clientEvent', sessionId: 'session', data: { sequence: 1, event: { name: 'context:locale-changed' } } })
+    socket.receive({ type: 'sessionEnded', sessionId: 'session' })
+    publish()
+    expect(socket.sent.filter(m => m.type === 'clientEvent')).toHaveLength(1)
+  })
+
+  it('буферизует события до snapshot, пропускает дубликаты и не возвращает команду клиенту', async () => {
+    const { module, adapter } = fixture({ role: 'configurator', serverUrl: server, debug: true })
+    const socket = adapter.sockets[0]
+    socket.welcome()
+    const session = module.debug.requestSession({ serverUrl: server, instanceId: 'client' })
+    socket.receive({ type: 'result', id: socket.sent.at(-1)!.id, data: { sessionId: 'session', clientId: 'client', configuratorId: 'connection' } })
+    await session
+    const apply = vi.spyOn(Endge.context, 'applyEvent').mockImplementation(() => {})
+    const execute = vi.spyOn(Endge.commands, 'execute')
+    await expect(module.debug.executeCommand('session', { type: 'context:set-locale', payload: { locale: 'en' } })).rejects.toThrow('not ready')
+    const snapshot = module.debug.startContextSync('session')
+    const requestId = socket.sent.at(-1)!.id
+    const event = (sequence: number, sessionId = 'session', value: unknown = 'en') => socket.receive({ type: 'clientEvent', sessionId, data: { sequence, event: { name: 'context:locale-changed', at: 1, sequence, payload: { previous: 'ru', value } } } })
+    event(1)
+    event(2)
+    event(3, 'unrelated')
+    expect(apply).not.toHaveBeenCalled()
+    socket.receive({ type: 'result', id: requestId, data: { snapshot: { format: 'endge-diagnostics-snapshot', version: 2 }, sequence: 1 } })
+    const initial = await snapshot
+    module.debug.activateContextSync('session', initial.sequence)
+    expect(apply).toHaveBeenCalledTimes(1)
+    event(2)
+    expect(apply).toHaveBeenCalledTimes(1)
+    expect(execute).not.toHaveBeenCalled()
+    expect(socket.sent.some(m => m.type === 'clientEvent' || m.type === 'executeCommand')).toBe(false)
+    event(3, 'session', 42)
+    await tick()
+    expect(apply).toHaveBeenCalledTimes(1)
+    expect(module.debug.sessions).toEqual([])
+  })
+
+  it('выполняет только команду активной клиентской сессии и не отвечает после её завершения', async () => {
+    const { module, adapter } = fixture({ role: 'client', allowedServers: [server], debug: true })
+    const socket = await approve(module, adapter)
+    let complete!: () => void
+    const execute = vi.spyOn(Endge.commands, 'execute').mockImplementation(() => new Promise<void>((resolve) => {
+      complete = resolve
+    }))
+    const command = { type: 'executeCommand', id: 'command', sessionId: 'session', data: { type: 'context:set-locale', payload: { locale: 'en' } } }
+    socket.receive({ ...command, sessionId: 'other' })
+    expect(execute).not.toHaveBeenCalled()
+    socket.receive(command)
+    expect(execute).toHaveBeenCalledWith(command.data)
+    socket.receive({ type: 'sessionEnded', sessionId: 'session' })
+    complete()
+    await tick()
+    expect(socket.sent.some(m => m.type === 'commandResult' && m.id === 'command')).toBe(false)
+  })
+
   it('отзывает зависшее соединение по heartbeat timeout и освобождает watchdog при reset', () => {
     vi.useFakeTimers()
     const { module, adapter } = fixture({ role: 'client', allowedServers: [server], debug: true })

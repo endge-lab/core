@@ -2,6 +2,9 @@ import type { EndgeModuleDefinition } from '@/features/federation/types/endge-mo
 import { EndgeActions_Module } from '@/features/core/modules/actions/EndgeActions_Module'
 import { EndgeAuth_Module } from '@/features/core/modules/auth/EndgeAuth_Module'
 import { EndgeBridge_Module } from '@/features/core/modules/bridge/EndgeBridge_Module'
+import { createContextCommandHandlers } from '@/features/core/modules/commands/config/commands.config'
+import { EndgeCommands_Module } from '@/features/core/modules/commands/EndgeCommands_Module'
+import { LocalCommandExecutor } from '@/features/core/modules/commands/services/LocalCommandExecutor'
 import { EndgeCompiler_Module } from '@/features/core/modules/compiler/EndgeCompiler_Module'
 import { EndgeComputations_Module } from '@/features/core/modules/computations/EndgeComputations_Module'
 import { EndgeConfiguration_Module } from '@/features/core/modules/configuration/EndgeConfiguration_Module'
@@ -34,6 +37,18 @@ export const ENDGE_CORE_MODULES = [
    * Координирует сохранение и восстановление состояния приложения.
    */
   { key: 'context', create: () => new EndgeContext_Module(), after: 'events' },
+
+  /**
+   * Регистрирует локальные обработчики; boot mode выбирает локальное или удалённое исполнение.
+   * Регистрация не изменяет Context и не подключает интерфейс или transport.
+   */
+  {
+    key: 'commands',
+    create: ({ getModule }) => new EndgeCommands_Module(
+      new LocalCommandExecutor(createContextCommandHandlers(getModule<EndgeContext_Module>('context'))),
+    ),
+    after: 'context',
+  },
 
   /**
    * Предоставляет тестовые данные из сохранённых mock-документов

@@ -78,8 +78,17 @@ describe('debugger inspection boundary', () => {
         { kind: 'module', key: 'context', status: 'captured', snapshot: context },
       ] },
     } as unknown as DiagnosticsSnapshot
+    const execute = vi.spyOn(Endge.commands, 'execute')
+    const published = vi.fn()
+    const stop = Endge.events.onAny(published)
     Endge.replaceDebuggerSnapshot(snapshot)
+    expect(execute).not.toHaveBeenCalled()
+    expect(published).not.toHaveBeenCalled()
     expect(Endge.context.serialize().user).toBe('remote-user')
+    Endge.context.applyEvent({ name: 'context:locale-changed', payload: { previous: Endge.context.currentLocale, value: 'en' } })
+    expect(Endge.context.serialize().locale).toBe('en')
+    expect(execute).not.toHaveBeenCalled()
+    stop()
     context.workspace = 'mismatch'
     expect(() => Endge.replaceDebuggerSnapshot(snapshot)).toThrow('do not match')
     expect(Endge.domain.getProject('remote-project')?.name).toBe('Remote')

@@ -9,6 +9,7 @@ export const BRIDGE_CONFIG = {
   reconnectMaxMs: 30_000,
   maxMessageBytes: 16 * 1024 * 1024,
   maxPendingRequests: 16,
+  maxBufferedEvents: 256,
 } as const
 
 /** Полный диагностический снимок для согласованной debug session. */

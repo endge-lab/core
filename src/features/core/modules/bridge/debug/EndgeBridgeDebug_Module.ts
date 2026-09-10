@@ -1,9 +1,17 @@
 import type { BrowserBridge_Adapter } from '@/features/core/modules/bridge/adapters/BrowserBridge_Adapter'
+import type { BridgeInspectionSnapshot, BridgeStreamEvent } from '@/features/core/modules/bridge/domain/bridge-sync.type'
 import type { BridgeCommands, BridgeDebugClient, BridgeDebugSession, BridgeMessage, DebugConnectionRequest, SimulationRunResult } from '@/features/core/modules/bridge/domain/bridge.type'
+import type { EndgeCommand } from '@/features/core/modules/commands/domain/commands.types'
 import type { DiagnosticsSnapshot } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
 import { Endge } from '@/features/core/kernel/endge'
-import { BRIDGE_SNAPSHOT_OPTIONS, normalizeBridgeServer } from '@/features/core/modules/bridge/config/bridge.config'
+import { BRIDGE_CONFIG, BRIDGE_SNAPSHOT_OPTIONS, normalizeBridgeServer } from '@/features/core/modules/bridge/config/bridge.config'
+import { readBridgeCommand, readBridgeContextEvent, readBridgeInspectionSnapshot, readBridgeStreamEvent } from '@/features/core/modules/bridge/tools/bridge-sync'
 import { EndgeModule } from '@/features/federation/EndgeModule'
+
+interface IncomingEventStream {
+  sequence: number | null
+  readonly buffered: BridgeStreamEvent[]
+}
 
 /** Debug policy и единственная client reservation сразу для всех backend. */
 export class EndgeBridgeDebug_Module extends EndgeModule {
@@ -15,6 +23,10 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
   private readonly _requests = new Map<string, object>()
   private readonly _clients = new Map<string, readonly BridgeDebugClient[]>()
   private readonly _sessions = new Map<string, BridgeDebugSession>()
+  private readonly _incoming = new Map<string, IncomingEventStream>()
+  private _outgoingSession: BridgeDebugSession | null = null
+  private _outgoingSequence = 0
+  private _unsubscribeEvents: (() => void) | null = null
 
   /**
    * ----------------------------------------
@@ -81,6 +93,7 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     const session = this._requireSession(sessionId)
     await this._commands.request(session.serverUrl, { type: 'endSession', sessionId })
     this._sessions.delete(sessionId)
+    this._releaseStream(sessionId)
     if (this._reservation?.sessionId === sessionId) {
       this._reservation = null
     }
@@ -92,6 +105,55 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     this._requireConfigurator()
     const session = this._requireSession(sessionId)
     return await this._commands.request(session.serverUrl, { type: 'getSnapshot', sessionId }) as DiagnosticsSnapshot
+  }
+
+  /** Начинает буферизацию событий до импорта согласованного с ними снимка. */
+  public async startContextSync(sessionId: string): Promise<BridgeInspectionSnapshot> {
+    this._requireConfigurator()
+    const session = this._requireSession(sessionId)
+    const stream: IncomingEventStream = { sequence: null, buffered: [] }
+    this._incoming.set(sessionId, stream)
+    try {
+      const result = readBridgeInspectionSnapshot(await this._commands.request(session.serverUrl, { type: 'startContextSync', sessionId }))
+      if (this._sessions.get(sessionId) !== session || this._incoming.get(sessionId) !== stream) {
+        throw new Error('[Endge Bridge] Inspection session changed')
+      }
+      return result
+    }
+    catch (error) {
+      if (this._incoming.get(sessionId) === stream) {
+        this._incoming.delete(sessionId)
+      }
+      throw error
+    }
+  }
+
+  /** После прямого импорта снимка применяет только более новые события, не вызывая Commands. */
+  public activateContextSync(sessionId: string, sequence: number): void {
+    this._requireConfigurator()
+    this._requireSession(sessionId)
+    const stream = this._incoming.get(sessionId)
+    if (!stream || stream.sequence !== null || !Number.isSafeInteger(sequence) || sequence < 0) {
+      throw new Error('[Endge Bridge] Context sync is not awaiting a snapshot')
+    }
+    stream.sequence = sequence
+    for (const event of stream.buffered.splice(0)) {
+      this._applyIncomingEvent(stream, event)
+    }
+    this.notify()
+  }
+
+  /** Отправляет запрос выбранному клиенту только после завершения первичной синхронизации. */
+  public async executeCommand(sessionId: string, command: EndgeCommand): Promise<void> {
+    this._requireConfigurator()
+    const session = this._requireSession(sessionId)
+    if (this._incoming.get(sessionId)?.sequence == null) {
+      throw new Error('[Endge Bridge] Context sync is not ready')
+    }
+    await this._commands.request(session.serverUrl, { type: 'executeCommand', sessionId, data: command })
+    if (this._sessions.get(sessionId) !== session) {
+      throw new Error('[Endge Bridge] Command session ended')
+    }
   }
 
   /** Пока выполняет только existence/hash check и console mock на стороне клиента. */
@@ -130,6 +192,7 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
       const session = this._sessions.get(message.sessionId)
       if (session?.serverUrl === serverUrl) {
         this._sessions.delete(message.sessionId)
+        this._releaseStream(message.sessionId)
       }
       if (this._reservation?.serverUrl === serverUrl && this._reservation.sessionId === message.sessionId) {
         this._reservation = null
@@ -137,7 +200,10 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
       }
       this.notify()
     }
-    else if (message.type === 'getSnapshot' || message.type === 'runSimulation') {
+    else if (message.type === 'clientEvent') {
+      this._receiveEvent(serverUrl, message)
+    }
+    else if (message.type === 'getSnapshot' || message.type === 'startContextSync' || message.type === 'executeCommand' || message.type === 'runSimulation') {
       await this._execute(serverUrl, message)
     }
   }
@@ -149,6 +215,7 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     for (const [id, session] of this._sessions) {
       if (session.serverUrl === serverUrl) {
         this._sessions.delete(id)
+        this._releaseStream(id)
       }
     }
     if (this._reservation?.serverUrl === serverUrl) {
@@ -160,6 +227,11 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
 
   /** Отзывает текущий lifecycle и освобождает принадлежащее модулю состояние. */
   public override reset(): void {
+    this._unsubscribeEvents?.()
+    this._unsubscribeEvents = null
+    this._outgoingSession = null
+    this._outgoingSequence = 0
+    this._incoming.clear()
     this._enabled = false
     this._reservation = null
     this._clearPendingConsent()
@@ -199,7 +271,7 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     this._pendingConsent = null
   }
 
-  /** Проверяет активную сессию и выполняет только snapshot либо simulation mock. */
+  /** Проверяет активную сессию и выполняет только явно разрешённые операции. */
   private async _execute(serverUrl: string, message: BridgeMessage): Promise<void> {
     const session = this._sessions.get(message.sessionId ?? '')
     if (!this._enabled || this._role !== 'client' || !session || session.serverUrl !== serverUrl || !message.id) {
@@ -209,6 +281,15 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
       let data: unknown
       if (message.type === 'getSnapshot') {
         data = Endge.diagnostics.snapshot(BRIDGE_SNAPSHOT_OPTIONS)
+      }
+      else if (message.type === 'startContextSync') {
+        this._startPublishing(session)
+        const snapshot = Endge.diagnostics.snapshot(BRIDGE_SNAPSHOT_OPTIONS)
+        data = { snapshot, sequence: this._outgoingSequence }
+      }
+      else if (message.type === 'executeCommand') {
+        await Endge.commands.execute(readBridgeCommand(message.data))
+        data = null
       }
       else {
         const identity = message.identity ?? ''
@@ -235,12 +316,91 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
           }
         }
       }
-      this._commands.send(serverUrl, { type: 'commandResult', id: message.id, sessionId: session.sessionId, data })
+      if (this._sessions.get(session.sessionId) === session) {
+        this._commands.send(serverUrl, { type: 'commandResult', id: message.id, sessionId: session.sessionId, data })
+      }
     }
     catch (error) {
       if (this._sessions.get(session.sessionId) === session) {
         this._commands.send(serverUrl, { type: 'commandResult', id: message.id, sessionId: session.sessionId, error: error instanceof Error ? error.message : 'Client command failed' })
       }
+    }
+  }
+
+  /** Подписка принадлежит подтверждённому клиентскому сеансу; дебагер никогда не ретранслирует свои Events. */
+  private _startPublishing(session: BridgeDebugSession): void {
+    if (this._outgoingSession === session) {
+      return
+    }
+    this._unsubscribeEvents?.()
+    this._outgoingSession = session
+    this._outgoingSequence = 0
+    this._unsubscribeEvents = Endge.events.onAny((event) => {
+      if (this._role !== 'client' || this._sessions.get(session.sessionId) !== session || this._outgoingSession !== session) {
+        return
+      }
+      try {
+        this._commands.send(session.serverUrl, {
+          type: 'clientEvent',
+          sessionId: session.sessionId,
+          data: { sequence: ++this._outgoingSequence, event: { ...event, payload: event.payload ?? null } },
+        })
+      }
+      catch {
+        this.disconnect(session.serverUrl)
+        // Потерянное событие отзывает поток, а не оставляет дебагер с незаметно устаревшим состоянием.
+        try {
+          this._commands.send(session.serverUrl, { type: 'endSession', sessionId: session.sessionId })
+        }
+        catch { /* Transport уже закрыт; lifecycle родителя завершит очистку. */ }
+      }
+    })
+  }
+
+  /** Принимает поток только своего клиента; буфер ограничен временем первичного запроса и размером. */
+  private _receiveEvent(serverUrl: string, message: BridgeMessage): void {
+    if (!this._enabled || this._role !== 'configurator' || !message.sessionId) {
+      return
+    }
+    const session = this._sessions.get(message.sessionId)
+    const stream = this._incoming.get(message.sessionId)
+    if (!session || session.serverUrl !== serverUrl || !stream) {
+      return
+    }
+    const event = readBridgeStreamEvent(message.data)
+    if (stream.sequence === null) {
+      if (stream.buffered.length >= BRIDGE_CONFIG.maxBufferedEvents) {
+        throw new Error('[Endge Bridge] Snapshot event buffer limit exceeded')
+      }
+      stream.buffered.push(event)
+      return
+    }
+    this._applyIncomingEvent(stream, event)
+  }
+
+  /** Дубликаты и события из снимка пропускаются; разрыв последовательности завершает синхронизацию. */
+  private _applyIncomingEvent(stream: IncomingEventStream, message: BridgeStreamEvent): void {
+    if (stream.sequence === null || message.sequence <= stream.sequence) {
+      return
+    }
+    if (message.sequence !== stream.sequence + 1) {
+      throw new Error('[Endge Bridge] Event stream sequence gap')
+    }
+    const event = readBridgeContextEvent(message.event)
+    stream.sequence = message.sequence
+    if (event) {
+      Endge.context.applyEvent(event)
+    }
+  }
+
+  /** Снимает буфер и подписку только соответствующего сеанса. */
+  private _releaseStream(sessionId: string): void {
+    this._incoming.delete(sessionId)
+    if (this._outgoingSession?.sessionId === sessionId) {
+      this._unsubscribeEvents?.()
+      this._unsubscribeEvents = null
+      this._outgoingSession = null
+      this._outgoingSequence = 0
     }
   }
 

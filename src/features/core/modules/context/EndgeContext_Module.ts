@@ -1,5 +1,6 @@
 import type { EndgeBootContext, EndgeBootMode } from '@/features/core/kernel/types/bootstrap.types'
 import type { EndgeConfiguration } from '@/features/core/modules/configuration/domain/types/configuration.type'
+import type { ContextEvent } from '@/features/core/modules/context/domain/context-events.types'
 import type {
   EndgeContextPersistenceConfig,
   EndgeContextSnapshot,
@@ -263,6 +264,30 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     super.notify()
   }
 
+  /** Применяет типизированное событие через setters, сохраняя их проверки и side effects. */
+  public applyEvent(event: ContextEvent): void {
+    switch (event.name) {
+      case 'context:workspace-changed':
+        return this.setCurrentWorkspace(event.payload.value)
+      case 'context:tenant-changed':
+        return this.setCurrentTenant(event.payload.value)
+      case 'context:project-changed':
+        return this.setCurrentProject(event.payload.value)
+      case 'context:environment-changed':
+        return this.setCurrentEnvironment(event.payload.value)
+      case 'context:user-changed':
+        return this.setCurrentUser(event.payload.value)
+      case 'context:locale-changed':
+        return this.setCurrentLocale(event.payload.value)
+      case 'context:theme-changed':
+        return this.setCurrentTheme(event.payload.value)
+      case 'context:timezone-changed':
+        return this.setCurrentTimezone(event.payload.value)
+      case 'context:data-mode-changed':
+        return this.setDataMode(event.payload.value)
+    }
+  }
+
   /** Восстанавливает execution scope из snapshot с безопасными defaults. */
   public override deserialize(payload: Partial<EndgeContextSnapshot> | undefined): void {
     this._currentWorkspace = normalizeOptionalText(payload?.workspace)
@@ -297,7 +322,14 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     this._currentUser = snapshot.user ?? DEFAULT_SCOPE.userId
     this._workspaceDataMode = snapshot.dataMode ?? 'live'
     this._dataModeOverride = null
-    // Locale/theme/timezone are displayed from the snapshot; local debugger UI preferences stay local.
+    this._currentLocale = snapshot.locale ?? DEFAULT_LOCALE
+    this._pendingLocale = null
+    this._currentTheme = snapshot.theme ?? DEFAULT_THEME
+    this._themePreference = null
+    this._currentTimezone = snapshot.timezone ?? DEFAULT_TIMEZONE
+    this._pendingTimezone = null
+    // Снимок задаёт baseline напрямую: импорт не выполняет команды и не переиздаёт события клиента.
+    this._eventContext = this._readEventContext()
     this.notify()
   }
 
@@ -885,7 +917,7 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
       return
     }
     const current = this._readEventContext()
-    if (!this._eventContext || this._bootMode === 'debugger') {
+    if (!this._eventContext) {
       this._eventContext = current
       return
     }
@@ -1006,7 +1038,7 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     fallback: string,
   ): void {
     const next = normalizeScopePart(identity, fallback)
-    if (!this._executionContextLocked || next === this[field]) {
+    if (this._bootMode === 'debugger' || !this._executionContextLocked || next === this[field]) {
       return
     }
     throw new Error('[EndgeContext] Structural context is immutable during boot. Call Endge.reset() and boot with a new context.')

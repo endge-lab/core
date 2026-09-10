@@ -310,6 +310,7 @@ const CREATE_NEW_BY_TYPE: Partial<{ [TType in DomainDocumentType]: (options: Doc
   'environment': options => initialize(new REnvironment(), options),
   'policy': options => initialize(new RPolicy(), options),
   'tenant': options => initialize(new RTenant(), options, { codeFromIdentity: true }),
+  'project': options => initialize(new RProject(), options),
   'style': options => initialize(new RStyle(), options, { sourceVersion: 1 }),
   'configuration': options => initialize(new RConfiguration(), options, { omitFolder: true }),
   'page-template': options => initialize(new RPageTemplate(), options),

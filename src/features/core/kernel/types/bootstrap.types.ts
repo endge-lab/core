@@ -1,5 +1,6 @@
 import type { EndgeAuthBootOptions } from '@/features/core/modules/auth/domain/types/auth-profile.types'
 import type { EndgeBridgeBootOptions } from '@/features/core/modules/bridge/domain/bridge.type'
+import type { EndgeCommandsBootOptions } from '@/features/core/modules/commands/types/command-executor.type'
 import type { EndgeDomainBundle } from '@/features/core/modules/domain/types/document/domain-export.type'
 import type { EndgeDomainProvider } from '@/features/core/modules/domain/types/document/domain-provider.type'
 import type { EndgeExecutionContext } from '@/features/core/modules/runtime/domain/execution-context.types'
@@ -65,6 +66,9 @@ export interface EndgeBootContext extends EndgeFederationContext {
 
   /** Optional host-owned bridge policy; отсутствие отключает соединения. */
   bridge?: EndgeBridgeBootOptions
+
+  /** Host передаёт порт выбранного сеанса для удалённого исполнения команд в debugger mode. */
+  commands?: EndgeCommandsBootOptions
 
   /**
    * Для plain provider.

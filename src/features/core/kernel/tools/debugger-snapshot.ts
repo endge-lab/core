@@ -1,6 +1,7 @@
 import type { EndgeContextSnapshot } from '@/features/core/modules/context/domain/context-persistence.types'
 import type { DiagnosticsSnapshot } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
 import type { EndgeDataMode } from '@/features/core/modules/workspace/domain/workspace.types'
+import { normalizeEndgeConfiguration } from '@/features/core/modules/configuration/domain/endge-configuration'
 import { normalizeEndgeWorkspaceDefinition } from '@/features/core/modules/domain/entities/RWorkspace'
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -42,5 +43,6 @@ export function prepareDebuggerSnapshot(snapshot: DiagnosticsSnapshot) {
   if (source.workspace !== workspace.identity) {
     throw new Error('[Endge] Snapshot workspace and context do not match')
   }
-  return { domain: snapshot.domain, workspace, context }
+  const configuration = normalizeEndgeConfiguration(captured('configuration') ?? workspace.configuration)
+  return { domain: snapshot.domain, workspace, context, configuration }
 }

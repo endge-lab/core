@@ -23,6 +23,9 @@ export class EndgeConfiguration_Module extends EndgeModule<EndgeBootContext> {
 
   /** Разрешает Workspace - Tenant - Project - Environment до compiler build. */
   public override build(ctx: EndgeBootContext): void {
+    if (ctx.mode === 'debugger') {
+      return
+    }
     const execution = Endge.context.resolveExecutionContext({
       explicit: ctx.context,
       tenants: Endge.domain.getTenants().map(item => item.identity),
@@ -69,6 +72,16 @@ export class EndgeConfiguration_Module extends EndgeModule<EndgeBootContext> {
   /** Очищает effective configuration перед следующим boot. */
   public override reset(): void {
     this._current = null
+    this._buildContext = null
+    this.notify()
+  }
+
+  /** Принимает уже разрешённую конфигурацию клиента без build, команд и запуска приложения. */
+  public applyInspection(configuration: EndgeConfiguration): void {
+    if (Endge.mode !== 'debugger') {
+      throw new Error('[EndgeConfiguration] Inspection requires debugger mode')
+    }
+    this._current = normalizeEndgeConfiguration(configuration)
     this._buildContext = null
     this.notify()
   }
