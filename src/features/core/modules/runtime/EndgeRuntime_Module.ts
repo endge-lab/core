@@ -1,3 +1,4 @@
+import type { EndgeCoreEventMap } from '@/features/core/modules/events/domain/events.types'
 import type { RuntimeEntityType } from '@/features/core/modules/runtime/domain/runtime-entity-map.types'
 import type { RuntimeExecuteOptions } from '@/features/core/modules/runtime/domain/runtime-execute.type'
 import type { DestroyedRuntimeHostSnapshot, RuntimeArtifactReader, RuntimeHost, RuntimeInspectionLease } from '@/features/core/modules/runtime/domain/runtime-host.types'
@@ -16,6 +17,7 @@ import { EndgeComposition } from '@/features/core/modules/runtime/execution/endg
 import { EndgeDataView } from '@/features/core/modules/runtime/execution/endge-data-view'
 import { EndgeProject } from '@/features/core/modules/runtime/execution/endge-project'
 import { EndgeQuery } from '@/features/core/modules/runtime/execution/endge-query'
+import { EndgeSimulation } from '@/features/core/modules/runtime/execution/endge-simulation'
 import { RuntimeBoundaryUpdatePhase } from '@/features/core/modules/runtime/helpers/raph-phases/runtime-boundary-update-phase'
 import { RuntimeNodeUpdatePhase } from '@/features/core/modules/runtime/helpers/raph-phases/runtime-node-update-phase'
 import { EndgeOperations_Module } from '@/features/core/modules/runtime/operation/EndgeOperations_Module'
@@ -23,6 +25,7 @@ import { RuntimeAppScope } from '@/features/core/modules/runtime/RuntimeAppScope
 import { RuntimeHostRegistry } from '@/features/core/modules/runtime/RuntimeHostRegistry'
 import { RuntimeScope } from '@/features/core/modules/runtime/RuntimeScope'
 import { RuntimeStrategyRegistry } from '@/features/core/modules/runtime/services/RuntimeStrategyRegistry'
+import { findSimulationRuntime } from '@/features/core/modules/runtime/services/simulation/find-simulation-runtime'
 import { ActionRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/ActionRuntimeStrategy'
 import { ComponentSFCRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/ComponentSFCRuntimeStrategy'
 import { CompositionRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/CompositionRuntimeStrategy'
@@ -30,6 +33,7 @@ import { FilterRuntimeStrategy } from '@/features/core/modules/runtime/services/
 import { PageRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/PageRuntimeStrategy'
 import { ProjectRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/ProjectRuntimeStrategy'
 import { QueryRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/QueryRuntimeStrategy'
+import { SimulationRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/SimulationRuntimeStrategy'
 import { StoreRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/StoreRuntimeStrategy'
 import { StreamRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/StreamRuntimeStrategy'
 import { EndgeModule } from '@/features/federation/EndgeModule'
@@ -40,8 +44,17 @@ export class EndgeRuntime_Module extends EndgeModule {
   public readonly dataView = new EndgeDataView()
   public readonly composition = new EndgeComposition()
   public readonly project = new EndgeProject()
+  public readonly simulation = new EndgeSimulation()
   public readonly operations = new EndgeOperations_Module()
-  public readonly scopes = new EndgeRuntimeScopes_Module()
+  public readonly scopes = new EndgeRuntimeScopes_Module(() => {
+    if (this._inited) {
+      Endge.events.emitEvent('runtime:scopes-changed', {})
+    }
+  })
+
+  private readonly _onHostStatusChanged = (change: EndgeCoreEventMap['runtime:host-status-changed']): void => {
+    Endge.events.emitEvent('runtime:host-status-changed', change)
+  }
 
   private _hosts = new RuntimeHostRegistry()
   private _strategies = new RuntimeStrategyRegistry()
@@ -86,6 +99,12 @@ export class EndgeRuntime_Module extends EndgeModule {
       persistence: 'disabled',
     })
     this._registerDefaultStrategies()
+  }
+
+  /** Уведомляет consumers об изменении реестра без передачи runtime data. */
+  public override notify(): void {
+    super.notify()
+    Endge.events.emitEvent('runtime:registry-changed', {})
   }
 
   /**
@@ -181,7 +200,9 @@ export class EndgeRuntime_Module extends EndgeModule {
     hostMeta.runtimeLocalId = address.localId
     hostMeta.runtimePath = address.runtimePath
     hostMeta.scopeRoot = scopeRoot
-    hostMeta.persistence = persistence ?? appScope.persistence
+    hostMeta.persistence = strategy.entityType === 'simulation' || findSimulationRuntime(parent)
+      ? 'disabled'
+      : persistence ?? appScope.persistence
     if (persistenceKey !== undefined) {
       hostMeta.persistenceKey = persistenceKey
     }
@@ -262,6 +283,14 @@ export class EndgeRuntime_Module extends EndgeModule {
 
   /** Разрешает data mode по ближайшему Composition override с fallback на общий Endge context. */
   public resolveDataMode(host: RuntimeHost<any, any> | null | undefined): EndgeDataMode {
+    const simulation = findSimulationRuntime(host)
+    if (simulation?.forceMock) {
+      return 'mock'
+    }
+    const simulationMode = simulation?.getArtifactPayload()?.dataMode
+    if (simulationMode === 'mock' || simulationMode === 'live') {
+      return simulationMode
+    }
     let current = host ?? null
     while (current) {
       if (current.entityType === 'composition' || current.entityType === 'project') {
@@ -690,6 +719,7 @@ export class EndgeRuntime_Module extends EndgeModule {
       catch (error) {
         cleanupError ??= error
       }
+      host.off('status-changed', this._onHostStatusChanged)
       this._hosts.removeById(id)
       this._hosts.rememberDeletedSnapshot(destroyedSnapshot)
     }
@@ -751,11 +781,13 @@ export class EndgeRuntime_Module extends EndgeModule {
     }
     try {
       this._hosts.register(host)
+      host.on('status-changed', this._onHostStatusChanged)
       this.scopes.attachRuntime(String(host.meta.runtimeScopeId ?? ''), host)
     }
     catch (error) {
       console.error(`[EndgeRuntime] Failed to register runtime host "${host.id}": ${errorText(error)}`)
       this.scopes.detachRuntime(host.id)
+      host.off('status-changed', this._onHostStatusChanged)
       this._hosts.removeById(host.id)
       return false
     }
@@ -797,6 +829,7 @@ export class EndgeRuntime_Module extends EndgeModule {
    * Регистрирует встроенные стратегии в порядке от специальных к общим.
    */
   private _registerDefaultStrategies(): void {
+    this.registerStrategy(new SimulationRuntimeStrategy())
     this.registerStrategy(new CompositionRuntimeStrategy())
     this.registerStrategy(new StoreRuntimeStrategy())
     this.registerStrategy(new StreamRuntimeStrategy(

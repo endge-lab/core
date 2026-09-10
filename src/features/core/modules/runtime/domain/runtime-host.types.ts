@@ -122,6 +122,7 @@ export interface ProjectRuntimeHostContext extends RuntimeHostContextBase {
 }
 
 export interface RuntimeHostContextMap {
+  'simulation': RuntimeHostContextBase
   'action': ActionRuntimeHostContext
   'query': QueryRuntimeHostContext
   'filter': FilterRuntimeHostContext

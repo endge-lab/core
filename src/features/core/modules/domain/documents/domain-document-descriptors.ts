@@ -265,7 +265,7 @@ const CAPABILITIES_BY_TYPE: Partial<Record<DomainDocumentType, Partial<DomainDoc
   'composition': { source: 'composition', program: 'composition', runtime: 'composition' },
   'store': { source: 'store', program: 'store', runtime: 'store' },
   'stream': { source: 'stream', program: 'stream', runtime: 'stream' },
-  'simulation': { source: 'simulation', program: 'simulation' },
+  'simulation': { source: 'simulation', program: 'simulation', runtime: 'simulation' },
   'update': { source: 'update', program: 'update' },
   'style': { source: 'style', program: 'style' },
   'configuration': { source: 'configuration', program: 'configuration' },

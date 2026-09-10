@@ -1,6 +1,6 @@
 import type { ProgramDependency, ProgramDiagnostic } from '@/features/core/modules/program/domain/types/program.types'
 
-/** Декларация будущей подмены request. Генерация данных здесь не выполняется. */
+/** Декларация подмены response Query. Генерация выполняется при запуске Simulation. */
 export interface SimulationMockRequest {
   kind: 'mock-request'
   seed?: string
@@ -19,6 +19,8 @@ export type SimulationTargetReference
 
 export interface SimulationSourceDocument {
   target: SimulationTargetReference
+  /** Режим неподменённых источников. Отсутствие значения сохраняет наследование. */
+  dataMode?: 'live' | 'mock'
   runtimes: SimulationRuntimeOverride[]
 }
 

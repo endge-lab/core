@@ -17,6 +17,17 @@ export class EndgeRuntimeScopes_Module extends EndgeModule {
    * ----------------------------------------
    */
 
+  /** Получает уведомление владельца Runtime без обращения к Core при создании. */
+  public constructor(private readonly _onChange: () => void = () => {}) {
+    super()
+  }
+
+  /** Публикует завершённое изменение scopes; состояние остаётся у их owners. */
+  public override notify(): void {
+    super.notify()
+    this._onChange()
+  }
+
   public register(scope: RuntimeScope): RuntimeScope {
     if (this._scopes.has(scope.id)) {
       throw new Error(`[EndgeRuntimeScopes_Module] Scope "${scope.id}" is already registered.`)

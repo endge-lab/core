@@ -1,3 +1,4 @@
+import type { RuntimeHostStatus } from '@/features/core/modules/runtime/domain/runtime-host.types'
 import type { EndgeDataMode } from '@/features/core/modules/workspace/domain/workspace.types'
 
 /** Связка события и identity действия из Domain. */
@@ -22,6 +23,9 @@ export interface EndgeCoreEventMap {
   'context:theme-changed': ContextValueChange<string>
   'context:timezone-changed': ContextValueChange<string>
   'context:data-mode-changed': ContextValueChange<EndgeDataMode>
+  'runtime:registry-changed': Record<string, never>
+  'runtime:scopes-changed': Record<string, never>
+  'runtime:host-status-changed': { readonly id: string, readonly previous: RuntimeHostStatus, readonly value: RuntimeHostStatus }
   'updates:message': { type: string, message: unknown }
   'updates:applied': { identity: string, count: number }
 }

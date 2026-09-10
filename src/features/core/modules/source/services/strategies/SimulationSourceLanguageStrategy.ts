@@ -19,7 +19,7 @@ export class SimulationSourceLanguageStrategy implements SourceLanguageStrategy 
     extension: '.endge-simulation.ts',
     keywords: ['defineSimulation', 'composition', 'project', 'mockRequest'],
     functions: ['defineSimulation', 'composition', 'project', 'mockRequest'],
-    properties: ['target', 'overrides', 'runtimes', 'request', 'seed', 'arrays'],
+    properties: ['target', 'dataMode', 'overrides', 'runtimes', 'request', 'seed', 'arrays'],
   })
 
   public constructor(private readonly _catalog: () => SimulationSourceCatalog) {}
@@ -79,11 +79,12 @@ export class SimulationSourceLanguageStrategy implements SourceLanguageStrategy 
     return [
       { label: 'defineSimulation', kind: 'snippet', insertText: SIMULATION_DEFAULT_SOURCE, detail: 'Создать Simulation Source' },
       { label: 'target', kind: 'property', insertText: 'target: composition(\'\'),', detail: 'Целевая Composition или Project' },
+      { label: 'dataMode', kind: 'property', insertText: 'dataMode: \'mock\',', detail: 'Режим неподменённых источников этого запуска; принудительный МОК Preview имеет приоритет' },
       { label: 'project', kind: 'function', insertText: 'project(\'\')', detail: 'Собственный граф проекта' },
       { label: 'composition', kind: 'function', insertText: 'composition(\'\')', detail: 'Граф отдельной Composition' },
       { label: 'overrides', kind: 'property', insertText: 'overrides: { runtimes: {} },', detail: 'Дерево подмен' },
       { label: 'mockRequest', kind: 'function', insertText: 'mockRequest({ arrays: {} })', detail: 'Описание подмены запроса' },
-      { label: 'seed', kind: 'property', insertText: 'seed: \'simulation\',', detail: 'Seed будущей генерации' },
+      { label: 'seed', kind: 'property', insertText: 'seed: \'simulation\',', detail: 'Seed воспроизводимой генерации ответа' },
       { label: 'arrays', kind: 'property', insertText: 'arrays: {},', detail: 'Количество элементов массивов ответа' },
     ]
   }

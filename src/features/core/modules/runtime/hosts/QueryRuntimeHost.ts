@@ -12,6 +12,7 @@ import { Endge } from '@/features/core/kernel/endge'
 import { RFilter as FilterModel } from '@/features/core/modules/domain/entities/RFilter'
 import { runResponseOutputTransforms } from '@/features/core/modules/runtime/execution/endge-response-output'
 import { RuntimeHostBase } from '@/features/core/modules/runtime/RuntimeHostBase'
+import { findSimulationRuntime } from '@/features/core/modules/runtime/services/simulation/find-simulation-runtime'
 import { evaluateSourceExpression } from '@/features/core/modules/source/services/source-expression-evaluate'
 
 function defaultContext(): RuntimeHostContext<'query'> {
@@ -109,7 +110,7 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
           return
         }
         host._isMockEnabled = isMockEnabled
-        if (!isMockEnabled) {
+        if (!isMockEnabled || findSimulationRuntime(host)?.hasRequest(host)) {
           return
         }
         host._runSequence += 1
@@ -210,8 +211,9 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
       this._applyProps(propsPatch, false)
     }
 
+    const simulatedResponse = findSimulationRuntime(this)?.readResponse(this) ?? null
     this._isMockEnabled = Endge.runtime.resolveDataMode(this) === 'mock'
-    if (this._isMockEnabled) {
+    if (this._isMockEnabled && !simulatedResponse) {
       this._runSequence += 1
       this._abortController?.abort()
       const updatedAt = new Date().toISOString()
@@ -233,11 +235,13 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     this.setContext({ status: 'running', startedAt, updatedAt: startedAt })
 
     try {
-      const response = await Endge.runtime.query.executeArtifact({
-        payload,
-        props: this.readInputs(),
-        signal: this._abortController.signal,
-      })
+      const response = simulatedResponse
+        ? simulatedResponse.value
+        : await Endge.runtime.query.executeArtifact({
+            payload,
+            props: this.readInputs(),
+            signal: this._abortController.signal,
+          })
       if (sequence !== this._runSequence) {
         throw new DOMException('Query execution was superseded.', 'AbortError')
       }

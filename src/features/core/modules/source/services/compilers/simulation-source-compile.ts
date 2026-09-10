@@ -26,7 +26,7 @@ export function compileSimulationSource(source: string, sourceVersion = 1): Simu
       diagnostics.push(diagnostic('error', 'simulation-source-definition', 'Source должен содержать один defineSimulation({...}).', undefined, statement))
       return result
     }
-    const definition = object(expression.arguments[0], 'defineSimulation', ['target', 'overrides'])
+    const definition = object(expression.arguments[0], 'defineSimulation', ['target', 'dataMode', 'overrides'])
     const targetCall = definition.get('target')
     let target: SimulationTargetReference = { entityType: 'composition', identity: '' }
     if ((!isCall(targetCall, 'composition') && !isCall(targetCall, 'project')) || !t.isStringLiteral(targetCall.arguments[0]) || !targetCall.arguments[0].value.trim()) {
@@ -35,11 +35,21 @@ export function compileSimulationSource(source: string, sourceVersion = 1): Simu
     else {
       target = { entityType: isCall(targetCall, 'project') ? 'project' : 'composition', identity: targetCall.arguments[0].value.trim() }
     }
+    const modeNode = definition.get('dataMode')
+    let dataMode: 'live' | 'mock' | undefined
+    if (modeNode) {
+      if (t.isStringLiteral(modeNode) && (modeNode.value === 'live' || modeNode.value === 'mock')) {
+        dataMode = modeNode.value
+      }
+      else {
+        diagnostics.push(diagnostic('error', 'simulation-data-mode', 'dataMode должен быть строкой \'live\' или \'mock\'. Для наследования не указывайте свойство.', 'dataMode', modeNode))
+      }
+    }
     const overrides = object(definition.get('overrides'), 'overrides', ['runtimes'])
     const runtimes = readRuntimes(overrides.get('runtimes'), 'overrides.runtimes')
-    result.document = { target, runtimes }
+    result.document = { target, ...(dataMode ? { dataMode } : {}), runtimes }
     if (!diagnostics.some(item => item.severity === 'error')) {
-      result.artifact = { type: 'simulation', sourceVersion, target, runtimes }
+      result.artifact = { type: 'simulation', sourceVersion, ...result.document }
     }
   }
   catch (error: unknown) {

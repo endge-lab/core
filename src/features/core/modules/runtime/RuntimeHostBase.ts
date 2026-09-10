@@ -397,8 +397,12 @@ export abstract class RuntimeHostBase<
    * ACCESS
    */
   public setStatus(status: RuntimeHostStatus): void {
+    const previous = this.status
     this.status = status
     this.touch()
+    if (previous !== status) {
+      this.emit('status-changed', { id: this.id, previous, value: status })
+    }
   }
 
   /** Проверяет наличие runtime capability. */

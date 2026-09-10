@@ -29,6 +29,24 @@ describe('жизненный цикл памяти runtime', () => {
     Raph.app.reset()
   })
 
+  /** Реестр публикует lifecycle facts только своих hosts и освобождает связь при удалении. */
+  it('передаёт изменения статуса в Events без повторов и отключает удалённый host', async () => {
+    const changes: unknown[] = []
+    const off = Endge.events.onEvent('runtime:host-status-changed', event => changes.push(event.payload))
+    try {
+      const host = executeQuery(90)
+      changes.length = 0
+      host.setStatus('paused')
+      host.setStatus('paused')
+      expect(changes).toEqual([{ id: host.id, previous: 'active', value: 'paused' }])
+      await Endge.runtime.destroyRuntimeTreeAsync(host.id)
+      changes.length = 0
+      host.emit('status-changed', { id: host.id, previous: 'destroyed', value: 'active' })
+      expect(changes).toEqual([])
+    }
+    finally { off() }
+  })
+
   it('обрабатывает каждую доставленную привязку обновления без структурного хеширования', () => {
     const model = queryModel(1)
     const host = new TestQueryHost(model)

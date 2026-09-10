@@ -5,7 +5,7 @@ import { Exclude, Expose } from 'class-transformer'
 
 import { REntity } from '@/features/core/modules/domain/entities/REntity'
 
-/** Сохранённое source-first определение симуляции без runtime execution. */
+/** Сохранённое source-first определение отдельного запуска Simulation. */
 export class RSimulation extends REntity {
   @Exclude()
   readonly type = 'simulation' as const

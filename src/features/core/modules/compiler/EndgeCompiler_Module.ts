@@ -312,6 +312,15 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     return this._compileEntity('simulation', entity, this._createCompileContext()) as ProgramArtifact<SimulationSourceArtifact>
   }
 
+  /** Компилирует черновик Simulation без публикации в общей Program. */
+  public compileSimulationArtifact(entity: RSimulation): ProgramArtifact<SimulationSourceArtifact> {
+    const handler = this._handlers.get('simulation') as EntityCompilerHandler<RSimulation, SimulationSourceArtifact> | undefined
+    if (!handler) {
+      throw new Error('Compiler handler is not registered for "simulation"')
+    }
+    return handler.compile(entity, this._createCompileContext())
+  }
+
   /** Компилирует один дочерний Update source в Endge.program. */
   public buildUpdate(entity: RUpdate): ProgramArtifact<UpdateSourceArtifact> {
     return this._compileEntity('update', entity, this._createCompileContext()) as ProgramArtifact<UpdateSourceArtifact>
@@ -1120,7 +1129,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
 
     //
     //
-    // Simulation публикует только декларативный artifact и зависимости authoring.
+    // Simulation публикует план отдельного runtime-запуска без выполнения подмен.
     this._registerHandler<RSimulation, SimulationSourceArtifact>({
       entityType: 'simulation',
       compile: (entity, context) => {
@@ -1130,7 +1139,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
           diagnostics.push({ severity: 'error', code: 'simulation-source-version', message: 'Simulation поддерживает sourceVersion 1.' })
         }
         return this._makeArtifact(entity, 'simulation', context, {
-          capabilities: ['compilable'],
+          capabilities: ['compilable', 'executable'],
           metadata: createEmptyProgramMetadata(),
           payload: (result.artifact as SimulationSourceArtifact | undefined) ?? { type: 'simulation', sourceVersion: 1, target: { entityType: 'composition', identity: '' }, runtimes: [] },
           dependencies: result.dependencies ?? [],
