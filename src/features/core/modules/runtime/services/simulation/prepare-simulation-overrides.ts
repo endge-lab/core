@@ -49,7 +49,7 @@ export function prepareSimulationOverrides(
           throw new Error(`[Simulation] Query "${runtime.identity}" требует однозначный контракт корневого response.`)
         }
         const key = JSON.stringify([...invocation, runtime.path])
-        requests.set(key, { schema: createSimulationSchema([...unique.values()][0]!, artifacts, override.request.arrays), seed: override.request.seed ?? `${seed}:${key}` })
+        requests.set(key, { schema: createSimulationSchema([...unique.values()][0]!, artifacts, override.request.arrays, {}, override.request.useExamples), seed: override.request.seed ?? `${seed}:${key}` })
       }
       if (override.stream) {
         if (runtime?.kind !== 'stream') {

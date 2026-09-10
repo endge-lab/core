@@ -19,7 +19,7 @@ export class SimulationSourceLanguageStrategy implements SourceLanguageStrategy 
     extension: '.endge-simulation.ts',
     keywords: ['defineSimulation', 'composition', 'project', 'mockRequest', 'mockStream'],
     functions: ['defineSimulation', 'composition', 'project', 'mockRequest', 'mockStream'],
-    properties: ['target', 'dataMode', 'overrides', 'runtimes', 'request', 'seed', 'arrays', 'stream', 'type', 'event', 'intervalMs', 'itemsPerMessage', 'fields'],
+    properties: ['target', 'dataMode', 'overrides', 'runtimes', 'request', 'seed', 'arrays', 'useExamples', 'stream', 'type', 'event', 'intervalMs', 'itemsPerMessage', 'fields'],
   })
 
   public constructor(private readonly _catalog: () => SimulationSourceCatalog) {}
@@ -93,6 +93,7 @@ export class SimulationSourceLanguageStrategy implements SourceLanguageStrategy 
       { label: 'mockRequest', kind: 'function', insertText: 'mockRequest({ arrays: {} })', detail: 'Описание подмены запроса' },
       { label: 'seed', kind: 'property', insertText: 'seed: \'simulation\',', detail: 'Seed воспроизводимой генерации ответа' },
       { label: 'arrays', kind: 'property', insertText: 'arrays: {},', detail: 'Количество элементов массивов ответа' },
+      { label: 'useExamples', kind: 'property', insertText: 'useExamples: false,', detail: 'Генерировать значения по Type без повторения его примеров' },
     ]
   }
 

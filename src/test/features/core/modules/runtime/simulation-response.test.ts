@@ -19,7 +19,7 @@ const artifacts: Record<string, TypeProgramPayload> = {
   String: { type: 'type', sourceVersion: 1, definition: null, runtimeType: 'String' },
   Number: { type: 'type', sourceVersion: 1, definition: null, runtimeType: 'Number' },
   Row: { type: 'type', sourceVersion: 1, definition: { kind: 'object', fields: [
-    field('name', 'String'),
+    field('name', 'String', { examples: ['example-name'] }),
     field('price', 'Number', { min: 0.1, max: 0.2 }),
     field('children', 'String', { array: true }),
   ] } },
@@ -33,6 +33,20 @@ const reader: RuntimeArtifactReader = {
 }
 
 describe('simulation schema projection', () => {
+  /** Отключение примеров не ослабляет типы и размеры вложенных массивов. */
+  it('исключает примеры по запросу сценария, сохраняя исходные артефакты и ограничения', () => {
+    const contract = { type: 'Envelope', array: false }
+    const normal = createSimulationSchema(contract, reader, { items: 50 })
+    expect(JSON.stringify(normal)).toContain('example-name')
+    const generated = createSimulationSchema(contract, reader, { items: 50 }, {}, false)
+    expect(JSON.stringify(generated)).not.toContain('examples')
+    expect(generated).toMatchObject({ properties: { items: { minItems: 50, maxItems: 50, items: { properties: {
+      name: { type: 'string' },
+      price: { type: 'number', minimum: 0.1, maximum: 0.2 },
+    } } } } })
+    expect(createSimulationSchema(contract, reader, { items: 50 })).toEqual(normal)
+  })
+
   it('preserves nested array counts and fractional field constraints for the service', () => {
     const schema = createSimulationSchema({ type: 'Envelope', array: false }, reader, { 'items': 20, 'items[].children': 2 })
     expect(schema).toMatchObject({ type: 'object', properties: { items: { minItems: 20, maxItems: 20, items: { properties: {

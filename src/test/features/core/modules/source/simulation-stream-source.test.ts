@@ -12,6 +12,19 @@ const resolver = new SimulationSourceResolver({
 })
 
 describe('simulation Stream Source', () => {
+  /** Compiler сохраняет выбор генерации, не исполняя выражения внутри Source. */
+  it('принимает boolean useExamples для Query и отклоняет остальные значения', () => {
+    const requestSource = (value: string) => `defineSimulation({ target: project('app'), overrides: { runtimes: { load: { request: mockRequest({ arrays: { items: 50 }, useExamples: ${value} }) } } } })`
+    for (const value of [true, false]) {
+      expect(compileSimulationSource(requestSource(String(value))).artifact?.runtimes[0]?.request)
+        .toMatchObject({ arrays: { items: 50 }, useExamples: value })
+    }
+    for (const value of ['0', '\'false\'', 'readPreference()']) {
+      expect(compileSimulationSource(requestSource(value)).diagnostics)
+        .toContainEqual(expect.objectContaining({ code: 'simulation-use-examples-shape', severity: 'error' }))
+    }
+  })
+
   it('resolves an existing Stream occurrence and business Type while preserving its constraints', () => {
     const result = resolver.analyze(compileSimulationSource(source('type: Quote, event: \'quote.updated\', intervalMs: 500, itemsPerMessage: 5, fields: { symbol: { enum: [\'BTC/USD\'] }, price: { minimum: 0.1, maximum: 100 } }')))
     expect(result.diagnostics).toEqual([])

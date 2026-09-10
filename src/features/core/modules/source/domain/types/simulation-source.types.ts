@@ -4,6 +4,8 @@ import type { ProgramDependency, ProgramDiagnostic } from '@/features/core/modul
 export interface SimulationMockRequest {
   kind: 'mock-request'
   seed?: string
+  /** false исключает примеры Type из схемы; ограничения и enum сохраняются. */
+  useExamples?: boolean
   arrays: Record<string, number>
 }
 

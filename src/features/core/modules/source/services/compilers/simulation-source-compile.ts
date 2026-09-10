@@ -163,11 +163,20 @@ export function compileSimulationSource(source: string, sourceVersion = 1): Simu
 
   function readRequest(node: t.Node | null | undefined, path: string): SimulationMockRequest | undefined {
     if (!isCall(node, 'mockRequest')) {
-      diagnostics.push(diagnostic('error', 'simulation-request-shape', 'request должен иметь вид mockRequest({ seed?, arrays? }).', path, node))
+      diagnostics.push(diagnostic('error', 'simulation-request-shape', 'request должен иметь вид mockRequest({ seed?, arrays?, useExamples? }).', path, node))
       return undefined
     }
-    const options = object(node.arguments[0], path, ['seed', 'arrays'])
+    const options = object(node.arguments[0], path, ['seed', 'arrays', 'useExamples'])
     const request: SimulationMockRequest = { kind: 'mock-request', arrays: Object.create(null) }
+    const useExamples = options.get('useExamples')
+    if (useExamples) {
+      if (t.isBooleanLiteral(useExamples)) {
+        request.useExamples = useExamples.value
+      }
+      else {
+        diagnostics.push(diagnostic('error', 'simulation-use-examples-shape', 'useExamples должен быть boolean literal.', `${path}.useExamples`, useExamples))
+      }
+    }
     const seed = options.get('seed')
     if (seed) {
       if (!t.isStringLiteral(seed)) {

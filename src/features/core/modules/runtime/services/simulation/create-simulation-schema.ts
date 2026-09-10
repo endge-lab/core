@@ -9,6 +9,7 @@ export function createSimulationSchema(
   artifacts: RuntimeArtifactReader,
   arrays: Record<string, number> = {},
   fields: Record<string, SimulationFieldConstraints> = {},
+  useExamples = true,
 ): Record<string, unknown> {
   const applied = new Set<string>()
   const visit = (expression: TypeSourceExpression, path: string, ancestors: ReadonlySet<string>, field?: TypeSourceField): Record<string, unknown> => {
@@ -78,7 +79,7 @@ export function createSimulationSchema(
         additionalProperties: false,
       }
     }
-    if (field?.examples.length) {
+    if (useExamples && field?.examples.length) {
       schema.examples = field.examples
     }
     const constraints = Object.hasOwn(fields, path) ? fields[path] : undefined
