@@ -86,7 +86,10 @@ export function serializeServiceDocument(
     })
   }
   if (documentType === 'action') {
-    return withFields(common, value, ['definition', 'input', 'output', 'target', 'defaultImplementation', 'owner'])
+    return withFields(common, value, ['definition', 'input', 'output', 'target', 'defaultImplementation', 'owner', 'source', 'sourceVersion'], {
+      source: text(value.source),
+      sourceVersion: positiveInteger(value.sourceVersion, 1),
+    })
   }
   if (documentType === FilterType.DefaultFilter) {
     return withFields(common, value, ['fields', 'source', 'sourceVersion'], {

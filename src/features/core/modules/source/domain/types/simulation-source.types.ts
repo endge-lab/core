@@ -1,3 +1,4 @@
+import type { ProgramMetadataMap } from '@/features/core/modules/program/domain/types/program-metadata.types'
 import type { ProgramDependency, ProgramDiagnostic } from '@/features/core/modules/program/domain/types/program.types'
 
 /** Декларация подмены response Query. Генерация выполняется при запуске Simulation. */
@@ -53,6 +54,7 @@ export interface SimulationSourceCompileResult {
   ast: unknown | null
   document: SimulationSourceDocument | null
   artifact: SimulationSourceArtifact | null
+  metadata: ProgramMetadataMap
   diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
   dependencies: ProgramDependency[]
   locations: Record<string, { start: number, end: number }>

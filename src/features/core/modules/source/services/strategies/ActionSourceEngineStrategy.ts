@@ -12,6 +12,7 @@ export class ActionSourceEngineStrategy implements SourceEngineStrategy {
       ok,
       document: result.payload.sourceDocument ?? undefined,
       artifact: result.payload,
+      metadata: result.metadata,
       diagnostics: result.diagnostics,
       dependencies: result.dependencies,
       message: ok ? undefined : 'Action source contains compilation errors.',

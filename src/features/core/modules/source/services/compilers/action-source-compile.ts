@@ -1,6 +1,7 @@
 import type { ActionTargetSelector } from '@/features/core/modules/actions/domain/action.types'
 import type { ActionProgramPayload } from '@/features/core/modules/program/domain/types/action-program.types'
 
+import type { ProgramMetadataMap } from '@/features/core/modules/program/domain/types/program-metadata.types'
 import type { ProgramDependency, ProgramDiagnostic } from '@/features/core/modules/program/domain/types/program.types'
 import type {
   ActionSourceBlock,
@@ -19,6 +20,7 @@ import {
   unwrapExpression,
 } from '@/features/core/modules/source/services/compilers/source-expression-compile'
 import { compileSourceField } from '@/features/core/modules/source/services/compilers/source-field-compile'
+import { compileProgramMetadataProperty } from '@/features/core/modules/source/services/compilers/source-metadata-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
@@ -30,6 +32,7 @@ export interface ActionSourceCompileInput {
 
 export interface ActionSourceCompileResult {
   payload: ActionProgramPayload
+  metadata: ProgramMetadataMap
   diagnostics: DiagnosticDraft[]
   dependencies: ProgramDependency[]
 }
@@ -45,6 +48,7 @@ interface BlockContext {
 export function compileActionSource(input: ActionSourceCompileInput): ActionSourceCompileResult {
   const diagnostics: DiagnosticDraft[] = []
   const dependencies: ProgramDependency[] = []
+  let metadata: ProgramMetadataMap = {}
   const payload: ActionProgramPayload = {
     type: 'action',
     sourceVersion: Math.max(1, Number(input.sourceVersion ?? 1) || 1),
@@ -53,7 +57,7 @@ export function compileActionSource(input: ActionSourceCompileInput): ActionSour
   }
   if (!input.source.trim()) {
     diagnostics.push(diagnostic('error', 'action-source-empty', 'Action source пуст.', 'source'))
-    return { payload, diagnostics, dependencies }
+    return { payload, metadata, diagnostics, dependencies }
   }
 
   let file: t.File
@@ -68,7 +72,7 @@ export function compileActionSource(input: ActionSourceCompileInput): ActionSour
       sourcePath: 'source',
       start: typeof error?.pos === 'number' ? error.pos : undefined,
     })
-    return { payload, diagnostics, dependencies }
+    return { payload, metadata, diagnostics, dependencies }
   }
 
   const calls: t.CallExpression[] = []
@@ -87,19 +91,20 @@ export function compileActionSource(input: ActionSourceCompileInput): ActionSour
   }
   if (calls.length !== 1) {
     diagnostics.push(diagnostic('error', 'action-define-required', 'Action source должен содержать ровно один defineAction({...}).', 'source', calls[1] ?? calls[0]))
-    return { payload, diagnostics, dependencies }
+    return { payload, metadata, diagnostics, dependencies }
   }
 
   const definition = calls[0]!.arguments[0]
   if (!definition || !t.isObjectExpression(definition)) {
     diagnostics.push(diagnostic('error', 'action-definition-object', 'defineAction принимает object literal.', 'source', calls[0]))
-    return { payload, diagnostics, dependencies }
+    return { payload, metadata, diagnostics, dependencies }
   }
 
   const contractNode = objectProperty(definition, 'contract')
   const stepsNode = objectProperty(definition, 'steps')
   const outputNode = expressionProperty(definition, 'output')
-  const allowed = new Set(['contract', 'steps', 'output'])
+  metadata = compileProgramMetadataProperty(definition, diagnostics)
+  const allowed = new Set(['metadata', 'contract', 'steps', 'output'])
   for (const property of definition.properties) {
     if (!t.isObjectProperty(property) || property.computed) {
       diagnostics.push(diagnostic('error', 'action-definition-property', 'defineAction допускает только обычные properties.', 'source', property))
@@ -138,7 +143,7 @@ export function compileActionSource(input: ActionSourceCompileInput): ActionSour
 
   if (!stepsNode || !t.isObjectExpression(unwrapExpression(stepsNode))) {
     diagnostics.push(diagnostic('error', 'action-steps-object', 'Action требует steps object.', 'steps', stepsNode ?? definition))
-    return { payload, diagnostics, dependencies }
+    return { payload, metadata, diagnostics, dependencies }
   }
   const block = compileBlock(
     unwrapExpression(stepsNode) as t.ObjectExpression,
@@ -152,7 +157,7 @@ export function compileActionSource(input: ActionSourceCompileInput): ActionSour
   }
   payload.sourceDocument = document
   collectDocumentTransforms(document, dependencies)
-  return { payload, diagnostics, dependencies: uniqueDependencies(dependencies) }
+  return { payload, metadata, diagnostics, dependencies: uniqueDependencies(dependencies) }
 }
 
 function compileBlock(

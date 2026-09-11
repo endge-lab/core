@@ -8,6 +8,7 @@ import type {
   ComputationSourceNode,
 } from '@/features/core/modules/domain/types/computation/computation-source.types'
 
+import type { ProgramMetadataMap } from '@/features/core/modules/program/domain/types/program-metadata.types'
 import type { ProgramDiagnostic } from '@/features/core/modules/program/domain/types/program.types'
 import type { SourceExpressionIR } from '@/features/core/modules/source/domain/types/source-expression.types'
 import { parse } from '@babel/parser'
@@ -19,6 +20,7 @@ import {
   unwrapExpression,
 } from '@/features/core/modules/source/services/compilers/source-expression-compile'
 import { compileSourceField } from '@/features/core/modules/source/services/compilers/source-field-compile'
+import { compileProgramMetadataProperty } from '@/features/core/modules/source/services/compilers/source-metadata-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
@@ -34,12 +36,14 @@ export interface ComputationCompileInput {
 
 export interface ComputationCompileResult {
   payload: ComputationProgramPayload
+  metadata: ProgramMetadataMap
   diagnostics: DiagnosticDraft[]
 }
 
 /** Компилирует source defineComputation в детерминированный выходной граф. */
 export function compileComputation(input: ComputationCompileInput): ComputationCompileResult {
   const diagnostics: DiagnosticDraft[] = []
+  let metadata: ProgramMetadataMap = {}
   const payload: ComputationProgramPayload = {
     input: null,
     output: null,
@@ -51,7 +55,7 @@ export function compileComputation(input: ComputationCompileInput): ComputationC
 
   if (!input.source.trim()) {
     diagnostics.push(diagnostic('error', 'computation-source-empty', 'Computation source пуст.', 'source'))
-    return { payload, diagnostics }
+    return { payload, metadata, diagnostics }
   }
 
   let file: t.File
@@ -66,7 +70,7 @@ export function compileComputation(input: ComputationCompileInput): ComputationC
       sourcePath: 'source',
       start: typeof error?.pos === 'number' ? error.pos : undefined,
     })
-    return { payload, diagnostics }
+    return { payload, metadata, diagnostics }
   }
 
   const calls: t.CallExpression[] = []
@@ -108,25 +112,29 @@ export function compileComputation(input: ComputationCompileInput): ComputationC
       'source',
       calls[1] ?? calls[0],
     ))
-    return { payload, diagnostics }
+    return { payload, metadata, diagnostics }
   }
 
   const definition = calls[0]!.arguments[0]
   if (!definition || !t.isObjectExpression(definition)) {
     diagnostics.push(diagnostic('error', 'computation-definition-object', 'defineComputation принимает object literal.', 'source', calls[0]))
-    return { payload, diagnostics }
+    return { payload, metadata, diagnostics }
   }
 
   let outputsNode: t.ObjectExpression | null = null
   let resultNode: t.Expression | null = null
   let inputContract: ComputationContractField | null = null
   let outputContract: ComputationContractField | null = null
+  metadata = compileProgramMetadataProperty(definition, diagnostics)
   for (const property of definition.properties) {
     if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
       diagnostics.push(diagnostic('error', 'computation-definition-property', 'defineComputation допускает только обычные properties.', 'source', property))
       continue
     }
     const name = propertyName(property.key)
+    if (name === 'metadata') {
+      continue
+    }
     if (name === 'input' || name === 'output') {
       const compiled = compileSourceField(
         name,
@@ -171,7 +179,7 @@ export function compileComputation(input: ComputationCompileInput): ComputationC
     diagnostics.push(diagnostic('error', 'computation-result-required', 'defineComputation требует result expression.', 'result', definition))
   }
   if (!outputsNode || !resultNode) {
-    return { payload, diagnostics }
+    return { payload, metadata, diagnostics }
   }
 
   const sourceNodes: ComputationSourceNode[] = []
@@ -219,7 +227,7 @@ export function compileComputation(input: ComputationCompileInput): ComputationC
 
   const result = compileComputationExpression(resultNode, diagnostics, 'result', externalContext)
   if (!result) {
-    return { payload, diagnostics }
+    return { payload, metadata, diagnostics }
   }
 
   const known = new Set(sourceNodes.map(node => node.name))
@@ -277,7 +285,7 @@ export function compileComputation(input: ComputationCompileInput): ComputationC
   payload.nodes = ordered
   payload.result = result
   payload.execution = ordered.some(node => node.kind === 'typescript' || node.kind === 'computation') ? 'async' : 'sync'
-  return { payload, diagnostics }
+  return { payload, metadata, diagnostics }
 }
 
 function compileTypescriptNode(

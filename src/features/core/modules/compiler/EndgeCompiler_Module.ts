@@ -6,7 +6,6 @@ import type { RConfiguration } from '@/features/core/modules/domain/entities/RCo
 import type { RSimulation } from '@/features/core/modules/domain/entities/RSimulation'
 import type { RStore } from '@/features/core/modules/domain/entities/RStore'
 import type { RStream } from '@/features/core/modules/domain/entities/RStream'
-import type { RStyle } from '@/features/core/modules/domain/entities/RStyle'
 import type { RType } from '@/features/core/modules/domain/entities/RType'
 import type { RUpdate } from '@/features/core/modules/domain/entities/RUpdate'
 import type { RVocabs } from '@/features/core/modules/domain/entities/RVocabs'
@@ -61,6 +60,7 @@ import {
   validateTypeSourceExpressionUsage,
 } from '@/features/core/modules/compiler/services/type/type-program-validation'
 import { createDiagnosticsEntityOwner } from '@/features/core/modules/diagnostics/EndgeProblems_Module'
+import { inspectDocumentMetadata } from '@/features/core/modules/domain/documents/document-metadata'
 import { RAction } from '@/features/core/modules/domain/entities/RAction'
 import { RComponentSFC } from '@/features/core/modules/domain/entities/RComponentSFC'
 import { RComposition } from '@/features/core/modules/domain/entities/RComposition'
@@ -70,6 +70,7 @@ import { RField } from '@/features/core/modules/domain/entities/RField'
 import { RFilter } from '@/features/core/modules/domain/entities/RFilter'
 import { RProject } from '@/features/core/modules/domain/entities/RProject'
 import { RQuery } from '@/features/core/modules/domain/entities/RQuery'
+import { RStyle } from '@/features/core/modules/domain/entities/RStyle'
 import {
   COMPONENT_SFC_FORM_EVENT_DEFINITIONS,
   COMPONENT_SFC_INTERACTION_EVENT_DEFINITIONS,
@@ -467,6 +468,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
         //
         return this._makeArtifact(entity, 'type', context, {
           capabilities: ['compilable', 'configuration'],
+          metadata: { self: result.metadata, nodes: [] },
           payload: {
             type: 'type',
             identity: entity.identity,
@@ -490,6 +492,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
       //
       compile: (entity, context) => {
         const schema = Endge.configurationSchema.get(entity.identity)
+        const metadata = inspectDocumentMetadata('configuration', { source: entity.source, meta: entity.meta })
         const values = schema?.document?.values ?? []
         const dependencies = [...new Set(values.flatMap(value => collectTypeSourceExpressionReferences(value.type)))]
           .filter(identity => identity !== 'Any')
@@ -506,6 +509,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
         //
         return this._makeArtifact(entity, 'configuration', context, {
           capabilities: ['compilable', 'configuration'],
+          metadata: { self: metadata.metadata, nodes: [] },
           payload: {
             type: 'configuration',
             identity: entity.identity,
@@ -539,6 +543,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
         //
         return this._makeArtifact(entity, 'action', context, {
           capabilities: result.payload.sourceDocument ? ['compilable', 'runnable', 'executable'] : ['compilable'],
+          metadata: { self: result.metadata, nodes: [] },
           payload: result.payload,
           diagnostics: [
             ...result.diagnostics,
@@ -578,6 +583,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
         //
         return this._makeArtifact(entity, 'computation', context, {
           capabilities: ['compilable', 'runnable'],
+          metadata: { self: result.metadata, nodes: [] },
           payload: result.payload,
           diagnostics: [
             ...result.diagnostics,
@@ -703,6 +709,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
       //
       compile: (entity, context) => {
         const result = compileEndgeCSS(entity.source, { identity: entity.identity, scope: 'global' })
+        const metadata = inspectDocumentMetadata('style', { source: entity.source, meta: entity.meta })
         const stylesheet: EndgeStyleSheetArtifact = result.artifact ?? {
           language: 'endgecss',
           version: 1,
@@ -717,6 +724,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
         //
         return this._makeArtifact(entity, 'style', context, {
           capabilities: ['compilable', 'configuration'],
+          metadata: { self: metadata.metadata, nodes: [] },
           payload: {
             stylesheet,
             themes: stylesheet.themes.map(theme => theme.id),
@@ -956,7 +964,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
         //
         return this._makeArtifact(entity, 'update', context, {
           capabilities: ['compilable', 'executable'],
-          metadata: createEmptyProgramMetadata(),
+          metadata: { self: result.metadata ?? {}, nodes: [] },
           payload: {
             type: 'update',
             sourceVersion: Number(entity.sourceVersion ?? 1) || 1,
@@ -1127,7 +1135,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
         //
         return this._makeArtifact(entity, 'store', context, {
           capabilities: ['compilable', 'executable', 'data-provider'],
-          metadata: createEmptyProgramMetadata(),
+          metadata: { self: result.metadata ?? {}, nodes: [] },
           payload: {
             ...(payload ?? { type: 'store', sourceVersion: Number(entity.sourceVersion ?? 1) || 1, data: [] }),
             updateHandlers,
@@ -1151,7 +1159,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
         }
         return this._makeArtifact(entity, 'simulation', context, {
           capabilities: ['compilable', 'executable'],
-          metadata: createEmptyProgramMetadata(),
+          metadata: { self: result.metadata ?? {}, nodes: [] },
           payload: (result.artifact as SimulationSourceArtifact | undefined) ?? { type: 'simulation', sourceVersion: 1, target: { entityType: 'composition', identity: '' }, runtimes: [] },
           dependencies: result.dependencies ?? [],
           diagnostics,
@@ -1171,7 +1179,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
         //
         return this._makeArtifact(entity, 'stream', context, {
           capabilities: ['compilable', 'runnable', 'data-provider'],
-          metadata: createEmptyProgramMetadata(),
+          metadata: { self: result.metadata ?? {}, nodes: [] },
           payload: payload ?? {
             type: 'stream',
             sourceVersion: Number(entity.sourceVersion ?? 1) || 1,
@@ -3420,6 +3428,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
       sourceVersion: entity?.sourceVersion ?? null,
       definition: entity?.definition ?? null,
       updatedAt: entity?.updatedAt ?? null,
+      userMetadata: entity instanceof RStyle ? entity?.meta?.user ?? null : undefined,
     }
   }
 

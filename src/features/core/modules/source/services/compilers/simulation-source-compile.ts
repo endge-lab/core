@@ -5,6 +5,7 @@ import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
 
 import { diagnostic, propertyName } from '@/features/core/modules/source/services/compilers/source-expression-compile'
+import { compileProgramMetadataExpression } from '@/features/core/modules/source/services/compilers/source-metadata-compile'
 
 type Diagnostic = Omit<ProgramDiagnostic, 'entityRef'>
 
@@ -12,7 +13,7 @@ type Diagnostic = Omit<ProgramDiagnostic, 'entityRef'>
 export function compileSimulationSource(source: string, sourceVersion = 1): SimulationSourceCompileResult {
   const diagnostics: Diagnostic[] = []
   const locations: SimulationSourceCompileResult['locations'] = {}
-  const result: SimulationSourceCompileResult = { ast: null, document: null, artifact: null, diagnostics, dependencies: [], locations }
+  const result: SimulationSourceCompileResult = { ast: null, document: null, artifact: null, metadata: {}, diagnostics, dependencies: [], locations }
   if (sourceVersion !== 1) {
     diagnostics.push(diagnostic('error', 'simulation-source-version', 'Simulation поддерживает sourceVersion 1.'))
   }
@@ -26,7 +27,9 @@ export function compileSimulationSource(source: string, sourceVersion = 1): Simu
       diagnostics.push(diagnostic('error', 'simulation-source-definition', 'Source должен содержать один defineSimulation({...}).', undefined, statement))
       return result
     }
-    const definition = object(expression.arguments[0], 'defineSimulation', ['target', 'dataMode', 'overrides'])
+    const definition = object(expression.arguments[0], 'defineSimulation', ['metadata', 'target', 'dataMode', 'overrides'])
+    const metadataNode = definition.get('metadata')
+    result.metadata = metadataNode ? compileProgramMetadataExpression(metadataNode, diagnostics) : {}
     const targetCall = definition.get('target')
     let target: SimulationTargetReference = { entityType: 'composition', identity: '' }
     if ((!isCall(targetCall, 'composition') && !isCall(targetCall, 'project')) || !t.isStringLiteral(targetCall.arguments[0]) || !targetCall.arguments[0].value.trim()) {

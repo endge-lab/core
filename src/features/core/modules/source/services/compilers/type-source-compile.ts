@@ -16,6 +16,7 @@ import {
   propertyName,
   unwrapExpression,
 } from '@/features/core/modules/source/services/compilers/source-expression-compile'
+import { compileProgramMetadataExpression } from '@/features/core/modules/source/services/compilers/source-metadata-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 type StaticValueResult = { ok: true, value: unknown } | { ok: false }
@@ -26,19 +27,20 @@ export function compileTypeSource(source: string, sourceVersion = 1): TypeSource
 
   // Существующие legacy-записи намеренно не имеют Source во время перехода.
   if (!String(source ?? '').trim()) {
-    return { ast: null, document: null, artifact: null, diagnostics }
+    return { ast: null, document: null, artifact: null, metadata: {}, diagnostics }
   }
 
   try {
     const ast = parseTS(source, { sourceType: 'module', plugins: ['typescript'] })
+    const metadata = readRootMetadata(ast, diagnostics)
     const call = readRootDefineType(ast, diagnostics)
     if (!call) {
-      return { ast, document: null, artifact: null, diagnostics }
+      return { ast, document: null, artifact: null, metadata, diagnostics }
     }
 
     if (call.arguments.length !== 1 || !isExpressionArgument(call.arguments[0])) {
       diagnostics.push(diagnostic('error', 'type-source-define-arity', 'defineType принимает ровно одно type definition.', 'defineType', call))
-      return { ast, document: null, artifact: null, diagnostics }
+      return { ast, document: null, artifact: null, metadata, diagnostics }
     }
 
     const definition = readDefinition(unwrapExpression(call.arguments[0]), diagnostics)
@@ -48,32 +50,56 @@ export function compileTypeSource(source: string, sourceVersion = 1): TypeSource
       ? { type: 'type' as const, sourceVersion, definition }
       : null
 
-    return { ast, document, artifact, diagnostics }
+    return { ast, document, artifact, metadata, diagnostics }
   }
   catch (error: any) {
     diagnostics.push(diagnostic('error', 'type-source-parse-error', `Не удалось распарсить Type source: ${error?.message ?? error}`))
-    return { ast: null, document: null, artifact: null, diagnostics }
+    return { ast: null, document: null, artifact: null, metadata: {}, diagnostics }
   }
 }
 
 function readRootDefineType(ast: t.File, diagnostics: DiagnosticDraft[]): t.CallExpression | null {
-  if (ast.program.body.length !== 1) {
-    diagnostics.push(diagnostic('error', 'type-source-root', 'Type source должен содержать только один вызов defineType(...).'))
+  const calls = ast.program.body.flatMap((statement) => {
+    if (!t.isExpressionStatement(statement)) {
+      return []
+    }
+    const expression = unwrapExpression(statement.expression)
+    return t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'defineType' }) ? [expression] : []
+  })
+  const unsupported = ast.program.body.filter((statement) => {
+    if (!t.isExpressionStatement(statement)) {
+      return true
+    }
+    const expression = unwrapExpression(statement.expression)
+    return !t.isCallExpression(expression) || !t.isIdentifier(expression.callee) || !['defineType', 'defineMetadata'].includes(expression.callee.name)
+  })
+  unsupported.forEach(statement => diagnostics.push(diagnostic('error', 'type-source-root', 'Type source допускает только один defineType(...) и optional defineMetadata(...).', 'source', statement)))
+  if (calls.length !== 1) {
+    diagnostics.push(diagnostic('error', 'type-source-define-missing', 'Type source должен содержать ровно один defineType(...).', 'defineType', calls[1] ?? calls[0]))
     return null
   }
+  return calls[0]
+}
 
-  const statement = ast.program.body[0]
-  if (!t.isExpressionStatement(statement)) {
-    diagnostics.push(diagnostic('error', 'type-source-root', 'Type source должен содержать только один вызов defineType(...).', 'defineType', statement))
-    return null
+function readRootMetadata(ast: t.File, diagnostics: DiagnosticDraft[]) {
+  const calls = ast.program.body.flatMap((statement) => {
+    if (!t.isExpressionStatement(statement)) {
+      return []
+    }
+    const expression = unwrapExpression(statement.expression)
+    return t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'defineMetadata' }) ? [expression] : []
+  })
+  if (calls.length > 1) {
+    diagnostics.push(diagnostic('error', 'program-metadata-duplicate', 'Найдено несколько defineMetadata.', 'metadata', calls[1]))
   }
-
-  const expression = unwrapExpression(statement.expression)
-  if (!t.isCallExpression(expression) || !t.isIdentifier(expression.callee, { name: 'defineType' })) {
-    diagnostics.push(diagnostic('error', 'type-source-define-missing', 'Type source должен начинаться с defineType(...).', 'defineType', statement))
-    return null
+  if (calls[0] && calls[0].arguments.length !== 1) {
+    diagnostics.push(diagnostic('error', 'program-metadata-shape', 'defineMetadata принимает ровно один static object literal.', 'metadata', calls[0]))
   }
-  return expression
+  const argument = calls[0]?.arguments[0]
+  if (!argument || !t.isExpression(argument)) {
+    return {}
+  }
+  return compileProgramMetadataExpression(argument, diagnostics)
 }
 
 function readDefinition(node: t.Expression, diagnostics: DiagnosticDraft[], sourcePath = 'defineType'): TypeSourceDefinition | null {

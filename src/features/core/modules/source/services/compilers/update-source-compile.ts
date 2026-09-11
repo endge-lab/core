@@ -9,6 +9,7 @@ import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
 
 import { compileSourceExpression, diagnostic, propertyName, readStringArgument, unwrapExpression } from '@/features/core/modules/source/services/compilers/source-expression-compile'
+import { compileProgramMetadataProperty } from '@/features/core/modules/source/services/compilers/source-metadata-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 const STRATEGIES = new Set<UpdateMutationStrategy>(['set', 'merge', 'replace', 'append', 'remove'])
@@ -18,7 +19,7 @@ export function compileUpdateSource(source: string, sourceVersion = 1): UpdateSo
   const diagnostics: DiagnosticDraft[] = []
   if (!String(source ?? '').trim()) {
     diagnostics.push(diagnostic('error', 'update-source-empty', 'Update source пуст.'))
-    return { ast: null, document: null, artifact: null, diagnostics }
+    return { ast: null, document: null, artifact: null, metadata: {}, diagnostics }
   }
 
   try {
@@ -27,9 +28,10 @@ export function compileUpdateSource(source: string, sourceVersion = 1): UpdateSo
     const definition = call?.arguments[0]
     if (!call || !definition || !t.isObjectExpression(definition)) {
       diagnostics.push(diagnostic('error', 'update-source-definition', 'Update source должен содержать defineUpdate({...}).'))
-      return { ast, document: null, artifact: null, diagnostics }
+      return { ast, document: null, artifact: null, metadata: {}, diagnostics }
     }
 
+    const metadata = compileProgramMetadataProperty(definition, diagnostics)
     let handles: string[] = []
     let mutations: UpdateMutationDescriptor[] = []
     const legacy: Record<string, string | null> = {}
@@ -39,11 +41,14 @@ export function compileUpdateSource(source: string, sourceVersion = 1): UpdateSo
         continue
       }
       const name = propertyName(property.key)
-      if (!name || !['handles', 'mutations', 'strategy', 'target', 'keyFrom', 'valueFrom'].includes(name)) {
+      if (!name || !['metadata', 'handles', 'mutations', 'strategy', 'target', 'keyFrom', 'valueFrom'].includes(name)) {
         diagnostics.push(diagnostic('error', 'update-source-property-unsupported', `Свойство "${name ?? ''}" не поддерживается Update v1.`, name ?? 'defineUpdate', property))
         continue
       }
       const value = unwrapExpression(property.value)
+      if (name === 'metadata') {
+        continue
+      }
       if (name === 'handles') {
         if (t.isNullLiteral(value)) {
           handles = []
@@ -118,12 +123,13 @@ export function compileUpdateSource(source: string, sourceVersion = 1): UpdateSo
       ast,
       document: hasErrors ? null : document,
       artifact: hasErrors ? null : { type: 'update', sourceVersion, ...document },
+      metadata,
       diagnostics,
     }
   }
   catch (error: any) {
     diagnostics.push(diagnostic('error', 'update-source-parse-error', `Не удалось распарсить Update source: ${error?.message ?? error}`))
-    return { ast: null, document: null, artifact: null, diagnostics }
+    return { ast: null, document: null, artifact: null, metadata: {}, diagnostics }
   }
 }
 

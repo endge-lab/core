@@ -23,6 +23,7 @@ export class TypeSourceEngineStrategy implements SourceEngineStrategy {
       ast: result.ast ?? undefined,
       document: result.document ?? undefined,
       artifact: result.artifact ?? undefined,
+      metadata: result.metadata,
       diagnostics: result.diagnostics,
       message: ok ? undefined : 'Type source contains compilation errors.',
     }

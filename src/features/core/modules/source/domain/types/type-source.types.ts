@@ -1,3 +1,4 @@
+import type { ProgramMetadataMap } from '@/features/core/modules/program/domain/types/program-metadata.types'
 import type { ProgramDiagnostic } from '@/features/core/modules/program/domain/types/program.types'
 
 /** Ссылка Type Source на примитивный или пользовательский тип домена. */
@@ -96,5 +97,6 @@ export interface TypeSourceCompileResult {
   ast: unknown | null
   document: TypeSourceDocument | null
   artifact: TypeProgramPayload | null
+  metadata: ProgramMetadataMap
   diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
 }

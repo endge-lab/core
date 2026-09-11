@@ -17,6 +17,7 @@ export class ComputationSourceEngineStrategy implements SourceEngineStrategy {
       ok,
       document: result.payload.sourceDocument ?? undefined,
       artifact: result.payload,
+      metadata: result.metadata,
       diagnostics: result.diagnostics,
       message: ok ? undefined : 'Computation source contains compilation errors.',
     }

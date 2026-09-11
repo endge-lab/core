@@ -1,4 +1,5 @@
 import type { EndgeMockReference } from '@/features/core/modules/mock/domain/types/mock-data.type'
+import type { ProgramMetadataMap } from '@/features/core/modules/program/domain/types/program-metadata.types'
 import type { ProgramDiagnostic } from '@/features/core/modules/program/domain/types/program.types'
 import type { DataViewRef } from '@/features/core/modules/source/domain/types/data-view-source.types'
 import type { SourceFieldDefinition } from '@/features/core/modules/source/domain/types/source-expression.types'
@@ -46,5 +47,6 @@ export interface StoreSourceCompileResult {
   ast: unknown | null
   document: StoreSourceDocument | null
   artifact: StoreSourceArtifact | null
+  metadata: ProgramMetadataMap
   diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
 }

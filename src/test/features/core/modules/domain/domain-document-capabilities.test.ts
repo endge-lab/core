@@ -9,11 +9,12 @@ import { FilterRuntimeStrategy } from '@/features/core/modules/runtime/services/
 import { PageRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/PageRuntimeStrategy'
 import { ProjectRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/ProjectRuntimeStrategy'
 import { QueryRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/QueryRuntimeStrategy'
+import { SimulationRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/SimulationRuntimeStrategy'
 import { StoreRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/StoreRuntimeStrategy'
 import { StreamRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/StreamRuntimeStrategy'
 import { EndgeSource_Module } from '@/features/core/modules/source/EndgeSource_Module'
 
-function descriptorCapabilityValues(key: 'source' | 'program' | 'runtime'): string[] {
+function descriptorCapabilityValues(key: 'source' | 'program' | 'runtime' | 'metadata'): string[] {
   return [...new Set(Object.values(DOMAIN_DOCUMENT_DESCRIPTORS)
     .map(descriptor => descriptor.capabilities[key])
     .filter(value => value != null))]
@@ -48,6 +49,7 @@ describe('контракты возможностей документов до�
       new PageRuntimeStrategy(),
       new ProjectRuntimeStrategy(),
       new QueryRuntimeStrategy(),
+      new SimulationRuntimeStrategy(),
       new StoreRuntimeStrategy(),
       new StreamRuntimeStrategy(async () => ({
         profileIdentity: null,
@@ -58,5 +60,15 @@ describe('контракты возможностей документов до�
 
     expect(descriptorCapabilityValues('runtime'))
       .toEqual(strategies.map(strategy => strategy.entityType).sort())
+  })
+
+  it('объявляет только три канонических metadata backing', () => {
+    expect(descriptorCapabilityValues('metadata')).toEqual([
+      'definition-declaration',
+      'definition-property',
+      'entity-meta',
+    ])
+    expect(DOMAIN_DOCUMENT_DESCRIPTORS['component-table'].capabilities.metadata).toBeNull()
+    expect(DOMAIN_DOCUMENT_DESCRIPTORS.primitive.capabilities.metadata).toBeNull()
   })
 })

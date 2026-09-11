@@ -1,6 +1,7 @@
 import type { DocumentSerializationContext } from '@/features/core/modules/domain/documents/service-document-serializer'
 import type { RComponent } from '@/features/core/modules/domain/types/component/component.types'
 import type { DocumentDraftOptions } from '@/features/core/modules/domain/types/document/document-draft.type'
+import type { DocumentMetadataBacking } from '@/features/core/modules/domain/types/document/document-metadata.types'
 import type { DomainDocumentType } from '@/features/core/modules/domain/types/document/document.types'
 import type { EndgeDomainCollection } from '@/features/core/modules/domain/types/document/domain-provider.type'
 import type { ProgramEntityType } from '@/features/core/modules/program/domain/types/program.types'
@@ -104,6 +105,7 @@ export interface DomainDocumentCapabilityMetadata {
   source: SourceKind | 'component-sfc' | null
   program: ProgramEntityType | null
   runtime: RuntimeEntityType | null
+  metadata: DocumentMetadataBacking | null
 }
 
 export interface DomainDocumentPersistenceDescriptor {
@@ -279,6 +281,35 @@ const CAPABILITIES_BY_TYPE: Partial<Record<DomainDocumentType, Partial<DomainDoc
   'project': { source: 'composition', program: 'project', runtime: 'project' },
 }
 
+const METADATA_BACKING_BY_TYPE: Partial<Record<DomainDocumentType, DocumentMetadataBacking>> = {
+  'action': 'definition-property',
+  'computation': 'definition-property',
+  'store': 'definition-property',
+  'stream': 'definition-property',
+  'simulation': 'definition-property',
+  'update': 'definition-property',
+  'query-custom': 'definition-property',
+  'query-gql': 'definition-property',
+  'query-rest': 'definition-property',
+  'data-view': 'definition-property',
+  'default-filter': 'definition-property',
+  'composition': 'definition-property',
+  'project': 'definition-property',
+  'vocabs': 'definition-property',
+  'component-sfc': 'definition-declaration',
+  'type': 'definition-declaration',
+  'configuration': 'definition-declaration',
+  'style': 'entity-meta',
+  'mock': 'entity-meta',
+  'converter': 'entity-meta',
+  'environment': 'entity-meta',
+  'tenant': 'entity-meta',
+  'auth-profile': 'entity-meta',
+  'i18n-bundles': 'entity-meta',
+  'navigation': 'entity-meta',
+  'workspace': 'entity-meta',
+}
+
 const CREATE_NEW_BY_TYPE: Partial<{ [TType in DomainDocumentType]: (options: DocumentDraftOptions) => DomainDocumentModelMap[TType] }> = {
   [ComponentType.DSL]: options => initialize(new RComponentDSL(), options, { type: ComponentType.DSL, groupFromFolder: true }),
   [ComponentType.Table]: options => initialize(new RComponentTable(), options, { type: ComponentType.Table, groupFromFolder: true }),
@@ -350,6 +381,7 @@ export const DOMAIN_DOCUMENT_DESCRIPTORS = Object.freeze(Object.fromEntries(
         source: capability?.source ?? null,
         program: capability?.program ?? null,
         runtime: capability?.runtime ?? null,
+        metadata: METADATA_BACKING_BY_TYPE[type] ?? null,
       }),
     })]
   }),

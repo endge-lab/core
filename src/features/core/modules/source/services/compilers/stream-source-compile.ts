@@ -11,6 +11,7 @@ import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
 
 import { diagnostic, propertyName, readStringArgument, unwrapExpression } from '@/features/core/modules/source/services/compilers/source-expression-compile'
+import { compileProgramMetadataProperty } from '@/features/core/modules/source/services/compilers/source-metadata-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
@@ -19,7 +20,7 @@ export function compileStreamSource(source: string, sourceVersion = 1): StreamSo
   const diagnostics: DiagnosticDraft[] = []
   if (!String(source ?? '').trim()) {
     diagnostics.push(diagnostic('error', 'stream-source-empty', 'Stream source пуст.'))
-    return { ast: null, document: null, artifact: null, diagnostics }
+    return { ast: null, document: null, artifact: null, metadata: {}, diagnostics }
   }
 
   try {
@@ -28,9 +29,10 @@ export function compileStreamSource(source: string, sourceVersion = 1): StreamSo
     const definition = call?.arguments[0]
     if (!call || !definition || !t.isObjectExpression(definition)) {
       diagnostics.push(diagnostic('error', 'stream-source-definition', 'Stream source должен содержать defineStream({...}).'))
-      return { ast, document: null, artifact: null, diagnostics }
+      return { ast, document: null, artifact: null, metadata: {}, diagnostics }
     }
 
+    const metadata = compileProgramMetadataProperty(definition, diagnostics)
     let transport: StreamTransportDescriptor | null = null
     let events: StreamEventDescriptor[] = []
     for (const property of definition.properties) {
@@ -40,6 +42,9 @@ export function compileStreamSource(source: string, sourceVersion = 1): StreamSo
       }
       const name = propertyName(property.key)
       const value = unwrapExpression(property.value)
+      if (name === 'metadata') {
+        continue
+      }
       if (name === 'transport') {
         if (!t.isCallExpression(value) || !t.isIdentifier(value.callee) || !['sse', 'websocket'].includes(value.callee.name) || value.arguments.length !== 1 || !t.isObjectExpression(value.arguments[0])) {
           diagnostics.push(diagnostic('error', 'stream-transport-shape', 'transport должен иметь вид sse({ url, withCredentials?, auth? }) или websocket({ url, onOpen? }).', 'transport', value))
@@ -114,12 +119,13 @@ export function compileStreamSource(source: string, sourceVersion = 1): StreamSo
       ast,
       document: hasErrors ? null : document,
       artifact: hasErrors || !document ? null : { type: 'stream', sourceVersion, ...document },
+      metadata,
       diagnostics,
     }
   }
   catch (error: any) {
     diagnostics.push(diagnostic('error', 'stream-source-parse-error', `Не удалось распарсить Stream source: ${error?.message ?? error}`))
-    return { ast: null, document: null, artifact: null, diagnostics }
+    return { ast: null, document: null, artifact: null, metadata: {}, diagnostics }
   }
 }
 

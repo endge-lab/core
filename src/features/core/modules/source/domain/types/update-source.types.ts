@@ -1,3 +1,4 @@
+import type { ProgramMetadataMap } from '@/features/core/modules/program/domain/types/program-metadata.types'
 import type { ProgramDiagnostic } from '@/features/core/modules/program/domain/types/program.types'
 import type { SourceExpressionIR } from '@/features/core/modules/source/domain/types/source-expression.types'
 
@@ -32,6 +33,7 @@ export interface UpdateSourceCompileResult {
   ast: unknown | null
   document: UpdateSourceDocument | null
   artifact: Omit<UpdateSourceArtifact, 'storeIdentity'> | null
+  metadata: ProgramMetadataMap
   diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
 }
 

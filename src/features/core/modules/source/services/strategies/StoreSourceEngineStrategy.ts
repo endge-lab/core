@@ -13,6 +13,6 @@ export class StoreSourceEngineStrategy implements SourceEngineStrategy {
   public compile(source: string): SourceEngineCompileResult {
     const result = compileStoreSource(source)
     const ok = !result.diagnostics.some(item => item.severity === 'error')
-    return { ok, ast: result.ast ?? undefined, document: result.document ?? undefined, artifact: result.artifact ?? undefined, diagnostics: result.diagnostics, message: ok ? undefined : 'Store source contains compilation errors.' }
+    return { ok, ast: result.ast ?? undefined, document: result.document ?? undefined, artifact: result.artifact ?? undefined, metadata: result.metadata, diagnostics: result.diagnostics, message: ok ? undefined : 'Store source contains compilation errors.' }
   }
 }

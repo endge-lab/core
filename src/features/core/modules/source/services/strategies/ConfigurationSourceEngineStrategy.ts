@@ -18,6 +18,7 @@ export class ConfigurationSourceEngineStrategy implements SourceEngineStrategy {
       ast: result.ast ?? undefined,
       document: result.document ?? undefined,
       artifact: result.document ?? undefined,
+      metadata: result.metadata,
       diagnostics: result.diagnostics,
       message: ok ? undefined : 'Configuration source contains compilation errors.',
     }

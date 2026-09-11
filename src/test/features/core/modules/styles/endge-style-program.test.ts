@@ -30,6 +30,34 @@ describe('жизненный цикл программы EndgeCSS', () => {
     expect(Endge.program.getStyleArtifact(71)?.payload.stylesheet.rules).toHaveLength(1)
   })
 
+  it('переносит meta.user в артефакт и учитывает metadata в fingerprint', () => {
+    prepareCompilerContext()
+    const style = RStyle.fromPlain({
+      id: 72,
+      identity: 'metadata-theme',
+      name: 'Metadata theme',
+      source: 'Text { color: white; }',
+      meta: {
+        user: { 'company.feature': { owner: 'operations' } },
+        configurator: { panel: 'source' },
+      },
+    })
+
+    Endge.program.beginCompile('test')
+    const first = Endge.compiler.buildStyle(style)
+    expect(first.metadata.self).toEqual({ 'company.feature': { owner: 'operations' } })
+
+    style.meta = {
+      ...style.meta,
+      user: { 'company.feature': { owner: 'platform' } },
+    }
+    const second = Endge.compiler.buildStyle(style)
+
+    expect(second.metadata.self).toEqual({ 'company.feature': { owner: 'platform' } })
+    expect(second.sourceHash).not.toBe(first.sourceHash)
+    expect(style.meta.configurator).toEqual({ panel: 'source' })
+  })
+
   it('использует каталог Workspace вместо публикации каждой темы из Source стиля', () => {
     Endge.workspace.apply(TEST_ENDGE_WORKSPACE)
     Endge.context.setCurrentTheme('light')

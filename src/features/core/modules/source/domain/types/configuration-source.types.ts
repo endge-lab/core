@@ -1,3 +1,4 @@
+import type { ProgramMetadataMap } from '@/features/core/modules/program/domain/types/program-metadata.types'
 import type { ProgramDiagnostic } from '@/features/core/modules/program/domain/types/program.types'
 import type { TypeSourceExpression } from '@/features/core/modules/source/domain/types/type-source.types'
 
@@ -42,6 +43,7 @@ export interface ConfigurationSourceCompileResult {
   document: ConfigurationSourceDocument | null
   /** Best-effort проекция AST для визуального исправления, когда семантическая диагностика блокирует компиляцию. */
   draftDocument?: ConfigurationSourceDocument | null
+  metadata: ProgramMetadataMap
   diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
 }
 

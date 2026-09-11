@@ -1,10 +1,12 @@
 import type { RAction } from '@/features/core/modules/domain/entities/RAction'
+import type { ProgramMetadataMap } from '@/features/core/modules/program/domain/types/program-metadata.types'
 import type { ActionProgramPayload, ProgramDependency, ProgramDiagnostic } from '@/features/core/modules/program/domain/types/program.types'
 import { normalizeActionTargets } from '@/features/core/modules/compiler/services/action/action-target-validation'
 import { compileActionSource } from '@/features/core/modules/source/services/compilers/action-source-compile'
 
 export interface ActionCompileResult {
   payload: ActionProgramPayload
+  metadata: ProgramMetadataMap
   diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
   dependencies: ProgramDependency[]
 }
@@ -28,6 +30,7 @@ export function compileAction(entity: RAction): ActionCompileResult {
   const source = compileActionSource({ source: entity.source, sourceVersion: entity.sourceVersion, target })
   return {
     payload: source.payload,
+    metadata: source.metadata,
     diagnostics: [...diagnostics, ...source.diagnostics],
     dependencies: source.dependencies,
   }

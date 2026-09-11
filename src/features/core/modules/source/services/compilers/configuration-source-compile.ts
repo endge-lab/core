@@ -11,6 +11,7 @@ import * as t from '@babel/types'
 
 import { inferConfigurationDefault, isEndgeJSONValue, validateConfigurationValue } from '@/features/core/modules/configuration/domain/configuration-value'
 import { diagnostic, propertyName, unwrapExpression } from '@/features/core/modules/source/services/compilers/source-expression-compile'
+import { compileProgramMetadataExpression } from '@/features/core/modules/source/services/compilers/source-metadata-compile'
 import { compileTypeSourceExpression } from '@/features/core/modules/source/services/compilers/type-source-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
@@ -23,14 +24,15 @@ export function compileConfigurationSource(
   const diagnostics: DiagnosticDraft[] = []
   try {
     const ast = parseTS(source, { sourceType: 'module', plugins: ['typescript'] })
+    const metadata = readRootMetadata(ast, diagnostics)
     const call = readRoot(ast, diagnostics)
     if (!call) {
-      return { ast, document: null, diagnostics }
+      return { ast, document: null, metadata, diagnostics }
     }
     const argument = call.arguments[0]
     if (call.arguments.length !== 1 || !argument || !t.isObjectExpression(argument)) {
       diagnostics.push(diagnostic('error', 'configuration-source-shape', 'defineConfig принимает ровно один object literal.', 'defineConfig', call))
-      return { ast, document: null, diagnostics }
+      return { ast, document: null, metadata, diagnostics }
     }
 
     const values: ConfigurationSourceValueDefinition[] = []
@@ -61,26 +63,58 @@ export function compileConfigurationSource(
       ast,
       document: diagnostics.some(item => item.severity === 'error') ? null : draftDocument,
       draftDocument,
+      metadata,
       diagnostics,
     }
   }
   catch (error: any) {
     diagnostics.push(diagnostic('error', 'configuration-source-parse-error', `Не удалось распарсить Configuration source: ${error?.message ?? error}`))
-    return { ast: null, document: null, diagnostics }
+    return { ast: null, document: null, metadata: {}, diagnostics }
   }
 }
 
 function readRoot(ast: t.File, diagnostics: DiagnosticDraft[]): t.CallExpression | null {
-  if (ast.program.body.length !== 1 || !t.isExpressionStatement(ast.program.body[0])) {
-    diagnostics.push(diagnostic('error', 'configuration-source-root', 'Configuration source должен содержать только defineConfig(...).'))
+  const calls = ast.program.body.flatMap((statement) => {
+    if (!t.isExpressionStatement(statement)) {
+      return []
+    }
+    const expression = unwrapExpression(statement.expression)
+    return t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'defineConfig' }) ? [expression] : []
+  })
+  const unsupported = ast.program.body.filter((statement) => {
+    if (!t.isExpressionStatement(statement)) {
+      return true
+    }
+    const expression = unwrapExpression(statement.expression)
+    return !t.isCallExpression(expression) || !t.isIdentifier(expression.callee) || !['defineConfig', 'defineMetadata'].includes(expression.callee.name)
+  })
+  unsupported.forEach(statement => diagnostics.push(diagnostic('error', 'configuration-source-root', 'Configuration source допускает только один defineConfig(...) и optional defineMetadata(...).', 'source', statement)))
+  if (calls.length !== 1) {
+    diagnostics.push(diagnostic('error', 'configuration-source-root', 'Configuration source должен содержать ровно один defineConfig(...).', 'defineConfig', calls[1] ?? calls[0]))
     return null
   }
-  const expression = unwrapExpression(ast.program.body[0].expression)
-  if (!t.isCallExpression(expression) || !t.isIdentifier(expression.callee, { name: 'defineConfig' })) {
-    diagnostics.push(diagnostic('error', 'configuration-source-root', 'Configuration source должен начинаться с defineConfig(...).'))
-    return null
+  return calls[0]
+}
+
+function readRootMetadata(ast: t.File, diagnostics: DiagnosticDraft[]) {
+  const calls = ast.program.body.flatMap((statement) => {
+    if (!t.isExpressionStatement(statement)) {
+      return []
+    }
+    const expression = unwrapExpression(statement.expression)
+    return t.isCallExpression(expression) && t.isIdentifier(expression.callee, { name: 'defineMetadata' }) ? [expression] : []
+  })
+  if (calls.length > 1) {
+    diagnostics.push(diagnostic('error', 'program-metadata-duplicate', 'Найдено несколько defineMetadata.', 'metadata', calls[1]))
   }
-  return expression
+  if (calls[0] && calls[0].arguments.length !== 1) {
+    diagnostics.push(diagnostic('error', 'program-metadata-shape', 'defineMetadata принимает ровно один static object literal.', 'metadata', calls[0]))
+  }
+  const argument = calls[0]?.arguments[0]
+  if (!argument || !t.isExpression(argument)) {
+    return {}
+  }
+  return compileProgramMetadataExpression(argument, diagnostics)
 }
 
 function readValue(

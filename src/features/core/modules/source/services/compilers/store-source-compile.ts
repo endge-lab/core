@@ -7,6 +7,7 @@ import * as t from '@babel/types'
 
 import { diagnostic, propertyName, readStringArgument, unwrapExpression } from '@/features/core/modules/source/services/compilers/source-expression-compile'
 import { compileSourceField } from '@/features/core/modules/source/services/compilers/source-field-compile'
+import { compileProgramMetadataProperty } from '@/features/core/modules/source/services/compilers/source-metadata-compile'
 import { readSourceModelReference } from '@/features/core/modules/source/services/compilers/source-model-reference-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
@@ -16,7 +17,7 @@ export function compileStoreSource(source: string, sourceVersion = 1): StoreSour
   const diagnostics: DiagnosticDraft[] = []
   if (!String(source ?? '').trim()) {
     diagnostics.push(diagnostic('error', 'store-source-empty', 'Store source пуст.'))
-    return { ast: null, document: null, artifact: null, diagnostics }
+    return { ast: null, document: null, artifact: null, metadata: {}, diagnostics }
   }
 
   try {
@@ -25,13 +26,14 @@ export function compileStoreSource(source: string, sourceVersion = 1): StoreSour
     const definition = call?.arguments[0]
     if (!call) {
       diagnostics.push(diagnostic('error', 'store-source-define-missing', 'Store source должен содержать defineStore({...}).'))
-      return { ast, document: null, artifact: null, diagnostics }
+      return { ast, document: null, artifact: null, metadata: {}, diagnostics }
     }
     if (!definition || !t.isObjectExpression(definition)) {
       diagnostics.push(diagnostic('error', 'store-source-definition', 'defineStore принимает объектный литерал.', 'defineStore', call))
-      return { ast, document: null, artifact: null, diagnostics }
+      return { ast, document: null, artifact: null, metadata: {}, diagnostics }
     }
 
+    const metadata = compileProgramMetadataProperty(definition, diagnostics)
     let dataNode: t.ObjectExpression | null = null
     for (const property of definition.properties) {
       if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
@@ -39,6 +41,9 @@ export function compileStoreSource(source: string, sourceVersion = 1): StoreSour
         continue
       }
       const name = propertyName(property.key)
+      if (name === 'metadata') {
+        continue
+      }
       if (name !== 'data') {
         diagnostics.push(diagnostic('error', 'store-source-property-unsupported', `Свойство "${name ?? ''}" не поддерживается Store v1.`, name ?? 'defineStore', property))
         continue
@@ -60,12 +65,13 @@ export function compileStoreSource(source: string, sourceVersion = 1): StoreSour
       ast,
       document: hasErrors ? null : document,
       artifact: hasErrors ? null : { type: 'store', sourceVersion, ...document, updateHandlers: [] },
+      metadata,
       diagnostics,
     }
   }
   catch (error: any) {
     diagnostics.push(diagnostic('error', 'store-source-parse-error', `Не удалось распарсить Store source: ${error?.message ?? error}`))
-    return { ast: null, document: null, artifact: null, diagnostics }
+    return { ast: null, document: null, artifact: null, metadata: {}, diagnostics }
   }
 }
 

@@ -1,3 +1,4 @@
+import type { ProgramMetadataMap } from '@/features/core/modules/program/domain/types/program-metadata.types'
 import type { ProgramDiagnostic } from '@/features/core/modules/program/domain/types/program.types'
 
 export interface StreamSseTransportDescriptor {
@@ -44,6 +45,7 @@ export interface StreamSourceCompileResult {
   ast: unknown | null
   document: StreamSourceDocument | null
   artifact: StreamSourceArtifact | null
+  metadata: ProgramMetadataMap
   diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
 }
 
