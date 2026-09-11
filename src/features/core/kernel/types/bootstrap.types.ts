@@ -20,7 +20,7 @@ export type EndgeDataProvider
 /**
  * Конфигурация загрузки движка
  * Определяет workspace, данные которого должны быть активированы из persisted Domain.
- * Tenant, project и environment передаются отдельно через EndgeBootContext.context.
+ * Выборы динамических фасетов передаются отдельно через EndgeBootContext.context.
  */
 export interface EndgeLoadScope {
   workspaceIdentity?: string

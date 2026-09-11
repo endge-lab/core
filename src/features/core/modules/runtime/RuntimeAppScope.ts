@@ -157,7 +157,6 @@ function runtimeEntityCollection(entityType: RuntimeEntityType): string {
     'composition': 'compositions',
     'filter': 'filters',
     'page': 'pages',
-    'project': 'projects',
     'query': 'queries',
     'store': 'stores',
     'stream': 'streams',

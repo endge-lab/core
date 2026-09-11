@@ -7,7 +7,6 @@ type RecordValue = Record<string, any>
 /** Явные Domain lookup-зависимости чистой сериализации persisted-документа. */
 export interface DocumentSerializationContext {
   resolveFolderIdentity: (value: string | number) => string | null
-  resolveEnvironmentIdentity: (value: string | number) => string | null
 }
 
 /** Преобразует persisted-модель Core в строгий write DTO service-backend. */
@@ -131,26 +130,6 @@ export function serializeServiceDocument(
   if (documentType === 'navigation') {
     return withFields(common, value, ['tree'], { tree: arrayValue(value.tree) })
   }
-  if (documentType === 'environment') {
-    return withFields(common, value, ['configuration'], { configuration: objectValue(value.configuration) })
-  }
-  if (documentType === 'tenant') {
-    return withFields(common, value, ['code', 'configuration'], {
-      code: text(value.code) || identity,
-      configuration: objectValue(value.configuration),
-    })
-  }
-  if (documentType === 'project') {
-    return withFields(common, value, ['configuration', 'slug', 'order', 'source', 'sourceVersion'], {
-      configuration: objectValue(value.configuration),
-      source: text(value.source),
-      sourceVersion: positiveInteger(value.sourceVersion, 1),
-      slug: nullableText(value.slug),
-      order: nullableNumber(value.order),
-      allowedEnvironments: resolveIdentities(value.allowedEnvironmentIdentities ?? value.allowedEnvironmentIds ?? value.allowedEnvironments, context.resolveEnvironmentIdentity),
-    })
-  }
-
   return common
 }
 
@@ -204,16 +183,6 @@ function resolveIdentity(
   return text(resolver(value as string | number) ?? value)
 }
 
-function resolveIdentities(
-  value: unknown,
-  resolver: (value: string | number) => string | null,
-): string[] {
-  return arrayValue(value).flatMap((item) => {
-    const identity = text(resolver(item as string | number) ?? item)
-    return identity ? [identity] : []
-  })
-}
-
 function isQuery(value: DomainDocumentType): boolean {
   return value === QueryType.REST || value === QueryType.GraphQL || value === QueryType.Custom
 }
@@ -241,11 +210,6 @@ function text(value: unknown): string {
 function nullableText(value: unknown): string | null {
   const result = text(value)
   return result || null
-}
-
-function nullableNumber(value: unknown): number | null {
-  const result = Number(value)
-  return Number.isFinite(result) ? result : null
 }
 
 function positiveInteger(value: unknown, fallback: number): number {

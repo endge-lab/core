@@ -3,14 +3,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { Endge } from '@/features/core/kernel/endge'
 import { RComponentSFC } from '@/features/core/modules/domain/entities/RComponentSFC'
 import { RComposition } from '@/features/core/modules/domain/entities/RComposition'
-import { REnvironment } from '@/features/core/modules/domain/entities/REnvironment'
 import { RFilter } from '@/features/core/modules/domain/entities/RFilter'
-import { RProject } from '@/features/core/modules/domain/entities/RProject'
 import { RQuery } from '@/features/core/modules/domain/entities/RQuery'
 import { RStore } from '@/features/core/modules/domain/entities/RStore'
-import { RTenant } from '@/features/core/modules/domain/entities/RTenant'
 import { RType } from '@/features/core/modules/domain/entities/RType'
-import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
+import { prepareTestCompilerContext } from '@/test/helpers/compiler-context'
 
 describe('проверка Composition в EndgeCompiler', () => {
   beforeEach(() => prepareCompilerContext())
@@ -20,55 +17,6 @@ describe('проверка Composition в EndgeCompiler', () => {
     Endge.program.clear()
     Endge.domain.reset()
     Endge.workspace.reset()
-  })
-
-  /** Project и Composition с одинаковой identity остаются разными artifact owners. */
-  it('компилирует собственный граф проекта и допускает вложенную композицию с такой же identity', () => {
-    const project = Endge.domain.getProject('project')!
-    const child = RComposition.fromPlain({
-      id: 801,
-      identity: 'project',
-      name: 'Child',
-      source: 'defineComposition({ runtimes: {} })',
-      sourceVersion: 1,
-    })
-    Endge.domain.addComposition(child)
-    Endge.compiler.buildComposition(child)
-    project.source = 'defineComposition({ activateOn: startup(), runtimes: { child: composition(\'project\') } })'
-
-    const artifact = Endge.compiler.buildProject(project)
-    expect(artifact.ref).toMatchObject({ entityType: 'project', identity: 'project' })
-    expect(artifact.status).not.toBe('error')
-    expect(artifact.dependencies).toContainEqual(expect.objectContaining({ entityType: 'composition', identity: 'project' }))
-    expect(Endge.program.getArtifact('project', project.id)).toBe(artifact)
-    expect(Endge.program.getCompositionArtifact('project')?.ref.id).toBe(child.id)
-  })
-
-  /** Изменение Source требует rebuild и не разрешает исполнять старый граф. */
-  it('инвалидирует артефакт проекта после изменения его Source', () => {
-    const project = Endge.domain.getProject('project')!
-    expect(Endge.compiler.buildProject(project).status).not.toBe('error')
-    project.source = 'defineComposition({ activateOn: manual(), runtimes: {} })'
-    const stale = Endge.program.getArtifact('project', project.id)
-    expect(stale?.status).toBe('error')
-    expect(stale?.diagnostics).toContainEqual(expect.objectContaining({ code: 'program-artifact-stale' }))
-    const rebuilt = Endge.compiler.buildProject(project)
-    expect(rebuilt.status).not.toBe('error')
-    expect(rebuilt.payload.activation?.mode).toBe('manual')
-  })
-
-  /** Изолированная компиляция draft не подменяет опубликованный граф проекта. */
-  it('компилирует черновик проекта без записи в общую program', () => {
-    const project = Endge.domain.getProject('project')!
-    const persisted = Endge.compiler.buildProject(project)
-    const draft = RProject.fromPlain({ ...project.toPlain(), source: 'defineComposition({ activateOn: manual(), runtimes: {} })' })
-    const isolated = Endge.compiler.compileProjectArtifact(draft)
-    expect(isolated.status).not.toBe('error')
-    expect(isolated.payload.activation?.mode).toBe('manual')
-    expect(Endge.program.getArtifact('project', project.id)).toBe(persisted)
-    draft.sourceVersion = 2
-    expect(Endge.compiler.compileProjectArtifact(draft).diagnostics)
-      .toContainEqual(expect.objectContaining({ code: 'project.source-version.unsupported' }))
   })
 
   it('отличает отсутствие модели Query от отсутствия артефакта Query', () => {
@@ -192,6 +140,127 @@ defineComposition({
     const selfArtifact = Endge.compiler.buildComposition(selfReference)
     expect(selfArtifact.diagnostics).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'composition-self-reference' }),
+    ]))
+  })
+
+  it('разрешает contextSwitch по наиболее специфичному compiler context и индексирует все варианты', () => {
+    for (const [id, identity] of ['default-app', 'regional-app', 'regional-web-app'].entries()) {
+      const child = RComposition.fromPlain({
+        id: id + 200,
+        identity,
+        name: identity,
+        source: 'defineComposition({ runtimes: {} })',
+        sourceVersion: 1,
+      })
+      Endge.domain.addComposition(child)
+      Endge.compiler.buildComposition(child)
+    }
+    const composition = RComposition.fromPlain({
+      id: 210,
+      identity: 'startup',
+      name: 'Startup',
+      sourceVersion: 1,
+      source: `
+defineComposition({
+  runtimes: {
+    application: contextSwitch({
+      default: composition('default-app'),
+      cases: [
+        { when: { region: 'eu' }, use: composition('regional-app') },
+        { when: { region: 'eu', channel: 'web' }, use: composition('regional-web-app') },
+      ],
+    }),
+  },
+})
+`,
+    })
+
+    const artifact = Endge.compiler.buildComposition(composition)
+    const runtime = artifact.payload.runtimes.find(item => item.name === 'application')
+
+    expect(artifact.status).toBe('valid')
+    expect(runtime).toMatchObject({
+      kind: 'composition',
+      identity: 'regional-web-app',
+      contextSwitch: { selected: 1 },
+    })
+    expect(artifact.dependencies).toEqual(expect.arrayContaining([
+      expect.objectContaining({ entityType: 'composition', identity: 'default-app' }),
+      expect.objectContaining({ entityType: 'composition', identity: 'regional-app' }),
+      expect.objectContaining({ entityType: 'composition', identity: 'regional-web-app' }),
+    ]))
+  })
+
+  it('отклоняет пересекающиеся contextSwitch cases одинаковой специфичности', () => {
+    const composition = RComposition.fromPlain({
+      id: 220,
+      identity: 'ambiguous-startup',
+      name: 'Ambiguous startup',
+      sourceVersion: 1,
+      source: `
+defineComposition({
+  runtimes: {
+    application: contextSwitch({
+      default: composition('default-app'),
+      cases: [
+        { when: { region: 'eu' }, use: composition('regional-app') },
+        { when: { channel: 'web' }, use: composition('regional-web-app') },
+      ],
+    }),
+  },
+})
+`,
+    })
+
+    expect(Endge.compiler.buildComposition(composition).diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'composition-context-switch-ambiguous' }),
+    ]))
+  })
+
+  it('применяет общий call-site contract после contextSwitch и отклоняет modifiers внутри ветки', () => {
+    const valid = RComposition.fromPlain({
+      id: 221,
+      identity: 'context-switch-call-site',
+      name: 'Context switch call site',
+      sourceVersion: 1,
+      source: `
+defineComposition({
+  runtimes: {
+    application: contextSwitch({
+      default: composition('default-app'),
+      cases: [
+        { when: { region: 'eu' }, use: composition('regional-app') },
+      ],
+    }).activateOn(manual()),
+  },
+})
+`,
+    })
+    expect(Endge.compiler.buildComposition(valid).payload.runtimes[0]).toMatchObject({
+      identity: 'regional-app',
+      activationOverride: { mode: 'manual' },
+    })
+
+    const invalid = RComposition.fromPlain({
+      id: 222,
+      identity: 'context-switch-branch-modifier',
+      name: 'Context switch branch modifier',
+      sourceVersion: 1,
+      source: `
+defineComposition({
+  runtimes: {
+    application: contextSwitch({
+      default: composition('default-app').activateOn(manual()),
+      cases: [
+        { when: { region: 'eu' }, use: composition('regional-app') },
+      ],
+    }),
+  },
+})
+`,
+    })
+    expect(Endge.compiler.buildComposition(invalid).diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'composition-context-switch-branch-modifier' }),
     ]))
   })
 
@@ -516,21 +585,7 @@ defineComposition({
 })
 
 function prepareCompilerContext(): void {
-  Endge.workspace.apply(TEST_ENDGE_WORKSPACE)
-  Endge.domain.addProject(RProject.fromPlain({ id: 101, identity: 'project', name: 'Project' }))
-  Endge.domain.addEnvironment(REnvironment.fromPlain({ id: 102, identity: 'environment', name: 'Environment' }))
-  const tenant = new RTenant()
-  tenant.id = 103
-  tenant.identity = 'tenant'
-  tenant.name = 'Tenant'
-  tenant.code = 'tenant'
-  Endge.domain.addTenant(tenant)
-  Endge.configuration.build({
-    dataProvider: 'plain',
-    scope: {},
-    vars: {},
-    context: { projectIdentity: 'project', environmentIdentity: 'environment', tenantIdentity: 'tenant' },
-  })
+  prepareTestCompilerContext()
 }
 
 function createComposition(): RComposition {

@@ -9,8 +9,6 @@ export const R_COMPOSITION_KINDS = [
   'library',
   'query',
   'workspace',
-  'tenant',
-  'environment',
 ] as const
 
 export type RCompositionKind = typeof R_COMPOSITION_KINDS[number]

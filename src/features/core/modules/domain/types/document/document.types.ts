@@ -6,7 +6,6 @@ import type { RComputation } from '@/features/core/modules/domain/entities/RComp
 import type { RConfiguration } from '@/features/core/modules/domain/entities/RConfiguration'
 import type { RConverter } from '@/features/core/modules/domain/entities/RConverter'
 import type { RDataView } from '@/features/core/modules/domain/entities/RDataView'
-import type { REnvironment } from '@/features/core/modules/domain/entities/REnvironment'
 import type { RFilter } from '@/features/core/modules/domain/entities/RFilter'
 import type { RI18nBundle } from '@/features/core/modules/domain/entities/RI18nBundle'
 import type { RIntegration } from '@/features/core/modules/domain/entities/RIntegration'
@@ -15,13 +14,11 @@ import type { RNavigation } from '@/features/core/modules/domain/entities/RNavig
 import type { RPage } from '@/features/core/modules/domain/entities/RPage'
 import type { RPageTemplate } from '@/features/core/modules/domain/entities/RPageTemplate'
 import type { RPolicy } from '@/features/core/modules/domain/entities/RPolicy'
-import type { RProject } from '@/features/core/modules/domain/entities/RProject'
 import type { RQuery } from '@/features/core/modules/domain/entities/RQuery'
 import type { RSimulation } from '@/features/core/modules/domain/entities/RSimulation'
 import type { RStore } from '@/features/core/modules/domain/entities/RStore'
 import type { RStream } from '@/features/core/modules/domain/entities/RStream'
 import type { RStyle } from '@/features/core/modules/domain/entities/RStyle'
-import type { RTenant } from '@/features/core/modules/domain/entities/RTenant'
 import type { RType } from '@/features/core/modules/domain/entities/RType'
 import type { RUpdate } from '@/features/core/modules/domain/entities/RUpdate'
 import type { RVocabs } from '@/features/core/modules/domain/entities/RVocabs'
@@ -58,6 +55,7 @@ export enum QueryType {
  * Вариации секций домена.
  */
 export enum DomainSectionType {
+  Workspace = 'workspace',
   Primitive = 'primitive',
   Type = 'type',
   Component = 'component',
@@ -74,8 +72,6 @@ export enum DomainSectionType {
   Computation = 'computation',
   Integration = 'integration',
   Filters = 'filters',
-  Environment = 'environment',
-  Tenant = 'tenant',
   Policy = 'policy',
   Style = 'style',
   Configuration = 'configuration',
@@ -85,7 +81,6 @@ export enum DomainSectionType {
   Vocabs = 'vocabs',
   I18nBundles = 'i18n-bundles',
   AuthProfile = 'auth-profile',
-  Project = 'project',
 }
 
 /** Канонический исчерпывающий список типов документов Domain. */
@@ -106,15 +101,12 @@ export const DOMAIN_DOCUMENT_TYPES = [
   'page-template',
   'page',
   'navigation',
-  'environment',
   'policy',
   'style',
   'configuration',
   'vocabs',
   'i18n-bundles',
   'auth-profile',
-  'tenant',
-  'project',
   'workspace',
   ComponentType.DSL,
   ComponentType.Table,
@@ -145,4 +137,4 @@ export interface Document {
 /**
  * Описывает любой документ рефлекцию
  */
-export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RComposition | RStore | RStream | RSimulation | RUpdate | RMock | RAction | RConverter | RComputation | RIntegration | RFilter | RPolicy | RStyle | RConfiguration | RType | RVocabs | RI18nBundle | RAuthProfile | RWorkspace | RTenant | RProject | REnvironment | RPageTemplate | RPage | RNavigation
+export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RComposition | RStore | RStream | RSimulation | RUpdate | RMock | RAction | RConverter | RComputation | RIntegration | RFilter | RPolicy | RStyle | RConfiguration | RType | RVocabs | RI18nBundle | RAuthProfile | RWorkspace | RPageTemplate | RPage | RNavigation

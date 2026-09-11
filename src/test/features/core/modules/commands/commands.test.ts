@@ -41,13 +41,13 @@ describe('context command execution boundary', () => {
 
   it('validates untrusted commands before mutation and awaits the host lifecycle', async () => {
     let finish!: () => void
-    const setCurrentTenant = vi.fn(() => new Promise<void>((resolve) => {
+    const setFacetSelection = vi.fn(() => new Promise<void>((resolve) => {
       finish = resolve
     }))
     const setCurrentLocale = vi.fn()
     const clearDataModeOverride = vi.fn()
     const target = Object.create(Endge.context)
-    Object.assign(target, { setCurrentTenant, setCurrentLocale, clearDataModeOverride })
+    Object.assign(target, { setFacetSelection, setCurrentLocale, clearDataModeOverride })
     const executor = createContextCommandExecutor(target)
     await expect(executor.execute({ type: '__proto__', payload: {} } as unknown as EndgeCommand)).rejects.toThrow('Unknown command')
     await expect(executor.execute({ type: 'context:set-locale', payload: { locale: 42 } } as unknown as EndgeCommand)).rejects.toThrow()
@@ -57,7 +57,7 @@ describe('context command execution boundary', () => {
     await executor.execute({ type: 'context:set-data-mode', payload: { dataMode: null } })
     expect(clearDataModeOverride).toHaveBeenCalledOnce()
     const completed = vi.fn()
-    const pending = executor.execute({ type: 'context:set-tenant', payload: { tenant: 'remote' } }).then(completed)
+    const pending = executor.execute({ type: 'context:set-facet', payload: { facet: 'region', document: 'eu' } }).then(completed)
     await Promise.resolve()
     expect(completed).not.toHaveBeenCalled()
     finish()

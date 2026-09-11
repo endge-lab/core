@@ -52,31 +52,31 @@ describe('каскад Configuration Endge', () => {
     expect(result.vars).toEqual([{ name: 'ONLY', defaultValue: 'replacement' }])
   })
 
-  it('последовательно разрешает вклады Workspace, Tenant, Project и Environment', () => {
+  it('последовательно разрешает вклады Workspace и выбранных фасетных документов', () => {
     const workspace = createDefaultEndgeConfiguration()
-    const tenant = applyEndgeConfigurationContribution(workspace, {
+    const region = applyEndgeConfigurationContribution(workspace, {
       mode: 'inherit',
       patch: {
-        vars: { entries: [{ key: 'ACCENT', op: 'upsert', value: { name: 'ACCENT', defaultValue: 'tenant' } }] },
+        vars: { entries: [{ key: 'ACCENT', op: 'upsert', value: { name: 'ACCENT', defaultValue: 'region' } }] },
       },
     })
-    const project = applyEndgeConfigurationContribution(tenant, {
+    const channel = applyEndgeConfigurationContribution(region, {
       mode: 'inherit',
       patch: {
-        vars: { entries: [{ key: 'ACCENT', op: 'upsert', value: { name: 'ACCENT', defaultValue: 'project' } }] },
+        vars: { entries: [{ key: 'ACCENT', op: 'upsert', value: { name: 'ACCENT', defaultValue: 'channel' } }] },
       },
     })
-    const environment = applyEndgeConfigurationContribution(project, {
+    const stage = applyEndgeConfigurationContribution(channel, {
       mode: 'inherit',
       patch: {
-        vars: { entries: [{ key: 'ACCENT', op: 'upsert', value: { name: 'ACCENT', defaultValue: 'environment' } }] },
+        vars: { entries: [{ key: 'ACCENT', op: 'upsert', value: { name: 'ACCENT', defaultValue: 'stage' } }] },
       },
     })
 
     expect(workspace.vars).toEqual([])
-    expect(tenant.vars).toEqual([{ name: 'ACCENT', defaultValue: 'tenant' }])
-    expect(project.vars).toEqual([{ name: 'ACCENT', defaultValue: 'project' }])
-    expect(environment.vars).toEqual([{ name: 'ACCENT', defaultValue: 'environment' }])
+    expect(region.vars).toEqual([{ name: 'ACCENT', defaultValue: 'region' }])
+    expect(channel.vars).toEqual([{ name: 'ACCENT', defaultValue: 'channel' }])
+    expect(stage.vars).toEqual([{ name: 'ACCENT', defaultValue: 'stage' }])
   })
 
   it('добавляет значения диагностики по умолчанию в legacy Configuration и объединяет patches коллекций', () => {
@@ -163,20 +163,20 @@ describe('каскад Configuration Endge', () => {
 
   it('независимо объединяет поля tooltip между слоями каскада', () => {
     const workspace = createDefaultEndgeConfiguration()
-    const tenant = applyEndgeConfigurationContribution(workspace, {
+    const region = applyEndgeConfigurationContribution(workspace, {
       mode: 'inherit',
       patch: { tooltips: { side: { op: 'set', value: 'bottom' } } },
     })
-    const project = applyEndgeConfigurationContribution(tenant, {
+    const channel = applyEndgeConfigurationContribution(region, {
       mode: 'inherit',
       patch: { tooltips: { openDelay: { op: 'set', value: 500 } } },
     })
-    const environment = applyEndgeConfigurationContribution(project, {
+    const stage = applyEndgeConfigurationContribution(channel, {
       mode: 'inherit',
       patch: { tooltips: { align: { op: 'set', value: 'center' }, closeDelay: { op: 'set', value: 0 } } },
     })
 
-    expect(environment.tooltips).toEqual({ side: 'bottom', align: 'center', openDelay: 500, closeDelay: 0 })
+    expect(stage.tooltips).toEqual({ side: 'bottom', align: 'center', openDelay: 500, closeDelay: 0 })
     expect(workspace.tooltips.side).toBe('right')
   })
 

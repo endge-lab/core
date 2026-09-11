@@ -3,6 +3,7 @@ import type { EndgeWorkspaceDefinition } from '@/features/core/modules/workspace
 export const TEST_ENDGE_WORKSPACE: EndgeWorkspaceDefinition = {
   identity: 'workspace-test',
   displayName: 'Test Workspace',
+  startupCompositionIdentity: null,
   dataMode: 'live',
   documentStructure: 'frontend',
   managedBy: 'user',

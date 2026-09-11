@@ -13,7 +13,6 @@ describe('сериализатор сервиса AuthProfile', () => {
       session: undefined,
     }, {
       resolveFolderIdentity: value => String(value),
-      resolveEnvironmentIdentity: value => String(value),
     })).toMatchObject({
       adapterId: 'basic',
       credentials: { username: 'test', password: 'literal' },

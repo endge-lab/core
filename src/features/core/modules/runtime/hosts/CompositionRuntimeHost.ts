@@ -40,12 +40,11 @@ import { RuntimeHostBase } from '@/features/core/modules/runtime/RuntimeHostBase
 import { RuntimeScope } from '@/features/core/modules/runtime/RuntimeScope'
 import { evaluateSourceExpression } from '@/features/core/modules/source/services/source-expression-evaluate'
 
-function defaultContext(): RuntimeHostContext<'composition'> & RuntimeHostContext<'project'> {
+function defaultContext(): RuntimeHostContext<'composition'> {
   return {
     status: 'idle',
     startedAt: null,
     updatedAt: null,
-    lastRefreshAt: null,
     mountedChildren: 0,
     lastHookAt: null,
   }
@@ -85,7 +84,7 @@ function evaluateComponentEventInput(
 }
 
 /** Runtime orchestration host: children, bindings, hooks и public handles. */
-export class CompositionRuntimeHost<TType extends 'composition' | 'project' = 'composition'> extends RuntimeHostBase<TType, RuntimeHostContext<'composition'> & RuntimeHostContext<'project'>, CompositionProgramPayload> {
+export class CompositionRuntimeHost extends RuntimeHostBase<'composition', RuntimeHostContext<'composition'>, CompositionProgramPayload> {
   private _mountPromise: Promise<void> | null = null
   private _destroyPromise: Promise<void> | null = null
   private _children = new Map<string, RuntimeHost<any, any>>()
@@ -118,8 +117,7 @@ export class CompositionRuntimeHost<TType extends 'composition' | 'project' = 'c
 
   public constructor(input: {
     id: string
-    model: RuntimeEntityModelMap[TType]
-    entityType?: TType
+    model: RuntimeEntityModelMap['composition']
     parent?: RuntimeHost<any, any> | null
     meta?: Record<string, unknown>
     artifactReader: RuntimeArtifactReader
@@ -130,13 +128,13 @@ export class CompositionRuntimeHost<TType extends 'composition' | 'project' = 'c
       parent: input.parent,
       meta: input.meta,
       kind: 'composition',
-      runtimeType: `${input.entityType ?? 'composition'}-runtime-host`,
-      entityType: input.entityType ?? 'composition' as TType,
+      runtimeType: 'composition-runtime-host',
+      entityType: 'composition',
       entityIdentity: input.model.identity ?? String(input.model.id),
       title: input.model.displayName ?? input.model.name ?? input.model.identity,
       context: defaultContext(),
       artifactReader: input.artifactReader,
-      artifactRef: { entityType: input.entityType ?? 'composition', id: input.model.id, identity: input.model.identity },
+      artifactRef: { entityType: 'composition', id: input.model.id, identity: input.model.identity },
     })
   }
 

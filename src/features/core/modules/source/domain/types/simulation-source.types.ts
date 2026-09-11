@@ -34,9 +34,10 @@ export interface SimulationRuntimeOverride {
   stream?: SimulationMockStream
 }
 
-export type SimulationTargetReference
-  = | { entityType: 'composition', identity: string }
-    | { entityType: 'project', identity: string }
+export interface SimulationTargetReference {
+  entityType: 'composition'
+  identity: string
+}
 
 export interface SimulationSourceDocument {
   target: SimulationTargetReference
@@ -71,7 +72,6 @@ export interface SimulationSourceInput {
 }
 
 export interface SimulationSourceCatalog {
-  projects: readonly SimulationSourceInput[]
   compositions: readonly SimulationSourceInput[]
   queries: readonly SimulationSourceInput[]
   types: readonly SimulationSourceInput[]

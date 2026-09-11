@@ -50,6 +50,12 @@ const COMPOSITION_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'onEvent', kind: 'function', insertText: `onEvent('componentRuntime', 'edited').applyUpdate(data('store'), update('update-identity'))`, detail: 'Route one Component Event explicitly' },
   { label: 'component', kind: 'function', insertText: `component('identity').withProps({})`, detail: 'Component runtime' },
   { label: 'composition', kind: 'function', insertText: `composition('identity')`, detail: 'Nested Composition runtime' },
+  { label: 'contextSwitch', kind: 'function', insertText: `contextSwitch({
+  default: composition('default-composition'),
+  cases: [
+    { when: { region: 'eu' }, use: composition('regional-composition') },
+  ],
+})`, detail: 'Compile-time runtime selection by structural context' },
   { label: 'withData', kind: 'function', insertText: `.withData({
   childAlias: data('parentAlias'),
 })`, detail: 'Explicit Store data binding for nested Composition' },
@@ -74,6 +80,7 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
     keywords: [
       'component',
       'composition',
+      'contextSwitch',
       'control',
       'data',
       'dataView',
@@ -115,6 +122,7 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
       'applyUpdate',
       'batch',
       'component',
+      'contextSwitch',
       'contextual',
       'controls',
       'dataView',
@@ -139,7 +147,7 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
       'withProps',
       ...VALUE_EXPRESSION_METHOD_NAMES,
     ],
-    properties: ['activateOn', 'data', 'dataMode', 'hooks', 'key', 'metadata', 'outputs', 'previewProps', 'props', 'resources', 'runtimes'],
+    properties: ['activateOn', 'cases', 'data', 'dataMode', 'default', 'hooks', 'key', 'metadata', 'outputs', 'previewProps', 'props', 'resources', 'runtimes', 'use', 'when'],
   })
 
   public supports(sourceKind: SourceKind | string): boolean {

@@ -841,6 +841,7 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
           displayName: workspace.displayName,
           dataMode: workspace.dataMode === 'mock' ? 'development' : 'production',
           documentStructure: workspace.documentStructure ?? 'frontend',
+          startupCompositionIdentity: workspace.startupCompositionIdentity,
           configuration: workspace.configuration,
           meta: normalizeEntityMeta(workspace.meta),
         },
@@ -993,12 +994,6 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     if (documentType === 'integration') {
       return domain.getIntegration(documentIdOrIdentity)
     }
-    if (documentType === 'environment') {
-      return domain.getEnvironment(documentIdOrIdentity)
-    }
-    if (documentType === 'tenant') {
-      return domain.getTenant(documentIdOrIdentity)
-    }
     if (documentType === 'policy') {
       return domain.getPolicy(documentIdOrIdentity)
     }
@@ -1025,9 +1020,6 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     }
     if (documentType === 'i18n-bundles') {
       return domain.getI18nBundle(documentIdOrIdentity)
-    }
-    if (documentType === 'project') {
-      return domain.getProject(documentIdOrIdentity)
     }
     return null
   }
@@ -1101,12 +1093,6 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     if (documentType === 'integration') {
       return remove(x => domain.removeIntegrationById(x), x => domain.removeIntegration(x))
     }
-    if (documentType === 'environment') {
-      return remove(x => domain.removeEnvironmentById(x), x => domain.removeEnvironment(x))
-    }
-    if (documentType === 'tenant') {
-      return remove(x => domain.removeTenantById(x), x => domain.removeTenant(x))
-    }
     if (documentType === 'policy') {
       return remove(x => domain.removePolicyById(x), x => domain.removePolicy(x))
     }
@@ -1134,9 +1120,6 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     if (documentType === 'i18n-bundles') {
       return remove(x => domain.removeI18nBundlesById(x), x => domain.removeI18nBundles(x))
     }
-    if (documentType === 'project') {
-      return remove(x => domain.removeProjectById(x), x => domain.removeProject(x))
-    }
   }
 
   private _getDomainCollectionKey(documentType: DomainDocumentType): DomainCollectionKey {
@@ -1155,7 +1138,6 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
   private _serializationContext() {
     return {
       resolveFolderIdentity: (value: string | number) => Endge.domain.getFolder(value)?.identity ?? null,
-      resolveEnvironmentIdentity: (value: string | number) => Endge.domain.getEnvironment(value)?.identity ?? null,
     }
   }
 

@@ -158,7 +158,7 @@ export function normalizeEndgeConfigurationContribution(input: unknown): EndgeCo
   }
 }
 
-/** Применяет один Project/Environment/Tenant contribution к upstream configuration. */
+/** Применяет один contribution Workspace или выбранного фасетного документа к upstream configuration. */
 export function applyEndgeConfigurationContribution(
   upstream: EndgeConfiguration,
   contribution: EndgeConfigurationContribution,

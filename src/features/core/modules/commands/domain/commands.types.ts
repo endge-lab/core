@@ -7,9 +7,7 @@ export interface EndgeCommandMap {
   'runtime:resume': RuntimeControlTarget
   'runtime:stop': RuntimeControlTarget
   'context:set-workspace': { workspace: string | null }
-  'context:set-tenant': { tenant: string }
-  'context:set-project': { project: string }
-  'context:set-environment': { environment: string }
+  'context:set-facet': { facet: string, document: string }
   'context:set-user': { user: string }
   'context:set-locale': { locale: string | null }
   'context:set-theme': { theme: string | null }

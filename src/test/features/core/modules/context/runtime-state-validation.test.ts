@@ -2,7 +2,7 @@ import type { EndgeStorageAdapter } from '@/features/core/modules/context/domain
 import { describe, expect, it, vi } from 'vitest'
 import { RuntimeStateController } from '@/features/core/modules/context/persistence/RuntimeStateController'
 
-const scope = { workspaceId: 'w', tenantId: 't', projectId: 'p', environmentId: 'e', userId: 'u' }
+const scope = { workspaceId: 'w', facetSelections: [{ facetIdentity: 'region', documentIdentity: 'east' }], userId: 'u' }
 
 function storage(initial?: unknown) {
   let value = initial
@@ -37,7 +37,7 @@ describe('безопасное восстановление RuntimeState', () =>
   })
 
   /** Повреждённая оболочка cache не должна мешать mount и последующей записи. */
-  it.each([null, [], 1, {}, { version: 1 }, { version: 2, state: {} }, { version: 1, state: [] }])(
+  it.each([null, [], 1, {}, { version: 1 }, { version: 2, state: {} }, { version: 2, state: [] }])(
     'восстанавливает defaults для несовместимого snapshot %#',
     (snapshot) => {
       const state = controller(storage(snapshot))
@@ -48,14 +48,14 @@ describe('безопасное восстановление RuntimeState', () =>
   )
 
   it('пропускает повреждённые секции, сохраняя исправные и стабильный storageId', () => {
-    const adapter = storage({ version: 1, runtimeId: 'old', scope, state: { bad: 42, good: { state: { limit: 3 } } } })
+    const adapter = storage({ version: 2, runtimeId: 'old', scope, state: { bad: 42, good: { state: { limit: 3 } } } })
     const state = controller(adapter, 'new')
     expect(state.get('bad', 'state', 'fallback')).toBe('fallback')
     expect(state.get('good', 'state', null)).toEqual({ limit: 3 })
   })
 
   it('не восстанавливает snapshot другого контекста даже при ошибке адаптера', () => {
-    const state = controller(storage({ version: 1, runtimeId: 'old', scope: { ...scope, userId: 'other' }, state: { filter: { state: 'foreign' } } }))
+    const state = controller(storage({ version: 2, runtimeId: 'old', scope: { ...scope, userId: 'other' }, state: { filter: { state: 'foreign' } } }))
     expect(state.get('filter', 'state', 'fallback')).toBe('fallback')
   })
 

@@ -10,13 +10,35 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Endge } from '@/features/core/kernel/endge'
 import { RComposition } from '@/features/core/modules/domain/entities/RComposition'
 import { RStore } from '@/features/core/modules/domain/entities/RStore'
+import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
 describe('проверка Scope runtime-приложения', () => {
   afterEach(async () => {
     await Endge.runtime.reset()
     Endge.program.clear()
     Endge.domain.reset()
+    Endge.workspace.reset()
     Raph.app.reset()
+  })
+
+  it('монтирует только назначенную startup Composition текущего Workspace', async () => {
+    const composition = installComposition()
+    Endge.workspace.apply({
+      ...TEST_ENDGE_WORKSPACE,
+      startupCompositionIdentity: composition.identity,
+    })
+
+    const session = await Endge.runtime.mountStartup()
+
+    expect(session.host.entityType).toBe('composition')
+    expect(session.host.entityIdentity).toBe(composition.identity)
+    expect(Endge.runtime.getRuntimeHostsByEntity('composition', composition.identity, 'app')).toEqual([session.host])
+  })
+
+  it('не подбирает fallback, если startup Composition не назначена', () => {
+    Endge.workspace.apply(TEST_ENDGE_WORKSPACE)
+
+    expect(() => Endge.runtime.mountStartup()).toThrow('Current Workspace has no startup Composition')
   })
 
   it('владеет корневым путём preview и заменяет ту же корневую сущность без suffix preview', async () => {

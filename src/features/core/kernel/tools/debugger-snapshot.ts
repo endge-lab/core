@@ -25,16 +25,23 @@ export function prepareDebuggerSnapshot(snapshot: DiagnosticsSnapshot) {
   }
   const context: EndgeContextSnapshot & { dataMode: EndgeDataMode } = {
     workspace: workspace.identity,
-    tenant: null,
-    project: null,
-    environment: null,
+    facets: {},
     user: null,
     locale: null,
     theme: null,
     timezone: null,
     dataMode: source.dataMode === 'mock' ? 'mock' : 'live',
   }
-  for (const key of ['tenant', 'project', 'environment', 'user', 'locale', 'theme', 'timezone'] as const) {
+  if (source.facets != null && !record(source.facets)) {
+    throw new Error('[Endge] Invalid snapshot context field: facets')
+  }
+  context.facets = Object.fromEntries(Object.entries(record(source.facets) ?? {}).map(([facet, document]) => {
+    if (!facet.trim() || typeof document !== 'string' || !document.trim()) {
+      throw new Error('[Endge] Invalid snapshot facet selection')
+    }
+    return [facet.trim(), document.trim()]
+  }))
+  for (const key of ['user', 'locale', 'theme', 'timezone'] as const) {
     const value = source[key]
     if (value !== null && value !== undefined && typeof value !== 'string') {
       throw new Error(`[Endge] Invalid snapshot context field: ${key}`)

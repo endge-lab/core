@@ -13,11 +13,9 @@ export function buildRuntimeStateStorageKey(
   return [
     'endge',
     'runtime-state',
-    'v1',
+    'v2',
     `workspace:${encodeScopePart(scope.workspaceId)}`,
-    `tenant:${encodeScopePart(scope.tenantId)}`,
-    `project:${encodeScopePart(scope.projectId)}`,
-    `environment:${encodeScopePart(scope.environmentId)}`,
+    `facets:${encodeScopePart(serializeFacetSelections(scope.facetSelections))}`,
     `user:${encodeScopePart(scope.userId)}`,
     `runtime:${encodeScopePart(runtimeId)}`,
   ].join(':')
@@ -104,12 +102,12 @@ export class RuntimeStateController implements RuntimeStateControllerLike {
     const document = this._createDefaultDocument()
     try {
       const stored = this._adapter.read<unknown>(this.storageKey)
-      if (!isRecord(stored) || stored.version !== 1 || !isRecord(stored.state)
+      if (!isRecord(stored) || stored.version !== 2 || !isRecord(stored.state)
         || typeof stored.runtimeId !== 'string' || !isRecord(stored.scope)) {
         return document
       }
       const storedScope = stored.scope
-      if (Object.entries(document.scope).some(([key, value]) => storedScope[key] !== value)) {
+      if (!samePersistenceScope(storedScope, document.scope)) {
         return document
       }
       // Оба уровня ключей принадлежат consumer: __proto__ и constructor тоже обычные данные.
@@ -127,12 +125,28 @@ export class RuntimeStateController implements RuntimeStateControllerLike {
 
   private _createDefaultDocument(): RuntimeStateDocument {
     return {
-      version: 1,
+      version: 2,
       scope: { ...this.scope },
       runtimeId: this.runtimeId,
       state: Object.create(null),
     }
   }
+}
+
+function serializeFacetSelections(
+  selections: EndgePersistenceScope['facetSelections'],
+): string {
+  return JSON.stringify(selections.map(selection => [selection.facetIdentity, selection.documentIdentity]))
+}
+
+function samePersistenceScope(
+  stored: Record<string, unknown>,
+  expected: EndgePersistenceScope,
+): boolean {
+  return stored.workspaceId === expected.workspaceId
+    && stored.userId === expected.userId
+    && Array.isArray(stored.facetSelections)
+    && JSON.stringify(stored.facetSelections) === JSON.stringify(expected.facetSelections)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -36,6 +36,8 @@ export interface EndgeWorkspaceDefinition extends EntityManagement {
   dataMode: EndgeDataMode
   /** Способ организации документов; legacy payloads без поля нормализуются в frontend. */
   documentStructure?: EndgeWorkspaceDocumentStructure
+  /** Единственная Composition, запускаемая как корень Workspace. */
+  startupCompositionIdentity: string | null
   meta?: Record<string, unknown>
   installedIntegrations: WorkspaceIntegrationReference[]
   configuration: EndgeConfiguration

@@ -10,7 +10,6 @@ import { Raph } from '@endge/raph'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Endge } from '@/features/core/kernel/endge'
 import { RComposition } from '@/features/core/modules/domain/entities/RComposition'
-import { RProject } from '@/features/core/modules/domain/entities/RProject'
 import { RQuery } from '@/features/core/modules/domain/entities/RQuery'
 import { RSimulation } from '@/features/core/modules/domain/entities/RSimulation'
 
@@ -31,8 +30,8 @@ describe('simulation runtime isolation and lifecycle', () => {
     vi.restoreAllMocks()
   })
 
-  it.each(['composition', 'project'] as const)('owns a %s target, overrides each occurrence, and disposes all children', async (kind) => {
-    setup(kind)
+  it('owns a Composition target, overrides each occurrence, and disposes all children', async () => {
+    setup()
     const transport = vi.spyOn(Endge.runtime.query, 'executeArtifact').mockResolvedValue(['network'])
     const session = await Endge.runtime.simulation.mount('scenario', { generator })
     const root = session.host.target!
@@ -66,7 +65,7 @@ describe('simulation runtime isolation and lifecycle', () => {
   })
 
   it('applies explicit live and forced mock precedence without suppressing an override', async () => {
-    setup('composition', 'live')
+    setup('live')
     const transport = vi.spyOn(Endge.runtime.query, 'executeArtifact').mockResolvedValue(['network'])
     const live = await Endge.runtime.simulation.mount('scenario', { generator })
     const liveQuery = live.host.target!.getChild('uncovered') as QueryRuntimeHost
@@ -88,7 +87,7 @@ describe('simulation runtime isolation and lifecycle', () => {
   })
 
   it('keeps the running simulation policy when a new artifact is published', async () => {
-    setup('composition')
+    setup()
     const transport = vi.spyOn(Endge.runtime.query, 'executeArtifact').mockResolvedValue(['network'])
     const session = await Endge.runtime.simulation.mount('scenario', { generator })
     const original = Endge.program.getArtifact<SimulationSourceArtifact>('simulation', 'scenario')!
@@ -104,7 +103,7 @@ describe('simulation runtime isolation and lifecycle', () => {
   })
 
   it('aborts pending service generation during runtime reset', async () => {
-    setup('composition')
+    setup()
     let began!: () => void
     const ready = new Promise<void>((resolve) => {
       began = resolve
@@ -125,7 +124,7 @@ describe('simulation runtime isolation and lifecycle', () => {
   })
 
   it('rejects a stale override before allocating hosts', async () => {
-    setup('composition')
+    setup()
     const artifact = Endge.program.getArtifact<SimulationSourceArtifact>('simulation', 'scenario')!
     artifact.payload.runtimes = [{ alias: 'missing', request: request(2) }]
     await expect(Endge.runtime.simulation.mount('scenario', { generator })).rejects.toThrow('missing')
@@ -133,7 +132,7 @@ describe('simulation runtime isolation and lifecycle', () => {
   })
 
   it('cancels target activation and releases the graph during runtime reset', async () => {
-    setup('composition')
+    setup()
     const session = await Endge.runtime.simulation.mount('scenario', { generator })
     await session.host.deactivateTarget()
     const activation = session.host.activateTarget()
@@ -144,7 +143,7 @@ describe('simulation runtime isolation and lifecycle', () => {
   })
 })
 
-function setup(kind: 'project' | 'composition', dataMode: 'live' | 'mock' = 'mock'): void {
+function setup(dataMode: 'live' | 'mock' = 'mock'): void {
   const query = Object.assign(new RQuery(), { id: 710, identity: 'load', name: 'load' })
   Endge.domain.addQuery(query)
   Endge.program.addArtifact(base<QueryProgramPayload>('query', query.id, query.identity, {
@@ -171,22 +170,15 @@ function setup(kind: 'project' | 'composition', dataMode: 'live' | 'mock' = 'moc
     runtime('second', 'composition', 'nested', true),
     runtime('uncovered', 'query', 'load'),
   ], 'mock')
-  if (kind === 'project') {
-    const project = Object.assign(new RProject(), { id: 713, identity: 'target', name: 'target' })
-    Endge.domain.addProject(project)
-    Endge.program.addArtifact(base('project', project.id, project.identity, payload))
-  }
-  else {
-    const composition = Object.assign(new RComposition(), { id: 713, identity: 'target', name: 'target' })
-    Endge.domain.addComposition(composition)
-    Endge.program.addArtifact(base('composition', composition.id, composition.identity, payload))
-  }
+  const composition = Object.assign(new RComposition(), { id: 713, identity: 'target', name: 'target' })
+  Endge.domain.addComposition(composition)
+  Endge.program.addArtifact(base('composition', composition.id, composition.identity, payload))
   const simulation = Object.assign(new RSimulation(), { id: 714, identity: 'scenario', name: 'scenario' })
   Endge.domain.addSimulation(simulation)
   Endge.program.addArtifact(base<SimulationSourceArtifact>('simulation', simulation.id, simulation.identity, {
     type: 'simulation',
     sourceVersion: 1,
-    target: { entityType: kind, identity: 'target' },
+    target: { entityType: 'composition', identity: 'target' },
     dataMode,
     runtimes: [
       { alias: 'first', runtimes: [{ alias: 'load', request: request(2) }] },

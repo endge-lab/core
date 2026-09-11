@@ -15,7 +15,7 @@ interface SimulationCompositionBranch {
 
 export interface SimulationSourceTarget {
   alias: string
-  kind: 'project' | 'composition' | 'scope' | 'query' | 'stream' | 'unsupported'
+  kind: 'composition' | 'scope' | 'query' | 'stream' | 'unsupported'
   identity: string
   branch: SimulationCompositionBranch | null
 }
@@ -31,7 +31,10 @@ export class SimulationSourceResolver {
   private readonly _branches = new Map<string, SimulationCompositionBranch | null>()
   private readonly _queryContracts = new Map<string, QueryArrayContract>()
 
-  public constructor(private readonly _catalog: SimulationSourceCatalog) {}
+  public constructor(
+    private readonly _catalog: SimulationSourceCatalog,
+    private readonly _executionContext: Readonly<Record<string, string>> = {},
+  ) {}
 
   public composition(identity: string): SimulationCompositionBranch | null {
     return this.graph({ entityType: 'composition', identity })
@@ -42,9 +45,8 @@ export class SimulationSourceResolver {
     if (this._branches.has(key)) {
       return this._branches.get(key) ?? null
     }
-    const catalog = reference.entityType === 'project' ? this._catalog.projects : this._catalog.compositions
-    const owner = catalog.find(item => item.identity === reference.identity)
-    const compiled = owner ? compileCompositionSource(owner.source, owner.sourceVersion) : null
+    const owner = this._catalog.compositions.find(item => item.identity === reference.identity)
+    const compiled = owner ? compileCompositionSource(owner.source, owner.sourceVersion, this._executionContext) : null
     const document = compiled?.diagnostics.some(item => item.severity === 'error') ? null : compiled?.document ?? null
     const branch = owner && document ? { owner, document, scopePath: 'scope_default' } : null
     this._branches.set(key, branch)
@@ -171,15 +173,14 @@ export class SimulationSourceResolver {
       diagnostics.push({ severity: 'error', code, message, sourcePath, ...result.locations[sourcePath] })
     }
     const addReference = (reference: SimulationTargetReference): void => {
-      const catalog = reference.entityType === 'project' ? this._catalog.projects : this._catalog.compositions
-      const owner = catalog.find(item => item.identity === reference.identity)
+      const owner = this._catalog.compositions.find(item => item.identity === reference.identity)
       dependencies.push({ ...reference, id: owner?.id ?? reference.identity, role: 'simulation-target' })
     }
     const root = this.graph(result.document.target)
     if (result.document.target.identity) {
       addReference(result.document.target)
       if (!root) {
-        report('simulation-target-unresolved', `${result.document.target.entityType === 'project' ? 'Project' : 'Composition'} "${result.document.target.identity}" отсутствует или содержит ошибки Source.`, 'target')
+        report('simulation-target-unresolved', `Composition "${result.document.target.identity}" отсутствует или содержит ошибки Source.`, 'target')
       }
     }
     const visit = (overrides: SimulationRuntimeOverride[], branch: SimulationCompositionBranch, path: string): void => {

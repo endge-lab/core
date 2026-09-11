@@ -190,7 +190,7 @@ export type EndgeConfigurationContribution
   = | { mode: 'inherit', patch: EndgeConfigurationPatch }
     | { mode: 'replace', value: EndgeConfiguration }
 
-export type EndgeConfigurationLayer = 'workspace' | 'tenant' | 'project' | 'environment'
+export type EndgeConfigurationLayer = 'workspace' | { facetIdentity: string }
 
 /** Immutable input, передаваемый compiler strategies. */
 export interface EndgeBuildContext {

@@ -7,7 +7,6 @@ import { ComponentSFCRuntimeStrategy } from '@/features/core/modules/runtime/ser
 import { CompositionRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/CompositionRuntimeStrategy'
 import { FilterRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/FilterRuntimeStrategy'
 import { PageRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/PageRuntimeStrategy'
-import { ProjectRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/ProjectRuntimeStrategy'
 import { QueryRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/QueryRuntimeStrategy'
 import { SimulationRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/SimulationRuntimeStrategy'
 import { StoreRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/StoreRuntimeStrategy'
@@ -47,7 +46,6 @@ describe('контракты возможностей документов до�
       new CompositionRuntimeStrategy(),
       new FilterRuntimeStrategy(),
       new PageRuntimeStrategy(),
-      new ProjectRuntimeStrategy(),
       new QueryRuntimeStrategy(),
       new SimulationRuntimeStrategy(),
       new StoreRuntimeStrategy(),

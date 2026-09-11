@@ -122,7 +122,6 @@ function normalizeTag(raw: unknown): string | null {
   return raw.trim() || null
 }
 
-/** Нормализует ссылку на проект из Payload relation или plain-значения. */
 /** Нормализует список поддерживаемых targets и оставляет только v1-значения. */
 function normalizeTargets(raw: unknown): RComponentRenderTarget[] {
   if (!Array.isArray(raw)) {

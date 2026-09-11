@@ -24,7 +24,7 @@ export const ENDGE_COMPILER_SPAN_GROUPS = {
 export const ENDGE_COMPUTATION_MAX_CALL_DEPTH = 32
 export const ENDGE_COMPUTATION_MAX_CALLS = 256
 
-export const CONTEXT_STORAGE_KEY = 'endge:context:v1'
+export const CONTEXT_STORAGE_KEY = 'endge:context:v2'
 export const LEGACY_CONTEXT_STORAGE_KEY = 'EndgeContext_Module'
 export const LEGACY_THEME_STORAGE_KEY = 'endge:theme'
 export const LEGACY_TIMEZONE_STORAGE_KEY = 'endge:isLocalTime'

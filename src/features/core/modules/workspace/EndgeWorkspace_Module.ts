@@ -78,6 +78,7 @@ export class EndgeWorkspace_Module extends EndgeModule<EndgeBootContext> {
         identity,
         displayName: identity === 'local' ? 'Local workspace' : identity,
         dataMode: 'live',
+        startupCompositionIdentity: null,
         managedBy: 'user',
         managedById: null,
         meta: {},

@@ -3,7 +3,6 @@ import type { RComponentSFC } from '@/features/core/modules/domain/entities/RCom
 import type { RComposition } from '@/features/core/modules/domain/entities/RComposition'
 import type { RFilter } from '@/features/core/modules/domain/entities/RFilter'
 import type { RPage } from '@/features/core/modules/domain/entities/RPage'
-import type { RProject } from '@/features/core/modules/domain/entities/RProject'
 import type { RQuery } from '@/features/core/modules/domain/entities/RQuery'
 import type { RSimulation } from '@/features/core/modules/domain/entities/RSimulation'
 import type { RStore } from '@/features/core/modules/domain/entities/RStore'
@@ -18,7 +17,6 @@ export type RuntimeKind = 'query' | 'filter' | 'composition' | 'store' | 'stream
 export type RuntimeExecutableModel
   = | RQuery
     | RAction
-    | RProject
     | RPage
     | RComponentSFC
     | RFilter

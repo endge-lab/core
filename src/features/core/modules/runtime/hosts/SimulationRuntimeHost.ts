@@ -16,7 +16,7 @@ import { prepareSimulationOverrides } from '@/features/core/modules/runtime/serv
 /** Владелец одного изолированного запуска target через общий runtime registry. */
 export class SimulationRuntimeHost extends RuntimeHostBase<'simulation', RuntimeHostContextBase, SimulationSourceArtifact> {
   public readonly forceMock: boolean
-  private _target: CompositionRuntimeHost<'composition' | 'project'> | null = null
+  private _target: CompositionRuntimeHost | null = null
   private _scope: RuntimeScope | null = null
   private _responses: ReadonlyMap<string, unknown> = new Map()
   private readonly _overrides: SimulationOverrides
@@ -25,7 +25,7 @@ export class SimulationRuntimeHost extends RuntimeHostBase<'simulation', Runtime
   private _generation = 0
   private _closed = false
   private _transition: Promise<unknown> = Promise.resolve()
-  private _activation: Promise<CompositionRuntimeHost<'composition' | 'project'>> | null = null
+  private _activation: Promise<CompositionRuntimeHost> | null = null
   private _destroying: Promise<void> | null = null
 
   private constructor(input: {
@@ -83,7 +83,7 @@ export class SimulationRuntimeHost extends RuntimeHostBase<'simulation', Runtime
     return host
   }
 
-  public get target(): CompositionRuntimeHost<'composition' | 'project'> | null {
+  public get target(): CompositionRuntimeHost | null {
     return this._target
   }
 
@@ -121,7 +121,7 @@ export class SimulationRuntimeHost extends RuntimeHostBase<'simulation', Runtime
     const path: string[] = []
     let current = host
     while (current.parent && current.parent !== this) {
-      if ((current.parent.entityType !== 'composition' && current.parent.entityType !== 'project') || typeof current.meta.instance !== 'string') {
+      if (current.parent.entityType !== 'composition' || typeof current.meta.instance !== 'string') {
         return null
       }
       path.unshift(current.meta.instance)
@@ -131,7 +131,7 @@ export class SimulationRuntimeHost extends RuntimeHostBase<'simulation', Runtime
   }
 
   /** Создаёт target штатной strategy; вложенные manual nodes сохраняют свои policies. */
-  public activateTarget(): Promise<CompositionRuntimeHost<'composition' | 'project'>> {
+  public activateTarget(): Promise<CompositionRuntimeHost> {
     if (this._closed) {
       return Promise.reject(new Error('[Simulation] Запуск уже закрыт.'))
     }
@@ -160,9 +160,7 @@ export class SimulationRuntimeHost extends RuntimeHostBase<'simulation', Runtime
         this._responses = responses
       }
       const payload = this.getArtifactPayload()!
-      const model = payload.target.entityType === 'project'
-        ? Endge.domain.getProject(payload.target.identity)
-        : Endge.domain.getComposition(payload.target.identity)
+      const model = Endge.domain.getComposition(payload.target.identity)
       if (!model) {
         throw new Error(`[Simulation] Target "${payload.target.identity}" отсутствует.`)
       }
@@ -186,7 +184,7 @@ export class SimulationRuntimeHost extends RuntimeHostBase<'simulation', Runtime
           runtimeScopeId: this._scope.id,
           input: { kind: 'local', props: this.meta.targetProps ?? {} },
         },
-      }) as CompositionRuntimeHost<'composition' | 'project'> | null
+      }) as CompositionRuntimeHost | null
       if (!target) {
         throw new Error(`[Simulation] Не удалось создать target "${payload.target.identity}".`)
       }

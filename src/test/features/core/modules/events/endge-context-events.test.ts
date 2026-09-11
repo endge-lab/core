@@ -24,12 +24,10 @@ describe('context publishes effective variable changes', () => {
     vi.restoreAllMocks()
   })
 
-  it('does not publish constructor hydration and emits all nine distinct variables', () => {
+  it('does not publish constructor hydration and emits all context variables', () => {
     expect(records).toEqual([])
     context.setCurrentWorkspace('events-workspace')
-    context.setCurrentTenant('events-tenant')
-    context.setCurrentProject('events-project')
-    context.setCurrentEnvironment('events-environment')
+    context.setFacetSelection('region', 'eu')
     context.setCurrentUser('events-user')
     context.setCurrentLocale('ru')
     context.setCurrentTheme('light')
@@ -37,17 +35,15 @@ describe('context publishes effective variable changes', () => {
     context.setDataMode('mock')
     expect(records.map(event => event.name)).toEqual([
       'context:workspace-changed',
-      'context:tenant-changed',
-      'context:project-changed',
-      'context:environment-changed',
+      'context:facets-changed',
       'context:user-changed',
       'context:locale-changed',
       'context:theme-changed',
       'context:timezone-changed',
       'context:data-mode-changed',
     ])
-    expect(records[5].payload).toEqual({ previous: 'en', value: 'ru' })
-    expect(records[6].payload).toEqual({ previous: 'dark', value: 'light' })
+    expect(records[3].payload).toEqual({ previous: 'en', value: 'ru' })
+    expect(records[4].payload).toEqual({ previous: 'dark', value: 'light' })
     const count = records.length
     context.setCurrentLocale('ru')
     context.setCurrentTheme('light')
@@ -57,13 +53,14 @@ describe('context publishes effective variable changes', () => {
   })
 
   it('tracks effective session identities and ignores hidden fallback changes', () => {
-    let identity = { userId: 'signed-in', tenantId: 'session-tenant' }
+    let identity = { userId: 'signed-in', facetSelections: { region: 'eu' } }
     context.setSessionIdentityProvider({ getCurrentIdentity: () => identity })
-    expect(records.map(event => event.name)).toEqual(['context:tenant-changed', 'context:user-changed'])
+    context.resolveExecutionContext({ facets: [{ identity: 'region', position: 0, documents: ['eu'] }] })
+    expect(records.map(event => event.name)).toEqual(['context:user-changed', 'context:facets-changed'])
     records.length = 0
     context.setCurrentUser('fallback-user')
     expect(records).toEqual([])
-    identity = { userId: 'other-user', tenantId: 'session-tenant' }
+    identity = { userId: 'other-user', facetSelections: { region: 'eu' } }
     context.notify()
     expect(records).toHaveLength(1)
     expect(records[0].payload).toEqual({ previous: 'signed-in', value: 'other-user' })
@@ -110,12 +107,13 @@ describe('context publishes effective variable changes', () => {
   })
 
   it('finishes a multi-variable commit before publishing changes caused by a listener', () => {
-    context.setCurrentTenant('before')
+    context.setFacetSelection('region', 'before')
+    context.setCurrentUser('before-user')
     records.length = 0
-    Endge.events.onEvent('context:tenant-changed', () => context.setCurrentProject('from-listener'))
-    context.deserialize({ tenant: 'after', project: 'from-snapshot' })
-    expect(records.filter(event => event.name === 'context:project-changed').map(event => event.payload)).toEqual([
-      { previous: 'default', value: 'from-snapshot' },
+    Endge.events.onEvent('context:facets-changed', () => context.setCurrentUser('from-listener'))
+    context.deserialize({ workspace: null, facets: { region: 'after' }, user: 'from-snapshot', locale: null, theme: null, timezone: null })
+    expect(records.filter(event => event.name === 'context:user-changed').map(event => event.payload)).toEqual([
+      { previous: 'before-user', value: 'from-snapshot' },
       { previous: 'from-snapshot', value: 'from-listener' },
     ])
   })

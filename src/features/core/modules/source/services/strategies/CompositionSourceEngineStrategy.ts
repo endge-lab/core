@@ -1,4 +1,4 @@
-import type { SourceEngineCompileResult, SourceEngineStrategy, SourceKind } from '@/features/core/modules/source/domain/types/source-engine.types'
+import type { SourceEngineCompileContext, SourceEngineCompileResult, SourceEngineStrategy, SourceKind } from '@/features/core/modules/source/domain/types/source-engine.types'
 
 import { compileCompositionSource } from '@/features/core/modules/source/services/compilers/composition-source-compile'
 
@@ -10,8 +10,8 @@ export class CompositionSourceEngineStrategy implements SourceEngineStrategy {
     return sourceKind === this.sourceKind
   }
 
-  public compile(source: string): SourceEngineCompileResult {
-    const result = compileCompositionSource(source)
+  public compile(source: string, context?: SourceEngineCompileContext): SourceEngineCompileResult {
+    const result = compileCompositionSource(source, context?.sourceVersion ?? 1, context?.executionContext)
     const ok = !result.diagnostics.some(item => item.severity === 'error')
     return {
       ok,

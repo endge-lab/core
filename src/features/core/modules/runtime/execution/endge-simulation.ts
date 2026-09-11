@@ -2,7 +2,7 @@ import type { SimulationMountOptions, SimulationRuntimeSession } from '@/feature
 import type { SimulationRuntimeHost } from '@/features/core/modules/runtime/hosts/SimulationRuntimeHost'
 import { Endge } from '@/features/core/kernel/endge'
 
-/** Запускает Simulation через тот же registry и lifecycle, что Project и Composition. */
+/** Запускает Simulation с Composition target через общий runtime registry и lifecycle. */
 export class EndgeSimulation {
   public async mount(identity: string, options: SimulationMountOptions = {}): Promise<SimulationRuntimeSession> {
     const model = Endge.domain.getSimulation(String(identity ?? '').trim())

@@ -27,7 +27,6 @@ const CORE_TYPES: readonly BuiltinTypeDefinition[] = [
   { identity: 'RefAction', displayName: 'Ссылка на действие', category: 'reference', target: 'actions' },
   { identity: 'RefComponent', displayName: 'Ссылка на компонент', category: 'reference', target: 'components' },
   { identity: 'RefConverter', displayName: 'Ссылка на конвертер', category: 'reference', target: 'converters' },
-  { identity: 'RefEnvironment', displayName: 'Ссылка на окружение', category: 'reference', target: 'environments' },
   { identity: 'RefFilter', displayName: 'Ссылка на фильтр', category: 'reference', target: 'filters' },
   { identity: 'RefFolder', displayName: 'Ссылка на папку', category: 'reference', target: 'folders' },
   { identity: 'RefIntegration', displayName: 'Ссылка на интеграцию', category: 'reference', target: 'integrations' },
@@ -35,10 +34,8 @@ const CORE_TYPES: readonly BuiltinTypeDefinition[] = [
   { identity: 'RefPage', displayName: 'Ссылка на страницу', category: 'reference', target: 'pages' },
   { identity: 'RefPageTemplate', displayName: 'Ссылка на шаблон страницы', category: 'reference', target: 'page-templates' },
   { identity: 'RefPolicy', displayName: 'Ссылка на policy', category: 'reference', target: 'policies' },
-  { identity: 'RefProject', displayName: 'Ссылка на проект', category: 'reference', target: 'projects' },
   { identity: 'RefQuery', displayName: 'Ссылка на запрос', category: 'reference', target: 'queries' },
   { identity: 'RefStyle', displayName: 'Ссылка на стиль', category: 'reference', target: 'styles' },
-  { identity: 'RefTenant', displayName: 'Ссылка на tenant', category: 'reference', target: 'tenants' },
   { identity: 'RefType', displayName: 'Ссылка на тип', category: 'reference', target: 'types' },
   { identity: 'RefVocab', displayName: 'Ссылка на словарь', category: 'reference', target: 'vocabs' },
 ]

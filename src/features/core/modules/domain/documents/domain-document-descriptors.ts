@@ -22,7 +22,6 @@ import { RComputation } from '@/features/core/modules/domain/entities/RComputati
 import { RConfiguration } from '@/features/core/modules/domain/entities/RConfiguration'
 import { RConverter } from '@/features/core/modules/domain/entities/RConverter'
 import { RDataView } from '@/features/core/modules/domain/entities/RDataView'
-import { REnvironment } from '@/features/core/modules/domain/entities/REnvironment'
 import { RFilter } from '@/features/core/modules/domain/entities/RFilter'
 import { RI18nBundle } from '@/features/core/modules/domain/entities/RI18nBundle'
 import { RIntegration } from '@/features/core/modules/domain/entities/RIntegration'
@@ -31,13 +30,11 @@ import { RNavigation } from '@/features/core/modules/domain/entities/RNavigation
 import { RPage } from '@/features/core/modules/domain/entities/RPage'
 import { RPageTemplate } from '@/features/core/modules/domain/entities/RPageTemplate'
 import { RPolicy } from '@/features/core/modules/domain/entities/RPolicy'
-import { RProject } from '@/features/core/modules/domain/entities/RProject'
 import { RQuery } from '@/features/core/modules/domain/entities/RQuery'
 import { RSimulation } from '@/features/core/modules/domain/entities/RSimulation'
 import { RStore } from '@/features/core/modules/domain/entities/RStore'
 import { RStream } from '@/features/core/modules/domain/entities/RStream'
 import { RStyle } from '@/features/core/modules/domain/entities/RStyle'
-import { RTenant } from '@/features/core/modules/domain/entities/RTenant'
 import { RType } from '@/features/core/modules/domain/entities/RType'
 import { RUpdate } from '@/features/core/modules/domain/entities/RUpdate'
 import { RVocabs } from '@/features/core/modules/domain/entities/RVocabs'
@@ -57,9 +54,9 @@ import { TYPE_DEFAULT_SOURCE } from '@/features/core/modules/source/templates/ty
 import { UPDATE_DEFAULT_SOURCE } from '@/features/core/modules/source/templates/update.default.source'
 
 export type DomainCollectionKey
-  = | 'projects' | 'types' | 'queries' | 'dataViews' | 'compositions' | 'stores'
+  = | 'types' | 'queries' | 'dataViews' | 'compositions' | 'stores'
     | 'streams' | 'simulations' | 'updates' | 'mocks' | 'componentSFCs' | 'actions' | 'filters'
-    | 'converters' | 'computations' | 'environments' | 'tenants' | 'styles' | 'configurations'
+    | 'converters' | 'computations' | 'styles' | 'configurations'
     | 'vocabs' | 'authProfiles' | 'i18nBundles' | 'navigations'
 
 /** Точное соответствие document type конкретной Domain-модели. */
@@ -80,15 +77,12 @@ export interface DomainDocumentModelMap {
   'page-template': RPageTemplate
   'page': RPage
   'navigation': RNavigation
-  'environment': REnvironment
   'policy': RPolicy
   'style': RStyle
   'configuration': RConfiguration
   'vocabs': RVocabs
   'i18n-bundles': RI18nBundle
   'auth-profile': RAuthProfile
-  'tenant': RTenant
-  'project': RProject
   'workspace': RWorkspace
   [ComponentType.DSL]: RComponentDSL
   [ComponentType.Table]: RComponentTable
@@ -141,15 +135,12 @@ const MATERIALIZERS: MaterializerMap = {
   'page-template': source => Serialize.fromJSON(RPageTemplate, source),
   'page': source => Serialize.fromJSON(RPage, source),
   'navigation': source => Serialize.fromJSON(RNavigation, source),
-  'environment': source => REnvironment.fromPlain(source),
   'policy': source => Serialize.fromJSON(RPolicy, source),
   'style': source => RStyle.fromPlain(source),
   'configuration': source => RConfiguration.fromPlain(source),
   'vocabs': source => RVocabs.fromPlain(source),
   'i18n-bundles': source => Serialize.fromJSON(RI18nBundle, source),
   'auth-profile': source => RAuthProfile.fromPlain(source),
-  'tenant': source => Serialize.fromJSON(RTenant, source),
-  'project': source => RProject.fromPlain(source),
   'workspace': source => RWorkspace.fromPlain(source),
   [ComponentType.DSL]: source => requireComponent(source, ComponentType.DSL) as RComponentDSL,
   [ComponentType.Table]: source => requireComponent(source, ComponentType.Table) as RComponentTable,
@@ -189,16 +180,13 @@ const SECTION_BY_TYPE: Record<DomainDocumentType, DomainSectionType> = {
   'page-template': DomainSectionType.PageTemplate,
   'page': DomainSectionType.Page,
   'navigation': DomainSectionType.Navigation,
-  'environment': DomainSectionType.Environment,
   'policy': DomainSectionType.Policy,
   'style': DomainSectionType.Style,
   'configuration': DomainSectionType.Configuration,
   'vocabs': DomainSectionType.Vocabs,
   'i18n-bundles': DomainSectionType.I18nBundles,
   'auth-profile': DomainSectionType.AuthProfile,
-  'tenant': DomainSectionType.Tenant,
-  'project': DomainSectionType.Project,
-  'workspace': DomainSectionType.Project,
+  'workspace': DomainSectionType.Workspace,
   [ComponentType.DSL]: DomainSectionType.Component,
   [ComponentType.Table]: DomainSectionType.Component,
   [ComponentType.SFC]: DomainSectionType.Component,
@@ -222,14 +210,11 @@ const DOMAIN_COLLECTION_BY_TYPE: Partial<Record<DomainDocumentType, DomainCollec
   'update': 'updates',
   'mock': 'mocks',
   'navigation': 'navigations',
-  'environment': 'environments',
   'style': 'styles',
   'configuration': 'configurations',
   'vocabs': 'vocabs',
   'i18n-bundles': 'i18nBundles',
   'auth-profile': 'authProfiles',
-  'tenant': 'tenants',
-  'project': 'projects',
   [ComponentType.SFC]: 'componentSFCs',
   [QueryType.Custom]: 'queries',
   [QueryType.GraphQL]: 'queries',
@@ -251,14 +236,11 @@ const PERSISTENCE_COLLECTION_BY_TYPE: Partial<Record<DomainDocumentType, EndgeDo
   'update': 'updates',
   'mock': 'mocks',
   'navigation': 'navigations',
-  'environment': 'environments',
   'style': 'styles',
   'configuration': 'configurations',
   'vocabs': 'vocabs',
   'i18n-bundles': 'i18n-bundles',
   'auth-profile': 'auth-profiles',
-  'tenant': 'tenants',
-  'project': 'projects',
   [ComponentType.SFC]: 'components',
   [QueryType.Custom]: 'queries',
   [QueryType.GraphQL]: 'queries',
@@ -286,7 +268,6 @@ const CAPABILITIES_BY_TYPE: Partial<Record<DomainDocumentType, Partial<DomainDoc
   [QueryType.REST]: { source: 'query', program: 'query', runtime: 'query' },
   [FilterType.DefaultFilter]: { source: 'filter', program: 'filter', runtime: 'filter' },
   'page': { runtime: 'page' },
-  'project': { source: 'composition', program: 'project', runtime: 'project' },
 }
 
 const METADATA_BACKING_BY_TYPE: Partial<Record<DomainDocumentType, DocumentMetadataBacking>> = {
@@ -302,7 +283,6 @@ const METADATA_BACKING_BY_TYPE: Partial<Record<DomainDocumentType, DocumentMetad
   'data-view': 'definition-property',
   'default-filter': 'definition-property',
   'composition': 'definition-property',
-  'project': 'definition-property',
   'vocabs': 'definition-property',
   'component-sfc': 'definition-declaration',
   'type': 'definition-declaration',
@@ -310,8 +290,6 @@ const METADATA_BACKING_BY_TYPE: Partial<Record<DomainDocumentType, DocumentMetad
   'style': 'entity-meta',
   'mock': 'entity-meta',
   'converter': 'entity-meta',
-  'environment': 'entity-meta',
-  'tenant': 'entity-meta',
   'auth-profile': 'entity-meta',
   'i18n-bundles': 'entity-meta',
   'navigation': 'entity-meta',
@@ -346,10 +324,7 @@ const CREATE_NEW_BY_TYPE: Partial<{ [TType in DomainDocumentType]: (options: Doc
   [FilterType.DefaultFilter]: options => initialize(new RFilter(), options, { source: FILTER_DEFAULT_SOURCE, sourceVersion: 1 }),
   'action': options => initialize(new RAction(), options, { source: ACTION_DEFAULT_SOURCE, sourceVersion: 1 }),
   'integration': options => initialize(new RIntegration(), options),
-  'environment': options => initialize(new REnvironment(), options),
   'policy': options => initialize(new RPolicy(), options),
-  'tenant': options => initialize(new RTenant(), options, { codeFromIdentity: true }),
-  'project': options => initialize(new RProject(), options),
   'style': options => initialize(new RStyle(), options, { sourceVersion: 1 }),
   'configuration': options => initialize(new RConfiguration(), options, { omitFolder: true }),
   'page-template': options => initialize(new RPageTemplate(), options),
@@ -438,11 +413,8 @@ function initialize<T extends object>(
   if ('displayName' in target) {
     target.displayName = title
   }
-  const { groupFromFolder, omitFolder, codeFromIdentity, ...assign } = values
+  const { groupFromFolder, omitFolder, ...assign } = values
   Object.assign(target, assign)
-  if (codeFromIdentity === true) {
-    target.code = identity
-  }
   if (omitFolder !== true && options.folderId != null) {
     target.folderId = options.folderId
     if (groupFromFolder === true) {

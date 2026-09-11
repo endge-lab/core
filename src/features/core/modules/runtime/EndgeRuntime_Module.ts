@@ -19,7 +19,6 @@ import { serializeDiagnosticsJson } from '@/features/core/modules/diagnostics/do
 import { EndgeRuntimeScopes_Module } from '@/features/core/modules/runtime/EndgeRuntimeScopes_Module'
 import { EndgeComposition } from '@/features/core/modules/runtime/execution/endge-composition'
 import { EndgeDataView } from '@/features/core/modules/runtime/execution/endge-data-view'
-import { EndgeProject } from '@/features/core/modules/runtime/execution/endge-project'
 import { EndgeQuery } from '@/features/core/modules/runtime/execution/endge-query'
 import { EndgeSimulation } from '@/features/core/modules/runtime/execution/endge-simulation'
 import { RuntimeBoundaryUpdatePhase } from '@/features/core/modules/runtime/helpers/raph-phases/runtime-boundary-update-phase'
@@ -35,7 +34,6 @@ import { ComponentSFCRuntimeStrategy } from '@/features/core/modules/runtime/ser
 import { CompositionRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/CompositionRuntimeStrategy'
 import { FilterRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/FilterRuntimeStrategy'
 import { PageRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/PageRuntimeStrategy'
-import { ProjectRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/ProjectRuntimeStrategy'
 import { QueryRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/QueryRuntimeStrategy'
 import { SimulationRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/SimulationRuntimeStrategy'
 import { StoreRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/StoreRuntimeStrategy'
@@ -48,7 +46,6 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
   public readonly query = new EndgeQuery()
   public readonly dataView = new EndgeDataView()
   public readonly composition = new EndgeComposition()
-  public readonly project = new EndgeProject()
   public readonly simulation = new EndgeSimulation()
   public readonly operations = new EndgeOperations_Module()
   public readonly scopes = new EndgeRuntimeScopes_Module(() => {
@@ -314,7 +311,7 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     }
     let current = host ?? null
     while (current) {
-      if (current.entityType === 'composition' || current.entityType === 'project') {
+      if (current.entityType === 'composition') {
         const mode = (current.getArtifactPayload() as CompositionProgramPayload | null)?.dataMode
         if (mode === 'mock' || mode === 'live') {
           return mode
@@ -323,6 +320,15 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
       current = current.parent
     }
     return Endge.context.dataMode
+  }
+
+  /** Монтирует единственную startup Composition текущего Workspace без legacy fallback. */
+  public mountStartup(options: Parameters<EndgeComposition['mount']>[1] = {}) {
+    const identity = Endge.workspace.current.startupCompositionIdentity
+    if (!identity) {
+      throw new Error('[EndgeRuntime] Current Workspace has no startup Composition.')
+    }
+    return this.composition.mount(identity, options)
   }
 
   /**
@@ -1020,7 +1026,6 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     this.registerStrategy(new QueryRuntimeStrategy())
     this.registerStrategy(new ComponentSFCRuntimeStrategy())
     this.registerStrategy(new ActionRuntimeStrategy())
-    this.registerStrategy(new ProjectRuntimeStrategy())
     this.registerStrategy(new PageRuntimeStrategy())
   }
 

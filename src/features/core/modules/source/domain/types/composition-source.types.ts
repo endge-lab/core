@@ -145,6 +145,16 @@ export interface CompositionRuntimeDescriptor {
   }
   kind: CompositionRuntimeKind
   identity: string
+  /** Compiler-resolved selector metadata. Runtime executes only kind/identity above. */
+  contextSwitch?: {
+    selected: 'default' | number
+    default: { kind: CompositionRuntimeKind, identity: string }
+    cases: Array<{
+      when: Readonly<Record<string, string>>
+      kind: CompositionRuntimeKind
+      identity: string
+    }>
+  }
   /** Явный override в месте вызова runtime. */
   activationOverride: CompositionActivationDescriptor | null
   /** Compiler-linked activation, которую runtime применяет без интерпретации source. */
@@ -389,7 +399,7 @@ export interface CompositionRuntimeOutputHandle {
 }
 
 /** Публичный контракт Composition host без зависимости Domain от concrete Model runtime. */
-export interface CompositionRuntimeHostHandle<TType extends 'composition' | 'project' = 'composition' | 'project'> extends RuntimeHost<TType, any, CompositionProgramPayload> {
+export interface CompositionRuntimeHostHandle extends RuntimeHost<'composition', any, CompositionProgramPayload> {
   mountGraph: () => Promise<void>
   getChild: (name: string) => RuntimeHost<any, any> | null
   getChildren: () => CompositionRuntimeChildHandle[]

@@ -38,9 +38,7 @@ export function readBridgeStreamEvent(value: unknown): BridgeStreamEvent {
 export function readBridgeContextEvent(event: BridgeStreamEvent['event']): ContextEvent | null {
   const fields = {
     'context:workspace-changed': 'workspace',
-    'context:tenant-changed': 'tenant',
-    'context:project-changed': 'project',
-    'context:environment-changed': 'environment',
+    'context:facets-changed': 'facets',
     'context:user-changed': 'user',
     'context:locale-changed': 'locale',
     'context:theme-changed': 'theme',
@@ -57,12 +55,20 @@ export function readBridgeContextEvent(event: BridgeStreamEvent['event']): Conte
   for (const value of [payload.previous, payload.value]) {
     const valid = event.name === 'context:data-mode-changed'
       ? value === 'live' || value === 'mock'
-      : typeof value === 'string' || (event.name === 'context:workspace-changed' && value === null)
+      : event.name === 'context:facets-changed'
+        ? isFacetSelections(value)
+        : typeof value === 'string' || (event.name === 'context:workspace-changed' && value === null)
     if (!valid) {
       throw new Error(`[Endge Bridge] Invalid payload for ${event.name}`)
     }
   }
   return { name: event.name, payload } as unknown as ContextEvent
+}
+
+function isFacetSelections(value: unknown): boolean {
+  const source = record(value)
+  return source != null && Object.entries(source).every(([facet, document]) =>
+    facet.trim().length > 0 && typeof document === 'string' && document.trim().length > 0)
 }
 
 /** Проверяет wire envelope; имя команды и payload дополнительно проверяет локальный реестр обработчиков. */

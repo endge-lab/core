@@ -4,6 +4,12 @@ import type { TypeSourceDefinition } from '@/features/core/modules/source/domain
 /** Канонический тип source-документа, для которого выбирается source strategy. */
 export type SourceKind = 'action' | 'query' | 'vocab' | 'data-view' | 'filter' | 'composition' | 'store' | 'stream' | 'simulation' | 'update' | 'computation' | 'style' | 'type' | 'configuration'
 
+/** Compiler-owned structural context for context-sensitive Source resolution. */
+export interface SourceEngineCompileContext {
+  sourceVersion?: number
+  executionContext?: Readonly<Record<string, string>>
+}
+
 /** Тип нейтральной source completion без привязки к Monaco или другому editor API. */
 export type SourceLanguageCompletionKind
   = | 'keyword'
@@ -49,11 +55,11 @@ export interface SourceLanguageContext {
   /** Identity документа, владеющего текущей диагностикой Source. */
   ownerIdentity?: string
 
-  /** Фактические каталоги переводов для всех текущих вхождений Project. */
+  /** Фактические каталоги переводов для всех текущих вхождений стартовой Composition. */
   i18n?: SourceLanguageI18nContext
 }
 
-/** Одно статически спроецированное вхождение Composition в текущем Project. */
+/** Одно статически спроецированное вхождение Composition в текущем дереве. */
 export interface SourceLanguageI18nOccurrence {
   id: string
   catalogsByScope: Readonly<Record<string, I18nRuntimeCatalog>>
@@ -106,7 +112,6 @@ export type SourceDocumentReferenceTarget
     | 'data-view'
     | 'filter'
     | 'i18n-bundles'
-    | 'project'
     | 'mock'
     | 'query'
     | 'store'
@@ -259,7 +264,7 @@ export interface SourceEngineStrategy {
   generate?: (model: unknown) => SourceEngineGenerateResult
 
   /** Компилирует source в normalized document и artifact payload. */
-  compile?: (source: string) => SourceEngineCompileResult
+  compile?: (source: string, context?: SourceEngineCompileContext) => SourceEngineCompileResult
 }
 
 /** Нейтральный token pattern source-языка, не завязанный на Monaco API. */

@@ -7,7 +7,6 @@ export type EndgeWorkspaceExport = EndgeWorkspaceDefinition
 export interface EndgeDomainPlain {
   facets: unknown[]
   facetDocuments: unknown[]
-  projects: unknown[]
   types: unknown[]
   queries: unknown[]
   dataViews: unknown[]
@@ -25,8 +24,6 @@ export interface EndgeDomainPlain {
   integrations: unknown[]
   folders: unknown[]
   filters: unknown[]
-  environments: unknown[]
-  tenants: unknown[]
   policies: unknown[]
   styles: unknown[]
   configurations: unknown[]
@@ -42,9 +39,6 @@ export interface EndgeDomainPlain {
 export interface EndgePortableDocuments {
   'facets': unknown[]
   'facet-documents': unknown[]
-  'projects': unknown[]
-  'tenants': unknown[]
-  'environments': unknown[]
   'folders': unknown[]
   'types': unknown[]
   'queries': unknown[]

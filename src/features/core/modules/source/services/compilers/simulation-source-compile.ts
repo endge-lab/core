@@ -32,11 +32,11 @@ export function compileSimulationSource(source: string, sourceVersion = 1): Simu
     result.metadata = metadataNode ? compileProgramMetadataExpression(metadataNode, diagnostics) : {}
     const targetCall = definition.get('target')
     let target: SimulationTargetReference = { entityType: 'composition', identity: '' }
-    if ((!isCall(targetCall, 'composition') && !isCall(targetCall, 'project')) || !t.isStringLiteral(targetCall.arguments[0]) || !targetCall.arguments[0].value.trim()) {
-      diagnostics.push(diagnostic('error', 'simulation-target-required', 'Выберите target: composition(\'identity\') или project(\'identity\').', 'target', targetCall ?? expression))
+    if (!isCall(targetCall, 'composition') || !t.isStringLiteral(targetCall.arguments[0]) || !targetCall.arguments[0].value.trim()) {
+      diagnostics.push(diagnostic('error', 'simulation-target-required', 'Выберите target: composition(\'identity\').', 'target', targetCall ?? expression))
     }
     else {
-      target = { entityType: isCall(targetCall, 'project') ? 'project' : 'composition', identity: targetCall.arguments[0].value.trim() }
+      target = { entityType: 'composition', identity: targetCall.arguments[0].value.trim() }
     }
     const modeNode = definition.get('dataMode')
     let dataMode: 'live' | 'mock' | undefined

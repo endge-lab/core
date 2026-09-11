@@ -2,11 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { Endge } from '@/features/core/kernel/endge'
 import { RAuthProfile } from '@/features/core/modules/domain/entities/RAuthProfile'
-import { REnvironment } from '@/features/core/modules/domain/entities/REnvironment'
-import { RProject } from '@/features/core/modules/domain/entities/RProject'
 import { RQuery } from '@/features/core/modules/domain/entities/RQuery'
-import { RTenant } from '@/features/core/modules/domain/entities/RTenant'
-import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
+import { prepareTestCompilerContext } from '@/test/helpers/compiler-context'
 
 describe('зависимости авторизации Query в EndgeCompiler', () => {
   beforeEach(() => prepareCompilerContext())
@@ -54,19 +51,5 @@ describe('зависимости авторизации Query в EndgeCompiler',
 })
 
 function prepareCompilerContext(): void {
-  Endge.workspace.apply(TEST_ENDGE_WORKSPACE)
-  Endge.domain.addProject(RProject.fromPlain({ id: 101, identity: 'project', name: 'Project' }))
-  Endge.domain.addEnvironment(REnvironment.fromPlain({ id: 102, identity: 'environment', name: 'Environment' }))
-  const tenant = new RTenant()
-  tenant.id = 103
-  tenant.identity = 'tenant'
-  tenant.name = 'Tenant'
-  tenant.code = 'tenant'
-  Endge.domain.addTenant(tenant)
-  Endge.configuration.build({
-    dataProvider: 'plain',
-    scope: {},
-    vars: {},
-    context: { projectIdentity: 'project', environmentIdentity: 'environment', tenantIdentity: 'tenant' },
-  })
+  prepareTestCompilerContext()
 }

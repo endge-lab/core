@@ -14,14 +14,18 @@ export function buildContextStateStorageKey(
   return [
     'endge',
     'context-state',
-    'v1',
+    'v2',
     `workspace:${encodePart(scope.workspaceId)}`,
-    `tenant:${encodePart(scope.tenantId)}`,
-    `project:${encodePart(scope.projectId)}`,
-    `environment:${encodePart(scope.environmentId)}`,
+    `facets:${encodePart(serializeFacetSelections(scope.facetSelections))}`,
     `user:${encodePart(scope.userId)}`,
     `key:${encodePart(key)}`,
   ].join(':')
+}
+
+function serializeFacetSelections(
+  selections: EndgePersistenceScope['facetSelections'],
+): string {
+  return JSON.stringify(selections.map(selection => [selection.facetIdentity, selection.documentIdentity]))
 }
 
 export function normalizeContextStateKey(value: unknown): string {

@@ -4,11 +4,8 @@ import { Endge } from '@/features/core/kernel/endge'
 import { validateTypeCompatibility } from '@/features/core/modules/compiler/services/type/type-program-validation'
 import { RAction } from '@/features/core/modules/domain/entities/RAction'
 import { RComponentSFC } from '@/features/core/modules/domain/entities/RComponentSFC'
-import { REnvironment } from '@/features/core/modules/domain/entities/REnvironment'
-import { RProject } from '@/features/core/modules/domain/entities/RProject'
-import { RTenant } from '@/features/core/modules/domain/entities/RTenant'
 import { RType } from '@/features/core/modules/domain/entities/RType'
-import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
+import { prepareTestCompilerContext } from '@/test/helpers/compiler-context'
 
 describe('проверка Program Type в EndgeCompiler', () => {
   beforeEach(() => {
@@ -132,19 +129,5 @@ function makeType(identity: string, source: string, primitive = false): RType {
 }
 
 function prepareCompilerContext(): void {
-  Endge.workspace.apply(TEST_ENDGE_WORKSPACE)
-  Endge.domain.addProject(RProject.fromPlain({ id: 101, identity: 'project', name: 'Project' }))
-  Endge.domain.addEnvironment(REnvironment.fromPlain({ id: 102, identity: 'environment', name: 'Environment' }))
-  const tenant = new RTenant()
-  tenant.id = 103
-  tenant.identity = 'tenant'
-  tenant.name = 'Tenant'
-  tenant.code = 'tenant'
-  Endge.domain.addTenant(tenant)
-  Endge.configuration.build({
-    dataProvider: 'plain',
-    scope: {},
-    vars: {},
-    context: { projectIdentity: 'project', environmentIdentity: 'environment', tenantIdentity: 'tenant' },
-  })
+  prepareTestCompilerContext()
 }

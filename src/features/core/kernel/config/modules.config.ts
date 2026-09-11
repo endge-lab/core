@@ -33,7 +33,7 @@ import { EndgeWorkspace_Module } from '@/features/core/modules/workspace/EndgeWo
 /** Декларативный граф загрузки модулей Endge Core. */
 export const ENDGE_CORE_MODULES = [
   /**
-   * Хранит текущий контекст workspace, проекта, окружения и пользователя.
+   * Хранит текущий контекст workspace, динамических фасетов и пользователя.
    * Координирует сохранение и восстановление состояния приложения.
    */
   { key: 'context', create: () => new EndgeContext_Module(), after: 'events' },
@@ -67,7 +67,7 @@ export const ENDGE_CORE_MODULES = [
 
   /**
    * Хранит профиль рабочего пространства, полученный от backend или из сборки,
-   * и предоставляет переменные с учётом переопределений окружения.
+   * и предоставляет переменные с учётом runtime/environment overrides.
    */
   { key: 'workspace', create: () => new EndgeWorkspace_Module(), after: ['context', 'domainRepository'] },
 

@@ -46,17 +46,17 @@ describe('локаль и тема EndgeContext', () => {
   it('сохраняет поддерживаемые записанные локали', () => {
     const context = new EndgeContext_Module()
 
-    context.deserialize({ project: null, environment: 'dev', locale: 'en' })
+    context.deserialize({ locale: 'en' })
     expect(context.currentLocale).toBe('en')
 
-    context.deserialize({ project: null, environment: 'dev', locale: 'ru' })
+    context.deserialize({ locale: 'ru' })
     expect(context.currentLocale).toBe('ru')
   })
 
   it('приводит неподдерживаемые записанные локали к ru', () => {
     const context = new EndgeContext_Module()
 
-    context.deserialize({ project: null, environment: 'dev', locale: 'kk' })
+    context.deserialize({ locale: 'kk' })
     context.reconcileCurrentLocaleWithWorkspace()
 
     expect(context.currentLocale).toBe('ru')
@@ -77,7 +77,7 @@ describe('локаль и тема EndgeContext', () => {
 
   it('нормализует неподдерживаемые обновления локали к ru', () => {
     const context = new EndgeContext_Module()
-    context.deserialize({ project: null, environment: 'dev', locale: 'en' })
+    context.deserialize({ locale: 'en' })
 
     context.setCurrentLocale('kk')
 
@@ -101,7 +101,7 @@ describe('локаль и тема EndgeContext', () => {
   it('согласует сохранённую локаль после загрузки локалей Workspace', () => {
     Endge.workspace.reset()
     const context = new EndgeContext_Module()
-    context.deserialize({ project: null, environment: 'dev', locale: 'kk' })
+    context.deserialize({ locale: 'kk' })
 
     Endge.workspace.apply({
       ...TEST_ENDGE_WORKSPACE,
@@ -122,7 +122,7 @@ describe('локаль и тема EndgeContext', () => {
   it('согласует сохранённую тему после загрузки тем Workspace', () => {
     Endge.workspace.reset()
     const context = new EndgeContext_Module()
-    context.deserialize({ project: null, environment: 'dev', theme: 'contrast' })
+    context.deserialize({ theme: 'contrast' })
 
     Endge.workspace.apply({
       ...TEST_ENDGE_WORKSPACE,
@@ -143,57 +143,45 @@ describe('локаль и тема EndgeContext', () => {
 
 describe('разрешение контекста выполнения EndgeContext', () => {
   const candidates = {
-    tenants: ['tenant-a', 'tenant-b'],
-    projects: [
-      { identity: 'project-a', allowedEnvironmentIds: [2] },
-      { identity: 'project-b', allowedEnvironmentIds: [] },
-    ],
-    environments: [
-      { id: 1, identity: 'development' },
-      { id: 2, identity: 'production' },
+    facets: [
+      { identity: 'region', position: 1, documents: ['west', 'east'] },
+      { identity: 'channel', position: 0, documents: ['web', 'mobile'] },
     ],
   } as const
 
-  it('использует первые доступные сущности для устаревших сохранённых координат', () => {
+  it('использует первые доступные документы для устаревших сохранённых координат', () => {
     const context = new EndgeContext_Module()
-    context.deserialize({ tenant: 'removed', project: 'removed', environment: 'removed' })
+    context.deserialize({ facets: { region: 'removed', obsolete: 'old' } })
 
     expect(context.resolveExecutionContext(candidates)).toEqual({
-      tenantIdentity: 'tenant-a',
-      projectIdentity: 'project-a',
-      environmentIdentity: 'production',
+      facets: { channel: 'mobile', region: 'east' },
     })
   })
 
-  it('сохраняет валидные записанные координаты', () => {
+  it('сохраняет валидные записанные координаты в порядке фасетов', () => {
     const context = new EndgeContext_Module()
-    context.deserialize({ tenant: 'tenant-b', project: 'project-b', environment: 'development' })
+    context.deserialize({ facets: { region: 'west', channel: 'web' } })
 
     expect(context.resolveExecutionContext(candidates)).toEqual({
-      tenantIdentity: 'tenant-b',
-      projectIdentity: 'project-b',
-      environmentIdentity: 'development',
+      facets: { channel: 'web', region: 'west' },
     })
   })
 
-  it('отклоняет явно запрошенную недоступную координату', () => {
+  it('отклоняет явно запрошенный недоступный документ фасета', () => {
     const context = new EndgeContext_Module()
 
     expect(() => context.resolveExecutionContext({
       ...candidates,
-      explicit: { projectIdentity: 'missing-project' },
-    })).toThrow('[EndgeContext] Project "missing-project" was not found in loaded Domain')
+      explicit: { facets: { region: 'missing' } },
+    })).toThrow('[EndgeContext] Facet "region" "missing" was not found in loaded Domain')
   })
 
-  it('отклоняет явно запрошенный Environment вне выбранного Project', () => {
+  it('отклоняет явно запрошенный неизвестный фасет', () => {
     const context = new EndgeContext_Module()
 
     expect(() => context.resolveExecutionContext({
       ...candidates,
-      explicit: {
-        projectIdentity: 'project-a',
-        environmentIdentity: 'development',
-      },
-    })).toThrow('[EndgeContext] Environment for Project "project-a" "development" was not found in loaded Domain')
+      explicit: { facets: { missing: 'value' } },
+    })).toThrow('[EndgeContext] explicit Facet "missing" was not found in loaded Domain')
   })
 })

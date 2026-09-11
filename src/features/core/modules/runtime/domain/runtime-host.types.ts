@@ -117,10 +117,6 @@ export interface PageRuntimeHostContext extends RuntimeHostContextBase {
   lastRenderAt: string | null
 }
 
-export interface ProjectRuntimeHostContext extends RuntimeHostContextBase {
-  lastRefreshAt: string | null
-}
-
 export interface RuntimeHostContextMap {
   'simulation': RuntimeHostContextBase
   'action': ActionRuntimeHostContext
@@ -131,7 +127,6 @@ export interface RuntimeHostContextMap {
   'stream': StreamRuntimeHostContext
   'component-sfc': ComponentSFCRuntimeHostContext
   'page': PageRuntimeHostContext
-  'project': ProjectRuntimeHostContext
 }
 
 export type RuntimeHostContext<TType extends RuntimeEntityType>

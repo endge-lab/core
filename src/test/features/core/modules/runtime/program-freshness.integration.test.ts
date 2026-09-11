@@ -50,7 +50,7 @@ describe('актуальность Program перед runtime side effects', () 
       }
       if (change === 'context') {
         Endge.workspace.apply({ ...Endge.workspace.current, identity: 'another-workspace' })
-        Endge.configuration.build({ dataProvider: 'plain', scope: {}, vars: {}, context: { projectIdentity: 'test-project', environmentIdentity: 'test-environment', tenantIdentity: 'test-tenant' } })
+        Endge.configuration.build({ dataProvider: 'plain', scope: {}, vars: {}, context: { facets: { region: 'eu' } } })
       }
       if (change === 'removed') {
         Endge.domain.removeStore(model.id)

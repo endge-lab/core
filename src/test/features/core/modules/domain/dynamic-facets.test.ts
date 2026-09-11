@@ -5,7 +5,7 @@ import { RFacet } from '@/features/core/modules/domain/entities/RFacet'
 import { RFacetDocument } from '@/features/core/modules/domain/entities/RFacetDocument'
 
 describe('динамические фасеты Domain', () => {
-  it('нормализует отсутствующие коллекции legacy snapshot в пустые массивы', () => {
+  it('нормализует отсутствующие коллекции фасетов в пустые массивы', () => {
     const domain = new EndgeDomain_Module()
 
     domain.mergeFromSnapshot({
@@ -14,9 +14,6 @@ describe('динамические фасеты Domain', () => {
       workspace: { identity: 'legacy', state: { id: 'workspace-id', revision: 1, generation: 'generation-id', headSequence: 0 } },
       installedIntegrations: [],
       documents: {
-        'projects': [],
-        'tenants': [],
-        'environments': [],
         'folders': [],
         'types': [],
         'queries': [],
@@ -77,9 +74,6 @@ describe('динамические фасеты Domain', () => {
           { facetIdentity: 'region', identity: 'default', displayName: 'Region default' },
           { facetIdentity: 'brand', identity: 'default', displayName: 'Brand default' },
         ],
-        'projects': [],
-        'tenants': [],
-        'environments': [],
         'folders': [],
         'types': [],
         'queries': [],
@@ -115,8 +109,6 @@ describe('динамические фасеты Domain', () => {
     domain.addFacet(RFacet.fromPlain({ id: 'region', identity: 'region', displayName: 'Region', position: 0 }))
 
     expect(domain.getFacets().map(facet => facet.identity)).toEqual(['region', 'brand'])
-    expect(domain.toPlain().projects).toEqual(before.projects)
-    expect(domain.toPlain().tenants).toEqual(before.tenants)
-    expect(domain.toPlain().environments).toEqual(before.environments)
+    expect(domain.toPlain().compositions).toEqual(before.compositions)
   })
 })

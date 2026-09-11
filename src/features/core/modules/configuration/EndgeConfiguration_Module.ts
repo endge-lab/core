@@ -21,39 +21,36 @@ export class EndgeConfiguration_Module extends EndgeModule<EndgeBootContext> {
   private _current: EndgeConfiguration | null = null
   private _buildContext: EndgeBuildContext | null = null
 
-  /** Разрешает Workspace - Tenant - Project - Environment до compiler build. */
+  /** Разрешает Workspace и выбранные документы активных фасетов до compiler build. */
   public override build(ctx: EndgeBootContext): void {
     if (ctx.mode === 'debugger') {
       return
     }
     const execution = Endge.context.resolveExecutionContext({
       explicit: ctx.context,
-      tenants: Endge.domain.getTenants().map(item => item.identity),
-      projects: Endge.domain.getProjects().map(item => ({
-        identity: item.identity,
-        allowedEnvironmentIds: item.allowedEnvironmentIds,
-      })),
-      environments: Endge.domain.getEnvironments().map(item => ({
-        id: item.id,
-        identity: item.identity,
+      facets: this._activeFacets().map(facet => ({
+        identity: facet.identity,
+        position: facet.position,
+        documents: Endge.domain.getFacetDocuments(facet.identity)
+          .filter(document => document.active !== false && !document.deletedAt)
+          .map(document => document.identity),
       })),
     })
-    const project = this._resolveEntity('Project', execution.projectIdentity, identity => Endge.domain.getProject(identity))
-    const environment = this._resolveEntity('Environment', execution.environmentIdentity, identity => Endge.domain.getEnvironment(identity))
-    const tenant = Endge.domain.getTenant(execution.tenantIdentity)
-
-    if (project && environment && project.allowedEnvironmentIds.length > 0 && !project.allowedEnvironmentIds.includes(Number(environment.id))) {
-      throw new Error(`[EndgeConfiguration] Environment "${environment.identity}" is not allowed for Project "${project.identity}"`)
-    }
 
     let configuration = normalizeEndgeConfiguration(Endge.workspace.current.configuration)
     configuration.values = Endge.configurationSchema.resolveValues(configuration.values)
-    configuration = applyEndgeConfigurationContribution(configuration, tenant?.configuration ?? EMPTY_CONTRIBUTION)
-    configuration.values = Endge.configurationSchema.resolveValues(configuration.values)
-    configuration = applyEndgeConfigurationContribution(configuration, project?.configuration ?? EMPTY_CONTRIBUTION)
-    configuration.values = Endge.configurationSchema.resolveValues(configuration.values)
-    configuration = applyEndgeConfigurationContribution(configuration, environment?.configuration ?? EMPTY_CONTRIBUTION)
-    configuration.values = Endge.configurationSchema.resolveValues(configuration.values)
+    for (const facet of this._activeFacets()) {
+      const documentIdentity = execution.facets[facet.identity]
+      if (!documentIdentity) {
+        continue
+      }
+      const document = Endge.domain.getFacetDocument(facet.identity, documentIdentity)
+      if (!document || document.active === false || document.deletedAt) {
+        throw new Error(`[EndgeConfiguration] Facet document "${facet.identity}:${documentIdentity}" was not found in loaded Domain`)
+      }
+      configuration = applyEndgeConfigurationContribution(configuration, document.configuration ?? EMPTY_CONTRIBUTION)
+      configuration.values = Endge.configurationSchema.resolveValues(configuration.values)
+    }
 
     const workspaceIdentity = Endge.workspace.current.identity
     this._current = configuration
@@ -140,25 +137,29 @@ export class EndgeConfiguration_Module extends EndgeModule<EndgeBootContext> {
   public resolveUpstream(layer: EndgeConfigurationLayer): EndgeConfiguration {
     let configuration = normalizeEndgeConfiguration(Endge.workspace.current.configuration)
     configuration.values = Endge.configurationSchema.resolveValues(configuration.values)
-    if (layer === 'workspace' || layer === 'tenant') {
+    if (layer === 'workspace') {
       return configuration
     }
 
     const execution = Endge.context.getExecutionContext()
-    configuration = applyEndgeConfigurationContribution(
-      configuration,
-      Endge.domain.getTenant(execution.tenantIdentity)?.configuration ?? EMPTY_CONTRIBUTION,
-    )
-    configuration.values = Endge.configurationSchema.resolveValues(configuration.values)
-    if (layer === 'project') {
-      return configuration
+    const target = String(layer.facetIdentity ?? '').trim()
+    if (!target || !this._activeFacets().some(facet => facet.identity === target)) {
+      throw new Error(`[EndgeConfiguration] Facet "${target}" was not found in loaded Domain`)
     }
-
-    configuration = applyEndgeConfigurationContribution(
-      configuration,
-      Endge.domain.getProject(execution.projectIdentity)?.configuration ?? EMPTY_CONTRIBUTION,
-    )
-    configuration.values = Endge.configurationSchema.resolveValues(configuration.values)
+    for (const facet of this._activeFacets()) {
+      if (facet.identity === target) {
+        return configuration
+      }
+      const documentIdentity = execution.facets[facet.identity]
+      const document = documentIdentity
+        ? Endge.domain.getFacetDocument(facet.identity, documentIdentity)
+        : null
+      configuration = applyEndgeConfigurationContribution(
+        configuration,
+        document?.configuration ?? EMPTY_CONTRIBUTION,
+      )
+      configuration.values = Endge.configurationSchema.resolveValues(configuration.values)
+    }
     return configuration
   }
 
@@ -169,15 +170,9 @@ export class EndgeConfiguration_Module extends EndgeModule<EndgeBootContext> {
     return result
   }
 
-  private _resolveEntity<TEntity>(
-    label: string,
-    identity: string,
-    resolve: (identity: string) => TEntity | null,
-  ): TEntity {
-    const entity = resolve(identity)
-    if (!entity) {
-      throw new Error(`[EndgeConfiguration] ${label} "${identity}" was not found in loaded Domain`)
-    }
-    return entity
+  private _activeFacets() {
+    return Endge.domain.getFacets()
+      .filter(facet => facet.active !== false && !facet.deletedAt)
+      .sort((left, right) => left.position - right.position || left.identity.localeCompare(right.identity))
   }
 }

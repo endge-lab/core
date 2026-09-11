@@ -19,9 +19,8 @@ import { EndgeDomain_Module } from '@/features/core/modules/domain/EndgeDomain_M
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
 const DOCUMENT_KEYS = [
-  'projects',
-  'tenants',
-  'environments',
+  'facets',
+  'facet-documents',
   'folders',
   'types',
   'queries',
@@ -62,11 +61,8 @@ function liveSnapshot(): EndgeLiveDomainSnapshot {
     DOCUMENT_KEYS.map(key => [key, [liveDocument(`${key}-item`)]]),
   ) as EndgeLiveDomainSnapshot['documents']
   documents.folders = [liveDocument('folder-root', { parentIdentity: null })]
-  documents.environments = [liveDocument('environment-dev')]
-  documents.projects = [liveDocument('project-a', {
-    folderIdentity: 'folder-root',
-    allowedEnvironments: ['environment-dev'],
-  })]
+  documents.facets = [liveDocument('region', { icon: 'Globe', color: '#2563eb', position: 0 })]
+  documents['facet-documents'] = [liveDocument('east', { facetIdentity: 'region', configuration: { mode: 'inherit', patch: {} } })]
   documents.components = [liveDocument('component-sfc-a', {
     folderIdentity: 'folder-root',
     source: '<template />',
@@ -83,6 +79,7 @@ function liveSnapshot(): EndgeLiveDomainSnapshot {
     workspace: {
       identity: 'workspace-a',
       displayName: 'Workspace A',
+      startupCompositionIdentity: null,
       dataMode: 'development',
       managedBy: 'user',
       managedById: null,
@@ -118,7 +115,7 @@ function releaseBundle(): EndgeDomainBundle {
   const { state: _workspaceState, ...workspace } = snapshot.workspace
   const documents = Object.fromEntries(DOCUMENT_KEYS.map(key => [
     key,
-    snapshot.documents[key].map(({ state: _documentState, ...document }) => document),
+    snapshot.documents[key]!.map(({ state: _documentState, ...document }) => document),
   ])) as unknown as EndgeDomainBundle['documents']
 
   return {
@@ -183,10 +180,8 @@ describe('провайдер Core для service backend', () => {
       identity: 'component-sfc-a',
       folderId: 'folder-root-server-id',
     })
-    expect(plain.projects[0]).toMatchObject({
-      id: 'project-a-server-id',
-      allowedEnvironmentIds: ['environment-dev-server-id'],
-    })
+    expect(plain.facets[0]).toMatchObject({ id: 'region-server-id', identity: 'region' })
+    expect(plain.facetDocuments[0]).toMatchObject({ identity: 'east', facetIdentity: 'region' })
     expect(plain.components).toEqual([])
     expect(plain.parameters).toEqual([])
     expect(plain.policies).toEqual([])
@@ -195,7 +190,8 @@ describe('провайдер Core для service backend', () => {
     expect(plain.integrations).toEqual([])
 
     const mappedCollections = [
-      'projects',
+      'facets',
+      'facetDocuments',
       'types',
       'queries',
       'dataViews',
@@ -210,8 +206,6 @@ describe('провайдер Core для service backend', () => {
       'converters',
       'computations',
       'folders',
-      'environments',
-      'tenants',
       'styles',
       'vocabs',
       'authProfiles',
@@ -227,15 +221,15 @@ describe('провайдер Core для service backend', () => {
     const snapshot = liveSnapshot()
     const deletedAction = liveDocument('deleted-action')
     const deletedFolder = liveDocument('deleted-folder', { parentIdentity: 'folder-root' })
-    const deletedEnvironment = liveDocument('deleted-environment')
+    const deletedFacetDocument = liveDocument('deleted-region', { facetIdentity: 'region', configuration: { mode: 'inherit', patch: {} } })
     const deletedAt = '2026-08-18T08:00:00Z'
 
     deletedAction.state.deletedAt = deletedAt
     deletedFolder.state.deletedAt = deletedAt
-    deletedEnvironment.state.deletedAt = deletedAt
+    deletedFacetDocument.state.deletedAt = deletedAt
     snapshot.documents.actions.push(deletedAction)
     snapshot.documents.folders.push(deletedFolder)
-    snapshot.documents.environments.push(deletedEnvironment)
+    snapshot.documents['facet-documents']!.push(deletedFacetDocument)
 
     const provider: EndgeDomainProvider = {
       id: 'service-backend',
@@ -260,7 +254,7 @@ describe('провайдер Core для service backend', () => {
     expect(repository.getDocumentServerState('actions', 'deleted-action')).toMatchObject({ deletedAt })
     expect(domain.getActionByIdentity('deleted-action')).toBeNull()
     expect(domain.getFolderByIdentity('deleted-folder')).toBeNull()
-    expect(domain.getEnvironmentByIdentity('deleted-environment')).toBeNull()
+    expect(domain.getFacetDocument('region', 'deleted-region')).toBeNull()
   })
 
   it('использует серверный UUID как ID live-документа без копирования ревизии в данные домена', () => {
@@ -333,28 +327,25 @@ describe('провайдер Core для service backend', () => {
     })
   })
 
-  it('сохраняет порядок проекта при применении обновлённого документа к live-домену', async () => {
+  it('сохраняет порядок Composition при применении обновлённого документа к live-домену', async () => {
     Endge.domain.reset()
     const snapshot = liveSnapshot()
     for (const key of DOCUMENT_KEYS) {
       snapshot.documents[key] = []
     }
     snapshot.documents.folders = [liveDocument('folder-root', { parentIdentity: null })]
-    snapshot.documents.environments = [liveDocument('environment-dev')]
-    snapshot.documents.projects = ['project-a', 'project-b', 'project-c'].map(identity =>
-      liveDocument(identity, {
-        folderIdentity: 'folder-root',
-        allowedEnvironments: ['environment-dev'],
-      }),
+    snapshot.documents.compositions = ['composition-a', 'composition-b', 'composition-c'].map(identity =>
+      liveDocument(identity, { folderIdentity: 'folder-root', source: 'defineComposition({})', sourceVersion: 1 }),
     )
-    const updatedProject = liveDocument('project-b', {
-      displayName: 'Project B updated',
+    const updatedComposition = liveDocument('composition-b', {
+      displayName: 'Composition B updated',
       folderIdentity: 'folder-root',
-      allowedEnvironments: ['environment-dev'],
+      source: 'defineComposition({})',
+      sourceVersion: 1,
     })
-    updatedProject.state.revision = 8
+    updatedComposition.state.revision = 8
     const updateDocument = vi.fn().mockResolvedValue({
-      document: updatedProject,
+      document: updatedComposition,
       etag: '"generation-id:5"',
     })
     const provider: EndgeDomainProvider = {
@@ -375,17 +366,17 @@ describe('провайдер Core для service backend', () => {
     await repository.loadSnapshot(context)
     Endge.domain.mergeFromSnapshot(snapshot)
 
-    await repository.saveDocument('project-b', 'project', {
-      model: Endge.domain.getProject('project-b'),
+    await repository.saveDocument('composition-b', 'composition', {
+      model: Endge.domain.getComposition('composition-b'),
     })
 
-    expect(Endge.domain.getProjects().map(project => project.identity)).toEqual([
-      'project-a',
-      'project-b',
-      'project-c',
+    expect(Endge.domain.getCompositions().map(composition => composition.identity)).toEqual([
+      'composition-a',
+      'composition-b',
+      'composition-c',
     ])
-    expect(Endge.domain.getProject('project-b')?.displayName).toBe('Project B updated')
-    expect(repository.getDocumentServerState('projects', 'project-b')?.revision).toBe(8)
+    expect(Endge.domain.getComposition('composition-b')?.displayName).toBe('Composition B updated')
+    expect(repository.getDocumentServerState('compositions', 'composition-b')?.revision).toBe(8)
   })
 
   it('сохраняет folderIdentity при сериализации одного документа для обновления', async () => {
@@ -516,9 +507,9 @@ describe('провайдер Core для service backend', () => {
     }
   })
 
-  it('нормализует Workspace snapshot без изменения runtime Tenant или пользователя', () => {
+  it('нормализует Workspace snapshot без изменения runtime фасетов или пользователя', () => {
     const snapshot = liveSnapshot()
-    const tenantBefore = Endge.context.getCurrentTenant()
+    const facetsBefore = Endge.context.getFacetSelections()
     const userBefore = Endge.context.getCurrentUser()
     vi.spyOn(Endge.domainRepository, 'getLoadedSnapshot').mockReturnValue(snapshot)
 
@@ -534,7 +525,7 @@ describe('провайдер Core для service backend', () => {
       integrationIdentity: 'integration-a',
       version: '1.2.3',
     }])
-    expect(Endge.context.getCurrentTenant()).toBe(tenantBefore)
+    expect(Endge.context.getFacetSelections()).toEqual(facetsBefore)
     expect(Endge.context.getCurrentUser()).toBe(userBefore)
   })
 
@@ -567,10 +558,7 @@ describe('провайдер Core для service backend', () => {
       identity: 'component-sfc-a',
       folderId: 'folder-root',
     })
-    expect(plain.projects[0]).toMatchObject({
-      id: 'project-a',
-      allowedEnvironmentIds: ['environment-dev'],
-    })
+    expect(plain.facets[0]).toMatchObject({ id: 'region', identity: 'region' })
     expect(Endge.workspace.current.identity).toBe('workspace-a')
     expect(Endge.workspace.current.dataMode).toBe('mock')
   })
@@ -639,11 +627,11 @@ describe('изоляция поколений DomainRepository', () => {
     vi.mocked(provider.restoreDocument).mockReturnValue(response.promise)
     vi.mocked(provider.updateWorkspace).mockReturnValue(response.promise)
     const pending = operation === 'save'
-      ? repository.saveDocument('project-a', 'project')
+      ? repository.saveDocument('compositions-item', 'composition')
       : operation === 'delete'
-        ? repository.deleteDocument('project-a', 'project')
+        ? repository.deleteDocument('compositions-item', 'composition')
         : operation === 'restore'
-          ? repository.restoreDocument('project-a', 'project')
+          ? repository.restoreDocument('compositions-item', 'composition')
           : operation === 'workspace'
             ? repository.saveDocument('workspace-a', 'workspace', { model: TEST_ENDGE_WORKSPACE })
             : repository.saveFolder('folder-root')
@@ -656,7 +644,7 @@ describe('изоляция поколений DomainRepository', () => {
     await repository.loadSnapshot(defaultContext(next))
     const before = Endge.domain.toPlain()
     expect(signal?.aborted).toBe(true)
-    response.resolve({ document: liveDocument('project-a', { displayName: 'stale' }), workspace: liveSnapshot().workspace, etag: 'stale' })
+    response.resolve({ document: liveDocument('compositions-item', { displayName: 'stale' }), workspace: liveSnapshot().workspace, etag: 'stale' })
     await rejected
     expect(Endge.domain.toPlain()).toEqual(before)
     expect(repository.domainETag).toBe('current')

@@ -407,14 +407,14 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
   /** Проецирует resource attributes в ограниченный набор Sentry tags. */
   private _resourceTags(resource: DiagnosticsAttributes): Record<string, string> {
     const tags: Record<string, string> = {}
-    for (const key of [
+    const keys = [
       'service.name',
       'service.version',
       'deployment.environment.name',
       'endge.workspace.id',
-      'endge.tenant.id',
-      'endge.project.id',
-    ]) {
+      ...Object.keys(resource).filter(key => key.startsWith('endge.facet.')).sort(),
+    ]
+    for (const key of keys) {
       const value = this._attributeText(resource, key)
       if (value) {
         tags[key] = value

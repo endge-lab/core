@@ -15,8 +15,6 @@ export interface CompositionI18nCatalogProjectionOccurrence {
 export interface CompositionI18nCatalogProjectionInput {
   artifacts: RuntimeArtifactReader
   rootIdentities: readonly string[]
-  rootEntityType?: 'composition' | 'project'
-  targetEntityType?: 'composition' | 'project'
   targetIdentity: string
 }
 
@@ -24,7 +22,7 @@ export interface CompositionI18nCatalogProjectionInput {
  * Проецирует фактические каталоги i18n только из скомпилированных артефактов Composition.
  * RuntimeHost, lifecycle-хуки и пользовательский runtime source не выполняются.
  */
-export function projectCompositionI18nCatalogs(
+export function compositionI18nCatalogs(
   input: CompositionI18nCatalogProjectionInput,
 ): CompositionI18nCatalogProjectionOccurrence[] {
   const targetIdentity = String(input.targetIdentity ?? '').trim()
@@ -37,8 +35,6 @@ export function projectCompositionI18nCatalogs(
     visitComposition({
       artifacts: input.artifacts,
       identity: rootIdentity,
-      entityType: input.rootEntityType ?? 'composition',
-      targetEntityType: input.targetEntityType ?? 'composition',
       targetIdentity,
       rootIdentity,
       invocationPath: [],
@@ -52,8 +48,6 @@ export function projectCompositionI18nCatalogs(
 }
 
 interface VisitCompositionInput {
-  entityType: 'composition' | 'project'
-  targetEntityType: 'composition' | 'project'
   artifacts: RuntimeArtifactReader
   identity: string
   targetIdentity: string
@@ -67,19 +61,19 @@ interface VisitCompositionInput {
 
 function visitComposition(input: VisitCompositionInput): void {
   const identity = String(input.identity ?? '').trim()
-  const key = `${input.entityType}:${identity}`
+  const key = `composition:${identity}`
   if (!identity || input.ancestors.has(key)) {
     return
   }
 
-  const artifact = input.artifacts.getArtifact<CompositionProgramPayload>(input.entityType, identity)
+  const artifact = input.artifacts.getArtifact<CompositionProgramPayload>('composition', identity)
   if (!artifact || artifact.status === 'error') {
     return
   }
 
   const catalogs = buildCompositionI18nCatalogs(artifact.payload, input.inherited)
   const provenance = buildCompositionI18nProvenance(artifact.payload, input.inheritedProvenance)
-  if (identity === input.targetIdentity && input.entityType === input.targetEntityType) {
+  if (identity === input.targetIdentity) {
     input.occurrences.push({
       id: [input.rootIdentity, ...input.invocationPath].join(' > '),
       rootIdentity: input.rootIdentity,
@@ -98,7 +92,6 @@ function visitComposition(input: VisitCompositionInput): void {
     visitComposition({
       ...input,
       identity: runtime.identity,
-      entityType: 'composition',
       invocationPath: [...input.invocationPath, runtime.path],
       inherited: catalogs.get(runtime.scopePath) ?? input.inherited,
       inheritedProvenance: provenance.get(runtime.scopePath) ?? input.inheritedProvenance,

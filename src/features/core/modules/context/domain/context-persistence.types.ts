@@ -12,9 +12,7 @@ export interface EndgeContextPersistenceConfig {
 
 export interface EndgeContextSnapshot {
   workspace: string | null
-  tenant: string | null
-  project: string | null
-  environment: string | null
+  facets: Readonly<Record<string, string>>
   user: string | null
   locale: string | null
   theme: string | null
@@ -54,17 +52,20 @@ export interface EndgeRuntimeContextSnapshot extends EndgeContextSnapshot {
 
 export interface EndgePersistenceScope {
   workspaceId: string
-  tenantId: string
-  projectId: string
-  environmentId: string
+  facetSelections: readonly EndgePersistenceFacetSelection[]
   userId: string
+}
+
+export interface EndgePersistenceFacetSelection {
+  facetIdentity: string
+  documentIdentity: string
 }
 
 export type EndgePersistenceScopeResolver = () => EndgePersistenceScope
 
 export interface EndgeSessionIdentity {
   userId?: string | null
-  tenantId?: string | null
+  facetSelections?: Readonly<Record<string, string>>
 }
 
 export interface EndgeSessionIdentityProvider {
@@ -84,7 +85,7 @@ export interface EndgeStorageAdapter {
 }
 
 export interface RuntimeStateDocument {
-  version: 1
+  version: 2
   scope: EndgePersistenceScope
   runtimeId: string
   state: Record<string, Record<string, unknown>>

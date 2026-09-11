@@ -10,33 +10,16 @@ import { Endge } from '@/features/core/kernel/endge'
 import { timeStringToDate } from '@/features/core/modules/converters/tools/date/time-string-to-date'
 import { weekdaysRange } from '@/features/core/modules/converters/tools/date/weekdays-range'
 import { RConverter } from '@/features/core/modules/domain/entities/RConverter'
-import { REnvironment } from '@/features/core/modules/domain/entities/REnvironment'
 import { RFilter } from '@/features/core/modules/domain/entities/RFilter'
-import { RProject } from '@/features/core/modules/domain/entities/RProject'
 import { RQuery } from '@/features/core/modules/domain/entities/RQuery'
-import { RTenant } from '@/features/core/modules/domain/entities/RTenant'
-import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
+import { prepareTestCompilerContext } from '@/test/helpers/compiler-context'
 
 describe('интеграция Query с производными данными Raph', () => {
   beforeEach(() => {
     Endge.runtime.reset()
     Endge.program.clear()
     Endge.domain.reset()
-    Endge.workspace.apply(TEST_ENDGE_WORKSPACE)
-    Endge.domain.addProject(RProject.fromPlain({ id: 101, identity: 'project', name: 'Project' }))
-    Endge.domain.addEnvironment(REnvironment.fromPlain({ id: 102, identity: 'environment', name: 'Environment' }))
-    const tenant = new RTenant()
-    tenant.id = 103
-    tenant.identity = 'tenant'
-    tenant.name = 'Tenant'
-    tenant.code = 'tenant'
-    Endge.domain.addTenant(tenant)
-    Endge.configuration.build({
-      dataProvider: 'plain',
-      scope: {},
-      vars: {},
-      context: { projectIdentity: 'project', environmentIdentity: 'environment', tenantIdentity: 'tenant' },
-    })
+    prepareTestCompilerContext()
     Raph.app.reset()
     Raph.app.kernel.clear()
     registerConverter(1, 'time-string-to-date', timeStringToDate)

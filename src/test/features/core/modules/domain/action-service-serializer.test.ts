@@ -14,7 +14,6 @@ describe('action service serializer', () => {
       meta: { configurator: { pinned: true } },
     }, {
       resolveFolderIdentity: () => null,
-      resolveEnvironmentIdentity: () => null,
     })
 
     expect(result).toMatchObject({

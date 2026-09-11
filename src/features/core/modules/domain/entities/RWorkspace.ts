@@ -1,9 +1,9 @@
 import type { EndgeConfiguration } from '@/features/core/modules/configuration/domain/types/configuration.type'
 import type {
   EndgeDataMode,
-  EndgeWorkspaceDocumentStructure,
   EndgeWorkspaceDefinition,
   EndgeWorkspaceDefinitionInput,
+  EndgeWorkspaceDocumentStructure,
   WorkspaceIntegrationReference,
 } from '@/features/core/modules/workspace/domain/workspace.types'
 
@@ -23,6 +23,9 @@ export class RWorkspace extends REntity implements EndgeWorkspaceDefinition {
   documentStructure: EndgeWorkspaceDocumentStructure = 'frontend'
 
   @Expose()
+  startupCompositionIdentity: string | null = null
+
+  @Expose()
   configuration!: EndgeConfiguration
 
   @Expose()
@@ -38,6 +41,7 @@ export class RWorkspace extends REntity implements EndgeWorkspaceDefinition {
       displayName: this.displayName,
       dataMode: this.dataMode,
       documentStructure: this.documentStructure,
+      startupCompositionIdentity: this.startupCompositionIdentity,
       managedBy: this.managedBy,
       managedById: this.managedById,
       meta: { ...this.meta },
@@ -67,12 +71,24 @@ function createWorkspace(input: unknown): RWorkspace {
   workspace.displayName = displayName
   workspace.dataMode = normalizeDataMode(source.dataMode)
   workspace.documentStructure = normalizeDocumentStructure(source.documentStructure)
+  workspace.startupCompositionIdentity = normalizeOptionalIdentity(source.startupCompositionIdentity)
   workspace.applyManagement(source)
   workspace.applyEntityMeta(source)
   workspace.installedIntegrations = normalizeInstalledIntegrations(source.installedIntegrations)
   workspace.configuration = normalizeEndgeConfiguration(source.configuration)
 
   return workspace
+}
+
+function normalizeOptionalIdentity(value: unknown): string | null {
+  if (value == null) {
+    return null
+  }
+  const identity = String(value).trim()
+  if (!identity) {
+    throw new Error('[RWorkspace] Field "startupCompositionIdentity" must be a non-empty identity or null')
+  }
+  return identity
 }
 
 function normalizeDataMode(value: unknown): EndgeDataMode {

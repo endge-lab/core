@@ -17,8 +17,8 @@ export class SimulationSourceLanguageStrategy implements SourceLanguageStrategy 
   public readonly syntax = createTypeScriptLikeSourceSyntax({
     alias: 'Endge Simulation Source',
     extension: '.endge-simulation.ts',
-    keywords: ['defineSimulation', 'composition', 'project', 'mockRequest', 'mockStream'],
-    functions: ['defineSimulation', 'composition', 'project', 'mockRequest', 'mockStream'],
+    keywords: ['defineSimulation', 'composition', 'mockRequest', 'mockStream'],
+    functions: ['defineSimulation', 'composition', 'mockRequest', 'mockStream'],
     properties: ['target', 'dataMode', 'overrides', 'runtimes', 'request', 'seed', 'arrays', 'useExamples', 'stream', 'type', 'event', 'intervalMs', 'itemsPerMessage', 'fields'],
   })
 
@@ -40,9 +40,6 @@ export class SimulationSourceLanguageStrategy implements SourceLanguageStrategy 
     const prefix = context.source.slice(0, offset)
     if (/\bcomposition\s*\(\s*['"][^'"]*$/.test(prefix)) {
       return catalog.compositions.map(item => ({ label: item.identity, kind: 'value', insertText: item.identity, detail: item.displayName || 'Composition' }))
-    }
-    if (/\bproject\s*\(\s*['"][^'"]*$/.test(prefix)) {
-      return catalog.projects.map(item => ({ label: item.identity, kind: 'value', insertText: item.identity, detail: item.displayName || 'Project' }))
     }
     if (/\btype\s*:\s*[$\w]*$/.test(prefix)) {
       return catalog.types.map(item => ({ label: item.identity, kind: 'value', insertText: item.identity, detail: item.displayName || 'Type' }))
@@ -84,9 +81,8 @@ export class SimulationSourceLanguageStrategy implements SourceLanguageStrategy 
     }
     return [
       { label: 'defineSimulation', kind: 'snippet', insertText: SIMULATION_DEFAULT_SOURCE, detail: 'Создать Simulation Source' },
-      { label: 'target', kind: 'property', insertText: 'target: composition(\'\'),', detail: 'Целевая Composition или Project' },
+      { label: 'target', kind: 'property', insertText: 'target: composition(\'\'),', detail: 'Целевая Composition' },
       { label: 'dataMode', kind: 'property', insertText: 'dataMode: \'mock\',', detail: 'Режим неподменённых источников этого запуска; принудительный МОК Preview имеет приоритет' },
-      { label: 'project', kind: 'function', insertText: 'project(\'\')', detail: 'Собственный граф проекта' },
       { label: 'composition', kind: 'function', insertText: 'composition(\'\')', detail: 'Граф отдельной Composition' },
       { label: 'overrides', kind: 'property', insertText: 'overrides: { runtimes: {} },', detail: 'Дерево подмен' },
       { label: 'mockStream', kind: 'function', insertText: 'mockStream({ type: \'\', event: \'\', intervalMs: 1000, itemsPerMessage: 1 })', detail: 'SSE генератор существующего Type' },
@@ -98,7 +94,7 @@ export class SimulationSourceLanguageStrategy implements SourceLanguageStrategy 
   }
 
   public resolveReference(context: SourceLanguageContext) {
-    return resolveSourceDocumentReference(context, { functions: { composition: 'composition', project: 'project' } })
+    return resolveSourceDocumentReference(context, { functions: { composition: 'composition' } })
   }
 }
 

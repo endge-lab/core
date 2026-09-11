@@ -15,9 +15,7 @@ export interface ContextValueChange<T> {
 /** Статические события Endge Core о фактически произошедших изменениях. */
 export interface EndgeCoreEventMap {
   'context:workspace-changed': ContextValueChange<string | null>
-  'context:tenant-changed': ContextValueChange<string>
-  'context:project-changed': ContextValueChange<string>
-  'context:environment-changed': ContextValueChange<string>
+  'context:facets-changed': ContextValueChange<Readonly<Record<string, string>>>
   'context:user-changed': ContextValueChange<string>
   'context:locale-changed': ContextValueChange<string>
   'context:theme-changed': ContextValueChange<string>

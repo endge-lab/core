@@ -25,7 +25,7 @@ describe('debugger inspection boundary', () => {
     const addNode = vi.spyOn(Raph.app, 'addNode')
     await bootDebugger()
     expect(Endge.mode).toBe('debugger')
-    expect(Endge.domain.getProjects()).toEqual([])
+    expect(Endge.domain.getCompositions()).toEqual([])
     expect(build).not.toHaveBeenCalled()
     expect(addPhase).not.toHaveBeenCalled()
     expect(addNode).not.toHaveBeenCalled()
@@ -37,46 +37,46 @@ describe('debugger inspection boundary', () => {
 
   it('replaces every collection with one notification and preserves the old Domain on malformed input', async () => {
     await bootDebugger()
-    Endge.domain.replaceFromPlain({ projects: [{ id: 1, identity: 'first', name: 'First' }], environments: [{ id: 2, identity: 'dev', name: 'Dev' }] })
+    Endge.domain.replaceFromPlain({ compositions: [{ id: 1, identity: 'first', name: 'First' }], styles: [{ id: 2, identity: 'base', name: 'Base' }] })
     const changed = vi.fn()
     const off = Endge.domain.subscribe(changed)
-    Endge.domain.replaceFromPlain({ projects: [{ id: 3, identity: 'second', name: 'Second' }] })
+    Endge.domain.replaceFromPlain({ compositions: [{ id: 3, identity: 'second', name: 'Second' }] })
     expect(changed).toHaveBeenCalledTimes(1)
-    expect(Endge.domain.getProject('first')).toBeNull()
-    expect(Endge.domain.getEnvironments()).toEqual([])
-    expect(() => Endge.domain.replaceFromPlain({ projects: {} })).toThrow('Invalid snapshot collection')
-    expect(Endge.domain.getProject('second')?.id).toBe(3)
+    expect(Endge.domain.getComposition('first')).toBeNull()
+    expect(Endge.domain.getStyles()).toEqual([])
+    expect(() => Endge.domain.replaceFromPlain({ compositions: {} })).toThrow('Invalid snapshot collection')
+    expect(Endge.domain.getComposition('second')?.id).toBe(3)
     expect(changed).toHaveBeenCalledTimes(1)
     off()
   })
 
   it('protects root and nested mutations and fails repository writes before invoking a provider', async () => {
     await bootDebugger()
-    Endge.domain.replaceFromPlain({ projects: [{ id: 1, identity: 'first', name: 'First', allowedEnvironmentIds: [2], meta: { label: 'original' } }] })
-    const project = Endge.domain.getProject('first')!
+    Endge.domain.replaceFromPlain({ compositions: [{ id: 1, identity: 'first', name: 'First', meta: { label: 'original', nested: { tags: ['one'] } } }] })
+    const composition = Endge.domain.getComposition('first')!
     expect(() => {
-      project.name = 'Changed'
+      composition.name = 'Changed'
     }).toThrow(EndgeDebuggerReadOnlyError)
-    expect(() => project.allowedEnvironmentIds.push(3)).toThrow(EndgeDebuggerReadOnlyError)
+    expect(() => (composition.meta.nested as { tags: string[] }).tags.push('two')).toThrow(EndgeDebuggerReadOnlyError)
     expect(() => {
-      project.meta.label = 'Changed'
+      composition.meta.label = 'Changed'
     }).toThrow(EndgeDebuggerReadOnlyError)
-    expect(() => Endge.domain.merge({ projects: [] })).toThrow(EndgeDebuggerReadOnlyError)
+    expect(() => Endge.domain.merge({ compositions: [] })).toThrow(EndgeDebuggerReadOnlyError)
     expect(() => Endge.runtime.createAppScope({ id: 'forbidden', rootPath: 'forbidden' })).toThrow(EndgeDebuggerReadOnlyError)
-    await expect(Endge.domainRepository.saveDocument('workspace', 'project', { model: { id: 1 } })).rejects.toThrow(EndgeDebuggerReadOnlyError)
-    expect(project.name).toBe('First')
-    expect(project.allowedEnvironmentIds).toEqual([2])
-    expect(project.meta.label).toBe('original')
+    await expect(Endge.domainRepository.saveDocument('workspace', 'composition', { model: { id: 1 } })).rejects.toThrow(EndgeDebuggerReadOnlyError)
+    expect(composition.name).toBe('First')
+    expect((composition.meta.nested as { tags: string[] }).tags).toEqual(['one'])
+    expect(composition.meta.label).toBe('original')
   })
 
   it('validates snapshot context before replacement and restores the local scope after reset', async () => {
     const original = Endge.context.serialize()
     await bootDebugger()
-    const context = { ...original, workspace: 'remote', tenant: 'remote-tenant', user: 'remote-user' }
+    const context = { ...original, workspace: 'remote', facets: { region: 'east' }, user: 'remote-user' }
     const snapshot = {
       format: 'endge-diagnostics-snapshot',
       version: 2,
-      domain: { projects: [{ id: 1, identity: 'remote-project', name: 'Remote' }] },
+      domain: { compositions: [{ id: 1, identity: 'remote-composition', name: 'Remote' }] },
       federation: { nodes: [
         { kind: 'module', key: 'workspace', status: 'captured', snapshot: { identity: 'remote', displayName: 'Remote', configuration: createDefaultEndgeConfiguration() } },
         { kind: 'module', key: 'context', status: 'captured', snapshot: context },
@@ -95,7 +95,7 @@ describe('debugger inspection boundary', () => {
     stop()
     context.workspace = 'mismatch'
     expect(() => Endge.replaceDebuggerSnapshot(snapshot)).toThrow('do not match')
-    expect(Endge.domain.getProject('remote-project')?.name).toBe('Remote')
+    expect(Endge.domain.getComposition('remote-composition')?.name).toBe('Remote')
     expect(Endge.context.serialize().workspace).toBe('remote')
     await Endge.reset()
     expect(Endge.context.serialize()).toEqual(original)
@@ -119,8 +119,8 @@ describe('debugger inspection boundary', () => {
   })
 
   it('keeps ordinary independently materialized Domain writable', () => {
-    const domain = EndgeDomain_Module.fromPlain({ projects: [{ id: 1, identity: 'first', name: 'First' }] })
-    domain.getProject('first')!.name = 'Changed'
-    expect(domain.getProject('first')!.name).toBe('Changed')
+    const domain = EndgeDomain_Module.fromPlain({ compositions: [{ id: 1, identity: 'first', name: 'First' }] })
+    domain.getComposition('first')!.name = 'Changed'
+    expect(domain.getComposition('first')!.name).toBe('Changed')
   })
 })

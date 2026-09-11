@@ -56,9 +56,7 @@ import { EndgeModule } from '@/features/federation/EndgeModule'
 
 interface ContextEventValues {
   workspace: string | null
-  tenant: string
-  project: string
-  environment: string
+  facets: Readonly<Record<string, string>>
   user: string
   locale: string
   theme: string
@@ -71,7 +69,7 @@ const MAX_CONTEXT_EVENT_PASSES = 100
 const LEGACY_STORAGE_ADAPTER = new LocalStorageContextAdapter()
 
 /**
- * Контекст выполнения Endge: текущий workspace/project/environment/user scope
+ * Контекст выполнения Endge: текущий workspace/dynamic facets/user scope
  * и координатор persistence-инфраструктуры приложения.
  */
 export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
@@ -81,9 +79,7 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
 
   private _contextPersistence: EndgePersistenceOptions = { driver: 'local' }
   private _currentWorkspace: string | null = null
-  private _currentTenant: string = DEFAULT_SCOPE.tenantId
-  private _currentProject: string = DEFAULT_SCOPE.projectId
-  private _currentEnvironment: string = DEFAULT_SCOPE.environmentId
+  private _facetSelections: Record<string, string> = Object.create(null)
   private _currentUser: string = DEFAULT_SCOPE.userId
   private _currentLocale = DEFAULT_LOCALE
   private _pendingLocale: string | null = null
@@ -130,18 +126,6 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
       this._pendingLocale = defaultLocale
     }
     this._hostDefaultTheme = normalizeOptionalText(ctx.ui?.defaultTheme)
-    const input = ctx.context
-    if (input) {
-      if (input.tenantIdentity != null) {
-        this._currentTenant = normalizeScopePart(input.tenantIdentity, DEFAULT_SCOPE.tenantId)
-      }
-      if (input.projectIdentity != null) {
-        this._currentProject = normalizeScopePart(input.projectIdentity, DEFAULT_SCOPE.projectId)
-      }
-      if (input.environmentIdentity != null) {
-        this._currentEnvironment = normalizeScopePart(input.environmentIdentity, DEFAULT_SCOPE.environmentId)
-      }
-    }
     this._executionContextLocked = true
     this._syncPersistentContextToRaph()
     this._publishContextChanges()
@@ -152,9 +136,7 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     if (this._beforeInspection) {
       const { context, dataMode, override } = this._beforeInspection
       this._currentWorkspace = context.workspace
-      this._currentTenant = context.tenant ?? DEFAULT_SCOPE.tenantId
-      this._currentProject = context.project ?? DEFAULT_SCOPE.projectId
-      this._currentEnvironment = context.environment ?? DEFAULT_SCOPE.environmentId
+      this._facetSelections = normalizeFacetSelections(context.facets)
       this._currentUser = context.user ?? DEFAULT_SCOPE.userId
       this._workspaceDataMode = dataMode
       this._dataModeOverride = override
@@ -185,22 +167,23 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     this.saveToStorage()
   }
 
-  /** Устанавливает provider актуальных tenant и user identity. */
+  /** Устанавливает provider актуальных user identity и обязательных session facet selections. */
   public setSessionIdentityProvider(provider: EndgeSessionIdentityProvider | null): void {
     this._sessionProvider = provider
     this.notify()
   }
 
-  /** Показывает, что Tenant принудительно задан authenticated session provider. */
-  public get isTenantLockedBySession(): boolean {
-    return normalizeOptionalText(this._sessionProvider?.getCurrentIdentity()?.tenantId) != null
+  /** Показывает, что выбор документа фасета задан authenticated session provider. */
+  public isFacetLockedBySession(facetIdentity: string): boolean {
+    const identity = normalizeOptionalText(facetIdentity)
+    const selections = this._sessionProvider?.getCurrentIdentity()?.facetSelections
+    return identity != null && selections != null && Object.hasOwn(selections, identity)
   }
 
   /** Сериализует текущий execution scope в snapshot. */
   public override createDiagnosticsSnapshot(): Record<string, unknown> {
     return {
       ...this.serialize(),
-      tenant: this.getCurrentTenant(),
       user: this.getCurrentUser(),
       execution: this.getExecutionContext(),
       dataMode: this.dataMode,
@@ -213,9 +196,7 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
   public override serialize(): EndgeContextSnapshot {
     return {
       workspace: this._currentWorkspace,
-      tenant: this._currentTenant,
-      project: this._currentProject,
-      environment: this._currentEnvironment,
+      facets: freezeFacetSelections(this._facetSelections),
       user: this._currentUser,
       locale: this._currentLocale || null,
       theme: this._currentTheme || null,
@@ -269,12 +250,8 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     switch (event.name) {
       case 'context:workspace-changed':
         return this.setCurrentWorkspace(event.payload.value)
-      case 'context:tenant-changed':
-        return this.setCurrentTenant(event.payload.value)
-      case 'context:project-changed':
-        return this.setCurrentProject(event.payload.value)
-      case 'context:environment-changed':
-        return this.setCurrentEnvironment(event.payload.value)
+      case 'context:facets-changed':
+        return this.setFacetSelections(event.payload.value)
       case 'context:user-changed':
         return this.setCurrentUser(event.payload.value)
       case 'context:locale-changed':
@@ -291,9 +268,7 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
   /** Восстанавливает execution scope из snapshot с безопасными defaults. */
   public override deserialize(payload: Partial<EndgeContextSnapshot> | undefined): void {
     this._currentWorkspace = normalizeOptionalText(payload?.workspace)
-    this._currentTenant = normalizeScopePart(payload?.tenant, DEFAULT_SCOPE.tenantId)
-    this._currentProject = normalizeScopePart(payload?.project, DEFAULT_SCOPE.projectId)
-    this._currentEnvironment = normalizeScopePart(payload?.environment, DEFAULT_SCOPE.environmentId)
+    this._facetSelections = normalizeFacetSelections(payload?.facets)
     this._currentUser = normalizeScopePart(payload?.user, DEFAULT_SCOPE.userId)
     const rawLocale = normalizeOptionalText(payload?.locale)
     this._hasLocalePreference = rawLocale != null
@@ -316,9 +291,7 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
       throw new Error('[EndgeContext] Inspection requires debugger mode')
     }
     this._currentWorkspace = snapshot.workspace
-    this._currentTenant = snapshot.tenant ?? DEFAULT_SCOPE.tenantId
-    this._currentProject = snapshot.project ?? DEFAULT_SCOPE.projectId
-    this._currentEnvironment = snapshot.environment ?? DEFAULT_SCOPE.environmentId
+    this._facetSelections = normalizeFacetSelections(snapshot.facets)
     this._currentUser = snapshot.user ?? DEFAULT_SCOPE.userId
     this._workspaceDataMode = snapshot.dataMode ?? 'live'
     this._dataModeOverride = null
@@ -388,14 +361,13 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
 
   /** Возвращает полный persistence scope текущей сессии. */
   public getPersistenceScope(): EndgePersistenceScope {
-    const session = this._resolveSessionIdentity()
-
     return {
       workspaceId: this._requireCurrentWorkspace(),
-      tenantId: session.tenantId,
-      projectId: this._currentProject,
-      environmentId: this._currentEnvironment,
-      userId: session.userId,
+      facetSelections: Object.entries(this._facetSelections).map(([facetIdentity, documentIdentity]) => ({
+        facetIdentity,
+        documentIdentity,
+      })),
+      userId: this.getCurrentUser(),
     }
   }
 
@@ -419,7 +391,7 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Сохраняет dynamic state в scope текущих workspace/tenant/project/environment/user. */
+  /** Сохраняет dynamic state в scope текущих workspace/facet selections/user. */
   public setState<T>(
     key: string,
     state: T,
@@ -527,40 +499,46 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     this.notify()
   }
 
-  /** Возвращает identity текущего tenant с учётом session provider. */
-  public getCurrentTenant(): string {
-    return this._resolveSessionIdentity().tenantId
+  /** Возвращает immutable map выбранных документов по identity фасета. */
+  public getFacetSelections(): Readonly<Record<string, string>> {
+    return freezeFacetSelections(this._facetSelections)
   }
 
-  /** Устанавливает fallback identity текущего tenant. */
-  public setCurrentTenant(identity: string | null): void {
-    this._assertStructuralContextMutable('_currentTenant', identity, DEFAULT_SCOPE.tenantId)
-    this._setScopeValue('_currentTenant', identity, DEFAULT_SCOPE.tenantId)
+  /** Возвращает выбранный документ фасета либо null, если фасет не имеет выбора. */
+  public getFacetSelection(facetIdentity: string): string | null {
+    const identity = normalizeOptionalText(facetIdentity)
+    return identity ? this._facetSelections[identity] ?? null : null
   }
 
-  /** Возвращает identity текущего project. */
-  public getCurrentProject(): string {
-    return this._currentProject
+  /** Устанавливает один выбор до следующего structural boot. */
+  public setFacetSelection(facetIdentity: string, documentIdentity: string | null): void {
+    const facet = normalizeRequiredScopePart(facetIdentity, 'facetIdentity')
+    const document = normalizeOptionalText(documentIdentity)
+    const next = normalizeFacetSelections(this._facetSelections)
+    if (document) {
+      next[facet] = document
+    }
+    else {
+      delete next[facet]
+    }
+    this.setFacetSelections(next)
   }
 
-  /** Устанавливает текущий project и сохраняет контекст. */
-  public setCurrentProject(identity: string | null): void {
-    this._assertStructuralContextMutable('_currentProject', identity, DEFAULT_SCOPE.projectId)
-    this._setScopeValue('_currentProject', identity, DEFAULT_SCOPE.projectId)
-  }
-
-  /** Возвращает identity текущего environment. */
-  public getCurrentEnvironment(): string {
-    return this._currentEnvironment
+  /** Заменяет structural map до следующего boot. */
+  public setFacetSelections(selections: Readonly<Record<string, string>>): void {
+    const next = normalizeFacetSelections(selections)
+    this._assertStructuralContextMutable(next)
+    if (sameFacetSelections(next, this._facetSelections)) {
+      return
+    }
+    this._facetSelections = next
+    this.saveToStorage()
+    this.notify()
   }
 
   /** Возвращает immutable structural coordinates текущего boot lifecycle. */
   public getExecutionContext(): EndgeExecutionContext {
-    return {
-      tenantIdentity: this.getCurrentTenant(),
-      projectIdentity: this.getCurrentProject(),
-      environmentIdentity: this.getCurrentEnvironment(),
-    }
+    return Object.freeze({ facets: freezeFacetSelections(this._facetSelections) })
   }
 
   /**
@@ -569,45 +547,54 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
    * безопасно перейти на первую доступную сущность, если Domain изменился.
    */
   public resolveExecutionContext(input: EndgeExecutionContextResolutionInput): EndgeExecutionContext {
-    const tenants = normalizeIdentityList(input.tenants)
-    const projects = input.projects.filter(item => normalizeOptionalText(item.identity) != null)
-    const sessionTenant = normalizeOptionalText(this._sessionProvider?.getCurrentIdentity()?.tenantId)
-    const explicitTenant = normalizeOptionalText(input.explicit?.tenantIdentity)
-    const explicitProject = normalizeOptionalText(input.explicit?.projectIdentity)
-    const explicitEnvironment = normalizeOptionalText(input.explicit?.environmentIdentity)
+    const explicit = normalizeRequestedFacetSelections(input.explicit?.facets, 'explicit')
+    const session = normalizeRequestedFacetSelections(
+      this._sessionProvider?.getCurrentIdentity()?.facetSelections,
+      'session',
+    )
+    const facets = input.facets
+      .map(facet => ({
+        identity: normalizeRequiredScopePart(facet.identity, 'facet identity'),
+        position: Number.isFinite(facet.position) ? facet.position : 0,
+        documents: normalizeIdentityList(facet.documents).sort(),
+      }))
+      .sort((left, right) => left.position - right.position || left.identity.localeCompare(right.identity))
+    const activeFacetIdentities = new Set(facets.map(facet => facet.identity))
+    if (activeFacetIdentities.size !== facets.length) {
+      throw new Error('[EndgeContext] Active facet identities must be unique')
+    }
+    for (const [source, selections] of [['explicit', explicit], ['session', session]] as const) {
+      for (const facetIdentity of Object.keys(selections)) {
+        if (!activeFacetIdentities.has(facetIdentity)) {
+          throw new Error(`[EndgeContext] ${source} Facet "${facetIdentity}" was not found in loaded Domain`)
+        }
+      }
+    }
+    const next: Record<string, string> = Object.create(null)
+    for (const facet of facets) {
+      const fromSession = Object.hasOwn(session, facet.identity)
+      const fromExplicit = Object.hasOwn(explicit, facet.identity)
+      const requested = fromSession
+        ? session[facet.identity]
+        : fromExplicit
+          ? explicit[facet.identity]
+          : this._facetSelections[facet.identity]
+      if (facet.documents.length === 0) {
+        if (fromSession || fromExplicit) {
+          throw new Error(`[EndgeContext] Facet "${facet.identity}" has no active documents`)
+        }
+        continue
+      }
+      next[facet.identity] = resolveAvailableIdentity({
+        label: `Facet "${facet.identity}"`,
+        requested,
+        required: fromSession || fromExplicit,
+        available: facet.documents,
+      })
+    }
 
-    const tenantIdentity = resolveAvailableIdentity({
-      label: 'Tenant',
-      requested: sessionTenant ?? explicitTenant ?? this._currentTenant,
-      required: sessionTenant != null || explicitTenant != null,
-      available: tenants,
-      fallbackWhenEmpty: DEFAULT_SCOPE.tenantId,
-    })
-    const projectIdentity = resolveAvailableIdentity({
-      label: 'Project',
-      requested: explicitProject ?? this._currentProject,
-      required: explicitProject != null,
-      available: projects.map(item => item.identity),
-    })
-    const project = projects.find(item => item.identity === projectIdentity)!
-    const allowedEnvironmentIds = new Set(project.allowedEnvironmentIds.map(Number))
-    const environments = input.environments
-      .filter(item => normalizeOptionalText(item.identity) != null)
-      .filter(item => allowedEnvironmentIds.size === 0 || allowedEnvironmentIds.has(Number(item.id)))
-    const environmentIdentity = resolveAvailableIdentity({
-      label: `Environment for Project "${projectIdentity}"`,
-      requested: explicitEnvironment ?? this._currentEnvironment,
-      required: explicitEnvironment != null,
-      available: environments.map(item => item.identity),
-    })
-
-    const changed = tenantIdentity !== this._currentTenant
-      || projectIdentity !== this._currentProject
-      || environmentIdentity !== this._currentEnvironment
-
-    this._currentTenant = tenantIdentity
-    this._currentProject = projectIdentity
-    this._currentEnvironment = environmentIdentity
+    const changed = !sameFacetSelections(next, this._facetSelections)
+    this._facetSelections = next
     this.saveToStorage()
 
     if (changed) {
@@ -615,12 +602,6 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     }
 
     return this.getExecutionContext()
-  }
-
-  /** Устанавливает текущий environment и сохраняет контекст. */
-  public setCurrentEnvironment(identity: string | null): void {
-    this._assertStructuralContextMutable('_currentEnvironment', identity, DEFAULT_SCOPE.environmentId)
-    this._setScopeValue('_currentEnvironment', identity, DEFAULT_SCOPE.environmentId)
   }
 
   /** Возвращает identity текущего user с учётом session provider. */
@@ -900,9 +881,7 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
   private _readEventContext(): ContextEventValues {
     return {
       workspace: this.getCurrentWorkspace(),
-      tenant: this.getCurrentTenant(),
-      project: this.getCurrentProject(),
-      environment: this.getCurrentEnvironment(),
+      facets: this.getFacetSelections(),
       user: this.getCurrentUser(),
       locale: this.currentLocale,
       theme: this.currentTheme,
@@ -939,16 +918,14 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
         previous = this._eventContext
         this._eventContext = next
         this._emitContextChange('context:workspace-changed', previous.workspace, next.workspace)
-        this._emitContextChange('context:tenant-changed', previous.tenant, next.tenant)
-        this._emitContextChange('context:project-changed', previous.project, next.project)
-        this._emitContextChange('context:environment-changed', previous.environment, next.environment)
+        this._emitContextChange('context:facets-changed', previous.facets, next.facets)
         this._emitContextChange('context:user-changed', previous.user, next.user)
         this._emitContextChange('context:locale-changed', previous.locale, next.locale)
         this._emitContextChange('context:theme-changed', previous.theme, next.theme)
         this._emitContextChange('context:timezone-changed', previous.timezone, next.timezone)
         this._emitContextChange('context:data-mode-changed', previous.dataMode, next.dataMode)
         next = this._readEventContext()
-      } while (Object.keys(next).some(key => next[key as keyof ContextEventValues] !== this._eventContext![key as keyof ContextEventValues]))
+      } while (Object.keys(next).some(key => !sameContextValue(next[key as keyof ContextEventValues], this._eventContext![key as keyof ContextEventValues])))
     }
     finally {
       this._publishingContextChanges = false
@@ -960,7 +937,7 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     previous: EndgeCoreEventMap[K]['previous'],
     value: EndgeCoreEventMap[K]['value'],
   ): void {
-    if (previous !== value) {
+    if (!sameContextValue(previous, value)) {
       Endge.events.emitEvent(name, Object.freeze({ previous, value }) as EndgeCoreEventMap[K])
     }
   }
@@ -982,7 +959,11 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     if (sameContextValue(current, next)) {
       return
     }
-    Raph.set(path, Array.isArray(next) ? [...next] : next)
+    Raph.set(path, Array.isArray(next)
+      ? [...next]
+      : isPlainRecord(next)
+        ? { ...next }
+        : next)
   }
 
   /** Возвращает identity активного workspace для persistence scope. */
@@ -995,30 +976,28 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
 
   /** Создаёт безопасный scope для контроллера, который не читает и не изменяет состояние. */
   private _getDisabledPersistenceScope(): EndgePersistenceScope {
-    const session = this._resolveSessionIdentity()
-
     return {
       workspaceId: this._currentWorkspace ?? 'detached',
-      tenantId: session.tenantId,
-      projectId: this._currentProject,
-      environmentId: this._currentEnvironment,
-      userId: session.userId,
+      facetSelections: Object.entries(this._facetSelections).map(([facetIdentity, documentIdentity]) => ({
+        facetIdentity,
+        documentIdentity,
+      })),
+      userId: this.getCurrentUser(),
     }
   }
 
-  /** Вычисляет tenant и user identity текущей сессии. */
-  private _resolveSessionIdentity(): { tenantId: string, userId: string } {
+  /** Вычисляет user identity текущей сессии. */
+  private _resolveSessionIdentity(): { userId: string } {
     const external = this._sessionProvider?.getCurrentIdentity() ?? null
 
     return {
-      tenantId: normalizeScopePart(external?.tenantId ?? this._currentTenant, DEFAULT_SCOPE.tenantId),
       userId: normalizeScopePart(external?.userId ?? this._currentUser, DEFAULT_SCOPE.userId),
     }
   }
 
   /** Обновляет одно поле scope и публикует изменение контекста. */
   private _setScopeValue(
-    field: '_currentTenant' | '_currentProject' | '_currentEnvironment' | '_currentUser',
+    field: '_currentUser',
     identity: string | null,
     fallback: string,
   ): void {
@@ -1033,12 +1012,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
   }
 
   private _assertStructuralContextMutable(
-    field: '_currentTenant' | '_currentProject' | '_currentEnvironment',
-    identity: string | null,
-    fallback: string,
+    next: Readonly<Record<string, string>>,
   ): void {
-    const next = normalizeScopePart(identity, fallback)
-    if (this._bootMode === 'debugger' || !this._executionContextLocked || next === this[field]) {
+    if (this._bootMode === 'debugger' || !this._executionContextLocked || sameFacetSelections(next, this._facetSelections)) {
       return
     }
     throw new Error('[EndgeContext] Structural context is immutable during boot. Call Endge.reset() and boot with a new context.')
@@ -1088,7 +1064,68 @@ function sameContextValue(left: unknown, right: unknown): boolean {
   if (Array.isArray(left) && Array.isArray(right)) {
     return left.length === right.length && left.every((value, index) => Object.is(value, right[index]))
   }
+  if (isPlainRecord(left) && isPlainRecord(right)) {
+    return sameFacetSelections(left, right)
+  }
   return Object.is(left, right)
+}
+
+function normalizeFacetSelections(value: unknown): Record<string, string> {
+  const result: Record<string, string> = Object.create(null)
+  if (!isPlainRecord(value)) {
+    return result
+  }
+  for (const [rawFacet, rawDocument] of Object.entries(value)) {
+    const facet = normalizeOptionalText(rawFacet)
+    const document = normalizeOptionalText(rawDocument)
+    if (facet && document) {
+      result[facet] = document
+    }
+  }
+  return result
+}
+
+function normalizeRequestedFacetSelections(
+  value: unknown,
+  source: 'explicit' | 'session',
+): Record<string, string> {
+  if (value == null) {
+    return Object.create(null)
+  }
+  if (!isPlainRecord(value)) {
+    throw new Error(`[EndgeContext] ${source} facet selections must be an object`)
+  }
+  const result: Record<string, string> = Object.create(null)
+  for (const [rawFacet, rawDocument] of Object.entries(value)) {
+    const facet = normalizeOptionalText(rawFacet)
+    const document = normalizeOptionalText(rawDocument)
+    if (!facet || !document) {
+      throw new Error(`[EndgeContext] ${source} facet selection must contain non-empty identities`)
+    }
+    result[facet] = document
+  }
+  return result
+}
+
+function freezeFacetSelections(value: Readonly<Record<string, string>>): Readonly<Record<string, string>> {
+  return Object.freeze({ ...value })
+}
+
+function sameFacetSelections(
+  left: Readonly<Record<string, unknown>>,
+  right: Readonly<Record<string, unknown>>,
+): boolean {
+  const leftEntries = Object.entries(left)
+  const rightEntries = Object.entries(right)
+  return leftEntries.length === rightEntries.length
+    && leftEntries.every(([key, value], index) => {
+      const rightEntry = rightEntries[index]
+      return rightEntry?.[0] === key && Object.is(rightEntry[1], value)
+    })
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === 'object' && !Array.isArray(value)
 }
 
 function normalizeScopePart(value: unknown, fallback: string): string {

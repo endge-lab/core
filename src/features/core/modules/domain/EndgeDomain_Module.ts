@@ -10,7 +10,6 @@ import type { RConverter } from '@/features/core/modules/domain/entities/RConver
 
 import type { RDataView } from '@/features/core/modules/domain/entities/RDataView'
 
-import type { REnvironment } from '@/features/core/modules/domain/entities/REnvironment'
 import type { RFacet } from '@/features/core/modules/domain/entities/RFacet'
 import type { RFacetDocument } from '@/features/core/modules/domain/entities/RFacetDocument'
 import type { RFilter } from '@/features/core/modules/domain/entities/RFilter'
@@ -21,13 +20,11 @@ import type { RNavigation } from '@/features/core/modules/domain/entities/RNavig
 import type { RPage } from '@/features/core/modules/domain/entities/RPage'
 import type { RPageTemplate } from '@/features/core/modules/domain/entities/RPageTemplate'
 import type { RPolicy } from '@/features/core/modules/domain/entities/RPolicy'
-import type { RProject } from '@/features/core/modules/domain/entities/RProject'
 import type { RQuery } from '@/features/core/modules/domain/entities/RQuery'
 import type { RSimulation } from '@/features/core/modules/domain/entities/RSimulation'
 import type { RStore } from '@/features/core/modules/domain/entities/RStore'
 import type { RStream } from '@/features/core/modules/domain/entities/RStream'
 import type { RStyle } from '@/features/core/modules/domain/entities/RStyle'
-import type { RTenant } from '@/features/core/modules/domain/entities/RTenant'
 import type { RType } from '@/features/core/modules/domain/entities/RType'
 import type { RUpdate } from '@/features/core/modules/domain/entities/RUpdate'
 import type { RVersion } from '@/features/core/modules/domain/entities/RVersion'
@@ -283,7 +280,6 @@ export interface EndgeDomainParsed {
   facets: RFacet[]
   facetDocuments: RFacetDocument[]
   filters: RFilter[]
-  projects: RProject[]
   types: RType[]
   queries: RQuery[]
   dataViews: RDataView[]
@@ -297,8 +293,6 @@ export interface EndgeDomainParsed {
   actions: RAction[]
   converters: RConverter[]
   integrations: RIntegration[]
-  environments: REnvironment[]
-  tenants: RTenant[]
   policies: RPolicy[]
   styles: RStyle[]
   configurations: RConfiguration[]
@@ -373,9 +367,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   private _facetsByIdentity: Map<string, RFacet> = new Map()
   private _facetDocumentsById: Map<string | number, RFacetDocument> = new Map()
   private _facetDocumentsByIdentity: Map<string, RFacetDocument> = new Map()
-  private _projectsById: Map<number, RProject> = new Map()
-  private _projectsByIdentity: Map<string, RProject> = new Map()
-
   private _typesById: Map<string | number, RType> = new Map()
   private _typesByIdentity: Map<string, RType> = new Map()
 
@@ -429,12 +420,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
 
   private _versionsById: Map<string | number, RVersion> = new Map()
   private _versionsByIdentity: Map<string, RVersion> = new Map()
-
-  private _environmentsById: Map<string | number, REnvironment> = new Map()
-  private _environmentsByIdentity: Map<string, REnvironment> = new Map()
-
-  private _tenantsById: Map<string | number, RTenant> = new Map()
-  private _tenantsByIdentity: Map<string, RTenant> = new Map()
 
   private _policiesById: Map<string | number, RPolicy> = new Map()
   private _policiesByIdentity: Map<string, RPolicy> = new Map()
@@ -517,7 +502,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   /** Публикует pure validation results сущностей, не имеющих compiled program artifact. */
   private _publishEntityValidationProblems(): void {
     const groups = [
-      { entityType: 'project', entities: this.getProjects() },
       { entityType: 'mock', entities: this.getMocks() },
       { entityType: 'vocabs', entities: this.getVocabs() },
       { entityType: 'i18n-bundles', entities: this.getI18nBundles() },
@@ -547,8 +531,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
     this._facetsByIdentity.clear()
     this._facetDocumentsById.clear()
     this._facetDocumentsByIdentity.clear()
-    this._projectsById.clear()
-    this._projectsByIdentity.clear()
     this._typesById.clear()
     this._typesByIdentity.clear()
     this._queriesById.clear()
@@ -586,10 +568,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
     this._filtersByIdentity.clear()
     this._versionsById.clear()
     this._versionsByIdentity.clear()
-    this._environmentsById.clear()
-    this._environmentsByIdentity.clear()
-    this._tenantsById.clear()
-    this._tenantsByIdentity.clear()
     this._policiesById.clear()
     this._policiesByIdentity.clear()
     this._stylesById.clear()
@@ -707,7 +685,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
         undefined,
         entity => EndgeDomain_Module._facetDocumentKey(entity.facetIdentity, entity.identity),
       ),
-      domainEntityIndex(this._projectsById, this._projectsByIdentity),
       domainEntityIndex(this._typesById, this._typesByIdentity),
       domainEntityIndex(this._queriesById, this._queriesByIdentity),
       domainEntityIndex(this._dataViewsById, this._dataViewsByIdentity),
@@ -726,8 +703,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
       domainEntityIndex(this._foldersById, this._foldersByIdentity),
       domainEntityIndex(this._filtersById, this._filtersByIdentity),
       domainEntityIndex(this._versionsById, this._versionsByIdentity),
-      domainEntityIndex(this._environmentsById, this._environmentsByIdentity),
-      domainEntityIndex(this._tenantsById, this._tenantsByIdentity),
       domainEntityIndex(this._policiesById, this._policiesByIdentity),
       domainEntityIndex(this._stylesById, this._stylesByIdentity),
       domainEntityIndex(this._configurationsById, this._configurationsByIdentity),
@@ -764,8 +739,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
     }
     const folders = snapshot.documents.folders
     const folderIds = snapshotIdentityToServerID(folders)
-    const environmentIds = snapshotIdentityToServerID(snapshot.documents.environments)
-
     const documents = snapshot.documents
     const plain: EndgeDomainPlain = {
       facets: normalizeSnapshotDocuments(documents.facets ?? [], new Map()).map((facet) => {
@@ -776,12 +749,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
         const source = (documents['facet-documents'] ?? []).find(value => value.state.id === document.id)
         return { ...document, serverState: source?.state }
       }),
-      projects: normalizeSnapshotDocuments(documents.projects, folderIds).map(project => ({
-        ...project,
-        allowedEnvironmentIds: Array.isArray(project.allowedEnvironments)
-          ? project.allowedEnvironments.map(identity => environmentIds.get(String(identity)) ?? identity)
-          : [],
-      })),
       types: normalizeSnapshotDocuments(documents.types, folderIds),
       queries: normalizeSnapshotDocuments(documents.queries, folderIds),
       dataViews: normalizeSnapshotDocuments(documents['data-views'], folderIds),
@@ -799,8 +766,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
       integrations: [],
       folders: normalizeSnapshotFolders(folders, folderIds),
       filters: normalizeSnapshotDocuments(documents.filters, folderIds),
-      environments: normalizeSnapshotDocuments(documents.environments, folderIds),
-      tenants: normalizeSnapshotDocuments(documents.tenants, folderIds),
       policies: [],
       styles: normalizeSnapshotDocuments(documents.styles, folderIds),
       configurations: normalizeSnapshotDocuments(documents.configurations ?? [], folderIds),
@@ -822,9 +787,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
     const normalized = {
       facets: bundleDocuments(documents.facets ?? [], 'facets'),
       facetDocuments: bundleDocuments(documents['facet-documents'] ?? [], 'facet-documents'),
-      projects: bundleDocuments(documents.projects, 'projects'),
-      tenants: bundleDocuments(documents.tenants, 'tenants'),
-      environments: bundleDocuments(documents.environments, 'environments'),
       folders: bundleDocuments(documents.folders, 'folders'),
       types: bundleDocuments(documents.types, 'types'),
       queries: bundleDocuments(documents.queries, 'queries'),
@@ -848,17 +810,9 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
       configurations: bundleDocuments(documents.configurations ?? [], 'configurations'),
     }
     const folderIds = bundleIdentityToRuntimeID(normalized.folders)
-    const environmentIds = bundleIdentityToRuntimeID(normalized.environments)
-
     const plain: EndgeDomainPlain = {
       facets: normalizeBundleDocuments(normalized.facets, new Map()),
       facetDocuments: normalizeBundleFacetDocuments(normalized.facetDocuments),
-      projects: normalizeBundleDocuments(normalized.projects, folderIds).map(project => ({
-        ...project,
-        allowedEnvironmentIds: Array.isArray(project.allowedEnvironments)
-          ? project.allowedEnvironments.map(identity => environmentIds.get(String(identity)) ?? identity)
-          : [],
-      })),
       types: normalizeBundleDocuments(normalized.types, folderIds),
       queries: normalizeBundleDocuments(normalized.queries, folderIds),
       dataViews: normalizeBundleDocuments(normalized.dataViews, folderIds),
@@ -876,8 +830,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
       integrations: [],
       folders: normalizeBundleFolders(normalized.folders, folderIds),
       filters: normalizeBundleDocuments(normalized.filters, folderIds),
-      environments: normalizeBundleDocuments(normalized.environments, folderIds),
-      tenants: normalizeBundleDocuments(normalized.tenants, folderIds),
       policies: [],
       styles: normalizeBundleDocuments(normalized.styles, folderIds),
       configurations: normalizeBundleDocuments(normalized.configurations, folderIds),
@@ -891,116 +843,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
 
     this.importFromSchema(EndgeDomain_Module.parsePlain(plain))
     this.notify()
-  }
-
-  /**
-   * Методы для работы с проектами
-   */
-  public getProjects(): RProject[] {
-    return Array.from(this._projectsById.values())
-  }
-
-  /**
-   * Возвращает Project по id.
-   */
-  public getProjectById(id: number): RProject | null {
-    return this._projectsById.get(id) ?? null
-  }
-
-  /**
-   * Возвращает Project по identity.
-   */
-  public getProjectByIdentity(identity: string): RProject | null {
-    return this._projectsByIdentity.get(identity) || null
-  }
-
-  /**
-   * Возвращает Project по id или identity.
-   */
-  public getProject(idOrIdentity: string | number): RProject | null {
-    return this.getProjectById(idOrIdentity as number) || this.getProjectById(Number(idOrIdentity)) || this.getProjectByIdentity(idOrIdentity as string)
-  }
-
-  /**
-   * Добавляет Project в домен и обновляет индексы.
-   */
-  public addProject(project: RProject): void {
-    if (this === Endge.domain) {
-      Endge.assertWritable()
-    }
-    if (this._projectsByIdentity.has(project.identity) || this._projectsById.has(project.id)) {
-      return
-    }
-    this._projectsById.set(project.id, project)
-    this._projectsByIdentity.set(project.identity, project)
-    this.notify()
-  }
-
-  /**
-   * Удаляет Project из домена по id.
-   */
-  public removeProjectById(id: number): void {
-    if (this === Endge.domain) {
-      Endge.assertWritable()
-    }
-    const project = this.getProjectById(id)
-    if (!project) {
-      return
-    }
-
-    this._projectsById.delete(project.id)
-    this._projectsByIdentity.delete(project.identity)
-    this.notify()
-  }
-
-  /**
-   * Удаляет Project из домена по identity.
-   */
-  public removeProjectByIdentity(identity: string): void {
-    if (this === Endge.domain) {
-      Endge.assertWritable()
-    }
-    const project = this._projectsByIdentity.get(identity)
-    if (!project) {
-      return
-    }
-
-    this._projectsById.delete(project.id)
-    this._projectsByIdentity.delete(project.identity)
-    this.notify()
-  }
-
-  // alias для removeProjectByIdentity
-  /**
-   * Удаляет Project из домена.
-   */
-  public removeProject(identity: string): void {
-    if (this === Endge.domain) {
-      Endge.assertWritable()
-    }
-    this.removeProjectByIdentity(identity)
-  }
-
-  /**
-   * Проверяет наличие Project по id.
-   */
-  public hasProjectById(id: number): boolean {
-    return this._projectsById.has(id)
-  }
-
-  /**
-   * Проверяет наличие Project по identity.
-   */
-  public hasProjectByIdentity(identity: string): boolean {
-    return this._projectsByIdentity.has(identity)
-  }
-
-  // alias для hasProjectByIdentity
-  /**
-   * Проверяет наличие Project по id или identity.
-   */
-  public hasProject(identity: string): boolean {
-    return this.hasProjectByIdentity(identity)
   }
 
   /**
@@ -2359,218 +2201,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   }
 
   /**
-   * Методы для работы с окружениями
-   */
-  public getEnvironments(): REnvironment[] {
-    return Array.from(this._environmentsById.values())
-  }
-
-  /**
-   * Возвращает Environment по id.
-   */
-  public getEnvironmentById(id: string | number): REnvironment | null {
-    return this._environmentsById.get(id) ?? null
-  }
-
-  /**
-   * Возвращает Environment по identity.
-   */
-  public getEnvironmentByIdentity(identity: string): REnvironment | null {
-    return this._environmentsByIdentity.get(identity) || null
-  }
-
-  /**
-   * Возвращает Environment по id или identity.
-   */
-  public getEnvironment(idOrIdentity: string | number): REnvironment | null {
-    return this.getEnvironmentById(idOrIdentity as number) || this.getEnvironmentById(Number(idOrIdentity)) || this.getEnvironmentByIdentity(idOrIdentity as string)
-  }
-
-  /**
-   * Добавляет Environment в домен и обновляет индексы.
-   */
-  public addEnvironment(environment: REnvironment): void {
-    if (this === Endge.domain) {
-      Endge.assertWritable()
-    }
-    if (this._environmentsByIdentity.has(environment.identity) || this._environmentsById.has(environment.id)) {
-      return
-    }
-    this._environmentsById.set(environment.id, environment)
-    this._environmentsByIdentity.set(environment.identity, environment)
-    this.notify()
-  }
-
-  /**
-   * Удаляет Environment из домена по id.
-   */
-  public removeEnvironmentById(id: string | number): void {
-    if (this === Endge.domain) {
-      Endge.assertWritable()
-    }
-    const environment = this._environmentsById.get(id)
-    if (!environment) {
-      return
-    }
-    this._environmentsById.delete(environment.id)
-    this._environmentsByIdentity.delete(environment.identity)
-    this.notify()
-  }
-
-  /**
-   * Удаляет Environment из домена по identity.
-   */
-  public removeEnvironmentByIdentity(identity: string): void {
-    if (this === Endge.domain) {
-      Endge.assertWritable()
-    }
-    const environment = this._environmentsByIdentity.get(identity)
-    if (!environment) {
-      return
-    }
-    this._environmentsById.delete(environment.id)
-    this._environmentsByIdentity.delete(environment.identity)
-    this.notify()
-  }
-
-  /**
-   * Удаляет Environment из домена.
-   */
-  public removeEnvironment(identity: string): void {
-    if (this === Endge.domain) {
-      Endge.assertWritable()
-    }
-    this.removeEnvironmentByIdentity(identity)
-  }
-
-  /**
-   * Проверяет наличие Environment по id.
-   */
-  public hasEnvironmentById(id: string | number): boolean {
-    return this._environmentsById.has(id)
-  }
-
-  /**
-   * Проверяет наличие Environment по identity.
-   */
-  public hasEnvironmentByIdentity(identity: string): boolean {
-    return this._environmentsByIdentity.has(identity)
-  }
-
-  /**
-   * Проверяет наличие Environment по id или identity.
-   */
-  public hasEnvironment(identity: string): boolean {
-    return this.hasEnvironmentByIdentity(identity)
-  }
-
-  /**
-   * Методы для работы с тенантами
-   */
-  public getTenants(): RTenant[] {
-    return Array.from(this._tenantsById.values())
-  }
-
-  /**
-   * Возвращает Tenant по id.
-   */
-  public getTenantById(id: string | number): RTenant | null {
-    return this._tenantsById.get(id) ?? null
-  }
-
-  /**
-   * Возвращает Tenant по identity.
-   */
-  public getTenantByIdentity(identity: string): RTenant | null {
-    return this._tenantsByIdentity.get(identity) || null
-  }
-
-  /**
-   * Возвращает Tenant по id или identity.
-   */
-  public getTenant(idOrIdentity: string | number): RTenant | null {
-    return this.getTenantById(idOrIdentity as number) || this.getTenantById(Number(idOrIdentity)) || this.getTenantByIdentity(idOrIdentity as string)
-  }
-
-  /**
-   * Добавляет Tenant в домен и обновляет индексы.
-   */
-  public addTenant(tenant: RTenant): void {
-    if (this === Endge.domain) {
-      Endge.assertWritable()
-    }
-    if (this._tenantsByIdentity.has(tenant.identity) || this._tenantsById.has(tenant.id)) {
-      return
-    }
-    this._tenantsById.set(tenant.id, tenant)
-    this._tenantsByIdentity.set(tenant.identity, tenant)
-    this.notify()
-  }
-
-  /**
-   * Удаляет Tenant из домена по id.
-   */
-  public removeTenantById(id: string | number): void {
-    if (this === Endge.domain) {
-      Endge.assertWritable()
-    }
-    const tenant = this._tenantsById.get(id)
-    if (!tenant) {
-      return
-    }
-    this._tenantsById.delete(tenant.id)
-    this._tenantsByIdentity.delete(tenant.identity)
-    this.notify()
-  }
-
-  /**
-   * Удаляет Tenant из домена по identity.
-   */
-  public removeTenantByIdentity(identity: string): void {
-    if (this === Endge.domain) {
-      Endge.assertWritable()
-    }
-    const tenant = this._tenantsByIdentity.get(identity)
-    if (!tenant) {
-      return
-    }
-    this._tenantsById.delete(tenant.id)
-    this._tenantsByIdentity.delete(tenant.identity)
-    this.notify()
-  }
-
-  /**
-   * Удаляет Tenant из домена.
-   */
-  public removeTenant(identity: string): void {
-    if (this === Endge.domain) {
-      Endge.assertWritable()
-    }
-    this.removeTenantByIdentity(identity)
-  }
-
-  /**
-   * Проверяет наличие Tenant по id.
-   */
-  public hasTenantById(id: string | number): boolean {
-    return this._tenantsById.has(id)
-  }
-
-  /**
-   * Проверяет наличие Tenant по identity.
-   */
-  public hasTenantByIdentity(identity: string): boolean {
-    return this._tenantsByIdentity.has(identity)
-  }
-
-  /**
-   * Проверяет наличие Tenant по id или identity.
-   */
-  public hasTenant(identity: string): boolean {
-    return this.hasTenantByIdentity(identity)
-  }
-
-  /**
    * Методы для работы с политиками
    */
   public getPolicies(): RPolicy[] {
@@ -3909,7 +3539,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
     return {
       facets: persisted(this.getFacets()).map(x => x.toPlain()),
       facetDocuments: persisted(Array.from(this._facetDocumentsById.values())).map(x => x.toPlain()),
-      projects: persisted(this.getProjects()).map(x => Serialize.toPlain(x)),
       types: persisted(this.getTypes()).map(x => Serialize.toPlain(x)),
       queries: persisted(this.getQueries()).map(x => Serialize.toPlain(x)),
       dataViews: persisted(this.getDataViews()).map(x => Serialize.toPlain(x)),
@@ -3927,8 +3556,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
       integrations: persisted(this.getIntegrations()).map(x => Serialize.toPlain(x)),
       folders: persisted(this.getFolders()).map(x => Serialize.toPlain(x)),
       filters: persisted(this.getFilters()).map(x => x.toPlain()),
-      environments: persisted(this.getEnvironments()).map(x => Serialize.toPlain(x)),
-      tenants: persisted(this.getTenants()).map(x => x.toPlain()),
       policies: persisted(this.getPolicies()).map(x => Serialize.toPlain(x)),
       styles: persisted(this.getStyles()).map(x => x.toPlain()),
       configurations: persisted(this.getConfigurations()).map(x => x.toPlain()),
@@ -4001,7 +3628,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
       facets: [],
       facetDocuments: [],
       filters: [],
-      projects: [],
       types: [],
       queries: [],
       dataViews: [],
@@ -4015,8 +3641,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
       actions: [],
       converters: [],
       integrations: [],
-      environments: [],
-      tenants: [],
       policies: [],
       styles: [],
       configurations: [],
@@ -4038,7 +3662,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
       out.facetDocuments.push(...json.facetDocuments.map((value: Record<string, unknown>) => FacetDocument.fromPlain(value)))
     }
     out.filters.push(...materializeDomainDocumentsOfType(json.filters, FilterType.DefaultFilter))
-    out.projects.push(...materializeDomainDocumentsOfType(json.projects ?? json._projectsByIdentity, 'project'))
     out.types.push(...materializeDomainDocuments(
       json.types,
       record => record.isPrimitive === true ? 'primitive' : 'type',
@@ -4063,8 +3686,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
     out.actions.push(...materializeDomainDocumentsOfType(json.actions, 'action'))
     out.converters.push(...materializeDomainDocumentsOfType(json.converters, 'converter'))
     out.integrations.push(...materializeDomainDocumentsOfType(json.integrations, 'integration'))
-    out.environments.push(...materializeDomainDocumentsOfType(json.environments, 'environment'))
-    out.tenants.push(...materializeDomainDocumentsOfType(json.tenants, 'tenant'))
     out.policies.push(...materializeDomainDocumentsOfType(json.policies, 'policy'))
     out.styles.push(...materializeDomainDocumentsOfType(json.styles, 'style'))
     out.configurations.push(...materializeDomainDocumentsOfType(json.configurations, 'configuration'))
@@ -4103,7 +3724,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
     parsed.facets.forEach(facet => this.addFacet(facet))
     parsed.facetDocuments.forEach(document => this.addFacetDocument(document))
     parsed.filters.forEach(f => this.addFilter(f))
-    parsed.projects.forEach(p => this.addProject(p))
     parsed.types.forEach(t => this.addType(t))
     parsed.queries.forEach(q => this.addQuery(q))
     parsed.dataViews.forEach(dv => this.addDataView(dv))
@@ -4117,8 +3737,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
     parsed.actions.forEach(a => this.addAction(a))
     parsed.converters.forEach(c => this.addConverter(c))
     parsed.integrations.forEach(i => this.addIntegration(i))
-    parsed.environments.forEach(e => this.addEnvironment(e))
-    parsed.tenants.forEach(t => this.addTenant(t))
     parsed.policies.forEach(p => this.addPolicy(p))
     parsed.styles.forEach(s => this.addStyle(s))
     parsed.configurations.forEach(configuration => this.addConfiguration(configuration))

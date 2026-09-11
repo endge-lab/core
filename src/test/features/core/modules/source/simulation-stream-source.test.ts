@@ -5,7 +5,6 @@ import { SimulationSourceResolver } from '@/features/core/modules/source/service
 
 const source = (options: string) => `defineSimulation({ target: composition('page'), dataMode: 'mock', overrides: { runtimes: { quotes: { stream: mockStream({ ${options} }) } } } })`
 const resolver = new SimulationSourceResolver({
-  projects: [],
   queries: [],
   compositions: [{ id: 'page-id', identity: 'page', sourceVersion: 1, source: 'defineComposition({ runtimes: { quotes: stream(\'quotes\') } })' }],
   types: [{ id: 'quote-id', identity: 'Quote', sourceVersion: 1, source: 'defineType({ symbol: field(String), price: field(Number) })' }],
@@ -14,7 +13,7 @@ const resolver = new SimulationSourceResolver({
 describe('simulation Stream Source', () => {
   /** Compiler сохраняет выбор генерации, не исполняя выражения внутри Source. */
   it('принимает boolean useExamples для Query и отклоняет остальные значения', () => {
-    const requestSource = (value: string) => `defineSimulation({ target: project('app'), overrides: { runtimes: { load: { request: mockRequest({ arrays: { items: 50 }, useExamples: ${value} }) } } } })`
+    const requestSource = (value: string) => `defineSimulation({ target: composition('app'), overrides: { runtimes: { load: { request: mockRequest({ arrays: { items: 50 }, useExamples: ${value} }) } } } })`
     for (const value of [true, false]) {
       expect(compileSimulationSource(requestSource(String(value))).artifact?.runtimes[0]?.request)
         .toMatchObject({ arrays: { items: 50 }, useExamples: value })

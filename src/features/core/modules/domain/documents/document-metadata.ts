@@ -28,7 +28,6 @@ const DEFINITION_CALL_BY_TYPE: Partial<Record<DomainDocumentType, string>> = {
   'data-view': 'defineDataView',
   'default-filter': 'defineFilter',
   'composition': 'defineComposition',
-  'project': 'defineComposition',
   'vocabs': 'defineVocab',
   'type': 'defineType',
   'configuration': 'defineConfig',

@@ -44,7 +44,11 @@ import { compileProgramMetadataProperty } from '@/features/core/modules/source/s
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
 /** Компилирует Composition source v1 в runtime graph artifact. */
-export function compileCompositionSource(source: string, sourceVersion = 1): CompositionSourceCompileResult {
+export function compileCompositionSource(
+  source: string,
+  sourceVersion = 1,
+  executionContext: Readonly<Record<string, string>> = {},
+): CompositionSourceCompileResult {
   const diagnostics: DiagnosticDraft[] = []
   if (!String(source ?? '').trim()) {
     diagnostics.push(diagnostic('error', 'composition-source-empty', 'Composition source пуст.'))
@@ -134,6 +138,7 @@ export function compileCompositionSource(source: string, sourceVersion = 1): Com
         'scope_default',
         defaultActivation,
         order,
+        executionContext,
       )
     }
     scopes[0].runtimes = runtimes.filter(item => item.scopePath === 'scope_default').map(item => item.path)
@@ -760,6 +765,7 @@ function readRuntimes(
   ownerScopePath: string,
   ownerActivation: CompositionActivationDescriptor,
   order: { value: number },
+  executionContext: Readonly<Record<string, string>>,
 ): void {
   const declared = new Set<string>()
   for (const property of node.properties) {
@@ -856,6 +862,7 @@ function readRuntimes(
           path,
           effectiveActivation,
           order,
+          executionContext,
         )
       }
       scope.runtimes = runtimes.filter(item => item.scopePath === path).map(item => item.path)
@@ -863,7 +870,7 @@ function readRuntimes(
       continue
     }
     const path = publicPrefix ? `${publicPrefix}.${name}` : name
-    const runtime = readRuntime(path, property.value, visibleData, diagnostics, ownerScopePath, ownerActivation)
+    const runtime = readRuntime(path, property.value, visibleData, diagnostics, ownerScopePath, ownerActivation, executionContext)
     if (runtime) {
       runtimes.push(runtime)
     }
@@ -877,7 +884,12 @@ function readRuntime(
   diagnostics: DiagnosticDraft[],
   scopePath: string,
   ownerActivation: CompositionActivationDescriptor,
+  executionContext: Readonly<Record<string, string>>,
 ): CompositionRuntimeDescriptor | null {
+  const contextual = readContextSwitchRuntime(name, raw, visibleData, diagnostics, scopePath, ownerActivation, executionContext)
+  if (contextual.handled) {
+    return contextual.descriptor
+  }
   const chain = memberChain(raw)
   if (!chain || !t.isIdentifier(chain.base.callee)) {
     diagnostics.push(diagnostic('error', 'composition-runtime-shape', `Runtime "${name}" должен начинаться с filter/query/component/composition/stream/filterView(identity).`, `runtimes.${name}`, raw))
@@ -1097,6 +1109,206 @@ function readRuntime(
     ))
   }
   return descriptor
+}
+
+function readContextSwitchRuntime(
+  name: string,
+  raw: t.Expression,
+  visibleData: ReadonlyMap<string, string>,
+  diagnostics: DiagnosticDraft[],
+  scopePath: string,
+  ownerActivation: CompositionActivationDescriptor,
+  executionContext: Readonly<Record<string, string>>,
+): { handled: false } | { handled: true, descriptor: CompositionRuntimeDescriptor | null } {
+  const chain = memberChain(raw)
+  if (!chain || !t.isIdentifier(chain.base.callee, { name: 'contextSwitch' })) {
+    return { handled: false }
+  }
+  const sourcePath = `runtimes.${name}.contextSwitch`
+  const definition = chain.base.arguments[0]
+  if (chain.base.arguments.length !== 1 || !definition || !t.isObjectExpression(definition)) {
+    diagnostics.push(diagnostic('error', 'composition-context-switch-shape', 'contextSwitch принимает один object literal с default и cases.', sourcePath, chain.base))
+    return { handled: true, descriptor: null }
+  }
+
+  const allowed = new Set(['default', 'cases'])
+  const seen = new Set<string>()
+  for (const property of definition.properties) {
+    if (!t.isObjectProperty(property) || property.computed || property.shorthand || !t.isExpression(property.value)) {
+      diagnostics.push(diagnostic('error', 'composition-context-switch-property', 'contextSwitch допускает только явные object properties.', sourcePath, property))
+      continue
+    }
+    const key = propertyName(property.key)
+    if (!key || !allowed.has(key)) {
+      diagnostics.push(diagnostic('error', 'composition-context-switch-property-unsupported', `Свойство "${key ?? ''}" не поддерживается contextSwitch.`, sourcePath, property))
+      continue
+    }
+    if (seen.has(key)) {
+      diagnostics.push(diagnostic('error', 'composition-context-switch-property-duplicate', `Свойство "${key}" указано повторно.`, `${sourcePath}.${key}`, property))
+    }
+    seen.add(key)
+  }
+
+  const defaultExpression = propertyValue(definition, 'default')
+  const casesNode = propertyValue(definition, 'cases')
+  if (!defaultExpression) {
+    diagnostics.push(diagnostic('error', 'composition-context-switch-default-required', 'contextSwitch требует default runtime reference.', `${sourcePath}.default`, definition))
+  }
+  if (!casesNode || !t.isArrayExpression(casesNode)) {
+    diagnostics.push(diagnostic('error', 'composition-context-switch-cases-shape', 'contextSwitch.cases должен быть массивом { when, use }.', `${sourcePath}.cases`, casesNode ?? definition))
+  }
+  if (!defaultExpression || !casesNode || !t.isArrayExpression(casesNode)) {
+    return { handled: true, descriptor: null }
+  }
+
+  const branches: Array<{ when: Readonly<Record<string, string>>, use: t.Expression, node: t.Node }> = []
+  for (const [index, element] of casesNode.elements.entries()) {
+    const branchPath = `${sourcePath}.cases.${index}`
+    if (!element || !t.isObjectExpression(element)) {
+      diagnostics.push(diagnostic('error', 'composition-context-switch-case-shape', 'Каждый case должен иметь вид { when: {...}, use: runtime(...) }.', branchPath, element ?? casesNode))
+      continue
+    }
+    const whenNode = propertyValue(element, 'when')
+    const use = propertyValue(element, 'use')
+    const extra = element.properties.filter(property => !t.isObjectProperty(property) || property.computed || !['when', 'use'].includes(propertyName(property.key) ?? ''))
+    for (const property of extra) {
+      diagnostics.push(diagnostic('error', 'composition-context-switch-case-property', 'Case contextSwitch допускает только when и use.', branchPath, property))
+    }
+    if (!whenNode || !t.isObjectExpression(whenNode)) {
+      diagnostics.push(diagnostic('error', 'composition-context-switch-when-shape', 'case.when должен быть непустым object literal строковых context identities.', `${branchPath}.when`, whenNode ?? element))
+      continue
+    }
+    const when = readContextPattern(whenNode, diagnostics, `${branchPath}.when`)
+    if (!Object.keys(when).length) {
+      diagnostics.push(diagnostic('error', 'composition-context-switch-when-empty', 'Пустой when недопустим: используйте default.', `${branchPath}.when`, whenNode))
+      continue
+    }
+    if (!use) {
+      diagnostics.push(diagnostic('error', 'composition-context-switch-use-required', 'case.use должен содержать runtime reference.', `${branchPath}.use`, element))
+      continue
+    }
+    branches.push({ when, use, node: element })
+  }
+
+  for (let left = 0; left < branches.length; left++) {
+    for (let right = left + 1; right < branches.length; right++) {
+      const first = branches[left]!
+      const second = branches[right]!
+      if (Object.keys(first.when).length === Object.keys(second.when).length && contextPatternsOverlap(first.when, second.when)) {
+        diagnostics.push(diagnostic(
+          'error',
+          'composition-context-switch-ambiguous',
+          `Cases ${left} и ${right} пересекаются с одинаковой специфичностью; порядок строк не задаёт приоритет.`,
+          `${sourcePath}.cases.${right}`,
+          second.node,
+        ))
+      }
+    }
+  }
+
+  const expressions = [defaultExpression, ...branches.map(branch => branch.use)]
+  for (const [index, expression] of expressions.entries()) {
+    const branchChain = memberChain(expression)
+    if (branchChain?.modifiers.length) {
+      const branchPath = index === 0
+        ? `${sourcePath}.default`
+        : `${sourcePath}.cases.${index - 1}.use`
+      diagnostics.push(diagnostic(
+        'error',
+        'composition-context-switch-branch-modifier',
+        'Ветки contextSwitch содержат только runtime reference; общие modifiers указываются после contextSwitch(...).',
+        branchPath,
+        expression,
+      ))
+    }
+  }
+  const descriptors = expressions.map(expression => readRuntime(
+    name,
+    appendRuntimeModifiers(expression, chain.modifiers),
+    visibleData,
+    diagnostics,
+    scopePath,
+    ownerActivation,
+    executionContext,
+  ))
+  const defaultDescriptor = descriptors[0]
+  if (!defaultDescriptor) {
+    return { handled: true, descriptor: null }
+  }
+  for (let index = 1; index < descriptors.length; index++) {
+    const descriptor = descriptors[index]
+    if (descriptor && descriptor.kind !== defaultDescriptor.kind) {
+      diagnostics.push(diagnostic(
+        'error',
+        'composition-context-switch-kind-mismatch',
+        `contextSwitch ожидает ${defaultDescriptor.kind}, но case ${index - 1} возвращает ${descriptor.kind}.`,
+        `${sourcePath}.cases.${index - 1}.use`,
+        branches[index - 1]?.node,
+      ))
+    }
+  }
+
+  const matches = branches
+    .map((branch, index) => ({ branch, index }))
+    .filter(({ branch }) => Object.entries(branch.when).every(([key, value]) => executionContext[key] === value))
+    .sort((left, right) => Object.keys(right.branch.when).length - Object.keys(left.branch.when).length)
+  const selectedIndex = matches[0]?.index
+  const selected = selectedIndex == null ? defaultDescriptor : descriptors[selectedIndex + 1] ?? defaultDescriptor
+  selected.sourceLocations = {
+    runtime: sourceRange(raw),
+    call: selected.sourceLocations?.call ?? sourceRange(raw),
+    withProps: selected.sourceLocations?.withProps ?? null,
+  }
+  selected.contextSwitch = {
+    selected: selectedIndex ?? 'default',
+    default: { kind: defaultDescriptor.kind, identity: defaultDescriptor.identity },
+    cases: branches.flatMap((branch, index) => {
+      const descriptor = descriptors[index + 1]
+      return descriptor ? [{ when: branch.when, kind: descriptor.kind, identity: descriptor.identity }] : []
+    }),
+  }
+  return { handled: true, descriptor: selected }
+}
+
+function readContextPattern(node: t.ObjectExpression, diagnostics: DiagnosticDraft[], sourcePath: string): Record<string, string> {
+  const result: Record<string, string> = Object.create(null)
+  for (const property of node.properties) {
+    if (!t.isObjectProperty(property) || property.computed || property.shorthand || !t.isStringLiteral(property.value)) {
+      diagnostics.push(diagnostic('error', 'composition-context-switch-when-entry', 'when допускает только пары context-key: string identity.', sourcePath, property))
+      continue
+    }
+    const key = propertyName(property.key)?.trim() ?? ''
+    const value = property.value.value.trim()
+    if (!key || !value) {
+      diagnostics.push(diagnostic('error', 'composition-context-switch-when-entry', 'Context key и identity не должны быть пустыми.', sourcePath, property))
+      continue
+    }
+    if (Object.hasOwn(result, key)) {
+      diagnostics.push(diagnostic('error', 'composition-context-switch-when-duplicate', `Context key "${key}" указан повторно.`, `${sourcePath}.${key}`, property))
+      continue
+    }
+    result[key] = value
+  }
+  return result
+}
+
+function contextPatternsOverlap(left: Readonly<Record<string, string>>, right: Readonly<Record<string, string>>): boolean {
+  return Object.keys(left).every(key => right[key] == null || right[key] === left[key])
+    && Object.keys(right).every(key => left[key] == null || left[key] === right[key])
+}
+
+function appendRuntimeModifiers(
+  raw: t.Expression,
+  modifiers: Array<{ name: string, call: t.CallExpression }>,
+): t.Expression {
+  let expression = raw
+  for (const modifier of modifiers) {
+    expression = t.callExpression(
+      t.memberExpression(expression, t.identifier(modifier.name)),
+      modifier.call.arguments,
+    )
+  }
+  return expression
 }
 
 function readDataBindings(

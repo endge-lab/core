@@ -99,13 +99,17 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     }
 
     const context = Endge.configuration.buildContext
+    const facetAttributes = Object.fromEntries(
+      Object.entries(context.execution.facets).map(([facetIdentity, documentIdentity]) => [
+        `endge.facet.${encodeURIComponent(facetIdentity)}.document.id`,
+        documentIdentity,
+      ]),
+    )
     this.configure(context.configuration.diagnostics, {
       attributes: {
         'service.name': 'endge',
         'endge.workspace.id': context.workspaceIdentity,
-        'endge.tenant.id': context.execution.tenantIdentity,
-        'endge.project.id': context.execution.projectIdentity,
-        'deployment.environment.name': context.execution.environmentIdentity,
+        ...facetAttributes,
       },
     })
   }

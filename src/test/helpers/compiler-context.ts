@@ -1,29 +1,20 @@
 import { Endge } from '@/features/core/kernel/endge'
-import { REnvironment } from '@/features/core/modules/domain/entities/REnvironment'
-import { RProject } from '@/features/core/modules/domain/entities/RProject'
-import { RTenant } from '@/features/core/modules/domain/entities/RTenant'
+import { RFacet } from '@/features/core/modules/domain/entities/RFacet'
+import { RFacetDocument } from '@/features/core/modules/domain/entities/RFacetDocument'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
 /** Подготавливает минимальный resolved build context для compiler contract tests. */
 export function prepareTestCompilerContext(): void {
   Endge.workspace.apply(TEST_ENDGE_WORKSPACE)
-  Endge.domain.addProject(RProject.fromPlain({ id: 9101, identity: 'test-project', name: 'Test project' }))
-  Endge.domain.addEnvironment(REnvironment.fromPlain({ id: 9102, identity: 'test-environment', name: 'Test environment' }))
-  const tenant = new RTenant()
-  tenant.id = 9103
-  tenant.identity = 'test-tenant'
-  tenant.name = 'Test tenant'
-  tenant.code = 'test-tenant'
-  Endge.domain.addTenant(tenant)
+  Endge.domain.addFacet(RFacet.fromPlain({ id: 9101, identity: 'region', displayName: 'Region', position: 0 }))
+  Endge.domain.addFacetDocument(RFacetDocument.fromPlain({ id: 9102, facetIdentity: 'region', identity: 'eu', displayName: 'Europe', configuration: { mode: 'inherit', patch: {} } }))
+  Endge.domain.addFacet(RFacet.fromPlain({ id: 9103, identity: 'channel', displayName: 'Channel', position: 1 }))
+  Endge.domain.addFacetDocument(RFacetDocument.fromPlain({ id: 9104, facetIdentity: 'channel', identity: 'web', displayName: 'Web', configuration: { mode: 'inherit', patch: {} } }))
   Endge.configuration.build({
     dataProvider: 'plain',
     scope: {},
     vars: {},
-    context: {
-      projectIdentity: 'test-project',
-      environmentIdentity: 'test-environment',
-      tenantIdentity: 'test-tenant',
-    },
+    context: { facets: { region: 'eu', channel: 'web' } },
   })
 }
 

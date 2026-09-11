@@ -1,6 +1,7 @@
 import type { SimulationSourceCatalog, SimulationSourceInput } from '@/features/core/modules/source/domain/types/simulation-source.types'
 import type {
   SourceDocumentReference,
+  SourceEngineCompileContext,
   SourceEngineCompileResult,
   SourceEngineGenerateResult,
   SourceEngineStrategy,
@@ -130,7 +131,7 @@ export class EndgeSource_Module extends EndgeModule {
   }
 
   /** Компилирует source указанного source-kind в normalized document и artifact payload. */
-  public compile(sourceKind: SourceKind | string, source: string): SourceEngineCompileResult {
+  public compile(sourceKind: SourceKind | string, source: string, context?: SourceEngineCompileContext): SourceEngineCompileResult {
     const strategy = this._resolveRequiredStrategy(sourceKind)
     if (!strategy.compile) {
       return {
@@ -139,7 +140,7 @@ export class EndgeSource_Module extends EndgeModule {
       }
     }
 
-    return strategy.compile(source)
+    return strategy.compile(source, context)
   }
 
   /** Парсит source указанного source-kind в normalized editor document. */
@@ -204,7 +205,7 @@ export class EndgeSource_Module extends EndgeModule {
     const inputs = (entities: Array<SimulationSourceInput & { deletedAt?: unknown }>): SimulationSourceInput[] => entities
       .filter(entity => !entity.deletedAt)
       .map(entity => ({ id: entity.id, identity: entity.identity, displayName: entity.displayName, source: entity.source, sourceVersion: entity.sourceVersion, isPrimitive: entity.isPrimitive }))
-    return { projects: inputs(Endge.domain.getProjects()), compositions: inputs(Endge.domain.getCompositions()), queries: inputs(Endge.domain.getQueries()), types: inputs(Endge.types.listResolved()) }
+    return { compositions: inputs(Endge.domain.getCompositions()), queries: inputs(Endge.domain.getQueries()), types: inputs(Endge.types.listResolved()) }
   }
 
   /** Регистрирует встроенные strategies ядра. */

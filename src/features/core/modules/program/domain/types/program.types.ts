@@ -36,7 +36,6 @@ export type ProgramEntityType
     | 'update'
     | 'filter'
     | 'composition'
-    | 'project'
     | 'style'
     | 'configuration'
 

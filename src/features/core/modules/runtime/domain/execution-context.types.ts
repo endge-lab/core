@@ -1,23 +1,15 @@
 /** Structural context одного полного boot/build lifecycle. */
 export interface EndgeExecutionContext {
-  tenantIdentity: string
-  projectIdentity: string
-  environmentIdentity: string
+  readonly facets: Readonly<Record<string, string>>
 }
 
-export interface EndgeExecutionContextProjectCandidate {
+export interface EndgeExecutionContextFacetCandidate {
   identity: string
-  allowedEnvironmentIds: readonly number[]
-}
-
-export interface EndgeExecutionContextEnvironmentCandidate {
-  id: string | number
-  identity: string
+  position: number
+  documents: readonly string[]
 }
 
 export interface EndgeExecutionContextResolutionInput {
   explicit?: Partial<EndgeExecutionContext>
-  tenants: readonly string[]
-  projects: readonly EndgeExecutionContextProjectCandidate[]
-  environments: readonly EndgeExecutionContextEnvironmentCandidate[]
+  facets: readonly EndgeExecutionContextFacetCandidate[]
 }

@@ -19,73 +19,63 @@ describe('сохранение EndgeContext', () => {
     expect(() => context.getPersistenceScope()).toThrow('Active workspace has not been loaded')
   })
 
-  it('нормализует пустые значения scope вне Workspace к значениям по умолчанию', () => {
+  it('использует пустую карту фасетов вне выбранных измерений', () => {
     const context = new EndgeContext_Module()
 
     context.setCurrentWorkspace('workspace-a')
-    context.setCurrentTenant('')
-    context.setCurrentProject('')
-    context.setCurrentEnvironment('')
     context.setCurrentUser('')
 
     expect(context.getPersistenceScope()).toEqual({
       workspaceId: 'workspace-a',
-      tenantId: 'default',
-      projectId: 'default',
-      environmentId: 'dev',
+      facetSelections: [],
       userId: 'anonymous',
     })
   })
 
-  it('использует провайдер сессии для scope пользователя и Tenant', () => {
+  it('использует провайдер сессии для пользователя и выбранных фасетов', () => {
     const context = new EndgeContext_Module()
     context.setCurrentWorkspace('workspace-a')
-    context.setCurrentProject('project-a')
-    context.setCurrentEnvironment('prod')
     context.setSessionIdentityProvider({
-      getCurrentIdentity: () => ({ userId: 'egor', tenantId: 'tenant-a' }),
+      getCurrentIdentity: () => ({ userId: 'egor', facetSelections: { region: 'east' } }),
     })
+    context.resolveExecutionContext({ facets: [{ identity: 'region', position: 0, documents: ['east', 'west'] }] })
 
     expect(context.getPersistenceScope()).toEqual({
       workspaceId: 'workspace-a',
-      tenantId: 'tenant-a',
-      projectId: 'project-a',
-      environmentId: 'prod',
+      facetSelections: [{ facetIdentity: 'region', documentIdentity: 'east' }],
       userId: 'egor',
     })
   })
 
   it('сохраняет структурные координаты неизменяемыми до reset', () => {
     const context = new EndgeContext_Module()
+    context.setFacetSelection('region', 'east')
     context.setup({
       dataProvider: 'plain',
       scope: {},
       vars: {},
-      context: { tenantIdentity: 'tenant-a', projectIdentity: 'project-a', environmentIdentity: 'dev' },
+      context: { facets: { region: 'east' } },
     })
 
-    expect(() => context.setCurrentProject('project-b')).toThrow('Structural context is immutable')
-    expect(context.getCurrentProject()).toBe('project-a')
+    expect(() => context.setFacetSelection('region', 'west')).toThrow('Structural context is immutable')
+    expect(context.getFacetSelection('region')).toBe('east')
 
     context.reset()
-    context.setCurrentProject('project-b')
-    expect(context.getCurrentProject()).toBe('project-b')
+    context.setFacetSelection('region', 'west')
+    expect(context.getFacetSelection('region')).toBe('west')
   })
 
-  it('сериализует новые поля контекста и читает legacy snapshots', () => {
+  it('сериализует динамические фасеты контекста', () => {
     const context = new EndgeContext_Module()
 
     context.deserialize({
-      project: 'legacy-project',
-      environment: 'prod',
+      facets: { region: 'east' },
       locale: 'en',
     })
 
     expect(context.serialize()).toEqual({
       workspace: null,
-      tenant: 'default',
-      project: 'legacy-project',
-      environment: 'prod',
+      facets: { region: 'east' },
       user: 'anonymous',
       locale: 'en',
       theme: 'dark',
@@ -95,7 +85,7 @@ describe('сохранение EndgeContext', () => {
 
   it('разрешает режим данных Workspace с несохраняемым переопределением host', async () => {
     const context = new EndgeContext_Module()
-    context.deserialize({ project: 'project-a', environment: 'prod' })
+    context.deserialize({ facets: { region: 'east' } })
     await Promise.resolve()
 
     context.setWorkspaceDataMode('mock')
@@ -109,12 +99,10 @@ describe('сохранение EndgeContext', () => {
     expect(context.isMockEnabled).toBe(false)
     expect(context.isDataModeOverridden).toBe(true)
     expect(context.getExecutionContext()).toEqual({
-      tenantIdentity: 'default',
-      projectIdentity: 'project-a',
-      environmentIdentity: 'prod',
+      facets: { region: 'east' },
     })
-    expect(JSON.parse(localStorage.getItem('endge:context:v1') ?? '{}')).not.toHaveProperty('dataMode')
-    expect(JSON.parse(localStorage.getItem('endge:context:v1') ?? '{}')).not.toHaveProperty('dataModeOverride')
+    expect(JSON.parse(localStorage.getItem('endge:context:v2') ?? '{}')).not.toHaveProperty('dataMode')
+    expect(JSON.parse(localStorage.getItem('endge:context:v2') ?? '{}')).not.toHaveProperty('dataModeOverride')
 
     context.clearDataModeOverride()
     expect(context.dataMode).toBe('mock')
@@ -125,14 +113,15 @@ describe('сохранение EndgeContext', () => {
   it('строит ключи runtime-хранилища из полного scope и кодирует ID', () => {
     const scope = {
       workspaceId: 'workspace/a',
-      tenantId: 'tenant a',
-      projectId: 'project:a',
-      environmentId: 'dev',
+      facetSelections: [
+        { facetIdentity: 'channel', documentIdentity: 'web' },
+        { facetIdentity: 'region', documentIdentity: 'east' },
+      ],
       userId: 'egor@example.com',
     }
 
     expect(buildRuntimeStateStorageKey(scope, 'runtime:main')).toBe(
-      'endge:runtime-state:v1:workspace:workspace%2Fa:tenant:tenant%20a:project:project%3Aa:environment:dev:user:egor%40example.com:runtime:runtime%3Amain',
+      'endge:runtime-state:v2:workspace:workspace%2Fa:facets:%5B%5B%22channel%22%2C%22web%22%5D%2C%5B%22region%22%2C%22east%22%5D%5D:user:egor%40example.com:runtime:runtime%3Amain',
     )
     expect(buildRuntimeStateStorageKey({ ...scope, userId: 'other' }, 'runtime:main')).not.toBe(
       buildRuntimeStateStorageKey(scope, 'runtime:main'),
@@ -144,9 +133,7 @@ describe('сохранение EndgeContext', () => {
       runtimeId: 'runtime-main',
       scope: {
         workspaceId: 'default',
-        tenantId: 'default',
-        projectId: 'default',
-        environmentId: 'dev',
+        facetSelections: [],
         userId: 'anonymous',
       },
       adapter: new LocalStorageContextAdapter(),
@@ -167,9 +154,7 @@ describe('сохранение EndgeContext', () => {
   it('отделяет ID активного runtime от ID долговременного хранилища', () => {
     const scope = {
       workspaceId: 'workspace',
-      tenantId: 'tenant',
-      projectId: 'project',
-      environmentId: 'prod',
+      facetSelections: [{ facetIdentity: 'region', documentIdentity: 'east' }],
       userId: 'user',
     }
     const first = new RuntimeStateController({
@@ -196,15 +181,15 @@ describe('сохранение EndgeContext', () => {
   it('изолирует долговременное состояние при изменении любого измерения контекста', () => {
     const base = {
       workspaceId: 'workspace',
-      tenantId: 'tenant',
-      projectId: 'project',
-      environmentId: 'prod',
+      facetSelections: [{ facetIdentity: 'region', documentIdentity: 'east' }],
       userId: 'user',
     }
-    const keys = (Object.keys(base) as Array<keyof typeof base>).map(key =>
-      buildRuntimeStateStorageKey({ ...base, [key]: `${base[key]}-other` }, 'schedule-filter'),
-    )
-    expect(new Set(keys).size).toBe(Object.keys(base).length)
+    const keys = [
+      buildRuntimeStateStorageKey({ ...base, workspaceId: 'other' }, 'schedule-filter'),
+      buildRuntimeStateStorageKey({ ...base, facetSelections: [{ facetIdentity: 'region', documentIdentity: 'west' }] }, 'schedule-filter'),
+      buildRuntimeStateStorageKey({ ...base, userId: 'other' }, 'schedule-filter'),
+    ]
+    expect(new Set(keys).size).toBe(3)
     expect(keys).not.toContain(buildRuntimeStateStorageKey(base, 'schedule-filter'))
   })
 
@@ -214,9 +199,7 @@ describe('сохранение EndgeContext', () => {
       runtimeId: 'runtime-main',
       scope: {
         workspaceId: 'default',
-        tenantId: 'default',
-        projectId: 'default',
-        environmentId: 'dev',
+        facetSelections: [],
         userId: 'anonymous',
       },
       adapter,
@@ -249,7 +232,7 @@ describe('сохранение EndgeContext', () => {
 
     expect(context.currentTheme).toBe('light')
     expect(context.serialize().theme).toBe('light')
-    expect(JSON.parse(localStorage.getItem('endge:context:v1') ?? '{}').theme).toBe('light')
+    expect(JSON.parse(localStorage.getItem('endge:context:v2') ?? '{}').theme).toBe('light')
   })
 })
 
