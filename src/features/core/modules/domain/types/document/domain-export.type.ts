@@ -5,6 +5,8 @@ export type EndgeWorkspaceExport = EndgeWorkspaceDefinition
 
 /** Persisted-срез домена, который можно восстановить через plain provider. */
 export interface EndgeDomainPlain {
+  facets: unknown[]
+  facetDocuments: unknown[]
   projects: unknown[]
   types: unknown[]
   queries: unknown[]
@@ -38,6 +40,8 @@ export interface EndgeDomainPlain {
 
 /** Коллекции документов канонического snapshot нового backend-сервиса. */
 export interface EndgePortableDocuments {
+  'facets': unknown[]
+  'facet-documents': unknown[]
   'projects': unknown[]
   'tenants': unknown[]
   'environments': unknown[]

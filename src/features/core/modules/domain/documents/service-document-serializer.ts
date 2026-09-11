@@ -33,6 +33,10 @@ export function serializeServiceDocument(
   if (folderIdentity) {
     common.folderIdentity = folderIdentity
   }
+  const workspaceFolderIdentity = resolveIdentity(model.workspaceFolderId ?? plain.workspaceFolderId, context.resolveFolderIdentity)
+  if (workspaceFolderIdentity) {
+    common.workspaceFolderIdentity = workspaceFolderIdentity
+  }
 
   const value = { ...plain, ...model }
   if (documentType === 'primitive' || documentType === 'type') {
@@ -163,8 +167,11 @@ export function serializeServiceFolder(
     identity,
     displayName: text(model.displayName ?? plain.displayName ?? model.name ?? plain.name ?? identity),
     description: nullableText(model.description ?? plain.description),
+    scope: text(model.scope ?? plain.scope) || 'collection',
     entityType: text(model.entityType ?? plain.entityType),
     parentIdentity: parentIdentity || null,
+    icon: nullableText(model.icon ?? plain.icon),
+    color: nullableText(model.color ?? plain.color),
     managedBy: text(model.managedBy ?? plain.managedBy) || 'user',
     managedById: nullableText(model.managedById ?? plain.managedById),
     meta: objectValue(model.meta ?? plain.meta),

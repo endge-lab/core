@@ -1,6 +1,7 @@
 import type { EndgeConfiguration } from '@/features/core/modules/configuration/domain/types/configuration.type'
 import type {
   EndgeDataMode,
+  EndgeWorkspaceDocumentStructure,
   EndgeWorkspaceDefinition,
   EndgeWorkspaceDefinitionInput,
   WorkspaceIntegrationReference,
@@ -19,6 +20,9 @@ export class RWorkspace extends REntity implements EndgeWorkspaceDefinition {
   dataMode: EndgeDataMode = 'live'
 
   @Expose()
+  documentStructure: EndgeWorkspaceDocumentStructure = 'frontend'
+
+  @Expose()
   configuration!: EndgeConfiguration
 
   @Expose()
@@ -33,6 +37,7 @@ export class RWorkspace extends REntity implements EndgeWorkspaceDefinition {
       identity: this.identity,
       displayName: this.displayName,
       dataMode: this.dataMode,
+      documentStructure: this.documentStructure,
       managedBy: this.managedBy,
       managedById: this.managedById,
       meta: { ...this.meta },
@@ -61,6 +66,7 @@ function createWorkspace(input: unknown): RWorkspace {
   workspace.name = displayName
   workspace.displayName = displayName
   workspace.dataMode = normalizeDataMode(source.dataMode)
+  workspace.documentStructure = normalizeDocumentStructure(source.documentStructure)
   workspace.applyManagement(source)
   workspace.applyEntityMeta(source)
   workspace.installedIntegrations = normalizeInstalledIntegrations(source.installedIntegrations)
@@ -71,6 +77,16 @@ function createWorkspace(input: unknown): RWorkspace {
 
 function normalizeDataMode(value: unknown): EndgeDataMode {
   return value === 'mock' ? 'mock' : 'live'
+}
+
+function normalizeDocumentStructure(value: unknown): EndgeWorkspaceDocumentStructure {
+  if (value == null || value === '') {
+    return 'frontend'
+  }
+  if (value === 'frontend' || value === 'custom') {
+    return value
+  }
+  throw new Error('[RWorkspace] Field "documentStructure" must be frontend or custom')
 }
 
 function normalizeInstalledIntegrations(value: unknown): WorkspaceIntegrationReference[] {

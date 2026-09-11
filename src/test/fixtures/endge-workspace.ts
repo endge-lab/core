@@ -4,6 +4,7 @@ export const TEST_ENDGE_WORKSPACE: EndgeWorkspaceDefinition = {
   identity: 'workspace-test',
   displayName: 'Test Workspace',
   dataMode: 'live',
+  documentStructure: 'frontend',
   managedBy: 'user',
   managedById: null,
   meta: {},

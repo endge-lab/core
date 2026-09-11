@@ -8,6 +8,20 @@ describe('рабочее пространство Endge', () => {
     expect(normalizeEndgeWorkspaceDefinition(TEST_ENDGE_WORKSPACE)).toEqual(TEST_ENDGE_WORKSPACE)
   })
 
+  it('использует frontend-структуру для legacy Workspace без нового поля', () => {
+    expect(normalizeEndgeWorkspaceDefinition({
+      ...TEST_ENDGE_WORKSPACE,
+      documentStructure: undefined,
+    }).documentStructure).toBe('frontend')
+  })
+
+  it('сохраняет выбранную custom-структуру Workspace', () => {
+    expect(normalizeEndgeWorkspaceDefinition({
+      ...TEST_ENDGE_WORKSPACE,
+      documentStructure: 'custom',
+    }).documentStructure).toBe('custom')
+  })
+
   it('нормализует повторяющиеся и legacy-идентификаторы адаптеров', () => {
     const workspace = normalizeEndgeWorkspaceDefinition({
       ...TEST_ENDGE_WORKSPACE,

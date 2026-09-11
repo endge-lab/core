@@ -48,6 +48,10 @@ export class REntity<TId extends string | number = number> {
   @Expose()
   folderId?: string | number | null = null
 
+  /** Id папки в свободной Workspace-проекции. */
+  @Expose()
+  workspaceFolderId?: string | number | null = null
+
   /** Кто управляет жизненным циклом документа. */
   @Expose()
   managedBy: ManagedBy = 'user'

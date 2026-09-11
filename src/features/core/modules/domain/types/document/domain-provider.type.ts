@@ -2,7 +2,7 @@ import type { EndgeLiveDomainDocument, EndgeLiveDomainSnapshot, EndgeWorkspaceSe
 
 /** Канонические коллекции persisted-домена нового backend. */
 export type EndgeDomainCollection
-  = | 'projects' | 'tenants' | 'environments' | 'folders' | 'types' | 'queries'
+  = | 'facets' | 'facet-documents' | 'projects' | 'tenants' | 'environments' | 'folders' | 'types' | 'queries'
     | 'data-views' | 'compositions' | 'stores' | 'streams' | 'simulations' | 'updates' | 'mocks'
     | 'components' | 'actions' | 'filters' | 'converters' | 'computations' | 'vocabs'
     | 'i18n-bundles' | 'auth-profiles' | 'navigations' | 'styles' | 'configurations'
@@ -47,6 +47,7 @@ export interface EndgeDocumentsMoveRequest {
   workspaceIdentity: string
   documents: EndgeDocumentMoveRequestItem[]
   folderIdentity: string
+  placement: 'frontend' | 'workspace'
   signal?: AbortSignal
 }
 
@@ -74,6 +75,49 @@ export interface EndgeWorkspaceMutationResult {
   etag: string | null
 }
 
+export interface EndgeFacetListRequest {
+  workspaceIdentity: string
+  includeDeleted?: boolean
+  signal?: AbortSignal
+}
+
+export interface EndgeFacetDocumentListRequest extends EndgeFacetListRequest {
+  facetIdentity: string
+}
+
+export interface EndgeFacetMutationRequest {
+  workspaceIdentity: string
+  identity: string
+  document?: Record<string, unknown>
+  expectedRevision?: number
+  signal?: AbortSignal
+}
+
+export interface EndgeFacetDocumentMutationRequest extends EndgeFacetMutationRequest {
+  facetIdentity: string
+}
+
+export interface EndgeFacetReorderItem {
+  identity: string
+  expectedRevision: number
+}
+
+export interface EndgeFacetReorderRequest {
+  workspaceIdentity: string
+  items: EndgeFacetReorderItem[]
+  signal?: AbortSignal
+}
+
+export interface EndgeFacetMutationResult {
+  document: EndgeLiveDomainDocument
+  etag: string | null
+}
+
+export interface EndgeFacetReorderResult {
+  documents: EndgeLiveDomainDocument[]
+  etag: string | null
+}
+
 /** Транспортно-независимый источник полного workspace snapshot. */
 export interface EndgeDomainProvider {
   readonly id: string
@@ -87,6 +131,18 @@ export interface EndgeDomainProvider {
   restoreDocument: (request: EndgeDocumentMutationRequest) => Promise<EndgeDocumentMutationResult>
   moveDocuments?: (request: EndgeDocumentsMoveRequest) => Promise<EndgeDocumentsMoveResult>
   updateWorkspace: (request: EndgeWorkspaceMutationRequest) => Promise<EndgeWorkspaceMutationResult>
+
+  listFacets?: (request: EndgeFacetListRequest) => Promise<EndgeLiveDomainDocument[]>
+  createFacet?: (request: EndgeFacetMutationRequest) => Promise<EndgeFacetMutationResult>
+  updateFacet?: (request: EndgeFacetMutationRequest) => Promise<EndgeFacetMutationResult>
+  softDeleteFacet?: (request: EndgeFacetMutationRequest) => Promise<EndgeFacetMutationResult>
+  restoreFacet?: (request: EndgeFacetMutationRequest) => Promise<EndgeFacetMutationResult>
+  reorderFacets?: (request: EndgeFacetReorderRequest) => Promise<EndgeFacetReorderResult>
+  listFacetDocuments?: (request: EndgeFacetDocumentListRequest) => Promise<EndgeLiveDomainDocument[]>
+  createFacetDocument?: (request: EndgeFacetDocumentMutationRequest) => Promise<EndgeFacetMutationResult>
+  updateFacetDocument?: (request: EndgeFacetDocumentMutationRequest) => Promise<EndgeFacetMutationResult>
+  softDeleteFacetDocument?: (request: EndgeFacetDocumentMutationRequest) => Promise<EndgeFacetMutationResult>
+  restoreFacetDocument?: (request: EndgeFacetDocumentMutationRequest) => Promise<EndgeFacetMutationResult>
 }
 
 export type EndgeDomainRepositoryProviderId = 'service-backend' | 'bundle' | 'plain'

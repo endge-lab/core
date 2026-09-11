@@ -11,6 +11,8 @@ import type { RConverter } from '@/features/core/modules/domain/entities/RConver
 import type { RDataView } from '@/features/core/modules/domain/entities/RDataView'
 
 import type { REnvironment } from '@/features/core/modules/domain/entities/REnvironment'
+import type { RFacet } from '@/features/core/modules/domain/entities/RFacet'
+import type { RFacetDocument } from '@/features/core/modules/domain/entities/RFacetDocument'
 import type { RFilter } from '@/features/core/modules/domain/entities/RFilter'
 import type { RI18nBundle } from '@/features/core/modules/domain/entities/RI18nBundle'
 import type { RIntegration } from '@/features/core/modules/domain/entities/RIntegration'
@@ -46,6 +48,8 @@ import {
   ReflectComponentFromPlain,
   ReflectComponentToPlain,
 } from '@/features/core/modules/domain/entities/RComponent'
+import { RFacet as Facet } from '@/features/core/modules/domain/entities/RFacet'
+import { RFacetDocument as FacetDocument } from '@/features/core/modules/domain/entities/RFacetDocument'
 import { RFolder } from '@/features/core/modules/domain/entities/RFolder'
 import { ResolvedEntityIndex } from '@/features/core/modules/domain/resolved/resolved-entity-index'
 import {
@@ -104,7 +108,7 @@ function normalizeBundleDocuments(
   folderIds: ReadonlyMap<string, string>,
 ): Record<string, unknown>[] {
   return documents.map((document) => {
-    const { folderIdentity, ...domainDocument } = document
+    const { folderIdentity, workspaceFolderIdentity, ...domainDocument } = document
     const identity = String(domainDocument.identity).trim()
     const displayName = String(
       domainDocument.displayName
@@ -112,6 +116,7 @@ function normalizeBundleDocuments(
       ?? identity,
     )
     const normalizedFolderIdentity = String(folderIdentity ?? '').trim()
+    const normalizedWorkspaceFolderIdentity = String(workspaceFolderIdentity ?? '').trim()
 
     return {
       ...domainDocument,
@@ -122,8 +127,23 @@ function normalizeBundleDocuments(
       folderId: normalizedFolderIdentity
         ? folderIds.get(normalizedFolderIdentity) ?? normalizedFolderIdentity
         : null,
+      workspaceFolderId: normalizedWorkspaceFolderIdentity
+        ? folderIds.get(normalizedWorkspaceFolderIdentity) ?? normalizedWorkspaceFolderIdentity
+        : null,
     }
   })
+}
+
+function normalizeBundleFacetDocuments(
+  documents: readonly Record<string, unknown>[],
+): Record<string, unknown>[] {
+  return normalizeBundleDocuments(documents, new Map()).map(document => ({
+    ...document,
+    id: JSON.stringify([
+      String(document.facetIdentity ?? '').trim(),
+      String(document.identity ?? '').trim(),
+    ]),
+  }))
 }
 
 function normalizeBundleFolders(
@@ -150,6 +170,7 @@ function normalizeBundleFolders(
         ? folderIds.get(normalizedParentIdentity) ?? normalizedParentIdentity
         : null,
       folderId: null,
+      workspaceFolderId: null,
     }
   })
 }
@@ -187,7 +208,7 @@ export function normalizeSnapshotDocuments(
   return documents
     .filter(document => document.state.deletedAt == null)
     .map((document) => {
-      const { state, folderIdentity, ...domainDocument } = document
+      const { state, folderIdentity, workspaceFolderIdentity, ...domainDocument } = document
       const identity = String(domainDocument.identity ?? '').trim()
       const displayName = String(
         domainDocument.displayName
@@ -195,6 +216,7 @@ export function normalizeSnapshotDocuments(
         ?? identity,
       )
       const normalizedFolderIdentity = String(folderIdentity ?? '').trim()
+      const normalizedWorkspaceFolderIdentity = String(workspaceFolderIdentity ?? '').trim()
 
       return {
         ...domainDocument,
@@ -204,6 +226,9 @@ export function normalizeSnapshotDocuments(
         displayName,
         folderId: normalizedFolderIdentity
           ? folderIds.get(normalizedFolderIdentity) ?? normalizedFolderIdentity
+          : null,
+        workspaceFolderId: normalizedWorkspaceFolderIdentity
+          ? folderIds.get(normalizedWorkspaceFolderIdentity) ?? normalizedWorkspaceFolderIdentity
           : null,
         createdAt: state.createdAt,
         updatedAt: state.updatedAt,
@@ -239,6 +264,7 @@ export function normalizeSnapshotFolders(
           ? folderIds.get(normalizedParentIdentity) ?? normalizedParentIdentity
           : null,
         folderId: null,
+        workspaceFolderId: null,
         createdAt: state.createdAt,
         updatedAt: state.updatedAt,
         deletedAt: state.deletedAt ?? null,
@@ -254,6 +280,8 @@ export function normalizeSnapshotFolders(
 
 /** Результат parsePlain: все распарсенные сущности без добавления в домен. */
 export interface EndgeDomainParsed {
+  facets: RFacet[]
+  facetDocuments: RFacetDocument[]
   filters: RFilter[]
   projects: RProject[]
   types: RType[]
@@ -296,15 +324,18 @@ interface DomainEntityIndex {
   kind?: 'update'
   byId: Map<DomainEntityId, IndexedDomainEntity>
   byIdentity: Map<DomainEntityId, IndexedDomainEntity>
+  identityOf: (entity: IndexedDomainEntity) => DomainEntityId
 }
 
 function domainEntityIndex<TId, TEntity>(
   byId: Map<TId, TEntity>,
   byIdentity: Map<string, TEntity>,
   kind?: DomainEntityIndex['kind'],
+  identityOf: (entity: TEntity) => DomainEntityId = entity => String((entity as IndexedDomainEntity).identity ?? (entity as IndexedDomainEntity).id),
 ): DomainEntityIndex {
   return {
     kind,
+    identityOf: identityOf as unknown as DomainEntityIndex['identityOf'],
     byId: byId as unknown as DomainEntityIndex['byId'],
     byIdentity: byIdentity as unknown as DomainEntityIndex['byIdentity'],
   }
@@ -338,6 +369,10 @@ function replaceMapEntry<K, V>(
 export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   /** Несохраняемые дескрипторы, материализованные ядром, плагинами и компилятором. */
   public readonly resolved = new ResolvedEntityIndex()
+  private _facetsById: Map<string | number, RFacet> = new Map()
+  private _facetsByIdentity: Map<string, RFacet> = new Map()
+  private _facetDocumentsById: Map<string | number, RFacetDocument> = new Map()
+  private _facetDocumentsByIdentity: Map<string, RFacetDocument> = new Map()
   private _projectsById: Map<number, RProject> = new Map()
   private _projectsByIdentity: Map<string, RProject> = new Map()
 
@@ -508,6 +543,10 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
    */
   public override reset(): void {
     this.resolved.clearDerived()
+    this._facetsById.clear()
+    this._facetsByIdentity.clear()
+    this._facetDocumentsById.clear()
+    this._facetDocumentsByIdentity.clear()
     this._projectsById.clear()
     this._projectsByIdentity.clear()
     this._typesById.clear()
@@ -638,17 +677,17 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
     }
     const current = currentEntity as IndexedDomainEntity
     const next = nextEntity as IndexedDomainEntity
-    const currentIdentity = String(current.identity ?? current.id)
-    const nextIdentity = String(next.identity ?? next.id)
     const index = this._entityIndexes().find(candidate =>
       candidate.byId.get(current.id) === currentEntity
-      || candidate.byIdentity.get(currentIdentity) === currentEntity,
+      || candidate.byIdentity.get(candidate.identityOf(current)) === currentEntity,
     )
 
     if (!index) {
       throw new Error('[EndgeDomain] Persisted entity is not indexed')
     }
 
+    const currentIdentity = index.identityOf(current)
+    const nextIdentity = index.identityOf(next)
     replaceMapEntry(index.byId, current.id, next.id, current, next)
     replaceMapEntry(index.byIdentity, currentIdentity, nextIdentity, current, next)
 
@@ -661,6 +700,13 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
 
   private _entityIndexes(): DomainEntityIndex[] {
     return [
+      domainEntityIndex(this._facetsById, this._facetsByIdentity),
+      domainEntityIndex(
+        this._facetDocumentsById,
+        this._facetDocumentsByIdentity,
+        undefined,
+        entity => EndgeDomain_Module._facetDocumentKey(entity.facetIdentity, entity.identity),
+      ),
       domainEntityIndex(this._projectsById, this._projectsByIdentity),
       domainEntityIndex(this._typesById, this._typesByIdentity),
       domainEntityIndex(this._queriesById, this._queriesByIdentity),
@@ -722,6 +768,14 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
 
     const documents = snapshot.documents
     const plain: EndgeDomainPlain = {
+      facets: normalizeSnapshotDocuments(documents.facets ?? [], new Map()).map((facet) => {
+        const source = (documents.facets ?? []).find(value => value.state.id === facet.id)
+        return { ...facet, serverState: source?.state }
+      }),
+      facetDocuments: normalizeSnapshotDocuments(documents['facet-documents'] ?? [], new Map()).map((document) => {
+        const source = (documents['facet-documents'] ?? []).find(value => value.state.id === document.id)
+        return { ...document, serverState: source?.state }
+      }),
       projects: normalizeSnapshotDocuments(documents.projects, folderIds).map(project => ({
         ...project,
         allowedEnvironmentIds: Array.isArray(project.allowedEnvironments)
@@ -766,6 +820,8 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   public mergeFromBundle(bundle: EndgeDomainBundle): void {
     const documents = bundle.documents
     const normalized = {
+      facets: bundleDocuments(documents.facets ?? [], 'facets'),
+      facetDocuments: bundleDocuments(documents['facet-documents'] ?? [], 'facet-documents'),
       projects: bundleDocuments(documents.projects, 'projects'),
       tenants: bundleDocuments(documents.tenants, 'tenants'),
       environments: bundleDocuments(documents.environments, 'environments'),
@@ -795,6 +851,8 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
     const environmentIds = bundleIdentityToRuntimeID(normalized.environments)
 
     const plain: EndgeDomainPlain = {
+      facets: normalizeBundleDocuments(normalized.facets, new Map()),
+      facetDocuments: normalizeBundleFacetDocuments(normalized.facetDocuments),
       projects: normalizeBundleDocuments(normalized.projects, folderIds).map(project => ({
         ...project,
         allowedEnvironmentIds: Array.isArray(project.allowedEnvironments)
@@ -3757,6 +3815,87 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
     return this.hasVersionByIdentity(identity)
   }
 
+  private static _facetDocumentKey(facetIdentity: unknown, documentIdentity: unknown): string {
+    return JSON.stringify([String(facetIdentity ?? '').trim(), String(documentIdentity ?? '').trim()])
+  }
+
+  /** Возвращает активные фасеты в единственном persisted-порядке специфичности. */
+  public getFacets(): RFacet[] {
+    return Array.from(this._facetsById.values()).sort((left, right) => left.position - right.position)
+  }
+
+  public getFacet(idOrIdentity: string | number): RFacet | null {
+    return this._facetsById.get(idOrIdentity)
+      ?? this._facetsById.get(Number(idOrIdentity))
+      ?? this._facetsByIdentity.get(String(idOrIdentity))
+      ?? null
+  }
+
+  public addFacet(facet: RFacet): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
+    if (this._facetsById.has(facet.id) || this._facetsByIdentity.has(facet.identity)) {
+      return
+    }
+    this._facetsById.set(facet.id, facet)
+    this._facetsByIdentity.set(facet.identity, facet)
+    this.notify()
+  }
+
+  public removeFacet(idOrIdentity: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
+    const facet = this.getFacet(idOrIdentity)
+    if (!facet) {
+      return
+    }
+    this._facetsById.delete(facet.id)
+    this._facetsByIdentity.delete(facet.identity)
+    this.notify()
+  }
+
+  public getFacetDocuments(facetIdentity: string): RFacetDocument[] {
+    const normalized = facetIdentity.trim()
+    return Array.from(this._facetDocumentsById.values()).filter(document => document.facetIdentity === normalized)
+  }
+
+  public getFacetDocument(facetIdentity: string, identityOrId: string | number): RFacetDocument | null {
+    const byId = this._facetDocumentsById.get(identityOrId)
+      ?? this._facetDocumentsById.get(Number(identityOrId))
+    if (byId?.facetIdentity === facetIdentity.trim()) {
+      return byId
+    }
+    return this._facetDocumentsByIdentity.get(EndgeDomain_Module._facetDocumentKey(facetIdentity, identityOrId)) ?? null
+  }
+
+  public addFacetDocument(document: RFacetDocument): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
+    const key = EndgeDomain_Module._facetDocumentKey(document.facetIdentity, document.identity)
+    if (this._facetDocumentsById.has(document.id) || this._facetDocumentsByIdentity.has(key)) {
+      return
+    }
+    this._facetDocumentsById.set(document.id, document)
+    this._facetDocumentsByIdentity.set(key, document)
+    this.notify()
+  }
+
+  public removeFacetDocument(facetIdentity: string, identityOrId: string | number): void {
+    if (this === Endge.domain) {
+      Endge.assertWritable()
+    }
+    const document = this.getFacetDocument(facetIdentity, identityOrId)
+    if (!document) {
+      return
+    }
+    this._facetDocumentsById.delete(document.id)
+    this._facetDocumentsByIdentity.delete(EndgeDomain_Module._facetDocumentKey(document.facetIdentity, document.identity))
+    this.notify()
+  }
+
   /** Возвращает полный persisted Domain для диагностического дерева. */
   public override createDiagnosticsSnapshot(): EndgeDomainPlain {
     return this.toPlain()
@@ -3768,6 +3907,8 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
       items.filter(item => item.isTemporary !== true && (item.origin?.kind ?? 'storage') === 'storage')
 
     return {
+      facets: persisted(this.getFacets()).map(x => x.toPlain()),
+      facetDocuments: persisted(Array.from(this._facetDocumentsById.values())).map(x => x.toPlain()),
       projects: persisted(this.getProjects()).map(x => Serialize.toPlain(x)),
       types: persisted(this.getTypes()).map(x => Serialize.toPlain(x)),
       queries: persisted(this.getQueries()).map(x => Serialize.toPlain(x)),
@@ -3857,6 +3998,8 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
     }
 
     const out: EndgeDomainParsed = {
+      facets: [],
+      facetDocuments: [],
       filters: [],
       projects: [],
       types: [],
@@ -3888,6 +4031,12 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
       folders: [],
     }
 
+    if (Array.isArray(json.facets)) {
+      out.facets.push(...json.facets.map((value: Record<string, unknown>) => Facet.fromPlain(value)))
+    }
+    if (Array.isArray(json.facetDocuments)) {
+      out.facetDocuments.push(...json.facetDocuments.map((value: Record<string, unknown>) => FacetDocument.fromPlain(value)))
+    }
     out.filters.push(...materializeDomainDocumentsOfType(json.filters, FilterType.DefaultFilter))
     out.projects.push(...materializeDomainDocumentsOfType(json.projects ?? json._projectsByIdentity, 'project'))
     out.types.push(...materializeDomainDocuments(
@@ -3951,6 +4100,8 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
     if (this === Endge.domain) {
       Endge.assertWritable()
     }
+    parsed.facets.forEach(facet => this.addFacet(facet))
+    parsed.facetDocuments.forEach(document => this.addFacetDocument(document))
     parsed.filters.forEach(f => this.addFilter(f))
     parsed.projects.forEach(p => this.addProject(p))
     parsed.types.forEach(t => this.addType(t))

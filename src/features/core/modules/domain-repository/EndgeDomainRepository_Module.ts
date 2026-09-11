@@ -23,6 +23,8 @@ import { getDomainDocumentDescriptor } from '@/features/core/modules/domain/docu
 import { serializeServiceFolder } from '@/features/core/modules/domain/documents/service-document-serializer'
 import { EndgeDomain_Module, normalizeSnapshotDocuments, normalizeSnapshotFolders } from '@/features/core/modules/domain/EndgeDomain_Module'
 import { normalizeEntityMeta } from '@/features/core/modules/domain/entities/REntity'
+import { RFacet } from '@/features/core/modules/domain/entities/RFacet'
+import { RFacetDocument } from '@/features/core/modules/domain/entities/RFacetDocument'
 import { normalizeEndgeWorkspaceDefinition } from '@/features/core/modules/domain/entities/RWorkspace'
 import { ComponentType, FilterType, QueryType } from '@/features/core/modules/domain/types/document/document.types'
 import { EndgeModule } from '@/features/federation/EndgeModule'
@@ -151,6 +153,10 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     return this._documentServerState.get(this._serverStateKey(collection, identity)) ?? null
   }
 
+  public getFacetDocumentServerState(facetIdentity: string, documentIdentity: string): EndgeDocumentServerState | null {
+    return this._documentServerState.get(this._facetDocumentServerStateKey(facetIdentity, documentIdentity)) ?? null
+  }
+
   public override reset(): void {
     this._generation += 1
     this._snapshotSequence += 1
@@ -262,6 +268,7 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     documentId: string | number,
     documentType: DomainDocumentType,
     folderIdOrIdentity: string | number | null,
+    placement: 'frontend' | 'workspace' = 'frontend',
   ): Promise<void> {
     this._assertMutationsSupported()
     const model = this._getDomainDocumentByType(documentType, documentId)
@@ -271,7 +278,7 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
 
     const document = this._serializeDocument(documentType, model)
     const folder = folderIdOrIdentity == null ? null : Endge.domain.getFolder(folderIdOrIdentity)
-    document.folderIdentity = folderIdOrIdentity == null
+    document[placement === 'workspace' ? 'workspaceFolderIdentity' : 'folderIdentity'] = folderIdOrIdentity == null
       ? null
       : String((folder as any)?.identity ?? folderIdOrIdentity).trim()
     await this._saveServiceDocument(documentId, documentType, { serializedDocument: document })
@@ -281,6 +288,7 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
   public async changeDocumentsFolder(
     documents: readonly EndgeDomainDocumentMove[],
     folderIdOrIdentity: string | number,
+    placement: 'frontend' | 'workspace' = 'frontend',
   ): Promise<number> {
     this._assertMutationsSupported()
     if (documents.length === 0) {
@@ -313,6 +321,7 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
       signal: this._abortController.signal,
       documents: requests,
       folderIdentity,
+      placement,
     })
     assertCurrent()
     if (result.documents.length !== documents.length) {
@@ -416,6 +425,162 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     this._applyServiceFolder(result.document, folderIdentity)
   }
 
+  public async listFacets(includeDeleted = false): Promise<RFacet[]> {
+    const assertCurrent = this._captureGeneration()
+    const provider = this._requireServiceProvider()
+    const values = await this._requireFacetProviderOperation(provider.listFacets, 'listFacets')({
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      includeDeleted,
+      signal: this._abortController.signal,
+    })
+    assertCurrent()
+    values.forEach(value => this._documentServerState.set(
+      this._serverStateKey('facets', String(value.identity ?? '').trim()),
+      { ...value.state },
+    ))
+    return values.map(value => this._materializeFacet(value))
+  }
+
+  public async createFacet(document: Record<string, unknown>): Promise<RFacet> {
+    this._assertMutationsSupported()
+    const assertCurrent = this._captureGeneration()
+    const provider = this._requireServiceProvider()
+    const result = await this._requireFacetProviderOperation(provider.createFacet, 'createFacet')({
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      identity: String(document.identity ?? '').trim(),
+      document,
+      signal: this._abortController.signal,
+    })
+    assertCurrent()
+    this._domainETag = result.etag
+    return this._applyFacet(result.document)
+  }
+
+  public async updateFacet(identity: string, document: Record<string, unknown>): Promise<RFacet> {
+    this._assertMutationsSupported()
+    const assertCurrent = this._captureGeneration()
+    const normalizedIdentity = identity.trim()
+    const state = this._requireDocumentServerState('facets', normalizedIdentity)
+    const provider = this._requireServiceProvider()
+    const result = await this._requireFacetProviderOperation(provider.updateFacet, 'updateFacet')({
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      identity: normalizedIdentity,
+      document,
+      expectedRevision: state.revision,
+      signal: this._abortController.signal,
+    })
+    assertCurrent()
+    this._domainETag = result.etag
+    return this._applyFacet(result.document, normalizedIdentity)
+  }
+
+  public async deleteFacet(identity: string): Promise<RFacet> {
+    return this._mutateFacetLifecycle(identity, 'delete')
+  }
+
+  public async restoreFacet(identity: string): Promise<RFacet> {
+    return this._mutateFacetLifecycle(identity, 'restore')
+  }
+
+  public async reorderFacets(identities: readonly string[]): Promise<RFacet[]> {
+    this._assertMutationsSupported()
+    const assertCurrent = this._captureGeneration()
+    const items = identities.map((identity) => {
+      const normalized = identity.trim()
+      return {
+        identity: normalized,
+        expectedRevision: this._requireDocumentServerState('facets', normalized).revision,
+      }
+    })
+    const provider = this._requireServiceProvider()
+    const result = await this._requireFacetProviderOperation(provider.reorderFacets, 'reorderFacets')({
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      items,
+      signal: this._abortController.signal,
+    })
+    assertCurrent()
+    this._domainETag = result.etag
+    const facets = result.documents.map(value => this._materializeFacet(value))
+    for (const current of Endge.domain.getFacets()) {
+      Endge.domain.removeFacet(current.id)
+    }
+    for (const facet of facets) {
+      Endge.domain.addFacet(facet)
+    }
+    result.documents.forEach((value) => {
+      this._documentServerState.set(this._serverStateKey('facets', String(value.identity)), { ...value.state })
+    })
+    this._notifyDomainChanged()
+    return facets
+  }
+
+  public async listFacetDocuments(facetIdentity: string, includeDeleted = false): Promise<RFacetDocument[]> {
+    const assertCurrent = this._captureGeneration()
+    const normalizedFacet = facetIdentity.trim()
+    const provider = this._requireServiceProvider()
+    const values = await this._requireFacetProviderOperation(provider.listFacetDocuments, 'listFacetDocuments')({
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      facetIdentity: normalizedFacet,
+      includeDeleted,
+      signal: this._abortController.signal,
+    })
+    assertCurrent()
+    values.forEach(value => this._documentServerState.set(
+      this._facetDocumentServerStateKey(normalizedFacet, String(value.identity ?? '').trim()),
+      { ...value.state },
+    ))
+    return values.map(value => this._materializeFacetDocument(value, normalizedFacet))
+  }
+
+  public async createFacetDocument(facetIdentity: string, document: Record<string, unknown>): Promise<RFacetDocument> {
+    this._assertMutationsSupported()
+    const assertCurrent = this._captureGeneration()
+    const normalizedFacet = facetIdentity.trim()
+    const provider = this._requireServiceProvider()
+    const result = await this._requireFacetProviderOperation(provider.createFacetDocument, 'createFacetDocument')({
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      facetIdentity: normalizedFacet,
+      identity: String(document.identity ?? '').trim(),
+      document,
+      signal: this._abortController.signal,
+    })
+    assertCurrent()
+    this._domainETag = result.etag
+    return this._applyFacetDocument(result.document, normalizedFacet)
+  }
+
+  public async updateFacetDocument(
+    facetIdentity: string,
+    identity: string,
+    document: Record<string, unknown>,
+  ): Promise<RFacetDocument> {
+    this._assertMutationsSupported()
+    const assertCurrent = this._captureGeneration()
+    const normalizedFacet = facetIdentity.trim()
+    const normalizedIdentity = identity.trim()
+    const state = this._requireFacetDocumentServerState(normalizedFacet, normalizedIdentity)
+    const provider = this._requireServiceProvider()
+    const result = await this._requireFacetProviderOperation(provider.updateFacetDocument, 'updateFacetDocument')({
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      facetIdentity: normalizedFacet,
+      identity: normalizedIdentity,
+      document,
+      expectedRevision: state.revision,
+      signal: this._abortController.signal,
+    })
+    assertCurrent()
+    this._domainETag = result.etag
+    return this._applyFacetDocument(result.document, normalizedFacet, normalizedIdentity)
+  }
+
+  public async deleteFacetDocument(facetIdentity: string, identity: string): Promise<RFacetDocument> {
+    return this._mutateFacetDocumentLifecycle(facetIdentity, identity, 'delete')
+  }
+
+  public async restoreFacetDocument(facetIdentity: string, identity: string): Promise<RFacetDocument> {
+    return this._mutateFacetDocumentLifecycle(facetIdentity, identity, 'restore')
+  }
+
   public toJSON(): Record<string, unknown> {
     return {
       isHealthy: this.isHealthy,
@@ -438,17 +603,27 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
   private _indexSnapshotServerState(snapshot: EndgeLiveDomainSnapshot): void {
     this._documentServerState.clear()
     for (const [documentType, documents] of Object.entries(snapshot.documents)) {
+      if (!Array.isArray(documents)) {
+        continue
+      }
       for (const document of documents) {
         const identity = String(document.identity ?? '').trim()
         if (identity) {
-          this._documentServerState.set(this._serverStateKey(documentType, identity), { ...document.state })
+          const key = documentType === 'facet-documents'
+            ? this._facetDocumentServerStateKey(String(document.facetIdentity ?? ''), identity)
+            : this._serverStateKey(documentType, identity)
+          this._documentServerState.set(key, { ...document.state })
         }
       }
     }
   }
 
   private _serverStateKey(documentType: string, identity: string): string {
-    return `${documentType}:${identity}`
+    return JSON.stringify([documentType, identity])
+  }
+
+  private _facetDocumentServerStateKey(facetIdentity: string, identity: string): string {
+    return JSON.stringify(['facet-documents', facetIdentity.trim(), identity.trim()])
   }
 
   private _requireDocumentServerState(
@@ -464,13 +639,131 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
 
   private _findServerIdentity(collection: EndgeDomainCollection, documentId: string | number): string | null {
     const id = String(documentId)
-    const prefix = `${collection}:`
     for (const [key, state] of this._documentServerState) {
-      if (key.startsWith(prefix) && String(state.id) === id) {
-        return key.slice(prefix.length)
+      const parsed = JSON.parse(key) as string[]
+      if (parsed[0] === collection && parsed.length === 2 && String(state.id) === id) {
+        return parsed[1] ?? null
       }
     }
     return null
+  }
+
+  private _requireFacetDocumentServerState(facetIdentity: string, identity: string): EndgeDocumentServerState {
+    const state = this.getFacetDocumentServerState(facetIdentity, identity)
+    if (!state) {
+      throw new Error(`Server state не найден для facet-documents/${facetIdentity}/${identity}`)
+    }
+    return state
+  }
+
+  private _materializeFacet(document: EndgeLiveDomainDocument): RFacet {
+    const { state, ...plain } = document
+    return RFacet.fromPlain({ ...plain, id: state.id, serverState: state, deletedAt: state.deletedAt ?? null })
+  }
+
+  private _materializeFacetDocument(document: EndgeLiveDomainDocument, facetIdentity?: string): RFacetDocument {
+    const { state, ...plain } = document
+    return RFacetDocument.fromPlain({
+      ...plain,
+      facetIdentity: String(plain.facetIdentity ?? facetIdentity ?? '').trim(),
+      id: state.id,
+      serverState: state,
+      deletedAt: state.deletedAt ?? null,
+    })
+  }
+
+  private _applyFacet(document: EndgeLiveDomainDocument, previousIdentity?: string): RFacet {
+    const next = this._materializeFacet(document)
+    const current = Endge.domain.getFacet(previousIdentity ?? next.identity)
+    if (current) {
+      Endge.domain.replacePersistedEntity(current, next)
+    }
+    else { Endge.domain.addFacet(next) }
+    if (previousIdentity && previousIdentity !== next.identity) {
+      this._documentServerState.delete(this._serverStateKey('facets', previousIdentity))
+    }
+    this._documentServerState.set(this._serverStateKey('facets', next.identity), { ...document.state })
+    this._notifyDomainChanged()
+    return next
+  }
+
+  private _applyFacetDocument(
+    document: EndgeLiveDomainDocument,
+    facetIdentity: string,
+    previousIdentity?: string,
+  ): RFacetDocument {
+    const next = this._materializeFacetDocument(document, facetIdentity)
+    const current = Endge.domain.getFacetDocument(facetIdentity, previousIdentity ?? next.identity)
+    if (current) {
+      Endge.domain.replacePersistedEntity(current, next)
+    }
+    else { Endge.domain.addFacetDocument(next) }
+    if (previousIdentity && previousIdentity !== next.identity) {
+      this._documentServerState.delete(this._facetDocumentServerStateKey(facetIdentity, previousIdentity))
+    }
+    this._documentServerState.set(this._facetDocumentServerStateKey(next.facetIdentity, next.identity), { ...document.state })
+    this._notifyDomainChanged()
+    return next
+  }
+
+  private async _mutateFacetLifecycle(identity: string, action: 'delete' | 'restore'): Promise<RFacet> {
+    this._assertMutationsSupported()
+    const assertCurrent = this._captureGeneration()
+    const normalized = identity.trim()
+    const state = this._requireDocumentServerState('facets', normalized)
+    const provider = this._requireServiceProvider()
+    const request = {
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      identity: normalized,
+      expectedRevision: state.revision,
+      signal: this._abortController.signal,
+    }
+    const result = action === 'delete'
+      ? await this._requireFacetProviderOperation(provider.softDeleteFacet, 'softDeleteFacet')(request)
+      : await this._requireFacetProviderOperation(provider.restoreFacet, 'restoreFacet')(request)
+    assertCurrent()
+    this._domainETag = result.etag
+    if (action === 'delete') {
+      Endge.domain.removeFacet(normalized)
+      const tombstone = this._materializeFacet(result.document)
+      this._documentServerState.set(this._serverStateKey('facets', normalized), { ...result.document.state })
+      this._notifyDomainChanged()
+      return tombstone
+    }
+    return this._applyFacet(result.document, normalized)
+  }
+
+  private async _mutateFacetDocumentLifecycle(
+    facetIdentity: string,
+    identity: string,
+    action: 'delete' | 'restore',
+  ): Promise<RFacetDocument> {
+    this._assertMutationsSupported()
+    const assertCurrent = this._captureGeneration()
+    const normalizedFacet = facetIdentity.trim()
+    const normalizedIdentity = identity.trim()
+    const state = this._requireFacetDocumentServerState(normalizedFacet, normalizedIdentity)
+    const provider = this._requireServiceProvider()
+    const request = {
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      facetIdentity: normalizedFacet,
+      identity: normalizedIdentity,
+      expectedRevision: state.revision,
+      signal: this._abortController.signal,
+    }
+    const result = action === 'delete'
+      ? await this._requireFacetProviderOperation(provider.softDeleteFacetDocument, 'softDeleteFacetDocument')(request)
+      : await this._requireFacetProviderOperation(provider.restoreFacetDocument, 'restoreFacetDocument')(request)
+    assertCurrent()
+    this._domainETag = result.etag
+    if (action === 'delete') {
+      Endge.domain.removeFacetDocument(normalizedFacet, normalizedIdentity)
+      const tombstone = this._materializeFacetDocument(result.document, normalizedFacet)
+      this._documentServerState.set(this._facetDocumentServerStateKey(normalizedFacet, normalizedIdentity), { ...result.document.state })
+      this._notifyDomainChanged()
+      return tombstone
+    }
+    return this._applyFacetDocument(result.document, normalizedFacet, normalizedIdentity)
   }
 
   private _assertMutationsSupported(): void {
@@ -490,6 +783,16 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
       throw new Error('[EndgeDomainRepository] Service domain provider is unavailable')
     }
     return provider
+  }
+
+  private _requireFacetProviderOperation<T extends (...args: never[]) => unknown>(
+    operation: T | undefined,
+    name: string,
+  ): T {
+    if (!operation) {
+      throw new Error(`[EndgeDomainRepository] Service domain provider does not support ${name}`)
+    }
+    return operation.bind(this._requireServiceProvider()) as T
   }
 
   private _serviceWorkspaceIdentity(): string {
@@ -537,6 +840,7 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
           identity: workspace.identity,
           displayName: workspace.displayName,
           dataMode: workspace.dataMode === 'mock' ? 'development' : 'production',
+          documentStructure: workspace.documentStructure ?? 'frontend',
           configuration: workspace.configuration,
           meta: normalizeEntityMeta(workspace.meta),
         },

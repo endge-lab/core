@@ -9,6 +9,7 @@ import type { EntityManagement } from '@/features/core/modules/domain/types/docu
 
 export type EndgeWorkspaceLocale = EndgeLocaleDefinition
 export type EndgeDataMode = 'live' | 'mock'
+export type EndgeWorkspaceDocumentStructure = 'frontend' | 'custom'
 
 export type EndgeWorkspaceLocaleLabelMode = keyof Pick<EndgeWorkspaceLocale, 'displayName' | 'shortLabel'>
 
@@ -33,6 +34,8 @@ export interface EndgeWorkspaceDefinition extends EntityManagement {
   identity: string
   displayName: string
   dataMode: EndgeDataMode
+  /** Способ организации документов; legacy payloads без поля нормализуются в frontend. */
+  documentStructure?: EndgeWorkspaceDocumentStructure
   meta?: Record<string, unknown>
   installedIntegrations: WorkspaceIntegrationReference[]
   configuration: EndgeConfiguration

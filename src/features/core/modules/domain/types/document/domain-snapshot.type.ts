@@ -34,7 +34,12 @@ export type EndgeLiveDomainDocument = Record<string, unknown> & {
 
 /** Коллекции документов live snapshot нового backend. */
 export type EndgeLivePortableDocuments = {
-  [K in keyof EndgePortableDocuments]: EndgeLiveDomainDocument[]
+  [K in Exclude<keyof EndgePortableDocuments, 'facets' | 'facet-documents'>]: EndgeLiveDomainDocument[]
+} & {
+  /** Optional only for backward-compatible materialization of pre-v6 in-memory snapshots. */
+  'facets'?: EndgeLiveDomainDocument[]
+  /** Optional only for backward-compatible materialization of pre-v6 in-memory snapshots. */
+  'facet-documents'?: EndgeLiveDomainDocument[]
 }
 
 /** Консистентный live snapshot одного workspace. */
