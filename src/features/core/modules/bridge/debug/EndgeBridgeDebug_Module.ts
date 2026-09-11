@@ -4,7 +4,7 @@ import type { BridgeCommands, BridgeDebugClient, BridgeDebugSession, BridgeMessa
 import type { EndgeCommand } from '@/features/core/modules/commands/domain/commands.types'
 import type { DiagnosticsSnapshot } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
 import { Endge } from '@/features/core/kernel/endge'
-import { BRIDGE_CONFIG, BRIDGE_SNAPSHOT_OPTIONS, normalizeBridgeServer } from '@/features/core/modules/bridge/config/bridge.config'
+import { BRIDGE_CONFIG, BRIDGE_SNAPSHOT_OPTIONS, BRIDGE_STRUCTURE_SNAPSHOT_OPTIONS, normalizeBridgeServer } from '@/features/core/modules/bridge/config/bridge.config'
 import { readBridgeCommand, readBridgeContextEvent, readBridgeInspectionSnapshot, readBridgeInspectionUpdate, readBridgeRuntimeEvent, readBridgeStreamEvent } from '@/features/core/modules/bridge/tools/bridge-sync'
 import { EndgeModule } from '@/features/federation/EndgeModule'
 
@@ -32,6 +32,7 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
   private _dataTimer: ReturnType<typeof setInterval> | null = null
   private _topologyTimer: ReturnType<typeof setTimeout> | null = null
   private _dataDirty = false
+  private _includeData = true
 
   /**
    * ----------------------------------------
@@ -113,12 +114,26 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
   }
 
   /** Начинает буферизацию событий до импорта согласованного с ними снимка. */
-  public async startContextSync(sessionId: string): Promise<BridgeInspectionSnapshot> {
+  public async startContextSync(sessionId: string, options?: { includeData: boolean }): Promise<BridgeInspectionSnapshot> {
     this._requireConfigurator()
     const session = this._requireSession(sessionId)
     const stream: IncomingEventStream = { sequence: null, buffered: [], bufferedBytes: 0 }
     this._incoming.set(sessionId, stream)
     try {
+      if (options) {
+        // Backend передаёт настройки только через setInspectionOptions, до первого снимка.
+        const accepted = await this._commands.request(session.serverUrl, {
+          type: 'setInspectionOptions',
+          sessionId,
+          data: { intervalMs: 0, includeData: options.includeData },
+        }) as { includeData?: boolean } | null
+        if (accepted?.includeData !== options.includeData) {
+          throw new Error('[Endge Bridge] Client does not support data transfer options; update client Core')
+        }
+        if (this._sessions.get(sessionId) !== session || this._incoming.get(sessionId) !== stream) {
+          throw new Error('[Endge Bridge] Inspection session changed')
+        }
+      }
       const result = readBridgeInspectionSnapshot(await this._commands.request(session.serverUrl, { type: 'startContextSync', sessionId }))
       if (this._sessions.get(sessionId) !== session || this._incoming.get(sessionId) !== stream) {
         throw new Error('[Endge Bridge] Inspection session changed')
@@ -249,6 +264,7 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     this._unsubscribeEvents = null
     this._outgoingSession = null
     this._outgoingSequence = 0
+    this._includeData = true
     this._incoming.clear()
     this._enabled = false
     this._reservation = null
@@ -298,11 +314,11 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     try {
       let data: unknown
       if (message.type === 'getSnapshot') {
-        data = Endge.diagnostics.snapshot(BRIDGE_SNAPSHOT_OPTIONS)
+        data = Endge.diagnostics.snapshot(this._includeData ? BRIDGE_SNAPSHOT_OPTIONS : BRIDGE_STRUCTURE_SNAPSHOT_OPTIONS)
       }
       else if (message.type === 'startContextSync') {
         this._startPublishing(session)
-        const snapshot = Endge.diagnostics.snapshot(BRIDGE_SNAPSHOT_OPTIONS)
+        const snapshot = Endge.diagnostics.snapshot(this._includeData ? BRIDGE_SNAPSHOT_OPTIONS : BRIDGE_STRUCTURE_SNAPSHOT_OPTIONS)
         data = { snapshot, sequence: this._outgoingSequence }
       }
       else if (message.type === 'executeCommand') {
@@ -310,18 +326,28 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
         data = null
       }
       else if (message.type === 'refreshInspection' || message.type === 'setInspectionOptions') {
-        if (this._outgoingSession !== session) {
-          throw new Error('[Endge Bridge] Inspection stream is not ready')
-        }
         if (message.type === 'refreshInspection') {
-          this._publishInspection(session, { kind: 'runtime', snapshot: Endge.runtime.captureInspection(true) })
+          if (this._outgoingSession !== session) {
+            throw new Error('[Endge Bridge] Inspection stream is not ready')
+          }
+          this._publishInspection(session, { kind: 'runtime', snapshot: Endge.runtime.captureInspection(this._includeData) })
+          data = null
         }
         else {
-          const intervalMs = (message.data as { intervalMs?: unknown } | undefined)?.intervalMs
+          const { intervalMs, includeData } = (message.data ?? {}) as { intervalMs?: unknown, includeData?: unknown }
           this._validateInterval(intervalMs)
+          if (includeData !== undefined && typeof includeData !== 'boolean') {
+            throw new Error('[Endge Bridge] Invalid data transfer option')
+          }
+          if (this._outgoingSession !== session && (includeData === undefined || intervalMs !== 0)) {
+            throw new Error('[Endge Bridge] Inspection stream is not ready')
+          }
+          if (includeData !== undefined) {
+            this._includeData = includeData
+          }
           this._configureDataPublishing(session, intervalMs)
+          data = { includeData: this._includeData }
         }
-        data = null
       }
       else {
         const identity = message.identity ?? ''
@@ -383,6 +409,9 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
         this._scheduleTopology(session)
       }
       try {
+        if (!this._includeData && !readBridgeContextEvent(event) && !readBridgeRuntimeEvent(event)) {
+          return
+        }
         this._commands.send(session.serverUrl, {
           type: 'clientEvent',
           sessionId: session.sessionId,
@@ -459,6 +488,9 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
   /** Снимает буфер и подписку только соответствующего сеанса. */
   private _releaseStream(sessionId: string): void {
     this._incoming.delete(sessionId)
+    if (this._reservation?.sessionId === sessionId) {
+      this._includeData = true
+    }
     if (this._outgoingSession?.sessionId === sessionId) {
       this._stopInspectionPublishing()
       this._unsubscribeEvents?.()
@@ -502,7 +534,7 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
   /** Fixed interval не голодает при непрерывных изменениях и пропускает неизменившиеся данные. */
   private _configureDataPublishing(session: BridgeDebugSession, intervalMs: number): void {
     this._stopDataPublishing()
-    if (intervalMs === 0) {
+    if (intervalMs === 0 || !this._includeData) {
       return
     }
     const lease = Endge.runtime.acquireDataChanges()

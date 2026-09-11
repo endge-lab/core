@@ -77,6 +77,58 @@ afterEach(() => {
 })
 
 describe('политика и lifecycle bridge', () => {
+  /** Ограничение действует до первого снимка и не снимается ручным или периодическим обновлением. */
+  it('исключает рабочие данные до снимка и сохраняет обновление структуры и контекста', async () => {
+    const { module, adapter, snapshot } = fixture({ role: 'client', allowedServers: [server], debug: true })
+    const socket = await approve(module, adapter)
+    const lease = vi.spyOn(Endge.runtime, 'acquireDataChanges')
+    const captureData = vi.spyOn(Endge.runtime, 'captureInspectionData')
+    const capture = vi.spyOn(Endge.runtime, 'captureInspection').mockReturnValue(inspectionFixture())
+    socket.receive({ type: 'setInspectionOptions', id: 'options', sessionId: 'session', data: { intervalMs: 0, includeData: false } })
+    expect(socket.sent.at(-1)).toMatchObject({ type: 'commandResult', data: { includeData: false } })
+    expect(snapshot).not.toHaveBeenCalled()
+    socket.receive({ type: 'startContextSync', id: 'start', sessionId: 'session' })
+    expect(snapshot).toHaveBeenCalledWith(expect.objectContaining({
+      includeDomain: true,
+      includeRuntime: true,
+      includeRaphData: false,
+      includeRaphGraph: false,
+      includeProgram: false,
+      includeTelemetry: false,
+      includeProblems: false,
+    }))
+    socket.receive({ type: 'refreshInspection', id: 'refresh', sessionId: 'session' })
+    expect(capture).toHaveBeenCalledWith(false)
+    socket.receive({ type: 'setInspectionOptions', id: 'interval', sessionId: 'session', data: { intervalMs: 1000 } })
+    expect(lease).not.toHaveBeenCalled()
+    expect(captureData).not.toHaveBeenCalled()
+    const sent = socket.sent.length
+    Endge.events.emitEvent('updates:message', { type: 'rows', message: { rows: [1, 2, 3] } })
+    expect(socket.sent).toHaveLength(sent)
+    Endge.events.emitEvent('context:locale-changed', { previous: 'ru', value: 'en' })
+    expect(socket.sent.at(-1)).toMatchObject({ type: 'clientEvent', data: { sequence: 2, event: { name: 'context:locale-changed' } } })
+    socket.receive({ type: 'sessionEnded', sessionId: 'session' })
+    await approve(module, adapter, 'next')
+    socket.receive({ type: 'startContextSync', id: 'next-start', sessionId: 'next' })
+    expect(snapshot).toHaveBeenLastCalledWith(expect.objectContaining({ includeRaphData: true }))
+  })
+
+  /** Старый клиент не должен молча отправлять полный снимок вопреки выбранному ограничению. */
+  it('не запрашивает снимок без подтверждения режима передачи данных', async () => {
+    const { module, adapter } = fixture({ role: 'configurator', serverUrl: server, debug: true })
+    const socket = adapter.sockets[0]!
+    socket.welcome()
+    const requested = module.debug.requestSession({ serverUrl: server, instanceId: 'client' })
+    socket.receive({ type: 'result', id: socket.sent.at(-1)!.id, data: { sessionId: 'session', clientId: 'client', configuratorId: 'connection' } })
+    await requested
+    const starting = module.debug.startContextSync('session', { includeData: false })
+    expect(socket.sent.at(-1)).toMatchObject({ type: 'setInspectionOptions', data: { includeData: false, intervalMs: 0 } })
+    const rejected = expect(starting).rejects.toThrow('Client does not support data transfer options')
+    socket.receive({ type: 'result', id: socket.sent.at(-1)!.id, data: null })
+    await rejected
+    expect(socket.sent.some(message => message.type === 'startContextSync')).toBe(false)
+  })
+
   /** Начальный snapshot, данные и статусы имеют общую последовательность без обратных Commands. */
   it('применяет буферизованные Runtime и данные в порядке потока и отзывает сеанс при разрыве', async () => {
     const { module, adapter } = fixture({ role: 'configurator', serverUrl: server, debug: true })

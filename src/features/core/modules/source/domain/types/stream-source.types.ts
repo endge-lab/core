@@ -8,13 +8,25 @@ export interface StreamSseTransportDescriptor {
   authProfileIdentity: string | null
 }
 
-export type StreamTransportDescriptor = StreamSseTransportDescriptor
+export type StreamJsonValue = string | number | boolean | null | StreamJsonValue[] | { [key: string]: StreamJsonValue }
+
+export interface StreamWebSocketTransportDescriptor {
+  kind: 'websocket'
+  url: string
+  onOpen: StreamJsonValue[]
+}
+
+export type StreamTransportDescriptor = StreamSseTransportDescriptor | StreamWebSocketTransportDescriptor
 
 export interface StreamEventDescriptor {
   sourceEvent: string
   type: string | null
   typePath: string | null
   payloadPath: string | null
+  /** Точные значения по dot-path исходного сообщения, проверяемые до eachFrom. */
+  match?: Record<string, string | number | boolean | null>
+  /** Путь к массиву; typePath и payloadPath читаются относительно каждого элемента. */
+  eachFrom?: string
 }
 
 export interface StreamSourceDocument {

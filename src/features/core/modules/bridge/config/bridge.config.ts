@@ -29,6 +29,16 @@ export const BRIDGE_SNAPSHOT_OPTIONS = {
   includeRaphGraph: true,
 } as const satisfies DiagnosticsSnapshotOptions
 
+/** Структура Domain и Runtime без рабочих данных, render payload и графа Raph. */
+export const BRIDGE_STRUCTURE_SNAPSHOT_OPTIONS = {
+  ...BRIDGE_SNAPSHOT_OPTIONS,
+  includeTelemetry: false,
+  includeProblems: false,
+  includeProgram: false,
+  includeRaphData: false,
+  includeRaphGraph: false,
+} as const satisfies DiagnosticsSnapshotOptions
+
 /** Нормализует точный backend URL без credentials, query и fragment. */
 export function normalizeBridgeServer(raw: string): string {
   const url = new URL(raw.trim())

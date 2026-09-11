@@ -1,7 +1,9 @@
 import type { ProgramDiagnostic } from '@/features/core/modules/program/domain/types/program.types'
 import type {
   StreamEventDescriptor,
+  StreamJsonValue,
   StreamSourceCompileResult,
+  StreamSseTransportDescriptor,
   StreamTransportDescriptor,
 } from '@/features/core/modules/source/domain/types/stream-source.types'
 
@@ -39,8 +41,8 @@ export function compileStreamSource(source: string, sourceVersion = 1): StreamSo
       const name = propertyName(property.key)
       const value = unwrapExpression(property.value)
       if (name === 'transport') {
-        if (!t.isCallExpression(value) || !t.isIdentifier(value.callee, { name: 'sse' }) || !t.isObjectExpression(value.arguments[0])) {
-          diagnostics.push(diagnostic('error', 'stream-transport-shape', 'transport должен иметь вид sse({ url, withCredentials? }).', 'transport', value))
+        if (!t.isCallExpression(value) || !t.isIdentifier(value.callee) || !['sse', 'websocket'].includes(value.callee.name) || value.arguments.length !== 1 || !t.isObjectExpression(value.arguments[0])) {
+          diagnostics.push(diagnostic('error', 'stream-transport-shape', 'transport должен иметь вид sse({ url, withCredentials?, auth? }) или websocket({ url, onOpen? }).', 'transport', value))
           continue
         }
         const transportDefinition = value.arguments[0]
@@ -48,16 +50,40 @@ export function compileStreamSource(source: string, sourceVersion = 1): StreamSo
         const url = readEnvironmentStringProperty(transportDefinition, 'url', diagnostics, 'transport.url')
         if (!url) {
           if (!diagnostics.some(item => item.sourcePath === 'transport.url')) {
-            diagnostics.push(diagnostic('error', 'stream-transport-url', 'SSE transport требует непустой url или env(...).', 'transport.url', value))
+            diagnostics.push(diagnostic('error', 'stream-transport-url', 'Stream transport требует непустой url или env(...).', 'transport.url', value))
           }
           continue
         }
-        const auth = readTransportAuth(transportDefinition, diagnostics)
-        transport = {
-          kind: 'sse',
-          url,
-          withCredentials: config.withCredentials === true,
-          ...auth,
+        if (value.callee.name === 'websocket') {
+          let onOpen: StreamJsonValue[] = []
+          for (const item of transportDefinition.properties) {
+            if (!t.isObjectProperty(item) || item.computed || !t.isExpression(item.value)) {
+              diagnostics.push(diagnostic('error', 'stream-websocket-property', 'websocket допускает только обычные url и onOpen properties.', 'transport', item))
+              continue
+            }
+            const key = propertyName(item.key)
+            if (key === 'onOpen') {
+              const messages = readJsonValue(unwrapExpression(item.value))
+              if (!Array.isArray(messages)) {
+                diagnostics.push(diagnostic('error', 'stream-websocket-on-open', 'onOpen должен быть массивом JSON literals без вызовов, spreads и вычислений.', 'transport.onOpen', item))
+              }
+              else {
+                onOpen = messages
+              }
+            }
+            else if (key !== 'url') {
+              diagnostics.push(diagnostic('error', 'stream-websocket-property', `websocket не поддерживает поле "${key ?? ''}".`, 'transport', item))
+            }
+          }
+          transport = { kind: 'websocket', url, onOpen }
+        }
+        else {
+          transport = {
+            kind: 'sse',
+            url,
+            withCredentials: config.withCredentials === true,
+            ...readTransportAuth(transportDefinition, diagnostics),
+          }
         }
         continue
       }
@@ -77,6 +103,9 @@ export function compileStreamSource(source: string, sourceVersion = 1): StreamSo
     }
     if (!events.length) {
       diagnostics.push(diagnostic('error', 'stream-events-empty', 'defineStream требует хотя бы одно событие.', 'events', definition))
+    }
+    if (transport?.kind === 'websocket' && events.some(event => event.sourceEvent !== 'message')) {
+      diagnostics.push(diagnostic('error', 'stream-websocket-event', 'WebSocket transport поддерживает только событие message.', 'events', definition))
     }
 
     const document = transport ? { transport, events } : null
@@ -111,10 +140,41 @@ function readEvents(node: t.ObjectExpression, diagnostics: DiagnosticDraft[]): S
     let type: string | null = null
     let typePath: string | null = null
     let payloadPath: string | null = null
+    const options: Pick<StreamEventDescriptor, 'match' | 'eachFrom'> = {}
     if (first && t.isObjectExpression(first)) {
       const config = readObject(first)
+      type = typeof config.type === 'string' ? config.type.trim() || null : null
       typePath = typeof config.typeFrom === 'string' ? config.typeFrom.trim() : null
       payloadPath = typeof config.payloadFrom === 'string' ? config.payloadFrom.trim() || null : null
+      if (type && typePath) {
+        diagnostics.push(diagnostic('error', 'stream-event-type-conflict', 'Укажите только type или typeFrom.', `events.${sourceEvent}`, first))
+      }
+      for (const item of first.properties) {
+        if (!t.isObjectProperty(item) || item.computed || !t.isExpression(item.value)) {
+          diagnostics.push(diagnostic('error', 'stream-event-property', 'event допускает только обычные properties.', `events.${sourceEvent}`, item))
+          continue
+        }
+        const key = propertyName(item.key)
+        const value = unwrapExpression(item.value)
+        if (key === 'match') {
+          const match = readJsonValue(value)
+          if (!match || typeof match !== 'object' || Array.isArray(match)
+            || Object.entries(match).some(([path, expected]) => !path.trim() || (expected !== null && typeof expected === 'object'))) {
+            diagnostics.push(diagnostic('error', 'stream-event-match', 'match должен содержать dot-path и JSON scalar (строку, число, boolean или null).', `events.${sourceEvent}.match`, item))
+          }
+          else {
+            options.match = match as NonNullable<StreamEventDescriptor['match']>
+          }
+        }
+        else if (key === 'eachFrom') {
+          if (!t.isStringLiteral(value)) {
+            diagnostics.push(diagnostic('error', 'stream-event-each-from', 'eachFrom должен быть строковым dot-path к массиву; пустая строка означает корневой массив.', `events.${sourceEvent}.eachFrom`, item))
+          }
+          else {
+            options.eachFrom = value.value.trim()
+          }
+        }
+      }
     }
     else {
       type = readStringArgument(call, 0)?.trim() || null
@@ -130,7 +190,7 @@ function readEvents(node: t.ObjectExpression, diagnostics: DiagnosticDraft[]): S
     if (type) {
       types.add(type)
     }
-    events.push({ sourceEvent, type, typePath, payloadPath })
+    events.push({ sourceEvent, type, typePath, payloadPath, ...options })
   }
   return events
 }
@@ -138,7 +198,7 @@ function readEvents(node: t.ObjectExpression, diagnostics: DiagnosticDraft[]): S
 function readTransportAuth(
   node: t.ObjectExpression,
   diagnostics: DiagnosticDraft[],
-): Pick<StreamTransportDescriptor, 'authMode' | 'authProfileIdentity'> {
+): Pick<StreamSseTransportDescriptor, 'authMode' | 'authProfileIdentity'> {
   const property = node.properties.find(item =>
     t.isObjectProperty(item)
     && !item.computed
@@ -192,6 +252,49 @@ function readTransportAuth(
     value,
   ))
   return { authMode: 'inherit', authProfileIdentity: null }
+}
+
+/** Принимает только JSON literals и не исполняет authored expressions. */
+function readJsonValue(node: t.Node): StreamJsonValue | undefined {
+  if (t.isStringLiteral(node) || t.isBooleanLiteral(node)) {
+    return node.value
+  }
+  if (t.isNullLiteral(node)) {
+    return null
+  }
+  if (t.isNumericLiteral(node)) {
+    return Number.isFinite(node.value) ? node.value : undefined
+  }
+  if (t.isUnaryExpression(node) && node.operator === '-' && t.isNumericLiteral(node.argument)) {
+    return Number.isFinite(node.argument.value) ? -node.argument.value : undefined
+  }
+  if (t.isArrayExpression(node)) {
+    const values: StreamJsonValue[] = []
+    for (const element of node.elements) {
+      const value = element ? readJsonValue(element) : undefined
+      if (value === undefined) {
+        return undefined
+      }
+      values.push(value)
+    }
+    return values
+  }
+  if (t.isObjectExpression(node)) {
+    const entries: Array<[string, StreamJsonValue]> = []
+    for (const property of node.properties) {
+      if (!t.isObjectProperty(property) || property.computed || property.shorthand) {
+        return undefined
+      }
+      const key = propertyName(property.key)
+      const value = readJsonValue(property.value)
+      if (key === null || value === undefined) {
+        return undefined
+      }
+      entries.push([key, value])
+    }
+    return Object.fromEntries(entries)
+  }
+  return undefined
 }
 
 function readObject(node: t.ObjectExpression): Record<string, unknown> {

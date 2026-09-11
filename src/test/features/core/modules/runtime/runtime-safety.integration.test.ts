@@ -84,6 +84,9 @@ describe('отмена, пауза и изоляция runtime', () => {
     const resolveAuth = vi.fn().mockResolvedValue({ profileIdentity: 'test', accessToken: 'token' })
     const model = addStream()
     const payload = Endge.program.getArtifact<StreamSourceArtifact>('stream', model.id)!.payload
+    if (payload.transport.kind !== 'sse') {
+      throw new Error('Ожидался SSE transport')
+    }
     payload.transport.authMode = 'inherit'
     const host = Endge.runtime.execute(model, { meta: { streamTransportFactory: new BrowserSseStreamTransportFactory(resolveAuth) } }) as StreamRuntimeHost
     await vi.advanceTimersByTimeAsync(0)

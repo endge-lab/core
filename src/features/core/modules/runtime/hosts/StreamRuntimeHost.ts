@@ -149,7 +149,7 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
       ?? artifact.transport.url,
     ).trim()
     if (!resolvedUrl || /^\{\{?\s*[A-Z_][A-Z0-9_]*\s*\}?\}$/.test(resolvedUrl)) {
-      throw new Error(`[StreamRuntimeHost] SSE url "${artifact.transport.url}" is not resolved.`)
+      throw new Error(`[StreamRuntimeHost] Stream url "${artifact.transport.url}" is not resolved.`)
     }
     const runtimeArtifact: StreamSourceArtifact = {
       ...artifact,
@@ -252,24 +252,38 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
     if (!descriptor) {
       return
     }
-    const now = new Date().toISOString()
-    const type = descriptor.type ?? String(readPayloadPath(message.data, descriptor.typePath) ?? '').trim()
-    if (!type) {
-      this.setContext({ status: 'error', updatedAt: now })
-      this.emit('event:error', new Error(`[StreamRuntimeHost] Event type is empty for "${descriptor.sourceEvent}".`))
+    if (descriptor.match && !Object.entries(descriptor.match).every(([path, expected]) => readPayloadPath(message.data, path) === expected)) {
       return
     }
-    const envelope: StreamEventEnvelope = {
-      type,
-      payload: readPayloadPath(message.data, descriptor.payloadPath),
-      meta: {
-        id: message.id,
-        source: this.entityIdentity,
-        sourceEvent: message.sourceEvent,
-        occurredAt: now,
-      },
+    const now = new Date().toISOString()
+    const items = descriptor.eachFrom === undefined ? [message.data] : readPayloadPath(message.data, descriptor.eachFrom)
+    if (!Array.isArray(items)) {
+      this.setContext({ status: 'error', updatedAt: now })
+      this.emit('event:error', new Error(`[StreamRuntimeHost] eachFrom must resolve to an array for "${descriptor.sourceEvent}".`))
+      return
     }
-    this._dispatch(envelope)
+    const generation = this._generation
+    for (const item of items) {
+      if (generation !== this._generation || this.status !== 'active') {
+        return
+      }
+      const type = descriptor.type ?? String(readPayloadPath(item, descriptor.typePath) ?? '').trim()
+      if (!type) {
+        this.setContext({ status: 'error', updatedAt: now })
+        this.emit('event:error', new Error(`[StreamRuntimeHost] Event type is empty for "${descriptor.sourceEvent}".`))
+        continue
+      }
+      this._dispatch({
+        type,
+        payload: readPayloadPath(item, descriptor.payloadPath),
+        meta: {
+          id: message.id,
+          source: this.entityIdentity,
+          sourceEvent: message.sourceEvent,
+          occurredAt: now,
+        },
+      })
+    }
   }
 
   private _dispatch(envelope: StreamEventEnvelope): void {
@@ -292,6 +306,6 @@ function readPayloadPath(value: unknown, path: string | null): unknown {
     if (current == null || typeof current !== 'object') {
       return undefined
     }
-    return (current as Record<string, unknown>)[key]
+    return Object.hasOwn(current, key) ? (current as Record<string, unknown>)[key] : undefined
   }, value)
 }

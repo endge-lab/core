@@ -17,24 +17,25 @@ export class BrowserSseStreamTransportFactory implements StreamTransportFactory 
   public constructor(private readonly _resolveAuthSession: ResolveAuthSession) {}
 
   public open(artifact: Parameters<StreamTransportFactory['open']>[0], callbacks: Parameters<StreamTransportFactory['open']>[1]): StreamTransportConnection {
-    if (artifact.transport.kind !== 'sse') {
-      throw new Error(`Unsupported Stream transport: ${(artifact.transport as any).kind}`)
+    const transport = artifact.transport
+    if (transport.kind !== 'sse') {
+      throw new Error(`Unsupported Stream transport: ${(transport as any).kind}`)
     }
-    if (artifact.transport.authMode !== 'none') {
+    if (transport.authMode !== 'none') {
       if (artifact.events.some(event => event.sourceEvent !== 'message')) {
         throw new Error('Authenticated SSE transport supports only the default "message" event.')
       }
       let forceRefreshOnReconnect = false
       const manager = new SSEManager({
-        url: artifact.transport.url,
+        url: transport.url,
         retryInterval: 5000,
         getToken: async () => {
-          const profileIdentity = String(artifact.transport.authProfileIdentity ?? '').trim()
-          if (artifact.transport.authMode === 'profile' && !profileIdentity) {
+          const profileIdentity = String(transport.authProfileIdentity ?? '').trim()
+          if (transport.authMode === 'profile' && !profileIdentity) {
             throw new Error('[BrowserSseStreamTransportFactory] Auth profile is required for profile mode.')
           }
           const session = await this._resolveAuthSession(
-            artifact.transport.authMode === 'profile'
+            transport.authMode === 'profile'
               ? { mode: 'profile', profile: profileIdentity }
               : { mode: 'inherit' },
             { forceRefresh: forceRefreshOnReconnect },
@@ -66,8 +67,8 @@ export class BrowserSseStreamTransportFactory implements StreamTransportFactory 
       throw new Error('EventSource is unavailable in the current runtime.')
     }
 
-    const source = new EventSource(artifact.transport.url, {
-      withCredentials: artifact.transport.withCredentials,
+    const source = new EventSource(transport.url, {
+      withCredentials: transport.withCredentials,
     })
     const listeners: Array<{ name: string, listener: EventListener }> = []
     const forward = (sourceEvent: string, raw: MessageEvent) => {
