@@ -160,6 +160,18 @@ const MATERIALIZERS: MaterializerMap = {
   [FilterType.DefaultFilter]: source => RFilter.fromPlain(source as never),
 }
 
+function materializeDocument<TType extends DomainDocumentType>(
+  type: TType,
+  source: Record<string, unknown>,
+): DomainDocumentModelMap[TType] {
+  const document = MATERIALIZERS[type](source)
+  const workspaceFolderId = source.workspaceFolderId
+  document.workspaceFolderId = typeof workspaceFolderId === 'string' || typeof workspaceFolderId === 'number'
+    ? workspaceFolderId
+    : null
+  return document
+}
+
 const SECTION_BY_TYPE: Record<DomainDocumentType, DomainSectionType> = {
   'primitive': DomainSectionType.Primitive,
   'type': DomainSectionType.Type,
@@ -364,7 +376,7 @@ export const DOMAIN_DOCUMENT_DESCRIPTORS = Object.freeze(Object.fromEntries(
       type,
       section: SECTION_BY_TYPE[type],
       domainCollection: DOMAIN_COLLECTION_BY_TYPE[type] ?? null,
-      materialize: MATERIALIZERS[type],
+      materialize: (source: Record<string, unknown>) => materializeDocument(type, source),
       createNew: CREATE_NEW_BY_TYPE[type] ?? null,
       structuralValidationOwner: 'entity' as const,
       persistence: collection
