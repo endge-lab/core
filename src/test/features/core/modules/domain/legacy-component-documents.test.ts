@@ -17,14 +17,12 @@ describe('проверка Legacy-документы компонентов', ()
       type: ComponentType.DSL,
       setupScript: 'const value = 1',
       jsxScript: '<Text>{{ value }}</Text>',
-      runtimeFilters: ['schedule'],
       inputs: {},
     }) as RComponentDSL
 
     expect(component).toBeInstanceOf(RComponentDSL)
     expect(component.setupScript).toBe('const value = 1')
     expect(component.jsxScript).toBe('<Text>{{ value }}</Text>')
-    expect(component.runtimeFilters).toEqual(['schedule'])
     expect(Object.hasOwn(RComponentDSL.prototype, 'compile')).toBe(false)
     expect((component as any).execute).toBeUndefined()
   })
@@ -38,7 +36,6 @@ describe('проверка Legacy-документы компонентов', ()
       setupScript: 'const rowHeight = 40',
       sourceIndex: 'rows',
       rowSize: 'zoom',
-      runtimeFilters: ['schedule'],
       inputs: {},
       bindings: { keys: { rows: { pk: 'id', fk: 'flightId' } } },
       columns: [{

@@ -24,7 +24,7 @@ import { serializeServiceFolder } from '@/features/core/modules/domain/documents
 import { EndgeDomain_Module, normalizeSnapshotDocuments, normalizeSnapshotFolders } from '@/features/core/modules/domain/EndgeDomain_Module'
 import { normalizeEntityMeta } from '@/features/core/modules/domain/entities/REntity'
 import { normalizeEndgeWorkspaceDefinition } from '@/features/core/modules/domain/entities/RWorkspace'
-import { ComponentType, FilterType, ParameterType, QueryType } from '@/features/core/modules/domain/types/document/document.types'
+import { ComponentType, FilterType, QueryType } from '@/features/core/modules/domain/types/document/document.types'
 import { EndgeModule } from '@/features/federation/EndgeModule'
 
 /** Явная ошибка записи через bundle/plain или live backend только для чтения. */
@@ -671,9 +671,6 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     if (documentType === 'mock') {
       return domain.getMock(documentIdOrIdentity)
     }
-    if (documentType === ParameterType.DefaultParameter) {
-      return domain.getParameter(documentIdOrIdentity)
-    }
     if (documentType === FilterType.DefaultFilter) {
       return domain.getFilter(documentIdOrIdentity)
     }
@@ -784,9 +781,6 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     }
     if (documentType === 'computation') {
       return remove(x => domain.removeComputationById(x), x => domain.removeComputation(x))
-    }
-    if (documentType === ParameterType.DefaultParameter) {
-      return remove(x => domain.removeParameterById(x), x => domain.removeParameter(x))
     }
     if (documentType === FilterType.DefaultFilter) {
       return remove(x => domain.removeFilterById(x), x => domain.removeFilter(x))

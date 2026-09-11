@@ -14,7 +14,6 @@ import type { RMock } from '@/features/core/modules/domain/entities/RMock'
 import type { RNavigation } from '@/features/core/modules/domain/entities/RNavigation'
 import type { RPage } from '@/features/core/modules/domain/entities/RPage'
 import type { RPageTemplate } from '@/features/core/modules/domain/entities/RPageTemplate'
-import type { RParameter } from '@/features/core/modules/domain/entities/RParameter'
 import type { RPolicy } from '@/features/core/modules/domain/entities/RPolicy'
 import type { RProject } from '@/features/core/modules/domain/entities/RProject'
 import type { RQuery } from '@/features/core/modules/domain/entities/RQuery'
@@ -39,11 +38,6 @@ export enum ComponentType {
   DSL = 'component-dsl',
   Table = 'component-table',
   SFC = 'component-sfc',
-}
-
-/** Тип документа «Параметр» (коллекция parameters). */
-export enum ParameterType {
-  DefaultParameter = 'default-parameter',
 }
 
 /** Тип документа «Фильтр» (коллекция filters). */
@@ -79,7 +73,6 @@ export enum DomainSectionType {
   Converter = 'converter',
   Computation = 'computation',
   Integration = 'integration',
-  Parameters = 'parameters',
   Filters = 'filters',
   Environment = 'environment',
   Tenant = 'tenant',
@@ -129,7 +122,6 @@ export const DOMAIN_DOCUMENT_TYPES = [
   QueryType.Custom,
   QueryType.GraphQL,
   QueryType.REST,
-  ParameterType.DefaultParameter,
   FilterType.DefaultFilter,
 ] as const
 
@@ -153,4 +145,4 @@ export interface Document {
 /**
  * Описывает любой документ рефлекцию
  */
-export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RComposition | RStore | RStream | RSimulation | RUpdate | RMock | RAction | RConverter | RComputation | RIntegration | RParameter | RFilter | RPolicy | RStyle | RConfiguration | RType | RVocabs | RI18nBundle | RAuthProfile | RWorkspace | RTenant | RProject | REnvironment | RPageTemplate | RPage | RNavigation
+export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RComposition | RStore | RStream | RSimulation | RUpdate | RMock | RAction | RConverter | RComputation | RIntegration | RFilter | RPolicy | RStyle | RConfiguration | RType | RVocabs | RI18nBundle | RAuthProfile | RWorkspace | RTenant | RProject | REnvironment | RPageTemplate | RPage | RNavigation

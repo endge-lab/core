@@ -30,7 +30,6 @@ import { RMock } from '@/features/core/modules/domain/entities/RMock'
 import { RNavigation } from '@/features/core/modules/domain/entities/RNavigation'
 import { RPage } from '@/features/core/modules/domain/entities/RPage'
 import { RPageTemplate } from '@/features/core/modules/domain/entities/RPageTemplate'
-import { RParameter } from '@/features/core/modules/domain/entities/RParameter'
 import { RPolicy } from '@/features/core/modules/domain/entities/RPolicy'
 import { RProject } from '@/features/core/modules/domain/entities/RProject'
 import { RQuery } from '@/features/core/modules/domain/entities/RQuery'
@@ -43,7 +42,7 @@ import { RType } from '@/features/core/modules/domain/entities/RType'
 import { RUpdate } from '@/features/core/modules/domain/entities/RUpdate'
 import { RVocabs } from '@/features/core/modules/domain/entities/RVocabs'
 import { RWorkspace } from '@/features/core/modules/domain/entities/RWorkspace'
-import { ComponentType, DOMAIN_DOCUMENT_TYPES, DomainSectionType, FilterType, ParameterType, QueryType } from '@/features/core/modules/domain/types/document/document.types'
+import { ComponentType, DOMAIN_DOCUMENT_TYPES, DomainSectionType, FilterType, QueryType } from '@/features/core/modules/domain/types/document/document.types'
 import { ACTION_DEFAULT_SOURCE } from '@/features/core/modules/source/templates/action.default.source'
 import { COMPONENT_SFC_DEFAULT_SOURCE } from '@/features/core/modules/source/templates/component-sfc/component-sfc.default.source'
 import { COMPOSITION_DEFAULT_SOURCE } from '@/features/core/modules/source/templates/composition.default.source'
@@ -97,7 +96,6 @@ export interface DomainDocumentModelMap {
   [QueryType.Custom]: RQuery
   [QueryType.GraphQL]: RQuery
   [QueryType.REST]: RQuery
-  [ParameterType.DefaultParameter]: RParameter
   [FilterType.DefaultFilter]: RFilter
 }
 
@@ -159,7 +157,6 @@ const MATERIALIZERS: MaterializerMap = {
   [QueryType.Custom]: source => Serialize.fromJSON(RQuery, source),
   [QueryType.GraphQL]: source => Serialize.fromJSON(RQuery, source),
   [QueryType.REST]: source => Serialize.fromJSON(RQuery, source),
-  [ParameterType.DefaultParameter]: source => RParameter.fromPlain(source as never),
   [FilterType.DefaultFilter]: source => RFilter.fromPlain(source as never),
 }
 
@@ -196,7 +193,6 @@ const SECTION_BY_TYPE: Record<DomainDocumentType, DomainSectionType> = {
   [QueryType.Custom]: DomainSectionType.Query,
   [QueryType.GraphQL]: DomainSectionType.Query,
   [QueryType.REST]: DomainSectionType.Query,
-  [ParameterType.DefaultParameter]: DomainSectionType.Parameters,
   [FilterType.DefaultFilter]: DomainSectionType.Filters,
 }
 

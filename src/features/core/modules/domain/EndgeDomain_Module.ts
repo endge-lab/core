@@ -18,7 +18,6 @@ import type { RMock } from '@/features/core/modules/domain/entities/RMock'
 import type { RNavigation } from '@/features/core/modules/domain/entities/RNavigation'
 import type { RPage } from '@/features/core/modules/domain/entities/RPage'
 import type { RPageTemplate } from '@/features/core/modules/domain/entities/RPageTemplate'
-import type { RParameter } from '@/features/core/modules/domain/entities/RParameter'
 import type { RPolicy } from '@/features/core/modules/domain/entities/RPolicy'
 import type { RProject } from '@/features/core/modules/domain/entities/RProject'
 import type { RQuery } from '@/features/core/modules/domain/entities/RQuery'
@@ -38,7 +37,6 @@ import type {
   EndgeLiveDomainDocument,
   EndgeLiveDomainSnapshot,
 } from '@/features/core/modules/domain/types/document/domain-snapshot.type'
-import type { FilterFieldSchema } from '@/features/core/modules/domain/types/document/query.types'
 import { Serialize } from '@endge/utils'
 import { Endge } from '@/features/core/kernel/endge'
 import { readOnlyDocument } from '@/features/core/kernel/tools/read-only-document'
@@ -53,7 +51,6 @@ import { ResolvedEntityIndex } from '@/features/core/modules/domain/resolved/res
 import {
   ComponentType,
   FilterType,
-  ParameterType,
   QueryType,
 } from '@/features/core/modules/domain/types/document/document.types'
 import { EndgeModule } from '@/features/federation/EndgeModule'
@@ -257,7 +254,6 @@ export function normalizeSnapshotFolders(
 
 /** Результат parsePlain: все распарсенные сущности без добавления в домен. */
 export interface EndgeDomainParsed {
-  parameters: RParameter[]
   filters: RFilter[]
   projects: RProject[]
   types: RType[]
@@ -392,9 +388,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
 
   private _foldersById: Map<string | number, RFolder> = new Map()
   private _foldersByIdentity: Map<string, RFolder> = new Map()
-
-  private _parametersById: Map<string | number, RParameter> = new Map()
-  private _parametersByIdentity: Map<string, RParameter> = new Map()
 
   private _filtersById: Map<string | number, RFilter> = new Map()
   private _filtersByIdentity: Map<string, RFilter> = new Map()
@@ -550,8 +543,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
     this._integrationsByIdentity.clear()
     this._foldersById.clear()
     this._foldersByIdentity.clear()
-    this._parametersById.clear()
-    this._parametersByIdentity.clear()
     this._filtersById.clear()
     this._filtersByIdentity.clear()
     this._versionsById.clear()
@@ -687,7 +678,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
       domainEntityIndex(this._convertersById, this._convertersByIdentity),
       domainEntityIndex(this._integrationsById, this._integrationsByIdentity),
       domainEntityIndex(this._foldersById, this._foldersByIdentity),
-      domainEntityIndex(this._parametersById, this._parametersByIdentity),
       domainEntityIndex(this._filtersById, this._filtersByIdentity),
       domainEntityIndex(this._versionsById, this._versionsByIdentity),
       domainEntityIndex(this._environmentsById, this._environmentsByIdentity),
@@ -754,7 +744,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
       computations: normalizeSnapshotDocuments(documents.computations, folderIds),
       integrations: [],
       folders: normalizeSnapshotFolders(folders, folderIds),
-      parameters: [],
       filters: normalizeSnapshotDocuments(documents.filters, folderIds),
       environments: normalizeSnapshotDocuments(documents.environments, folderIds),
       tenants: normalizeSnapshotDocuments(documents.tenants, folderIds),
@@ -828,7 +817,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
       computations: normalizeBundleDocuments(normalized.computations, folderIds),
       integrations: [],
       folders: normalizeBundleFolders(normalized.folders, folderIds),
-      parameters: [],
       filters: normalizeBundleDocuments(normalized.filters, folderIds),
       environments: normalizeBundleDocuments(normalized.environments, folderIds),
       tenants: normalizeBundleDocuments(normalized.tenants, folderIds),
@@ -3544,126 +3532,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
   }
 
   /**
-   * Методы для работы с параметрами
-   */
-  public getParameters(): RParameter[] {
-    return Array.from(this._parametersByIdentity.values())
-  }
-
-  /**
-   * Возвращает Parameter по id.
-   */
-  public getParameterById(id: string | number): RParameter | null {
-    return this._parametersById.get(id) ?? null
-  }
-
-  /**
-   * Возвращает Parameter по identity.
-   */
-  public getParameterByIdentity(identity: string): RParameter | null {
-    return this._parametersByIdentity.get(identity) || null
-  }
-
-  /**
-   * Возвращает Parameter по id или identity.
-   */
-  public getParameter(idOrIdentity: string | number): RParameter | null {
-    return this.getParameterById(idOrIdentity as number) || this.getParameterById(Number(idOrIdentity)) || this.getParameterByIdentity(idOrIdentity as string)
-  }
-
-  /**
-   * Возвращает Parameter по identity.
-   */
-  public getParameterIdentity(identity: string): RParameter | null {
-    return this.getParameterByIdentity(identity)
-  }
-
-  /**
-   * Возвращает поле Parameter по identity и имени поля.
-   */
-  public getParameterField(identity: string, field: string): FilterFieldSchema | null {
-    return this.getParameterByIdentity(identity)?.fields.get(field) ?? null
-  }
-
-  /**
-   * Добавляет Parameter в домен и обновляет индексы.
-   */
-  public addParameter(parameter: RParameter): void {
-    if (this === Endge.domain) {
-      Endge.assertWritable()
-    }
-    if (this._parametersByIdentity.has(parameter.identity) || this._parametersById.has(parameter.id)) {
-      return
-    }
-    this._parametersById.set(parameter.id, parameter)
-    this._parametersByIdentity.set(parameter.identity, parameter)
-    this.notify()
-  }
-
-  /**
-   * Удаляет Parameter из домена по id.
-   */
-  public removeParameterById(id: string | number): void {
-    if (this === Endge.domain) {
-      Endge.assertWritable()
-    }
-    const parameter = this._parametersById.get(id)
-    if (!parameter) {
-      return
-    }
-    this._parametersById.delete(parameter.id)
-    this._parametersByIdentity.delete(parameter.identity)
-    this.notify()
-  }
-
-  /**
-   * Удаляет Parameter из домена по identity.
-   */
-  public removeParameterByIdentity(identity: string): void {
-    if (this === Endge.domain) {
-      Endge.assertWritable()
-    }
-    const parameter = this._parametersByIdentity.get(identity)
-    if (!parameter) {
-      return
-    }
-    this._parametersById.delete(parameter.id)
-    this._parametersByIdentity.delete(parameter.identity)
-    this.notify()
-  }
-
-  /**
-   * Удаляет Parameter из домена.
-   */
-  public removeParameter(identity: string): void {
-    if (this === Endge.domain) {
-      Endge.assertWritable()
-    }
-    this.removeParameterByIdentity(identity)
-  }
-
-  /**
-   * Проверяет наличие Parameter по id.
-   */
-  public hasParameterById(id: string | number): boolean {
-    return this._parametersById.has(id)
-  }
-
-  /**
-   * Проверяет наличие Parameter по identity.
-   */
-  public hasParameterByIdentity(identity: string): boolean {
-    return this._parametersByIdentity.has(identity)
-  }
-
-  /**
-   * Проверяет наличие Parameter по id или identity.
-   */
-  public hasParameter(identity: string): boolean {
-    return this.hasParameterByIdentity(identity)
-  }
-
-  /**
    * Методы для работы с фильтрами
    */
   public getFilters(): RFilter[] {
@@ -3917,7 +3785,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
       converters: persisted(this.getConverters()).map(x => Serialize.toPlain(x)),
       integrations: persisted(this.getIntegrations()).map(x => Serialize.toPlain(x)),
       folders: persisted(this.getFolders()).map(x => Serialize.toPlain(x)),
-      parameters: persisted(this.getParameters()).map(x => x.toPlain()),
       filters: persisted(this.getFilters()).map(x => x.toPlain()),
       environments: persisted(this.getEnvironments()).map(x => Serialize.toPlain(x)),
       tenants: persisted(this.getTenants()).map(x => x.toPlain()),
@@ -3990,7 +3857,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
     }
 
     const out: EndgeDomainParsed = {
-      parameters: [],
       filters: [],
       projects: [],
       types: [],
@@ -4022,7 +3888,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
       folders: [],
     }
 
-    out.parameters.push(...materializeDomainDocumentsOfType(json.parameters, ParameterType.DefaultParameter))
     out.filters.push(...materializeDomainDocumentsOfType(json.filters, FilterType.DefaultFilter))
     out.projects.push(...materializeDomainDocumentsOfType(json.projects ?? json._projectsByIdentity, 'project'))
     out.types.push(...materializeDomainDocuments(
@@ -4086,7 +3951,6 @@ export class EndgeDomain_Module extends EndgeModule<EndgeBootContext> {
     if (this === Endge.domain) {
       Endge.assertWritable()
     }
-    parsed.parameters.forEach(p => this.addParameter(p))
     parsed.filters.forEach(f => this.addFilter(f))
     parsed.projects.forEach(p => this.addProject(p))
     parsed.types.forEach(t => this.addType(t))

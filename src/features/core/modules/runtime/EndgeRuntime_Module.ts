@@ -149,7 +149,6 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     Raph.addPhase(RuntimeNodeUpdatePhase.make())
     Raph.addPhase(RuntimeBoundaryUpdatePhase.make())
     this._syncWorkspaceVariablesToRaph()
-    this._hydrateRuntimeFilters()
     this._unsubscribeWorkspace = Endge.workspace.subscribe(() => {
       this._syncWorkspaceVariablesToRaph()
     })
@@ -833,55 +832,6 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
         continue
       }
       Raph.app.set(`${STORAGE_VARS_KEY}.${name}`, Endge.workspace.variables.getValue(name))
-    }
-  }
-
-  /** Восстанавливает сохранённые значения runtime-фильтров независимо от переменных workspace. */
-  private _hydrateRuntimeFilters(): void {
-    try {
-      const store = Endge.context.getState<Record<string, unknown>>('endge.runtime.parameters')
-        ?? this._migrateLegacyRuntimeFilters()
-      if (!store || typeof store !== 'object') {
-        return
-      }
-
-      for (const [identity, payload] of Object.entries(store)) {
-        if (!identity) {
-          continue
-        }
-        Raph.set(
-          identity.startsWith('parameters.') ? identity : `parameters.${identity}`,
-          payload,
-        )
-      }
-    }
-    catch (error) {
-      console.error(`[EndgeRuntime] Failed to hydrate runtime filters: ${errorText(error)}`)
-    }
-  }
-
-  /** Однократно переносит прежний глобальный storage runtime-фильтров. */
-  private _migrateLegacyRuntimeFilters(): Record<string, unknown> | undefined {
-    if (typeof localStorage === 'undefined') {
-      return undefined
-    }
-    try {
-      const raw = localStorage.getItem('endge:parameters')
-      if (!raw) {
-        return undefined
-      }
-      const store = JSON.parse(raw) as Record<string, unknown>
-      if (!store || typeof store !== 'object' || Array.isArray(store)) {
-        return undefined
-      }
-      Endge.context.setState('endge.runtime.parameters', store)
-      if (Endge.context.getState('endge.runtime.parameters') !== undefined) {
-        localStorage.removeItem('endge:parameters')
-      }
-      return store
-    }
-    catch {
-      return undefined
     }
   }
 

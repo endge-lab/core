@@ -34,7 +34,6 @@ const CORE_TYPES: readonly BuiltinTypeDefinition[] = [
   { identity: 'RefNavigation', displayName: 'Ссылка на навигацию', category: 'reference', target: 'navigations' },
   { identity: 'RefPage', displayName: 'Ссылка на страницу', category: 'reference', target: 'pages' },
   { identity: 'RefPageTemplate', displayName: 'Ссылка на шаблон страницы', category: 'reference', target: 'page-templates' },
-  { identity: 'RefParameter', displayName: 'Ссылка на параметр', category: 'reference', target: 'parameters' },
   { identity: 'RefPolicy', displayName: 'Ссылка на policy', category: 'reference', target: 'policies' },
   { identity: 'RefProject', displayName: 'Ссылка на проект', category: 'reference', target: 'projects' },
   { identity: 'RefQuery', displayName: 'Ссылка на запрос', category: 'reference', target: 'queries' },

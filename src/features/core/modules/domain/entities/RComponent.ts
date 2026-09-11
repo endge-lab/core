@@ -48,7 +48,6 @@ export function ReflectComponentFromPlain(
     table.setupScript = base.setupScript
     table.sourceIndex = json.sourceIndex
     table.rowSize = json.rowSize
-    table.runtimeFilters = base.runtimeFilters
     table.applyEntityMeta(json)
 
     const rawBindings = json.bindings

@@ -27,7 +27,4 @@ export class RComponentBase extends REntity {
   /** Сохранённый legacy source настройки. Он хранится только для просмотра. */
   @Expose()
   setupScript: string = ''
-
-  @Expose()
-  runtimeFilters: string[] = []
 }

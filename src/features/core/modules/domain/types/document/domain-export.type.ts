@@ -22,7 +22,6 @@ export interface EndgeDomainPlain {
   computations: unknown[]
   integrations: unknown[]
   folders: unknown[]
-  parameters: unknown[]
   filters: unknown[]
   environments: unknown[]
   tenants: unknown[]
