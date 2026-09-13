@@ -35,6 +35,28 @@ export interface EndgeDocumentMutationResult {
   etag: string | null
 }
 
+/** Minimal deleted-document metadata returned by the workspace archive. */
+export interface EndgeArchivedDocument {
+  type: EndgeDomainCollection
+  identity: string
+  displayName: string
+  description?: string
+  deletedAt: string
+  revision: number
+}
+
+export interface EndgeArchiveListRequest {
+  workspaceIdentity: string
+  limit?: number
+  cursor?: string
+  signal?: AbortSignal
+}
+
+export interface EndgeArchivePage {
+  items: EndgeArchivedDocument[]
+  nextCursor?: string
+}
+
 /** Документ с optimistic revision для атомарного перемещения. */
 export interface EndgeDocumentMoveRequestItem {
   collection: EndgeDomainCollection
@@ -129,6 +151,7 @@ export interface EndgeDomainProvider {
   updateDocument: (request: EndgeDocumentMutationRequest) => Promise<EndgeDocumentMutationResult>
   softDeleteDocument: (request: EndgeDocumentMutationRequest) => Promise<EndgeDocumentMutationResult>
   restoreDocument: (request: EndgeDocumentMutationRequest) => Promise<EndgeDocumentMutationResult>
+  listArchivedDocuments?: (request: EndgeArchiveListRequest) => Promise<EndgeArchivePage>
   moveDocuments?: (request: EndgeDocumentsMoveRequest) => Promise<EndgeDocumentsMoveResult>
   updateWorkspace: (request: EndgeWorkspaceMutationRequest) => Promise<EndgeWorkspaceMutationResult>
 

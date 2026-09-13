@@ -4,6 +4,8 @@ import type { DocumentCreateRequest, DocumentCreateResult } from '@/features/cor
 import type { EndgeDomainDocumentMove } from '@/features/core/modules/domain/types/document/document-move.type'
 import type { DomainDocumentType } from '@/features/core/modules/domain/types/document/document.types'
 import type {
+  EndgeArchivedDocument,
+  EndgeArchivePage,
   EndgeDomainCollection,
   EndgeDomainProvider,
   EndgeDomainRepositoryCapabilities,
@@ -262,6 +264,43 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     assertCurrent()
     this._domainETag = result.etag
     this._applyServiceDocument(documentType, result.document, documentIdOrIdentity)
+  }
+
+  /** Lists deleted generic documents for the active service workspace. */
+  public async listArchivedDocuments(cursor?: string, limit = 100): Promise<EndgeArchivePage> {
+    const assertCurrent = this._captureGeneration()
+    const provider = this._requireServiceProvider()
+    if (!provider.listArchivedDocuments) {
+      throw new Error('[EndgeDomainRepository] Service domain provider does not support listArchivedDocuments')
+    }
+    const page = await provider.listArchivedDocuments({
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      cursor,
+      limit,
+      signal: this._abortController.signal,
+    })
+    assertCurrent()
+    return page
+  }
+
+  /** Restores a tombstone returned by listArchivedDocuments. */
+  public async restoreArchivedDocument(item: EndgeArchivedDocument): Promise<EndgeLiveDomainDocument> {
+    this._assertMutationsSupported()
+    if (!this._capabilities.restore) {
+      throw new EndgeDomainRepositoryReadOnlyError(this._capabilities.provider)
+    }
+    const assertCurrent = this._captureGeneration()
+    const provider = this._requireServiceProvider()
+    const result = await provider.restoreDocument({
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      signal: this._abortController.signal,
+      collection: item.type,
+      identity: item.identity,
+      expectedRevision: item.revision,
+    })
+    assertCurrent()
+    this._domainETag = result.etag
+    return result.document
   }
 
   public async changeDocumentFolder(
