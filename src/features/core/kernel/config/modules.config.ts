@@ -211,7 +211,16 @@ export const ENDGE_CORE_MODULES = [
    * управляет их деревом, операциями и ресурсами Raph.
    */
   { key: 'runtime', create: () => new EndgeRuntime_Module(), after: ['compiler', 'workspace', 'context'] },
-  { key: 'inspection', create: () => new EndgeInspection_Module(), after: ['runtime', 'program', 'events', 'context'] },
+  {
+    key: 'inspection',
+    create: ({ getModule }) => new EndgeInspection_Module(
+      getModule<EndgeContext_Module>('context'),
+      getModule<EndgeRuntime_Module>('runtime'),
+      getModule<EndgeEvents_Module>('events'),
+      getModule<EndgeProgram_Module>('program'),
+    ),
+    after: ['runtime', 'program', 'events', 'context'],
+  },
 
   /**
    * Сохраняет точку входа для обработки прежних профилей внешних обновлений.

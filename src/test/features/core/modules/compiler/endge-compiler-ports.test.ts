@@ -9,9 +9,13 @@ import { RQuery } from '@/features/core/modules/domain/entities/RQuery'
 import { prepareTestCompilerContext } from '@/test/helpers/compiler-context'
 
 describe('порты ComponentSFC в EndgeCompiler', () => {
-  beforeEach(() => prepareCompilerContext())
+  beforeEach(() => {
+    Endge.actions.setup()
+    prepareCompilerContext()
+  })
 
   afterEach(() => {
+    Endge.actions.reset()
     Endge.configuration.reset()
     Endge.program.clear()
     Endge.domain.reset()

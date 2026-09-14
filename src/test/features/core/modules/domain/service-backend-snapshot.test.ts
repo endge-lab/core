@@ -28,6 +28,7 @@ const DOCUMENT_KEYS = [
   'compositions',
   'stores',
   'streams',
+  'simulations',
   'updates',
   'mocks',
   'components',
@@ -40,6 +41,7 @@ const DOCUMENT_KEYS = [
   'auth-profiles',
   'navigations',
   'styles',
+  'configurations',
 ] as const
 
 function liveDocument(identity: string, extra: Record<string, unknown> = {}): EndgeLiveDomainDocument {
@@ -72,6 +74,8 @@ function liveSnapshot(): EndgeLiveDomainSnapshot {
     config: {},
     credentials: {},
   })]
+  documents.simulations = []
+  documents.configurations = []
 
   return {
     kind: 'workspace-snapshot',
@@ -207,7 +211,6 @@ describe('провайдер Core для service backend', () => {
     expect(plain.facets[0]).toMatchObject({ id: 'region-server-id', identity: 'region' })
     expect(plain.facetDocuments[0]).toMatchObject({ identity: 'east', facetIdentity: 'region' })
     expect(plain.components).toEqual([])
-    expect(plain.parameters).toEqual([])
     expect(plain.policies).toEqual([])
     expect(plain.pageTemplates).toEqual([])
     expect(plain.pages).toEqual([])
@@ -487,6 +490,7 @@ describe('провайдер Core для service backend', () => {
       workspaceIdentity: 'workspace-a',
       signal: expect.any(AbortSignal),
       folderIdentity: 'folder-target',
+      placement: 'frontend',
       documents: [
         { collection: 'actions', identity: 'action-a', expectedRevision: 7 },
         { collection: 'actions', identity: 'action-b', expectedRevision: 7 },

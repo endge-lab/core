@@ -175,6 +175,7 @@ describe('компилятор Source типа', () => {
       ast: null,
       document: null,
       artifact: null,
+      metadata: {},
       diagnostics: [],
     })
   })

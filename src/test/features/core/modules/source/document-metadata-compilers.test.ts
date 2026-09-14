@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
 import { compileComputation } from '@/features/core/modules/compiler/services/computation/computation-compile'
-import { patchDocumentMetadata } from '@/features/core/modules/domain/documents/document-metadata'
 import { compileActionSource } from '@/features/core/modules/source/services/compilers/action-source-compile'
 import { compileConfigurationSource } from '@/features/core/modules/source/services/compilers/configuration-source-compile'
 import { compileSimulationSource } from '@/features/core/modules/source/services/compilers/simulation-source-compile'
@@ -10,6 +9,7 @@ import { compileStreamSource } from '@/features/core/modules/source/services/com
 import { compileTypeSource } from '@/features/core/modules/source/services/compilers/type-source-compile'
 import { compileUpdateSource } from '@/features/core/modules/source/services/compilers/update-source-compile'
 import { compileVocabSource } from '@/features/core/modules/source/services/compilers/vocab-source-compile'
+import { patchDocumentMetadata } from '@/features/core/modules/source/services/document-metadata'
 import { ACTION_DEFAULT_SOURCE } from '@/features/core/modules/source/templates/action.default.source'
 import { COMPUTATION_DEFAULT_SOURCE } from '@/features/core/modules/source/templates/computation.default.source'
 import { CONFIGURATION_DEFAULT_SOURCE } from '@/features/core/modules/source/templates/configuration.default.source'

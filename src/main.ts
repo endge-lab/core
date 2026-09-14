@@ -242,7 +242,7 @@ export * from '@/features/core/modules/converters/tools/date/string-to-date'
 export * from '@/features/core/modules/converters/tools/date/weekdays-range'
 
 export * from '@/features/core/modules/domain/documents/domain-document-descriptors'
-export * from '@/features/core/modules/domain/documents/document-metadata'
+export * from '@/features/core/modules/source/services/document-metadata'
 export * from '@/features/core/modules/domain/documents/service-document-serializer'
 export * from '@/features/core/modules/configuration/domain/endge-configuration'
 export * from '@/features/core/modules/configuration/domain/configuration-value'

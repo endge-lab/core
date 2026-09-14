@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { ENDGE_CORE_MODULES } from '@/features/core/kernel/config/modules.config'
 import { Endge } from '@/features/core/kernel/endge'
 import { EndgeSource_Module } from '@/features/core/modules/source/EndgeSource_Module'
 
 describe('модуль EndgeSource', () => {
   it('регистрируется как модуль федерации Endge', () => {
-    expect(ENDGE_CORE_MODULES.some(module => module.key === 'source')).toBe(true)
+    expect(Endge.hasModule('source')).toBe(true)
     expect(Endge.source).toBeInstanceOf(EndgeSource_Module)
   })
 

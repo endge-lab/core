@@ -68,7 +68,7 @@ describe('endgeFederation.define', () => {
           create: () => new DependencyModule(),
         },
       ] as const satisfies readonly EndgeModuleDefinition[],
-    })).toThrow('module key "boot" conflicts with federation API')
+    })).toThrow('lifecycle node key "boot" conflicts with federation API')
   })
 
   it('обнаруживает цикл между module factories', () => {

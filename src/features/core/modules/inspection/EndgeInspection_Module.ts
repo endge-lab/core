@@ -5,8 +5,11 @@ import type {
   InspectionRecording,
   InspectionState,
 } from './types/inspection.types'
+import type { EndgeContext_Module } from '@/features/core/modules/context/EndgeContext_Module'
+import type { EndgeEvents_Module } from '@/features/core/modules/events/EndgeEvents_Module'
+import type { EndgeProgram_Module } from '@/features/core/modules/program/EndgeProgram_Module'
+import type { EndgeRuntime_Module } from '@/features/core/modules/runtime/EndgeRuntime_Module'
 import { v4 as uuid } from 'uuid'
-import { Endge } from '@/features/core/kernel/endge'
 import {
   copyBundleJson,
   equalBundleJson,
@@ -41,6 +44,15 @@ export class EndgeInspection_Module extends EndgeModule {
   private _captureProgramId: string | null = null
   private _runId = uuid()
 
+  public constructor(
+    private readonly _context: EndgeContext_Module,
+    private readonly _runtime: EndgeRuntime_Module,
+    private readonly _events: EndgeEvents_Module,
+    private readonly _program: EndgeProgram_Module,
+  ) {
+    super()
+  }
+
   public get status(): 'idle' | 'recording' | 'stopped' | 'ready' | 'error' {
     if (this.error) {
       return 'error'
@@ -61,7 +73,7 @@ export class EndgeInspection_Module extends EndgeModule {
   public get dataAvailable(): boolean {
     return (
       this._local?.dataAvailable
-      ?? Object.hasOwn(Endge.runtime.inspection, 'data')
+      ?? Object.hasOwn(this._runtime.inspection, 'data')
     )
   }
 
@@ -193,7 +205,7 @@ export class EndgeInspection_Module extends EndgeModule {
   public open(recording: InspectionRecording): void {
     this._requireDebugger()
     const prepared = this.prepare(recording)
-    if (prepared.programId !== Endge.program.programId) {
+    if (prepared.programId !== this._program.programId) {
       throw new Error('[Inspection] Program mismatch')
     }
     const records = prepared.chunks.flatMap(chunk => chunk.records)
@@ -271,8 +283,8 @@ export class EndgeInspection_Module extends EndgeModule {
 
   private _applyState(state: InspectionState, sequence: number): void {
     if (this._appliedState !== state) {
-      Endge.context.applyInspection(state.context)
-      Endge.runtime.replaceInspectionSnapshot({
+      this._context.applyInspection(state.context)
+      this._runtime.replaceInspectionSnapshot({
         ...state.runtime,
         ...(state.dataAvailable ? { data: state.data } : {}),
       })
@@ -338,12 +350,12 @@ export class EndgeInspection_Module extends EndgeModule {
     options: { includeData?: boolean },
     onChunk?: (chunk: InspectionChunk) => void,
   ): InspectionCapture {
-    if (Endge.mode === 'debugger' || !Endge.program.programId) {
+    if (this._context.bootMode === 'debugger' || !this._program.programId) {
       throw new Error(
         '[Inspection] A compiled running application is required',
       )
     }
-    const programId = Endge.program.programId
+    const programId = this._program.programId
     if (this._captureProgramId !== programId) {
       this._captureProgramId = programId
       this._runId = uuid()
@@ -351,7 +363,7 @@ export class EndgeInspection_Module extends EndgeModule {
     let lease: { release: () => void } | null = null
     const policy = (includeData: boolean) => {
       if (includeData && !lease) {
-        lease = Endge.runtime.acquireDataChanges()
+        lease = this._runtime.acquireDataChanges()
       }
       if (!includeData && lease) {
         lease.release()
@@ -375,14 +387,14 @@ export class EndgeInspection_Module extends EndgeModule {
       throw error
     }
     this._captures.add(capture)
-    const offEvents = Endge.events.onAny(event =>
+    const offEvents = this._events.onAny(event =>
       capture.update({
         name: event.name,
         payload: lease ? serializeDiagnosticsJson(event.payload).value : null,
       }),
     )
-    const offProgram = Endge.program.subscribe(() => {
-      if (Endge.program.programId !== programId) {
+    const offProgram = this._program.subscribe(() => {
+      if (this._program.programId !== programId) {
         capture.stop()
       }
     })
@@ -420,9 +432,9 @@ export class EndgeInspection_Module extends EndgeModule {
   }
 
   private _captureState(includeData: boolean): InspectionState {
-    const { data, ...runtime } = Endge.runtime.captureInspection(includeData)
+    const { data, ...runtime } = this._runtime.captureInspection(includeData)
     return copyBundleJson({
-      context: { ...Endge.context.serialize(), dataMode: Endge.context.dataMode },
+      context: { ...this._context.serialize(), dataMode: this._context.dataMode },
       runtime,
       data: data ?? null,
       dataAvailable: includeData,
@@ -533,7 +545,7 @@ export class EndgeInspection_Module extends EndgeModule {
   }
 
   private _requireDebugger(): void {
-    if (Endge.mode !== 'debugger') {
+    if (this._context.bootMode !== 'debugger') {
       throw new Error('[Inspection] Playback requires debugger mode')
     }
   }

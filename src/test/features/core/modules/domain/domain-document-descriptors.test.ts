@@ -194,11 +194,13 @@ describe('дескрипторы документов домена', () => {
       source: null,
       program: null,
       runtime: null,
+      metadata: 'entity-meta',
     })
     expect(getDomainDocumentDescriptor('page').capabilities).toEqual({
       source: null,
       program: null,
       runtime: 'page',
+      metadata: null,
     })
   })
 })

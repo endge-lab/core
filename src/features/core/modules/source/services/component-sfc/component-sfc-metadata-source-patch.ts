@@ -4,8 +4,8 @@ import type {
 } from '@/features/core/modules/domain/types/component/sfc/metadata-visual.types'
 import type { ProgramMetadataMap } from '@/features/core/modules/program/domain/types/program-metadata.types'
 
-import { inspectDocumentMetadata, patchDocumentMetadata } from '@/features/core/modules/domain/documents/document-metadata'
 import { ComponentType } from '@/features/core/modules/domain/types/document/document.types'
+import { inspectDocumentMetadata, patchDocumentMetadata } from '@/features/core/modules/source/services/document-metadata'
 
 /** Совместимый фасад старого SFC API над общим descriptor-driven metadata contract. */
 export function inspectComponentSFCMetadata(source: string): ComponentSFCMetadataVisualProjection {

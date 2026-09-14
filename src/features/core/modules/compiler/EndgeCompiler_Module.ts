@@ -61,7 +61,6 @@ import {
   validateTypeSourceExpressionUsage,
 } from '@/features/core/modules/compiler/services/type/type-program-validation'
 import { createDiagnosticsEntityOwner } from '@/features/core/modules/diagnostics/EndgeProblems_Module'
-import { inspectDocumentMetadata } from '@/features/core/modules/domain/documents/document-metadata'
 import { RAction } from '@/features/core/modules/domain/entities/RAction'
 import { RComponentSFC } from '@/features/core/modules/domain/entities/RComponentSFC'
 import { RComposition } from '@/features/core/modules/domain/entities/RComposition'
@@ -80,6 +79,7 @@ import { collectI18nMessageKeys, compileI18nLocales } from '@/features/core/modu
 import { createEmptyProgramMetadata } from '@/features/core/modules/program/domain/types/program-metadata.types'
 import { compileTypeSource } from '@/features/core/modules/source/services/compilers/type-source-compile'
 import { resolveCompositionActivation } from '@/features/core/modules/source/services/composition-activation'
+import { inspectDocumentMetadata } from '@/features/core/modules/source/services/document-metadata'
 import { compileEndgeCSS } from '@/features/core/modules/styles/services/endgecss-compile'
 import { EndgeModule } from '@/features/federation/EndgeModule'
 import { createCompiledProgramCatalog } from './tools/compiled-program-catalog'

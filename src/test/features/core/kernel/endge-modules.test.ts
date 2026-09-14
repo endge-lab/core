@@ -1,11 +1,11 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
 
-import { ENDGE_CORE_MODULES } from '@/features/core/kernel/config/modules.config'
+import { Endge } from '@/features/core/kernel/endge'
 
 describe('модули Core', () => {
   it('сохраняет dependency order модулей', () => {
-    const keys = ENDGE_CORE_MODULES.map(item => item.key)
+    const keys = Endge.createDiagnosticsSnapshot().nodes.map(item => item.key)
 
     expect(keys.indexOf('domainRepository')).toBeGreaterThanOrEqual(0)
     expect(keys.indexOf('domain')).toBeGreaterThanOrEqual(0)

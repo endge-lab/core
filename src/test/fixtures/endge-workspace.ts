@@ -52,10 +52,30 @@ export const TEST_ENDGE_WORKSPACE: EndgeWorkspaceDefinition = {
         routes: [],
       },
       snapshots: {
-        content: { telemetry: true, problems: true, configuration: false },
+        content: {
+          telemetry: true,
+          problems: true,
+          configuration: false,
+          effectiveConfiguration: true,
+          domain: true,
+          program: true,
+          runtime: true,
+          raphData: true,
+          raphGraph: true,
+        },
         shortcut: {
           triggerSet: [],
-          content: { telemetry: true, problems: true, configuration: false },
+          content: {
+            telemetry: true,
+            problems: true,
+            configuration: false,
+            effectiveConfiguration: true,
+            domain: true,
+            program: true,
+            runtime: true,
+            raphData: true,
+            raphGraph: true,
+          },
         },
         automatic: {
           enabled: false,

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { inspectDocumentMetadata, patchDocumentMetadata } from '@/features/core/modules/domain/documents/document-metadata'
 import { ComponentType, QueryType } from '@/features/core/modules/domain/types/document/document.types'
 import { inspectComponentSFCMetadata, patchComponentSFCMetadataSource } from '@/features/core/modules/source/services/component-sfc/component-sfc-metadata-source-patch'
+import { inspectDocumentMetadata, patchDocumentMetadata } from '@/features/core/modules/source/services/document-metadata'
 
 const metadata = { 'company.feature': { owner: 'operations', flags: [true, null, 3] } }
 
