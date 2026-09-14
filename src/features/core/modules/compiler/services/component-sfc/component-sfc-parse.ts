@@ -170,15 +170,23 @@ function normalizeComponentSFCInput(source: string): string {
 function parseScriptBlock(block: { content: string, attrs: Record<string, any>, loc: SourceLocation }): RComponentSFC_AST_Script {
   const content = block.content ?? ''
   const range = rangeFromLoc(block.loc)
+  let syntax: ReturnType<typeof parseTS> | null = null
+  try {
+    syntax = parseTS(content, { sourceType: 'module', plugins: ['typescript'] })
+  }
+  catch {
+    // Незавершённый script остаётся доступен редактору.
+  }
 
   return {
+    syntax,
     lang: typeof block.attrs.lang === 'string' ? block.attrs.lang : null,
     setup: true,
     content,
-    props: extractPropsDeclaration(content, range.start),
-    previewProps: extractPreviewPropsDeclaration(content, range.start),
-    metadata: extractMetadataDeclarations(content, range.start),
-    bindings: extractScriptBindings(content, range.start),
+    props: extractPropsDeclaration(content, range.start, syntax),
+    previewProps: extractPreviewPropsDeclaration(content, range.start, syntax),
+    metadata: extractMetadataDeclarations(content, range.start, syntax),
+    bindings: extractScriptBindings(range.start, syntax),
     range,
   }
 }
@@ -317,7 +325,32 @@ function isControlDirectiveName(name: string): boolean {
   return name === 'if' || name === 'else-if' || name === 'else' || name === 'for' || name === 'key'
 }
 
-function extractPropsDeclaration(content: string, baseOffset: number): RComponentSFC_AST_PropsDeclaration | null {
+function extractPropsDeclaration(content: string, baseOffset: number, syntax: ReturnType<typeof parseTS> | null): RComponentSFC_AST_PropsDeclaration | null {
+  const calls = (syntax?.program.body ?? []).flatMap((statement) => {
+    if (statement.type === 'ExpressionStatement') {
+      return [statement.expression]
+    }
+    if (statement.type === 'VariableDeclaration') {
+      return statement.declarations.map(declaration => declaration.init)
+    }
+    return []
+  })
+  for (const call of calls) {
+    if (call?.type !== 'CallExpression' || call.callee.type !== 'Identifier' || call.callee.name !== 'defineProps') {
+      continue
+    }
+    const types = call.typeParameters?.type === 'TSTypeParameterInstantiation' ? call.typeParameters.params : []
+    const argument = types[0] ?? call.arguments[0]
+    if (!argument || argument.start == null || argument.end == null) {
+      continue
+    }
+    return {
+      source: content.slice(argument.start, argument.end).trim(),
+      mode: types.length ? 'type' : 'runtime',
+      range: { start: baseOffset + (call.start ?? 0), end: baseOffset + (call.end ?? 0) },
+    }
+  }
+
   const match = content.match(/defineProps\s*(?:<([\s\S]*?)>\s*)?\(([\s\S]*?)\)/)
   if (!match || match.index == null) {
     return null
@@ -338,14 +371,9 @@ function extractPropsDeclaration(content: string, baseOffset: number): RComponen
   }
 }
 
-function extractPreviewPropsDeclaration(content: string, baseOffset: number): RComponentSFC_AST_PreviewPropsDeclaration | null {
+function extractPreviewPropsDeclaration(content: string, baseOffset: number, ast: ReturnType<typeof parseTS> | null): RComponentSFC_AST_PreviewPropsDeclaration | null {
   try {
-    const ast = parseTS(content, {
-      sourceType: 'module',
-      plugins: ['typescript'],
-    }) as any
-
-    for (const statement of ast.program.body as any[]) {
+    for (const statement of (ast?.program.body ?? []) as any[]) {
       const expression = statement.type === 'ExpressionStatement'
         ? statement.expression
         : null
@@ -383,16 +411,11 @@ function extractPreviewPropsDeclaration(content: string, baseOffset: number): RC
   return null
 }
 
-function extractMetadataDeclarations(content: string, baseOffset: number): RComponentSFC_AST_MetadataDeclaration[] {
+function extractMetadataDeclarations(content: string, baseOffset: number, ast: ReturnType<typeof parseTS> | null): RComponentSFC_AST_MetadataDeclaration[] {
   const declarations: RComponentSFC_AST_MetadataDeclaration[] = []
 
   try {
-    const ast = parseTS(content, {
-      sourceType: 'module',
-      plugins: ['typescript'],
-    }) as any
-
-    for (const statement of ast.program.body as any[]) {
+    for (const statement of (ast?.program.body ?? []) as any[]) {
       const expression = statement.type === 'ExpressionStatement'
         ? statement.expression
         : null
@@ -426,16 +449,11 @@ function extractMetadataDeclarations(content: string, baseOffset: number): RComp
   return declarations
 }
 
-function extractScriptBindings(content: string, baseOffset: number): RComponentSFC_AST_ScriptBinding[] {
+function extractScriptBindings(baseOffset: number, ast: ReturnType<typeof parseTS> | null): RComponentSFC_AST_ScriptBinding[] {
   const bindings: RComponentSFC_AST_ScriptBinding[] = []
 
   try {
-    const ast = parseTS(content, {
-      sourceType: 'module',
-      plugins: ['typescript'],
-    }) as any
-
-    for (const statement of ast.program.body as any[]) {
+    for (const statement of (ast?.program.body ?? []) as any[]) {
       if (statement.type === 'ImportDeclaration') {
         for (const specifier of statement.specifiers ?? []) {
           const name = specifier.local?.name

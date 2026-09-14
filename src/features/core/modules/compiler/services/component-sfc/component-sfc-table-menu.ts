@@ -1,4 +1,5 @@
 import type { RComponentDiagnostic } from '@/features/core/modules/domain/types/component/component-core.types'
+import type { ComponentSFCExpressionIR } from '@/features/core/modules/domain/types/component/sfc/expression-ir.types'
 import type {
   ComponentSFCTableCellMenuDescriptor,
   ComponentSFCTableColumnMenuDescriptor,
@@ -10,8 +11,8 @@ import type {
 } from '@/features/core/modules/domain/types/component/sfc/ir.types'
 import type { ComponentSFCActionPort } from '@/features/core/modules/domain/types/component/sfc/ports.types'
 import { parseExpression } from '@babel/parser'
-import * as t from '@babel/types'
 import { ENDGE_SFC_TABLE_COLUMN_MENU_MODES } from '@/features/core/modules/domain/types/component/sfc/tag-attribute-contract.types'
+import { lowerComponentSFCExpression } from './component-sfc-expression-ir'
 
 export const SFC_TABLE_COLUMN_MENU_MODES = ENDGE_SFC_TABLE_COLUMN_MENU_MODES
 
@@ -334,7 +335,7 @@ function readActionBinding(
   }
 
   try {
-    const expression = unwrapExpression(parseExpression(value.source, { sourceType: 'module', plugins: ['typescript'] }))
+    const expression = value.expression
     const portReference = readActionPortReference(expression)
     if (portReference) {
       return {
@@ -344,21 +345,15 @@ function readActionBinding(
         hasInput: false,
       }
     }
-    if (!t.isObjectExpression(expression)) {
+    if (expression.kind === 'unsupported' && expression.reason === 'object-property') {
+      pushActionBindingDiagnostic(diagnostics, node, menuTag, 'action-object-invalid', 'Action binding не поддерживает spread, methods и computed properties.')
+      return null
+    }
+    if (expression.kind !== 'object') {
       pushActionBindingDiagnostic(diagnostics, node, menuTag, 'action-reference-required', 'Dynamic :action должен ссылаться на port key (`:action="openDetails"`) или быть static object literal `{ identity, input? }`. Прямую Action identity задавайте строкой `action="..."`.')
       return null
     }
-    const properties = new Map<string, t.Expression>()
-    for (const property of expression.properties) {
-      if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
-        pushActionBindingDiagnostic(diagnostics, node, menuTag, 'action-object-invalid', 'Action binding не поддерживает spread, methods и computed properties.')
-        return null
-      }
-      const key = t.isIdentifier(property.key) ? property.key.name : t.isStringLiteral(property.key) ? property.key.value : ''
-      if (key) {
-        properties.set(key, property.value)
-      }
-    }
+    const properties = new Map(expression.entries.map(entry => [entry.key, entry.value]))
     if (properties.has('payload')) {
       pushActionBindingDiagnostic(diagnostics, node, menuTag, 'action-payload-removed', 'Используйте input вместо payload.')
       return null
@@ -369,8 +364,8 @@ function readActionBinding(
       return null
     }
     const identityValue = properties.get('identity')
-    const identityNode = identityValue ? unwrapExpression(identityValue) : null
-    const identity = identityNode && t.isStringLiteral(identityNode) ? identityNode.value.trim() : ''
+    const identityNode = identityValue
+    const identity = identityNode?.kind === 'literal' && typeof identityNode.value === 'string' ? identityNode.value.trim() : ''
     if (!identity) {
       pushActionBindingDiagnostic(diagnostics, node, menuTag, 'action-identity-missing', 'Action binding должен содержать literal identity.')
       return null
@@ -397,7 +392,7 @@ export function readComponentSFCTableMenuActionPortReference(
   source: string,
 ): { name: string, role?: 'require' | 'provides' } | null {
   try {
-    const expression = unwrapExpression(parseExpression(source, { sourceType: 'module', plugins: ['typescript'] }))
+    const expression = lowerComponentSFCExpression(parseExpression(source, { sourceType: 'module', plugins: ['typescript'] }))
     return readActionPortReference(expression)
   }
   catch {
@@ -406,62 +401,46 @@ export function readComponentSFCTableMenuActionPortReference(
 }
 
 function readActionPortReference(
-  expression: t.Expression,
+  expression: ComponentSFCExpressionIR,
 ): { name: string, role?: 'require' | 'provides' } | null {
-  if (t.isIdentifier(expression)) {
+  if (expression.kind === 'read') {
     return { name: expression.name }
   }
-
-  if (!t.isMemberExpression(expression)) {
+  if (expression.kind !== 'member' || expression.object.kind !== 'member') {
     return null
   }
-
-  const owner = unwrapExpression(expression.object as t.Expression)
-  if (!t.isMemberExpression(owner)) {
+  const owner = expression.object
+  if (owner.object.kind !== 'read' || owner.object.name !== 'ports') {
     return null
   }
-
-  const root = unwrapExpression(owner.object as t.Expression)
-  if (!t.isIdentifier(root, { name: 'ports' })) {
-    return null
-  }
-
   const role = readStaticMemberName(owner)
   if (role !== 'require' && role !== 'provides') {
     return null
   }
-
   const name = readStaticMemberName(expression)?.trim() ?? ''
   return name ? { name, role } : null
 }
 
-function readStaticMemberName(expression: t.MemberExpression): string | null {
-  if (!expression.computed && t.isIdentifier(expression.property)) {
+function readStaticMemberName(expression: Extract<ComponentSFCExpressionIR, { kind: 'member' }>): string | null {
+  if (!expression.computed && expression.property.kind === 'read') {
     return expression.property.name
   }
-  if (expression.computed && t.isStringLiteral(expression.property)) {
+  if (expression.computed && expression.property.kind === 'literal' && typeof expression.property.value === 'string') {
     return expression.property.value
   }
   return null
 }
 
-function readStaticExpression(node: t.Expression): unknown | typeof STATIC_VALUE_UNSUPPORTED {
-  const expression = unwrapExpression(node)
-  if (t.isStringLiteral(expression) || t.isNumericLiteral(expression) || t.isBooleanLiteral(expression)) {
+function readStaticExpression(expression: ComponentSFCExpressionIR): unknown | typeof STATIC_VALUE_UNSUPPORTED {
+  if (expression.kind === 'literal') {
     return expression.value
   }
-  if (t.isNullLiteral(expression)) {
-    return null
-  }
-  if (t.isUnaryExpression(expression) && expression.operator === '-' && t.isNumericLiteral(expression.argument)) {
+  if (expression.kind === 'unary' && expression.operator === '-' && expression.argument.kind === 'literal' && typeof expression.argument.value === 'number') {
     return -expression.argument.value
   }
-  if (t.isArrayExpression(expression)) {
+  if (expression.kind === 'array') {
     const result: unknown[] = []
-    for (const element of expression.elements) {
-      if (!element || !t.isExpression(element)) {
-        return STATIC_VALUE_UNSUPPORTED
-      }
+    for (const element of expression.items) {
       const item = readStaticExpression(element)
       if (item === STATIC_VALUE_UNSUPPORTED) {
         return item
@@ -470,21 +449,17 @@ function readStaticExpression(node: t.Expression): unknown | typeof STATIC_VALUE
     }
     return result
   }
-  if (t.isObjectExpression(expression)) {
+  if (expression.kind === 'object') {
     const result: Record<string, unknown> = {}
-    for (const property of expression.properties) {
-      if (!t.isObjectProperty(property) || property.computed || !t.isExpression(property.value)) {
+    for (const entry of expression.entries) {
+      if (!entry.key || ['__proto__', 'constructor', 'prototype'].includes(entry.key)) {
         return STATIC_VALUE_UNSUPPORTED
       }
-      const key = t.isIdentifier(property.key) ? property.key.name : t.isStringLiteral(property.key) ? property.key.value : ''
-      if (!key) {
-        return STATIC_VALUE_UNSUPPORTED
-      }
-      const item = readStaticExpression(property.value)
+      const item = readStaticExpression(entry.value)
       if (item === STATIC_VALUE_UNSUPPORTED) {
         return item
       }
-      result[key] = item
+      result[entry.key] = item
     }
     return result
   }
@@ -601,14 +576,6 @@ function directMenuNodes(tableNode: RComponentSFC_IR_ElementNode, tag: TableMenu
 
 function menuCode(tag: TableMenuTag): 'column-menu' | 'cell-menu' | 'row-menu' {
   return tag === 'ColumnMenu' ? 'column-menu' : tag === 'CellMenu' ? 'cell-menu' : 'row-menu'
-}
-
-function unwrapExpression(node: t.Expression): t.Expression {
-  let current = node
-  while (t.isTSAsExpression(current) || t.isTSTypeAssertion(current) || t.isTSNonNullExpression(current)) {
-    current = current.expression
-  }
-  return current
 }
 
 function readLiteralStringProp(node: RComponentSFC_IR_ElementNode, name: string): string {

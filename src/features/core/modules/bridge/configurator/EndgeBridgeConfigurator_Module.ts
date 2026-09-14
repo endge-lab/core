@@ -1,7 +1,7 @@
 import type { ConfiguratorConnection, ConfiguratorParticipant } from '@/features/core/modules/bridge/domain/bridge.type'
 import { EndgeModule } from '@/features/federation/EndgeModule'
 
-/** Проекция авторизованных конфигураторов workspace, без page/UI state. */
+/** Проекция авторизованных конфигураторов backend, без page/UI state. */
 export class EndgeBridgeConfigurator_Module extends EndgeModule {
   private readonly _byServer = new Map<string, readonly ConfiguratorConnection[]>()
 

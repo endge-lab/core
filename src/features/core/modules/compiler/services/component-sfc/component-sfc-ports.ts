@@ -1,3 +1,4 @@
+import type { File } from '@babel/types'
 import type { RComponentDependencies, RComponentDiagnostic } from '@/features/core/modules/domain/types/component/component-core.types'
 
 import type { RComponentSFC_AST_Script } from '@/features/core/modules/domain/types/component/sfc/ast.types'
@@ -21,11 +22,12 @@ import type {
 import type { TypeSourceDefinition } from '@/features/core/modules/source/domain/types/type-source.types'
 import { parse as parseTS } from '@babel/parser'
 import { isComponentSFCBuiltInTag } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-built-in-tags'
-import { compileComponentSFCExpression } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-expression'
+import { compileComponentSFCExpressionAST } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-expression'
 import { parseComponentSFCTypeFields } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-script'
 import { createEmptyComponentSFCPortManifest } from '@/features/core/modules/domain/types/component/sfc/ports.types'
 
 export interface ComponentSFCPortAnalysisOptions {
+  scriptSyntax?: File | null
   resolveProvider?: (
     identity: string,
     expectedKind: 'computation' | 'component' | 'action' | 'query',
@@ -225,14 +227,21 @@ export function analyzeComponentSFCPorts(
 
   let ast: any
   try {
-    ast = parseTS(script.content, {
-      sourceType: 'module',
-      plugins: ['typescript'],
-    }) as any
+    ast = script.syntax !== undefined
+      ? script.syntax
+      : parseTS(script.content, {
+        sourceType: 'module',
+        plugins: ['typescript'],
+      }) as any
   }
   catch {
     return { manifest, calls, dependencies, diagnostics, bindingName: null }
   }
+
+  if (!ast) {
+    return { manifest, calls, dependencies, diagnostics, bindingName: null }
+  }
+  options = { ...options, scriptSyntax: ast }
 
   const declarations: Array<{ statement: any, declaration: any }> = []
   for (const statement of ast.program.body ?? []) {
@@ -1387,7 +1396,7 @@ function parsePortCalls(
         continue
       }
       const source = script.content.slice(argument.start, argument.end)
-      const compiled = compileComponentSFCExpression(source, {
+      const compiled = compileComponentSFCExpressionAST(argument, source, {
         props,
         locals,
         sourcePath: `script.${local}`,

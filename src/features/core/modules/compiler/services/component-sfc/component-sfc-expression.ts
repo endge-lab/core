@@ -1,6 +1,7 @@
+import type { Node } from '@babel/types'
 import type { EndgeRuntimeContextSnapshot } from '@/features/core/modules/context/domain/context-persistence.types'
-
 import type { RComponentDiagnostic } from '@/features/core/modules/domain/types/component/component-core.types'
+
 import type {
   RComponentSFC_IR_DataMetaRead,
   RComponentSFC_IR_Read,
@@ -9,8 +10,10 @@ import type {
 } from '@/features/core/modules/domain/types/component/sfc/ir.types'
 import type { EndgeConfigurationSchemaEntry } from '@/features/core/modules/source/domain/types/configuration-source.types'
 import { parseExpression } from '@babel/parser'
+import { lowerComponentSFCExpression } from './component-sfc-expression-ir'
 
 const SFC_PLATFORM_LOCALS = new Set(['$table', '$row', '$column', '$cell'])
+const SFC_TABLE_LOCALS = new Set(['row', 'rowId', 'rowIndex', 'columnKey', 'columnMeta', 'value'])
 
 /** Контекст анализа выражения SFC template/script. */
 export interface ComponentSFCExpressionContext {
@@ -344,20 +347,8 @@ export function compileComponentSFCExpression(
     const ast = parseExpression(expression, {
       sourceType: 'module',
       plugins: ['typescript'],
-    }) as unknown
-    const vocabReads = collectVocabReads(ast, expression, diagnostics, context)
-    const dataMetaReads = collectDataMetaReads(ast, expression, diagnostics, context)
-
-    return {
-      value: {
-        kind: 'expression',
-        source: expression,
-        reads: collectExpressionReads(ast, context),
-        ...(vocabReads.length ? { vocabReads } : {}),
-        ...(dataMetaReads.length ? { dataMetaReads } : {}),
-      },
-      diagnostics,
-    }
+    })
+    return compileComponentSFCExpressionAST(ast, expression, context)
   }
   catch (error: any) {
     diagnostics.push({
@@ -372,10 +363,38 @@ export function compileComponentSFCExpression(
       value: {
         kind: 'expression',
         source: expression,
+        expression: { kind: 'unsupported' },
         reads: [],
       },
       diagnostics,
     }
+  }
+}
+
+/** Использует уже разобранный узел script/annotation без повторного parser pass. */
+export function compileComponentSFCExpressionAST(
+  ast: Node,
+  source: string,
+  context: ComponentSFCExpressionContext = {},
+): ComponentSFCExpressionCompileResult {
+  const diagnostics: RComponentDiagnostic[] = []
+  const vocabReads = collectVocabReads(ast, source, diagnostics, context)
+  const dataMetaReads = collectDataMetaReads(ast, source, diagnostics, context)
+  const offset = ast.start ?? 0
+  return {
+    value: {
+      kind: 'expression',
+      source,
+      expression: lowerComponentSFCExpression(ast),
+      reads: collectExpressionReads(ast, context),
+      ...(vocabReads.length ? { vocabReads } : {}),
+      ...(dataMetaReads.length ? { dataMetaReads } : {}),
+    },
+    diagnostics: diagnostics.map(item => ({
+      ...item,
+      start: item.start == null ? undefined : item.start - offset,
+      end: item.end == null ? undefined : item.end - offset,
+    })),
   }
 }
 
@@ -566,7 +585,7 @@ function resolveReadSource(
   if (props.has(root) || root === 'props') {
     return 'props'
   }
-  if (locals.has(root)) {
+  if (locals.has(root) || SFC_TABLE_LOCALS.has(root)) {
     return 'local'
   }
   return null

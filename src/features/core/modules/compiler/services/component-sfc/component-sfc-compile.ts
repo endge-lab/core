@@ -247,7 +247,7 @@ export function compileComponentSFC(
 
   const ir: RComponentSFC_IR | null = templateResult.template
     ? {
-        version: 1,
+        version: 2,
         script: {
           props: scriptResult.props,
           locals: templateLocals,

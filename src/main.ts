@@ -310,3 +310,6 @@ export { readOnlyDocument } from './features/core/kernel/tools/read-only-documen
 
 export { resolveRuntimeTranslation } from '@/features/core/modules/i18n/tools/resolve-runtime-translation'
 export { resolveRuntimeVocabOptions } from '@/features/core/modules/runtime/tools/runtime-render-values'
+
+export * from '@/features/core/modules/domain/types/component/sfc/expression-ir.types'
+export * from '@/features/core/modules/runtime/services/component-sfc-expression-evaluate'

@@ -1,3 +1,4 @@
+import type { File } from '@babel/types'
 import type { RComponentSFC_SourceRange } from './location.types'
 
 /** Parser-level AST SFC source до построения семантического IR. */
@@ -17,6 +18,9 @@ export interface RComponentSFC_AST {
 
 /** AST script setup секции. */
 export interface RComponentSFC_AST_Script {
+  /** Compiler-only дерево script; null означает ошибку синтаксиса. Не входит в IR. */
+  syntax?: File | null
+
   /** Язык script-секции: ts, js или другое значение из source. */
   lang: string | null
 

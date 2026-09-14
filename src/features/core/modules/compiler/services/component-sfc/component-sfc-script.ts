@@ -1,3 +1,4 @@
+import type { File } from '@babel/types'
 import type { RComponentContract, RComponentDiagnostic } from '@/features/core/modules/domain/types/component/component-core.types'
 
 import type { RComponentSFC_AST_Script } from '@/features/core/modules/domain/types/component/sfc/ast.types'
@@ -15,9 +16,10 @@ import type {
 import type { TypeSourceDefinition, TypeSourceExpression } from '@/features/core/modules/source/domain/types/type-source.types'
 import { parse as parseTS } from '@babel/parser'
 import { createEmptyComponentContract } from '@/features/core/modules/domain/types/component/component-core.types'
-import { compileProgramMetadataSource } from '@/features/core/modules/source/services/compilers/source-metadata-compile'
+import { compileProgramMetadataExpression, compileProgramMetadataSource } from '@/features/core/modules/source/services/compilers/source-metadata-compile'
 
 export interface ComponentSFCTypeResolutionOptions {
+  scriptSyntax?: File | null
   resolveTypeDefinition?: (identity: string) => TypeSourceDefinition | null
 }
 
@@ -81,11 +83,14 @@ export function analyzeComponentSFCScript(
     })
   }
 
+  options = { ...options, scriptSyntax: script.syntax }
   const props = script.props
     ? parseComponentSFCTypeFields(script.props.source, script.content, options)
     : []
+  const previewCall = findScriptCall(script.syntax, 'definePreviewProps')
+  const metadataCall = findScriptCall(script.syntax, 'defineMetadata')
   const previewPropsResult = script.previewProps
-    ? parsePreviewPropsSource(script.previewProps.source, script.previewProps.optionsSource)
+    ? parsePreviewPropsSource(script.previewProps.source, script.previewProps.optionsSource, previewCall?.arguments)
     : { props: null, options: null, diagnostics: [] }
 
   diagnostics.push(...previewPropsResult.diagnostics)
@@ -101,7 +106,9 @@ export function analyzeComponentSFCScript(
     })
   }
   const metadata = script.metadata[0]
-    ? compileProgramMetadataSource(script.metadata[0].source, diagnostics, 'script.defineMetadata')
+    ? metadataCall?.arguments[0]
+      ? compileProgramMetadataExpression(metadataCall.arguments[0], diagnostics, 'script.defineMetadata')
+      : compileProgramMetadataSource(script.metadata[0].source, diagnostics, 'script.defineMetadata')
     : {}
 
   contract.inputs = props.map(prop => ({
@@ -127,6 +134,12 @@ export function analyzeComponentSFCScript(
   }
 }
 
+function findScriptCall(syntax: File | null | undefined, name: string): any {
+  return syntax?.program.body
+    .map(statement => statement.type === 'ExpressionStatement' ? statement.expression : null)
+    .find(expression => expression?.type === 'CallExpression' && expression.callee.type === 'Identifier' && expression.callee.name === name)
+}
+
 /** Определяет inline или именованные TypeScript-контракты объектов, используемые макросами SFC. */
 export function parseComponentSFCTypeFields(
   source: string,
@@ -135,7 +148,7 @@ export function parseComponentSFCTypeFields(
 ): RComponentSFC_IR_Prop[] {
   const identity = source.trim()
   const named = /^[A-Z_$][\w$]*$/i.test(identity)
-    ? findNamedTypeLiteral(identity, scriptContent)
+    ? findNamedTypeLiteral(identity, scriptContent, options.scriptSyntax)
     : null
   if (named) {
     return readTypeMembers(named.members, named.content)
@@ -146,6 +159,11 @@ export function parseComponentSFCTypeFields(
     if (definition?.kind === 'object') {
       return readTypeSourceFields(definition)
     }
+  }
+
+  if (options.scriptSyntax !== undefined) {
+    const members = findInlineTypeMembers(options.scriptSyntax, identity, scriptContent)
+    return members ? readTypeMembers(members, scriptContent) : []
   }
 
   const prefix = 'type __EndgeContract = '
@@ -211,13 +229,16 @@ function typeSourceExpressionToTypeScript(expression: TypeSourceExpression): str
 function findNamedTypeLiteral(
   name: string,
   content: string,
+  syntax?: File | null,
 ): { members: any[], content: string } | null {
   try {
-    const ast = parseTS(content, {
-      sourceType: 'module',
-      plugins: ['typescript'],
-    }) as any
-    for (const statement of ast.program.body ?? []) {
+    const ast = syntax !== undefined
+      ? syntax
+      : parseTS(content, {
+        sourceType: 'module',
+        plugins: ['typescript'],
+      }) as any
+    for (const statement of ast?.program.body ?? []) {
       if (statement.type === 'TSInterfaceDeclaration' && statement.id?.name === name) {
         return { members: statement.body?.body ?? [], content }
       }
@@ -232,6 +253,35 @@ function findNamedTypeLiteral(
   }
   catch {
     return null
+  }
+  return null
+}
+
+function findInlineTypeMembers(node: unknown, source: string, content: string): any[] | null {
+  if (!node || typeof node !== 'object') {
+    return null
+  }
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const result = findInlineTypeMembers(child, source, content)
+      if (result) {
+        return result
+      }
+    }
+    return null
+  }
+  const value = node as Record<string, any>
+  if (value.type === 'TSTypeLiteral' && content.slice(value.start, value.end).trim() === source) {
+    return value.members
+  }
+  for (const key of Object.keys(value)) {
+    if (key === 'loc' || key === 'extra' || key.endsWith('Comments')) {
+      continue
+    }
+    const result = findInlineTypeMembers(value[key], source, content)
+    if (result) {
+      return result
+    }
   }
   return null
 }
@@ -262,23 +312,24 @@ function readTypeMembers(members: any[], content: string): RComponentSFC_IR_Prop
   return props
 }
 
+function parsePreviewExpression(source: string): any {
+  const ast = parseTS(`const __preview = ${source}`, { sourceType: 'module', plugins: ['typescript'] }) as any
+  return ast.program.body[0]?.declarations?.[0]?.init
+}
+
 function parsePreviewPropsSource(
   source: string,
   optionsSource?: string | null,
+  args?: any[],
 ): { props: ComponentSFCPreviewProps | null, options: ComponentSFCPreviewOptions | null, diagnostics: RComponentDiagnostic[] } {
   const diagnostics: RComponentDiagnostic[] = []
 
   try {
-    const ast = parseTS(`const __preview = ${source}`, {
-      sourceType: 'module',
-      plugins: ['typescript'],
-    }) as any
-    const declaration = ast.program.body[0]?.declarations?.[0]
-    const value = readPreviewPropsObject(declaration?.init)
+    const value = readPreviewPropsObject(args ? args[0] : parsePreviewExpression(source))
 
     if (value.ok && value.value && typeof value.value === 'object' && !Array.isArray(value.value)) {
       const options = optionsSource
-        ? parsePreviewOptionsSource(optionsSource, diagnostics)
+        ? parsePreviewOptionsSource(optionsSource, diagnostics, args?.[1])
         : null
       return {
         props: value.value as ComponentSFCPreviewProps,
@@ -315,14 +366,10 @@ function parsePreviewPropsSource(
 function parsePreviewOptionsSource(
   source: string,
   diagnostics: RComponentDiagnostic[],
+  expression?: any,
 ): ComponentSFCPreviewOptions | null {
   try {
-    const ast = parseTS(`const __previewOptions = ${source}`, {
-      sourceType: 'module',
-      plugins: ['typescript'],
-    }) as any
-    const declaration = ast.program.body[0]?.declarations?.[0]
-    const value = readPreviewOptionsObject(declaration?.init)
+    const value = readPreviewOptionsObject(expression ?? parsePreviewExpression(source))
     if (value.ok) {
       return value.value
     }

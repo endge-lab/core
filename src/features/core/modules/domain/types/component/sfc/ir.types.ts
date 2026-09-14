@@ -1,4 +1,5 @@
 import type { RComponentDiagnostic } from '../component-core.types'
+import type { ComponentSFCExpressionIR } from './expression-ir.types'
 import type { RComponentSFC_SourceRange } from './location.types'
 import type {
   ComponentSFCEventAction,
@@ -13,7 +14,7 @@ import type { EndgeStyleSheetArtifact } from '@/features/core/modules/styles/dom
 /** Семантическая модель компонента после compiler pipeline, независимая от DOM и Nova. */
 export interface RComponentSFC_IR {
   /** Версия IR-модели. */
-  version: 1
+  version: 2
 
   /** Нормализованная модель script setup. */
   script: RComponentSFC_IR_Script
@@ -438,6 +439,9 @@ export interface RComponentSFC_IR_LiteralValue {
 
 /** Runtime-выражение с зависимостями для реактивного обновления. */
 export interface RComponentSFC_IR_ExpressionValue {
+  /** Готовая программа выражения; source используется только инструментами authoring/debug. */
+  expression: ComponentSFCExpressionIR
+
   /** Тип значения. */
   kind: 'expression'
 

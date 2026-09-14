@@ -1,14 +1,10 @@
 import type { RComponentDependencies, RComponentDiagnostic } from '@/features/core/modules/domain/types/component/component-core.types'
-
 import type { RComponentSFC_AST_Attribute } from '@/features/core/modules/domain/types/component/sfc/ast.types'
-import type {
-  RComponentSFC_IR_EventModifier,
-  RComponentSFC_IR_InteractionGroup,
-  RComponentSFC_IR_InteractionRule,
-} from '@/features/core/modules/domain/types/component/sfc/ir.types'
+
+import type { RComponentSFC_IR_EventModifier, RComponentSFC_IR_InteractionGroup, RComponentSFC_IR_InteractionRule, RComponentSFC_IR_Value } from '@/features/core/modules/domain/types/component/sfc/ir.types'
 import type { ComponentSFCPortManifest } from '@/features/core/modules/domain/types/component/sfc/ports.types'
 import { parseExpression } from '@babel/parser'
-import { compileComponentSFCExpression } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-expression'
+import { compileComponentSFCExpressionAST } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-expression'
 import { compileComponentSFCLocalEventAction } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-ports'
 
 const INTERACTION_MODIFIERS = new Set<RComponentSFC_IR_EventModifier>([
@@ -45,31 +41,24 @@ export interface ComponentSFCInteractionCompileContext {
 
 /** Статически обнаруживает недопустимые сочетания passive и prevent в общих описателях trigger. */
 export function hasComponentSFCPassivePreventConflict(
-  source: string,
+  value: RComponentSFC_IR_Value,
   suffixes: readonly RComponentSFC_IR_EventModifier[] = [],
 ): boolean {
-  try {
-    const expression: any = parseExpression(String(source ?? '').trim(), { sourceType: 'module', plugins: ['typescript'] })
-    const nodes = expression.type === 'ArrayExpression' ? expression.elements : [expression]
-    return nodes.some((node: any) => {
-      if (node?.type !== 'ObjectExpression') {
-        return false
-      }
-      const properties = new Map<string, any>()
-      for (const property of node.properties ?? []) {
-        const name = propertyName(property)
-        if (name) {
-          properties.set(name, property)
-        }
-      }
-      const passive = suffixes.includes('passive') || booleanProperty(properties.get('passive')) === true
-      const prevent = suffixes.includes('prevent') || booleanProperty(properties.get('prevent')) === true
-      return passive && prevent
-    })
-  }
-  catch {
+  if (value.kind !== 'expression') {
     return false
   }
+  const expression = value.expression
+  const nodes = expression.kind === 'array' ? expression.items : [expression]
+  return nodes.some((node) => {
+    if (node.kind !== 'object') {
+      return false
+    }
+    const properties = new Map(node.entries.map(entry => [entry.key, entry.value]))
+    const passive = properties.get('passive')
+    const prevent = properties.get('prevent')
+    return (suffixes.includes('passive') || (passive?.kind === 'literal' && passive.value === true))
+      && (suffixes.includes('prevent') || (prevent?.kind === 'literal' && prevent.value === true))
+  })
 }
 
 /** Компилирует одну принадлежащую Source аннотацию `:on` в нейтральные к renderer правила. */
@@ -186,7 +175,7 @@ function compileTriggerSetRule(
     return null
   }
 
-  const trigger = compileComponentSFCExpression(sliceNode(source, triggersNode), {
+  const trigger = compileComponentSFCExpressionAST(triggersNode, sliceNode(source, triggersNode), {
     props: context.props,
     locals: context.locals,
     sourcePath: 'template.on.triggers',
@@ -318,7 +307,7 @@ function compileRule(
 
   const triggerProperties = properties.filter((property: any) => propertyName(property) !== 'reaction')
   const triggerSource = `{ ${triggerProperties.map((property: any) => sliceNode(source, property)).join(', ')} }`
-  const trigger = compileComponentSFCExpression(triggerSource, {
+  const trigger = compileComponentSFCExpressionAST({ ...node, properties: triggerProperties }, triggerSource, {
     props: context.props,
     locals: context.locals,
     sourcePath: `template.on.${event}`,

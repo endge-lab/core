@@ -758,7 +758,7 @@ function compileEditableBehavior(
       end: triggerAttribute?.range.end,
     })
   }
-  else if (triggerAttribute?.dynamic && hasComponentSFCPassivePreventConflict(triggerAttribute.value ?? '', triggerModifiers)) {
+  else if (triggerAttribute?.dynamic && hasComponentSFCPassivePreventConflict(triggers, triggerModifiers)) {
     diagnostics.push({
       severity: 'error',
       code: 'sfc-edit-on-passive-prevent',
@@ -847,7 +847,7 @@ function compileEditableOutcomeTriggers(
   }
   if (
     (modifiers.includes('passive') && modifiers.includes('prevent'))
-    || (attribute?.dynamic && hasComponentSFCPassivePreventConflict(attribute.value ?? '', modifiers))
+    || (attribute?.dynamic && hasComponentSFCPassivePreventConflict(triggers, modifiers))
   ) {
     diagnostics.push({
       severity: 'error',
@@ -1257,7 +1257,9 @@ function compileDirectiveExpression(
   context: ComponentSFCTemplateCompileContext,
   diagnostics: RComponentDiagnostic[],
 ): RComponentSFC_IR_Value {
-  const result = compileComponentSFCExpression(directive.expression ?? '', {
+  const expression = directive.expression ?? ''
+  const forMatch = directive.name === 'for' ? expression.match(/^\s*(?:\(([^,\s]+)\s*,\s*(\S[^)]*)\)|(\S+))\s+in\s+(\S.*)$/) : null
+  const result = compileComponentSFCExpression(forMatch?.[4]?.trim() ?? expression, {
     props: context.props,
     locals: context.locals,
     sourcePath: `template.${directive.name}`,
@@ -1283,11 +1285,7 @@ function parseForDirective(
   return {
     item: match[1] ?? match[3] ?? 'item',
     index: match[2]?.trim(),
-    source: {
-      kind: 'expression',
-      source: match[4]?.trim() ?? expression,
-      reads: source.kind === 'expression' ? source.reads : [],
-    },
+    source,
   }
 }
 

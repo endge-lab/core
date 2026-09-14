@@ -11,6 +11,7 @@ export interface BridgeConnectionState {
 }
 
 export interface ConfiguratorConnection {
+  workspaceDisplayName?: string
   serverUrl: string
   instanceId: string
   userId: string

@@ -291,7 +291,7 @@ export interface ComponentSFCProgramPayload {
   previewOptions: ComponentSFCPreviewOptions | null
 
   /** Parser-level AST SFC source, нужен для diagnostics и debug UI. */
-  ast: RComponentSFC_AST | null
+  ast?: RComponentSFC_AST | null
 
   /** Target-neutral semantic IR, который renderer-слои используют для DOM/Nova. */
   ir: RComponentSFC_IR | null
