@@ -10,6 +10,7 @@ import type { RType } from '@/features/core/modules/domain/entities/RType'
 import type { RUpdate } from '@/features/core/modules/domain/entities/RUpdate'
 import type { RVocabs } from '@/features/core/modules/domain/entities/RVocabs'
 import type { ComponentSFCPortManifest } from '@/features/core/modules/domain/types/component/sfc/ports.types'
+import type { ProgramHostActionRequirement } from '@/features/core/modules/program/domain/types/execution-bundle.types'
 import type { ProgramMetadata } from '@/features/core/modules/program/domain/types/program-metadata.types'
 import type {
   ActionProgramPayload,
@@ -233,7 +234,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
       if (errorCount === 0) {
         const catalog = createCompiledProgramCatalog(Endge.domain, Endge.program.getArtifacts())
         const signature = JSON.stringify(catalog)
-        Endge.program.completeCompile(catalog, { ...Endge.context.serialize(), configuration: Endge.configuration.current }, () => signature === JSON.stringify(createCompiledProgramCatalog(Endge.domain, Endge.program.getArtifacts())))
+        Endge.program.completeCompile(catalog, { ...Endge.context.serialize(), configuration: Endge.configuration.current }, () => signature === JSON.stringify(createCompiledProgramCatalog(Endge.domain, Endge.program.getArtifacts())), this._hostActionRequirements())
       }
       const compileSpan = this._compileSpan
       compileSpan?.log({
@@ -374,6 +375,31 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
    * PRIVATE
    * ----------------------------------------
    */
+
+  /** Фиксирует только реально используемые code Actions как требования к host этой сборки. */
+  private _hostActionRequirements(): ProgramHostActionRequirement[] {
+    const result = new Map<string, ProgramHostActionRequirement>()
+    const visit = (artifact: ProgramArtifact): void => {
+      for (const dependency of artifact.dependencies) {
+        if (dependency.entityType !== 'action') {
+          continue
+        }
+        const identity = dependency.identity ?? String(dependency.id)
+        const action = Endge.actions.getCodeDefinition(identity)
+        if (action?.defaultImplementation.kind === 'provider'
+          && (action.origin.kind === 'builtin' || action.origin.kind === 'local')) {
+          result.set(identity, {
+            identity,
+            owner: action.origin.owner,
+            providerKey: action.defaultImplementation.providerKey,
+          })
+        }
+      }
+      artifact.children?.forEach(visit)
+    }
+    Endge.program.getArtifacts().forEach(visit)
+    return [...result.values()].sort((left, right) => left.identity.localeCompare(right.identity))
+  }
 
   /** Собирает полный registry встроенных compiler handlers для поддерживаемых Domain documents. */
   private _registerDefaultHandlers(): void {

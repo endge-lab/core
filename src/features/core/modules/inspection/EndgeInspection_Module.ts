@@ -32,6 +32,7 @@ export class EndgeInspection_Module extends EndgeModule {
   private _receivedState: InspectionState | null = null
   private _receivedRevision = -1
   private _applied: number | null = null
+  private _appliedState: InspectionState | null = null
   private _follow = false
   private _error: string | null = null
   private _bytes = 0
@@ -207,6 +208,7 @@ export class EndgeInspection_Module extends EndgeModule {
     this._receivedRevision = tail.revision
     this._bytes = new TextEncoder().encode(JSON.stringify(records)).length
     this._applied = null
+    this._appliedState = null
     this._follow = false
     this._error = null
     if (records.length) {
@@ -243,6 +245,10 @@ export class EndgeInspection_Module extends EndgeModule {
     if (index < 0) {
       throw new Error('[Inspection] Position is unavailable')
     }
+    if (sequence === this.receivedSequence && this._receivedState) {
+      this._applyState(this._receivedState, sequence)
+      return
+    }
     let start = index
     while (
       start >= 0
@@ -260,11 +266,18 @@ export class EndgeInspection_Module extends EndgeModule {
     if (!state) {
       throw new Error('[Inspection] State is unavailable')
     }
-    Endge.context.applyInspection(state.context)
-    Endge.runtime.replaceInspectionSnapshot({
-      ...state.runtime,
-      ...(state.dataAvailable ? { data: state.data } : {}),
-    })
+    this._applyState(state, sequence)
+  }
+
+  private _applyState(state: InspectionState, sequence: number): void {
+    if (this._appliedState !== state) {
+      Endge.context.applyInspection(state.context)
+      Endge.runtime.replaceInspectionSnapshot({
+        ...state.runtime,
+        ...(state.dataAvailable ? { data: state.data } : {}),
+      })
+      this._appliedState = state
+    }
     this._applied = sequence
     this.notify()
   }
@@ -389,6 +402,7 @@ export class EndgeInspection_Module extends EndgeModule {
     this._recording = null
     this._records = []
     this._applied = null
+    this._appliedState = null
     this._follow = false
     this._error = null
     this._bytes = 0
@@ -408,7 +422,7 @@ export class EndgeInspection_Module extends EndgeModule {
   private _captureState(includeData: boolean): InspectionState {
     const { data, ...runtime } = Endge.runtime.captureInspection(includeData)
     return copyBundleJson({
-      context: Endge.context.serialize(),
+      context: { ...Endge.context.serialize(), dataMode: Endge.context.dataMode },
       runtime,
       data: data ?? null,
       dataAvailable: includeData,

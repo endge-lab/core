@@ -99,6 +99,40 @@ afterEach(() => {
 })
 
 describe('shared passive inspection player', () => {
+  it('applies live deltas once and does not rebuild runtime for informational records', () => {
+    const records = history(3)
+    Endge.inspection.open(recording(records.slice(0, 1)))
+    Endge.inspection.setFollowLive(true)
+    const apply = vi.spyOn(Endge.runtime, 'replaceInspectionSnapshot')
+    Endge.inspection.appendRecording(recording(records.slice(1)))
+    expect(Endge.runtime.inspection.data).toEqual({ count: 3 })
+    expect(apply).toHaveBeenCalledTimes(1)
+    Endge.inspection.appendRecording(recording([{ sequence: 4, at: 4, kind: 'event', name: 'notice', payload: null }]))
+    expect(apply).toHaveBeenCalledTimes(1)
+    expect(Endge.inspection.appliedSequence).toBe(4)
+    Endge.inspection.seek(0)
+    expect(Endge.runtime.inspection.data).toEqual({ count: 0 })
+    Endge.inspection.seek(4)
+    expect(Endge.runtime.inspection.data).toEqual({ count: 3 })
+  })
+
+  it('installs workspace metadata and theme configuration for bundle-only inspection', () => {
+    const bundle = Endge.program.exportBundle()
+    bundle.catalog.workspace = { identity: 'inspection', displayName: 'Inspected workspace', startupCompositionIdentity: null, documentStructure: 'custom' }
+    Endge.workspace.reset()
+    Endge.installDebuggerBundle({ format: 'endge-bundle', version: 1, bundle })
+    expect(Endge.workspace.isLoaded).toBe(true)
+    expect(Endge.workspace.current.displayName).toBe('Inspected workspace')
+    expect(Endge.workspace.current.documentStructure).toBe('custom')
+    expect(Endge.workspace.themes).toEqual(bundle.context.configuration.themes)
+    expect(Endge.context.currentTheme).toBe('light')
+    expect(Endge.runtime.getRuntimeHosts()).toHaveLength(0)
+    const invalid = structuredClone(bundle)
+    invalid.catalog.workspace!.identity = 'other'
+    expect(() => Endge.installDebuggerBundle({ format: 'endge-bundle', version: 1, bundle: invalid })).toThrow('Invalid workspace descriptor')
+    expect(Endge.workspace.current.identity).toBe('inspection')
+  })
+
   it('applies the initial snapshot, receives while paused, steps and seeks through checkpoints', () => {
     const records = history()
     Endge.inspection.open(recording(records.slice(0, 1)))

@@ -11,6 +11,8 @@ export interface CompiledFolderDescriptor {
   scope: 'workspace' | 'collection'
   entityType: string | null
   position: number
+  icon?: string
+  color?: string
 }
 
 export interface CompiledDocumentDescriptor {
@@ -21,11 +23,27 @@ export interface CompiledDocumentDescriptor {
   folderId: string | null
   workspaceFolderId: string | null
   position: number
+  /** Необязательные навигационные сведения; не заменяют Source или IR. */
+  documentType?: string
+  facetIdentity?: string
+  kind?: string
+  kindIdentity?: string
+  storeIdentity?: string
+  icon?: string
+  color?: string
   artifactKeys: ProgramArtifactKey[]
   status: 'compiled' | 'not-compiled'
 }
 
+export interface CompiledWorkspaceDescriptor {
+  identity: string
+  displayName: string
+  startupCompositionIdentity: string | null
+  documentStructure?: 'frontend' | 'custom'
+}
+
 export interface CompiledProgramCatalog {
+  workspace?: CompiledWorkspaceDescriptor
   folders: Record<string, CompiledFolderDescriptor>
   documents: Record<string, CompiledDocumentDescriptor>
 }
@@ -37,7 +55,15 @@ export interface CompiledContextDescriptor extends EndgeContextSnapshot {
   configuration: EndgeConfiguration
 }
 
+/** Действие предоставляет host; исполняемый callback не входит в переносимый контракт. */
+export interface ProgramHostActionRequirement {
+  identity: string
+  owner: string
+  providerKey: string
+}
+
 export interface ProgramRequirements {
+  hostActions?: ProgramHostActionRequirement[]
   artifactTypes: string[]
   componentTags: ComponentSFCTagRegistryEntry[]
 }

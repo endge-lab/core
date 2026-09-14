@@ -10,6 +10,33 @@ describe('сохранение EndgeContext', () => {
     installLocalStorageMock()
   })
 
+  it('сохраняет личные настройки debugger отдельно от remote context и других пользователей', () => {
+    const context = new EndgeContext_Module()
+    context.setup({ mode: 'debugger', scope: {}, vars: {} })
+    const before = context.serialize()
+    context.setUserState('developer-a', 'inspection.width', 65)
+    context.setUserState('developer-b', 'inspection.width', 35)
+    context.setState('inspection.width', 90)
+    expect(context.getState('inspection.width')).toBeUndefined()
+    expect(context.serialize()).toEqual(before)
+    context.deserialize({ workspace: 'remote', user: 'remote-user', facets: {} })
+    expect(context.getUserState('developer-a', 'inspection.width')).toBe(65)
+    expect(context.getUserState('developer-b', 'inspection.width')).toBe(35)
+    expect(context.getUserState('remote-user', 'inspection.width')).toBeUndefined()
+    const restored = new EndgeContext_Module()
+    expect(restored.getUserState('developer-a', 'inspection.width')).toBe(65)
+    expect(() => context.setUserState('', 'inspection.width', 50)).toThrow('User identity is required')
+  })
+
+  it('личные настройки соблюдают disabled adapter', () => {
+    const context = new EndgeContext_Module()
+    context.configurePersistence({ context: 'disabled' })
+    context.setUserState('developer', 'inspection.width', 65)
+    expect(context.getUserState('developer', 'inspection.width')).toBeUndefined()
+    context.configurePersistence({ context: 'local' })
+    expect(context.getUserState('developer', 'inspection.width')).toBeUndefined()
+  })
+
   it('оставляет Workspace неразрешённым, пока его не выберет backend', () => {
     const context = new EndgeContext_Module()
     context.deserialize(undefined)

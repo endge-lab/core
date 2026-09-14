@@ -27,6 +27,9 @@ export function readInspectionState(input: unknown): InspectionState {
       throw new Error('[Inspection] Invalid context field')
     }
   }
+  if (context.dataMode !== undefined && context.dataMode !== 'live' && context.dataMode !== 'mock') {
+    throw new Error('[Inspection] Invalid data mode')
+  }
   const facets = bundleObject(context.facets, 'facets')
   if (Object.values(facets).some(item => typeof item !== 'string')) {
     throw new Error('[Inspection] Invalid facets')

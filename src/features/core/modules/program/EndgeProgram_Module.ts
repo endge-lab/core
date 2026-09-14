@@ -3,6 +3,7 @@ import type {
   CompiledProgramCatalog,
   ExecutionBundle,
   PreparedProgramInstall,
+  ProgramHostActionRequirement,
 } from './domain/types/execution-bundle.types'
 import type {
   ActionProgramPayload,
@@ -58,6 +59,7 @@ export class EndgeProgram_Module extends EndgeModule {
   private _compilerVersion = '0'
   private _programId: string | null = null
   private _createdAt = ''
+  private _hostActions: ProgramHostActionRequirement[] = []
   private _catalog: CompiledProgramCatalog = { folders: {}, documents: {} }
   private _compiledContext: CompiledContextDescriptor | null = null
   private _catalogIsCurrent: (() => boolean) | null = null
@@ -75,6 +77,7 @@ export class EndgeProgram_Module extends EndgeModule {
     catalog: CompiledProgramCatalog,
     context: CompiledContextDescriptor,
     isCurrent?: () => boolean,
+    hostActions: ProgramHostActionRequirement[] = [],
   ): void {
     if (this._status === 'error') {
       return
@@ -85,6 +88,7 @@ export class EndgeProgram_Module extends EndgeModule {
     this._compiledContext = copyBundleJson(
       context,
     ) as unknown as CompiledContextDescriptor
+    this._hostActions = copyBundleJson(hostActions) as unknown as ProgramHostActionRequirement[]
     this._catalogIsCurrent = isCurrent ?? null
     this._createdAt = new Date().toISOString()
     this._programId = uuid()
@@ -112,6 +116,7 @@ export class EndgeProgram_Module extends EndgeModule {
       context: this._compiledContext,
       catalog: this._catalog,
       requirements: {
+        ...(this._hostActions.length ? { hostActions: this._hostActions } : {}),
         artifactTypes: [
           ...new Set(this.getArtifacts().map(item => item.ref.entityType)),
         ],
@@ -149,6 +154,7 @@ export class EndgeProgram_Module extends EndgeModule {
     this._freshnessChecks.clear()
     this._validating.clear()
     this._catalogIsCurrent = null
+    this._hostActions = value.requirements.hostActions ?? []
     this._catalog = value.catalog
     this._compiledContext = value.context
     this._compilerVersion = value.compilerVersion
@@ -202,6 +208,7 @@ export class EndgeProgram_Module extends EndgeModule {
     artifact: ProgramArtifact<TPayload>,
     isCurrent?: () => boolean,
   ): ProgramArtifact<TPayload> {
+    this._hostActions = []
     this._programId = null
     const key = this._keyFor(artifact.ref.entityType, artifact.ref.id)
     const previous = this._artifacts.get(key)
@@ -506,6 +513,7 @@ export class EndgeProgram_Module extends EndgeModule {
    * Очищает compiled program и возвращает статус в `valid`.
    */
   public clear(): void {
+    this._hostActions = []
     this._programId = null
     this._compiledContext = null
     this._catalogIsCurrent = null

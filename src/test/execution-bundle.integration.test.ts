@@ -45,10 +45,40 @@ afterEach(async () => {
 })
 
 describe('actual compiler → portable Program', () => {
+  it('сохраняет требование к встроенному Action без сериализации провайдера', () => {
+    const dispose = Endge.actions.define({
+      identity: 'bundle.host-action',
+      origin: { kind: 'builtin', owner: 'test-host' },
+      defaultImplementation: { kind: 'provider', providerKey: 'test-host.action' },
+    })
+    try {
+      Endge.domain.addComponentSFC(Object.assign(new RComponentSFC(), {
+        id: 'host-component',
+        identity: 'host-component',
+        source: `<template><Text @click="action({ identity: 'bundle.host-action' })" /></template>`,
+      }))
+      Endge.compiler.build({} as never)
+      const bundle = Endge.program.exportBundle()
+      expect(bundle.requirements.hostActions).toEqual([
+        { identity: 'bundle.host-action', owner: 'test-host', providerKey: 'test-host.action' },
+      ])
+      const program = new EndgeProgram_Module()
+      program.installBundle(program.prepareInstall(bundle))
+      expect(program.exportBundle()).toEqual(bundle)
+      const invalid = structuredClone(bundle)
+      delete invalid.requirements.hostActions
+      expect(() => program.prepareInstall(invalid)).toThrow('Missing artifact dependency')
+      expect(program.exportBundle()).toEqual(bundle)
+    }
+    finally {
+      dispose()
+    }
+  })
+
   it('round trips all supported compiler payloads, AST and dependencies', async () => {
     for (const folder of [
       { id: 'root', identity: 'root', displayName: 'Workspace', scope: 'workspace' },
-      { id: 'child', identity: 'child', displayName: 'Nested', scope: 'workspace', parent: 'root' },
+      { id: 'child', identity: 'child', displayName: 'Nested', scope: 'workspace', parent: 'root', icon: 'Monitor', color: '#abcdef' },
       { id: 'sfc', identity: 'sfc', displayName: 'Components', scope: 'collection', entityType: 'components' },
     ]) {
       Endge.domain.addFolder(Object.assign(new RFolder(), folder))
@@ -177,8 +207,11 @@ describe('actual compiler → portable Program', () => {
     for (const includeAst of [false, true]) {
       const exported = Endge.program.exportBundle({ includeAst })
       expect(exported.programId).toBe(id)
-      expect(exported.catalog.folders.child).toMatchObject({ parentId: 'root', scope: 'workspace' })
-      expect(exported.catalog.documents['component-sfc:2']).toMatchObject({ id: '2', folderId: 'sfc', workspaceFolderId: 'child' })
+      expect(exported.catalog.folders.child).toMatchObject({ parentId: 'root', scope: 'workspace', icon: 'Monitor', color: '#abcdef' })
+      expect(exported.catalog.documents['component-sfc:2']).toMatchObject({ id: '2', folderId: 'sfc', workspaceFolderId: 'child', documentType: 'component-sfc' })
+      const invalid = structuredClone(exported)
+      Object.assign(invalid.catalog.folders.child!, { icon: 42 })
+      expect(() => Endge.program.prepareInstall(invalid)).toThrow('Invalid folder presentation')
       expect(exported.catalog.documents['filter:6']).toMatchObject({ id: '6', identity: 'bundle-5', workspaceFolderId: 'child' })
       for (const key of Object.keys(exported.artifacts)) {
         const invalid = structuredClone(exported)

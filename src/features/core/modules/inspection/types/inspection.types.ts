@@ -3,7 +3,7 @@ import type { EndgeContextSnapshot } from '@/features/core/modules/context/domai
 import type { RuntimeInspectionSnapshot } from '@/features/core/modules/runtime/domain/runtime-inspection.types'
 
 export interface InspectionState {
-  context: EndgeContextSnapshot
+  context: EndgeContextSnapshot & { dataMode?: 'live' | 'mock' }
   runtime: RuntimeInspectionSnapshot
   data: BundleJsonValue | null
   dataAvailable: boolean

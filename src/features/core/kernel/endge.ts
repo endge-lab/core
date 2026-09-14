@@ -56,8 +56,20 @@ class EndgeCore extends EndgeFederation.define({
     const recording = value.inspection
       ? this.inspection.prepare(value.inspection)
       : null
+    const workspace = {
+      identity: program.bundle.context.workspace ?? 'inspection',
+      displayName: program.bundle.context.workspace ?? 'Inspection',
+      startupCompositionIdentity: null,
+      ...program.bundle.catalog.workspace,
+      dataMode: 'live' as const,
+      managedBy: 'user' as const,
+      managedById: null,
+      installedIntegrations: [],
+      configuration: program.bundle.context.configuration,
+    }
     this.domain.replaceFromPlain({})
     this.program.installBundle(program)
+    this.workspace.applyInspection(workspace)
     this.configuration.applyInspection(program.bundle.context.configuration)
     this.context.applyInspection(program.bundle.context)
     this.runtime.clearInspection()

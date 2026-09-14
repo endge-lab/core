@@ -43,6 +43,7 @@ import { DisabledContextAdapter } from '@/features/core/modules/context/persiste
 import { LocalStorageContextAdapter } from '@/features/core/modules/context/persistence/adapters/LocalStorageContextAdapter'
 import {
   buildContextStateStorageKey,
+  buildUserContextStateStorageKey,
   deserializeContextState,
   normalizeContextStateKey,
   serializeContextState,
@@ -368,6 +369,34 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
         documentIdentity,
       })),
       userId: this.getCurrentUser(),
+    }
+  }
+
+  /** Читает личную настройку явно указанного пользователя host, в том числе в debugger. */
+  public getUserState<T>(userId: string, key: string, transform?: EndgeContextStateTransform<T>): T | undefined {
+    const storageKey = buildUserContextStateStorageKey(userId, key)
+    try {
+      const value = this._resolveAdapter(this._contextPersistence).read<unknown>(storageKey)
+      return value === undefined ? undefined : deserializeContextState(value, transform)
+    }
+    catch (error) {
+      this._warnStateFailure('read', key, error)
+      return undefined
+    }
+  }
+
+  /** Сохраняет личную настройку host, не меняя контекст или данные инспектируемого приложения. */
+  public setUserState<T>(userId: string, key: string, state: T, transform?: EndgeContextStateTransform<T>): void {
+    const storageKey = buildUserContextStateStorageKey(userId, key)
+    try {
+      const value = serializeContextState(state, transform)
+      if (value === undefined) {
+        throw new Error('State serializer returned undefined.')
+      }
+      this._resolveAdapter(this._contextPersistence).write(storageKey, value)
+    }
+    catch (error) {
+      this._warnStateFailure('write', key, error)
     }
   }
 

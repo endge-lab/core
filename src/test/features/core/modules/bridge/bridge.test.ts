@@ -135,6 +135,22 @@ afterEach(() => {
 })
 
 describe('политика и lifecycle bridge', () => {
+  it('подключает независимый дебагер без authoring Workspace и сохраняет имя Workspace приложения', () => {
+    const adapter = new FakeAdapter()
+    const module = new EndgeBridge_Module(adapter)
+    modules.push(module)
+    module.setup({ vars: {}, scope: {}, bridge: { role: 'configurator', serverUrl: server, debug: true, allWorkspaces: true } } as EndgeBootContext)
+    module.start()
+    const socket = adapter.sockets[0]!
+    socket.welcome()
+    expect(socket.sent[0]!.data).toMatchObject({ allWorkspaces: true, workspaceIdentity: '' })
+    socket.receive({ type: 'clients', data: [{ instanceId: 'aodb', label: 'AODB', workspaceIdentity: 'default', workspaceDisplayName: 'AODB Workspace' }] })
+    expect(module.debug.clients[0]).toMatchObject({ serverUrl: server, workspaceIdentity: 'default', workspaceDisplayName: 'AODB Workspace' })
+    module.reset()
+    expect(module.debug.clients).toEqual([])
+    expect(() => module.setup({ vars: {}, scope: {}, bridge: { role: 'client', allowedServers: [server], debug: true } } as EndgeBootContext)).toThrow('workspaceIdentity is required')
+  })
+
   it('исключает данные на отправителе, включая payload событий, по умолчанию', async () => {
     const { module, adapter, snapshot } = fixture({
       role: 'client',

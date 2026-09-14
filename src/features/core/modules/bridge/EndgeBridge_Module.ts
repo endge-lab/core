@@ -47,7 +47,8 @@ export class EndgeBridge_Module extends EndgeModule<EndgeBootContext> {
     for (const server of servers) {
       this._allowed.add(normalizeBridgeServer(server))
     }
-    if (this._allowed.size && !this._workspaceIdentity) {
+    if (this._allowed.size && !this._workspaceIdentity
+      && !(this._options?.role === 'configurator' && this._options.debug && this._options.allWorkspaces)) {
       throw new Error('[Endge Bridge] scope.workspaceIdentity is required')
     }
     this.debug.configure(this._options.role, this._options.debug === true)
@@ -87,6 +88,7 @@ export class EndgeBridge_Module extends EndgeModule<EndgeBootContext> {
     if (!connection) {
       connection = new BridgeConnection_Service(serverUrl, this._options.role, {
         protocol: BRIDGE_CONFIG.protocol,
+        ...(this._options.role === 'configurator' && this._options.allWorkspaces ? { allWorkspaces: true } : {}),
         workspaceIdentity: this._workspaceIdentity,
         debug: this._options.debug === true,
         label: this._options.label ?? this._options.role,

@@ -18,6 +18,15 @@ afterEach(async () => {
 })
 
 describe('debugger inspection boundary', () => {
+  it('запускает независимый дебагер без authoring Workspace и без компилятора', async () => {
+    vi.spyOn(Endge.bridge, 'start').mockImplementation(() => {})
+    const build = vi.spyOn(Endge.compiler, 'build')
+    await Endge.boot({ mode: 'debugger', scope: {}, vars: {}, bridge: { role: 'configurator', serverUrl: 'http://localhost:8080', debug: true, allWorkspaces: true } })
+    expect(Endge.mode).toBe('debugger')
+    expect(build).not.toHaveBeenCalled()
+    expect(Endge.runtime.snapshot().hosts).toEqual([])
+  })
+
   /** Debugger подключает owner Runtime, сохраняя запрет на исполнение и Raph-фазы. */
   it('подключает пассивный Runtime без компиляции, hosts и Raph-фаз', async () => {
     const build = vi.spyOn(Endge.compiler, 'build')

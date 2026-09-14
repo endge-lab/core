@@ -1,7 +1,7 @@
 /** Локальная политика host, не сохраняемая в Domain. URL включает backend base path. */
 export type EndgeBridgeBootOptions
   = | { role: 'client', allowedServers: readonly string[], debug?: boolean, label?: string }
-    | { role: 'configurator', serverUrl: string, debug?: boolean, label?: string }
+    | { role: 'configurator', serverUrl: string, debug?: boolean, label?: string, allWorkspaces?: boolean }
 
 export interface BridgeConnectionState {
   serverUrl: string
@@ -27,6 +27,8 @@ export interface ConfiguratorParticipant {
 }
 
 export interface BridgeDebugClient {
+  workspaceIdentity?: string
+  workspaceDisplayName?: string
   serverUrl: string
   instanceId: string
   label: string

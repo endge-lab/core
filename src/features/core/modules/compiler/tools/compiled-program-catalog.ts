@@ -2,6 +2,8 @@ import type { EndgeDomain_Module } from '@/features/core/modules/domain/EndgeDom
 import type { CompiledProgramCatalog } from '@/features/core/modules/program/domain/types/execution-bundle.types'
 import type { ProgramArtifact } from '@/features/core/modules/program/domain/types/program.types'
 
+import { Endge } from '@/features/core/kernel/endge'
+
 const COLLECTION_TYPES: Record<string, string> = {
   componentSFCs: 'component-sfc',
   dataViews: 'data-view',
@@ -38,6 +40,10 @@ export function createCompiledProgramCatalog(
   artifacts: readonly ProgramArtifact[],
 ): CompiledProgramCatalog {
   const result: CompiledProgramCatalog = { folders: {}, documents: {} }
+  if (Endge.workspace.isLoaded) {
+    const workspace = Endge.workspace.current
+    result.workspace = { identity: workspace.identity, displayName: workspace.displayName, startupCompositionIdentity: workspace.startupCompositionIdentity, documentStructure: workspace.documentStructure ?? 'frontend' }
+  }
   // Read navigation from loaded entities: authoring toPlain() intentionally omits
   // placement or server IDs for some Source document families.
   const loaded = {
@@ -85,6 +91,8 @@ export function createCompiledProgramCatalog(
       entityType:
         typeof folder.entityType === 'string' ? folder.entityType : null,
       position,
+      ...(typeof folder.icon === 'string' ? { icon: folder.icon } : {}),
+      ...(typeof folder.color === 'string' ? { color: folder.color } : {}),
     }
   }
   for (const [collection, entries] of Object.entries(collections)) {
@@ -116,6 +124,10 @@ export function createCompiledProgramCatalog(
         folderId,
         workspaceFolderId,
         position,
+        ...(typeof document.type === 'string' ? { documentType: document.type } : {}),
+        ...Object.fromEntries(['facetIdentity', 'kind', 'kindIdentity', 'storeIdentity', 'icon', 'color']
+          .filter(field => typeof document[field] === 'string')
+          .map(field => [field, document[field]])),
         artifactKeys,
         status: artifactKeys.length ? 'compiled' : 'not-compiled',
       }

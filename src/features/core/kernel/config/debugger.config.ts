@@ -12,8 +12,8 @@ export function selectCoreLifecycleNodes(nodes: readonly EndgeLifecycleNodeDescr
     }
     return nodes
   }
-  if (options.bridge?.role !== 'configurator' || options.bridge.debug !== true || !options.scope.workspaceIdentity || options.dataProvider || options.domainProvider) {
-    throw new Error('[Endge] Debugger requires a configurator bridge, workspace scope and no domain provider')
+  if (options.bridge?.role !== 'configurator' || options.bridge.debug !== true || (!options.bridge.allWorkspaces && !options.scope.workspaceIdentity) || options.dataProvider || options.domainProvider) {
+    throw new Error('[Endge] Debugger requires a configurator bridge, authorized discovery scope and no domain provider')
   }
   return nodes.filter(node => node.kind === 'module' && (DEBUGGER_MODULES.has(node.key)
     || ('debuggerCompatible' in node.module && node.module.debuggerCompatible === true)))
