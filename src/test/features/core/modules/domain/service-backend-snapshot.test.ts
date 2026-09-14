@@ -130,6 +130,30 @@ function releaseBundle(): EndgeDomainBundle {
 describe('провайдер Core для service backend', () => {
   afterEach(() => vi.restoreAllMocks())
 
+  it('builds refreshed saved documents and returns their exact provenance without executing Runtime', async () => {
+    const snapshot = liveSnapshot()
+    snapshot.documents = Object.fromEntries([...DOCUMENT_KEYS, 'simulations', 'configurations'].map(key => [key, []])) as unknown as EndgeLiveDomainSnapshot['documents']
+    snapshot.documents.components = [liveDocument('component-sfc-a', { source: '<template />' })]
+    const refresh = vi.spyOn(Endge.domainRepository, 'refreshSnapshot').mockResolvedValue(snapshot)
+    const build = vi.spyOn(Endge, 'build').mockResolvedValue(undefined)
+    const execute = vi.spyOn(Endge.runtime, 'execute')
+    try {
+      expect(await Endge.buildSavedProgram()).toBe(snapshot)
+      expect(refresh).toHaveBeenCalledTimes(1)
+      expect(build).toHaveBeenCalledTimes(1)
+      expect(Endge.domain.getComponentSFCs().map(value => value.identity)).toContain('component-sfc-a')
+      expect(execute).not.toHaveBeenCalled()
+      refresh.mockRejectedValueOnce(new Error('network unavailable'))
+      const before = Endge.domain.getComponentSFCs()[0]
+      await expect(Endge.buildSavedProgram()).rejects.toThrow('network unavailable')
+      expect(Endge.domain.getComponentSFCs()[0]).toBe(before)
+      expect(build).toHaveBeenCalledTimes(1)
+    }
+    finally {
+      Endge.domain.reset()
+    }
+  })
+
   it('загружает ровно один snapshot и хранит ETag и метаданные ревизии в репозитории', async () => {
     const snapshot = liveSnapshot()
     const loadWorkspace = vi.fn().mockResolvedValue(snapshot)

@@ -1,6 +1,6 @@
-import type { EndgeLiveDomainSnapshot } from '@/features/core/modules/domain/types/document/domain-snapshot.type'
 import type { EndgeBootMode } from '@/features/core/kernel/types/bootstrap.types'
 import type { DiagnosticsSnapshot } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
+import type { EndgeLiveDomainSnapshot } from '@/features/core/modules/domain/types/document/domain-snapshot.type'
 import { selectCoreLifecycleNodes } from '@/features/core/kernel/config/debugger.config'
 import { ENDGE_CORE_MODULES } from '@/features/core/kernel/config/modules.config'
 import { EndgeDebuggerReadOnlyError } from '@/features/core/kernel/errors/EndgeDebuggerReadOnlyError'
