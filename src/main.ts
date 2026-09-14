@@ -102,7 +102,7 @@ export * from '@/features/core/modules/domain/types/computation/computation.type
 export * from '@/features/core/modules/diagnostics/domain/types/diagnostics-adapter.type'
 export * from '@/features/core/modules/diagnostics/domain/types/diagnostics-snapshot-runtime-adapter.type'
 export * from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
-export * from '@/features/core/modules/domain/types/document/codegen.types'
+export * from '@/features/core/modules/domain/types/document/document-identity.types'
 export * from '@/features/core/modules/domain/types/document/document.types'
 export * from '@/features/core/modules/domain/types/document/document-create.type'
 export * from '@/features/core/modules/domain/types/document/document-draft.type'
