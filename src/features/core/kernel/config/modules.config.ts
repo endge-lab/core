@@ -20,6 +20,7 @@ import { EndgeVocabs_Module } from '@/features/core/modules/EndgeVocabs_Module'
 import { EndgeEvents_Module } from '@/features/core/modules/events/EndgeEvents_Module'
 import { EndgeI18n_Module } from '@/features/core/modules/i18n/EndgeI18n_Module'
 import { EndgeImplementations_Module } from '@/features/core/modules/implementations/EndgeImplementations_Module'
+import { EndgeInspection_Module } from '@/features/core/modules/inspection/EndgeInspection_Module'
 import { EndgeMock_Module } from '@/features/core/modules/mock/EndgeMock_Module'
 import { EndgeProgram_Module } from '@/features/core/modules/program/EndgeProgram_Module'
 import { EndgeRuntime_Module } from '@/features/core/modules/runtime/EndgeRuntime_Module'
@@ -210,6 +211,7 @@ export const ENDGE_CORE_MODULES = [
    * управляет их деревом, операциями и ресурсами Raph.
    */
   { key: 'runtime', create: () => new EndgeRuntime_Module(), after: ['compiler', 'workspace', 'context'] },
+  { key: 'inspection', create: () => new EndgeInspection_Module(), after: ['runtime', 'program', 'events', 'context'] },
 
   /**
    * Сохраняет точку входа для обработки прежних профилей внешних обновлений.
@@ -236,7 +238,7 @@ export const ENDGE_CORE_MODULES = [
   {
     key: 'bridge',
     create: () => new EndgeBridge_Module(),
-    after: ['diagnostics', 'runtime', 'domain'],
+    after: ['diagnostics', 'runtime', 'domain', 'inspection'],
   },
 
   /**

@@ -377,6 +377,8 @@ export interface CompositionRuntimeGraph {
 
 /** Payload Composition artifact без runtime state. */
 export interface CompositionProgramPayload extends CompositionSourceDocument {
+  /** Optional parser tree retained for inspection; runtime does not require it. */
+  ast?: unknown
   type: 'composition'
   sourceVersion: number
   /** Снимки словарей, которые runtime читает без обращения к Domain. */

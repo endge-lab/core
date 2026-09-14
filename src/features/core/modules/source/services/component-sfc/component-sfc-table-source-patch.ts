@@ -509,7 +509,7 @@ function setMenuItemAttribute(
 }
 
 function isSemanticNode(node: RComponentSFC_AST_TemplateNode): boolean {
-  return node.kind !== 'text' || Boolean(node.content.trim())
+  return node.kind !== 'comment' && (node.kind !== 'text' || Boolean(node.content.trim()))
 }
 
 function requireColumn(context: TableSourceContext, index: number): RComponentSFC_AST_ElementNode {

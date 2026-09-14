@@ -31,8 +31,8 @@ import type {
   QueryProgramPayload,
 } from '@/features/core/modules/program/domain/types/program.types'
 import type { CompositionBindingValue, CompositionProgramPayload } from '@/features/core/modules/source/domain/types/composition-source.types'
-
 import type { DataViewMaterializationStrategy, DataViewPipelineStep, DataViewRef } from '@/features/core/modules/source/domain/types/data-view-source.types'
+
 import type { FilterProgramPayload } from '@/features/core/modules/source/domain/types/filter-source.types'
 import type { ResponseOutputTransform } from '@/features/core/modules/source/domain/types/response-output.types'
 import type { SimulationSourceArtifact } from '@/features/core/modules/source/domain/types/simulation-source.types'
@@ -81,6 +81,7 @@ import { compileTypeSource } from '@/features/core/modules/source/services/compi
 import { resolveCompositionActivation } from '@/features/core/modules/source/services/composition-activation'
 import { compileEndgeCSS } from '@/features/core/modules/styles/services/endgecss-compile'
 import { EndgeModule } from '@/features/federation/EndgeModule'
+import { createCompiledProgramCatalog } from './tools/compiled-program-catalog'
 
 const MISSING_STATIC_PATH = Symbol('missing-static-path')
 
@@ -229,6 +230,11 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
       const diagnostics = Endge.program.getDiagnostics()
       const errorCount = diagnostics.filter(diagnostic => diagnostic.severity === 'error').length
       const warningCount = diagnostics.filter(diagnostic => diagnostic.severity === 'warning').length
+      if (errorCount === 0) {
+        const catalog = createCompiledProgramCatalog(Endge.domain, Endge.program.getArtifacts())
+        const signature = JSON.stringify(catalog)
+        Endge.program.completeCompile(catalog, { ...Endge.context.serialize(), configuration: Endge.configuration.current }, () => signature === JSON.stringify(createCompiledProgramCatalog(Endge.domain, Endge.program.getArtifacts())))
+      }
       const compileSpan = this._compileSpan
       compileSpan?.log({
         body: errorCount > 0 ? 'Компиляция домена завершена с ошибками' : 'Компиляция домена завершена',
@@ -454,6 +460,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
             type: 'type',
             identity: entity.identity,
             displayName: entity.displayName || entity.name || entity.identity,
+            ast: result.ast,
             category: 'user',
             sourceVersion: Number(entity.sourceVersion ?? 1) || 1,
             definition,
@@ -493,6 +500,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
           metadata: { self: metadata.metadata, nodes: [] },
           payload: {
             type: 'configuration',
+            ast: schema?.ast,
             identity: entity.identity,
             displayName: entity.displayName || entity.name || entity.identity,
             sourceVersion: 1,
@@ -707,6 +715,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
           capabilities: ['compilable', 'configuration'],
           metadata: { self: metadata.metadata, nodes: [] },
           payload: {
+            ast: result.ast ? { type: result.ast.type, source: result.ast.source, nodes: result.ast.nodes.map(node => (node as import('postcss').ChildNode).toJSON()) } : null,
             stylesheet,
             themes: stylesheet.themes.map(theme => theme.id),
             dependencies: [],
@@ -897,6 +906,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
           payload: {
             ...this._makeEmptyDataViewPayload(),
             ...(local.payload ?? artifact ?? {}),
+            ast: result.ast,
             sourceDocument: (result.document as DataViewProgramPayload['sourceDocument']) ?? null,
           },
           dependencies: [
@@ -952,6 +962,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
             handles: [],
             mutations: [],
             ...(compiled ?? {}),
+            ast: result.ast,
             storeIdentity: entity.storeIdentity,
           },
           dependencies: store
@@ -1119,6 +1130,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
           metadata: { self: result.metadata ?? {}, nodes: [] },
           payload: {
             ...(payload ?? { type: 'store', sourceVersion: Number(entity.sourceVersion ?? 1) || 1, data: [] }),
+            ast: result.ast,
             updateHandlers,
           },
           dependencies,
@@ -1144,7 +1156,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
         return this._makeArtifact(entity, 'simulation', context, {
           capabilities: ['compilable', 'executable'],
           metadata: { self: result.metadata ?? {}, nodes: [] },
-          payload: (result.artifact as SimulationSourceArtifact | undefined) ?? { type: 'simulation', sourceVersion: 1, target: { entityType: 'composition', identity: '' }, runtimes: [] },
+          payload: { ...((result.artifact as SimulationSourceArtifact | undefined) ?? { type: 'simulation', sourceVersion: 1, target: { entityType: 'composition', identity: '' }, runtimes: [] }), ast: result.ast },
           dependencies: result.dependencies ?? [],
           diagnostics,
         })
@@ -1164,7 +1176,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
         return this._makeArtifact(entity, 'stream', context, {
           capabilities: ['compilable', 'runnable', 'data-provider'],
           metadata: { self: result.metadata ?? {}, nodes: [] },
-          payload: payload ?? {
+          payload: { ast: result.ast, ...(payload ?? {
             type: 'stream',
             sourceVersion: Number(entity.sourceVersion ?? 1) || 1,
             transport: {
@@ -1175,7 +1187,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
               authProfileIdentity: null,
             },
             events: [],
-          },
+          }) },
           diagnostics: (result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[],
         })
       },
@@ -1218,7 +1230,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
         return this._makeArtifact(entity, 'filter', context, {
           capabilities: ['compilable', 'executable', 'data-provider', 'configuration'],
           metadata: { self: result.metadata ?? {}, nodes: [] },
-          payload: payload ?? this._makeEmptyFilterPayload(entity.sourceVersion),
+          payload: { ...(payload ?? this._makeEmptyFilterPayload(entity.sourceVersion)), ast: result.ast },
           dependencies: [
             ...dependencies,
             ...this._typeDependencies(payload?.fields.map(field => field.type) ?? []),
@@ -1260,7 +1272,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
         return this._makeArtifact(entity, 'composition', context, {
           capabilities: ['compilable', 'executable', 'configuration'],
           metadata: { self: result.metadata ?? {}, nodes: [] },
-          payload: payload ?? this._makeEmptyCompositionPayload(entity.sourceVersion),
+          payload: { ...(payload ?? this._makeEmptyCompositionPayload(entity.sourceVersion)), ast: result.ast },
           dependencies: [
             ...i18n.dependencies,
             ...validation.dependencies,

@@ -31,6 +31,8 @@ export interface ConfigurationSourceDocument {
 
 /** Ранний артефакт Configuration для компилятора. */
 export interface ConfigurationProgramPayload {
+  /** Optional parser tree retained for inspection; runtime does not require it. */
+  ast?: unknown
   type: 'configuration'
   identity: string
   displayName: string
@@ -48,6 +50,8 @@ export interface ConfigurationSourceCompileResult {
 }
 
 export interface EndgeConfigurationSchemaEntry {
+  /** Optional parser tree retained for inspection; runtime does not require it. */
+  ast?: unknown
   id: string | number
   identity: string
   displayName: string

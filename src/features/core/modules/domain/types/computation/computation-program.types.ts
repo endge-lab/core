@@ -33,6 +33,8 @@ export type ComputationProgramNode
 
 /** Готовый для runtime граф, скомпилированный из одного Source-документа defineComputation. */
 export interface ComputationProgramPayload {
+  /** Optional parser tree retained for inspection; runtime does not require it. */
+  ast?: unknown
   input: ComputationContractField | null
   output: ComputationContractField | null
   sourceDocument: ComputationSourceDocument | null

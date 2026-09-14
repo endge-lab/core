@@ -234,6 +234,8 @@ export type { VocabProgramPayload }
 
 /** Payload artifact для DataView: executable read-model без persisted runtime state. */
 export interface DataViewProgramPayload {
+  /** Optional parser tree retained for inspection; runtime does not require it. */
+  ast?: unknown
   /** Тип artifact для diagnostics/debug UI. */
   type: 'data-view'
 
@@ -299,6 +301,8 @@ export interface ComponentSFCProgramPayload {
 
 /** Source-first документ стилей в payload runtime. */
 export interface EndgeStyleProgramPayload {
+  /** Optional parser tree retained for inspection; runtime does not require it. */
+  ast?: unknown
   /** Скомпилированная таблица стилей, нейтральная к renderer. */
   stylesheet: EndgeStyleSheetArtifact
 

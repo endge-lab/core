@@ -38,6 +38,8 @@ export interface StoreUpdateHandlerDescriptor {
 
 /** Готовый для runtime артефакт source Store v1. */
 export interface StoreSourceArtifact extends StoreSourceDocument {
+  /** Optional parser tree retained for inspection; runtime does not require it. */
+  ast?: unknown
   type: 'store'
   sourceVersion: number
   updateHandlers: StoreUpdateHandlerDescriptor[]

@@ -193,6 +193,7 @@ function parseScriptBlock(block: { content: string, attrs: Record<string, any>, 
 
 function parseTemplateBlock(content: string, range: RComponentSFC_SourceRange): RComponentSFC_AST_Template {
   const root = baseParse(content, {
+    comments: true,
     decodeEntities: decodeTemplateEntities,
   }) as RootNode
 
@@ -223,6 +224,9 @@ function parseStyleBlock(block: { content: string, attrs: Record<string, any>, l
 }
 
 function mapTemplateNode(node: RootNode['children'][number], baseOffset: number): RComponentSFC_AST_TemplateNode | null {
+  if (node.type === NodeTypes.COMMENT) {
+    return { kind: 'comment', content: node.content, range: rangeFromLoc(node.loc, baseOffset) }
+  }
   if (node.type === NodeTypes.TEXT) {
     return mapTextNode(node as TextNode, baseOffset)
   }

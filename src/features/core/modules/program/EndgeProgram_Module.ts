@@ -1,4 +1,10 @@
 import type {
+  CompiledContextDescriptor,
+  CompiledProgramCatalog,
+  ExecutionBundle,
+  PreparedProgramInstall,
+} from './domain/types/execution-bundle.types'
+import type {
   ActionProgramPayload,
   ComponentSFCTagRegistryEntry,
   ComputationProgramPayload,
@@ -18,17 +24,30 @@ import type { FilterProgramPayload } from '@/features/core/modules/source/domain
 import type { SimulationSourceArtifact } from '@/features/core/modules/source/domain/types/simulation-source.types'
 import type { StoreSourceArtifact } from '@/features/core/modules/source/domain/types/store-source.types'
 import type { StreamSourceArtifact } from '@/features/core/modules/source/domain/types/stream-source.types'
-import type { TypeProgramCatalogEntry, TypeProgramPayload } from '@/features/core/modules/source/domain/types/type-source.types'
+import type {
+  TypeProgramCatalogEntry,
+  TypeProgramPayload,
+} from '@/features/core/modules/source/domain/types/type-source.types'
 import type { UpdateSourceArtifact } from '@/features/core/modules/source/domain/types/update-source.types'
 import type { VocabProgramPayload } from '@/features/core/modules/source/domain/types/vocab-source.types'
+import { v4 as uuid } from 'uuid'
+import { copyBundleJson } from '@/features/core/kernel/tools/bundle-json'
 import { EndgeModule } from '@/features/federation/EndgeModule'
+import {
+  packProgramArtifact,
+  readExecutionBundle,
+} from './tools/execution-bundle'
 
 /**
  * Хранилище compiled artifacts, полученных после компиляции домена.
  */
 export class EndgeProgram_Module extends EndgeModule {
   private _artifacts = new Map<ProgramArtifactKey, ProgramArtifact>()
-  private readonly _freshnessChecks = new Map<ProgramArtifactKey, () => boolean>()
+  private readonly _freshnessChecks = new Map<
+    ProgramArtifactKey,
+    () => boolean
+  >()
+
   private readonly _validating = new Set<ProgramArtifactKey>()
   private _indexByIdentity = new Map<ProgramArtifactKey, ProgramArtifactKey>()
 
@@ -37,6 +56,106 @@ export class EndgeProgram_Module extends EndgeModule {
 
   private _status: ProgramArtifactStatus = 'valid'
   private _compilerVersion = '0'
+  private _programId: string | null = null
+  private _createdAt = ''
+  private _catalog: CompiledProgramCatalog = { folders: {}, documents: {} }
+  private _compiledContext: CompiledContextDescriptor | null = null
+  private _catalogIsCurrent: (() => boolean) | null = null
+
+  public get programId(): string | null {
+    return this._programId
+  }
+
+  public get catalog(): Readonly<CompiledProgramCatalog> {
+    return this._catalog
+  }
+
+  /** Публикует завершённый compile snapshot; incremental builds не создают новую экспортируемую сборку. */
+  public completeCompile(
+    catalog: CompiledProgramCatalog,
+    context: CompiledContextDescriptor,
+    isCurrent?: () => boolean,
+  ): void {
+    if (this._status === 'error') {
+      return
+    }
+    this._catalog = copyBundleJson(
+      catalog,
+    ) as unknown as CompiledProgramCatalog
+    this._compiledContext = copyBundleJson(
+      context,
+    ) as unknown as CompiledContextDescriptor
+    this._catalogIsCurrent = isCurrent ?? null
+    this._createdAt = new Date().toISOString()
+    this._programId = uuid()
+    this.notify()
+  }
+
+  /** Упаковывает проверенную текущую программу без второго постоянного владельца artifacts. */
+  public exportBundle(options: { includeAst?: boolean } = {}): ExecutionBundle {
+    for (const artifact of this._artifacts.values()) {
+      this.getArtifactByRef(artifact.ref)
+    }
+    if (
+      !this._programId
+      || !this._compiledContext
+      || this._status === 'error'
+      || this._catalogIsCurrent?.() === false
+    ) {
+      throw new Error('[Bundle] Complete current compilation is required')
+    }
+    return readExecutionBundle({
+      version: 1,
+      programId: this._programId,
+      compilerVersion: this._compilerVersion,
+      createdAt: this._createdAt,
+      context: this._compiledContext,
+      catalog: this._catalog,
+      requirements: {
+        artifactTypes: [
+          ...new Set(this.getArtifacts().map(item => item.ref.entityType)),
+        ],
+        componentTags: this.getComponentTags(),
+      },
+      artifacts: Object.fromEntries(
+        [...this._artifacts].map(([key, artifact]) => [
+          key,
+          packProgramArtifact(artifact, options.includeAst === true),
+        ]),
+      ),
+    })
+  }
+
+  public prepareInstall(value: unknown): PreparedProgramInstall {
+    return { bundle: readExecutionBundle(value) }
+  }
+
+  /** Строит все индексы до замены, не публикуя промежуточную очищенную программу. */
+  public installBundle(prepared: PreparedProgramInstall): void {
+    const value = readExecutionBundle(prepared.bundle)
+    const artifacts = new Map(Object.entries(value.artifacts))
+    const identities = new Map(
+      [...artifacts].map(([key, item]) => [
+        `${item.ref.entityType}:${item.ref.identity}`,
+        key,
+      ]),
+    )
+    const tags = new Map(
+      value.requirements.componentTags.map(item => [item.tag, item.identity]),
+    )
+    this._artifacts = artifacts
+    this._indexByIdentity = identities
+    this._componentIdentityByTag = tags
+    this._freshnessChecks.clear()
+    this._validating.clear()
+    this._catalogIsCurrent = null
+    this._catalog = value.catalog
+    this._compiledContext = value.context
+    this._compilerVersion = value.compilerVersion
+    this._programId = value.programId
+    this._createdAt = value.createdAt
+    this.recalculateStatus()
+  }
 
   /**
    * Возвращает общий статус текущей compiled program.
@@ -79,21 +198,36 @@ export class EndgeProgram_Module extends EndgeModule {
   /**
    * Добавляет compiled artifact и индексирует его по id и identity.
    */
-  public addArtifact<TPayload>(artifact: ProgramArtifact<TPayload>, isCurrent?: () => boolean): ProgramArtifact<TPayload> {
+  public addArtifact<TPayload>(
+    artifact: ProgramArtifact<TPayload>,
+    isCurrent?: () => boolean,
+  ): ProgramArtifact<TPayload> {
+    this._programId = null
     const key = this._keyFor(artifact.ref.entityType, artifact.ref.id)
     const previous = this._artifacts.get(key)
     if (previous) {
-      const oldIdentityKey = this._keyFor(previous.ref.entityType, previous.ref.identity)
+      const oldIdentityKey = this._keyFor(
+        previous.ref.entityType,
+        previous.ref.identity,
+      )
       if (this._indexByIdentity.get(oldIdentityKey) === key) {
         this._indexByIdentity.delete(oldIdentityKey)
       }
-      if (previous.sourceHash !== artifact.sourceHash || previous.contextHash !== artifact.contextHash
-        || previous.compilerVersion !== artifact.compilerVersion) {
+      if (
+        previous.sourceHash !== artifact.sourceHash
+        || previous.contextHash !== artifact.contextHash
+        || previous.compilerVersion !== artifact.compilerVersion
+      ) {
         for (const dependent of this._artifacts.values()) {
-          if (dependent !== previous && dependent.dependencies.some(dependency =>
-            dependency.entityType === previous.ref.entityType
-            && (dependency.identity === previous.ref.identity || String(dependency.id) === String(previous.ref.id)),
-          )) {
+          if (
+            dependent !== previous
+            && dependent.dependencies.some(
+              dependency =>
+                dependency.entityType === previous.ref.entityType
+                && (dependency.identity === previous.ref.identity
+                  || String(dependency.id) === String(previous.ref.id)),
+            )
+          ) {
             this._markStale(dependent, 'program-dependency-stale')
           }
         }
@@ -104,7 +238,10 @@ export class EndgeProgram_Module extends EndgeModule {
       this._freshnessChecks.set(key, isCurrent)
     }
     this._artifacts.set(key, artifact as ProgramArtifact)
-    this._indexByIdentity.set(this._keyFor(artifact.ref.entityType, artifact.ref.identity), key)
+    this._indexByIdentity.set(
+      this._keyFor(artifact.ref.entityType, artifact.ref.identity),
+      key,
+    )
     if (previous) {
       this.recalculateStatus()
     }
@@ -116,7 +253,9 @@ export class EndgeProgram_Module extends EndgeModule {
   }
 
   /** Заменяет build-derived registry пользовательских SFC tags. */
-  public setComponentTags(entries: readonly ComponentSFCTagRegistryEntry[]): void {
+  public setComponentTags(
+    entries: readonly ComponentSFCTagRegistryEntry[],
+  ): void {
     this._componentIdentityByTag.clear()
     for (const entry of entries) {
       this._componentIdentityByTag.set(entry.tag, entry.identity)
@@ -131,7 +270,10 @@ export class EndgeProgram_Module extends EndgeModule {
 
   /** Возвращает snapshot build-derived registry без выдачи mutable Map наружу. */
   public getComponentTags(): ComponentSFCTagRegistryEntry[] {
-    return Array.from(this._componentIdentityByTag, ([tag, identity]) => ({ tag, identity }))
+    return Array.from(this._componentIdentityByTag, ([tag, identity]) => ({
+      tag,
+      identity,
+    }))
   }
 
   /**
@@ -146,7 +288,12 @@ export class EndgeProgram_Module extends EndgeModule {
       ? key
       : this._indexByIdentity.get(key)
     const artifact = resolvedKey ? this._artifacts.get(resolvedKey) : null
-    if (artifact && resolvedKey && artifact.status !== 'error' && !this._validating.has(resolvedKey)) {
+    if (
+      artifact
+      && resolvedKey
+      && artifact.status !== 'error'
+      && !this._validating.has(resolvedKey)
+    ) {
       this._validating.add(resolvedKey)
       try {
         if (this._freshnessChecks.get(resolvedKey)?.() === false) {
@@ -154,16 +301,33 @@ export class EndgeProgram_Module extends EndgeModule {
         }
         else {
           for (const dependency of artifact.dependencies) {
-            const target = this.getArtifact(dependency.entityType as ProgramEntityType, dependency.id ?? dependency.identity)
-              ?? (dependency.identity ? this.getArtifact(dependency.entityType as ProgramEntityType, dependency.identity) : null)
-            if (target?.diagnostics.some(diagnostic => diagnostic.code === 'program-artifact-stale' || diagnostic.code === 'program-dependency-stale')) {
+            const target
+              = this.getArtifact(
+                dependency.entityType as ProgramEntityType,
+                dependency.id ?? dependency.identity,
+              )
+              ?? (dependency.identity
+                ? this.getArtifact(
+                    dependency.entityType as ProgramEntityType,
+                    dependency.identity,
+                  )
+                : null)
+            if (
+              target?.diagnostics.some(
+                diagnostic =>
+                  diagnostic.code === 'program-artifact-stale'
+                  || diagnostic.code === 'program-dependency-stale',
+              )
+            ) {
               this._markStale(artifact, 'program-dependency-stale')
               break
             }
           }
         }
       }
-      finally { this._validating.delete(resolvedKey) }
+      finally {
+        this._validating.delete(resolvedKey)
+      }
     }
     return (artifact as ProgramArtifact<TPayload> | null) ?? null
   }
@@ -172,7 +336,10 @@ export class EndgeProgram_Module extends EndgeModule {
    * Возвращает artifact по compact reference.
    */
   public getArtifactByRef<TPayload = unknown>(
-    ref: Pick<ProgramArtifactRef, 'entityType'> & { id?: string | number, identity?: string },
+    ref: Pick<ProgramArtifactRef, 'entityType'> & {
+      id?: string | number
+      identity?: string
+    },
   ): ProgramArtifact<TPayload> | null {
     const idOrIdentity = ref.id ?? ref.identity
     if (idOrIdentity == null) {
@@ -182,74 +349,112 @@ export class EndgeProgram_Module extends EndgeModule {
   }
 
   /** Возвращает скомпилированный артефакт Action по id или identity. */
-  public getActionArtifact(idOrIdentity: string | number): ProgramArtifact<ActionProgramPayload> | null {
+  public getActionArtifact(
+    idOrIdentity: string | number,
+  ): ProgramArtifact<ActionProgramPayload> | null {
     return this.getArtifact<ActionProgramPayload>('action', idOrIdentity)
   }
 
   /** Возвращает compiled query artifact по id или identity. */
-  public getQueryArtifact(idOrIdentity: string | number): ProgramArtifact<QueryProgramPayload> | null {
+  public getQueryArtifact(
+    idOrIdentity: string | number,
+  ): ProgramArtifact<QueryProgramPayload> | null {
     return this.getArtifact<QueryProgramPayload>('query', idOrIdentity)
   }
 
   /** Возвращает compiled Vocab artifact по id или identity. */
-  public getVocabArtifact(idOrIdentity: string | number): ProgramArtifact<VocabProgramPayload> | null {
+  public getVocabArtifact(
+    idOrIdentity: string | number,
+  ): ProgramArtifact<VocabProgramPayload> | null {
     return this.getArtifact<VocabProgramPayload>('vocab', idOrIdentity)
   }
 
   /** Возвращает скомпилированный артефакт Computation по id или identity. */
-  public getComputationArtifact(idOrIdentity: string | number): ProgramArtifact<ComputationProgramPayload> | null {
-    return this.getArtifact<ComputationProgramPayload>('computation', idOrIdentity)
+  public getComputationArtifact(
+    idOrIdentity: string | number,
+  ): ProgramArtifact<ComputationProgramPayload> | null {
+    return this.getArtifact<ComputationProgramPayload>(
+      'computation',
+      idOrIdentity,
+    )
   }
 
   /** Возвращает compiled DataView artifact по id или identity. */
-  public getDataViewArtifact(idOrIdentity: string | number): ProgramArtifact<DataViewProgramPayload> | null {
+  public getDataViewArtifact(
+    idOrIdentity: string | number,
+  ): ProgramArtifact<DataViewProgramPayload> | null {
     return this.getArtifact<DataViewProgramPayload>('data-view', idOrIdentity)
   }
 
   /** Возвращает compiled Store artifact по id или identity. */
-  public getStoreArtifact(idOrIdentity: string | number): ProgramArtifact<StoreSourceArtifact> | null {
+  public getStoreArtifact(
+    idOrIdentity: string | number,
+  ): ProgramArtifact<StoreSourceArtifact> | null {
     return this.getArtifact<StoreSourceArtifact>('store', idOrIdentity)
   }
 
   /** Возвращает compiled Stream artifact по id или identity. */
-  public getStreamArtifact(idOrIdentity: string | number): ProgramArtifact<StreamSourceArtifact> | null {
+  public getStreamArtifact(
+    idOrIdentity: string | number,
+  ): ProgramArtifact<StreamSourceArtifact> | null {
     return this.getArtifact<StreamSourceArtifact>('stream', idOrIdentity)
   }
 
   /** Возвращает compiled Simulation artifact по id или identity. */
-  public getSimulationArtifact(idOrIdentity: string | number): ProgramArtifact<SimulationSourceArtifact> | null {
-    return this.getArtifact<SimulationSourceArtifact>('simulation', idOrIdentity)
+  public getSimulationArtifact(
+    idOrIdentity: string | number,
+  ): ProgramArtifact<SimulationSourceArtifact> | null {
+    return this.getArtifact<SimulationSourceArtifact>(
+      'simulation',
+      idOrIdentity,
+    )
   }
 
   /** Возвращает compiled Update artifact по id или identity. */
-  public getUpdateArtifact(idOrIdentity: string | number): ProgramArtifact<UpdateSourceArtifact> | null {
+  public getUpdateArtifact(
+    idOrIdentity: string | number,
+  ): ProgramArtifact<UpdateSourceArtifact> | null {
     return this.getArtifact<UpdateSourceArtifact>('update', idOrIdentity)
   }
 
   /** Возвращает compiled Filter artifact по id или identity. */
-  public getFilterArtifact(idOrIdentity: string | number): ProgramArtifact<FilterProgramPayload> | null {
+  public getFilterArtifact(
+    idOrIdentity: string | number,
+  ): ProgramArtifact<FilterProgramPayload> | null {
     return this.getArtifact<FilterProgramPayload>('filter', idOrIdentity)
   }
 
   /** Возвращает compiled Composition artifact по id или identity. */
-  public getCompositionArtifact(idOrIdentity: string | number): ProgramArtifact<CompositionProgramPayload> | null {
-    return this.getArtifact<CompositionProgramPayload>('composition', idOrIdentity)
+  public getCompositionArtifact(
+    idOrIdentity: string | number,
+  ): ProgramArtifact<CompositionProgramPayload> | null {
+    return this.getArtifact<CompositionProgramPayload>(
+      'composition',
+      idOrIdentity,
+    )
   }
 
   /** Возвращает скомпилированный документ EndgeCSS по сохранённому id или identity. */
-  public getStyleArtifact(idOrIdentity: string | number): ProgramArtifact<EndgeStyleProgramPayload> | null {
+  public getStyleArtifact(
+    idOrIdentity: string | number,
+  ): ProgramArtifact<EndgeStyleProgramPayload> | null {
     return this.getArtifact<EndgeStyleProgramPayload>('style', idOrIdentity)
   }
 
   /** Возвращает один артефакт Type, принадлежащий компилятору. */
-  public getTypeArtifact(idOrIdentity: string | number): ProgramArtifact<TypeProgramPayload> | null {
+  public getTypeArtifact(
+    idOrIdentity: string | number,
+  ): ProgramArtifact<TypeProgramPayload> | null {
     return this.getArtifact<TypeProgramPayload>('type', idOrIdentity)
   }
 
   /** Стабильный каталог для редактора, полученный только из скомпилированных артефактов Type. */
   public getTypeCatalog(): TypeProgramCatalogEntry[] {
     return this.getArtifacts()
-      .filter((artifact): artifact is ProgramArtifact<TypeProgramPayload> => artifact.ref.entityType === 'type')
+      .filter(
+        (artifact): artifact is ProgramArtifact<TypeProgramPayload> =>
+          artifact.ref.entityType === 'type',
+      )
       .map(artifact => ({
         id: artifact.ref.id,
         identity: artifact.ref.identity,
@@ -263,15 +468,22 @@ export class EndgeProgram_Module extends EndgeModule {
       }))
       .sort((left, right) => {
         const rank = { primitive: 0, reference: 1, user: 2 }
-        return rank[left.category] - rank[right.category]
+        return (
+          rank[left.category] - rank[right.category]
           || left.displayName.localeCompare(right.displayName)
+        )
       })
   }
 
   /**
    * Возвращает diagnostics для конкретного artifact или всей program.
    */
-  public getDiagnostics(ref?: Pick<ProgramArtifactRef, 'entityType'> & { id?: string | number, identity?: string }): ProgramDiagnostic[] {
+  public getDiagnostics(
+    ref?: Pick<ProgramArtifactRef, 'entityType'> & {
+      id?: string | number
+      identity?: string
+    },
+  ): ProgramDiagnostic[] {
     if (ref) {
       return this.getArtifactByRef(ref)?.diagnostics ?? []
     }
@@ -294,6 +506,10 @@ export class EndgeProgram_Module extends EndgeModule {
    * Очищает compiled program и возвращает статус в `valid`.
    */
   public clear(): void {
+    this._programId = null
+    this._compiledContext = null
+    this._catalogIsCurrent = null
+    this._catalog = { folders: {}, documents: {} }
     this._artifacts.clear()
     this._freshnessChecks.clear()
     this._validating.clear()
@@ -327,7 +543,8 @@ export class EndgeProgram_Module extends EndgeModule {
 
     for (const artifact of artifacts) {
       byStatus[artifact.status] += 1
-      byEntityType[artifact.ref.entityType] = (byEntityType[artifact.ref.entityType] ?? 0) + 1
+      byEntityType[artifact.ref.entityType]
+        = (byEntityType[artifact.ref.entityType] ?? 0) + 1
     }
 
     return {
@@ -369,12 +586,18 @@ export class EndgeProgram_Module extends EndgeModule {
     this.notify()
   }
 
-  private _keyFor(entityType: ProgramEntityType, idOrIdentity: string | number): ProgramArtifactKey {
+  private _keyFor(
+    entityType: ProgramEntityType,
+    idOrIdentity: string | number,
+  ): ProgramArtifactKey {
     return `${entityType}:${String(idOrIdentity ?? '').trim()}`
   }
 }
 
-function mergeStatus(current: ProgramArtifactStatus, next: ProgramArtifactStatus): ProgramArtifactStatus {
+function mergeStatus(
+  current: ProgramArtifactStatus,
+  next: ProgramArtifactStatus,
+): ProgramArtifactStatus {
   if (current === 'error' || next === 'error') {
     return 'error'
   }

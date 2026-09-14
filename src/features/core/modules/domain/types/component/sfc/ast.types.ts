@@ -102,7 +102,8 @@ export interface RComponentSFC_AST_Template {
 
 /** AST узел template до семантической нормализации. */
 export type RComponentSFC_AST_TemplateNode
-  = RComponentSFC_AST_ElementNode
+  = { kind: 'comment', content: string, range: RComponentSFC_SourceRange }
+    | RComponentSFC_AST_ElementNode
     | RComponentSFC_AST_TextNode
     | RComponentSFC_AST_InterpolationNode
 

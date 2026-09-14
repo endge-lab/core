@@ -17,6 +17,12 @@ export * from '@/features/federation/types/federation.types'
 //
 
 export * from '@/features/core/kernel/endge'
+export * from '@/features/core/kernel/types/endge-bundle.types'
+export * from '@/features/core/kernel/services/EndgeBundleCodec_Service'
+export * from '@/features/core/modules/program/domain/types/execution-bundle.types'
+export { restoreProgramArtifactSource } from '@/features/core/modules/program/tools/restore-program-source'
+export * from '@/features/core/modules/inspection/EndgeInspection_Module'
+export * from '@/features/core/modules/inspection/types/inspection.types'
 export * from '@/features/core/modules/commands/EndgeCommands_Module'
 export * from '@/features/core/modules/bridge/EndgeBridge_Module'
 export * from '@/features/core/modules/bridge/domain/bridge.type'

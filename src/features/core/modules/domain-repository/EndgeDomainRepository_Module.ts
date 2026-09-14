@@ -45,6 +45,7 @@ export class EndgeDomainRepositoryReadOnlyError extends Error {
 
 /** Граница persistence для live service-backend и локальных источников только для чтения. */
 export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> {
+  private _snapshotContext: EndgeBootContext | null = null
   private _generation = 0
   private _snapshotSequence = 0
   private _abortController = new AbortController()
@@ -81,6 +82,7 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
 
   public override async setup(ctx: EndgeBootContext): Promise<void> {
     this.reset()
+    this._snapshotContext = ctx
     if (ctx.mode === 'debugger') {
       this._capabilities = { provider: 'plain', mutations: false, softDelete: false, restore: false }
       return
@@ -144,6 +146,17 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     return snapshot
   }
 
+  /** Reloads a consistent saved input for build without touching editor drafts. */
+  public refreshSnapshot(signal?: AbortSignal): Promise<EndgeLiveDomainSnapshot | null> {
+    if (this._capabilities.provider !== 'service-backend') {
+      return Promise.resolve(null)
+    }
+    if (!this._snapshotContext) {
+      throw new Error('[EndgeDomainRepository] Snapshot context is unavailable')
+    }
+    return this.loadSnapshot({ ...this._snapshotContext, signal: signal ?? this._snapshotContext.signal })
+  }
+
   public getLoadedSnapshot(): EndgeLiveDomainSnapshot | null {
     return this._loadedSnapshot
   }
@@ -160,6 +173,7 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
   }
 
   public override reset(): void {
+    this._snapshotContext = null
     this._generation += 1
     this._snapshotSequence += 1
     this._abortController.abort()

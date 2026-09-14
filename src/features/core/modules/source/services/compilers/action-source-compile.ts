@@ -75,6 +75,7 @@ export function compileActionSource(input: ActionSourceCompileInput): ActionSour
     return { payload, metadata, diagnostics, dependencies }
   }
 
+  payload.ast = file
   const calls: t.CallExpression[] = []
   for (const statement of file.program.body) {
     if (t.isTSTypeAliasDeclaration(statement) || t.isTSInterfaceDeclaration(statement)) {

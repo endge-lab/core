@@ -20,7 +20,7 @@ afterEach(async () => {
 describe('debugger inspection boundary', () => {
   /** Debugger подключает owner Runtime, сохраняя запрет на исполнение и Raph-фазы. */
   it('подключает пассивный Runtime без компиляции, hosts и Raph-фаз', async () => {
-    const build = vi.spyOn(Endge.program, 'build')
+    const build = vi.spyOn(Endge.compiler, 'build')
     const addPhase = vi.spyOn(Raph, 'addPhase')
     const addNode = vi.spyOn(Raph.app, 'addNode')
     await bootDebugger()

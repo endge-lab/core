@@ -47,6 +47,8 @@ export interface SimulationSourceDocument {
 }
 
 export interface SimulationSourceArtifact extends SimulationSourceDocument {
+  /** Optional parser tree retained for inspection; runtime does not require it. */
+  ast?: unknown
   type: 'simulation'
   sourceVersion: number
 }

@@ -73,6 +73,7 @@ export function compileComputation(input: ComputationCompileInput): ComputationC
     return { payload, metadata, diagnostics }
   }
 
+  payload.ast = file
   const calls: t.CallExpression[] = []
   for (const statement of file.program.body) {
     if (t.isImportDeclaration(statement)) {

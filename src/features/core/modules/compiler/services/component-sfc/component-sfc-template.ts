@@ -1,5 +1,8 @@
 import type { EndgeSFCEditingConfiguration } from '@/features/core/modules/configuration/domain/types/configuration.type'
-import type { RComponentDependencies, RComponentDiagnostic } from '@/features/core/modules/domain/types/component/component-core.types'
+import type {
+  RComponentDependencies,
+  RComponentDiagnostic,
+} from '@/features/core/modules/domain/types/component/component-core.types'
 import type {
   RComponentSFC_AST_Attribute,
   RComponentSFC_AST_Directive,
@@ -67,7 +70,9 @@ export interface ComponentSFCTemplateCompileContext {
   hasComponentIdentity?: (identity: string) => boolean
 
   /** Определяет публичные Events вложенного пользовательского Component для локальных bindings `@event`. */
-  resolveComponentPortManifest?: (identity: string) => ComponentSFCPortManifest | null
+  resolveComponentPortManifest?: (
+    identity: string,
+  ) => ComponentSFCPortManifest | null
 
   /** Определяет статические провайдеры для плоских bindings дочерних портов. */
   resolvePortProvider?: (
@@ -129,10 +134,25 @@ export function compileComponentSFCTemplate(
   }
 
   const roots = template.roots
-    .map((node, index) => compileTemplateNode(node, `root-${index}`, context, dependencies, metadata, diagnostics))
+    .filter(node => node.kind !== 'comment')
+    .map((node, index) =>
+      compileTemplateNode(
+        node,
+        `root-${index}`,
+        context,
+        dependencies,
+        metadata,
+        diagnostics,
+      ),
+    )
     .filter((node): node is RComponentSFC_IR_Node => node != null)
   validateTooltipTree(roots, diagnostics)
-  const variants = validateVariantContainer(roots, diagnostics, 'template', false)
+  const variants = validateVariantContainer(
+    roots,
+    diagnostics,
+    'template',
+    false,
+  )
   const emittedEvents = collectTemplateEmittedEvents(roots)
 
   return {
@@ -155,6 +175,9 @@ function compileTemplateNode(
   metadata: ProgramNodeMetadata[],
   diagnostics: RComponentDiagnostic[],
 ): RComponentSFC_IR_Node | null {
+  if (node.kind === 'comment') {
+    return null
+  }
   if (node.kind === 'text') {
     return compileTextNode(node, id)
   }
@@ -163,10 +186,20 @@ function compileTemplateNode(
     return compileInterpolationNode(node, id, context, diagnostics)
   }
 
-  return compileElementNode(node, id, context, dependencies, metadata, diagnostics)
+  return compileElementNode(
+    node,
+    id,
+    context,
+    dependencies,
+    metadata,
+    diagnostics,
+  )
 }
 
-function compileTextNode(node: RComponentSFC_AST_TextNode, id: string): RComponentSFC_IR_Node | null {
+function compileTextNode(
+  node: RComponentSFC_AST_TextNode,
+  id: string,
+): RComponentSFC_IR_Node | null {
   if (!node.content.trim()) {
     return null
   }
@@ -211,12 +244,12 @@ function compileElementNode(
   const isBuiltIn = isComponentSFCBuiltInTag(node.tag)
   const localComponentPort = isBuiltIn
     ? null
-    : context.componentPorts?.find(port => port.tag === node.tag) ?? null
+    : (context.componentPorts?.find(port => port.tag === node.tag) ?? null)
   const directComponentIdentity = isBuiltIn
     ? null
-    : localComponentPort?.defaultIdentity
+    : (localComponentPort?.defaultIdentity
       ?? context.resolveComponentTag?.(node.tag)
-      ?? null
+      ?? null)
 
   if (!isBuiltIn && !directComponentIdentity) {
     diagnostics.push({
@@ -231,33 +264,85 @@ function compileElementNode(
   }
 
   const componentManifest = directComponentIdentity
-    ? context.resolveComponentPortManifest?.(directComponentIdentity) ?? null
+    ? (context.resolveComponentPortManifest?.(directComponentIdentity) ?? null)
     : null
   const portBindings = directComponentIdentity
-    ? compileRequiredPortBindings(node, componentManifest, context, dependencies, diagnostics)
+    ? compileRequiredPortBindings(
+        node,
+        componentManifest,
+        context,
+        dependencies,
+        diagnostics,
+      )
     : []
-  const portBindingRanges = new Set(portBindings.map(binding => `${binding.sourceRange?.start}:${binding.sourceRange?.end}`))
-  const nodeMetadata = compileNodeMetadata(node.attributes, diagnostics, `template.${id}.metadata`)
-  validateSemanticStyleAttributes(node.attributes, diagnostics, `template.${id}`)
+  const portBindingRanges = new Set(
+    portBindings.map(
+      binding => `${binding.sourceRange?.start}:${binding.sourceRange?.end}`,
+    ),
+  )
+  const nodeMetadata = compileNodeMetadata(
+    node.attributes,
+    diagnostics,
+    `template.${id}.metadata`,
+  )
+  validateSemanticStyleAttributes(
+    node.attributes,
+    diagnostics,
+    `template.${id}`,
+  )
   const props = compileAttributes(
-    node.attributes.filter(attribute => (
-      !['metadata', 'editable', 'edit-on', 'cancel-on', 'commit-on', 'on'].includes(attribute.name)
-      && !portBindingRanges.has(`${attribute.range.start}:${attribute.range.end}`)
-    )),
+    node.attributes.filter(
+      attribute =>
+        ![
+          'metadata',
+          'editable',
+          'edit-on',
+          'cancel-on',
+          'commit-on',
+          'on',
+        ].includes(attribute.name)
+        && !portBindingRanges.has(
+          `${attribute.range.start}:${attribute.range.end}`,
+        ),
+    ),
     context,
     diagnostics,
   )
-  const directives = compileDirectives(node.directives.filter(directive => directive.name !== 'on'), context, diagnostics)
-  const tag: RComponentSFC_IR_Tag = directComponentIdentity ? 'Component' : node.tag as RComponentSFC_IR_Tag
+  const directives = compileDirectives(
+    node.directives.filter(directive => directive.name !== 'on'),
+    context,
+    diagnostics,
+  )
+  const tag: RComponentSFC_IR_Tag = directComponentIdentity
+    ? 'Component'
+    : (node.tag as RComponentSFC_IR_Tag)
   const baseEventManifest = directComponentIdentity
     ? componentManifest
     : createBuiltInComponentPortManifest(tag)
-  const editable = compileEditableBehavior(node, tag, props, context, diagnostics)
+  const editable = compileEditableBehavior(
+    node,
+    tag,
+    props,
+    context,
+    diagnostics,
+  )
   const eventManifest = editable
     ? withEditableEventManifest(baseEventManifest)
     : baseEventManifest
-  const events = compileEventBindings(node.directives, eventManifest, context.ownerPorts, dependencies, diagnostics)
-  const interactions = compileInteractionBindings(node.attributes, eventManifest, context, dependencies, diagnostics)
+  const events = compileEventBindings(
+    node.directives,
+    eventManifest,
+    context.ownerPorts,
+    dependencies,
+    diagnostics,
+  )
+  const interactions = compileInteractionBindings(
+    node.attributes,
+    eventManifest,
+    context,
+    dependencies,
+    diagnostics,
+  )
 
   if (directComponentIdentity) {
     if (props.is) {
@@ -287,7 +372,17 @@ function compileElementNode(
     events,
     ...(interactions.length ? { interactions } : {}),
     children: node.children
-      .map((child, index) => compileTemplateNode(child, `${id}-${index}`, context, dependencies, metadata, diagnostics))
+      .filter(child => child.kind !== 'comment')
+      .map((child, index) =>
+        compileTemplateNode(
+          child,
+          `${id}-${index}`,
+          context,
+          dependencies,
+          metadata,
+          diagnostics,
+        ),
+      )
       .filter((child): child is RComponentSFC_IR_Node => child != null),
     sourceRange: node.range,
     port: localComponentPort
@@ -302,8 +397,13 @@ function compileElementNode(
   }
 
   if (editable && element.tag === 'Component') {
-    const identity = element.props.is?.kind === 'literal' ? String(element.props.is.value ?? '').trim() : ''
-    const variants = identity ? context.resolveComponentVariants?.(identity) : null
+    const identity
+      = element.props.is?.kind === 'literal'
+        ? String(element.props.is.value ?? '').trim()
+        : ''
+    const variants = identity
+      ? context.resolveComponentVariants?.(identity)
+      : null
     if (variants && !variants.includes('edit')) {
       diagnostics.push({
         severity: 'error',
@@ -320,14 +420,20 @@ function compileElementNode(
     events.push({
       name: 'edited',
       modifiers: [],
-      action: { kind: 'emit', event: 'edited', payload: { kind: 'event', path: null } },
+      action: {
+        kind: 'emit',
+        event: 'edited',
+        payload: { kind: 'event', path: null },
+      },
     })
   }
 
   validateNestedVariants(element, diagnostics, `template.${id}`)
 
   if (Object.keys(nodeMetadata).length > 0) {
-    const staticKey = node.directives.find(directive => directive.name === 'key' && !directive.argument)
+    const staticKey = node.directives.find(
+      directive => directive.name === 'key' && !directive.argument,
+    )
     const key = staticKey?.expression?.trim() || undefined
     metadata.push({
       nodeId: id,
@@ -339,8 +445,12 @@ function compileElementNode(
 
   if (element.tag === 'Table') {
     diagnostics.push(...normalizeComponentSFCTableSort(element).diagnostics)
-    diagnostics.push(...normalizeComponentSFCTableColumnPin(element).diagnostics)
-    diagnostics.push(...normalizeComponentSFCTableColumnVisibility(element).diagnostics)
+    diagnostics.push(
+      ...normalizeComponentSFCTableColumnPin(element).diagnostics,
+    )
+    diagnostics.push(
+      ...normalizeComponentSFCTableColumnVisibility(element).diagnostics,
+    )
   }
 
   return element
@@ -389,7 +499,10 @@ function compileRequiredPortBindings(
     if (!binding) {
       continue
     }
-    const provider = context.resolvePortProvider?.(binding.identity, binding.kind)
+    const provider = context.resolvePortProvider?.(
+      binding.identity,
+      binding.kind,
+    )
     if (context.resolvePortProvider && !provider) {
       diagnostics.push({
         severity: 'error',
@@ -425,10 +538,9 @@ function compileRequiredPortBindings(
     if (
       provider?.kind === 'query'
       && port.kind === 'query'
-      && (
-        hasTemplatePortFieldMismatch(port.inputs, provider.inputs)
-        || (port.outputs.length > 0 && hasTemplatePortFieldMismatch(port.outputs, provider.outputs))
-      )
+      && (hasTemplatePortFieldMismatch(port.inputs, provider.inputs)
+        || (port.outputs.length > 0
+          && hasTemplatePortFieldMismatch(port.outputs, provider.outputs)))
     ) {
       diagnostics.push({
         severity: 'error',
@@ -455,19 +567,31 @@ function parseRequiredPortBinding(
   let expression: any
   try {
     expression = attribute.dynamic
-      ? parseExpression(String(attribute.value ?? '').trim(), { sourceType: 'module', plugins: ['typescript'] })
+      ? parseExpression(String(attribute.value ?? '').trim(), {
+          sourceType: 'module',
+          plugins: ['typescript'],
+        })
       : null
   }
   catch {
     expression = null
   }
-  const kind = expression?.type === 'CallExpression' && expression.callee?.type === 'Identifier'
-    ? expression.callee.name as ComponentSFCRequiredPortKind
-    : null
-  const identity = expression?.arguments?.length === 1 && expression.arguments[0]?.type === 'StringLiteral'
-    ? String(expression.arguments[0].value ?? '').trim()
-    : ''
-  if (!attribute.dynamic || !kind || !['action', 'component', 'computation', 'query'].includes(kind) || !identity) {
+  const kind
+    = expression?.type === 'CallExpression'
+      && expression.callee?.type === 'Identifier'
+      ? (expression.callee.name as ComponentSFCRequiredPortKind)
+      : null
+  const identity
+    = expression?.arguments?.length === 1
+      && expression.arguments[0]?.type === 'StringLiteral'
+      ? String(expression.arguments[0].value ?? '').trim()
+      : ''
+  if (
+    !attribute.dynamic
+    || !kind
+    || !['action', 'component', 'computation', 'query'].includes(kind)
+    || !identity
+  ) {
     diagnostics.push({
       severity: 'error',
       code: 'sfc-template-port-binding-shape',
@@ -519,22 +643,38 @@ function appendRequiredPortBindingDependency(
 }
 
 function normalizePublicBindingName(value: string): string {
-  return String(value ?? '').replace(/-([a-z0-9])/g, (_match, letter: string) => letter.toUpperCase())
+  return String(value ?? '').replace(/-([a-z0-9])/g, (_match, letter: string) =>
+    letter.toUpperCase())
 }
 
 function hasTemplatePortFieldMismatch(
-  expectedFields: Array<{ name: string, type: string, isArray?: boolean, optional?: boolean }>,
-  actualFields: Array<{ name: string, type: string, isArray?: boolean, optional?: boolean }>,
+  expectedFields: Array<{
+    name: string
+    type: string
+    isArray?: boolean
+    optional?: boolean
+  }>,
+  actualFields: Array<{
+    name: string
+    type: string
+    isArray?: boolean
+    optional?: boolean
+  }>,
 ): boolean {
   const expected = new Map(expectedFields.map(field => [field.name, field]))
   const actual = new Map(actualFields.map(field => [field.name, field]))
-  return expectedFields.some((field) => {
-    const candidate = actual.get(field.name)
-    return !candidate
-      || candidate.type.replace(/\s+/g, '') !== field.type.replace(/\s+/g, '')
-      || Boolean(candidate.isArray) !== Boolean(field.isArray)
-      || Boolean(candidate.optional) !== Boolean(field.optional)
-  }) || actualFields.some(field => !field.optional && !expected.has(field.name))
+  return (
+    expectedFields.some((field) => {
+      const candidate = actual.get(field.name)
+      return (
+        !candidate
+        || candidate.type.replace(/\s+/g, '') !== field.type.replace(/\s+/g, '')
+        || Boolean(candidate.isArray) !== Boolean(field.isArray)
+        || Boolean(candidate.optional) !== Boolean(field.optional)
+      )
+    })
+    || actualFields.some(field => !field.optional && !expected.has(field.name))
+  )
 }
 
 /** Проверяет составную форму lazy Tooltip после удаления узлов, содержащих только пробелы. */
@@ -551,7 +691,10 @@ function validateTooltipTree(
       return
     }
 
-    if ((node.tag === 'TooltipTrigger' || node.tag === 'TooltipContent') && parent?.tag !== 'Tooltip') {
+    if (
+      (node.tag === 'TooltipTrigger' || node.tag === 'TooltipContent')
+      && parent?.tag !== 'Tooltip'
+    ) {
       diagnostics.push({
         severity: 'error',
         code: 'sfc-tooltip-structural-parent',
@@ -567,7 +710,8 @@ function validateTooltipTree(
         diagnostics.push({
           severity: 'error',
           code: 'sfc-tooltip-nested',
-          message: 'Tooltip нельзя вкладывать в TooltipContent: один Shell управляет одним активным overlay.',
+          message:
+            'Tooltip нельзя вкладывать в TooltipContent: один Shell управляет одним активным overlay.',
           sourcePath: `template.${node.id}`,
           start: node.sourceRange?.start,
           end: node.sourceRange?.end,
@@ -589,12 +733,14 @@ function validateTooltipNode(
 ): void {
   const hasText = Object.hasOwn(node.props, 'text')
   const hasMarkdown = Object.hasOwn(node.props, 'markdown')
-  const triggerNodes = node.children.filter((child): child is RComponentSFC_IR_ElementNode => (
-    child.kind === 'element' && child.tag === 'TooltipTrigger'
-  ))
-  const contentNodes = node.children.filter((child): child is RComponentSFC_IR_ElementNode => (
-    child.kind === 'element' && child.tag === 'TooltipContent'
-  ))
+  const triggerNodes = node.children.filter(
+    (child): child is RComponentSFC_IR_ElementNode =>
+      child.kind === 'element' && child.tag === 'TooltipTrigger',
+  )
+  const contentNodes = node.children.filter(
+    (child): child is RComponentSFC_IR_ElementNode =>
+      child.kind === 'element' && child.tag === 'TooltipContent',
+  )
   const usesCompound = triggerNodes.length > 0 || contentNodes.length > 0
 
   const report = (code: string, message: string): void => {
@@ -618,22 +764,35 @@ function validateTooltipNode(
 
   if (hasText || hasMarkdown) {
     if (node.children.length === 0) {
-      report('sfc-tooltip-trigger-required', 'Tooltip text/markdown требует trigger-содержимое.')
+      report(
+        'sfc-tooltip-trigger-required',
+        'Tooltip text/markdown требует trigger-содержимое.',
+      )
     }
     return
   }
 
-  if (triggerNodes.length !== 1 || contentNodes.length !== 1 || node.children.length !== 2) {
+  if (
+    triggerNodes.length !== 1
+    || contentNodes.length !== 1
+    || node.children.length !== 2
+  ) {
     report(
       'sfc-tooltip-compound-shape',
       'Rich Tooltip требует ровно один TooltipTrigger и один TooltipContent без соседних узлов.',
     )
   }
   if (triggerNodes[0]?.children.length === 0) {
-    report('sfc-tooltip-trigger-required', 'TooltipTrigger не может быть пустым.')
+    report(
+      'sfc-tooltip-trigger-required',
+      'TooltipTrigger не может быть пустым.',
+    )
   }
   if (contentNodes[0]?.children.length === 0) {
-    report('sfc-tooltip-content-required', 'TooltipContent не может быть пустым.')
+    report(
+      'sfc-tooltip-content-required',
+      'TooltipContent не может быть пустым.',
+    )
   }
 }
 
@@ -653,13 +812,18 @@ function compileEditableBehavior(
   context: ComponentSFCTemplateCompileContext,
   diagnostics: RComponentDiagnostic[],
 ) {
-  const editableAttribute = node.attributes.find(attribute => attribute.name === 'editable')
+  const editableAttribute = node.attributes.find(
+    attribute => attribute.name === 'editable',
+  )
   const enabled = tag === 'Editable' || Boolean(editableAttribute)
   if (!enabled) {
     return undefined
   }
 
-  if (editableAttribute?.dynamic || (editableAttribute?.value != null && editableAttribute.value !== '')) {
+  if (
+    editableAttribute?.dynamic
+    || (editableAttribute?.value != null && editableAttribute.value !== '')
+  ) {
     diagnostics.push({
       severity: 'error',
       code: 'sfc-editable-static',
@@ -672,7 +836,11 @@ function compileEditableBehavior(
 
   let value = tag === 'Checkbox' ? props.checked : props.value
   if (!value && tag === 'Text') {
-    const meaningful = node.children.filter(child => child.kind !== 'text' || child.content.trim())
+    const meaningful = node.children.filter(
+      child =>
+        child.kind !== 'comment'
+        && (child.kind !== 'text' || child.content.trim()),
+    )
     if (meaningful.length === 1 && meaningful[0]?.kind === 'interpolation') {
       const compiled = compileComponentSFCExpression(meaningful[0].expression, {
         props: context.props,
@@ -686,7 +854,8 @@ function compileEditableBehavior(
       diagnostics.push({
         severity: 'error',
         code: 'sfc-editable-text-value',
-        message: 'Text editable требует :value или ровно одну interpolation без смешанного текста.',
+        message:
+          'Text editable требует :value или ровно одну interpolation без смешанного текста.',
         sourcePath: 'template.editable.value',
         start: node.range.start,
         end: node.range.end,
@@ -705,14 +874,19 @@ function compileEditableBehavior(
     value = { kind: 'literal', value: null }
   }
 
-  const triggerAttribute = node.attributes.find(attribute => attribute.name === 'edit-on')
+  const triggerAttribute = node.attributes.find(
+    attribute => attribute.name === 'edit-on',
+  )
   let triggers: RComponentSFC_IR_Value = { kind: 'literal', value: 'click' }
   if (triggerAttribute?.dynamic) {
-    const compiled = compileComponentSFCExpression(triggerAttribute.value ?? '', {
-      props: context.props,
-      locals: context.locals,
-      sourcePath: 'template.edit-on',
-    })
+    const compiled = compileComponentSFCExpression(
+      triggerAttribute.value ?? '',
+      {
+        props: context.props,
+        locals: context.locals,
+        sourcePath: 'template.edit-on',
+      },
+    )
     diagnostics.push(...compiled.diagnostics)
     triggers = compiled.value
   }
@@ -735,7 +909,9 @@ function compileEditableBehavior(
 
   const triggerModifiers: RComponentSFC_IR_EventModifier[] = []
   for (const modifier of triggerAttribute?.modifiers ?? []) {
-    if (!LOCAL_EVENT_MODIFIERS.has(modifier as RComponentSFC_IR_EventModifier)) {
+    if (
+      !LOCAL_EVENT_MODIFIERS.has(modifier as RComponentSFC_IR_EventModifier)
+    ) {
       diagnostics.push({
         severity: 'error',
         code: 'sfc-edit-on-modifier',
@@ -748,7 +924,10 @@ function compileEditableBehavior(
     }
     triggerModifiers.push(modifier as RComponentSFC_IR_EventModifier)
   }
-  if (triggerModifiers.includes('passive') && triggerModifiers.includes('prevent')) {
+  if (
+    triggerModifiers.includes('passive')
+    && triggerModifiers.includes('prevent')
+  ) {
     diagnostics.push({
       severity: 'error',
       code: 'sfc-edit-on-passive-prevent',
@@ -758,7 +937,10 @@ function compileEditableBehavior(
       end: triggerAttribute?.range.end,
     })
   }
-  else if (triggerAttribute?.dynamic && hasComponentSFCPassivePreventConflict(triggers, triggerModifiers)) {
+  else if (
+    triggerAttribute?.dynamic
+    && hasComponentSFCPassivePreventConflict(triggers, triggerModifiers)
+  ) {
     diagnostics.push({
       severity: 'error',
       code: 'sfc-edit-on-passive-prevent',
@@ -772,14 +954,16 @@ function compileEditableBehavior(
   const cancel = compileEditableOutcomeTriggers(
     node,
     'cancel-on',
-    context.sfcEditing?.cancelOn ?? DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION.cancelOn,
+    context.sfcEditing?.cancelOn
+    ?? DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION.cancelOn,
     context,
     diagnostics,
   )
   const commit = compileEditableOutcomeTriggers(
     node,
     'commit-on',
-    context.sfcEditing?.commitOn ?? DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION.commitOn,
+    context.sfcEditing?.commitOn
+    ?? DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION.commitOn,
     context,
     diagnostics,
   )
@@ -801,9 +985,15 @@ function compileEditableOutcomeTriggers(
   defaultValue: unknown,
   context: ComponentSFCTemplateCompileContext,
   diagnostics: RComponentDiagnostic[],
-): { triggers: RComponentSFC_IR_Value, modifiers: RComponentSFC_IR_EventModifier[] } {
+): {
+  triggers: RComponentSFC_IR_Value
+  modifiers: RComponentSFC_IR_EventModifier[]
+} {
   const attribute = node.attributes.find(item => item.name === name)
-  let triggers: RComponentSFC_IR_Value = { kind: 'literal', value: defaultValue }
+  let triggers: RComponentSFC_IR_Value = {
+    kind: 'literal',
+    value: defaultValue,
+  }
   if (attribute?.dynamic) {
     const compiled = compileComponentSFCExpression(attribute.value ?? '', {
       props: context.props,
@@ -832,7 +1022,9 @@ function compileEditableOutcomeTriggers(
 
   const modifiers: RComponentSFC_IR_EventModifier[] = []
   for (const modifier of attribute?.modifiers ?? []) {
-    if (!LOCAL_EVENT_MODIFIERS.has(modifier as RComponentSFC_IR_EventModifier)) {
+    if (
+      !LOCAL_EVENT_MODIFIERS.has(modifier as RComponentSFC_IR_EventModifier)
+    ) {
       diagnostics.push({
         severity: 'error',
         code: `sfc-${name}-modifier`,
@@ -847,7 +1039,8 @@ function compileEditableOutcomeTriggers(
   }
   if (
     (modifiers.includes('passive') && modifiers.includes('prevent'))
-    || (attribute?.dynamic && hasComponentSFCPassivePreventConflict(triggers, modifiers))
+    || (attribute?.dynamic
+      && hasComponentSFCPassivePreventConflict(triggers, modifiers))
   ) {
     diagnostics.push({
       severity: 'error',
@@ -861,7 +1054,9 @@ function compileEditableOutcomeTriggers(
   return { triggers, modifiers }
 }
 
-function withEditableEventManifest(manifest: ComponentSFCPortManifest | null): ComponentSFCPortManifest {
+function withEditableEventManifest(
+  manifest: ComponentSFCPortManifest | null,
+): ComponentSFCPortManifest {
   const result = manifest
     ? {
         ...manifest,
@@ -900,13 +1095,17 @@ function validateVariantContainer(
   sourcePath: string,
   requireEdit: boolean,
 ): ComponentSFCVariant[] {
-  const variantNodes = nodes.filter((node): node is RComponentSFC_IR_ElementNode => node.kind === 'element' && node.tag === 'Variant')
+  const variantNodes = nodes.filter(
+    (node): node is RComponentSFC_IR_ElementNode =>
+      node.kind === 'element' && node.tag === 'Variant',
+  )
   if (!variantNodes.length) {
     if (requireEdit) {
       diagnostics.push({
         severity: 'error',
         code: 'sfc-editable-variants-required',
-        message: 'Editable требует Variant name="default" и Variant name="edit".',
+        message:
+          'Editable требует Variant name="default" и Variant name="edit".',
         sourcePath,
       })
     }
@@ -916,14 +1115,18 @@ function validateVariantContainer(
     diagnostics.push({
       severity: 'error',
       code: 'sfc-variant-roots-only',
-      message: 'При явных Variant все соседние корневые узлы контейнера должны быть Variant.',
+      message:
+        'При явных Variant все соседние корневые узлы контейнера должны быть Variant.',
       sourcePath,
     })
   }
   const result: ComponentSFCVariant[] = []
   const names = new Set<string>()
   for (const variant of variantNodes) {
-    const name = variant.props.name?.kind === 'literal' ? String(variant.props.name.value ?? '').trim() : ''
+    const name
+      = variant.props.name?.kind === 'literal'
+        ? String(variant.props.name.value ?? '').trim()
+        : ''
     if (!name || names.has(name)) {
       diagnostics.push({
         severity: 'error',
@@ -939,15 +1142,27 @@ function validateVariantContainer(
     result.push({ name, nodeId: variant.id })
   }
   if (!names.has('default')) {
-    diagnostics.push({ severity: 'error', code: 'sfc-variant-default-required', message: 'Явные Variant требуют ровно один name="default".', sourcePath })
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-variant-default-required',
+      message: 'Явные Variant требуют ровно один name="default".',
+      sourcePath,
+    })
   }
   if (requireEdit && !names.has('edit')) {
-    diagnostics.push({ severity: 'error', code: 'sfc-variant-edit-required', message: 'Editable требует Variant name="edit".', sourcePath })
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-variant-edit-required',
+      message: 'Editable требует Variant name="edit".',
+      sourcePath,
+    })
   }
   return result
 }
 
-function collectTemplateEmittedEvents(nodes: RComponentSFC_IR_Node[]): string[] {
+function collectTemplateEmittedEvents(
+  nodes: RComponentSFC_IR_Node[],
+): string[] {
   const result = new Set<string>()
   const visit = (node: RComponentSFC_IR_Node): void => {
     if (node.kind !== 'element') {
@@ -996,7 +1211,14 @@ function compileInteractionBindings(
   return attributes
     .filter(attribute => attribute.name === 'on')
     .flatMap((attribute) => {
-      const group = compileComponentSFCInteractionAnnotation(attribute, manifest, context, dependencies, diagnostics, context.ownerPorts)
+      const group = compileComponentSFCInteractionAnnotation(
+        attribute,
+        manifest,
+        context,
+        dependencies,
+        diagnostics,
+        context.ownerPorts,
+      )
       return group ? [group] : []
     })
 }
@@ -1010,7 +1232,9 @@ function compileEventBindings(
   const result: RComponentSFC_IR_EventBinding[] = []
   for (const directive of directives.filter(item => item.name === 'on')) {
     const name = directive.argument?.trim() ?? ''
-    const available = manifest?.emits.events.find(event => event.name === name)
+    const available = manifest?.emits.events.find(
+      event => event.name === name,
+    )
     if (!name || !available) {
       diagnostics.push({
         severity: 'error',
@@ -1027,7 +1251,9 @@ function compileEventBindings(
     const modifiers: RComponentSFC_IR_EventModifier[] = []
     let invalid = false
     for (const modifier of directive.modifiers ?? []) {
-      if (!LOCAL_EVENT_MODIFIERS.has(modifier as RComponentSFC_IR_EventModifier)) {
+      if (
+        !LOCAL_EVENT_MODIFIERS.has(modifier as RComponentSFC_IR_EventModifier)
+      ) {
         diagnostics.push({
           severity: 'error',
           code: 'sfc-template-event-modifier',
@@ -1038,7 +1264,9 @@ function compileEventBindings(
         })
         invalid = true
       }
-      else if (!modifiers.includes(modifier as RComponentSFC_IR_EventModifier)) {
+      else if (
+        !modifiers.includes(modifier as RComponentSFC_IR_EventModifier)
+      ) {
         modifiers.push(modifier as RComponentSFC_IR_EventModifier)
       }
     }
@@ -1067,7 +1295,14 @@ function compileEventBindings(
       }
       continue
     }
-    const actions = compileComponentSFCLocalEventActions(name, expression, directive.range.start, dependencies, diagnostics, ownerPorts)
+    const actions = compileComponentSFCLocalEventActions(
+      name,
+      expression,
+      directive.range.start,
+      dependencies,
+      diagnostics,
+      ownerPorts,
+    )
     if (!actions.length) {
       continue
     }
@@ -1091,10 +1326,14 @@ function validateSemanticStyleAttributes(
   if (!part) {
     return
   }
-  const valid = !part.dynamic
-    && typeof part.value === 'string'
-    && part.value.trim().length > 0
-    && part.value.trim().split(/\s+/).every(token => /^[a-z][\w-]*$/i.test(token))
+  const valid
+    = !part.dynamic
+      && typeof part.value === 'string'
+      && part.value.trim().length > 0
+      && part.value
+        .trim()
+        .split(/\s+/)
+        .every(token => /^[a-z][\w-]*$/i.test(token))
   if (!valid) {
     diagnostics.push({
       severity: 'error',
@@ -1153,7 +1392,10 @@ function validateComponentCall(
     })
   }
 
-  collectComponentDependency({ kind: 'literal', value: identity }, dependencies)
+  collectComponentDependency(
+    { kind: 'literal', value: identity },
+    dependencies,
+  )
 }
 
 function compileNodeMetadata(
@@ -1161,7 +1403,9 @@ function compileNodeMetadata(
   diagnostics: RComponentDiagnostic[],
   sourcePath: string,
 ) {
-  const declarations = attributes.filter(attribute => attribute.name === 'metadata')
+  const declarations = attributes.filter(
+    attribute => attribute.name === 'metadata',
+  )
   if (declarations.length === 0) {
     return {}
   }
@@ -1182,7 +1426,8 @@ function compileNodeMetadata(
     diagnostics.push({
       severity: 'error',
       code: 'sfc-template-metadata-shape',
-      message: 'Metadata template-узла должна быть статическим object literal в :metadata.',
+      message:
+        'Metadata template-узла должна быть статическим object literal в :metadata.',
       sourcePath,
       start: declaration.range.start,
       end: declaration.range.end,
@@ -1190,7 +1435,11 @@ function compileNodeMetadata(
     return {}
   }
 
-  return compileProgramMetadataSource(declaration.value, diagnostics, sourcePath)
+  return compileProgramMetadataSource(
+    declaration.value,
+    diagnostics,
+    sourcePath,
+  )
 }
 
 function compileAttributes(
@@ -1258,12 +1507,20 @@ function compileDirectiveExpression(
   diagnostics: RComponentDiagnostic[],
 ): RComponentSFC_IR_Value {
   const expression = directive.expression ?? ''
-  const forMatch = directive.name === 'for' ? expression.match(/^\s*(?:\(([^,\s]+)\s*,\s*(\S[^)]*)\)|(\S+))\s+in\s+(\S.*)$/) : null
-  const result = compileComponentSFCExpression(forMatch?.[4]?.trim() ?? expression, {
-    props: context.props,
-    locals: context.locals,
-    sourcePath: `template.${directive.name}`,
-  })
+  const forMatch
+    = directive.name === 'for'
+      ? expression.match(
+          /^\s*(?:\(([^,\s]+)\s*,\s*(\S[^)]*)\)|(\S+))\s+in\s+(\S.*)$/,
+        )
+      : null
+  const result = compileComponentSFCExpression(
+    forMatch?.[4]?.trim() ?? expression,
+    {
+      props: context.props,
+      locals: context.locals,
+      sourcePath: `template.${directive.name}`,
+    },
+  )
   diagnostics.push(...result.diagnostics)
   return result.value
 }
@@ -1273,7 +1530,9 @@ function parseForDirective(
   source: RComponentSFC_IR_Value,
 ): RComponentSFC_IR_Directives['for'] {
   const expression = directive.expression ?? ''
-  const match = expression.match(/^\s*(?:\(([^,\s]+)\s*,\s*(\S[^)]*)\)|(\S+))\s+in\s+(\S.*)$/)
+  const match = expression.match(
+    /^\s*(?:\(([^,\s]+)\s*,\s*(\S[^)]*)\)|(\S+))\s+in\s+(\S.*)$/,
+  )
 
   if (!match) {
     return {
@@ -1289,8 +1548,16 @@ function parseForDirective(
   }
 }
 
-function collectComponentDependency(value: RComponentSFC_IR_Value | undefined, dependencies: RComponentDependencies): void {
-  if (!value || value.kind !== 'literal' || typeof value.value !== 'string' || !value.value.trim()) {
+function collectComponentDependency(
+  value: RComponentSFC_IR_Value | undefined,
+  dependencies: RComponentDependencies,
+): void {
+  if (
+    !value
+    || value.kind !== 'literal'
+    || typeof value.value !== 'string'
+    || !value.value.trim()
+  ) {
     return
   }
 

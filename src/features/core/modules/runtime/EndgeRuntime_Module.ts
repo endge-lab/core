@@ -543,6 +543,13 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     super.notify()
   }
 
+  /** Полная замена состояния выбранного момента; отсутствие data не наследует более поздние значения. */
+  public replaceInspectionSnapshot(value: unknown): void {
+    this._requireInspection()
+    this._inspection = readRuntimeInspectionSnapshot(value)
+    super.notify()
+  }
+
   /** Событие обновляет только известный экземпляр; новую структуру приносит следующий snapshot. */
   public applyInspectionEvent(change: RuntimeStatusChange): void {
     this._requireInspection()

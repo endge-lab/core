@@ -68,6 +68,7 @@ export class EndgeConfigurationSchema_Module extends EndgeModule<EndgeBootContex
           displayName: entity.displayName || entity.name || entity.identity,
           description: entity.description,
           sourceVersion: entity.sourceVersion,
+          ast: result.ast,
           document: diagnostics.some(item => item.severity === 'error') ? null : result.document,
           diagnostics,
           status: diagnostics.some(item => item.severity === 'error') ? 'error' as const : diagnostics.length ? 'warning' as const : 'valid' as const,

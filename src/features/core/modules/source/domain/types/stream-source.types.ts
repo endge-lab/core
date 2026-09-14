@@ -37,6 +37,8 @@ export interface StreamSourceDocument {
 
 /** Готовый для runtime артефакт Stream. */
 export interface StreamSourceArtifact extends StreamSourceDocument {
+  /** Optional parser tree retained for inspection; runtime does not require it. */
+  ast?: unknown
   type: 'stream'
   sourceVersion: number
 }

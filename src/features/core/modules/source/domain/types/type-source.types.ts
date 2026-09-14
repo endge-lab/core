@@ -65,6 +65,8 @@ export interface TypeSourceDocument {
 
 /** Compiler payload Type Source. Runtime пока не потребляет этот artifact. */
 export interface TypeProgramPayload {
+  /** Optional parser tree retained for inspection; runtime does not require it. */
+  ast?: unknown
   type: 'type'
   sourceVersion: number
   /** Стабильная identity скомпилированного типа. Артефакты только parser могут её не содержать. */
