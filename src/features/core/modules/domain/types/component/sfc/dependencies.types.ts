@@ -1,0 +1,126 @@
+import type { RComponentSFC_IR_DataMetaReference, RComponentSFC_IR_Read } from './ir.types'
+
+/** Источник runtime-зависимости SFC v1. */
+export type RComponentSFC_RuntimeDependencySource = 'props' | 'context'
+
+/** Runtime-зависимость SFC template от входного prop. */
+export interface RComponentSFC_RuntimeDependency {
+  /** Источник зависимости. В v1 поддерживаем только props. */
+  source: 'props'
+
+  /** Имя входного prop, например `flight`. */
+  prop: string
+
+  /** Путь внутри prop, например `['status']` для `flight.status`. */
+  path: string[]
+
+  /** Исходный read из IR, полезен для diagnostics/debug. */
+  raw: string
+
+  /** Нормализованный read из IR. */
+  read: RComponentSFC_IR_Read
+}
+
+/** Runtime-зависимость SFC template от глобального Endge context. */
+export interface RComponentSFC_RuntimeContextDependency {
+  source: 'context'
+  /** Путь после `$context`, например `['input', 'keyboard', 'modifiers', 'shift']`. */
+  path: string[]
+  raw: string
+  read: RComponentSFC_IR_Read
+}
+
+/** Тип patchable runtime boundary внутри SFC IR. */
+export type RComponentSFC_RuntimeBoundaryKind = 'table'
+
+/** Runtime-зависимость колонки таблицы от полей текущей строки. */
+export interface RComponentSFC_RuntimeTableColumnDependency {
+  /** Стабильный boundary-id колонки, совпадает с id IR node. */
+  id: string
+
+  /** Ключ колонки из `<Column key="...">`. */
+  key: string
+
+  /** Видимый индекс колонки внутри таблицы. */
+  index: number
+
+  /** Поля alias-а `row`, которые читает cell template. */
+  rowReads: string[]
+}
+
+/** Patchable runtime boundary SFC, для которой создается отдельная Raph-нода. */
+export interface RComponentSFC_RuntimeBoundaryDependency {
+  /** Стабильный boundary-id, совпадает с id IR node. */
+  id: string
+
+  /** Тип boundary. В v1 поддерживаем Table. */
+  kind: RComponentSFC_RuntimeBoundaryKind
+
+  /** Имя prop, из которого boundary получает коллекцию. */
+  sourceProp: string
+
+  /** Путь внутри prop, если source выражен как `foo.bar`. */
+  sourcePath: string[]
+
+  /** Поле ключа строки из `row-key`. */
+  rowKey: string | null
+
+  /** Пути контекста, используемые внутри границы; они инвалидируют всю границу. */
+  contextReads: string[][]
+
+  /** Колонки таблицы, которые можно обновлять точечно. */
+  columns: RComponentSFC_RuntimeTableColumnDependency[]
+}
+
+/** Runtime-зависимость SFC от Vocab alias ближайшего Composition scope. */
+export interface RComponentSFC_RuntimeVocabDependency {
+  /** Публичный, scope-local alias; физическая Vocab identity сюда не протекает. */
+  alias: string
+
+  /** Путь option value внутри элемента Vocab. */
+  valuePath: string
+
+  /** Путь option label внутри элемента Vocab. */
+  labelPath: string
+
+  /** Исходное выражение для diagnostics/debug. */
+  raw: string
+}
+
+/** Реактивное чтение Meta-plane, разрешаемое через provenance входного prop. */
+export interface RComponentSFC_RuntimeMetaDependency {
+  reference: RComponentSFC_IR_DataMetaReference
+  /** Table boundary для row-reference; null для обычного prop. */
+  boundaryId: string | null
+  namespace: string | null
+  raw: string
+}
+
+/** Набор runtime-зависимостей SFC artifact. */
+export interface RComponentSFC_RuntimeDependencies {
+  /** Зависимости от props, которые можно связать с внешним input source. */
+  props: RComponentSFC_RuntimeDependency[]
+
+  /** Зависимости контекста за пределами изменяемых границ. */
+  context: RComponentSFC_RuntimeContextDependency[]
+
+  /** Patchable boundaries, для которых runtime строит отдельные Raph-ноды. */
+  boundaries: RComponentSFC_RuntimeBoundaryDependency[]
+
+  /** Vocab aliases, которые должен предоставить ближайший Composition scope. */
+  vocabs?: RComponentSFC_RuntimeVocabDependency[]
+
+  /** Read-only зависимости `$data.metaOf(...)`. */
+  meta?: RComponentSFC_RuntimeMetaDependency[]
+}
+
+/** Создает пустой dependency artifact SFC runtime. */
+export function createEmptyComponentSFCRuntimeDependencies(): RComponentSFC_RuntimeDependencies {
+  return {
+    props: [],
+    context: [],
+    boundaries: [],
+    vocabs: [],
+    meta: [],
+  }
+}

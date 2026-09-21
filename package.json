@@ -1,0 +1,72 @@
+{
+  "name": "@endge/core",
+  "type": "module",
+  "version": "13.0.0",
+  "private": false,
+  "packageManager": "pnpm@8.8.0",
+  "license": "Apache-2.0",
+  "exports": {
+    ".": {
+      "types": "./dist/main.d.ts",
+      "import": "./dist/core.js",
+      "default": "./dist/core.js"
+    }
+  },
+  "main": "./dist/core.js",
+  "module": "./dist/core.js",
+  "types": "./dist/main.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "clean": "rimraf dist tsconfig.tsbuildinfo",
+    "dev": "vite build --watch",
+    "build": "pnpm typecheck && vite build",
+    "preview": "vite preview",
+    "test": "vitest",
+    "bench:interactions": "vitest bench --run src/test/component-sfc-interactions.bench.ts",
+    "typecheck": "tsc --noEmit",
+    "lint-check": "eslint . --cache",
+    "lint-fix": "eslint . --fix --cache"
+  },
+  "peerDependencies": {
+    "@endge/raph": "4.0.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "reflect-metadata": "^0.2.2"
+  },
+  "dependencies": {
+    "@babel/generator": "^7.29.7",
+    "@babel/parser": "^7.27.2",
+    "@babel/types": "^7.27.1",
+    "@endge/utils": "^0.27.0",
+    "@vue/compiler-dom": "^3.5.24",
+    "@vue/compiler-sfc": "^3.5.24",
+    "axios": "^1.13.2",
+    "date-fns": "^4.1.0",
+    "fflate": "^0.8.3",
+    "graphql": "^16.12.0",
+    "lodash": "^4.17.21",
+    "mitt": "^3.0.1",
+    "oidc-client-ts": "^3.5.0",
+    "postcss": "^8.5.6",
+    "postcss-scss": "^4.0.9",
+    "postcss-selector-parser": "^7.1.0",
+    "postcss-value-parser": "^4.2.0",
+    "uuid": "^11.1.0",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "9.3.0",
+    "@types/babel__generator": "^7.27.0",
+    "@types/lodash": "^4.14.202",
+    "@vue/language-core": "^3.3.11",
+    "eslint": "10.9.1",
+    "rimraf": "^6.0.1",
+    "typescript": "~6.0.3",
+    "unplugin-dts": "^1.0.3",
+    "vite": "^6.1.0",
+    "vitest": "^2.1.9"
+  },
+  "version_updated": "14.09.2026"
+}

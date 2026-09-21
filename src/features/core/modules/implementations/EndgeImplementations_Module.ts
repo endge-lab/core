@@ -1,0 +1,167 @@
+import type {
+  ImplementationBinding,
+  ImplementationContract,
+  ImplementationInvocation,
+  ImplementationProvider,
+  ImplementationResolutionRequest,
+  ImplementationSnapshot,
+  ResolvedImplementation,
+} from '@/features/core/modules/implementations/domain/implementation.types'
+import { ImplementationError } from '@/features/core/modules/implementations/domain/implementation.types'
+import { ImplementationBindingRegistry } from '@/features/core/modules/implementations/services/ImplementationBindingRegistry'
+import { ImplementationProviderRegistry } from '@/features/core/modules/implementations/services/ImplementationProviderRegistry'
+import { EndgeModule } from '@/features/federation/EndgeModule'
+
+/** Общий runtime-модуль для провайдеров кода, bindings и фактического разрешения. */
+export class EndgeImplementations_Module extends EndgeModule {
+  private readonly _providers = new ImplementationProviderRegistry()
+  private readonly _bindings = new ImplementationBindingRegistry()
+
+  /**
+   * ----------------------------------------
+   * PUBLIC
+   * ----------------------------------------
+   */
+
+  /** Регистрирует локальный исполняемый код и возвращает его disposer. */
+  public registerProvider(provider: ImplementationProvider): () => void {
+    return this._providers.register(provider)
+  }
+
+  public hasProvider(key: string): boolean {
+    return this._providers.get(key) != null
+  }
+
+  /** Регистрирует явный binding и возвращает его disposer. */
+  public bind(binding: ImplementationBinding): () => void {
+    return this._bindings.register(binding)
+  }
+
+  /** Определяет фактический провайдер по scope и приоритету. */
+  public resolve(request: ImplementationResolutionRequest): ResolvedImplementation {
+    if (request.invocationProviderKey) {
+      const provider = this._requireProvider(request.invocationProviderKey)
+      this._assertCompatibleContract(provider, request)
+      return {
+        provider,
+        binding: null,
+        scope: 'invocation',
+      }
+    }
+    const binding = this._bindings.resolve(request)
+    const providerKey = binding?.providerKey ?? request.defaultProviderKey
+    if (!providerKey) {
+      throw new ImplementationError(
+        'implementation-provider-missing',
+        `No implementation for ${request.executable.type}:${request.executable.identity}.`,
+      )
+    }
+    const provider = this._requireProvider(providerKey)
+    this._assertCompatibleContract(provider, request)
+    return {
+      provider,
+      binding,
+      scope: binding?.scope ?? 'default',
+    }
+  }
+
+  /** Возвращает null только когда не объявлены ни binding, ни provider по умолчанию. */
+  public resolveOptional(request: ImplementationResolutionRequest): ResolvedImplementation | null {
+    const binding = this._bindings.resolve(request)
+    if (!binding && !request.invocationProviderKey && !request.defaultProviderKey) {
+      return null
+    }
+    return this.resolve(request)
+  }
+
+  /** Вычисляет и выполняет один вызов через его фактический provider. */
+  public async execute<TResult = unknown>(
+    request: ImplementationResolutionRequest,
+    invocation: ImplementationInvocation,
+  ): Promise<TResult> {
+    const resolved = this.resolve(request)
+    if (resolved.provider.canExecute && !resolved.provider.canExecute(invocation)) {
+      throw new ImplementationError(
+        'implementation-cannot-execute',
+        `Provider cannot execute ${invocation.executable.type}:${invocation.executable.identity}.`,
+      )
+    }
+    return await resolved.provider.execute(invocation) as TResult
+  }
+
+  /** Включает безопасную проекцию implementations в диагностическое дерево. */
+  public override createDiagnosticsSnapshot(): ImplementationSnapshot {
+    return this.snapshot()
+  }
+
+  /** Возвращает сериализуемый snapshot инспекции без функций. */
+  public snapshot(): ImplementationSnapshot {
+    return {
+      providers: this._providers.list().map(provider => ({
+        key: provider.key,
+        active: provider.active !== false,
+        origin: provider.origin,
+      })),
+      bindings: this._bindings.list(),
+    }
+  }
+
+  /** Освобождает providers и bindings после зависимых execution Modules. */
+  public override reset(): void {
+    this._bindings.clear()
+    this._providers.clear()
+  }
+
+  /**
+   * ----------------------------------------
+   * PRIVATE
+   * ----------------------------------------
+   */
+
+  private _requireProvider(key: string): ImplementationProvider {
+    const provider = this._providers.get(key)
+    if (!provider) {
+      throw new ImplementationError('implementation-provider-missing', `Implementation provider is not registered: ${key}.`)
+    }
+    if (provider.active === false) {
+      throw new ImplementationError('implementation-provider-inactive', `Implementation provider is inactive: ${key}.`)
+    }
+    return provider
+  }
+
+  private _assertCompatibleContract(
+    provider: ImplementationProvider,
+    request: ImplementationResolutionRequest,
+  ): void {
+    if (!provider.contract || !request.expectedContract) {
+      return
+    }
+    if (stableContract(provider.contract) === stableContract(request.expectedContract)) {
+      return
+    }
+    throw new ImplementationError(
+      'implementation-contract-incompatible',
+      `Provider contract is incompatible with ${request.executable.type}:${request.executable.identity}.`,
+    )
+  }
+}
+
+function stableContract(contract: ImplementationContract): string {
+  const field = (value: unknown) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return value ?? null
+    }
+    const raw = value as Record<string, unknown>
+    return {
+      name: raw.name ?? null,
+      type: raw.type ?? null,
+      isArray: raw.isArray === true,
+      optional: raw.optional === true,
+    }
+  }
+  const target = Array.isArray(contract.target)
+    ? contract.target.map((selector: any) => ({ type: selector.type, identity: selector.identity ?? null }))
+        .sort((left: any, right: any) => JSON.stringify(left).localeCompare(JSON.stringify(right)))
+    : null
+  return JSON.stringify({ target, input: field(contract.input), output: field(contract.output) })
+}
