@@ -1,0 +1,1205 @@
+import type { EndgeBootContext } from '@/features/core/kernel/types/bootstrap.types'
+import type { DomainCollectionKey } from '@/features/core/modules/domain/documents/domain-document-descriptors'
+import type { DocumentCreateRequest, DocumentCreateResult } from '@/features/core/modules/domain/types/document/document-create.type'
+import type { EndgeDomainDocumentMove } from '@/features/core/modules/domain/types/document/document-move.type'
+import type { DomainDocumentType } from '@/features/core/modules/domain/types/document/document.types'
+import type {
+  EndgeArchivedDocument,
+  EndgeArchivePage,
+  EndgeDomainCollection,
+  EndgeDomainProvider,
+  EndgeDomainRepositoryCapabilities,
+} from '@/features/core/modules/domain/types/document/domain-provider.type'
+import type {
+  EndgeDocumentServerState,
+  EndgeLiveDomainDocument,
+  EndgeLiveDomainSnapshot,
+  EndgeWorkspaceServerState,
+} from '@/features/core/modules/domain/types/document/domain-snapshot.type'
+
+import { AppBus } from '@endge/utils'
+
+import { Endge } from '@/features/core/kernel/endge'
+import { resolveEndgeServiceCollection, resolveEndgeServiceStateCollection } from '@/features/core/modules/domain-repository/services/domain-provider'
+import { getDomainDocumentDescriptor } from '@/features/core/modules/domain/documents/domain-document-descriptors'
+import { serializeServiceFolder } from '@/features/core/modules/domain/documents/service-document-serializer'
+import { EndgeDomain_Module, normalizeSnapshotDocuments, normalizeSnapshotFolders } from '@/features/core/modules/domain/EndgeDomain_Module'
+import { normalizeEntityMeta } from '@/features/core/modules/domain/entities/REntity'
+import { RFacet } from '@/features/core/modules/domain/entities/RFacet'
+import { RFacetDocument } from '@/features/core/modules/domain/entities/RFacetDocument'
+import { normalizeEndgeWorkspaceDefinition } from '@/features/core/modules/domain/entities/RWorkspace'
+import { ComponentType, FilterType, QueryType } from '@/features/core/modules/domain/types/document/document.types'
+import { EndgeModule } from '@/features/federation/EndgeModule'
+
+/** Явная ошибка записи через bundle/plain или live backend только для чтения. */
+export class EndgeDomainRepositoryReadOnlyError extends Error {
+  public readonly code = 'provider_read_only'
+
+  public constructor(provider: string) {
+    super(provider === 'service-backend'
+      ? 'Service backend mutations are disabled'
+      : `Domain repository provider "${provider}" is read-only`)
+    this.name = 'EndgeDomainRepositoryReadOnlyError'
+  }
+}
+
+/** Граница persistence для live service-backend и локальных источников только для чтения. */
+export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> {
+  private _snapshotContext: EndgeBootContext | null = null
+  private _generation = 0
+  private _snapshotSequence = 0
+  private _abortController = new AbortController()
+  private _loadedSnapshot: EndgeLiveDomainSnapshot | null = null
+  private _domainProvider: EndgeDomainProvider | null = null
+  private _domainETag: string | null = null
+  private _documentServerState = new Map<string, EndgeDocumentServerState>()
+  private _workspaceServerState: EndgeWorkspaceServerState | null = null
+  private _capabilities: EndgeDomainRepositoryCapabilities = {
+    provider: 'service-backend',
+    mutations: false,
+    softDelete: false,
+    restore: false,
+  }
+
+  /** Версия контекста persistence для составных операций, включая импорт. */
+  public get generation(): number { return this._generation }
+
+  public get capabilities(): EndgeDomainRepositoryCapabilities {
+    return { ...this._capabilities }
+  }
+
+  public get domainETag(): string | null {
+    return this._domainETag
+  }
+
+  public get isHealthy(): boolean {
+    return this._capabilities.provider !== 'service-backend' || this._loadedSnapshot != null
+  }
+
+  public get hasErrors(): boolean {
+    return !this.isHealthy
+  }
+
+  public override async setup(ctx: EndgeBootContext): Promise<void> {
+    this.reset()
+    this._snapshotContext = ctx
+    if (ctx.mode === 'debugger') {
+      this._capabilities = { provider: 'plain', mutations: false, softDelete: false, restore: false }
+      return
+    }
+    if (ctx.dataProvider === 'default') {
+      if (!ctx.domainProvider) {
+        throw new Error('[EndgeDomainRepository] domainProvider is required for default data provider')
+      }
+      this._domainProvider = ctx.domainProvider
+      this._capabilities = {
+        provider: 'service-backend',
+        mutations: ctx.domainProvider.capabilities.mutations,
+        softDelete: ctx.domainProvider.capabilities.softDelete,
+        restore: ctx.domainProvider.capabilities.restore,
+      }
+      return
+    }
+
+    this._domainProvider = null
+    if (ctx.dataProvider === 'plain') {
+      this._capabilities = { provider: 'plain', mutations: false, softDelete: false, restore: false }
+      return
+    }
+    if (ctx.dataProvider === 'bundle') {
+      if (!ctx.bundleSource) {
+        throw new Error('[EndgeDomainRepository] bundleSource is required for bundle data provider')
+      }
+      this._capabilities = { provider: 'bundle', mutations: false, softDelete: false, restore: false }
+      return
+    }
+
+    throw new Error(`[EndgeDomainRepository] Unsupported data provider: ${String(ctx.dataProvider)}`)
+  }
+
+  /** Загружает live snapshot через активный transport provider и индексирует server state. */
+  public async loadSnapshot(ctx: EndgeBootContext): Promise<EndgeLiveDomainSnapshot> {
+    if (ctx.dataProvider !== 'default') {
+      throw new Error('[EndgeDomainRepository] Live snapshot is available only for default data provider')
+    }
+    const assertCurrent = this._captureGeneration()
+    const sequence = ++this._snapshotSequence
+    const provider = this._serviceProvider()
+    const workspaceIdentity = String(ctx.scope.workspaceIdentity ?? '').trim()
+    if (!provider) {
+      throw new Error('[EndgeDomainRepository] domainProvider is not configured')
+    }
+    if (!workspaceIdentity) {
+      throw new Error('[EndgeDomainRepository] workspaceIdentity is required for live snapshot')
+    }
+
+    const snapshot = await provider.loadWorkspace({ workspaceIdentity, signal: ctx.signal })
+    assertCurrent()
+    ctx.signal?.throwIfAborted()
+    if (sequence !== this._snapshotSequence) {
+      throw new DOMException('Domain snapshot was superseded.', 'AbortError')
+    }
+    this._loadedSnapshot = snapshot
+    this._domainETag = provider.etag
+    this._workspaceServerState = { ...snapshot.workspace.state }
+    this._indexSnapshotServerState(snapshot)
+    return snapshot
+  }
+
+  /** Reloads a consistent saved input for build without touching editor drafts. */
+  public refreshSnapshot(signal?: AbortSignal): Promise<EndgeLiveDomainSnapshot | null> {
+    if (this._capabilities.provider !== 'service-backend') {
+      return Promise.resolve(null)
+    }
+    if (!this._snapshotContext) {
+      throw new Error('[EndgeDomainRepository] Snapshot context is unavailable')
+    }
+    return this.loadSnapshot({ ...this._snapshotContext, signal: signal ?? this._snapshotContext.signal })
+  }
+
+  public getLoadedSnapshot(): EndgeLiveDomainSnapshot | null {
+    return this._loadedSnapshot
+  }
+
+  public getDocumentServerState(documentType: string, identity: string): EndgeDocumentServerState | null {
+    const collection = this._capabilities.provider === 'service-backend'
+      ? resolveEndgeServiceStateCollection(documentType)
+      : documentType
+    return this._documentServerState.get(this._serverStateKey(collection, identity)) ?? null
+  }
+
+  public getFacetDocumentServerState(facetIdentity: string, documentIdentity: string): EndgeDocumentServerState | null {
+    return this._documentServerState.get(this._facetDocumentServerStateKey(facetIdentity, documentIdentity)) ?? null
+  }
+
+  public override reset(): void {
+    this._snapshotContext = null
+    this._generation += 1
+    this._snapshotSequence += 1
+    this._abortController.abort()
+    this._abortController = new AbortController()
+    this._capabilities = { provider: 'service-backend', mutations: false, softDelete: false, restore: false }
+    this._loadedSnapshot = null
+    this._domainProvider = null
+    this._domainETag = null
+    this._workspaceServerState = null
+    this._documentServerState.clear()
+  }
+
+  public async isDocumentIdentityAvailable(
+    documentType: DomainDocumentType,
+    identity: string,
+  ): Promise<boolean> {
+    const normalizedIdentity = identity.trim()
+    return normalizedIdentity.length > 0
+      && this._getDomainDocumentByType(documentType, normalizedIdentity) == null
+  }
+
+  public async createDocument(request: DocumentCreateRequest): Promise<DocumentCreateResult> {
+    const assertCurrent = this._captureGeneration()
+    this._assertMutationsSupported()
+    const identity = request.identity.trim()
+    if (!identity) {
+      throw new Error('Document identity is required.')
+    }
+    if (!(await this.isDocumentIdentityAvailable(request.documentType, identity))) {
+      throw new Error(`Документ "${identity}" уже существует`)
+    }
+
+    assertCurrent()
+    const model = request.mode === 'model' ? request.model : request.document
+    await this.saveDocument(identity, request.documentType, { model })
+    assertCurrent()
+    return { documentType: request.documentType, identity }
+  }
+
+  public async saveDocument(
+    documentId: string | number,
+    documentType: DomainDocumentType,
+    opts?: { model?: unknown, previousIdentity?: string },
+  ): Promise<void> {
+    this._assertMutationsSupported()
+    await this._saveServiceDocument(documentId, documentType, opts)
+  }
+
+  public async deleteDocument(
+    documentIdOrIdentity: string,
+    documentType: DomainDocumentType,
+  ): Promise<void> {
+    this._assertMutationsSupported()
+    if (!this._capabilities.softDelete) {
+      throw new EndgeDomainRepositoryReadOnlyError(this._capabilities.provider)
+    }
+
+    const assertCurrent = this._captureGeneration()
+    const provider = this._requireServiceProvider()
+    const identity = this._resolveDocumentIdentity(documentIdOrIdentity, documentType)
+    const collection = resolveEndgeServiceCollection(documentType)
+    const state = this._requireDocumentServerState(collection, identity)
+    const result = await provider.softDeleteDocument({
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      signal: this._abortController.signal,
+      collection,
+      identity,
+      expectedRevision: state.revision,
+    })
+    assertCurrent()
+    if (!result.document.state.deletedAt) {
+      throw new Error('[EndgeDomainRepository] Delete response does not contain a tombstone')
+    }
+    assertCurrent()
+    this._domainETag = result.etag
+    this._removeDomainDocumentByType(documentType, documentIdOrIdentity)
+    this._documentServerState.set(this._serverStateKey(collection, identity), { ...result.document.state })
+    this._notifyDomainChanged()
+  }
+
+  public async restoreDocument(
+    documentIdOrIdentity: string,
+    documentType: DomainDocumentType,
+  ): Promise<void> {
+    this._assertMutationsSupported()
+    if (!this._capabilities.restore) {
+      throw new EndgeDomainRepositoryReadOnlyError(this._capabilities.provider)
+    }
+
+    const assertCurrent = this._captureGeneration()
+    const provider = this._requireServiceProvider()
+    const identity = this._resolveDocumentIdentity(documentIdOrIdentity, documentType)
+    const collection = resolveEndgeServiceCollection(documentType)
+    const state = this._requireDocumentServerState(collection, identity)
+    const result = await provider.restoreDocument({
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      signal: this._abortController.signal,
+      collection,
+      identity,
+      expectedRevision: state.revision,
+    })
+    assertCurrent()
+    this._domainETag = result.etag
+    this._applyServiceDocument(documentType, result.document, documentIdOrIdentity)
+  }
+
+  /** Lists deleted generic documents for the active service workspace. */
+  public async listArchivedDocuments(cursor?: string, limit = 100): Promise<EndgeArchivePage> {
+    const assertCurrent = this._captureGeneration()
+    const provider = this._requireServiceProvider()
+    if (!provider.listArchivedDocuments) {
+      throw new Error('[EndgeDomainRepository] Service domain provider does not support listArchivedDocuments')
+    }
+    const page = await provider.listArchivedDocuments({
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      cursor,
+      limit,
+      signal: this._abortController.signal,
+    })
+    assertCurrent()
+    return page
+  }
+
+  /** Restores a tombstone returned by listArchivedDocuments. */
+  public async restoreArchivedDocument(item: EndgeArchivedDocument): Promise<EndgeLiveDomainDocument> {
+    this._assertMutationsSupported()
+    if (!this._capabilities.restore) {
+      throw new EndgeDomainRepositoryReadOnlyError(this._capabilities.provider)
+    }
+    const assertCurrent = this._captureGeneration()
+    const provider = this._requireServiceProvider()
+    const result = await provider.restoreDocument({
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      signal: this._abortController.signal,
+      collection: item.type,
+      identity: item.identity,
+      expectedRevision: item.revision,
+    })
+    assertCurrent()
+    this._domainETag = result.etag
+    return result.document
+  }
+
+  public async changeDocumentFolder(
+    documentId: string | number,
+    documentType: DomainDocumentType,
+    folderIdOrIdentity: string | number | null,
+    placement: 'frontend' | 'workspace' = 'frontend',
+  ): Promise<void> {
+    this._assertMutationsSupported()
+    const model = this._getDomainDocumentByType(documentType, documentId)
+    if (!model) {
+      throw new Error(`Документ не найден: ${String(documentId)}`)
+    }
+
+    const document = this._serializeDocument(documentType, model)
+    const folder = folderIdOrIdentity == null ? null : Endge.domain.getFolder(folderIdOrIdentity)
+    document[placement === 'workspace' ? 'workspaceFolderIdentity' : 'folderIdentity'] = folderIdOrIdentity == null
+      ? null
+      : String((folder as any)?.identity ?? folderIdOrIdentity).trim()
+    await this._saveServiceDocument(documentId, documentType, { serializedDocument: document })
+  }
+
+  /** Атомарно переносит несколько persisted-документов в одну папку. */
+  public async changeDocumentsFolder(
+    documents: readonly EndgeDomainDocumentMove[],
+    folderIdOrIdentity: string | number,
+    placement: 'frontend' | 'workspace' = 'frontend',
+  ): Promise<number> {
+    this._assertMutationsSupported()
+    if (documents.length === 0) {
+      return 0
+    }
+
+    const assertCurrent = this._captureGeneration()
+    const provider = this._requireServiceProvider()
+    if (!provider.moveDocuments) {
+      throw new Error('[EndgeDomainRepository] Domain provider does not support atomic document moves')
+    }
+    const folder = Endge.domain.getFolder(folderIdOrIdentity)
+    const folderIdentity = String((folder as any)?.identity ?? folderIdOrIdentity).trim()
+    if (!folderIdentity) {
+      throw new Error('Папка назначения не найдена')
+    }
+
+    const requests = documents.map(({ documentId, documentType }) => {
+      const model = this._getDomainDocumentByType(documentType, documentId)
+      if (!model) {
+        throw new Error(`Документ не найден: ${String(documentId)}`)
+      }
+      const collection = resolveEndgeServiceCollection(documentType)
+      const identity = this._resolveDocumentIdentity(documentId, documentType)
+      const state = this._requireDocumentServerState(collection, identity)
+      return { collection, identity, expectedRevision: state.revision }
+    })
+    const result = await provider.moveDocuments({
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      signal: this._abortController.signal,
+      documents: requests,
+      folderIdentity,
+      placement,
+    })
+    assertCurrent()
+    if (result.documents.length !== documents.length) {
+      throw new Error('[EndgeDomainRepository] Bulk move response does not match request')
+    }
+
+    result.documents.forEach((item, index) => {
+      const expected = requests[index]!
+      const responseIdentity = String(item.document.identity ?? '').trim()
+      if (item.collection !== expected.collection || responseIdentity !== expected.identity) {
+        throw new Error('[EndgeDomainRepository] Bulk move response document does not match request')
+      }
+    })
+    result.documents.forEach((item, index) => {
+      assertCurrent()
+      const source = documents[index]!
+      this._applyServiceDocument(source.documentType, item.document, source.documentId)
+    })
+    return result.moved
+  }
+
+  public async saveFolder(folderId: string): Promise<void> {
+    this._assertMutationsSupported()
+    const assertCurrent = this._captureGeneration()
+    const provider = this._requireServiceProvider()
+    const folder = Endge.domain.getFolder(folderId)
+    if (!folder) {
+      throw new Error(`Папка не найдена: ${folderId}`)
+    }
+
+    const document = serializeServiceFolder(folder, this._serializationContext())
+    const identity = String(document.identity ?? '').trim()
+    const persistedIdentity = this._findServerIdentity('folders', folder.id) || identity
+    const state = this._documentServerState.get(this._serverStateKey('folders', persistedIdentity))
+    const request = {
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      signal: this._abortController.signal,
+      collection: 'folders' as const,
+      identity: persistedIdentity,
+      document,
+    }
+    const result = state
+      ? await provider.updateDocument({ ...request, expectedRevision: state.revision })
+      : await provider.createDocument(request)
+    assertCurrent()
+    this._domainETag = result.etag
+    this._applyServiceFolder(result.document, folderId)
+  }
+
+  public async deleteFolder(folderIdentity: string): Promise<void> {
+    this._assertMutationsSupported()
+    if (!this._capabilities.softDelete) {
+      throw new EndgeDomainRepositoryReadOnlyError(this._capabilities.provider)
+    }
+
+    const assertCurrent = this._captureGeneration()
+    const provider = this._requireServiceProvider()
+    const folder = Endge.domain.getFolder(folderIdentity)
+    const identity = String((folder as any)?.identity ?? folderIdentity).trim()
+    const state = this._requireDocumentServerState('folders', identity)
+    const result = await provider.softDeleteDocument({
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      signal: this._abortController.signal,
+      collection: 'folders',
+      identity,
+      expectedRevision: state.revision,
+    })
+    assertCurrent()
+    if (!result.document.state.deletedAt) {
+      throw new Error('[EndgeDomainRepository] Delete response does not contain a folder tombstone')
+    }
+    assertCurrent()
+    this._domainETag = result.etag
+    if (folder) {
+      Endge.domain.removeFolderById(folder.id)
+    }
+    this._documentServerState.set(this._serverStateKey('folders', identity), { ...result.document.state })
+    this._notifyDomainChanged()
+  }
+
+  public async restoreFolder(folderIdentity: string): Promise<void> {
+    this._assertMutationsSupported()
+    if (!this._capabilities.restore) {
+      throw new EndgeDomainRepositoryReadOnlyError(this._capabilities.provider)
+    }
+
+    const assertCurrent = this._captureGeneration()
+    const provider = this._requireServiceProvider()
+    const folder = Endge.domain.getFolder(folderIdentity)
+    const identity = String((folder as any)?.identity ?? folderIdentity).trim()
+    const state = this._requireDocumentServerState('folders', identity)
+    const result = await provider.restoreDocument({
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      signal: this._abortController.signal,
+      collection: 'folders',
+      identity,
+      expectedRevision: state.revision,
+    })
+    assertCurrent()
+    this._domainETag = result.etag
+    this._applyServiceFolder(result.document, folderIdentity)
+  }
+
+  public async listFacets(includeDeleted = false): Promise<RFacet[]> {
+    const assertCurrent = this._captureGeneration()
+    const provider = this._requireServiceProvider()
+    const values = await this._requireFacetProviderOperation(provider.listFacets, 'listFacets')({
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      includeDeleted,
+      signal: this._abortController.signal,
+    })
+    assertCurrent()
+    values.forEach(value => this._documentServerState.set(
+      this._serverStateKey('facets', String(value.identity ?? '').trim()),
+      { ...value.state },
+    ))
+    return values.map(value => this._materializeFacet(value))
+  }
+
+  public async createFacet(document: Record<string, unknown>): Promise<RFacet> {
+    this._assertMutationsSupported()
+    const assertCurrent = this._captureGeneration()
+    const provider = this._requireServiceProvider()
+    const result = await this._requireFacetProviderOperation(provider.createFacet, 'createFacet')({
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      identity: String(document.identity ?? '').trim(),
+      document,
+      signal: this._abortController.signal,
+    })
+    assertCurrent()
+    this._domainETag = result.etag
+    return this._applyFacet(result.document)
+  }
+
+  public async updateFacet(identity: string, document: Record<string, unknown>): Promise<RFacet> {
+    this._assertMutationsSupported()
+    const assertCurrent = this._captureGeneration()
+    const normalizedIdentity = identity.trim()
+    const state = this._requireDocumentServerState('facets', normalizedIdentity)
+    const provider = this._requireServiceProvider()
+    const result = await this._requireFacetProviderOperation(provider.updateFacet, 'updateFacet')({
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      identity: normalizedIdentity,
+      document,
+      expectedRevision: state.revision,
+      signal: this._abortController.signal,
+    })
+    assertCurrent()
+    this._domainETag = result.etag
+    return this._applyFacet(result.document, normalizedIdentity)
+  }
+
+  public async deleteFacet(identity: string): Promise<RFacet> {
+    return this._mutateFacetLifecycle(identity, 'delete')
+  }
+
+  public async restoreFacet(identity: string): Promise<RFacet> {
+    return this._mutateFacetLifecycle(identity, 'restore')
+  }
+
+  public async reorderFacets(identities: readonly string[]): Promise<RFacet[]> {
+    this._assertMutationsSupported()
+    const assertCurrent = this._captureGeneration()
+    const items = identities.map((identity) => {
+      const normalized = identity.trim()
+      return {
+        identity: normalized,
+        expectedRevision: this._requireDocumentServerState('facets', normalized).revision,
+      }
+    })
+    const provider = this._requireServiceProvider()
+    const result = await this._requireFacetProviderOperation(provider.reorderFacets, 'reorderFacets')({
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      items,
+      signal: this._abortController.signal,
+    })
+    assertCurrent()
+    this._domainETag = result.etag
+    const facets = result.documents.map(value => this._materializeFacet(value))
+    for (const current of Endge.domain.getFacets()) {
+      Endge.domain.removeFacet(current.id)
+    }
+    for (const facet of facets) {
+      Endge.domain.addFacet(facet)
+    }
+    result.documents.forEach((value) => {
+      this._documentServerState.set(this._serverStateKey('facets', String(value.identity)), { ...value.state })
+    })
+    this._notifyDomainChanged()
+    return facets
+  }
+
+  public async listFacetDocuments(facetIdentity: string, includeDeleted = false): Promise<RFacetDocument[]> {
+    const assertCurrent = this._captureGeneration()
+    const normalizedFacet = facetIdentity.trim()
+    const provider = this._requireServiceProvider()
+    const values = await this._requireFacetProviderOperation(provider.listFacetDocuments, 'listFacetDocuments')({
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      facetIdentity: normalizedFacet,
+      includeDeleted,
+      signal: this._abortController.signal,
+    })
+    assertCurrent()
+    values.forEach(value => this._documentServerState.set(
+      this._facetDocumentServerStateKey(normalizedFacet, String(value.identity ?? '').trim()),
+      { ...value.state },
+    ))
+    return values.map(value => this._materializeFacetDocument(value, normalizedFacet))
+  }
+
+  public async createFacetDocument(facetIdentity: string, document: Record<string, unknown>): Promise<RFacetDocument> {
+    this._assertMutationsSupported()
+    const assertCurrent = this._captureGeneration()
+    const normalizedFacet = facetIdentity.trim()
+    const provider = this._requireServiceProvider()
+    const result = await this._requireFacetProviderOperation(provider.createFacetDocument, 'createFacetDocument')({
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      facetIdentity: normalizedFacet,
+      identity: String(document.identity ?? '').trim(),
+      document,
+      signal: this._abortController.signal,
+    })
+    assertCurrent()
+    this._domainETag = result.etag
+    return this._applyFacetDocument(result.document, normalizedFacet)
+  }
+
+  public async updateFacetDocument(
+    facetIdentity: string,
+    identity: string,
+    document: Record<string, unknown>,
+  ): Promise<RFacetDocument> {
+    this._assertMutationsSupported()
+    const assertCurrent = this._captureGeneration()
+    const normalizedFacet = facetIdentity.trim()
+    const normalizedIdentity = identity.trim()
+    const state = this._requireFacetDocumentServerState(normalizedFacet, normalizedIdentity)
+    const provider = this._requireServiceProvider()
+    const result = await this._requireFacetProviderOperation(provider.updateFacetDocument, 'updateFacetDocument')({
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      facetIdentity: normalizedFacet,
+      identity: normalizedIdentity,
+      document,
+      expectedRevision: state.revision,
+      signal: this._abortController.signal,
+    })
+    assertCurrent()
+    this._domainETag = result.etag
+    return this._applyFacetDocument(result.document, normalizedFacet, normalizedIdentity)
+  }
+
+  public async deleteFacetDocument(facetIdentity: string, identity: string): Promise<RFacetDocument> {
+    return this._mutateFacetDocumentLifecycle(facetIdentity, identity, 'delete')
+  }
+
+  public async restoreFacetDocument(facetIdentity: string, identity: string): Promise<RFacetDocument> {
+    return this._mutateFacetDocumentLifecycle(facetIdentity, identity, 'restore')
+  }
+
+  public toJSON(): Record<string, unknown> {
+    return {
+      isHealthy: this.isHealthy,
+      capabilities: this.capabilities,
+      domainETag: this.domainETag,
+    }
+  }
+
+  /** Не позволяет позднему ответу предыдущего контекста изменить новый Domain. */
+  private _captureGeneration(): () => void {
+    const generation = this._generation
+    const signal = this._abortController.signal
+    return () => {
+      if (generation !== this._generation || signal.aborted) {
+        throw new DOMException('Domain repository context was reset.', 'AbortError')
+      }
+    }
+  }
+
+  private _indexSnapshotServerState(snapshot: EndgeLiveDomainSnapshot): void {
+    this._documentServerState.clear()
+    for (const [documentType, documents] of Object.entries(snapshot.documents)) {
+      if (!Array.isArray(documents)) {
+        continue
+      }
+      for (const document of documents) {
+        const identity = String(document.identity ?? '').trim()
+        if (identity) {
+          const key = documentType === 'facet-documents'
+            ? this._facetDocumentServerStateKey(String(document.facetIdentity ?? ''), identity)
+            : this._serverStateKey(documentType, identity)
+          this._documentServerState.set(key, { ...document.state })
+        }
+      }
+    }
+  }
+
+  private _serverStateKey(documentType: string, identity: string): string {
+    return JSON.stringify([documentType, identity])
+  }
+
+  private _facetDocumentServerStateKey(facetIdentity: string, identity: string): string {
+    return JSON.stringify(['facet-documents', facetIdentity.trim(), identity.trim()])
+  }
+
+  private _requireDocumentServerState(
+    collection: EndgeDomainCollection,
+    identity: string,
+  ): EndgeDocumentServerState {
+    const state = this._documentServerState.get(this._serverStateKey(collection, identity))
+    if (!state) {
+      throw new Error(`Server state не найден для ${collection}/${identity}`)
+    }
+    return state
+  }
+
+  private _findServerIdentity(collection: EndgeDomainCollection, documentId: string | number): string | null {
+    const id = String(documentId)
+    for (const [key, state] of this._documentServerState) {
+      const parsed = JSON.parse(key) as string[]
+      if (parsed[0] === collection && parsed.length === 2 && String(state.id) === id) {
+        return parsed[1] ?? null
+      }
+    }
+    return null
+  }
+
+  private _requireFacetDocumentServerState(facetIdentity: string, identity: string): EndgeDocumentServerState {
+    const state = this.getFacetDocumentServerState(facetIdentity, identity)
+    if (!state) {
+      throw new Error(`Server state не найден для facet-documents/${facetIdentity}/${identity}`)
+    }
+    return state
+  }
+
+  private _materializeFacet(document: EndgeLiveDomainDocument): RFacet {
+    const { state, ...plain } = document
+    return RFacet.fromPlain({ ...plain, id: state.id, serverState: state, deletedAt: state.deletedAt ?? null })
+  }
+
+  private _materializeFacetDocument(document: EndgeLiveDomainDocument, facetIdentity?: string): RFacetDocument {
+    const { state, ...plain } = document
+    return RFacetDocument.fromPlain({
+      ...plain,
+      facetIdentity: String(plain.facetIdentity ?? facetIdentity ?? '').trim(),
+      id: state.id,
+      serverState: state,
+      deletedAt: state.deletedAt ?? null,
+    })
+  }
+
+  private _applyFacet(document: EndgeLiveDomainDocument, previousIdentity?: string): RFacet {
+    const next = this._materializeFacet(document)
+    const current = Endge.domain.getFacet(previousIdentity ?? next.identity)
+    if (current) {
+      Endge.domain.replacePersistedEntity(current, next)
+    }
+    else { Endge.domain.addFacet(next) }
+    if (previousIdentity && previousIdentity !== next.identity) {
+      this._documentServerState.delete(this._serverStateKey('facets', previousIdentity))
+    }
+    this._documentServerState.set(this._serverStateKey('facets', next.identity), { ...document.state })
+    this._notifyDomainChanged()
+    return next
+  }
+
+  private _applyFacetDocument(
+    document: EndgeLiveDomainDocument,
+    facetIdentity: string,
+    previousIdentity?: string,
+  ): RFacetDocument {
+    const next = this._materializeFacetDocument(document, facetIdentity)
+    const current = Endge.domain.getFacetDocument(facetIdentity, previousIdentity ?? next.identity)
+    if (current) {
+      Endge.domain.replacePersistedEntity(current, next)
+    }
+    else { Endge.domain.addFacetDocument(next) }
+    if (previousIdentity && previousIdentity !== next.identity) {
+      this._documentServerState.delete(this._facetDocumentServerStateKey(facetIdentity, previousIdentity))
+    }
+    this._documentServerState.set(this._facetDocumentServerStateKey(next.facetIdentity, next.identity), { ...document.state })
+    this._notifyDomainChanged()
+    return next
+  }
+
+  private async _mutateFacetLifecycle(identity: string, action: 'delete' | 'restore'): Promise<RFacet> {
+    this._assertMutationsSupported()
+    const assertCurrent = this._captureGeneration()
+    const normalized = identity.trim()
+    const state = this._requireDocumentServerState('facets', normalized)
+    const provider = this._requireServiceProvider()
+    const request = {
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      identity: normalized,
+      expectedRevision: state.revision,
+      signal: this._abortController.signal,
+    }
+    const result = action === 'delete'
+      ? await this._requireFacetProviderOperation(provider.softDeleteFacet, 'softDeleteFacet')(request)
+      : await this._requireFacetProviderOperation(provider.restoreFacet, 'restoreFacet')(request)
+    assertCurrent()
+    this._domainETag = result.etag
+    if (action === 'delete') {
+      Endge.domain.removeFacet(normalized)
+      const tombstone = this._materializeFacet(result.document)
+      this._documentServerState.set(this._serverStateKey('facets', normalized), { ...result.document.state })
+      this._notifyDomainChanged()
+      return tombstone
+    }
+    return this._applyFacet(result.document, normalized)
+  }
+
+  private async _mutateFacetDocumentLifecycle(
+    facetIdentity: string,
+    identity: string,
+    action: 'delete' | 'restore',
+  ): Promise<RFacetDocument> {
+    this._assertMutationsSupported()
+    const assertCurrent = this._captureGeneration()
+    const normalizedFacet = facetIdentity.trim()
+    const normalizedIdentity = identity.trim()
+    const state = this._requireFacetDocumentServerState(normalizedFacet, normalizedIdentity)
+    const provider = this._requireServiceProvider()
+    const request = {
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      facetIdentity: normalizedFacet,
+      identity: normalizedIdentity,
+      expectedRevision: state.revision,
+      signal: this._abortController.signal,
+    }
+    const result = action === 'delete'
+      ? await this._requireFacetProviderOperation(provider.softDeleteFacetDocument, 'softDeleteFacetDocument')(request)
+      : await this._requireFacetProviderOperation(provider.restoreFacetDocument, 'restoreFacetDocument')(request)
+    assertCurrent()
+    this._domainETag = result.etag
+    if (action === 'delete') {
+      Endge.domain.removeFacetDocument(normalizedFacet, normalizedIdentity)
+      const tombstone = this._materializeFacetDocument(result.document, normalizedFacet)
+      this._documentServerState.set(this._facetDocumentServerStateKey(normalizedFacet, normalizedIdentity), { ...result.document.state })
+      this._notifyDomainChanged()
+      return tombstone
+    }
+    return this._applyFacetDocument(result.document, normalizedFacet, normalizedIdentity)
+  }
+
+  private _assertMutationsSupported(): void {
+    Endge.assertWritable()
+    if (!this._capabilities.mutations) {
+      throw new EndgeDomainRepositoryReadOnlyError(this._capabilities.provider)
+    }
+  }
+
+  private _serviceProvider(): EndgeDomainProvider | null {
+    return this._capabilities.provider === 'service-backend' ? this._domainProvider : null
+  }
+
+  private _requireServiceProvider(): EndgeDomainProvider {
+    const provider = this._serviceProvider()
+    if (!provider) {
+      throw new Error('[EndgeDomainRepository] Service domain provider is unavailable')
+    }
+    return provider
+  }
+
+  private _requireFacetProviderOperation<T extends (...args: never[]) => unknown>(
+    operation: T | undefined,
+    name: string,
+  ): T {
+    if (!operation) {
+      throw new Error(`[EndgeDomainRepository] Service domain provider does not support ${name}`)
+    }
+    return operation.bind(this._requireServiceProvider()) as T
+  }
+
+  private _serviceWorkspaceIdentity(): string {
+    const identity = String(
+      this._loadedSnapshot?.workspace.identity
+      ?? (Endge.workspace.isLoaded ? Endge.workspace.current.identity : ''),
+    ).trim()
+    if (!identity) {
+      throw new Error('[EndgeDomainRepository] Service workspace identity is unavailable')
+    }
+    return identity
+  }
+
+  private _serviceFolderIds(): Map<string, string> {
+    const result = new Map<string, string>()
+    for (const folder of Endge.domain.getFolders()) {
+      const identity = String((folder as any).identity ?? '').trim()
+      const id = String((folder as any).id ?? '').trim()
+      if (identity && id) {
+        result.set(identity, id)
+      }
+    }
+    return result
+  }
+
+  private async _saveServiceDocument(
+    documentId: string | number,
+    documentType: DomainDocumentType,
+    opts?: { model?: unknown, previousIdentity?: string, serializedDocument?: Record<string, unknown> },
+  ): Promise<void> {
+    const assertCurrent = this._captureGeneration()
+    const provider = this._requireServiceProvider()
+
+    if (documentType === 'workspace') {
+      const workspace = normalizeEndgeWorkspaceDefinition(opts?.model ?? Endge.workspace.current)
+      const state = this._workspaceServerState
+      if (!state) {
+        throw new Error('[EndgeDomainRepository] Workspace server state is unavailable')
+      }
+      const result = await provider.updateWorkspace({
+        workspaceIdentity: this._serviceWorkspaceIdentity(),
+        signal: this._abortController.signal,
+        expectedRevision: state.revision,
+        document: {
+          identity: workspace.identity,
+          displayName: workspace.displayName,
+          dataMode: workspace.dataMode === 'mock' ? 'development' : 'production',
+          documentStructure: workspace.documentStructure ?? 'frontend',
+          startupCompositionIdentity: workspace.startupCompositionIdentity,
+          configuration: workspace.configuration,
+          meta: normalizeEntityMeta(workspace.meta),
+        },
+      })
+      assertCurrent()
+      this._workspaceServerState = { ...result.workspace.state }
+      this._domainETag = result.etag
+      Endge.workspace.apply(normalizeEndgeWorkspaceDefinition({
+        ...result.workspace,
+        dataMode: result.workspace.dataMode === 'development' ? 'mock' : 'live',
+      }))
+      this._notifyDomainChanged()
+      return
+    }
+
+    const model = opts?.model ?? this._getDomainDocumentByType(documentType, documentId)
+    if (!model) {
+      throw new Error(`Документ не найден: ${String(documentId)}`)
+    }
+    const document = opts?.serializedDocument ?? this._serializeDocument(documentType, model)
+    const identity = String(document.identity ?? '').trim()
+    const collection = resolveEndgeServiceCollection(documentType)
+    const persistedIdentity = String(opts?.previousIdentity ?? '').trim()
+      || this._findServerIdentity(collection, documentId)
+      || String((this._getDomainDocumentByType(documentType, documentId) as any)?.identity ?? identity).trim()
+    const state = this._documentServerState.get(this._serverStateKey(collection, persistedIdentity))
+    const request = {
+      workspaceIdentity: this._serviceWorkspaceIdentity(),
+      signal: this._abortController.signal,
+      collection,
+      identity: persistedIdentity || identity,
+      document,
+    }
+    const result = state
+      ? await provider.updateDocument({ ...request, expectedRevision: state.revision })
+      : await provider.createDocument(request)
+    assertCurrent()
+    this._domainETag = result.etag
+    this._applyServiceDocument(documentType, result.document, documentId, state ? persistedIdentity : undefined)
+  }
+
+  private _applyServiceDocument(
+    documentType: DomainDocumentType,
+    document: EndgeLiveDomainDocument,
+    replaceRef?: string | number,
+    previousIdentity?: string,
+  ): void {
+    const collection = resolveEndgeServiceCollection(documentType)
+    const identity = String(document.identity ?? '').trim()
+    const current = replaceRef == null
+      ? null
+      : this._getDomainDocumentByType(documentType, replaceRef)
+        ?? (previousIdentity ? this._getDomainDocumentByType(documentType, previousIdentity) : null)
+    const persistedIdentity = String((current as any)?.identity ?? previousIdentity ?? replaceRef ?? '').trim()
+
+    if (persistedIdentity && persistedIdentity !== identity) {
+      this._documentServerState.delete(this._serverStateKey(collection, persistedIdentity))
+    }
+
+    const key = this._getDomainCollectionKey(documentType)
+    const plain = normalizeSnapshotDocuments([document], this._serviceFolderIds())[0]
+    const next = getDomainDocumentDescriptor(documentType).materialize(plain)
+    const parsed = EndgeDomain_Module.parsePlain({})
+    ;(parsed[key] as unknown[]).push(next)
+    if (current) {
+      Endge.domain.replacePersistedEntity(current, next)
+    }
+    else { Endge.domain.importFromSchema(parsed) }
+    this._documentServerState.set(this._serverStateKey(collection, identity), { ...document.state })
+    this._notifyDomainChanged()
+  }
+
+  private _applyServiceFolder(document: EndgeLiveDomainDocument, replaceRef?: string | number): void {
+    const identity = String(document.identity ?? '').trim()
+    const existing = replaceRef == null ? null : Endge.domain.getFolder(replaceRef)
+    const previousIdentity = String((existing as any)?.identity ?? replaceRef ?? '').trim()
+    if (existing) {
+      Endge.domain.removeFolderById(existing.id)
+    }
+    if (previousIdentity && previousIdentity !== identity) {
+      this._documentServerState.delete(this._serverStateKey('folders', previousIdentity))
+    }
+
+    const folderIds = this._serviceFolderIds()
+    folderIds.set(identity, document.state.id)
+    const plain = normalizeSnapshotFolders([document], folderIds)[0]
+    Endge.domain.merge({ folders: [plain] })
+    this._documentServerState.set(this._serverStateKey('folders', identity), { ...document.state })
+    this._notifyDomainChanged()
+  }
+
+  private _resolveDocumentIdentity(
+    documentIdOrIdentity: string | number,
+    documentType: DomainDocumentType,
+  ): string {
+    const document = this._getDomainDocumentByType(documentType, documentIdOrIdentity)
+    return String((document as any)?.identity ?? documentIdOrIdentity)
+  }
+
+  private _getDomainDocumentByType(
+    documentType: DomainDocumentType,
+    documentIdOrIdentity: string | number,
+  ): any | null {
+    const domain = Endge.domain
+    if (documentType === ComponentType.SFC) {
+      return domain.getComponentSFC(documentIdOrIdentity)
+    }
+    if (documentType === ComponentType.Table || documentType === ComponentType.DSL) {
+      return domain.getComponent(documentIdOrIdentity)
+    }
+    if (documentType === QueryType.REST || documentType === QueryType.GraphQL || documentType === QueryType.Custom) {
+      return domain.getQuery(documentIdOrIdentity)
+    }
+    if (documentType === 'data-view') {
+      return domain.getDataView(documentIdOrIdentity)
+    }
+    if (documentType === 'composition') {
+      return domain.getComposition(documentIdOrIdentity)
+    }
+    if (documentType === 'store') {
+      return domain.getStore(documentIdOrIdentity)
+    }
+    if (documentType === 'stream') {
+      return domain.getStream(documentIdOrIdentity)
+    }
+    if (documentType === 'simulation') {
+      return domain.getSimulation(documentIdOrIdentity)
+    }
+    if (documentType === 'update') {
+      return domain.getUpdate(documentIdOrIdentity)
+    }
+    if (documentType === 'mock') {
+      return domain.getMock(documentIdOrIdentity)
+    }
+    if (documentType === FilterType.DefaultFilter) {
+      return domain.getFilter(documentIdOrIdentity)
+    }
+    if (documentType === 'type' || documentType === 'primitive') {
+      return domain.getType(documentIdOrIdentity)
+    }
+    if (documentType === 'action') {
+      return domain.getAction(documentIdOrIdentity)
+    }
+    if (documentType === 'converter') {
+      return domain.getConverter(documentIdOrIdentity)
+    }
+    if (documentType === 'computation') {
+      return domain.getComputation(documentIdOrIdentity)
+    }
+    if (documentType === 'integration') {
+      return domain.getIntegration(documentIdOrIdentity)
+    }
+    if (documentType === 'policy') {
+      return domain.getPolicy(documentIdOrIdentity)
+    }
+    if (documentType === 'style') {
+      return domain.getStyle(documentIdOrIdentity)
+    }
+    if (documentType === 'configuration') {
+      return domain.getConfiguration(documentIdOrIdentity)
+    }
+    if (documentType === 'page-template') {
+      return domain.getPageTemplate(documentIdOrIdentity)
+    }
+    if (documentType === 'page') {
+      return domain.getPage(documentIdOrIdentity)
+    }
+    if (documentType === 'navigation') {
+      return domain.getNavigation(documentIdOrIdentity)
+    }
+    if (documentType === 'vocabs') {
+      return domain.getVocab(documentIdOrIdentity)
+    }
+    if (documentType === 'auth-profile') {
+      return domain.getAuthProfile(documentIdOrIdentity)
+    }
+    if (documentType === 'i18n-bundles') {
+      return domain.getI18nBundle(documentIdOrIdentity)
+    }
+    return null
+  }
+
+  private _removeDomainDocumentByType(
+    documentType: DomainDocumentType,
+    documentIdOrIdentity: string | number,
+  ): void {
+    const existing = this._getDomainDocumentByType(documentType, documentIdOrIdentity)
+    if (!existing) {
+      return
+    }
+
+    const id = (existing as any).id
+    const identity = String((existing as any).identity ?? '')
+    const remove = (removeById: (value: any) => void, removeByIdentity: (value: string) => void) => {
+      if (id != null) {
+        removeById(id)
+      }
+      else if (identity) {
+        removeByIdentity(identity)
+      }
+    }
+    const domain = Endge.domain
+
+    if (documentType === ComponentType.SFC) {
+      return remove(x => domain.removeComponentSFCById(x), x => domain.removeComponentSFC(x))
+    }
+    if (documentType === ComponentType.Table || documentType === ComponentType.DSL) {
+      return remove(x => domain.removeComponentById(x), x => domain.removeComponent(x))
+    }
+    if (documentType === QueryType.REST || documentType === QueryType.GraphQL || documentType === QueryType.Custom) {
+      return remove(x => domain.removeQueryById(x), x => domain.removeQuery(x))
+    }
+    if (documentType === 'data-view') {
+      return remove(x => domain.removeDataViewById(x), x => domain.removeDataView(x))
+    }
+    if (documentType === 'composition') {
+      return remove(x => domain.removeCompositionById(x), x => domain.removeComposition(x))
+    }
+    if (documentType === 'store') {
+      return remove(x => domain.removeStoreById(x), x => domain.removeStore(x))
+    }
+    if (documentType === 'stream') {
+      return remove(x => domain.removeStreamById(x), x => domain.removeStream(x))
+    }
+    if (documentType === 'simulation') {
+      return remove(x => domain.removeSimulationById(x), x => domain.removeSimulation(x))
+    }
+    if (documentType === 'update') {
+      return remove(x => domain.removeUpdateById(x), x => domain.removeUpdate(x))
+    }
+    if (documentType === 'mock') {
+      return remove(x => domain.removeMockById(x), x => domain.removeMock(x))
+    }
+    if (documentType === 'computation') {
+      return remove(x => domain.removeComputationById(x), x => domain.removeComputation(x))
+    }
+    if (documentType === FilterType.DefaultFilter) {
+      return remove(x => domain.removeFilterById(x), x => domain.removeFilter(x))
+    }
+    if (documentType === 'type' || documentType === 'primitive') {
+      return remove(x => domain.removeTypeById(x), x => domain.removeType(x))
+    }
+    if (documentType === 'action') {
+      return remove(x => domain.removeActionById(x), x => domain.removeAction(x))
+    }
+    if (documentType === 'converter') {
+      return remove(x => domain.removeConverterById(x), x => domain.removeConverter(x))
+    }
+    if (documentType === 'integration') {
+      return remove(x => domain.removeIntegrationById(x), x => domain.removeIntegration(x))
+    }
+    if (documentType === 'policy') {
+      return remove(x => domain.removePolicyById(x), x => domain.removePolicy(x))
+    }
+    if (documentType === 'style') {
+      return remove(x => domain.removeStyleById(x), x => domain.removeStyle(x))
+    }
+    if (documentType === 'configuration') {
+      return remove(x => domain.removeConfigurationById(x), x => domain.removeConfiguration(x))
+    }
+    if (documentType === 'page-template') {
+      return remove(x => domain.removePageTemplateById(x), x => domain.removePageTemplate(x))
+    }
+    if (documentType === 'page') {
+      return remove(x => domain.removePageById(x), x => domain.removePage(x))
+    }
+    if (documentType === 'navigation') {
+      return remove(x => domain.removeNavigationById(x), x => domain.removeNavigation(x))
+    }
+    if (documentType === 'vocabs') {
+      return remove(x => domain.removeVocabsById(x), x => domain.removeVocabs(x))
+    }
+    if (documentType === 'auth-profile') {
+      return remove(x => domain.removeAuthProfileById(x), x => domain.removeAuthProfile(x))
+    }
+    if (documentType === 'i18n-bundles') {
+      return remove(x => domain.removeI18nBundlesById(x), x => domain.removeI18nBundles(x))
+    }
+  }
+
+  private _getDomainCollectionKey(documentType: DomainDocumentType): DomainCollectionKey {
+    const key = getDomainDocumentDescriptor(documentType).domainCollection
+    if (!key) {
+      throw new Error(`[EndgeDomainRepository] Unsupported service document type: ${documentType}`)
+    }
+    return key
+  }
+
+  private _notifyDomainChanged(): void {
+    ;(AppBus.emit as (event: string, payload?: unknown) => void)('domainChanged', undefined)
+  }
+
+  /** Собирает явные lookup-зависимости чистой Domain-сериализации. */
+  private _serializationContext() {
+    return {
+      resolveFolderIdentity: (value: string | number) => Endge.domain.getFolder(value)?.identity ?? null,
+    }
+  }
+
+  /** Сериализует persisted document через его канонический Domain descriptor. */
+  private _serializeDocument(documentType: DomainDocumentType, model: unknown): Record<string, unknown> {
+    const persistence = getDomainDocumentDescriptor(documentType).persistence
+    if (!persistence) {
+      throw new Error(`[EndgeDomainRepository] Document type is not persisted: ${documentType}`)
+    }
+    return persistence.serialize(model, this._serializationContext())
+  }
+}

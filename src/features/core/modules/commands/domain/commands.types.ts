@@ -1,0 +1,26 @@
+import type { RuntimeControlTarget } from '@/features/core/modules/runtime/domain/runtime-inspection.types'
+import type { EndgeDataMode } from '@/features/core/modules/workspace/domain/workspace.types'
+
+/** Параметры явных команд Core; это запросы на изменение, а не произошедшие события. */
+export interface EndgeCommandMap {
+  'runtime:pause': RuntimeControlTarget
+  'runtime:resume': RuntimeControlTarget
+  'runtime:stop': RuntimeControlTarget
+  'context:set-workspace': { workspace: string | null }
+  'context:set-facet': { facet: string, document: string }
+  'context:set-user': { user: string }
+  'context:set-locale': { locale: string | null }
+  'context:set-theme': { theme: string | null }
+  'context:set-timezone': { timezone: string | null }
+  'context:set-data-mode': { dataMode: EndgeDataMode | null }
+}
+
+export type EndgeCommandType = keyof EndgeCommandMap
+
+/** Связывает имя команды с её payload для единой точки execute(). */
+export type EndgeCommand = {
+  [K in EndgeCommandType]: {
+    readonly type: K
+    readonly payload: Readonly<EndgeCommandMap[K]>
+  }
+}[EndgeCommandType]
