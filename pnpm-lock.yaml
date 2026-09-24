@@ -15,8 +15,8 @@ dependencies:
     specifier: ^7.27.1
     version: 7.29.7
   '@endge/utils':
-    specifier: ^0.27.0
-    version: 0.27.0
+    specifier: 1.0.0-dev
+    version: 1.0.0-dev
   '@vue/compiler-dom':
     specifier: ^3.5.24
     version: 3.5.39
@@ -318,8 +318,8 @@ packages:
       semver: 7.8.5
     dev: true
 
-  /@endge/utils@0.27.0:
-    resolution: {integrity: sha512-abuCAbeV/k/Daez4dsIegw0lB8R8TIAHqRYiXYFHs6JAWm26qWsyOqO5Dji6k5oOF0dlTNpexQkPlBgvefF8wQ==}
+  /@endge/utils@1.0.0-dev:
+    resolution: {integrity: sha512-4ZxT6jLyKT+YJp4m083CNLDcbC81svJXFv0hBuDGsLUPG0WqtM58DR9dhzC41Tsn+ofgiTIH+VgJuQ/UoEqcog==}
     dependencies:
       '@microsoft/fetch-event-source': 2.0.1
       class-transformer: 0.5.1

@@ -75,7 +75,7 @@ jobs:
           name="$(node -p 'require("./package.json").name')"
           version="$(node -p 'require("./package.json").version')"
           channel="${{ steps.preflight.outputs.channel }}"
-          for attempt in {1..12}; do
+          for attempt in {1..120}; do
             published="$(npm view "${name}@${version}" version 2>/dev/null || true)"
             tag_version="$(npm view "${name}" "dist-tags.${channel}" 2>/dev/null || true)"
             if test "$published" = "$version" && test "$tag_version" = "$version"; then exit 0; fi
