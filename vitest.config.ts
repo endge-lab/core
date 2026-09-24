@@ -4,7 +4,6 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   resolve: {
     alias: {
-      '@raphy-js/raph': path.resolve(__dirname, '../@raphy/@raphy-raph/dist/raph.js'),
       '@': path.resolve(__dirname, './src'),
     },
   },
