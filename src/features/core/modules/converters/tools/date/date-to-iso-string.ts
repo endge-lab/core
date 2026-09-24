@@ -1,4 +1,4 @@
-/** Date в ISO-строка (дата и время). */
+// Date в ISO-строка (дата и время).
 export function dateToIsoString(value: unknown): string | null {
   if (value == null) {
     return null

@@ -21,7 +21,9 @@ import { serializeDiagnosticsJson } from '@/features/core/modules/diagnostics/do
 import { ComponentSFCInteractionTriggerActivationMatcher, hasComponentSFCInteractionTriggerActivation, normalizeComponentSFCInteractionTriggerActivation } from '@/features/core/modules/domain/component/component-sfc-edit-trigger'
 import { EndgeModule } from '@/features/federation/EndgeModule'
 
-/** Владелец создания, доставки, скачивания и trigger policies диагностических snapshots. */
+/**
+ * Владелец создания, доставки, скачивания и trigger policies диагностических snapshots.
+ */
 export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootContext> {
   private _automaticErrorTimestamps: number[] = []
   private _automaticCooldownUntil = 0
@@ -30,7 +32,9 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
   private _shortcutMatcher: ComponentSFCInteractionTriggerActivationMatcher | null = null
   private _started = false
 
-  /** Создаёт snapshots owner поверх telemetry, problems и platform adapter. */
+  /**
+   * Создаёт snapshots owner поверх telemetry, problems и platform adapter.
+   */
   public constructor(
     private readonly _telemetry: EndgeTelemetry_Module,
     private readonly _problems: EndgeProblems_Module,
@@ -40,18 +44,24 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
     this._subscribeAutomaticSnapshots()
   }
 
-  /** Восстанавливает internal policy subscriptions после telemetry build/reset. */
+  /**
+   * Восстанавливает internal policy subscriptions после telemetry build/reset.
+   */
   public override build(_ctx: EndgeBootContext): void {
     this.configure()
   }
 
-  /** Включает глобальную shortcut subscription только в live lifecycle. */
+  /**
+   * Включает глобальную shortcut subscription только в live lifecycle.
+   */
   public override start(_ctx: EndgeBootContext): void {
     this._started = true
     this._syncShortcutSubscription()
   }
 
-  /** Освобождает live subscriptions и transient policy state. */
+  /**
+   * Освобождает live subscriptions и transient policy state.
+   */
   public override reset(): void {
     this._started = false
     this._unsubscribeShortcut?.()
@@ -64,7 +74,9 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
     this._shortcutMatcher = null
   }
 
-  /** Синхронизирует subscriptions после применения новой effective configuration. */
+  /**
+   * Синхронизирует subscriptions после применения новой effective configuration.
+   */
   public configure(): void {
     this._automaticErrorTimestamps = []
     this._automaticCooldownUntil = 0
@@ -72,7 +84,9 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
     this._syncShortcutSubscription()
   }
 
-  /** Возвращает JSON-safe snapshot выбранных частей текущего состояния Core. */
+  /**
+   * Возвращает JSON-safe snapshot выбранных частей текущего состояния Core.
+   */
   public snapshot(options: DiagnosticsSnapshotOptions = {}): DiagnosticsSnapshot {
     const content = this._telemetry.configuration.snapshots.content
     const includeTelemetry = options.includeTelemetry ?? content.telemetry
@@ -138,7 +152,9 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
     return snapshot
   }
 
-  /** Создаёт snapshot и доставляет его в выбранные configured outputs. */
+  /**
+   * Создаёт snapshot и доставляет его в выбранные configured outputs.
+   */
   public sendSnapshot(outputIds?: readonly string[], options: DiagnosticsSnapshotOptions = {}): DiagnosticsSnapshot {
     const snapshot = this.snapshot(options)
     const targets = outputIds ?? this._telemetry.configuration.snapshots.automatic.outputIds
@@ -146,14 +162,18 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
     return snapshot
   }
 
-  /** Создаёт snapshot и сохраняет его platform adapter-ом в JSON-файл. */
+  /**
+   * Создаёт snapshot и сохраняет его platform adapter-ом в JSON-файл.
+   */
   public downloadSnapshot(options: DiagnosticsSnapshotOptions = {}): DiagnosticsSnapshot {
     const snapshot = this.snapshot(options)
     this._runtimeAdapter.downloadJson(snapshot)
     return snapshot
   }
 
-  /** Восстанавливает внутреннюю подписку на ERROR/FATAL records после configure. */
+  /**
+   * Восстанавливает внутреннюю подписку на ERROR/FATAL records после configure.
+   */
   private _subscribeAutomaticSnapshots(): void {
     this._unsubscribeAutomaticRecords?.()
     this._unsubscribeAutomaticRecords = this._telemetry.subscribe(
@@ -162,7 +182,9 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
     )
   }
 
-  /** Пересоздаёт live shortcut subscription по effective trigger activation. */
+  /**
+   * Пересоздаёт live shortcut subscription по effective trigger activation.
+   */
   private _syncShortcutSubscription(): void {
     this._unsubscribeShortcut?.()
     this._unsubscribeShortcut = null
@@ -199,7 +221,9 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
     })
   }
 
-  /** Читает одну часть snapshot из её state owner и локализует возможный сбой. */
+  /**
+   * Читает одну часть snapshot из её state owner и локализует возможный сбой.
+   */
   private _captureSection(
     section: DiagnosticsSnapshotCaptureError['section'],
     capture: () => unknown,
@@ -214,7 +238,9 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
     }
   }
 
-  /** Сохраняет прежние top-level поля, получая их из нового дерева владельцев. */
+  /**
+   * Сохраняет прежние top-level поля, получая их из нового дерева владельцев.
+   */
   private _federationOwnerSections(
     federation: EndgeFederationDiagnosticsSnapshot | null,
     content: Pick<
@@ -239,7 +265,9 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
     }
   }
 
-  /** Применяет существующие content toggles к тяжёлым Core Modules до чтения их состояния. */
+  /**
+   * Применяет существующие content toggles к тяжёлым Core Modules до чтения их состояния.
+   */
   private _federationOptions(
     content: Pick<
       EndgeDiagnosticsSnapshotContentConfiguration,
@@ -271,7 +299,9 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
     }
   }
 
-  /** Переносит snapshot Core Module в совместимое top-level поле без повторного сбора. */
+  /**
+   * Переносит snapshot Core Module в совместимое top-level поле без повторного сбора.
+   */
   private _takeModuleSnapshot(
     federation: EndgeFederationDiagnosticsSnapshot | null,
     key: string,
@@ -302,7 +332,9 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
     return snapshot
   }
 
-  /** Показывает, что состояние Diagnostics Module представлено корневыми полями файла. */
+  /**
+   * Показывает, что состояние Diagnostics Module представлено корневыми полями файла.
+   */
   private _referenceDiagnosticsModule(federation: EndgeFederationDiagnosticsSnapshot): void {
     const node = federation.nodes.find(
       (candidate): candidate is EndgeModuleDiagnosticsSnapshotNode =>
@@ -315,7 +347,9 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
     node.snapshotRef = '#/'
   }
 
-  /** Применяет sliding window и cooldown политики автоматического snapshot. */
+  /**
+   * Применяет sliding window и cooldown политики автоматического snapshot.
+   */
   private _handleAutomaticSnapshotRecord(record: DiagnosticsRecord): void {
     if (record.signal !== 'log') {
       return
@@ -339,7 +373,9 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
     this.sendSnapshot(policy.outputIds, { trigger: 'automatic' })
   }
 
-  /** Переводит persisted content policy в публичные snapshot options. */
+  /**
+   * Переводит persisted content policy в публичные snapshot options.
+   */
   private _snapshotOptions(
     content: EndgeDiagnosticsSnapshotContentConfiguration,
     trigger: NonNullable<DiagnosticsSnapshotOptions['trigger']>,

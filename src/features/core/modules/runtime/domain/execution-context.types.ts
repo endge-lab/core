@@ -1,4 +1,4 @@
-/** Structural context одного полного boot/build lifecycle. */
+// Structural context одного полного boot/build lifecycle.
 export interface EndgeExecutionContext {
   readonly facets: Readonly<Record<string, string>>
 }

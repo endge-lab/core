@@ -9,7 +9,7 @@ function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null
 }
 
-/** Validates captured inspection metadata before any owner changes its current state. */
+// Validates captured inspection metadata before any owner changes its current state.
 export function prepareDebuggerSnapshot(snapshot: DiagnosticsSnapshot) {
   if (snapshot.format !== 'endge-diagnostics-snapshot' || snapshot.version !== 2 || !record(snapshot.domain)) {
     throw new Error('[Endge] Expected a v2 diagnostics snapshot with Domain')

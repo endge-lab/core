@@ -5,7 +5,9 @@ import { Expose } from 'class-transformer'
 
 import { REntity } from '@/features/core/modules/domain/entities/REntity'
 
-/** Persisted source-first описание пользовательского хранилища. */
+/**
+ * Persisted source-first описание пользовательского хранилища.
+ */
 export class RStore extends REntity {
   @Expose()
   description: string | null = null

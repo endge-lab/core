@@ -1,32 +1,32 @@
-/** Секция source, которую пользователь видит как вкладку script. */
+// Секция source, которую пользователь видит как вкладку script.
 export interface RComponentSFCSource_Script {
-  /** Содержимое <script setup>. */
+  // Содержимое <script setup>.
   content: string
 }
 
-/** Секция source, которую пользователь видит как вкладку template. */
+// Секция source, которую пользователь видит как вкладку template.
 export interface RComponentSFCSource_Template {
-  /** Содержимое <template>. */
+  // Содержимое <template>.
   content: string
 }
 
-/** Секция source, которую пользователь видит как вкладку style. */
+// Секция source, которую пользователь видит как вкладку style.
 export interface RComponentSFCSource_Style {
-  /** Содержимое <style>. */
+  // Содержимое <style>.
   content: string
 
-  /** Флаг scoped-стилей в духе Vue/Nova SFC. */
+  // Флаг scoped-стилей в духе Vue/Nova SFC.
   scoped: boolean
 }
 
-/** Разложенное представление SFC для вкладок конфигуратора. */
+// Разложенное представление SFC для вкладок конфигуратора.
 export interface RComponentSFCSource_Parts {
-  /** Script-секция компонента. */
+  // Script-секция компонента.
   script: RComponentSFCSource_Script
 
-  /** Template-секция компонента. */
+  // Template-секция компонента.
   template: RComponentSFCSource_Template
 
-  /** Style-секция компонента. */
+  // Style-секция компонента.
   style: RComponentSFCSource_Style
 }

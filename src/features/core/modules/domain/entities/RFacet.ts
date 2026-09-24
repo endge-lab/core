@@ -3,9 +3,11 @@ import { Expose } from 'class-transformer'
 
 import { normalizeEntityMeta, REntity } from '@/features/core/modules/domain/entities/REntity'
 
-/** Persisted authoring definition of a dynamic configuration facet. */
+/**
+ * Persisted authoring definition of a dynamic configuration facet.
+ */
 export class RFacet extends REntity<string | number> {
-  /** Optimistic-lock and audit state returned only by a live persistence provider. */
+  // Optimistic-lock and audit state returned only by a live persistence provider.
   serverState: EndgeDocumentServerState | null = null
 
   @Expose()
@@ -17,7 +19,7 @@ export class RFacet extends REntity<string | number> {
   @Expose()
   position = 0
 
-  /** Server-computed number of active documents in this facet. */
+  // Server-computed number of active documents in this facet.
   @Expose()
   documentCount = 0
 

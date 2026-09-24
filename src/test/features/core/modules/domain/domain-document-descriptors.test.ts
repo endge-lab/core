@@ -151,7 +151,7 @@ describe('дескрипторы документов домена', () => {
       .toThrow('Document identity is required.')
   })
 
-  /** Гарантирует descriptor и явные capabilities для каждого canonical document type. */
+  // Гарантирует descriptor и явные capabilities для каждого canonical document type.
   it('охватывает каждый канонический тип документа явными значениями capabilities', () => {
     expect(Object.keys(DOMAIN_DOCUMENT_DESCRIPTORS).sort())
       .toEqual([...DOMAIN_DOCUMENT_TYPES].sort())
@@ -166,7 +166,7 @@ describe('дескрипторы документов домена', () => {
     }
   })
 
-  /** Проверяет единый round-trip создания, сериализации и материализации Query. */
+  // Проверяет единый round-trip создания, сериализации и материализации Query.
   it('сохраняет сохранённый Query при двустороннем преобразовании через его descriptor', () => {
     const descriptor = getDomainDocumentDescriptor(QueryType.REST)
     const draft = createNewDomainDocument(QueryType.REST, {
@@ -188,7 +188,7 @@ describe('дескрипторы документов домена', () => {
     })
   })
 
-  /** Фиксирует отсутствие несуществующих Source, Program и Runtime возможностей. */
+  // Фиксирует отсутствие несуществующих Source, Program и Runtime возможностей.
   it('представляет неподдерживаемые capabilities значением null', () => {
     expect(getDomainDocumentDescriptor('auth-profile').capabilities).toEqual({
       source: null,

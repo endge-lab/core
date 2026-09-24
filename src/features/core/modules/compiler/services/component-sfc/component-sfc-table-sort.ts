@@ -39,7 +39,7 @@ const SORT_MODE_SET = new Set<string>(SFC_TABLE_SORT_MODES)
 const SORT_COMPARATOR_SET = new Set<string>(SFC_TABLE_SORT_COMPARATORS)
 const SORT_DIRECTION_SET = new Set<string>(SFC_TABLE_SORT_DIRECTIONS)
 
-/** Нормализует декларативные sort props SFC Table из IR без выполнения пользовательского кода. */
+// Нормализует декларативные sort props SFC Table из IR без выполнения пользовательского кода.
 export function normalizeComponentSFCTableSort(
   tableNode: RComponentSFC_IR_ElementNode,
 ): ComponentSFCTableSortDescriptor {

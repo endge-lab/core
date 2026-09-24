@@ -12,7 +12,7 @@ export interface RPageTemplateAreaSchema {
   description?: string | null
 }
 
-/** short | normal | tall - высота строки в превью. */
+// short | normal | tall - высота строки в превью.
 export type RPageTemplatePreviewRowHeight = 'short' | 'normal' | 'tall'
 
 export interface RPageTemplatePreviewSchema {
@@ -29,7 +29,9 @@ export interface RPageTemplateSchema extends EntityManagement {
   meta?: Record<string, unknown>
 }
 
-/** Шаблон страницы (коллекция page-templates). */
+/**
+ * Шаблон страницы (коллекция page-templates).
+ */
 export class RPageTemplate extends REntity {
   @Expose()
   description: string | null = null
@@ -40,7 +42,9 @@ export class RPageTemplate extends REntity {
   @Expose()
   preview: RPageTemplatePreviewSchema | null = null
 
-  /** Тип документа для редактора/инспектора. */
+  /**
+   * Тип документа для редактора/инспектора.
+   */
   get type(): DomainDocumentType {
     return 'page-template' as DomainDocumentType
   }

@@ -1,4 +1,4 @@
-/** Строка в число (parseFloat). */
+// Строка в число (parseFloat).
 export function stringToNumber(value: unknown): number | null {
   if (value == null) {
     return null

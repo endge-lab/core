@@ -20,7 +20,9 @@ export class LocalStorageContextAdapter implements EndgeStorageAdapter {
     return JSON.parse(raw) as T
   }
 
-  /** Читает legacy raw string, который ещё не использовал JSON serialization. */
+  /**
+   * Читает legacy raw string, который ещё не использовал JSON serialization.
+   */
   public readRaw(key: string): string | null {
     if (!this.isAvailable()) {
       return null

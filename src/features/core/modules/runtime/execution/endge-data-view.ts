@@ -12,7 +12,9 @@ import { RDataView } from '@/features/core/modules/domain/entities/RDataView'
 import { compileDataViewSource } from '@/features/core/modules/source/services/compilers/data-view-source-compile'
 import { evaluateSourceExpression } from '@/features/core/modules/source/services/source-expression-evaluate'
 
-/** Сообщает, что persisted DataView не прошёл общий build pipeline. */
+/**
+ * Сообщает, что persisted DataView не прошёл общий build pipeline.
+ */
 export class DataViewArtifactUnavailableError extends Error {
   public readonly code = 'data_view_artifact_unavailable'
 
@@ -22,9 +24,13 @@ export class DataViewArtifactUnavailableError extends Error {
   }
 }
 
-/** Модуль выполнения скомпилированных RDataView artifacts. */
+/**
+ * Модуль выполнения скомпилированных RDataView artifacts.
+ */
 export class EndgeDataView {
-  /** Выполняет DataView по id/identity/model над переданным input object. */
+  /**
+   * Выполняет DataView по id/identity/model над переданным input object.
+   */
   public run(
     dataViewOrId: RDataView | string | number,
     input: unknown,
@@ -39,7 +45,9 @@ export class EndgeDataView {
     })
   }
 
-  /** Выполняет уже скомпилированный DataView artifact без поиска в домене. */
+  /**
+   * Выполняет уже скомпилированный DataView artifact без поиска в домене.
+   */
   public runArtifact(
     artifact: ProgramArtifact<DataViewProgramPayload>,
     input: unknown,
@@ -57,7 +65,9 @@ export class EndgeDataView {
     })
   }
 
-  /** Выполняет уже скомпилированный DataView payload. */
+  /**
+   * Выполняет уже скомпилированный DataView payload.
+   */
   public runPayload(
     artifact: DataViewProgramPayload,
     input: unknown,
@@ -80,7 +90,9 @@ export class EndgeDataView {
     return this._runPipeline(artifact, input, runTools, context, props)
   }
 
-  /** Вычисляет object projection один раз над целым DataView input. */
+  /**
+   * Вычисляет object projection один раз над целым DataView input.
+   */
   private _runProjection(
     artifact: DataViewProgramPayload,
     input: unknown,
@@ -104,7 +116,9 @@ export class EndgeDataView {
     )
   }
 
-  /** Вычисляет root ValueExpression без object projection wrapper. */
+  /**
+   * Вычисляет root ValueExpression без object projection wrapper.
+   */
   private _runExpression(
     artifact: DataViewProgramPayload,
     input: unknown,
@@ -126,7 +140,9 @@ export class EndgeDataView {
     })
   }
 
-  /** Выполняет DataView-ссылку из query/DataView artifact. */
+  /**
+   * Выполняет DataView-ссылку из query/DataView artifact.
+   */
   public runRef(
     ref: DataViewRef,
     input: unknown,
@@ -149,7 +165,9 @@ export class EndgeDataView {
     return this.runArtifact(artifact, input, tools, context)
   }
 
-  /** Выполняет DataView source без записи artifact в `Endge.program`. */
+  /**
+   * Выполняет DataView source без записи artifact в `Endge.program`.
+   */
   public runSource(
     source: string,
     input: unknown,
@@ -168,7 +186,9 @@ export class EndgeDataView {
     return this.runPayload(result.artifact as DataViewProgramPayload, input, tools, context)
   }
 
-  /** Возвращает DataView model из домена или входного экземпляра. */
+  /**
+   * Возвращает DataView model из домена или входного экземпляра.
+   */
   private _resolveDataView(dataViewOrId: RDataView | string | number): RDataView {
     if (dataViewOrId instanceof RDataView) {
       return dataViewOrId
@@ -182,7 +202,9 @@ export class EndgeDataView {
     return dataView
   }
 
-  /** Возвращает только artifact, подготовленный общим compiler build. */
+  /**
+   * Возвращает только artifact, подготовленный общим compiler build.
+   */
   private _resolveArtifact(dataView: RDataView): ProgramArtifact<DataViewProgramPayload> {
     const artifact = Endge.program.getDataViewArtifact(dataView.id ?? dataView.identity)
     if (!artifact) {
@@ -196,12 +218,16 @@ export class EndgeDataView {
     return artifact
   }
 
-  /** Останавливает manual DataView до появления безопасного runtime. */
+  /**
+   * Останавливает manual DataView до появления безопасного runtime.
+   */
   private _runManual(): never {
     throw new Error('[DataView] mode "manual" временно отключён: безопасный runtime для пользовательского TypeScript ещё не реализован.')
   }
 
-  /** Интерпретирует декларативные pipeline steps без eval. */
+  /**
+   * Интерпретирует декларативные pipeline steps без eval.
+   */
   private _runPipeline(
     artifact: DataViewProgramPayload,
     input: unknown,
@@ -269,7 +295,9 @@ export class EndgeDataView {
     })))
   }
 
-  /** Заполняет отсутствующие props декларативными defaults DataView artifact. */
+  /**
+   * Заполняет отсутствующие props декларативными defaults DataView artifact.
+   */
   private _resolveProps(
     artifact: DataViewProgramPayload,
     input: Record<string, unknown> | undefined,
@@ -283,7 +311,9 @@ export class EndgeDataView {
     return props
   }
 
-  /** Последовательно вычисляет whole-value steps; каждый select получает результат предыдущего. */
+  /**
+   * Последовательно вычисляет whole-value steps; каждый select получает результат предыдущего.
+   */
   private _runSelectPipeline(artifact: DataViewProgramPayload, input: unknown): unknown {
     let value = input
 
@@ -307,7 +337,9 @@ export class EndgeDataView {
     return value
   }
 
-  /** Собирает базовый output для map step из spread-источников. */
+  /**
+   * Собирает базовый output для map step из spread-источников.
+   */
   private _createMapOutput(
     spreads: Array<{ source: string }>,
     scope: Record<string, unknown>,
@@ -323,7 +355,9 @@ export class EndgeDataView {
     return output
   }
 
-  /** Вычисляет join-result для текущей строки pipeline. */
+  /**
+   * Вычисляет join-result для текущей строки pipeline.
+   */
   private _resolveJoin(
     input: unknown,
     scope: Record<string, unknown>,
@@ -339,7 +373,9 @@ export class EndgeDataView {
     return source.find(item => tools.path(item, join.right) === leftValue) ?? null
   }
 
-  /** Вычисляет одно поле map-expression. */
+  /**
+   * Вычисляет одно поле map-expression.
+   */
   private _evaluateExpression(
     expression: DataViewExpression,
     scope: Record<string, unknown>,
@@ -364,7 +400,9 @@ export class EndgeDataView {
     return value
   }
 
-  /** Применяет chain operation к path-expression. */
+  /**
+   * Применяет chain operation к path-expression.
+   */
   private _applyPathOperation(
     value: unknown,
     operation: DataViewPathOperation,
@@ -390,7 +428,9 @@ export class EndgeDataView {
     return value
   }
 
-  /** Создает набор runtime tools с возможностью точечной подмены в preview. */
+  /**
+   * Создает набор runtime tools с возможностью точечной подмены в preview.
+   */
   private _createTools(overrides?: Partial<DataViewRunTools>): DataViewRunTools {
     const tools: DataViewRunTools = {
       convert: (identity, value, options) => this._convert(identity, value, options),
@@ -405,7 +445,9 @@ export class EndgeDataView {
     return { ...tools, ...(overrides ?? {}) }
   }
 
-  /** Минимальные built-in converters для preview v1. */
+  /**
+   * Минимальные built-in converters для preview v1.
+   */
   private _convert(identity: string, value: unknown, options?: Record<string, unknown>): unknown {
     // Converter resolution принадлежит общему definition/provider owner.
     // Это также сохраняет совместимость автономного выполнения DataView с определениями,
@@ -428,12 +470,16 @@ export class EndgeDataView {
     return value
   }
 
-  /** Применяет один зарегистрированный Converter ко всему текущему значению. */
+  /**
+   * Применяет один зарегистрированный Converter ко всему текущему значению.
+   */
   public convert(identity: string, value: unknown, options?: Record<string, unknown>): unknown {
     return this._convert(identity, value, options)
   }
 
-  /** Читает dot-path из object/array без выбрасывания ошибок. */
+  /**
+   * Читает dot-path из object/array без выбрасывания ошибок.
+   */
   private _path(source: unknown, path: string): unknown {
     const parts = String(path ?? '').split('.').filter(Boolean)
     let current: any = source
@@ -446,7 +492,9 @@ export class EndgeDataView {
     return current
   }
 
-  /** Ищет локальный DataView artifact среди child artifacts, включая вложенные children. */
+  /**
+   * Ищет локальный DataView artifact среди child artifacts, включая вложенные children.
+   */
   private _findLocalDataViewArtifact(
     ref: Extract<DataViewRef, { kind: 'local' }>,
     children: ProgramArtifact[],

@@ -12,7 +12,7 @@ import { readSourceModelReference } from '@/features/core/modules/source/service
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
-/** Компилирует Store source v1 в data graph без запуска runtime. */
+// Компилирует Store source v1 в data graph без запуска runtime.
 export function compileStoreSource(source: string, sourceVersion = 1): StoreSourceCompileResult {
   const diagnostics: DiagnosticDraft[] = []
   if (!String(source ?? '').trim()) {

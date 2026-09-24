@@ -1,4 +1,4 @@
-import type { RaphNode } from '@endge/raph'
+import type { RaphNode } from '@raphy-js/raph'
 import type { RuntimeStateControllerLike } from '@/features/core/modules/context/domain/context-persistence.types'
 import type { ProgramArtifact } from '@/features/core/modules/program/domain/types/program.types'
 import type { RuntimeEntityModelMap, RuntimeEntityType } from '@/features/core/modules/runtime/domain/runtime-entity-map.types'
@@ -19,8 +19,8 @@ import type {
 } from '@/features/core/modules/runtime/domain/runtime-host.types'
 import type { RuntimeKind } from '@/features/core/modules/runtime/domain/runtime.types'
 
-import { Raph } from '@endge/raph'
 import { EventBus } from '@endge/utils'
+import { Raph } from '@raphy-js/raph'
 
 import { RUNTIME_NODE_UPDATE_PHASE_NAME } from '@/features/core/modules/runtime/domain/runtime-host.types'
 
@@ -31,64 +31,64 @@ export abstract class RuntimeHostBase<
 >
   extends EventBus<Record<string, any>>
   implements RuntimeHost<TType, TContext, TArtifactPayload> {
-  /** Уникальный runtime-id host. */
+  // Уникальный runtime-id host.
   public readonly id: string
 
-  /** Родительский runtime-host для отладки вложенных запусков. */
+  // Родительский runtime-host для отладки вложенных запусков.
   public parent: RuntimeHost<any, any> | null
 
-  /** Канонический runtime kind host. */
+  // Канонический runtime kind host.
   public readonly kind: RuntimeKind | 'runtime'
 
-  /** Техническое имя реализации host. */
+  // Техническое имя реализации host.
   public readonly runtimeType: string
 
-  /** Возможности runtime-host, доступные внешним consumers. */
+  // Возможности runtime-host, доступные внешним consumers.
   public readonly capabilities: readonly RuntimeHostCapability[]
 
-  /** Тип доменной сущности, к которой привязан host. */
+  // Тип доменной сущности, к которой привязан host.
   public readonly entityType: TType
 
-  /** Экземпляр доменной модели, на которой работает host. */
+  // Экземпляр доменной модели, на которой работает host.
   public readonly model: RuntimeEntityModelMap[TType]
 
-  /** Identity связанной доменной сущности. */
+  // Identity связанной доменной сущности.
   public readonly entityIdentity: string
 
-  /** Заголовок host для отображения в UI. */
+  // Заголовок host для отображения в UI.
   public readonly title: string
 
-  /** Текущий статус жизненного цикла host. */
+  // Текущий статус жизненного цикла host.
   public status: RuntimeHostStatus
 
-  /** Время создания host (timestamp ms). */
+  // Время создания host (timestamp ms).
   public readonly createdAt: number
 
-  /** Время последнего изменения host (timestamp ms). */
+  // Время последнего изменения host (timestamp ms).
   public updatedAt: number
 
-  /** Ресурсы, ассоциированные с host. */
+  // Ресурсы, ассоциированные с host.
   public readonly resources: RuntimeHostResource[]
 
-  /** Каналы, используемые host для коммуникации. */
+  // Каналы, используемые host для коммуникации.
   public readonly channels: RuntimeHostChannel[]
 
-  /** Произвольные метаданные host. */
+  // Произвольные метаданные host.
   public readonly meta: Record<string, unknown>
 
-  /** Типизированный runtime-контекст host. */
+  // Типизированный runtime-контекст host.
   public context: TContext
 
-  /** Корневая raph-нода host (первая добавленная). */
+  // Корневая raph-нода host (первая добавленная).
   public node: RaphNode | null = null
 
-  /** Runtime-scoped namespace данных host. */
+  // Runtime-scoped namespace данных host.
   public readonly basePath: string
 
-  /** Контроллер persistence уровня runtime. */
+  // Контроллер persistence уровня runtime.
   public runtimeState: RuntimeStateControllerLike | null = null
 
-  /** Список raph-нод, которыми владеет host. */
+  // Список raph-нод, которыми владеет host.
   private _raphNodes = new Map<string, RaphNode>()
 
   private _inputBindings = new Map<string, RuntimeHostInputBinding>()
@@ -97,54 +97,54 @@ export abstract class RuntimeHostBase<
   private _updateTimers = new Map<string, ReturnType<typeof setTimeout>>()
   private _quiesced = false
 
-  /** Read-only доступ к compiled artifacts, если host связан с program artifact. */
+  // Read-only доступ к compiled artifacts, если host связан с program artifact.
   private _artifactReader: RuntimeArtifactReader | null
 
-  /** Ссылка на compiled artifact, связанный с host. */
+  // Ссылка на compiled artifact, связанный с host.
   private _artifactRef: RuntimeHostArtifactRef | null
 
   constructor(input: {
 
-    /** Уникальный runtime-id host. */
+    // Уникальный runtime-id host.
     id: string
 
-    /** Родительский runtime-host. */
+    // Родительский runtime-host.
     parent?: RuntimeHost<any, any> | null
 
-    /** Канонический runtime kind host. */
+    // Канонический runtime kind host.
     kind: RuntimeKind
 
-    /** Техническое имя реализации host. */
+    // Техническое имя реализации host.
     runtimeType: string
 
-    /** Возможности runtime-host, доступные внешним consumers. */
+    // Возможности runtime-host, доступные внешним consumers.
     capabilities?: RuntimeHostCapability[]
 
-    /** Тип доменной сущности. */
+    // Тип доменной сущности.
     entityType: TType
 
-    /** Экземпляр доменной модели. */
+    // Экземпляр доменной модели.
     model: RuntimeEntityModelMap[TType]
 
-    /** Identity доменной сущности. */
+    // Identity доменной сущности.
     entityIdentity: string
 
-    /** Отображаемое имя host. */
+    // Отображаемое имя host.
     title?: string
 
-    /** Стартовый статус host. */
+    // Стартовый статус host.
     status?: RuntimeHostStatus
 
-    /** Начальные метаданные host. */
+    // Начальные метаданные host.
     meta?: Record<string, unknown>
 
-    /** Начальный контекст host (тип зависит от реализации). */
+    // Начальный контекст host (тип зависит от реализации).
     context?: TContext
 
-    /** Read-only доступ к compiled artifacts. */
+    // Read-only доступ к compiled artifacts.
     artifactReader?: RuntimeArtifactReader | null
 
-    /** Ссылка на artifact, который обслуживает этот host. */
+    // Ссылка на artifact, который обслуживает этот host.
     artifactRef?: RuntimeHostArtifactRef | null
   }) {
     super([])
@@ -228,7 +228,9 @@ export abstract class RuntimeHostBase<
     }
   }
 
-  /** Останавливает доставку новых updates, не освобождая данные host-а. */
+  /**
+   * Останавливает доставку новых updates, не освобождая данные host-а.
+   */
   public quiesce(): void {
     if (this._quiesced) {
       return
@@ -323,7 +325,9 @@ export abstract class RuntimeHostBase<
     }
   }
 
-  /** Логическая обработка update после разрешения binding-ов. */
+  /**
+   * Логическая обработка update после разрешения binding-ов.
+   */
   protected onUpdate(ctx: RuntimeHostUpdateContext): Promise<void> | void {
     this.emit('update', ctx)
   }
@@ -393,9 +397,9 @@ export abstract class RuntimeHostBase<
     this._updateTimers.delete(id)
   }
 
-  /**
-   * ACCESS
-   */
+  // ---------------------------------------------
+  // ACCESS
+  // ---------------------------------------------
   public setStatus(status: RuntimeHostStatus): void {
     const previous = this.status
     this.status = status
@@ -405,14 +409,16 @@ export abstract class RuntimeHostBase<
     }
   }
 
-  /** Проверяет наличие runtime capability. */
+  /**
+   * Проверяет наличие runtime capability.
+   */
   public hasCapability(capability: RuntimeHostCapability): boolean {
     return this.capabilities.includes(capability)
   }
 
-  /**
-   * ACCESS
-   */
+  // ---------------------------------------------
+  // ACCESS
+  // ---------------------------------------------
   public addResource(resource: RuntimeHostResource): void {
     const idx = this.resources.findIndex(item => item.id === resource.id)
     if (idx >= 0) {
@@ -422,9 +428,9 @@ export abstract class RuntimeHostBase<
     this.touch()
   }
 
-  /**
-   * ACCESS
-   */
+  // ---------------------------------------------
+  // ACCESS
+  // ---------------------------------------------
   public addChannel(channel: RuntimeHostChannel): void {
     const idx = this.channels.findIndex(item => item.id === channel.id)
     if (idx >= 0) {
@@ -452,9 +458,9 @@ export abstract class RuntimeHostBase<
     this.touch()
   }
 
-  /**
-   * ACCESS
-   */
+  // ---------------------------------------------
+  // ACCESS
+  // ---------------------------------------------
   public addRaphNode(node: RaphNode): void {
     const key = String(node?.id ?? '').trim()
     if (!key) {
@@ -467,9 +473,9 @@ export abstract class RuntimeHostBase<
     this.touch()
   }
 
-  /**
-   * ACCESS
-   */
+  // ---------------------------------------------
+  // ACCESS
+  // ---------------------------------------------
   public getArtifact(): ProgramArtifact<TArtifactPayload> | null {
     if (!this._artifactReader || !this._artifactRef) {
       return null
@@ -486,22 +492,24 @@ export abstract class RuntimeHostBase<
     )
   }
 
-  /** Возвращает read-only artifact reader текущей runtime session. */
+  /**
+   * Возвращает read-only artifact reader текущей runtime session.
+   */
   public getArtifactReader(): RuntimeArtifactReader | null {
     return this._artifactReader
   }
 
-  /**
-   * ACCESS
-   */
+  // ---------------------------------------------
+  // ACCESS
+  // ---------------------------------------------
   public getArtifactPayload(): TArtifactPayload | null {
     const artifact = this.getArtifact()
     return artifact && artifact.status !== 'error' ? artifact.payload : null
   }
 
-  /**
-   * ACCESS
-   */
+  // ---------------------------------------------
+  // ACCESS
+  // ---------------------------------------------
   public snapshot(): RuntimeHostSnapshot {
     return {
       id: this.id,
@@ -523,9 +531,9 @@ export abstract class RuntimeHostBase<
     }
   }
 
-  /**
-   * ACCESS
-   */
+  // ---------------------------------------------
+  // ACCESS
+  // ---------------------------------------------
   protected touch(): void {
     this.updatedAt = Date.now()
   }

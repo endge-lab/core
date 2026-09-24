@@ -31,7 +31,9 @@ import { normalizeEndgeWorkspaceDefinition } from '@/features/core/modules/domai
 import { ComponentType, FilterType, QueryType } from '@/features/core/modules/domain/types/document/document.types'
 import { EndgeModule } from '@/features/federation/EndgeModule'
 
-/** Явная ошибка записи через bundle/plain или live backend только для чтения. */
+/**
+ * Явная ошибка записи через bundle/plain или live backend только для чтения.
+ */
 export class EndgeDomainRepositoryReadOnlyError extends Error {
   public readonly code = 'provider_read_only'
 
@@ -43,7 +45,9 @@ export class EndgeDomainRepositoryReadOnlyError extends Error {
   }
 }
 
-/** Граница persistence для live service-backend и локальных источников только для чтения. */
+/**
+ * Граница persistence для live service-backend и локальных источников только для чтения.
+ */
 export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> {
   private _snapshotContext: EndgeBootContext | null = null
   private _generation = 0
@@ -61,7 +65,9 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     restore: false,
   }
 
-  /** Версия контекста persistence для составных операций, включая импорт. */
+  /**
+   * Версия контекста persistence для составных операций, включая импорт.
+   */
   public get generation(): number { return this._generation }
 
   public get capabilities(): EndgeDomainRepositoryCapabilities {
@@ -117,7 +123,9 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     throw new Error(`[EndgeDomainRepository] Unsupported data provider: ${String(ctx.dataProvider)}`)
   }
 
-  /** Загружает live snapshot через активный transport provider и индексирует server state. */
+  /**
+   * Загружает live snapshot через активный transport provider и индексирует server state.
+   */
   public async loadSnapshot(ctx: EndgeBootContext): Promise<EndgeLiveDomainSnapshot> {
     if (ctx.dataProvider !== 'default') {
       throw new Error('[EndgeDomainRepository] Live snapshot is available only for default data provider')
@@ -146,7 +154,9 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     return snapshot
   }
 
-  /** Reloads a consistent saved input for build without touching editor drafts. */
+  /**
+   * Reloads a consistent saved input for build without touching editor drafts.
+   */
   public refreshSnapshot(signal?: AbortSignal): Promise<EndgeLiveDomainSnapshot | null> {
     if (this._capabilities.provider !== 'service-backend') {
       return Promise.resolve(null)
@@ -280,7 +290,9 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     this._applyServiceDocument(documentType, result.document, documentIdOrIdentity)
   }
 
-  /** Lists deleted generic documents for the active service workspace. */
+  /**
+   * Lists deleted generic documents for the active service workspace.
+   */
   public async listArchivedDocuments(cursor?: string, limit = 100): Promise<EndgeArchivePage> {
     const assertCurrent = this._captureGeneration()
     const provider = this._requireServiceProvider()
@@ -297,7 +309,9 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     return page
   }
 
-  /** Restores a tombstone returned by listArchivedDocuments. */
+  /**
+   * Restores a tombstone returned by listArchivedDocuments.
+   */
   public async restoreArchivedDocument(item: EndgeArchivedDocument): Promise<EndgeLiveDomainDocument> {
     this._assertMutationsSupported()
     if (!this._capabilities.restore) {
@@ -337,7 +351,9 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     await this._saveServiceDocument(documentId, documentType, { serializedDocument: document })
   }
 
-  /** Атомарно переносит несколько persisted-документов в одну папку. */
+  /**
+   * Атомарно переносит несколько persisted-документов в одну папку.
+   */
   public async changeDocumentsFolder(
     documents: readonly EndgeDomainDocumentMove[],
     folderIdOrIdentity: string | number,
@@ -642,7 +658,9 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     }
   }
 
-  /** Не позволяет позднему ответу предыдущего контекста изменить новый Domain. */
+  /**
+   * Не позволяет позднему ответу предыдущего контекста изменить новый Domain.
+   */
   private _captureGeneration(): () => void {
     const generation = this._generation
     const signal = this._abortController.signal
@@ -1187,14 +1205,18 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
     ;(AppBus.emit as (event: string, payload?: unknown) => void)('domainChanged', undefined)
   }
 
-  /** Собирает явные lookup-зависимости чистой Domain-сериализации. */
+  /**
+   * Собирает явные lookup-зависимости чистой Domain-сериализации.
+   */
   private _serializationContext() {
     return {
       resolveFolderIdentity: (value: string | number) => Endge.domain.getFolder(value)?.identity ?? null,
     }
   }
 
-  /** Сериализует persisted document через его канонический Domain descriptor. */
+  /**
+   * Сериализует persisted document через его канонический Domain descriptor.
+   */
   private _serializeDocument(documentType: DomainDocumentType, model: unknown): Record<string, unknown> {
     const persistence = getDomainDocumentDescriptor(documentType).persistence
     if (!persistence) {

@@ -3,7 +3,7 @@ import { executeRuntimeOperation } from '@/features/core/modules/runtime/operati
 import { OperationHistory } from '@/features/core/modules/runtime/operation/operation-history'
 
 describe('история операций', () => {
-  /** Каждый повторный run создаёт актуальный результат для последующей отмены. */
+  // Каждый повторный run создаёт актуальный результат для последующей отмены.
   it('передаёт в повторный undo результат последнего успешного default redo', async () => {
     const history = new OperationHistory({ id: 'history' })
     let nextId = 0
@@ -26,7 +26,7 @@ describe('история операций', () => {
     expect(deleted).toEqual([1, 2])
   })
 
-  /** Явный redo может вернуть служебный результат и не заменяет контракт runOutput. */
+  // Явный redo может вернуть служебный результат и не заменяет контракт runOutput.
   it('сохраняет исходный runOutput для пользовательского redo', async () => {
     const history = new OperationHistory({ id: 'history' })
     const undo = vi.fn(async ({ runOutput }) => runOutput)

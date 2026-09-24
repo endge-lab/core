@@ -4,7 +4,7 @@ import type {
   ComponentSFCInteractionTriggerPlatform,
 } from '@/features/core/modules/domain/types/component/sfc/ir.types'
 
-/** Keyboard event, приведённое platform adapter к общему TriggerSet contract. */
+// Keyboard event, приведённое platform adapter к общему TriggerSet contract.
 export interface DiagnosticsSnapshotShortcutEvent {
   type: 'keydown' | 'keyup'
   occurrence: ComponentSFCInteractionTriggerEvent
@@ -13,7 +13,7 @@ export interface DiagnosticsSnapshotShortcutEvent {
   stopPropagation: () => void
 }
 
-/** Platform boundary подписки на shortcut и сохранения snapshot-файла. */
+// Platform boundary подписки на shortcut и сохранения snapshot-файла.
 export interface DiagnosticsSnapshotRuntimeAdapter {
   subscribeShortcut: (listener: (event: DiagnosticsSnapshotShortcutEvent) => void) => () => void
   downloadJson: (snapshot: DiagnosticsSnapshot) => void

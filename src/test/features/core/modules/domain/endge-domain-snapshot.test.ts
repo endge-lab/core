@@ -4,7 +4,7 @@ import { EndgeDomain_Module } from '@/features/core/modules/domain/EndgeDomain_M
 import { RComposition } from '@/features/core/modules/domain/entities/RComposition'
 
 describe('snapshot домена', () => {
-  /** Проверяет независимое восстановление Domain через API его владельца. */
+  // Проверяет независимое восстановление Domain через API его владельца.
   it('сериализует и материализует persisted-сущности Domain', () => {
     const source = new EndgeDomain_Module()
     source.addComposition(RComposition.fromPlain({
@@ -23,7 +23,7 @@ describe('snapshot домена', () => {
     })
   })
 
-  /** Проверяет сохранение правила исключения временных сущностей из snapshot. */
+  // Проверяет сохранение правила исключения временных сущностей из snapshot.
   it('не переносит временные сущности', () => {
     const source = new EndgeDomain_Module()
     const temporary = RComposition.fromPlain({

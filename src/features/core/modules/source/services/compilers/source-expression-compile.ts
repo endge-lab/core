@@ -305,7 +305,7 @@ const OPERATION_ARITY: Record<SourceExpressionOperation, { min: number, max?: nu
   'contains-any': { min: 2, max: 2 },
 }
 
-/** Компилирует разрешенное source-expression в безопасный IR. */
+// Компилирует разрешенное source-expression в безопасный IR.
 export function compileSourceExpression(
   raw: t.Expression | null | undefined,
   diagnostics: DiagnosticDraft[],
@@ -524,7 +524,7 @@ function compileFilterFieldsRead(
   return { type: 'read', source: 'composition-filter-fields', path: '', parameters: [runtime, ...(fields as string[])] }
 }
 
-/** Публичный alias: SourceExpression и ValueExpression используют один compiler. */
+// Публичный alias: SourceExpression и ValueExpression используют один compiler.
 export const compileValueExpression = compileSourceExpression
 
 function compileArguments(
@@ -602,7 +602,7 @@ function compileDomainRead(
   }
 }
 
-/** Извлекает expression-body из arrow/function callback и компилирует его в IR. */
+// Извлекает expression-body из arrow/function callback и компилирует его в IR.
 export function compileSourceCallback(
   raw: t.CallExpression['arguments'][number] | undefined,
   diagnostics: DiagnosticDraft[],
@@ -627,7 +627,7 @@ export function compileSourceCallback(
   return compileSourceExpression(callback.body, diagnostics, sourcePath)
 }
 
-/** Снимает TS/parentheses wrappers с AST expression. */
+// Снимает TS/parentheses wrappers с AST expression.
 export function unwrapExpression<T extends t.Node>(node: T): T {
   let current: t.Node = node
   while (

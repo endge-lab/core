@@ -1,4 +1,4 @@
-/** Date или строка даты в ISO-строку с окончанием Z (UTC). */
+// Date или строка даты в ISO-строку с окончанием Z (UTC).
 export function dateToIsoZ(value: unknown): string | null {
   if (value == null) {
     return null

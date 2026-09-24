@@ -1,4 +1,4 @@
-/** Удаление пробелов по краям строки. */
+// Удаление пробелов по краям строки.
 export function stringTrim(value: unknown): string | null {
   if (value == null) {
     return null

@@ -5,13 +5,11 @@ export type QuerySourceV1MigrationResult
   = | { ok: true, source: string, sourceVersion: 2 }
     | { ok: false, code: string, message: string }
 
-/**
- * Переводит поддерживаемый legacy Query v1 source в canonical Query v2.
- *
- * Старые params и filters не имеют однозначного аналога без изменения
- * поведения запроса, поэтому автоматическая миграция разрешена только для
- * пустых контрактов. Остальные Query должны быть мигрированы явно автором.
- */
+// Переводит поддерживаемый legacy Query v1 source в canonical Query v2.
+//
+// Старые params и filters не имеют однозначного аналога без изменения
+// поведения запроса, поэтому автоматическая миграция разрешена только для
+// пустых контрактов. Остальные Query должны быть мигрированы явно автором.
 export function migrateQuerySourceV1ToV2(source: string): QuerySourceV1MigrationResult {
   let definition: t.ObjectExpression
   try {

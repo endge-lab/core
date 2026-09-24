@@ -55,7 +55,7 @@ const NON_VISUAL_CELL_TAGS = new Set([
 
 const EDITABLE_PRIMITIVE_TAGS = new Set(['Text', 'Number', 'DateTime'])
 
-/** Строит UI-neutral visual projection только для SFC с одним корневым Table. */
+// Строит UI-neutral visual projection только для SFC с одним корневым Table.
 export function inspectComponentSFCVisual(
   source: string,
   options: ComponentSFCVisualInspectionOptions = {},
@@ -1404,7 +1404,7 @@ function projectSingleCellElement(
   return { kind: 'source' }
 }
 
-/** Проецирует только props управляемого элемента, не затрагивая его children. */
+// Проецирует только props управляемого элемента, не затрагивая его children.
 function projectCellBindings(
   node: RComponentSFC_AST_ElementNode,
   excludedNames: ReadonlySet<string> = new Set(),

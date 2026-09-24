@@ -2,7 +2,9 @@ import type { EndgeCommandHandler } from '@/features/core/modules/commands/types
 import type { EndgeRuntimeCommandTarget } from '@/features/core/modules/commands/types/runtime-command-target.type'
 import { readRuntimeControlTarget } from '@/features/core/modules/runtime/tools/runtime-inspection'
 
-/** Делегирует resume существующему владельцу runtime lifecycle. */
+/**
+ * Делегирует resume существующему владельцу runtime lifecycle.
+ */
 export class ResumeRuntimeCommand implements EndgeCommandHandler {
   public readonly type = 'runtime:resume' as const
   public constructor(private readonly _runtime: EndgeRuntimeCommandTarget) {}

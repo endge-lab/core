@@ -1,4 +1,4 @@
-/** ISO-строка в время HH:mm:ss. */
+// ISO-строка в время HH:mm:ss.
 export function isoStringToTimeString(value: unknown): string | null {
   if (value == null) {
     return null

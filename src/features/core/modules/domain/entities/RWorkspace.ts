@@ -11,7 +11,9 @@ import { Expose } from 'class-transformer'
 import { normalizeEndgeConfiguration } from '@/features/core/modules/configuration/domain/endge-configuration'
 import { REntity } from '@/features/core/modules/domain/entities/REntity'
 
-/** Сохранённый корень Workspace с одним полным документом конфигурации. */
+/**
+ * Сохранённый корень Workspace с одним полным документом конфигурации.
+ */
 export class RWorkspace extends REntity implements EndgeWorkspaceDefinition {
   @Expose()
   displayName = ''

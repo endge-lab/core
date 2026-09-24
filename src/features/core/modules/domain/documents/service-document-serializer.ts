@@ -4,12 +4,12 @@ import { ComponentType, FilterType, QueryType } from '@/features/core/modules/do
 
 type RecordValue = Record<string, any>
 
-/** Явные Domain lookup-зависимости чистой сериализации persisted-документа. */
+// Явные Domain lookup-зависимости чистой сериализации persisted-документа.
 export interface DocumentSerializationContext {
   resolveFolderIdentity: (value: string | number) => string | null
 }
 
-/** Преобразует persisted-модель Core в строгий write DTO service-backend. */
+// Преобразует persisted-модель Core в строгий write DTO service-backend.
 export function serializeServiceDocument(
   documentType: DomainDocumentType,
   source: unknown,
@@ -133,7 +133,7 @@ export function serializeServiceDocument(
   return common
 }
 
-/** Преобразует RFolder в write DTO service-backend. */
+// Преобразует RFolder в write DTO service-backend.
 export function serializeServiceFolder(
   source: unknown,
   context: Pick<DocumentSerializationContext, 'resolveFolderIdentity'>,

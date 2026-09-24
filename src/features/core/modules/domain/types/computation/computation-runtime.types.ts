@@ -33,13 +33,13 @@ export interface ComputationSandboxAdapter {
   dispose?: () => void | Promise<void>
 }
 
-/** Shared execution scope одного root computation call. */
+// Shared execution scope одного root computation call.
 export interface ComputationExecutionScope {
   readonly stack: readonly string[]
   readonly budget: { calls: number }
 }
 
-/** Runtime boundary для вызова compiler-linked computation dependency. */
+// Runtime boundary для вызова compiler-linked computation dependency.
 export interface ComputationDependencyRunner {
   run: (identity: string, input: unknown, scope: ComputationExecutionScope) => Promise<unknown>
   runSync: (identity: string, input: unknown, scope: ComputationExecutionScope) => unknown

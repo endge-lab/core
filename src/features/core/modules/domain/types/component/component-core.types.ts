@@ -1,119 +1,119 @@
-/** Цель рендера, под которую компонент может быть скомпилирован. */
+// Цель рендера, под которую компонент может быть скомпилирован.
 export type RComponentRenderTarget = 'dom' | 'canvas'
 
-/** Источник описания компонента в новой ветке модели. */
+// Источник описания компонента в новой ветке модели.
 export type RComponentSourceKind = 'component-sfc'
 
-/** Уровень диагностического сообщения компилятора компонента. */
+// Уровень диагностического сообщения компилятора компонента.
 export type RComponentDiagnosticSeverity = 'info' | 'warning' | 'error'
 
-/** Ссылка на компонент из чистого SFC-хранилища новой версии. */
+// Ссылка на компонент из чистого SFC-хранилища новой версии.
 export interface RComponentRef {
-  /** Тип хранилища, в котором лежит новый компонент. */
+  // Тип хранилища, в котором лежит новый компонент.
   source: 'component-sfc'
 
-  /** Идентификатор компонента внутри выбранного хранилища. */
+  // Идентификатор компонента внутри выбранного хранилища.
   id: string | number
 
-  /** Семантическая роль зависимости в скомпилированном артефакте. */
+  // Семантическая роль зависимости в скомпилированном артефакте.
   role?: 'child-component' | 'port-default-component' | 'port-override-component'
 }
 
-/** Ссылка SFC-компонента на computation provider. */
+// Ссылка SFC-компонента на computation provider.
 export interface RComputationRef {
   source: 'computation'
   id: string | number
   role: 'port-default-computation' | 'port-override-computation'
 }
 
-/** Описание одного сообщения компилятора или валидатора. */
+// Описание одного сообщения компилятора или валидатора.
 export interface RComponentDiagnostic {
-  /** Уровень важности сообщения. */
+  // Уровень важности сообщения.
   severity: RComponentDiagnosticSeverity
 
-  /** Машинный код ошибки или предупреждения. */
+  // Машинный код ошибки или предупреждения.
   code: string
 
-  /** Человекочитаемое описание проблемы. */
+  // Человекочитаемое описание проблемы.
   message: string
 
-  /** Опциональный путь до секции source: script/template/style. */
+  // Опциональный путь до секции source: script/template/style.
   sourcePath?: string
 
-  /** Начальная позиция в source, если она известна компилятору. */
+  // Начальная позиция в source, если она известна компилятору.
   start?: number
 
-  /** Конечная позиция в source, если она известна компилятору. */
+  // Конечная позиция в source, если она известна компилятору.
   end?: number
 }
 
-/** Контракт входных данных компонента. */
+// Контракт входных данных компонента.
 export interface RComponentContractInput {
-  /** Имя входного параметра, доступное в template/script. */
+  // Имя входного параметра, доступное в template/script.
   name: string
 
-  /** Тип входного параметра в доменной модели. */
+  // Тип входного параметра в доменной модели.
   type: string
 
-  /** Флаг массива для простого отображения в UI конфигуратора. */
+  // Флаг массива для простого отображения в UI конфигуратора.
   isArray?: boolean
 
-  /** Флаг необязательного параметра. */
+  // Флаг необязательного параметра.
   optional?: boolean
 }
 
-/** Контракт события, которое компонент может отправить наружу. */
+// Контракт события, которое компонент может отправить наружу.
 export interface RComponentContractEvent {
-  /** Имя события, объявленное в definePorts.emits. */
+  // Имя события, объявленное в definePorts.emits.
   name: string
 
-  /** Описание полезной нагрузки события. */
+  // Описание полезной нагрузки события.
   payloadType?: string
 }
 
-/** Контракт slot, который компонент разрешает переопределять. */
+// Контракт slot, который компонент разрешает переопределять.
 export interface RComponentContractSlot {
-  /** Имя slot, default используется для содержимого без имени. */
+  // Имя slot, default используется для содержимого без имени.
   name: string
 
-  /** Имена параметров, которые slot получает в scope. */
+  // Имена параметров, которые slot получает в scope.
   scope?: string[]
 }
 
-/** Контракт компонента, извлеченный из source. */
+// Контракт компонента, извлеченный из source.
 export interface RComponentContract {
-  /** Входные данные компонента. */
+  // Входные данные компонента.
   inputs: RComponentContractInput[]
 
-  /** События, которые компонент может emit-ить. */
+  // События, которые компонент может emit-ить.
   events: RComponentContractEvent[]
 
-  /** Slot-ы, которые компонент предоставляет. */
+  // Slot-ы, которые компонент предоставляет.
   slots: RComponentContractSlot[]
 }
 
-/** Набор внешних зависимостей, найденных при компиляции компонента. */
+// Набор внешних зависимостей, найденных при компиляции компонента.
 export interface RComponentDependencies {
-  /** Дочерние компоненты, на которые ссылается template. */
+  // Дочерние компоненты, на которые ссылается template.
   components: RComponentRef[]
 
-  /** Провайдеры Computation, требуемые портами Source. */
+  // Провайдеры Computation, требуемые портами Source.
   computations: RComputationRef[]
 
-  /** Действия, которые вызываются из handlers или bindings. */
+  // Действия, которые вызываются из handlers или bindings.
   actions: string[]
 
-  /** Query, которые запускаются из локальных Event reactions. */
+  // Query, которые запускаются из локальных Event reactions.
   queries: string[]
 
-  /** Источники данных, которые компонент читает напрямую. */
+  // Источники данных, которые компонент читает напрямую.
   dataSources: string[]
 
-  /** Внешние render/capability ссылки. */
+  // Внешние render/capability ссылки.
   renderers: string[]
 }
 
-/** Пустой контракт нужен, чтобы compile всегда возвращал предсказуемую форму. */
+// Пустой контракт нужен, чтобы compile всегда возвращал предсказуемую форму.
 export function createEmptyComponentContract(): RComponentContract {
   return {
     inputs: [],
@@ -122,7 +122,7 @@ export function createEmptyComponentContract(): RComponentContract {
   }
 }
 
-/** Пустой набор зависимостей используется перед каждым новым проходом compile. */
+// Пустой набор зависимостей используется перед каждым новым проходом compile.
 export function createEmptyComponentDependencies(): RComponentDependencies {
   return {
     components: [],

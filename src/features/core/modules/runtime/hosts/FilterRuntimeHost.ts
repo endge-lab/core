@@ -9,7 +9,7 @@ import type {
 } from '@/features/core/modules/source/domain/types/filter-source.types'
 import type { SourceFieldDefinition } from '@/features/core/modules/source/domain/types/source-expression.types'
 
-import { Raph, RaphNode } from '@endge/raph'
+import { Raph, RaphNode } from '@raphy-js/raph'
 
 import { RuntimeHostBase } from '@/features/core/modules/runtime/RuntimeHostBase'
 import { evaluateSourceExpression } from '@/features/core/modules/source/services/source-expression-evaluate'
@@ -24,7 +24,9 @@ function defaultContext(instance: string): RuntimeHostContext<'filter'> {
   }
 }
 
-/** Runtime-владелец Filter state, outputs и Actions. */
+/**
+ * Runtime-владелец Filter state, outputs и Actions.
+ */
 export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostContext<'filter'>, FilterProgramPayload> {
   private _outputs = new Map<string, FilterRuntimeOutput>()
 
@@ -93,7 +95,9 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
     return host
   }
 
-  /** Активирует зарегистрированный Filter host с восстановленным state. */
+  /**
+   * Активирует зарегистрированный Filter host с восстановленным state.
+   */
   public override create(): void {
     if (this.status === 'active') {
       return
@@ -102,7 +106,9 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
     super.create()
   }
 
-  /** Восстанавливает persisted state после подключения runtime controller. */
+  /**
+   * Восстанавливает persisted state после подключения runtime controller.
+   */
   private _hydratePersistence(): void {
     if (!this.runtimeState) {
       return
@@ -150,7 +156,9 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
     super.destroy()
   }
 
-  /** Возвращает вызываемый Action изменения Filter state. */
+  /**
+   * Возвращает вызываемый Action изменения Filter state.
+   */
   public action(id: FilterRuntimeActionId): FilterRuntimeActionHandle {
     if (!['patch', 'set', 'reset', 'clear'].includes(id)) {
       throw new Error(`[FilterRuntimeHost] unsupported action: ${id}`)

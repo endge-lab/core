@@ -1,4 +1,4 @@
-/** Миллисекунды с эпохи в Date. */
+// Миллисекунды с эпохи в Date.
 export function timestampToDate(value: unknown): Date | null {
   if (value == null) {
     return null

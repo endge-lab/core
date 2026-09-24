@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { EndgeDiagnostics_Module } from '@/features/core/modules/diagnostics/EndgeDiagnostics_Module'
 
 describe('подмодули EndgeDiagnostics_Module', () => {
-  /** Проверяет явную передачу lifecycle каждому подмодулю в прямом порядке. */
+  // Проверяет явную передачу lifecycle каждому подмодулю в прямом порядке.
   it('передаёт setup, load, build и start подмодулям', async () => {
     const diagnostics = new EndgeDiagnostics_Module()
     const context = {} as EndgeBootContext
@@ -35,7 +35,7 @@ describe('подмодули EndgeDiagnostics_Module', () => {
     expect(telemetryStart.mock.invocationCallOrder[0]).toBeLessThan(problemsStart.mock.invocationCallOrder[0])
   })
 
-  /** Проверяет обратный порядок reset для зависимых подмодулей. */
+  // Проверяет обратный порядок reset для зависимых подмодулей.
   it('сбрасывает подмодули в обратном порядке', async () => {
     const diagnostics = new EndgeDiagnostics_Module()
     const telemetryReset = vi.spyOn(diagnostics.telemetry, 'reset').mockResolvedValue()

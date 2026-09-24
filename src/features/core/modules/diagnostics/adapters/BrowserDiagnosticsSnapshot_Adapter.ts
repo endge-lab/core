@@ -3,9 +3,13 @@ import type { DiagnosticsSnapshot } from '@/features/core/modules/diagnostics/do
 import { getKeyboardStateSnapshot } from '@endge/utils'
 import { resolveComponentSFCInteractionTriggerPlatform } from '@/features/core/modules/domain/component/component-sfc-edit-trigger'
 
-/** Browser implementation platform boundary диагностических snapshots. */
+/**
+ * Browser implementation platform boundary диагностических snapshots.
+ */
 export class BrowserDiagnosticsSnapshot_Adapter implements DiagnosticsSnapshotRuntimeAdapter {
-  /** Подписывает Core на глобальные keyboard events текущего document. */
+  /**
+   * Подписывает Core на глобальные keyboard events текущего document.
+   */
   public subscribeShortcut(listener: (event: DiagnosticsSnapshotShortcutEvent) => void): () => void {
     if (typeof document === 'undefined') {
       return () => {}
@@ -52,7 +56,9 @@ export class BrowserDiagnosticsSnapshot_Adapter implements DiagnosticsSnapshotRu
     }
   }
 
-  /** Сохраняет JSON-safe snapshot в файл средствами browser platform. */
+  /**
+   * Сохраняет JSON-safe snapshot в файл средствами browser platform.
+   */
   public downloadJson(snapshot: DiagnosticsSnapshot): void {
     if (typeof document === 'undefined' || typeof URL === 'undefined') {
       throw new Error('[EndgeDiagnostics] Browser snapshot download is unavailable')

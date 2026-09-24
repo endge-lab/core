@@ -33,7 +33,7 @@ const DEFINITION_CALL_BY_TYPE: Partial<Record<DomainDocumentType, string>> = {
   'configuration': 'defineConfig',
 }
 
-/** Читает пользовательские metadata документа через объявленный descriptor backing. */
+// Читает пользовательские metadata документа через объявленный descriptor backing.
 export function inspectDocumentMetadata(
   type: DomainDocumentType,
   input: DocumentMetadataInput,
@@ -51,7 +51,7 @@ export function inspectDocumentMetadata(
   return inspectDefinitionMetadata(type, String(input.source ?? ''), backing === 'definition-property')
 }
 
-/** Патчит только metadata backing документа, не переписывая остальной Source или системные meta siblings. */
+// Патчит только metadata backing документа, не переписывая остальной Source или системные meta siblings.
 export function patchDocumentMetadata(
   type: DomainDocumentType,
   input: DocumentMetadataInput,

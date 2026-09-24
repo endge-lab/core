@@ -15,16 +15,12 @@ export interface QueryExecutorDependencies {
   reportWarning: (message: string, data?: unknown) => void
 }
 
-/** Выполняет source-only compiled query artifact. */
+/**
+ * Выполняет source-only compiled query artifact.
+ */
 export class QueryExecutor_Adapter {
-  /** Transport capability для REST и GraphQL requests. */
+  // Transport capability для REST и GraphQL requests.
   private readonly _http: AxiosInstance
-
-  /**
-   * ----------------------------------------
-   * PUBLIC
-   * ----------------------------------------
-   */
 
   public constructor(
     private readonly _dependencies: QueryExecutorDependencies,
@@ -35,14 +31,22 @@ export class QueryExecutor_Adapter {
     this._http = http
   }
 
-  /** Выполняет только transport/mock слой; output graph материализует QueryRuntimeHost через Raph. */
+  // ---------------------------------------------
+  // PUBLIC API
+  // ---------------------------------------------
+
+  /**
+   * Выполняет только transport/mock слой; output graph материализует QueryRuntimeHost через Raph.
+   */
   public async execute(context: QueryExecutionContext): Promise<any> {
     return context.payload.mockDataEnabled
       ? this._readMockData(context.payload.mockData)
       : await this._executeByProtocol(context.payload, context.vars ?? {}, context.signal)
   }
 
-  /** Извлекает response-backed source output без запуска DataView. */
+  /**
+   * Извлекает response-backed source output без запуска DataView.
+   */
   public readResponseOutput(
     output: QueryProgramOutput,
     response: unknown,
@@ -59,13 +63,13 @@ export class QueryExecutor_Adapter {
     return output.source.path == null ? response : this._path(response, output.source.path)
   }
 
-  /**
-   * ----------------------------------------
-   * PRIVATE
-   * ----------------------------------------
-   */
+  // ---------------------------------------------
+  // PRIVATE
+  // ---------------------------------------------
 
-  /** Выбирает protocol executor по compiled artifact type. */
+  /**
+   * Выбирает protocol executor по compiled artifact type.
+   */
   private async _executeByProtocol(
     payload: QueryProgramPayload,
     vars: Record<string, unknown>,
@@ -81,7 +85,9 @@ export class QueryExecutor_Adapter {
     throw new Error(`Unsupported query artifact type: ${payload.type}`)
   }
 
-  /** Выполняет GraphQL operation и возвращает ее data, отделяя transport errors от GraphQL errors. */
+  /**
+   * Выполняет GraphQL operation и возвращает ее data, отделяя transport errors от GraphQL errors.
+   */
   private async _runGraphQL(
     payload: QueryProgramPayload,
     vars: Record<string, unknown>,
@@ -150,7 +156,9 @@ export class QueryExecutor_Adapter {
     }
   }
 
-  /** Выполняет REST artifact. */
+  /**
+   * Выполняет REST artifact.
+   */
   private async _runRest(
     payload: QueryProgramPayload,
     vars: Record<string, unknown>,
@@ -256,7 +264,9 @@ export class QueryExecutor_Adapter {
     throw new Error(`${message}\n${details}`)
   }
 
-  /** Пишет краткую transport-индикацию без request body, headers и response payload. */
+  /**
+   * Пишет краткую transport-индикацию без request body, headers и response payload.
+   */
   private _writeRequestError(input: {
     protocol: 'REST' | 'GraphQL'
     method: string
@@ -277,7 +287,9 @@ export class QueryExecutor_Adapter {
     console.error(`[QueryExecutor_Adapter] ${input.protocol}${operation} ${input.method} ${input.url} failed: ${reason}`)
   }
 
-  /** Публикует runtime warning безопасного expression evaluator. */
+  /**
+   * Публикует runtime warning безопасного expression evaluator.
+   */
   private _writeExpressionWarning(message: string, data?: unknown): void {
     this._dependencies.reportWarning(message, data)
   }
@@ -288,7 +300,9 @@ export class QueryExecutor_Adapter {
       : {}
   }
 
-  /** Вычисляет скомпилированное выражение запроса с поддержкой legacy-полей статической нагрузки. */
+  /**
+   * Вычисляет скомпилированное выражение запроса с поддержкой legacy-полей статической нагрузки.
+   */
   private _evaluateRequestValue(value: unknown, props: Record<string, unknown>): unknown {
     if (!this._isSourceExpression(value)) {
       return value
@@ -342,7 +356,9 @@ export class QueryExecutor_Adapter {
     return Number.isFinite(number) ? number : undefined
   }
 
-  /** Читает mock payload из artifact. */
+  /**
+   * Читает mock payload из artifact.
+   */
   private _readMockData(raw: unknown): any {
     if (typeof raw !== 'string') {
       return raw
@@ -356,7 +372,9 @@ export class QueryExecutor_Adapter {
     }
   }
 
-  /** Читает dot-path из backend response без исключений. */
+  /**
+   * Читает dot-path из backend response без исключений.
+   */
   private _path(source: unknown, path: string): unknown {
     const parts = String(path ?? '').split('.').filter(Boolean)
     let current: any = source
@@ -369,7 +387,9 @@ export class QueryExecutor_Adapter {
     return current
   }
 
-  /** Безопасно склеивает endpoint и path. */
+  /**
+   * Безопасно склеивает endpoint и path.
+   */
   private _buildUrl(base: string, path?: string | null): string {
     if (!path) {
       return base
@@ -385,7 +405,9 @@ export class QueryExecutor_Adapter {
     return `${normalizedBase}/${normalizedPath}`
   }
 
-  /** Применяет auth к headers или query params. */
+  /**
+   * Применяет auth к headers или query params.
+   */
   private async _applyAuth(
     auth: RQueryAuth | undefined,
     headers: Record<string, string>,
@@ -429,7 +451,9 @@ export class QueryExecutor_Adapter {
     headers[headerName] = `${scheme} ${token}`
   }
 
-  /** Разрешает environment placeholder через переданный composition owner. */
+  /**
+   * Разрешает environment placeholder через переданный composition owner.
+   */
   private _resolveVariable(source: string): string {
     return this._dependencies.resolveVariable(source) || source
   }

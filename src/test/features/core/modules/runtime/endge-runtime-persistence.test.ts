@@ -1,13 +1,13 @@
 import type { ComponentSFCRuntimeHost } from '@/features/core/modules/runtime/hosts/ComponentSFCRuntimeHost'
-import { Raph } from '@endge/raph'
+import { Raph } from '@raphy-js/raph'
 
 import { afterEach, describe, expect, it } from 'vitest'
 import { Endge } from '@/features/core/kernel/endge'
 import { RComponentSFC } from '@/features/core/modules/domain/entities/RComponentSFC'
 
 describe('интеграция сохранения runtime Endge', () => {
-  afterEach(() => {
-    Endge.runtime.reset()
+  afterEach(async () => {
+    await Endge.runtime.reset()
     Raph.reset()
   })
 

@@ -15,7 +15,7 @@ function id(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0 && value.length <= 4096
 }
 
-/** Проверяет транспортную проекцию до изменения owner; циклы родителей не попадают в UI. */
+// Проверяет транспортную проекцию до изменения owner; циклы родителей не попадают в UI.
 export function readRuntimeInspectionSnapshot(value: unknown): RuntimeInspectionSnapshot {
   if (!record(value) || value.version !== 1 || !record(value.runtime)) {
     throw new Error('[Endge Runtime] Invalid inspection snapshot')
@@ -58,7 +58,7 @@ export function readRuntimeInspectionSnapshot(value: unknown): RuntimeInspection
   return value as unknown as RuntimeInspectionSnapshot
 }
 
-/** Проверяет presentation payload до его передачи renderer-у. */
+// Проверяет presentation payload до его передачи renderer-у.
 export function readRuntimeRenderInspection(value: unknown): RuntimeRenderInspection {
   if (!record(value) || !record(value.hosts) || !Array.isArray(value.styles)) {
     throw new Error('[Endge Runtime] Invalid render inspection')
@@ -111,7 +111,7 @@ function validateParents(parents: Map<string, string | null>): void {
   }
 }
 
-/** Команда адресует конкретное поколение host/scope, а не документ по identity. */
+// Команда адресует конкретное поколение host/scope, а не документ по identity.
 export function readRuntimeControlTarget(value: unknown): RuntimeControlTarget {
   if (!record(value) || !id(value.id)) {
     throw new Error('[Endge Runtime] Invalid control target')

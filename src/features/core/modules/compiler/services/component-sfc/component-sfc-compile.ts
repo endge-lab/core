@@ -39,72 +39,72 @@ import {
 import { createEmptyComponentSFCRuntimeDependencies } from '@/features/core/modules/domain/types/component/sfc/dependencies.types'
 import { createEmptyProgramMetadata } from '@/features/core/modules/program/domain/types/program-metadata.types'
 
-/** Результат полного SFC compiler pipeline в core. */
+// Результат полного SFC compiler pipeline в core.
 export interface ComponentSFCCompileResult {
-  /** Разложенный canonical source. */
+  // Разложенный canonical source.
   sourceParts: RComponentSFCSource_Parts
 
-  /** AST уровня parser. */
+  // AST уровня parser.
   ast: RComponentSFC_AST | null
 
-  /** Семантический IR, нейтральный к цели. */
+  // Семантический IR, нейтральный к цели.
   ir: RComponentSFC_IR | null
 
-  /** Внешний контракт компонента. */
+  // Внешний контракт компонента.
   contract: RComponentContract
 
-  /** Зависимости компонента. */
+  // Зависимости компонента.
   dependencies: RComponentDependencies
 
-  /** Runtime-зависимости SFC v1, извлеченные из IR reads. */
+  // Runtime-зависимости SFC v1, извлеченные из IR reads.
   runtimeDependencies: RComponentSFC_RuntimeDependencies
 
-  /** Preview-only props для песочницы и debug UI. Не меняют contract. */
+  // Preview-only props для песочницы и debug UI. Не меняют contract.
   previewProps: ComponentSFCPreviewProps | null
 
-  /** Preview-only runtime options для песочницы компонента. */
+  // Preview-only runtime options для песочницы компонента.
   previewOptions: ComponentSFCPreviewOptions | null
 
-  /** Все diagnostics pipeline. */
+  // Все diagnostics pipeline.
   diagnostics: RComponentDiagnostic[]
 
-  /** Публичная metadata компонента и его template-узлов. */
+  // Публичная metadata компонента и его template-узлов.
   metadata: ProgramMetadata
 
-  /** Статус каждой секции; ошибки style не отменяют отображение template. */
+  // Статус каждой секции; ошибки style не отменяют отображение template.
   sections: Record<'script' | 'template' | 'style', 'valid' | 'warning' | 'error'>
 }
 
-/** Внешний registry-контекст, который связывает чистый SFC compiler с domain build. */
+// Внешний registry-контекст, который связывает чистый SFC compiler с domain build.
 export interface ComponentSFCCompileOptions {
-  /** Стабильный сохранённый идентификатор для scope id стилей компонента. */
+  // Стабильный сохранённый идентификатор для scope id стилей компонента.
   identity?: string
-  /** Разрешает прямой пользовательский tag в identity компонента. */
+  // Разрешает прямой пользовательский tag в identity компонента.
   resolveComponentTag?: (tag: string) => string | null
 
-  /** Проверяет существование статической identity из Component is. */
+  // Проверяет существование статической identity из Component is.
   hasComponentIdentity?: (identity: string) => boolean
 
-  /** Определяет и описывает провайдер порта по умолчанию для проверки при сборке. */
+  // Определяет и описывает провайдер порта по умолчанию для проверки при сборке.
   resolvePortProvider?: (
     identity: string,
     expectedKind: 'computation' | 'component' | 'action' | 'query',
   ) => ComponentSFCPortProviderDescriptor | null
 
-  /** Определяет скомпилированный публичный манифест портов вложенного SFC-компонента. */
+  // Определяет скомпилированный публичный манифест портов вложенного SFC-компонента.
   resolveComponentPortManifest?: (identity: string) => ComponentSFCPortManifest | null
 
-  /** Определяет явные корневые variants одного вложенного пользовательского компонента. */
+  // Определяет явные корневые variants одного вложенного пользовательского компонента.
   resolveComponentVariants?: (identity: string) => string[] | null
 
-  /** Определяет внешнее объявление Type Registry для именованного контракта SFC. */
+  // Определяет внешнее объявление Type Registry для именованного контракта SFC.
   resolveTypeDefinition?: (identity: string) => TypeSourceDefinition | null
 
-  /** Effective edit-session defaults из immutable build context. */
+  // Effective edit-session defaults из immutable build context.
   sfcEditing?: EndgeSFCEditingConfiguration
 }
 
-/** Компилирует Endge SFC source до target-neutral artifact для Endge.program. */
+// Компилирует Endge SFC source до target-neutral artifact для Endge.program.
 export function compileComponentSFC(
   source: string,
   options: ComponentSFCCompileOptions = {},

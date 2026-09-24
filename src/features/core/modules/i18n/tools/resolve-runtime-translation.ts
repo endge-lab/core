@@ -1,6 +1,6 @@
 import type { I18nRuntimeCatalog } from '@/features/core/modules/i18n/domain/i18n.types'
 
-/** Одно разрешение translation catalog для живого и наблюдаемого renderer. */
+// Одно разрешение translation catalog для живого и наблюдаемого renderer.
 export function resolveRuntimeTranslation(catalog: I18nRuntimeCatalog, key: string, locale: string, fallbackLocale: string, fallback?: string): string {
   const rawKey = String(key ?? '').trim()
   const separator = rawKey.indexOf(':')

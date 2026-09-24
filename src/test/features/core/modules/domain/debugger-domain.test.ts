@@ -1,5 +1,5 @@
 import type { DiagnosticsSnapshot } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
-import { Raph } from '@endge/raph'
+import { Raph } from '@raphy-js/raph'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Endge } from '@/features/core/kernel/endge'
 import { EndgeDebuggerReadOnlyError } from '@/features/core/kernel/errors/EndgeDebuggerReadOnlyError'
@@ -27,7 +27,7 @@ describe('debugger inspection boundary', () => {
     expect(Endge.runtime.snapshot().hosts).toEqual([])
   })
 
-  /** Debugger подключает owner Runtime, сохраняя запрет на исполнение и Raph-фазы. */
+  // Debugger подключает owner Runtime, сохраняя запрет на исполнение и Raph-фазы.
   it('подключает пассивный Runtime без компиляции, hosts и Raph-фаз', async () => {
     const build = vi.spyOn(Endge.compiler, 'build')
     const addPhase = vi.spyOn(Raph, 'addPhase')

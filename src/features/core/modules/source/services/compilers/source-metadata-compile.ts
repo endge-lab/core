@@ -3,7 +3,7 @@ import type { ProgramMetadataMap, ProgramMetadataValue } from '@/features/core/m
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
 
-/** Минимальный общий diagnostic-контракт metadata compiler. */
+// Минимальный общий diagnostic-контракт metadata compiler.
 export interface ProgramMetadataCompileDiagnostic {
   severity: 'info' | 'warning' | 'error'
   code: string
@@ -13,7 +13,7 @@ export interface ProgramMetadataCompileDiagnostic {
   end?: number
 }
 
-/** Извлекает optional `metadata` из корневого object DSL. */
+// Извлекает optional `metadata` из корневого object DSL.
 export function compileProgramMetadataProperty(
   definition: t.ObjectExpression,
   diagnostics: ProgramMetadataCompileDiagnostic[],
@@ -54,7 +54,7 @@ export function compileProgramMetadataProperty(
     : {}
 }
 
-/** Компилирует source-аргумент `defineMetadata({...})` в metadata map. */
+// Компилирует source-аргумент `defineMetadata({...})` в metadata map.
 export function compileProgramMetadataSource(
   source: string,
   diagnostics: ProgramMetadataCompileDiagnostic[],
@@ -93,7 +93,7 @@ export function compileProgramMetadataSource(
   }
 }
 
-/** Компилирует статический object literal без выполнения пользовательского JavaScript. */
+// Компилирует статический object literal без выполнения пользовательского JavaScript.
 export function compileProgramMetadataExpression(
   expression: t.Expression,
   diagnostics: ProgramMetadataCompileDiagnostic[],

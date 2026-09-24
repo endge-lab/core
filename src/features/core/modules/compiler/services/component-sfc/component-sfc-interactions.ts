@@ -39,7 +39,7 @@ export interface ComponentSFCInteractionCompileContext {
   locals: string[]
 }
 
-/** Статически обнаруживает недопустимые сочетания passive и prevent в общих описателях trigger. */
+// Статически обнаруживает недопустимые сочетания passive и prevent в общих описателях trigger.
 export function hasComponentSFCPassivePreventConflict(
   value: RComponentSFC_IR_Value,
   suffixes: readonly RComponentSFC_IR_EventModifier[] = [],
@@ -61,7 +61,7 @@ export function hasComponentSFCPassivePreventConflict(
   })
 }
 
-/** Компилирует одну принадлежащую Source аннотацию `:on` в нейтральные к renderer правила. */
+// Компилирует одну принадлежащую Source аннотацию `:on` в нейтральные к renderer правила.
 export function compileComponentSFCInteractionAnnotation(
   attribute: RComponentSFC_AST_Attribute,
   manifest: ComponentSFCPortManifest | null,
@@ -136,7 +136,7 @@ export function compileComponentSFCInteractionAnnotation(
   return { rules, sourceRange: attribute.range }
 }
 
-/** Компилирует `{ triggers, reaction }`, сохраняя одно runtime-выражение TriggerSet. */
+// Компилирует `{ triggers, reaction }`, сохраняя одно runtime-выражение TriggerSet.
 function compileTriggerSetRule(
   node: any,
   source: string,
@@ -366,7 +366,7 @@ function literalString(node: any): string | null {
   return null
 }
 
-/** undefined означает отсутствие, null — наличие без статического boolean-значения. */
+// undefined означает отсутствие, null — наличие без статического boolean-значения.
 function booleanProperty(property: any): boolean | null | undefined {
   if (!property) {
     return undefined

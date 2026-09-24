@@ -3,13 +3,13 @@ import type { EntityManagement, EntityManagementLike, EntityOrigin, ManagedBy } 
 import { Exclude, Expose, Transform } from 'class-transformer'
 import { normalizeEntityManagement } from '@/features/core/modules/domain/types/document/entity-management.type'
 
-/** Опции для дублирования сущности: новый identity и опционально имя. */
+// Опции для дублирования сущности: новый identity и опционально имя.
 export interface DuplicateOptions {
   identity: string
   name?: string
 }
 
-/** Нормализует произвольную metadata документа и разрывает ссылку на transport object. */
+// Нормализует произвольную metadata документа и разрывает ссылку на transport object.
 export function normalizeEntityMeta(value: unknown): Record<string, unknown> {
   return value != null && typeof value === 'object' && !Array.isArray(value)
     ? { ...(value as Record<string, unknown>) }
@@ -17,14 +17,14 @@ export function normalizeEntityMeta(value: unknown): Record<string, unknown> {
 }
 
 export class REntity<TId extends string | number = number> {
-  /** Идентификатор в storage (Payload: number, plain: string | number) */
+  // Идентификатор в storage (Payload: number, plain: string | number)
   @Expose()
   id!: TId
 
   @Expose()
   identity!: string
 
-  /** Человекочитаемое имя документа */
+  // Человекочитаемое имя документа
   @Expose()
   displayName!: string
 
@@ -44,31 +44,31 @@ export class REntity<TId extends string | number = number> {
   //   this.displayName = v
   // }
 
-  /** Id папки, в которой расположен документ (связь по id). */
+  // Id папки, в которой расположен документ (связь по id).
   @Expose()
   folderId?: string | number | null = null
 
-  /** Id папки в свободной Workspace-проекции. */
+  // Id папки в свободной Workspace-проекции.
   @Expose()
   workspaceFolderId?: string | number | null = null
 
-  /** Кто управляет жизненным циклом документа. */
+  // Кто управляет жизненным циклом документа.
   @Expose()
   managedBy: ManagedBy = 'user'
 
-  /** Источник effective entity; только storage-сущности сохраняются и экспортируются. */
+  // Источник effective entity; только storage-сущности сохраняются и экспортируются.
   @Exclude()
   origin: EntityOrigin = { kind: 'storage' }
 
-  /** Opaque installation ID; используется только для integration-managed документов. */
+  // Opaque installation ID; используется только для integration-managed документов.
   @Expose()
   managedById: string | null = null
 
-  /** Временная сущность runtime/editor, не должна отображаться как обычный документ домена. */
+  // Временная сущность runtime/editor, не должна отображаться как обычный документ домена.
   @Exclude()
   isTemporary: boolean = false
 
-  /** Произвольные метаданные (из Payload meta, по умолчанию {}). */
+  // Произвольные метаданные (из Payload meta, по умолчанию {}).
   @Expose()
   @Transform(({ value }) => normalizeEntityMeta(value), { toClassOnly: true })
   meta: Record<string, unknown> = {}
@@ -90,7 +90,9 @@ export class REntity<TId extends string | number = number> {
   @Exclude()
   active?: boolean | null
 
-  /** Применяет общий meta-контракт к transport/plain документу. */
+  /**
+   * Применяет общий meta-контракт к transport/plain документу.
+   */
   applyEntityMeta(raw: unknown): void {
     const source = raw != null && typeof raw === 'object' && !Array.isArray(raw)
       ? (raw as Record<string, unknown>).meta
@@ -98,7 +100,9 @@ export class REntity<TId extends string | number = number> {
     this.meta = normalizeEntityMeta(source)
   }
 
-  /** Подмешивает storage-мета и meta из Payload. */
+  /**
+   * Подмешивает storage-мета и meta из Payload.
+   */
   applyStorageMeta(raw: any): void {
     this.origin = { kind: 'storage' }
     this.applyManagement(raw)
@@ -116,12 +120,16 @@ export class REntity<TId extends string | number = number> {
     this.managedById = management.managedById
   }
 
-  /** Возвращает текущие validation problems без сохранения mutable state в сущности. */
+  /**
+   * Возвращает текущие validation problems без сохранения mutable state в сущности.
+   */
   getDiagnosticProblems(): DiagnosticsProblemInput[] {
     return []
   }
 
-  /** Выполняет legacy compile hook без хранения validation state в сущности. */
+  /**
+   * Выполняет legacy compile hook без хранения validation state в сущности.
+   */
   compile(): void {}
 
   /**

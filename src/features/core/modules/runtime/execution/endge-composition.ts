@@ -4,9 +4,13 @@ import type { CompositionMountOptions, CompositionPreviewProps, CompositionSessi
 import type { EndgeDataMode } from '@/features/core/modules/workspace/domain/workspace.types'
 import { Endge } from '@/features/core/kernel/endge'
 
-/** Публичный API монтирования Composition runtime sessions. */
+/**
+ * Публичный API монтирования Composition runtime sessions.
+ */
 export class EndgeComposition {
-  /** Монтирует Composition runtime и возвращает управляемую session. */
+  /**
+   * Монтирует Composition runtime и возвращает управляемую session.
+   */
   public async mount(identity: string, options: CompositionMountOptions = {}): Promise<CompositionSession<CompositionRuntimeHost>> {
     const normalizedIdentity = String(identity ?? '').trim()
     const model = Endge.domain.getComposition(normalizedIdentity)
@@ -62,7 +66,7 @@ export class EndgeComposition {
   }
 }
 
-/** Материализует литералы только для preview и ссылки RMock в обычные props Composition. */
+// Материализует литералы только для preview и ссылки RMock в обычные props Composition.
 export function materializeCompositionPreviewProps(
   previewProps: CompositionPreviewProps | null | undefined,
   dataMode: EndgeDataMode = Endge.context.dataMode,

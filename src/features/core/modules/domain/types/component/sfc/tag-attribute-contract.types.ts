@@ -1,30 +1,30 @@
 import type { RComponentSFC_IR_Tag } from './ir.types'
 
-/** Статическое значение атрибута, которое можно безопасно предлагать в Source Editor. */
+// Статическое значение атрибута, которое можно безопасно предлагать в Source Editor.
 export type ComponentSFCTagAttributeLiteral = string | number | boolean
 
-/** Renderer-neutral контракт атрибута встроенного SFC tag с конечным набором значений. */
+// Renderer-neutral контракт атрибута встроенного SFC tag с конечным набором значений.
 export interface ComponentSFCTagAttributeContract {
-  /** Каноническое имя для нового source. */
+  // Каноническое имя для нового source.
   name: string
 
-  /** Совместимые имена, которые уже принимает compiler/runtime. */
+  // Совместимые имена, которые уже принимает compiler/runtime.
   aliases?: readonly string[]
 
-  /** Полный набор допустимых статических значений. */
+  // Полный набор допустимых статических значений.
   values: readonly ComponentSFCTagAttributeLiteral[]
 
-  /** Значение, которое применяется при отсутствии атрибута. */
+  // Значение, которое применяется при отсутствии атрибута.
   defaultValue?: ComponentSFCTagAttributeLiteral
 
-  /** Краткое описание для completion и hover. */
+  // Краткое описание для completion и hover.
   description: string
 
-  /** false, когда более контекстная проверка уже выполняется compiler-ом. */
+  // false, когда более контекстная проверка уже выполняется compiler-ом.
   validate?: boolean
 }
 
-/** Дополнительные контракты tag, например literal-union props пользовательского компонента. */
+// Дополнительные контракты tag, например literal-union props пользовательского компонента.
 export interface ComponentSFCAttributeAnalysisOptions {
   resolveTagAttributeContracts?: (
     tag: string,
@@ -49,7 +49,7 @@ export const ENDGE_SFC_INPUT_TYPES = ['String', 'Number', 'Date', 'Time', 'DateT
 export const ENDGE_SFC_TOOLTIP_SIDES = ['top', 'right', 'bottom', 'left'] as const
 export const ENDGE_SFC_TOOLTIP_ALIGNS = ['start', 'center', 'end'] as const
 
-/** Конечные значения встроенных SFC tags. Свободные string/number props сюда не входят. */
+// Конечные значения встроенных SFC tags. Свободные string/number props сюда не входят.
 export const ENDGE_SFC_TAG_ATTRIBUTE_CONTRACTS = {
   Table: [
     {
@@ -185,7 +185,7 @@ export const ENDGE_SFC_TAG_ATTRIBUTE_CONTRACTS = {
   ],
 } as const satisfies Partial<Record<RComponentSFC_IR_Tag, readonly ComponentSFCTagAttributeContract[]>>
 
-/** Возвращает строгие контракты атрибутов одного встроенного SFC tag. */
+// Возвращает строгие контракты атрибутов одного встроенного SFC tag.
 export function getComponentSFCTagAttributeContracts(
   tag: string,
 ): readonly ComponentSFCTagAttributeContract[] {
@@ -194,7 +194,7 @@ export function getComponentSFCTagAttributeContracts(
   ] ?? []
 }
 
-/** Находит строгий контракт по каноническому или совместимому имени атрибута. */
+// Находит строгий контракт по каноническому или совместимому имени атрибута.
 export function getComponentSFCTagAttributeContract(
   tag: string,
   attributeName: string,

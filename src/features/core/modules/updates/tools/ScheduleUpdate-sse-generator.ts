@@ -1,5 +1,5 @@
 // utils/runUpdates.ts
-import { Raph } from '@endge/raph'
+import { Raph } from '@raphy-js/raph'
 import { Endge } from '@/features/core/kernel/endge'
 
 type ScheduleRecord = Record<string, unknown>

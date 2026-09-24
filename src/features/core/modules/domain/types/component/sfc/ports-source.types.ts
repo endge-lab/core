@@ -12,13 +12,13 @@ export interface ComponentSFCPortsSourceProjection {
   diagnostics: RComponentDiagnostic[]
 }
 
-/** Сохраняющий Source CRUD для визуальных редакторов Ports и Events. */
+// Сохраняющий Source CRUD для визуальных редакторов Ports и Events.
 export type ComponentSFCPortsSourcePatch
   = | {
     type: 'upsert-port'
     role: ComponentSFCPortRole
     name: string
-    /** Полное выражение фабрики, например `event<RowEvent>()`. */
+    // Полное выражение фабрики, например `event<RowEvent>()`.
     declaration: string
   }
   | {
@@ -31,7 +31,7 @@ export type ComponentSFCPortsSourcePatch
     name: string
     payloadType: string
     from?: ComponentSFCEventSource | null
-    /** Исходное выражение Action: `{ identity: ... }` или `typescript({...})`. */
+    // Исходное выражение Action: `{ identity: ... }` или `typescript({...})`.
     actionSource?: string | null
   }
   | {
@@ -40,7 +40,7 @@ export type ComponentSFCPortsSourcePatch
   }
   | {
     type: 'set-forward'
-    /** Исходное значение `forward`; null удаляет секцию. */
+    // Исходное значение `forward`; null удаляет секцию.
     declaration: string | null
   }
 

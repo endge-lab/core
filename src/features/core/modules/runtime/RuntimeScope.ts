@@ -17,7 +17,9 @@ export interface RuntimeScopeOptions {
   hooks?: RuntimeScopeLifecycleHooks
 }
 
-/** Runtime lifecycle owner для hosts, nested scopes и disposable resources. */
+/**
+ * Runtime lifecycle owner для hosts, nested scopes и disposable resources.
+ */
 export class RuntimeScope implements RuntimeScopeHandle {
   public readonly id: string
   public readonly path: string

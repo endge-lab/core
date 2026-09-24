@@ -6,7 +6,9 @@ import type {
 
 import { compileFilterSource } from '@/features/core/modules/source/services/compilers/filter-source-compile'
 
-/** Source strategy для RFilter/source-kind=filter. */
+/**
+ * Source strategy для RFilter/source-kind=filter.
+ */
 export class FilterSourceEngineStrategy implements SourceEngineStrategy {
   public readonly id = 'source:filter'
   public readonly sourceKind: SourceKind = 'filter'

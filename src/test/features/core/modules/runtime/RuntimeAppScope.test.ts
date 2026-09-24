@@ -5,7 +5,7 @@ import type { StoreRuntimeHost } from '@/features/core/modules/runtime/hosts/Sto
 import type { CompositionProgramPayload } from '@/features/core/modules/source/domain/types/composition-source.types'
 import type { StoreSourceArtifact } from '@/features/core/modules/source/domain/types/store-source.types'
 
-import { Raph } from '@endge/raph'
+import { Raph } from '@raphy-js/raph'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Endge } from '@/features/core/kernel/endge'
 import { RComposition } from '@/features/core/modules/domain/entities/RComposition'

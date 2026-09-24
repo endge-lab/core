@@ -12,7 +12,7 @@ export interface StreamTransportConnection {
   resume?: () => Promise<void>
 }
 
-/** Нейтральный к браузеру порт, используемый StreamRuntimeHost. */
+// Нейтральный к браузеру порт, используемый StreamRuntimeHost.
 export interface StreamTransportFactory {
   open: (
     artifact: StreamSourceArtifact,

@@ -33,7 +33,7 @@ const reader: RuntimeArtifactReader = {
 }
 
 describe('simulation schema projection', () => {
-  /** Отключение примеров не ослабляет типы и размеры вложенных массивов. */
+  // Отключение примеров не ослабляет типы и размеры вложенных массивов.
   it('исключает примеры по запросу сценария, сохраняя исходные артефакты и ограничения', () => {
     const contract = { type: 'Envelope', array: false }
     const normal = createSimulationSchema(contract, reader, { items: 50 })

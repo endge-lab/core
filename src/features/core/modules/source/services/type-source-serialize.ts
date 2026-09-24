@@ -7,7 +7,7 @@ import type {
 
 import * as t from '@babel/types'
 
-/** Детерминированный сериализатор канонических документов Type Source v1. */
+// Детерминированный сериализатор канонических документов Type Source v1.
 export function serializeTypeSourceDocument(document: TypeSourceDocument): string {
   return `defineType(${serializeDefinition(document.definition)})\n`
 }
@@ -106,7 +106,7 @@ function sourceString(value: string): string {
   return `'${json.slice(1, -1).replace(/\\"/g, '"').replace(/'/g, String.raw`\'`)}'`
 }
 
-/** Сериализует одну именованную ссылку на тип в каноническом кратком синтаксисе, когда это возможно. */
+// Сериализует одну именованную ссылку на тип в каноническом кратком синтаксисе, когда это возможно.
 export function serializeTypeSourceReference(identity: string): string {
   return t.isValidIdentifier(identity) ? identity : `type(${sourceString(identity)})`
 }

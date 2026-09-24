@@ -26,7 +26,9 @@ interface QueryArrayContract {
   errors: string[]
 }
 
-/** Read-only разрешение aliases и контрактов; не создаёт RuntimeHost или generator payload. */
+/**
+ * Read-only разрешение aliases и контрактов; не создаёт RuntimeHost или generator payload.
+ */
 export class SimulationSourceResolver {
   private readonly _branches = new Map<string, SimulationCompositionBranch | null>()
   private readonly _queryContracts = new Map<string, QueryArrayContract>()

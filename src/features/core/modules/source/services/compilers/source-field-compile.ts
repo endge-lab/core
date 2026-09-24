@@ -29,7 +29,7 @@ interface SourceFieldCompileOptions {
   allowInlineTypeExpressions?: boolean
 }
 
-/** Компилирует chain field(...).optional().array()... в общий field contract. */
+// Компилирует chain field(...).optional().array()... в общий field contract.
 export function compileSourceField(
   key: string,
   raw: t.Expression,

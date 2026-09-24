@@ -14,7 +14,9 @@ import {
   patchFilterSource,
 } from '@/features/core/modules/source/services/filter-source-patch'
 
-/** Source patch strategy для RFilter/source-kind=filter. */
+/**
+ * Source patch strategy для RFilter/source-kind=filter.
+ */
 export class FilterSourcePatchStrategy implements SourcePatchStrategy<FilterSourcePatch, FilterSourceEditorDocument> {
   public readonly id = 'source-patch:filter'
   public readonly sourceKind: SourceKind = 'filter'

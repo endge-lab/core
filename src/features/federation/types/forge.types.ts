@@ -1,6 +1,4 @@
-/**
- * Endge Модуль
- */
+// Endge Модуль
 export interface EndgeModule {
   //
   // Lifecycle
@@ -16,9 +14,7 @@ export interface EndgeModule {
 
 export type EndgeEventMap = Record<string, any>
 
-/**
- * Токены (типизированные идентификаторы сервисов)
- */
+// Токены (типизированные идентификаторы сервисов)
 export type EndgeToken<T, E extends EndgeEventMap> = string & {
   __t?: T
   __ev?: E

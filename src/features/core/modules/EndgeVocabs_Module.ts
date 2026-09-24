@@ -6,7 +6,7 @@ import type {
   VocabReference,
 } from '@/features/core/modules/runtime/domain/vocab-cache.types'
 import type { VocabMockReference, VocabPayloadProvider, VocabProgramPayload } from '@/features/core/modules/source/domain/types/vocab-source.types'
-import { Raph } from '@endge/raph'
+import { Raph } from '@raphy-js/raph'
 import { Endge } from '@/features/core/kernel/endge'
 import { DEFAULT_VOCAB_LOAD_POLICY } from '@/features/core/modules/runtime/domain/vocab-cache.types'
 import { runResponseOutputTransforms } from '@/features/core/modules/runtime/execution/endge-response-output'
@@ -57,10 +57,8 @@ export interface VocabAcquireOptions {
  * Модуль загрузки и чтения external vocabs в Raph cache.
  */
 export class EndgeVocabs_Module extends EndgeModule {
-  /**
-   * slug -> namespace
-   * Можно оставить для getNamespaceValues (чтобы понимать какие slugs в пространстве)
-   */
+  // slug -> namespace
+  // Можно оставить для getNamespaceValues (чтобы понимать какие slugs в пространстве)
   private _index: Record<string, string> = {}
   private _byIdCache: Record<string, any[]> = {}
   private readonly _loadedIdentities = new Set<string>()
@@ -73,7 +71,9 @@ export class EndgeVocabs_Module extends EndgeModule {
   private _loadingRequests: number = 0
   public loading: boolean = false
 
-  /** Освобождает кэш и запрещает ответы предыдущего lifecycle поколения. */
+  /**
+   * Освобождает кэш и запрещает ответы предыдущего lifecycle поколения.
+   */
   public override reset(): void {
     this._abortController.abort()
     this._abortController = new AbortController()
@@ -93,7 +93,9 @@ export class EndgeVocabs_Module extends EndgeModule {
     this.notify()
   }
 
-  /** Возвращает отдельный реактивный путь для выбранного режима данных. */
+  /**
+   * Возвращает отдельный реактивный путь для выбранного режима данных.
+   */
   public getPath(identity: string, options: Pick<VocabAcquireOptions, 'dataMode'> = {}): string {
     return `${options.dataMode === 'mock' ? 'vocabsMock' : 'vocabs'}.${identity}`
   }
@@ -560,7 +562,9 @@ export class EndgeVocabs_Module extends EndgeModule {
     }
   }
 
-  /** Загружает raw Payload без output pipeline; используется authoring preview и Mock generator. */
+  /**
+   * Загружает raw Payload без output pipeline; используется authoring preview и Mock generator.
+   */
   public async loadRawVocab(
     idOrIdentity: string | number,
     options: { limit?: number, throwOnError?: boolean } = {},
@@ -640,7 +644,9 @@ export class EndgeVocabs_Module extends EndgeModule {
     }
   }
 
-  /** Применяет pipeline source-outputs и проверяет обязательный массив items. */
+  /**
+   * Применяет pipeline source-outputs и проверяет обязательный массив items.
+   */
   private _applyOutputs(cfg: VocabRuntimeConfig, raw: unknown): any[] {
     const values: Record<string, unknown> = {}
     for (const output of cfg.outputs) {
@@ -661,7 +667,9 @@ export class EndgeVocabs_Module extends EndgeModule {
     return items
   }
 
-  /** Читает explicit Mock JSON; отсутствие ссылки штатно означает пустой Vocab. */
+  /**
+   * Читает explicit Mock JSON; отсутствие ссылки штатно означает пустой Vocab.
+   */
   private _resolveMockValue(cfg: VocabRuntimeConfig): unknown {
     if (!cfg.mock) {
       return []
@@ -723,7 +731,9 @@ export class EndgeVocabs_Module extends EndgeModule {
     return await request
   }
 
-  /** Прямые загрузки одного cache key используют latest-wins; acquire разделяет один запуск. */
+  /**
+   * Прямые загрузки одного cache key используют latest-wins; acquire разделяет один запуск.
+   */
   private _beginCacheWrite(cfg: VocabRuntimeConfig, dataMode: 'live' | 'mock' = 'live'): () => void {
     const signal = this._abortController.signal
     const cacheVersion = this._cacheVersions.get(cfg.identity) ?? 0
@@ -738,7 +748,9 @@ export class EndgeVocabs_Module extends EndgeModule {
     }
   }
 
-  /** Проверяет актуальность загрузки до первой записи в observable cache. */
+  /**
+   * Проверяет актуальность загрузки до первой записи в observable cache.
+   */
   private _assertCacheRequest(cfg: VocabRuntimeConfig, signal: AbortSignal, version: number): void {
     signal.throwIfAborted()
     if ((this._cacheVersions.get(cfg.identity) ?? 0) !== version) {
@@ -782,7 +794,9 @@ export class EndgeVocabs_Module extends EndgeModule {
     this._loadedIdentities.add(identity)
   }
 
-  /** Пишет кэш только по identity; имя коллекции разрешается отдельным индексом. */
+  /**
+   * Пишет кэш только по identity; имя коллекции разрешается отдельным индексом.
+   */
   private _setCache(cfg: VocabRuntimeConfig, docs: any[], dataMode: 'live' | 'mock' = 'live'): void {
     const values = Array.isArray(docs) ? docs : []
     const path = this.getPath(cfg.identity, { dataMode })
@@ -794,7 +808,9 @@ export class EndgeVocabs_Module extends EndgeModule {
     this._setByIdentityCache(cfg.identity, values)
   }
 
-  /** Читает кэш только выбранной identity и режима без данных другого справочника. */
+  /**
+   * Читает кэш только выбранной identity и режима без данных другого справочника.
+   */
   private _getCache(cfg: VocabRuntimeConfig, dataMode: 'live' | 'mock' = 'live'): unknown {
     return Raph.get(this.getPath(cfg.identity, { dataMode }))
   }
@@ -850,7 +866,9 @@ export class EndgeVocabs_Module extends EndgeModule {
     }
   }
 
-  /** Находит runtime config справочника по identity или collection slug. */
+  /**
+   * Находит runtime config справочника по identity или collection slug.
+   */
   private _resolveVocabConfigByIdentityOrSlug(identity: string, collectionSlug: string): VocabRuntimeConfig | null {
     const normalizedIdentity = String(identity ?? '').trim()
     const normalizedSlug = String(collectionSlug ?? '').trim()
@@ -867,7 +885,9 @@ export class EndgeVocabs_Module extends EndgeModule {
     return this._createRuntimeConfig(fallback)
   }
 
-  /** Собирает auth headers для обращения к внешнему справочнику. */
+  /**
+   * Собирает auth headers для обращения к внешнему справочнику.
+   */
   private async _resolveAuthHeaders(cfg: { authMode?: 'inherit' | 'profile' | 'none', authProfileIdentity?: string | null }): Promise<Record<string, string>> {
     const mode = cfg.authMode ?? 'inherit'
     const session = await Endge.auth.requests.resolve(
@@ -940,7 +960,7 @@ export class EndgeVocabs_Module extends EndgeModule {
   }
 }
 
-/** Отмена одного consumer прекращает ожидание, сохраняя общую загрузку других scopes. */
+// Отмена одного consumer прекращает ожидание, сохраняя общую загрузку других scopes.
 async function waitForVocab<T>(request: Promise<T>, signal?: AbortSignal): Promise<T> {
   if (!signal) {
     return request

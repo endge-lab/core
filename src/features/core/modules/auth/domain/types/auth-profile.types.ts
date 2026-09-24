@@ -21,7 +21,7 @@ export interface AuthProfileCredentials {
   [key: string]: string
 }
 
-/** Сохраняемый дискриминированный контракт встроенных адаптеров. */
+// Сохраняемый дискриминированный контракт встроенных адаптеров.
 export interface AuthProfileBase {
   id: string
   identity: string
@@ -84,7 +84,7 @@ export type AuthProfile
     | BasicAuthProfile
     | BearerAuthProfile
 
-/** Runtime-проекция также принимает структурно проверенные расширения реестра и legacy числовые ID. */
+// Runtime-проекция также принимает структурно проверенные расширения реестра и legacy числовые ID.
 export interface AuthProfileSchema {
   id: string | number
   identity: string
@@ -138,14 +138,14 @@ export interface AuthSessionSourceResolveOptions {
   minValiditySeconds: number
 }
 
-/** Host-owned источник session для внешнего Authorization Code + PKCE flow. */
+// Host-owned источник session для внешнего Authorization Code + PKCE flow.
 export interface AuthSessionSource {
   resolveToken: (options: AuthSessionSourceResolveOptions) => Promise<AuthTokenSet | null>
   logout?: () => Promise<void>
   loadUserInfo?: () => Promise<Record<string, unknown> | null>
 }
 
-/** Минимальный синхронный auth context без tokens и полного claims payload. */
+// Минимальный синхронный auth context без tokens и полного claims payload.
 export interface EndgeAuthContext {
   authenticated: boolean
   subject?: string
@@ -154,7 +154,7 @@ export interface EndgeAuthContext {
 }
 
 export interface EndgeAuthBootOptions {
-  /** Host-owned namespace isolates sessions одинаковых Workspaces across backends. */
+  // Host-owned namespace isolates sessions одинаковых Workspaces across backends.
   storageNamespace?: string
 }
 
@@ -166,7 +166,7 @@ export interface AuthAdapterContext {
   resolveCredential: (credential: string) => Promise<string>
 }
 
-/** Контракт расширяемого auth adapter. Storage и application state остаются в EndgeAuth_Module. */
+// Контракт расширяемого auth adapter. Storage и application state остаются в EndgeAuth_Module.
 export interface AuthProfileAdapter {
   id: AuthProfileAdapterId
   label: string

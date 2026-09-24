@@ -1,4 +1,4 @@
-/** Date в строку времени HH:mm:ss. */
+// Date в строку времени HH:mm:ss.
 export function dateToTimeString(value: unknown): string | null {
   if (value == null) {
     return null

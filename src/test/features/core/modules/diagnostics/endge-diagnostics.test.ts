@@ -8,7 +8,7 @@ import type {
 import { describe, expect, it, vi } from 'vitest'
 import { EndgeDiagnostics_Module } from '@/features/core/modules/diagnostics/EndgeDiagnostics_Module'
 
-/** Создаёт независимую configuration для одного тестового diagnostics module. */
+// Создаёт независимую configuration для одного тестового diagnostics module.
 function configuration(
   overrides: Partial<EndgeDiagnosticsConfiguration['telemetry']['collection']> = {},
 ): EndgeDiagnosticsConfiguration {

@@ -5,7 +5,7 @@ import {
   decodeJwtClaims,
 } from '@/features/core/modules/auth/services/auth-context'
 
-/** Создаёт неподписанный JWT только для проверки безопасного payload decoding. */
+// Создаёт неподписанный JWT только для проверки безопасного payload decoding.
 function createToken(payload: Record<string, unknown>): string {
   const encoded = globalThis.btoa(JSON.stringify(payload))
     .replace(/=/g, '')

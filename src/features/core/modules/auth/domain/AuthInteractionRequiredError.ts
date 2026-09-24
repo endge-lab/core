@@ -1,4 +1,6 @@
-/** Сигнал host-приложению, что продолжение требует пользовательского OIDC flow. */
+/**
+ * Сигнал host-приложению, что продолжение требует пользовательского OIDC flow.
+ */
 export class AuthInteractionRequiredError extends Error {
   public readonly code = 'auth_interaction_required'
 

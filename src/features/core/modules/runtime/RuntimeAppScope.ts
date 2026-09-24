@@ -6,13 +6,13 @@ import type { RuntimeExecutableModel } from '@/features/core/modules/runtime/dom
 export type RuntimeAppScopeCollisionPolicy = 'multi' | 'reject' | 'replace'
 
 export interface RuntimeAppScopeOptions {
-  /** Уникальный id scope внутри EndgeRuntime_Module. */
+  // Уникальный id scope внутри EndgeRuntime_Module.
   id: string
-  /** Публичный корень runtime data в Raph. */
+  // Публичный корень runtime data в Raph.
   rootPath: string
-  /** Политика повторного запуска root entity в этом scope. */
+  // Политика повторного запуска root entity в этом scope.
   collisionPolicy?: RuntimeAppScopeCollisionPolicy
-  /** Persistence policy по умолчанию для host-ов scope. */
+  // Persistence policy по умолчанию для host-ов scope.
   persistence?: 'disabled' | 'local'
 }
 
@@ -58,7 +58,9 @@ export class RuntimeAppScope {
     this.persistence = options.persistence ?? 'disabled'
   }
 
-  /** Запускает entity в этом AppScope; root определяется отсутствием parent. */
+  /**
+   * Запускает entity в этом AppScope; root определяется отсутствием parent.
+   */
   public execute(
     model: RuntimeExecutableModel,
     options: RuntimeAppScopeExecuteOptions = {},
@@ -69,7 +71,9 @@ export class RuntimeAppScope {
     })
   }
 
-  /** Запускает entity, ожидая завершения teardown при collisionPolicy: replace. */
+  /**
+   * Запускает entity, ожидая завершения teardown при collisionPolicy: replace.
+   */
   public executeAsync(
     model: RuntimeExecutableModel,
     options: RuntimeAppScopeExecuteOptions = {},
@@ -77,7 +81,9 @@ export class RuntimeAppScope {
     return this._owner.executeAsync(model, { ...options, appScope: this })
   }
 
-  /** Возвращает активный root runtime entity по domain identity. */
+  /**
+   * Возвращает активный root runtime entity по domain identity.
+   */
   public resolve<T = AnyRuntimeHost>(
     entityType: RuntimeEntityType,
     identity: string,
@@ -86,7 +92,9 @@ export class RuntimeAppScope {
     return (hosts.find(host => host.meta.scopeRoot === true) ?? hosts[0] ?? null) as T | null
   }
 
-  /** Удаляет runtime tree entity из этого scope. */
+  /**
+   * Удаляет runtime tree entity из этого scope.
+   */
   public destroy(entityType: RuntimeEntityType, identity: string): void {
     const runtime = this.resolve(entityType, identity)
     if (runtime && typeof runtime === 'object' && 'id' in runtime) {
@@ -94,7 +102,9 @@ export class RuntimeAppScope {
     }
   }
 
-  /** Удаляет runtime tree и ждёт полного освобождения lifecycle-ресурсов. */
+  /**
+   * Удаляет runtime tree и ждёт полного освобождения lifecycle-ресурсов.
+   */
   public async destroyAsync(entityType: RuntimeEntityType, identity: string): Promise<void> {
     const runtime = this.resolve(entityType, identity)
     if (runtime && typeof runtime === 'object' && 'id' in runtime) {
@@ -102,7 +112,9 @@ export class RuntimeAppScope {
     }
   }
 
-  /** Строит внутренний runtime id и независимый от него публичный Raph path. */
+  /**
+   * Строит внутренний runtime id и независимый от него публичный Raph path.
+   */
   public allocate(input: {
     entityType: RuntimeEntityType
     identity: string
@@ -143,7 +155,9 @@ export class RuntimeAppScope {
     }
   }
 
-  /** Сбрасывает automatic instance counters при reset общего runtime. */
+  /**
+   * Сбрасывает automatic instance counters при reset общего runtime.
+   */
   public reset(): void {
     this._nextIndex.clear()
   }

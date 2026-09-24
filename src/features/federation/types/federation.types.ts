@@ -6,7 +6,7 @@ import type {
   EndgeModuleOrder,
 } from '@/features/federation/types/endge-modules.types'
 
-/** Минимальный context, общий для lifecycle любой федерации. */
+// Минимальный context, общий для lifecycle любой федерации.
 export interface EndgeFederationContext {
   signal?: AbortSignal
 }
@@ -15,7 +15,7 @@ export type EndgeFederationState = 'idle' | 'booting' | 'ready' | 'building' | '
 
 export type EndgeModuleDiagnosticsSnapshotStatus = 'captured' | 'empty' | 'skipped' | 'failed' | 'referenced'
 
-/** Стабильная ссылка на Module внутри декларативного дерева Federation. */
+// Стабильная ссылка на Module внутри декларативного дерева Federation.
 export interface EndgeModuleDiagnosticsSnapshotReference {
   federationId: string
   key: string
@@ -23,12 +23,12 @@ export interface EndgeModuleDiagnosticsSnapshotReference {
   moduleName: string
 }
 
-/** Настройки рекурсивного сбора диагностического дерева Federation. */
+// Настройки рекурсивного сбора диагностического дерева Federation.
 export interface EndgeFederationDiagnosticsSnapshotOptions {
   shouldCaptureModule?: (module: EndgeModuleDiagnosticsSnapshotReference) => boolean
 }
 
-/** Диагностический узел зарегистрированного Module. */
+// Диагностический узел зарегистрированного Module.
 export interface EndgeModuleDiagnosticsSnapshotNode extends EndgeModuleDiagnosticsSnapshotReference {
   kind: 'module'
   status: EndgeModuleDiagnosticsSnapshotStatus
@@ -37,7 +37,7 @@ export interface EndgeModuleDiagnosticsSnapshotNode extends EndgeModuleDiagnosti
   error?: string
 }
 
-/** Диагностический узел дочерней Federation. */
+// Диагностический узел дочерней Federation.
 export interface EndgeChildFederationDiagnosticsSnapshotNode {
   kind: 'federation'
   key: string
@@ -51,7 +51,7 @@ export type EndgeFederationDiagnosticsSnapshotNode
   = EndgeModuleDiagnosticsSnapshotNode
     | EndgeChildFederationDiagnosticsSnapshotNode
 
-/** Рекурсивная диагностическая проекция одного декларативного Federation graph. */
+// Рекурсивная диагностическая проекция одного декларативного Federation graph.
 export interface EndgeFederationDiagnosticsSnapshot {
   id: string
   name: string
@@ -61,7 +61,7 @@ export interface EndgeFederationDiagnosticsSnapshot {
   nodes: EndgeFederationDiagnosticsSnapshotNode[]
 }
 
-/** Публичный lifecycle-контракт статического facade Federation. */
+// Публичный lifecycle-контракт статического facade Federation.
 export interface EndgeFederationFacade<in TContext extends EndgeFederationContext = EndgeFederationContext> {
   readonly id: string
   readonly isConfigured: boolean
@@ -76,7 +76,7 @@ export interface EndgeFederationFacade<in TContext extends EndgeFederationContex
 
 export type AnyEndgeFederation = EndgeFederationFacade<any>
 
-/** Дочерняя Federation как один composite lifecycle-узел родительского graph. */
+// Дочерняя Federation как один composite lifecycle-узел родительского graph.
 export interface EndgeChildFederationDefinition<
   TKey extends string = string,
   TFederation extends AnyEndgeFederation = AnyEndgeFederation,
@@ -89,7 +89,7 @@ export interface EndgeChildFederationDefinition<
 
 export type EndgeChildFederationDefinitions = readonly EndgeChildFederationDefinition[]
 
-/** Plugin декларативно расширяет одну Federation до её configuration/boot. */
+// Plugin декларативно расширяет одну Federation до её configuration/boot.
 export interface EndgePlugin<
   TModules extends EndgeModuleDefinitions = EndgeModuleDefinitions,
   TFederations extends EndgeChildFederationDefinitions = EndgeChildFederationDefinitions,
@@ -97,11 +97,11 @@ export interface EndgePlugin<
   readonly id: string
   readonly modules?: TModules
   readonly federations?: TFederations
-  /** Selects an ordered subset once per boot; reset uses the same nodes. */
+  // Selects an ordered subset once per boot; reset uses the same nodes.
   readonly selectLifecycleNodes?: (nodes: readonly EndgeLifecycleNodeDescriptor[], ctx: EndgeFederationContext) => readonly EndgeLifecycleNodeDescriptor[]
 }
 
-/** Полное декларативное описание автоматически собираемой федерации. */
+// Полное декларативное описание автоматически собираемой федерации.
 export interface EndgeFederationDefinition<
   TDefinitions extends EndgeModuleDefinitions,
   TFederations extends EndgeChildFederationDefinitions = readonly [],
@@ -110,7 +110,7 @@ export interface EndgeFederationDefinition<
   readonly name?: string
   readonly modules: TDefinitions
   readonly federations?: TFederations
-  /** Selects an ordered subset once per boot; reset uses the same nodes. */
+  // Selects an ordered subset once per boot; reset uses the same nodes.
   readonly selectLifecycleNodes?: (nodes: readonly EndgeLifecycleNodeDescriptor[], ctx: EndgeFederationContext) => readonly EndgeLifecycleNodeDescriptor[]
 }
 

@@ -5,75 +5,75 @@ import type { DataViewRef } from '@/features/core/modules/source/domain/types/da
 import type { ResponseOutputTransform } from '@/features/core/modules/source/domain/types/response-output.types'
 import type { QueryProgramProp, SourceExpressionIR, SourceFieldDefinition } from '@/features/core/modules/source/domain/types/source-expression.types'
 
-/** Поддерживаемые transport-kind Query source. */
+// Поддерживаемые transport-kind Query source.
 export type QuerySourceKind = 'rest' | 'graphql'
 
-/** Политика GraphQL errors в HTTP 2xx response. */
+// Политика GraphQL errors в HTTP 2xx response.
 export type QueryGraphQLErrorPolicy = 'throw' | 'ignore'
 
-/** Статическое значение запроса или безопасное выражение, вычисляемое из props Query в runtime. */
+// Статическое значение запроса или безопасное выражение, вычисляемое из props Query в runtime.
 export type QuerySourceRequestValue<T> = T | SourceExpressionIR
 
-/** Source-описание HTTP request части REST-запроса. */
+// Source-описание HTTP request части REST-запроса.
 export interface QuerySourceRestRequest {
-  /** Endpoint или Endge var-token вида {API_URL}. */
+  // Endpoint или Endge var-token вида {API_URL}.
   endpoint: QuerySourceRequestValue<string>
 
-  /** REST path. В legacy RQuery это поле хранится как query. */
+  // REST path. В legacy RQuery это поле хранится как query.
   path: QuerySourceRequestValue<string>
 
-  /** Метод HTTP. */
+  // Метод HTTP.
   method: QuerySourceRequestValue<string>
 
-  /** Заголовки HTTP. */
+  // Заголовки HTTP.
   headers: QuerySourceRequestValue<Record<string, string>>
 
-  /** Конфигурация авторизации. */
+  // Конфигурация авторизации.
   auth: QuerySourceRequestValue<RQueryAuth>
 
-  /** Таймаут запроса. */
+  // Таймаут запроса.
   timeoutMs?: QuerySourceRequestValue<number>
 
-  /** Отправлять body как application/x-www-form-urlencoded. */
+  // Отправлять body как application/x-www-form-urlencoded.
   formUrlencoded?: QuerySourceRequestValue<boolean>
 
-  /** Безопасный body expression для query source v2. */
+  // Безопасный body expression для query source v2.
   body?: SourceExpressionIR | null
 }
 
-/** Source-описание GraphQL operation и variables. */
+// Source-описание GraphQL operation и variables.
 export interface QuerySourceGraphQLRequest {
-  /** GraphQL endpoint или Endge var-token вида {API_URL}. */
+  // GraphQL endpoint или Endge var-token вида {API_URL}.
   endpoint: QuerySourceRequestValue<string>
 
-  /** Статический GraphQL document из gql template. */
+  // Статический GraphQL document из gql template.
   document: string
 
-  /** Operation name для document с несколькими operations. */
+  // Operation name для document с несколькими operations.
   operationName?: string
 
-  /** Безопасное variables expression, построенное через variables(...). */
+  // Безопасное variables expression, построенное через variables(...).
   variables?: SourceExpressionIR | null
 
-  /** Дополнительные HTTP headers. */
+  // Дополнительные HTTP headers.
   headers: QuerySourceRequestValue<Record<string, string>>
 
-  /** Конфигурация авторизации. */
+  // Конфигурация авторизации.
   auth: QuerySourceRequestValue<RQueryAuth>
 
-  /** Таймаут запроса. */
+  // Таймаут запроса.
   timeoutMs?: QuerySourceRequestValue<number>
 
-  /** Обработка GraphQL errors в HTTP 2xx response. */
+  // Обработка GraphQL errors в HTTP 2xx response.
   errorPolicy: QueryGraphQLErrorPolicy
 }
 
-/** Source-описание mock-режима запроса. */
+// Source-описание mock-режима запроса.
 export interface QuerySourceMock {
-  /** Включены ли mock data. */
+  // Включены ли mock data.
   enabled: boolean
 
-  /** Mock-данные. */
+  // Mock-данные.
   data: unknown
 }
 
@@ -91,9 +91,9 @@ export type QueryOutputSource
 export interface QuerySourceOutput {
   key: string
   source: QueryOutputSource
-  /** Упорядоченная цепочка transform. */
+  // Упорядоченная цепочка transform.
   transforms: ResponseOutputTransform[]
-  /** Проекция совместимости, содержащая только transforms DataView. */
+  // Проекция совместимости, содержащая только transforms DataView.
   dataViews: DataViewRef[]
   contract?: SourceFieldDefinition | null
 }
@@ -101,13 +101,13 @@ export interface QuerySourceOutput {
 export type QuerySourceOutputs = QuerySourceOutput[]
 
 interface QuerySourceDocumentBase {
-  /** Единственный runtime input contract Query. */
+  // Единственный runtime input contract Query.
   props: QueryProgramProp[]
 
-  /** Упорядоченный выходной граф: источники response/output и преобразования. */
+  // Упорядоченный выходной граф: источники response/output и преобразования.
   outputs: QuerySourceOutputs
 
-  /** Конфигурация mock. */
+  // Конфигурация mock.
   mock: QuerySourceMock
 }
 
@@ -121,10 +121,10 @@ export interface QuerySourceGraphQLDocument extends QuerySourceDocumentBase {
   request: QuerySourceGraphQLRequest
 }
 
-/** Canonical authoring-модель source-only Query v2. */
+// Canonical authoring-модель source-only Query v2.
 export type QuerySourceDocument = QuerySourceRestDocument | QuerySourceGraphQLDocument
 
-/** Публичные editor-slots, которые query source patcher умеет менять точечно. */
+// Публичные editor-slots, которые query source patcher умеет менять точечно.
 export type QuerySourcePatchPath
   = | 'kind'
     | 'request.endpoint'
@@ -140,35 +140,35 @@ export type QuerySourcePatchPath
     | 'mock.enabled'
     | 'mock.data'
 
-/** Операция AST-патчинга query source. */
+// Операция AST-патчинга query source.
 export interface QuerySourcePatchOperation {
-  /** Изменяемый editor-slot. */
+  // Изменяемый editor-slot.
   path: QuerySourcePatchPath
 
-  /** Новое normalized значение, если patcher должен сам напечатать expression. */
+  // Новое normalized значение, если patcher должен сам напечатать expression.
   value?: unknown
 
-  /** Готовое source-expression для сложных DSL-значений: env(...), field(...), filter... */
+  // Готовое source-expression для сложных DSL-значений: env(...), field(...), filter...
   expression?: string
 }
 
-/** Patch query source: одиночная операция или пачка операций. */
+// Patch query source: одиночная операция или пачка операций.
 export type QuerySourcePatch = QuerySourcePatchOperation | QuerySourcePatchOperation[]
 
-/** Результат компиляции query source. */
+// Результат компиляции query source.
 export interface QuerySourceCompileResult {
-  /** AST уровня parser. */
+  // AST уровня parser.
   ast: unknown | null
 
-  /** Canonical authoring-модель. */
+  // Canonical authoring-модель.
   document: QuerySourceDocument | null
 
-  /** Query artifact payload для Endge.program. */
+  // Query artifact payload для Endge.program.
   artifact: QueryProgramPayload | null
 
-  /** Публичная metadata, извлечённая из canonical source. */
+  // Публичная metadata, извлечённая из canonical source.
   metadata: ProgramMetadataMap
 
-  /** Diagnostics source compiler-а. */
+  // Diagnostics source compiler-а.
   diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
 }

@@ -18,7 +18,7 @@ export const INSPECTION_MAX_RECORDS = 100_000
 export const INSPECTION_MAX_BYTES = 128 * 1024 * 1024
 const ROOTS = new Set(['runtime', 'context', 'data', 'dataAvailable'])
 
-/** Проверяет пассивный snapshot, не создавая ни одного runtime resource. */
+// Проверяет пассивный snapshot, не создавая ни одного runtime resource.
 export function readInspectionState(input: unknown): InspectionState {
   const value = bundleObject(copyBundleJson(input), 'inspection state')
   const context = bundleObject(value.context, 'inspection context')
@@ -44,7 +44,7 @@ export function readInspectionState(input: unknown): InspectionState {
   return value as unknown as InspectionState
 }
 
-/** Общий sequenced record reader для файла и Bridge. */
+// Общий sequenced record reader для файла и Bridge.
 export function readInspectionChunk(input: unknown): InspectionChunk {
   const value = bundleObject(copyBundleJson(input), 'inspection chunk')
   if (
@@ -193,7 +193,7 @@ export function readInspectionRecording(input: unknown): InspectionRecording {
   }
 }
 
-/** Детерминированное применение фактов; никогда не вызывает Events/Commands или parser. */
+// Детерминированное применение фактов; никогда не вызывает Events/Commands или parser.
 export function reduceInspectionRecord(
   state: InspectionState | null,
   revision: number,
@@ -254,7 +254,7 @@ export function reduceInspectionRecord(
   return { state: readInspectionState(next), revision: record.revision }
 }
 
-/** Объекты патчатся по ключам, массивы заменяются целиком, отсутствующие значения удаляются явно. */
+// Объекты патчатся по ключам, массивы заменяются целиком, отсутствующие значения удаляются явно.
 export function diffInspectionState(
   previous: InspectionState,
   next: InspectionState,

@@ -8,7 +8,9 @@ import type { AuthProfileRegistry } from '@/features/core/modules/auth/services/
 import type { AuthSessionManager } from '@/features/core/modules/auth/services/AuthSessionManager'
 import { AuthInteractionRequiredError } from '@/features/core/modules/auth/domain/AuthInteractionRequiredError'
 
-/** Разрешает auth policy запроса без изменения sessions других profiles. */
+/**
+ * Разрешает auth policy запроса без изменения sessions других profiles.
+ */
 export class AuthRequestResolver {
   public constructor(
     private readonly _profiles: AuthProfileRegistry,
@@ -16,7 +18,9 @@ export class AuthRequestResolver {
     private readonly _onInteractionRequired?: (error: AuthInteractionRequiredError) => void,
   ) {}
 
-  /** Возвращает transport-neutral credentials для none/inherit/profile policy. */
+  /**
+   * Возвращает transport-neutral credentials для none/inherit/profile policy.
+   */
   public async resolve(policy: AuthRequestPolicy, options: AuthResolveOptions = {}): Promise<AuthResolvedSession> {
     if (policy.mode === 'none') {
       return {
@@ -57,7 +61,9 @@ export class AuthRequestResolver {
     return session
   }
 
-  /** Публикует типизированный сигнал host до завершения запроса с ошибкой. */
+  /**
+   * Публикует типизированный сигнал host до завершения запроса с ошибкой.
+   */
   private _throwInteractionRequired(profileIdentity: string): never {
     this._publishAndThrow(new AuthInteractionRequiredError(profileIdentity))
   }

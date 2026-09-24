@@ -2,7 +2,7 @@ import type { ProgramArtifact, QueryProgramPayload } from '@/features/core/modul
 import type { QueryRuntimeHost } from '@/features/core/modules/runtime/hosts/QueryRuntimeHost'
 
 import type { CompositionProgramPayload } from '@/features/core/modules/source/domain/types/composition-source.types'
-import { Raph } from '@endge/raph'
+import { Raph } from '@raphy-js/raph'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Endge } from '@/features/core/kernel/endge'
 import { RComposition } from '@/features/core/modules/domain/entities/RComposition'

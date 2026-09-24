@@ -3,7 +3,7 @@ import type { EndgeFederationContext, EndgeLifecycleNodeDescriptor } from '@/fea
 
 const DEBUGGER_MODULES = new Set(['events', 'context', 'commands', 'workspace', 'configuration', 'ui', 'uiRegistry', 'domainRepository', 'domain', 'program', 'inspection', 'runtime', 'bridge'])
 
-/** Debugger boots an empty Domain and Bridge; it never runs the inspected application. */
+// Debugger boots an empty Domain and Bridge; it never runs the inspected application.
 export function selectCoreLifecycleNodes(nodes: readonly EndgeLifecycleNodeDescriptor[], ctx: EndgeFederationContext): readonly EndgeLifecycleNodeDescriptor[] {
   const options = ctx as EndgeBootContext
   if (options.mode !== 'debugger') {

@@ -102,7 +102,7 @@ function sourceKey(value: string): string {
   return /^[A-Z_$][\w$]*$/i.test(value) ? value : JSON.stringify(value)
 }
 
-/** AST-контекст сохраняет уровень aliases, включая пустые object literals при вводе. */
+// AST-контекст сохраняет уровень aliases, включая пустые object literals при вводе.
 function objectAt(source: string, offset: number): { path: string[], keys: string[] } | null {
   try {
     const ast = parseTS(source, { sourceType: 'module', plugins: ['typescript'], errorRecovery: true })

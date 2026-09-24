@@ -3,7 +3,7 @@ import { RFacet } from '@/features/core/modules/domain/entities/RFacet'
 import { RFacetDocument } from '@/features/core/modules/domain/entities/RFacetDocument'
 import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
-/** Подготавливает минимальный resolved build context для compiler contract tests. */
+// Подготавливает минимальный resolved build context для compiler contract tests.
 export function prepareTestCompilerContext(): void {
   Endge.workspace.apply(TEST_ENDGE_WORKSPACE)
   Endge.domain.addFacet(RFacet.fromPlain({ id: 9101, identity: 'region', displayName: 'Region', position: 0 }))
@@ -18,7 +18,7 @@ export function prepareTestCompilerContext(): void {
   })
 }
 
-/** Очищает build context и связанные test-owned owners. */
+// Очищает build context и связанные test-owned owners.
 export function resetTestCompilerContext(): void {
   Endge.configuration.reset()
   Endge.program.clear()

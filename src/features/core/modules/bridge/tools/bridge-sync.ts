@@ -10,7 +10,7 @@ function record(value: unknown): Record<string, unknown> | null {
     : null
 }
 
-/** Проверяет границу снимка; сам Domain валидируется штатным импортом Core. */
+// Проверяет границу снимка; сам Domain валидируется штатным импортом Core.
 export function readBridgeInspectionSnapshot(value: unknown): BridgeInspectionSnapshot {
   const source = record(value)
   const snapshot = record(source?.snapshot)
@@ -21,7 +21,7 @@ export function readBridgeInspectionSnapshot(value: unknown): BridgeInspectionSn
   return source as unknown as BridgeInspectionSnapshot
 }
 
-/** Проверяет метаданные потока до помещения события в ограниченный буфер. */
+// Проверяет метаданные потока до помещения события в ограниченный буфер.
 export function readBridgeStreamEvent(value: unknown): BridgeStreamEvent {
   const source = record(value)
   const event = record(source?.event)
@@ -34,7 +34,7 @@ export function readBridgeStreamEvent(value: unknown): BridgeStreamEvent {
   return source as unknown as BridgeStreamEvent
 }
 
-/** Распознаёт только существующие Context events и проверяет оба значения перед применением. */
+// Распознаёт только существующие Context events и проверяет оба значения перед применением.
 export function readBridgeContextEvent(event: BridgeStreamEvent['event']): ContextEvent | null {
   const fields = {
     'context:workspace-changed': 'workspace',
@@ -71,7 +71,7 @@ function isFacetSelections(value: unknown): boolean {
     facet.trim().length > 0 && typeof document === 'string' && document.trim().length > 0)
 }
 
-/** Проверяет wire envelope; имя команды и payload дополнительно проверяет локальный реестр обработчиков. */
+// Проверяет wire envelope; имя команды и payload дополнительно проверяет локальный реестр обработчиков.
 export function readBridgeCommand(value: unknown): EndgeCommand {
   const source = record(value)
   if (!source || typeof source.type !== 'string' || !source.type || source.type.length > 160
@@ -81,7 +81,7 @@ export function readBridgeCommand(value: unknown): EndgeCommand {
   return source as unknown as EndgeCommand
 }
 
-/** Проверяет крупный snapshot до буферизации в согласованном потоке. */
+// Проверяет крупный snapshot до буферизации в согласованном потоке.
 export function readBridgeInspectionUpdate(value: unknown): BridgeInspectionUpdate {
   const source = record(value)
   const update = record(source?.update)
@@ -105,7 +105,7 @@ export function readBridgeInspectionUpdate(value: unknown): BridgeInspectionUpda
   return source as unknown as BridgeInspectionUpdate
 }
 
-/** Runtime facts применяются только после проверки статусов и адреса host. */
+// Runtime facts применяются только после проверки статусов и адреса host.
 export function readBridgeRuntimeEvent(event: BridgeStreamEvent['event']): RuntimeStatusChange | null {
   if (event.name !== 'runtime:host-status-changed') {
     return null

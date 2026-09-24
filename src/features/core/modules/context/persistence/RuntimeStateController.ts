@@ -43,12 +43,16 @@ export class RuntimeStateController implements RuntimeStateControllerLike {
     this._adapter = input.adapter
   }
 
-  /** Возвращает актуальный persistence scope, включая текущую session identity. */
+  /**
+   * Возвращает актуальный persistence scope, включая текущую session identity.
+   */
   public get scope(): EndgePersistenceScope {
     return { ...this._resolveScope() }
   }
 
-  /** Строит storage key из актуального scope, чтобы переавторизация не сохраняла данные прежнему пользователю. */
+  /**
+   * Строит storage key из актуального scope, чтобы переавторизация не сохраняла данные прежнему пользователю.
+   */
   public get storageKey(): string {
     return buildRuntimeStateStorageKey(this.scope, this.storageId)
   }

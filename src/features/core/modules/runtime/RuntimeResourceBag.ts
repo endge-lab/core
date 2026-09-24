@@ -1,6 +1,8 @@
 import type { RuntimeOwnedResource, RuntimeResourceBagSnapshot } from '@/features/core/modules/runtime/domain/runtime-resource.types'
 
-/** Владеет disposable runtime resources и освобождает их в обратном порядке. */
+/**
+ * Владеет disposable runtime resources и освобождает их в обратном порядке.
+ */
 export class RuntimeResourceBag {
   private readonly _resources = new Map<string, RuntimeOwnedResource>()
   private _paused = false

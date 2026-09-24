@@ -1,7 +1,7 @@
 import type { RuntimeHostStatus } from '@/features/core/modules/runtime/domain/runtime-host.types'
 import type { EndgeDataMode } from '@/features/core/modules/workspace/domain/workspace.types'
 
-/** Связка события и identity действия из Domain. */
+// Связка события и identity действия из Domain.
 export interface EndgeEventBinding {
   event: string
   actionId: string | null
@@ -12,7 +12,7 @@ export interface ContextValueChange<T> {
   readonly value: T
 }
 
-/** Статические события Endge Core о фактически произошедших изменениях. */
+// Статические события Endge Core о фактически произошедших изменениях.
 export interface EndgeCoreEventMap {
   'context:workspace-changed': ContextValueChange<string | null>
   'context:facets-changed': ContextValueChange<Readonly<Record<string, string>>>
@@ -33,12 +33,12 @@ export interface EndgeCustomEventMap {
   [event: string]: unknown
 }
 
-/** Уведомление о свершившемся факте не отменяет операцию owner-а. */
+// Уведомление о свершившемся факте не отменяет операцию owner-а.
 export interface EndgeEvent<T> {
   readonly payload: T
 }
 
-/** Метаданные одной публикации. Историю хранит потребитель, а не шина. */
+// Метаданные одной публикации. Историю хранит потребитель, а не шина.
 export interface EndgePublishedEvent<T = unknown> extends EndgeEvent<T> {
   readonly name: string
   readonly at: number

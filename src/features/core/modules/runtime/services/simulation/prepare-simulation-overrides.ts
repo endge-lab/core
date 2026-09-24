@@ -10,7 +10,7 @@ export interface SimulationOverrides {
   streams: ReadonlyMap<string, { schema: Record<string, unknown>, options: SimulationMockStream }>
 }
 
-/** Подготавливает подмены по occurrence paths до активации target; Program остаётся неизменным. */
+// Подготавливает подмены по occurrence paths до активации target; Program остаётся неизменным.
 export function prepareSimulationOverrides(
   simulation: SimulationSourceArtifact,
   artifacts: RuntimeArtifactReader,

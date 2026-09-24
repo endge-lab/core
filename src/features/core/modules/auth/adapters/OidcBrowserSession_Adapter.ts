@@ -66,13 +66,17 @@ class SanitizingStateStore implements StateStore {
     return this._delegate.getAllKeys()
   }
 
-  /** Принимает User, возвращённого popup/redirect callback, в память текущей вкладки. */
+  /**
+   * Принимает User, возвращённого popup/redirect callback, в память текущей вкладки.
+   */
   public async adopt(key: string, user: User): Promise<void> {
     await this.set(key, user.toStorageString())
   }
 }
 
-/** Общий browser OIDC runtime для popup и redirect Authorization Code + PKCE flows. */
+/**
+ * Общий browser OIDC runtime для popup и redirect Authorization Code + PKCE flows.
+ */
 export class OidcBrowserSession_Adapter implements AuthSessionSource {
   private readonly _userStore: SanitizingStateStore
   private readonly _manager: UserManager
@@ -82,12 +86,16 @@ export class OidcBrowserSession_Adapter implements AuthSessionSource {
     this._manager = new UserManager(createSettings(options, this._userStore))
   }
 
-  /** Возвращает сохранённого пользователя без запуска интерактивного flow. */
+  /**
+   * Возвращает сохранённого пользователя без запуска интерактивного flow.
+   */
   public async hasSession(): Promise<boolean> {
     return isUsable(await this._manager.getUser())
   }
 
-  /** Открывает внешний OIDC login в popup и сохраняет полученную session. */
+  /**
+   * Открывает внешний OIDC login в popup и сохраняет полученную session.
+   */
   public async loginPopup(): Promise<AuthTokenSet> {
     globalThis.sessionStorage.setItem(POPUP_OPTIONS_KEY, JSON.stringify(this.options))
     const user = await this._manager.signinPopup()
@@ -95,7 +103,9 @@ export class OidcBrowserSession_Adapter implements AuthSessionSource {
     return requireToken(user, this.options.profileIdentity)
   }
 
-  /** Завершает callback в отдельном popup без загрузки Domain. */
+  /**
+   * Завершает callback в отдельном popup без загрузки Domain.
+   */
   public static async completeStoredPopupCallback(url: string = globalThis.location?.href ?? ''): Promise<void> {
     const raw = globalThis.sessionStorage.getItem(POPUP_OPTIONS_KEY)
     if (!raw) {
@@ -106,25 +116,33 @@ export class OidcBrowserSession_Adapter implements AuthSessionSource {
     await source.completePopupCallback(url)
   }
 
-  /** Перенаправляет текущую вкладку на внешний OIDC login. */
+  /**
+   * Перенаправляет текущую вкладку на внешний OIDC login.
+   */
   public async loginRedirect(): Promise<never> {
     await this._manager.signinRedirect()
     return await new Promise<never>(() => undefined)
   }
 
-  /** Завершает redirect callback и сохраняет session. */
+  /**
+   * Завершает redirect callback и сохраняет session.
+   */
   public async completeRedirectCallback(url: string = globalThis.location?.href ?? ''): Promise<AuthTokenSet> {
     const user = await this._manager.signinRedirectCallback(url)
     await this._userStore.adopt(userStoreKey(this.options), user)
     return requireToken(user, this.options.profileIdentity)
   }
 
-  /** Завершает popup callback; результат передаётся opener через oidc-client-ts. */
+  /**
+   * Завершает popup callback; результат передаётся opener через oidc-client-ts.
+   */
   public async completePopupCallback(url: string = globalThis.location?.href ?? ''): Promise<void> {
     await this._manager.signinPopupCallback(url)
   }
 
-  /** Возвращает актуальную session, используя refresh token только при необходимости. */
+  /**
+   * Возвращает актуальную session, используя refresh token только при необходимости.
+   */
   public async resolveToken(options: AuthSessionSourceResolveOptions): Promise<AuthTokenSet | null> {
     let user = await this._manager.getUser()
     const expiresIn = user?.expires_in ?? null
@@ -147,7 +165,9 @@ export class OidcBrowserSession_Adapter implements AuthSessionSource {
     return user && isUsable(user) ? toTokenSet(user) : null
   }
 
-  /** Возвращает claims и при наличии endpoint дополняет их OIDC userinfo. */
+  /**
+   * Возвращает claims и при наличии endpoint дополняет их OIDC userinfo.
+   */
   public async loadUserInfo(): Promise<Record<string, unknown> | null> {
     const user = await this._manager.getUser()
     if (!isUsable(user)) {
@@ -168,7 +188,9 @@ export class OidcBrowserSession_Adapter implements AuthSessionSource {
     }
   }
 
-  /** Завершает provider session выбранным host flow и всегда удаляет local user. */
+  /**
+   * Завершает provider session выбранным host flow и всегда удаляет local user.
+   */
   public async logout(): Promise<void> {
     try {
       if (this.options.flow === 'popup') {
@@ -242,5 +264,7 @@ function toTokenSet(user: User): AuthTokenSet {
   }
 }
 
-/** @deprecated Используйте OidcBrowserSession_Adapter. */
+/**
+ * @deprecated Используйте OidcBrowserSession_Adapter.
+ */
 export { OidcBrowserSession_Adapter as OidcBrowserSession_Service }

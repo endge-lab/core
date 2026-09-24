@@ -28,7 +28,7 @@ function uniqueFederationId(label: string): string {
 }
 
 describe('машина состояний жизненного цикла EndgeFederation', () => {
-  /** Проверяет общий phase-order родителя и дочерней Federation. */
+  // Проверяет общий phase-order родителя и дочерней Federation.
   it('проводит дочернюю федерацию через единый lifecycle graph', async () => {
     const calls: string[] = []
 
@@ -106,7 +106,7 @@ describe('машина состояний жизненного цикла EndgeF
     expect(Child.state).toBe('idle')
   })
 
-  /** Проверяет plugin-вклад Modules и Federations до общей сортировки graph. */
+  // Проверяет plugin-вклад Modules и Federations до общей сортировки graph.
   it('добавляет plugin-узлы лениво и сортирует их вместе с federation graph', async () => {
     const calls: string[] = []
 
@@ -151,7 +151,7 @@ describe('машина состояний жизненного цикла EndgeF
     expect(calls).toEqual(['plugin', 'child', 'runtime'])
   })
 
-  /** Проверяет accessor и instance при двух facade-копиях с одним runtime id. */
+  // Проверяет accessor и instance при двух facade-копиях с одним runtime id.
   it('синхронизирует plugin accessors между facade-копиями одного federation host', async () => {
     class TestModule extends EndgeModule {}
 
@@ -183,7 +183,7 @@ describe('машина состояний жизненного цикла EndgeF
     expect(secondExtension).toBe(FirstFacade.getModule('extension'))
   })
 
-  /** Проверяет рекурсивную валидацию graph до первого lifecycle side effect. */
+  // Проверяет рекурсивную валидацию graph до первого lifecycle side effect.
   it('не начинает root lifecycle при некорректном graph дочерней федерации', async () => {
     const calls: string[] = []
 
@@ -214,7 +214,7 @@ describe('машина состояний жизненного цикла EndgeF
     expect(Parent.state).toBe('idle')
   })
 
-  /** Проверяет single-flight boot и запрет подмены активного контекста. */
+  // Проверяет single-flight boot и запрет подмены активного контекста.
   it('разделяет один запуск для одинакового контекста и отклоняет другой контекст', async () => {
     const setupGate = createDeferred()
 
@@ -246,7 +246,7 @@ describe('машина состояний жизненного цикла EndgeF
     expect(TestFederation.state).toBe('ready')
   })
 
-  /** Проверяет rollback каждой boot phase и разрешённый retry после успешной очистки. */
+  // Проверяет rollback каждой boot phase и разрешённый retry после успешной очистки.
   it.each(['setup', 'load', 'build', 'start'] as const)(
     'откатывает затронутые модули после ошибки %s и разрешает повтор',
     async (failedPhase) => {
@@ -306,7 +306,7 @@ describe('машина состояний жизненного цикла EndgeF
     },
   )
 
-  /** Проверяет failed-state при ошибке rollback и восстановление отдельным reset. */
+  // Проверяет failed-state при ошибке rollback и восстановление отдельным reset.
   it('сохраняет исходную ошибку и ошибку отката до успешного восстановительного reset', async () => {
     let resetShouldFail = true
 
@@ -345,7 +345,7 @@ describe('машина состояний жизненного цикла EndgeF
     expect(TestFederation.state).toBe('idle')
   })
 
-  /** Проверяет FIFO rebuild, изоляцию ошибки и продолжение очереди. */
+  // Проверяет FIFO rebuild, изоляцию ошибки и продолжение очереди.
   it('выполняет пересборки в порядке FIFO и продолжает после одной ошибки', async () => {
     const firstBuildGate = createDeferred()
     const starts: number[] = []
@@ -396,7 +396,7 @@ describe('машина состояний жизненного цикла EndgeF
     expect(TestFederation.isInitialized).toBe(true)
   })
 
-  /** Проверяет ожидание build queue и single-flight reset. */
+  // Проверяет ожидание build queue и single-flight reset.
   it('ожидает поставленные в очередь сборки и разделяет один конкурентный reset', async () => {
     const buildGate = createDeferred()
     const calls: string[] = []

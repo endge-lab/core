@@ -2,19 +2,19 @@ import type { DiagnosticsSnapshot } from '@/features/core/modules/diagnostics/do
 import type { EndgePublishedEvent } from '@/features/core/modules/events/domain/events.types'
 import type { RuntimeInspectionSnapshot } from '@/features/core/modules/runtime/domain/runtime-inspection.types'
 
-/** Начальное состояние и граница последующих событий одного согласованного сеанса. */
+// Начальное состояние и граница последующих событий одного согласованного сеанса.
 export interface BridgeInspectionSnapshot {
   readonly snapshot: DiagnosticsSnapshot
   readonly sequence: number
 }
 
-/** Последовательность относится к потоку сеанса; метаданные самой публикации сохраняются в event. */
+// Последовательность относится к потоку сеанса; метаданные самой публикации сохраняются в event.
 export interface BridgeStreamEvent {
   readonly sequence: number
   readonly event: EndgePublishedEvent
 }
 
-/** Объёмные снимки используют тот же sequenced session stream, но отдельный transport limit. */
+// Объёмные снимки используют тот же sequenced session stream, но отдельный transport limit.
 export interface BridgeInspectionUpdate {
   readonly sequence: number
   readonly update:

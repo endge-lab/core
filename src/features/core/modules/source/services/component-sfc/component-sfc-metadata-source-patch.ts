@@ -7,7 +7,7 @@ import type { ProgramMetadataMap } from '@/features/core/modules/program/domain/
 import { ComponentType } from '@/features/core/modules/domain/types/document/document.types'
 import { inspectDocumentMetadata, patchDocumentMetadata } from '@/features/core/modules/source/services/document-metadata'
 
-/** Совместимый фасад старого SFC API над общим descriptor-driven metadata contract. */
+// Совместимый фасад старого SFC API над общим descriptor-driven metadata contract.
 export function inspectComponentSFCMetadata(source: string): ComponentSFCMetadataVisualProjection {
   const result = inspectDocumentMetadata(ComponentType.SFC, { source })
   return {
@@ -20,7 +20,7 @@ export function inspectComponentSFCMetadata(source: string): ComponentSFCMetadat
   }
 }
 
-/** Совместимый фасад старого SFC patch API над общим descriptor-driven metadata contract. */
+// Совместимый фасад старого SFC patch API над общим descriptor-driven metadata contract.
 export function patchComponentSFCMetadataSource(
   source: string,
   metadata: ProgramMetadataMap,

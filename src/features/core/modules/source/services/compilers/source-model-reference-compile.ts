@@ -4,7 +4,7 @@ export type ParsedSourceModelReference
   = | { kind: 'external', identity: string }
     | { kind: 'inline', source: string, definition: t.CallExpression }
 
-/** Читает canonical string identity или legacy wrapper model('identity'). */
+// Читает canonical string identity или legacy wrapper model('identity').
 export function readSourceModelIdentity(
   raw: t.CallExpression['arguments'][number] | undefined,
   referenceCall: string,
@@ -28,7 +28,7 @@ export function readSourceModelIdentity(
     : null
 }
 
-/** Нормализует shorthand, legacy external wrapper и inline define-call в общий reference contract. */
+// Нормализует shorthand, legacy external wrapper и inline define-call в общий reference contract.
 export function readSourceModelReference(
   raw: t.CallExpression['arguments'][number] | undefined,
   source: string,

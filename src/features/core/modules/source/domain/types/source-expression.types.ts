@@ -1,7 +1,7 @@
 import type { ProgramMetadataMap } from '@/features/core/modules/program/domain/types/program-metadata.types'
 import type { TypeSourceExpression } from '@/features/core/modules/source/domain/types/type-source.types'
 
-/** Identity Type Registry для контрактов полей Query и Filter. */
+// Identity Type Registry для контрактов полей Query и Filter.
 export type SourceFieldType
   = | 'String'
     | 'Number'
@@ -13,7 +13,7 @@ export type SourceFieldType
     | 'Any'
     | (string & {})
 
-/** Источник безопасного чтения значения внутри source expression. */
+// Источник безопасного чтения значения внутри source expression.
 export type SourceExpressionReadKind
   = | 'env'
     | 'prop'
@@ -39,7 +39,7 @@ export type SourceExpressionReadKind
     | 'update-has-data'
     | 'update-has-meta'
 
-/** Whitelist операций статического expression IR. */
+// Whitelist операций статического expression IR.
 export type SourceExpressionOperation
   = | 'merge'
     | 'compact'
@@ -173,11 +173,9 @@ export type SourceExpressionOperation
     | 'contains-all'
     | 'contains-any'
 
-/**
- * Безопасное runtime-выражение, полученное из source callback.
- *
- * IR не содержит исполняемого JavaScript и вычисляется только штатным evaluator-ом.
- */
+// Безопасное runtime-выражение, полученное из source callback.
+//
+// IR не содержит исполняемого JavaScript и вычисляется только штатным evaluator-ом.
 export type SourceExpressionIR
   = | { type: 'literal', value: unknown }
     | { type: 'object', properties: Record<string, SourceExpressionIR> }
@@ -196,35 +194,35 @@ export type SourceExpressionIR
       arguments: SourceExpressionIR[]
     }
 
-/** Статический вариант выбора source-field. */
+// Статический вариант выбора source-field.
 export interface SourceFieldOption {
   value: string | number | boolean
   label?: string
 }
 
-/** Ссылка source-field на доменный vocab. */
+// Ссылка source-field на доменный vocab.
 export interface SourceFieldVocab {
   identity: string
   valuePath: string
   labelPath: string
 }
 
-/** Общий compiled field contract для Filter и Query props. */
+// Общий compiled field contract для Filter и Query props.
 export interface SourceFieldDefinition {
   key: string
   type: SourceFieldType
-  /** Точный inline-контракт для objectOf/recordOf; type сохраняет coarse runtime identity. */
+  // Точный inline-контракт для objectOf/recordOf; type сохраняет coarse runtime identity.
   typeExpression?: TypeSourceExpression
   optional: boolean
   array: boolean
   defaultValue?: SourceExpressionIR
   options?: SourceFieldOption[]
   vocab?: SourceFieldVocab
-  /** Статическая presentation metadata поля, не влияющая на Filter state. */
+  // Статическая presentation metadata поля, не влияющая на Filter state.
   metadata?: ProgramMetadataMap
 }
 
-/** Default value prop, вычисляемый через output внешнего или локального Filter. */
+// Default value prop, вычисляемый через output внешнего или локального Filter.
 export type SourceFieldDefaultSource
   = | { kind: 'filter', identity: string, output: string }
     | { kind: 'inline-filter', source: string, output: string }
@@ -234,14 +232,14 @@ export type SourceFieldDefaultSource
       output: string
     }
 
-/** Query prop на базе общего field contract. */
+// Query prop на базе общего field contract.
 export interface QueryProgramProp extends SourceFieldDefinition {
   defaultSource?: SourceFieldDefaultSource
 }
 
-/** Контекст вычисления безопасного source expression. */
+// Контекст вычисления безопасного source expression.
 export interface SourceExpressionContext {
-  /** Разрешает чтение env(name), не предоставляя workspace вычислителю. */
+  // Разрешает чтение env(name), не предоставляя workspace вычислителю.
   environment?: (name: string) => unknown
   props?: Record<string, unknown>
   values?: Record<string, unknown>
@@ -255,11 +253,11 @@ export interface SourceExpressionContext {
   onWarning?: (warning: SourceExpressionWarning) => void
 }
 
-/** Публичное имя общего декларативного value DSL. */
+// Публичное имя общего декларативного value DSL.
 export type ValueExpressionIR = SourceExpressionIR
 export type ValueExpressionContext = SourceExpressionContext
 
-/** Runtime warning безопасного expression evaluator. */
+// Runtime warning безопасного expression evaluator.
 export interface SourceExpressionWarning {
   code: string
   message: string

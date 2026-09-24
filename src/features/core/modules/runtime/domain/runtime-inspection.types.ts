@@ -2,7 +2,7 @@ import type { RuntimeHostStatus } from './runtime-host.types'
 import type { RuntimeRenderInspection } from './runtime-render-inspection.types'
 import type { EndgeRuntimeSnapshot } from './runtime.types'
 
-/** Наблюдаемое состояние Runtime. Данные никогда не исполняются при импорте. */
+// Наблюдаемое состояние Runtime. Данные никогда не исполняются при импорте.
 export interface RuntimeInspectionSnapshot {
   version: 1
   runtime: EndgeRuntimeSnapshot
@@ -12,7 +12,7 @@ export interface RuntimeInspectionSnapshot {
   dataError?: string
 }
 
-/** Клиентский идентификатор экземпляра и его поколение защищают от повторного использования id. */
+// Клиентский идентификатор экземпляра и его поколение защищают от повторного использования id.
 export type RuntimeControlTarget
   = | { kind: 'host', id: string, createdAt: number }
     | { kind: 'scope', id: string, generation: number }

@@ -38,7 +38,9 @@ function rendererIndexKey(input: {
   return `${input.definitionRef}::${input.surface}::${input.role}`
 }
 
-/** Модуль UI definitions, presets, renderers и adapter registry. */
+/**
+ * Модуль UI definitions, presets, renderers и adapter registry.
+ */
 export class EndgeUIRegistry_Module extends EndgeModule {
   public readonly adapters = new UIAdapterRegistry(() => this.notify())
 

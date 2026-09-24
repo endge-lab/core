@@ -1,9 +1,9 @@
 import type { EndgeWorkspaceDefinition } from '@/features/core/modules/workspace/domain/workspace.types'
 
-/** Workspace-конфигурация не содержит credential material. */
+// Workspace-конфигурация не содержит credential material.
 export type EndgeWorkspaceExport = EndgeWorkspaceDefinition
 
-/** Persisted-срез домена, который можно восстановить через plain provider. */
+// Persisted-срез домена, который можно восстановить через plain provider.
 export interface EndgeDomainPlain {
   facets: unknown[]
   facetDocuments: unknown[]
@@ -35,7 +35,7 @@ export interface EndgeDomainPlain {
   navigations: unknown[]
 }
 
-/** Коллекции документов канонического snapshot нового backend-сервиса. */
+// Коллекции документов канонического snapshot нового backend-сервиса.
 export interface EndgePortableDocuments {
   'facets': unknown[]
   'facet-documents': unknown[]
@@ -72,7 +72,7 @@ export type EndgePortableWorkspace = Omit<EndgeWorkspaceExport, 'installedIntegr
   dataMode: 'development' | 'production'
 }
 
-/** Переносимый workspace snapshot, принимаемый новым backend import API. */
+// Переносимый workspace snapshot, принимаемый новым backend import API.
 export interface EndgeDomainBundle {
   schemaVersion: number
   kind: 'workspace-snapshot'

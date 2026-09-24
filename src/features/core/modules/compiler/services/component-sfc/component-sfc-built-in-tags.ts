@@ -31,7 +31,7 @@ export const ENDGE_SFC_BUILT_IN_TAGS = new Set<RComponentSFC_IR_Tag>([
   'TooltipContent',
 ])
 
-/** Проверяет, является ли tag встроенным renderer-neutral SFC primitive. */
+// Проверяет, является ли tag встроенным renderer-neutral SFC primitive.
 export function isComponentSFCBuiltInTag(tag: string): tag is RComponentSFC_IR_Tag {
   return ENDGE_SFC_BUILT_IN_TAGS.has(tag as RComponentSFC_IR_Tag)
 }

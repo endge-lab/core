@@ -2,7 +2,9 @@ import type { EndgeCommandHandler } from '@/features/core/modules/commands/types
 import type { EndgeContextCommandTarget } from '@/features/core/modules/commands/types/context-command-target.type'
 import { readCommandNullableString } from '@/features/core/modules/commands/tools/command-payload'
 
-/** Применяет запрос изменения темы через существующий метод Context. */
+/**
+ * Применяет запрос изменения темы через существующий метод Context.
+ */
 export class SetThemeCommand implements EndgeCommandHandler {
   public readonly type = 'context:set-theme' as const
   private readonly _context: Pick<EndgeContextCommandTarget, 'setCurrentTheme'>

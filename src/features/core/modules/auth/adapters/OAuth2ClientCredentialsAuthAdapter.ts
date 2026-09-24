@@ -2,7 +2,9 @@ import type { AuthAdapterContext, AuthProfileAdapter, AuthProfileSchema, AuthTok
 
 const CONFIG_KEYS = ['clientAuthentication', 'clientId', 'scopes', 'tokenEndpoint']
 
-/** Выполняет OAuth2 Client Credentials grant. */
+/**
+ * Выполняет OAuth2 Client Credentials grant.
+ */
 export class OAuth2ClientCredentialsAuthAdapter implements AuthProfileAdapter {
   public readonly id = 'oauth2-client-credentials'
   public readonly label = 'OAuth2 Client Credentials'

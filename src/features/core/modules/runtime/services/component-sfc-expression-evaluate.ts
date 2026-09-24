@@ -13,7 +13,7 @@ const UNSUPPORTED_EXPRESSION = Symbol('unsupported-sfc-expression')
 const BLOCKED_MEMBER_KEYS = new Set(['__proto__', 'prototype', 'constructor'])
 type SFCExpressionResult = unknown | typeof UNSUPPORTED_EXPRESSION
 
-/** Исполняет только готовый IR. Не читает source и не вызывает parser/compiler. */
+// Исполняет только готовый IR. Не читает source и не вызывает parser/compiler.
 export function evaluateComponentSFCExpression(expression: Expression, context: SFCExpressionEvaluationContext): unknown {
   const result = evaluate(expression, context)
   return result === UNSUPPORTED_EXPRESSION ? undefined : result

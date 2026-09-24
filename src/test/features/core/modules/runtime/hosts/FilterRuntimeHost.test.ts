@@ -1,7 +1,7 @@
 import type { ProgramArtifact } from '@/features/core/modules/program/domain/types/program.types'
 import type { FilterProgramPayload } from '@/features/core/modules/source/domain/types/filter-source.types'
 
-import { Raph } from '@endge/raph'
+import { Raph } from '@raphy-js/raph'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { RFilter } from '@/features/core/modules/domain/entities/RFilter'

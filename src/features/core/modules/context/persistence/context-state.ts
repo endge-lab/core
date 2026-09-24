@@ -6,7 +6,7 @@ import type {
 
 import { Serialize } from '@endge/utils'
 
-/** Строит изолированный ключ dynamic state из полного context scope и ключа потребителя. */
+// Строит изолированный ключ dynamic state из полного context scope и ключа потребителя.
 export function buildContextStateStorageKey(
   scope: EndgePersistenceScope,
   key: string,
@@ -22,7 +22,7 @@ export function buildContextStateStorageKey(
   ].join(':')
 }
 
-/** Личные настройки host-приложения не зависят от рабочего или инспектируемого context. */
+// Личные настройки host-приложения не зависят от рабочего или инспектируемого context.
 export function buildUserContextStateStorageKey(userId: string, key: string): string {
   const identity = String(userId ?? '').trim()
   if (!identity) {

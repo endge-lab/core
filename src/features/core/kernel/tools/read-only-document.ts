@@ -1,6 +1,6 @@
 import { EndgeDebuggerReadOnlyError } from '@/features/core/kernel/errors/EndgeDebuggerReadOnlyError'
 
-/** Protects materialized documents while preserving their entity prototypes and shared references. */
+// Protects materialized documents while preserving their entity prototypes and shared references.
 export function readOnlyDocument<T extends object>(value: T, mutableRootKeys: readonly string[] = []): T {
   const cache = new WeakMap<object, object>()
   function wrap<V>(target: V): V {

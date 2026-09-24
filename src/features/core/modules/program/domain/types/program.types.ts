@@ -21,7 +21,7 @@ export type { ConfigurationProgramPayload } from '@/features/core/modules/source
 
 export type ProgramArtifactKey = string
 
-/** Тип доменной сущности, для которой compiler может построить program artifact. */
+// Тип доменной сущности, для которой compiler может построить program artifact.
 export type ProgramEntityType
   = 'type'
     | 'component-sfc'
@@ -39,10 +39,10 @@ export type ProgramEntityType
     | 'style'
     | 'configuration'
 
-/** Итоговый статус artifact после компиляции и валидации. */
+// Итоговый статус artifact после компиляции и валидации.
 export type ProgramArtifactStatus = 'valid' | 'warning' | 'error'
 
-/** Возможность, которую artifact предоставляет runtime/render слоям. */
+// Возможность, которую artifact предоставляет runtime/render слоям.
 export type ProgramCapability
   = 'compilable'
     | 'runnable'
@@ -51,95 +51,95 @@ export type ProgramCapability
     | 'data-provider'
     | 'configuration'
 
-/** Стабильная ссылка на compiled artifact внутри Endge.program. */
+// Стабильная ссылка на compiled artifact внутри Endge.program.
 export interface ProgramArtifactRef {
-  /** Тип доменной сущности, которой принадлежит artifact. */
+  // Тип доменной сущности, которой принадлежит artifact.
   entityType: ProgramEntityType
 
-  /** Persisted id доменной сущности или fallback id, если persisted id еще нет. */
+  // Persisted id доменной сущности или fallback id, если persisted id еще нет.
   id: string | number
 
-  /** Стабильная identity доменной сущности для поиска без привязки к database id. */
+  // Стабильная identity доменной сущности для поиска без привязки к database id.
   identity: string
 }
 
-/** Диагностическое сообщение, полученное во время компиляции artifact. */
+// Диагностическое сообщение, полученное во время компиляции artifact.
 export interface ProgramDiagnostic {
-  /** Уровень важности диагностического сообщения. */
+  // Уровень важности диагностического сообщения.
   severity: 'info' | 'warning' | 'error'
 
-  /** Машинный код диагностики для фильтрации, тестов и UI-группировки. */
+  // Машинный код диагностики для фильтрации, тестов и UI-группировки.
   code: string
 
-  /** Человекочитаемое описание проблемы или предупреждения. */
+  // Человекочитаемое описание проблемы или предупреждения.
   message: string
 
-  /** Artifact, к которому относится диагностика. Заполняется при добавлении в program. */
+  // Artifact, к которому относится диагностика. Заполняется при добавлении в program.
   entityRef?: ProgramArtifactRef
 
-  /** Путь внутри source/model: например script, template, style или definition.nodes. */
+  // Путь внутри source/model: например script, template, style или definition.nodes.
   sourcePath?: string
 
-  /** Абсолютный offset начала проблемного фрагмента в source. */
+  // Абсолютный offset начала проблемного фрагмента в source.
   start?: number
 
-  /** Абсолютный offset конца проблемного фрагмента в source. */
+  // Абсолютный offset конца проблемного фрагмента в source.
   end?: number
 }
 
-/** Зависимость compiled artifact от другой доменной сущности или внешней capability. */
+// Зависимость compiled artifact от другой доменной сущности или внешней capability.
 export interface ProgramDependency {
-  /** Тип зависимой сущности. Может быть расширен строкой для внешних источников. */
+  // Тип зависимой сущности. Может быть расширен строкой для внешних источников.
   entityType: ProgramEntityType | string
 
-  /** Id зависимой сущности, если он известен compiler-у. */
+  // Id зависимой сущности, если он известен compiler-у.
   id: string | number
 
-  /** Identity зависимой сущности, если она известна compiler-у. */
+  // Identity зависимой сущности, если она известна compiler-у.
   identity?: string
 
-  /** Роль зависимости: child-component, renderer, data-source и т.п. */
+  // Роль зависимости: child-component, renderer, data-source и т.п.
   role?: string
 
-  /** Необязательное местоположение в Source ссылки на зависимость для диагностики linker. */
+  // Необязательное местоположение в Source ссылки на зависимость для диагностики linker.
   sourcePath?: string
   start?: number
   end?: number
 }
 
-/** Единица compiled program: результат компиляции одной доменной сущности. */
+// Единица compiled program: результат компиляции одной доменной сущности.
 export interface ProgramArtifact<TPayload = unknown> {
-  /** Ссылка на исходную доменную сущность и ключ artifact в program. */
+  // Ссылка на исходную доменную сущность и ключ artifact в program.
   ref: ProgramArtifactRef
 
-  /** Hash стабильного source-снимка, по которому можно понять, менялся ли artifact input. */
+  // Hash стабильного source-снимка, по которому можно понять, менялся ли artifact input.
   sourceHash: string
 
-  /** Версия compiler pipeline, построившая artifact. */
+  // Версия compiler pipeline, построившая artifact.
   compilerVersion: string
 
-  /** Hash structural context и effective configuration этой сборки. */
+  // Hash structural context и effective configuration этой сборки.
   contextHash?: string
 
-  /** Итоговый статус artifact с учетом diagnostics. */
+  // Итоговый статус artifact с учетом diagnostics.
   status: ProgramArtifactStatus
 
-  /** Список diagnostics, привязанных к artifact. */
+  // Список diagnostics, привязанных к artifact.
   diagnostics: ProgramDiagnostic[]
 
-  /** Список зависимостей, найденных compiler-ом. */
+  // Список зависимостей, найденных compiler-ом.
   dependencies: ProgramDependency[]
 
-  /** Возможности artifact для runtime/render/query слоев. */
+  // Возможности artifact для runtime/render/query слоев.
   capabilities: ProgramCapability[]
 
-  /** Публичная compiler-derived metadata сущности и её внутренних узлов. */
+  // Публичная compiler-derived metadata сущности и её внутренних узлов.
   metadata: ProgramMetadata
 
-  /** Typed payload конкретного artifact: SFC IR, compiled flow, query plan и т.п. */
+  // Typed payload конкретного artifact: SFC IR, compiled flow, query plan и т.п.
   payload: TPayload
 
-  /** Локальные compiled artifacts, принадлежащие только этому artifact. */
+  // Локальные compiled artifacts, принадлежащие только этому artifact.
   children?: ProgramArtifact[]
 }
 
@@ -157,9 +157,9 @@ export type QueryProgramOutputSource
 export interface QueryProgramOutput {
   key: string
   source: QueryProgramOutputSource
-  /** Упорядоченная цепочка transform для новых runtimes. */
+  // Упорядоченная цепочка transform для новых runtimes.
   transforms?: ResponseOutputTransform[]
-  /** Проекция совместимости для runtimes, скомпилированных до упорядоченных transforms. */
+  // Проекция совместимости для runtimes, скомпилированных до упорядоченных transforms.
   dataViews: DataViewRef[]
   contract?: SourceFieldDefinition | null
   materialization:
@@ -167,160 +167,160 @@ export interface QueryProgramOutput {
     | { kind: 'derived', strategy: import('@/features/core/modules/source/domain/types/data-view-source.types').DataViewMaterializationStrategy }
 }
 
-/** Статическое значение для обратной совместимости или скомпилированное выражение runtime-запроса. */
+// Статическое значение для обратной совместимости или скомпилированное выражение runtime-запроса.
 export type QueryProgramRequestValue<T> = T | SourceExpressionIR
 
-/** Payload artifact для query-сущности. */
+// Payload artifact для query-сущности.
 export interface QueryProgramPayload {
-  /** Версия source syntax, определяющая runtime contract. */
+  // Версия source syntax, определяющая runtime contract.
   sourceVersion: number
 
-  /** Parser-level AST query source, нужен для diagnostics/debug UI. */
+  // Parser-level AST query source, нужен для diagnostics/debug UI.
   ast?: unknown
 
-  /** Canonical authoring-модель query source. */
+  // Canonical authoring-модель query source.
   sourceDocument?: unknown
 
-  /** Тип query: REST, GraphQL, custom или другой поддерживаемый источник. */
+  // Тип query: REST, GraphQL, custom или другой поддерживаемый источник.
   type: string
 
-  /** HTTP method для REST query. */
+  // HTTP method для REST query.
   method?: QueryProgramRequestValue<string>
 
-  /** Endpoint или базовая ссылка источника данных. */
+  // Endpoint или базовая ссылка источника данных.
   endpoint: QueryProgramRequestValue<string>
 
-  /** Тело запроса, GraphQL document или custom query expression. */
+  // Тело запроса, GraphQL document или custom query expression.
   query: QueryProgramRequestValue<string>
 
-  /** GraphQL operation name, если artifact использует query-gql transport. */
+  // GraphQL operation name, если artifact использует query-gql transport.
   operationName?: string
 
-  /** Политика GraphQL errors в HTTP 2xx response. */
+  // Политика GraphQL errors в HTTP 2xx response.
   errorPolicy?: 'throw' | 'ignore'
 
-  /** HTTP-заголовки транспорта Query. */
+  // HTTP-заголовки транспорта Query.
   headers?: QueryProgramRequestValue<Record<string, string>>
 
-  /** Auth config, подготовленный для runtime query layer. */
+  // Auth config, подготовленный для runtime query layer.
   auth?: QueryProgramRequestValue<unknown>
 
-  /** Request timeout для REST query. */
+  // Request timeout для REST query.
   timeoutMs?: QueryProgramRequestValue<number>
 
-  /** Отправлять body как application/x-www-form-urlencoded. */
+  // Отправлять body как application/x-www-form-urlencoded.
   sendAsFormUrlencoded?: QueryProgramRequestValue<boolean>
 
-  /** Единственный runtime input contract Query. */
+  // Единственный runtime input contract Query.
   props: QueryProgramProp[]
 
-  /** Безопасный request.body IR. При null отправляется пустой object payload. */
+  // Безопасный request.body IR. При null отправляется пустой object payload.
   requestBody: SourceExpressionIR | null
 
-  /** Безопасный GraphQL variables IR. */
+  // Безопасный GraphQL variables IR.
   requestVariables?: SourceExpressionIR | null
 
-  /** Включены ли mock data для query. */
+  // Включены ли mock data для query.
   mockDataEnabled?: boolean
 
-  /** Query с mock-payload. */
+  // Query с mock-payload.
   mockData?: unknown
 
-  /** Ordered output graph, который runtime вычисляет после backend response. */
+  // Ordered output graph, который runtime вычисляет после backend response.
   outputs: QueryProgramOutput[]
 }
 
 export type { VocabProgramPayload }
 
-/** Payload artifact для DataView: executable read-model без persisted runtime state. */
+// Payload artifact для DataView: executable read-model без persisted runtime state.
 export interface DataViewProgramPayload {
-  /** Optional parser tree retained for inspection; runtime does not require it. */
+  // Optional parser tree retained for inspection; runtime does not require it.
   ast?: unknown
-  /** Тип artifact для diagnostics/debug UI. */
+  // Тип artifact для diagnostics/debug UI.
   type: 'data-view'
 
-  /** Режим выполнения source: manual transform, pipeline, object projection или root expression. */
+  // Режим выполнения source: manual transform, pipeline, object projection или root expression.
   mode: 'manual' | 'pipeline' | 'projection' | 'expression'
 
-  /** Runtime-ready strategy; auto всегда разрешен compiler-ом заранее. */
+  // Runtime-ready strategy; auto всегда разрешен compiler-ом заранее.
   materializationStrategy: import('@/features/core/modules/source/domain/types/data-view-source.types').DataViewMaterializationStrategy
 
-  /** Canonical source document для debug/preview UI. */
+  // Canonical source document для debug/preview UI.
   sourceDocument: DataViewSourceDocument | null
 
-  /** Декларативный входной и выходной тип DataView. */
+  // Декларативный входной и выходной тип DataView.
   contract?: DataViewSourceDocument['contract']
 
-  /** Контракт внешних параметров одного materialized DataView instance. */
+  // Контракт внешних параметров одного materialized DataView instance.
   props?: SourceFieldDefinition[]
 
-  /** Row-local predicate, применяемый после pipeline steps. */
+  // Row-local predicate, применяемый после pipeline steps.
   filter?: SourceExpressionIR | null
 
-  /** Compiled manual transform. Используется только в mode=manual. */
+  // Compiled manual transform. Используется только в mode=manual.
   transform: DataViewManualTransform | null
 
-  /** Compiled pipeline steps. Используется только в mode=pipeline. */
+  // Compiled pipeline steps. Используется только в mode=pipeline.
   steps: DataViewPipelineStep[]
 
-  /** Compiled object fields. Используется только в mode=projection. */
+  // Compiled object fields. Используется только в mode=projection.
   output: Record<string, SourceExpressionIR>
 
-  /** Compiled root expression. Используется только в mode=expression. */
+  // Compiled root expression. Используется только в mode=expression.
   expression?: SourceExpressionIR | null
 }
 
-/** Payload artifact для нового source-first SFC компонента. */
+// Payload artifact для нового source-first SFC компонента.
 export interface ComponentSFCProgramPayload {
-  /** Независимый статус компилятора для каждой секции SFC. */
+  // Независимый статус компилятора для каждой секции SFC.
   sections?: Record<'script' | 'template' | 'style', ProgramArtifactStatus>
-  /** Разложенный canonical source: script, template и style. */
+  // Разложенный canonical source: script, template и style.
   sourceParts: RComponentSFCSource_Parts
 
-  /** Внешний контракт компонента: inputs, events, slots. */
+  // Внешний контракт компонента: inputs, events, slots.
   contract: RComponentContract
 
-  /** Зависимости компонента: дочерние компоненты, data sources, actions, renderers. */
+  // Зависимости компонента: дочерние компоненты, data sources, actions, renderers.
   dependencies: RComponentDependencies
 
-  /** Runtime-зависимости SFC v1, по которым host подписывается на input source. */
+  // Runtime-зависимости SFC v1, по которым host подписывается на input source.
   runtimeDependencies: RComponentSFC_RuntimeDependencies
 
-  /** Preview-only props для песочницы/debug UI. Не являются runtime default props. */
+  // Preview-only props для песочницы/debug UI. Не являются runtime default props.
   previewProps: ComponentSFCPreviewProps | null
 
-  /** Runtime-параметры только для preview: заполнение локального store, запуск queries/actions и прочее. */
+  // Runtime-параметры только для preview: заполнение локального store, запуск queries/actions и прочее.
   previewOptions: ComponentSFCPreviewOptions | null
 
-  /** Parser-level AST SFC source, нужен для diagnostics и debug UI. */
+  // Parser-level AST SFC source, нужен для diagnostics и debug UI.
   ast?: RComponentSFC_AST | null
 
-  /** Target-neutral semantic IR, который renderer-слои используют для DOM/Nova. */
+  // Target-neutral semantic IR, который renderer-слои используют для DOM/Nova.
   ir: RComponentSFC_IR | null
 }
 
-/** Source-first документ стилей в payload runtime. */
+// Source-first документ стилей в payload runtime.
 export interface EndgeStyleProgramPayload {
-  /** Optional parser tree retained for inspection; runtime does not require it. */
+  // Optional parser tree retained for inspection; runtime does not require it.
   ast?: unknown
-  /** Скомпилированная таблица стилей, нейтральная к renderer. */
+  // Скомпилированная таблица стилей, нейтральная к renderer.
   stylesheet: EndgeStyleSheetArtifact
 
-  /** ID тем, предоставляемые этим документом. */
+  // ID тем, предоставляемые этим документом.
   themes: string[]
 
-  /** Внешние зависимости, найденные при компиляции условий стилей. */
+  // Внешние зависимости, найденные при компиляции условий стилей.
   dependencies: ProgramDependency[]
 }
 
 export type { ComputationProgramPayload }
 
-/** Одна запись build-derived registry пользовательских SFC tags. */
+// Одна запись build-derived registry пользовательских SFC tags.
 export interface ComponentSFCTagRegistryEntry {
-  /** Пользовательский tag, доступный в template. */
+  // Пользовательский tag, доступный в template.
   tag: string
 
-  /** Identity persisted SFC-компонента, на который разрешается tag. */
+  // Identity persisted SFC-компонента, на который разрешается tag.
   identity: string
 }
 
@@ -364,71 +364,71 @@ export interface ComponentSFCPreviewOptions {
   run?: ComponentSFCPreviewRunTarget[]
 }
 
-/** Контекст одного запуска compiler pipeline. */
+// Контекст одного запуска compiler pipeline.
 export interface ProgramCompileContext {
-  /** Версия compiler pipeline, которая попадет во все artifacts текущей сборки. */
+  // Версия compiler pipeline, которая попадет во все artifacts текущей сборки.
   compilerVersion: string
 
-  /** Неизменяемый структурный контекст и фактическая конфигурация этой сборки. */
+  // Неизменяемый структурный контекст и фактическая конфигурация этой сборки.
   buildContext: import('@/features/core/modules/configuration/domain/types/configuration.type').EndgeBuildContext
 }
 
-/** Handler компиляции одного типа доменных сущностей. */
+// Handler компиляции одного типа доменных сущностей.
 export interface EntityCompilerHandler<TEntity = unknown, TPayload = unknown> {
-  /** Тип сущности, которую умеет компилировать handler. */
+  // Тип сущности, которую умеет компилировать handler.
   entityType: ProgramEntityType
 
-  /** Функция компиляции одной сущности в один typed artifact. */
+  // Функция компиляции одной сущности в один typed artifact.
   compile: (
     entity: TEntity,
     context: ProgramCompileContext,
   ) => ProgramArtifact<TPayload>
 }
 
-/** Сводный snapshot текущего Endge.program для diagnostics/debug UI. */
+// Сводный snapshot текущего Endge.program для diagnostics/debug UI.
 export interface EndgeProgramSnapshot {
-  /** Unix timestamp создания snapshot. */
+  // Unix timestamp создания snapshot.
   generatedAt: number
 
-  /** Общий статус program, агрегированный по всем artifacts. */
+  // Общий статус program, агрегированный по всем artifacts.
   status: ProgramArtifactStatus
 
-  /** Версия compiler, которой была собрана текущая program. */
+  // Версия compiler, которой была собрана текущая program.
   compilerVersion: string
 
-  /** Общее количество artifacts в program. */
+  // Общее количество artifacts в program.
   total: number
 
-  /** Количество artifacts по статусам valid/warning/error. */
+  // Количество artifacts по статусам valid/warning/error.
   byStatus: Record<ProgramArtifactStatus, number>
 
-  /** Количество artifacts по типам доменных сущностей. */
+  // Количество artifacts по типам доменных сущностей.
   byEntityType: Record<string, number>
 
-  /** Все diagnostics из всех artifacts. */
+  // Все diagnostics из всех artifacts.
   diagnostics: ProgramDiagnostic[]
 
-  /** Компактные сведения по каждому artifact без тяжелого payload. */
+  // Компактные сведения по каждому artifact без тяжелого payload.
   artifacts: Array<{
-    /** Ссылка на artifact. */
+    // Ссылка на artifact.
     ref: ProgramArtifactRef
 
-    /** Итоговый статус artifact. */
+    // Итоговый статус artifact.
     status: ProgramArtifactStatus
 
-    /** Количество diagnostics у artifact. */
+    // Количество diagnostics у artifact.
     diagnostics: number
 
-    /** Количество зависимостей у artifact. */
+    // Количество зависимостей у artifact.
     dependencies: number
 
-    /** Возможности artifact. */
+    // Возможности artifact.
     capabilities: ProgramCapability[]
 
-    /** Исходный входной артефакт для hash. */
+    // Исходный входной артефакт для hash.
     sourceHash: string
 
-    /** Версия compiler, построившая artifact. */
+    // Версия compiler, построившая artifact.
     compilerVersion: string
   }>
 }

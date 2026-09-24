@@ -13,7 +13,9 @@ import {
   INSPECTION_MAX_RECORDS,
 } from '../tools/inspection-recording'
 
-/** Один consumer capture: собственные policy, immutable history, sequence и disposer. */
+/**
+ * Один consumer capture: собственные policy, immutable history, sequence и disposer.
+ */
 export class InspectionCapture_Service implements InspectionCapture {
   private readonly _recording: InspectionRecording
   private _state: InspectionState
@@ -98,7 +100,9 @@ export class InspectionCapture_Service implements InspectionCapture {
     }
   }
 
-  /** Снимает состояние на границе уведомления owner, не откладывая чтение mutable values. */
+  /**
+   * Снимает состояние на границе уведомления owner, не откладывая чтение mutable values.
+   */
   public update(event?: { name: string, payload: unknown }): void {
     if (this._stopped) {
       return

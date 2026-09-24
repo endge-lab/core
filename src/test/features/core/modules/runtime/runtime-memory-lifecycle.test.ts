@@ -1,7 +1,7 @@
 import type { ProgramArtifact, QueryProgramPayload } from '@/features/core/modules/program/domain/types/program.types'
 import type { RuntimeHost, RuntimeHostContext } from '@/features/core/modules/runtime/domain/runtime-host.types'
 
-import { Raph, RaphNode } from '@endge/raph'
+import { Raph, RaphNode } from '@raphy-js/raph'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Endge } from '@/features/core/kernel/endge'
 import { RQuery } from '@/features/core/modules/domain/entities/RQuery'
@@ -30,7 +30,7 @@ describe('жизненный цикл памяти runtime', () => {
     Raph.reset()
   })
 
-  /** Реестр публикует lifecycle facts только своих hosts и освобождает связь при удалении. */
+  // Реестр публикует lifecycle facts только своих hosts и освобождает связь при удалении.
   it('передаёт изменения статуса в Events без повторов и отключает удалённый host', async () => {
     const changes: unknown[] = []
     const off = Endge.events.onEvent('runtime:host-status-changed', event => changes.push(event.payload))

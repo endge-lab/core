@@ -23,7 +23,7 @@ interface LocatedSourceDocumentReference {
   identityRange: SourceDocumentReference['range']
 }
 
-/** Разрешает внешнюю document reference под курсором по AST и правилам DSL. */
+// Разрешает внешнюю document reference под курсором по AST и правилам DSL.
 export function resolveSourceDocumentReference(
   context: SourceLanguageContext,
   rules: SourceDocumentReferenceRules,
@@ -39,7 +39,7 @@ export function resolveSourceDocumentReference(
     ?.reference ?? null
 }
 
-/** Подсвечивает ссылки `field(Type)` на отдельные Type Source документы. */
+// Подсвечивает ссылки `field(Type)` на отдельные Type Source документы.
 export function typedSourceTypeReferenceHighlights(
   context: SourceLanguageContext,
 ): SourceLanguageSemanticHighlight[] {
@@ -52,7 +52,7 @@ export function typedSourceTypeReferenceHighlights(
   return typeReferenceHighlights(context, references)
 }
 
-/** Создаёт единый semantic highlight для разрешимых Type Source ссылок. */
+// Создаёт единый semantic highlight для разрешимых Type Source ссылок.
 export function typeReferenceHighlights(
   context: SourceLanguageContext,
   references: readonly SourceDocumentReference[],
@@ -108,12 +108,10 @@ function collectSourceDocumentReferences(
   }
 }
 
-/**
- * Разрешает ссылки типизированного DSL-документа.
- *
- * `field(TypeIdentity)` является общим source-контрактом Type Registry,
- * поэтому каждый новый типизированный язык не должен регистрировать его отдельно.
- */
+// Разрешает ссылки типизированного DSL-документа.
+//
+// `field(TypeIdentity)` является общим source-контрактом Type Registry,
+// поэтому каждый новый типизированный язык не должен регистрировать его отдельно.
 export function resolveTypedSourceDocumentReference(
   context: SourceLanguageContext,
   rules: SourceDocumentReferenceRules = {},

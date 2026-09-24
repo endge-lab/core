@@ -30,7 +30,9 @@ interface SentryEnvelopeAttachment {
   body: string
 }
 
-/** Системный adapter доставки Endge telemetry и snapshots в Sentry ingestion API. */
+/**
+ * Системный adapter доставки Endge telemetry и snapshots в Sentry ingestion API.
+ */
 export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
   public readonly id: string
 
@@ -45,7 +47,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
   private readonly _tags: Record<string, string>
   private readonly _pending = new Set<Promise<void>>()
 
-  /** Создаёт Sentry adapter и разрешает variable tokens только в runtime copy options. */
+  /**
+   * Создаёт Sentry adapter и разрешает variable tokens только в runtime copy options.
+   */
   public constructor(
     output: EndgeDiagnosticsOutputConfiguration,
     context: DiagnosticsAdapterCreateContext,
@@ -65,7 +69,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
     this._tags = this._normalizeTags(options.tags)
   }
 
-  /** Преобразует routed log в Sentry event, а завершённый span — в transaction. */
+  /**
+   * Преобразует routed log в Sentry event, а завершённый span — в transaction.
+   */
   public acceptRecord(record: DiagnosticsRecord, context: DiagnosticsAdapterRecordContext): Promise<void> {
     const payload = record.signal === 'log'
       ? this._mapLogRecord(record, context)
@@ -73,7 +79,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
     return this._track(this._sendEnvelope(record.signal === 'log' ? 'event' : 'transaction', payload))
   }
 
-  /** Отправляет snapshot как отдельное событие с полным JSON attachment. */
+  /**
+   * Отправляет snapshot как отдельное событие с полным JSON attachment.
+   */
   public acceptSnapshot(snapshot: DiagnosticsSnapshot, context: DiagnosticsAdapterSnapshotContext): Promise<void> | void {
     if (!this._sendSnapshots) {
       return
@@ -102,7 +110,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
     }))
   }
 
-  /** Отправляет безопасное тестовое событие, не добавляя запись в локальную diagnostics history. */
+  /**
+   * Отправляет безопасное тестовое событие, не добавляя запись в локальную diagnostics history.
+   */
   public test(): Promise<void> {
     const payload = this._baseEvent({}, {
       message: `Endge diagnostics output test: ${this._name}`,
@@ -116,7 +126,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
     return this._track(this._sendEnvelope('event', payload))
   }
 
-  /** Ожидает завершения всех ingestion requests, начатых adapter-ом. */
+  /**
+   * Ожидает завершения всех ingestion requests, начатых adapter-ом.
+   */
   public async flush(): Promise<void> {
     const pending = [...this._pending]
     if (pending.length) {
@@ -124,12 +136,16 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
     }
   }
 
-  /** Завершает pending delivery перед освобождением adapter. */
+  /**
+   * Завершает pending delivery перед освобождением adapter.
+   */
   public dispose(): Promise<void> {
     return this.flush()
   }
 
-  /** Нормализует persisted options и разрешает только строковые runtime credentials. */
+  /**
+   * Нормализует persisted options и разрешает только строковые runtime credentials.
+   */
   private _normalizeOptions(
     output: EndgeDiagnosticsOutputConfiguration,
     context: DiagnosticsAdapterCreateContext,
@@ -160,7 +176,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
     }
   }
 
-  /** Разбирает standard Sentry DSN и строит browser-safe envelope endpoint. */
+  /**
+   * Разбирает standard Sentry DSN и строит browser-safe envelope endpoint.
+   */
   private _parseDsn(dsn: string, tunnel?: string): ParsedSentryDsn {
     let url: URL
     try {
@@ -189,7 +207,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
     }
   }
 
-  /** Преобразует Endge log record в Sentry event payload. */
+  /**
+   * Преобразует Endge log record в Sentry event payload.
+   */
   private _mapLogRecord(record: DiagnosticsLogRecord, context: DiagnosticsAdapterRecordContext): Record<string, unknown> {
     const attributes = record.attributes
     const exceptionType = this._attributeText(attributes, 'exception.type')
@@ -229,7 +249,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
     })
   }
 
-  /** Преобразует завершённый Endge span в Sentry transaction payload. */
+  /**
+   * Преобразует завершённый Endge span в Sentry transaction payload.
+   */
   private _mapSpanRecord(record: DiagnosticsSpanRecord, context: DiagnosticsAdapterRecordContext): Record<string, unknown> {
     return this._baseEvent(context.resource.attributes, {
       type: 'transaction',
@@ -255,7 +277,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
     })
   }
 
-  /** Добавляет общие Sentry environment, release, resource и static tags. */
+  /**
+   * Добавляет общие Sentry environment, release, resource и static tags.
+   */
   private _baseEvent(
     resource: DiagnosticsAttributes,
     payload: Record<string, unknown>,
@@ -280,7 +304,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
     }
   }
 
-  /** Формирует Sentry trace context из OpenTelemetry-compatible ids. */
+  /**
+   * Формирует Sentry trace context из OpenTelemetry-compatible ids.
+   */
   private _traceContext(record: DiagnosticsRecord): Record<string, unknown> {
     if (!record.traceId || !record.spanId) {
       return {}
@@ -298,7 +324,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
     }
   }
 
-  /** Выделяет Sentry user context из стандартных diagnostics attributes. */
+  /**
+   * Выделяет Sentry user context из стандартных diagnostics attributes.
+   */
   private _mapUser(attributes: DiagnosticsAttributes): Record<string, string> | undefined {
     const id = this._attributeText(attributes, 'user.id')
     const email = this._attributeText(attributes, 'user.email')
@@ -315,7 +343,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
     }
   }
 
-  /** Собирает envelope и выполняет один ingestion request. */
+  /**
+   * Собирает envelope и выполняет один ingestion request.
+   */
   private async _sendEnvelope(
     itemType: 'event' | 'transaction',
     payload: Record<string, unknown>,
@@ -366,7 +396,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
     }
   }
 
-  /** Учитывает pending request для flush и удаляет его после завершения. */
+  /**
+   * Учитывает pending request для flush и удаляет его после завершения.
+   */
   private _track(request: Promise<void>): Promise<void> {
     this._pending.add(request)
     void request.then(
@@ -376,7 +408,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
     return request
   }
 
-  /** Преобразует Endge severity в Sentry event level. */
+  /**
+   * Преобразует Endge severity в Sentry event level.
+   */
   private _mapLogLevel(record: DiagnosticsLogRecord): 'debug' | 'info' | 'warning' | 'error' | 'fatal' {
     if (record.severityNumber >= 21) {
       return 'fatal'
@@ -393,7 +427,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
     return 'debug'
   }
 
-  /** Преобразует Endge span status в Sentry trace status. */
+  /**
+   * Преобразует Endge span status в Sentry trace status.
+   */
   private _mapSpanStatus(record: DiagnosticsSpanRecord): 'ok' | 'internal_error' | 'unknown' {
     if (record.status.code === 'ok') {
       return 'ok'
@@ -404,7 +440,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
     return 'unknown'
   }
 
-  /** Проецирует resource attributes в ограниченный набор Sentry tags. */
+  /**
+   * Проецирует resource attributes в ограниченный набор Sentry tags.
+   */
   private _resourceTags(resource: DiagnosticsAttributes): Record<string, string> {
     const tags: Record<string, string> = {}
     const keys = [
@@ -423,7 +461,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
     return tags
   }
 
-  /** Читает adapter tags из JSON-safe options. */
+  /**
+   * Читает adapter tags из JSON-safe options.
+   */
   private _readTags(value: unknown): SentryDiagnosticsAdapterOptions['tags'] {
     if (!this._isRecord(value)) {
       return undefined
@@ -437,7 +477,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
     return tags
   }
 
-  /** Нормализует произвольный tags object в строковые Sentry tags. */
+  /**
+   * Нормализует произвольный tags object в строковые Sentry tags.
+   */
   private _normalizeTags(value: unknown): Record<string, string> {
     if (!this._isRecord(value)) {
       return {}
@@ -451,7 +493,9 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
     return tags
   }
 
-  /** Возвращает непустой scalar attribute как строку. */
+  /**
+   * Возвращает непустой scalar attribute как строку.
+   */
   private _attributeText(attributes: DiagnosticsAttributes, key: string): string | undefined {
     const value = attributes[key]
     if (Array.isArray(value) || value == null) {
@@ -461,13 +505,17 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
     return text || undefined
   }
 
-  /** Возвращает положительное целое число или fallback. */
+  /**
+   * Возвращает положительное целое число или fallback.
+   */
   private _normalizePositiveInteger(value: unknown, fallback: number): number {
     const normalized = Number(value)
     return Number.isFinite(normalized) && normalized > 0 ? Math.floor(normalized) : fallback
   }
 
-  /** Создаёт 128-bit Sentry event id в lowercase hexadecimal representation. */
+  /**
+   * Создаёт 128-bit Sentry event id в lowercase hexadecimal representation.
+   */
   private _createEventId(): string {
     const bytes = new Uint8Array(16)
     if (globalThis.crypto?.getRandomValues) {
@@ -481,13 +529,15 @@ export class SentryDiagnosticsAdapter implements DiagnosticsAdapter {
     return [...bytes].map(byte => byte.toString(16).padStart(2, '0')).join('')
   }
 
-  /** Проверяет, что unknown value является plain record. */
+  /**
+   * Проверяет, что unknown value является plain record.
+   */
   private _isRecord(value: unknown): value is Record<string, unknown> {
     return value != null && typeof value === 'object' && !Array.isArray(value)
   }
 }
 
-/** Factory встроенного Sentry adapter. */
+// Factory встроенного Sentry adapter.
 export const SENTRY_DIAGNOSTICS_ADAPTER_FACTORY: DiagnosticsAdapterFactory = {
   type: 'sentry',
   capabilities: {

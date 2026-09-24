@@ -14,7 +14,7 @@ import { compileProgramMetadataProperty } from '@/features/core/modules/source/s
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 const STRATEGIES = new Set<UpdateMutationStrategy>(['set', 'merge', 'replace', 'append', 'remove'])
 
-/** Компилирует один принадлежащий Store рецепт update в готовый для runtime описатель изменения. */
+// Компилирует один принадлежащий Store рецепт update в готовый для runtime описатель изменения.
 export function compileUpdateSource(source: string, sourceVersion = 1): UpdateSourceCompileResult {
   const diagnostics: DiagnosticDraft[] = []
   if (!String(source ?? '').trim()) {

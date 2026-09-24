@@ -32,7 +32,7 @@ export interface DataViewSourceDocument {
   expression?: SourceExpressionIR
 }
 
-/** Runtime-контекст одного вызова parameterized DataView. */
+// Runtime-контекст одного вызова parameterized DataView.
 export interface DataViewRunContext {
   props?: Record<string, unknown>
 }

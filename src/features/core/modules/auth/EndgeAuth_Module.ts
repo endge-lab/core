@@ -23,7 +23,9 @@ import { EndgeModule } from '@/features/federation/EndgeModule'
 
 export type AuthInteractionRequiredListener = (error: AuthInteractionRequiredError) => void
 
-/** Единый lifecycle owner runtime auth profile sessions и request authentication. */
+/**
+ * Единый lifecycle owner runtime auth profile sessions и request authentication.
+ */
 export class EndgeAuth_Module extends EndgeModule<EndgeBootContext> {
   public readonly adapters: AuthAdapterRegistry
   public readonly profiles: AuthProfileRegistry
@@ -38,7 +40,9 @@ export class EndgeAuth_Module extends EndgeModule<EndgeBootContext> {
   private readonly _store: AuthSessionStore
   private readonly _interactionRequiredListeners = new Set<AuthInteractionRequiredListener>()
 
-  /** Собирает auth subsystem и регистрирует встроенные adapters один раз. */
+  /**
+   * Собирает auth subsystem и регистрирует встроенные adapters один раз.
+   */
   public constructor() {
     super()
     this.adapters = new AuthAdapterRegistry()
@@ -70,18 +74,24 @@ export class EndgeAuth_Module extends EndgeModule<EndgeBootContext> {
     )
   }
 
-  /** Подписывает host-приложение на запросы, требующие интерактивного OIDC flow. */
+  /**
+   * Подписывает host-приложение на запросы, требующие интерактивного OIDC flow.
+   */
   public onInteractionRequired(listener: AuthInteractionRequiredListener): () => void {
     this._interactionRequiredListeners.add(listener)
     return () => this._interactionRequiredListeners.delete(listener)
   }
 
-  /** Возвращает безопасный auth context без tokens, claims и userinfo. */
+  /**
+   * Возвращает безопасный auth context без tokens, claims и userinfo.
+   */
   public override createDiagnosticsSnapshot(): EndgeAuthContext {
     return this.session.context
   }
 
-  /** Подключает storage namespace и безопасные context providers. */
+  /**
+   * Подключает storage namespace и безопасные context providers.
+   */
   public override setup(ctx: EndgeBootContext): void {
     this._storageNamespace = String(ctx.auth?.storageNamespace ?? '').trim() || 'default'
     this._store.setNamespace(this._storageNamespace)
@@ -110,14 +120,18 @@ export class EndgeAuth_Module extends EndgeModule<EndgeBootContext> {
     })
   }
 
-  /** Валидирует Domain profiles и восстанавливает session default runtime profile. */
+  /**
+   * Валидирует Domain profiles и восстанавливает session default runtime profile.
+   */
   public override build(): void {
     this.profiles.validateAll()
     this.session.configureDefault(this.profiles.getDefault())
     this.notify()
   }
 
-  /** Сбрасывает runtime state, не удаляя persisted browser session. */
+  /**
+   * Сбрасывает runtime state, не удаляя persisted browser session.
+   */
   public override reset(): void {
     this._abortController?.abort()
     this._abortController = null
@@ -133,7 +147,9 @@ export class EndgeAuth_Module extends EndgeModule<EndgeBootContext> {
     this.notify()
   }
 
-  /** Создаёт OIDC browser source из resolved persisted profile. */
+  /**
+   * Создаёт OIDC browser source из resolved persisted profile.
+   */
   public createOidcSessionSource(
     profileInput: AuthProfileSchema | string,
     options: Pick<OidcBrowserSessionOptions, 'redirectUri' | 'popupRedirectUri' | 'postLogoutRedirectUri' | 'flow'>,

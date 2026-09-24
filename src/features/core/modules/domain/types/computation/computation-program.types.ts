@@ -1,7 +1,7 @@
 import type { ComputationSourceDocument } from './computation-source.types'
 import type { SourceExpressionIR } from '@/features/core/modules/source/domain/types/source-expression.types'
 
-/** Необязательные сохраняемые метаданные; компилятор v1 не сравнивает контракты. */
+// Необязательные сохраняемые метаданные; компилятор v1 не сравнивает контракты.
 export interface ComputationContractField {
   type: string
   isArray?: boolean
@@ -31,9 +31,9 @@ export type ComputationProgramNode
     input: SourceExpressionIR
   }
 
-/** Готовый для runtime граф, скомпилированный из одного Source-документа defineComputation. */
+// Готовый для runtime граф, скомпилированный из одного Source-документа defineComputation.
 export interface ComputationProgramPayload {
-  /** Optional parser tree retained for inspection; runtime does not require it. */
+  // Optional parser tree retained for inspection; runtime does not require it.
   ast?: unknown
   input: ComputationContractField | null
   output: ComputationContractField | null

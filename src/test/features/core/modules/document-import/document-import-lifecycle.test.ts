@@ -28,7 +28,7 @@ describe('жизненный цикл применения импорта', () =
     Endge.domain.reset()
   })
 
-  /** Поздняя запись старого plan не должна продолжать импорт или очищать новый plan. */
+  // Поздняя запись старого plan не должна продолжать импорт или очищать новый plan.
   it.each(['reset', 'provider'] as const)('прекращает apply после смены %s и сохраняет новый plan', async (change) => {
     const first = deferred<DocumentCreateResult>()
     const create = vi.spyOn(Endge.domainRepository, 'createDocument').mockImplementation(async request => ({ documentType: request.documentType, identity: request.identity }))

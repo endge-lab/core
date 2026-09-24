@@ -1,6 +1,6 @@
 import type { DiagnosticsSnapshotOptions } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
 
-/** Ограничения протокола и ресурсов bridge v1. */
+// Ограничения протокола и ресурсов bridge v1.
 export const BRIDGE_CONFIG = {
   protocol: 1,
   registrationTimeoutMs: 10_000,
@@ -16,7 +16,7 @@ export const BRIDGE_CONFIG = {
   maxInspectionIntervalMs: 60000,
 } as const
 
-/** Полный диагностический снимок для согласованной debug session. */
+// Полный диагностический снимок для согласованной debug session.
 export const BRIDGE_SNAPSHOT_OPTIONS = {
   includeTelemetry: true,
   includeProblems: true,
@@ -29,7 +29,7 @@ export const BRIDGE_SNAPSHOT_OPTIONS = {
   includeRaphGraph: true,
 } as const satisfies DiagnosticsSnapshotOptions
 
-/** Структура Domain и Runtime без рабочих данных, render payload и графа Raph. */
+// Структура Domain и Runtime без рабочих данных, render payload и графа Raph.
 export const BRIDGE_STRUCTURE_SNAPSHOT_OPTIONS = {
   ...BRIDGE_SNAPSHOT_OPTIONS,
   includeTelemetry: false,
@@ -39,7 +39,7 @@ export const BRIDGE_STRUCTURE_SNAPSHOT_OPTIONS = {
   includeRaphGraph: false,
 } as const satisfies DiagnosticsSnapshotOptions
 
-/** Нормализует точный backend URL без credentials, query и fragment. */
+// Нормализует точный backend URL без credentials, query и fragment.
 export function normalizeBridgeServer(raw: string): string {
   const url = new URL(raw.trim())
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) {
@@ -48,7 +48,7 @@ export function normalizeBridgeServer(raw: string): string {
   return url.toString().replace(/\/+$/, '')
 }
 
-/** Разбирает CSV environment value на стороне host до передачи массива в boot. */
+// Разбирает CSV environment value на стороне host до передачи массива в boot.
 export function parseBridgeAllowedServers(value: string | undefined): string[] {
   return [...new Set((value ?? '').split(',').map(item => item.trim()).filter(Boolean).map(normalizeBridgeServer))]
 }

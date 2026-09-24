@@ -14,7 +14,7 @@ export class RVersion {
   @Expose()
   description: string = ''
 
-  /** Данные домена (JSON). Заполняется только при запросе (скачать). */
+  // Данные домена (JSON). Заполняется только при запросе (скачать).
   @Expose()
   data?: any
 
@@ -24,7 +24,9 @@ export class RVersion {
   @Exclude()
   updatedAt?: string
 
-  /** Заполнить из persisted document (без data для списка). */
+  /**
+   * Заполнить из persisted document (без data для списка).
+   */
   static fromPlain(doc: { id: number, identity?: string, description?: string, data?: any, createdAt?: string, updatedAt?: string }): RVersion {
     const v = new RVersion()
     v.id = doc.id

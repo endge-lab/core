@@ -1,4 +1,4 @@
-/** Исполняемые SFC expressions. Не содержат parser AST или исходного синтаксиса. */
+// Исполняемые SFC expressions. Не содержат parser AST или исходного синтаксиса.
 export type ComponentSFCExpressionIR
   = | { kind: 'literal', value: string | number | boolean | null }
     | { kind: 'read', name: string }

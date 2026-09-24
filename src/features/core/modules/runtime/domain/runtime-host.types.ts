@@ -1,4 +1,4 @@
-import type { PhaseEvent, PhaseName, RaphFrameContext, RaphNode } from '@endge/raph'
+import type { PhaseEvent, PhaseName, RaphFrameContext, RaphNode } from '@raphy-js/raph'
 import type { RuntimeStateControllerLike } from '@/features/core/modules/context/domain/context-persistence.types'
 import type { ProgramArtifact, ProgramEntityType } from '@/features/core/modules/program/domain/types/program.types'
 import type { RuntimeEntityModelMap, RuntimeEntityType } from '@/features/core/modules/runtime/domain/runtime-entity-map.types'
@@ -17,7 +17,7 @@ export type RuntimeHostStatus
     | 'destroyed'
     | 'error'
 
-/** Возможность, которую runtime-host предоставляет внешним consumers. */
+// Возможность, которую runtime-host предоставляет внешним consumers.
 export type RuntimeHostCapability = 'renderable'
 
 export type RuntimeHostResourceKind
@@ -28,15 +28,15 @@ export type RuntimeHostResourceKind
     | 'meta'
 
 export interface RuntimeHostResource {
-  /** Уникальный идентификатор ресурса внутри host. */
+  // Уникальный идентификатор ресурса внутри host.
   id: string
-  /** Тип ресурса (raph-node, binding, contract и т.д.). */
+  // Тип ресурса (raph-node, binding, contract и т.д.).
   kind: RuntimeHostResourceKind
-  /** Короткий заголовок для UI/инспектора. */
+  // Короткий заголовок для UI/инспектора.
   title: string
-  /** Дополнительная подпись для контекста. */
+  // Дополнительная подпись для контекста.
   subtitle?: string
-  /** Произвольные метаданные ресурса. */
+  // Произвольные метаданные ресурса.
   payload?: Record<string, unknown>
 }
 
@@ -46,19 +46,19 @@ export type RuntimeHostChannelKind
     | 'external'
 
 export interface RuntimeHostChannel {
-  /** Уникальный идентификатор канала. */
+  // Уникальный идентификатор канала.
   id: string
 
-  /** Семантический тип канала коммуникации. */
+  // Семантический тип канала коммуникации.
   kind: RuntimeHostChannelKind
 
-  /** Отображаемое имя канала. */
+  // Отображаемое имя канала.
   name: string
 
-  /** Направление потока сообщений для канала. */
+  // Направление потока сообщений для канала.
   direction: 'in' | 'out' | 'both'
 
-  /** Дополнительная поясняющая подпись. */
+  // Дополнительная поясняющая подпись.
   subtitle?: string
 }
 
@@ -69,7 +69,7 @@ export interface RuntimeHostContextBase {
 }
 
 export interface ActionRuntimeHostContext extends RuntimeHostContextBase {
-  /** Неизменяемый вход текущего вызова Action из Source. */
+  // Неизменяемый вход текущего вызова Action из Source.
   input: Record<string, unknown>
   result: unknown
   parent?: ActionRuntimeHostContext | null
@@ -101,16 +101,16 @@ export interface StreamRuntimeHostContext extends RuntimeHostContextBase {
 }
 
 export interface ComponentSFCRuntimeHostContext extends RuntimeHostContextBase {
-  /** Target последней подготовки SFC. */
+  // Target последней подготовки SFC.
   target: 'dom' | 'canvas' | null
 
-  /** Время последнего разбора source на вкладки. */
+  // Время последнего разбора source на вкладки.
   lastParseAt: string | null
 
-  /** Время последней подготовки compiler placeholders. */
+  // Время последней подготовки compiler placeholders.
   lastCompileAt: string | null
 
-  /** Время последней попытки render/projection. */
+  // Время последней попытки render/projection.
   lastRenderAt: string | null
 }
 
@@ -134,56 +134,56 @@ export type RuntimeHostContext<TType extends RuntimeEntityType>
   = RuntimeHostContextMap[TType]
 
 export interface RuntimeHostSnapshot {
-  /** Идентификатор runtime-host. */
+  // Идентификатор runtime-host.
   id: string
 
-  /** Публичный runtime-scoped путь данных host в Raph. */
+  // Публичный runtime-scoped путь данных host в Raph.
   basePath: string
 
-  /** Runtime-id родительского host, если host запущен как дочерний. */
+  // Runtime-id родительского host, если host запущен как дочерний.
   parentId: string | null
 
-  /** Время удаления host, если snapshot попал в debug-архив удалённых. */
+  // Время удаления host, если snapshot попал в debug-архив удалённых.
   removedAt: number | null
 
-  /** Технический тип runtime-host реализации. */
+  // Технический тип runtime-host реализации.
   runtimeType: string
 
-  /** Возможности runtime-host, доступные внешним consumers. */
+  // Возможности runtime-host, доступные внешним consumers.
   capabilities: RuntimeHostCapability[]
 
-  /** Тип доменной сущности, к которой привязан host. */
+  // Тип доменной сущности, к которой привязан host.
   entityType: RuntimeEntityType
 
-  /** Identity доменной сущности. */
+  // Identity доменной сущности.
   entityIdentity: string
 
-  /** Заголовок host для отображения в UI. */
+  // Заголовок host для отображения в UI.
   title: string
 
-  /** Текущий статус жизненного цикла host. */
+  // Текущий статус жизненного цикла host.
   status: RuntimeHostStatus
 
-  /** Время создания host (timestamp ms). */
+  // Время создания host (timestamp ms).
   createdAt: number
 
-  /** Время последнего изменения host (timestamp ms). */
+  // Время последнего изменения host (timestamp ms).
   updatedAt: number
 
-  /** Список ресурсов, связанных с host. */
+  // Список ресурсов, связанных с host.
   resources: RuntimeHostResource[]
 
-  /** Список каналов, через которые host взаимодействует с окружением. */
+  // Список каналов, через которые host взаимодействует с окружением.
   channels: RuntimeHostChannel[]
 
-  /** Произвольные метаданные host. */
+  // Произвольные метаданные host.
   meta: Record<string, unknown>
 
-  /** Контекст host (для debug/inspection). */
+  // Контекст host (для debug/inspection).
   context: Record<string, unknown>
 }
 
-/** Лёгкий архивный описатель. Runtime-данные намеренно исключены. */
+// Лёгкий архивный описатель. Runtime-данные намеренно исключены.
 export interface DestroyedRuntimeHostSnapshot {
   id: string
   basePath: string
@@ -207,7 +207,7 @@ export interface RuntimeInspectionLease {
 }
 
 export interface RuntimeHostLifecycle {
-  /** Точка входа совместимости: mount и start. */
+  // Точка входа совместимости: mount и start.
   create: () => Promise<void> | void
   mount: () => Promise<void> | void
   start: () => Promise<void> | void
@@ -217,13 +217,13 @@ export interface RuntimeHostLifecycle {
   stop: () => Promise<void> | void
   unmount: () => Promise<void> | void
 
-  /** Синхронно запрещает новые updates перед освобождением runtime tree. */
+  // Синхронно запрещает новые updates перед освобождением runtime tree.
   quiesce: () => Promise<void> | void
 
-  /** Корректно остановить host и освободить ресурсы. */
+  // Корректно остановить host и освободить ресурсы.
   destroy: () => Promise<void> | void
 
-  /** Обработать runtime update, пришедший из логической либо boundary Raph-фазы. */
+  // Обработать runtime update, пришедший из логической либо boundary Raph-фазы.
   update: (ctx: RuntimeHostUpdateContext) => Promise<void> | void
 }
 
@@ -240,18 +240,18 @@ export interface RuntimeHostArtifactRef {
   identity?: string
 }
 
-/** Каноническое имя Raph-фазы, которая агрегирует dirty runtime-ноды к root host. */
+// Каноническое имя Raph-фазы, которая агрегирует dirty runtime-ноды к root host.
 export const RUNTIME_BOUNDARY_UPDATE_PHASE_NAME = 'runtime-boundary-update' as PhaseName
 
-/** Фаза логического обновления root-ноды runtime-host. */
+// Фаза логического обновления root-ноды runtime-host.
 export const RUNTIME_NODE_UPDATE_PHASE_NAME = 'runtime-node-update' as PhaseName
 
-/** Значение входа runtime-host: literal либо прямая ссылка на Raph data path. */
+// Значение входа runtime-host: literal либо прямая ссылка на Raph data path.
 export type RuntimeHostInputBinding
   = | { kind: 'literal', value: unknown }
     | { kind: 'raph', path: string }
 
-/** Декларативная команда, которую host должен обработать при изменении sourcePath. */
+// Декларативная команда, которую host должен обработать при изменении sourcePath.
 export interface RuntimeHostUpdateBinding {
   id: string
   sourcePath: string
@@ -264,7 +264,7 @@ export interface RuntimeHostUpdateBinding {
   }
 }
 
-/** Конкретное логическое обновление, разрешённое из Raph events. */
+// Конкретное логическое обновление, разрешённое из Raph events.
 export interface RuntimeHostResolvedUpdate {
   bindingId: string
   sourcePath: string
@@ -272,17 +272,17 @@ export interface RuntimeHostResolvedUpdate {
   payload?: unknown
 }
 
-/** Локальный input source runtime-host-а без привязки к Raph. */
+// Локальный input source runtime-host-а без привязки к Raph.
 export interface RuntimeHostLocalInputSource {
   kind: 'local'
   props: Record<string, unknown>
 }
 
-/** Binding входного prop на путь в Raph data storage. */
+// Binding входного prop на путь в Raph data storage.
 export interface RuntimeHostRaphInputBinding {
   path: string
   wildcardDynamic?: boolean
-  /** Необязательный исходный DataPath для Meta, если value был преобразован. */
+  // Необязательный исходный DataPath для Meta, если value был преобразован.
   metaSource?: {
     path: string
     key?: string
@@ -290,100 +290,100 @@ export interface RuntimeHostRaphInputBinding {
   }
 }
 
-/** Raph-backed input source runtime-host-а. */
+// Raph-backed input source runtime-host-а.
 export interface RuntimeHostRaphInputSource {
   kind: 'raph'
   bindings: Record<string, RuntimeHostRaphInputBinding>
-  /** Literal props, которые объединяются с Raph bindings. */
+  // Literal props, которые объединяются с Raph bindings.
   props?: Record<string, unknown>
 }
 
-/** Унифицированный источник входных данных runtime-host-а. */
+// Унифицированный источник входных данных runtime-host-а.
 export type RuntimeHostInputSource
   = | RuntimeHostLocalInputSource
     | RuntimeHostRaphInputSource
 
-/** Группа dirty-ноды, агрегированная к runtime boundary. */
+// Группа dirty-ноды, агрегированная к runtime boundary.
 export interface RuntimeDirtyBoundary {
   boundary: RaphNode
   dirtyNodes: RaphNode[]
   events: PhaseEvent[]
 }
 
-/** Контекст универсального runtime update, который получает root runtime-host. */
+// Контекст универсального runtime update, который получает root runtime-host.
 export interface RuntimeHostUpdateContext {
   node: RaphNode
   events: PhaseEvent[]
   boundaries: RuntimeDirtyBoundary[]
   frame: RaphFrameContext
-  /** Логические обновления root runtime-ноды. Boundary-фаза это поле не заполняет. */
+  // Логические обновления root runtime-ноды. Boundary-фаза это поле не заполняет.
   updates?: RuntimeHostResolvedUpdate[]
 }
 
-/** Проекция patchable collection boundary, которую можно обновить точечно. */
+// Проекция patchable collection boundary, которую можно обновить точечно.
 export interface RuntimeCollectionProjectionPatch {
-  /** Boundary-id дочерней проекции, например колонки таблицы. */
+  // Boundary-id дочерней проекции, например колонки таблицы.
   boundaryId: string
 
-  /** Семантический ключ проекции, например key колонки. */
+  // Семантический ключ проекции, например key колонки.
   key: string
 
-  /** Индекс проекции в render target, например индекс колонки. */
+  // Индекс проекции в render target, например индекс колонки.
   index: number
 }
 
-/** Patch обновления части коллекции внутри runtime boundary. */
+// Patch обновления части коллекции внутри runtime boundary.
 export interface RuntimeCollectionProjectionUpdatePatch {
-  /** Тип patch payload. */
+  // Тип patch payload.
   kind: 'collection-projection-update'
 
-  /** Boundary-id владельца коллекции, например Table. */
+  // Boundary-id владельца коллекции, например Table.
   boundaryId: string
 
-  /** Тип boundary владельца коллекции. */
+  // Тип boundary владельца коллекции.
   boundaryType: 'table'
 
-  /** Source path, на который подписана boundary-нода. */
+  // Source path, на который подписана boundary-нода.
   sourcePath: string
 
-  /** Индекс элемента коллекции, если его можно извлечь из Raph event path. */
+  // Индекс элемента коллекции, если его можно извлечь из Raph event path.
   itemIndex: number | null
 
-  /** Ключ элемента коллекции, если runtime смог его прочитать. */
+  // Ключ элемента коллекции, если runtime смог его прочитать.
   itemKey: unknown
 
-  /** Снимок элемента коллекции после изменения. */
+  // Снимок элемента коллекции после изменения.
   itemSnapshot: unknown
 
-  /** Измененные относительные paths внутри элемента коллекции. */
+  // Измененные относительные paths внутри элемента коллекции.
   changedPaths: string[][]
 
-  /** Проекции, которые зависят от измененных paths. */
+  // Проекции, которые зависят от измененных paths.
   affectedProjections: RuntimeCollectionProjectionPatch[]
 
-  /** Исходные события Raph, из которых собран patch. */
+  // Исходные события Raph, из которых собран patch.
   events: PhaseEvent[]
 
-  /** Raph-нода, которая стала верхней dirty boundary. */
+  // Raph-нода, которая стала верхней dirty boundary.
   node: RaphNode
 }
 
-/** Одно keyed изменение строки внутри пакетного patch коллекции. */
+// Одно keyed изменение строки внутри пакетного patch коллекции.
 export interface RuntimeCollectionItemPatch {
-  /** Текущий индекс строки; null означает, что строка удалена из результата. */
+  // Текущий индекс строки; null означает, что строка удалена из результата.
   itemIndex: number | null
 
-  /** Стабильный ключ строки из selector или актуального snapshot. */
+  // Стабильный ключ строки из selector или актуального snapshot.
   itemKey: unknown
 
-  /** Актуальный snapshot строки; null/undefined означает удаление. */
+  // Актуальный snapshot строки; null/undefined означает удаление.
   itemSnapshot: unknown
 
-  /** Измененные относительные paths внутри строки. */
+  // Измененные относительные paths внутри строки.
   changedPaths: string[][]
 }
 
-/** Пакет keyed изменений одной коллекции за один Raph frame. */
+// Пакет keyed изменений одной коллекции за один Raph frame.
 export interface RuntimeCollectionProjectionBatchPatch {
   kind: 'collection-projection-batch'
   boundaryId: string
@@ -395,7 +395,7 @@ export interface RuntimeCollectionProjectionBatchPatch {
   node: RaphNode
 }
 
-/** Нейтральный patch runtime boundary для render adapter-а. */
+// Нейтральный patch runtime boundary для render adapter-а.
 export type RuntimeBoundaryPatch
   = RuntimeCollectionProjectionUpdatePatch
     | RuntimeCollectionProjectionBatchPatch
@@ -405,126 +405,124 @@ export interface RuntimeHost<
   TContext extends RuntimeHostContext<TType> = RuntimeHostContext<TType>,
   TArtifactPayload = unknown,
 > extends RuntimeHostLifecycle {
-  /** Уникальный runtime-id host. */
+  // Уникальный runtime-id host.
   readonly id: string
 
-  /** Родительский runtime-host для отладки вложенных запусков. */
+  // Родительский runtime-host для отладки вложенных запусков.
   readonly parent: RuntimeHost<any, any> | null
 
-  /** Канонический runtime kind (query/table/action/runtime). */
+  // Канонический runtime kind (query/table/action/runtime).
   readonly kind: RuntimeKind | 'runtime'
 
-  /**
-   * Имя конкретной runtime-реализации host.
-   */
+  // Имя конкретной runtime-реализации host.
   readonly runtimeType: string
 
-  /** Возможности runtime-host, доступные внешним consumers. */
+  // Возможности runtime-host, доступные внешним consumers.
   readonly capabilities: readonly RuntimeHostCapability[]
-  /** Тип привязанной доменной сущности. */
+  // Тип привязанной доменной сущности.
   readonly entityType: TType
 
-  /** Привязанная доменная модель. */
+  // Привязанная доменная модель.
   readonly model: RuntimeEntityModelMap[TType]
 
-  /** Identity привязанной доменной сущности. */
+  // Identity привязанной доменной сущности.
   readonly entityIdentity: string
 
-  /** Человекочитаемое имя host. */
+  // Человекочитаемое имя host.
   readonly title: string
 
-  /** Текущее состояние жизненного цикла host. */
+  // Текущее состояние жизненного цикла host.
   status: RuntimeHostStatus
 
-  /** Время создания host (timestamp ms). */
+  // Время создания host (timestamp ms).
   readonly createdAt: number
 
-  /** Время последнего изменения host (timestamp ms). */
+  // Время последнего изменения host (timestamp ms).
   updatedAt: number
 
-  /** Связанные runtime-ресурсы host. */
+  // Связанные runtime-ресурсы host.
   readonly resources: RuntimeHostResource[]
 
-  /** Связанные каналы взаимодействия host. */
+  // Связанные каналы взаимодействия host.
   readonly channels: RuntimeHostChannel[]
 
-  /** Произвольные runtime-метаданные host. */
+  // Произвольные runtime-метаданные host.
   readonly meta: Record<string, unknown>
 
-  /** Контекст runtime-host (тип зависит от host). */
+  // Контекст runtime-host (тип зависит от host).
   context: TContext
 
-  /** Runtime-scoped persistence controller, если host запущен с persistence. */
+  // Runtime-scoped persistence controller, если host запущен с persistence.
   readonly runtimeState: RuntimeStateControllerLike | null
 
-  /** Корневая raph-нода host (если есть). */
+  // Корневая raph-нода host (если есть).
   readonly node: RaphNode | null
 
-  /** Runtime-scoped базовый путь host в Raph data storage. */
+  // Runtime-scoped базовый путь host в Raph data storage.
   readonly basePath: string
 
-  /** Возвращает путь runtime state. */
+  // Возвращает путь runtime state.
   statePath: (path?: string) => string
 
-  /** Возвращает путь output runtime-host. */
+  // Возвращает путь output runtime-host.
   outputPath: (name: string) => string
 
-  /** Привязывает локальное имя входа к literal либо Raph path. */
+  // Привязывает локальное имя входа к literal либо Raph path.
   bindInput: (name: string, binding: RuntimeHostInputBinding) => void
 
-  /** Читает разрешённое значение входа. */
+  // Читает разрешённое значение входа.
   readInput: (name: string) => unknown
 
-  /** Читает все входы одним snapshot. */
+  // Читает все входы одним snapshot.
   readInputs: () => Readonly<Record<string, unknown>>
 
-  /** Подписывает root runtime-ноду на data path и тип логического обновления. */
+  // Подписывает root runtime-ноду на data path и тип логического обновления.
   bindUpdate: (binding: RuntimeHostUpdateBinding) => () => void
 
-  /** Возвращает compiled artifact, связанный с host, если он доступен. */
+  // Возвращает compiled artifact, связанный с host, если он доступен.
   getArtifact: () => ProgramArtifact<TArtifactPayload> | null
 
-  /** Возвращает session-local reader, через который host читает compiled artifacts. */
+  // Возвращает session-local reader, через который host читает compiled artifacts.
   getArtifactReader: () => RuntimeArtifactReader | null
 
-  /** Возвращает payload compiled artifact, связанный с host, если он доступен. */
+  // Возвращает payload compiled artifact, связанный с host, если он доступен.
   getArtifactPayload: () => TArtifactPayload | null
 
-  /** Изменить статус host и обновить updatedAt. */
+  // Изменить статус host и обновить updatedAt.
   setStatus: (status: RuntimeHostStatus) => void
 
-  /** Проверить наличие runtime capability. */
+  // Проверить наличие runtime capability.
   hasCapability: (capability: RuntimeHostCapability) => boolean
 
-  /** Добавить/обновить runtime-ресурс host. */
+  // Добавить/обновить runtime-ресурс host.
   addResource: (resource: RuntimeHostResource) => void
 
-  /** Добавить/обновить канал host. */
+  // Добавить/обновить канал host.
   addChannel: (channel: RuntimeHostChannel) => void
 
-  /** Сгенерировать runtime-событие host. */
+  // Сгенерировать runtime-событие host.
   emit: (event: string, payload: any) => void
 
-  /** Подписаться на runtime-событие host. */
+  // Подписаться на runtime-событие host.
   on: (event: string, listener: (payload: any) => void) => any
 
-  /** Отписаться от runtime-события host. */
+  // Отписаться от runtime-события host.
   off: (event: string, listener: (payload: any) => void) => any
 
-  /** Частично обновить context host. */
+  // Частично обновить context host.
   setContext: (patch: Partial<TContext>) => void
 
-  /** Полностью заменить context host. */
+  // Полностью заменить context host.
   replaceContext: (context: TContext) => void
 
-  /** Привязать runtime-scoped persistence controller. */
+  // Привязать runtime-scoped persistence controller.
   attachRuntimeState: (runtimeState: RuntimeStateControllerLike | null) => void
 
-  /** Обработать runtime update, пришедший из логической либо boundary Raph-фазы. */
+  // Обработать runtime update, пришедший из логической либо boundary Raph-фазы.
   update: (ctx: RuntimeHostUpdateContext) => Promise<void> | void
 
-  /** Сериализовать host в снимок для UI/диагностики. */
+  // Сериализовать host в снимок для UI/диагностики.
   snapshot: () => RuntimeHostSnapshot
-  /** Чистый снимок привязок renderer, без запуска или изменения host. */
+  // Чистый снимок привязок renderer, без запуска или изменения host.
   captureRenderInspection?: () => import('./runtime-render-inspection.types').RuntimeRenderableInspection
 }

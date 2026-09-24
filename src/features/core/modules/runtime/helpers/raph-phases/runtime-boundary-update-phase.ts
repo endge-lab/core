@@ -5,10 +5,10 @@ import type {
   PhaseName,
   RaphNode,
   RaphPhase,
-} from '@endge/raph'
+} from '@raphy-js/raph'
 import type { RuntimeDirtyBoundary, RuntimeHost } from '@/features/core/modules/runtime/domain/runtime-host.types'
 
-import { Raph } from '@endge/raph'
+import { Raph } from '@raphy-js/raph'
 
 import { Endge } from '@/features/core/kernel/endge'
 import { RUNTIME_BOUNDARY_UPDATE_PHASE_NAME } from '@/features/core/modules/runtime/domain/runtime-host.types'
@@ -31,11 +31,15 @@ interface RuntimeBoundaryAccumulator {
   dirtyNodes: RaphNode[]
 }
 
-/** Универсальная Raph-фаза обновления runtime-сущностей через верхние dirty boundaries. */
+/**
+ * Универсальная Raph-фаза обновления runtime-сущностей через верхние dirty boundaries.
+ */
 export class RuntimeBoundaryUpdatePhase {
   public static readonly PHASE_NAME = RUNTIME_BOUNDARY_UPDATE_PHASE_NAME
 
-  /** Создает Raph-фазу, которая вызывает update у runtime-host верхних dirty boundaries. */
+  /**
+   * Создает Raph-фазу, которая вызывает update у runtime-host верхних dirty boundaries.
+   */
   public static make(options: RuntimeBoundaryUpdatePhaseOptions = {}): RaphPhase {
     const name = options.name ?? RuntimeBoundaryUpdatePhase.PHASE_NAME
 
@@ -77,7 +81,7 @@ export class RuntimeBoundaryUpdatePhase {
   }
 }
 
-/** Агрегирует dirty runtime-ноды к минимальному списку верхних dirty boundaries. */
+// Агрегирует dirty runtime-ноды к минимальному списку верхних dirty boundaries.
 export function aggregateRuntimeBoundaryUpdates(
   graph: DepGraph<RaphNode>,
   ctxs: readonly PhaseExecutorContext[],

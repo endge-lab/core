@@ -9,7 +9,7 @@ import { TABLE_RUNTIME_ACTION_IDS } from '@/features/core/modules/actions/domain
 
 type TableTargetMethodName = keyof TableRuntimeActionTarget
 
-/** Встроенные провайдеры Action, реализованные смонтированной целью Table. */
+// Встроенные провайдеры Action, реализованные смонтированной целью Table.
 export function createTableRuntimeActions(): RuntimeAction<TableColumnActionContext>[] {
   return [
     action(TABLE_RUNTIME_ACTION_IDS.columnHide, context => context.hideable && hasTargetMethod(context, 'setColumnVisibility'), executeHideColumn),

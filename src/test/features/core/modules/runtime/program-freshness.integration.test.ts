@@ -1,5 +1,5 @@
 import type { QueryRuntimeHost } from '@/features/core/modules/runtime/hosts/QueryRuntimeHost'
-import { Raph } from '@endge/raph'
+import { Raph } from '@raphy-js/raph'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Endge } from '@/features/core/kernel/endge'
 import { RQuery } from '@/features/core/modules/domain/entities/RQuery'
@@ -24,7 +24,7 @@ describe('актуальность Program перед runtime side effects', () 
     Raph.reset()
   })
 
-  /** Изменённый Source требует явной компиляции; runtime не должен читать старое значение. */
+  // Изменённый Source требует явной компиляции; runtime не должен читать старое значение.
   it('блокирует stale Source до создания host и разрешает новый artifact после rebuild', () => {
     const { model } = store()
     const create = vi.spyOn(StoreRuntimeHost, 'createRuntime')

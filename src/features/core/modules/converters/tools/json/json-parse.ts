@@ -1,4 +1,4 @@
-/** JSON-строка в объект. */
+// JSON-строка в объект.
 export function jsonParse(value: unknown): unknown {
   if (value == null) {
     return null

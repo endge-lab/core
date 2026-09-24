@@ -44,7 +44,7 @@ interface BlockContext {
   inputRead: 'action' | 'operation-run' | 'operation-undo' | 'operation-redo'
 }
 
-/** Компилирует один канонический source defineAction в детерминированный последовательный IR. */
+// Компилирует один канонический source defineAction в детерминированный последовательный IR.
 export function compileActionSource(input: ActionSourceCompileInput): ActionSourceCompileResult {
   const diagnostics: DiagnosticDraft[] = []
   const dependencies: ProgramDependency[] = []

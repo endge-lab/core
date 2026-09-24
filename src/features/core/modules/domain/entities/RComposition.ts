@@ -25,7 +25,9 @@ export function normalizeRCompositionKindIdentity(value: unknown): string | null
   return normalized || null
 }
 
-/** Persisted source-first описание runtime-графа без layout/rendering. */
+/**
+ * Persisted source-first описание runtime-графа без layout/rendering.
+ */
 export class RComposition extends REntity {
   @Exclude()
   readonly type = 'composition' as const
@@ -33,11 +35,11 @@ export class RComposition extends REntity {
   @Expose()
   description: string | null = null
 
-  /** Presentation-владелец Composition; runtime semantics пока не меняет. */
+  // Presentation-владелец Composition; runtime semantics пока не меняет.
   @Expose()
   kind: RCompositionKind = 'library'
 
-  /** Identity конкретной сущности kind-владельца. Для query может отсутствовать. */
+  // Identity конкретной сущности kind-владельца. Для query может отсутствовать.
   @Expose()
   kindIdentity: string | null = null
 

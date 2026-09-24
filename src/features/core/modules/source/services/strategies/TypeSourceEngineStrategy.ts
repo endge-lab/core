@@ -6,7 +6,9 @@ import type {
 
 import { compileTypeSource } from '@/features/core/modules/source/services/compilers/type-source-compile'
 
-/** Source strategy для RType/source-kind=type. */
+/**
+ * Source strategy для RType/source-kind=type.
+ */
 export class TypeSourceEngineStrategy implements SourceEngineStrategy {
   public readonly id = 'source:type'
   public readonly sourceKind: SourceKind = 'type'

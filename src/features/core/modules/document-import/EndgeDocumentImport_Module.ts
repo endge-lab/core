@@ -22,22 +22,24 @@ interface InternalDocumentImportPlan {
   drafts: ReadonlyMap<string, ParsedDocumentImportCandidate>
 }
 
-/** Владеет подготовкой и применением внешних схем как Domain-документов Endge. */
+/**
+ * Владеет подготовкой и применением внешних схем как Domain-документов Endge.
+ */
 export class EndgeDocumentImport_Module extends EndgeModule {
-  /** Format-specific parsers и единственный активный подтверждаемый plan. */
+  // Format-specific parsers и единственный активный подтверждаемый plan.
   private readonly _graphQLParser = new GraphQLDocumentImportParser()
   private readonly _openAPIParser = new OpenAPIDocumentImportParser()
   private _activePlan: InternalDocumentImportPlan | null = null
   private _planSequence = 0
   private _applyingPlan: InternalDocumentImportPlan | null = null
 
-  /**
-   * ----------------------------------------
-   * PUBLIC
-   * ----------------------------------------
-   */
+  // ---------------------------------------------
+  // PUBLIC API
+  // ---------------------------------------------
 
-  /** Разбирает внешний документ и создаёт renderer-neutral plan без изменения Domain. */
+  /**
+   * Разбирает внешний документ и создаёт renderer-neutral plan без изменения Domain.
+   */
   public prepare(request: DocumentImportPrepareRequest): DocumentImportPlan {
     if (this._applyingPlan) {
       throw new Error('Document import is already running.')
@@ -91,7 +93,9 @@ export class EndgeDocumentImport_Module extends EndgeModule {
     return clonePlan(publicPlan)
   }
 
-  /** Создаёт только подтверждённых кандидатов из ранее подготовленного plan. */
+  /**
+   * Создаёт только подтверждённых кандидатов из ранее подготовленного plan.
+   */
   public async apply(request: DocumentImportApplyRequest): Promise<DocumentImportApplyResult> {
     const plan = this._activePlan
     if (!plan || plan.publicPlan.id !== request.planId) {
@@ -197,20 +201,22 @@ export class EndgeDocumentImport_Module extends EndgeModule {
     }
   }
 
-  /** Сбрасывает неподтверждённый import plan при reset Core context. */
+  /**
+   * Сбрасывает неподтверждённый import plan при reset Core context.
+   */
   public override reset(): void {
     this._activePlan = null
     this._applyingPlan = null
     this.notify()
   }
 
-  /**
-   * ----------------------------------------
-   * PRIVATE
-   * ----------------------------------------
-   */
+  // ---------------------------------------------
+  // PRIVATE
+  // ---------------------------------------------
 
-  /** Выбирает внутренний parser без публичного registry до появления extension use case. */
+  /**
+   * Выбирает внутренний parser без публичного registry до появления extension use case.
+   */
   private _resolveParser(format: DocumentImportFormat): DocumentImportParser {
     if (format === 'graphql') {
       return this._graphQLParser
@@ -221,13 +227,17 @@ export class EndgeDocumentImport_Module extends EndgeModule {
     throw new Error(`Unsupported document import format: ${String(format)}`)
   }
 
-  /** Проверяет сгенерированный Type Source через публичный Source owner. */
+  /**
+   * Проверяет сгенерированный Type Source через публичный Source owner.
+   */
   private _validateTypeSource(candidate: ParsedDocumentImportCandidate): DocumentImportDiagnostic[] {
     const result = Endge.source.compile('type', candidate.source)
     return (result.diagnostics ?? []).map(diagnostic => normalizeSourceDiagnostic(diagnostic, candidate.id))
   }
 
-  /** Запрещает помещение Type в папку другого Domain section. */
+  /**
+   * Запрещает помещение Type в папку другого Domain section.
+   */
   private _assertDestination(folderId: string | number | null): void {
     if (folderId == null) {
       return

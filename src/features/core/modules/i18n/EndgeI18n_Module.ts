@@ -185,12 +185,16 @@ export class EndgeI18n_Module extends EndgeModule {
     return out
   }
 
-  /** Нормализует сокращённые и полные options перевода. */
+  /**
+   * Нормализует сокращённые и полные options перевода.
+   */
   private _normalizeOptions(options: I18nTranslateOptions | string): I18nTranslateOptions {
     return typeof options === 'string' ? { locale: options } : options
   }
 
-  /** Разбирает ключ формата `bundle:key`. */
+  /**
+   * Разбирает ключ формата `bundle:key`.
+   */
   private _parseKey(key: string, bundle?: string): { bundle?: string, key: string } {
     const rawKey = String(key ?? '').trim()
     const separatorIndex = rawKey.indexOf(':')
@@ -208,7 +212,9 @@ export class EndgeI18n_Module extends EndgeModule {
     }
   }
 
-  /** Ищет перевод в общем или bundle-specific index. */
+  /**
+   * Ищет перевод в общем или bundle-specific index.
+   */
   private _resolveFromIndex(key: string, locale: string, bundleIdentity?: string): string | undefined {
     if (!key || !locale) {
       return undefined
@@ -221,19 +227,25 @@ export class EndgeI18n_Module extends EndgeModule {
     return this._messagesByLocale.get(locale)?.get(key)
   }
 
-  /** Возвращает доступные translation bundles. */
+  /**
+   * Возвращает доступные translation bundles.
+   */
   private _getBundles(includeInactive: boolean): RI18nBundle[] {
     return Endge.domain.getI18nBundles().filter(bundle => includeInactive || bundle.active !== false)
   }
 
-  /** Читает сообщения locale из одного bundle. */
+  /**
+   * Читает сообщения locale из одного bundle.
+   */
   private _readLocaleMessages(bundle: RI18nBundle, locale: string): I18nLocaleMessages {
     const locales = bundle.locales ?? {}
     const messages = locales[locale]
     return messages && typeof messages === 'object' && !Array.isArray(messages) ? messages : {}
   }
 
-  /** Подставляет параметры в placeholders строки перевода. */
+  /**
+   * Подставляет параметры в placeholders строки перевода.
+   */
   private _interpolate(text: string, params?: Record<string, unknown>): string {
     if (!params) {
       return text
@@ -245,7 +257,9 @@ export class EndgeI18n_Module extends EndgeModule {
     })
   }
 
-  /** Рекурсивно объединяет деревья сообщений. */
+  /**
+   * Рекурсивно объединяет деревья сообщений.
+   */
   private _mergeMessages(target: I18nLocaleMessages, source: I18nLocaleMessages): void {
     for (const [key, value] of Object.entries(source)) {
       const prev = target[key]
@@ -265,7 +279,9 @@ export class EndgeI18n_Module extends EndgeModule {
     }
   }
 
-  /** Возвращает или создаёт общий index для locale. */
+  /**
+   * Возвращает или создаёт общий index для locale.
+   */
   private _getLocaleIndex(locale: string): Map<string, string> {
     const key = String(locale ?? '').trim()
     let index = this._messagesByLocale.get(key)
@@ -276,7 +292,9 @@ export class EndgeI18n_Module extends EndgeModule {
     return index
   }
 
-  /** Возвращает или создаёт index locale для конкретного bundle. */
+  /**
+   * Возвращает или создаёт index locale для конкретного bundle.
+   */
   private _getBundleLocaleIndex(bundleIdentity: string, locale: string): Map<string, string> {
     let bundleIndex = this._messagesByBundle.get(bundleIdentity)
     if (!bundleIndex) {
@@ -294,7 +312,9 @@ export class EndgeI18n_Module extends EndgeModule {
     return localeIndex
   }
 
-  /** Записывает вложенные сообщения в плоский dot-path index. */
+  /**
+   * Записывает вложенные сообщения в плоский dot-path index.
+   */
   private _writeMessagesIndex(
     target: Map<string, string>,
     source: I18nLocaleMessages,
@@ -317,7 +337,9 @@ export class EndgeI18n_Module extends EndgeModule {
     }
   }
 
-  /** Проверяет, является ли значение обычным object. */
+  /**
+   * Проверяет, является ли значение обычным object.
+   */
   private _isPlainObject(value: unknown): value is Record<string, unknown> {
     return !!value && typeof value === 'object' && !Array.isArray(value)
   }

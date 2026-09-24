@@ -15,7 +15,7 @@ import {
   getComponentSFCTagAttributeContracts,
 } from '@/features/core/modules/domain/types/component/sfc/tag-attribute-contract.types'
 
-/** Проверяет статические значения конечных SFC-атрибутов по renderer-neutral контрактам. */
+// Проверяет статические значения конечных SFC-атрибутов по renderer-neutral контрактам.
 export function validateComponentSFCAttributeValues(
   source: string,
   ast: RComponentSFC_AST | null,
@@ -28,7 +28,7 @@ export function validateComponentSFCAttributeValues(
   return diagnostics
 }
 
-/** Возвращает встроенные и подключенные извне контракты без повторов имён. */
+// Возвращает встроенные и подключенные извне контракты без повторов имён.
 export function resolveComponentSFCTagAttributeContracts(
   tag: string,
   options: ComponentSFCAttributeAnalysisOptions = {},
@@ -48,7 +48,7 @@ export function resolveComponentSFCTagAttributeContracts(
   return result
 }
 
-/** Преобразует literal-union inputs пользовательского компонента в editor-контракты. */
+// Преобразует literal-union inputs пользовательского компонента в editor-контракты.
 export function createComponentSFCAttributeContractsFromInputs(
   inputs: readonly RComponentContractInput[],
 ): ComponentSFCTagAttributeContract[] {

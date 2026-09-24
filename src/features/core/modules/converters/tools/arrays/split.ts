@@ -1,4 +1,4 @@
-/** Разбивает строку по запятой, trim каждого элемента. */
+// Разбивает строку по запятой, trim каждого элемента.
 export function split(value: unknown): string[] {
   if (value == null) {
     return []

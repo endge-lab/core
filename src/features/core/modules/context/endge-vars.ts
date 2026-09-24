@@ -31,12 +31,16 @@ export class WorkspaceVariables {
     this._envyRecord = envyRecord ?? {}
   }
 
-  /** Имя совместимости для вызывающего кода, который всё ещё напрямую передаёт runtime-переопределения. */
+  /**
+   * Имя совместимости для вызывающего кода, который всё ещё напрямую передаёт runtime-переопределения.
+   */
   setEnvyRecord(envyRecord: EnvRecord): void {
     this.setEnvironment(envyRecord)
   }
 
-  /** Сохранённые определения переменных, принадлежащие Workspace. */
+  /**
+   * Сохранённые определения переменных, принадлежащие Workspace.
+   */
   get definitions(): EndgeWorkspaceVar[] {
     return [...this._getDefinitions()]
   }
@@ -225,7 +229,9 @@ export class WorkspaceVariables {
     return s === 'true' || s === '1'
   }
 
-  /** Интерполирует все корректные `{{ VAR }}` и legacy `{VAR}` токены в строке. */
+  /**
+   * Интерполирует все корректные `{{ VAR }}` и legacy `{VAR}` токены в строке.
+   */
   private _interpolate(template: string): {
     value: string
     hasTokens: boolean
@@ -291,7 +297,9 @@ export class WorkspaceVariables {
     return { ok: true, name: inner }
   }
 
-  /** Читает variable из внешнего environment без изменения module state. */
+  /**
+   * Читает variable из внешнего environment без изменения module state.
+   */
   private _getExternalValue(name: string): unknown {
     const key = String(name ?? '').trim()
     if (!key) {

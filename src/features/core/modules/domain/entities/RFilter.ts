@@ -10,11 +10,11 @@ export class RFilter extends REntity {
   @Expose()
   fields: FilterFieldItemSchema[] = []
 
-  /** Независимый source-first контракт нового Filter runtime. */
+  // Независимый source-first контракт нового Filter runtime.
   @Expose()
   source: string = ''
 
-  /** Версия Filter source syntax. */
+  // Версия Filter source syntax.
   @Expose()
   sourceVersion: number = 1
 

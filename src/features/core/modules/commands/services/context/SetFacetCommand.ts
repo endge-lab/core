@@ -2,7 +2,9 @@ import type { EndgeCommandHandler } from '@/features/core/modules/commands/types
 import type { EndgeContextCommandTarget } from '@/features/core/modules/commands/types/context-command-target.type'
 import { readCommandString } from '@/features/core/modules/commands/tools/command-payload'
 
-/** Применяет запрос выбора документа произвольного динамического фасета. */
+/**
+ * Применяет запрос выбора документа произвольного динамического фасета.
+ */
 export class SetFacetCommand implements EndgeCommandHandler {
   public readonly type = 'context:set-facet' as const
   private readonly _context: Pick<EndgeContextCommandTarget, 'setFacetSelection'>

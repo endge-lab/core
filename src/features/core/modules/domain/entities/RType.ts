@@ -14,7 +14,7 @@ export class RType extends REntity<string> {
   @Expose()
   isPrimitive: boolean = false
 
-  /** Каноническое структурное определение типа. */
+  // Каноническое структурное определение типа.
   @Expose()
   source: string = ''
 

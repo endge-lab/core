@@ -1,5 +1,5 @@
 import type { ComponentSFCRuntimeHost } from '@/features/core/modules/runtime/hosts/ComponentSFCRuntimeHost'
-import { Raph } from '@endge/raph'
+import { Raph } from '@raphy-js/raph'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Endge } from '@/features/core/kernel/endge'
 import { compileComponentSFC } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-compile'
@@ -32,7 +32,7 @@ afterEach(async () => {
 })
 
 describe('наблюдение Runtime и управление через Commands', () => {
-  /** Renderer получает привязки и уже вычисленное состояние; capture не повторяет бизнес-вычисления. */
+  // Renderer получает привязки и уже вычисленное состояние; capture не повторяет бизнес-вычисления.
   it('сохраняет входы SFC, Meta и computation вместе с данными Raph без повторного execution', () => {
     Endge.runtime.setup(application)
     const model = RComponentSFC.fromPlain({ id: 'inspection-sfc', identity: 'inspection-sfc', source: `<script setup lang="ts">defineProps<{ count: number }>()</script><template><Text>{{ count }} {{ $data.metaOf(count, 'inspection')?.status }}</Text></template>` })
@@ -57,7 +57,7 @@ describe('наблюдение Runtime и управление через Comman
     expect(passive.getRuntimeById(host.id)).toBeNull()
     expect(runtimeInspectionMetaKey({ kind: 'prop', prop: 'count', path: [] })).toBe(runtimeInspectionMetaKey({ prop: 'count', path: [], kind: 'prop' }))
   })
-  /** Импорт обновляет только пассивную проекцию, включая независимые экземпляры документа. */
+  // Импорт обновляет только пассивную проекцию, включая независимые экземпляры документа.
   it('импортирует данные и статусы без hosts, Raph-записей и событий в обратную сторону', () => {
     const runtime = passiveRuntime()
     const execute = vi.spyOn(Endge.commands, 'execute')
@@ -80,7 +80,7 @@ describe('наблюдение Runtime и управление через Comman
     expect(execute).not.toHaveBeenCalled()
   })
 
-  /** Повреждённая топология не должна частично заменить предыдущее дерево. */
+  // Повреждённая топология не должна частично заменить предыдущее дерево.
   it('отклоняет повторные id и циклы атомарно, сохраняя ошибку данных до успешного обновления', () => {
     const runtime = passiveRuntime()
     runtime.applyInspectionSnapshot(inspectionFixture())
@@ -107,7 +107,7 @@ describe('наблюдение Runtime и управление через Comman
     expect(runtime.inspection.data).toBeUndefined()
   })
 
-  /** Реальный Raph watcher имеет одного owner, независимо от числа наблюдателей. */
+  // Реальный Raph watcher имеет одного owner, независимо от числа наблюдателей.
   it('публикует лёгкие изменения вложенных данных только пока существует lease', () => {
     Endge.runtime.setup(application)
     const watch = vi.spyOn(Raph, 'watch')
@@ -132,7 +132,7 @@ describe('наблюдение Runtime и управление через Comman
     off()
   })
 
-  /** Адрес поколения исключает управление заменённым scope через запоздалый клик. */
+  // Адрес поколения исключает управление заменённым scope через запоздалый клик.
   it('управляет настоящим scope через локальные Commands и отвергает старое поколение', async () => {
     Endge.runtime.setup(application)
     Endge.commands.setup(application)
@@ -148,7 +148,7 @@ describe('наблюдение Runtime и управление через Comman
     await expect(Endge.commands.execute({ type: 'runtime:resume', payload: target })).rejects.toThrow('instance changed')
   })
 
-  /** Снимок настоящего Store проходит wire JSON roundtrip, но не создаёт Store на наблюдателе. */
+  // Снимок настоящего Store проходит wire JSON roundtrip, но не создаёт Store на наблюдателе.
   it('передаёт реальный Store с данными и управляет только выбранным экземпляром', async () => {
     Endge.runtime.setup(application)
     Endge.commands.setup(application)

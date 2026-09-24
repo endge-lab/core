@@ -30,7 +30,7 @@ import type {
 import type { StreamEventEnvelope } from '@/features/core/modules/source/domain/types/stream-source.types'
 
 import type { StoreMutationPlan } from '@/features/core/modules/source/domain/types/update-source.types'
-import { collectionByKey, filterByKey, full, Raph, RaphNode } from '@endge/raph'
+import { collectionByKey, filterByKey, full, Raph, RaphNode } from '@raphy-js/raph'
 import { Endge } from '@/features/core/kernel/endge'
 import { normalizeComponentSFCInteractionTriggers } from '@/features/core/modules/domain/component/component-sfc-edit-trigger'
 import { buildCompositionI18nCatalogs, cloneI18nRuntimeCatalog } from '@/features/core/modules/i18n/services/i18n-catalog'
@@ -83,7 +83,9 @@ function evaluateComponentEventInput(
   ]))
 }
 
-/** Runtime orchestration host: children, bindings, hooks и public handles. */
+/**
+ * Runtime orchestration host: children, bindings, hooks и public handles.
+ */
 export class CompositionRuntimeHost extends RuntimeHostBase<'composition', RuntimeHostContext<'composition'>, CompositionProgramPayload> {
   private _mountPromise: Promise<void> | null = null
   private _destroyPromise: Promise<void> | null = null
@@ -167,7 +169,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     return host
   }
 
-  /** Создает children, bindings и hooks. Повторный mount является no-op. */
+  /**
+   * Создает children, bindings и hooks. Повторный mount является no-op.
+   */
   public mountGraph(): Promise<void> {
     if (this._mountCancelled) {
       return Promise.reject(new DOMException('[CompositionRuntimeHost] Mount was cancelled.', 'AbortError'))
@@ -255,12 +259,16 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     return this._scopes.get(String(path ?? '').trim()) ?? null
   }
 
-  /** Возвращает накопленный translation catalog для заданного lifecycle scope. */
+  /**
+   * Возвращает накопленный translation catalog для заданного lifecycle scope.
+   */
   public getI18nCatalog(scopePath = 'scope_default'): I18nRuntimeCatalog {
     return cloneI18nRuntimeCatalog(this._i18nCatalogs.get(scopePath) ?? {})
   }
 
-  /** Возвращает накопленный Vocab catalog для заданного lifecycle scope. */
+  /**
+   * Возвращает накопленный Vocab catalog для заданного lifecycle scope.
+   */
   public getVocabCatalog(scopePath = 'scope_default'): VocabRuntimeCatalog {
     return { ...(this._vocabCatalogs.get(scopePath) ?? {}) }
   }
@@ -269,7 +277,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     return this._runtimeHandles.get(String(path ?? '').trim()) ?? null
   }
 
-  /** Возвращает текущее значение публичного Composition output. */
+  /**
+   * Возвращает текущее значение публичного Composition output.
+   */
   public getOutput(name: string): unknown {
     const key = String(name ?? '').trim()
     const handle = this._publicOutputs[key]
@@ -288,29 +298,39 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     return handle.output ? handle.runtime ? Raph.get(handle.runtime.outputPath(handle.output)) : undefined : handle.runtime
   }
 
-  /** Текущие значения data-блока для preview и runtime debugger. */
+  /**
+   * Текущие значения data-блока для preview и runtime debugger.
+   */
   public getDataSnapshot(): Readonly<Record<string, unknown>> {
     return Object.fromEntries(
       Array.from(this._dataPaths.entries()).map(([name, path]) => [name, Raph.get(path)]),
     )
   }
 
-  /** Возвращает текущие значения публичных Composition props. */
+  /**
+   * Возвращает текущие значения публичных Composition props.
+   */
   public getProps(): Readonly<Record<string, unknown>> {
     return this.readInputs()
   }
 
-  /** Императивное локальное изменение для UI-сценариев, которым не нужен сохраняемый RUpdate. */
+  /**
+   * Императивное локальное изменение для UI-сценариев, которым не нужен сохраняемый RUpdate.
+   */
   public mutateStore(dataAlias: string, plan: StoreMutationPlan): void {
     this._requireStoreRuntime(dataAlias).applyMutation(plan)
   }
 
-  /** Явно вызывает один именованный RUpdate, принадлежащий Store, вне dispatch Stream. */
+  /**
+   * Явно вызывает один именованный RUpdate, принадлежащий Store, вне dispatch Stream.
+   */
   public applyStoreUpdate(dataAlias: string, updateIdentity: string, payload: unknown): void {
     this._requireStoreRuntime(dataAlias).applyUpdate(updateIdentity, payload)
   }
 
-  /** Сопоставляет артефакт Update с alias данных Store, принадлежащим этой Composition. */
+  /**
+   * Сопоставляет артефакт Update с alias данных Store, принадлежащим этой Composition.
+   */
   public applyUpdateByIdentity(updateIdentity: string, payload: unknown): void {
     const update = Endge.program.getUpdateArtifact(updateIdentity)
     if (!update) {
@@ -323,7 +343,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     this.applyStoreUpdate(data.path ?? data.name, updateIdentity, payload)
   }
 
-  /** Устанавливает literal/Raph-backed источник публичных Composition props. */
+  /**
+   * Устанавливает literal/Raph-backed источник публичных Composition props.
+   */
   public setInputSource(input: RuntimeHostInputSource | null | undefined): void {
     const payload = this.getArtifactPayload()
     if (!payload) {
@@ -358,7 +380,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }
   }
 
-  /** Проверяет обязательные props до создания child runtime graph. */
+  /**
+   * Проверяет обязательные props до создания child runtime graph.
+   */
   private _assertRequiredProps(payload: CompositionProgramPayload): void {
     for (const descriptor of payload.props) {
       if (descriptor.optional || descriptor.defaultValue !== undefined) {
@@ -370,7 +394,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }
   }
 
-  /** Возвращает runtime Raph path объявленной data-зависимости. */
+  /**
+   * Возвращает runtime Raph path объявленной data-зависимости.
+   */
   public getDataPath(name: string, path = ''): string {
     return this._requireDataPath(name, path)
   }
@@ -864,13 +890,17 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }
   }
 
-  /** Строит effective catalogs по той же иерархии, что и lifecycle scopes. */
+  /**
+   * Строит effective catalogs по той же иерархии, что и lifecycle scopes.
+   */
   private _buildI18nCatalogs(payload: CompositionProgramPayload): void {
     const inherited = (this.meta.i18nCatalog ?? {}) as I18nRuntimeCatalog
     this._i18nCatalogs = buildCompositionI18nCatalogs(payload, inherited)
   }
 
-  /** Строит nearest-scope catalog публичных Vocab aliases поверх shared cache paths. */
+  /**
+   * Строит nearest-scope catalog публичных Vocab aliases поверх shared cache paths.
+   */
   private _buildVocabCatalogs(payload: CompositionProgramPayload): void {
     this._vocabCatalogs.clear()
     const inherited = (this.meta.vocabCatalog ?? {}) as VocabRuntimeCatalog
@@ -900,7 +930,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }
   }
 
-  /** Дожидается cache текущего режима, включая его смену во время acquisition. */
+  /**
+   * Дожидается cache текущего режима, включая его смену во время acquisition.
+   */
   private async _acquireScopeVocabs(
     descriptor: CompositionProgramPayload['scopes'][number],
     payload: CompositionProgramPayload,
@@ -922,7 +954,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }
   }
 
-  /** Регистрирует shared Vocab paths и разрешает Store aliases через explicit, ancestor или local provider. */
+  /**
+   * Регистрирует shared Vocab paths и разрешает Store aliases через explicit, ancestor или local provider.
+   */
   private _mountData(payload: CompositionProgramPayload): void {
     const explicitStoreRuntimes = (
       this.meta.dataRuntimes && typeof this.meta.dataRuntimes === 'object'
@@ -1048,7 +1082,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }
   }
 
-  /** Находит ближайший Store provider только среди Composition ancestors. */
+  /**
+   * Находит ближайший Store provider только среди Composition ancestors.
+   */
   private _findAncestorStoreProvider(identity: string, slot: string | null | undefined): StoreRuntimeHost | null {
     const key = storeProviderKey(identity, slot)
     let current = this.parent
@@ -1072,7 +1108,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     return null
   }
 
-  /** Публикует resolved Store instance для descendants этой Composition. */
+  /**
+   * Публикует resolved Store instance для descendants этой Composition.
+   */
   private _registerStoreProvider(identity: string, slot: string | null | undefined, runtimeId: string): void {
     const key = storeProviderKey(identity, slot)
     const runtimeIds = this._storeProviderRuntimeIds.get(key) ?? new Set<string>()
@@ -1080,7 +1118,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     this._storeProviderRuntimeIds.set(key, runtimeIds)
   }
 
-  /** Атомарно публикует накопленный batch runtime outputs в writable Store data. */
+  /**
+   * Атомарно публикует накопленный batch runtime outputs в writable Store data.
+   */
   private _publishUpdates(publications: CompositionRuntimePublicationConnection[]): void {
     const writes: Array<{ runtimeId: string, path: string, value: unknown }> = []
     for (const publication of publications) {
@@ -1519,7 +1559,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }))
   }
 
-  /** Не допускает прямые и транзитивные циклы Composition runtime tree. */
+  /**
+   * Не допускает прямые и транзитивные циклы Composition runtime tree.
+   */
   private _assertCompositionCycle(identity: string): void {
     if (this.entityType === 'composition' && this.entityIdentity === identity) {
       throw new Error(`[CompositionRuntimeHost] composition cycle detected for "${identity}".`)
@@ -1691,7 +1733,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }
   }
 
-  /** Запускает все одновременно готовые Query hooks одним parallel batch. */
+  /**
+   * Запускает все одновременно готовые Query hooks одним parallel batch.
+   */
   private async _runQueries(names: string[]): Promise<void> {
     await Promise.all(names.map(name => this._runQuery(name)))
   }
@@ -1758,7 +1802,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     )
   }
 
-  /** Материализует authored bindings в единый runtime input source child Composition. */
+  /**
+   * Материализует authored bindings в единый runtime input source child Composition.
+   */
   private _makeInputSource(runtimeName: string): RuntimeHostInputSource {
     const literals: Record<string, unknown> = {}
     const bindings: Record<string, RuntimeHostRaphInputBinding> = {}
@@ -1790,7 +1836,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }
   }
 
-  /** Подписки и materializations живут столько же, сколько их child runtime. */
+  /**
+   * Подписки и materializations живут столько же, сколько их child runtime.
+   */
   private _addRuntimeDisposer(runtimeName: string, dispose: () => void): void {
     const disposers = this._runtimeDisposers.get(runtimeName) ?? []
     disposers.push(dispose)
@@ -1911,7 +1959,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     return path
   }
 
-  /** Материализует parameterized DataView binding без отдельного runtime host. */
+  /**
+   * Материализует parameterized DataView binding без отдельного runtime host.
+   */
   private _materializeDataViewBinding(
     runtimeName: string,
     prop: string,
@@ -1953,7 +2003,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     return to
   }
 
-  /** Гарантирует, что список outputs для fromOutput(runtime) был связан до запуска runtime. */
+  /**
+   * Гарантирует, что список outputs для fromOutput(runtime) был связан до запуска runtime.
+   */
   private _requireResolvedOutputs(runtime: string, outputs: string[] | undefined): string[] {
     if (!outputs) {
       throw new Error(`[CompositionRuntimeHost] fromOutput("${runtime}") was not linked by the compiler.`)
@@ -1961,18 +2013,24 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     return outputs
   }
 
-  /** Читает и распаковывает один именованный runtime output. */
+  /**
+   * Читает и распаковывает один именованный runtime output.
+   */
   private _readRuntimeOutput(runtime: string, output: string): unknown {
     const value = Raph.get(this._requireOutputBridge(runtime, output)) as any
     return value?.kind === 'json' ? value.value : value
   }
 
-  /** Собирает объект всех runtime outputs с сохранением их публичных имён. */
+  /**
+   * Собирает объект всех runtime outputs с сохранением их публичных имён.
+   */
   private _readRuntimeOutputs(runtime: string, outputs: string[]): Record<string, unknown> {
     return Object.fromEntries(outputs.map(output => [output, this._readRuntimeOutput(runtime, output)]))
   }
 
-  /** Читает весь compiled metadata map или один namespace сущности runtime alias-а. */
+  /**
+   * Читает весь compiled metadata map или один namespace сущности runtime alias-а.
+   */
   private _readRuntimeMetadata(runtimePath: string, namespace?: string): unknown {
     const descriptor = this.getArtifactPayload()?.runtimes.find(runtime => runtime.path === runtimePath)
     if (!descriptor) {
@@ -2139,7 +2197,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     return runtime.runtimeType === 'filter-view-runtime-host'
   }
 
-  /** Возвращает topological runtime order по fromOutput dependencies. */
+  /**
+   * Возвращает topological runtime order по fromOutput dependencies.
+   */
   private _dependencyOrder(
     runtimes: CompositionProgramPayload['runtimes'],
   ): CompositionProgramPayload['runtimes'] {

@@ -49,7 +49,7 @@ describe('жизненный цикл RuntimeScope', () => {
     expect(child.state).toBe('active')
   })
 
-  /** Восстановление ребёнка не занимает его очередь до восстановления предка. */
+  // Восстановление ребёнка не занимает его очередь до восстановления предка.
   it('возобновляет остановленное дерево через ребёнка без взаимного ожидания', async () => {
     const parent = new RuntimeScope({ id: 'parent', path: 'parent' })
     const child = new RuntimeScope({ id: 'child', path: 'child', parent })
@@ -65,7 +65,7 @@ describe('жизненный цикл RuntimeScope', () => {
     await parent.dispose()
   })
 
-  /** Startup hook родителя может активировать того же ребёнка, который запросил запуск. */
+  // Startup hook родителя может активировать того же ребёнка, который запросил запуск.
   it('активирует startup ребёнка через неактивного родителя без цикла очередей', async () => {
     let child: RuntimeScope
     const parent: RuntimeScope = new RuntimeScope({

@@ -5,7 +5,7 @@ import { createContextCommandExecutor } from '@/features/core/modules/commands/c
 import { EndgeCommands_Module } from '@/features/core/modules/commands/EndgeCommands_Module'
 
 describe('context command execution boundary', () => {
-  /** Runtime сохраняет штатный локальный owner при host override Context и уходит в transport в debugger. */
+  // Runtime сохраняет штатный локальный owner при host override Context и уходит в transport в debugger.
   it('направляет Runtime в локальный реестр или удалённый transport без Context override', async () => {
     const local = { execute: vi.fn() }
     const context = { execute: vi.fn() }

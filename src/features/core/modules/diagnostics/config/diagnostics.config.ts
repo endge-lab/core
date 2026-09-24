@@ -3,7 +3,7 @@ import type {
   EndgeDiagnosticsConfiguration,
 } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
 
-/** Системная diagnostics configuration для workspace без явных настроек. */
+// Системная diagnostics configuration для workspace без явных настроек.
 export const DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION: Readonly<EndgeDiagnosticsConfiguration> = Object.freeze({
   telemetry: {
     collection: {
@@ -77,7 +77,7 @@ export const DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION: Readonly<EndgeDiagnosticsC
   },
 } satisfies EndgeDiagnosticsConfiguration)
 
-/** Текстовое представление базовых значений OpenTelemetry SeverityNumber. */
+// Текстовое представление базовых значений OpenTelemetry SeverityNumber.
 export const DIAGNOSTICS_SEVERITY_TEXT: Record<DiagnosticsSeverityNumber, 'TRACE' | 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'FATAL'> = {
   1: 'TRACE',
   5: 'DEBUG',

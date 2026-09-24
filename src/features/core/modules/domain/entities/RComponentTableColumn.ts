@@ -57,19 +57,17 @@ export class ReflectComponentTableColumnBase {
   // Настройки сортировки (опционально)
   sort: ColumnSortConfig | null = null
 
-  /**
-   * Конфигурация отчетов.
-   *
-   * - null/undefined/{} => "по умолчанию": все dataPaths включены, форматирование базовое
-   * - либо объект по ключам dataPaths:
-   *
-   * reports: {
-   *   data: {
-   *     enabled: true,
-   *     formatter: { type: 'DateTime', format: 'DD/MM/YYYY' }
-   *   }
-   * }
-   */
+  // Конфигурация отчетов.
+  //
+  // - null/undefined/{} => "по умолчанию": все dataPaths включены, форматирование базовое
+  // - либо объект по ключам dataPaths:
+  //
+  // reports: {
+  //   data: {
+  //     enabled: true,
+  //     formatter: { type: 'DateTime', format: 'DD/MM/YYYY' }
+  //   }
+  // }
   reports: Record<
     string,
     {
@@ -284,9 +282,7 @@ export type RComponentTableColumn
   = | ReflectComponentTableColumnHtml
     | ReflectComponentTableColumnComponent
 
-/**
- * Маппер типов
- */
+// Маппер типов
 export const ColumnTypeMap: Record<
   ColumnComponentType,
   Constructor<RComponentTableColumn>
@@ -295,10 +291,8 @@ export const ColumnTypeMap: Record<
   [ComponentType.Component]: ReflectComponentTableColumnComponent,
 }
 
-/**
- * Безопасный конструктор для типа.
- * Возвращает конструктор колонки в зависимости от типа.
- */
+// Безопасный конструктор для типа.
+// Возвращает конструктор колонки в зависимости от типа.
 export function RComponentTableColumn_TypeCtor(
   type: ColumnComponentType,
 ): Constructor<RComponentTableColumn> | null {

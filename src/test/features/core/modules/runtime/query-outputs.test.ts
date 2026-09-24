@@ -1,7 +1,7 @@
 import type { QueryRuntimeHost } from '@/features/core/modules/runtime/hosts/QueryRuntimeHost'
 import type { QuerySourceDocument } from '@/features/core/modules/source/domain/types/query-source.types'
 
-import { Raph } from '@endge/raph'
+import { Raph } from '@raphy-js/raph'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Endge } from '@/features/core/kernel/endge'
 import { RDataView } from '@/features/core/modules/domain/entities/RDataView'

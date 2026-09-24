@@ -9,7 +9,7 @@ import { bundleObject } from '../tools/bundle-json'
 
 export const ENDGE_BUNDLE_MAX_BYTES = 256 * 1024 * 1024
 
-/** Проверяет общий контейнер независимо от способа доставки и не устанавливает его. */
+// Проверяет общий контейнер независимо от способа доставки и не устанавливает его.
 export function readEndgeBundle(input: unknown): EndgeBundle {
   const value = bundleObject(input, 'container')
   if (
@@ -36,7 +36,9 @@ export function readEndgeBundle(input: unknown): EndgeBundle {
   }
 }
 
-/** Stateless file boundary. fflate async operations own cancellable workers, never Program/Runtime. */
+/**
+ * Stateless file boundary. fflate async operations own cancellable workers, never Program/Runtime.
+ */
 export class EndgeBundleCodec_Service {
   private readonly _maxBytes: number
   public constructor(options: { maxDecodedBytes?: number } = {}) {

@@ -1,16 +1,14 @@
 import type { RComponentSFC_IR_Tag } from './ir.types'
 import type { RComponentContractInput } from '@/features/core/modules/domain/types/component/component-core.types'
 
-/** Публичный входной параметр renderer-neutral встроенного SFC tag. */
+// Публичный входной параметр renderer-neutral встроенного SFC tag.
 export type ComponentSFCTagInputContract = Readonly<RComponentContractInput> & {
-  /** Допустимые SFC spelling aliases для одного renderer-facing параметра. */
+  // Допустимые SFC spelling aliases для одного renderer-facing параметра.
   aliases?: readonly string[]
 }
 
-/**
- * Data-facing входы встроенных tags для source-aware visual editors.
- * Presentation-атрибуты остаются в отдельном редакторе атрибутов.
- */
+// Data-facing входы встроенных tags для source-aware visual editors.
+// Presentation-атрибуты остаются в отдельном редакторе атрибутов.
 export const ENDGE_SFC_TAG_INPUT_CONTRACTS = {
   Text: [
     { name: 'value', type: 'string', optional: true },
@@ -87,7 +85,7 @@ export const ENDGE_SFC_TAG_INPUT_CONTRACTS = {
   ],
 } as const satisfies Partial<Record<RComponentSFC_IR_Tag, readonly ComponentSFCTagInputContract[]>>
 
-/** Возвращает публичные data-входы встроенного SFC tag. */
+// Возвращает публичные data-входы встроенного SFC tag.
 export function getComponentSFCTagInputContract(
   tag: RComponentSFC_IR_Tag,
 ): readonly ComponentSFCTagInputContract[] {

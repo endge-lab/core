@@ -104,7 +104,7 @@ const COMPONENT_SFC_BUILTIN_EVENT_PAYLOAD_TYPES = new Set([
  * Компилятор persisted domain model в compiled program artifacts.
  */
 export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
-  /** Хранит compiler handlers, локальные counters, component caches и активный diagnostics span. */
+  // Хранит compiler handlers, локальные counters, component caches и активный diagnostics span.
   private readonly _handlers = new Map<ProgramEntityType, EntityCompilerHandler<any, any>>()
   private _localDataViewCounter = 0
   private _localFilterCounter = 0
@@ -112,12 +112,6 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
   private _componentPortManifestCache = new Map<string, ComponentSFCPortManifest>()
   private _componentPortManifestResolving = new Set<string>()
   private _compileSpan: DiagnosticsSpanHandle | null = null
-
-  /**
-   * ----------------------------------------
-   * PUBLIC
-   * ----------------------------------------
-   */
 
   /**
    * Создает singleton-bound compiler module и регистрирует стандартные handlers.
@@ -130,7 +124,13 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     this._registerDefaultHandlers()
   }
 
-  /** Возвращает фактически зарегистрированные compiler entity types для contract verification. */
+  // ---------------------------------------------
+  // PUBLIC API
+  // ---------------------------------------------
+
+  /**
+   * Возвращает фактически зарегистрированные compiler entity types для contract verification.
+   */
   public listSupportedEntityTypes(): ProgramEntityType[] {
     return [...this._handlers.keys()]
   }
@@ -257,18 +257,24 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Компилирует один query source в Endge.program без запуска остальных compiler-фаз. */
+  /**
+   * Компилирует один query source в Endge.program без запуска остальных compiler-фаз.
+   */
   public buildQuery(entity: RQuery): ProgramArtifact<QueryProgramPayload> {
     const context = this._createCompileContext()
     return this._compileEntity('query', entity, context) as ProgramArtifact<QueryProgramPayload>
   }
 
-  /** Компилирует один Vocab source в Endge.program. */
+  /**
+   * Компилирует один Vocab source в Endge.program.
+   */
   public buildVocab(entity: RVocabs): ProgramArtifact<VocabProgramPayload> {
     return this._compileEntity('vocab', entity, this._createCompileContext()) as ProgramArtifact<VocabProgramPayload>
   }
 
-  /** Компилирует одну Computation в безопасный runtime artifact. */
+  /**
+   * Компилирует одну Computation в безопасный runtime artifact.
+   */
   public buildComputation(entity: RComputation): ProgramArtifact<ComputationProgramPayload> {
     const context = this._createCompileContext()
     const artifact = this._compileEntity('computation', entity, context) as ProgramArtifact<ComputationProgramPayload>
@@ -276,24 +282,32 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     return artifact
   }
 
-  /** Компилирует один Type Source в общий Type Registry. */
+  /**
+   * Компилирует один Type Source в общий Type Registry.
+   */
   public buildType(entity: RType): ProgramArtifact<TypeProgramPayload> {
     return this._compileEntity('type', entity, this._createCompileContext()) as ProgramArtifact<TypeProgramPayload>
   }
 
-  /** Компилирует один сохранённый Action в неизменяемый артефакт Program. */
+  /**
+   * Компилирует один сохранённый Action в неизменяемый артефакт Program.
+   */
   public buildAction(entity: RAction): ProgramArtifact<ActionProgramPayload> {
     return this._compileEntity('action', entity, this._createCompileContext()) as ProgramArtifact<ActionProgramPayload>
   }
 
-  /** Компилирует один ComponentSFC без запуска полного domain build. */
+  /**
+   * Компилирует один ComponentSFC без запуска полного domain build.
+   */
   public buildComponentSFC(entity: RComponentSFC): ProgramArtifact<ComponentSFCProgramPayload> {
     const context = this._createCompileContext()
     this._prepareComponentTagRegistry(Endge.domain.getComponentSFCs())
     return this._compileEntity('component-sfc', entity, context) as ProgramArtifact<ComponentSFCProgramPayload>
   }
 
-  /** Компилирует наблюдаемый SFC без записи в Program и без запуска runtime. */
+  /**
+   * Компилирует наблюдаемый SFC без записи в Program и без запуска runtime.
+   */
   public compileComponentSFCArtifact(entity: RComponentSFC): ProgramArtifact<ComponentSFCProgramPayload> {
     this._componentPortManifestCache.clear()
     this._componentTagDiagnosticsByIdentity.clear()
@@ -304,29 +318,39 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     return handler.compile(entity, this._createCompileContext())
   }
 
-  /** Компилирует один DataView source в Endge.program без запуска остальных compiler-фаз. */
+  /**
+   * Компилирует один DataView source в Endge.program без запуска остальных compiler-фаз.
+   */
   public buildDataView(entity: RDataView): ProgramArtifact<DataViewProgramPayload> {
     const context = this._createCompileContext()
     return this._compileEntity('data-view', entity, context) as ProgramArtifact<DataViewProgramPayload>
   }
 
-  /** Компилирует один Store source в Endge.program. */
+  /**
+   * Компилирует один Store source в Endge.program.
+   */
   public buildStore(entity: RStore): ProgramArtifact<StoreSourceArtifact> {
     const context = this._createCompileContext()
     return this._compileEntity('store', entity, context) as ProgramArtifact<StoreSourceArtifact>
   }
 
-  /** Компилирует один Stream source в Endge.program. */
+  /**
+   * Компилирует один Stream source в Endge.program.
+   */
   public buildStream(entity: RStream): ProgramArtifact<StreamSourceArtifact> {
     return this._compileEntity('stream', entity, this._createCompileContext()) as ProgramArtifact<StreamSourceArtifact>
   }
 
-  /** Компилирует один Simulation source в Endge.program. */
+  /**
+   * Компилирует один Simulation source в Endge.program.
+   */
   public buildSimulation(entity: RSimulation): ProgramArtifact<SimulationSourceArtifact> {
     return this._compileEntity('simulation', entity, this._createCompileContext()) as ProgramArtifact<SimulationSourceArtifact>
   }
 
-  /** Компилирует черновик Simulation без публикации в общей Program. */
+  /**
+   * Компилирует черновик Simulation без публикации в общей Program.
+   */
   public compileSimulationArtifact(entity: RSimulation): ProgramArtifact<SimulationSourceArtifact> {
     const handler = this._handlers.get('simulation') as EntityCompilerHandler<RSimulation, SimulationSourceArtifact> | undefined
     if (!handler) {
@@ -335,18 +359,24 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     return handler.compile(entity, this._createCompileContext())
   }
 
-  /** Компилирует один дочерний Update source в Endge.program. */
+  /**
+   * Компилирует один дочерний Update source в Endge.program.
+   */
   public buildUpdate(entity: RUpdate): ProgramArtifact<UpdateSourceArtifact> {
     return this._compileEntity('update', entity, this._createCompileContext()) as ProgramArtifact<UpdateSourceArtifact>
   }
 
-  /** Компилирует один Filter source в Endge.program. */
+  /**
+   * Компилирует один Filter source в Endge.program.
+   */
   public buildFilter(entity: RFilter): ProgramArtifact<FilterProgramPayload> {
     const context = this._createCompileContext()
     return this._compileEntity('filter', entity, context) as ProgramArtifact<FilterProgramPayload>
   }
 
-  /** Компилирует один Composition source в Endge.program. */
+  /**
+   * Компилирует один Composition source в Endge.program.
+   */
   public buildComposition(entity: RComposition): ProgramArtifact<CompositionProgramPayload> {
     const context = this._createCompileContext()
     return this._compileEntity('composition', entity, context) as ProgramArtifact<CompositionProgramPayload>
@@ -364,19 +394,21 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     return handler.compile(entity, this._createCompileContext())
   }
 
-  /** Компилирует один глобальный source-first документ EndgeCSS. */
+  /**
+   * Компилирует один глобальный source-first документ EndgeCSS.
+   */
   public buildStyle(entity: RStyle): ProgramArtifact<EndgeStyleProgramPayload> {
     const context = this._createCompileContext()
     return this._compileEntity('style', entity, context) as ProgramArtifact<EndgeStyleProgramPayload>
   }
 
-  /**
-   * ----------------------------------------
-   * PRIVATE
-   * ----------------------------------------
-   */
+  // ---------------------------------------------
+  // PRIVATE
+  // ---------------------------------------------
 
-  /** Фиксирует только реально используемые code Actions как требования к host этой сборки. */
+  /**
+   * Фиксирует только реально используемые code Actions как требования к host этой сборки.
+   */
   private _hostActionRequirements(): ProgramHostActionRequirement[] {
     const result = new Map<string, ProgramHostActionRequirement>()
     const visit = (artifact: ProgramArtifact): void => {
@@ -401,7 +433,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     return [...result.values()].sort((left, right) => left.identity.localeCompare(right.identity))
   }
 
-  /** Собирает полный registry встроенных compiler handlers для поддерживаемых Domain documents. */
+  /**
+   * Собирает полный registry встроенных compiler handlers для поддерживаемых Domain documents.
+   */
   private _registerDefaultHandlers(): void {
     //
     //
@@ -1327,7 +1361,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     this._handlers.set(handler.entityType, handler as EntityCompilerHandler<any, any>)
   }
 
-  /** Создаёт единый immutable context для полного и точечного compiler entry points. */
+  /**
+   * Создаёт единый immutable context для полного и точечного compiler entry points.
+   */
   private _createCompileContext(): ProgramCompileContext {
     return {
       compilerVersion: ENDGE_COMPILER_VERSION,
@@ -1440,7 +1476,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     return artifact
   }
 
-  /** Сравнивает inputs без повторного parser/compiler вызова и hash большого Source на каждой строке UI. */
+  /**
+   * Сравнивает inputs без повторного parser/compiler вызова и hash большого Source на каждой строке UI.
+   */
   private _createFreshnessCheck(entity: unknown, artifact: ProgramArtifact): () => boolean {
     const input = this._toStableSource(entity) as Record<string, unknown>
     const expected = Object.entries(input).map(([key, value]) => ({
@@ -1466,7 +1504,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Читает текущую Domain-сущность, включая замену объекта ответом persistence. */
+  /**
+   * Читает текущую Domain-сущность, включая замену объекта ответом persistence.
+   */
   private _resolveArtifactEntity(ref: ProgramArtifactRef): unknown {
     const domain = Endge.domain
     const id = ref.id
@@ -1489,7 +1529,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Стабильный порядок исходников: сначала системные документы, затем авторские по identity. */
+  /**
+   * Стабильный порядок исходников: сначала системные документы, затем авторские по identity.
+   */
   private _orderedStyles(): RStyle[] {
     const rank = (style: RStyle) => style.managedBy === 'system' ? 0 : 1
     return Endge.domain.getStyles()
@@ -1497,7 +1539,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
       .sort((left, right) => rank(left) - rank(right) || left.identity.localeCompare(right.identity))
   }
 
-  /** Возвращает static artifact dependencies внешних computation calls. */
+  /**
+   * Возвращает static artifact dependencies внешних computation calls.
+   */
   private _computationDependencies(payload: ComputationProgramPayload): ProgramArtifact['dependencies'] {
     const identities = new Set<string>()
     const dependencies: ProgramArtifact['dependencies'] = []
@@ -1517,7 +1561,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     return dependencies
   }
 
-  /** Проверяет контракт одного владельца по Type Registry, построенному из исходников. */
+  /**
+   * Проверяет контракт одного владельца по Type Registry, построенному из исходников.
+   */
   private _typeContractDiagnostics(
     expression: string | TypeSourceExpression | null | undefined,
     sourcePath: string,
@@ -1567,7 +1613,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
       : validateTypeSourceExpressionUsage(expression, catalogWithLocals, sourcePath)
   }
 
-  /** Создаёт стабильные зависимости Program для каждого выражения пользовательского типа. */
+  /**
+   * Создаёт стабильные зависимости Program для каждого выражения пользовательского типа.
+   */
   private _typeDependencies(
     expressions: Array<string | TypeSourceExpression | null | undefined>,
     excluded: ReadonlySet<string> = new Set(),
@@ -1595,7 +1643,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     })
   }
 
-  /** Публикует статическую ссылку Query на профиль авторизации в общем графе Program. */
+  /**
+   * Публикует статическую ссылку Query на профиль авторизации в общем графе Program.
+   */
   private _queryAuthDependencies(
     payload: QueryProgramPayload | undefined,
   ): ProgramArtifact['dependencies'] {
@@ -1617,7 +1667,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     }]
   }
 
-  /** Добавляет явные зависимости RMock, используемые только fixtures preview для Composition. */
+  /**
+   * Добавляет явные зависимости RMock, используемые только fixtures preview для Composition.
+   */
   private _compositionPreviewDependencies(
     payload: CompositionProgramPayload | undefined,
   ): ProgramArtifact['dependencies'] {
@@ -1631,7 +1683,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
       : [])
   }
 
-  /** Диагностика preview остаётся предупреждением, чтобы сломанный fixture не делал production-выполнение невалидным. */
+  /**
+   * Диагностика preview остаётся предупреждением, чтобы сломанный fixture не делал production-выполнение невалидным.
+   */
   private _compositionPreviewDiagnostics(
     payload: CompositionProgramPayload | undefined,
   ): Omit<ProgramDiagnostic, 'entityRef'>[] {
@@ -1668,7 +1722,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     return diagnostics
   }
 
-  /** Связывает computation artifacts, запрещает missing/invalid/cyclic references и выводит effective execution mode. */
+  /**
+   * Связывает computation artifacts, запрещает missing/invalid/cyclic references и выводит effective execution mode.
+   */
   private _linkComputations(): void {
     const artifacts = Endge.program.getArtifacts()
       .filter((artifact): artifact is ComputationArtifact => artifact.ref.entityType === 'computation')
@@ -1752,7 +1808,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     Endge.program.recalculateStatus()
   }
 
-  /** Добавляет linker diagnostic без duplicate сообщений и обновляет artifact status. */
+  /**
+   * Добавляет linker diagnostic без duplicate сообщений и обновляет artifact status.
+   */
   private _addComputationLinkDiagnostic(
     artifact: ComputationArtifact,
     value: Omit<ProgramDiagnostic, 'entityRef'>,
@@ -1764,7 +1822,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     artifact.status = statusFromDiagnostics(artifact.diagnostics)
   }
 
-  /** Находит strongly connected components, которые образуют реальные cycles. */
+  /**
+   * Находит strongly connected components, которые образуют реальные cycles.
+   */
   private _findComputationCycles(graph: Map<string, string[]>): string[][] {
     let index = 0
     const indexes = new Map<string, number>()
@@ -1812,7 +1872,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     return cycles
   }
 
-  /** Восстанавливает один точный cycle path внутри strongly connected component. */
+  /**
+   * Восстанавливает один точный cycle path внутри strongly connected component.
+   */
   private _findCyclePath(component: string[], graph: Map<string, string[]>): string[] {
     const members = new Set(component)
     const search = (current: string, path: string[]): string[] | null => {
@@ -1834,7 +1896,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     return search(component[0]!, [component[0]!]) ?? [...component, component[0]!]
   }
 
-  /** Компилирует один исходник SFC и кеширует его вычисленный манифест публичных портов для проброса родителем. */
+  /**
+   * Компилирует один исходник SFC и кеширует его вычисленный манифест публичных портов для проброса родителем.
+   */
   private _compileComponentSFCSource(
     entity: RComponentSFC,
     sfcEditing: EndgeSFCEditingConfiguration,
@@ -1872,7 +1936,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Читает явные имена корневых Variant без рекурсивной компиляции дочернего элемента. */
+  /**
+   * Читает явные имена корневых Variant без рекурсивной компиляции дочернего элемента.
+   */
   private _resolveComponentVariantNames(identity: string): string[] | null {
     const component = Endge.domain.getComponentSFC(identity)
     if (!component) {
@@ -1893,7 +1959,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     return variants.length ? variants : []
   }
 
-  /** Вычисляет публичные порты дочернего элемента независимо от порядка компиляции доменных компонентов. */
+  /**
+   * Вычисляет публичные порты дочернего элемента независимо от порядка компиляции доменных компонентов.
+   */
   private _resolveComponentPortManifest(
     identity: string,
     sfcEditing: EndgeSFCEditingConfiguration,
@@ -1912,7 +1980,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     return this._compileComponentSFCSource(component, sfcEditing).ir?.script.ports ?? null
   }
 
-  /** Вычисляет Type Source независимо от порядка компиляции типов и компонентов. */
+  /**
+   * Вычисляет Type Source независимо от порядка компиляции типов и компонентов.
+   */
   private _resolveTypeDefinition(identity: string): TypeSourceDefinition | null {
     const compiled = Endge.program.getTypeArtifact(identity)?.payload.definition
     if (compiled) {
@@ -1926,7 +1996,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     return compileTypeSource(type.source, type.sourceVersion).document?.definition ?? null
   }
 
-  /** Материализует итоговые предоставленные и проброшенные порты SFC Action как производные дескрипторы. */
+  /**
+   * Материализует итоговые предоставленные и проброшенные порты SFC Action как производные дескрипторы.
+   */
   private _materializeProvidedActions(components: readonly RComponentSFC[]): void {
     for (const component of components) {
       const artifact = Endge.program.getArtifact<ComponentSFCProgramPayload>('component-sfc', component.identity)
@@ -1966,7 +2038,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     Endge.program.recalculateStatus()
   }
 
-  /** Вычисляет дескриптор доменного provider без зависимости от порядка компиляции SFC. */
+  /**
+   * Вычисляет дескриптор доменного provider без зависимости от порядка компиляции SFC.
+   */
   private _resolvePortProvider(
     identity: string,
     expectedKind: 'computation' | 'component' | 'action' | 'query',
@@ -2081,7 +2155,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     Endge.program.setComponentTags(entries)
   }
 
-  /** Добавляет build diagnostic владельцу persisted SFC tag. */
+  /**
+   * Добавляет build diagnostic владельцу persisted SFC tag.
+   */
   private _addComponentTagDiagnostic(
     identity: string,
     diagnostic: Omit<ProgramDiagnostic, 'entityRef'>,
@@ -2091,7 +2167,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     this._componentTagDiagnosticsByIdentity.set(identity, diagnostics)
   }
 
-  /** Связывает каждый внешний шаг Action с каталогами storage или установленного кода. */
+  /**
+   * Связывает каждый внешний шаг Action с каталогами storage или установленного кода.
+   */
   private _linkActionDependencies(seed: ProgramDependency[]): {
     dependencies: ProgramDependency[]
     diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
@@ -2182,7 +2260,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Материализует локальные DataView внутри query output graph в child artifacts. */
+  /**
+   * Материализует локальные DataView внутри query output graph в child artifacts.
+   */
   private _materializeResponseOutputDataViews<TPayload extends { outputs: QueryProgramOutput[] }>(
     payload: TPayload,
     entity: RQuery | RVocabs,
@@ -2265,7 +2345,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Сворачивает цепочку DataView: byKey допустим только при одинаковом доказанном ключе. */
+  /**
+   * Сворачивает цепочку DataView: byKey допустим только при одинаковом доказанном ключе.
+   */
   private _resolveDataViewChainStrategy(
     refs: DataViewRef[],
     localChildren: ProgramArtifact[],
@@ -2291,7 +2373,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     return strategy ?? { kind: 'full' }
   }
 
-  /** Рекурсивно ищет локальный DataView artifact среди дочерних artifacts. */
+  /**
+   * Рекурсивно ищет локальный DataView artifact среди дочерних artifacts.
+   */
   private _findDataViewChild(
     children: ProgramArtifact[],
     id: string | number,
@@ -2309,7 +2393,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     return null
   }
 
-  /** Материализует локальные Filter defaults query props в child artifacts. */
+  /**
+   * Материализует локальные Filter defaults query props в child artifacts.
+   */
   private _materializeQueryLocalFilters(
     payload: QueryProgramPayload,
     entity: RQuery,
@@ -2443,7 +2529,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     return { payload: { ...payload, props }, children, diagnostics, dependencies }
   }
 
-  /** Компилирует owned Filter artifact без регистрации в Endge.program. */
+  /**
+   * Компилирует owned Filter artifact без регистрации в Endge.program.
+   */
   private _compileLocalFilterArtifact(
     source: string,
     ownerIdentity: string,
@@ -2488,7 +2576,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     })
   }
 
-  /** Материализует i18n resources в Composition program artifact. */
+  /**
+   * Материализует i18n resources в Composition program artifact.
+   */
   private _materializeCompositionI18n(payload: CompositionProgramPayload): {
     payload: CompositionProgramPayload
     diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
@@ -2616,7 +2706,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     return diagnostics
   }
 
-  /** Проверяет domain/program references и stable-prop bindings Composition. */
+  /**
+   * Проверяет domain/program references и stable-prop bindings Composition.
+   */
   private _validateComposition(payload: CompositionProgramPayload, owner: RComposition): {
     diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
     dependencies: ProgramArtifact['dependencies']
@@ -2667,7 +2759,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
       }
     }
 
-    /** Проверяет публикацию публичных runtime outputs в writable Store fields. */
+    // Проверяет публикацию публичных runtime outputs в writable Store fields.
     const validateStoreTo = (
       runtime: CompositionProgramPayload['runtimes'][number],
       outputNames: Set<string>,
@@ -3196,7 +3288,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     return { diagnostics, dependencies }
   }
 
-  /** Сортирует Composition так, чтобы compiled artifact зависимости появился раньше consumer. */
+  /**
+   * Сортирует Composition так, чтобы compiled artifact зависимости появился раньше consumer.
+   */
   private _orderCompositionsForCompile(compositions: RComposition[]): RComposition[] {
     const byIdentity = new Map(compositions.map(composition => [composition.identity, composition]))
     const ordered: RComposition[] = []
@@ -3229,7 +3323,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     return ordered
   }
 
-  /** Проверяет достижимость Composition dependency для compile-time cycle diagnostics. */
+  /**
+   * Проверяет достижимость Composition dependency для compile-time cycle diagnostics.
+   */
   private _compositionDependsOn(fromIdentity: string, targetIdentity: string, visited = new Set<string>()): boolean {
     if (fromIdentity === targetIdentity) {
       return true
@@ -3246,7 +3342,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
       .some(identity => this._compositionDependsOn(identity, targetIdentity, visited))
   }
 
-  /** Читает только прямые Composition dependencies из source без создания Program artifact. */
+  /**
+   * Читает только прямые Composition dependencies из source без создания Program artifact.
+   */
   private _compositionDependencies(composition: RComposition): string[] {
     const result = Endge.source.compile('composition', this._resolveCompositionSource(composition))
     const payload = result.artifact as CompositionProgramPayload | undefined
@@ -3261,7 +3359,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     )]
   }
 
-  /** Материализует локальные DataView внутри DataView pipeline steps в child artifacts. */
+  /**
+   * Материализует локальные DataView внутри DataView pipeline steps в child artifacts.
+   */
   private _materializeDataViewLocalDataViews(
     payload: DataViewProgramPayload,
     entity: RDataView | { id?: string | number, identity?: string, name?: string },
@@ -3295,7 +3395,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Материализует локальные DataView refs внутри pipeline steps. */
+  /**
+   * Материализует локальные DataView refs внутри pipeline steps.
+   */
   private _materializeDataViewRefsInSteps(
     steps: DataViewPipelineStep[],
     ownerIdentity: string,
@@ -3325,7 +3427,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     })
   }
 
-  /** Заменяет inline DataView refs на local refs и собирает external dependencies. */
+  /**
+   * Заменяет inline DataView refs на local refs и собирает external dependencies.
+   */
   private _materializeDataViewRefs(
     refs: DataViewRef[],
     ownerIdentity: string,
@@ -3377,7 +3481,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     })
   }
 
-  /** Компилирует локальный DataView source в child artifact без записи в Endge.program. */
+  /**
+   * Компилирует локальный DataView source в child artifact без записи в Endge.program.
+   */
   private _compileLocalDataViewArtifact(
     source: string,
     ownerIdentity: string,
@@ -3433,7 +3539,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     return { entityType, id, identity }
   }
 
-  /** Переносит pure entity validation result в diagnostics compiled artifact. */
+  /**
+   * Переносит pure entity validation result в diagnostics compiled artifact.
+   */
   private _collectEntityDiagnostics(entity: any): Omit<ProgramDiagnostic, 'entityRef'>[] {
     const problems = typeof entity?.getDiagnosticProblems === 'function' ? entity.getDiagnosticProblems() : []
     return Array.isArray(problems)
@@ -3480,7 +3588,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Возвращает сохраненный query source. Legacy generation больше не используется runtime compiler-ом. */
+  /**
+   * Возвращает сохраненный query source. Legacy generation больше не используется runtime compiler-ом.
+   */
   private _resolveQuerySource(entity: RQuery): string {
     const source = typeof entity.source === 'string' ? entity.source.trim() : ''
     if (source) {
@@ -3490,7 +3600,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     throw new Error(`Query source is required for "${entity.identity ?? entity.name ?? entity.id}".`)
   }
 
-  /** Возвращает сохраненный DataView source. */
+  /**
+   * Возвращает сохраненный DataView source.
+   */
   private _resolveDataViewSource(entity: RDataView): string {
     const source = typeof entity.source === 'string' ? entity.source.trim() : ''
     if (source) {
@@ -3500,22 +3612,30 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     throw new Error(`DataView source is required for "${entity.identity ?? entity.name ?? entity.id}".`)
   }
 
-  /** Возвращает Filter source без fallback на legacy fields. */
+  /**
+   * Возвращает Filter source без fallback на legacy fields.
+   */
   private _resolveFilterSource(entity: RFilter): string {
     return typeof entity.source === 'string' ? entity.source : ''
   }
 
-  /** Возвращает сохраненный Composition source. */
+  /**
+   * Возвращает сохраненный Composition source.
+   */
   private _resolveCompositionSource(entity: RComposition): string {
     return typeof entity.source === 'string' ? entity.source : ''
   }
 
-  /** Возвращает immutable selections в generic Source key space. */
+  /**
+   * Возвращает immutable selections в generic Source key space.
+   */
   private _sourceExecutionContext(context: ProgramCompileContext): Readonly<Record<string, string>> {
     return context.buildContext.execution.facets
   }
 
-  /** Создает пустой query payload для error-artifact. */
+  /**
+   * Создает пустой query payload для error-artifact.
+   */
   private _makeEmptyQueryPayload(): QueryProgramPayload {
     return {
       type: 'query-rest',
@@ -3528,7 +3648,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Создает пустой Filter payload для error-artifact. */
+  /**
+   * Создает пустой Filter payload для error-artifact.
+   */
   private _makeEmptyFilterPayload(sourceVersion = 1): FilterProgramPayload {
     return {
       type: 'filter',
@@ -3539,7 +3661,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Создает пустой Composition payload для error-artifact. */
+  /**
+   * Создает пустой Composition payload для error-artifact.
+   */
   private _makeEmptyCompositionPayload(sourceVersion = 1): CompositionProgramPayload {
     return {
       type: 'composition',
@@ -3570,7 +3694,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Создает пустой DataView payload для error-artifact. */
+  /**
+   * Создает пустой DataView payload для error-artifact.
+   */
   private _makeEmptyDataViewPayload(): DataViewProgramPayload {
     return {
       type: 'data-view',

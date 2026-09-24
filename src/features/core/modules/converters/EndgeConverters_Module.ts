@@ -48,22 +48,22 @@ const BUILTIN_CONVERTERS: Record<string, (...args: any[]) => unknown> = {
   'json-stringify': jsonStringify,
 }
 
-/** Синхронно координирует definitions, providers и bindings конвертеров. */
+/**
+ * Синхронно координирует definitions, providers и bindings конвертеров.
+ */
 export class EndgeConverters_Module extends EndgeModule {
   private readonly _definitions = new Map<string, { identity: string, origin: EntityOrigin, defaultProviderKey?: string }>()
   private readonly _providerDisposers = new Set<VoidFunction>()
   private readonly _definitionDisposers = new Set<VoidFunction>()
   private _started = false
 
-  /**
-   * ----------------------------------------
-   * PUBLIC
-   * ----------------------------------------
-   */
-
   public constructor(private readonly _implementations: EndgeImplementations_Module) {
     super()
   }
+
+  // ---------------------------------------------
+  // PUBLIC API
+  // ---------------------------------------------
 
   public has(identity: string): boolean {
     return Endge.domain.getConverter(identity) != null

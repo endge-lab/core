@@ -6,11 +6,15 @@ import { parseDocument } from 'yaml'
 
 import { serializeTypeSourceDocument } from '@/features/core/modules/source/services/type-source-serialize'
 
-/** Преобразует OpenAPI YAML/JSON components.schemas в черновики Type Source. */
+/**
+ * Преобразует OpenAPI YAML/JSON components.schemas в черновики Type Source.
+ */
 export class OpenAPIDocumentImportParser implements DocumentImportParser {
   public readonly format = 'openapi' as const
 
-  /** Возвращает object/enum schemas и диагностики неподдержанных OpenAPI constructs. */
+  /**
+   * Возвращает object/enum schemas и диагностики неподдержанных OpenAPI constructs.
+   */
   public parse(source: string): DocumentImportParserResult {
     const document = parseDocument(source, { prettyErrors: true })
     if (document.errors.length > 0) {

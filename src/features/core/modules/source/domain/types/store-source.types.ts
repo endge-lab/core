@@ -30,15 +30,15 @@ export interface StoreSourceDocument {
   data: StoreDataDescriptor[]
 }
 
-/** Скомпилированная таблица маршрутизации событий к дочерним Update. */
+// Скомпилированная таблица маршрутизации событий к дочерним Update.
 export interface StoreUpdateHandlerDescriptor {
   identity: string
   eventTypes: string[]
 }
 
-/** Готовый для runtime артефакт source Store v1. */
+// Готовый для runtime артефакт source Store v1.
 export interface StoreSourceArtifact extends StoreSourceDocument {
-  /** Optional parser tree retained for inspection; runtime does not require it. */
+  // Optional parser tree retained for inspection; runtime does not require it.
   ast?: unknown
   type: 'store'
   sourceVersion: number

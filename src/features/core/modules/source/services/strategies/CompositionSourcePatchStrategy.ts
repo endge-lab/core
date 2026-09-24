@@ -14,22 +14,30 @@ import {
   patchCompositionSource,
 } from '@/features/core/modules/source/services/composition-source-patch'
 
-/** Source patch strategy для RComposition/source-kind=composition. */
+/**
+ * Source patch strategy для RComposition/source-kind=composition.
+ */
 export class CompositionSourcePatchStrategy implements SourcePatchStrategy<CompositionSourcePatch, CompositionSourceDocument> {
   public readonly id = 'source-patch:composition'
   public readonly sourceKind: SourceKind = 'composition'
 
-  /** Проверяет, что strategy обслуживает Composition source. */
+  /**
+   * Проверяет, что strategy обслуживает Composition source.
+   */
   public supports(sourceKind: SourceKind | string): boolean {
     return sourceKind === this.sourceKind
   }
 
-  /** Парсит Composition source в normalized document. */
+  /**
+   * Парсит Composition source в normalized document.
+   */
   public parse(source: string): SourceParseResult<CompositionSourceDocument> {
     return parseCompositionSource(source)
   }
 
-  /** Атомарно добавляет Composition dependencies. */
+  /**
+   * Атомарно добавляет Composition dependencies.
+   */
   public patch(
     source: string,
     patch: CompositionSourcePatch,

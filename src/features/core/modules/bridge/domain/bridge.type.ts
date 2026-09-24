@@ -1,4 +1,4 @@
-/** Локальная политика host, не сохраняемая в Domain. URL включает backend base path. */
+// Локальная политика host, не сохраняемая в Domain. URL включает backend base path.
 export type EndgeBridgeBootOptions
   = | { role: 'client', allowedServers: readonly string[], debug?: boolean, label?: string }
     | { role: 'configurator', serverUrl: string, debug?: boolean, label?: string, allWorkspaces?: boolean }
@@ -53,7 +53,7 @@ export type SimulationRunResult
   = | { status: 'mocked', identity: string, hash: string }
     | { status: 'rejected', reason: 'not-found' | 'hash-mismatch' }
 
-/** Закрытый набор сообщений bridge v1; это не произвольный RPC над Core. */
+// Закрытый набор сообщений bridge v1; это не произвольный RPC над Core.
 export interface BridgeMessage {
   type: string
   id?: string
@@ -66,7 +66,7 @@ export interface BridgeMessage {
   error?: string
 }
 
-/** Внутренний порт подмодулей к единственному владельцу соединений. */
+// Внутренний порт подмодулей к единственному владельцу соединений.
 export interface BridgeCommands {
   request: (serverUrl: string, message: BridgeMessage) => Promise<unknown>
   send: (serverUrl: string, message: BridgeMessage) => void

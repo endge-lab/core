@@ -15,7 +15,7 @@ import { compileProgramMetadataProperty } from '@/features/core/modules/source/s
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
-/** Компилирует декларативный source Stream без открытия транспорта. */
+// Компилирует декларативный source Stream без открытия транспорта.
 export function compileStreamSource(source: string, sourceVersion = 1): StreamSourceCompileResult {
   const diagnostics: DiagnosticDraft[] = []
   if (!String(source ?? '').trim()) {
@@ -260,7 +260,7 @@ function readTransportAuth(
   return { authMode: 'inherit', authProfileIdentity: null }
 }
 
-/** Принимает только JSON literals и не исполняет authored expressions. */
+// Принимает только JSON literals и не исполняет authored expressions.
 function readJsonValue(node: t.Node): StreamJsonValue | undefined {
   if (t.isStringLiteral(node) || t.isBooleanLiteral(node)) {
     return node.value
@@ -321,10 +321,8 @@ function readObject(node: t.ObjectExpression): Record<string, unknown> {
   return out
 }
 
-/**
- * Читает строковое значение авторинга и нормализует env('NAME') в существующий
- * token переменной workspace, используемый runtime-артефактами.
- */
+// Читает строковое значение авторинга и нормализует env('NAME') в существующий
+// token переменной workspace, используемый runtime-артефактами.
 function readEnvironmentStringProperty(
   node: t.ObjectExpression,
   key: string,

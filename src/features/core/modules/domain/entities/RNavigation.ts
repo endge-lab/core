@@ -40,7 +40,9 @@ function cloneTreeNode(node: NavigationTreeNodeDoc): NavigationTreeNodeDoc {
       }
 }
 
-/** Навигация (коллекция navigations). */
+/**
+ * Навигация (коллекция navigations).
+ */
 export class RNavigation extends REntity {
   @Expose()
   description: string | null = null
@@ -48,7 +50,9 @@ export class RNavigation extends REntity {
   @Expose()
   tree: NavigationTreeNodeDoc[] = []
 
-  /** Тип документа для редактора/инспектора. */
+  /**
+   * Тип документа для редактора/инспектора.
+   */
   get type(): DomainDocumentType {
     return 'navigation' as DomainDocumentType
   }

@@ -15,19 +15,25 @@ interface AuthProfileRegistryDependencies {
   getSignal: () => AbortSignal | undefined
 }
 
-/** Читает persisted AuthProfile и проверяет adapter-specific contracts. */
+/**
+ * Читает persisted AuthProfile и проверяет adapter-specific contracts.
+ */
 export class AuthProfileRegistry {
   public constructor(
     private readonly _adapters: AuthAdapterRegistry,
     private readonly _dependencies: AuthProfileRegistryDependencies,
   ) {}
 
-  /** Возвращает все persisted profiles. */
+  /**
+   * Возвращает все persisted profiles.
+   */
   public list(): AuthProfileSchema[] {
     return this._dependencies.listProfiles().map(profile => profile as AuthProfileSchema)
   }
 
-  /** Возвращает profile по identity. */
+  /**
+   * Возвращает profile по identity.
+   */
   public get(identity: string): AuthProfileSchema | null {
     const normalized = String(identity ?? '').trim()
     return normalized
@@ -35,7 +41,9 @@ export class AuthProfileRegistry {
       : null
   }
 
-  /** Возвращает активный default profile или сообщает о повреждённой configuration. */
+  /**
+   * Возвращает активный default profile или сообщает о повреждённой configuration.
+   */
   public getDefault(): AuthProfileSchema | null {
     const identity = String(this._dependencies.getDefaultIdentity() ?? '').trim()
     if (!identity) {
@@ -49,7 +57,9 @@ export class AuthProfileRegistry {
     return profile
   }
 
-  /** Проверяет все не удалённые profiles текущего Domain. */
+  /**
+   * Проверяет все не удалённые profiles текущего Domain.
+   */
   public validateAll(): void {
     for (const profile of this.list()) {
       if (profile.deletedAt) {
@@ -60,7 +70,9 @@ export class AuthProfileRegistry {
     }
   }
 
-  /** Проверяет profile в изолированной session без записи token в storage. */
+  /**
+   * Проверяет profile в изолированной session без записи token в storage.
+   */
   public async test(profile: AuthProfileSchema): Promise<AuthProfileTestResult> {
     this._validateCommon(profile)
     const adapter = this._adapters.require(profile)
@@ -99,7 +111,9 @@ export class AuthProfileRegistry {
     }
   }
 
-  /** Требует существующий активный profile. */
+  /**
+   * Требует существующий активный profile.
+   */
   public requireActive(profileOrIdentity: AuthProfileSchema | string): AuthProfileSchema {
     const profile = typeof profileOrIdentity === 'string'
       ? this.get(profileOrIdentity)
@@ -115,7 +129,9 @@ export class AuthProfileRegistry {
     return profile
   }
 
-  /** Создаёт adapter context с opaque host credential resolver. */
+  /**
+   * Создаёт adapter context с opaque host credential resolver.
+   */
   public createAdapterContext(profile: AuthProfileSchema): AuthAdapterContext {
     return this._adapterContext(profile)
   }

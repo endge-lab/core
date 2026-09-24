@@ -13,7 +13,7 @@ import { PauseRuntimeCommand } from '@/features/core/modules/commands/services/r
 import { ResumeRuntimeCommand } from '@/features/core/modules/commands/services/runtime/ResumeRuntimeCommand'
 import { StopRuntimeCommand } from '@/features/core/modules/commands/services/runtime/StopRuntimeCommand'
 
-/** Создаёт явный набор локальных обработчиков; регистрация не выполняет сами команды. */
+// Создаёт явный набор локальных обработчиков; регистрация не выполняет сами команды.
 export function createContextCommandHandlers(context: EndgeContextCommandTarget): readonly EndgeCommandHandler[] {
   return [
     new SetWorkspaceCommand(context),
@@ -26,12 +26,12 @@ export function createContextCommandHandlers(context: EndgeContextCommandTarget)
   ]
 }
 
-/** Привязывает команды к штатным операциям конкретного приложения без изменения обработчиков. */
+// Привязывает команды к штатным операциям конкретного приложения без изменения обработчиков.
 export function createContextCommandExecutor(context: EndgeContextCommandTarget): EndgeCommandExecutor {
   return new LocalCommandExecutor(createContextCommandHandlers(context))
 }
 
-/** Runtime использует одинаковые обработчики для локальных и принятых удалённых команд. */
+// Runtime использует одинаковые обработчики для локальных и принятых удалённых команд.
 export function createRuntimeCommandHandlers(runtime: EndgeRuntimeCommandTarget): readonly EndgeCommandHandler[] {
   return [new PauseRuntimeCommand(runtime), new ResumeRuntimeCommand(runtime), new StopRuntimeCommand(runtime)]
 }

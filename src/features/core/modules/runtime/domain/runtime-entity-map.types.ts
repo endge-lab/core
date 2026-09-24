@@ -8,29 +8,27 @@ import type { RSimulation } from '@/features/core/modules/domain/entities/RSimul
 import type { RStore } from '@/features/core/modules/domain/entities/RStore'
 import type { RStream } from '@/features/core/modules/domain/entities/RStream'
 
-/**
- * Канонический перечень сущностей, для которых может существовать runtime-host.
- */
+// Канонический перечень сущностей, для которых может существовать runtime-host.
 export interface RuntimeEntityModelMap {
-  /** Владелец отдельного запуска target с локальными подменами. */
+  // Владелец отдельного запуска target с локальными подменами.
   'simulation': RSimulation
-  /** Доменная модель страницы. */
+  // Доменная модель страницы.
   'page': RPage
-  /** Доменная модель SFC-компонента нового API. */
+  // Доменная модель SFC-компонента нового API.
   'component-sfc': RComponentSFC
-  /** Доменная модель запроса. */
+  // Доменная модель запроса.
   'query': RQuery
-  /** Source-first runtime для Filter. */
+  // Source-first runtime для Filter.
   'filter': RFilter
-  /** Граф оркестрации runtime. */
+  // Граф оркестрации runtime.
   'composition': RComposition
-  /** Source-first реактивный runtime Store. */
+  // Source-first реактивный runtime Store.
   'store': RStore
-  /** Внешний или эмулируемый нормализованный поток событий. */
+  // Внешний или эмулируемый нормализованный поток событий.
   'stream': RStream
-  /** Доменная модель action. */
+  // Доменная модель action.
   'action': RAction
 }
 
-/** Дискриминатор типа runtime-сущности. */
+// Дискриминатор типа runtime-сущности.
 export type RuntimeEntityType = keyof RuntimeEntityModelMap

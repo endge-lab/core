@@ -1,22 +1,30 @@
 import type { AuthProfileSchema } from '@/features/core/modules/auth/domain/types/auth-profile.types'
 import type { AuthSessionSnapshot } from '@/features/core/modules/auth/domain/types/auth-runtime.types'
 
-/** Хранит versioned token snapshots согласно profile persistence policy. */
+/**
+ * Хранит versioned token snapshots согласно profile persistence policy.
+ */
 export class AuthSessionStore {
   private readonly _memory = new Map<string, AuthSessionSnapshot>()
   private _namespace = 'default'
 
-  /** Устанавливает namespace, предоставленный host-приложением до restore/build. */
+  /**
+   * Устанавливает namespace, предоставленный host-приложением до restore/build.
+   */
   public setNamespace(namespace: string | undefined): void {
     this._namespace = String(namespace ?? '').trim() || 'default'
   }
 
-  /** Возвращает namespaced storage key для workspace/profile. */
+  /**
+   * Возвращает namespaced storage key для workspace/profile.
+   */
   public getKey(workspaceIdentity: string, profileIdentity: string): string {
     return `endge:auth:v2:${encodeURIComponent(this._namespace)}:${encodeURIComponent(workspaceIdentity)}:${encodeURIComponent(profileIdentity)}`
   }
 
-  /** Восстанавливает snapshot и удаляет повреждённое значение. */
+  /**
+   * Восстанавливает snapshot и удаляет повреждённое значение.
+   */
   public read(workspaceIdentity: string, profile: AuthProfileSchema): AuthSessionSnapshot | null {
     const key = this.getKey(workspaceIdentity, profile.identity)
     const storagePolicy = profile.session?.storage ?? 'memory'
@@ -51,7 +59,9 @@ export class AuthSessionStore {
     }
   }
 
-  /** Сохраняет token snapshot без credentials и userinfo. */
+  /**
+   * Сохраняет token snapshot без credentials и userinfo.
+   */
   public write(workspaceIdentity: string, profile: AuthProfileSchema, snapshot: AuthSessionSnapshot): void {
     const key = this.getKey(workspaceIdentity, profile.identity)
     const sanitized = profile.session?.persistRefreshToken === true
@@ -74,7 +84,9 @@ export class AuthSessionStore {
     }
   }
 
-  /** Удаляет session из всех поддерживаемых storage. */
+  /**
+   * Удаляет session из всех поддерживаемых storage.
+   */
   public remove(workspaceIdentity: string, profileIdentity: string): void {
     const key = this.getKey(workspaceIdentity, profileIdentity)
     this._memory.delete(key)
@@ -88,7 +100,9 @@ export class AuthSessionStore {
     }
   }
 
-  /** Очищает только memory sessions при reset lifecycle. */
+  /**
+   * Очищает только memory sessions при reset lifecycle.
+   */
   public resetRuntime(): void {
     this._memory.clear()
   }

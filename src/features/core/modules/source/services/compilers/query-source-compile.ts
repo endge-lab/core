@@ -23,7 +23,7 @@ import { readSourceModelReference } from '@/features/core/modules/source/service
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
-/** Компилирует source-only Query v2 в canonical document и query artifact payload. */
+// Компилирует source-only Query v2 в canonical document и query artifact payload.
 export function compileQuerySource(source: string): QuerySourceCompileResult {
   const diagnostics: DiagnosticDraft[] = []
 

@@ -23,31 +23,31 @@ export interface ComponentSFCTypeResolutionOptions {
   resolveTypeDefinition?: (identity: string) => TypeSourceDefinition | null
 }
 
-/** Результат анализа script-секции SFC. */
+// Результат анализа script-секции SFC.
 export interface ComponentSFCScriptAnalysisResult {
-  /** Контракт компонента, извлеченный из defineProps. */
+  // Контракт компонента, извлеченный из defineProps.
   contract: RComponentContract
 
-  /** IR props компонента. */
+  // IR props компонента.
   props: RComponentSFC_IR_Prop[]
 
-  /** Локальные bindings script setup. */
+  // Локальные bindings script setup.
   locals: RComponentSFC_IR_LocalBinding[]
 
-  /** Preview-only props для SFC Playground. Не входят в runtime contract. */
+  // Preview-only props для SFC Playground. Не входят в runtime contract.
   previewProps: ComponentSFCPreviewProps | null
 
-  /** Preview-only runtime options для запуска песочницы компонента. */
+  // Preview-only runtime options для запуска песочницы компонента.
   previewOptions: ComponentSFCPreviewOptions | null
 
-  /** Публичная metadata компонента из defineMetadata. */
+  // Публичная metadata компонента из defineMetadata.
   metadata: ProgramMetadataMap
 
-  /** Диагностический проход script. */
+  // Диагностический проход script.
   diagnostics: RComponentDiagnostic[]
 }
 
-/** Анализирует script setup и извлекает контракт/locals для IR. */
+// Анализирует script setup и извлекает контракт/locals для IR.
 export function analyzeComponentSFCScript(
   script: RComponentSFC_AST_Script | null,
   options: ComponentSFCTypeResolutionOptions = {},
@@ -140,7 +140,7 @@ function findScriptCall(syntax: File | null | undefined, name: string): any {
     .find(expression => expression?.type === 'CallExpression' && expression.callee.type === 'Identifier' && expression.callee.name === name)
 }
 
-/** Определяет inline или именованные TypeScript-контракты объектов, используемые макросами SFC. */
+// Определяет inline или именованные TypeScript-контракты объектов, используемые макросами SFC.
 export function parseComponentSFCTypeFields(
   source: string,
   scriptContent = '',

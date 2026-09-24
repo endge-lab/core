@@ -49,65 +49,65 @@ import { createEmptyComponentDependencies } from '@/features/core/modules/domain
 import { createEmptyComponentSFCPortManifest } from '@/features/core/modules/domain/types/component/sfc/ports.types'
 import { compileProgramMetadataSource } from '@/features/core/modules/source/services/compilers/source-metadata-compile'
 
-/** Контекст компиляции template в IR. */
+// Контекст компиляции template в IR.
 export interface ComponentSFCTemplateCompileContext {
-  /** Имена props для классификации expression reads. */
+  // Имена props для классификации expression reads.
   props: string[]
 
-  /** Имена locals для классификации expression reads. */
+  // Имена locals для классификации expression reads.
   locals: string[]
 
-  /** Порты локального компонента имеют приоритет над глобальным реестром пользовательских тегов. */
+  // Порты локального компонента имеют приоритет над глобальным реестром пользовательских тегов.
   componentPorts?: ComponentSFCComponentPort[]
 
-  /** Обязательные порты, принадлежащие компилируемому Component SFC. */
+  // Обязательные порты, принадлежащие компилируемому Component SFC.
   ownerPorts?: ComponentSFCPortManifest | null
 
-  /** Разрешает зарегистрированный пользовательский tag в identity компонента. */
+  // Разрешает зарегистрированный пользовательский tag в identity компонента.
   resolveComponentTag?: (tag: string) => string | null
 
-  /** Проверяет статическую identity из Component is. */
+  // Проверяет статическую identity из Component is.
   hasComponentIdentity?: (identity: string) => boolean
 
-  /** Определяет публичные Events вложенного пользовательского Component для локальных bindings `@event`. */
+  // Определяет публичные Events вложенного пользовательского Component для локальных bindings `@event`.
   resolveComponentPortManifest?: (
     identity: string,
   ) => ComponentSFCPortManifest | null
 
-  /** Определяет статические провайдеры для плоских bindings дочерних портов. */
+  // Определяет статические провайдеры для плоских bindings дочерних портов.
   resolvePortProvider?: (
     identity: string,
     expectedKind: ComponentSFCRequiredPortKind,
   ) => ComponentSFCPortProviderDescriptor | null
 
-  /** Определяет явные имена корневых Variant вложенного пользовательского компонента. */
+  // Определяет явные имена корневых Variant вложенного пользовательского компонента.
   resolveComponentVariants?: (identity: string) => string[] | null
 
-  /** Effective defaults завершения edit session для текущего build context. */
+  // Effective defaults завершения edit session для текущего build context.
   sfcEditing?: EndgeSFCEditingConfiguration
 }
 
-/** Результат компиляции template в IR. */
+// Результат компиляции template в IR.
 export interface ComponentSFCTemplateCompileResult {
-  /** IR template или null, если template отсутствует. */
+  // IR template или null, если template отсутствует.
   template: RComponentSFC_IR_Template | null
 
-  /** Зависимости, найденные в template. */
+  // Зависимости, найденные в template.
   dependencies: RComponentDependencies
 
-  /** Диагностический проход template. */
+  // Диагностический проход template.
   diagnostics: RComponentDiagnostic[]
 
-  /** Публичная metadata внутренних template-узлов. */
+  // Публичная metadata внутренних template-узлов.
   metadata: ProgramNodeMetadata[]
 
-  /** Events, создаваемые декларативными реакциями template или редактируемым поведением. */
+  // Events, создаваемые декларативными реакциями template или редактируемым поведением.
   emittedEvents: string[]
 }
 
 export { isComponentSFCBuiltInTag } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-built-in-tags'
 
-/** Компилирует AST template в renderer-neutral Endge SFC IR. */
+// Компилирует AST template в renderer-neutral Endge SFC IR.
 export function compileComponentSFCTemplate(
   template: RComponentSFC_AST_Template | null,
   context: ComponentSFCTemplateCompileContext,
@@ -677,7 +677,7 @@ function hasTemplatePortFieldMismatch(
   )
 }
 
-/** Проверяет составную форму lazy Tooltip после удаления узлов, содержащих только пробелы. */
+// Проверяет составную форму lazy Tooltip после удаления узлов, содержащих только пробелы.
 function validateTooltipTree(
   roots: RComponentSFC_IR_Node[],
   diagnostics: RComponentDiagnostic[],

@@ -1,7 +1,7 @@
 import type { ProgramArtifact } from '@/features/core/modules/program/domain/types/program.types'
 import type { StoreSourceArtifact } from '@/features/core/modules/source/domain/types/store-source.types'
 
-import { Raph } from '@endge/raph'
+import { Raph } from '@raphy-js/raph'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { Endge } from '@/features/core/kernel/endge'
@@ -10,9 +10,9 @@ import { RStore } from '@/features/core/modules/domain/entities/RStore'
 import { StoreRuntimeHost } from '@/features/core/modules/runtime/hosts/StoreRuntimeHost'
 
 describe('проверка Host runtime для Store', () => {
-  afterEach(() => {
+  afterEach(async () => {
     Endge.context.setDataMode('live')
-    Endge.runtime.reset()
+    await Endge.runtime.reset()
     Endge.program.clear()
     Endge.domain.reset()
     Endge.mock.reset()

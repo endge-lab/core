@@ -23,7 +23,9 @@ import { ComputationGraphExecutor, ComputationRuntimeError } from '@/features/co
 import { evaluateSourceExpression } from '@/features/core/modules/source/services/source-expression-evaluate'
 import { EndgeModule } from '@/features/federation/EndgeModule'
 
-/** Выполняет скомпилированные графы computation и создаёт нейтральные к renderer ресурсы. */
+/**
+ * Выполняет скомпилированные графы computation и создаёт нейтральные к renderer ресурсы.
+ */
 export class EndgeComputations_Module extends EndgeModule {
   private readonly _definitions = new Map<string, { identity: string, origin: EntityOrigin, defaultProviderKey?: string, execution?: 'sync' | 'async' }>()
   private readonly _providers = new Map<string, ComputationOverride>()
@@ -43,15 +45,13 @@ export class EndgeComputations_Module extends EndgeModule {
     evaluate: (expression, scope) => evaluateSourceExpression(expression, { scope }),
   }
 
-  /**
-   * ----------------------------------------
-   * PUBLIC
-   * ----------------------------------------
-   */
-
   public constructor(private readonly _implementations: EndgeImplementations_Module) {
     super()
   }
+
+  // ---------------------------------------------
+  // PUBLIC API
+  // ---------------------------------------------
 
   public hasDefinition(identity: string): boolean {
     return Endge.domain.getComputation(identity) != null
@@ -59,7 +59,9 @@ export class EndgeComputations_Module extends EndgeModule {
       || this._definitions.has(identity)
   }
 
-  /** Устанавливает сериализуемое определение Computation из кода. */
+  /**
+   * Устанавливает сериализуемое определение Computation из кода.
+   */
   public define(definition: { identity: string, origin: EntityOrigin, defaultProviderKey?: string, execution?: 'sync' | 'async' }): VoidFunction {
     const identity = String(definition.identity ?? '').trim()
     if (!identity) {
@@ -80,7 +82,9 @@ export class EndgeComputations_Module extends EndgeModule {
     return dispose
   }
 
-  /** Устанавливает исполняемый код отдельно от определения Computation. */
+  /**
+   * Устанавливает исполняемый код отдельно от определения Computation.
+   */
   public provide(provider: { identity: string, key: string, origin?: EntityOrigin, implementation: ComputationOverride }): VoidFunction {
     const identity = String(provider.identity ?? '').trim()
     if (!Endge.domain.getComputation(identity) && !Endge.program.getComputationArtifact(identity) && !this._definitions.has(identity)) {
@@ -106,7 +110,9 @@ export class EndgeComputations_Module extends EndgeModule {
     return dispose
   }
 
-  /** Выбирает ранее предоставленную реализацию без переопределения семантики. */
+  /**
+   * Выбирает ранее предоставленную реализацию без переопределения семантики.
+   */
   public override(binding: {
     identity: string
     providerKey: string
@@ -148,7 +154,9 @@ export class EndgeComputations_Module extends EndgeModule {
     this._sandbox = adapter
   }
 
-  /** Выполняет уже проверенную компилятором функцию в общем изолированном sandbox. */
+  /**
+   * Выполняет уже проверенную компилятором функцию в общем изолированном sandbox.
+   */
   public async executeSandbox(request: ComputationSandboxRequest): Promise<unknown> {
     if (!this._sandbox) {
       throw new ComputationRuntimeError('Computation sandbox adapter is not registered.', request.computationIdentity, 'sandbox-missing')
@@ -236,11 +244,9 @@ export class EndgeComputations_Module extends EndgeModule {
     this.setSandboxAdapter(null)
   }
 
-  /**
-   * ----------------------------------------
-   * PRIVATE
-   * ----------------------------------------
-   */
+  // ---------------------------------------------
+  // PRIVATE
+  // ---------------------------------------------
 
   private async _run(
     idOrIdentity: string | number,
@@ -300,7 +306,9 @@ export class EndgeComputations_Module extends EndgeModule {
     }
   }
 
-  /** Создает child scope и блокирует runtime recursion или чрезмерно глубокий call graph. */
+  /**
+   * Создает child scope и блокирует runtime recursion или чрезмерно глубокий call graph.
+   */
   private _enterExecution(identity: string, parent: ComputationExecutionScope): ComputationExecutionScope {
     const cycleStart = parent.stack.indexOf(identity)
     if (cycleStart >= 0) {

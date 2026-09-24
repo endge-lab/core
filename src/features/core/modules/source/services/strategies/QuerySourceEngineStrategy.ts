@@ -8,17 +8,23 @@ import type {
 
 import { compileQuerySource } from '@/features/core/modules/source/services/compilers/query-source-compile'
 
-/** Source strategy для RQuery/source-kind=query. */
+/**
+ * Source strategy для RQuery/source-kind=query.
+ */
 export class QuerySourceEngineStrategy implements SourceEngineStrategy {
   public readonly id = 'source:query'
   public readonly sourceKind: SourceKind = 'query'
 
-  /** Проверяет, что стратегия обслуживает query source. */
+  /**
+   * Проверяет, что стратегия обслуживает query source.
+   */
   public supports(sourceKind: SourceKind | string): boolean {
     return sourceKind === this.sourceKind
   }
 
-  /** Заглушка будущего analyze/patch API, чтобы strategy уже имела стабильный контракт. */
+  /**
+   * Заглушка будущего analyze/patch API, чтобы strategy уже имела стабильный контракт.
+   */
   public execute(_operation: SourceEngineOperation): SourceEngineResult {
     return {
       ok: false,
@@ -26,7 +32,9 @@ export class QuerySourceEngineStrategy implements SourceEngineStrategy {
     }
   }
 
-  /** Компилирует source-only Query v2 в canonical document и artifact payload. */
+  /**
+   * Компилирует source-only Query v2 в canonical document и artifact payload.
+   */
   public compile(source: string): SourceEngineCompileResult {
     const result = compileQuerySource(source)
     const ok = !result.diagnostics.some(diagnostic => diagnostic.severity === 'error')

@@ -8,7 +8,9 @@ import { ComputationRuntimeError } from '@/features/core/modules/computations/se
 type AsyncRunner<T> = (input: unknown) => Promise<T>
 type SyncRunner<T> = (input: unknown) => T
 
-/** Нейтральное к renderer состояние latest-wins для одного consumer computation. */
+/**
+ * Нейтральное к renderer состояние latest-wins для одного consumer computation.
+ */
 export class ComputationResourceState<T = unknown> implements ComputationResourceContract<T> {
   private _status: ComputationResourceContract<T>['status'] = 'idle'
   private _value: T | undefined
@@ -36,7 +38,9 @@ export class ComputationResourceState<T = unknown> implements ComputationResourc
   get value() { return this._value }
   get error() { return this._error }
 
-  /** Снимок фактического результата для пассивного renderer debugger. */
+  /**
+   * Снимок фактического результата для пассивного renderer debugger.
+   */
   public snapshot() {
     return { identity: this._identity, input: this._input, status: this.status, loading: this.loading, value: this.value, error: this.error }
   }

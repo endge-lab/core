@@ -1,11 +1,15 @@
 import type { AuthAdapterContext, AuthProfileAdapter, AuthProfileSchema, AuthTokenSet } from '@/features/core/modules/auth/domain/types/auth-profile.types'
 
-/** Материализует HTTP Basic header без token session. */
+/**
+ * Материализует HTTP Basic header без token session.
+ */
 export class BasicAuthAdapter implements AuthProfileAdapter {
   public readonly id = 'basic'
   public readonly label = 'Basic'
 
-  /** Проверяет строгий Basic contract. */
+  /**
+   * Проверяет строгий Basic contract.
+   */
   public validate(profile: AuthProfileSchema): void {
     if (Object.keys(profile.config ?? {}).length > 0) {
       throw new Error(`[EndgeAuth] Basic profile "${profile.identity}" config must be empty`)
@@ -22,7 +26,9 @@ export class BasicAuthAdapter implements AuthProfileAdapter {
     }
   }
 
-  /** Разрешает credentials и возвращает готовый Authorization header. */
+  /**
+   * Разрешает credentials и возвращает готовый Authorization header.
+   */
   public async authenticate(context: AuthAdapterContext): Promise<AuthTokenSet> {
     const username = await context.resolveCredential('username')
     const password = await context.resolveCredential('password')

@@ -10,7 +10,7 @@ interface TypeSourceReferenceLocation extends SourceDocumentReference {
   normalizationRange: SourceDocumentReference['range']
 }
 
-/** Собирает ссылки на Type Registry из поддержанных Type Source выражений. */
+// Собирает ссылки на Type Registry из поддержанных Type Source выражений.
 export function collectTypeSourceReferences(source: string): TypeSourceReferenceLocation[] {
   try {
     const ast = parseTS(source, {
@@ -39,7 +39,7 @@ export function collectTypeSourceReferences(source: string): TypeSourceReference
   }
 }
 
-/** Собирает ссылки Type Registry из вызовов value(Type, ...) в Configuration Source. */
+// Собирает ссылки Type Registry из вызовов value(Type, ...) в Configuration Source.
 export function collectConfigurationTypeSourceReferences(source: string): TypeSourceReferenceLocation[] {
   try {
     const ast = parseTS(source, { sourceType: 'module', plugins: ['typescript'], errorRecovery: true })
@@ -80,7 +80,7 @@ export function collectConfigurationTypeSourceReferences(source: string): TypeSo
   }
 }
 
-/** Переводит ссылки на типы в канонический синтаксис без кавычек. */
+// Переводит ссылки на типы в канонический синтаксис без кавычек.
 export function normalizeTypeSourceReferences(source: string): string {
   return collectTypeSourceReferences(source)
     .map(reference => ({
@@ -95,7 +95,7 @@ export function normalizeTypeSourceReferences(source: string): string {
     )
 }
 
-/** Находит ссылку Type Source в позиции редактора. */
+// Находит ссылку Type Source в позиции редактора.
 export function resolveTypeSourceReference(context: SourceLanguageContext): SourceDocumentReference | null {
   return resolveReference(context, collectTypeSourceReferences(context.source))
 }

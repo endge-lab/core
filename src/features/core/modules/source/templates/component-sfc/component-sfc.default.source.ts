@@ -1,4 +1,4 @@
-/** Канонический source нового SFC-компонента. */
+// Канонический source нового SFC-компонента.
 export const COMPONENT_SFC_DEFAULT_SOURCE = `<script setup lang="ts">
 const props = defineProps<Record<string, unknown>>()
 </script>

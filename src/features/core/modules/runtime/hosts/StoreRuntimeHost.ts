@@ -1,11 +1,11 @@
-import type { RaphDerivedHandle } from '@endge/raph'
+import type { RaphDerivedHandle } from '@raphy-js/raph'
 import type { RStore } from '@/features/core/modules/domain/entities/RStore'
 import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext } from '@/features/core/modules/runtime/domain/runtime-host.types'
 import type { StoreDataDescriptor, StoreSourceArtifact, StoreValueDescriptor } from '@/features/core/modules/source/domain/types/store-source.types'
 import type { StreamEventEnvelope } from '@/features/core/modules/source/domain/types/stream-source.types'
 
 import type { StoreMutationPlan, UpdateSourceArtifact } from '@/features/core/modules/source/domain/types/update-source.types'
-import { collectionByKey, DefaultDataAdapter, filterByKey, full, Raph, RaphNode } from '@endge/raph'
+import { collectionByKey, DefaultDataAdapter, filterByKey, full, Raph, RaphNode } from '@raphy-js/raph'
 
 import { Endge } from '@/features/core/kernel/endge'
 import { RuntimeHostBase } from '@/features/core/modules/runtime/RuntimeHostBase'
@@ -22,7 +22,9 @@ function defaultContext(artifact: StoreSourceArtifact): RuntimeHostContext<'stor
   }
 }
 
-/** Runtime-владелец writable Store state и реактивных DataView projections. */
+/**
+ * Runtime-владелец writable Store state и реактивных DataView projections.
+ */
 export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContext<'store'>, StoreSourceArtifact> {
   private _derivedHandles: RaphDerivedHandle[] = []
 
@@ -50,7 +52,9 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
     })
   }
 
-  /** Создаёт Store runtime только из valid compiled artifact. */
+  /**
+   * Создаёт Store runtime только из valid compiled artifact.
+   */
   public static createRuntime(input: {
     id: string
     model: RStore
@@ -96,36 +100,48 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
     return host
   }
 
-  /** Возвращает compiled descriptors Store fields. */
+  /**
+   * Возвращает compiled descriptors Store fields.
+   */
   public getFields(): StoreDataDescriptor[] {
     return this.getArtifactPayload()?.data ?? []
   }
 
-  /** Возвращает абсолютный Raph path Store state или вложенного поля. */
+  /**
+   * Возвращает абсолютный Raph path Store state или вложенного поля.
+   */
   public getDataPath(path = ''): string {
     return appendStorePath(this.basePath, path)
   }
 
-  /** Возвращает текущий снимок raw и derived Store fields. */
+  /**
+   * Возвращает текущий снимок raw и derived Store fields.
+   */
   public getDataSnapshot(): Readonly<Record<string, unknown>> {
     return cloneRuntimeValue(
       (Raph.get(this.getDataPath()) as Record<string, unknown> | undefined) ?? {},
     )
   }
 
-  /** Проверяет, можно ли записывать в root field указанного Store path. */
+  /**
+   * Проверяет, можно ли записывать в root field указанного Store path.
+   */
   public isWritable(path: string): boolean {
     const root = String(path ?? '').split(/[.[\]]/)[0] ?? ''
     return this.getFields().some(field => field.kind === 'value' && field.key === root)
   }
 
-  /** Проверяет принадлежность root field этому Store, включая derived field. */
+  /**
+   * Проверяет принадлежность root field этому Store, включая derived field.
+   */
   public isDeclared(path: string): boolean {
     const root = String(path ?? '').split(/[.[\]]/)[0] ?? ''
     return this.getFields().some(field => field.key === root)
   }
 
-  /** Записывает значение в writable Store field и запускает derived graph через Raph. */
+  /**
+   * Записывает значение в writable Store field и запускает derived graph через Raph.
+   */
   public set(path: string, value: unknown): void {
     const normalizedPath = String(path ?? '').trim()
     if (!normalizedPath || !this.isWritable(normalizedPath)) {
@@ -151,7 +167,9 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
     return true
   }
 
-  /** Применяет именованный дочерний Update к Store без привязки к транспорту. */
+  /**
+   * Применяет именованный дочерний Update к Store без привязки к транспорту.
+   */
   public applyUpdate(updateIdentity: string, payload: unknown): void {
     const descriptor = this.getArtifactPayload()?.updateHandlers.find(item => item.identity === updateIdentity)
     if (!descriptor) {
@@ -208,7 +226,9 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
     this.emit('state:change', { path: target, strategy: plan.strategy, value: cloneRuntimeValue(plan.value) })
   }
 
-  /** Освобождает derived registrations до удаления Store state. */
+  /**
+   * Освобождает derived registrations до удаления Store state.
+   */
   public override destroy(): void {
     for (const handle of [...this._derivedHandles].reverse()) {
       handle.dispose()
@@ -217,7 +237,9 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
     super.destroy()
   }
 
-  /** Инициализирует writable fields и затем immediate derived graph. */
+  /**
+   * Инициализирует writable fields и затем immediate derived graph.
+   */
   private _mount(artifact: StoreSourceArtifact): void {
     const initialValues = new Map<string, unknown>()
     for (const field of artifact.data) {

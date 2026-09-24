@@ -1,6 +1,6 @@
 import type { RuntimeInspectionSnapshot } from '@/features/core/modules/runtime/domain/runtime-inspection.types'
 
-/** Два экземпляра одного документа имеют независимые runtime ids и пути данных. */
+// Два экземпляра одного документа имеют независимые runtime ids и пути данных.
 export function inspectionFixture(count = 2): RuntimeInspectionSnapshot {
   return {
     version: 1,

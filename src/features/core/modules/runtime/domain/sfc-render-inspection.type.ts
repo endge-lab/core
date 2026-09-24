@@ -1,9 +1,9 @@
 import type { RComponentSFC_SourceRange } from '@/features/core/modules/domain/types/component/sfc/location.types'
 
-/** Семантический вид узла в живом SFC render tree. */
+// Семантический вид узла в живом SFC render tree.
 export type SFCRenderInspectionNodeKind = 'component' | 'element' | 'text' | 'expression'
 
-/** Вычисленное значение template binding вместе с его source provenance. */
+// Вычисленное значение template binding вместе с его source provenance.
 export interface SFCRenderInspectionBinding {
   kind: 'literal' | 'expression'
   source?: string
@@ -11,7 +11,7 @@ export interface SFCRenderInspectionBinding {
   value: unknown
 }
 
-/** Данные, которыми renderer регистрирует один живой SFC instance. */
+// Данные, которыми renderer регистрирует один живой SFC instance.
 export interface SFCRenderInspectionNodeInput {
   runtimeId: string
   componentIdentity: string
@@ -31,18 +31,18 @@ export interface SFCRenderInspectionNodeInput {
   meta?: Record<string, unknown>
 }
 
-/** Зарегистрированный живой SFC instance. */
+// Зарегистрированный живой SFC instance.
 export interface SFCRenderInspectionNode extends SFCRenderInspectionNodeInput {
   id: string
   updatedAt: number
 }
 
-/** Иерархическая проекция зарегистрированных SFC instances. */
+// Иерархическая проекция зарегистрированных SFC instances.
 export interface SFCRenderInspectionTreeNode extends SFCRenderInspectionNode {
   children: SFCRenderInspectionTreeNode[]
 }
 
-/** Optional renderer-neutral sink: при null runtime не выполняет inspection work. */
+// Optional renderer-neutral sink: при null runtime не выполняет inspection work.
 export interface SFCRenderInspectionSessionLike {
   registerNode: (input: SFCRenderInspectionNodeInput) => string
   unregisterNode: (id: string) => void

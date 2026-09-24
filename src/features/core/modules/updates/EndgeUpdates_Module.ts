@@ -6,7 +6,9 @@ import { EndgeModule } from '@/features/federation/EndgeModule'
  * должен описываться отдельной доменной моделью.
  */
 export class EndgeUpdates_Module extends EndgeModule {
-  /** Обрабатывает legacy update profile; текущая реализация оставлена как no-op boundary. */
+  /**
+   * Обрабатывает legacy update profile; текущая реализация оставлена как no-op boundary.
+   */
   public applyUpdateForProfile(
     profileIdentity: string,
     message: unknown,

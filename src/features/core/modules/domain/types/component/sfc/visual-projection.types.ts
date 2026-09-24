@@ -4,20 +4,20 @@ import type { EndgeSFCEditingConfiguration } from '@/features/core/modules/confi
 import type { RComponentDiagnostic } from '@/features/core/modules/domain/types/component/component-core.types'
 import type { TypeSourceDefinition } from '@/features/core/modules/source/domain/types/type-source.types'
 
-/** Значение SFC source, подготовленное для безопасного отображения в visual editor. */
+// Значение SFC source, подготовленное для безопасного отображения в visual editor.
 export type ComponentSFCVisualSourceValue
   = | { kind: 'boolean', value: boolean }
     | { kind: 'literal', value: unknown }
     | { kind: 'expression', source: string }
 
-/** Один attribute исходного SFC-узла без привязки к конкретному UI framework. */
+// Один attribute исходного SFC-узла без привязки к конкретному UI framework.
 export interface ComponentSFCVisualAttribute {
   name: string
   value: ComponentSFCVisualSourceValue
   sourceRange?: RComponentSFC_SourceRange
 }
 
-/** Редактируемый prop binding единственного управляемого элемента колонки Table. */
+// Редактируемый prop binding единственного управляемого элемента колонки Table.
 export type ComponentSFCTableCellBindingProjection = ComponentSFCVisualAttribute
 
 export type ComponentSFCTableCellInteractionModifier
@@ -26,7 +26,7 @@ export type ComponentSFCTableCellInteractionModifier
 export type ComponentSFCTableCellInteractionFlag
   = 'stop' | 'prevent' | 'self' | 'once' | 'capture' | 'passive'
 
-/** UI-neutral projection одного статически разбираемого trigger взаимодействия. */
+// UI-neutral projection одного статически разбираемого trigger взаимодействия.
 export interface ComponentSFCInteractionTriggerProjection {
   event: string
   key: string[]
@@ -44,12 +44,12 @@ export interface ComponentSFCInteractionTriggerProjection {
   flags: Partial<Record<ComponentSFCTableCellInteractionFlag, boolean>>
 }
 
-/** UI-neutral projection одного статически разбираемого правила Cell `:on`. */
+// UI-neutral projection одного статически разбираемого правила Cell `:on`.
 export interface ComponentSFCTableCellInteractionRuleProjection extends ComponentSFCInteractionTriggerProjection {
   reactionSource: string
 }
 
-/** Source-preserving read-model взаимодействий Cell для visual editor таблицы. */
+// Source-preserving read-model взаимодействий Cell для visual editor таблицы.
 export interface ComponentSFCTableCellInteractionsProjection {
   editable: boolean
   rules: ComponentSFCTableCellInteractionRuleProjection[]
@@ -58,7 +58,7 @@ export interface ComponentSFCTableCellInteractionsProjection {
   message?: string
 }
 
-/** Source-backed локальная reaction одного semantic Event. */
+// Source-backed локальная reaction одного semantic Event.
 export interface ComponentSFCEventReactionProjection {
   editable: boolean
   source: string | null
@@ -92,7 +92,7 @@ export type ComponentSFCTableEditableElementProjection
   }
   | { kind: 'source' }
 
-/** Source-backed editable-поведение единственного управляемого корня ячейки Table. */
+// Source-backed editable-поведение единственного управляемого корня ячейки Table.
 export interface ComponentSFCTableCellEditingProjection {
   editable: boolean
   enabled: boolean
@@ -110,7 +110,7 @@ export interface ComponentSFCTableCellEditingProjection {
   message?: string
 }
 
-/** Способ, которым содержимое ячейки представлено в простом visual editor. */
+// Способ, которым содержимое ячейки представлено в простом visual editor.
 export type ComponentSFCTableVisualCellTag = Exclude<
   RComponentSFC_IR_Tag,
   'Component' | 'Table' | 'Column' | 'Cell' | 'ColumnMenu' | 'CellMenu' | 'RowMenu' | 'MenuItem' | 'MenuSeparator' | 'Editable' | 'Variant'
@@ -132,17 +132,17 @@ export type ComponentSFCTableCellProjection
     }
     | { kind: 'source' }
 
-/** Контекст реестра для разрешения прямых тегов пользовательских компонентов при чтении Source. */
+// Контекст реестра для разрешения прямых тегов пользовательских компонентов при чтении Source.
 export interface ComponentSFCVisualInspectionOptions {
   resolveComponentTag?: (tag: string) => string | null
   resolveTypeDefinition?: (identity: string) => TypeSourceDefinition | null
-  /** Идентификаторы прямых Action, доступные bindings MenuItem из Source. */
+  // Идентификаторы прямых Action, доступные bindings MenuItem из Source.
   actionIdentities?: Iterable<string>
-  /** Effective editing defaults текущего compiler context. */
+  // Effective editing defaults текущего compiler context.
   sfcEditing?: EndgeSFCEditingConfiguration
 }
 
-/** Visual read-model одной прямой Column внутри корневого Table. */
+// Visual read-model одной прямой Column внутри корневого Table.
 export interface ComponentSFCTableColumnProjection {
   id: string
   index: number
@@ -157,7 +157,7 @@ export interface ComponentSFCTableColumnProjection {
   cell: ComponentSFCTableCellProjection
   editing: ComponentSFCTableCellEditingProjection
   interactions: ComponentSFCTableCellInteractionsProjection
-  /** Переопределение CellMenu уровня Column; режим по умолчанию наследует Table > CellMenu. */
+  // Переопределение CellMenu уровня Column; режим по умолчанию наследует Table > CellMenu.
   cellMenu: ComponentSFCTableMenuProjection
   hasCustomCell: boolean
   cellSource: string | null
@@ -199,7 +199,7 @@ export interface ComponentSFCTableMenuProjection {
   sourceRange?: RComponentSFC_SourceRange
 }
 
-/** Минимальные source-preserving операции visual editor таблицы. */
+// Минимальные source-preserving операции visual editor таблицы.
 export type ComponentSFCTableSourcePatch
   = | {
     type: 'add-column'
@@ -248,7 +248,7 @@ export type ComponentSFCTableSourcePatch
   | {
     type: 'set-column-cell-on'
     columnIndex: number
-    /** Полное выражение объекта или массива либо null для удаления аннотации. */
+    // Полное выражение объекта или массива либо null для удаления аннотации.
     value: string | null
   }
   | {
@@ -259,25 +259,25 @@ export type ComponentSFCTableSourcePatch
   | {
     type: 'set-column-cell-edit-triggers'
     columnIndex: number
-    /** Пустой список восстанавливает неявный trigger клика и удаляет edit-on из Source. */
+    // Пустой список восстанавливает неявный trigger клика и удаляет edit-on из Source.
     triggers: ComponentSFCInteractionTriggerProjection[]
   }
   | {
     type: 'set-column-cell-edited-reaction'
     columnIndex: number
-    /** Полное выражение локальной реакции либо null для удаления @edited. */
+    // Полное выражение локальной реакции либо null для удаления @edited.
     value: string | null
   }
   | {
     type: 'set-column-cell-cancel-triggers'
     columnIndex: number
-    /** Null наследует фактическую конфигурацию; пустой список явно отключает автоматическую отмену. */
+    // Null наследует фактическую конфигурацию; пустой список явно отключает автоматическую отмену.
     triggers: ComponentSFCInteractionTriggerProjection[] | null
   }
   | {
     type: 'set-column-cell-commit-triggers'
     columnIndex: number
-    /** Null наследует фактическую конфигурацию; пустой список явно отключает автоматическое подтверждение. */
+    // Null наследует фактическую конфигурацию; пустой список явно отключает автоматическое подтверждение.
     triggers: ComponentSFCInteractionTriggerProjection[] | null
   }
   | {
@@ -332,7 +332,7 @@ export type ComponentSFCTableSourcePatch
     valueKind: 'expression' | 'literal'
   }
 
-/** Результат точечного изменения SFC Table source. */
+// Результат точечного изменения SFC Table source.
 export interface ComponentSFCTableSourcePatchResult {
   ok: boolean
   source: string
@@ -342,7 +342,7 @@ export interface ComponentSFCTableSourcePatchResult {
   message?: string
 }
 
-/** Visual read-model SFC, template которого содержит один корневой Table. */
+// Visual read-model SFC, template которого содержит один корневой Table.
 export interface ComponentSFCTableVisualProjection {
   kind: 'table'
   ref: ComponentSFCVisualSourceValue | null
@@ -370,7 +370,7 @@ export interface ComponentSFCTableVisualProjection {
   sourceRange: RComponentSFC_SourceRange
 }
 
-/** Результат выбора специализированного visual editor для SFC source. */
+// Результат выбора специализированного visual editor для SFC source.
 export interface ComponentSFCVisualInspection {
   support:
     | { kind: 'table' }

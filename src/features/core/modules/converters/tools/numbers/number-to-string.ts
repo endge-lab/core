@@ -1,4 +1,4 @@
-/** Число в строку. */
+// Число в строку.
 export function numberToString(value: unknown): string | null {
   if (value == null) {
     return null

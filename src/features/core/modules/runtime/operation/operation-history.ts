@@ -22,7 +22,9 @@ export interface OperationHistoryOptions {
   onChange?: () => void
 }
 
-/** Курсор undo/redo в runtime-памяти. Переходы сериализованы, а ошибки не изменяют курсор. */
+/**
+ * Курсор undo/redo в runtime-памяти. Переходы сериализованы, а ошибки не изменяют курсор.
+ */
 export class OperationHistory implements RuntimeOwnedResource {
   public readonly kind = 'operation-history'
   public readonly id: string
@@ -64,7 +66,9 @@ export class OperationHistory implements RuntimeOwnedResource {
     return this._enqueue(async () => this._commit(entry))
   }
 
-  /** Serializes the data mutation and its history entry with undo/redo. */
+  /**
+   * Serializes the data mutation and its history entry with undo/redo.
+   */
   public execute<T>(operation: () => Promise<{ result: T, entry: OperationHistoryEntry }>): Promise<T> {
     return this._enqueue(async () => {
       if (this._disposed) {

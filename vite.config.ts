@@ -15,7 +15,7 @@ export default defineConfig({
       external: [
         '@endge/core',
         '@endge/utils',
-        '@endge/raph',
+        '@raphy-js/raph',
         'reflect-metadata',
         'class-transformer',
         'class-validator',

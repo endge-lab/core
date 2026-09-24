@@ -25,7 +25,9 @@ import {
   reduceInspectionRecord,
 } from './tools/inspection-recording'
 
-/** Общий журнал инспекции и управление временем; наблюдаемое состояние принадлежит Runtime/Context. */
+/**
+ * Общий журнал инспекции и управление временем; наблюдаемое состояние принадлежит Runtime/Context.
+ */
 export class EndgeInspection_Module extends EndgeModule {
   private readonly _archives = new Map<string, InspectionRecording>()
   private _recording: InspectionRecording | null = null
@@ -111,7 +113,9 @@ export class EndgeInspection_Module extends EndgeModule {
     return this._local?.recordingId ?? this._recording?.recordingId ?? null
   }
 
-  /** Завершённые сеансы хранят только записи; Program остаётся единственным владельцем программы. */
+  /**
+   * Завершённые сеансы хранят только записи; Program остаётся единственным владельцем программы.
+   */
   public get archives(): ReadonlyArray<{
     recordingId: string
     programId: string
@@ -195,7 +199,9 @@ export class EndgeInspection_Module extends EndgeModule {
     this.notify()
   }
 
-  /** Валидация всей записи вместе с semantic replay до изменений текущих owners. */
+  /**
+   * Валидация всей записи вместе с semantic replay до изменений текущих owners.
+   */
   public prepare(recording: unknown): InspectionRecording {
     const value = readInspectionRecording(recording)
     this._replay(value.chunks.flatMap(chunk => chunk.records))
@@ -345,7 +351,9 @@ export class EndgeInspection_Module extends EndgeModule {
     this.notify()
   }
 
-  /** Bridge и local recorder получают независимые leases и не меняют policy друг друга. */
+  /**
+   * Bridge и local recorder получают независимые leases и не меняют policy друг друга.
+   */
   public createCapture(
     options: { includeData?: boolean },
     onChunk?: (chunk: InspectionChunk) => void,
@@ -551,7 +559,7 @@ export class EndgeInspection_Module extends EndgeModule {
   }
 }
 
-/** Deeply freezes the isolated record, never the application's mutable objects. */
+// Deeply freezes the isolated record, never the application's mutable objects.
 function freezeRecord<T>(value: T): T {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
     for (const child of Object.values(value)) {

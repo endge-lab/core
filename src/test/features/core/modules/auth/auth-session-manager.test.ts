@@ -36,7 +36,7 @@ describe('менеджер сессии авторизации', () => {
     )
   })
 
-  /** Ответ прежнего source не восстанавливает уже завершённую сессию. */
+  // Ответ прежнего source не восстанавливает уже завершённую сессию.
   it('отбрасывает поздний токен после logout и разрешает новую сессию', async () => {
     const runtime = createRuntime()
     runtime.sessions.configureDefault(runtime.profile)
@@ -55,7 +55,7 @@ describe('менеджер сессии авторизации', () => {
     await expect(runtime.sessions.ensureValid()).resolves.toBe(true)
   })
 
-  /** Reset не позволяет ответу старого source перезаписать новую session. */
+  // Reset не позволяет ответу старого source перезаписать новую session.
   it('сохраняет новую сессию при позднем ответе после reset', async () => {
     const runtime = createRuntime()
     runtime.sessions.configureDefault(runtime.profile)
@@ -74,7 +74,7 @@ describe('менеджер сессии авторизации', () => {
     expect((await runtime.requests.resolve({ mode: 'inherit' })).accessToken).toBe('new')
   })
 
-  /** Userinfo загружается отдельно и тоже не должен воскрешать token после выхода. */
+  // Userinfo загружается отдельно и тоже не должен воскрешать token после выхода.
   it('не восстанавливает сессию поздним userinfo после logout', async () => {
     const runtime = createRuntime()
     runtime.sessions.configureDefault(runtime.profile)

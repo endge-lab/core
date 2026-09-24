@@ -8,7 +8,9 @@ import { VOCAB_DEFAULT_SOURCE } from '@/features/core/modules/source/templates/v
 
 export type RVocabMode = 'external_payload' | 'internal'
 
-/** Сущность словаря (коллекция vocabs). Один документ = один словарь. */
+/**
+ * Сущность словаря (коллекция vocabs). Один документ = один словарь.
+ */
 export class RVocabs extends REntity {
   @Expose()
   sourceVersion: number = 1
@@ -83,7 +85,9 @@ export class RVocabs extends REntity {
     }
   }
 
-  /** Возвращает validation problems vocab без mutable entity state. */
+  /**
+   * Возвращает validation problems vocab без mutable entity state.
+   */
   override getDiagnosticProblems(): DiagnosticsProblemInput[] {
     const problems: DiagnosticsProblemInput[] = []
     if (!String(this.identity ?? '').trim()) {

@@ -1,4 +1,4 @@
-import type { PhaseEvent, RaphDerivedHandle } from '@endge/raph'
+import type { PhaseEvent, RaphDerivedHandle } from '@raphy-js/raph'
 import type { RFilter } from '@/features/core/modules/domain/entities/RFilter'
 import type { RQuery } from '@/features/core/modules/domain/entities/RQuery'
 import type { ProgramArtifact, QueryProgramPayload } from '@/features/core/modules/program/domain/types/program.types'
@@ -7,7 +7,7 @@ import type { FilterRuntimeHost } from '@/features/core/modules/runtime/hosts/Fi
 
 import type { FilterProgramPayload } from '@/features/core/modules/source/domain/types/filter-source.types'
 
-import { collectionByKey, filterByKey, full, Raph, RaphNode } from '@endge/raph'
+import { collectionByKey, filterByKey, full, Raph, RaphNode } from '@raphy-js/raph'
 import { Endge } from '@/features/core/kernel/endge'
 import { RFilter as FilterModel } from '@/features/core/modules/domain/entities/RFilter'
 import { runResponseOutputTransforms } from '@/features/core/modules/runtime/execution/endge-response-output'
@@ -24,7 +24,9 @@ function defaultContext(): RuntimeHostContext<'query'> {
   }
 }
 
-/** Executable Query runtime с props, child filters и latest-wins. */
+/**
+ * Executable Query runtime с props, child filters и latest-wins.
+ */
 export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContext<'query'>, QueryProgramPayload> {
   private _props: Record<string, unknown> = {}
   private _outputs: Record<string, unknown> = {}
@@ -124,7 +126,9 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     return host
   }
 
-  /** Активирует зарегистрированный Query host и создаёт его child filters. */
+  /**
+   * Активирует зарегистрированный Query host и создаёт его child filters.
+   */
   public override create(): void {
     if (this.status === 'active') {
       return
@@ -133,7 +137,9 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     super.create()
   }
 
-  /** Создает unresolved Filter defaults после регистрации Query host. */
+  /**
+   * Создает unresolved Filter defaults после регистрации Query host.
+   */
   private _initializeDefaultSources(): void {
     const payload = this.getArtifactPayload()
     const artifact = this.getArtifact()
@@ -346,7 +352,9 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     this.emit('update', ctx)
   }
 
-  /** Монтирует compiled output graph как runtime-scoped Raph materialized dependencies. */
+  /**
+   * Монтирует compiled output graph как runtime-scoped Raph materialized dependencies.
+   */
   private _mountOutputGraph(artifact: ProgramArtifact<QueryProgramPayload>): void {
     const payload = artifact.payload
     for (const output of payload.outputs) {

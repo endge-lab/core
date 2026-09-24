@@ -15,24 +15,24 @@ import { lowerComponentSFCExpression } from './component-sfc-expression-ir'
 const SFC_PLATFORM_LOCALS = new Set(['$table', '$row', '$column', '$cell'])
 const SFC_TABLE_LOCALS = new Set(['row', 'rowId', 'rowIndex', 'columnKey', 'columnMeta', 'value'])
 
-/** Контекст анализа выражения SFC template/script. */
+// Контекст анализа выражения SFC template/script.
 export interface ComponentSFCExpressionContext {
-  /** Имена props, доступные выражению. */
+  // Имена props, доступные выражению.
   props?: Iterable<string>
 
-  /** Имена локальных bindings, доступные выражению. */
+  // Имена локальных bindings, доступные выражению.
   locals?: Iterable<string>
 
-  /** Путь source для diagnostics. */
+  // Путь source для diagnostics.
   sourcePath?: string
 }
 
-/** Результат компиляции expression в renderer-neutral IR value. */
+// Результат компиляции expression в renderer-neutral IR value.
 export interface ComponentSFCExpressionCompileResult {
-  /** Нормализованное значение IR. */
+  // Нормализованное значение IR.
   value: RComponentSFC_IR_Value
 
-  /** Diagnostics, найденные при анализе expression. */
+  // Diagnostics, найденные при анализе expression.
   diagnostics: RComponentDiagnostic[]
 }
 
@@ -121,10 +121,8 @@ const STATIC_MEMBER_CANDIDATES: Readonly<Record<string, readonly ExpressionCompl
   ],
 }
 
-/**
- * Возвращает renderer-neutral подсказки для SFC expression в точной lexical
- * области. UI отвечает только за отображение и применение replacement range.
- */
+// Возвращает renderer-neutral подсказки для SFC expression в точной lexical
+// области. UI отвечает только за отображение и применение replacement range.
 export function resolveComponentSFCExpressionCompletions(
   request: ComponentSFCExpressionCompletionRequest,
 ): ComponentSFCExpressionCompletion[] {
@@ -294,7 +292,7 @@ function isInsideQuotedExpression(source: string, cursor: number): boolean {
   return quote != null
 }
 
-/** Возвращает статический fallback из `t(key, fallback)` без i18n/runtime-контекста. */
+// Возвращает статический fallback из `t(key, fallback)` без i18n/runtime-контекста.
 export function readComponentSFCTranslationFallback(source: string): string | null {
   try {
     const expression = parseExpression(String(source ?? '').trim(), {
@@ -325,7 +323,7 @@ export function readComponentSFCTranslationFallback(source: string): string | nu
   return null
 }
 
-/** Компилирует expression и извлекает reactive reads для runtime-подписок. */
+// Компилирует expression и извлекает reactive reads для runtime-подписок.
 export function compileComponentSFCExpression(
   source: string,
   context: ComponentSFCExpressionContext = {},
@@ -371,7 +369,7 @@ export function compileComponentSFCExpression(
   }
 }
 
-/** Использует уже разобранный узел script/annotation без повторного parser pass. */
+// Использует уже разобранный узел script/annotation без повторного parser pass.
 export function compileComponentSFCExpressionAST(
   ast: Node,
   source: string,
@@ -464,10 +462,8 @@ function normalizeDataMetaReference(
   return null
 }
 
-/**
- * Извлекает только статические `vocab(alias, mapping?)`, чтобы alias оставался
- * compiler-visible, а runtime не пытался угадывать физическую identity.
- */
+// Извлекает только статические `vocab(alias, mapping?)`, чтобы alias оставался
+// compiler-visible, а runtime не пытался угадывать физическую identity.
 function collectVocabReads(
   ast: unknown,
   source: string,

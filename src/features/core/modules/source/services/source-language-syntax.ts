@@ -22,7 +22,7 @@ const COMMON_KEYWORDS = [
   'undefined',
 ]
 
-/** Создает общий TypeScript-like tokenizer, добавляя vocabulary конкретного DSL. */
+// Создает общий TypeScript-like tokenizer, добавляя vocabulary конкретного DSL.
 export function createTypeScriptLikeSourceSyntax(
   options: TypeScriptLikeSourceSyntaxOptions,
 ): SourceLanguageSyntaxDefinition {

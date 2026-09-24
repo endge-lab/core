@@ -2,7 +2,9 @@ import type { AuthAdapterContext, AuthProfileAdapter, AuthProfileSchema, AuthTok
 
 const CONFIG_KEYS = ['clientId', 'scopes', 'tokenEndpoint']
 
-/** Выполняет OAuth2 Resource Owner Password grant для dev/test профилей. */
+/**
+ * Выполняет OAuth2 Resource Owner Password grant для dev/test профилей.
+ */
 export class OAuth2PasswordAuthAdapter implements AuthProfileAdapter {
   public readonly id = 'oauth2-password'
   public readonly label = 'OAuth2 Password (dev/test)'
