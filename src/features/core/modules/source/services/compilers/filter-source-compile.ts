@@ -21,7 +21,7 @@ import { compileProgramMetadataProperty } from '@/features/core/modules/source/s
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
-/** Компилирует Filter source v1 в normalized document и artifact payload. */
+// Компилирует Filter source v1 в normalized document и artifact payload.
 export function compileFilterSource(source: string, sourceVersion = 1): FilterSourceCompileResult {
   const diagnostics: DiagnosticDraft[] = []
   if (!String(source ?? '').trim()) {

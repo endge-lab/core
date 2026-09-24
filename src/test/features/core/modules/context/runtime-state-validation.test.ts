@@ -21,7 +21,7 @@ function controller(adapter: EndgeStorageAdapter, runtimeId = 'runtime') {
 }
 
 describe('безопасное восстановление RuntimeState', () => {
-  /** Специальные имена должны переживать JSON round-trip без изменения общих объектов. */
+  // Специальные имена должны переживать JSON round-trip без изменения общих объектов.
   it.each(['__proto__', 'constructor', 'toString'])('изолирует ключ %s на обоих уровнях словаря', (key) => {
     const state = controller(storage())
     const before = Object.getOwnPropertyDescriptors(Object.prototype)
@@ -36,7 +36,7 @@ describe('безопасное восстановление RuntimeState', () =>
     expect(Object.getOwnPropertyDescriptors(Object.prototype)).toEqual(before)
   })
 
-  /** Повреждённая оболочка cache не должна мешать mount и последующей записи. */
+  // Повреждённая оболочка cache не должна мешать mount и последующей записи.
   it.each([null, [], 1, {}, { version: 1 }, { version: 2, state: {} }, { version: 2, state: [] }])(
     'восстанавливает defaults для несовместимого snapshot %#',
     (snapshot) => {

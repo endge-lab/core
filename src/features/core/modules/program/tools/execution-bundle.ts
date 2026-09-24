@@ -14,7 +14,7 @@ import {
 import { normalizeEndgeConfiguration } from '@/features/core/modules/configuration/domain/endge-configuration'
 import { validatePortableProgramPayload } from './portable-program-payload'
 
-/** Поддержанные compiler payload families; новые виды требуют явного добавления в wire contract. */
+// Поддержанные compiler payload families; новые виды требуют явного добавления в wire contract.
 const PAYLOAD_TYPES: readonly ProgramEntityType[] = [
   'type',
   'component-sfc',
@@ -33,7 +33,7 @@ const PAYLOAD_TYPES: readonly ProgramEntityType[] = [
   'configuration',
 ]
 
-/** AST имеет отдельную boundary; executable payload сохраняется без compiler instances. */
+// AST имеет отдельную boundary; executable payload сохраняется без compiler instances.
 export function packProgramArtifact(
   artifact: ProgramArtifact,
   includeAst: boolean,
@@ -60,7 +60,7 @@ export function packProgramArtifact(
   return packed
 }
 
-/** Проверяет весь transport до изменения Program. Индексы строятся из validated refs. */
+// Проверяет весь transport до изменения Program. Индексы строятся из validated refs.
 export function readExecutionBundle(input: unknown): ExecutionBundle {
   const value = bundleObject(copyBundleJson(input), 'program')
   if (value.version !== 1) {

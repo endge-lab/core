@@ -4,7 +4,9 @@ import type { EndgeCommandExecutor } from '@/features/core/modules/commands/type
 import { RemoteCommandExecutor } from '@/features/core/modules/commands/services/RemoteCommandExecutor'
 import { EndgeModule } from '@/features/federation/EndgeModule'
 
-/** Выбирает способ выполнения команд по boot mode, не владея изменяемым контекстом. */
+/**
+ * Выбирает способ выполнения команд по boot mode, не владея изменяемым контекстом.
+ */
 export class EndgeCommands_Module extends EndgeModule<EndgeBootContext> {
   private readonly _localExecutor: EndgeCommandExecutor
   private _remote = false
@@ -15,7 +17,9 @@ export class EndgeCommands_Module extends EndgeModule<EndgeBootContext> {
     this._localExecutor = localExecutor
   }
 
-  /** Клиент выполняет команды локально, дебагер передаёт их через предоставленный host транспорт. */
+  /**
+   * Клиент выполняет команды локально, дебагер передаёт их через предоставленный host транспорт.
+   */
   public override setup(ctx: EndgeBootContext): void {
     this._remote = ctx.mode === 'debugger'
     this._executor = this._remote
@@ -23,7 +27,9 @@ export class EndgeCommands_Module extends EndgeModule<EndgeBootContext> {
       : ctx.commands?.local ?? this._localExecutor
   }
 
-  /** Делегирует команду; состояние и публикация событий остаются у владельца операции. */
+  /**
+   * Делегирует команду; состояние и публикация событий остаются у владельца операции.
+   */
   public async execute(command: EndgeCommand): Promise<void> {
     if (!this._executor) {
       throw new Error('[Endge Commands] Command execution requires boot setup')
@@ -32,7 +38,9 @@ export class EndgeCommands_Module extends EndgeModule<EndgeBootContext> {
     return executor.execute(command)
   }
 
-  /** Отзывает выбранного исполнителя и ссылку на транспорт перед следующим boot. */
+  /**
+   * Отзывает выбранного исполнителя и ссылку на транспорт перед следующим boot.
+   */
   public override reset(): void {
     this._executor = null
   }

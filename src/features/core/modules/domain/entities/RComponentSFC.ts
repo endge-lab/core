@@ -14,19 +14,19 @@ import { ComponentType } from '@/features/core/modules/domain/types/document/doc
  * sourceParts, diagnostics, AST и IR вычисляются runtime-host.
  */
 export class RComponentSFC extends RComponentCore {
-  /** Внутренний маркер SFC-компонента новой ветки. */
+  // Внутренний маркер SFC-компонента новой ветки.
   @Expose()
   override kind: string = 'component-sfc'
 
-  /** Тип доменного документа и Payload documentType. */
+  // Тип доменного документа и Payload documentType.
   @Expose()
   type: ComponentType.SFC = ComponentType.SFC
 
-  /** Canonical .endge source: script/template/style в одном тексте. */
+  // Canonical .endge source: script/template/style в одном тексте.
   @Expose()
   source: string = ''
 
-  /** Опциональный пользовательский tag для прямого вызова компонента из SFC template. */
+  // Опциональный пользовательский tag для прямого вызова компонента из SFC template.
   @Expose()
   tag: string | null = null
 
@@ -36,22 +36,30 @@ export class RComponentSFC extends RComponentCore {
     this.supportedTargets = ['dom', 'canvas']
   }
 
-  /** Возвращает canonical source компонента. */
+  /**
+   * Возвращает canonical source компонента.
+   */
   override getSource(): string {
     return this.source
   }
 
-  /** Обновляет canonical source без изменения runtime-derived состояния. */
+  /**
+   * Обновляет canonical source без изменения runtime-derived состояния.
+   */
   setSource(source: string): void {
     this.source = source ?? ''
   }
 
-  /** Собирает persisted source из вкладок редактора. */
+  /**
+   * Собирает persisted source из вкладок редактора.
+   */
   setSourceParts(parts: RComponentSFCSource_Parts): void {
     this.source = serializeSFCSourceParts(parts)
   }
 
-  /** Создает копию SFC-компонента как новый доменный документ. */
+  /**
+   * Создает копию SFC-компонента как новый доменный документ.
+   */
   override duplicate(options: DuplicateOptions): RComponentSFC {
     const copy = new RComponentSFC()
     this.copyCoreFieldsTo(copy)
@@ -65,7 +73,9 @@ export class RComponentSFC extends RComponentCore {
     return copy
   }
 
-  /** Возвращает plain-форму для domain dump/export. */
+  /**
+   * Возвращает plain-форму для domain dump/export.
+   */
   toPlain(): Record<string, unknown> {
     return {
       id: this.id,
@@ -87,7 +97,9 @@ export class RComponentSFC extends RComponentCore {
     }
   }
 
-  /** Восстанавливает SFC-компонент из plain schema или Payload-normalized объекта. */
+  /**
+   * Восстанавливает SFC-компонент из plain schema или Payload-normalized объекта.
+   */
   static fromPlain(raw: any): RComponentSFC {
     const component = new RComponentSFC()
     const sourceParts = raw?.sourceParts as RComponentSFCSource_Parts | undefined
@@ -114,7 +126,7 @@ export class RComponentSFC extends RComponentCore {
   }
 }
 
-/** Нормализует опциональный пользовательский tag без навязывания namespace. */
+// Нормализует опциональный пользовательский tag без навязывания namespace.
 function normalizeTag(raw: unknown): string | null {
   if (typeof raw !== 'string') {
     return null
@@ -122,7 +134,7 @@ function normalizeTag(raw: unknown): string | null {
   return raw.trim() || null
 }
 
-/** Нормализует список поддерживаемых targets и оставляет только v1-значения. */
+// Нормализует список поддерживаемых targets и оставляет только v1-значения.
 function normalizeTargets(raw: unknown): RComponentRenderTarget[] {
   if (!Array.isArray(raw)) {
     return ['dom', 'canvas']

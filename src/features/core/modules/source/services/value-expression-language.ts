@@ -1,6 +1,6 @@
 import type { SourceLanguageCompletion } from '@/features/core/modules/source/domain/types/source-engine.types'
 
-/** Общий vocabulary ValueExpression, подключаемый всеми domain source languages. */
+// Общий vocabulary ValueExpression, подключаемый всеми domain source languages.
 export const VALUE_EXPRESSION_FUNCTION_NAMES = [
   'get',
   'getOr',

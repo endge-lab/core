@@ -40,7 +40,9 @@ const CORE_TYPES: readonly BuiltinTypeDefinition[] = [
   { identity: 'RefVocab', displayName: 'Ссылка на словарь', category: 'reference', target: 'vocabs' },
 ]
 
-/** Фактический Type Registry: встроенные типы из кода и сохранённые пользовательские Types. */
+/**
+ * Фактический Type Registry: встроенные типы из кода и сохранённые пользовательские Types.
+ */
 export class EndgeTypes_Module extends EndgeModule {
   private readonly _builtins = new Map<string, RType>()
 

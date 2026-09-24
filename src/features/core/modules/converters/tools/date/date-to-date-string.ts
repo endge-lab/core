@@ -1,4 +1,4 @@
-/** Date в строку только даты YYYY-MM-DD. */
+// Date в строку только даты YYYY-MM-DD.
 export function dateToDateString(value: unknown): string | null {
   if (value == null) {
     return null

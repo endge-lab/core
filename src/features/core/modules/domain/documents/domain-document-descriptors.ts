@@ -59,7 +59,7 @@ export type DomainCollectionKey
     | 'converters' | 'computations' | 'styles' | 'configurations'
     | 'vocabs' | 'authProfiles' | 'i18nBundles' | 'navigations'
 
-/** Точное соответствие document type конкретной Domain-модели. */
+// Точное соответствие document type конкретной Domain-модели.
 export interface DomainDocumentModelMap {
   'primitive': RType
   'type': RType
@@ -370,14 +370,14 @@ export const DOMAIN_DOCUMENT_DESCRIPTORS = Object.freeze(Object.fromEntries(
   }),
 )) as DescriptorMap
 
-/** Возвращает канонический descriptor конкретного document type. */
+// Возвращает канонический descriptor конкретного document type.
 export function getDomainDocumentDescriptor<TType extends DomainDocumentType>(
   type: TType,
 ): DomainDocumentDescriptor<TType> {
   return DOMAIN_DOCUMENT_DESCRIPTORS[type]
 }
 
-/** Создаёт новый Domain-документ через канонический descriptor. */
+// Создаёт новый Domain-документ через канонический descriptor.
 export function createNewDomainDocument<TType extends DomainDocumentType>(
   type: TType,
   options: DocumentDraftOptions,

@@ -50,7 +50,7 @@ export interface OperationHistoryShortcutDescriptor {
     | { kind: 'literal', value: ComponentSFCInteractionTrigger[] }
 }
 
-/** Материализованный i18n-resource внутри Composition program artifact. */
+// Материализованный i18n-resource внутри Composition program artifact.
 export interface CompositionI18nResourceArtifact {
   name: string
   path: string
@@ -62,12 +62,12 @@ export interface CompositionI18nResourceArtifact {
 
 export interface CompositionScopeDescriptor {
   name: string
-  /** Публичный path; implicit scope_default имеет path "scope_default". */
+  // Публичный path; implicit scope_default имеет path "scope_default".
   path: string
   parentPath: string | null
   activationOverride: CompositionActivationDescriptor | null
   effectiveActivation: CompositionActivationDescriptor
-  /** Data dependencies, активируемые вместе с lifecycle scope. */
+  // Data dependencies, активируемые вместе с lifecycle scope.
   data?: string[]
   resources: string[]
   runtimes: string[]
@@ -93,7 +93,7 @@ export type CompositionBindingValue
     }
     | { kind: 'expression', expression: SourceExpressionIR }
 
-/** Явная provenance-ссылка Meta-plane для преобразованного входного значения. */
+// Явная provenance-ссылка Meta-plane для преобразованного входного значения.
 export interface CompositionMetaSourceBinding {
   data: string
   path: string
@@ -103,17 +103,17 @@ export interface CompositionMetaSourceBinding {
 
 export interface CompositionDataDescriptor {
   name: string
-  /** Полный data path. Для root data совпадает с name. */
+  // Полный data path. Для root data совпадает с name.
   path?: string
-  /** Lifecycle scope, которому принадлежит dependency. */
+  // Lifecycle scope, которому принадлежит dependency.
   scopePath?: string
   kind: 'store' | 'vocab'
   identity: string
-  /** Политика разрешения Store; для Vocab не используется. */
+  // Политика разрешения Store; для Vocab не используется.
   resolution?: 'contextual' | 'isolated' | 'injected'
-  /** Provider slot для нескольких Store instances с одной identity. */
+  // Provider slot для нескольких Store instances с одной identity.
   slot?: string | null
-  /** Нормализованная политика загрузки Vocab; для Store не используется. */
+  // Нормализованная политика загрузки Vocab; для Store не используется.
   policy?: VocabLoadPolicy
 }
 
@@ -133,11 +133,11 @@ export interface CompositionFilterFieldsSlice {
 
 export interface CompositionRuntimeDescriptor {
   name: string
-  /** Полный публичный path runtime внутри Composition. */
+  // Полный публичный path runtime внутри Composition.
   path: string
-  /** Внутренний путь, владеющий RuntimeScope. */
+  // Внутренний путь, владеющий RuntimeScope.
   scopePath: string
-  /** Смещения Source для authoring-инструментов; runtime их не интерпретирует. */
+  // Смещения Source для authoring-инструментов; runtime их не интерпретирует.
   sourceLocations?: {
     runtime: { start: number, end: number }
     call: { start: number, end: number }
@@ -145,7 +145,7 @@ export interface CompositionRuntimeDescriptor {
   }
   kind: CompositionRuntimeKind
   identity: string
-  /** Compiler-resolved selector metadata. Runtime executes only kind/identity above. */
+  // Compiler-resolved selector metadata. Runtime executes only kind/identity above.
   contextSwitch?: {
     selected: 'default' | number
     default: { kind: CompositionRuntimeKind, identity: string }
@@ -155,21 +155,21 @@ export interface CompositionRuntimeDescriptor {
       identity: string
     }>
   }
-  /** Явный override в месте вызова runtime. */
+  // Явный override в месте вызова runtime.
   activationOverride: CompositionActivationDescriptor | null
-  /** Compiler-linked activation, которую runtime применяет без интерпретации source. */
+  // Compiler-linked activation, которую runtime применяет без интерпретации source.
   effectiveActivation: CompositionActivationDescriptor
   fields?: string[]
   controls?: Record<string, FilterViewControlDefinition>
   componentIdentity?: string
   persistKey?: string
   props: Record<string, CompositionBindingValue>
-  /** Локальный data alias child -> data alias owner Composition. */
+  // Локальный data alias child -> data alias owner Composition.
   dataBindings?: Record<string, string>
   storeTo: CompositionStorePublication[]
-  /** Псевдонимы данных Store, получающие нормализованные события Stream. */
+  // Псевдонимы данных Store, получающие нормализованные события Stream.
   dispatchTo?: string[]
-  /** Необязательная политика пакетной обработки событий, принадлежащая Composition. */
+  // Необязательная политика пакетной обработки событий, принадлежащая Composition.
   batch?: {
     maxItems: number
     maxWaitMs: number
@@ -182,7 +182,7 @@ export interface CompositionRuntimeChildHandle {
   runtime: RuntimeHost<any, any>
 }
 
-/** Источник изменения для управляемого повторного запуска Query. */
+// Источник изменения для управляемого повторного запуска Query.
 export type CompositionChangeSource
   = | { kind: 'runtime-output', runtime: string, output: string }
     | { kind: 'prop', path: string }
@@ -261,12 +261,12 @@ export type CompositionPreviewPropValue
 export type CompositionPreviewProps = Record<string, CompositionPreviewPropValue>
 
 export interface CompositionSourceDocument {
-  /** Локальный override режима данных; отсутствие значения наследует runtime ancestry. */
+  // Локальный override режима данных; отсутствие значения наследует runtime ancestry.
   dataMode?: EndgeDataMode | null
   activation: CompositionActivationDescriptor | null
-  /** Публичный props contract Composition. */
+  // Публичный props contract Composition.
   props: SourceFieldDefinition[]
-  /** Preview-only fixtures. Не являются runtime defaults. */
+  // Preview-only fixtures. Не являются runtime defaults.
   previewProps?: CompositionPreviewProps | null
   data: CompositionDataDescriptor[]
   resources: CompositionResourceDescriptor[]
@@ -276,7 +276,7 @@ export interface CompositionSourceDocument {
   outputs: CompositionOutputDescriptor[]
 }
 
-/** Добавление data dependency в canonical Composition source. */
+// Добавление data dependency в canonical Composition source.
 export interface CompositionSourceAddDataPatch {
   type: 'add-data'
   name: string
@@ -284,7 +284,7 @@ export interface CompositionSourceAddDataPatch {
   identity: string
 }
 
-/** Добавление owned resource в canonical Composition source. */
+// Добавление owned resource в canonical Composition source.
 export interface CompositionSourceAddResourcePatch {
   type: 'add-resource'
   name: string
@@ -292,7 +292,7 @@ export interface CompositionSourceAddResourcePatch {
   identity?: string
 }
 
-/** Добавление runtime dependency в canonical Composition source. */
+// Добавление runtime dependency в canonical Composition source.
 export interface CompositionSourceAddRuntimePatch {
   type: 'add-runtime'
   name: string
@@ -301,32 +301,32 @@ export interface CompositionSourceAddRuntimePatch {
   activation?: CompositionActivationMode
 }
 
-/** Одна узкая source-preserving операция над Composition dependencies. */
+// Одна узкая source-preserving операция над Composition dependencies.
 export type CompositionSourcePatchOperation
   = | CompositionSourceAddDataPatch
     | CompositionSourceAddResourcePatch
     | CompositionSourceAddRuntimePatch
 
-/** Composition source patch: одиночная операция или атомарная пачка. */
+// Composition source patch: одиночная операция или атомарная пачка.
 export type CompositionSourcePatch
   = | CompositionSourcePatchOperation
     | CompositionSourcePatchOperation[]
 
-/** Нормализованная связь input runtime-ноды. */
+// Нормализованная связь input runtime-ноды.
 export interface CompositionRuntimeInputConnection {
   targetRuntime: string
   targetProp: string
   source: CompositionBindingValue
 }
 
-/** Явная передача Store data из owner Composition во вложенную Composition. */
+// Явная передача Store data из owner Composition во вложенную Composition.
 export interface CompositionRuntimeDataConnection {
   targetRuntime: string
   targetData: string
   sourceData: string
 }
 
-/** Нормализованный trigger логического update runtime-ноды. */
+// Нормализованный trigger логического update runtime-ноды.
 export interface CompositionRuntimeUpdateConnection {
   id: string
   source: CompositionChangeSource
@@ -335,7 +335,7 @@ export interface CompositionRuntimeUpdateConnection {
   debounceMs: number
 }
 
-/** Запуск target Query после успешного выполнения source Query. */
+// Запуск target Query после успешного выполнения source Query.
 export interface CompositionRuntimeSuccessConnection {
   id: string
   sourceRuntime: string
@@ -343,7 +343,7 @@ export interface CompositionRuntimeSuccessConnection {
   updateKind: 'run'
 }
 
-/** Публикация output runtime-ноды в Composition data. */
+// Публикация output runtime-ноды в Composition data.
 export interface CompositionRuntimePublicationConnection {
   id: string
   sourceRuntime: string
@@ -352,7 +352,7 @@ export interface CompositionRuntimePublicationConnection {
   targetPath: string
 }
 
-/** Действие, выполняемое после mount всего графа. */
+// Действие, выполняемое после mount всего графа.
 export interface CompositionRuntimeMountConnection {
   targetRuntime: string
   updateKind: 'run'
@@ -362,26 +362,26 @@ export interface CompositionRuntimeEventConnection extends CompositionComponentE
   id: string
 }
 
-/** Исполняемый граф Composition, построенный компилятором из source document. */
+// Исполняемый граф Composition, построенный компилятором из source document.
 export interface CompositionRuntimeGraph {
   inputs: CompositionRuntimeInputConnection[]
   dataInputs?: CompositionRuntimeDataConnection[]
   updates: CompositionRuntimeUpdateConnection[]
-  /** Optional для чтения artifacts, скомпилированных до появления onSuccess. */
+  // Optional для чтения artifacts, скомпилированных до появления onSuccess.
   successes?: CompositionRuntimeSuccessConnection[]
   publications: CompositionRuntimePublicationConnection[]
   mounts: CompositionRuntimeMountConnection[]
-  /** Семантические эффекты Event компонента, принадлежащие этой Composition. */
+  // Семантические эффекты Event компонента, принадлежащие этой Composition.
   events?: CompositionRuntimeEventConnection[]
 }
 
-/** Payload Composition artifact без runtime state. */
+// Payload Composition artifact без runtime state.
 export interface CompositionProgramPayload extends CompositionSourceDocument {
-  /** Optional parser tree retained for inspection; runtime does not require it. */
+  // Optional parser tree retained for inspection; runtime does not require it.
   ast?: unknown
   type: 'composition'
   sourceVersion: number
-  /** Снимки словарей, которые runtime читает без обращения к Domain. */
+  // Снимки словарей, которые runtime читает без обращения к Domain.
   i18nResources?: CompositionI18nResourceArtifact[]
   graph: CompositionRuntimeGraph
 }
@@ -400,7 +400,7 @@ export interface CompositionRuntimeOutputHandle {
   output?: string
 }
 
-/** Публичный контракт Composition host без зависимости Domain от concrete Model runtime. */
+// Публичный контракт Composition host без зависимости Domain от concrete Model runtime.
 export interface CompositionRuntimeHostHandle extends RuntimeHost<'composition', any, CompositionProgramPayload> {
   mountGraph: () => Promise<void>
   getChild: (name: string) => RuntimeHost<any, any> | null
@@ -434,9 +434,9 @@ export type CompositionPublicOutputHandle
 
 export interface CompositionMountOptions {
   id?: string
-  /** Значения публичных Composition props для standalone mount. */
+  // Значения публичных Composition props для standalone mount.
   props?: Record<string, unknown>
-  /** Явные runtime-id Store instances для data aliases. */
+  // Явные runtime-id Store instances для data aliases.
   dataRuntimes?: Record<string, string>
 }
 

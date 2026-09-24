@@ -12,7 +12,7 @@ const FEDERATION_ROLE_DIRECTORIES = new Set(['constants', 'services', 'tools', '
 const LEGACY_PRODUCTION_ROOTS = ['domain', 'kernel', 'model', 'modules', 'tools']
   .map(segment => join(SRC_ROOT, segment))
 
-/** Собирает production TypeScript-файлы без test tree. */
+// Собирает production TypeScript-файлы без test tree.
 function collectTypeScriptFiles(root: string): string[] {
   return readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
     const path = join(root, entry.name)
@@ -23,7 +23,7 @@ function collectTypeScriptFiles(root: string): string[] {
   })
 }
 
-/** Находит локальные domain slices всех structured Modules. */
+// Находит локальные domain slices всех structured Modules.
 function collectNamedDirectories(root: string, name: string): string[] {
   return readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
     if (!entry.isDirectory()) {

@@ -13,7 +13,9 @@ export interface RIntegrationSchema extends EntityManagement {
   meta: Record<string, unknown>
 }
 
-/** Сущность интеграции (коллекция integrations). */
+/**
+ * Сущность интеграции (коллекция integrations).
+ */
 export class RIntegration extends REntity {
   @Expose()
   description: string | null = null

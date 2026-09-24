@@ -46,7 +46,7 @@ export type ValueOperation = (
   runtime: ValueOperationRuntime,
 ) => unknown
 
-/** Единственный runtime-registry операций для Query, Composition и DataView. */
+// Единственный runtime-registry операций для Query, Composition и DataView.
 export const VALUE_EXPRESSION_OPERATIONS: Record<SourceExpressionOperation, ValueOperation> = {
   'get': eager(args => readPath(args[0], String(args[1] ?? ''))),
   'get-or': eager(args => defaultTo(readPath(args[0], String(args[1] ?? '')), args[2])),
@@ -195,7 +195,7 @@ function collection(operation: (items: unknown[], expression: SourceExpressionIR
   return (args, runtime) => operation(asArray(runtime.evaluate(args[0])), args[1], runtime)
 }
 
-/** Вычисляет только первую подходящую ветку вида `{ when, then }`. */
+// Вычисляет только первую подходящую ветку вида `{ when, then }`.
 function choose(args: SourceExpressionIR[], runtime: ValueOperationRuntime): unknown {
   const branches = args[0]
   if (branches?.type !== 'array') {
@@ -215,7 +215,7 @@ function choose(args: SourceExpressionIR[], runtime: ValueOperationRuntime): unk
   return runtime.evaluate(args[1])
 }
 
-/** Стабильная сортировка по последовательности `{ by, direction }`. */
+// Стабильная сортировка по последовательности `{ by, direction }`.
 function orderBy(args: SourceExpressionIR[], runtime: ValueOperationRuntime): unknown {
   const items = asArray(runtime.evaluate(args[0]))
   const descriptors = args[1]
@@ -255,7 +255,7 @@ function orderBy(args: SourceExpressionIR[], runtime: ValueOperationRuntime): un
 
 const resolveJoinSource = resolveCollectionSource
 
-/** Создаёт отложенное описание join до объявления matching keys. */
+// Создаёт отложенное описание join до объявления matching keys.
 function joinBuilder(type: JoinType): ValueOperation {
   return (args, runtime) => ({
     kind: 'value-expression-join',
@@ -265,7 +265,7 @@ function joinBuilder(type: JoinType): ValueOperation {
   }) satisfies JoinBuilder
 }
 
-/** Создаёт отложенный lookup, который будет проиндексирован после .by(...). */
+// Создаёт отложенный lookup, который будет проиндексирован после .by(...).
 function lookupBuilder(cardinality: LookupBuilder['cardinality']): ValueOperation {
   return (args, runtime) => ({
     kind: 'value-expression-lookup',
@@ -274,7 +274,7 @@ function lookupBuilder(cardinality: LookupBuilder['cardinality']): ValueOperatio
   }) satisfies LookupBuilder
 }
 
-/** Выполняет join по одному composite key или набору альтернативных keys. */
+// Выполняет join по одному composite key или набору альтернативных keys.
 function joinBy(mode: 'all' | 'any'): ValueOperation {
   return (args, runtime) => {
     const builder = runtime.evaluate(args[0])
@@ -296,7 +296,7 @@ function joinBy(mode: 'all' | 'any'): ValueOperation {
   }
 }
 
-/** Дополняет вложенную object-ветку вычисленными полями, не меняя source rows. */
+// Дополняет вложенную object-ветку вычисленными полями, не меняя source rows.
 function enrich(args: SourceExpressionIR[], runtime: ValueOperationRuntime): unknown {
   const rows = runtime.evaluate(args[0])
   const branchPath = String(runtime.evaluate(args[1]) ?? '').trim()
@@ -376,7 +376,7 @@ function buildLookupIndex(source: unknown[], sourcePath: string): LookupIndex {
   return { rowsByKey, warnedKeys: new Set() }
 }
 
-/** Объединяет left/right records, заполняя отсутствующие поля по приоритету. */
+// Объединяет left/right records, заполняя отсутствующие поля по приоритету.
 function joinCoalesce(args: SourceExpressionIR[], runtime: ValueOperationRuntime): unknown {
   const rows = runtime.evaluate(args[0])
   if (!Array.isArray(rows)) {

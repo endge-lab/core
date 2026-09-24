@@ -24,9 +24,9 @@ export interface StreamEventDescriptor {
   type: string | null
   typePath: string | null
   payloadPath: string | null
-  /** Точные значения по dot-path исходного сообщения, проверяемые до eachFrom. */
+  // Точные значения по dot-path исходного сообщения, проверяемые до eachFrom.
   match?: Record<string, string | number | boolean | null>
-  /** Путь к массиву; typePath и payloadPath читаются относительно каждого элемента. */
+  // Путь к массиву; typePath и payloadPath читаются относительно каждого элемента.
   eachFrom?: string
 }
 
@@ -35,9 +35,9 @@ export interface StreamSourceDocument {
   events: StreamEventDescriptor[]
 }
 
-/** Готовый для runtime артефакт Stream. */
+// Готовый для runtime артефакт Stream.
 export interface StreamSourceArtifact extends StreamSourceDocument {
-  /** Optional parser tree retained for inspection; runtime does not require it. */
+  // Optional parser tree retained for inspection; runtime does not require it.
   ast?: unknown
   type: 'stream'
   sourceVersion: number

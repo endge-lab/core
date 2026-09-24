@@ -95,12 +95,16 @@ export abstract class EndgeFederation {
   protected static readonly federationId: string = 'default'
   protected static readonly federationDefinitionSignature: string | null = null
 
-  /** Стабильная runtime identity Federation. */
+  /**
+   * Стабильная runtime identity Federation.
+   */
   public static get id(): string {
     return this._getFederationId()
   }
 
-  /** Создаёт Federation с ленивыми Modules и дочерними Federations. */
+  /**
+   * Создаёт Federation с ленивыми Modules и дочерними Federations.
+   */
   public static define<
     const TDefinitions extends EndgeModuleDefinitions,
     const TFederations extends EndgeChildFederationDefinitions = readonly [],
@@ -156,7 +160,9 @@ export abstract class EndgeFederation {
     return this._getOrCreateHost().lastError
   }
 
-  /** Рекурсивно снимает диагностическое состояние явного Federation graph. */
+  /**
+   * Рекурсивно снимает диагностическое состояние явного Federation graph.
+   */
   public static createDiagnosticsSnapshot(
     options: EndgeFederationDiagnosticsSnapshotOptions = {},
   ): EndgeFederationDiagnosticsSnapshot {
@@ -164,15 +170,21 @@ export abstract class EndgeFederation {
     return this._createDiagnosticsSnapshot([this.id], options)
   }
 
-  /** Хук одноразовой декларации собственных lifecycle-узлов Federation. */
+  /**
+   * Хук одноразовой декларации собственных lifecycle-узлов Federation.
+   */
   protected static configureFederation(): void {}
 
-  /** Selects the lifecycle graph without creating a second owner for its nodes. */
+  /**
+   * Selects the lifecycle graph without creating a second owner for its nodes.
+   */
   protected static selectLifecycleNodes(nodes: readonly EndgeLifecycleNodeDescriptor[], _ctx: EndgeFederationContext): readonly EndgeLifecycleNodeDescriptor[] {
     return nodes
   }
 
-  /** Запускает всё дерево Federation по pipeline `setup -> load -> build -> start`. */
+  /**
+   * Запускает всё дерево Federation по pipeline `setup -> load -> build -> start`.
+   */
   public static boot(ctx: EndgeFederationContext): Promise<void> {
     const host = this._getOrCreateHost()
     if (host.parentFederationId) {
@@ -263,7 +275,9 @@ export abstract class EndgeFederation {
     }
   }
 
-  /** Регистрирует декларативное расширение до configuration Federation. */
+  /**
+   * Регистрирует декларативное расширение до configuration Federation.
+   */
   public static use(plugin: EndgePlugin): void {
     const host = this._getOrCreateHost()
 
@@ -300,7 +314,9 @@ export abstract class EndgeFederation {
     host.pluginSignatures.set(pluginId, signature)
   }
 
-  /** Декларирует уже созданный Module во время custom configuration. */
+  /**
+   * Декларирует уже созданный Module во время custom configuration.
+   */
   public static defineModule<T extends AnyEndgeModule>(descriptor: EndgeModuleDescriptor<T>): T {
     const host = this._requireConfiguringHost()
     const key = this._normalizeNodeKey(descriptor.key)
@@ -319,7 +335,9 @@ export abstract class EndgeFederation {
     }
   }
 
-  /** Декларирует лениво создаваемые Modules во время configuration. */
+  /**
+   * Декларирует лениво создаваемые Modules во время configuration.
+   */
   protected static defineModuleDefinitions(definitions: readonly EndgeModuleDefinition[]): void {
     const host = this._requireConfiguringHost()
     for (const definition of this._normalizeModuleDefinitions(definitions)) {
@@ -328,7 +346,9 @@ export abstract class EndgeFederation {
     }
   }
 
-  /** Декларирует дочернюю Federation как composite lifecycle-узел. */
+  /**
+   * Декларирует дочернюю Federation как composite lifecycle-узел.
+   */
   public static defineFederation(definition: EndgeChildFederationDefinition): void {
     const host = this._requireConfiguringHost()
     const [normalized] = this._normalizeFederationDefinitions([definition])
@@ -409,7 +429,9 @@ export abstract class EndgeFederation {
     await this._runPhase('start', ctx, touchedNodes)
   }
 
-  /** Сбрасывает всё дерево в обратном dependency order. */
+  /**
+   * Сбрасывает всё дерево в обратном dependency order.
+   */
   public static reset(): Promise<void> {
     const host = this._getOrCreateHost()
     if (host.parentFederationId) {

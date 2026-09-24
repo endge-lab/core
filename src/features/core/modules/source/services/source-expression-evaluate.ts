@@ -2,7 +2,7 @@ import type { SourceExpressionContext, SourceExpressionIR } from '@/features/cor
 
 import { readPath, VALUE_EXPRESSION_OPERATIONS } from './value-expression-operations'
 
-/** Вычисляет общий безопасный ValueExpression без eval/new Function. */
+// Вычисляет общий безопасный ValueExpression без eval/new Function.
 export function evaluateSourceExpression(
   expression: SourceExpressionIR,
   context: SourceExpressionContext = {},
@@ -79,7 +79,7 @@ export function evaluateSourceExpression(
   return evaluate(expression)
 }
 
-/** Публичный alias общего DSL для новых domain source compiler-ов. */
+// Публичный alias общего DSL для новых domain source compiler-ов.
 export const evaluateValueExpression = evaluateSourceExpression
 
 function cloneValue<T>(value: T): T {

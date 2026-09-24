@@ -21,7 +21,7 @@ export interface DiagnosticsJsonSerializationResult {
   redactedFields: number
 }
 
-/** Преобразует произвольное состояние в JSON-safe диагностическую проекцию с редактированием секретов. */
+// Преобразует произвольное состояние в JSON-safe диагностическую проекцию с редактированием секретов.
 export function serializeDiagnosticsJson(input: unknown): DiagnosticsJsonSerializationResult {
   const ancestors = new WeakSet<object>()
   let redactedFields = 0
@@ -80,7 +80,7 @@ export function serializeDiagnosticsJson(input: unknown): DiagnosticsJsonSeriali
   }
 }
 
-/** Проверяет normalized key без зависимости от регистра и разделителей. */
+// Проверяет normalized key без зависимости от регистра и разделителей.
 function isSensitiveKey(key: string): boolean {
   const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, '')
   return SENSITIVE_KEY_PARTS.some(part => normalized.includes(part))

@@ -4,7 +4,7 @@ import { Serialize } from '@endge/utils'
 import { Exclude, Expose } from 'class-transformer'
 import { REntity } from '@/features/core/modules/domain/entities/REntity'
 
-/** Исходный source-first документ EndgeCSS. */
+// Исходный source-first документ EndgeCSS.
 export const ENDGE_STYLE_DEFAULT_SOURCE = `/* EndgeCSS is renderer-neutral. */
 * {
   --surface: #ffffff;
@@ -17,7 +17,9 @@ export const ENDGE_STYLE_DEFAULT_SOURCE = `/* EndgeCSS is renderer-neutral. */
 }
 `
 
-/** Сохранённый source-first документ EndgeCSS без compiled/runtime-состояния. */
+/**
+ * Сохранённый source-first документ EndgeCSS без compiled/runtime-состояния.
+ */
 export class RStyle extends REntity {
   @Exclude()
   readonly type = 'style' as const

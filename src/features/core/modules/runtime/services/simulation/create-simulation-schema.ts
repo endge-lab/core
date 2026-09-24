@@ -3,7 +3,7 @@ import type { SimulationFieldConstraints } from '@/features/core/modules/source/
 import type { SourceFieldDefinition } from '@/features/core/modules/source/domain/types/source-expression.types'
 import type { TypeProgramPayload, TypeSourceExpression, TypeSourceField } from '@/features/core/modules/source/domain/types/type-source.types'
 
-/** Проекция compiled Type в JSON Schema. Генерация значений принадлежит внешнему сервису. */
+// Проекция compiled Type в JSON Schema. Генерация значений принадлежит внешнему сервису.
 export function createSimulationSchema(
   contract: Pick<SourceFieldDefinition, 'type' | 'typeExpression' | 'array'>,
   artifacts: RuntimeArtifactReader,

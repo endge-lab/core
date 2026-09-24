@@ -21,7 +21,7 @@ function descriptorCapabilityValues(key: 'source' | 'program' | 'runtime' | 'met
 }
 
 describe('контракты возможностей документов домена', () => {
-  /** Сверяет descriptor Source capabilities с реальным language strategy registry. */
+  // Сверяет descriptor Source capabilities с реальным language strategy registry.
   it('сопоставляет зарегистрированные стратегии языка Source', () => {
     const registered = new EndgeSource_Module()
       .listLanguageStrategies()
@@ -32,13 +32,13 @@ describe('контракты возможностей документов до�
       .toEqual(registered)
   })
 
-  /** Сверяет descriptor Program capabilities с реальными compiler handlers. */
+  // Сверяет descriptor Program capabilities с реальными compiler handlers.
   it('сопоставляет зарегистрированные handlers компилятора', () => {
     expect(descriptorCapabilityValues('program'))
       .toEqual(new EndgeCompiler_Module().listSupportedEntityTypes().sort())
   })
 
-  /** Сверяет descriptor Runtime capabilities с реальными built-in strategies. */
+  // Сверяет descriptor Runtime capabilities с реальными built-in strategies.
   it('сопоставляет встроенные runtime-стратегии', () => {
     const strategies = [
       new ActionRuntimeStrategy(),

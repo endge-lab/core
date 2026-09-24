@@ -21,7 +21,9 @@ export interface EndgeStyleResolver {
   resolve: (node: EndgeStyleMatchNode, theme?: string) => Record<string, EndgeStyleResolvedDeclaration>
 }
 
-/** Нейтральный реестр стилей. Материализаторы renderer используют его артефакты и resolver. */
+/**
+ * Нейтральный реестр стилей. Материализаторы renderer используют его артефакты и resolver.
+ */
 export class EndgeStyles_Module extends EndgeModule {
   private _unsubscribeProgram: (() => void) | null = null
   private readonly _placements = new Map<string, {
@@ -51,7 +53,9 @@ export class EndgeStyles_Module extends EndgeModule {
     })
   }
 
-  /** Возвращает валидные скомпилированные артефакты. Наличие не активирует стиль. */
+  /**
+   * Возвращает валидные скомпилированные артефакты. Наличие не активирует стиль.
+   */
   public getAvailableArtifacts(): EndgeStyleSheetArtifact[] {
     const rankByIdentity = new Map(
       Endge.domain.getStyles()
@@ -68,7 +72,9 @@ export class EndgeStyles_Module extends EndgeModule {
       .map(artifact => artifact.payload.stylesheet)
   }
 
-  /** Возвращает только размещения, полученные активными владельцами runtime. */
+  /**
+   * Возвращает только размещения, полученные активными владельцами runtime.
+   */
   public getActivePlacements(): EndgeStylePlacement[] {
     return [...this._placements.entries()]
       .map(([id, placement]): EndgeStylePlacement => {
@@ -176,7 +182,9 @@ export class EndgeStyles_Module extends EndgeModule {
     }
   }
 
-  /** Создаёт независимый от renderer resolver поверх активного snapshot программы. */
+  /**
+   * Создаёт независимый от renderer resolver поверх активного snapshot программы.
+   */
   public createResolver(target: EndgeStyleTargetProfile): EndgeStyleResolver {
     const placements = this.getActivePlacements()
     return {

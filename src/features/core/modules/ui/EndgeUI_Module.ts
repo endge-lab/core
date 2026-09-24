@@ -44,7 +44,9 @@ export class EndgeUI_Module extends EndgeModule {
     this._applyThemeToDocument(this._theme)
   }
 
-  /** Подключает UI projection к пользовательскому контексту после загрузки workspace. */
+  /**
+   * Подключает UI projection к пользовательскому контексту после загрузки workspace.
+   */
   public override start(): void {
     this._offContext?.()
     this._offZoomState?.()
@@ -69,7 +71,9 @@ export class EndgeUI_Module extends EndgeModule {
     this._syncThemeFromContext()
   }
 
-  /** Отключает runtime subscription; пользовательское значение остаётся в EndgeContext_Module. */
+  /**
+   * Отключает runtime subscription; пользовательское значение остаётся в EndgeContext_Module.
+   */
   public override reset(): void {
     this._offContext?.()
     this._offZoomState?.()
@@ -82,12 +86,16 @@ export class EndgeUI_Module extends EndgeModule {
   //
   // Снимок состояния
   //
-  /** Включает текущие UI-настройки в диагностическое дерево. */
+  /**
+   * Включает текущие UI-настройки в диагностическое дерево.
+   */
   public override createDiagnosticsSnapshot(): EndgeUISnapshot {
     return this.snapshot
   }
 
-  /** Возвращает полный snapshot UI-настроек. */
+  /**
+   * Возвращает полный snapshot UI-настроек.
+   */
   public get snapshot(): EndgeUISnapshot {
     return {
       zoom: this._zoom,
@@ -179,7 +187,9 @@ export class EndgeUI_Module extends EndgeModule {
     return true
   }
 
-  /** Однократно переносит прежний глобальный zoom в user-scoped context state. */
+  /**
+   * Однократно переносит прежний глобальный zoom в user-scoped context state.
+   */
   private _migrateLegacyZoom(): void {
     if (
       Endge.context.getState<number>(this._ZOOM_STATE_KEY) !== undefined
@@ -212,7 +222,9 @@ export class EndgeUI_Module extends EndgeModule {
     return this._theme
   }
 
-  /** Возвращает workspace theme catalog; до boot используется безопасный bootstrap fallback. */
+  /**
+   * Возвращает workspace theme catalog; до boot используется безопасный bootstrap fallback.
+   */
   public get availableThemes(): string[] {
     if (!Endge.workspace.isLoaded) {
       return [...themeConfig.availableThemes]

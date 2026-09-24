@@ -7,7 +7,7 @@ import type {
   RuntimeHost,
   RuntimeHostUpdateContext,
 } from '@/features/core/modules/runtime/domain/runtime-host.types'
-import { Raph } from '@endge/raph'
+import { Raph } from '@raphy-js/raph'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Endge } from '@/features/core/kernel/endge'
 import { compileComponentSFC } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-compile'
@@ -23,7 +23,6 @@ describe('проверка Host runtime для ComponentSFC', () => {
     Endge.styles.reset()
     Endge.domain.reset()
     Raph.reset()
-    Raph.clearPhases()
   })
 
   it('обновляет вложенные props при замене объекта отчёта и снимает подписки при destroy', () => {
@@ -129,6 +128,7 @@ defineProps<{
     let host: ComponentSFCRuntimeHost | null = null
 
     Raph.reset()
+    Raph.configure({ mode: 'runtime' })
     Raph.definePhases([
       RuntimeBoundaryUpdatePhase.make({
         resolveHost: runtimeId => runtimeId === 'runtime-1' ? host as any : null,

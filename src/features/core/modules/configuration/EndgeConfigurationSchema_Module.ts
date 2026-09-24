@@ -31,7 +31,9 @@ const PUBLIC_SYSTEM_KEYS = new Set([
   'constructor',
 ])
 
-/** Компилирует схемы Configuration до разрешения фактического контекста. */
+/**
+ * Компилирует схемы Configuration до разрешения фактического контекста.
+ */
 export class EndgeConfigurationSchema_Module extends EndgeModule<EndgeBootContext> {
   private _entries: EndgeConfigurationSchemaEntry[] = []
   private _types: TypeProgramCatalogEntry[] = []
@@ -103,7 +105,9 @@ export class EndgeConfigurationSchema_Module extends EndgeModule<EndgeBootContex
       .map(diagnostic => ({ identity: entry.identity, diagnostic })))
   }
 
-  /** Применяет defaults, игнорирует устаревшие ключи и записывает несовместимые активные значения в Compiler Problems. */
+  /**
+   * Применяет defaults, игнорирует устаревшие ключи и записывает несовместимые активные значения в Compiler Problems.
+   */
   public resolveValues(input: EndgeConfigurationValues): EndgeConfigurationValues {
     const result: EndgeConfigurationValues = {}
     this._valueDiagnostics.clear()

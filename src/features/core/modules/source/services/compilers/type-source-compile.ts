@@ -21,7 +21,7 @@ import { compileProgramMetadataExpression } from '@/features/core/modules/source
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 type StaticValueResult = { ok: true, value: unknown } | { ok: false }
 
-/** Компилирует Type Source v1 без выполнения пользовательского JavaScript. */
+// Компилирует Type Source v1 без выполнения пользовательского JavaScript.
 export function compileTypeSource(source: string, sourceVersion = 1): TypeSourceCompileResult {
   const diagnostics: DiagnosticDraft[] = []
 
@@ -364,7 +364,7 @@ function readRecordDefinition(
   return values ? { kind: 'record', values } : null
 }
 
-/** Компилирует одно рекурсивное inline type expression без выполнения JavaScript. */
+// Компилирует одно рекурсивное inline type expression без выполнения JavaScript.
 export function compileTypeSourceExpression(
   raw: t.Expression,
   diagnostics: DiagnosticDraft[],

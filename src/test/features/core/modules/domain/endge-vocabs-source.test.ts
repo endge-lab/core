@@ -1,4 +1,4 @@
-import { Raph } from '@endge/raph'
+import { Raph } from '@raphy-js/raph'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { Endge } from '@/features/core/kernel/endge'
@@ -20,7 +20,7 @@ describe('проверка Vocab с приоритетом Source', () => {
     Raph.delete('vocabs.airlines-payload')
   })
 
-  /** Collection другого провайдера не может записать или удалить кэш по чужой identity. */
+  // Collection другого провайдера не может записать или удалить кэш по чужой identity.
   it('изолирует кэш при совпадении collection с identity другого справочника', async () => {
     const first = makeVocab(`defineVocab({
       provider: payload({ baseUrl: 'https://payload.invalid', collection: 'primary', auth: { mode: 'none' } }),
@@ -105,7 +105,7 @@ defineVocab({
     expect(Raph.get('vocabs.airlines-payload')).toBeUndefined()
   })
 
-  /** Один Vocab одновременно обслуживает live и mock consumers без общего значения. */
+  // Один Vocab одновременно обслуживает live и mock consumers без общего значения.
   it('разделяет live и mock кэш при последовательных acquire и fallback', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(response({ docs: [{ code: 'LIVE' }] }))
     const vocab = makeVocab(`defineVocab({
@@ -125,7 +125,7 @@ defineVocab({
     expect(Endge.vocabs.getValues('airlines')).toEqual([{ code: 'LIVE' }])
   })
 
-  /** Даже transport, игнорирующий abort, не может заполнить кэш после reset. */
+  // Даже transport, игнорирующий abort, не может заполнить кэш после reset.
   it('отменяет загрузку при reset и не удаляет данные следующего поколения', async () => {
     let release!: (value: Response) => void
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementationOnce(() => new Promise((resolve) => {
@@ -172,7 +172,7 @@ defineVocab({
     expect(Endge.vocabs.getValues('airlines')).toEqual([{ code: 'NEW' }])
   })
 
-  /** Отмена ожидания одного scope не прерывает загрузку второго consumer. */
+  // Отмена ожидания одного scope не прерывает загрузку второго consumer.
   it('отменяет один acquire и сохраняет общую загрузку другого', async () => {
     let release!: (value: Response) => void
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise((resolve) => {

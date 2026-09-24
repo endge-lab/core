@@ -2,7 +2,9 @@ import type { EndgeCommandHandler } from '@/features/core/modules/commands/types
 import type { EndgeRuntimeCommandTarget } from '@/features/core/modules/commands/types/runtime-command-target.type'
 import { readRuntimeControlTarget } from '@/features/core/modules/runtime/tools/runtime-inspection'
 
-/** Делегирует pause существующему владельцу runtime lifecycle. */
+/**
+ * Делегирует pause существующему владельцу runtime lifecycle.
+ */
 export class PauseRuntimeCommand implements EndgeCommandHandler {
   public readonly type = 'runtime:pause' as const
   public constructor(private readonly _runtime: EndgeRuntimeCommandTarget) {}

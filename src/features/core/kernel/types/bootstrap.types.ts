@@ -6,83 +6,69 @@ import type { EndgeDomainProvider } from '@/features/core/modules/domain/types/d
 import type { EndgeExecutionContext } from '@/features/core/modules/runtime/domain/execution-context.types'
 import type { EndgeFederationContext } from '@/features/federation/types/federation.types'
 
-/**
- * Источник получения доменных данных
- * default - работа с внешним сервисом backend
- * bundle - read-only работа с переносимым workspace snapshot
- * plain - данные подтягиваются из файла
- */
+// Источник получения доменных данных
+// default - работа с внешним сервисом backend
+// bundle - read-only работа с переносимым workspace snapshot
+// plain - данные подтягиваются из файла
 export type EndgeDataProvider
   = | 'default'
     | 'bundle'
     | 'plain'
 
-/**
- * Конфигурация загрузки движка
- * Определяет workspace, данные которого должны быть активированы из persisted Domain.
- * Выборы динамических фасетов передаются отдельно через EndgeBootContext.context.
- */
+// Конфигурация загрузки движка
+// Определяет workspace, данные которого должны быть активированы из persisted Domain.
+// Выборы динамических фасетов передаются отдельно через EndgeBootContext.context.
 export interface EndgeLoadScope {
   workspaceIdentity?: string
 }
 
 export interface EndgeUIBootOptions {
-  /** Локаль host при отсутствии сохранённого выбора, если она доступна в Workspace. */
+  // Локаль host при отсутствии сохранённого выбора, если она доступна в Workspace.
   defaultLocale?: string
-  /** Тема host при отсутствии сохранённого выбора, если она доступна в Workspace. */
+  // Тема host при отсутствии сохранённого выбора, если она доступна в Workspace.
   defaultTheme?: string
-  /** Локальный для host порядок fallback, когда настроенная реализация адаптера недоступна. */
+  // Локальный для host порядок fallback, когда настроенная реализация адаптера недоступна.
   adapterFallbackIds?: readonly string[]
 }
 
 export type EndgeBootMode = 'application' | 'debugger'
 
 export interface EndgeBootContext extends EndgeFederationContext {
-  /** Immutable lifecycle profile; application is the default. */
+  // Immutable lifecycle profile; application is the default.
   mode?: EndgeBootMode
-  /**
-   * Источник получения доменных данных
-   */
+  // Источник получения доменных данных
   dataProvider?: EndgeDataProvider
 
-  /**
-   * Граница загружаемого persisted Domain.
-   */
+  // Граница загружаемого persisted Domain.
   scope: EndgeLoadScope
 
-  /** Структурный контекст, неизменяемый в течение полного lifecycle запуска и сборки. */
+  // Структурный контекст, неизменяемый в течение полного lifecycle запуска и сборки.
   context?: Partial<EndgeExecutionContext>
 
-  /**
-   * Runtime/env vars, которые нужны ядру.
-   */
+  // Runtime/env vars, которые нужны ядру.
   vars: Record<string, unknown>
 
-  /** Локальная для host политика UI, не изменяющая сохранённую конфигурацию Workspace. */
+  // Локальная для host политика UI, не изменяющая сохранённую конфигурацию Workspace.
   ui?: EndgeUIBootOptions
 
-  /** Пространство имён браузерной сессии, принадлежащее host. */
+  // Пространство имён браузерной сессии, принадлежащее host.
   auth?: EndgeAuthBootOptions
 
-  /** Optional host-owned bridge policy; отсутствие отключает соединения. */
+  // Optional host-owned bridge policy; отсутствие отключает соединения.
   bridge?: EndgeBridgeBootOptions
 
-  /** Host передаёт порт выбранного сеанса для удалённого исполнения команд в debugger mode. */
+  // Host передаёт порт выбранного сеанса для удалённого исполнения команд в debugger mode.
   commands?: EndgeCommandsBootOptions
 
-  /**
-   * Для plain provider.
-   */
+  // Для plain provider.
   plainSource?: unknown
 
-  /** Внешний источник live snapshot для default backend provider. */
+  // Внешний источник live snapshot для default backend provider.
   domainProvider?: EndgeDomainProvider
 
-  /** Переносимый read-only workspace snapshot для bundle provider. */
+  // Переносимый read-only workspace snapshot для bundle provider.
   bundleSource?: EndgeDomainBundle
 
-  /**
-   * Для отмены долгой загрузки/сборки.
-   */
+  // Для отмены долгой загрузки/сборки.
   signal?: AbortSignal
 }

@@ -8,7 +8,7 @@ import type { CompositionProgramPayload, CompositionRuntimeOutputHandle } from '
 
 import type { StoreSourceArtifact } from '@/features/core/modules/source/domain/types/store-source.types'
 import type { UpdateSourceArtifact } from '@/features/core/modules/source/domain/types/update-source.types'
-import { Raph } from '@endge/raph'
+import { Raph } from '@raphy-js/raph'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Endge } from '@/features/core/kernel/endge'
 import { compileComponentSFC } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-compile'
@@ -558,6 +558,7 @@ defineComposition({
     Endge.program.clear()
     Endge.domain.reset()
     Raph.reset()
+    Raph.configure({ mode: 'runtime' })
     installContextualStoreCompositions({ resolution: 'isolated', parentHasStore: true, explicitBinding: true })
     const explicitSession = await Endge.runtime.composition.mount('context-parent')
     const explicitChild = explicitSession.host.getChild('child') as CompositionRuntimeHost
@@ -579,6 +580,7 @@ defineComposition({
     Endge.program.clear()
     Endge.domain.reset()
     Raph.reset()
+    Raph.configure({ mode: 'runtime' })
     installContextualStoreCompositions({ resolution: 'injected', parentHasStore: false })
     await expect(Endge.runtime.composition.mount('context-child')).rejects.toThrow('requires provider "context-store"')
     expect(Endge.runtime.getRuntimeHosts()).toEqual([])

@@ -213,7 +213,9 @@ const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
   },
 ]
 
-/** Source language strategy для editor-facing операций RQuery source. */
+/**
+ * Source language strategy для editor-facing операций RQuery source.
+ */
 export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
   public readonly id = 'source-language:query'
   public readonly sourceKind: SourceKind = 'query'
@@ -298,19 +300,25 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
     ],
   }))
 
-  /** Проверяет, что стратегия обслуживает query source. */
+  /**
+   * Проверяет, что стратегия обслуживает query source.
+   */
   public supports(sourceKind: SourceKind | string): boolean {
     return sourceKind === this.sourceKind
   }
 
-  /** Возвращает базовый source новой RQuery. */
+  /**
+   * Возвращает базовый source новой RQuery.
+   */
   public createDefaultSource(variant?: string): string {
     return variant === 'graphql' || variant === 'query-gql'
       ? QUERY_GRAPHQL_DEFAULT_SOURCE
       : QUERY_DEFAULT_SOURCE
   }
 
-  /** Валидирует query source через текущий compiler pass. */
+  /**
+   * Валидирует query source через текущий compiler pass.
+   */
   public validate(source: string, context?: SourceLanguageContext): SourceLanguageValidationResult {
     const result = compileQuerySource(source)
     const typeCatalog = context?.typeSymbols?.map((type, index) => ({
@@ -344,7 +352,9 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
     }
   }
 
-  /** Возвращает подсказки source-only Query v2 API. */
+  /**
+   * Возвращает подсказки source-only Query v2 API.
+   */
   public completions(context: SourceLanguageContext): SourceLanguageCompletion[] {
     return [...QUERY_SOURCE_COMPLETIONS, ...VALUE_EXPRESSION_COMPLETIONS, ...typeCompletions(context)]
   }
@@ -369,7 +379,7 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
   }
 }
 
-/** Добавляет токенизацию GraphQL только внутри статических tagged templates gql. */
+// Добавляет токенизацию GraphQL только внутри статических tagged templates gql.
 function withGraphQLSyntax(syntax: SourceLanguageSyntaxDefinition): SourceLanguageSyntaxDefinition {
   return {
     ...syntax,

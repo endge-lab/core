@@ -17,7 +17,7 @@ export type EndgeWorkspaceTheme = EndgeThemeDefinition
 export type EndgeWorkspaceTimezone = EndgeTimezoneDefinition
 export type EndgeWorkspaceVar = EndgeVariableDefinition
 
-/** Фактическая переменная workspace после применения переопределений runtime и окружения. */
+// Фактическая переменная workspace после применения переопределений runtime и окружения.
 export interface EndgeResolvedWorkspaceVariable {
   name: string
   defaultValue: string
@@ -34,9 +34,9 @@ export interface EndgeWorkspaceDefinition extends EntityManagement {
   identity: string
   displayName: string
   dataMode: EndgeDataMode
-  /** Способ организации документов; legacy payloads без поля нормализуются в frontend. */
+  // Способ организации документов; legacy payloads без поля нормализуются в frontend.
   documentStructure?: EndgeWorkspaceDocumentStructure
-  /** Единственная Composition, запускаемая как корень Workspace. */
+  // Единственная Composition, запускаемая как корень Workspace.
   startupCompositionIdentity: string | null
   meta?: Record<string, unknown>
   installedIntegrations: WorkspaceIntegrationReference[]

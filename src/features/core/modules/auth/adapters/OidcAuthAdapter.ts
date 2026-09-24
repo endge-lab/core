@@ -4,7 +4,9 @@ import { AuthInteractionRequiredError } from '@/features/core/modules/auth/domai
 
 const CONFIG_KEYS = ['clientId', 'issuer', 'scopes']
 
-/** Валидирует общий OIDC profile; interactive flow запускает host через session source. */
+/**
+ * Валидирует общий OIDC profile; interactive flow запускает host через session source.
+ */
 export class OidcAuthAdapter implements AuthProfileAdapter {
   public readonly id = 'oidc'
   public readonly label = 'OIDC'

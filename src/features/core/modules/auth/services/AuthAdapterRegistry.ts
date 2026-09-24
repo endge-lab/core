@@ -1,10 +1,14 @@
 import type { AuthProfileAdapter, AuthProfileSchema } from '@/features/core/modules/auth/domain/types/auth-profile.types'
 
-/** Registry встроенных и plugin auth adapters. */
+/**
+ * Registry встроенных и plugin auth adapters.
+ */
 export class AuthAdapterRegistry {
   private readonly _adapters = new Map<string, AuthProfileAdapter>()
 
-  /** Регистрирует adapter и запрещает неявную замену существующего id. */
+  /**
+   * Регистрирует adapter и запрещает неявную замену существующего id.
+   */
   public register(adapter: AuthProfileAdapter): void {
     const id = String(adapter.id ?? '').trim()
     if (!id) {
@@ -16,12 +20,16 @@ export class AuthAdapterRegistry {
     this._adapters.set(id, adapter)
   }
 
-  /** Возвращает adapter по id. */
+  /**
+   * Возвращает adapter по id.
+   */
   public get(id: string): AuthProfileAdapter | null {
     return this._adapters.get(String(id ?? '').trim()) ?? null
   }
 
-  /** Требует зарегистрированный adapter для profile. */
+  /**
+   * Требует зарегистрированный adapter для profile.
+   */
   public require(profile: AuthProfileSchema): AuthProfileAdapter {
     const adapter = this.get(profile.adapterId)
     if (!adapter) {
@@ -30,7 +38,9 @@ export class AuthAdapterRegistry {
     return adapter
   }
 
-  /** Проверяет profile его adapter-ом. */
+  /**
+   * Проверяет profile его adapter-ом.
+   */
   public validate(profile: AuthProfileSchema): void {
     this.require(profile).validate(profile)
   }

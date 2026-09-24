@@ -278,7 +278,7 @@ function removeObjectProperty(source: string, base: number, object: any, propert
   return `${source.slice(0, propertyStart)}${suffix}${source.slice(objectEnd)}`
 }
 
-/** Удаляет только разделитель объекта, сохраняя комментарии и форматирование. */
+// Удаляет только разделитель объекта, сохраняя комментарии и форматирование.
 function removeStructuralComma(source: string): string {
   let lineComment = false
   let blockComment = false

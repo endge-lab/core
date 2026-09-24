@@ -4,11 +4,12 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   resolve: {
     alias: {
-      '@endge/raph': path.resolve(__dirname, '../@endge-raph/dist/raph.js'),
+      '@raphy-js/raph': path.resolve(__dirname, '../@raphy/@raphy-raph/dist/raph.js'),
       '@': path.resolve(__dirname, './src'),
     },
   },
   test: {
     environment: 'node',
+    setupFiles: [path.resolve(__dirname, 'src/test/setup.ts')],
   },
 })

@@ -8,7 +8,7 @@ import { Subscribable } from '@endge/utils'
 export abstract class EndgeModule<
   TContext extends EndgeFederationContext = EndgeFederationContext,
 > extends Subscribable {
-  /** Сохраняет требуемый lifecycle context в type system без runtime state. */
+  // Сохраняет требуемый lifecycle context в type system без runtime state.
   protected declare readonly _contextType: TContext
 
   /**

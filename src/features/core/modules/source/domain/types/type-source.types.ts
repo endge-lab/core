@@ -1,13 +1,13 @@
 import type { ProgramMetadataMap } from '@/features/core/modules/program/domain/types/program-metadata.types'
 import type { ProgramDiagnostic } from '@/features/core/modules/program/domain/types/program.types'
 
-/** Ссылка Type Source на примитивный или пользовательский тип домена. */
+// Ссылка Type Source на примитивный или пользовательский тип домена.
 export interface TypeSourceReference {
   kind: 'reference'
   identity: string
 }
 
-/** Поле объектного Type Source v1. */
+// Поле объектного Type Source v1.
 export interface TypeSourceField {
   key: string
   type: TypeSourceExpression
@@ -39,37 +39,37 @@ export interface TypeSourceArrayDefinition {
   items: TypeSourceExpression
 }
 
-/** Словарь с произвольными string-ключами и единым типом значений. */
+// Словарь с произвольными string-ключами и единым типом значений.
 export interface TypeSourceRecordDefinition {
   kind: 'record'
   values: TypeSourceExpression
 }
 
-/** Поддержанные корневые формы Type Source v1. */
+// Поддержанные корневые формы Type Source v1.
 export type TypeSourceDefinition
   = | TypeSourceObjectDefinition
     | TypeSourceEnumDefinition
     | TypeSourceUnionDefinition
     | TypeSourceArrayDefinition
 
-/** Рекурсивное выражение типа: ссылка или анонимное inline-определение. */
+// Рекурсивное выражение типа: ссылка или анонимное inline-определение.
 export type TypeSourceExpression
   = | TypeSourceReference
     | TypeSourceDefinition
     | TypeSourceRecordDefinition
 
-/** Канонический authoring-документ Type Source v1. */
+// Канонический authoring-документ Type Source v1.
 export interface TypeSourceDocument {
   definition: TypeSourceDefinition
 }
 
-/** Compiler payload Type Source. Runtime пока не потребляет этот artifact. */
+// Compiler payload Type Source. Runtime пока не потребляет этот artifact.
 export interface TypeProgramPayload {
-  /** Optional parser tree retained for inspection; runtime does not require it. */
+  // Optional parser tree retained for inspection; runtime does not require it.
   ast?: unknown
   type: 'type'
   sourceVersion: number
-  /** Стабильная identity скомпилированного типа. Артефакты только parser могут её не содержать. */
+  // Стабильная identity скомпилированного типа. Артефакты только parser могут её не содержать.
   identity?: string
   displayName?: string
   category?: 'primitive' | 'reference' | 'user'
@@ -81,7 +81,7 @@ export interface TypeProgramPayload {
   }
 }
 
-/** Проекция только для чтения, используемая редакторами и языковыми инструментами. */
+// Проекция только для чтения, используемая редакторами и языковыми инструментами.
 export interface TypeProgramCatalogEntry {
   id: string | number
   identity: string
@@ -94,7 +94,7 @@ export interface TypeProgramCatalogEntry {
   status: 'valid' | 'warning' | 'error'
 }
 
-/** Результат безопасного разбора Type Source. */
+// Результат безопасного разбора Type Source.
 export interface TypeSourceCompileResult {
   ast: unknown | null
   document: TypeSourceDocument | null

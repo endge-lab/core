@@ -1,10 +1,14 @@
 {
   "name": "@endge/core",
   "type": "module",
-  "version": "13.0.0",
+  "version": "14.0.0-dev",
   "private": false,
   "packageManager": "pnpm@8.8.0",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/endge-lab/core.git"
+  },
   "exports": {
     ".": {
       "types": "./dist/main.d.ts",
@@ -30,7 +34,7 @@
     "lint-fix": "eslint . --fix --cache"
   },
   "peerDependencies": {
-    "@endge/raph": "4.0.0",
+    "@raphy-js/raph": "1.0.0-dev.2",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "reflect-metadata": "^0.2.2"
@@ -68,5 +72,5 @@
     "vite": "^6.1.0",
     "vitest": "^2.1.9"
   },
-  "version_updated": "14.09.2026"
+  "version_updated": "24.09.2026"
 }

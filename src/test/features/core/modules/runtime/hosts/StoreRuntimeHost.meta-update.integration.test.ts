@@ -1,12 +1,12 @@
-import { Raph } from '@endge/raph'
+import { Raph } from '@raphy-js/raph'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { Endge } from '@/features/core/kernel/endge'
 import { createUpdateStoreRuntime } from '@/test/fixtures/update-source'
 
 describe('интеграция локального и stream-dispatched Update через Meta-plane', () => {
-  afterEach(() => {
-    Endge.runtime.reset()
+  afterEach(async () => {
+    await Endge.runtime.reset()
     Endge.program.clear()
     Endge.domain.reset()
     Raph.reset()

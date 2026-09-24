@@ -3,7 +3,7 @@ import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext } from '@/f
 import type { StreamTransportConnection, StreamTransportFactory, StreamTransportMessage } from '@/features/core/modules/runtime/domain/stream-runtime.types'
 import type { StreamEventEnvelope, StreamSourceArtifact } from '@/features/core/modules/source/domain/types/stream-source.types'
 
-import { Raph, RaphNode } from '@endge/raph'
+import { Raph, RaphNode } from '@raphy-js/raph'
 
 import { Endge } from '@/features/core/kernel/endge'
 import { RuntimeHostBase } from '@/features/core/modules/runtime/RuntimeHostBase'
@@ -19,7 +19,9 @@ function defaultContext(): RuntimeHostContext<'stream'> {
   }
 }
 
-/** Владелец lifecycle runtime для одного скомпилированного транспорта Stream. */
+/**
+ * Владелец lifecycle runtime для одного скомпилированного транспорта Stream.
+ */
 export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostContext<'stream'>, StreamSourceArtifact> {
   private _connection: StreamTransportConnection | null = null
   private _generation = 0
@@ -183,7 +185,9 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
     }
   }
 
-  /** Generator сохраняет SSE на паузе; обычный transport закрывает соединение. */
+  /**
+   * Generator сохраняет SSE на паузе; обычный transport закрывает соединение.
+   */
   public override async pause(): Promise<void> {
     super.pause()
     if (this._connection?.pause) {
@@ -194,7 +198,9 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
     }
   }
 
-  /** Возобновляет transport только после восстановления host lifecycle. */
+  /**
+   * Возобновляет transport только после восстановления host lifecycle.
+   */
   public override async resume(): Promise<void> {
     super.resume()
     if (this._connection?.resume) {

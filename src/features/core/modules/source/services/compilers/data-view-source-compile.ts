@@ -23,7 +23,7 @@ import { readSourceModelIdentity, readSourceModelReference } from '@/features/co
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
-/** Компилирует DataView source v1 в canonical document и executable artifact payload. */
+// Компилирует DataView source v1 в canonical document и executable artifact payload.
 export function compileDataViewSource(source: string): DataViewSourceCompileResult {
   const diagnostics: DiagnosticDraft[] = []
 

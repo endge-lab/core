@@ -22,9 +22,9 @@ export interface UpdateSourceDocument {
   mutations: UpdateMutationDescriptor[]
 }
 
-/** Готовый для runtime артефакт Update, всегда ограниченный своим владельцем Store. */
+// Готовый для runtime артефакт Update, всегда ограниченный своим владельцем Store.
 export interface UpdateSourceArtifact extends UpdateSourceDocument {
-  /** Optional parser tree retained for inspection; runtime does not require it. */
+  // Optional parser tree retained for inspection; runtime does not require it.
   ast?: unknown
   type: 'update'
   sourceVersion: number

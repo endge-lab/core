@@ -11,12 +11,16 @@ import type {
   DiagnosticsSpanRecord,
 } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
 
-/** Управляет одним активным span и завершает его через owner-модуль. */
+/**
+ * Управляет одним активным span и завершает его через owner-модуль.
+ */
 export class DiagnosticsSpan implements DiagnosticsSpanHandle {
   private _ended = false
   private _attributes: DiagnosticsAttributes
 
-  /** Создаёт handle с уже нормализованной correlation и scope. */
+  /**
+   * Создаёт handle с уже нормализованной correlation и scope.
+   */
   public constructor(
     private readonly _owner: DiagnosticsSpanOwner,
     public readonly traceId: string,
@@ -32,12 +36,16 @@ export class DiagnosticsSpan implements DiagnosticsSpanHandle {
     this._attributes = { ...attributes }
   }
 
-  /** Показывает, был ли span уже завершён. */
+  /**
+   * Показывает, был ли span уже завершён.
+   */
   public get isEnded(): boolean {
     return this._ended
   }
 
-  /** Добавляет или заменяет структурированные атрибуты активного span. */
+  /**
+   * Добавляет или заменяет структурированные атрибуты активного span.
+   */
   public setAttributes(attributes: DiagnosticsAttributes): void {
     if (this._ended) {
       return
@@ -45,7 +53,9 @@ export class DiagnosticsSpan implements DiagnosticsSpanHandle {
     this._attributes = { ...this._attributes, ...attributes }
   }
 
-  /** Создаёт дочерний span с correlation текущего handle. */
+  /**
+   * Создаёт дочерний span с correlation текущего handle.
+   */
   public startChild(
     name: string,
     options: Omit<DiagnosticsSpanOptions, 'traceId' | 'parentSpanId'> = {},
@@ -60,7 +70,9 @@ export class DiagnosticsSpan implements DiagnosticsSpanHandle {
     })
   }
 
-  /** Записывает log с автоматической correlation текущего span. */
+  /**
+   * Записывает log с автоматической correlation текущего span.
+   */
   public log(input: Omit<DiagnosticsLogInput, 'traceId' | 'spanId'>): DiagnosticsLogRecord | null {
     return this._owner.log({
       ...input,
@@ -72,7 +84,9 @@ export class DiagnosticsSpan implements DiagnosticsSpanHandle {
     })
   }
 
-  /** Записывает exception как связанный ERROR/FATAL log. */
+  /**
+   * Записывает exception как связанный ERROR/FATAL log.
+   */
   public recordException(error: unknown, options: DiagnosticsExceptionOptions = {}): DiagnosticsLogRecord | null {
     return this._owner.recordException(error, {
       ...options,
@@ -84,7 +98,9 @@ export class DiagnosticsSpan implements DiagnosticsSpanHandle {
     })
   }
 
-  /** Идемпотентно завершает span и возвращает сохранённый record. */
+  /**
+   * Идемпотентно завершает span и возвращает сохранённый record.
+   */
   public end(options: DiagnosticsSpanEndOptions = {}): DiagnosticsSpanRecord | null {
     if (this._ended) {
       return null

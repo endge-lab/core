@@ -3,7 +3,7 @@ import type { StreamTransportFactory } from '@/features/core/modules/runtime/dom
 import type { StreamRuntimeHost } from '@/features/core/modules/runtime/hosts/StreamRuntimeHost'
 import type { CompositionProgramPayload } from '@/features/core/modules/source/domain/types/composition-source.types'
 import type { StreamSourceArtifact } from '@/features/core/modules/source/domain/types/stream-source.types'
-import { Raph } from '@endge/raph'
+import { Raph } from '@raphy-js/raph'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Endge } from '@/features/core/kernel/endge'
 import { RComposition } from '@/features/core/modules/domain/entities/RComposition'

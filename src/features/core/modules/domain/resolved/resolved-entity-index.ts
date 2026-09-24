@@ -1,6 +1,8 @@
 import type { REntity } from '@/features/core/modules/domain/entities/REntity'
 
-/** Универсальный индекс неперсистентных дескрипторов результирующего домена. */
+/**
+ * Универсальный индекс неперсистентных дескрипторов результирующего домена.
+ */
 export class ResolvedEntityIndex {
   private readonly _entities = new Map<string, Map<string, REntity>>()
 
@@ -26,7 +28,9 @@ export class ResolvedEntityIndex {
     this._entities.get(type)?.delete(identity)
   }
 
-  /** Удаляет только вычисленные при сборке записи, сохраняя встроенные и локальные. */
+  /**
+   * Удаляет только вычисленные при сборке записи, сохраняя встроенные и локальные.
+   */
   public clearDerived(type?: string): void {
     const entries = type ? [[type, this._entities.get(type)] as const] : [...this._entities.entries()]
     for (const [, byIdentity] of entries) {

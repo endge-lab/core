@@ -2,7 +2,9 @@ import type { BrowserBridge_Adapter } from '@/features/core/modules/bridge/adapt
 import type { BridgeConnectionState, BridgeMessage } from '@/features/core/modules/bridge/domain/bridge.type'
 import { BRIDGE_CONFIG } from '@/features/core/modules/bridge/config/bridge.config'
 
-/** Один socket generation, bounded requests и reconnect одного backend. */
+/**
+ * Один socket generation, bounded requests и reconnect одного backend.
+ */
 export class BridgeConnection_Service {
   private _socket: WebSocket | null = null
   private _retry: ReturnType<typeof setTimeout> | null = null
@@ -22,7 +24,9 @@ export class BridgeConnection_Service {
     private readonly _onMessage: (message: BridgeMessage) => void,
   ) {}
 
-  /** Запускает одну попытку. Повторный вызов не создаёт второй socket. */
+  /**
+   * Запускает одну попытку. Повторный вызов не создаёт второй socket.
+   */
   public start(): void {
     if (this._active) {
       return
@@ -31,7 +35,9 @@ export class BridgeConnection_Service {
     this._open()
   }
 
-  /** Отменяет всю работу; запоздалые callbacks старого socket игнорируются. */
+  /**
+   * Отменяет всю работу; запоздалые callbacks старого socket игнорируются.
+   */
   public stop(): void {
     this._active = false
     if (this._retry) {
@@ -42,7 +48,9 @@ export class BridgeConnection_Service {
     this._onState({ serverUrl: this._serverUrl, status: 'disconnected' })
   }
 
-  /** Отправляет конечную команду с correlation id и deadline. */
+  /**
+   * Отправляет конечную команду с correlation id и deadline.
+   */
   public request(message: BridgeMessage): Promise<unknown> {
     if (!this._ready || this._pending.size >= BRIDGE_CONFIG.maxPendingRequests) {
       return Promise.reject(new Error('[Endge Bridge] Connection is unavailable or request limit reached'))
@@ -65,7 +73,9 @@ export class BridgeConnection_Service {
     })
   }
 
-  /** Отправляет сообщение без очереди для offline-соединения. */
+  /**
+   * Отправляет сообщение без очереди для offline-соединения.
+   */
   public send(message: BridgeMessage): void {
     const socket = this._socket
     if (!this._ready || !socket || socket.readyState !== 1) {

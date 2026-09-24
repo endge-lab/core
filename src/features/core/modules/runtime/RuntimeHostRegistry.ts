@@ -13,9 +13,9 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
   private _deletedSnapshots = new Map<string, DestroyedRuntimeHostSnapshot>()
   private _deletedSnapshotLimit = 0
 
-  /**
-   * ACCESS
-   */
+  // ---------------------------------------------
+  // ACCESS
+  // ---------------------------------------------
   public register<T extends RuntimeHost<any, any>>(host: T): T {
     const runtimeId = String(host.id ?? '').trim()
     if (!runtimeId) {
@@ -40,9 +40,9 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
     return host
   }
 
-  /**
-   * ACCESS
-   */
+  // ---------------------------------------------
+  // ACCESS
+  // ---------------------------------------------
   public getById(id: string): RuntimeHost<any, any> | null {
     const key = String(id ?? '').trim()
     if (!key) {
@@ -51,14 +51,16 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
     return this._hosts.get(key) ?? null
   }
 
-  /**
-   * ACCESS
-   */
+  // ---------------------------------------------
+  // ACCESS
+  // ---------------------------------------------
   public getAll(): RuntimeHost<any, any>[] {
     return Array.from(this._hosts.values())
   }
 
-  /** Возвращает runtime subtree в безопасном для destroy порядке: children first. */
+  /**
+   * Возвращает runtime subtree в безопасном для destroy порядке: children first.
+   */
   public getTreePostOrder(rootId: string): string[] {
     const ordered: string[] = []
     const visited = new Set<string>()
@@ -76,9 +78,9 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
     return ordered
   }
 
-  /**
-   * ACCESS
-   */
+  // ---------------------------------------------
+  // ACCESS
+  // ---------------------------------------------
   public getByEntity(entityType: RuntimeEntityType, entityIdentity: string): RuntimeHost<any, any>[] {
     const key = this._entityKey(entityType, entityIdentity)
     const ids = this._indexByEntity.get(key)
@@ -96,9 +98,9 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
     return out
   }
 
-  /**
-   * ACCESS
-   */
+  // ---------------------------------------------
+  // ACCESS
+  // ---------------------------------------------
   public removeById(id: string): RuntimeHost<any, any> | null {
     const key = String(id ?? '').trim()
     if (!key) {
@@ -142,9 +144,9 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
     this._parentByChild.clear()
   }
 
-  /**
-   * ACCESS
-   */
+  // ---------------------------------------------
+  // ACCESS
+  // ---------------------------------------------
   public rememberDeletedSnapshot(snapshot: DestroyedRuntimeHostSnapshot): void {
     if (this._deletedSnapshotLimit === 0) {
       return
@@ -159,16 +161,16 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
     this._trimDeletedSnapshots()
   }
 
-  /**
-   * ACCESS
-   */
+  // ---------------------------------------------
+  // ACCESS
+  // ---------------------------------------------
   public getDeletedSnapshots(): DestroyedRuntimeHostSnapshot[] {
     return Array.from(this._deletedSnapshots.values())
   }
 
-  /**
-   * ACCESS
-   */
+  // ---------------------------------------------
+  // ACCESS
+  // ---------------------------------------------
   public removeDeletedSnapshot(id: string): DestroyedRuntimeHostSnapshot | null {
     const key = String(id ?? '').trim()
     if (!key) {
@@ -184,9 +186,9 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
     return snapshot
   }
 
-  /**
-   * ACCESS
-   */
+  // ---------------------------------------------
+  // ACCESS
+  // ---------------------------------------------
   public clearDeleted(): void {
     this._deletedSnapshots.clear()
   }
@@ -206,9 +208,9 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
     }
   }
 
-  /**
-   * ACCESS
-   */
+  // ---------------------------------------------
+  // ACCESS
+  // ---------------------------------------------
   public snapshot(): RuntimeHostRegistrySnapshot {
     const hosts = this.getAll().map(host => host.snapshot())
     const deletedHosts = this.getDeletedSnapshots()
@@ -226,9 +228,9 @@ export class RuntimeHostRegistry implements RuntimeHostRegistryLike {
     }
   }
 
-  /**
-   * ACCESS
-   */
+  // ---------------------------------------------
+  // ACCESS
+  // ---------------------------------------------
   private _entityKey(entityType: RuntimeEntityType, entityIdentity: string): string {
     return `${entityType}:${String(entityIdentity ?? '').trim()}`
   }

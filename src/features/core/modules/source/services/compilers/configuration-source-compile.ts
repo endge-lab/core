@@ -16,7 +16,7 @@ import { compileTypeSourceExpression } from '@/features/core/modules/source/serv
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
-/** Разбирает Configuration Source v1 без выполнения пользовательского JavaScript. */
+// Разбирает Configuration Source v1 без выполнения пользовательского JavaScript.
 export function compileConfigurationSource(
   source: string,
   catalog: readonly TypeProgramCatalogEntry[] = [],

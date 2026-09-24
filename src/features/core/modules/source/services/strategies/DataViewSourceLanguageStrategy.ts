@@ -100,7 +100,9 @@ const DATA_VIEW_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'field', kind: 'function', insertText: `field('String')`, detail: 'Описание поля контракта' },
 ]
 
-/** Source language strategy для editor-facing операций RDataView source. */
+/**
+ * Source language strategy для editor-facing операций RDataView source.
+ */
 export class DataViewSourceLanguageStrategy implements SourceLanguageStrategy {
   public readonly id = 'source-language:data-view'
   public readonly sourceKind: SourceKind = 'data-view'
@@ -138,17 +140,23 @@ export class DataViewSourceLanguageStrategy implements SourceLanguageStrategy {
     properties: ['contract', 'filter', 'incremental', 'input', 'left', 'manual', 'metadata', 'mode', 'output', 'pipeline', 'props', 'right', 'steps', 'tools'],
   })
 
-  /** Проверяет, что strategy обслуживает DataView source. */
+  /**
+   * Проверяет, что strategy обслуживает DataView source.
+   */
   public supports(sourceKind: SourceKind | string): boolean {
     return sourceKind === this.sourceKind
   }
 
-  /** Возвращает базовый source новой RDataView. */
+  /**
+   * Возвращает базовый source новой RDataView.
+   */
   public createDefaultSource(): string {
     return DATA_VIEW_DEFAULT_SOURCE
   }
 
-  /** Валидирует DataView source через текущий compiler pass. */
+  /**
+   * Валидирует DataView source через текущий compiler pass.
+   */
   public validate(source: string): SourceLanguageValidationResult {
     const result = compileDataViewSource(source)
     const ok = !result.diagnostics.some(diagnostic => diagnostic.severity === 'error')
@@ -160,7 +168,9 @@ export class DataViewSourceLanguageStrategy implements SourceLanguageStrategy {
     }
   }
 
-  /** Возвращает подсказки v1 для разрешенного DataView source API. */
+  /**
+   * Возвращает подсказки v1 для разрешенного DataView source API.
+   */
   public completions(_context: SourceLanguageContext): SourceLanguageCompletion[] {
     return [...DATA_VIEW_SOURCE_COMPLETIONS, ...VALUE_EXPRESSION_COMPLETIONS]
   }

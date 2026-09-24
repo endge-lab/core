@@ -72,7 +72,9 @@ export class EndgeProgram_Module extends EndgeModule {
     return this._catalog
   }
 
-  /** Публикует завершённый compile snapshot; incremental builds не создают новую экспортируемую сборку. */
+  /**
+   * Публикует завершённый compile snapshot; incremental builds не создают новую экспортируемую сборку.
+   */
   public completeCompile(
     catalog: CompiledProgramCatalog,
     context: CompiledContextDescriptor,
@@ -95,7 +97,9 @@ export class EndgeProgram_Module extends EndgeModule {
     this.notify()
   }
 
-  /** Упаковывает проверенную текущую программу без второго постоянного владельца artifacts. */
+  /**
+   * Упаковывает проверенную текущую программу без второго постоянного владельца artifacts.
+   */
   public exportBundle(options: { includeAst?: boolean } = {}): ExecutionBundle {
     for (const artifact of this._artifacts.values()) {
       this.getArtifactByRef(artifact.ref)
@@ -135,7 +139,9 @@ export class EndgeProgram_Module extends EndgeModule {
     return { bundle: readExecutionBundle(value) }
   }
 
-  /** Строит все индексы до замены, не публикуя промежуточную очищенную программу. */
+  /**
+   * Строит все индексы до замены, не публикуя промежуточную очищенную программу.
+   */
   public installBundle(prepared: PreparedProgramInstall): void {
     const value = readExecutionBundle(prepared.bundle)
     const artifacts = new Map(Object.entries(value.artifacts))
@@ -192,7 +198,9 @@ export class EndgeProgram_Module extends EndgeModule {
     this._status = mergeStatus(this._status, status)
   }
 
-  /** Пересчитывает общий status после compiler linking pass. */
+  /**
+   * Пересчитывает общий status после compiler linking pass.
+   */
   public recalculateStatus(): void {
     this._status = 'valid'
     for (const artifact of this._artifacts.values()) {
@@ -259,7 +267,9 @@ export class EndgeProgram_Module extends EndgeModule {
     return artifact
   }
 
-  /** Заменяет build-derived registry пользовательских SFC tags. */
+  /**
+   * Заменяет build-derived registry пользовательских SFC tags.
+   */
   public setComponentTags(
     entries: readonly ComponentSFCTagRegistryEntry[],
   ): void {
@@ -270,12 +280,16 @@ export class EndgeProgram_Module extends EndgeModule {
     this.notify()
   }
 
-  /** Разрешает пользовательский SFC tag в persisted identity компонента. */
+  /**
+   * Разрешает пользовательский SFC tag в persisted identity компонента.
+   */
   public resolveComponentTag(tag: string): string | null {
     return this._componentIdentityByTag.get(tag) ?? null
   }
 
-  /** Возвращает snapshot build-derived registry без выдачи mutable Map наружу. */
+  /**
+   * Возвращает snapshot build-derived registry без выдачи mutable Map наружу.
+   */
   public getComponentTags(): ComponentSFCTagRegistryEntry[] {
     return Array.from(this._componentIdentityByTag, ([tag, identity]) => ({
       tag,
@@ -355,28 +369,36 @@ export class EndgeProgram_Module extends EndgeModule {
     return this.getArtifact<TPayload>(ref.entityType, idOrIdentity)
   }
 
-  /** Возвращает скомпилированный артефакт Action по id или identity. */
+  /**
+   * Возвращает скомпилированный артефакт Action по id или identity.
+   */
   public getActionArtifact(
     idOrIdentity: string | number,
   ): ProgramArtifact<ActionProgramPayload> | null {
     return this.getArtifact<ActionProgramPayload>('action', idOrIdentity)
   }
 
-  /** Возвращает compiled query artifact по id или identity. */
+  /**
+   * Возвращает compiled query artifact по id или identity.
+   */
   public getQueryArtifact(
     idOrIdentity: string | number,
   ): ProgramArtifact<QueryProgramPayload> | null {
     return this.getArtifact<QueryProgramPayload>('query', idOrIdentity)
   }
 
-  /** Возвращает compiled Vocab artifact по id или identity. */
+  /**
+   * Возвращает compiled Vocab artifact по id или identity.
+   */
   public getVocabArtifact(
     idOrIdentity: string | number,
   ): ProgramArtifact<VocabProgramPayload> | null {
     return this.getArtifact<VocabProgramPayload>('vocab', idOrIdentity)
   }
 
-  /** Возвращает скомпилированный артефакт Computation по id или identity. */
+  /**
+   * Возвращает скомпилированный артефакт Computation по id или identity.
+   */
   public getComputationArtifact(
     idOrIdentity: string | number,
   ): ProgramArtifact<ComputationProgramPayload> | null {
@@ -386,28 +408,36 @@ export class EndgeProgram_Module extends EndgeModule {
     )
   }
 
-  /** Возвращает compiled DataView artifact по id или identity. */
+  /**
+   * Возвращает compiled DataView artifact по id или identity.
+   */
   public getDataViewArtifact(
     idOrIdentity: string | number,
   ): ProgramArtifact<DataViewProgramPayload> | null {
     return this.getArtifact<DataViewProgramPayload>('data-view', idOrIdentity)
   }
 
-  /** Возвращает compiled Store artifact по id или identity. */
+  /**
+   * Возвращает compiled Store artifact по id или identity.
+   */
   public getStoreArtifact(
     idOrIdentity: string | number,
   ): ProgramArtifact<StoreSourceArtifact> | null {
     return this.getArtifact<StoreSourceArtifact>('store', idOrIdentity)
   }
 
-  /** Возвращает compiled Stream artifact по id или identity. */
+  /**
+   * Возвращает compiled Stream artifact по id или identity.
+   */
   public getStreamArtifact(
     idOrIdentity: string | number,
   ): ProgramArtifact<StreamSourceArtifact> | null {
     return this.getArtifact<StreamSourceArtifact>('stream', idOrIdentity)
   }
 
-  /** Возвращает compiled Simulation artifact по id или identity. */
+  /**
+   * Возвращает compiled Simulation artifact по id или identity.
+   */
   public getSimulationArtifact(
     idOrIdentity: string | number,
   ): ProgramArtifact<SimulationSourceArtifact> | null {
@@ -417,21 +447,27 @@ export class EndgeProgram_Module extends EndgeModule {
     )
   }
 
-  /** Возвращает compiled Update artifact по id или identity. */
+  /**
+   * Возвращает compiled Update artifact по id или identity.
+   */
   public getUpdateArtifact(
     idOrIdentity: string | number,
   ): ProgramArtifact<UpdateSourceArtifact> | null {
     return this.getArtifact<UpdateSourceArtifact>('update', idOrIdentity)
   }
 
-  /** Возвращает compiled Filter artifact по id или identity. */
+  /**
+   * Возвращает compiled Filter artifact по id или identity.
+   */
   public getFilterArtifact(
     idOrIdentity: string | number,
   ): ProgramArtifact<FilterProgramPayload> | null {
     return this.getArtifact<FilterProgramPayload>('filter', idOrIdentity)
   }
 
-  /** Возвращает compiled Composition artifact по id или identity. */
+  /**
+   * Возвращает compiled Composition artifact по id или identity.
+   */
   public getCompositionArtifact(
     idOrIdentity: string | number,
   ): ProgramArtifact<CompositionProgramPayload> | null {
@@ -441,21 +477,27 @@ export class EndgeProgram_Module extends EndgeModule {
     )
   }
 
-  /** Возвращает скомпилированный документ EndgeCSS по сохранённому id или identity. */
+  /**
+   * Возвращает скомпилированный документ EndgeCSS по сохранённому id или identity.
+   */
   public getStyleArtifact(
     idOrIdentity: string | number,
   ): ProgramArtifact<EndgeStyleProgramPayload> | null {
     return this.getArtifact<EndgeStyleProgramPayload>('style', idOrIdentity)
   }
 
-  /** Возвращает один артефакт Type, принадлежащий компилятору. */
+  /**
+   * Возвращает один артефакт Type, принадлежащий компилятору.
+   */
   public getTypeArtifact(
     idOrIdentity: string | number,
   ): ProgramArtifact<TypeProgramPayload> | null {
     return this.getArtifact<TypeProgramPayload>('type', idOrIdentity)
   }
 
-  /** Стабильный каталог для редактора, полученный только из скомпилированных артефактов Type. */
+  /**
+   * Стабильный каталог для редактора, полученный только из скомпилированных артефактов Type.
+   */
   public getTypeCatalog(): TypeProgramCatalogEntry[] {
     return this.getArtifacts()
       .filter(
@@ -534,12 +576,16 @@ export class EndgeProgram_Module extends EndgeModule {
     this.clear()
   }
 
-  /** Включает summary compiled program в диагностическое дерево Module. */
+  /**
+   * Включает summary compiled program в диагностическое дерево Module.
+   */
   public override createDiagnosticsSnapshot(): EndgeProgramSnapshot {
     return this.snapshot()
   }
 
-  /** Формирует summary snapshot для диагностики compiled program. */
+  /**
+   * Формирует summary snapshot для диагностики compiled program.
+   */
   public snapshot(): EndgeProgramSnapshot {
     const artifacts = this.getArtifacts()
     const byStatus: Record<ProgramArtifactStatus, number> = {

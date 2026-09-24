@@ -11,7 +11,7 @@ export interface ConfigurationValueResult {
   diagnostics: DiagnosticDraft[]
 }
 
-/** Проверяет одно сохранённое значение или default по фактическому Type Registry. */
+// Проверяет одно сохранённое значение или default по фактическому Type Registry.
 export function validateConfigurationValue(
   expression: TypeSourceExpression,
   value: unknown,
@@ -22,7 +22,7 @@ export function validateConfigurationValue(
   return { ok: diagnostics.length === 0, diagnostics }
 }
 
-/** Выводит детерминированный JSON default либо возвращает null, когда требуется явный ввод автора. */
+// Выводит детерминированный JSON default либо возвращает null, когда требуется явный ввод автора.
 export function inferConfigurationDefault(
   expression: TypeSourceExpression,
   catalog: readonly TypeProgramCatalogEntry[],

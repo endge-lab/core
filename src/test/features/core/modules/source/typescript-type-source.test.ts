@@ -6,7 +6,7 @@ import { analyzeTypeScriptTypeDeclarations } from '@/features/core/modules/sourc
 describe('извлечение Source типов TypeScript', () => {
   it('преобразует безопасный interface в канонические данные Type Source', () => {
     const [result] = analyzeTypeScriptTypeDeclarations(`interface FlightRow {
-  /** Stable flight identity. */
+  // Stable flight identity.
   id: string
   delayed?: boolean
   tags: string[]

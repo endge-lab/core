@@ -6,11 +6,15 @@ import { GraphQLError, Kind, parse } from 'graphql'
 
 import { serializeTypeSourceDocument } from '@/features/core/modules/source/services/type-source-serialize'
 
-/** Преобразует GraphQL SDL в черновики Type Source без изменения Domain. */
+/**
+ * Преобразует GraphQL SDL в черновики Type Source без изменения Domain.
+ */
 export class GraphQLDocumentImportParser implements DocumentImportParser {
   public readonly format = 'graphql' as const
 
-  /** Возвращает поддержанные object/enum types и нормализует scalar aliases. */
+  /**
+   * Возвращает поддержанные object/enum types и нормализует scalar aliases.
+   */
   public parse(source: string): DocumentImportParserResult {
     try {
       const document = parse(source)

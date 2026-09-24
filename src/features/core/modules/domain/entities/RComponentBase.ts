@@ -24,7 +24,7 @@ export class RComponentBase extends REntity {
   @TypeRecord(RField)
   inputFields: Record<string, RField> = {}
 
-  /** Сохранённый legacy source настройки. Он хранится только для просмотра. */
+  // Сохранённый legacy source настройки. Он хранится только для просмотра.
   @Expose()
   setupScript: string = ''
 }

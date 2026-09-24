@@ -1,4 +1,4 @@
-/** Типы документа навигации из Payload (коллекция navigations). */
+// Типы документа навигации из Payload (коллекция navigations).
 import type { EntityManagement } from './entity-management.type'
 
 interface NavigationTreeNodeBaseDoc {
@@ -27,13 +27,13 @@ export interface NavigationLinkNodeDoc extends NavigationTreeNodeBaseDoc {
   type: 'link'
 }
 
-/** Узел полного дерева навигации. */
+// Узел полного дерева навигации.
 export type NavigationTreeNodeDoc
   = | NavigationSectionNodeDoc
     | NavigationGroupNodeDoc
     | NavigationLinkNodeDoc
 
-/** Документ навигации из Payload. */
+// Документ навигации из Payload.
 export interface NavigationDoc extends EntityManagement {
   id: number | string
   identity: string

@@ -1,13 +1,15 @@
 import type { StreamRuntimeHost } from '@/features/core/modules/runtime/hosts/StreamRuntimeHost'
 import type { StreamSourceArtifact } from '@/features/core/modules/source/domain/types/stream-source.types'
-import { Raph } from '@endge/raph'
+import { Raph } from '@raphy-js/raph'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Endge } from '@/features/core/kernel/endge'
 import { RStream } from '@/features/core/modules/domain/entities/RStream'
 import { BrowserWebSocketStreamTransportFactory } from '@/features/core/modules/runtime/services/transports/BrowserWebSocketStreamTransportFactory'
 import { compileStreamSource } from '@/features/core/modules/source/services/compilers/stream-source-compile'
 
-/** Управляемый socket без сети: имитирует browser events, включая поздние callbacks. */
+/**
+ * Управляемый socket без сети: имитирует browser events, включая поздние callbacks.
+ */
 class TestWebSocket extends EventTarget {
   static instances: TestWebSocket[] = []
   send = vi.fn()
@@ -32,7 +34,7 @@ function compile(event = 'event({ match: { channel: \'ticker\' }, eachFrom: \'da
   })`).artifact!
 }
 
-/** Создаёт runtime через штатную strategy и публичный registry. */
+// Создаёт runtime через штатную strategy и публичный registry.
 function start(payload = compile()): StreamRuntimeHost {
   const model = Object.assign(new RStream(), { id: 9901, identity: 'websocket-quotes', name: 'Котировки' })
   Endge.domain.addStream(model)
@@ -69,7 +71,7 @@ describe('транспорт WebSocket и lifecycle Stream', () => {
     vi.useRealTimers()
   })
 
-  /** Реальное состояние host зависит только от подходящих сообщений, а не heartbeat. */
+  // Реальное состояние host зависит только от подходящих сообщений, а не heartbeat.
   it('разрешает env, отправляет подписку и разбирает массив ticker', () => {
     const host = start()
     const received = vi.fn()
@@ -92,7 +94,7 @@ describe('транспорт WebSocket и lifecycle Stream', () => {
     expect(host.context.receivedCount).toBe(2)
   })
 
-  /** Потерянное соединение восстанавливает ту же подписку; старый socket не публикует данные. */
+  // Потерянное соединение восстанавливает ту же подписку; старый socket не публикует данные.
   it('переподключается с повторным onOpen и отменяет reconnect при остановке', async () => {
     const host = start()
     const received = vi.fn()
@@ -116,7 +118,7 @@ describe('транспорт WebSocket и lifecycle Stream', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
-  /** Пауза, mock и destroy не оставляют действующих соединений или таймеров. */
+  // Пауза, mock и destroy не оставляют действующих соединений или таймеров.
   it('закрывает socket на паузе и mock, возобновляет и освобождает при destroy', async () => {
     const host = start()
     const first = TestWebSocket.instances[0]
@@ -141,7 +143,7 @@ describe('транспорт WebSocket и lifecycle Stream', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
-  /** Ошибка одного сообщения диагностируется и не блокирует последующие корректные данные. */
+  // Ошибка одного сообщения диагностируется и не блокирует последующие корректные данные.
   it('диагностирует неверный JSON, binary и eachFrom без массива', () => {
     const host = start()
     const transportErrors = vi.fn()
@@ -161,7 +163,7 @@ describe('транспорт WebSocket и lifecycle Stream', () => {
     expect(host.context.receivedCount).toBe(1)
   })
 
-  /** Пути typeFrom/payloadFrom разрешаются внутри элемента, а match — на envelope. */
+  // Пути typeFrom/payloadFrom разрешаются внутри элемента, а match — на envelope.
   it('читает dot-path фильтра и относительные пути каждого элемента', () => {
     const host = start(compile('event({ match: { \'meta.channel\': \'ticker\' }, eachFrom: \'data\', typeFrom: \'kind\', payloadFrom: \'quote\' })'))
     const received = vi.fn()
@@ -170,7 +172,7 @@ describe('транспорт WebSocket и lifecycle Stream', () => {
     expect(received).toHaveBeenCalledWith(expect.objectContaining({ type: 'changed', payload: { last: 12 } }))
   })
 
-  /** Если consumer остановил host, оставшаяся часть сообщения не должна менять Store. */
+  // Если consumer остановил host, оставшаяся часть сообщения не должна менять Store.
   it('останавливает разбор массива при синхронной паузе из consumer', () => {
     const host = start()
     const received = vi.fn(() => {
@@ -181,7 +183,7 @@ describe('транспорт WebSocket и lifecycle Stream', () => {
     expect(received).toHaveBeenCalledTimes(1)
   })
 
-  /** Ошибочная схема URL отклоняется до создания соединения. */
+  // Ошибочная схема URL отклоняется до создания соединения.
   it('отклоняет HTTP URL до открытия WebSocket', () => {
     const payload = compile()
     payload.transport.url = 'https://example.test/quotes'

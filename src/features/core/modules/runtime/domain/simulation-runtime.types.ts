@@ -3,7 +3,7 @@ import type { StreamTransportConnection, StreamTransportFactory } from '@/featur
 import type { SimulationRuntimeHost } from '@/features/core/modules/runtime/hosts/SimulationRuntimeHost'
 import type { SimulationMockStream } from '@/features/core/modules/source/domain/types/simulation-source.types'
 
-/** Host adapter выполняет только transport; schema compilation/PRNG принадлежат сервису. */
+// Host adapter выполняет только transport; schema compilation/PRNG принадлежат сервису.
 export interface SimulationGenerator {
   generate: (schema: Record<string, unknown>, seed: string, signal: AbortSignal) => Promise<unknown>
   openStream: (
@@ -15,11 +15,11 @@ export interface SimulationGenerator {
 
 export interface SimulationMountOptions {
   generator?: SimulationGenerator
-  /** Preview может передать draft artifact без изменения общей Program. */
+  // Preview может передать draft artifact без изменения общей Program.
   artifactReader?: RuntimeArtifactReader
-  /** Принудительный МОК поверхности запуска имеет приоритет над Simulation dataMode. */
+  // Принудительный МОК поверхности запуска имеет приоритет над Simulation dataMode.
   forceMock?: boolean
-  /** Явные входы target; Core не подставляет preview fixtures самостоятельно. */
+  // Явные входы target; Core не подставляет preview fixtures самостоятельно.
   props?: Record<string, unknown>
 }
 

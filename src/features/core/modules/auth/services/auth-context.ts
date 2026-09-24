@@ -1,6 +1,6 @@
 import type { EndgeAuthContext } from '@/features/core/modules/auth/domain/types/auth-profile.types'
 
-/** Минимальные источники, из которых можно построить безопасный auth context. */
+// Минимальные источники, из которых можно построить безопасный auth context.
 export interface EndgeAuthContextSource {
   authenticated: boolean
   accessToken?: string
@@ -10,7 +10,7 @@ export interface EndgeAuthContextSource {
   userInfo?: unknown
 }
 
-/** Декодирует только JWT payload; результат не используется для authorization decisions. */
+// Декодирует только JWT payload; результат не используется для authorization decisions.
 export function decodeJwtClaims(token: string | null | undefined): Record<string, unknown> | null {
   const payload = String(token ?? '').split('.')[1]
   if (!payload) {
@@ -30,7 +30,7 @@ export function decodeJwtClaims(token: string | null | undefined): Record<string
   }
 }
 
-/** Строит минимальный actor/session snapshot без сохранения tokens или полного claims. */
+// Строит минимальный actor/session snapshot без сохранения tokens или полного claims.
 export function createEndgeAuthContext(source: EndgeAuthContextSource): EndgeAuthContext {
   if (!source.authenticated) {
     return { authenticated: false }
@@ -57,7 +57,7 @@ export function createEndgeAuthContext(source: EndgeAuthContextSource): EndgeAut
   }
 }
 
-/** Возвращает первую непустую строку из списка claim candidates. */
+// Возвращает первую непустую строку из списка claim candidates.
 function firstText(...values: unknown[]): string | undefined {
   for (const value of values) {
     const normalized = typeof value === 'string' ? value.trim() : ''
@@ -68,7 +68,7 @@ function firstText(...values: unknown[]): string | undefined {
   return undefined
 }
 
-/** Проверяет plain object перед чтением claims. */
+// Проверяет plain object перед чтением claims.
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === 'object' && !Array.isArray(value)
 }

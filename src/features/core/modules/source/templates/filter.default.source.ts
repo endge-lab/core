@@ -1,4 +1,4 @@
-/** Базовый source нового Filter v1. */
+// Базовый source нового Filter v1.
 export const FILTER_DEFAULT_SOURCE = `defineFilter({
   fields: {
     search: field('String')

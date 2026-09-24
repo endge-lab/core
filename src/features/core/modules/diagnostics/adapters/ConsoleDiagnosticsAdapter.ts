@@ -19,7 +19,9 @@ function boundedConsoleText(value: string): string {
     : `${value.slice(0, MAX_CONSOLE_TEXT_LENGTH)}… [truncated ${value.length - MAX_CONSOLE_TEXT_LENGTH} chars]`
 }
 
-/** Системный adapter вывода diagnostics records и snapshots в console API. */
+/**
+ * Системный adapter вывода diagnostics records и snapshots в console API.
+ */
 export class ConsoleDiagnosticsAdapter implements DiagnosticsAdapter {
   public readonly id: string
   private readonly _name: string
@@ -29,7 +31,9 @@ export class ConsoleDiagnosticsAdapter implements DiagnosticsAdapter {
   private readonly _includeScope: boolean
   private readonly _includeAttributes: boolean
 
-  /** Создаёт console adapter из JSON-safe output options. */
+  /**
+   * Создаёт console adapter из JSON-safe output options.
+   */
   public constructor(output: EndgeDiagnosticsOutputConfiguration) {
     this.id = output.id
     this._name = output.name
@@ -40,7 +44,9 @@ export class ConsoleDiagnosticsAdapter implements DiagnosticsAdapter {
     this._includeAttributes = output.options.includeAttributes !== false
   }
 
-  /** Выводит одну routed record в pretty или JSON формате. */
+  /**
+   * Выводит одну routed record в pretty или JSON формате.
+   */
   public acceptRecord(record: DiagnosticsRecord, context: DiagnosticsAdapterRecordContext): void {
     if (this._format === 'json') {
       console.log(JSON.stringify({
@@ -72,7 +78,9 @@ export class ConsoleDiagnosticsAdapter implements DiagnosticsAdapter {
     }
   }
 
-  /** Выводит bounded summary снимка, не сериализуя telemetry history целиком. */
+  /**
+   * Выводит bounded summary снимка, не сериализуя telemetry history целиком.
+   */
   public acceptSnapshot(snapshot: DiagnosticsSnapshot, context: DiagnosticsAdapterSnapshotContext): void {
     console.log(JSON.stringify({
       outputId: context.output.id,
@@ -84,12 +92,16 @@ export class ConsoleDiagnosticsAdapter implements DiagnosticsAdapter {
     }))
   }
 
-  /** Пишет безопасную тестовую строку без добавления record в diagnostics history. */
+  /**
+   * Пишет безопасную тестовую строку без добавления record в diagnostics history.
+   */
   public test(): void {
     console.info(`[Endge diagnostics] Канал «${this._name}» доступен`)
   }
 
-  /** Формирует компактное сообщение и optional structured details. */
+  /**
+   * Формирует компактное сообщение и optional structured details.
+   */
   private _formatRecord(record: DiagnosticsRecord): { message: string, details?: string } {
     const prefix: string[] = []
     if (this._includeTimestamp) {
@@ -113,7 +125,9 @@ export class ConsoleDiagnosticsAdapter implements DiagnosticsAdapter {
     return { message: `[${prefix.join(' · ')}] ${text}`, ...(details ? { details } : {}) }
   }
 
-  /** Выбирает подходящий console method по severity или span status. */
+  /**
+   * Выбирает подходящий console method по severity или span status.
+   */
   private _writeRecord(record: DiagnosticsRecord, message: string, details?: string): void {
     const text = details ? `${message} ${details}` : message
     if (record.signal === 'span') {
@@ -134,7 +148,7 @@ export class ConsoleDiagnosticsAdapter implements DiagnosticsAdapter {
   }
 }
 
-/** Factory системного console adapter. */
+// Factory системного console adapter.
 export const CONSOLE_DIAGNOSTICS_ADAPTER_FACTORY: DiagnosticsAdapterFactory = {
   type: 'console',
   capabilities: {

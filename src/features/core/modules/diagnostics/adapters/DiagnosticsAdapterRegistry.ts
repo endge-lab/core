@@ -5,12 +5,16 @@ import type {
 } from '@/features/core/modules/diagnostics/domain/types/diagnostics-adapter.type'
 import type { EndgeDiagnosticsOutputConfiguration } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
 
-/** Реестр расширяемых типов diagnostics adapters. */
+/**
+ * Реестр расширяемых типов diagnostics adapters.
+ */
 export class DiagnosticsAdapterRegistry {
   private readonly _factories = new Map<string, DiagnosticsAdapterFactory>()
   private readonly _listeners = new Set<() => void>()
 
-  /** Регистрирует factory по стабильному adapter type и возвращает функцию удаления. */
+  /**
+   * Регистрирует factory по стабильному adapter type и возвращает функцию удаления.
+   */
   public register(factory: DiagnosticsAdapterFactory): () => void {
     const type = String(factory.type ?? '').trim()
     if (!type) {
@@ -31,17 +35,23 @@ export class DiagnosticsAdapterRegistry {
     }
   }
 
-  /** Возвращает factory зарегистрированного adapter type. */
+  /**
+   * Возвращает factory зарегистрированного adapter type.
+   */
   public get(type: string): DiagnosticsAdapterFactory | undefined {
     return this._factories.get(String(type ?? '').trim())
   }
 
-  /** Возвращает список зарегистрированных adapter types. */
+  /**
+   * Возвращает список зарегистрированных adapter types.
+   */
   public list(): readonly DiagnosticsAdapterFactory[] {
     return [...this._factories.values()]
   }
 
-  /** Создаёт runtime adapter для одного output или возвращает null для неизвестного type. */
+  /**
+   * Создаёт runtime adapter для одного output или возвращает null для неизвестного type.
+   */
   public create(
     output: EndgeDiagnosticsOutputConfiguration,
     context: DiagnosticsAdapterCreateContext,
@@ -49,13 +59,17 @@ export class DiagnosticsAdapterRegistry {
     return this.get(output.adapterType)?.create(output, context) ?? null
   }
 
-  /** Подписывает listener на изменения состава factories. */
+  /**
+   * Подписывает listener на изменения состава factories.
+   */
   public subscribe(listener: () => void): () => void {
     this._listeners.add(listener)
     return () => this._listeners.delete(listener)
   }
 
-  /** Уведомляет владельца runtime adapters о необходимости пересборки. */
+  /**
+   * Уведомляет владельца runtime adapters о необходимости пересборки.
+   */
   private _notify(): void {
     for (const listener of this._listeners) {
       listener()

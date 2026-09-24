@@ -7,7 +7,7 @@ export type ComponentSFCPortRole = 'require' | 'provides' | 'emits'
 export type ComponentSFCPortKind = 'computation' | 'component' | 'action' | 'query' | 'event'
 export type ComponentSFCRequiredPortKind = Exclude<ComponentSFCPortKind, 'event'>
 
-/** Публичный дочерний порт, выбранный правилом `definePorts.forward` при компиляции. */
+// Публичный дочерний порт, выбранный правилом `definePorts.forward` при компиляции.
 export interface ComponentSFCPortForwardOrigin {
   nodeId: string
   ref?: string
@@ -16,7 +16,7 @@ export interface ComponentSFCPortForwardOrigin {
   portName: string
 }
 
-/** Нормализованный селектор одного направления порта внутри правила forward. */
+// Нормализованный селектор одного направления порта внутри правила forward.
 export interface ComponentSFCPortForwardSelector {
   include: '*' | string[]
   exclude: string[]
@@ -24,7 +24,7 @@ export interface ComponentSFCPortForwardSelector {
   namespace?: 'none' | 'ref' | string
 }
 
-/** Правило перенаправления времени компиляции, сохранённое в артефакте Component SFC. */
+// Правило перенаправления времени компиляции, сохранённое в артефакте Component SFC.
 export interface ComponentSFCPortForwardRule {
   from: '*' | string[]
   ports: Partial<Record<ComponentSFCPortRole, ComponentSFCPortForwardSelector>>
@@ -32,7 +32,7 @@ export interface ComponentSFCPortForwardRule {
   sourceRange?: RComponentSFC_SourceRange
 }
 
-/** Описатель провайдера по умолчанию, предоставляемый границей сборки домена. */
+// Описатель провайдера по умолчанию, предоставляемый границей сборки домена.
 export type ComponentSFCPortProviderDescriptor
   = | {
     kind: 'computation'
@@ -62,7 +62,7 @@ export type ComponentSFCPortProviderDescriptor
     outputs: RComponentContractInput[]
   }
 
-/** Порт Computation, объявленный через `computation<Input, Output>`. */
+// Порт Computation, объявленный через `computation<Input, Output>`.
 export interface ComponentSFCComputationPort {
   kind: 'computation'
   name: string
@@ -73,7 +73,7 @@ export interface ComponentSFCComputationPort {
   sourceRange?: RComponentSFC_SourceRange
 }
 
-/** Порт Component, объявленный через `component<Props>`. */
+// Порт Component, объявленный через `component<Props>`.
 export interface ComponentSFCComponentPort {
   kind: 'component'
   name: string
@@ -85,7 +85,7 @@ export interface ComponentSFCComponentPort {
   sourceRange?: RComponentSFC_SourceRange
 }
 
-/** Вызываемый Action, требуемый извне или предоставляемый этим компонентом. */
+// Вызываемый Action, требуемый извне или предоставляемый этим компонентом.
 export interface ComponentSFCActionPort {
   kind: 'action'
   role: 'require' | 'provides'
@@ -97,7 +97,7 @@ export interface ComponentSFCActionPort {
   sourceRange?: RComponentSFC_SourceRange
 }
 
-/** Вызываемый Query, требуемый компонентом. */
+// Вызываемый Query, требуемый компонентом.
 export interface ComponentSFCQueryPort {
   kind: 'query'
   name: string
@@ -110,7 +110,7 @@ export interface ComponentSFCQueryPort {
   sourceRange?: RComponentSFC_SourceRange
 }
 
-/** Одно статическое переопределение провайдера для вызова смонтированного дочернего Component SFC. */
+// Одно статическое переопределение провайдера для вызова смонтированного дочернего Component SFC.
 export interface ComponentSFCRequiredPortBinding {
   port: string
   kind: ComponentSFCRequiredPortKind
@@ -118,29 +118,29 @@ export interface ComponentSFCRequiredPortBinding {
   sourceRange?: RComponentSFC_SourceRange
 }
 
-/** Многоадресное уведомление, создаваемое этим компонентом. */
+// Многоадресное уведомление, создаваемое этим компонентом.
 export interface ComponentSFCEventPort {
   kind: 'event'
   role: 'emits'
   name: string
-  /** Читаемая человеком метка каталога. Идентичность по-прежнему основана на `name`. */
+  // Читаемая человеком метка каталога. Идентичность по-прежнему основана на `name`.
   displayName?: string
   payloadType: string
-  /** Необязательный локальный producer, Event которого повторно публикует этот компонент. */
+  // Необязательный локальный producer, Event которого повторно публикует этот компонент.
   from?: ComponentSFCEventSource
-  /** Необязательная реакция, выполняемая после публикации возникновения Event. */
+  // Необязательная реакция, выполняемая после публикации возникновения Event.
   action?: ComponentSFCEventAction
   forwardedFrom?: ComponentSFCPortForwardOrigin
   sourceRange?: RComponentSFC_SourceRange
 }
 
-/** Литеральная ссылка на дочерний Event для `event({ from })`. */
+// Литеральная ссылка на дочерний Event для `event({ from })`.
 export interface ComponentSFCEventSource {
   ref: string
   event: string
 }
 
-/** Безопасное нейтральное к renderer выражение, сопоставленное со входом реакции Event. */
+// Безопасное нейтральное к renderer выражение, сопоставленное со входом реакции Event.
 export type ComponentSFCEventInputValue
   = | { kind: 'event', path: string | null }
     | { kind: 'operation-input', path: string | null }
@@ -156,31 +156,31 @@ export interface ComponentSFCEventInputEntry {
   value: ComponentSFCEventInputValue
 }
 
-/** Один Action, выбранный непосредственно в Source Component SFC. */
+// Один Action, выбранный непосредственно в Source Component SFC.
 export interface ComponentSFCEventDirectAction {
   kind: 'action'
   identity: string
   input?: ComponentSFCEventInputValue
 }
 
-/** Один Query, выбранный непосредственно в Source Component SFC. */
+// Один Query, выбранный непосредственно в Source Component SFC.
 export interface ComponentSFCEventDirectQuery {
   kind: 'query'
   identity: string
   input?: ComponentSFCEventInputValue
 }
 
-/** Изолированная реакция TypeScript. Её результатом является проверенный список эффектов. */
+// Изолированная реакция TypeScript. Её результатом является проверенный список эффектов.
 export interface ComponentSFCEventTypescriptAction {
   kind: 'typescript'
   inputs: Record<string, { kind: 'event', path: string | null }>
-  /** Исходное выражение `typescript({...})` для двусторонней проекции Source и редактора. */
+  // Исходное выражение `typescript({...})` для двусторонней проекции Source и редактора.
   definitionSource?: string
   source: string
   emittedEvents: string[]
 }
 
-/** Безопасный локальный emit из template reaction. */
+// Безопасный локальный emit из template reaction.
 export interface ComponentSFCEventEmitAction {
   kind: 'emit'
   event: string
@@ -197,7 +197,7 @@ export interface ComponentSFCEventOperationBlock {
   output: string | null
 }
 
-/** Inline-алгоритм с отменой, скомпилированный из одной реакции Component SFC. */
+// Inline-алгоритм с отменой, скомпилированный из одной реакции Component SFC.
 export interface ComponentSFCEventOperationAction {
   kind: 'operation'
   input?: ComponentSFCEventInputValue
@@ -206,7 +206,7 @@ export interface ComponentSFCEventOperationAction {
   redo: ComponentSFCEventOperationBlock | null
 }
 
-/** Вызывает один обязательный исполняемый порт через фактический провайдер экземпляра. */
+// Вызывает один обязательный исполняемый порт через фактический провайдер экземпляра.
 export interface ComponentSFCEventRequiredPortAction {
   kind: 'required-port'
   portKind: 'action' | 'query'
@@ -256,7 +256,7 @@ export interface ComponentSFCEmittedPorts {
   events: ComponentSFCEventPort[]
 }
 
-/** Типизированный манифест портов в скомпилированном артефакте ComponentSFC. */
+// Типизированный манифест портов в скомпилированном артефакте ComponentSFC.
 export interface ComponentSFCPortManifest {
   require: ComponentSFCRequiredPorts
   provides: ComponentSFCProvidedPorts
@@ -266,7 +266,7 @@ export interface ComponentSFCPortManifest {
   }
 }
 
-/** Одно локальное значение верхнего уровня, инициализированное вызовом порта computation. */
+// Одно локальное значение верхнего уровня, инициализированное вызовом порта computation.
 export interface RComponentSFC_IR_PortCall {
   kind: 'computation'
   local: string
@@ -276,7 +276,7 @@ export interface RComponentSFC_IR_PortCall {
   sourceRange?: RComponentSFC_SourceRange
 }
 
-/** Маркер вложенного узла Component IR, созданного из локального порта компонента. */
+// Маркер вложенного узла Component IR, созданного из локального порта компонента.
 export interface RComponentSFC_IR_ComponentPortMarker {
   kind: 'component'
   port: string

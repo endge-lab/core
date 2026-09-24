@@ -1,3 +1,4 @@
+import type { RaphRuntime } from '@raphy-js/raph'
 import type { EndgeBootContext } from '@/features/core/kernel/types/bootstrap.types'
 import type { EndgeCoreEventMap } from '@/features/core/modules/events/domain/events.types'
 import type { RuntimeEntityType } from '@/features/core/modules/runtime/domain/runtime-entity-map.types'
@@ -7,12 +8,12 @@ import type { RuntimeControlOperation, RuntimeControlTarget, RuntimeInspectionSn
 import type { RuntimeRenderInspection } from '@/features/core/modules/runtime/domain/runtime-render-inspection.types'
 import type { AnyRuntimeHost, AnyRuntimeStrategy } from '@/features/core/modules/runtime/domain/runtime-strategy.types'
 import type { EndgeRuntimeRaphSnapshot, EndgeRuntimeSnapshot, RuntimeExecutableModel } from '@/features/core/modules/runtime/domain/runtime.types'
+
 import type { RuntimeAppScopeOptions } from '@/features/core/modules/runtime/RuntimeAppScope'
 
 import type { CompositionProgramPayload } from '@/features/core/modules/source/domain/types/composition-source.types'
-
 import type { EndgeDataMode } from '@/features/core/modules/workspace/domain/workspace.types'
-import { Raph, RaphNode } from '@endge/raph'
+import { Raph, RaphNode } from '@raphy-js/raph'
 import { STORAGE_VARS_KEY } from '@/features/core/kernel/config/kernel.config'
 import { Endge } from '@/features/core/kernel/endge'
 import { serializeDiagnosticsJson } from '@/features/core/modules/diagnostics/domain/diagnostics-snapshot'
@@ -41,7 +42,9 @@ import { StreamRuntimeStrategy } from '@/features/core/modules/runtime/services/
 import { emptyRuntimeInspection, readRuntimeControlTarget, readRuntimeInspectionSnapshot, readRuntimeRenderInspection } from '@/features/core/modules/runtime/tools/runtime-inspection'
 import { EndgeModule } from '@/features/federation/EndgeModule'
 
-/** Модуль создания, регистрации и уничтожения runtime hosts и app scopes. */
+/**
+ * Модуль создания, регистрации и уничтожения runtime hosts и app scopes.
+ */
 export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
   public readonly query = new EndgeQuery()
   public readonly dataView = new EndgeDataView()
@@ -74,6 +77,7 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
   private _hosts = new RuntimeHostRegistry()
   private _strategies = new RuntimeStrategyRegistry()
   private _inited = false
+  private _phaseRuntime: RaphRuntime | null = null
   private _appNode: RaphNode | null = null
   private _scopeNodes = new Map<string, RaphNode>()
   private _appScopes = new Map<string, RuntimeAppScope>()
@@ -86,7 +90,9 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
   private _generation = 0
   private _executions = new Map<string, Promise<unknown>>()
 
-  /** Сохраняет только ограниченные лёгкие описатели для явного inspector. */
+  /**
+   * Сохраняет только ограниченные лёгкие описатели для явного inspector.
+   */
   public acquireDestroyedHostSnapshots(limit: number): RuntimeInspectionLease {
     const token = Symbol('destroyed-runtime-host-snapshots')
     this._destroyedSnapshotLeases.set(token, normalizeInspectionLimit(limit))
@@ -104,7 +110,9 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Создаёт default app scope и регистрирует runtime strategies. */
+  /**
+   * Создаёт default app scope и регистрирует runtime strategies.
+   */
   public constructor() {
     super()
     this._defaultAppScope = this._createAppScope({
@@ -116,7 +124,9 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     this._registerDefaultStrategies()
   }
 
-  /** Уведомляет consumers об изменении реестра без передачи runtime data. */
+  /**
+   * Уведомляет consumers об изменении реестра без передачи runtime data.
+   */
   public override notify(): void {
     super.notify()
     Endge.events.emitEvent('runtime:registry-changed', {})
@@ -138,12 +148,16 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
       return
     }
     this._inited = true
-    this._appNode = new RaphNode(Raph.runtime, {
+    const runtime = Raph.runtime
+    if (this._phaseRuntime !== runtime) {
+      runtime.addPhase(RuntimeNodeUpdatePhase.make())
+      runtime.addPhase(RuntimeBoundaryUpdatePhase.make())
+      this._phaseRuntime = runtime
+    }
+    this._appNode = new RaphNode(runtime, {
       id: '__endge.runtime.app',
       meta: { type: 'runtime-scope', kind: 'app' },
     })
-    Raph.addPhase(RuntimeNodeUpdatePhase.make())
-    Raph.addPhase(RuntimeBoundaryUpdatePhase.make())
     this._syncWorkspaceVariablesToRaph()
     this._unsubscribeWorkspace = Endge.workspace.subscribe(() => {
       this._syncWorkspaceVariablesToRaph()
@@ -244,7 +258,9 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     return host
   }
 
-  /** Awaits teardown before reusing a root address; serializes competing replacements. */
+  /**
+   * Awaits teardown before reusing a root address; serializes competing replacements.
+   */
   public async executeAsync(
     model: RuntimeExecutableModel,
     options: RuntimeExecuteOptions = {},
@@ -298,7 +314,9 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Разрешает data mode по ближайшему Composition override с fallback на общий Endge context. */
+  /**
+   * Разрешает data mode по ближайшему Composition override с fallback на общий Endge context.
+   */
   public resolveDataMode(host: RuntimeHost<any, any> | null | undefined): EndgeDataMode {
     const simulation = findSimulationRuntime(host)
     if (simulation?.forceMock) {
@@ -321,7 +339,9 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     return Endge.context.dataMode
   }
 
-  /** Монтирует единственную startup Composition текущего Workspace без legacy fallback. */
+  /**
+   * Монтирует единственную startup Composition текущего Workspace без legacy fallback.
+   */
   public mountStartup(options: Parameters<EndgeComposition['mount']>[1] = {}) {
     const identity = Endge.workspace.current.startupCompositionIdentity
     if (!identity) {
@@ -337,7 +357,9 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     this._strategies.register(strategy)
   }
 
-  /** Создаёт или возвращает именованный root runtime scope приложения. */
+  /**
+   * Создаёт или возвращает именованный root runtime scope приложения.
+   */
   public createAppScope(options: RuntimeAppScopeOptions): RuntimeAppScope {
     Endge.assertWritable()
     return this._createAppScope(options)
@@ -355,17 +377,23 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     return scope
   }
 
-  /** Возвращает lifecycle scope, которому принадлежит RuntimeHost. */
+  /**
+   * Возвращает lifecycle scope, которому принадлежит RuntimeHost.
+   */
   public getRuntimeScopeByHost(runtimeId: string): RuntimeScope | null {
     return this.scopes.getByRuntime(runtimeId)
   }
 
-  /** Возвращает корневой scope обычного запуска приложения. */
+  /**
+   * Возвращает корневой scope обычного запуска приложения.
+   */
   public getDefaultAppScope(): RuntimeAppScope {
     return this._defaultAppScope
   }
 
-  /** Возвращает зарегистрированный AppScope. */
+  /**
+   * Возвращает зарегистрированный AppScope.
+   */
   public getAppScope(id: string): RuntimeAppScope | null {
     return this._appScopes.get(String(id ?? '').trim()) ?? null
   }
@@ -408,7 +436,9 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     })
   }
 
-  /** Регистрирует host, созданный владельцем составной runtime-сущности. */
+  /**
+   * Регистрирует host, созданный владельцем составной runtime-сущности.
+   */
   public registerRuntimeHost(host: AnyRuntimeHost): boolean {
     Endge.assertWritable()
     if (this._inspectionMode) {
@@ -461,7 +491,9 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
       : hosts
   }
 
-  /** Включает hosts, scopes и operation histories в диагностическое дерево Module. */
+  /**
+   * Включает hosts, scopes и operation histories в диагностическое дерево Module.
+   */
   public override createDiagnosticsSnapshot(): EndgeRuntimeSnapshot & { operations: unknown } {
     return {
       ...this.snapshot(),
@@ -469,7 +501,9 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Возвращает общий snapshot runtime-состояния. */
+  /**
+   * Возвращает общий snapshot runtime-состояния.
+   */
   public snapshot(): EndgeRuntimeSnapshot {
     if (this._inspectionMode) {
       return this._inspection.runtime
@@ -481,7 +515,9 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Формирует принадлежащую runtime-модулю диагностическую проекцию Raph. */
+  /**
+   * Формирует принадлежащую runtime-модулю диагностическую проекцию Raph.
+   */
   public snapshotRaph(options: { includeData: boolean, includeGraph: boolean }): EndgeRuntimeRaphSnapshot {
     if (this._inspectionMode) {
       return options.includeData ? { data: this._inspection.data, render: this._inspection.render } : {}
@@ -519,7 +555,9 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     return result
   }
 
-  /** JSON-safe проекция owner-а; Bridge задаёт частоту и набор передаваемых частей. */
+  /**
+   * JSON-safe проекция owner-а; Bridge задаёт частоту и набор передаваемых частей.
+   */
   public captureInspection(includeData = false): RuntimeInspectionSnapshot {
     if (this._inspectionMode) {
       return this._inspection
@@ -531,7 +569,9 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     }).value as unknown as RuntimeInspectionSnapshot
   }
 
-  /** Прямой импорт факта: не создаёт hosts, не пишет Raph и не выполняет Commands. */
+  /**
+   * Прямой импорт факта: не создаёт hosts, не пишет Raph и не выполняет Commands.
+   */
   public applyInspectionSnapshot(value: unknown): void {
     this._requireInspection()
     const snapshot = readRuntimeInspectionSnapshot(value)
@@ -544,14 +584,18 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     super.notify()
   }
 
-  /** Полная замена состояния выбранного момента; отсутствие data не наследует более поздние значения. */
+  /**
+   * Полная замена состояния выбранного момента; отсутствие data не наследует более поздние значения.
+   */
   public replaceInspectionSnapshot(value: unknown): void {
     this._requireInspection()
     this._inspection = readRuntimeInspectionSnapshot(value)
     super.notify()
   }
 
-  /** Событие обновляет только известный экземпляр; новую структуру приносит следующий snapshot. */
+  /**
+   * Событие обновляет только известный экземпляр; новую структуру приносит следующий snapshot.
+   */
   public applyInspectionEvent(change: RuntimeStatusChange): void {
     this._requireInspection()
     const runtime = this._inspection.runtime
@@ -567,7 +611,9 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     super.notify()
   }
 
-  /** Данные остаются снимком для чтения, даже когда локальный Raph уже существует. */
+  /**
+   * Данные остаются снимком для чтения, даже когда локальный Raph уже существует.
+   */
   public applyInspectionData(data: unknown, generatedAt: number, render?: RuntimeRenderInspection): void {
     this._requireInspection()
     if (!Number.isFinite(generatedAt) || generatedAt < 0) {
@@ -580,14 +626,18 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     super.notify()
   }
 
-  /** Ошибка передачи не маскируется под свежий или пустой снимок данных. */
+  /**
+   * Ошибка передачи не маскируется под свежий или пустой снимок данных.
+   */
   public applyInspectionDataError(message: string): void {
     this._requireInspection()
     this._inspection = { ...this._inspection, dataError: message }
     super.notify()
   }
 
-  /** JSON-safe снимок только данных, без пересборки структуры и Raph graph. */
+  /**
+   * JSON-safe снимок только данных, без пересборки структуры и Raph graph.
+   */
   public captureInspectionData(): { data: unknown, render?: RuntimeRenderInspection, generatedAt: number } {
     if (this._inspectionMode) {
       return { data: this._inspection.data, render: this._inspection.render, generatedAt: this._inspection.dataGeneratedAt ?? 0 }
@@ -596,7 +646,9 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     return { data: captured.data, render: captured.render, generatedAt: Date.now() }
   }
 
-  /** Смена debug session удаляет прошлые данные, не затрагивая локальный runtime. */
+  /**
+   * Смена debug session удаляет прошлые данные, не затрагивая локальный runtime.
+   */
   public clearInspection(): void {
     this._inspection = { version: 1, runtime: emptyRuntimeInspection() }
     if (this._inspectionMode) {
@@ -608,7 +660,9 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     return this._inspection
   }
 
-  /** Наблюдение Raph существует только пока у Runtime есть явный consumer. */
+  /**
+   * Наблюдение Raph существует только пока у Runtime есть явный consumer.
+   */
   public acquireDataChanges(): RuntimeInspectionLease {
     if (this._inspectionMode) {
       throw new Error('[Endge Runtime] Cannot observe local Raph in debugger')
@@ -637,7 +691,9 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     } }
   }
 
-  /** Локальная операция над конкретным экземпляром; удалённый вызов идёт через Commands. */
+  /**
+   * Локальная операция над конкретным экземпляром; удалённый вызов идёт через Commands.
+   */
   public async control(operation: RuntimeControlOperation, input: RuntimeControlTarget): Promise<void> {
     Endge.assertWritable()
     if (this._inspectionMode) {
@@ -719,7 +775,9 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     void this.destroyRuntimeTreeAsync(runtimeId).catch(error => console.error('[EndgeRuntime] Tree cleanup failed:', error))
   }
 
-  /** Concurrent callers await the same tree, including every child's async cleanup. */
+  /**
+   * Concurrent callers await the same tree, including every child's async cleanup.
+   */
   public destroyRuntimeTreeAsync(runtimeId: string): Promise<void> {
     const rootId = String(runtimeId ?? '').trim()
     const pending = this._destroyingTrees.get(rootId)
@@ -811,7 +869,6 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     }
     await scopesReset
 
-    await release(() => Raph.clearPhases())
     if (this._appNode) {
       await release(() => this._appNode!.dispose())
     }
@@ -834,7 +891,9 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Проецирует фактические переменные workspace в runtime namespace Raph. */
+  /**
+   * Проецирует фактические переменные workspace в runtime namespace Raph.
+   */
   private _syncWorkspaceVariablesToRaph(): void {
     if (!Endge.workspace.isLoaded) {
       return
@@ -952,7 +1011,9 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Регистрирует host, подключает infrastructure и только затем активирует его. */
+  /**
+   * Регистрирует host, подключает infrastructure и только затем активирует его.
+   */
   private _registerAndActivateHost(host: AnyRuntimeHost, parent: AnyRuntimeHost | null): boolean {
     if (this._hosts.getById(host.id)) {
       console.error(`[EndgeRuntime] Runtime host "${host.id}" is already active.`)
@@ -969,7 +1030,7 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
           parentRuntimeId: parent?.id ?? null,
         },
       })
-      ;(parent?.node ?? this._ensureScopeNode(String(host.meta.appScopeId ?? 'app')))?.addChild(host.node, { invalidate: false })
+      ;(parent?.node ?? this._ensureScopeNode(String(host.meta.appScopeId ?? 'app')))?.addChild(host.node)
     }
     try {
       this._hosts.register(host)
@@ -1001,7 +1062,9 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     return true
   }
 
-  /** Лениво пересоздаёт корень жизненного цикла после полного Endge.reset(). */
+  /**
+   * Лениво пересоздаёт корень жизненного цикла после полного Endge.reset().
+   */
   private _ensureLifecycleAppScope(appScope: RuntimeAppScope): RuntimeScope {
     const id = `runtime-scope:${appScope.id}`
     const existing = this.scopes.get(id)
@@ -1037,7 +1100,9 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     this.registerStrategy(new PageRuntimeStrategy())
   }
 
-  /** Разрешает scope запуска: explicit -> parent -> default app. */
+  /**
+   * Разрешает scope запуска: explicit -> parent -> default app.
+   */
   private _resolveAppScope(rawScope: unknown, parent: AnyRuntimeHost | null): RuntimeAppScope {
     if (rawScope instanceof RuntimeAppScope) {
       return rawScope
@@ -1058,7 +1123,9 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     return this.getAppScope(parentScopeId) ?? this._defaultAppScope
   }
 
-  /** Создаёт Raph graph node для AppScope независимо от data namespace. */
+  /**
+   * Создаёт Raph graph node для AppScope независимо от data namespace.
+   */
   private _ensureScopeNode(scopeId: string): RaphNode | null {
     const scope = this.getAppScope(scopeId) ?? this._defaultAppScope
     const existing = this._scopeNodes.get(scope.id)
@@ -1077,12 +1144,14 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
         rootPath: scope.rootPath,
       },
     })
-    this._appNode.addChild(node, { invalidate: false })
+    this._appNode.addChild(node)
     this._scopeNodes.set(scope.id, node)
     return node
   }
 
-  /** Разрешает и проверяет явно переданный parent host. */
+  /**
+   * Разрешает и проверяет явно переданный parent host.
+   */
   private _resolveParentHost(rawParent: unknown): AnyRuntimeHost | null {
     if (rawParent === undefined || rawParent === null) {
       return null
@@ -1111,7 +1180,9 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     return parent
   }
 
-  /** Разрешает artifact reader и запрещает невалидную явную зависимость. */
+  /**
+   * Разрешает artifact reader и запрещает невалидную явную зависимость.
+   */
   private _resolveArtifactReader(rawReader: unknown): RuntimeArtifactReader {
     if (rawReader === undefined) {
       return Endge.program

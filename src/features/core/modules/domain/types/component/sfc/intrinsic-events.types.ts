@@ -10,7 +10,7 @@ export interface ComponentSFCEventModifiersState {
 
 export interface ComponentSFCInteractionEventPayload {
   type: string
-  /** UTC-время нормализации исходного occurrence, одинаковое для всех его локальных reactions. */
+  // UTC-время нормализации исходного occurrence, одинаковое для всех его локальных reactions.
   occurredAt: string
   modifiers: ComponentSFCEventModifiersState
   held: { key: string[], code: string[] }

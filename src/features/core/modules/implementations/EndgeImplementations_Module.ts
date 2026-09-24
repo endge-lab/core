@@ -12,18 +12,20 @@ import { ImplementationBindingRegistry } from '@/features/core/modules/implement
 import { ImplementationProviderRegistry } from '@/features/core/modules/implementations/services/ImplementationProviderRegistry'
 import { EndgeModule } from '@/features/federation/EndgeModule'
 
-/** Общий runtime-модуль для провайдеров кода, bindings и фактического разрешения. */
+/**
+ * Общий runtime-модуль для провайдеров кода, bindings и фактического разрешения.
+ */
 export class EndgeImplementations_Module extends EndgeModule {
   private readonly _providers = new ImplementationProviderRegistry()
   private readonly _bindings = new ImplementationBindingRegistry()
 
-  /**
-   * ----------------------------------------
-   * PUBLIC
-   * ----------------------------------------
-   */
+  // ---------------------------------------------
+  // PUBLIC API
+  // ---------------------------------------------
 
-  /** Регистрирует локальный исполняемый код и возвращает его disposer. */
+  /**
+   * Регистрирует локальный исполняемый код и возвращает его disposer.
+   */
   public registerProvider(provider: ImplementationProvider): () => void {
     return this._providers.register(provider)
   }
@@ -32,12 +34,16 @@ export class EndgeImplementations_Module extends EndgeModule {
     return this._providers.get(key) != null
   }
 
-  /** Регистрирует явный binding и возвращает его disposer. */
+  /**
+   * Регистрирует явный binding и возвращает его disposer.
+   */
   public bind(binding: ImplementationBinding): () => void {
     return this._bindings.register(binding)
   }
 
-  /** Определяет фактический провайдер по scope и приоритету. */
+  /**
+   * Определяет фактический провайдер по scope и приоритету.
+   */
   public resolve(request: ImplementationResolutionRequest): ResolvedImplementation {
     if (request.invocationProviderKey) {
       const provider = this._requireProvider(request.invocationProviderKey)
@@ -65,7 +71,9 @@ export class EndgeImplementations_Module extends EndgeModule {
     }
   }
 
-  /** Возвращает null только когда не объявлены ни binding, ни provider по умолчанию. */
+  /**
+   * Возвращает null только когда не объявлены ни binding, ни provider по умолчанию.
+   */
   public resolveOptional(request: ImplementationResolutionRequest): ResolvedImplementation | null {
     const binding = this._bindings.resolve(request)
     if (!binding && !request.invocationProviderKey && !request.defaultProviderKey) {
@@ -74,7 +82,9 @@ export class EndgeImplementations_Module extends EndgeModule {
     return this.resolve(request)
   }
 
-  /** Вычисляет и выполняет один вызов через его фактический provider. */
+  /**
+   * Вычисляет и выполняет один вызов через его фактический provider.
+   */
   public async execute<TResult = unknown>(
     request: ImplementationResolutionRequest,
     invocation: ImplementationInvocation,
@@ -89,12 +99,16 @@ export class EndgeImplementations_Module extends EndgeModule {
     return await resolved.provider.execute(invocation) as TResult
   }
 
-  /** Включает безопасную проекцию implementations в диагностическое дерево. */
+  /**
+   * Включает безопасную проекцию implementations в диагностическое дерево.
+   */
   public override createDiagnosticsSnapshot(): ImplementationSnapshot {
     return this.snapshot()
   }
 
-  /** Возвращает сериализуемый snapshot инспекции без функций. */
+  /**
+   * Возвращает сериализуемый snapshot инспекции без функций.
+   */
   public snapshot(): ImplementationSnapshot {
     return {
       providers: this._providers.list().map(provider => ({
@@ -106,17 +120,17 @@ export class EndgeImplementations_Module extends EndgeModule {
     }
   }
 
-  /** Освобождает providers и bindings после зависимых execution Modules. */
+  /**
+   * Освобождает providers и bindings после зависимых execution Modules.
+   */
   public override reset(): void {
     this._bindings.clear()
     this._providers.clear()
   }
 
-  /**
-   * ----------------------------------------
-   * PRIVATE
-   * ----------------------------------------
-   */
+  // ---------------------------------------------
+  // PRIVATE
+  // ---------------------------------------------
 
   private _requireProvider(key: string): ImplementationProvider {
     const provider = this._providers.get(key)

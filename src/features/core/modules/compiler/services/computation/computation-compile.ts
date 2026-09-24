@@ -40,7 +40,7 @@ export interface ComputationCompileResult {
   diagnostics: DiagnosticDraft[]
 }
 
-/** Компилирует source defineComputation в детерминированный выходной граф. */
+// Компилирует source defineComputation в детерминированный выходной граф.
 export function compileComputation(input: ComputationCompileInput): ComputationCompileResult {
   const diagnostics: DiagnosticDraft[] = []
   let metadata: ProgramMetadataMap = {}
@@ -414,7 +414,7 @@ function rewriteComputationReads(raw: t.Expression, diagnostics: DiagnosticDraft
   return node
 }
 
-/** Поднимает nested computation(...) calls в отдельные graph nodes. */
+// Поднимает nested computation(...) calls в отдельные graph nodes.
 function liftExternalComputationCalls(
   root: t.Expression,
   diagnostics: DiagnosticDraft[],

@@ -1,8 +1,8 @@
 export class EndgeModuleController {
-  /** Зарегистрированные подмодули: ключ -> модуль */
+  // Зарегистрированные подмодули: ключ -> модуль
   private _modules: Map<string, any> = new Map()
 
-  /** Флаг инициализации контроллера */
+  // Флаг инициализации контроллера
   private _isInitialized = false
 
   /**

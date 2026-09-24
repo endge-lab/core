@@ -1,4 +1,4 @@
-import type { PhaseName, RaphNode, RaphPhase } from '@endge/raph'
+import type { PhaseName, RaphNode, RaphPhase } from '@raphy-js/raph'
 import type { RuntimeHost } from '@/features/core/modules/runtime/domain/runtime-host.types'
 
 import { Endge } from '@/features/core/kernel/endge'

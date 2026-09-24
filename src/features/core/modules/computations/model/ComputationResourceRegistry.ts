@@ -4,11 +4,13 @@ import type {
   ComputationResource as ComputationResourceContract,
 } from '@/features/core/modules/domain/types/computation/computation-runtime.types'
 
-/** Принадлежащий host реестр, изолирующий ресурсы по месту вызова и ключу consumer строки. */
+/**
+ * Принадлежащий host реестр, изолирующий ресурсы по месту вызова и ключу consumer строки.
+ */
 export class ComputationResourceRegistry {
   private readonly _resources = new Map<string, ComputationResourceState>()
   private readonly _disposers = new Map<string, VoidFunction>()
-  /** Входы ресурсов, запрошенные текущим активным проходом renderer. */
+  // Входы ресурсов, запрошенные текущим активным проходом renderer.
   private readonly _updatingInputs = new Set<string>()
 
   getOrCreate(
@@ -43,7 +45,9 @@ export class ComputationResourceRegistry {
     return resource
   }
 
-  /** Renderer освобождает завершившихся consumers, не затрагивая соседние scopes. */
+  /**
+   * Renderer освобождает завершившихся consumers, не затрагивая соседние scopes.
+   */
   releaseScope(scope: string, keep?: (key: string) => boolean): void {
     for (const [key, resource] of this._resources) {
       if ((key === scope || key.startsWith(`${scope}/`) || key.startsWith(`${scope}:`)) && !keep?.(key)) {
@@ -68,7 +72,9 @@ export class ComputationResourceRegistry {
     this._updatingInputs.clear()
   }
 
-  /** Считывает ресурсы существующих consumers; новые вычисления не создаются. */
+  /**
+   * Считывает ресурсы существующих consumers; новые вычисления не создаются.
+   */
   snapshot() {
     return [...this._resources.values()].map(resource => resource.snapshot())
   }

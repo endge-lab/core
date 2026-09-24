@@ -50,7 +50,7 @@ export interface EndgeStyleSelectorSegment {
   compound: EndgeStyleCompoundSelector
 }
 
-/** Селектор хранится слева направо, а matcher вычисляет его справа налево. */
+// Селектор хранится слева направо, а matcher вычисляет его справа налево.
 export interface EndgeStyleSelector {
   source: string
   segments: EndgeStyleSelectorSegment[]
@@ -146,7 +146,7 @@ export interface EndgeStyleTargetProfile {
   capabilities?: Iterable<string>
 }
 
-/** Нейтральный к renderer логический узел. DOM-обёртки намеренно отсутствуют. */
+// Нейтральный к renderer логический узел. DOM-обёртки намеренно отсутствуют.
 export interface EndgeStyleMatchNode {
   tag: string
   id?: string
@@ -157,13 +157,11 @@ export interface EndgeStyleMatchNode {
   component?: string
   identity?: string
   ownerScopeId?: string
-  /** Иерархия lifecycle runtime для нейтральной к renderer изоляции размещения. */
+  // Иерархия lifecycle runtime для нейтральной к renderer изоляции размещения.
   runtimeScopeIds?: ReadonlySet<string>
   parent?: EndgeStyleMatchNode
-  /**
-   * Непосредственный логический предшественник. Связанная цепочка сохраняет соседние
-   * комбинаторы нейтральными к renderer без копии префикса в каждом узле.
-   */
+  // Непосредственный логический предшественник. Связанная цепочка сохраняет соседние
+  // комбинаторы нейтральными к renderer без копии префикса в каждом узле.
   previousSibling?: EndgeStyleMatchNode
   index: number
   siblingCount: number

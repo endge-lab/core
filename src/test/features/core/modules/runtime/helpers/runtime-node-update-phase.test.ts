@@ -1,6 +1,6 @@
 import type { RuntimeHost, RuntimeHostUpdateContext } from '@/features/core/modules/runtime/domain/runtime-host.types'
 
-import { RaphKernel, RaphNode, RaphRuntime, RaphSchedulerType } from '@endge/raph'
+import { RaphKernel, RaphNode, RaphRuntime, RaphSchedulerType } from '@raphy-js/raph'
 import { describe, expect, it } from 'vitest'
 
 import { RuntimeNodeUpdatePhase } from '@/features/core/modules/runtime/helpers/raph-phases/runtime-node-update-phase'

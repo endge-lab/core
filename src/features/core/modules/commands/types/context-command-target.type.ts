@@ -1,6 +1,6 @@
 import type { EndgeDataMode } from '@/features/core/modules/workspace/domain/workspace.types'
 
-/** Владелец локальных операций: Core setters либо штатные операции приложения с reset/boot. */
+// Владелец локальных операций: Core setters либо штатные операции приложения с reset/boot.
 export interface EndgeContextCommandTarget {
   setCurrentWorkspace: (workspace: string | null) => void | Promise<void>
   setFacetSelection: (facet: string, document: string) => void | Promise<void>

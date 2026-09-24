@@ -5,15 +5,17 @@ import { Serialize } from '@endge/utils'
 import { Expose } from 'class-transformer'
 import { REntity } from '@/features/core/modules/domain/entities/REntity'
 
-/** Дерево сообщений по локали (формат vue-i18n). */
+// Дерево сообщений по локали (формат vue-i18n).
 export type RI18nBundleLocales = Record<string, Record<string, unknown>>
 
-/** Сущность словаря переводов (коллекция i18n-bundles). Один документ = словарь с несколькими локалями. */
+/**
+ * Сущность словаря переводов (коллекция i18n-bundles). Один документ = словарь с несколькими локалями.
+ */
 export class RI18nBundle extends REntity {
   @Expose()
   override description: string | null = null
 
-  /** По коду локали (ru, en) — дерево ключ-значение. */
+  // По коду локали (ru, en) — дерево ключ-значение.
   @Expose()
   locales: RI18nBundleLocales = {}
 
@@ -48,7 +50,9 @@ export class RI18nBundle extends REntity {
     }
   }
 
-  /** Возвращает validation problems i18n bundle без mutable entity state. */
+  /**
+   * Возвращает validation problems i18n bundle без mutable entity state.
+   */
   override getDiagnosticProblems(): DiagnosticsProblemInput[] {
     const problems: DiagnosticsProblemInput[] = []
     if (!String(this.identity ?? '').trim()) {

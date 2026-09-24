@@ -7,7 +7,9 @@ import { EndgeBridgeDebug_Module } from '@/features/core/modules/bridge/debug/En
 import { BridgeConnection_Service } from '@/features/core/modules/bridge/services/BridgeConnection_Service'
 import { EndgeModule } from '@/features/federation/EndgeModule'
 
-/** Владелец bridge транспорта, host policy и lifecycle обоих подмодулей. */
+/**
+ * Владелец bridge транспорта, host policy и lifecycle обоих подмодулей.
+ */
 export class EndgeBridge_Module extends EndgeModule<EndgeBootContext> {
   public readonly debug: EndgeBridgeDebug_Module
   public readonly configurator = new EndgeBridgeConfigurator_Module()
@@ -21,12 +23,8 @@ export class EndgeBridge_Module extends EndgeModule<EndgeBootContext> {
   private readonly _states = new Map<string, BridgeConnectionState>()
 
   /**
-   * ----------------------------------------
-   * PUBLIC
-   * ----------------------------------------
+   * Создаёт owner и его явные зависимости без запуска транспорта.
    */
-
-  /** Создаёт owner и его явные зависимости без запуска транспорта. */
   public constructor(private readonly _adapter = new BrowserBridge_Adapter()) {
     super()
     this.debug = new EndgeBridgeDebug_Module({
@@ -35,7 +33,13 @@ export class EndgeBridge_Module extends EndgeModule<EndgeBootContext> {
     }, _adapter)
   }
 
-  /** Принимает optional host policy без network/DOM side effects. */
+  // ---------------------------------------------
+  // PUBLIC API
+  // ---------------------------------------------
+
+  /**
+   * Принимает optional host policy без network/DOM side effects.
+   */
   public override setup(ctx: EndgeBootContext): void {
     this._options = ctx.bridge ? { ...ctx.bridge } : undefined
     this._workspaceIdentity = ctx.scope.workspaceIdentity ?? ''
@@ -54,7 +58,9 @@ export class EndgeBridge_Module extends EndgeModule<EndgeBootContext> {
     this.debug.configure(this._options.role, this._options.debug === true)
   }
 
-  /** Запускает live transports после загрузки Domain и diagnostics. */
+  /**
+   * Запускает live transports после загрузки Domain и diagnostics.
+   */
   public override start(): void {
     if (this._started || !this._options || !this._allowed.size) {
       return
@@ -78,7 +84,9 @@ export class EndgeBridge_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Подключается только к адресу из неизменяемой host policy текущего boot. */
+  /**
+   * Подключается только к адресу из неизменяемой host policy текущего boot.
+   */
   public connect(rawServerUrl: string): void {
     const serverUrl = normalizeBridgeServer(rawServerUrl)
     if (!this._started || !this._options || !this._allowed.has(serverUrl)) {
@@ -107,14 +115,18 @@ export class EndgeBridge_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Отключение пользователем прекращает reconnect до следующего connect/boot. */
+  /**
+   * Отключение пользователем прекращает reconnect до следующего connect/boot.
+   */
   public disconnect(rawServerUrl: string): void {
     const serverUrl = normalizeBridgeServer(rawServerUrl)
     this._connections.get(serverUrl)?.stop()
     this._connections.delete(serverUrl)
   }
 
-  /** Отзывает текущий lifecycle и освобождает принадлежащее модулю состояние. */
+  /**
+   * Отзывает текущий lifecycle и освобождает принадлежащее модулю состояние.
+   */
   public override reset(): void {
     this._started = false
     this._suspended = false
@@ -133,18 +145,20 @@ export class EndgeBridge_Module extends EndgeModule<EndgeBootContext> {
     this.notify()
   }
 
-  /** Только безопасные metadata; без pending payloads и снимков других клиентов. */
+  /**
+   * Только безопасные metadata; без pending payloads и снимков других клиентов.
+   */
   public override createDiagnosticsSnapshot(): unknown {
     return { connections: this.connections, sessions: this.debug.sessions, configurators: this.configurator.connections }
   }
 
-  /**
-   * ----------------------------------------
-   * PRIVATE
-   * ----------------------------------------
-   */
+  // ---------------------------------------------
+  // PRIVATE
+  // ---------------------------------------------
 
-  /** Разрешает только существующее соединение из host allowlist. */
+  /**
+   * Разрешает только существующее соединение из host allowlist.
+   */
   private _connection(rawServerUrl: string): BridgeConnection_Service {
     const connection = this._connections.get(normalizeBridgeServer(rawServerUrl))
     if (!connection) {
@@ -153,7 +167,9 @@ export class EndgeBridge_Module extends EndgeModule<EndgeBootContext> {
     return connection
   }
 
-  /** Направляет сообщение в подмодуль и отзывает канал при ошибке обработки. */
+  /**
+   * Направляет сообщение в подмодуль и отзывает канал при ошибке обработки.
+   */
   private _receive(serverUrl: string, message: BridgeMessage): void {
     if (message.type === 'configurators') {
       this.configurator.update(serverUrl, message.data as Omit<ConfiguratorConnection, 'serverUrl'>[])
@@ -166,13 +182,13 @@ export class EndgeBridge_Module extends EndgeModule<EndgeBootContext> {
     })
   }
 
-  /**
-   * ----------------------------------------
-   * ACCESS
-   * ----------------------------------------
-   */
+  // ---------------------------------------------
+  // ACCESS
+  // ---------------------------------------------
 
-  /** Возвращает текущие подключения без доступа к внутреннему mutable state. */
+  /**
+   * Возвращает текущие подключения без доступа к внутреннему mutable state.
+   */
   public get connections(): readonly BridgeConnectionState[] {
     return Array.from(this._states.values(), value => ({ ...value }))
   }

@@ -1,4 +1,4 @@
-/** Строка времени HH:mm или HH:mm:ss в Date с текущей датой. */
+// Строка времени HH:mm или HH:mm:ss в Date с текущей датой.
 export function timeStringToDate(value: unknown): Date | null {
   if (value == null) {
     return null

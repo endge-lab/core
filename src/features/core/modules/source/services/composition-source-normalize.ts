@@ -9,7 +9,7 @@ interface SourceEdit {
   replacement: string
 }
 
-/** Нормализует ссылки на типы только в полях Composition defineProps. */
+// Нормализует ссылки на типы только в полях Composition defineProps.
 export function normalizeCompositionSourceTypeReferences(source: string): string {
   try {
     const ast = parseTS(source, {

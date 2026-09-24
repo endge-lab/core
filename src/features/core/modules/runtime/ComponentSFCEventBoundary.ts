@@ -8,7 +8,9 @@ import type {
 } from '@/features/core/modules/domain/types/component/sfc/ports.types'
 import type { ComponentSFCRuntimeHost } from '@/features/core/modules/runtime/hosts/ComponentSFCRuntimeHost'
 
-/** Router Event уровня mount для границы одного артефакта Component SFC. */
+/**
+ * Router Event уровня mount для границы одного артефакта Component SFC.
+ */
 export class ComponentSFCEventBoundary {
   private readonly _consumedLocalOnce = new Set<string>()
 
@@ -34,12 +36,16 @@ export class ComponentSFCEventBoundary {
     return new ComponentSFCEventBoundary(this._host, componentIdentity, manifest, this, source, bindings, transform, requiredPortBindings)
   }
 
-  /** True, когда текущий публичный манифест наблюдает один Event этого дочернего source. */
+  /**
+   * True, когда текущий публичный манифест наблюдает один Event этого дочернего source.
+   */
   public observesChild(source: ComponentSFCEventRuntimeSource, event: string): boolean {
     return this._manifest.emits.events.some(port => matchesSource(port, source, event))
   }
 
-  /** Фиксирует логическое правило `.once` уровня mount после его совпадения. */
+  /**
+   * Фиксирует логическое правило `.once` уровня mount после его совпадения.
+   */
   public claimLocalOnce(key: string): boolean {
     if (this._consumedLocalOnce.has(key)) {
       return false
@@ -48,7 +54,9 @@ export class ComponentSFCEventBoundary {
     return true
   }
 
-  /** Выполняет локальные реакции `@event`, затем маршрутизирует событие, если отсутствует `.stop`. */
+  /**
+   * Выполняет локальные реакции `@event`, затем маршрутизирует событие, если отсутствует `.stop`.
+   */
   public async routeChild(
     source: ComponentSFCEventRuntimeSource,
     event: string,
@@ -100,7 +108,9 @@ export class ComponentSFCEventBoundary {
     await Promise.allSettled([...reactions.filter(Boolean), routed] as Promise<unknown>[])
   }
 
-  /** Получает событие встроенного или вложенного дочернего элемента и вычисляет публичные порты по источнику. */
+  /**
+   * Получает событие встроенного или вложенного дочернего элемента и вычисляет публичные порты по источнику.
+   */
   public async emitChild(
     source: ComponentSFCEventRuntimeSource,
     event: string,
@@ -112,7 +122,9 @@ export class ComponentSFCEventBoundary {
     await Promise.all(ports.map(port => this._dispatch(port, payload, source, trace, depth)))
   }
 
-  /** Отправляет Event, объявленный собственным событием этого компонента. */
+  /**
+   * Отправляет Event, объявленный собственным событием этого компонента.
+   */
   public async emitOwn(name: string, payload: unknown, trace: string[] = [], depth = 0): Promise<void> {
     const port = this._manifest.emits.events.find(candidate => candidate.name === name && !candidate.from && !candidate.forwardedFrom)
     if (!port) {

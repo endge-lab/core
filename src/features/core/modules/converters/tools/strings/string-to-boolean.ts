@@ -1,4 +1,4 @@
-/** "true", "1" и т.п. в true; иначе false. */
+// "true", "1" и т.п. в true; иначе false.
 export function stringToBoolean(value: unknown): boolean {
   if (value == null) {
     return false

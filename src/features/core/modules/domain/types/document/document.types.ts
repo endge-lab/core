@@ -25,35 +25,29 @@ import type { RVocabs } from '@/features/core/modules/domain/entities/RVocabs'
 import type { RWorkspace } from '@/features/core/modules/domain/entities/RWorkspace'
 import type { RComponent } from '@/features/core/modules/domain/types/component/component.types'
 
-/**
- * Разновидности типов компонентов
- */
+// Разновидности типов компонентов
 export enum ComponentType {
   Component = 'component',
-  /** Legacy-тип шаблона колонки таблицы; не является отдельным документом. */
+  // Legacy-тип шаблона колонки таблицы; не является отдельным документом.
   Html = 'html',
   DSL = 'component-dsl',
   Table = 'component-table',
   SFC = 'component-sfc',
 }
 
-/** Тип документа «Фильтр» (коллекция filters). */
+// Тип документа «Фильтр» (коллекция filters).
 export enum FilterType {
   DefaultFilter = 'default-filter',
 }
 
-/**
- * Разновидности типов запросов
- */
+// Разновидности типов запросов
 export enum QueryType {
   Custom = 'query-custom',
   GraphQL = 'query-gql',
   REST = 'query-rest',
 }
 
-/**
- * Вариации секций домена.
- */
+// Вариации секций домена.
 export enum DomainSectionType {
   Workspace = 'workspace',
   Primitive = 'primitive',
@@ -66,7 +60,7 @@ export enum DomainSectionType {
   Store = 'store',
   Mock = 'mock',
   Action = 'action',
-  /** Классификация каталога только для frontend; Event не является сохраняемым документом. */
+  // Классификация каталога только для frontend; Event не является сохраняемым документом.
   Event = 'event',
   Converter = 'converter',
   Computation = 'computation',
@@ -83,7 +77,7 @@ export enum DomainSectionType {
   AuthProfile = 'auth-profile',
 }
 
-/** Канонический исчерпывающий список типов документов Domain. */
+// Канонический исчерпывающий список типов документов Domain.
 export const DOMAIN_DOCUMENT_TYPES = [
   'primitive',
   'type',
@@ -117,12 +111,10 @@ export const DOMAIN_DOCUMENT_TYPES = [
   FilterType.DefaultFilter,
 ] as const
 
-/** Все возможные типы документов. */
+// Все возможные типы документов.
 export type DomainDocumentType = (typeof DOMAIN_DOCUMENT_TYPES)[number]
 
-/**
- * Описывает любой документ
- */
+// Описывает любой документ
 export interface Document {
   // Тип документа
   type: DomainDocumentType
@@ -134,7 +126,5 @@ export interface Document {
   id: string
 }
 
-/**
- * Описывает любой документ рефлекцию
- */
+// Описывает любой документ рефлекцию
 export type RDocument = RComponent | RComponentSFC | RQuery | RDataView | RComposition | RStore | RStream | RSimulation | RUpdate | RMock | RAction | RConverter | RComputation | RIntegration | RFilter | RPolicy | RStyle | RConfiguration | RType | RVocabs | RI18nBundle | RAuthProfile | RWorkspace | RPageTemplate | RPage | RNavigation

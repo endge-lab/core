@@ -71,28 +71,38 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
   private _contextProviderFailures = 0
   private _notifyScheduled = false
 
-  /** Создаёт telemetry module с внешним registry adapter factories. */
+  /**
+   * Создаёт telemetry module с внешним registry adapter factories.
+   */
   public constructor(private readonly _adapterRegistry: DiagnosticsAdapterRegistry) {
     super()
     this._adapterRegistry.subscribe(() => this._rebuildConfiguredAdapters())
   }
 
-  /** Возвращает идентификатор текущей diagnostics session. */
+  /**
+   * Возвращает идентификатор текущей diagnostics session.
+   */
   public get sessionId(): string {
     return this._sessionId
   }
 
-  /** Возвращает независимую копию effective diagnostics configuration. */
+  /**
+   * Возвращает независимую копию effective diagnostics configuration.
+   */
   public get configuration(): EndgeDiagnosticsConfiguration {
     return this._cloneConfiguration(this._configuration)
   }
 
-  /** Возвращает независимую копию resource текущего запуска. */
+  /**
+   * Возвращает независимую копию resource текущего запуска.
+   */
   public get resource(): DiagnosticsResource {
     return { attributes: this._cloneAttributes(this._resource.attributes) }
   }
 
-  /** Применяет effective configuration после разрешения build context. */
+  /**
+   * Применяет effective configuration после разрешения build context.
+   */
   public override build(_ctx: EndgeBootContext): void {
     if (!Endge.configuration.isResolved) {
       return
@@ -144,7 +154,9 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     this._scheduleNotify()
   }
 
-  /** Применяет telemetry, outputs и routes configuration без привязки к UI. */
+  /**
+   * Применяет telemetry, outputs и routes configuration без привязки к UI.
+   */
   public configure(configuration: EndgeDiagnosticsConfiguration, resource: DiagnosticsResource = this._resource): void {
     const signals = [...new Set(configuration.telemetry.collection.signals.filter(signal => signal === 'log' || signal === 'span'))]
     this._configuration = {
@@ -172,7 +184,9 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     this._scheduleNotify()
   }
 
-  /** Записывает один нормализованный structured log. */
+  /**
+   * Записывает один нормализованный structured log.
+   */
   public log(input: DiagnosticsLogInput): DiagnosticsLogRecord | null {
     const severityNumber = this._normalizeSeverity(input.severityNumber)
     if (!this._canCollect('log', severityNumber)) {
@@ -200,37 +214,51 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     return record
   }
 
-  /** Записывает log уровня TRACE. */
+  /**
+   * Записывает log уровня TRACE.
+   */
   public trace(body: string, options: DiagnosticsLogOptions = {}): DiagnosticsLogRecord | null {
     return this.log({ ...options, body, severityNumber: 1 })
   }
 
-  /** Записывает log уровня DEBUG. */
+  /**
+   * Записывает log уровня DEBUG.
+   */
   public debug(body: string, options: DiagnosticsLogOptions = {}): DiagnosticsLogRecord | null {
     return this.log({ ...options, body, severityNumber: 5 })
   }
 
-  /** Записывает log уровня INFO. */
+  /**
+   * Записывает log уровня INFO.
+   */
   public info(body: string, options: DiagnosticsLogOptions = {}): DiagnosticsLogRecord | null {
     return this.log({ ...options, body, severityNumber: 9 })
   }
 
-  /** Записывает log уровня WARN. */
+  /**
+   * Записывает log уровня WARN.
+   */
   public warn(body: string, options: DiagnosticsLogOptions = {}): DiagnosticsLogRecord | null {
     return this.log({ ...options, body, severityNumber: 13 })
   }
 
-  /** Записывает log уровня ERROR без обязательного объекта exception. */
+  /**
+   * Записывает log уровня ERROR без обязательного объекта exception.
+   */
   public error(body: string, options: DiagnosticsLogOptions = {}): DiagnosticsLogRecord | null {
     return this.log({ ...options, body, severityNumber: 17 })
   }
 
-  /** Записывает log уровня FATAL; метод не останавливает runtime самостоятельно. */
+  /**
+   * Записывает log уровня FATAL; метод не останавливает runtime самостоятельно.
+   */
   public fatal(body: string, options: DiagnosticsLogOptions = {}): DiagnosticsLogRecord | null {
     return this.log({ ...options, body, severityNumber: 21 })
   }
 
-  /** Нормализует пойманное исключение в ERROR/FATAL log с exception.* attributes. */
+  /**
+   * Нормализует пойманное исключение в ERROR/FATAL log с exception.* attributes.
+   */
   public recordException(error: unknown, options: DiagnosticsExceptionOptions = {}): DiagnosticsLogRecord | null {
     const normalized = this._normalizeException(error)
     return this.log({
@@ -247,7 +275,9 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     })
   }
 
-  /** Создаёт root или child span и возвращает correlation handle. */
+  /**
+   * Создаёт root или child span и возвращает correlation handle.
+   */
   public startSpan(name: string, options: DiagnosticsSpanOptions = {}): DiagnosticsSpanHandle {
     const traceId = this._normalizeTraceId(options.traceId) ?? this._randomHex(32)
     const spanId = this._randomHex(16)
@@ -274,7 +304,9 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     return span
   }
 
-  /** Завершает активный span и сохраняет один итоговый span record. */
+  /**
+   * Завершает активный span и сохраняет один итоговый span record.
+   */
   public finishSpan(input: {
     traceId: string
     spanId: string
@@ -317,13 +349,19 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     return record
   }
 
-  /** Подписывает listener на общие изменения Subscribable-модуля. */
+  /**
+   * Подписывает listener на общие изменения Subscribable-модуля.
+   */
   public override subscribe(listener: () => void): () => void
 
-  /** Подписывает listener на отфильтрованный diagnostics stream. */
+  /**
+   * Подписывает listener на отфильтрованный diagnostics stream.
+   */
   public subscribe(filter: DiagnosticsFilter, listener: DiagnosticsListener, options?: DiagnosticsSubscribeOptions): () => void
 
-  /** Реализует общую и records-specific формы подписки. */
+  /**
+   * Реализует общую и records-specific формы подписки.
+   */
   public subscribe(
     filterOrListener: DiagnosticsFilter | (() => void),
     listener?: DiagnosticsListener,
@@ -350,14 +388,18 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     return () => this._subscriptions.delete(subscription)
   }
 
-  /** Возвращает read-only snapshot records, соответствующих filter. */
+  /**
+   * Возвращает read-only snapshot records, соответствующих filter.
+   */
   public query(filter: DiagnosticsFilter = {}): readonly DiagnosticsRecord[] {
     let records = this._store.toArray()
     records = records.filter(record => this._matchesFilter(record, filter))
     return filter.limit != null && filter.limit > 0 ? records.slice(-filter.limit) : records
   }
 
-  /** Возвращает telemetry-часть JSON-safe diagnostics snapshot. */
+  /**
+   * Возвращает telemetry-часть JSON-safe diagnostics snapshot.
+   */
   public snapshot(filter: DiagnosticsFilter = {}): DiagnosticsTelemetrySnapshot {
     return {
       sessionId: this._sessionId,
@@ -367,7 +409,9 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     }
   }
 
-  /** Возвращает счётчики текущей diagnostics session. */
+  /**
+   * Возвращает счётчики текущей diagnostics session.
+   */
   public getCounters(): DiagnosticsCounters {
     return {
       totalRecords: this._store.size,
@@ -384,7 +428,9 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     }
   }
 
-  /** Очищает локальную history и session counters без изменения configuration и adapters. */
+  /**
+   * Очищает локальную history и session counters без изменения configuration и adapters.
+   */
   public clear(): void {
     this._store.clear()
     this._droppedByPolicy = 0
@@ -395,7 +441,9 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     this._scheduleNotify()
   }
 
-  /** Регистрирует синхронный provider общих record attributes и возвращает функцию отключения. */
+  /**
+   * Регистрирует синхронный provider общих record attributes и возвращает функцию отключения.
+   */
   public registerContextProvider(id: string, provider: DiagnosticsContextProvider): () => void {
     const normalizedId = this._normalizeText(id)
     if (!normalizedId) {
@@ -414,7 +462,9 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     }
   }
 
-  /** Регистрирует готовый adapter для программного output и возвращает функцию отключения. */
+  /**
+   * Регистрирует готовый adapter для программного output и возвращает функцию отключения.
+   */
   public registerAdapter(adapter: DiagnosticsAdapter): () => void {
     const id = this._normalizeText(adapter.id)
     if (!id) {
@@ -431,7 +481,9 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     }
   }
 
-  /** Доставляет buffered data, освобождает adapter и удаляет его из registry. */
+  /**
+   * Доставляет buffered data, освобождает adapter и удаляет его из registry.
+   */
   public async unregisterAdapter(adapterId: string): Promise<void> {
     const id = this._normalizeText(adapterId)
     const adapter = this._manualAdapters.get(id)
@@ -452,7 +504,9 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     }
   }
 
-  /** Проверяет один configured output через optional adapter test method. */
+  /**
+   * Проверяет один configured output через optional adapter test method.
+   */
   public async testOutput(outputId: string): Promise<boolean> {
     const adapter = this._getAdapter(outputId)
     if (!adapter?.test) {
@@ -468,7 +522,9 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     }
   }
 
-  /** Доставляет snapshot в указанные outputs с поддержкой best-effort semantics. */
+  /**
+   * Доставляет snapshot в указанные outputs с поддержкой best-effort semantics.
+   */
   public deliverSnapshot(snapshot: DiagnosticsSnapshot, outputIds: readonly string[]): void {
     for (const outputId of new Set(outputIds)) {
       const adapter = this._getAdapter(outputId)
@@ -495,7 +551,9 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     }
   }
 
-  /** Выполняет best-effort flush всех adapters без reset модуля. */
+  /**
+   * Выполняет best-effort flush всех adapters без reset модуля.
+   */
   public async flush(): Promise<DiagnosticsFlushResult> {
     const result: DiagnosticsFlushResult = { succeeded: [], failed: [] }
     for (const [outputId, adapter] of this._allAdapters().entries()) {
@@ -511,7 +569,9 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     return result
   }
 
-  /** Проверяет collection policy для signal и optional severity. */
+  /**
+   * Проверяет collection policy для signal и optional severity.
+   */
   private _canCollect(signal: DiagnosticsSignal, severity?: DiagnosticsSeverityNumber): boolean {
     const collection = this._configuration.telemetry.collection
     const allowed = collection.enabled
@@ -524,7 +584,9 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     return allowed
   }
 
-  /** Добавляет record в store, subscribers и matching adapter routes. */
+  /**
+   * Добавляет record в store, subscribers и matching adapter routes.
+   */
   private _appendRecord(record: DiagnosticsRecord): void {
     const immutableRecord = this._freezeRecord(record)
     if (this._store.append(immutableRecord)) {
@@ -572,7 +634,9 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     this._scheduleNotify()
   }
 
-  /** Безопасно вызывает listener, не позволяя ему сломать producer. */
+  /**
+   * Безопасно вызывает listener, не позволяя ему сломать producer.
+   */
   private _notifyListener(listener: DiagnosticsListener, record: DiagnosticsRecord): void {
     try {
       listener(record)
@@ -582,7 +646,9 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     }
   }
 
-  /** Проверяет record по общему subscription/route filter. */
+  /**
+   * Проверяет record по общему subscription/route filter.
+   */
   private _matchesFilter(record: DiagnosticsRecord, filter: DiagnosticsFilter): boolean {
     if (filter.signals?.length && !filter.signals.includes(record.signal)) {
       return false
@@ -620,14 +686,18 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     return true
   }
 
-  /** Сравнивает scalar/array attribute values без приведения типов. */
+  /**
+   * Сравнивает scalar/array attribute values без приведения типов.
+   */
   private _attributeEquals(left: DiagnosticsAttributeValue | undefined, right: DiagnosticsAttributeValue): boolean {
     return Array.isArray(left) || Array.isArray(right)
       ? JSON.stringify(left) === JSON.stringify(right)
       : left === right
   }
 
-  /** Нормализует и redacts attributes перед попаданием в core store. */
+  /**
+   * Нормализует и redacts attributes перед попаданием в core store.
+   */
   private _normalizeAttributes(input: DiagnosticsAttributes | undefined): DiagnosticsAttributes {
     const attributes: DiagnosticsAttributes = {}
     for (const [rawKey, rawValue] of Object.entries(input ?? {})) {
@@ -642,7 +712,9 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     return attributes
   }
 
-  /** Добавляет к producer attributes значения всех context providers в порядке регистрации. */
+  /**
+   * Добавляет к producer attributes значения всех context providers в порядке регистрации.
+   */
   private _resolveRecordAttributes(input: DiagnosticsAttributes | undefined): DiagnosticsAttributes {
     const attributes = this._normalizeAttributes(input)
     for (const provider of this._contextProviders.values()) {
@@ -656,14 +728,18 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     return attributes
   }
 
-  /** Клонирует attributes, включая array values, без повторного изменения ключей. */
+  /**
+   * Клонирует attributes, включая array values, без повторного изменения ключей.
+   */
   private _cloneAttributes(input: DiagnosticsAttributes): DiagnosticsAttributes {
     return Object.fromEntries(
       Object.entries(input).map(([key, value]) => [key, Array.isArray(value) ? [...value] : value]),
     )
   }
 
-  /** Клонирует filter, чтобы внешние mutation не меняли subscription или route. */
+  /**
+   * Клонирует filter, чтобы внешние mutation не меняли subscription или route.
+   */
   private _cloneFilter(filter: DiagnosticsFilter): DiagnosticsFilter {
     return {
       ...filter,
@@ -676,7 +752,9 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     }
   }
 
-  /** Замораживает record и его вложенные структуры перед публикацией потребителям. */
+  /**
+   * Замораживает record и его вложенные структуры перед публикацией потребителям.
+   */
   private _freezeRecord(record: DiagnosticsRecord): DiagnosticsRecord {
     for (const value of Object.values(record.attributes)) {
       if (Array.isArray(value)) {
@@ -691,25 +769,33 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     return Object.freeze(record)
   }
 
-  /** Проверяет имя атрибута по обязательному списку sensitive fragments. */
+  /**
+   * Проверяет имя атрибута по обязательному списку sensitive fragments.
+   */
   private _isSensitiveKey(key: string): boolean {
     const normalized = key.toLowerCase()
     return SENSITIVE_ATTRIBUTE_PARTS.some(part => normalized.includes(part))
   }
 
-  /** Нормализует instrumentation scope и гарантирует непустое имя. */
+  /**
+   * Нормализует instrumentation scope и гарантирует непустое имя.
+   */
   private _normalizeScope(scope: DiagnosticsInstrumentationScope | undefined): DiagnosticsInstrumentationScope {
     const name = this._normalizeText(scope?.name) || DEFAULT_SCOPE.name
     const version = this._normalizeText(scope?.version)
     return { name, ...(version ? { version } : {}) }
   }
 
-  /** Нормализует diagnostics phase из explicit field или legacy endge.phase attribute. */
+  /**
+   * Нормализует diagnostics phase из explicit field или legacy endge.phase attribute.
+   */
   private _normalizePhase(value: unknown): 'authoring' | 'build' | 'runtime' | undefined {
     return value === 'authoring' || value === 'build' || value === 'runtime' ? value : undefined
   }
 
-  /** Нормализует correlation и отбрасывает невалидные W3C ids. */
+  /**
+   * Нормализует correlation и отбрасывает невалидные W3C ids.
+   */
   private _normalizeCorrelation(input: DiagnosticsLogOptions): Pick<DiagnosticsLogRecord, 'traceId' | 'spanId' | 'traceFlags'> {
     const traceId = this._normalizeTraceId(input.traceId)
     const spanId = traceId ? this._normalizeSpanId(input.spanId) : undefined
@@ -721,19 +807,25 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     }
   }
 
-  /** Проверяет 16-byte trace id в lowercase hexadecimal representation. */
+  /**
+   * Проверяет 16-byte trace id в lowercase hexadecimal representation.
+   */
   private _normalizeTraceId(value: string | undefined): string | undefined {
     const normalized = this._normalizeText(value).toLowerCase()
     return /^[0-9a-f]{32}$/.test(normalized) && !/^0+$/.test(normalized) ? normalized : undefined
   }
 
-  /** Проверяет 8-byte span id в lowercase hexadecimal representation. */
+  /**
+   * Проверяет 8-byte span id в lowercase hexadecimal representation.
+   */
   private _normalizeSpanId(value: string | undefined): string | undefined {
     const normalized = this._normalizeText(value).toLowerCase()
     return /^[0-9a-f]{16}$/.test(normalized) && !/^0+$/.test(normalized) ? normalized : undefined
   }
 
-  /** Нормализует W3C trace flags до одного unsigned byte. */
+  /**
+   * Нормализует W3C trace flags до одного unsigned byte.
+   */
   private _normalizeTraceFlags(value: number | undefined): number | undefined {
     if (value == null || !Number.isFinite(value)) {
       return undefined
@@ -741,12 +833,16 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     return Math.max(0, Math.min(255, Math.floor(value)))
   }
 
-  /** Нормализует timestamp и использует текущее время для отсутствующего значения. */
+  /**
+   * Нормализует timestamp и использует текущее время для отсутствующего значения.
+   */
   private _normalizeTimestamp(value: number | undefined): number {
     return value != null && Number.isFinite(value) ? Math.max(0, value) : Date.now()
   }
 
-  /** Нормализует unknown exception в безопасные строковые поля. */
+  /**
+   * Нормализует unknown exception в безопасные строковые поля.
+   */
   private _normalizeException(error: unknown): { type: string, message: string, stacktrace?: string } {
     if (error instanceof Error) {
       return {
@@ -758,7 +854,9 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     return { type: typeof error, message: this._normalizeText(error) || 'Unknown exception' }
   }
 
-  /** Возвращает ближайшее поддерживаемое базовое severity value. */
+  /**
+   * Возвращает ближайшее поддерживаемое базовое severity value.
+   */
   private _normalizeSeverity(value: number): DiagnosticsSeverityNumber {
     if (value >= 21) {
       return 21
@@ -778,18 +876,24 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     return 1
   }
 
-  /** Создаёт новый монотонный id внутри session. */
+  /**
+   * Создаёт новый монотонный id внутри session.
+   */
   private _nextRecordId(): number {
     this._recordId += 1
     return this._recordId
   }
 
-  /** Создаёт session id без зависимости от browser-only API. */
+  /**
+   * Создаёт session id без зависимости от browser-only API.
+   */
   private _createSessionId(): string {
     return `diag-${this._randomHex(16)}`
   }
 
-  /** Создаёт hexadecimal id указанной длины. */
+  /**
+   * Создаёт hexadecimal id указанной длины.
+   */
   private _randomHex(length: number): string {
     const bytes = new Uint8Array(Math.ceil(length / 2))
     if (globalThis.crypto?.getRandomValues) {
@@ -803,19 +907,25 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     return [...bytes].map(byte => byte.toString(16).padStart(2, '0')).join('').slice(0, length)
   }
 
-  /** Клонирует configuration без передачи mutable ссылок наружу. */
+  /**
+   * Клонирует configuration без передачи mutable ссылок наружу.
+   */
   private _cloneConfiguration(configuration: Readonly<EndgeDiagnosticsConfiguration>): EndgeDiagnosticsConfiguration {
     return JSON.parse(JSON.stringify(configuration)) as EndgeDiagnosticsConfiguration
   }
 
-  /** Клонирует JSON-safe adapter options. */
+  /**
+   * Клонирует JSON-safe adapter options.
+   */
   private _cloneAdapterOptions(
     options: EndgeDiagnosticsOutputConfiguration['options'],
   ): EndgeDiagnosticsOutputConfiguration['options'] {
     return JSON.parse(JSON.stringify(options)) as EndgeDiagnosticsOutputConfiguration['options']
   }
 
-  /** Пересоздаёт adapters enabled outputs после configuration или registry changes. */
+  /**
+   * Пересоздаёт adapters enabled outputs после configuration или registry changes.
+   */
   private _rebuildConfiguredAdapters(): void {
     for (const adapter of this._configuredAdapters.values()) {
       void Promise.resolve().then(() => adapter.dispose?.()).catch(() => {
@@ -845,12 +955,16 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     this._scheduleNotify()
   }
 
-  /** Возвращает configured или manual adapter для одного output id. */
+  /**
+   * Возвращает configured или manual adapter для одного output id.
+   */
   private _getAdapter(outputId: string): DiagnosticsAdapter | undefined {
     return this._manualAdapters.get(outputId) ?? this._configuredAdapters.get(outputId)
   }
 
-  /** Возвращает configured output или synthetic descriptor программного adapter. */
+  /**
+   * Возвращает configured output или synthetic descriptor программного adapter.
+   */
   private _resolveOutput(outputId: string): EndgeDiagnosticsOutputConfiguration | undefined {
     const configured = this._configuration.telemetry.outputs.find(output => output.id === outputId && output.enabled)
     if (configured) {
@@ -868,17 +982,23 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     return undefined
   }
 
-  /** Объединяет adapters для counters и flush, отдавая приоритет manual registration. */
+  /**
+   * Объединяет adapters для counters и flush, отдавая приоритет manual registration.
+   */
   private _allAdapters(): Map<string, DiagnosticsAdapter> {
     return new Map([...this._configuredAdapters, ...this._manualAdapters])
   }
 
-  /** Нормализует optional text. */
+  /**
+   * Нормализует optional text.
+   */
   private _normalizeText(value: unknown): string {
     return String(value ?? '').trim()
   }
 
-  /** Объединяет частые notify в один microtask. */
+  /**
+   * Объединяет частые notify в один microtask.
+   */
   private _scheduleNotify(): void {
     if (this._notifyScheduled) {
       return

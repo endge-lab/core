@@ -2,7 +2,7 @@ import type { ProgramMetadataMap } from '@/features/core/modules/program/domain/
 import type { ProgramDiagnostic } from '@/features/core/modules/program/domain/types/program.types'
 import type { TypeSourceExpression } from '@/features/core/modules/source/domain/types/type-source.types'
 
-/** Сохраняемое JSON-сериализуемое значение конфигурации. */
+// Сохраняемое JSON-сериализуемое значение конфигурации.
 export type EndgeJSONValue
   = | null
     | boolean
@@ -11,7 +11,7 @@ export type EndgeJSONValue
     | EndgeJSONValue[]
     | { [key: string]: EndgeJSONValue }
 
-/** Одна пользовательская настройка на основе Source. */
+// Одна пользовательская настройка на основе Source.
 export interface ConfigurationSourceValueDefinition {
   key: string
   type: TypeSourceExpression
@@ -24,14 +24,14 @@ export interface ConfigurationSourceValueDefinition {
   step?: number
 }
 
-/** Канонический документ Configuration Source v1. */
+// Канонический документ Configuration Source v1.
 export interface ConfigurationSourceDocument {
   values: ConfigurationSourceValueDefinition[]
 }
 
-/** Ранний артефакт Configuration для компилятора. */
+// Ранний артефакт Configuration для компилятора.
 export interface ConfigurationProgramPayload {
-  /** Optional parser tree retained for inspection; runtime does not require it. */
+  // Optional parser tree retained for inspection; runtime does not require it.
   ast?: unknown
   type: 'configuration'
   identity: string
@@ -43,14 +43,14 @@ export interface ConfigurationProgramPayload {
 export interface ConfigurationSourceCompileResult {
   ast: unknown | null
   document: ConfigurationSourceDocument | null
-  /** Best-effort проекция AST для визуального исправления, когда семантическая диагностика блокирует компиляцию. */
+  // Best-effort проекция AST для визуального исправления, когда семантическая диагностика блокирует компиляцию.
   draftDocument?: ConfigurationSourceDocument | null
   metadata: ProgramMetadataMap
   diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
 }
 
 export interface EndgeConfigurationSchemaEntry {
-  /** Optional parser tree retained for inspection; runtime does not require it. */
+  // Optional parser tree retained for inspection; runtime does not require it.
   ast?: unknown
   id: string | number
   identity: string

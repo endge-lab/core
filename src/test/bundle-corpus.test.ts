@@ -4,7 +4,7 @@ import { gzipSync } from 'fflate'
 import { describe, expect, it } from 'vitest'
 import { EndgeBundleCodec_Service } from '@/features/core/kernel/services/EndgeBundleCodec_Service'
 
-/** Golden transport files remain independent of today's compiler implementation. */
+// Golden transport files remain independent of today's compiler implementation.
 describe('version 1 golden corpus', () => {
   it('decodes JSON and gzip fixtures identically', async () => {
     const codec = new EndgeBundleCodec_Service()

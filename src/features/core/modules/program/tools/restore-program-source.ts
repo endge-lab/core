@@ -6,7 +6,7 @@ import type {
 } from '@/features/core/modules/domain/types/component/sfc/ast.types'
 import generate from '@babel/generator'
 
-/** Печатает имеющееся дерево без повторного parse/compile и без гарантии исходного форматирования. */
+// Печатает имеющееся дерево без повторного parse/compile и без гарантии исходного форматирования.
 export function restoreProgramArtifactSource(
   artifact: ProgramArtifact,
 ): string | null {

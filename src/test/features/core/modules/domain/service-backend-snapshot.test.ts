@@ -621,7 +621,7 @@ describe('изоляция поколений DomainRepository', () => {
     Endge.domain.reset()
   })
 
-  /** Старый snapshot не должен заменять актуальные revisions после setup/reset. */
+  // Старый snapshot не должен заменять актуальные revisions после setup/reset.
   it.each([false, true])('отклоняет старый snapshot, reset=%s', async (reset) => {
     const repository = new EndgeDomainRepository_Module()
     const old = deferred<EndgeLiveDomainSnapshot>()
@@ -642,7 +642,7 @@ describe('изоляция поколений DomainRepository', () => {
     expect(repository.getLoadedSnapshot()?.workspace.state.revision).toBe(9)
   })
 
-  /** Все виды mutation должны игнорировать транспорт, не подчинившийся AbortSignal. */
+  // Все виды mutation должны игнорировать транспорт, не подчинившийся AbortSignal.
   it.each(['save', 'delete', 'restore', 'workspace', 'folder'] as const)('не применяет поздний ответ %s после setup нового контекста', async (operation) => {
     const repository = new EndgeDomainRepository_Module()
     const provider = mutableProvider()

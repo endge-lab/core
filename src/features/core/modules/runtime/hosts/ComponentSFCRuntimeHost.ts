@@ -45,7 +45,7 @@ import type {
 import type { SourceFieldOption } from '@/features/core/modules/source/domain/types/source-expression.types'
 import type { EndgeStyleLease } from '@/features/core/modules/styles/domain/types/style.types'
 
-import { DataPath, Raph, RaphNode } from '@endge/raph'
+import { DataPath, Raph, RaphNode } from '@raphy-js/raph'
 
 import { ENDGE_CONTEXT_RAPH_PATH } from '@/features/core/kernel/config/kernel.config'
 import { Endge } from '@/features/core/kernel/endge'
@@ -276,17 +276,23 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     return host
   }
 
-  /** Возвращает разложенный canonical source из compiled artifact. */
+  /**
+   * Возвращает разложенный canonical source из compiled artifact.
+   */
   public getSourceParts(): RComponentSFCSource_Parts | null {
     return this.getArtifactPayload()?.sourceParts ?? null
   }
 
-  /** Возвращает diagnostics compiled artifact. */
+  /**
+   * Возвращает diagnostics compiled artifact.
+   */
   public getDiagnostics(): ProgramDiagnostic[] {
     return this.getArtifact()?.diagnostics ?? []
   }
 
-  /** Переводит public key через накопленный Composition catalog этого runtime. */
+  /**
+   * Переводит public key через накопленный Composition catalog этого runtime.
+   */
   public translate(key: string, fallback?: string): string {
     return Endge.i18n.translate(
       (this.meta.i18nCatalog ?? {}) as I18nRuntimeCatalog,
@@ -313,17 +319,23 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     return resolveRuntimeVocabOptions(Raph.get(entry.path), mapping)
   }
 
-  /** Возвращает внешний контракт компонента из compiled artifact. */
+  /**
+   * Возвращает внешний контракт компонента из compiled artifact.
+   */
   public getContract(): RComponentContract | null {
     return this.getArtifactPayload()?.contract ?? null
   }
 
-  /** Возвращает зависимости компонента из compiled artifact. */
+  /**
+   * Возвращает зависимости компонента из compiled artifact.
+   */
   public getDependencies(): RComponentDependencies | null {
     return this.getArtifactPayload()?.dependencies ?? null
   }
 
-  /** Возвращает runtime-зависимости SFC v1 из compiled artifact. */
+  /**
+   * Возвращает runtime-зависимости SFC v1 из compiled artifact.
+   */
   public getRuntimeDependencies(): RComponentSFC_RuntimeDependencies {
     const dependencies = this.getArtifactPayload()?.runtimeDependencies
       ?? createEmptyComponentSFCRuntimeDependencies()
@@ -338,27 +350,37 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     }
   }
 
-  /** Возвращает parser-level AST из compiled artifact. */
+  /**
+   * Возвращает parser-level AST из compiled artifact.
+   */
   public getAst(): RComponentSFC_AST | null {
     return this.getArtifactPayload()?.ast ?? null
   }
 
-  /** Возвращает target-neutral semantic IR из compiled artifact. */
+  /**
+   * Возвращает target-neutral semantic IR из compiled artifact.
+   */
   public getIr(): RComponentSFC_IR | null {
     return this.getArtifactPayload()?.ir ?? null
   }
 
-  /** Возвращает preview-only props из compiled artifact. */
+  /**
+   * Возвращает preview-only props из compiled artifact.
+   */
   public getPreviewProps(): Record<string, unknown> | null {
     return this.getArtifactPayload()?.previewProps ?? null
   }
 
-  /** Возвращает preview-only runtime options из compiled artifact. */
+  /**
+   * Возвращает preview-only runtime options из compiled artifact.
+   */
   public getPreviewOptions(): ComponentSFCPreviewOptions | null {
     return this.getArtifactPayload()?.previewOptions ?? null
   }
 
-  /** Подписывается на один публичный порт Event смонтированного экземпляра компонента. */
+  /**
+   * Подписывается на один публичный порт Event смонтированного экземпляра компонента.
+   */
   public onEventPort(name: string, listener: (occurrence: ComponentSFCEventOccurrence) => void): () => void {
     const key = String(name ?? '').trim()
     if (!key) {
@@ -375,12 +397,16 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     }
   }
 
-  /** Отправляет собственный публичный Event через корневую границу Component SFC. */
+  /**
+   * Отправляет собственный публичный Event через корневую границу Component SFC.
+   */
   public async emitEventPort(name: string, payload: unknown, source?: ComponentSFCEventRuntimeSource): Promise<void> {
     await this._emitRootEventPort(name, payload, source, [], 0)
   }
 
-  /** Выполняет одну связанную компилятором реакцию Event для границы renderer. */
+  /**
+   * Выполняет одну связанную компилятором реакцию Event для границы renderer.
+   */
   public async executeEventPortAction(
     ownerIdentity: string,
     port: ComponentSFCEventPort,
@@ -481,7 +507,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     }
   }
 
-  /** Публикует уже маршрутизированный корневой Event без глобальной шины Endge.events. */
+  /**
+   * Публикует уже маршрутизированный корневой Event без глобальной шины Endge.events.
+   */
   public publishEventPort(name: string, payload: unknown, source?: ComponentSFCEventRuntimeSource): void {
     const occurrence: ComponentSFCEventOccurrence = {
       componentIdentity: this.entityIdentity,
@@ -496,12 +524,16 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     }
   }
 
-  /** Возвращает активную host-owned edit-сессию конкретного renderer consumer. */
+  /**
+   * Возвращает активную host-owned edit-сессию конкретного renderer consumer.
+   */
   public getEditSession(key: string): Readonly<ComponentSFCEditSession> | null {
     return this._editSession?.key === key ? this._editSession : null
   }
 
-  /** Открывает единственную edit-сессию runtime; предыдущая отменяется без Event. */
+  /**
+   * Открывает единственную edit-сессию runtime; предыдущая отменяется без Event.
+   */
   public beginEditSession(key: string, originalValue: unknown, baseVariant = 'default'): ComponentSFCEditSession {
     const normalizedKey = String(key ?? '').trim()
     if (!normalizedKey) {
@@ -517,7 +549,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     return this._editSession
   }
 
-  /** Обновляет renderer-owned draft активной edit-сессии. */
+  /**
+   * Обновляет renderer-owned draft активной edit-сессии.
+   */
   public updateEditDraft(key: string, value: unknown): void {
     if (this._editSession?.key !== key) {
       return
@@ -525,7 +559,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     this._editSession.draftValue = cloneEditValue(value)
   }
 
-  /** Завершает edit-сессию и возвращает нормализованный semantic payload. */
+  /**
+   * Завершает edit-сессию и возвращает нормализованный semantic payload.
+   */
   public commitEditSession(key: string, value?: unknown): ComponentSFCEditedEventPayload | null {
     const session = this._editSession
     if (!session || session.key !== key) {
@@ -540,7 +576,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     return payload
   }
 
-  /** Отменяет edit-сессию без публикации edited. */
+  /**
+   * Отменяет edit-сессию без публикации edited.
+   */
   public cancelEditSession(key?: string): void {
     if (!this._editSession || (key && this._editSession.key !== key)) {
       return
@@ -550,7 +588,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     this.emit('resource:dirty', { kind: 'editable', action: 'cancel', key: sessionKey })
   }
 
-  /** Возвращает один ресурс вычислений, принадлежащий host и изолированный scope потребителя renderer. */
+  /**
+   * Возвращает один ресурс вычислений, принадлежащий host и изолированный scope потребителя renderer.
+   */
   public getComputationResource(
     identity: string,
     input: unknown,
@@ -573,12 +613,16 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     return resource
   }
 
-  /** Завершает ресурсы исчезнувших renderer consumers; host сохраняет остальных. */
+  /**
+   * Завершает ресурсы исчезнувших renderer consumers; host сохраняет остальных.
+   */
   public releaseComputationResources(consumerScope: string, keep?: (key: string) => boolean): void {
     this._computationResources.releaseScope(consumerScope, keep)
   }
 
-  /** Обновляет input source и пересобирает Raph subscriptions host-а. */
+  /**
+   * Обновляет input source и пересобирает Raph subscriptions host-а.
+   */
   public setInputSource(input: RuntimeHostInputSource | null | undefined): void {
     this._clearRaphInputSubscriptions()
     this._inputSource = input ?? null
@@ -590,12 +634,16 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     this.emit('render-input:changed', null)
   }
 
-  /** Возвращает текущий input source host-а. */
+  /**
+   * Возвращает текущий input source host-а.
+   */
   public getInputSource(): RuntimeHostInputSource | null {
     return this._inputSource
   }
 
-  /** Наблюдение сохраняет входы и уже вычисленное состояние; compilation и execution не запускаются. */
+  /**
+   * Наблюдение сохраняет входы и уже вычисленное состояние; compilation и execution не запускаются.
+   */
   public captureRenderInspection(): RuntimeRenderableInspection {
     const dataMeta: Record<string, unknown> = {}
     const dependencies = this.getRuntimeDependencies()
@@ -622,7 +670,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     return { kind: 'component-sfc', input: this._inputSource, computations: this._computationResources.snapshot(), dataMeta }
   }
 
-  /** Читает Meta-plane по compiler-known ссылке, не раскрывая SFC физический DataPath. */
+  /**
+   * Читает Meta-plane по compiler-known ссылке, не раскрывая SFC физический DataPath.
+   */
   public readDataMeta(
     reference: RComponentSFC_IR_DataMetaReference & { boundaryId?: string, rowKey?: unknown },
     namespace?: string,
@@ -669,7 +719,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     super.resume()
   }
 
-  /** Очищает Raph subscriptions перед общим destroy host-а. */
+  /**
+   * Очищает Raph subscriptions перед общим destroy host-а.
+   */
   public override destroy(): void {
     this._clearRaphInputSubscriptions()
     for (const dispose of this._vocabDisposers.values()) {
@@ -850,7 +902,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     console.error(`[ComponentSFCRuntimeHost] Computation port failed for "${this.entityIdentity}.${portName ?? 'unknown'}" (${resource.error.computationIdentity || identity}/${resource.error.outputName ?? 'unknown'}, ${resource.error.kind})`)
   }
 
-  /** Синхронизирует runtime context с текущим compiled artifact. */
+  /**
+   * Синхронизирует runtime context с текущим compiled artifact.
+   */
   public syncArtifactState(target: RComponentRenderTarget | null): void {
     const now = new Date().toISOString()
     const artifact = this.getArtifact()
@@ -866,7 +920,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     })
   }
 
-  /** Backward-compatible alias для старого runtime prepare API. */
+  /**
+   * Backward-compatible alias для старого runtime prepare API.
+   */
   public preparePlaceholders(target: RComponentRenderTarget | null): void {
     this.syncArtifactState(target)
   }
@@ -895,7 +951,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     }
   }
 
-  /** Подписывает host на shared Vocab path один раз, включая вложенные SFC artifacts. */
+  /**
+   * Подписывает host на shared Vocab path один раз, включая вложенные SFC artifacts.
+   */
   private _ensureVocabSubscription(alias: string, path: string): void {
     const key = `${alias}\u0000${path}`
     if (this._vocabDisposers.has(key)) {
@@ -933,7 +991,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
         },
       })
 
-      root.addChild(tableNode, { invalidate: false })
+      root.addChild(tableNode)
       this.addRaphNode(tableNode)
       this.addResource({
         id: `node:${tableNode.id}`,
@@ -975,7 +1033,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
       },
     })
 
-    tableNode.addChild(columnNode, { invalidate: false })
+    tableNode.addChild(columnNode)
     this.addRaphNode(columnNode)
     this.addResource({
       id: `node:${columnNode.id}`,
@@ -1117,7 +1175,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     return mapped.split('.').map(part => part.trim()).filter(Boolean)
   }
 
-  /** Зависимости контекста основаны на Raph и не зависят от вида входных props компонента. */
+  /**
+   * Зависимости контекста основаны на Raph и не зависят от вида входных props компонента.
+   */
   private _bindRaphContextSources(): void {
     if (!this.node) {
       return
@@ -1287,7 +1347,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     return this._makeCollectionPatch(ctx, sourcePath, boundaryId, rowKey, projection ? [projection] : [])
   }
 
-  /** Собирает все keyed события frame-а, не теряя соседние SSE-изменения. */
+  /**
+   * Собирает все keyed события frame-а, не теряя соседние SSE-изменения.
+   */
   private _makeCollectionPatch(
     ctx: RuntimeHostUpdateContext,
     sourcePath: string,
@@ -1462,7 +1524,7 @@ function isCollectionEventPath(sourcePath: string, canonical: string): boolean {
     || canonical.startsWith(`${sourcePath}[`)
 }
 
-/** Нормализует target из runtime meta. */
+// Нормализует target из runtime meta.
 function normalizeTarget(raw: unknown): RComponentRenderTarget | null {
   return raw === 'dom' || raw === 'canvas'
     ? raw

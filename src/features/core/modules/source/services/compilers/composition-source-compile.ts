@@ -43,7 +43,7 @@ import { compileProgramMetadataProperty } from '@/features/core/modules/source/s
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
-/** Компилирует Composition source v1 в runtime graph artifact. */
+// Компилирует Composition source v1 в runtime graph artifact.
 export function compileCompositionSource(
   source: string,
   sourceVersion = 1,
@@ -181,7 +181,7 @@ export function compileCompositionSource(
   }
 }
 
-/** Строит normalized graph отдельно от source AST, чтобы runtime не интерпретировал DSL. */
+// Строит normalized graph отдельно от source AST, чтобы runtime не интерпретировал DSL.
 export function buildRuntimeGraph(document: CompositionSourceDocument): CompositionRuntimeGraph {
   const inputs = document.runtimes.flatMap(runtime => Object.entries(runtime.props).map(([targetProp, source]) => ({
     targetRuntime: runtime.name,
@@ -254,7 +254,7 @@ function validateRootProperties(node: t.ObjectExpression, diagnostics: Diagnosti
   }
 }
 
-/** Читает статический Composition data mode override. */
+// Читает статический Composition data mode override.
 function readDataMode(
   raw: t.Expression,
   diagnostics: DiagnosticDraft[],
@@ -1875,7 +1875,7 @@ function readStringObjectProperty(node: t.ObjectExpression, name: string): strin
   return value && t.isStringLiteral(value) ? value.value.trim() : null
 }
 
-/** Разбирает поддерживаемый источник onChange без расширения hooks до произвольных выражений. */
+// Разбирает поддерживаемый источник onChange без расширения hooks до произвольных выражений.
 function readChangeSource(
   call: t.CallExpression,
   runtimeNames: Set<string>,

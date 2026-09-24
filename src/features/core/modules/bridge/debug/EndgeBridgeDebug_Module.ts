@@ -33,7 +33,9 @@ interface IncomingEventStream {
   bufferedBytes: number
 }
 
-/** Debug policy и единственная client reservation сразу для всех backend. */
+/**
+ * Debug policy и единственная client reservation сразу для всех backend.
+ */
 export class EndgeBridgeDebug_Module extends EndgeModule {
   private _role: 'client' | 'configurator' = 'client'
   private _enabled = false
@@ -58,12 +60,8 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
   private _includeData = false
 
   /**
-   * ----------------------------------------
-   * PUBLIC
-   * ----------------------------------------
+   * Создаёт owner и его явные зависимости без запуска транспорта.
    */
-
-  /** Создаёт owner и его явные зависимости без запуска транспорта. */
   public constructor(
     private readonly _commands: BridgeCommands,
     private readonly _adapter: BrowserBridge_Adapter,
@@ -71,13 +69,21 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     super()
   }
 
-  /** Настраивается только родителем из host boot options. */
+  // ---------------------------------------------
+  // PUBLIC API
+  // ---------------------------------------------
+
+  /**
+   * Настраивается только родителем из host boot options.
+   */
   public configure(role: 'client' | 'configurator', enabled: boolean): void {
     this._role = role
     this._enabled = enabled
   }
 
-  /** Запрашивает сессию; Promise завершается после подтверждения в приложении. */
+  /**
+   * Запрашивает сессию; Promise завершается после подтверждения в приложении.
+   */
   public async requestSession(input: {
     serverUrl: string
     instanceId: string
@@ -101,7 +107,9 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     return { ...session }
   }
 
-  /** Принимает ответ UI только для текущего непросроченного запроса. */
+  /**
+   * Принимает ответ UI только для текущего непросроченного запроса.
+   */
   public respondToConsent(
     request: Pick<DebugConnectionRequest, 'serverUrl' | 'sessionId'>,
     accepted: boolean,
@@ -141,7 +149,9 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     return true
   }
 
-  /** Завершает выбранную сессию с любой её стороны. */
+  /**
+   * Завершает выбранную сессию с любой её стороны.
+   */
   public async endSession(sessionId: string): Promise<void> {
     const session = this._requireSession(sessionId)
     this._sessions.delete(sessionId)
@@ -156,7 +166,9 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     })
   }
 
-  /** Запрашивает snapshot существующего diagnostics collector без скачивания файла. */
+  /**
+   * Запрашивает snapshot существующего diagnostics collector без скачивания файла.
+   */
   public async getSnapshot(sessionId: string): Promise<DiagnosticsSnapshot> {
     this._requireConfigurator()
     const session = this._requireSession(sessionId)
@@ -166,7 +178,9 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     })) as DiagnosticsSnapshot
   }
 
-  /** Начинает буферизацию событий до импорта согласованного с ними снимка. */
+  /**
+   * Начинает буферизацию событий до импорта согласованного с ними снимка.
+   */
   public async startContextSync(
     sessionId: string,
     options: { includeData: boolean } = { includeData: false },
@@ -228,7 +242,9 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     }
   }
 
-  /** После прямого импорта снимка применяет только более новые события, не вызывая Commands. */
+  /**
+   * После прямого импорта снимка применяет только более новые события, не вызывая Commands.
+   */
   public activateContextSync(sessionId: string, sequence: number): void {
     this._requireConfigurator()
     this._requireSession(sessionId)
@@ -249,12 +265,16 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     this.notify()
   }
 
-  /** Обновляет Runtime и данные через тот же упорядоченный поток, что и события. */
+  /**
+   * Обновляет Runtime и данные через тот же упорядоченный поток, что и события.
+   */
   public async refreshInspection(sessionId: string): Promise<void> {
     await this._requestInspection(sessionId, 'refreshInspection')
   }
 
-  /** Ноль оставляет ручное обновление; положительный интервал ограничивает частоту полных данных. */
+  /**
+   * Ноль оставляет ручное обновление; положительный интервал ограничивает частоту полных данных.
+   */
   public async setInspectionInterval(
     sessionId: string,
     intervalMs: number,
@@ -265,7 +285,9 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     })
   }
 
-  /** Отправляет запрос выбранному клиенту только после завершения первичной синхронизации. */
+  /**
+   * Отправляет запрос выбранному клиенту только после завершения первичной синхронизации.
+   */
   public async executeCommand(
     sessionId: string,
     command: EndgeCommand,
@@ -285,7 +307,9 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     }
   }
 
-  /** Пока выполняет только existence/hash check и console mock на стороне клиента. */
+  /**
+   * Пока выполняет только existence/hash check и console mock на стороне клиента.
+   */
   public async runSimulation(
     sessionId: string,
     input: { identity: string, expectedHash: string },
@@ -299,7 +323,9 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     })) as SimulationRunResult
   }
 
-  /** Вычисляет hash локальной симуляции для передачи expectedHash. */
+  /**
+   * Вычисляет hash локальной симуляции для передачи expectedHash.
+   */
   public async getSimulationHash(identity: string): Promise<string> {
     const simulation = Endge.domain.getSimulationByIdentity(identity)
     if (!simulation) {
@@ -311,7 +337,9 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     })
   }
 
-  /** Применяет сообщение только из принадлежащего родителю соединения. */
+  /**
+   * Применяет сообщение только из принадлежащего родителю соединения.
+   */
   public async receive(
     serverUrl: string,
     message: BridgeMessage,
@@ -373,7 +401,9 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     }
   }
 
-  /** Потеря транспорта окончательно отзывает сессию и согласие. */
+  /**
+   * Потеря транспорта окончательно отзывает сессию и согласие.
+   */
   public disconnect(serverUrl: string): void {
     this._requests.delete(serverUrl)
     this._clients.delete(serverUrl)
@@ -390,7 +420,9 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     this.notify()
   }
 
-  /** Отзывает текущий lifecycle и освобождает принадлежащее модулю состояние. */
+  /**
+   * Отзывает текущий lifecycle и освобождает принадлежащее модулю состояние.
+   */
   public override reset(): void {
     this._stopInspectionPublishing()
     this._outgoingSession = null
@@ -405,13 +437,13 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     this.notify()
   }
 
-  /**
-   * ----------------------------------------
-   * PRIVATE
-   * ----------------------------------------
-   */
+  // ---------------------------------------------
+  // PRIVATE
+  // ---------------------------------------------
 
-  /** Резервирует запрос для View приложения, не вызывая browser dialog. */
+  /**
+   * Резервирует запрос для View приложения, не вызывая browser dialog.
+   */
   private _requestConsent(
     serverUrl: string,
     request: Omit<DebugConnectionRequest, 'serverUrl'>,
@@ -446,7 +478,9 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     this.notify()
   }
 
-  /** Снимает View-проекцию и принадлежащий запросу deadline timer. */
+  /**
+   * Снимает View-проекцию и принадлежащий запросу deadline timer.
+   */
   private _clearPendingConsent(): void {
     if (this._consentTimer !== null) {
       clearTimeout(this._consentTimer)
@@ -455,7 +489,9 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     this._pendingConsent = null
   }
 
-  /** Проверяет активную сессию и выполняет только явно разрешённые операции. */
+  /**
+   * Проверяет активную сессию и выполняет только явно разрешённые операции.
+   */
   private async _execute(
     serverUrl: string,
     message: BridgeMessage,
@@ -607,7 +643,9 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     }
   }
 
-  /** Delivery batching never coalesces already captured changes. */
+  /**
+   * Delivery batching never coalesces already captured changes.
+   */
   private _queueChunk(
     session: BridgeDebugSession,
     chunk: InspectionChunk,
@@ -786,14 +824,18 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     this._pendingBytes = 0
   }
 
-  /** Проверяет локальную роль и явное разрешение отладки. */
+  /**
+   * Проверяет локальную роль и явное разрешение отладки.
+   */
   private _requireConfigurator(): void {
     if (!this._enabled || this._role !== 'configurator') {
       throw new Error('[Endge Bridge] Configurator debug is disabled')
     }
   }
 
-  /** Разрешает только существующую активную сессию. */
+  /**
+   * Разрешает только существующую активную сессию.
+   */
   private _requireSession(id: string): BridgeDebugSession {
     const session = this._sessions.get(id)
     if (!session) {
@@ -802,25 +844,29 @@ export class EndgeBridgeDebug_Module extends EndgeModule {
     return session
   }
 
-  /**
-   * ----------------------------------------
-   * ACCESS
-   * ----------------------------------------
-   */
+  // ---------------------------------------------
+  // ACCESS
+  // ---------------------------------------------
 
-  /** Показывает приложению текущий запрос без права менять состояние Bridge. */
+  /**
+   * Показывает приложению текущий запрос без права менять состояние Bridge.
+   */
   public get pendingConsent(): Readonly<DebugConnectionRequest> | null {
     return this._pendingConsent
   }
 
-  /** Возвращает доступные приложения из актуальных server rosters. */
+  /**
+   * Возвращает доступные приложения из актуальных server rosters.
+   */
   public get clients(): readonly BridgeDebugClient[] {
     return Array.from(this._clients.values())
       .flat()
       .map(value => ({ ...value }))
   }
 
-  /** Возвращает копии активных согласованных сессий. */
+  /**
+   * Возвращает копии активных согласованных сессий.
+   */
   public get sessions(): readonly BridgeDebugSession[] {
     return Array.from(this._sessions.values(), value => ({ ...value }))
   }

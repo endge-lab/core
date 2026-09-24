@@ -1,4 +1,4 @@
-/** ISO-строка в Date. Пример: "2025-02-22T12:00:00Z" в Date. */
+// ISO-строка в Date. Пример: "2025-02-22T12:00:00Z" в Date.
 export function isoStringToDate(value: unknown): Date | null {
   if (value == null) {
     return null

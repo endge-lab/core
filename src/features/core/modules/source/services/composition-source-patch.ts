@@ -36,7 +36,7 @@ const ROOT_SECTION_ORDER = [
   'outputs',
 ] as const
 
-/** Парсит Composition source в normalized editor document. */
+// Парсит Composition source в normalized editor document.
 export function parseCompositionSource(source: string): SourceParseResult<CompositionSourceDocument> {
   const result = compileCompositionSource(source)
   const ok = !result.diagnostics.some(diagnostic => diagnostic.severity === 'error')
@@ -50,7 +50,7 @@ export function parseCompositionSource(source: string): SourceParseResult<Compos
   }
 }
 
-/** Атомарно добавляет dependencies, сохраняя нетронутые участки Composition source. */
+// Атомарно добавляет dependencies, сохраняя нетронутые участки Composition source.
 export function patchCompositionSource(
   source: string,
   patch: CompositionSourcePatch,

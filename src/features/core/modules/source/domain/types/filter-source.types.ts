@@ -2,19 +2,19 @@ import type { ProgramMetadataMap } from '@/features/core/modules/program/domain/
 import type { ProgramDiagnostic } from '@/features/core/modules/program/domain/types/program.types'
 import type { SourceExpressionIR, SourceFieldDefinition } from '@/features/core/modules/source/domain/types/source-expression.types'
 
-/** Source-описание Filter v1. */
+// Source-описание Filter v1.
 export interface FilterSourceDocument {
   fields: SourceFieldDefinition[]
   outputs: FilterProgramOutput[]
 }
 
-/** Абсолютный диапазон узла внутри Filter source. */
+// Абсолютный диапазон узла внутри Filter source.
 export interface FilterSourceRange {
   start: number
   end: number
 }
 
-/** Source-backed поле для визуального редактора Filter. */
+// Source-backed поле для визуального редактора Filter.
 export interface FilterSourceEditorField extends SourceFieldDefinition {
   sourceRange: FilterSourceRange
   keyRange: FilterSourceRange
@@ -23,7 +23,7 @@ export interface FilterSourceEditorField extends SourceFieldDefinition {
   defaultSource: string | null
 }
 
-/** Source-backed output для навигации из визуального редактора. */
+// Source-backed output для навигации из визуального редактора.
 export interface FilterSourceEditorOutput {
   key: string
   kind: FilterProgramOutput['kind']
@@ -31,13 +31,13 @@ export interface FilterSourceEditorOutput {
   source: string
 }
 
-/** Проекция Filter source, которая не хранится отдельно от source. */
+// Проекция Filter source, которая не хранится отдельно от source.
 export interface FilterSourceEditorDocument {
   fields: FilterSourceEditorField[]
   outputs: FilterSourceEditorOutput[]
 }
 
-/** Узкие операции визуального редактора над canonical Filter source. */
+// Узкие операции визуального редактора над canonical Filter source.
 export type FilterSourcePatchOperation
   = | { type: 'add-field', key: string, expression: string }
     | { type: 'remove-field', key: string }
@@ -49,7 +49,7 @@ export type FilterSourcePatch
   = FilterSourcePatchOperation
     | FilterSourcePatchOperation[]
 
-/** JSON-output фильтра. */
+// JSON-output фильтра.
 export interface FilterProgramJsonOutput {
   key: string
   kind: 'json'
@@ -57,7 +57,7 @@ export interface FilterProgramJsonOutput {
   dependencies?: string[]
 }
 
-/** Локальный predicate, вычисляемый над строкой и state фильтра. */
+// Локальный predicate, вычисляемый над строкой и state фильтра.
 export interface FilterProgramPredicateOutput {
   key: string
   kind: 'predicate'
@@ -69,9 +69,9 @@ export type FilterProgramOutput
   = | FilterProgramJsonOutput
     | FilterProgramPredicateOutput
 
-/** Payload Filter artifact без persisted source и diagnostics envelope. */
+// Payload Filter artifact без persisted source и diagnostics envelope.
 export interface FilterProgramPayload {
-  /** Optional parser tree retained for inspection; runtime does not require it. */
+  // Optional parser tree retained for inspection; runtime does not require it.
   ast?: unknown
   type: 'filter'
   sourceVersion: number
@@ -80,7 +80,7 @@ export interface FilterProgramPayload {
   outputs: FilterProgramOutput[]
 }
 
-/** Результат компиляции Filter source. */
+// Результат компиляции Filter source.
 export interface FilterSourceCompileResult {
   ast: unknown | null
   document: FilterSourceDocument | null
@@ -89,7 +89,7 @@ export interface FilterSourceCompileResult {
   diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
 }
 
-/** Runtime-value одного Filter output. */
+// Runtime-value одного Filter output.
 export type FilterRuntimeOutput
   = | { key: string, kind: 'json', value: unknown }
     | { key: string, kind: 'predicate', test: (row: unknown) => boolean }

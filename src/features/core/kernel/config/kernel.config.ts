@@ -10,7 +10,7 @@ export {
 
 export const ENDGE_COMPILER_VERSION = 'program-v4'
 
-/** Стабильные scope groups для compiler spans. */
+// Стабильные scope groups для compiler spans.
 export const ENDGE_COMPILER_SPAN_GROUPS = {
   COMPONENTS: 'components',
   TYPES: 'types',
@@ -20,7 +20,7 @@ export const ENDGE_COMPILER_SPAN_GROUPS = {
   RAPH: 'raph',
 } as const
 
-/** Runtime fallback limits для nested computation execution. */
+// Runtime fallback limits для nested computation execution.
 export const ENDGE_COMPUTATION_MAX_CALL_DEPTH = 32
 export const ENDGE_COMPUTATION_MAX_CALLS = 256
 
@@ -29,19 +29,19 @@ export const LEGACY_CONTEXT_STORAGE_KEY = 'EndgeContext_Module'
 export const LEGACY_THEME_STORAGE_KEY = 'endge:theme'
 export const LEGACY_TIMEZONE_STORAGE_KEY = 'endge:isLocalTime'
 
-/** Встроенные mock-провайдеры. Провайдеры приложения регистрируются при запуске. */
+// Встроенные mock-провайдеры. Провайдеры приложения регистрируются при запуске.
 export const ENDGE_CORE_MOCK_PROVIDERS: EndgeMockProvider[] = []
 
 export const VARS_STORAGE_KEY = 'endge:vars'
 export const AUTH_STORAGE_KEY = 'endge:auth'
 
-/** Ключ в Raph-хранилище для глобальных переменных. */
+// Ключ в Raph-хранилище для глобальных переменных.
 export const STORAGE_VARS_KEY = 'vars'
-/** Пространство имён Raph с постоянными и временными значениями контекста Endge. */
+// Пространство имён Raph с постоянными и временными значениями контекста Endge.
 export const ENDGE_CONTEXT_RAPH_PATH = 'context'
 export const ENDGE_KEYBOARD_CONTEXT_RAPH_PATH = `${ENDGE_CONTEXT_RAPH_PATH}.input.keyboard`
 
-/** Обратная совместимость публичного API `Config`. */
+// Обратная совместимость публичного API `Config`.
 export default {
   VARS_STORAGE_KEY,
   AUTH_STORAGE_KEY,
