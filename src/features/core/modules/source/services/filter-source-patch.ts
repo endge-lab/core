@@ -28,7 +28,7 @@ interface ParsedFilterSource {
   message?: string
 }
 
-/** Парсит Filter source в проекцию с абсолютными source ranges. */
+// Парсит Filter source в проекцию с абсолютными source ranges.
 export function parseFilterSourceForEditor(source: string) {
   const parsed = parseFilterDefinition(source)
   const diagnostics = parsed.result.diagnostics
@@ -46,7 +46,7 @@ export function parseFilterSourceForEditor(source: string) {
   }
 }
 
-/** Применяет visual-editor patch, не создавая вторую persisted-модель Filter. */
+// Применяет visual-editor patch, не создавая вторую persisted-модель Filter.
 export function patchFilterSource(
   source: string,
   patch: FilterSourcePatch,

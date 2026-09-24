@@ -5,7 +5,7 @@ import axios from 'axios'
 
 import { QueryExecutor_Adapter } from '@/features/core/modules/runtime/adapters/QueryExecutor_Adapter'
 
-/** Создаёт Query executor с изолированными test dependencies. */
+// Создаёт Query executor с изолированными test dependencies.
 export function createQueryExecutor(
   http: AxiosInstance = axios.create(),
   overrides: Partial<QueryExecutorDependencies> = {},

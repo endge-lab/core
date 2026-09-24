@@ -9,7 +9,7 @@ import { compileProgramMetadataExpression } from '@/features/core/modules/source
 
 type Diagnostic = Omit<ProgramDiagnostic, 'entityRef'>
 
-/** Разбирает только whitelist Simulation v1, не исполняя authored Source. */
+// Разбирает только whitelist Simulation v1, не исполняя authored Source.
 export function compileSimulationSource(source: string, sourceVersion = 1): SimulationSourceCompileResult {
   const diagnostics: Diagnostic[] = []
   const locations: SimulationSourceCompileResult['locations'] = {}

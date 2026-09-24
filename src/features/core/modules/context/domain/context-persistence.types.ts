@@ -19,12 +19,12 @@ export interface EndgeContextSnapshot {
   timezone: string | null
 }
 
-/** Данные хранилища, отличающие явный выбор темы от фактического default. */
+// Данные хранилища, отличающие явный выбор темы от фактического default.
 export interface EndgePersistedContextSnapshot extends EndgeContextSnapshot {
   themePreferenceVersion?: 1
 }
 
-/** Временное состояние клавиатуры, предоставляемое активным UI-адаптером. */
+// Временное состояние клавиатуры, предоставляемое активным UI-адаптером.
 export interface EndgeKeyboardContextSnapshot {
   platform: 'macos' | 'windows' | 'linux' | 'unknown'
   modifiers: {
@@ -41,9 +41,9 @@ export interface EndgeKeyboardContextSnapshot {
   }
 }
 
-/** Полный readonly-контекст SFC. Временное состояние ввода намеренно не сериализуется. */
+// Полный readonly-контекст SFC. Временное состояние ввода намеренно не сериализуется.
 export interface EndgeRuntimeContextSnapshot extends EndgeContextSnapshot {
-  /** Статическая фактическая конфигурация текущей сборки; не сохраняется и не поддерживается Raph. */
+  // Статическая фактическая конфигурация текущей сборки; не сохраняется и не поддерживается Raph.
   config: EndgePublicConfigurationSnapshot
   input: {
     keyboard: EndgeKeyboardContextSnapshot

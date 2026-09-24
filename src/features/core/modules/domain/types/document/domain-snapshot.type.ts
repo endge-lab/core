@@ -3,14 +3,14 @@ import type {
   EndgePortableDocuments,
 } from '@/features/core/modules/domain/types/document/domain-export.type'
 
-/** Безопасная публичная ссылка на автора server-side изменения. */
+// Безопасная публичная ссылка на автора server-side изменения.
 export interface EndgeSnapshotActor {
   id: string
   username?: string
   displayName?: string
 }
 
-/** Server-only состояние документа, не являющееся частью доменной конфигурации. */
+// Server-only состояние документа, не являющееся частью доменной конфигурации.
 export interface EndgeDocumentServerState {
   id: string
   revision: number
@@ -21,28 +21,28 @@ export interface EndgeDocumentServerState {
   updatedAt?: string
 }
 
-/** Server-only состояние workspace. */
+// Server-only состояние workspace.
 export interface EndgeWorkspaceServerState extends EndgeDocumentServerState {
   generation: string
   headSequence: number
 }
 
-/** Документ live snapshot с обязательным server-side состоянием. */
+// Документ live snapshot с обязательным server-side состоянием.
 export type EndgeLiveDomainDocument = Record<string, unknown> & {
   state: EndgeDocumentServerState
 }
 
-/** Коллекции документов live snapshot нового backend. */
+// Коллекции документов live snapshot нового backend.
 export type EndgeLivePortableDocuments = {
   [K in Exclude<keyof EndgePortableDocuments, 'facets' | 'facet-documents'>]: EndgeLiveDomainDocument[]
 } & {
-  /** Optional only for backward-compatible materialization of pre-v6 in-memory snapshots. */
+  // Optional only for backward-compatible materialization of pre-v6 in-memory snapshots.
   'facets'?: EndgeLiveDomainDocument[]
-  /** Optional only for backward-compatible materialization of pre-v6 in-memory snapshots. */
+  // Optional only for backward-compatible materialization of pre-v6 in-memory snapshots.
   'facet-documents'?: EndgeLiveDomainDocument[]
 }
 
-/** Консистентный live snapshot одного workspace. */
+// Консистентный live snapshot одного workspace.
 export type EndgeLiveDomainSnapshot = Omit<EndgeDomainBundle, 'documents' | 'workspace'> & {
   workspace: EndgeDomainBundle['workspace'] & {
     state: EndgeWorkspaceServerState

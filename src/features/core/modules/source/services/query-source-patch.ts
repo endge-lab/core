@@ -21,7 +21,7 @@ interface InsertTarget {
   depth: number
 }
 
-/** Парсит query source в normalized document для editor projections. */
+// Парсит query source в normalized document для editor projections.
 export function parseQuerySource(source: string) {
   const result = compileQuerySource(source)
   const ok = !result.diagnostics.some(diagnostic => diagnostic.severity === 'error')
@@ -35,7 +35,7 @@ export function parseQuerySource(source: string) {
   }
 }
 
-/** Патчит query source v1 по editor-slot операции, не перепечатывая весь документ. */
+// Патчит query source v1 по editor-slot операции, не перепечатывая весь документ.
 export function patchQuerySource(source: string, patch: QuerySourcePatch): SourcePatchResult<QuerySourceDocument> {
   const operations = Array.isArray(patch) ? patch : [patch]
   let nextSource = source

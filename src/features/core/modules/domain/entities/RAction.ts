@@ -7,7 +7,9 @@ import { Serialize } from '@endge/utils'
 import { Expose } from 'class-transformer'
 import { REntity } from '@/features/core/modules/domain/entities/REntity'
 
-/** Каноническое определение Action на основе Source. Исполняемый код предоставляет провайдер. */
+/**
+ * Каноническое определение Action на основе Source. Исполняемый код предоставляет провайдер.
+ */
 export class RAction extends REntity {
   @Expose()
   override displayName: string = ''

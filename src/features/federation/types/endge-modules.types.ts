@@ -9,13 +9,13 @@ export type AnyEndgeModule = EndgeModule<any>
 
 export type EndgeModuleOrder = string | readonly string[]
 
-/** Доступ к уже объявленным модулям во время создания graph dependencies. */
+// Доступ к уже объявленным модулям во время создания graph dependencies.
 export interface EndgeModuleFactoryContext {
   getModule: <T extends AnyEndgeModule = AnyEndgeModule>(key: string) => T
   createDiagnosticsSnapshot: (options?: EndgeFederationDiagnosticsSnapshotOptions) => EndgeFederationDiagnosticsSnapshot
 }
 
-/** Декларативное описание лениво создаваемого модуля федерации. */
+// Декларативное описание лениво создаваемого модуля федерации.
 export interface EndgeModuleDefinition<
   TKey extends string = string,
   TModule extends AnyEndgeModule = AnyEndgeModule,
@@ -35,7 +35,7 @@ export interface EndgeModuleDescriptor<T extends AnyEndgeModule = AnyEndgeModule
 
 export type EndgeModuleDefinitions = readonly EndgeModuleDefinition[]
 
-/** Lifecycle context, объявленный concrete Module. */
+// Lifecycle context, объявленный concrete Module.
 export type EndgeModuleContext<TModule extends AnyEndgeModule>
   = TModule extends EndgeModule<infer TContext> ? TContext : never
 
@@ -44,13 +44,13 @@ type UnionToIntersection<TValue>
     ? TResult
     : never
 
-/** Наиболее строгий lifecycle context, требуемый всеми Modules федерации. */
+// Наиболее строгий lifecycle context, требуемый всеми Modules федерации.
 export type EndgeFederationContextOf<TDefinitions extends EndgeModuleDefinitions>
   = UnionToIntersection<EndgeModuleContext<ReturnType<TDefinitions[number]['create']>>> extends infer TContext extends EndgeFederationContext
     ? TContext
     : EndgeFederationContext
 
-/** Readonly module accessors, выведенные из literal keys и factory return types. */
+// Readonly module accessors, выведенные из literal keys и factory return types.
 export type EndgeFederationModuleAccessors<TDefinitions extends EndgeModuleDefinitions> = {
   readonly [TDefinition in TDefinitions[number] as TDefinition['key']]: ReturnType<TDefinition['create']>
 }

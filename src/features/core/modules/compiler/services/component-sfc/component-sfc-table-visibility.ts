@@ -4,7 +4,7 @@ import type {
 } from '@/features/core/modules/domain/types/component/sfc/ir.types'
 import type { ComponentSFCTableColumnVisibilityDescriptor } from '@/features/core/modules/domain/types/component/sfc/table-visibility.types'
 
-/** Нормализует authored default-hidden без renderer-specific visibility state. */
+// Нормализует authored default-hidden без renderer-specific visibility state.
 export function normalizeComponentSFCTableColumnVisibility(
   tableNode: RComponentSFC_IR_ElementNode,
 ): ComponentSFCTableColumnVisibilityDescriptor {

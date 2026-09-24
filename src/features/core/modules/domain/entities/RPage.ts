@@ -9,9 +9,9 @@ import { REntity } from '@/features/core/modules/domain/entities/REntity'
 export interface RPageAreaBlockSchema {
   key: string
   entityType?: string | null
-  /** Целочисленный id документа в Payload (relation value). */
+  // Целочисленный id документа в Payload (relation value).
   entityId?: number | null
-  /** Identity сущности (для отображения и fallback при сохранении). */
+  // Identity сущности (для отображения и fallback при сохранении).
   entityIdentity?: string | null
   titleOverride?: string | null
   visibleWhen?: string | null
@@ -36,7 +36,9 @@ export interface RPageSchema extends EntityManagement {
   meta?: Record<string, unknown>
 }
 
-/** Страница приложения (коллекция pages). */
+/**
+ * Страница приложения (коллекция pages).
+ */
 export class RPage extends REntity {
   @Expose()
   description: string | null = null
@@ -56,7 +58,9 @@ export class RPage extends REntity {
   @Expose()
   areas: RPageAreaSchema[] = []
 
-  /** Тип документа для редактора/инспектора. */
+  /**
+   * Тип документа для редактора/инспектора.
+   */
   get type(): DomainDocumentType {
     return 'page' as DomainDocumentType
   }

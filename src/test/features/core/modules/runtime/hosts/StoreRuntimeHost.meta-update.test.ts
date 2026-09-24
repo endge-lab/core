@@ -1,4 +1,4 @@
-import { Raph } from '@endge/raph'
+import { Raph } from '@raphy-js/raph'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { Endge } from '@/features/core/kernel/endge'

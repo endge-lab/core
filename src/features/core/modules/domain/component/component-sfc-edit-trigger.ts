@@ -21,7 +21,7 @@ export type ComponentSFCInteractionTriggerActivationMatch
       triggerIndex: number
     }
 
-/** Нормализует общее значение trigger `edit-on` или `on`. */
+// Нормализует общее значение trigger `edit-on` или `on`.
 export function normalizeComponentSFCInteractionTriggers(value: unknown): ComponentSFCInteractionTrigger[] {
   const values = Array.isArray(value) ? value : [value]
   return values.flatMap((item): ComponentSFCInteractionTrigger[] => {
@@ -59,7 +59,7 @@ export function normalizeComponentSFCInteractionTriggers(value: unknown): Compon
   })
 }
 
-/** Нормализует legacy TriggerSet или последовательность, не меняя форму обычного набора. */
+// Нормализует legacy TriggerSet или последовательность, не меняя форму обычного набора.
 export function normalizeComponentSFCInteractionTriggerActivation(
   value: unknown,
 ): ComponentSFCInteractionTriggerActivation {
@@ -82,7 +82,7 @@ export function normalizeComponentSFCInteractionTriggerActivation(
   return { mode: 'sequence', steps }
 }
 
-/** Проверяет, содержит ли активация хотя бы один исполнимый TriggerSet. */
+// Проверяет, содержит ли активация хотя бы один исполнимый TriggerSet.
 export function hasComponentSFCInteractionTriggerActivation(
   activation: ComponentSFCInteractionTriggerActivation,
 ): boolean {
@@ -91,7 +91,9 @@ export function hasComponentSFCInteractionTriggerActivation(
     : activation.steps.length > 0 && activation.steps.every(step => step.triggerSet.length > 0)
 }
 
-/** Stateful matcher последовательностей, общий для runtime-владельцев и platform adapters. */
+/**
+ * Stateful matcher последовательностей, общий для runtime-владельцев и platform adapters.
+ */
 export class ComponentSFCInteractionTriggerActivationMatcher {
   private readonly _activation: ComponentSFCInteractionTriggerActivation
   private readonly _onceTriggered = new Set<string>()
@@ -103,7 +105,9 @@ export class ComponentSFCInteractionTriggerActivationMatcher {
     this._activation = normalizeComponentSFCInteractionTriggerActivation(value)
   }
 
-  /** Принимает очередное событие и возвращает прогресс либо завершение активации. */
+  /**
+   * Принимает очередное событие и возвращает прогресс либо завершение активации.
+   */
   public match(
     eventName: string,
     event: ComponentSFCInteractionTriggerEvent,
@@ -116,7 +120,9 @@ export class ComponentSFCInteractionTriggerActivationMatcher {
     return this._matchSequence(this._activation, eventName, event, platform, occurredAt)
   }
 
-  /** Сбрасывает transient progress и once-состояние при lifecycle/configuration reset. */
+  /**
+   * Сбрасывает transient progress и once-состояние при lifecycle/configuration reset.
+   */
   public reset(): void {
     this._onceTriggered.clear()
     this._resetProgress()
@@ -233,7 +239,7 @@ export class ComponentSFCInteractionTriggerActivationMatcher {
   }
 }
 
-/** Проверяет один нормализованный trigger без зависимости от DOM и конкретного renderer-а. */
+// Проверяет один нормализованный trigger без зависимости от DOM и конкретного renderer-а.
 export function matchesComponentSFCInteractionTrigger(
   trigger: ComponentSFCInteractionTrigger,
   event: ComponentSFCInteractionTriggerEvent,
@@ -260,7 +266,7 @@ export function matchesComponentSFCInteractionTrigger(
   return matchesComponentSFCInteractionKeyboardCondition(trigger, event, platform)
 }
 
-/** Приводит browser platform label к стабильным значениям edit-on контракта. */
+// Приводит browser platform label к стабильным значениям edit-on контракта.
 export function resolveComponentSFCInteractionTriggerPlatform(value: unknown): ComponentSFCInteractionTriggerPlatform {
   const platform = String(value ?? '').toLowerCase()
   if (platform.includes('mac') || platform.includes('darwin') || platform.includes('iphone') || platform.includes('ipad')) {
@@ -314,7 +320,7 @@ export function normalizeComponentSFCInteractionHeldKeys(value: unknown): Compon
   return Object.keys(result).length ? result : undefined
 }
 
-/** Нормализует переиспользуемое условие текущего состояния клавиатуры. */
+// Нормализует переиспользуемое условие текущего состояния клавиатуры.
 export function normalizeComponentSFCInteractionKeyboardCondition(value: unknown): ComponentSFCInteractionKeyboardCondition | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return undefined
@@ -385,7 +391,7 @@ export function matchesComponentSFCInteractionHeldKeys(
   return true
 }
 
-/** Проверяет модификаторы и обычные удерживаемые клавиши по одному snapshot клавиатуры. */
+// Проверяет модификаторы и обычные удерживаемые клавиши по одному snapshot клавиатуры.
 export function matchesComponentSFCInteractionKeyboardCondition(
   expected: ComponentSFCInteractionKeyboardCondition | undefined,
   actual: Pick<ComponentSFCInteractionTriggerEvent, 'held' | 'modifiers'>,
@@ -468,7 +474,7 @@ function primaryModifierActive(
   return modifiers.ctrl || modifiers.meta
 }
 
-/** Editable-обёртки для обратной совместимости. */
+// Editable-обёртки для обратной совместимости.
 export const normalizeComponentSFCEditTriggers = normalizeComponentSFCInteractionTriggers
 export const matchesComponentSFCEditTrigger = matchesComponentSFCInteractionTrigger
 export const resolveComponentSFCEditTriggerPlatform = resolveComponentSFCInteractionTriggerPlatform

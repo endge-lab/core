@@ -1,7 +1,7 @@
 import type { ComponentSFCEventPort } from '@/features/core/modules/domain/types/component/sfc/ports.types'
 import type { ProgramEntityType } from '@/features/core/modules/program/domain/types/program.types'
 import type { ComponentSFCRuntimeHost } from '@/features/core/modules/runtime/hosts/ComponentSFCRuntimeHost'
-import { Raph } from '@endge/raph'
+import { Raph } from '@raphy-js/raph'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Endge } from '@/features/core/kernel/endge'
 import { compileComponentSFC } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-compile'
@@ -14,7 +14,7 @@ import { RStore } from '@/features/core/modules/domain/entities/RStore'
 import { RUpdate } from '@/features/core/modules/domain/entities/RUpdate'
 import { RuntimeScope } from '@/features/core/modules/runtime/RuntimeScope'
 
-/** Публикует скомпилированную программу без зависимости от workspace и сети. */
+// Публикует скомпилированную программу без зависимости от workspace и сети.
 function publish(type: ProgramEntityType, model: { id: number, identity: string }, payload: unknown): void {
   Endge.program.addArtifact({
     ref: { entityType: type, id: model.id, identity: model.identity },
@@ -85,7 +85,7 @@ describe('регрессии связанного выполнения Action и
     Raph.reset()
   })
 
-  /** Вложенные именованные Actions не входят повторно в занятую очередь History. */
+  // Вложенные именованные Actions не входят повторно в занятую очередь History.
   it('сохраняет одну запись History при вложенных Actions в run, undo и redo', async () => {
     const { parent, history } = await mountStoreOwner()
     addAction('inner', 'defineAction({steps:{edit:operation({run:{steps:{},output:input(\'value\')},undo:{steps:{}}})},output:output(\'edit\')})', 21)
@@ -103,7 +103,7 @@ describe('регрессии связанного выполнения Action и
     expect(history.snapshot()).toMatchObject({ size: 1, cursor: 1 })
   })
 
-  /** Inline SFC Operation использует ту же History при вызове Source Action. */
+  // Inline SFC Operation использует ту же History при вызове Source Action.
   it('не создаёт вложенную запись History через SFC Operation → Action', async () => {
     const { parent, history } = await mountStoreOwner()
     addAction('inner', 'defineAction({steps:{edit:operation({run:{steps:{},output:1},undo:{steps:{}}})}})')
@@ -129,7 +129,7 @@ describe('регрессии связанного выполнения Action и
     expect(history.snapshot()).toMatchObject({ size: 1, cursor: 1 })
   })
 
-  /** Отмена transport должна отменить весь Action до следующей записи в Store. */
+  // Отмена transport должна отменить весь Action до следующей записи в Store.
   it('останавливает Query → Update при паузе scope', async () => {
     const { session, parent, scope } = await mountStoreOwner()
     const query = Object.assign(new RQuery(), { id: 3, identity: 'q', name: 'q' })
@@ -151,7 +151,7 @@ describe('регрессии связанного выполнения Action и
     expect(session.host.getDataSnapshot()).toEqual({ db: { counter: 0 } })
   })
 
-  /** Даже неотменяемый collaborator не оживляет старое выполнение после resume. */
+  // Даже неотменяемый collaborator не оживляет старое выполнение после resume.
   it('не продолжает Action после паузы и возобновления во время computation', async () => {
     const { session, parent, scope } = await mountStoreOwner()
     const request = deferred<unknown>()
@@ -166,7 +166,7 @@ describe('регрессии связанного выполнения Action и
     expect(session.host.getDataSnapshot()).toEqual({ db: { counter: 0 } })
   })
 
-  /** История остаётся пригодной к использованию после смены поколения scope. */
+  // История остаётся пригодной к использованию после смены поколения scope.
   it('выполняет undo и default redo после паузы и resume', async () => {
     const { parent, history, scope } = await mountStoreOwner()
     addAction('outer', 'defineAction({steps:{edit:operation({run:{steps:{},output:1},undo:{steps:{},output:0}})},output:output(\'edit\')})')
@@ -177,7 +177,7 @@ describe('регрессии связанного выполнения Action и
     await expect(history.redo()).resolves.toBe(1)
   })
 
-  /** Ошибка одного cleanup не удерживает другие hosts и инфраструктуру Runtime. */
+  // Ошибка одного cleanup не удерживает другие hosts и инфраструктуру Runtime.
   it('завершает reset и допускает повторный запуск после ошибки cleanup', async () => {
     const { session, parent } = await mountStoreOwner()
     const nodeId = parent.node!.id
@@ -198,7 +198,7 @@ describe('регрессии связанного выполнения Action и
     await restarted.unmount()
   })
 
-  /** Прямой destroy Composition также освобождает Store и scopes после ошибки child. */
+  // Прямой destroy Composition также освобождает Store и scopes после ошибки child.
   it('освобождает ресурсы Composition при ошибке дочернего destroy', async () => {
     addComposition('child', 'defineComposition({runtimes:{}})', 11)
     addComposition('owner', 'defineComposition({runtimes:{nested:composition(\'child\')}})')
@@ -221,7 +221,7 @@ describe('регрессии связанного выполнения Action и
     await Endge.runtime.destroyRuntimeTreeAsync(session.id).catch(() => {})
   })
 
-  /** Все корневые scopes освобождаются независимо от ошибки первого. */
+  // Все корневые scopes освобождаются независимо от ошибки первого.
   it('удаляет scopes из реестра и продолжает их dispose после исключения', async () => {
     const disposed = vi.fn()
     const first = Endge.runtime.scopes.register(new RuntimeScope({ id: 'first', path: 'first', hooks: { dispose: disposed } }))
@@ -235,7 +235,7 @@ describe('регрессии связанного выполнения Action и
     expect(Endge.runtime.scopes.getAll()).toEqual([])
   })
 
-  /** Все вызывающие стороны ожидают один mount и получают один готовый host. */
+  // Все вызывающие стороны ожидают один mount и получают один готовый host.
   it.each(['success', 'failure'] as const)('объединяет параллельный activate вложенной Composition: %s', async (outcome) => {
     addComposition('child', 'defineComposition({data:{dict:vocab(\'dictionary\')},runtimes:{}})', 11)
     addComposition('owner', 'defineComposition({runtimes:{nested:composition(\'child\').activateOn(manual())}})')
@@ -267,7 +267,7 @@ describe('регрессии связанного выполнения Action и
     await session.unmount()
   })
 
-  /** Deactivate инвалидирует старый mount, но сохраняет возможность следующей активации. */
+  // Deactivate инвалидирует старый mount, но сохраняет возможность следующей активации.
   it('создаёт новый runtime после отмены pending activate через deactivate', async () => {
     addComposition('child', 'defineComposition({data:{dict:vocab(\'dictionary\')},runtimes:{}})', 11)
     addComposition('owner', 'defineComposition({runtimes:{nested:composition(\'child\').activateOn(manual())}})')
@@ -290,7 +290,7 @@ describe('регрессии связанного выполнения Action и
     await session.unmount()
   })
 
-  /** Dispose отменяет pending acquire без ожидания сети и запрещает публикацию host. */
+  // Dispose отменяет pending acquire без ожидания сети и запрещает публикацию host.
   it('отменяет pending activate при dispose вложенного handle', async () => {
     addComposition('child', 'defineComposition({data:{dict:vocab(\'dictionary\')},runtimes:{}})', 11)
     addComposition('owner', 'defineComposition({runtimes:{nested:composition(\'child\').activateOn(manual())}})')

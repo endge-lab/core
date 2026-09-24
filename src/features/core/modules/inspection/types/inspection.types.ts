@@ -37,7 +37,7 @@ export interface InspectionRecording {
   chunks: InspectionChunk[]
 }
 
-/** Transport consumer leases own independent capture policies and sequence. */
+// Transport consumer leases own independent capture policies and sequence.
 export interface InspectionCapture {
   readonly recording: InspectionRecording
   setIncludeData: (value: boolean) => void

@@ -1,4 +1,4 @@
-/** Строка в Date: YYYY-MM-DD, HH:mm(:ss), ISO и др. */
+// Строка в Date: YYYY-MM-DD, HH:mm(:ss), ISO и др.
 export function stringToDate(input: string | Date | null | undefined): Date | null {
   if (!input) {
     return null

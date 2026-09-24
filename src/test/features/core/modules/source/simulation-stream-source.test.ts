@@ -11,7 +11,7 @@ const resolver = new SimulationSourceResolver({
 })
 
 describe('simulation Stream Source', () => {
-  /** Compiler сохраняет выбор генерации, не исполняя выражения внутри Source. */
+  // Compiler сохраняет выбор генерации, не исполняя выражения внутри Source.
   it('принимает boolean useExamples для Query и отклоняет остальные значения', () => {
     const requestSource = (value: string) => `defineSimulation({ target: composition('app'), overrides: { runtimes: { load: { request: mockRequest({ arrays: { items: 50 }, useExamples: ${value} }) } } } })`
     for (const value of [true, false]) {

@@ -12,7 +12,9 @@ export type ResolveAuthSession = (
   options?: AuthResolveOptions,
 ) => Promise<AuthResolvedSession>
 
-/** Браузерный адаптер, владеющий нативным EventSource и преобразующий его в транспортный порт Core. */
+/**
+ * Браузерный адаптер, владеющий нативным EventSource и преобразующий его в транспортный порт Core.
+ */
 export class BrowserSseStreamTransportFactory implements StreamTransportFactory {
   public constructor(private readonly _resolveAuthSession: ResolveAuthSession) {}
 

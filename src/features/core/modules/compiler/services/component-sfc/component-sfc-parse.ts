@@ -30,19 +30,19 @@ import {
 import { parse as parseSFC } from '@vue/compiler-sfc'
 import { parseSFCSourceParts } from '@/features/core/modules/domain/component/sfc/component-sfc-source-parts'
 
-/** Результат parser pass для SFC-компонента. */
+// Результат parser pass для SFC-компонента.
 export interface ComponentSFCParseResult {
-  /** Разложенный source для editor/debug UI. */
+  // Разложенный source для editor/debug UI.
   sourceParts: RComponentSFCSource_Parts
 
-  /** Stable AST, независимый от внутренних типов Vue parser. */
+  // Stable AST, независимый от внутренних типов Vue parser.
   ast: RComponentSFC_AST | null
 
-  /** Диагностический проход parser. */
+  // Диагностический проход parser.
   diagnostics: RComponentDiagnostic[]
 }
 
-/** Разбирает SFC source в stable AST без построения semantic IR. */
+// Разбирает SFC source в stable AST без построения semantic IR.
 export function parseComponentSFC(source: string): ComponentSFCParseResult {
   const input = normalizeComponentSFCInput(source ?? '')
   const sourceParts = parseSFCSourceParts(input)

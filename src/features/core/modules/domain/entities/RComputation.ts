@@ -5,7 +5,9 @@ import { Serialize } from '@endge/utils'
 import { Expose } from 'class-transformer'
 import { REntity } from '@/features/core/modules/domain/entities/REntity'
 
-/** Сохранённая исполняемая спецификация. Runtime-выполнение предоставляется отдельно. */
+/**
+ * Сохранённая исполняемая спецификация. Runtime-выполнение предоставляется отдельно.
+ */
 export class RComputation extends REntity {
   @Expose()
   override displayName: string = ''
@@ -61,7 +63,9 @@ export class RComputation extends REntity {
     }
   }
 
-  /** Возвращает validation problems computation без mutable entity state. */
+  /**
+   * Возвращает validation problems computation без mutable entity state.
+   */
   override getDiagnosticProblems(): DiagnosticsProblemInput[] {
     const problems: DiagnosticsProblemInput[] = []
     if (!this.identity) {

@@ -32,7 +32,7 @@ export interface ComponentSFCTableColumnPinCapability {
 const PIN_MODE_SET = new Set<string>(SFC_TABLE_COLUMN_PIN_MODES)
 const PIN_SIDE_SET = new Set<string>(SFC_TABLE_COLUMN_PIN_SIDES)
 
-/** Нормализует declarative pin props SFC Table без renderer-specific деталей. */
+// Нормализует declarative pin props SFC Table без renderer-specific деталей.
 export function normalizeComponentSFCTableColumnPin(
   tableNode: RComponentSFC_IR_ElementNode,
 ): ComponentSFCTableColumnPinDescriptor {

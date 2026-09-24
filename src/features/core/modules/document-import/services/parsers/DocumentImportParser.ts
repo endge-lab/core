@@ -4,7 +4,7 @@ import type {
   DocumentImportSkippedItem,
 } from '@/features/core/modules/document-import/domain/types/document-import.type'
 
-/** Внутренний черновик Type, который Configurator не может изменить. */
+// Внутренний черновик Type, который Configurator не может изменить.
 export interface ParsedDocumentImportCandidate {
   id: string
   identity: string
@@ -16,14 +16,14 @@ export interface ParsedDocumentImportCandidate {
   diagnostics: DocumentImportDiagnostic[]
 }
 
-/** Нормализованный результат одного format-specific parser. */
+// Нормализованный результат одного format-specific parser.
 export interface DocumentImportParserResult {
   candidates: ParsedDocumentImportCandidate[]
   diagnostics: DocumentImportDiagnostic[]
   skipped: DocumentImportSkippedItem[]
 }
 
-/** Внутренний contract парсера внешнего документного формата. */
+// Внутренний contract парсера внешнего документного формата.
 export interface DocumentImportParser {
   readonly format: DocumentImportFormat
   parse: (source: string) => DocumentImportParserResult

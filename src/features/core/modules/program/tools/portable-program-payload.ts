@@ -4,7 +4,7 @@ import {
   bundleText,
 } from '@/features/core/kernel/tools/bundle-json'
 
-/** Проверяет форму каждой исполняемой семьи без парсинга исходного языка. */
+// Проверяет форму каждой исполняемой семьи без парсинга исходного языка.
 export function validatePortableProgramPayload(
   type: ProgramEntityType,
   input: unknown,

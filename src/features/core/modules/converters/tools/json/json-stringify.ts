@@ -1,4 +1,4 @@
-/** Объект в JSON-строку. */
+// Объект в JSON-строку.
 export function jsonStringify(value: unknown): string | null {
   if (value === undefined) {
     return null

@@ -1,7 +1,7 @@
 import type { BundleJsonValue } from '../types/endge-bundle.types'
 import { NODE_FIELDS } from '@babel/types'
 
-/** Отдельная копия wire values: не вызывает toJSON/getters и не скрывает неподдержанные значения. */
+// Отдельная копия wire values: не вызывает toJSON/getters и не скрывает неподдержанные значения.
 export function copyBundleJson(
   value: unknown,
   syntaxTree = false,
@@ -70,7 +70,7 @@ export function copyBundleJson(
   return visit(value, 0)
 }
 
-/** Проверяет object без преобразования типов. */
+// Проверяет object без преобразования типов.
 export function bundleObject(
   value: unknown,
   label: string,
@@ -81,7 +81,7 @@ export function bundleObject(
   return value as Record<string, unknown>
 }
 
-/** Проверяет непустой идентификатор. */
+// Проверяет непустой идентификатор.
 export function bundleText(value: unknown, label: string): string {
   if (typeof value !== 'string' || !value.trim()) {
     throw new Error(`[Bundle] Invalid ${label}`)
@@ -89,7 +89,7 @@ export function bundleText(value: unknown, label: string): string {
   return value
 }
 
-/** Babel names are minified in browser builds; only its data shapes cross the AST boundary. */
+// Babel names are minified in browser builds; only its data shapes cross the AST boundary.
 function isParserValue(value: object): boolean {
   const fields = Object.getOwnPropertyDescriptors(value)
   const type = fields.type?.value
@@ -113,7 +113,7 @@ function isParserValue(value: object): boolean {
   )
 }
 
-/** JSON object key order is not part of record identity across runtimes. */
+// JSON object key order is not part of record identity across runtimes.
 export function equalBundleJson(left: unknown, right: unknown): boolean {
   if (left === right) {
     return true

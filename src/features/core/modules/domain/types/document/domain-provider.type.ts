@@ -1,13 +1,13 @@
 import type { EndgeLiveDomainDocument, EndgeLiveDomainSnapshot, EndgeWorkspaceServerState } from '@/features/core/modules/domain/types/document/domain-snapshot.type'
 
-/** Канонические коллекции persisted-домена нового backend. */
+// Канонические коллекции persisted-домена нового backend.
 export type EndgeDomainCollection
   = | 'facets' | 'facet-documents' | 'folders' | 'types' | 'queries'
     | 'data-views' | 'compositions' | 'stores' | 'streams' | 'simulations' | 'updates' | 'mocks'
     | 'components' | 'actions' | 'filters' | 'converters' | 'computations' | 'vocabs'
     | 'i18n-bundles' | 'auth-profiles' | 'navigations' | 'styles' | 'configurations'
 
-/** Возможности выбранного источника домена. */
+// Возможности выбранного источника домена.
 export interface EndgeDomainProviderCapabilities {
   snapshot: true
   mutations: boolean
@@ -15,7 +15,7 @@ export interface EndgeDomainProviderCapabilities {
   restore: boolean
 }
 
-/** Запрос полного состояния workspace. */
+// Запрос полного состояния workspace.
 export interface EndgeDomainLoadRequest {
   workspaceIdentity: string
   signal?: AbortSignal
@@ -35,7 +35,7 @@ export interface EndgeDocumentMutationResult {
   etag: string | null
 }
 
-/** Minimal deleted-document metadata returned by the workspace archive. */
+// Minimal deleted-document metadata returned by the workspace archive.
 export interface EndgeArchivedDocument {
   type: EndgeDomainCollection
   identity: string
@@ -57,14 +57,14 @@ export interface EndgeArchivePage {
   nextCursor?: string
 }
 
-/** Документ с optimistic revision для атомарного перемещения. */
+// Документ с optimistic revision для атомарного перемещения.
 export interface EndgeDocumentMoveRequestItem {
   collection: EndgeDomainCollection
   identity: string
   expectedRevision: number
 }
 
-/** Запрос атомарного перемещения документов в одну папку. */
+// Запрос атомарного перемещения документов в одну папку.
 export interface EndgeDocumentsMoveRequest {
   workspaceIdentity: string
   documents: EndgeDocumentMoveRequestItem[]
@@ -73,13 +73,13 @@ export interface EndgeDocumentsMoveRequest {
   signal?: AbortSignal
 }
 
-/** Актуальный документ и его transport-коллекция после перемещения. */
+// Актуальный документ и его transport-коллекция после перемещения.
 export interface EndgeMovedDocument {
   collection: EndgeDomainCollection
   document: EndgeLiveDomainDocument
 }
 
-/** Результат атомарного перемещения документов. */
+// Результат атомарного перемещения документов.
 export interface EndgeDocumentsMoveResult {
   documents: EndgeMovedDocument[]
   moved: number
@@ -140,7 +140,7 @@ export interface EndgeFacetReorderResult {
   etag: string | null
 }
 
-/** Транспортно-независимый источник полного workspace snapshot. */
+// Транспортно-независимый источник полного workspace snapshot.
 export interface EndgeDomainProvider {
   readonly id: string
   readonly capabilities: EndgeDomainProviderCapabilities
@@ -170,7 +170,7 @@ export interface EndgeDomainProvider {
 
 export type EndgeDomainRepositoryProviderId = 'service-backend' | 'bundle' | 'plain'
 
-/** Публичные возможности активного источника persisted domain. */
+// Публичные возможности активного источника persisted domain.
 export interface EndgeDomainRepositoryCapabilities {
   provider: EndgeDomainRepositoryProviderId
   mutations: boolean

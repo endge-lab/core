@@ -2,7 +2,7 @@ import type { RComponentSFC_IR_Prop } from './ir.types'
 import type { RComponentSFC_SourceRange } from './location.types'
 import type { RComponentDiagnostic } from '@/features/core/modules/domain/types/component/component-core.types'
 
-/** Основанная на Source проекция публичного контракта props SFC для визуальных редакторов. */
+// Основанная на Source проекция публичного контракта props SFC для визуальных редакторов.
 export interface ComponentSFCPropsVisualProjection {
   mode: 'missing' | 'inline-type' | 'named-type' | 'runtime'
   editable: boolean
@@ -11,7 +11,7 @@ export interface ComponentSFCPropsVisualProjection {
   message?: string
 }
 
-/** Результат замены редактируемого inline-контракта defineProps. */
+// Результат замены редактируемого inline-контракта defineProps.
 export interface ComponentSFCPropsSourcePatchResult {
   ok: boolean
   source: string

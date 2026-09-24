@@ -34,7 +34,7 @@ export interface EndgeVariableDefinition {
   defaultValue: string
 }
 
-/** Effective defaults завершения одной SFC edit session. */
+// Effective defaults завершения одной SFC edit session.
 export interface EndgeSFCEditingConfiguration {
   cancelOn: ComponentSFCInteractionTrigger[]
   commitOn: ComponentSFCInteractionTrigger[]
@@ -43,17 +43,17 @@ export interface EndgeSFCEditingConfiguration {
 export type EndgeTooltipSide = 'top' | 'right' | 'bottom' | 'left'
 export type EndgeTooltipAlign = 'start' | 'center' | 'end'
 
-/** Фактические defaults поведения единственного tooltip-слоя, принадлежащего Shell. */
+// Фактические defaults поведения единственного tooltip-слоя, принадлежащего Shell.
 export interface EndgeTooltipConfiguration {
   side: EndgeTooltipSide
   align: EndgeTooltipAlign
   openDelay: number
   closeDelay: number
-  /** Необязательное состояние клавиатуры, требуемое при активации tooltip указателем или focus. */
+  // Необязательное состояние клавиатуры, требуемое при активации tooltip указателем или focus.
   keyboard?: ComponentSFCInteractionKeyboardCondition
 }
 
-/** Полная конфигурация, с которой компилируется один Endge context. */
+// Полная конфигурация, с которой компилируется один Endge context.
 export interface EndgeConfiguration {
   vars: EndgeVariableDefinition[]
   locales: EndgeLocaleDefinition[]
@@ -66,17 +66,17 @@ export interface EndgeConfiguration {
   defaultAuthProfileIdentity: string | null
   sfcAdapterIds: string[]
   defaultSfcAdapterId: string
-  /** Effective triggers, которые наследуют editable-узлы без локальных атрибутов. */
+  // Effective triggers, которые наследуют editable-узлы без локальных атрибутов.
   sfcEditing: EndgeSFCEditingConfiguration
-  /** Фактическое поведение tooltip. Визуальные стили принадлежат CSS и хукам адаптера. */
+  // Фактическое поведение tooltip. Визуальные стили принадлежат CSS и хукам адаптера.
   tooltips: EndgeTooltipConfiguration
-  /** Настройки telemetry, output adapters, routing и snapshots. */
+  // Настройки telemetry, output adapters, routing и snapshots.
   diagnostics: EndgeDiagnosticsConfiguration
-  /** Сохранённые и фактические значения, сгруппированные по идентификатору документа Configuration. */
+  // Сохранённые и фактические значения, сгруппированные по идентификатору документа Configuration.
   values: EndgeConfigurationValues
 }
 
-/** Глубоко readonly фактическая проекция конфигурации, доступная SFC. */
+// Глубоко readonly фактическая проекция конфигурации, доступная SFC.
 export type EndgePublicConfigurationSnapshot = Readonly<
   Omit<EndgeConfiguration, 'vars' | 'diagnostics' | 'values'>
   & Record<string, unknown>
@@ -86,13 +86,13 @@ export type EndgeValueOverride<T>
   = | { op: 'set', value: T }
     | { op: 'remove' }
 
-/** Независимые override-операции SFC editing для одного configuration layer. */
+// Независимые override-операции SFC editing для одного configuration layer.
 export interface EndgeSFCEditingConfigurationPatch {
   cancelOn?: EndgeValueOverride<ComponentSFCInteractionTrigger[]>
   commitOn?: EndgeValueOverride<ComponentSFCInteractionTrigger[]>
 }
 
-/** Переопределения tooltip уровня поля для одного слоя каскада конфигурации. */
+// Переопределения tooltip уровня поля для одного слоя каскада конфигурации.
 export interface EndgeTooltipConfigurationPatch {
   side?: EndgeValueOverride<EndgeTooltipSide>
   align?: EndgeValueOverride<EndgeTooltipAlign>
@@ -109,7 +109,7 @@ export interface EndgeCollectionPatch<T> {
   entries: EndgeCollectionPatchEntry<T>[]
 }
 
-/** Локальные операции inherit-слоя. Отсутствующее поле наследуется без изменений. */
+// Локальные операции inherit-слоя. Отсутствующее поле наследуется без изменений.
 export interface EndgeConfigurationPatch {
   vars?: EndgeCollectionPatch<EndgeVariableDefinition>
   locales?: EndgeCollectionPatch<EndgeLocaleDefinition>
@@ -124,13 +124,13 @@ export interface EndgeConfigurationPatch {
   defaultSfcAdapterId?: EndgeValueOverride<string>
   sfcEditing?: EndgeSFCEditingConfigurationPatch
   tooltips?: EndgeTooltipConfigurationPatch
-  /** Локальный contribution diagnostics для текущего configuration layer. */
+  // Локальный contribution diagnostics для текущего configuration layer.
   diagnostics?: EndgeDiagnosticsConfigurationPatch
-  /** Переопределения значений Configuration уровня поля, основанных на Source. */
+  // Переопределения значений Configuration уровня поля, основанных на Source.
   values?: EndgeConfigurationValuePatch
 }
 
-/** Patch локальной collection policy модуля диагностики. */
+// Patch локальной collection policy модуля диагностики.
 export interface EndgeDiagnosticsCollectionPatch {
   enabled?: EndgeValueOverride<boolean>
   signals?: EndgeCollectionPatch<DiagnosticsSignal>
@@ -138,14 +138,14 @@ export interface EndgeDiagnosticsCollectionPatch {
   maxRecords?: EndgeValueOverride<number>
 }
 
-/** Patch telemetry configuration с merge outputs и routes по стабильному id. */
+// Patch telemetry configuration с merge outputs и routes по стабильному id.
 export interface EndgeDiagnosticsTelemetryPatch {
   collection?: EndgeDiagnosticsCollectionPatch
   outputs?: EndgeCollectionPatch<EndgeDiagnosticsOutputConfiguration>
   routes?: EndgeCollectionPatch<EndgeDiagnosticsRoute>
 }
 
-/** Patch состава диагностического snapshot. */
+// Patch состава диагностического snapshot.
 export interface EndgeDiagnosticsSnapshotContentPatch {
   telemetry?: EndgeValueOverride<boolean>
   problems?: EndgeValueOverride<boolean>
@@ -158,7 +158,7 @@ export interface EndgeDiagnosticsSnapshotContentPatch {
   raphGraph?: EndgeValueOverride<boolean>
 }
 
-/** Patch условий автоматического snapshot. */
+// Patch условий автоматического snapshot.
 export interface EndgeDiagnosticsAutomaticSnapshotPatch {
   enabled?: EndgeValueOverride<boolean>
   errorCount?: EndgeValueOverride<number>
@@ -167,20 +167,20 @@ export interface EndgeDiagnosticsAutomaticSnapshotPatch {
   outputIds?: EndgeCollectionPatch<string>
 }
 
-/** Patch snapshot, скачиваемого глобальной комбинацией клавиш. */
+// Patch snapshot, скачиваемого глобальной комбинацией клавиш.
 export interface EndgeDiagnosticsShortcutSnapshotPatch {
   triggerSet?: EndgeValueOverride<ComponentSFCInteractionTriggerActivation>
   content?: EndgeDiagnosticsSnapshotContentPatch
 }
 
-/** Patch snapshots configuration текущего cascade layer. */
+// Patch snapshots configuration текущего cascade layer.
 export interface EndgeDiagnosticsSnapshotsPatch {
   content?: EndgeDiagnosticsSnapshotContentPatch
   shortcut?: EndgeDiagnosticsShortcutSnapshotPatch
   automatic?: EndgeDiagnosticsAutomaticSnapshotPatch
 }
 
-/** Patch diagnostics configuration текущего cascade layer. */
+// Patch diagnostics configuration текущего cascade layer.
 export interface EndgeDiagnosticsConfigurationPatch {
   telemetry?: EndgeDiagnosticsTelemetryPatch
   snapshots?: EndgeDiagnosticsSnapshotsPatch
@@ -192,7 +192,7 @@ export type EndgeConfigurationContribution
 
 export type EndgeConfigurationLayer = 'workspace' | { facetIdentity: string }
 
-/** Immutable input, передаваемый compiler strategies. */
+// Immutable input, передаваемый compiler strategies.
 export interface EndgeBuildContext {
   workspaceIdentity: string
   execution: EndgeExecutionContext

@@ -11,14 +11,14 @@ import { QueryType } from '@/features/core/modules/domain/types/document/documen
  * RQuery хранит только общие document-поля и source.
  */
 export class RQuery extends REntity {
-  /** Внутренний document type для существующих registries; не persisted transport config. */
+  // Внутренний document type для существующих registries; не persisted transport config.
   type: QueryType = QueryType.REST
 
-  /** Единственный persisted authoring-контракт Query. */
+  // Единственный persisted authoring-контракт Query.
   @Expose()
   source: string = ''
 
-  /** Версия Query source syntax. */
+  // Версия Query source syntax.
   @Expose()
   sourceVersion: number = 2
 }

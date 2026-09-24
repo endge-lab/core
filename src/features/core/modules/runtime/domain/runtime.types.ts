@@ -9,9 +9,7 @@ import type { RStore } from '@/features/core/modules/domain/entities/RStore'
 import type { RStream } from '@/features/core/modules/domain/entities/RStream'
 import type { RuntimeHostRegistrySnapshot } from '@/features/core/modules/runtime/domain/runtime-registry.types'
 
-/**
- * Виды runtime
- */
+// Виды runtime
 export type RuntimeKind = 'query' | 'filter' | 'composition' | 'store' | 'stream' | 'action' | 'simulation' | 'runtime'
 
 export type RuntimeExecutableModel
@@ -30,7 +28,7 @@ export interface EndgeRuntimeSnapshot extends RuntimeHostRegistrySnapshot {
   scopes: import('@/features/core/modules/runtime/domain/runtime-scope.types').RuntimeScopeSnapshot[]
 }
 
-/** Опциональные данные и graph-состояние Raph для диагностического snapshot. */
+// Опциональные данные и graph-состояние Raph для диагностического snapshot.
 export interface EndgeRuntimeRaphSnapshot {
   data?: unknown
   render?: import('./runtime-render-inspection.types').RuntimeRenderInspection
@@ -44,16 +42,12 @@ export interface EndgeRuntimeRaphSnapshot {
   }
 }
 
-/**
- * Событие для query: изменение фильтра
- */
+// Событие для query: изменение фильтра
 export interface FilterChangeEvent {
   filterId: string
 }
 
-/**
- * Runtime-события Query
- */
+// Runtime-события Query
 export interface QueryRuntimeEvents {
   'filter:change': FilterChangeEvent
 }
@@ -88,9 +82,7 @@ export interface ActionRuntimeEvents {
   }
 }
 
-/**
- * Типы runtime-профилей
- */
+// Типы runtime-профилей
 export interface RuntimeProfile<
   K extends RuntimeKind,
   E extends Record<string, any>,
@@ -99,9 +91,7 @@ export interface RuntimeProfile<
   events: E
 }
 
-/**
- * Реестр профилей
- */
+// Реестр профилей
 export interface RuntimeProfiles {
   query: RuntimeProfile<'query', QueryRuntimeEvents>
   action: RuntimeProfile<'action', ActionRuntimeEvents>

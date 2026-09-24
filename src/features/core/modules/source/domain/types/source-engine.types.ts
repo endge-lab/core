@@ -1,16 +1,16 @@
 import type { I18nCatalogProvenance, I18nRuntimeCatalog } from '@/features/core/modules/i18n/domain/i18n.types'
 import type { TypeSourceDefinition } from '@/features/core/modules/source/domain/types/type-source.types'
 
-/** Канонический тип source-документа, для которого выбирается source strategy. */
+// Канонический тип source-документа, для которого выбирается source strategy.
 export type SourceKind = 'action' | 'query' | 'vocab' | 'data-view' | 'filter' | 'composition' | 'store' | 'stream' | 'simulation' | 'update' | 'computation' | 'style' | 'type' | 'configuration'
 
-/** Compiler-owned structural context for context-sensitive Source resolution. */
+// Compiler-owned structural context for context-sensitive Source resolution.
 export interface SourceEngineCompileContext {
   sourceVersion?: number
   executionContext?: Readonly<Record<string, string>>
 }
 
-/** Тип нейтральной source completion без привязки к Monaco или другому editor API. */
+// Тип нейтральной source completion без привязки к Monaco или другому editor API.
 export type SourceLanguageCompletionKind
   = | 'keyword'
     | 'function'
@@ -18,24 +18,24 @@ export type SourceLanguageCompletionKind
     | 'value'
     | 'snippet'
 
-/** Позиция курсора внутри source-документа. */
+// Позиция курсора внутри source-документа.
 export interface SourceLanguagePosition {
-  /** Номер строки, начиная с 1. */
+  // Номер строки, начиная с 1.
   lineNumber: number
 
-  /** Номер колонки, начиная с 1. */
+  // Номер колонки, начиная с 1.
   column: number
 }
 
-/** Контекст, который UI/editor adapter передает language strategy. */
+// Контекст, который UI/editor adapter передает language strategy.
 export interface SourceLanguageContext {
-  /** Текущий текст source-документа. */
+  // Текущий текст source-документа.
   source: string
 
-  /** Текущая позиция курсора, если она есть у editor adapter. */
+  // Текущая позиция курсора, если она есть у editor adapter.
   position?: SourceLanguagePosition
 
-  /** Символы Type Registry на основе Source, доступные этому редактору. */
+  // Символы Type Registry на основе Source, доступные этому редактору.
   typeSymbols?: Array<{
     identity: string
     displayName?: string
@@ -44,7 +44,7 @@ export interface SourceLanguageContext {
     entityReference?: { target: string, storage: 'id' | 'identity' }
   }>
 
-  /** Каталог установленных определений storage и кода для completions identity. */
+  // Каталог установленных определений storage и кода для completions identity.
   documentSymbols?: Array<{
     target: SourceDocumentReferenceTarget
     identity: string
@@ -52,42 +52,42 @@ export interface SourceLanguageContext {
     description?: string | null
   }>
 
-  /** Identity документа, владеющего текущей диагностикой Source. */
+  // Identity документа, владеющего текущей диагностикой Source.
   ownerIdentity?: string
 
-  /** Фактические каталоги переводов для всех текущих вхождений стартовой Composition. */
+  // Фактические каталоги переводов для всех текущих вхождений стартовой Composition.
   i18n?: SourceLanguageI18nContext
 }
 
-/** Одно статически спроецированное вхождение Composition в текущем дереве. */
+// Одно статически спроецированное вхождение Composition в текущем дереве.
 export interface SourceLanguageI18nOccurrence {
   id: string
   catalogsByScope: Readonly<Record<string, I18nRuntimeCatalog>>
   provenanceByScope: Readonly<Record<string, I18nCatalogProvenance>>
 }
 
-/** Вход переводов, подготовленный приложением без монтирования Runtime. */
+// Вход переводов, подготовленный приложением без монтирования Runtime.
 export interface SourceLanguageI18nContext {
   locale: string
   fallbackLocale: string
   occurrences: readonly SourceLanguageI18nOccurrence[]
 }
 
-/** Нейтральная completion item, которую editor adapter мапит в свой формат. */
+// Нейтральная completion item, которую editor adapter мапит в свой формат.
 export interface SourceLanguageCompletion {
-  /** Текст, отображаемый в списке подсказок. */
+  // Текст, отображаемый в списке подсказок.
   label: string
 
-  /** Семантический тип подсказки. */
+  // Семантический тип подсказки.
   kind: SourceLanguageCompletionKind
 
-  /** Текст, который нужно вставить. Может быть snippet-ом. */
+  // Текст, который нужно вставить. Может быть snippet-ом.
   insertText: string
 
-  /** Краткое описание справа от completion item. */
+  // Краткое описание справа от completion item.
   detail?: string
 
-  /** Документация completion item. */
+  // Документация completion item.
   documentation?: string
 }
 
@@ -101,7 +101,7 @@ export interface SourceLanguageSignatureHelp {
   }>
 }
 
-/** Логический тип внешнего доменного документа, на который ссылается source. */
+// Логический тип внешнего доменного документа, на который ссылается source.
 export type SourceDocumentReferenceTarget
   = | 'action'
     | 'auth-profile'
@@ -121,22 +121,22 @@ export type SourceDocumentReferenceTarget
     | 'type'
     | 'vocabs'
 
-/** Семантическая ссылка из source на внешний доменный документ. */
+// Семантическая ссылка из source на внешний доменный документ.
 export interface SourceDocumentReference {
-  /** Логический тип цели; UI может уточнить concrete document type через domain. */
+  // Логический тип цели; UI может уточнить concrete document type через domain.
   target: SourceDocumentReferenceTarget
 
-  /** Persisted identity целевого документа. */
+  // Persisted identity целевого документа.
   identity: string
 
-  /** Полуоткрытый диапазон reference-expression в source offsets. */
+  // Полуоткрытый диапазон reference-expression в source offsets.
   range: {
     start: number
     end: number
   }
 }
 
-/** Нейтральное к renderer семантическое выделение одного диапазона Source. */
+// Нейтральное к renderer семантическое выделение одного диапазона Source.
 export interface SourceLanguageSemanticHighlight {
   kind: 'type-reference'
   status: 'resolved' | 'unresolved'
@@ -144,7 +144,7 @@ export interface SourceLanguageSemanticHighlight {
   range: SourceDocumentReference['range']
 }
 
-/** Нейтральная к renderer inline-аннотация после одного диапазона Source. */
+// Нейтральная к renderer inline-аннотация после одного диапазона Source.
 export interface SourceLanguageInlineHint {
   kind: 'translation'
   status: 'resolved' | 'ambiguous'
@@ -153,128 +153,128 @@ export interface SourceLanguageInlineHint {
   range: SourceDocumentReference['range']
 }
 
-/** Результат validation source language strategy. */
+// Результат validation source language strategy.
 export interface SourceLanguageValidationResult extends SourceEngineResult {
-  /** Diagnostics, найденные language strategy. */
+  // Diagnostics, найденные language strategy.
   diagnostics: unknown[]
 }
 
-/** Минимальная операция source engine. Детальные операции появятся вместе с patch engine. */
+// Минимальная операция source engine. Детальные операции появятся вместе с patch engine.
 export interface SourceEngineOperation {
-  /** Тип операции, например replace-slot или insert-block. */
+  // Тип операции, например replace-slot или insert-block.
   type: string
 
-  /** Дополнительный payload операции. */
+  // Дополнительный payload операции.
   payload?: Record<string, unknown>
 }
 
-/** Базовый результат source operation до внедрения полноценного patch engine. */
+// Базовый результат source operation до внедрения полноценного patch engine.
 export interface SourceEngineResult {
-  /** Было ли действие обработано стратегией. */
+  // Было ли действие обработано стратегией.
   ok: boolean
 
-  /** Машинное сообщение об ошибке или причине no-op. */
+  // Машинное сообщение об ошибке или причине no-op.
   message?: string
 }
 
-/** Результат генерации source из persisted/legacy модели. */
+// Результат генерации source из persisted/legacy модели.
 export interface SourceEngineGenerateResult extends SourceEngineResult {
-  /** Сгенерированный source-документ. */
+  // Сгенерированный source-документ.
   source?: string
 
-  /** Нормализованный source document, если стратегия его построила. */
+  // Нормализованный source document, если стратегия его построила.
   document?: unknown
 }
 
-/** Результат компиляции source в normalized document и runtime artifact payload. */
+// Результат компиляции source в normalized document и runtime artifact payload.
 export interface SourceEngineCompileResult extends SourceEngineResult {
-  /** AST уровня parser. */
+  // AST уровня parser.
   ast?: unknown
 
-  /** Нормализованный source document. */
+  // Нормализованный source document.
   document?: unknown
 
-  /** Payload артефакта, готовый для runtime и program. */
+  // Payload артефакта, готовый для runtime и program.
   artifact?: any
 
-  /** Публичная metadata, извлечённая из source. */
+  // Публичная metadata, извлечённая из source.
   metadata?: import('@/features/core/modules/program/domain/types/program-metadata.types').ProgramMetadataMap
 
-  /** Diagnostics, найденные source compiler-ом. */
+  // Diagnostics, найденные source compiler-ом.
   diagnostics?: unknown[]
 
-  /** Статические зависимости Program, найденные компилятором Source. */
+  // Статические зависимости Program, найденные компилятором Source.
   dependencies?: import('@/features/core/modules/program/domain/types/program.types').ProgramDependency[]
 }
 
-/** Результат parse source без обязательной runtime-компиляции. */
+// Результат parse source без обязательной runtime-компиляции.
 export interface SourceParseResult<TDocument = unknown> extends SourceEngineResult {
-  /** AST уровня parser. */
+  // AST уровня parser.
   ast?: unknown
 
-  /** Нормализованный source document. */
+  // Нормализованный source document.
   document?: TDocument
 
-  /** Diagnostics, найденные parser/compiler-ом. */
+  // Diagnostics, найденные parser/compiler-ом.
   diagnostics?: unknown[]
 }
 
-/** Результат patch source-документа. */
+// Результат patch source-документа.
 export interface SourcePatchResult<TDocument = unknown> extends SourceParseResult<TDocument> {
-  /** Новый source-документ. */
+  // Новый source-документ.
   source: string
 
-  /** Был ли source реально изменен. */
+  // Был ли source реально изменен.
   changed: boolean
 }
 
-/** Strategy source patching для одного source-kind. */
+// Strategy source patching для одного source-kind.
 export interface SourcePatchStrategy<TPatch = unknown, TDocument = unknown> {
-  /** Стабильный id стратегии для debug/плагинов. */
+  // Стабильный id стратегии для debug/плагинов.
   id: string
 
-  /** Тип source-документа, который обслуживает стратегия. */
+  // Тип source-документа, который обслуживает стратегия.
   sourceKind: SourceKind
 
-  /** Проверяет, может ли стратегия обслужить переданный source-kind. */
+  // Проверяет, может ли стратегия обслужить переданный source-kind.
   supports: (sourceKind: SourceKind | string) => boolean
 
-  /** Парсит source в editor-facing normalized document. */
+  // Парсит source в editor-facing normalized document.
   parse: (source: string) => SourceParseResult<TDocument>
 
-  /** Применяет минимальный patch, сохраняя остальной авторский source. */
+  // Применяет минимальный patch, сохраняя остальной авторский source.
   patch: (source: string, patch: TPatch) => SourcePatchResult<TDocument>
 }
 
-/** Strategy source engine для одного source-kind. */
+// Strategy source engine для одного source-kind.
 export interface SourceEngineStrategy {
-  /** Стабильный id стратегии для debug/плагинов. */
+  // Стабильный id стратегии для debug/плагинов.
   id: string
 
-  /** Тип source-документа, который обслуживает стратегия. */
+  // Тип source-документа, который обслуживает стратегия.
   sourceKind: SourceKind
 
-  /** Проверяет, может ли стратегия обслужить переданный source-kind. */
+  // Проверяет, может ли стратегия обслужить переданный source-kind.
   supports: (sourceKind: SourceKind | string) => boolean
 
-  /** Выполняет нейтральную source operation. Пока используется как будущий контракт patch/analyze API. */
+  // Выполняет нейтральную source operation. Пока используется как будущий контракт patch/analyze API.
   execute?: (operation: SourceEngineOperation) => SourceEngineResult
 
-  /** Генерирует source из persisted/legacy модели. */
+  // Генерирует source из persisted/legacy модели.
   generate?: (model: unknown) => SourceEngineGenerateResult
 
-  /** Компилирует source в normalized document и artifact payload. */
+  // Компилирует source в normalized document и artifact payload.
   compile?: (source: string, context?: SourceEngineCompileContext) => SourceEngineCompileResult
 }
 
-/** Нейтральный token pattern source-языка, не завязанный на Monaco API. */
+// Нейтральный token pattern source-языка, не завязанный на Monaco API.
 export interface SourceLanguageTokenPattern {
   pattern: RegExp
   token: string
   next?: string
 }
 
-/** Editor-facing синтаксис, которым владеет SourceLanguageStrategy. */
+// Editor-facing синтаксис, которым владеет SourceLanguageStrategy.
 export interface SourceLanguageSyntaxDefinition {
   aliases: string[]
   extensions: string[]
@@ -288,41 +288,41 @@ export interface SourceLanguageSyntaxDefinition {
   tokenizer: Record<string, SourceLanguageTokenPattern[]>
 }
 
-/** Strategy source language для editor-facing операций одного source-kind. */
+// Strategy source language для editor-facing операций одного source-kind.
 export interface SourceLanguageStrategy {
-  /** Стабильный id стратегии для debug/плагинов. */
+  // Стабильный id стратегии для debug/плагинов.
   id: string
 
-  /** Тип source-документа, который обслуживает стратегия. */
+  // Тип source-документа, который обслуживает стратегия.
   sourceKind: SourceKind
 
-  /** Проверяет, может ли стратегия обслужить переданный source-kind. */
+  // Проверяет, может ли стратегия обслужить переданный source-kind.
   supports: (sourceKind: SourceKind | string) => boolean
 
-  /** Описывает подсветку, brackets и editor triggers в adapter-neutral формате. */
+  // Описывает подсветку, brackets и editor triggers в adapter-neutral формате.
   syntax: SourceLanguageSyntaxDefinition
 
-  /** Возвращает базовый source для новой сущности. */
+  // Возвращает базовый source для новой сущности.
   createDefaultSource: (variant?: string) => string
 
-  /** Нормализует поддержанный syntax, сохраняя остальной авторский source. */
+  // Нормализует поддержанный syntax, сохраняя остальной авторский source.
   normalize?: (source: string) => string
 
-  /** Валидирует source без знания о конкретном editor adapter. */
+  // Валидирует source без знания о конкретном editor adapter.
   validate: (source: string, context?: SourceLanguageContext) => SourceLanguageValidationResult
 
-  /** Возвращает доступные подсказки языка в нейтральном формате. */
+  // Возвращает доступные подсказки языка в нейтральном формате.
   completions: (context: SourceLanguageContext) => SourceLanguageCompletion[]
 
-  /** Возвращает сведения о сигнатуре вызова в текущей позиции курсора. */
+  // Возвращает сведения о сигнатуре вызова в текущей позиции курсора.
   signatureHelp?: (context: SourceLanguageContext) => SourceLanguageSignatureHelp | null
 
-  /** Возвращает внешнюю document reference под курсором, если язык её поддерживает. */
+  // Возвращает внешнюю document reference под курсором, если язык её поддерживает.
   resolveReference?: (context: SourceLanguageContext) => SourceDocumentReference | null
 
-  /** Возвращает semantic highlights без привязки к конкретному editor adapter. */
+  // Возвращает semantic highlights без привязки к конкретному editor adapter.
   semanticHighlights?: (context: SourceLanguageContext) => SourceLanguageSemanticHighlight[]
 
-  /** Возвращает inline annotations без привязки к конкретному editor adapter. */
+  // Возвращает inline annotations без привязки к конкретному editor adapter.
   inlineHints?: (context: SourceLanguageContext) => SourceLanguageInlineHint[]
 }

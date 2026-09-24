@@ -20,7 +20,7 @@ export interface ActionProgramExecutorDependencies {
   executeConverter: (identity: string, input: unknown, options?: Record<string, unknown>) => unknown
 }
 
-/** Контекст одного вызова сохраняется через вложенные Source Actions. */
+// Контекст одного вызова сохраняется через вложенные Source Actions.
 export interface ActionProgramExecutionOptions {
   recordHistory?: boolean
   assertActive?: () => void
@@ -34,7 +34,9 @@ interface ExecutionContext {
   assertActive: () => void
 }
 
-/** Выполняет созданный компилятором IR Action без интерпретации Source. */
+/**
+ * Выполняет созданный компилятором IR Action без интерпретации Source.
+ */
 export class ActionProgramExecutor {
   public constructor(private readonly _dependencies: ActionProgramExecutorDependencies) {}
 

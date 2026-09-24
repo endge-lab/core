@@ -1,7 +1,7 @@
 import type { RPage } from '@/features/core/modules/domain/entities/RPage'
 import type { RuntimeHost, RuntimeHostContext } from '@/features/core/modules/runtime/domain/runtime-host.types'
 
-import { Raph, RaphNode } from '@endge/raph'
+import { Raph, RaphNode } from '@raphy-js/raph'
 
 import { RuntimeHostBase } from '@/features/core/modules/runtime/RuntimeHostBase'
 

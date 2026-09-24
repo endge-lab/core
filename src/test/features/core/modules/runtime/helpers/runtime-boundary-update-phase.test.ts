@@ -4,7 +4,7 @@ import {
   RaphNode,
   RaphRuntime,
   RaphSchedulerType,
-} from '@endge/raph'
+} from '@raphy-js/raph'
 
 import { describe, expect, it } from 'vitest'
 import { RuntimeBoundaryUpdatePhase } from '@/features/core/modules/runtime/helpers/raph-phases/runtime-boundary-update-phase'

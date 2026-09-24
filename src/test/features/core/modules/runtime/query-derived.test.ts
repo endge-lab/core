@@ -2,7 +2,7 @@ import type { QueryRuntimeHost } from '@/features/core/modules/runtime/hosts/Que
 import {
   Raph,
   RaphDerivedTargetWriteError,
-} from '@endge/raph'
+} from '@raphy-js/raph'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Endge } from '@/features/core/kernel/endge'
@@ -14,20 +14,21 @@ import { RQuery } from '@/features/core/modules/domain/entities/RQuery'
 import { prepareTestCompilerContext } from '@/test/helpers/compiler-context'
 
 describe('интеграция Query с производными данными Raph', () => {
-  beforeEach(() => {
-    Endge.runtime.reset()
+  beforeEach(async () => {
+    await Endge.runtime.reset()
     Endge.program.clear()
     Endge.domain.reset()
     prepareTestCompilerContext()
     Raph.reset()
+    Raph.configure({ mode: 'runtime' })
     registerConverter(1, 'time-string-to-date', timeStringToDate)
     registerConverter(2, 'weekdays-range', weekdaysRange)
     compileScheduleFilter()
   })
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.restoreAllMocks()
-    Endge.runtime.reset()
+    await Endge.runtime.reset()
     Endge.program.clear()
     Endge.domain.reset()
     Endge.configuration.reset()

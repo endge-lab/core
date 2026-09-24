@@ -16,7 +16,7 @@
 
     // Локальные алиасы
     "paths": {
-      "@endge/raph": ["../@endge-raph/dist/main.d.ts"],
+      "@raphy-js/raph": ["../@raphy/@raphy-raph/dist/main.d.ts"],
       "@/*": ["./src/*"]
     },
     "resolveJsonModule": true,

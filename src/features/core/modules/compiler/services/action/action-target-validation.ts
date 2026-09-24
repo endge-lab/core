@@ -18,7 +18,7 @@ export class ActionTargetError extends Error {
   }
 }
 
-/** Нормализует и проверяет контракт authoring-цели. */
+// Нормализует и проверяет контракт authoring-цели.
 export function normalizeActionTargets(value: unknown): ActionTargetSelector[] | null {
   if (value == null) {
     return null
@@ -46,7 +46,7 @@ export function normalizeActionTargets(value: unknown): ActionTargetSelector[] |
   })
 }
 
-/** Проверяет одну конкретную runtime-цель по альтернативным селекторам. */
+// Проверяет одну конкретную runtime-цель по альтернативным селекторам.
 export function validateActionTarget(
   selectors: readonly ActionTargetSelector[] | null,
   target: ActionExecutionTarget | undefined,

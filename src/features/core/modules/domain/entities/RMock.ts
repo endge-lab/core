@@ -9,7 +9,9 @@ import { Serialize } from '@endge/utils'
 import { Expose } from 'class-transformer'
 import { REntity } from '@/features/core/modules/domain/entities/REntity'
 
-/** Сохранённый source-first документ mock. */
+/**
+ * Сохранённый source-first документ mock.
+ */
 export class RMock extends REntity {
   @Expose()
   override displayName: string = ''
@@ -29,7 +31,9 @@ export class RMock extends REntity {
   @Expose()
   codeRef: string | null = null
 
-  /** Создает доменную модель из portable plain source. */
+  /**
+   * Создает доменную модель из portable plain source.
+   */
   static fromPlain(json: any, storageMeta?: any): RMock {
     const mock = new RMock()
     mock.id = json?.id
@@ -53,7 +57,9 @@ export class RMock extends REntity {
     return mock
   }
 
-  /** Возвращает portable persisted representation. */
+  /**
+   * Возвращает portable persisted representation.
+   */
   toPlain(): Record<string, unknown> {
     return {
       id: this.id,
@@ -75,7 +81,9 @@ export class RMock extends REntity {
     }
   }
 
-  /** Возвращает validation problems mock-документа без mutable entity state. */
+  /**
+   * Возвращает validation problems mock-документа без mutable entity state.
+   */
   override getDiagnosticProblems(): DiagnosticsProblemInput[] {
     const problems: DiagnosticsProblemInput[] = []
     if (!this.identity) {
@@ -102,7 +110,9 @@ export class RMock extends REntity {
     return problems
   }
 
-  /** Создает копию документа с новым identity. */
+  /**
+   * Создает копию документа с новым identity.
+   */
   override duplicate(options: DuplicateOptions): RMock {
     const plain = Serialize.toPlain(this) as Record<string, any>
     const name = (options.name ?? options.identity).trim() || options.identity

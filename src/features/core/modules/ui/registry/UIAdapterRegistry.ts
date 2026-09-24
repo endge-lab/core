@@ -5,14 +5,18 @@ import type {
   UIRenderAdapterRequirement,
 } from '@/features/core/modules/ui/domain/types/ui-render-adapter.type'
 
-/** Хранит runtime implementations UI adapter-ов и выбранный adapter. */
+/**
+ * Хранит runtime implementations UI adapter-ов и выбранный adapter.
+ */
 export class UIAdapterRegistry {
   private _adapters = new Map<string, UIRenderAdapter>()
   private _activeAdapterId: string | null = null
 
   public constructor(private readonly _onChange: () => void = () => {}) {}
 
-  /** Регистрирует adapter и запрещает неявную замену implementation с тем же id. */
+  /**
+   * Регистрирует adapter и запрещает неявную замену implementation с тем же id.
+   */
   public register<TImplementation>(input: UIRenderAdapter<TImplementation>): UIRenderAdapter<TImplementation> {
     const adapter = this._normalizeAdapter(input)
     if (this._adapters.has(adapter.id)) {
@@ -25,18 +29,24 @@ export class UIAdapterRegistry {
     return adapter
   }
 
-  /** Проверяет наличие adapter-а по id. */
+  /**
+   * Проверяет наличие adapter-а по id.
+   */
   public has(id: string | null | undefined): boolean {
     return this._adapters.has(String(id ?? '').trim())
   }
 
-  /** Возвращает adapter по id без проверки его контракта. */
+  /**
+   * Возвращает adapter по id без проверки его контракта.
+   */
   public get<TImplementation = unknown>(id: string | null | undefined): UIRenderAdapter<TImplementation> | null {
     const adapter = this._adapters.get(String(id ?? '').trim())
     return (adapter as UIRenderAdapter<TImplementation> | undefined) ?? null
   }
 
-  /** Возвращает configured adapter либо первый зарегистрированный fallback в заданном порядке. */
+  /**
+   * Возвращает configured adapter либо первый зарегистрированный fallback в заданном порядке.
+   */
   public resolveAvailable<TImplementation = unknown>(
     preferredId: string | null | undefined,
     fallbackIds: readonly string[] = [],
@@ -56,7 +66,9 @@ export class UIAdapterRegistry {
     return null
   }
 
-  /** Возвращает adapter и проверяет его protocol, renderer и обязательные renderer keys. */
+  /**
+   * Возвращает adapter и проверяет его protocol, renderer и обязательные renderer keys.
+   */
   public require<TImplementation = unknown>(requirement: UIRenderAdapterRequirement): UIRenderAdapter<TImplementation> {
     const id = String(requirement.id ?? '').trim()
     const adapter = this.get<TImplementation>(id)
@@ -71,7 +83,9 @@ export class UIAdapterRegistry {
     return adapter
   }
 
-  /** Проверяет и делает adapter активным для текущего workspace runtime. */
+  /**
+   * Проверяет и делает adapter активным для текущего workspace runtime.
+   */
   public activate<TImplementation = unknown>(
     input: string | UIRenderAdapterRequirement,
   ): UIRenderAdapter<TImplementation> {
@@ -86,12 +100,16 @@ export class UIAdapterRegistry {
     return adapter
   }
 
-  /** Возвращает активный adapter без проверки consumer-контракта. */
+  /**
+   * Возвращает активный adapter без проверки consumer-контракта.
+   */
   public get active(): UIRenderAdapter | null {
     return this.get(this._activeAdapterId)
   }
 
-  /** Возвращает активный adapter и проверяет его consumer-контракт. */
+  /**
+   * Возвращает активный adapter и проверяет его consumer-контракт.
+   */
   public requireActive<TImplementation = unknown>(
     requirement: UIActiveRenderAdapterRequirement = {},
   ): UIRenderAdapter<TImplementation> {
@@ -105,7 +123,9 @@ export class UIAdapterRegistry {
     })
   }
 
-  /** Возвращает сериализуемые descriptors всех зарегистрированных adapter-ов. */
+  /**
+   * Возвращает сериализуемые descriptors всех зарегистрированных adapter-ов.
+   */
   public list(): UIRenderAdapterDescriptor[] {
     return [...this._adapters.values()].map(adapter => ({
       id: adapter.id,
@@ -117,7 +137,9 @@ export class UIAdapterRegistry {
     }))
   }
 
-  /** Очищает runtime registrations и active adapter. */
+  /**
+   * Очищает runtime registrations и active adapter.
+   */
   public reset(): void {
     const changed = this._adapters.size > 0 || this._activeAdapterId !== null
     this._adapters.clear()
@@ -127,7 +149,9 @@ export class UIAdapterRegistry {
     }
   }
 
-  /** Нормализует descriptor, сохраняя runtime implementations без сериализации. */
+  /**
+   * Нормализует descriptor, сохраняя runtime implementations без сериализации.
+   */
   private _normalizeAdapter<TImplementation>(
     input: UIRenderAdapter<TImplementation>,
   ): UIRenderAdapter<TImplementation> {
@@ -186,7 +210,9 @@ export class UIAdapterRegistry {
     }
   }
 
-  /** Проверяет совместимость adapter-а с контрактом конкретного render engine. */
+  /**
+   * Проверяет совместимость adapter-а с контрактом конкретного render engine.
+   */
   private _assertRequirement(
     adapter: UIRenderAdapter,
     requirement: UIRenderAdapterRequirement,

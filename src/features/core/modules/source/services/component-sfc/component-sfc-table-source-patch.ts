@@ -44,7 +44,7 @@ const NON_VISUAL_CELL_TAGS = new Set([
 
 const EDITABLE_PRIMITIVE_TAGS = new Set(['Text', 'Number', 'DateTime'])
 
-/** Применяет одну узкую visual-editor операцию, не перепечатывая остальной SFC source. */
+// Применяет одну узкую visual-editor операцию, не перепечатывая остальной SFC source.
 export function patchComponentSFCTableSource(
   source: string,
   patch: ComponentSFCTableSourcePatch,

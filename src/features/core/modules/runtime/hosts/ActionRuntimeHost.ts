@@ -1,7 +1,7 @@
 import type { RAction } from '@/features/core/modules/domain/entities/RAction'
 import type { ActionRuntimeHostContext, RuntimeHost, RuntimeHostContext } from '@/features/core/modules/runtime/domain/runtime-host.types'
 
-import { Raph, RaphNode } from '@endge/raph'
+import { Raph, RaphNode } from '@raphy-js/raph'
 
 import { RuntimeHostBase } from '@/features/core/modules/runtime/RuntimeHostBase'
 
@@ -15,10 +15,8 @@ function createDefaultActionContext(): RuntimeHostContext<'action'> {
   }
 }
 
-/**
- * Создаёт контекст action-runtime с опциональной ссылкой на родительский контекст.
- * Создаёт изолированный invocation context и optional parent link.
- */
+// Создаёт контекст action-runtime с опциональной ссылкой на родительский контекст.
+// Создаёт изолированный invocation context и optional parent link.
 export function createActionContext(options: {
   input?: Record<string, unknown> | unknown
   parent?: ActionRuntimeHostContext | null

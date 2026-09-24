@@ -4,7 +4,9 @@ import { Serialize } from '@endge/utils'
 import { Expose } from 'class-transformer'
 import { REntity } from '@/features/core/modules/domain/entities/REntity'
 
-/** Сущность политики (коллекция policies). identity, displayName, description, folder. */
+/**
+ * Сущность политики (коллекция policies). identity, displayName, description, folder.
+ */
 export class RPolicy extends REntity {
   @Expose()
   override description: string | null = null

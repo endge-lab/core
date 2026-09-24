@@ -23,7 +23,7 @@ export interface CompiledDocumentDescriptor {
   folderId: string | null
   workspaceFolderId: string | null
   position: number
-  /** Необязательные навигационные сведения; не заменяют Source или IR. */
+  // Необязательные навигационные сведения; не заменяют Source или IR.
   documentType?: string
   facetIdentity?: string
   kind?: string
@@ -50,12 +50,12 @@ export interface CompiledProgramCatalog {
 
 export type PortableProgramArtifact = ProgramArtifact<BundleJsonValue>
 
-/** Данные одной завершённой сборки; runtime capabilities описываются отдельно от формата файла. */
+// Данные одной завершённой сборки; runtime capabilities описываются отдельно от формата файла.
 export interface CompiledContextDescriptor extends EndgeContextSnapshot {
   configuration: EndgeConfiguration
 }
 
-/** Действие предоставляет host; исполняемый callback не входит в переносимый контракт. */
+// Действие предоставляет host; исполняемый callback не входит в переносимый контракт.
 export interface ProgramHostActionRequirement {
   identity: string
   owner: string
@@ -79,7 +79,7 @@ export interface ExecutionBundle {
   artifacts: Record<ProgramArtifactKey, PortableProgramArtifact>
 }
 
-/** Подготовленные изолированные данные; install повторно проверяет их перед заменой. */
+// Подготовленные изолированные данные; install повторно проверяет их перед заменой.
 export interface PreparedProgramInstall {
   readonly bundle: ExecutionBundle
 }

@@ -34,7 +34,7 @@ const COLLECTION_TYPES: Record<string, string> = {
   navigations: 'navigation',
 }
 
-/** Сохраняет только навигационные дескрипторы полного compile snapshot, без authoring Source. */
+// Сохраняет только навигационные дескрипторы полного compile snapshot, без authoring Source.
 export function createCompiledProgramCatalog(
   domain: EndgeDomain_Module,
   artifacts: readonly ProgramArtifact[],

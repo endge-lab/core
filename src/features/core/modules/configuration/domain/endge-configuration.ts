@@ -66,12 +66,12 @@ const DEFAULT_CONFIGURATION_VALUE: EndgeConfiguration = {
 
 export const DEFAULT_ENDGE_CONFIGURATION: Readonly<EndgeConfiguration> = Object.freeze(DEFAULT_CONFIGURATION_VALUE)
 
-/** Создаёт независимую полную конфигурацию с системными defaults. */
+// Создаёт независимую полную конфигурацию с системными defaults.
 export function createDefaultEndgeConfiguration(): EndgeConfiguration {
   return cloneConfiguration(DEFAULT_ENDGE_CONFIGURATION)
 }
 
-/** Нормализует и строго проверяет полную persisted-конфигурацию. */
+// Нормализует и строго проверяет полную persisted-конфигурацию.
 export function normalizeEndgeConfiguration(input: unknown): EndgeConfiguration {
   if (!isRecord(input)) {
     throw new Error('[EndgeConfiguration] configuration must be an object')
@@ -127,7 +127,7 @@ export function normalizeEndgeConfiguration(input: unknown): EndgeConfiguration 
   }
 }
 
-/** Мигрирует сохранённые идентификаторы адаптеров, предоставляя только канонические runtime-id. */
+// Мигрирует сохранённые идентификаторы адаптеров, предоставляя только канонические runtime-id.
 function normalizeSfcAdapterIds(input: unknown): string[] {
   return [...new Set(
     normalizeStringCollection(input, 'sfcAdapterIds').map(normalizeSfcAdapterId),
@@ -139,7 +139,7 @@ function normalizeSfcAdapterId(input: unknown): string {
   return LEGACY_SFC_ADAPTER_IDS[id] ?? id
 }
 
-/** Нормализует contribution сущности; пустое значение означает чистое наследование. */
+// Нормализует contribution сущности; пустое значение означает чистое наследование.
 export function normalizeEndgeConfigurationContribution(input: unknown): EndgeConfigurationContribution {
   if (!isRecord(input)) {
     return { mode: 'inherit', patch: {} }
@@ -158,7 +158,7 @@ export function normalizeEndgeConfigurationContribution(input: unknown): EndgeCo
   }
 }
 
-/** Применяет один contribution Workspace или выбранного фасетного документа к upstream configuration. */
+// Применяет один contribution Workspace или выбранного фасетного документа к upstream configuration.
 export function applyEndgeConfigurationContribution(
   upstream: EndgeConfiguration,
   contribution: EndgeConfigurationContribution,
@@ -208,7 +208,7 @@ export function applyEndgeConfigurationContribution(
   return normalizeEndgeConfiguration(next)
 }
 
-/** Возвращает стабильный hash полного build context без platform crypto API. */
+// Возвращает стабильный hash полного build context без platform crypto API.
 export function createEndgeContextHash(input: unknown): string {
   const source = stableStringify(input)
   let hash = 0x811C9DC5
@@ -219,7 +219,7 @@ export function createEndgeContextHash(input: unknown): string {
   return `ctx-${(hash >>> 0).toString(16).padStart(8, '0')}`
 }
 
-/** Строит стабильную публичную проекцию SFC без внутренних vars, diagnostics и namespace storage. */
+// Строит стабильную публичную проекцию SFC без внутренних vars, diagnostics и namespace storage.
 export function createEndgePublicConfigurationSnapshot(
   configuration: EndgeConfiguration,
 ): EndgePublicConfigurationSnapshot {
@@ -295,7 +295,7 @@ function isSafeConfigurationKey(value: string): boolean {
   return value.length > 0 && value !== '__proto__' && value !== 'prototype' && value !== 'constructor'
 }
 
-/** Нормализует persisted literal triggers и поддерживает документы до появления sfcEditing. */
+// Нормализует persisted literal triggers и поддерживает документы до появления sfcEditing.
 function normalizeSFCEditingConfiguration(input: unknown): EndgeSFCEditingConfiguration {
   const source = isRecord(input) ? input : {}
   return {
@@ -312,7 +312,7 @@ function normalizeSFCEditingConfiguration(input: unknown): EndgeSFCEditingConfig
   }
 }
 
-/** Нормализует persisted TriggerSet и проверяет общие несовместимые flags. */
+// Нормализует persisted TriggerSet и проверяет общие несовместимые flags.
 function normalizeTriggerSetConfiguration(
   input: unknown,
   fallback: readonly EndgeSFCEditingConfiguration['cancelOn'][number][],
@@ -357,7 +357,7 @@ function normalizeTriggerSetConfiguration(
   }))
 }
 
-/** Нормализует универсальную активацию, принимая legacy TriggerSet без mode и migration. */
+// Нормализует универсальную активацию, принимая legacy TriggerSet без mode и migration.
 function normalizeTriggerActivationConfiguration(
   input: unknown,
   fallback: ComponentSFCInteractionTriggerActivation,
@@ -472,7 +472,7 @@ function applyTooltipPatch(
   }
 }
 
-/** Применяет diagnostics patch без замены остальных configuration fields. */
+// Применяет diagnostics patch без замены остальных configuration fields.
 function applyDiagnosticsPatch(
   upstream: EndgeDiagnosticsConfiguration,
   patch: NonNullable<EndgeConfigurationPatch['diagnostics']>,
@@ -555,7 +555,7 @@ function applyDiagnosticsPatch(
   return normalizeDiagnosticsConfiguration(next)
 }
 
-/** Применяет required diagnostics override и запрещает remove для scalar policy. */
+// Применяет required diagnostics override и запрещает remove для scalar policy.
 function applyDiagnosticsRequiredValue<TTarget extends object, TKey extends keyof TTarget>(
   target: TTarget,
   key: TKey,
@@ -726,7 +726,7 @@ function normalizeStringCollection(input: unknown, field: string): string[] {
   return result
 }
 
-/** Нормализует полную diagnostics configuration и добавляет системные defaults. */
+// Нормализует полную diagnostics configuration и добавляет системные defaults.
 function normalizeDiagnosticsConfiguration(input: unknown): EndgeDiagnosticsConfiguration {
   const defaults = structuredCloneSafe(DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION)
   if (!isRecord(input)) {
@@ -808,13 +808,13 @@ function normalizeDiagnosticsConfiguration(input: unknown): EndgeDiagnosticsConf
   }
 }
 
-/** Нормализует уникальный список поддерживаемых diagnostics signals. */
+// Нормализует уникальный список поддерживаемых diagnostics signals.
 function normalizeDiagnosticsSignals(input: unknown): DiagnosticsSignal[] {
   const source = Array.isArray(input) ? input : DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION.telemetry.collection.signals
   return [...new Set(source.filter((item): item is DiagnosticsSignal => item === 'log' || item === 'span'))]
 }
 
-/** Нормализует базовый OpenTelemetry severity number. */
+// Нормализует базовый OpenTelemetry severity number.
 function normalizeDiagnosticsSeverity(input: unknown, fallback: DiagnosticsSeverityNumber): DiagnosticsSeverityNumber {
   const value = Number(input)
   return value === 1 || value === 5 || value === 9 || value === 13 || value === 17 || value === 21
@@ -822,7 +822,7 @@ function normalizeDiagnosticsSeverity(input: unknown, fallback: DiagnosticsSever
     : fallback
 }
 
-/** Нормализует outputs и сохраняет только JSON-safe adapter options. */
+// Нормализует outputs и сохраняет только JSON-safe adapter options.
 function normalizeDiagnosticsOutputs(input: unknown): EndgeDiagnosticsOutputConfiguration[] {
   const outputs: EndgeDiagnosticsOutputConfiguration[] = []
   const used = new Set<string>()
@@ -850,7 +850,7 @@ function normalizeDiagnosticsOutputs(input: unknown): EndgeDiagnosticsOutputConf
   return outputs
 }
 
-/** Нормализует routes и поддерживает legacy target.adapterId при чтении. */
+// Нормализует routes и поддерживает legacy target.adapterId при чтении.
 function normalizeDiagnosticsRoutes(input: unknown): EndgeDiagnosticsRoute[] {
   const routes: EndgeDiagnosticsRoute[] = []
   const used = new Set<string>()
@@ -880,7 +880,7 @@ function normalizeDiagnosticsRoutes(input: unknown): EndgeDiagnosticsRoute[] {
   return routes
 }
 
-/** Нормализует persisted route filter до поддерживаемого подмножества. */
+// Нормализует persisted route filter до поддерживаемого подмножества.
 function normalizeDiagnosticsFilter(input: unknown): DiagnosticsFilter {
   if (!isRecord(input)) {
     return {}
@@ -908,7 +908,7 @@ function normalizeDiagnosticsFilter(input: unknown): DiagnosticsFilter {
   }
 }
 
-/** Нормализует optional список diagnostics phases. */
+// Нормализует optional список diagnostics phases.
 function normalizeDiagnosticsPhases(input: unknown): DiagnosticsPhase[] | undefined {
   if (!Array.isArray(input)) {
     return undefined
@@ -917,7 +917,7 @@ function normalizeDiagnosticsPhases(input: unknown): DiagnosticsPhase[] | undefi
   return values.length ? values : undefined
 }
 
-/** Нормализует optional список статусов завершённых spans. */
+// Нормализует optional список статусов завершённых spans.
 function normalizeDiagnosticsSpanStatuses(input: unknown): Array<'unset' | 'ok' | 'error'> | undefined {
   if (!Array.isArray(input)) {
     return undefined
@@ -926,7 +926,7 @@ function normalizeDiagnosticsSpanStatuses(input: unknown): Array<'unset' | 'ok' 
   return values.length ? values : undefined
 }
 
-/** Нормализует JSON-safe options без функций и undefined. */
+// Нормализует JSON-safe options без функций и undefined.
 function normalizeDiagnosticsAdapterOptions(input: unknown): Record<string, DiagnosticsAdapterOptionValue> {
   if (!isRecord(input)) {
     return {}
@@ -941,7 +941,7 @@ function normalizeDiagnosticsAdapterOptions(input: unknown): Record<string, Diag
   return result
 }
 
-/** Рекурсивно оставляет только JSON-safe adapter option value. */
+// Рекурсивно оставляет только JSON-safe adapter option value.
 function normalizeDiagnosticsAdapterOptionValue(input: unknown): DiagnosticsAdapterOptionValue | undefined {
   if (input === null || typeof input === 'string' || typeof input === 'boolean') {
     return input
@@ -959,24 +959,24 @@ function normalizeDiagnosticsAdapterOptionValue(input: unknown): DiagnosticsAdap
   return undefined
 }
 
-/** Возвращает boolean или заданное default value. */
+// Возвращает boolean или заданное default value.
 function normalizeBoolean(input: unknown, fallback: boolean): boolean {
   return typeof input === 'boolean' ? input : fallback
 }
 
-/** Нормализует обязательное положительное целое число. */
+// Нормализует обязательное положительное целое число.
 function normalizePositiveInteger(input: unknown, fallback: number): number {
   const value = Number(input)
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback
 }
 
-/** Нормализует целое число, допускающее нулевое значение. */
+// Нормализует целое число, допускающее нулевое значение.
 function normalizeNonNegativeInteger(input: unknown, fallback: number): number {
   const value = Number(input)
   return Number.isFinite(value) && value >= 0 ? Math.floor(value) : fallback
 }
 
-/** Нормализует непустой список строк или возвращает undefined. */
+// Нормализует непустой список строк или возвращает undefined.
 function normalizeOptionalStringArray(input: unknown): string[] | undefined {
   if (!Array.isArray(input)) {
     return undefined
@@ -985,7 +985,7 @@ function normalizeOptionalStringArray(input: unknown): string[] | undefined {
   return values.length > 0 ? values : undefined
 }
 
-/** Нормализует безопасные scalar/array attributes route. */
+// Нормализует безопасные scalar/array attributes route.
 function normalizeDiagnosticsAttributes(input: unknown): DiagnosticsAttributes | undefined {
   if (!isRecord(input)) {
     return undefined

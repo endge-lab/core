@@ -10,7 +10,7 @@ import type {
 } from '@/features/core/modules/source/domain/types/filter-view.type'
 import type { SourceFieldDefinition, SourceFieldOption } from '@/features/core/modules/source/domain/types/source-expression.types'
 
-import { Raph } from '@endge/raph'
+import { Raph } from '@raphy-js/raph'
 
 import { Endge } from '@/features/core/kernel/endge'
 import { RuntimeHostBase } from '@/features/core/modules/runtime/RuntimeHostBase'
@@ -25,7 +25,9 @@ function defaultContext(instance: string): RuntimeHostContext<'filter'> {
   }
 }
 
-/** Renderable UI-проекция одного Filter runtime без собственного filter state. */
+/**
+ * Renderable UI-проекция одного Filter runtime без собственного filter state.
+ */
 export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostContext<'filter'>, FilterProgramPayload> {
   private readonly _sourceRuntime: FilterRuntimeHost
   private readonly _sourceRuntimeName: string
@@ -112,7 +114,9 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
       : () => {}
   }
 
-  /** Возвращает renderer-neutral модель встроенного или пользовательского Filter view. */
+  /**
+   * Возвращает renderer-neutral модель встроенного или пользовательского Filter view.
+   */
   public getRenderModel(): FilterViewRenderModel {
     const state = this._sourceRuntime.getState()
     const selected = new Set(this._fieldKeys)
@@ -132,17 +136,23 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
     }
   }
 
-  /** Возвращает snapshot пользовательских presentation props. */
+  /**
+   * Возвращает snapshot пользовательских presentation props.
+   */
   public getProps(): Readonly<Record<string, unknown>> {
     return { ...this._props }
   }
 
-  /** Включает фактические controls, props и значения именно этого view, а не только Filter document. */
+  /**
+   * Включает фактические controls, props и значения именно этого view, а не только Filter document.
+   */
   public captureRenderInspection() {
     return { kind: 'filter-view' as const, model: this.getRenderModel() }
   }
 
-  /** Атомарно обновляет presentation props и invalidates renderer. */
+  /**
+   * Атомарно обновляет presentation props и invalidates renderer.
+   */
   public setProps(patch: Record<string, unknown>): void {
     this._props = { ...this._props, ...patch }
     const now = new Date().toISOString()
@@ -150,7 +160,9 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
     this.emit('render:change', this.getRenderModel())
   }
 
-  /** Меняет одно поле через state-владельца Filter runtime. */
+  /**
+   * Меняет одно поле через state-владельца Filter runtime.
+   */
   public async setValue(key: string, value: unknown): Promise<void> {
     if (!this._fieldKeys.includes(key)) {
       throw new Error(`[FilterViewRuntimeHost] field "${key}" is outside this view.`)
@@ -159,7 +171,9 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
     await this._sourceRuntime.action('set').run({ key, value })
   }
 
-  /** Возвращает read-only slice для существующих fromFilter bindings. */
+  /**
+   * Возвращает read-only slice для существующих fromFilter bindings.
+   */
   public getSlice(): CompositionFilterFieldsSlice {
     const state = this._sourceRuntime.getState()
     return {

@@ -16,7 +16,7 @@ export interface DocumentMetadataDiagnostic {
   end?: number
 }
 
-/** Единая read-модель пользовательских metadata документа независимо от backing. */
+// Единая read-модель пользовательских metadata документа независимо от backing.
 export interface DocumentMetadataProjection {
   backing: DocumentMetadataBacking | null
   mode: 'missing' | 'static' | 'invalid' | 'duplicate'
@@ -28,7 +28,7 @@ export interface DocumentMetadataProjection {
   message?: string
 }
 
-/** Результат узкого metadata patch с сохранением второго backing без изменений. */
+// Результат узкого metadata patch с сохранением второго backing без изменений.
 export interface DocumentMetadataPatchResult {
   ok: boolean
   source: string

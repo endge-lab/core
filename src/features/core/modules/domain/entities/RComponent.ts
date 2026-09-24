@@ -117,10 +117,8 @@ export function ReflectComponentToPlain(
   return null
 }
 
-/**
- * Полная копия компонента с новым identity и именем (в корне).
- * Сохраняет всю внутреннюю структуру (колонки таблицы, DSL и т.д.).
- */
+// Полная копия компонента с новым identity и именем (в корне).
+// Сохраняет всю внутреннюю структуру (колонки таблицы, DSL и т.д.).
 export function duplicateComponent(
   component: RComponent,
   options: DuplicateOptions,
@@ -143,9 +141,7 @@ export function duplicateComponent(
   return copy
 }
 
-/**
- * Строит объект для PATCH/POST компонента в Payload (flat-поля, без использования schema).
- */
+// Строит объект для PATCH/POST компонента в Payload (flat-поля, без использования schema).
 export function ReflectComponentToPayloadData(
   component: RComponent,
   componentIdentityToId: Map<string, number>,

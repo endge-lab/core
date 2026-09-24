@@ -10,26 +10,28 @@ import { REntity } from '@/features/core/modules/domain/entities/REntity'
  *  - из plain-domain-формата (schema)
  */
 export class RFolder extends REntity {
-  /** Проекция, которой принадлежит папка. */
+  // Проекция, которой принадлежит папка.
   @Expose()
   scope: 'collection' | 'workspace' = 'collection'
 
-  /** Тип сущностей, для которых предназначена папка (canonical collection slug). */
+  // Тип сущностей, для которых предназначена папка (canonical collection slug).
   @Expose()
   entityType: string | null = null
 
-  /** Id родительской папки (null если корень). */
+  // Id родительской папки (null если корень).
   @Expose()
   parent: string | number | null = null
 
-  /** Опциональное пользовательское оформление Workspace-папки. */
+  // Опциональное пользовательское оформление Workspace-папки.
   @Expose()
   icon: string | null = null
 
   @Expose()
   color: string | null = null
 
-  /** Загружает папку из plain-schema (schema.toPlain()) */
+  /**
+   * Загружает папку из plain-schema (schema.toPlain())
+   */
   static fromPlain(json: any): RFolder {
     const f = new RFolder()
 
@@ -50,7 +52,9 @@ export class RFolder extends REntity {
     return f
   }
 
-  /** Экспорт только схемы (parent уже id в plain). */
+  /**
+   * Экспорт только схемы (parent уже id в plain).
+   */
   toPlain(): any {
     return {
       id: this.id,

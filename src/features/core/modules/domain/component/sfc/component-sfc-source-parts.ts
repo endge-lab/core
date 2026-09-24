@@ -1,6 +1,6 @@
 import type { RComponentSFCSource_Parts } from '@/features/core/modules/domain/types/component/sfc/source.types'
 
-/** Создает пустые sourceParts для нового компонента. */
+// Создает пустые sourceParts для нового компонента.
 export function createEmptySFCSourceParts(): RComponentSFCSource_Parts {
   return {
     script: {
@@ -16,7 +16,7 @@ export function createEmptySFCSourceParts(): RComponentSFCSource_Parts {
   }
 }
 
-/** Создает глубокую копию вкладок source без привязки к редакторскому объекту. */
+// Создает глубокую копию вкладок source без привязки к редакторскому объекту.
 export function cloneSFCSourceParts(parts: RComponentSFCSource_Parts): RComponentSFCSource_Parts {
   return {
     script: {
@@ -32,7 +32,7 @@ export function cloneSFCSourceParts(parts: RComponentSFCSource_Parts): RComponen
   }
 }
 
-/** Сериализует вкладки конфигуратора в полноценный .endge SFC. */
+// Сериализует вкладки конфигуратора в полноценный .endge SFC.
 export function serializeSFCSourceParts(parts: RComponentSFCSource_Parts): string {
   const chunks: string[] = []
   const styleScoped = parts.style.scoped ? ' scoped' : ''
@@ -55,7 +55,7 @@ export function serializeSFCSourceParts(parts: RComponentSFCSource_Parts): strin
   return `${chunks.join('\n')}\n`
 }
 
-/** Разбирает простой SFC-source на вкладки редактора v1. */
+// Разбирает простой SFC-source на вкладки редактора v1.
 export function parseSFCSourceParts(source: string): RComponentSFCSource_Parts {
   const parts = createEmptySFCSourceParts()
   const input = source ?? ''
@@ -69,12 +69,12 @@ export function parseSFCSourceParts(source: string): RComponentSFCSource_Parts {
   return parts
 }
 
-/** Вытаскивает содержимое первого тега без попытки заменить полноценный compiler-parser. */
+// Вытаскивает содержимое первого тега без попытки заменить полноценный compiler-parser.
 function extractBlock(source: string, tag: string): string | null {
   return extractBlockWithAttrs(source, tag)?.content ?? null
 }
 
-/** Вытаскивает содержимое первого тега вместе с атрибутами. */
+// Вытаскивает содержимое первого тега вместе с атрибутами.
 function extractBlockWithAttrs(source: string, tag: string): { attrs: string, content: string } | null {
   const pattern = new RegExp(`<${tag}([^>]*)>([\\s\\S]*?)<\\/${tag}>`, 'i')
   const match = source.match(pattern)

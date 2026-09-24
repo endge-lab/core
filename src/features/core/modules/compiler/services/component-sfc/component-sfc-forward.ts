@@ -43,7 +43,7 @@ export interface ComponentSFCPortForwardResult {
   dependencies: RComponentDependencies
 }
 
-/** Сопоставляет статические правила forward с bindings компонентов этого template SFC. */
+// Сопоставляет статические правила forward с bindings компонентов этого template SFC.
 export function resolveComponentSFCPortForwards(
   manifest: ComponentSFCPortManifest,
   template: RComponentSFC_IR_Template | null,
@@ -115,7 +115,7 @@ export function resolveComponentSFCPortForwards(
   return { diagnostics, dependencies }
 }
 
-/** Возвращает собственный публичный манифест встроенного компонента, нейтрального к renderer. */
+// Возвращает собственный публичный манифест встроенного компонента, нейтрального к renderer.
 export function createBuiltInComponentPortManifest(tag: string): ComponentSFCPortManifest | null {
   const normalizedTag = listComponentSFCEventCapableTags().find(candidate => candidate === tag)
   if (!normalizedTag) {
@@ -145,7 +145,7 @@ export function createBuiltInComponentPortManifest(tag: string): ComponentSFCPor
   return manifest
 }
 
-/** Встроенные манифесты, используемые компилятором и frontend-каталогами событий. */
+// Встроенные манифесты, используемые компилятором и frontend-каталогами событий.
 export function listBuiltInComponentPortManifests(): Array<{ tag: string, manifest: ComponentSFCPortManifest }> {
   return listComponentSFCEventCapableTags().map(tag => ({
     tag,

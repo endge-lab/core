@@ -39,7 +39,7 @@ const CREATE_CONTEXT: DiagnosticsAdapterCreateContext = {
   },
 }
 
-/** Создаёт успешный fetch response без зависимости от browser Response. */
+// Создаёт успешный fetch response без зависимости от browser Response.
 function successfulResponse(): Pick<Response, 'ok' | 'status'> {
   return { ok: true, status: 200 }
 }

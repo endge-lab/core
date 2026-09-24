@@ -1,13 +1,13 @@
 import type { QueryProgramPayload } from '@/features/core/modules/program/domain/types/program.types'
 
-/** Runtime context одного выполнения compiled query artifact. */
+// Runtime context одного выполнения compiled query artifact.
 export interface QueryExecutionContext {
-  /** Runtime-ready query payload из Endge.program. */
+  // Runtime-ready query payload из Endge.program.
   payload: QueryProgramPayload
 
-  /** Входные параметры одноразового или реактивного запуска. */
+  // Входные параметры одноразового или реактивного запуска.
   vars?: Record<string, unknown>
 
-  /** AbortSignal текущего runtime run. */
+  // AbortSignal текущего runtime run.
   signal?: AbortSignal
 }

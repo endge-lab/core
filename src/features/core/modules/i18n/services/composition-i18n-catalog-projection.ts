@@ -18,10 +18,8 @@ export interface CompositionI18nCatalogProjectionInput {
   targetIdentity: string
 }
 
-/**
- * Проецирует фактические каталоги i18n только из скомпилированных артефактов Composition.
- * RuntimeHost, lifecycle-хуки и пользовательский runtime source не выполняются.
- */
+// Проецирует фактические каталоги i18n только из скомпилированных артефактов Composition.
+// RuntimeHost, lifecycle-хуки и пользовательский runtime source не выполняются.
 export function compositionI18nCatalogs(
   input: CompositionI18nCatalogProjectionInput,
 ): CompositionI18nCatalogProjectionOccurrence[] {

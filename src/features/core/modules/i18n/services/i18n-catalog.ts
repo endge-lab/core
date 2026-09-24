@@ -6,7 +6,7 @@ import type {
 } from '@/features/core/modules/i18n/domain/i18n.types'
 import type { CompositionI18nResourceArtifact, CompositionProgramPayload } from '@/features/core/modules/source/domain/types/composition-source.types'
 
-/** Материализует authored locale trees в плоские dot-path индексы. */
+// Материализует authored locale trees в плоские dot-path индексы.
 export function compileI18nLocales(locales: I18nLocales): I18nCompiledLocales {
   return Object.fromEntries(
     Object.entries(locales).map(([locale, messages]) => {
@@ -19,12 +19,12 @@ export function compileI18nLocales(locales: I18nLocales): I18nCompiledLocales {
   )
 }
 
-/** Возвращает все логические message keys независимо от локали. */
+// Возвращает все логические message keys независимо от локали.
 export function collectI18nMessageKeys(messages: I18nCompiledLocales): Set<string> {
   return new Set(Object.values(messages).flatMap(locale => Object.keys(locale)))
 }
 
-/** Добавляет локальные ресурсы scope к унаследованному runtime catalog. */
+// Добавляет локальные ресурсы scope к унаследованному runtime catalog.
 export function extendI18nRuntimeCatalog(
   inherited: I18nRuntimeCatalog,
   resources: readonly CompositionI18nResourceArtifact[],
@@ -45,7 +45,7 @@ export function extendI18nRuntimeCatalog(
   return catalog
 }
 
-/** Строит effective translation catalogs всех lifecycle scopes Composition. */
+// Строит effective translation catalogs всех lifecycle scopes Composition.
 export function buildCompositionI18nCatalogs(
   payload: CompositionProgramPayload,
   inherited: I18nRuntimeCatalog = {},
@@ -63,7 +63,7 @@ export function buildCompositionI18nCatalogs(
   return catalogs
 }
 
-/** Создаёт независимый snapshot runtime catalog для передачи дочернему host. */
+// Создаёт независимый snapshot runtime catalog для передачи дочернему host.
 export function cloneI18nRuntimeCatalog(catalog: I18nRuntimeCatalog): I18nRuntimeCatalog {
   return Object.fromEntries(
     Object.entries(catalog).map(([name, entry]) => [name, {

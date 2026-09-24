@@ -24,7 +24,7 @@ import type {
   EndgeExecutionContextResolutionInput,
 } from '@/features/core/modules/runtime/domain/execution-context.types'
 import type { EndgeDataMode } from '@/features/core/modules/workspace/domain/workspace.types'
-import { Raph } from '@endge/raph'
+import { Raph } from '@raphy-js/raph'
 import {
   CONTEXT_STORAGE_KEY,
   DEFAULT_LOCALE,
@@ -102,7 +102,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
 
   public get bootMode(): EndgeBootMode { return this._bootMode }
 
-  /** Создаёт контекст, регистрирует storage adapters и восстанавливает snapshot. */
+  /**
+   * Создаёт контекст, регистрирует storage adapters и восстанавливает snapshot.
+   */
   public constructor() {
     super()
     this.registerStorageAdapter(new LocalStorageContextAdapter())
@@ -110,7 +112,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     this.loadFromStorage()
   }
 
-  /** Применяет explicit structural context до load/build остальных модулей. */
+  /**
+   * Применяет explicit structural context до load/build остальных модулей.
+   */
   public override setup(ctx: EndgeBootContext): void {
     this._bootMode = ctx.mode ?? 'application'
     this._executionContextLocked = false
@@ -132,7 +136,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     this._publishContextChanges()
   }
 
-  /** Разрешает выбрать новый structural context только перед следующим boot. */
+  /**
+   * Разрешает выбрать новый structural context только перед следующим boot.
+   */
   public override reset(): void {
     if (this._beforeInspection) {
       const { context, dataMode, override } = this._beforeInspection
@@ -148,17 +154,23 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     this.notify()
   }
 
-  /** Показывает, выполняется ли восстановление контекста из storage. */
+  /**
+   * Показывает, выполняется ли восстановление контекста из storage.
+   */
   public get isLoadingFromStorage(): boolean {
     return this._isHydrating
   }
 
-  /** Регистрирует storage adapter для persistence-контекста. */
+  /**
+   * Регистрирует storage adapter для persistence-контекста.
+   */
   public registerStorageAdapter(adapter: EndgeStorageAdapter): void {
     this._adapters.register(adapter)
   }
 
-  /** Настраивает persistence текущего контекста. */
+  /**
+   * Настраивает persistence текущего контекста.
+   */
   public configurePersistence(config: EndgeContextPersistenceConfig): void {
     if (config.context == null) {
       return
@@ -168,20 +180,26 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     this.saveToStorage()
   }
 
-  /** Устанавливает provider актуальных user identity и обязательных session facet selections. */
+  /**
+   * Устанавливает provider актуальных user identity и обязательных session facet selections.
+   */
   public setSessionIdentityProvider(provider: EndgeSessionIdentityProvider | null): void {
     this._sessionProvider = provider
     this.notify()
   }
 
-  /** Показывает, что выбор документа фасета задан authenticated session provider. */
+  /**
+   * Показывает, что выбор документа фасета задан authenticated session provider.
+   */
   public isFacetLockedBySession(facetIdentity: string): boolean {
     const identity = normalizeOptionalText(facetIdentity)
     const selections = this._sessionProvider?.getCurrentIdentity()?.facetSelections
     return identity != null && selections != null && Object.hasOwn(selections, identity)
   }
 
-  /** Сериализует текущий execution scope в snapshot. */
+  /**
+   * Сериализует текущий execution scope в snapshot.
+   */
   public override createDiagnosticsSnapshot(): Record<string, unknown> {
     return {
       ...this.serialize(),
@@ -205,7 +223,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Возвращает полный доступный SFC контекст без добавления временных значений в persistence. */
+  /**
+   * Возвращает полный доступный SFC контекст без добавления временных значений в persistence.
+   */
   public runtimeSnapshot(): EndgeRuntimeContextSnapshot {
     return {
       ...this.serialize(),
@@ -216,12 +236,16 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Возвращает текущее временное состояние клавиатуры из общего пространства контекста Raph. */
+  /**
+   * Возвращает текущее временное состояние клавиатуры из общего пространства контекста Raph.
+   */
   public getKeyboardState(): EndgeKeyboardContextSnapshot {
     return normalizeKeyboardContextSnapshot(Raph.get(ENDGE_KEYBOARD_CONTEXT_RAPH_PATH))
   }
 
-  /** Публикует состояние клавиатуры UI-адаптера как узкие несохраняемые изменения Raph. */
+  /**
+   * Публикует состояние клавиатуры UI-адаптера как узкие несохраняемые изменения Raph.
+   */
   public setKeyboardState(input: EndgeKeyboardContextSnapshot): void {
     const next = normalizeKeyboardContextSnapshot(input)
     const current = this.getKeyboardState()
@@ -239,14 +263,18 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     })
   }
 
-  /** Сохраняет подписчиков legacy-модуля и проецирует постоянные поля контекста в Raph. */
+  /**
+   * Сохраняет подписчиков legacy-модуля и проецирует постоянные поля контекста в Raph.
+   */
   public override notify(): void {
     this._syncPersistentContextToRaph()
     this._publishContextChanges()
     super.notify()
   }
 
-  /** Применяет типизированное событие через setters, сохраняя их проверки и side effects. */
+  /**
+   * Применяет типизированное событие через setters, сохраняя их проверки и side effects.
+   */
   public applyEvent(event: ContextEvent): void {
     switch (event.name) {
       case 'context:workspace-changed':
@@ -266,7 +294,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Восстанавливает execution scope из snapshot с безопасными defaults. */
+  /**
+   * Восстанавливает execution scope из snapshot с безопасными defaults.
+   */
   public override deserialize(payload: Partial<EndgeContextSnapshot> | undefined): void {
     this._currentWorkspace = normalizeOptionalText(payload?.workspace)
     this._facetSelections = normalizeFacetSelections(payload?.facets)
@@ -286,7 +316,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     this._publishContextChanges()
   }
 
-  /** Adopts observed scope only in memory; developer authorization stays with the host session. */
+  /**
+   * Adopts observed scope only in memory; developer authorization stays with the host session.
+   */
   public applyInspection(snapshot: EndgeContextSnapshot & { dataMode?: EndgeDataMode }): void {
     if (this._bootMode !== 'debugger') {
       throw new Error('[EndgeContext] Inspection requires debugger mode')
@@ -307,7 +339,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     this.notify()
   }
 
-  /** Сохраняет текущий context snapshot через выбранный adapter. */
+  /**
+   * Сохраняет текущий context snapshot через выбранный adapter.
+   */
   public saveToStorage(): void {
     if (this._bootMode === 'debugger') {
       return
@@ -325,7 +359,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Загружает context snapshot из нового или legacy storage key. */
+  /**
+   * Загружает context snapshot из нового или legacy storage key.
+   */
   public loadFromStorage(): EndgeContextSnapshot | undefined {
     let shouldPersistThemeMigration = false
     this._isHydrating = true
@@ -360,7 +396,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Возвращает полный persistence scope текущей сессии. */
+  /**
+   * Возвращает полный persistence scope текущей сессии.
+   */
   public getPersistenceScope(): EndgePersistenceScope {
     return {
       workspaceId: this._requireCurrentWorkspace(),
@@ -372,7 +410,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Читает личную настройку явно указанного пользователя host, в том числе в debugger. */
+  /**
+   * Читает личную настройку явно указанного пользователя host, в том числе в debugger.
+   */
   public getUserState<T>(userId: string, key: string, transform?: EndgeContextStateTransform<T>): T | undefined {
     const storageKey = buildUserContextStateStorageKey(userId, key)
     try {
@@ -385,7 +425,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Сохраняет личную настройку host, не меняя контекст или данные инспектируемого приложения. */
+  /**
+   * Сохраняет личную настройку host, не меняя контекст или данные инспектируемого приложения.
+   */
   public setUserState<T>(userId: string, key: string, state: T, transform?: EndgeContextStateTransform<T>): void {
     const storageKey = buildUserContextStateStorageKey(userId, key)
     try {
@@ -400,7 +442,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Возвращает dynamic state текущего полного context scope. */
+  /**
+   * Возвращает dynamic state текущего полного context scope.
+   */
   public getState<T>(
     key: string,
     transform?: EndgeContextStateTransform<T>,
@@ -420,7 +464,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Сохраняет dynamic state в scope текущих workspace/facet selections/user. */
+  /**
+   * Сохраняет dynamic state в scope текущих workspace/facet selections/user.
+   */
   public setState<T>(
     key: string,
     state: T,
@@ -444,7 +490,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Удаляет dynamic state только из текущего полного context scope. */
+  /**
+   * Удаляет dynamic state только из текущего полного context scope.
+   */
   public removeState(key: string): void {
     if (this._bootMode === 'debugger') {
       return
@@ -460,7 +508,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Подписывает потребителя на изменения одного dynamic state key. */
+  /**
+   * Подписывает потребителя на изменения одного dynamic state key.
+   */
   public subscribeState(key: string, listener: EndgeContextStateListener): () => void {
     const normalizedKey = normalizeContextStateKey(key)
     const listeners = this._stateListeners.get(normalizedKey) ?? new Set<EndgeContextStateListener>()
@@ -475,7 +525,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Создаёт или возвращает controller runtime-состояния по runtime id. */
+  /**
+   * Создаёт или возвращает controller runtime-состояния по runtime id.
+   */
   public createRuntimeStateController(input: {
     runtimeId: string
     storageId?: string
@@ -500,22 +552,30 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     return controller
   }
 
-  /** Возвращает runtime state controller по id. */
+  /**
+   * Возвращает runtime state controller по id.
+   */
   public getRuntimeStateController(runtimeId: string): RuntimeStateController | null {
     return this._runtimeControllers.get(String(runtimeId ?? '').trim()) ?? null
   }
 
-  /** Удаляет runtime state controller из registry. */
+  /**
+   * Удаляет runtime state controller из registry.
+   */
   public destroyRuntimeStateController(runtimeId: string): void {
     this._runtimeControllers.delete(String(runtimeId ?? '').trim())
   }
 
-  /** Возвращает identity текущего workspace. */
+  /**
+   * Возвращает identity текущего workspace.
+   */
   public getCurrentWorkspace(): string | null {
     return this._currentWorkspace
   }
 
-  /** Устанавливает текущий workspace и сохраняет контекст. */
+  /**
+   * Устанавливает текущий workspace и сохраняет контекст.
+   */
   public setCurrentWorkspace(identity: string | null): void {
     const next = normalizeOptionalText(identity)
     if (next === this._currentWorkspace) {
@@ -528,18 +588,24 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     this.notify()
   }
 
-  /** Возвращает immutable map выбранных документов по identity фасета. */
+  /**
+   * Возвращает immutable map выбранных документов по identity фасета.
+   */
   public getFacetSelections(): Readonly<Record<string, string>> {
     return freezeFacetSelections(this._facetSelections)
   }
 
-  /** Возвращает выбранный документ фасета либо null, если фасет не имеет выбора. */
+  /**
+   * Возвращает выбранный документ фасета либо null, если фасет не имеет выбора.
+   */
   public getFacetSelection(facetIdentity: string): string | null {
     const identity = normalizeOptionalText(facetIdentity)
     return identity ? this._facetSelections[identity] ?? null : null
   }
 
-  /** Устанавливает один выбор до следующего structural boot. */
+  /**
+   * Устанавливает один выбор до следующего structural boot.
+   */
   public setFacetSelection(facetIdentity: string, documentIdentity: string | null): void {
     const facet = normalizeRequiredScopePart(facetIdentity, 'facetIdentity')
     const document = normalizeOptionalText(documentIdentity)
@@ -553,7 +619,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     this.setFacetSelections(next)
   }
 
-  /** Заменяет structural map до следующего boot. */
+  /**
+   * Заменяет structural map до следующего boot.
+   */
   public setFacetSelections(selections: Readonly<Record<string, string>>): void {
     const next = normalizeFacetSelections(selections)
     this._assertStructuralContextMutable(next)
@@ -565,7 +633,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     this.notify()
   }
 
-  /** Возвращает immutable structural coordinates текущего boot lifecycle. */
+  /**
+   * Возвращает immutable structural coordinates текущего boot lifecycle.
+   */
   public getExecutionContext(): EndgeExecutionContext {
     return Object.freeze({ facets: freezeFacetSelections(this._facetSelections) })
   }
@@ -633,32 +703,44 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     return this.getExecutionContext()
   }
 
-  /** Возвращает identity текущего user с учётом session provider. */
+  /**
+   * Возвращает identity текущего user с учётом session provider.
+   */
   public getCurrentUser(): string {
     return this._resolveSessionIdentity().userId
   }
 
-  /** Устанавливает fallback identity текущего user. */
+  /**
+   * Устанавливает fallback identity текущего user.
+   */
   public setCurrentUser(identity: string | null): void {
     this._setScopeValue('_currentUser', identity, DEFAULT_SCOPE.userId)
   }
 
-  /** Возвращает текущий режим выполнения данных для fixtures Store и внешних запусков Query. */
+  /**
+   * Возвращает текущий режим выполнения данных для fixtures Store и внешних запусков Query.
+   */
   public get dataMode(): EndgeDataMode {
     return this._dataModeOverride ?? this._workspaceDataMode
   }
 
-  /** Показывает, должны ли runtime-потребители вычислять сохранённые fixtures RMock. */
+  /**
+   * Показывает, должны ли runtime-потребители вычислять сохранённые fixtures RMock.
+   */
   public get isMockEnabled(): boolean {
     return this.dataMode === 'mock'
   }
 
-  /** Показывает, получен ли фактический режим из локального runtime-переопределения. */
+  /**
+   * Показывает, получен ли фактический режим из локального runtime-переопределения.
+   */
   public get isDataModeOverridden(): boolean {
     return this._dataModeOverride != null
   }
 
-  /** Применяет сохранённое значение Workspace по умолчанию без записи в локальное хранилище контекста. */
+  /**
+   * Применяет сохранённое значение Workspace по умолчанию без записи в локальное хранилище контекста.
+   */
   public setWorkspaceDataMode(mode: EndgeDataMode): void {
     const next = normalizeDataMode(mode)
     if (next === this._workspaceDataMode) {
@@ -672,7 +754,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Применяет принадлежащее host переопределение режима данных без перестроения структурного контекста. */
+  /**
+   * Применяет принадлежащее host переопределение режима данных без перестроения структурного контекста.
+   */
   public setDataMode(mode: EndgeDataMode): void {
     const next = normalizeDataMode(mode)
     if (next === this._dataModeOverride) {
@@ -683,7 +767,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     this.notify()
   }
 
-  /** Удаляет локальное переопределение и восстанавливает текущее значение Workspace по умолчанию. */
+  /**
+   * Удаляет локальное переопределение и восстанавливает текущее значение Workspace по умолчанию.
+   */
   public clearDataModeOverride(): void {
     if (this._dataModeOverride == null) {
       return
@@ -693,17 +779,23 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     this.notify()
   }
 
-  /** Упрощённый API для переключателей UI, представляющих mock-режим как boolean-состояние. */
+  /**
+   * Упрощённый API для переключателей UI, представляющих mock-режим как boolean-состояние.
+   */
   public setMockEnabled(enabled: boolean): void {
     this.setDataMode(enabled ? 'mock' : 'live')
   }
 
-  /** Возвращает текущую locale контекста. */
+  /**
+   * Возвращает текущую locale контекста.
+   */
   public get currentLocale(): string {
     return this._currentLocale || DEFAULT_LOCALE
   }
 
-  /** Нормализует, сохраняет и публикует новую locale. */
+  /**
+   * Нормализует, сохраняет и публикует новую locale.
+   */
   public setCurrentLocale(locale: string | null): void {
     this._hasLocalePreference = true
     const configuration = this._activeConfiguration()
@@ -719,7 +811,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     this.notify()
   }
 
-  /** Согласует текущую locale с effective configuration после workspace resolution. */
+  /**
+   * Согласует текущую locale с effective configuration после workspace resolution.
+   */
   public reconcileCurrentLocaleWithWorkspace(configuration?: EndgeConfiguration): void {
     const activeConfiguration = configuration ?? this._activeConfiguration()
     if (!activeConfiguration) {
@@ -738,12 +832,16 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     this.notify()
   }
 
-  /** Возвращает текущую тему контекста. */
+  /**
+   * Возвращает текущую тему контекста.
+   */
   public get currentTheme(): string {
     return this._currentTheme || DEFAULT_THEME
   }
 
-  /** Нормализует, сохраняет и публикует пользовательскую тему. */
+  /**
+   * Нормализует, сохраняет и публикует пользовательскую тему.
+   */
   public setCurrentTheme(theme: string | null): void {
     const configuration = this._activeConfiguration()
     const raw = normalizeOptionalText(theme) ?? DEFAULT_THEME
@@ -763,7 +861,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Согласует сохранённую тему с effective configuration после workspace resolution. */
+  /**
+   * Согласует сохранённую тему с effective configuration после workspace resolution.
+   */
   public reconcileCurrentThemeWithWorkspace(configuration?: EndgeConfiguration): void {
     const activeConfiguration = configuration ?? this._activeConfiguration()
     if (!activeConfiguration) {
@@ -793,12 +893,16 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Возвращает текущую временную зону контекста. */
+  /**
+   * Возвращает текущую временную зону контекста.
+   */
   public get currentTimezone(): string {
     return this._currentTimezone || DEFAULT_TIMEZONE
   }
 
-  /** Нормализует, сохраняет и публикует новую временную зону. */
+  /**
+   * Нормализует, сохраняет и публикует новую временную зону.
+   */
   public setCurrentTimezone(timezone: string | null): void {
     const configuration = this._activeConfiguration()
     const raw = normalizeOptionalText(timezone) ?? DEFAULT_TIMEZONE
@@ -813,7 +917,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     this.notify()
   }
 
-  /** Согласует сохранённую временную зону с effective configuration. */
+  /**
+   * Согласует сохранённую временную зону с effective configuration.
+   */
   public reconcileCurrentTimezoneWithWorkspace(configuration?: EndgeConfiguration): void {
     const activeConfiguration = configuration ?? this._activeConfiguration()
     if (!activeConfiguration) {
@@ -832,7 +938,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     this.notify()
   }
 
-  /** Возвращает effective configuration либо persisted workspace configuration до resolution. */
+  /**
+   * Возвращает effective configuration либо persisted workspace configuration до resolution.
+   */
   private _activeConfiguration(): EndgeConfiguration | null {
     try {
       if (Endge.configuration.isResolved) {
@@ -869,7 +977,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     return configuration.timezones.some(item => item.identity === value) ? value : configuration.defaultTimezone
   }
 
-  /** Сохраняет только явное предпочтение; фактическим значением по умолчанию продолжает владеть конфигурация. */
+  /**
+   * Сохраняет только явное предпочтение; фактическим значением по умолчанию продолжает владеть конфигурация.
+   */
   private _serializeForPersistence(): EndgePersistedContextSnapshot {
     return {
       ...this.serialize(),
@@ -878,7 +988,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Выбирает storage adapter для заданной persistence policy. */
+  /**
+   * Выбирает storage adapter для заданной persistence policy.
+   */
   private _resolveAdapter(persistence: EndgePersistenceInput): EndgeStorageAdapter {
     return this._adapters.resolve(persistence)
   }
@@ -906,7 +1018,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     )
   }
 
-  /** Снимок фактических значений: session identities и effective data mode включены. */
+  /**
+   * Снимок фактических значений: session identities и effective data mode включены.
+   */
   private _readEventContext(): ContextEventValues {
     return {
       workspace: this.getCurrentWorkspace(),
@@ -919,7 +1033,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Constructor hydration задаёт baseline; последующие commits публикуют только изменения. */
+  /**
+   * Constructor hydration задаёт baseline; последующие commits публикуют только изменения.
+   */
   private _publishContextChanges(): void {
     if (this._publishingContextChanges) {
       return
@@ -995,7 +1111,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
         : next)
   }
 
-  /** Возвращает identity активного workspace для persistence scope. */
+  /**
+   * Возвращает identity активного workspace для persistence scope.
+   */
   private _requireCurrentWorkspace(): string {
     if (!this._currentWorkspace) {
       throw new Error('[EndgeContext] Active workspace has not been loaded')
@@ -1003,7 +1121,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     return this._currentWorkspace
   }
 
-  /** Создаёт безопасный scope для контроллера, который не читает и не изменяет состояние. */
+  /**
+   * Создаёт безопасный scope для контроллера, который не читает и не изменяет состояние.
+   */
   private _getDisabledPersistenceScope(): EndgePersistenceScope {
     return {
       workspaceId: this._currentWorkspace ?? 'detached',
@@ -1015,7 +1135,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Вычисляет user identity текущей сессии. */
+  /**
+   * Вычисляет user identity текущей сессии.
+   */
   private _resolveSessionIdentity(): { userId: string } {
     const external = this._sessionProvider?.getCurrentIdentity() ?? null
 
@@ -1024,7 +1146,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Обновляет одно поле scope и публикует изменение контекста. */
+  /**
+   * Обновляет одно поле scope и публикует изменение контекста.
+   */
   private _setScopeValue(
     field: '_currentUser',
     identity: string | null,

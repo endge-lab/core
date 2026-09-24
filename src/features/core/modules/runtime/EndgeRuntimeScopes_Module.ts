@@ -3,7 +3,9 @@ import type { RuntimeHost } from '@/features/core/modules/runtime/domain/runtime
 import type { RuntimeScope } from '@/features/core/modules/runtime/RuntimeScope'
 import { EndgeModule } from '@/features/federation/EndgeModule'
 
-/** Индексирует runtime scopes и membership RuntimeHost. */
+/**
+ * Индексирует runtime scopes и membership RuntimeHost.
+ */
 export class EndgeRuntimeScopes_Module extends EndgeModule {
   private readonly _scopes = new Map<string, RuntimeScope>()
   private readonly _scopeByRuntime = new Map<string, string>()
@@ -12,17 +14,19 @@ export class EndgeRuntimeScopes_Module extends EndgeModule {
   private _notificationPending = false
 
   /**
-   * ----------------------------------------
-   * PUBLIC
-   * ----------------------------------------
+   * Получает уведомление владельца Runtime без обращения к Core при создании.
    */
-
-  /** Получает уведомление владельца Runtime без обращения к Core при создании. */
   public constructor(private readonly _onChange: () => void = () => {}) {
     super()
   }
 
-  /** Публикует завершённое изменение scopes; состояние остаётся у их owners. */
+  // ---------------------------------------------
+  // PUBLIC API
+  // ---------------------------------------------
+
+  /**
+   * Публикует завершённое изменение scopes; состояние остаётся у их owners.
+   */
   public override notify(): void {
     super.notify()
     this._onChange()
@@ -134,11 +138,9 @@ export class EndgeRuntimeScopes_Module extends EndgeModule {
     }
   }
 
-  /**
-   * ----------------------------------------
-   * PRIVATE
-   * ----------------------------------------
-   */
+  // ---------------------------------------------
+  // PRIVATE
+  // ---------------------------------------------
 
   private _removeScope(scope: RuntimeScope): void {
     for (const [runtimeId, scopeId] of this._scopeByRuntime) {

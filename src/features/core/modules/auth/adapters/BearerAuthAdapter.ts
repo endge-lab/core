@@ -5,12 +5,16 @@ import type {
   AuthTokenSet,
 } from '@/features/core/modules/auth/domain/types/auth-profile.types'
 
-/** Материализует Bearer header из literal или Workspace variable. */
+/**
+ * Материализует Bearer header из literal или Workspace variable.
+ */
 export class BearerAuthAdapter implements AuthProfileAdapter {
   public readonly id = 'bearer'
   public readonly label = 'Bearer token'
 
-  /** Проверяет строгий persisted contract bearer profile. */
+  /**
+   * Проверяет строгий persisted contract bearer profile.
+   */
   public validate(profile: AuthProfileSchema): void {
     if (Object.keys(profile.config ?? {}).length > 0) {
       throw new Error(`[EndgeAuth] Bearer profile "${profile.identity}" config must be empty`)
@@ -24,7 +28,9 @@ export class BearerAuthAdapter implements AuthProfileAdapter {
     }
   }
 
-  /** Получает token у host и не сохраняет его в browser storage. */
+  /**
+   * Получает token у host и не сохраняет его в browser storage.
+   */
   public async authenticate(context: AuthAdapterContext): Promise<AuthTokenSet> {
     const accessToken = (await context.resolveCredential('token')).trim()
     if (!accessToken) {

@@ -1,7 +1,7 @@
 import type { VocabOptionMapping } from '@/features/core/modules/runtime/domain/vocab-cache.types'
 import type { SourceFieldOption } from '@/features/core/modules/source/domain/types/source-expression.types'
 
-/** Преобразование уже загруженного Vocab не требует его runtime или сетевого запроса. */
+// Преобразование уже загруженного Vocab не требует его runtime или сетевого запроса.
 export function resolveRuntimeVocabOptions(values: unknown, mapping?: Partial<VocabOptionMapping>): SourceFieldOption[] {
   if (!Array.isArray(values)) {
     return []

@@ -19,9 +19,9 @@ export interface RuntimeHostFactoryInput<TType extends RuntimeEntityType> {
 
 export type RuntimeHostFactoryAnyInput = RuntimeHostFactoryInput<RuntimeEntityType>
 
-/**
- * ACCESS
- */
+// ---------------------------------------------
+// ACCESS
+// ---------------------------------------------
 export function createRuntimeHost(
   input: RuntimeHostFactoryAnyInput,
 ): RuntimeHost<any> {

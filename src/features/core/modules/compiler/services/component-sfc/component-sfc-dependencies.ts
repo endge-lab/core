@@ -17,7 +17,7 @@ import type {
 } from '@/features/core/modules/domain/types/component/sfc/ir.types'
 import { createEmptyComponentSFCRuntimeDependencies } from '@/features/core/modules/domain/types/component/sfc/dependencies.types'
 
-/** Анализирует SFC IR и собирает runtime-зависимости от входных props. */
+// Анализирует SFC IR и собирает runtime-зависимости от входных props.
 export function analyzeComponentSFCRuntimeDependencies(
   ir: RComponentSFC_IR | null,
 ): RComponentSFC_RuntimeDependencies {

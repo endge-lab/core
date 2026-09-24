@@ -1,18 +1,14 @@
 import type { RuntimeHost } from '@/features/core/modules/runtime/domain/runtime-host.types'
 
-/**
- * Минимальная binding-scope модель runtime.
- * Хранит базовый путь и алиасы, от которых компоненты строят локальные selectors.
- */
+// Минимальная binding-scope модель runtime.
+// Хранит базовый путь и алиасы, от которых компоненты строят локальные selectors.
 export interface RuntimeBindingScope {
   parentRuntimeId: string | null
   basePath: string | null
   aliases: Record<string, string>
 }
 
-/**
- * Привести unknown-значение к RuntimeBindingScope, если это возможно.
- */
+// Привести unknown-значение к RuntimeBindingScope, если это возможно.
 export function asRuntimeBindingScope(value: unknown): RuntimeBindingScope | null {
   if (!value || typeof value !== 'object') {
     return null
@@ -33,11 +29,9 @@ export function asRuntimeBindingScope(value: unknown): RuntimeBindingScope | nul
   }
 }
 
-/**
- * Собрать binding-scope для runtime.
- * Если explicit scope не передан, пытается унаследовать scope родителя
- * и только потом fallback-ится на legacy basePath.
- */
+// Собрать binding-scope для runtime.
+// Если explicit scope не передан, пытается унаследовать scope родителя
+// и только потом fallback-ится на legacy basePath.
 export function resolveRuntimeBindingScope(input: {
   parent?: RuntimeHost<any, any> | null
   basePath?: string | null
@@ -83,16 +77,12 @@ export function resolveRuntimeBindingScope(input: {
   }
 }
 
-/**
- * Прочитать путь массива items из scope.
- */
+// Прочитать путь массива items из scope.
 export function getRuntimeScopeItemsPath(scope: RuntimeBindingScope): string {
   return String(scope.aliases.items ?? '').trim()
 }
 
-/**
- * Прочитать шаблон пути строки из scope.
- */
+// Прочитать шаблон пути строки из scope.
 export function getRuntimeScopeRowPath(scope: RuntimeBindingScope): string {
   const explicit = String(scope.aliases.row ?? '').trim()
   if (explicit) {
@@ -103,13 +93,11 @@ export function getRuntimeScopeRowPath(scope: RuntimeBindingScope): string {
   return itemsPath ? `${itemsPath}[$i]` : ''
 }
 
-/**
- * Скомпилировать selector таблицы в абсолютный runtime path.
- * Поддерживает:
- * - legacy absolute: `$store...`
- * - scope aliases: `@root.`, `@items.`, `@row.`
- * - relative row selectors: `number`, `attrs[name='STA'].dateTime`
- */
+// Скомпилировать selector таблицы в абсолютный runtime path.
+// Поддерживает:
+// - legacy absolute: `$store...`
+// - scope aliases: `@root.`, `@items.`, `@row.`
+// - relative row selectors: `number`, `attrs[name='STA'].dateTime`
 export function resolveScopedTablePath(input: {
   rawPath: string
   scope: RuntimeBindingScope

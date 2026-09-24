@@ -366,7 +366,7 @@ defineDataView({
 })
 
 describe('владение артефактом EndgeDataView', () => {
-  /** Проверяет запрет локальной компиляции persisted DataView во время runtime. */
+  // Проверяет запрет локальной компиляции persisted DataView во время runtime.
   it('отклоняет выполнение без artifact общего build pipeline', () => {
     const model = new RDataView()
     model.id = 501

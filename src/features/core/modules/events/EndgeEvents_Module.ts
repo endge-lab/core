@@ -8,7 +8,9 @@ import type {
 import { EventBus } from '@endge/utils'
 import { EndgeModule } from '@/features/federation/EndgeModule'
 
-/** Синхронная шина Core: только подписки, без кеша событий и очереди доставки. */
+/**
+ * Синхронная шина Core: только подписки, без кеша событий и очереди доставки.
+ */
 export class EndgeEvents_Module extends EndgeModule {
   private readonly _bus = new EventBus<EndgeCoreEventMap, EndgeCustomEventMap>([], {
     onListenerError: (error, name) => this._reportListenerError(error, name),
@@ -20,7 +22,9 @@ export class EndgeEvents_Module extends EndgeModule {
 
   private _sequence = 0
 
-  /** Подписывает наблюдателя на все последующие публикации. */
+  /**
+   * Подписывает наблюдателя на все последующие публикации.
+   */
   public onAny(callback: (event: EndgePublishedEvent) => void): () => void {
     this._observers.on('event', callback)
     return () => this._observers.off('event', callback)

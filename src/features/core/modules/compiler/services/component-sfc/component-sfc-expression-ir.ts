@@ -1,7 +1,7 @@
 import type * as t from '@babel/types'
 import type { ComponentSFCExpressionIR } from '@/features/core/modules/domain/types/component/sfc/expression-ir.types'
 
-/** Lowering уже разобранного AST; parser вызывается только владельцем compile pipeline. */
+// Lowering уже разобранного AST; parser вызывается только владельцем compile pipeline.
 export function lowerComponentSFCExpression(node: t.Node): ComponentSFCExpressionIR {
   const lower = lowerComponentSFCExpression
   switch (node.type) {

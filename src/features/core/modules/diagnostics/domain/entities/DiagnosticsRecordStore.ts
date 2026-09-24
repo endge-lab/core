@@ -3,7 +3,9 @@ import type {
   DiagnosticsSignal,
 } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
 
-/** Ограниченное кольцевое хранилище diagnostic records с основными индексами. */
+/**
+ * Ограниченное кольцевое хранилище diagnostic records с основными индексами.
+ */
 export class DiagnosticsRecordStore {
   private _capacity: number
   private _slots: Array<DiagnosticsRecord | undefined>
@@ -16,18 +18,24 @@ export class DiagnosticsRecordStore {
   private readonly _recordsBySignal = new Map<DiagnosticsSignal, number>()
   private readonly _recordsByScope = new Map<string, number>()
 
-  /** Создаёт store с указанной максимальной ёмкостью. */
+  /**
+   * Создаёт store с указанной максимальной ёмкостью.
+   */
   public constructor(capacity: number) {
     this._capacity = this._normalizeCapacity(capacity)
     this._slots = Array.from({ length: this._capacity })
   }
 
-  /** Возвращает количество сохранённых records. */
+  /**
+   * Возвращает количество сохранённых records.
+   */
   public get size(): number {
     return this._length
   }
 
-  /** Изменяет ёмкость, сохраняя самые новые records. */
+  /**
+   * Изменяет ёмкость, сохраняя самые новые records.
+   */
   public setCapacity(nextCapacity: number): void {
     const next = this._normalizeCapacity(nextCapacity)
     if (next === this._capacity) {
@@ -44,7 +52,9 @@ export class DiagnosticsRecordStore {
     }
   }
 
-  /** Добавляет record и возвращает вытесненную запись. */
+  /**
+   * Добавляет record и возвращает вытесненную запись.
+   */
   public append(record: DiagnosticsRecord): DiagnosticsRecord | null {
     let evicted: DiagnosticsRecord | null = null
 
@@ -66,13 +76,17 @@ export class DiagnosticsRecordStore {
     return evicted
   }
 
-  /** Полностью очищает records и индексы. */
+  /**
+   * Полностью очищает records и индексы.
+   */
   public clear(): void {
     this._clearState()
     this._slots = Array.from({ length: this._capacity })
   }
 
-  /** Возвращает records от старых к новым с необязательным ограничением хвоста. */
+  /**
+   * Возвращает records от старых к новым с необязательным ограничением хвоста.
+   */
   public toArray(limit?: number): DiagnosticsRecord[] {
     if (this._length === 0) {
       return []
@@ -91,32 +105,44 @@ export class DiagnosticsRecordStore {
     return limit != null && limit > 0 ? records.slice(-limit) : records
   }
 
-  /** Возвращает records одного trace. */
+  /**
+   * Возвращает records одного trace.
+   */
   public getByTraceId(traceId: string, limit?: number): DiagnosticsRecord[] {
     return this._fromIndex(this._traceIndex.get(String(traceId ?? '').trim()), limit)
   }
 
-  /** Возвращает records, связанные с одним span. */
+  /**
+   * Возвращает records, связанные с одним span.
+   */
   public getBySpanId(spanId: string, limit?: number): DiagnosticsRecord[] {
     return this._fromIndex(this._spanIndex.get(String(spanId ?? '').trim()), limit)
   }
 
-  /** Возвращает records одного instrumentation scope. */
+  /**
+   * Возвращает records одного instrumentation scope.
+   */
   public getByScope(scopeName: string, limit?: number): DiagnosticsRecord[] {
     return this._fromIndex(this._scopeIndex.get(String(scopeName ?? '').trim()), limit)
   }
 
-  /** Возвращает количества records по signal. */
+  /**
+   * Возвращает количества records по signal.
+   */
   public getRecordsBySignal(): Partial<Record<DiagnosticsSignal, number>> {
     return Object.fromEntries(this._recordsBySignal.entries())
   }
 
-  /** Возвращает количества records по instrumentation scope. */
+  /**
+   * Возвращает количества records по instrumentation scope.
+   */
   public getRecordsByScope(): Record<string, number> {
     return Object.fromEntries(this._recordsByScope.entries())
   }
 
-  /** Очищает внутреннее состояние без пересоздания массива slots. */
+  /**
+   * Очищает внутреннее состояние без пересоздания массива slots.
+   */
   private _clearState(): void {
     this._head = 0
     this._length = 0
@@ -128,7 +154,9 @@ export class DiagnosticsRecordStore {
     this._recordsByScope.clear()
   }
 
-  /** Возвращает records по готовому индексу. */
+  /**
+   * Возвращает records по готовому индексу.
+   */
   private _fromIndex(index: Set<number> | undefined, limit?: number): DiagnosticsRecord[] {
     if (!index) {
       return []
@@ -139,7 +167,9 @@ export class DiagnosticsRecordStore {
     return selected.map(id => this._byId.get(id)).filter((record): record is DiagnosticsRecord => record != null)
   }
 
-  /** Добавляет record во все индексы store. */
+  /**
+   * Добавляет record во все индексы store.
+   */
   private _addIndexes(record: DiagnosticsRecord): void {
     if (record.traceId) {
       this._addToIndex(this._traceIndex, record.traceId, record.id)
@@ -154,7 +184,9 @@ export class DiagnosticsRecordStore {
     this._bump(this._recordsByScope, scopeName, 1)
   }
 
-  /** Удаляет вытесненный record из всех индексов store. */
+  /**
+   * Удаляет вытесненный record из всех индексов store.
+   */
   private _removeIndexes(record: DiagnosticsRecord): void {
     this._byId.delete(record.id)
     if (record.traceId) {
@@ -170,14 +202,18 @@ export class DiagnosticsRecordStore {
     this._bump(this._recordsByScope, scopeName, -1)
   }
 
-  /** Добавляет id в индекс по строковому ключу. */
+  /**
+   * Добавляет id в индекс по строковому ключу.
+   */
   private _addToIndex(index: Map<string, Set<number>>, key: string, id: number): void {
     const bucket = index.get(key) ?? new Set<number>()
     bucket.add(id)
     index.set(key, bucket)
   }
 
-  /** Удаляет id из индекса и очищает пустую корзину. */
+  /**
+   * Удаляет id из индекса и очищает пустую корзину.
+   */
   private _removeFromIndex(index: Map<string, Set<number>>, key: string, id: number): void {
     const bucket = index.get(key)
     if (!bucket) {
@@ -189,7 +225,9 @@ export class DiagnosticsRecordStore {
     }
   }
 
-  /** Изменяет счётчик и удаляет нулевое значение. */
+  /**
+   * Изменяет счётчик и удаляет нулевое значение.
+   */
   private _bump<TKey extends string>(target: Map<TKey, number>, key: TKey, delta: number): void {
     const next = Math.max(0, (target.get(key) ?? 0) + delta)
     if (next === 0) {
@@ -198,7 +236,9 @@ export class DiagnosticsRecordStore {
     else { target.set(key, next) }
   }
 
-  /** Нормализует ёмкость store до положительного целого числа. */
+  /**
+   * Нормализует ёмкость store до положительного целого числа.
+   */
   private _normalizeCapacity(value: number): number {
     return Math.max(1, Math.floor(Number(value) || 2_000))
   }

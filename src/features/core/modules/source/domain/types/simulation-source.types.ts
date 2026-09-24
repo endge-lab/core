@@ -1,16 +1,16 @@
 import type { ProgramMetadataMap } from '@/features/core/modules/program/domain/types/program-metadata.types'
 import type { ProgramDependency, ProgramDiagnostic } from '@/features/core/modules/program/domain/types/program.types'
 
-/** Декларация подмены response Query. Генерация выполняется при запуске Simulation. */
+// Декларация подмены response Query. Генерация выполняется при запуске Simulation.
 export interface SimulationMockRequest {
   kind: 'mock-request'
   seed?: string
-  /** false исключает примеры Type из схемы; ограничения и enum сохраняются. */
+  // false исключает примеры Type из схемы; ограничения и enum сохраняются.
   useExamples?: boolean
   arrays: Record<string, number>
 }
 
-/** Ограничения сценария сужают существующий Type, не создавая новый Domain Type. */
+// Ограничения сценария сужают существующий Type, не создавая новый Domain Type.
 export interface SimulationFieldConstraints {
   enum?: Array<string | number | boolean>
   minimum?: number
@@ -41,13 +41,13 @@ export interface SimulationTargetReference {
 
 export interface SimulationSourceDocument {
   target: SimulationTargetReference
-  /** Режим неподменённых источников. Отсутствие значения сохраняет наследование. */
+  // Режим неподменённых источников. Отсутствие значения сохраняет наследование.
   dataMode?: 'live' | 'mock'
   runtimes: SimulationRuntimeOverride[]
 }
 
 export interface SimulationSourceArtifact extends SimulationSourceDocument {
-  /** Optional parser tree retained for inspection; runtime does not require it. */
+  // Optional parser tree retained for inspection; runtime does not require it.
   ast?: unknown
   type: 'simulation'
   sourceVersion: number
@@ -63,7 +63,7 @@ export interface SimulationSourceCompileResult {
   locations: Record<string, { start: number, end: number }>
 }
 
-/** Read-only authoring inputs; Source services не получают Domain owner. */
+// Read-only authoring inputs; Source services не получают Domain owner.
 export interface SimulationSourceInput {
   id: string | number
   identity: string

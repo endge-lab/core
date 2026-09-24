@@ -9,17 +9,23 @@ import type {
 import { Endge } from '@/features/core/kernel/endge'
 import { EndgeModule } from '@/features/federation/EndgeModule'
 
-/** Runtime resolver persisted mock-документов и подключенных code providers. */
+/**
+ * Runtime resolver persisted mock-документов и подключенных code providers.
+ */
 export class EndgeMock_Module extends EndgeModule {
   private readonly _providers = new Map<string, EndgeMockProvider>()
 
-  /** Создает пустой registry для application providers. */
+  /**
+   * Создает пустой registry для application providers.
+   */
   public constructor() {
     super()
     this.reset()
   }
 
-  /** Регистрирует provider по namespaced ref и запрещает неявную замену. */
+  /**
+   * Регистрирует provider по namespaced ref и запрещает неявную замену.
+   */
   public registerProvider(provider: EndgeMockProvider): void {
     const normalized = normalizeProvider(provider)
     if (this._providers.has(normalized.ref)) {
@@ -44,7 +50,9 @@ export class EndgeMock_Module extends EndgeModule {
     })
   }
 
-  /** Возвращает состояние binding persisted mock и code provider. */
+  /**
+   * Возвращает состояние binding persisted mock и code provider.
+   */
   public getBindingStatus(identity: string): EndgeMockBindingStatus {
     const mock = Endge.domain.getMock(normalizeIdentity(identity))
     if (!mock) {
@@ -64,13 +72,17 @@ export class EndgeMock_Module extends EndgeModule {
     return 'document'
   }
 
-  /** Проверяет, может ли persisted mock быть разрешен прямо сейчас. */
+  /**
+   * Проверяет, может ли persisted mock быть разрешен прямо сейчас.
+   */
   public has(identity: string): boolean {
     const status = this.getBindingStatus(identity)
     return status === 'document' || status === 'connected'
   }
 
-  /** Разрешает данные из persisted document или его code provider. */
+  /**
+   * Разрешает данные из persisted document или его code provider.
+   */
   public get<T = unknown>(identity: string): T {
     const normalizedIdentity = normalizeIdentity(identity)
     const mock = Endge.domain.getMock(normalizedIdentity)
@@ -104,7 +116,9 @@ export class EndgeMock_Module extends EndgeModule {
     }
   }
 
-  /** Возвращает descriptions зарегистрированных code providers. */
+  /**
+   * Возвращает descriptions зарегистрированных code providers.
+   */
   public listProviders(): EndgeMockDescriptor[] {
     return [...this._providers.values()].map(item => ({
       ref: item.ref,
@@ -112,18 +126,24 @@ export class EndgeMock_Module extends EndgeModule {
     }))
   }
 
-  /** @deprecated Используйте listProviders(). */
+  /**
+   * @deprecated Используйте listProviders().
+   */
   public list(): EndgeMockDescriptor[] {
     return this.listProviders()
   }
 
-  /** Очищает runtime providers. */
+  /**
+   * Очищает runtime providers.
+   */
   public override reset(): void {
     this._providers.clear()
     this.notify()
   }
 
-  /** Возвращает легкий snapshot provider registry. */
+  /**
+   * Возвращает легкий snapshot provider registry.
+   */
   public override serialize(): EndgeMockSnapshot {
     return { providers: this.listProviders() }
   }

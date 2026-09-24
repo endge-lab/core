@@ -13,7 +13,9 @@ import { QueryExecutor_Adapter } from '@/features/core/modules/runtime/adapters/
 export class EndgeQuery {
   private readonly _executor: QueryExecutor_Adapter
 
-  /** Создаёт query module с явным transport adapter. */
+  /**
+   * Создаёт query module с явным transport adapter.
+   */
   public constructor(executor: QueryExecutor_Adapter = createQueryExecutor()) {
     this._executor = executor
   }
@@ -54,7 +56,9 @@ export class EndgeQuery {
     }
   }
 
-  /** Выполняет artifact для QueryRuntimeHost без преждевременной записи stores. */
+  /**
+   * Выполняет artifact для QueryRuntimeHost без преждевременной записи stores.
+   */
   public executeArtifact(input: {
     payload: QueryProgramPayload
     props: Record<string, unknown>
@@ -67,7 +71,9 @@ export class EndgeQuery {
     })
   }
 
-  /** Извлекает response-backed output для атомарного commit в QueryRuntimeHost. */
+  /**
+   * Извлекает response-backed output для атомарного commit в QueryRuntimeHost.
+   */
   public readResponseOutput(
     output: QueryProgramPayload['outputs'][number],
     response: unknown,

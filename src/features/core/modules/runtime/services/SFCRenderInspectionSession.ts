@@ -16,7 +16,9 @@ export class SFCRenderInspectionSession implements SFCRenderInspectionSessionLik
   private _counter = 0
   private _notifyPending = false
 
-  /** Регистрирует или обновляет один instance и возвращает его opaque id. */
+  /**
+   * Регистрирует или обновляет один instance и возвращает его opaque id.
+   */
   public registerNode(input: SFCRenderInspectionNodeInput): string {
     const stableKey = this._makeStableKey(input)
     const id = this._idsByStableKey.get(stableKey) ?? `sfc-ri-${++this._counter}`
@@ -31,7 +33,9 @@ export class SFCRenderInspectionSession implements SFCRenderInspectionSessionLik
     return id
   }
 
-  /** Удаляет instance после unmount renderer-owned physical node. */
+  /**
+   * Удаляет instance после unmount renderer-owned physical node.
+   */
   public unregisterNode(id: string): void {
     if (!this._nodes.has(id)) {
       return
@@ -49,12 +53,16 @@ export class SFCRenderInspectionSession implements SFCRenderInspectionSessionLik
     this._scheduleNotify()
   }
 
-  /** Возвращает зарегистрированный instance по opaque id. */
+  /**
+   * Возвращает зарегистрированный instance по opaque id.
+   */
   public getNode(id: string): SFCRenderInspectionNode | null {
     return this._nodes.get(id) ?? null
   }
 
-  /** Строит текущую иерархию без сохранения отдельного дублирующего дерева. */
+  /**
+   * Строит текущую иерархию без сохранения отдельного дублирующего дерева.
+   */
   public getTree(runtimeId?: string): SFCRenderInspectionTreeNode[] {
     const source = [...this._nodes.values()].filter(node => !runtimeId || node.runtimeId === runtimeId)
     const treeById = new Map<string, SFCRenderInspectionTreeNode>()
@@ -74,13 +82,17 @@ export class SFCRenderInspectionSession implements SFCRenderInspectionSessionLik
     return roots
   }
 
-  /** Подписывает UI на batched изменения inspection projection. */
+  /**
+   * Подписывает UI на batched изменения inspection projection.
+   */
   public subscribe(listener: () => void): VoidFunction {
     this._listeners.add(listener)
     return () => this._listeners.delete(listener)
   }
 
-  /** Очищает instances одного runtime root. */
+  /**
+   * Очищает instances одного runtime root.
+   */
   public clearRuntime(runtimeId: string): void {
     const ids = [...this._nodes.values()]
       .filter(node => node.runtimeId === runtimeId)
@@ -94,7 +106,9 @@ export class SFCRenderInspectionSession implements SFCRenderInspectionSessionLik
     this._scheduleNotify()
   }
 
-  /** Полностью очищает короткоживущую debug session. */
+  /**
+   * Полностью очищает короткоживущую debug session.
+   */
   public clear(): void {
     if (this._nodes.size === 0 && this._idsByStableKey.size === 0) {
       return

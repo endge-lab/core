@@ -5,12 +5,14 @@ import { Exclude, Expose } from 'class-transformer'
 
 import { REntity } from '@/features/core/modules/domain/entities/REntity'
 
-/** Сохранённое source-first определение изменения, принадлежащее Store. */
+/**
+ * Сохранённое source-first определение изменения, принадлежащее Store.
+ */
 export class RUpdate extends REntity {
   @Exclude()
   readonly type = 'update' as const
 
-  /** Стабильный идентификатор единственного Store, который может выполнить этот Update. */
+  // Стабильный идентификатор единственного Store, который может выполнить этот Update.
   @Expose()
   storeIdentity: string = ''
 

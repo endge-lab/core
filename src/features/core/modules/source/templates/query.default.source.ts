@@ -1,4 +1,4 @@
-/** Базовый canonical source для новой RQuery v2. */
+// Базовый canonical source для новой RQuery v2.
 export const QUERY_DEFAULT_SOURCE = `defineQuery({
   kind: 'rest',
 
@@ -34,7 +34,7 @@ export const QUERY_DEFAULT_SOURCE = `defineQuery({
 })
 `
 
-/** Базовый canonical source для новой GraphQL RQuery v2. */
+// Базовый canonical source для новой GraphQL RQuery v2.
 export const QUERY_GRAPHQL_DEFAULT_SOURCE = `defineQuery({
   kind: 'graphql',
 

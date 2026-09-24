@@ -6,7 +6,7 @@ import type {
   UIJsxComponentDocument,
 } from '@/features/core/modules/ui/domain/types/ui-composition.types'
 
-/** Декларативная конфигурация встроенных UI-компонентов. */
+// Декларативная конфигурация встроенных UI-компонентов.
 export const UI_COMPONENT_HOST_DEFINITION_ID = 'ui.component-host'
 
 export const ENDGE_UI_DEFAULT_DEFINITIONS = [

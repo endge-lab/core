@@ -6,7 +6,7 @@ import type { CompositionProgramPayload } from '@/features/core/modules/source/d
 import type { SimulationSourceArtifact } from '@/features/core/modules/source/domain/types/simulation-source.types'
 import type { TypeProgramPayload } from '@/features/core/modules/source/domain/types/type-source.types'
 
-import { Raph } from '@endge/raph'
+import { Raph } from '@raphy-js/raph'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Endge } from '@/features/core/kernel/endge'
 import { RComposition } from '@/features/core/modules/domain/entities/RComposition'

@@ -7,13 +7,15 @@ import type { CompositionRuntimeHost } from '@/features/core/modules/runtime/hos
 import type { SimulationOverrides } from '@/features/core/modules/runtime/services/simulation/prepare-simulation-overrides'
 import type { SimulationSourceArtifact } from '@/features/core/modules/source/domain/types/simulation-source.types'
 
-import { Raph, RaphNode } from '@endge/raph'
+import { Raph, RaphNode } from '@raphy-js/raph'
 import { Endge } from '@/features/core/kernel/endge'
 import { RuntimeHostBase } from '@/features/core/modules/runtime/RuntimeHostBase'
 import { RuntimeScope } from '@/features/core/modules/runtime/RuntimeScope'
 import { prepareSimulationOverrides } from '@/features/core/modules/runtime/services/simulation/prepare-simulation-overrides'
 
-/** Владелец одного изолированного запуска target через общий runtime registry. */
+/**
+ * Владелец одного изолированного запуска target через общий runtime registry.
+ */
 export class SimulationRuntimeHost extends RuntimeHostBase<'simulation', RuntimeHostContextBase, SimulationSourceArtifact> {
   public readonly forceMock: boolean
   private _target: CompositionRuntimeHost | null = null
@@ -86,13 +88,17 @@ export class SimulationRuntimeHost extends RuntimeHostBase<'simulation', Runtime
     return this._target
   }
 
-  /** Проверяет occurrence, а не глобальную identity Query. */
+  /**
+   * Проверяет occurrence, а не глобальную identity Query.
+   */
   public hasRequest(host: RuntimeHost<any, any>): boolean {
     const key = this._requestKey(host)
     return key !== null && this._responses.has(key)
   }
 
-  /** Каждое выполнение получает новый response; mutation Query не меняет шаблон следующего вызова. */
+  /**
+   * Каждое выполнение получает новый response; mutation Query не меняет шаблон следующего вызова.
+   */
   public readResponse(host: RuntimeHost<any, any>): { value: unknown } | null {
     const key = this._requestKey(host)
     return key !== null && this._responses.has(key)
@@ -129,7 +135,9 @@ export class SimulationRuntimeHost extends RuntimeHostBase<'simulation', Runtime
     return current === this._target ? JSON.stringify(path) : null
   }
 
-  /** Создаёт target штатной strategy; вложенные manual nodes сохраняют свои policies. */
+  /**
+   * Создаёт target штатной strategy; вложенные manual nodes сохраняют свои policies.
+   */
   public activateTarget(): Promise<CompositionRuntimeHost> {
     if (this._closed) {
       return Promise.reject(new Error('[Simulation] Запуск уже закрыт.'))

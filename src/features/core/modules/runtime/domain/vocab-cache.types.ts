@@ -11,10 +11,8 @@ export type VocabLoadErrorPolicy
 
 export interface VocabLoadPolicy {
   strategy: VocabLoadStrategy
-  /**
-   * Максимальный возраст cache entry в миллисекундах.
-   * `null` означает, что cache не устаревает автоматически.
-   */
+  // Максимальный возраст cache entry в миллисекундах.
+  // `null` означает, что cache не устаревает автоматически.
   maxAgeMs: number | null
   onError: VocabLoadErrorPolicy
 }
@@ -38,19 +36,19 @@ export interface VocabCacheOperationResult {
   count: number
 }
 
-/** Один публичный Vocab alias, доступный внутри runtime scope Composition. */
+// Один публичный Vocab alias, доступный внутри runtime scope Composition.
 export interface VocabRuntimeCatalogEntry {
-  /** Физическая identity Vocab-документа, полезная для diagnostics. */
+  // Физическая identity Vocab-документа, полезная для diagnostics.
   identity: string
 
-  /** Реактивный Raph path загруженного массива значений. */
+  // Реактивный Raph path загруженного массива значений.
   path: string
 }
 
-/** Накопленный Vocab catalog ближайшего Composition scope. */
+// Накопленный Vocab catalog ближайшего Composition scope.
 export type VocabRuntimeCatalog = Record<string, VocabRuntimeCatalogEntry>
 
-/** Явное преобразование элемента Vocab в renderer-neutral option. */
+// Явное преобразование элемента Vocab в renderer-neutral option.
 export interface VocabOptionMapping {
   valuePath: string
   labelPath: string

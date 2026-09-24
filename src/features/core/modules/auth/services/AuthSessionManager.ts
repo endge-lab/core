@@ -19,7 +19,9 @@ interface AuthSessionManagerDependencies {
   now?: () => number
 }
 
-/** Владеет изолированными sessions runtime auth profiles. */
+/**
+ * Владеет изолированными sessions runtime auth profiles.
+ */
 export class AuthSessionManager {
   private readonly _states = new Map<string, AuthSessionState>()
   private readonly _operations = new Map<string, Promise<AuthTokenSet | null>>()
@@ -39,18 +41,24 @@ export class AuthSessionManager {
     this._now = _dependencies.now ?? (() => Date.now())
   }
 
-  /** Runtime-профиль идентификации по умолчанию. */
+  /**
+   * Runtime-профиль идентификации по умолчанию.
+   */
   public get profileIdentity(): string | null {
     return this._defaultProfile?.identity ?? null
   }
 
-  /** Показывает наличие действующей session default runtime profile. */
+  /**
+   * Показывает наличие действующей session default runtime profile.
+   */
   public get isAuthenticated(): boolean {
     const state = this._defaultState()
     return Boolean(state && this._isSessionUsable(state.token))
   }
 
-  /** Безопасный actor/session context без tokens. */
+  /**
+   * Безопасный actor/session context без tokens.
+   */
   public get context(): EndgeAuthContext {
     const state = this._defaultState()
     if (!state || !this._defaultProfile || !this._isSessionUsable(state.token)) {
@@ -66,18 +74,24 @@ export class AuthSessionManager {
     })
   }
 
-  /** Claims default profile session только для presentation, не для authorization decisions. */
+  /**
+   * Claims default profile session только для presentation, не для authorization decisions.
+   */
   public get claims(): Record<string, unknown> {
     const token = this._defaultState()?.token
     return decodeJwtClaims(token?.idToken) ?? decodeJwtClaims(token?.accessToken) ?? {}
   }
 
-  /** Загруженный OIDC userinfo default profile session. */
+  /**
+   * Загруженный OIDC userinfo default profile session.
+   */
   public get userInfo(): Record<string, unknown> | null {
     return this._defaultState()?.userInfo ?? null
   }
 
-  /** Выбирает default runtime profile и восстанавливает его snapshot. */
+  /**
+   * Выбирает default runtime profile и восстанавливает его snapshot.
+   */
   public configureDefault(profile: AuthProfileSchema | null): void {
     this._defaultProfile = profile
     if (!profile) {
@@ -98,7 +112,9 @@ export class AuthSessionManager {
     this._dependencies.onSessionChange()
   }
 
-  /** Подключает host-owned session source и запрещает смешивание с persisted snapshot profile. */
+  /**
+   * Подключает host-owned session source и запрещает смешивание с persisted snapshot profile.
+   */
   public connect(profileIdentity: string, source: AuthSessionSource): void {
     const profile = this._profiles.requireActive(profileIdentity)
     this._invalidateSession(profile.identity)
@@ -112,7 +128,9 @@ export class AuthSessionManager {
     }
   }
 
-  /** Гарантирует действующую session default runtime profile. */
+  /**
+   * Гарантирует действующую session default runtime profile.
+   */
   public async ensureValid(options: AuthEnsureOptions = {}): Promise<boolean> {
     const profile = this._defaultProfile
     if (!profile) {
@@ -122,7 +140,9 @@ export class AuthSessionManager {
     return Boolean(token && this._isSessionUsable(token))
   }
 
-  /** Загружает userinfo для session default runtime profile. */
+  /**
+   * Загружает userinfo для session default runtime profile.
+   */
   public async ensureUserInfo(): Promise<Record<string, unknown> | null> {
     const profile = this._defaultProfile
     if (!profile) {
@@ -163,7 +183,9 @@ export class AuthSessionManager {
     return userInfo
   }
 
-  /** Завершает session default runtime profile и всегда очищает local snapshot. */
+  /**
+   * Завершает session default runtime profile и всегда очищает local snapshot.
+   */
   public async logout(): Promise<void> {
     const profile = this._defaultProfile
     if (!profile) {
@@ -196,7 +218,9 @@ export class AuthSessionManager {
     }
   }
 
-  /** Гарантирует session указанного profile, не меняя default profile. */
+  /**
+   * Гарантирует session указанного profile, не меняя default profile.
+   */
   public async ensureProfile(profileInput: AuthProfileSchema, options: AuthEnsureOptions = {}): Promise<AuthTokenSet | null> {
     const profile = this._profiles.requireActive(profileInput)
     if (this._loggingOut.has(profile.identity)) {
@@ -264,7 +288,9 @@ export class AuthSessionManager {
     return this._singleFlight(profile, () => this._authenticate(profile))
   }
 
-  /** Преобразует token set в transport-neutral request session. */
+  /**
+   * Преобразует token set в transport-neutral request session.
+   */
   public toResolvedSession(profile: AuthProfileSchema, token: AuthTokenSet): AuthResolvedSession {
     const context = createEndgeAuthContext({
       authenticated: this._isSessionUsable(token),
@@ -284,7 +310,9 @@ export class AuthSessionManager {
     }
   }
 
-  /** Сбрасывает runtime state, сохраняя local/sessionStorage snapshots. */
+  /**
+   * Сбрасывает runtime state, сохраняя local/sessionStorage snapshots.
+   */
   public resetRuntime(): void {
     this._generation += 1
     this._sessionVersions.clear()
@@ -411,13 +439,17 @@ export class AuthSessionManager {
     return promise
   }
 
-  /** Отсоединяет старую operation до изменения session owner. */
+  /**
+   * Отсоединяет старую operation до изменения session owner.
+   */
   private _invalidateSession(identity: string): void {
     this._sessionVersions.set(identity, Symbol(identity))
     this._operations.delete(identity)
   }
 
-  /** Поздний ответ не должен менять новую сессию или другой workspace. */
+  /**
+   * Поздний ответ не должен менять новую сессию или другой workspace.
+   */
   private _sessionGuard(identity: string): () => boolean {
     const generation = this._generation
     const version = this._sessionVersions.get(identity)

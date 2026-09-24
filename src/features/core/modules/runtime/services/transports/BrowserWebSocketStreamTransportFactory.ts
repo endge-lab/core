@@ -1,8 +1,12 @@
 import type { StreamTransportConnection, StreamTransportFactory } from '@/features/core/modules/runtime/domain/stream-runtime.types'
 
-/** Владеет WebSocket, повторной подпиской и таймером переподключения одного Stream. */
+/**
+ * Владеет WebSocket, повторной подпиской и таймером переподключения одного Stream.
+ */
 export class BrowserWebSocketStreamTransportFactory implements StreamTransportFactory {
-  /** Открывает JSON transport; close отменяет reconnect и все callbacks соединения. */
+  /**
+   * Открывает JSON transport; close отменяет reconnect и все callbacks соединения.
+   */
   public open(artifact: Parameters<StreamTransportFactory['open']>[0], callbacks: Parameters<StreamTransportFactory['open']>[1]): StreamTransportConnection {
     const transport = artifact.transport
     if (transport.kind !== 'websocket') {

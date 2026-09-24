@@ -6,9 +6,11 @@ import { Expose } from 'class-transformer'
 import { normalizeEndgeConfigurationContribution } from '@/features/core/modules/configuration/domain/endge-configuration'
 import { normalizeEntityMeta, REntity } from '@/features/core/modules/domain/entities/REntity'
 
-/** Persisted contribution document whose identity is scoped by facetIdentity. */
+/**
+ * Persisted contribution document whose identity is scoped by facetIdentity.
+ */
 export class RFacetDocument extends REntity<string | number> {
-  /** Optimistic-lock and audit state returned only by a live persistence provider. */
+  // Optimistic-lock and audit state returned only by a live persistence provider.
   serverState: EndgeDocumentServerState | null = null
 
   @Expose()
