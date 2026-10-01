@@ -79,7 +79,7 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
       artifactReader,
       artifact: programArtifact.payload,
     })
-    const node = new RaphNode(Raph.runtime, {
+    const node = new RaphNode(Raph.runtime(), {
       id: `${input.model.identity}-${input.id}`,
       meta: {
         type: 'store',
@@ -186,7 +186,7 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
 
     const plans = this._makeMutationPlans(artifact.payload, payload)
     this._validateMutationPlans(plans)
-    Raph.transaction(() => {
+    Raph.batch(() => {
       for (const plan of plans) {
         this._applyMutationPlan(plan)
       }
@@ -219,7 +219,7 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
       this._validateMetaPlan(plan)
     }
 
-    Raph.transaction(() => this._applyMutationPlan(plan))
+    Raph.batch(() => this._applyMutationPlan(plan))
 
     const now = new Date().toISOString()
     this.setContext({ status: 'success', updatedAt: now, lastStateChangeAt: now })
@@ -248,7 +248,7 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
       }
     }
 
-    Raph.transaction(() => {
+    Raph.batch(() => {
       for (const field of artifact.data) {
         if (field.kind === 'value') {
           Raph.set(this.getDataPath(field.key), cloneRuntimeValue(initialValues.get(field.key)))

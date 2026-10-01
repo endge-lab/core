@@ -1,8 +1,14 @@
-import type { PhaseEvent, RaphDerivedHandle } from '@raphy-js/raph'
+import type { RaphDerivedHandle, RaphPhaseTask } from '@raphy-js/raph'
 import type { RFilter } from '@/features/core/modules/domain/entities/RFilter'
 import type { RQuery } from '@/features/core/modules/domain/entities/RQuery'
 import type { ProgramArtifact, QueryProgramPayload } from '@/features/core/modules/program/domain/types/program.types'
-import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext, RuntimeHostUpdateContext } from '@/features/core/modules/runtime/domain/runtime-host.types'
+import type {
+  RuntimeArtifactReader,
+  RuntimeHost,
+  RuntimeHostContext,
+  RuntimeHostUpdateContext,
+  RuntimePhaseEvent,
+} from '@/features/core/modules/runtime/domain/runtime-host.types'
 import type { FilterRuntimeHost } from '@/features/core/modules/runtime/hosts/FilterRuntimeHost'
 
 import type { FilterProgramPayload } from '@/features/core/modules/source/domain/types/filter-source.types'
@@ -90,7 +96,7 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
       artifactReader: input.artifacts,
     })
     try {
-      const node = new RaphNode(Raph.runtime, {
+      const node = new RaphNode(Raph.runtime(), {
         id: `${input.model.identity}-${input.id}`,
         meta: {
           type: 'query',
@@ -258,7 +264,7 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
         this._publishOutputs(Object.keys(this._outputs))
       }
       else {
-        Raph.transaction(() => {
+        Raph.batch(() => {
           for (const output of payload.outputs) {
             if (output.source.type !== 'response') {
               continue
@@ -409,13 +415,13 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     }
 
     const masks = [
-      `${this._internalBase}.outputs.*`,
+      `${this._internalBase}.outputs`,
       `${this._internalBase}.outputGeneration`,
     ]
-    this._outputWatchers.push(Raph.watch(masks, ({ events }) => this._syncOutputs(events, true)))
+    this._outputWatchers.push(this.watchRuntimePaths(masks, task => this._syncOutputs(pathEvents(task), true)))
     const sourcePaths = [...new Set(this._derivedHandles.map(handle => String(handle.options.from)))]
     if (sourcePaths.length) {
-      this._outputWatchers.push(Raph.watch(sourcePaths.flatMap(path => [path, `${path}.*`, `${path}[*]`, `${path}[*].*`]), () => {
+      this._outputWatchers.push(this.watchRuntimePaths(sourcePaths, () => {
         const hasError = this._derivedHandles.some(handle => handle.status === 'error')
         if (hasError !== this._derivedErrorActive) {
           this._syncOutputs([], false)
@@ -445,7 +451,7 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     return path
   }
 
-  private _syncOutputs(events: readonly PhaseEvent[], emit: boolean): void {
+  private _syncOutputs(events: readonly RuntimePhaseEvent[], emit: boolean): void {
     const outputs = Object.fromEntries([...this._outputPaths].map(([key, path]) => [key, Raph.get(path)]))
     this._outputs = outputs
     const derivedError = this._derivedHandles.find(handle => handle.status === 'error')?.lastError ?? null
@@ -518,6 +524,12 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
       this.bindInput(key, { kind: 'literal', value })
     }
   }
+}
+
+function pathEvents(task: RaphPhaseTask): RuntimePhaseEvent[] {
+  return task.causes
+    .flatMap(cause => cause.events ?? [])
+    .filter((event): event is RuntimePhaseEvent => typeof event.path === 'string')
 }
 
 function pathAffects(sourcePath: string, eventPath: string): boolean {

@@ -2,7 +2,7 @@ import type { ProgramArtifact, QueryProgramPayload } from '@/features/core/modul
 import type { FilterProgramPayload } from '@/features/core/modules/source/domain/types/filter-source.types'
 
 import { Raph } from '@raphy-js/raph'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Endge } from '@/features/core/kernel/endge'
 import { RQuery } from '@/features/core/modules/domain/entities/RQuery'
@@ -10,6 +10,10 @@ import { QueryRuntimeHost } from '@/features/core/modules/runtime/hosts/QueryRun
 import { compileFilterSource } from '@/features/core/modules/source/services/compilers/filter-source-compile'
 
 describe('проверка Host runtime для Query', () => {
+  beforeEach(() => {
+    Endge.runtime.start()
+  })
+
   afterEach(async () => {
     vi.restoreAllMocks()
     Endge.context.setDataMode('live')
@@ -23,13 +27,13 @@ describe('проверка Host runtime для Query', () => {
     const subscribe = vi.spyOn(Endge.context, 'subscribe')
     for (let attempt = 0; attempt < 10; attempt++) {
       expect(() => createHost({ unknown: true })).toThrow('unknown prop')
-      expect(Raph.runtime.getNode('test-query-query-runtime')).toBeUndefined()
+      expect(Raph.runtime().getNode('test-query-query-runtime')).toBeUndefined()
     }
     expect(subscribe).not.toHaveBeenCalled()
     const host = createHost()
-    expect(Raph.runtime.getNode('test-query-query-runtime')).toBeDefined()
+    expect(Raph.runtime().getNode('test-query-query-runtime')).toBeDefined()
     host.destroy()
-    expect(Raph.runtime.getNode('test-query-query-runtime')).toBeUndefined()
+    expect(Raph.runtime().getNode('test-query-query-runtime')).toBeUndefined()
   })
 
   it('использует стратегию latest-wins, отменяет предыдущий transport и игнорирует устаревший результат', async () => {

@@ -36,7 +36,7 @@ describe('debugger inspection boundary', () => {
     expect(Endge.domain.getCompositions()).toEqual([])
     expect(build).not.toHaveBeenCalled()
     expect(addPhase).not.toHaveBeenCalled()
-    expect(Raph.runtime.root.children).toEqual([])
+    expect(Raph.runtime().root.children).toEqual([])
     expect(Endge.runtime.snapshot().hosts).toEqual([])
     await Endge.reset()
     expect(Endge.runtime.inspection.runtime.hosts).toEqual([])

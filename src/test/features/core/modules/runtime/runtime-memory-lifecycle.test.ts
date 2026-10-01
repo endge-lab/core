@@ -51,7 +51,7 @@ describe('жизненный цикл памяти runtime', () => {
   it('обрабатывает каждую доставленную привязку обновления без структурного хеширования', () => {
     const model = queryModel(1)
     const host = new TestQueryHost(model)
-    const node = new RaphNode(Raph.runtime, { id: 'binding-node' })
+    const node = new RaphNode(Raph.runtime(), { id: 'binding-node' })
     Raph.addPhase(RuntimeNodeUpdatePhase.make())
     host.addRaphNode(node)
     host.bindUpdate({ id: 'refresh', sourcePath: 'source.rows', update: { kind: 'run' } })

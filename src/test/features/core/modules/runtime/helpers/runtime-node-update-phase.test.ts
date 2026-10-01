@@ -21,7 +21,7 @@ describe('фаза обновления узлов runtime', () => {
     })
     runtime.definePhases([RuntimeNodeUpdatePhase.make({ resolveHost: () => host })])
     root.addChild(boundary)
-    runtime.observeData(root, 'filters.request', { phase: RuntimeNodeUpdatePhase.PHASE_NAME })
+    root.watch(runtime.path('filters.request'), RuntimeNodeUpdatePhase.PHASE_NAME, () => {})
 
     kernel.set('filters.request', { search: 'SU' })
 

@@ -80,7 +80,7 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
       meta: input.meta,
       artifactReader,
     })
-    const node = new RaphNode(Raph.runtime, {
+    const node = new RaphNode(Raph.runtime(), {
       id: `${input.model.identity}-${input.id}`,
       meta: {
         type: 'filter',
@@ -222,7 +222,7 @@ export class FilterRuntimeHost extends RuntimeHostBase<'filter', RuntimeHostCont
         .filter(key => !filterValuesEqual(previous[key], state[key])),
     )
     let changedOutputs: Array<{ key: string, output: FilterRuntimeOutput }> = []
-    Raph.transaction(() => {
+    Raph.batch(() => {
       Raph.set(this.statePath(), state)
       changedOutputs = this._recomputeOutputs(emit ? (invalidatedFields ?? changedFields) : null, emit)
     })

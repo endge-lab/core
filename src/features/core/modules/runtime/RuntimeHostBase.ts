@@ -1,4 +1,4 @@
-import type { RaphNode } from '@raphy-js/raph'
+import type { RaphNode, RaphPhaseEffect } from '@raphy-js/raph'
 import type { RuntimeStateControllerLike } from '@/features/core/modules/context/domain/context-persistence.types'
 import type { ProgramArtifact } from '@/features/core/modules/program/domain/types/program.types'
 import type { RuntimeEntityModelMap, RuntimeEntityType } from '@/features/core/modules/runtime/domain/runtime-entity-map.types'
@@ -375,13 +375,38 @@ export abstract class RuntimeHostBase<
     this._unbindUpdate(id)
     const normalized: RuntimeHostUpdateBinding = { ...binding, id, sourcePath }
     this._updateBindings.set(id, normalized)
-    const disposers = [sourcePath, `${sourcePath}.*`].map(mask => Raph.runtime.observeData(
-      this.node!,
-      mask,
-      { phase: RUNTIME_NODE_UPDATE_PHASE_NAME },
-    ))
+    const disposers = [this.watchRuntimePaths(sourcePath, () => {})]
     this._updateDisposers.set(id, disposers)
     return () => this._unbindUpdate(id)
+  }
+
+  /**
+   * Создаёт одну persistent binding для набора явных PathHandle sources.
+   */
+  protected watchRuntimePaths(
+    paths: string | readonly string[],
+    callback: RaphPhaseEffect,
+    phase = RUNTIME_NODE_UPDATE_PHASE_NAME,
+  ): () => void {
+    if (!this.node) {
+      throw new Error(`[RuntimeHostBase] Runtime node is missing for "${this.id}".`)
+    }
+    const normalized = [...new Set((Array.isArray(paths) ? paths : [paths])
+      .map(path => String(path).trim())
+      .filter(Boolean))]
+    if (normalized.length === 0) {
+      throw new Error('[RuntimeHostBase] At least one runtime path is required.')
+    }
+    const sources = normalized.map(path => Raph.runtime().path(path))
+    if (sources.length === 1) {
+      return this.node.watch(sources[0], phase, callback)
+    }
+    const aggregate = this.node.aggregate(sources)
+    const stop = this.node.watch(aggregate, phase, callback)
+    return () => {
+      stop()
+      aggregate.dispose()
+    }
   }
 
   private _unbindUpdate(id: string): void {

@@ -1,14 +1,19 @@
 import type { ProgramArtifact } from '@/features/core/modules/program/domain/types/program.types'
 
 import { Raph } from '@raphy-js/raph'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { RFilter } from '@/features/core/modules/domain/entities/RFilter'
+import { RuntimeNodeUpdatePhase } from '@/features/core/modules/runtime/helpers/raph-phases/runtime-node-update-phase'
 import { FilterRuntimeHost } from '@/features/core/modules/runtime/hosts/FilterRuntimeHost'
 import { FilterViewRuntimeHost } from '@/features/core/modules/runtime/hosts/FilterViewRuntimeHost'
 import { compileFilterSource } from '@/features/core/modules/source/services/compilers/filter-source-compile'
 
 describe('проверка Host runtime для FilterView', () => {
+  beforeEach(() => {
+    Raph.definePhases([RuntimeNodeUpdatePhase.make({ resolveHost: () => null })])
+  })
+
   afterEach(() => Raph.reset())
 
   it('строит единый независимый от renderer план и делегирует изменения состоянию Filter', async () => {
