@@ -235,7 +235,7 @@ defineProps<{
     ])
     patches.length = 0
     propsUpdates.length = 0
-    Raph.transaction(() => {
+    Raph.batch(() => {
       Raph.set('test.sfc.flights[id="flight-1"].counter', 2)
       Raph.set('test.sfc.flights[id="flight-2"].counter', 1)
     })

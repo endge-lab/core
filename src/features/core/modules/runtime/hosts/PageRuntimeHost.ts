@@ -45,7 +45,7 @@ export class PageRuntimeHost extends RuntimeHostBase<'page'> {
     const meta = input.meta ?? {}
     const parent = input.parent ?? null
 
-    const node = new RaphNode(Raph.runtime, {
+    const node = new RaphNode(Raph.runtime(), {
       id: `${model.identity || model.id}-${id}`,
       meta: {
         type: 'page',

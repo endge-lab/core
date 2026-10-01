@@ -148,7 +148,7 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
       return
     }
     this._inited = true
-    const runtime = Raph.runtime
+    const runtime = Raph.runtime()
     if (this._phaseRuntime !== runtime) {
       runtime.addPhase(RuntimeNodeUpdatePhase.make())
       runtime.addPhase(RuntimeBoundaryUpdatePhase.make())
@@ -426,12 +426,12 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     if (!this._inited) {
       return
     }
-    Raph.transaction(() => {
+    Raph.batch(() => {
       for (const host of this._hosts.getAll()) {
         if (!host.capabilities.includes('renderable') || !host.node) {
           continue
         }
-        host.node.dirty(RuntimeNodeUpdatePhase.PHASE_NAME)
+        host.node.touch({ kind: 'application-scope-context' })
       }
     })
   }
@@ -544,12 +544,12 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
       }
       collect(tree)
       result.graph = {
-        runtimeId: Raph.runtime.id,
-        loopEnabled: Raph.runtime.loopEnabled,
-        frame: { ...Raph.runtime.frame },
+        runtimeId: Raph.runtime().id,
+        loopEnabled: Raph.runtime().loopEnabled,
+        frame: { ...Raph.runtime().frame },
         nodes,
         tree: [tree],
-        derived: Raph.runtime.getDerivedSnapshot(),
+        derived: Raph.runtime().getDerivedSnapshot(),
       }
     }
     return result
@@ -667,15 +667,23 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     if (this._inspectionMode) {
       throw new Error('[Endge Runtime] Cannot observe local Raph in debugger')
     }
+    this.start()
     const token = Symbol('runtime-data-changes')
     this._dataLeases.add(token)
     if (!this._unsubscribeData) {
-      const offData = Raph.watch('*', this._onRenderChanged)
-      const offMeta = Raph.meta.watch('*', this._onRenderChanged)
+      const dataSource = Raph.runtime().path('')
+      const metaSource = Raph.runtime().metaSource('*')
+      const changes = Raph.runtime().rootScope.aggregate([dataSource, metaSource])
+      const offRuntime = Raph.runtime().rootScope.watch(
+        changes,
+        RuntimeNodeUpdatePhase.PHASE_NAME,
+        () => this._onRenderChanged(),
+      )
       this._hosts.getAll().forEach(host => this._observeRenderChanges(host))
       this._unsubscribeData = () => {
-        offData()
-        offMeta()
+        offRuntime()
+        changes.dispose()
+        metaSource.dispose()
         this._renderDataOff.forEach(off => off())
         this._renderDataOff.clear()
       }
@@ -904,7 +912,7 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
       if (!name) {
         continue
       }
-      Raph.runtime.set(`${STORAGE_VARS_KEY}.${name}`, Endge.workspace.variables.getValue(name))
+      Raph.runtime().set(`${STORAGE_VARS_KEY}.${name}`, Endge.workspace.variables.getValue(name))
     }
   }
 
@@ -1031,6 +1039,11 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
         },
       })
       ;(parent?.node ?? this._ensureScopeNode(String(host.meta.appScopeId ?? 'app')))?.addChild(host.node)
+      host.node.watch(
+        host.node,
+        RuntimeNodeUpdatePhase.PHASE_NAME,
+        () => {},
+      )
     }
     try {
       this._hosts.register(host)
@@ -1135,7 +1148,7 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     if (!this._appNode) {
       return null
     }
-    const node = new RaphNode(Raph.runtime, {
+    const node = new RaphNode(Raph.runtime(), {
       id: `__endge.runtime.scope.${scope.id}`,
       meta: {
         type: 'runtime-scope',

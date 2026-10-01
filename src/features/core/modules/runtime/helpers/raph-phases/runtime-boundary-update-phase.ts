@@ -1,61 +1,51 @@
 import type {
-  DepGraph,
-  PhaseEvent,
-  PhaseExecutorContext,
+  PathEvent,
   PhaseName,
   RaphNode,
   RaphPhase,
+  RaphPhaseTask,
 } from '@raphy-js/raph'
-import type { RuntimeDirtyBoundary, RuntimeHost } from '@/features/core/modules/runtime/domain/runtime-host.types'
-
-import { Raph } from '@raphy-js/raph'
+import type {
+  RuntimeDirtyBoundary,
+  RuntimeHost,
+  RuntimePhaseEvent,
+} from '@/features/core/modules/runtime/domain/runtime-host.types'
 
 import { Endge } from '@/features/core/kernel/endge'
 import { RUNTIME_BOUNDARY_UPDATE_PHASE_NAME } from '@/features/core/modules/runtime/domain/runtime-host.types'
 
 export interface RuntimeBoundaryAggregatedUpdate {
   node: RaphNode
-  events: PhaseEvent[]
+  events: RuntimePhaseEvent[]
   boundaries: RuntimeDirtyBoundary[]
 }
 
 export interface RuntimeBoundaryUpdatePhaseOptions {
   name?: PhaseName
-  getGraph?: () => DepGraph<RaphNode>
   resolveHost?: (runtimeId: string) => RuntimeHost | null
 }
 
 interface RuntimeBoundaryAccumulator {
   node: RaphNode
-  events: PhaseEvent[]
+  events: RuntimePhaseEvent[]
   dirtyNodes: RaphNode[]
 }
 
 /**
- * Универсальная Raph-фаза обновления runtime-сущностей через верхние dirty boundaries.
+ * Агрегирует persistent phase bindings к верхним runtime boundaries.
  */
 export class RuntimeBoundaryUpdatePhase {
   public static readonly PHASE_NAME = RUNTIME_BOUNDARY_UPDATE_PHASE_NAME
 
-  /**
-   * Создает Raph-фазу, которая вызывает update у runtime-host верхних dirty boundaries.
-   */
   public static make(options: RuntimeBoundaryUpdatePhaseOptions = {}): RaphPhase {
     const name = options.name ?? RuntimeBoundaryUpdatePhase.PHASE_NAME
 
     return {
       name,
-      routes: ['*'],
-      traversal: 'dirty-only',
-      nodes: (node: RaphNode) => isRuntimeNode(node),
-      all: (ctxs) => {
-        if (!ctxs.length) {
-          return
-        }
-
-        const graph = options.getGraph?.() ?? Raph.runtime.graph
-        const updates = aggregateRuntimeBoundaryUpdates(graph, ctxs)
-        const resolveHost = options.resolveHost ?? ((runtimeId: string) => Endge.runtime.getRuntimeById(runtimeId))
+      process: (batch) => {
+        const updates = aggregateRuntimeBoundaryUpdates(batch.tasks)
+        const resolveHost = options.resolveHost
+          ?? ((runtimeId: string) => Endge.runtime.getRuntimeById(runtimeId))
 
         for (const update of updates) {
           const runtimeId = String(update.node.meta?.runtimeId ?? '').trim()
@@ -73,40 +63,45 @@ export class RuntimeBoundaryUpdatePhase {
             node: update.node,
             events: update.events,
             boundaries: update.boundaries,
-            frame: ctxs[0].frame,
+            frame: batch.frame,
           })
+        }
+
+        for (const task of batch.tasks) {
+          task.run()
         }
       },
     }
   }
 }
 
-// Агрегирует dirty runtime-ноды к минимальному списку верхних dirty boundaries.
+// Агрегирует consumer-ноды к минимальному списку верхних boundaries.
 export function aggregateRuntimeBoundaryUpdates(
-  graph: DepGraph<RaphNode>,
-  ctxs: readonly PhaseExecutorContext[],
+  tasks: readonly RaphPhaseTask[],
 ): RuntimeBoundaryAggregatedUpdate[] {
   const candidates = new Map<string, RuntimeBoundaryAccumulator>()
 
-  for (const ctx of ctxs) {
-    if (!isRuntimeNode(ctx.node)) {
+  for (const task of tasks) {
+    const node = task.consumerOwner.node
+    if (!node || !isRuntimeNode(node) || task.causes.length === 0) {
       continue
     }
 
-    const boundary = findUpdateBoundary(ctx.node, graph)
+    const boundary = findUpdateBoundary(node)
     if (!boundary) {
       continue
     }
 
-    const events = ctx.events ?? []
     const accumulator = getBoundaryAccumulator(candidates, boundary)
-    accumulator.events.push(...events)
-    if (!accumulator.dirtyNodes.some(node => node.id === ctx.node.id)) {
-      accumulator.dirtyNodes.push(ctx.node)
+    for (const cause of task.causes) {
+      accumulator.events.push(...(cause.events ?? []).filter(isPathEvent))
+    }
+    if (!accumulator.dirtyNodes.some(item => item.id === node.id)) {
+      accumulator.dirtyNodes.push(node)
     }
   }
 
-  return pruneCoveredUpdates(graph, Array.from(candidates.values())).map(item => ({
+  return pruneCoveredUpdates(Array.from(candidates.values())).map(item => ({
     node: item.node,
     events: item.events,
     boundaries: makeBoundaryRecords(item),
@@ -132,18 +127,11 @@ function getBoundaryAccumulator(
 }
 
 function pruneCoveredUpdates(
-  graph: DepGraph<RaphNode>,
   updates: RuntimeBoundaryAccumulator[],
 ): RuntimeBoundaryAccumulator[] {
-  return updates.filter((candidate) => {
-    return !updates.some((other) => {
-      if (candidate === other) {
-        return false
-      }
-
-      return isRuntimeAncestor(other.node, candidate.node, graph)
-    })
-  })
+  return updates.filter(candidate => !updates.some(other => (
+    candidate !== other && isRuntimeAncestor(other.node, candidate.node)
+  )))
 }
 
 function makeBoundaryRecords(accumulator: RuntimeBoundaryAccumulator): RuntimeDirtyBoundary[] {
@@ -158,82 +146,28 @@ function makeBoundaryRecords(accumulator: RuntimeBoundaryAccumulator): RuntimeDi
   }]
 }
 
-function findUpdateBoundary(node: RaphNode, graph: DepGraph<RaphNode>): RaphNode | null {
-  if (node.meta?.kind === 'root' || node.meta?.kind === 'boundary') {
-    return node
-  }
-
-  return findNearestRuntimeAncestor(node, graph, (item) => {
-    return item.meta?.kind === 'boundary' || item.meta?.kind === 'root'
-  })
-}
-
-function findNearestRuntimeAncestor(
-  node: RaphNode,
-  graph: DepGraph<RaphNode>,
-  predicate: (node: RaphNode) => boolean,
-): RaphNode | null {
-  if (predicate(node)) {
-    return node
-  }
-
-  const seen = new Set<string>([node.id])
-  const queue: RaphNode[] = [node]
-
-  while (queue.length) {
-    const current = queue.shift()
-    if (!current) {
-      continue
-    }
-
-    for (const parent of graph.parentsOf(current)) {
-      if (seen.has(parent.id)) {
-        continue
-      }
-
-      if (predicate(parent)) {
-        return parent
-      }
-
-      seen.add(parent.id)
-      queue.push(parent)
+function findUpdateBoundary(node: RaphNode): RaphNode | null {
+  for (let current: RaphNode | null = node; current !== null; current = current.parent) {
+    if (current.meta?.kind === 'boundary' || current.meta?.kind === 'root') {
+      return current
     }
   }
-
   return null
 }
 
-function isRuntimeAncestor(ancestor: RaphNode, node: RaphNode, graph: DepGraph<RaphNode>): boolean {
-  if (ancestor.id === node.id) {
-    return true
-  }
-
-  const seen = new Set<string>([node.id])
-  const queue: RaphNode[] = [node]
-
-  while (queue.length) {
-    const current = queue.shift()
-    if (!current) {
-      continue
-    }
-
-    for (const parent of graph.parentsOf(current)) {
-      if (seen.has(parent.id)) {
-        continue
-      }
-
-      if (parent.id === ancestor.id) {
-        return true
-      }
-
-      seen.add(parent.id)
-      queue.push(parent)
+function isRuntimeAncestor(ancestor: RaphNode, node: RaphNode): boolean {
+  for (let current: RaphNode | null = node; current !== null; current = current.parent) {
+    if (current === ancestor) {
+      return true
     }
   }
-
   return false
 }
 
 function isRuntimeNode(node: RaphNode): boolean {
   return node.meta?.type === 'runtime-node'
+}
+
+function isPathEvent(event: unknown): event is PathEvent {
+  return typeof (event as { path?: unknown })?.path === 'string'
 }

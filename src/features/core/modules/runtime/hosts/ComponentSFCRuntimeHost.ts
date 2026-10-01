@@ -206,7 +206,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     const parent = input.parent ?? null
     const target = normalizeTarget(meta?.target)
 
-    const node = new RaphNode(Raph.runtime, {
+    const node = new RaphNode(Raph.runtime(), {
       id: `${model.identity || model.id}-${id}`,
       meta: {
         ...meta,
@@ -960,7 +960,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
       return
     }
 
-    const dispose = Raph.watch([path, `${path}.*`], () => {
+    const dispose = this.watchRuntimePaths(path, () => {
       this.emit('resource:dirty', { kind: 'vocab', alias, path })
     })
     this._vocabDisposers.set(key, dispose)
@@ -974,7 +974,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
         continue
       }
 
-      const tableNode = new RaphNode(Raph.runtime, {
+      const tableNode = new RaphNode(Raph.runtime(), {
         id: `${root.id}:table:${boundary.id}`,
         meta: {
           type: 'runtime-node',
@@ -1012,7 +1012,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     boundary: RComponentSFC_RuntimeBoundaryDependency,
     column: RComponentSFC_RuntimeTableColumnDependency,
   ): void {
-    const columnNode = new RaphNode(Raph.runtime, {
+    const columnNode = new RaphNode(Raph.runtime(), {
       id: `${tableNode.id}:column:${column.id}`,
       meta: {
         type: 'runtime-node',
@@ -1067,10 +1067,11 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
           continue
         }
         observed.add(key)
-        const dispose = Raph.runtime.observeData(this.node, observedPath, {
-          phase: RUNTIME_BOUNDARY_UPDATE_PHASE_NAME,
-          wildcardDynamic: binding.wildcardDynamic ?? true,
-        })
+        const dispose = this.node.watch(
+          Raph.runtime().path(observedPath),
+          RUNTIME_BOUNDARY_UPDATE_PHASE_NAME,
+          () => {},
+        )
         this._raphInputDisposers.push(dispose)
       }
     }
@@ -1097,10 +1098,15 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
         continue
       }
       seen.add(key)
-      this._raphInputDisposers.push(Raph.runtime.meta.watch(observedPath, () => this.node?.dirty(RUNTIME_BOUNDARY_UPDATE_PHASE_NAME), {
+      const source = Raph.runtime().metaSource(observedPath, {
         ...(dependency.namespace ? { namespace: dependency.namespace } : {}),
         wildcardDynamic: true,
-      }))
+      })
+      const stop = this.node.watch(source, RUNTIME_BOUNDARY_UPDATE_PHASE_NAME, () => {})
+      this._raphInputDisposers.push(() => {
+        stop()
+        source.dispose()
+      })
     }
   }
 
@@ -1211,12 +1217,11 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     if (!observedPath) {
       return
     }
-    for (const mask of [observedPath, `${observedPath}.*`]) {
-      this._raphInputDisposers.push(Raph.runtime.observeData(node, mask, {
-        phase: RUNTIME_BOUNDARY_UPDATE_PHASE_NAME,
-        wildcardDynamic: true,
-      }))
-    }
+    this._raphInputDisposers.push(node.watch(
+      Raph.runtime().path(observedPath),
+      RUNTIME_BOUNDARY_UPDATE_PHASE_NAME,
+      () => {},
+    ))
   }
 
   private _bindRaphBoundaryInputSource(
@@ -1236,28 +1241,11 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
 
       const tableNode = this._findRuntimeNodeByMeta('boundaryId', boundary.id)
       if (tableNode) {
-        this._raphInputDisposers.push(Raph.runtime.observeData(tableNode, sourcePath, {
-          phase: RUNTIME_BOUNDARY_UPDATE_PHASE_NAME,
-          wildcardDynamic: binding.wildcardDynamic ?? true,
-        }))
-        this._raphInputDisposers.push(Raph.runtime.observeData(tableNode, `${sourcePath}[*]`, {
-          phase: RUNTIME_BOUNDARY_UPDATE_PHASE_NAME,
-          wildcardDynamic: binding.wildcardDynamic ?? true,
-        }))
-      }
-
-      for (const column of boundary.columns) {
-        const columnNode = this._findRuntimeNodeByMeta('boundaryId', column.id)
-        if (!columnNode) {
-          continue
-        }
-
-        for (const observedPath of this._makeObservedColumnPaths(sourcePath, column)) {
-          this._raphInputDisposers.push(Raph.runtime.observeData(columnNode, observedPath, {
-            phase: RUNTIME_BOUNDARY_UPDATE_PHASE_NAME,
-            wildcardDynamic: binding.wildcardDynamic ?? true,
-          }))
-        }
+        this._raphInputDisposers.push(tableNode.watch(
+          Raph.runtime().path(sourcePath),
+          RUNTIME_BOUNDARY_UPDATE_PHASE_NAME,
+          () => {},
+        ))
       }
     }
   }
@@ -1287,15 +1275,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
       return null
     }
 
-    return Raph.runtime.getNode(nodeId) ?? null
-  }
-
-  private _makeObservedColumnPaths(
-    sourcePath: string,
-    column: RComponentSFC_RuntimeTableColumnDependency,
-  ): string[] {
-    const reads = column.rowReads.length > 0 ? column.rowReads : [column.key]
-    return reads.map(read => `${sourcePath}[*].${read}`)
+    return Raph.runtime().getNode(nodeId) ?? null
   }
 
   private _makeBoundaryPatch(ctx: RuntimeHostUpdateContext): RuntimeBoundaryPatch | null {
@@ -1485,12 +1465,8 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
 
   private _makeObservedRaphPaths(basePath: string, dependencyPath: string[]): string[] {
     const path = this._joinRaphPath(basePath, dependencyPath)
-    if (dependencyPath.length > 0) {
-      // Derived outputs могут заменить весь prop, не публикуя события его полей.
-      return [basePath, path]
-    }
-
-    return [path, `${path}.*`]
+    // Exact PathHandle получает события собственного subtree и замен предков.
+    return [path]
   }
 
   private _clearRaphInputSubscriptions(): void {

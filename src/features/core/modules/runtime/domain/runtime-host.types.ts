@@ -1,4 +1,9 @@
-import type { PhaseEvent, PhaseName, RaphFrameContext, RaphNode } from '@raphy-js/raph'
+import type {
+  PathEvent,
+  PhaseName,
+  RaphFrameContext,
+  RaphNode,
+} from '@raphy-js/raph'
 import type { RuntimeStateControllerLike } from '@/features/core/modules/context/domain/context-persistence.types'
 import type { ProgramArtifact, ProgramEntityType } from '@/features/core/modules/program/domain/types/program.types'
 import type { RuntimeEntityModelMap, RuntimeEntityType } from '@/features/core/modules/runtime/domain/runtime-entity-map.types'
@@ -246,6 +251,9 @@ export const RUNTIME_BOUNDARY_UPDATE_PHASE_NAME = 'runtime-boundary-update' as P
 // Фаза логического обновления root-ноды runtime-host.
 export const RUNTIME_NODE_UPDATE_PHASE_NAME = 'runtime-node-update' as PhaseName
 
+// События, доставленные persistent Runtime binding-ом через causes.
+export type RuntimePhaseEvent = PathEvent
+
 // Значение входа runtime-host: literal либо прямая ссылка на Raph data path.
 export type RuntimeHostInputBinding
   = | { kind: 'literal', value: unknown }
@@ -307,13 +315,13 @@ export type RuntimeHostInputSource
 export interface RuntimeDirtyBoundary {
   boundary: RaphNode
   dirtyNodes: RaphNode[]
-  events: PhaseEvent[]
+  events: RuntimePhaseEvent[]
 }
 
 // Контекст универсального runtime update, который получает root runtime-host.
 export interface RuntimeHostUpdateContext {
   node: RaphNode
-  events: PhaseEvent[]
+  events: RuntimePhaseEvent[]
   boundaries: RuntimeDirtyBoundary[]
   frame: RaphFrameContext
   // Логические обновления root runtime-ноды. Boundary-фаза это поле не заполняет.
@@ -362,7 +370,7 @@ export interface RuntimeCollectionProjectionUpdatePatch {
   affectedProjections: RuntimeCollectionProjectionPatch[]
 
   // Исходные события Raph, из которых собран patch.
-  events: PhaseEvent[]
+  events: RuntimePhaseEvent[]
 
   // Raph-нода, которая стала верхней dirty boundary.
   node: RaphNode
@@ -391,7 +399,7 @@ export interface RuntimeCollectionProjectionBatchPatch {
   sourcePath: string
   items: RuntimeCollectionItemPatch[]
   affectedProjections: RuntimeCollectionProjectionPatch[]
-  events: PhaseEvent[]
+  events: RuntimePhaseEvent[]
   node: RaphNode
 }
 
