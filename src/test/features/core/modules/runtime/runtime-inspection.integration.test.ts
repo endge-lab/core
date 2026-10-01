@@ -110,7 +110,7 @@ describe('наблюдение Runtime и управление через Comman
   // Реальный Raph watcher имеет одного owner, независимо от числа наблюдателей.
   it('публикует лёгкие изменения вложенных данных только пока существует lease', () => {
     Endge.runtime.setup(application)
-    const watch = vi.spyOn(Raph, 'watch')
+    const watch = vi.spyOn(Raph.runtime().rootScope, 'watch')
     const changes = vi.fn()
     const off = Endge.events.onEvent('runtime:data-changed', changes)
     const first = Endge.runtime.acquireDataChanges()

@@ -10,7 +10,7 @@ import type {
 } from '@/features/core/modules/source/domain/types/filter-view.type'
 import type { SourceFieldDefinition, SourceFieldOption } from '@/features/core/modules/source/domain/types/source-expression.types'
 
-import { Raph } from '@raphy-js/raph'
+import { Raph, RaphNode } from '@raphy-js/raph'
 
 import { Endge } from '@/features/core/kernel/endge'
 import { RuntimeHostBase } from '@/features/core/modules/runtime/RuntimeHostBase'
@@ -86,15 +86,25 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
     this._controls = { ...(input.controls ?? {}) }
     this._implementation = implementation
     this._props = { ...(input.props ?? {}) }
+    const node = new RaphNode(Raph.runtime(), {
+      id: `${input.id}:filter-view`,
+      meta: {
+        type: 'filter-view',
+        runtimeId: input.id,
+        parentRuntimeId: input.parent?.id ?? null,
+      },
+    })
+    this.addRaphNode(node)
+    this.addResource({ id: `node:${node.id}`, kind: 'raph-node', title: node.id })
     this._onSourceChange = () => {
       const now = new Date().toISOString()
       this.setContext({ updatedAt: now, lastStateChangeAt: now })
       this.emit('render:change', this.getRenderModel())
     }
-    this._disposeSourceWatch = Raph.watch([
+    this._disposeSourceWatch = this.watchRuntimePaths(
       this._sourceRuntime.statePath(),
-      `${this._sourceRuntime.statePath()}.*`,
-    ], this._onSourceChange)
+      this._onSourceChange,
+    )
     const vocabPaths = [...new Set(this._sourceRuntime.getFields()
       .filter(field => this._fieldKeys.includes(field.key))
       .flatMap((field) => {
@@ -103,11 +113,11 @@ export class FilterViewRuntimeHost extends RuntimeHostBase<'filter', RuntimeHost
         }
         return (['live', 'mock'] as const).flatMap((dataMode) => {
           const path = Endge.vocabs.getPath(field.vocab!.identity, { dataMode })
-          return [path, `${path}.*`]
+          return [path]
         })
       }))]
     this._disposeVocabWatch = vocabPaths.length
-      ? Raph.watch(vocabPaths, this._onSourceChange)
+      ? this.watchRuntimePaths(vocabPaths, this._onSourceChange)
       : () => {}
     this._disposeContextWatch = vocabPaths.length
       ? Endge.context.subscribe(this._onSourceChange)

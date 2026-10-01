@@ -76,7 +76,7 @@ describe('интеграция Query с производными данными 
     await waitForRuntimeTick()
     expect(changed).toContain('table')
 
-    Raph.transaction(() => {
+    Raph.batch(() => {
       Raph.merge(`${rawPath}[id=2]`, { departureGate: 'B2' })
       Raph.set(`${rawPath}[id=3]`, scheduleRow(3, 'DP', '300'))
     })

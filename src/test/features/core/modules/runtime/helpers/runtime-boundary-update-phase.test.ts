@@ -41,7 +41,6 @@ function createFixture() {
 
   runtime.definePhases([
     RuntimeBoundaryUpdatePhase.make({
-      getGraph: () => runtime.graph,
       resolveHost: () => host,
     }),
   ])
@@ -54,7 +53,7 @@ describe('фаза обновления границ runtime', () => {
     const { kernel, runtime, updates } = createFixture()
     const root = createRuntimeNode(runtime, 'root', 'root')
 
-    runtime.observeData(root, 'data.root', { phase: RuntimeBoundaryUpdatePhase.PHASE_NAME })
+    root.watch(runtime.path('data.root'), RuntimeBoundaryUpdatePhase.PHASE_NAME, () => {})
 
     kernel.set('data.root', 1)
 
@@ -68,7 +67,7 @@ describe('фаза обновления границ runtime', () => {
     const { kernel, runtime, updates } = createFixture()
     const root = createRuntimeNode(runtime, 'root', 'root')
 
-    runtime.observeData(root, 'data.rows.*', { phase: RuntimeBoundaryUpdatePhase.PHASE_NAME })
+    root.watch(runtime.path('data.rows'), RuntimeBoundaryUpdatePhase.PHASE_NAME, () => {})
 
     kernel.set('data.rows[0].counter', 1)
 
@@ -84,7 +83,7 @@ describe('фаза обновления границ runtime', () => {
     const boundary = createRuntimeNode(runtime, 'boundary', 'boundary')
 
     root.addChild(boundary)
-    runtime.observeData(boundary, 'data.boundary', { phase: RuntimeBoundaryUpdatePhase.PHASE_NAME })
+    boundary.watch(runtime.path('data.boundary'), RuntimeBoundaryUpdatePhase.PHASE_NAME, () => {})
 
     kernel.set('data.boundary', 1)
 
@@ -103,7 +102,7 @@ describe('фаза обновления границ runtime', () => {
 
     root.addChild(boundary)
     boundary.addChild(leaf)
-    runtime.observeData(leaf, 'data.leaf', { phase: RuntimeBoundaryUpdatePhase.PHASE_NAME })
+    leaf.watch(runtime.path('data.leaf'), RuntimeBoundaryUpdatePhase.PHASE_NAME, () => {})
 
     kernel.set('data.leaf', 1)
 
@@ -123,10 +122,10 @@ describe('фаза обновления границ runtime', () => {
     root.addChild(boundary)
     boundary.addChild(firstLeaf)
     boundary.addChild(secondLeaf)
-    runtime.observeData(firstLeaf, 'data.first', { phase: RuntimeBoundaryUpdatePhase.PHASE_NAME })
-    runtime.observeData(secondLeaf, 'data.second', { phase: RuntimeBoundaryUpdatePhase.PHASE_NAME })
+    firstLeaf.watch(runtime.path('data.first'), RuntimeBoundaryUpdatePhase.PHASE_NAME, () => {})
+    secondLeaf.watch(runtime.path('data.second'), RuntimeBoundaryUpdatePhase.PHASE_NAME, () => {})
 
-    kernel.transaction(() => {
+    kernel.batch(() => {
       kernel.set('data.first', 1)
       kernel.set('data.second', 2)
     })
@@ -150,10 +149,10 @@ describe('фаза обновления границ runtime', () => {
     root.addChild(secondBoundary)
     firstBoundary.addChild(firstLeaf)
     secondBoundary.addChild(secondLeaf)
-    runtime.observeData(firstLeaf, 'data.first', { phase: RuntimeBoundaryUpdatePhase.PHASE_NAME })
-    runtime.observeData(secondLeaf, 'data.second', { phase: RuntimeBoundaryUpdatePhase.PHASE_NAME })
+    firstLeaf.watch(runtime.path('data.first'), RuntimeBoundaryUpdatePhase.PHASE_NAME, () => {})
+    secondLeaf.watch(runtime.path('data.second'), RuntimeBoundaryUpdatePhase.PHASE_NAME, () => {})
 
-    kernel.transaction(() => {
+    kernel.batch(() => {
       kernel.set('data.first', 1)
       kernel.set('data.second', 2)
     })
@@ -168,10 +167,10 @@ describe('фаза обновления границ runtime', () => {
     const boundary = createRuntimeNode(runtime, 'boundary', 'boundary')
 
     root.addChild(boundary)
-    runtime.observeData(root, 'data.root', { phase: RuntimeBoundaryUpdatePhase.PHASE_NAME })
-    runtime.observeData(boundary, 'data.boundary', { phase: RuntimeBoundaryUpdatePhase.PHASE_NAME })
+    root.watch(runtime.path('data.root'), RuntimeBoundaryUpdatePhase.PHASE_NAME, () => {})
+    boundary.watch(runtime.path('data.boundary'), RuntimeBoundaryUpdatePhase.PHASE_NAME, () => {})
 
-    kernel.transaction(() => {
+    kernel.batch(() => {
       kernel.set('data.root', 1)
       kernel.set('data.boundary', 2)
     })

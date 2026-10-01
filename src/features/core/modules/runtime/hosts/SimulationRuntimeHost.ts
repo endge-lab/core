@@ -75,7 +75,7 @@ export class SimulationRuntimeHost extends RuntimeHostBase<'simulation', Runtime
     }
     const overrides = prepareSimulationOverrides(artifact.payload, artifacts, input.model.identity)
     const host = new SimulationRuntimeHost({ ...input, artifacts, overrides })
-    const node = new RaphNode(Raph.runtime, {
+    const node = new RaphNode(Raph.runtime(), {
       id: `${input.model.identity}-${input.id}`,
       meta: { type: 'simulation', runtimeId: input.id, entityIdentity: input.model.identity },
     })

@@ -159,7 +159,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       meta: input.meta,
       artifactReader: input.artifacts,
     })
-    const node = new RaphNode(Raph.runtime, {
+    const node = new RaphNode(Raph.runtime(), {
       id: `${input.model.identity}-${input.id}`,
       meta: { type: 'composition', runtimeId: input.id, entityIdentity: input.model.identity },
     })
@@ -774,7 +774,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         }
       }
       sync()
-      this._outputBridgeDisposers.set(key, Raph.watch([sourcePath, `${sourcePath}.*`], sync))
+      this._outputBridgeDisposers.set(key, this.watchRuntimePaths(sourcePath, sync))
     }
   }
 
@@ -978,9 +978,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         }
         const paths = (['live', 'mock'] as const).flatMap((mode) => {
           const path = Endge.vocabs.getPath(descriptor.identity, { dataMode: mode })
-          return [path, `${path}.*`]
+          return [path]
         })
-        this._disposers.push(Raph.watch(paths, sync))
+        this._disposers.push(this.watchRuntimePaths(paths, sync))
         this._disposers.push(Endge.context.subscribe(() => {
           const next = Endge.runtime.resolveDataMode(this) === 'mock' ? 'mock' : 'live'
           if (next === dataMode) {
@@ -1145,7 +1145,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       })
     }
 
-    Raph.transaction(() => {
+    Raph.batch(() => {
       for (const write of writes) {
         const storeRuntime = Endge.runtime.getRuntimeById<StoreRuntimeHost>(write.runtimeId)
         if (!storeRuntime) {
@@ -1239,7 +1239,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
           vocabCatalog: this.getVocabCatalog(descriptor.scopePath),
         },
       })
-      const node = new RaphNode(Raph.runtime, {
+      const node = new RaphNode(Raph.runtime(), {
         id: `${this.id}:${descriptor.name}:root`,
         meta: { type: 'runtime-node', kind: 'root', runtimeId: child.id },
       })
@@ -1433,7 +1433,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       }
       const batch = descriptor.batch
       if (!batch || (batch.maxItems === 1 && batch.maxWaitMs === 0)) {
-        Raph.transaction(() => {
+        Raph.batch(() => {
           for (const store of stores) {
             store.dispatch(event)
           }
@@ -1496,7 +1496,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
             occurredAt: new Date().toISOString(),
           },
         }
-        Raph.transaction(() => {
+        Raph.batch(() => {
           for (const store of stores) {
             store.dispatch(envelope)
           }
@@ -1519,7 +1519,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     if (!events.length) {
       return
     }
-    Raph.transaction(() => {
+    Raph.batch(() => {
       for (const event of events) {
         for (const store of stores) {
           store.dispatch(event)
@@ -1549,7 +1549,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
           }
         }
         sync()
-        this._disposers.push(Raph.watch([sourcePath, `${sourcePath}.*`], sync))
+        this._disposers.push(this.watchRuntimePaths(sourcePath, sync))
       }
       if (!runtime) {
         return [output.key, this._runtimeHandles.get(output.runtime) ?? { kind: 'runtime', runtime: null, output: output.output }]
@@ -1873,12 +1873,12 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       return
     }
     if (binding.kind === 'store') {
-      const dispose = Raph.watch(binding.key, sync)
+      const dispose = this.watchRuntimePaths(binding.key, sync)
       this._addRuntimeDisposer(runtimeName, dispose)
       return
     }
     if (binding.kind === 'data') {
-      const dispose = Raph.watch(`${this._requireDataPath(binding.data, binding.path)}.*`, sync)
+      const dispose = this.watchRuntimePaths(this._requireDataPath(binding.data, binding.path), sync)
       this._addRuntimeDisposer(runtimeName, dispose)
       return
     }
@@ -1893,10 +1893,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       if (!runtime) {
         return
       }
-      this._addRuntimeDisposer(runtimeName, Raph.watch([
-        runtime.statePath(),
-        `${runtime.statePath()}.*`,
-      ], sync))
+      this._addRuntimeDisposer(runtimeName, this.watchRuntimePaths(runtime.statePath(), sync))
       return
     }
     if (binding.kind === 'expression') {
@@ -1915,15 +1912,15 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       const paths = this._requireResolvedOutputs(binding.runtime, binding.outputs)
         .flatMap((output) => {
           const path = this._requireOutputBridge(binding.runtime, output)
-          return [path, `${path}.*`]
+          return [path]
         })
       if (paths.length) {
-        this._addRuntimeDisposer(runtimeName, Raph.watch(paths, sync))
+        this._addRuntimeDisposer(runtimeName, this.watchRuntimePaths(paths, sync))
       }
       return
     }
     const path = this._requireOutputBridge(binding.runtime, binding.output)
-    this._addRuntimeDisposer(runtimeName, Raph.watch([path, `${path}.*`], sync))
+    this._addRuntimeDisposer(runtimeName, this.watchRuntimePaths(path, sync))
   }
 
   private _bindingPath(
@@ -2132,35 +2129,35 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       const prop = dot > 0 ? read.path.slice(0, dot) : read.path
       const source = this._compositionInputBindings.get(prop)
       if (source?.kind === 'raph') {
-        this._addRuntimeDisposer(runtimeName, Raph.watch([source.path, `${source.path}.*`], sync))
+        this._addRuntimeDisposer(runtimeName, this.watchRuntimePaths(source.path, sync))
       }
       return
     }
     if (read.source === 'composition-output') {
       const path = this._requireOutputBridge(parameters[0], parameters[1])
-      this._addRuntimeDisposer(runtimeName, Raph.watch([path, `${path}.*`], sync))
+      this._addRuntimeDisposer(runtimeName, this.watchRuntimePaths(path, sync))
       return
     }
     if (read.source === 'composition-outputs') {
       const [runtime = '', ...outputs] = parameters
       const paths = outputs.flatMap((output) => {
         const path = this._requireOutputBridge(runtime, output)
-        return [path, `${path}.*`]
+        return [path]
       })
       if (paths.length) {
-        this._addRuntimeDisposer(runtimeName, Raph.watch(paths, sync))
+        this._addRuntimeDisposer(runtimeName, this.watchRuntimePaths(paths, sync))
       }
       return
     }
     if (read.source === 'composition-filter-fields') {
       const runtime = this._children.get(parameters[0])
       if (runtime) {
-        this._addRuntimeDisposer(runtimeName, Raph.watch([runtime.statePath(), `${runtime.statePath()}.*`], sync))
+        this._addRuntimeDisposer(runtimeName, this.watchRuntimePaths(runtime.statePath(), sync))
       }
       return
     }
     if (read.source === 'composition-store' || read.source === 'store') {
-      this._addRuntimeDisposer(runtimeName, Raph.watch(read.source === 'store' ? read.path : parameters[0], sync))
+      this._addRuntimeDisposer(runtimeName, this.watchRuntimePaths(read.source === 'store' ? read.path : parameters[0], sync))
       return
     }
     if (read.source === 'composition-data') {
@@ -2170,7 +2167,7 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
         throw new Error(`[CompositionRuntimeHost] Data reference "${ref}" is missing.`)
       }
       const path = this._requireDataPath(resolved.data, resolved.path)
-      this._addRuntimeDisposer(runtimeName, Raph.watch(`${path}.*`, sync))
+      this._addRuntimeDisposer(runtimeName, this.watchRuntimePaths(path, sync))
     }
   }
 

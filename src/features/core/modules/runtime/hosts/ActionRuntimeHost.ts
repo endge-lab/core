@@ -3,6 +3,7 @@ import type { ActionRuntimeHostContext, RuntimeHost, RuntimeHostContext } from '
 
 import { Raph, RaphNode } from '@raphy-js/raph'
 
+import { RUNTIME_NODE_UPDATE_PHASE_NAME } from '@/features/core/modules/runtime/domain/runtime-host.types'
 import { RuntimeHostBase } from '@/features/core/modules/runtime/RuntimeHostBase'
 
 function createDefaultActionContext(): RuntimeHostContext<'action'> {
@@ -73,7 +74,7 @@ export class ActionRuntimeHost extends RuntimeHostBase<'action'> {
       ...watchPathsFromMeta,
     ]))
 
-    const node = new RaphNode(Raph.runtime, {
+    const node = new RaphNode(Raph.runtime(), {
       id: `${model.identity || model.id}-${id}`,
       meta: {
         type: 'watch',
@@ -130,12 +131,15 @@ export class ActionRuntimeHost extends RuntimeHostBase<'action'> {
     })
 
     for (const watchPath of watchPaths) {
-      Raph.runtime.track(node, watchPath, {
-        vars: meta.trackVars && typeof meta.trackVars === 'object' && !Array.isArray(meta.trackVars)
-          ? meta.trackVars
-          : undefined,
-        wildcardDynamic: meta.wildcardDynamic === true,
-      })
+      node.watch(
+        Raph.runtime().path(watchPath, {
+          vars: meta.trackVars && typeof meta.trackVars === 'object' && !Array.isArray(meta.trackVars)
+            ? meta.trackVars
+            : undefined,
+        }),
+        RUNTIME_NODE_UPDATE_PHASE_NAME,
+        () => {},
+      )
     }
     return host
   }

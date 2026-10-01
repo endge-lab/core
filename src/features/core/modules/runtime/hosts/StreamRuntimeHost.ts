@@ -76,7 +76,7 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
       artifactReader: input.artifacts,
       privateTransportFactory: input.transportFactory,
     })
-    const node = new RaphNode(Raph.runtime, {
+    const node = new RaphNode(Raph.runtime(), {
       id: `${input.model.identity}-${input.id}`,
       meta: { type: 'stream', runtimeId: input.id, entityIdentity: input.model.identity },
     })

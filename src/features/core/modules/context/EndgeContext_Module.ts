@@ -97,6 +97,7 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
   private _eventContext: ContextEventValues | null = null
   private _publishingContextChanges = false
   private _executionContextLocked = false
+  private _raphProjectionActive = false
   private _bootMode: EndgeBootMode = 'application'
   private _beforeInspection: { context: EndgeContextSnapshot, dataMode: EndgeDataMode, override: EndgeDataMode | null } | null = null
 
@@ -132,6 +133,7 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     }
     this._hostDefaultTheme = normalizeOptionalText(ctx.ui?.defaultTheme)
     this._executionContextLocked = true
+    this._raphProjectionActive = true
     this._syncPersistentContextToRaph()
     this._publishContextChanges()
   }
@@ -151,6 +153,7 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     }
     this._bootMode = 'application'
     this._executionContextLocked = false
+    this._raphProjectionActive = false
     this.notify()
   }
 
@@ -249,7 +252,7 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
   public setKeyboardState(input: EndgeKeyboardContextSnapshot): void {
     const next = normalizeKeyboardContextSnapshot(input)
     const current = this.getKeyboardState()
-    Raph.transaction(() => {
+    Raph.batch(() => {
       this._setRaphValueIfChanged(`${ENDGE_KEYBOARD_CONTEXT_RAPH_PATH}.platform`, current.platform, next.platform)
       for (const key of ['ctrl', 'shift', 'alt', 'meta', 'mod', 'altGraph'] as const) {
         this._setRaphValueIfChanged(
@@ -1088,11 +1091,11 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
   }
 
   private _syncPersistentContextToRaph(): void {
-    if (this._bootMode === 'debugger') {
+    if (this._bootMode === 'debugger' || !this._raphProjectionActive) {
       return
     }
     const snapshot = this.serialize()
-    Raph.transaction(() => {
+    Raph.batch(() => {
       for (const [key, value] of Object.entries(snapshot)) {
         const path = `${ENDGE_CONTEXT_RAPH_PATH}.${key}`
         this._setRaphValueIfChanged(path, Raph.get(path), value)
