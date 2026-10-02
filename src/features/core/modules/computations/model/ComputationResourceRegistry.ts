@@ -9,6 +9,7 @@ import type {
  */
 export class ComputationResourceRegistry {
   private readonly _resources = new Map<string, ComputationResourceState>()
+  private readonly _scopeIndex = new Map<string, Set<string>>()
   private readonly _disposers = new Map<string, VoidFunction>()
   // Входы ресурсов, запрошенные текущим активным проходом renderer.
   private readonly _updatingInputs = new Set<string>()
@@ -35,6 +36,14 @@ export class ComputationResourceRegistry {
     }
     const resource = create()
     this._resources.set(key, resource)
+    for (const scope of resourceScopes(key)) {
+      let keys = this._scopeIndex.get(scope)
+      if (!keys) {
+        keys = new Set()
+        this._scopeIndex.set(scope, keys)
+      }
+      keys.add(key)
+    }
     if (onChange) {
       this._disposers.set(key, resource.subscribe(() => {
         if (!this._updatingInputs.has(key)) {
@@ -49,13 +58,21 @@ export class ComputationResourceRegistry {
    * Renderer освобождает завершившихся consumers, не затрагивая соседние scopes.
    */
   releaseScope(scope: string, keep?: (key: string) => boolean): void {
-    for (const [key, resource] of this._resources) {
-      if ((key === scope || key.startsWith(`${scope}/`) || key.startsWith(`${scope}:`)) && !keep?.(key)) {
-        this._disposers.get(key)?.()
-        resource.dispose()
-        this._disposers.delete(key)
-        this._resources.delete(key)
-        this._updatingInputs.delete(key)
+    for (const key of this._scopeIndex.get(scope) ?? []) {
+      if (keep?.(key)) {
+        continue
+      }
+      this._disposers.get(key)?.()
+      this._resources.get(key)?.dispose()
+      this._disposers.delete(key)
+      this._resources.delete(key)
+      this._updatingInputs.delete(key)
+      for (const indexedScope of resourceScopes(key)) {
+        const keys = this._scopeIndex.get(indexedScope)
+        keys?.delete(key)
+        if (keys?.size === 0) {
+          this._scopeIndex.delete(indexedScope)
+        }
       }
     }
   }
@@ -69,6 +86,7 @@ export class ComputationResourceRegistry {
     }
     this._disposers.clear()
     this._resources.clear()
+    this._scopeIndex.clear()
     this._updatingInputs.clear()
   }
 
@@ -78,4 +96,14 @@ export class ComputationResourceRegistry {
   snapshot() {
     return [...this._resources.values()].map(resource => resource.snapshot())
   }
+}
+
+function resourceScopes(key: string): string[] {
+  const scopes = [key]
+  for (let index = 1; index < key.length; index++) {
+    if (key[index] === '/' || key[index] === ':') {
+      scopes.push(key.slice(0, index))
+    }
+  }
+  return scopes
 }

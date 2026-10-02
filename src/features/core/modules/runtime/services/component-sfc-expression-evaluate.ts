@@ -20,7 +20,6 @@ export function evaluateComponentSFCExpression(expression: Expression, context: 
 }
 
 function evaluate(node: Expression, context: SFCExpressionEvaluationContext): SFCExpressionResult {
-  const run = (value: Expression) => evaluate(value, context)
   switch (node.kind) {
     case 'literal': return node.value
     case 'unsupported': return UNSUPPORTED_EXPRESSION
@@ -43,60 +42,60 @@ function evaluate(node: Expression, context: SFCExpressionEvaluationContext): SF
       return Object.hasOwn(context.locals, node.name) ? context.locals[node.name] : context.props[node.name]
     }
     case 'unary': {
-      const argument = run(node.argument)
+      const argument = evaluate(node.argument, context)
       if (argument === UNSUPPORTED_EXPRESSION) {
         return argument
       }
       return unary(node.operator, argument)
     }
     case 'binary': {
-      const left = run(node.left)
-      const right = run(node.right)
+      const left = evaluate(node.left, context)
+      const right = evaluate(node.right, context)
       if (left === UNSUPPORTED_EXPRESSION || right === UNSUPPORTED_EXPRESSION) {
         return UNSUPPORTED_EXPRESSION
       }
       return binary(node.operator, left, right)
     }
     case 'logical': {
-      const left = run(node.left)
+      const left = evaluate(node.left, context)
       if (left === UNSUPPORTED_EXPRESSION) {
         return left
       }
       if (node.operator === '&&') {
-        return left ? run(node.right) : left
+        return left ? evaluate(node.right, context) : left
       }
       if (node.operator === '||') {
-        return left || run(node.right)
+        return left || evaluate(node.right, context)
       }
       if (node.operator === '??') {
-        return left ?? run(node.right)
+        return left ?? evaluate(node.right, context)
       }
       return UNSUPPORTED_EXPRESSION
     }
     case 'conditional': {
-      const test = run(node.test)
-      return test === UNSUPPORTED_EXPRESSION ? test : run(test ? node.consequent : node.alternate)
+      const test = evaluate(node.test, context)
+      return test === UNSUPPORTED_EXPRESSION ? test : evaluate(test ? node.consequent : node.alternate, context)
     }
     case 'member': {
-      const object = run(node.object)
+      const object = evaluate(node.object, context)
       if (object === UNSUPPORTED_EXPRESSION) {
         return object
       }
       if (object == null) {
         return undefined
       }
-      const property = node.computed ? run(node.property) : readName(node.property)
+      const property = node.computed ? evaluate(node.property, context) : readName(node.property)
       return typeof property === 'string' || typeof property === 'number' ? readSafeMember(object, property) : UNSUPPORTED_EXPRESSION
     }
     case 'select': {
-      const object = run(node.object)
+      const object = evaluate(node.object, context)
       if (object === UNSUPPORTED_EXPRESSION) {
         return object
       }
       if (!Array.isArray(object)) {
         return undefined
       }
-      const expected = run(node.value)
+      const expected = evaluate(node.value, context)
       if (expected === UNSUPPORTED_EXPRESSION || BLOCKED_MEMBER_KEYS.has(node.key)) {
         return UNSUPPORTED_EXPRESSION
       }
@@ -106,7 +105,7 @@ function evaluate(node: Expression, context: SFCExpressionEvaluationContext): SF
     case 'array': {
       const result = []
       for (const item of node.items) {
-        const value = run(item)
+        const value = evaluate(item, context)
         if (value === UNSUPPORTED_EXPRESSION) {
           return value
         }
@@ -120,7 +119,7 @@ function evaluate(node: Expression, context: SFCExpressionEvaluationContext): SF
         if (BLOCKED_MEMBER_KEYS.has(entry.key)) {
           return UNSUPPORTED_EXPRESSION
         }
-        const value = run(entry.value)
+        const value = evaluate(entry.value, context)
         if (value === UNSUPPORTED_EXPRESSION) {
           return value
         }
@@ -136,7 +135,7 @@ function evaluate(node: Expression, context: SFCExpressionEvaluationContext): SF
         if (!expression) {
           continue
         }
-        const value = run(expression)
+        const value = evaluate(expression, context)
         if (value === UNSUPPORTED_EXPRESSION) {
           return value
         }

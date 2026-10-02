@@ -101,6 +101,21 @@ describe('состояние ресурса Computation', () => {
     expect(fresh.value).toBeUndefined()
   })
 
+  it('изолирует пустой scope и соседние consumer-префиксы', () => {
+    const registry = new ComputationResourceRegistry()
+    const first = new ComputationResourceState(1, async value => value, value => value)
+    const adjacent = new ComputationResourceState(2, async value => value, value => value)
+    registry.getOrCreate('renderer:1/table:grid/row:1/component:cell:state', 1, () => first)
+    registry.getOrCreate('renderer:1/table:grid/row:1/component:cell-other:state', 2, () => adjacent)
+
+    registry.releaseScope('renderer:1/table:grid/row:1/component:missing')
+    registry.releaseScope('renderer:1/table:grid/row:1/component:cell')
+
+    expect(first.value).toBeUndefined()
+    expect(adjacent.value).toBe(2)
+    registry.dispose()
+  })
+
   it('не возвращает результат удалённого async consumer и не удерживает новые input после dispose', async () => {
     let resolve!: (value: number) => void
     const onChange = vi.fn()
