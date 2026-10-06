@@ -752,7 +752,7 @@ describe('политика и lifecycle bridge', () => {
       identity: 'sim',
       expectedHash: 'x',
     })
-    await tick()
+    await vi.waitFor(() => expect(socket.sent.at(-1)?.id).toBe('mismatch'))
     expect(socket.sent.at(-1)?.data).toEqual({
       status: 'rejected',
       reason: 'hash-mismatch',
@@ -766,7 +766,7 @@ describe('политика и lifecycle bridge', () => {
       identity: 'sim',
       expectedHash: hash,
     })
-    await tick()
+    await vi.waitFor(() => expect(socket.sent.at(-1)?.id).toBe('match'))
     expect(socket.sent.at(-1)?.data).toEqual({
       status: 'mocked',
       identity: 'sim',
