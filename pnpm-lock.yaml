@@ -77,8 +77,8 @@ devDependencies:
     specifier: 9.3.0
     version: 9.3.0(@typescript-eslint/typescript-estree@8.69.0)(@typescript-eslint/utils@8.69.0)(@vue/compiler-sfc@3.5.39)(eslint@10.9.1)(typescript@6.0.3)(vitest@2.1.9)
   '@raphy-js/raph':
-    specifier: 1.0.0-dev.18
-    version: 1.0.0-dev.18
+    specifier: 1.0.1-dev.25
+    version: 1.0.1-dev.25
   '@types/babel__generator':
     specifier: ^7.27.0
     version: 7.27.0
@@ -982,8 +982,8 @@ packages:
     engines: {node: ^14.18.0 || >=16.0.0}
     dev: true
 
-  /@raphy-js/raph@1.0.0-dev.18:
-    resolution: {integrity: sha512-k2SRIuAGbfClmyNXiuOkMB2HUtioeBVwhBVOyjUlVEN9osiedKs2VKc++H6fnVuHClZgotXEJlvZkSoDBMcu1Q==}
+  /@raphy-js/raph@1.0.1-dev.25:
+    resolution: {integrity: sha512-BLbZDmmn6mM/PdHqgREkMgq0d+F4odcUUrmsvZy0ge5S58x0ClmgflzYSbTFA6xl9pSg9/HXH6k5/jprv7/I6g==}
     dev: true
 
   /@rollup/pluginutils@5.4.0:

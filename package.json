@@ -1,7 +1,7 @@
 {
   "name": "@endge/core",
   "type": "module",
-  "version": "1.0.0-dev.4",
+  "version": "1.0.0-dev.5",
   "private": false,
   "packageManager": "pnpm@8.8.0",
   "license": "Apache-2.0",
@@ -34,7 +34,7 @@
     "lint-fix": "eslint . --fix --cache"
   },
   "peerDependencies": {
-    "@raphy-js/raph": "1.0.0-dev.18",
+    "@raphy-js/raph": "1.0.0-dev.18 || 1.0.1-dev.25",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "reflect-metadata": "^0.2.2"
@@ -62,7 +62,7 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "9.3.0",
-    "@raphy-js/raph": "1.0.0-dev.18",
+    "@raphy-js/raph": "1.0.1-dev.25",
     "@types/babel__generator": "^7.27.0",
     "@types/lodash": "^4.14.202",
     "@vue/language-core": "^3.3.11",
