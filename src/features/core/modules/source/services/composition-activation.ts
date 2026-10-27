@@ -1,4 +1,4 @@
-import type { CompositionActivationDescriptor } from '@/features/core/modules/source/domain/types/composition-source.types'
+import type { CompositionActivationDescriptor, CompositionScopeDescriptor } from '@/features/core/modules/source/domain/types/composition-source.types'
 
 const STARTUP: CompositionActivationDescriptor = Object.freeze({ mode: 'startup' })
 
@@ -9,4 +9,17 @@ export function resolveCompositionActivation(
   ownerScope: CompositionActivationDescriptor | null | undefined,
 ): CompositionActivationDescriptor {
   return invocationOverride ?? targetRoot ?? ownerScope ?? STARTUP
+}
+
+/**
+ * Активация содержимого scope: `effectiveActivation` scope описывает его собственный запуск
+ * относительно владельца, а runtime внутри scope с `.activateWhen(...)` стартуют вместе с ним.
+ */
+export function resolveScopeContentActivation(
+  scope: Pick<CompositionScopeDescriptor, 'effectiveActivation' | 'activateWhen'> | null | undefined,
+): CompositionActivationDescriptor | undefined {
+  if (!scope) {
+    return undefined
+  }
+  return scope.activateWhen ? STARTUP : scope.effectiveActivation
 }

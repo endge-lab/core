@@ -337,6 +337,49 @@ defineComposition({
     ]))
   })
 
+  it('запускает вложенную Composition вместе со scope activateWhen и оставляет условный runtime ручным', () => {
+    const child = new RComposition()
+    child.id = 31
+    child.identity = 'screen-page'
+    child.name = 'Screen page'
+    child.source = 'defineComposition({ runtimes: {}, outputs: {} })'
+    const rooted = new RComposition()
+    rooted.id = 32
+    rooted.identity = 'rooted-page'
+    rooted.name = 'Rooted page'
+    rooted.source = 'defineComposition({ activateOn: startup(), runtimes: {}, outputs: {} })'
+    Endge.domain.addComposition(child)
+    Endge.domain.addComposition(rooted)
+    Endge.compiler.buildComposition(child)
+    Endge.compiler.buildComposition(rooted)
+
+    const parent = RComposition.fromPlain({
+      id: 33,
+      identity: 'screens-app',
+      name: 'Screens app',
+      sourceVersion: 1,
+      source: `
+defineComposition({
+  runtimes: {
+    overview: scope({
+      runtimes: { page: composition('screen-page') },
+    }).activateWhen(fromStore('ui.overview')),
+    manualScope: scope({
+      runtimes: { page: composition('screen-page') },
+    }).activateOn(manual()),
+    conditional: composition('rooted-page').activateWhen(fromStore('ui.details')),
+  },
+})
+`,
+    })
+    const artifact = Endge.compiler.buildComposition(parent)
+    expect(artifact.status).toBe('valid')
+    const runtime = (path: string) => artifact.payload.runtimes.find(item => item.path === path)
+    expect(runtime('overview.page')?.effectiveActivation).toEqual({ mode: 'startup' })
+    expect(runtime('manualScope.page')?.effectiveActivation).toEqual({ mode: 'manual' })
+    expect(runtime('conditional')?.effectiveActivation).toEqual({ mode: 'manual' })
+  })
+
   it('записывает runtimes компонентов как зависимости component-sfc', () => {
     const component = new RComponentSFC()
     component.id = 30

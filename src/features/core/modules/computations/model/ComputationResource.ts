@@ -19,6 +19,8 @@ export class ComputationResourceState<T = unknown> implements ComputationResourc
   private _revision = 0
   private _disposed = false
   private _input: unknown
+  // Снимок входа последнего асинхронного запуска: renderer создаёт новый объект входа на каждый проход.
+  private _inputSignature: string | null = null
 
   constructor(
     input: unknown,
@@ -49,6 +51,15 @@ export class ComputationResourceState<T = unknown> implements ComputationResourc
     if (this._disposed || Object.is(input, this._input)) {
       return
     }
+    if (!this._syncRunner) {
+      const signature = inputSignature(input)
+      if (signature !== null && signature === this._inputSignature) {
+        // Тот же по содержимому вход не перезапускает async-вычисление: иначе уведомление
+        // о результате вызывает повторный render, новый объект входа и бесконечный цикл.
+        this._input = input
+        return
+      }
+    }
     this._input = input
     if (this._syncRunner) {
       this._runSync()
@@ -65,6 +76,7 @@ export class ComputationResourceState<T = unknown> implements ComputationResourc
       return
     }
     const revision = ++this._revision
+    this._inputSignature = inputSignature(this._input)
     this._status = 'pending'
     this._error = null
     this._notify()
@@ -100,6 +112,7 @@ export class ComputationResourceState<T = unknown> implements ComputationResourc
     this._revision++
     this._listeners.clear()
     this._input = undefined
+    this._inputSignature = null
     this._value = undefined
     this._error = null
   }
@@ -124,6 +137,15 @@ export class ComputationResourceState<T = unknown> implements ComputationResourc
     for (const listener of this._listeners) {
       listener()
     }
+  }
+}
+
+function inputSignature(input: unknown): string | null {
+  try {
+    return JSON.stringify(input) ?? null
+  }
+  catch {
+    return null
   }
 }
 

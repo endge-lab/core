@@ -57,6 +57,14 @@ describe('компиляция условного Update Source', () => {
     })
   })
 
+  it('не считает функции общих выражений с именами Object.prototype функциями чтения', () => {
+    const result = compileUpdateSource(`defineUpdate({
+      mutations: [{ strategy: 'set', target: 'label', value: concat('#', toString(input('number'))) }],
+    })`)
+    expect(result.diagnostics).toEqual([])
+    expect(JSON.stringify(result.artifact?.mutations[0]?.value)).toContain('to-string')
+  })
+
   it('диагностирует конфликт value/valueFrom, wildcard, пустой namespace и unsafe JavaScript', () => {
     const result = compileUpdateSource(`defineUpdate({ mutations: [
       { strategy: 'set', target: 'rows[*].value', valueFrom: 'value', value: fetch('/unsafe') },
