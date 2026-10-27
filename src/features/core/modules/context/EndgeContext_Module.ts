@@ -650,10 +650,11 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
    */
   public resolveExecutionContext(input: EndgeExecutionContextResolutionInput): EndgeExecutionContext {
     const explicit = normalizeRequestedFacetSelections(input.explicit?.facets, 'explicit')
-    const session = normalizeRequestedFacetSelections(
-      this._sessionProvider?.getCurrentIdentity()?.facetSelections,
-      'session',
-    )
+    const sessionIdentity = this._sessionProvider?.getCurrentIdentity()
+    if (sessionIdentity?.facetErrors?.length) {
+      throw new Error(`[EndgeContext] ${sessionIdentity.facetErrors.join('; ')}`)
+    }
+    const session = normalizeRequestedFacetSelections(sessionIdentity?.facetSelections, 'session')
     const facets = input.facets
       .map(facet => ({
         identity: normalizeRequiredScopePart(facet.identity, 'facet identity'),

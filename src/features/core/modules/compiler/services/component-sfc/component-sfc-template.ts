@@ -47,6 +47,7 @@ import { normalizeComponentSFCTableColumnVisibility } from '@/features/core/modu
 import { DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION } from '@/features/core/modules/domain/component/sfc-editing.config'
 import { createEmptyComponentDependencies } from '@/features/core/modules/domain/types/component/component-core.types'
 import { createEmptyComponentSFCPortManifest } from '@/features/core/modules/domain/types/component/sfc/ports.types'
+import { isContextSwitchCall, selectContextSwitchNode } from '@/features/core/modules/source/services/compilers/source-expression-compile'
 import { compileProgramMetadataSource } from '@/features/core/modules/source/services/compilers/source-metadata-compile'
 
 // Контекст компиляции template в IR.
@@ -499,71 +500,93 @@ function compileRequiredPortBindings(
     if (!binding) {
       continue
     }
-    const provider = context.resolvePortProvider?.(
-      binding.identity,
-      binding.kind,
-    )
-    if (context.resolvePortProvider && !provider) {
-      diagnostics.push({
-        severity: 'error',
-        code: 'sfc-template-port-provider-missing',
-        message: `Provider "${binding.identity}" для required port "${portName}" не найден.`,
-        sourcePath: `template.ports.${portName}`,
-        start: attribute.range.start,
-        end: attribute.range.end,
-      })
-      continue
-    }
-    if (provider && provider.kind !== port.kind) {
-      diagnostics.push({
-        severity: 'error',
-        code: 'sfc-template-port-provider-kind',
-        message: `Provider "${binding.identity}" имеет kind "${provider.kind}", required port "${portName}" ожидает "${port.kind}".`,
-        sourcePath: `template.ports.${portName}`,
-        start: attribute.range.start,
-        end: attribute.range.end,
-      })
-      continue
-    }
-    if (provider && !provider.active) {
-      diagnostics.push({
-        severity: 'error',
-        code: 'sfc-template-port-provider-inactive',
-        message: `Provider "${binding.identity}" для required port "${portName}" неактивен.`,
-        sourcePath: `template.ports.${portName}`,
-        start: attribute.range.start,
-        end: attribute.range.end,
-      })
-    }
-    if (
-      provider?.kind === 'query'
-      && port.kind === 'query'
-      && (hasTemplatePortFieldMismatch(port.inputs, provider.inputs)
-        || (port.outputs.length > 0
-          && hasTemplatePortFieldMismatch(port.outputs, provider.outputs)))
-    ) {
-      diagnostics.push({
-        severity: 'error',
-        code: 'sfc-template-query-port-contract',
-        message: `Query "${binding.identity}" не соответствует contract required port "${portName}".`,
-        sourcePath: `template.ports.${portName}`,
-        start: attribute.range.start,
-        end: attribute.range.end,
-      })
+    // contextSwitch: каждая ветка проходит те же проверки provider и contract порта.
+    const variants = binding.variants ?? [binding]
+    const checks = variants.map(variant => validateRequiredPortProvider(variant, port, portName, attribute, context, diagnostics))
+    if (!checks.every(Boolean)) {
       continue
     }
 
-    appendRequiredPortBindingDependency(binding, dependencies)
-    result.push({ ...binding, port: portName, sourceRange: attribute.range })
+    for (const variant of variants) {
+      appendRequiredPortBindingDependency(variant, dependencies)
+    }
+    result.push({ kind: binding.kind, identity: binding.identity, port: portName, sourceRange: attribute.range })
   }
   return result
 }
+
+// Проверяет provider одной ветки переопределения required port; false — привязка отклонена.
+function validateRequiredPortProvider(
+  binding: { kind: ComponentSFCRequiredPortKind, identity: string },
+  port: ComponentSFCPortManifest['require'][keyof ComponentSFCPortManifest['require']][number],
+  portName: string,
+  attribute: RComponentSFC_AST_Attribute,
+  context: ComponentSFCTemplateCompileContext,
+  diagnostics: RComponentDiagnostic[],
+): boolean {
+  const provider = context.resolvePortProvider?.(
+    binding.identity,
+    binding.kind,
+  )
+  if (context.resolvePortProvider && !provider) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-template-port-provider-missing',
+      message: `Provider "${binding.identity}" для required port "${portName}" не найден.`,
+      sourcePath: `template.ports.${portName}`,
+      start: attribute.range.start,
+      end: attribute.range.end,
+    })
+    return false
+  }
+  if (provider && provider.kind !== port.kind) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-template-port-provider-kind',
+      message: `Provider "${binding.identity}" имеет kind "${provider.kind}", required port "${portName}" ожидает "${port.kind}".`,
+      sourcePath: `template.ports.${portName}`,
+      start: attribute.range.start,
+      end: attribute.range.end,
+    })
+    return false
+  }
+  if (provider && !provider.active) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-template-port-provider-inactive',
+      message: `Provider "${binding.identity}" для required port "${portName}" неактивен.`,
+      sourcePath: `template.ports.${portName}`,
+      start: attribute.range.start,
+      end: attribute.range.end,
+    })
+  }
+  if (
+    provider?.kind === 'query'
+    && port.kind === 'query'
+    && (hasTemplatePortFieldMismatch(port.inputs, provider.inputs)
+      || (port.outputs.length > 0
+        && hasTemplatePortFieldMismatch(port.outputs, provider.outputs)))
+  ) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-template-query-port-contract',
+      message: `Query "${binding.identity}" не соответствует contract required port "${portName}".`,
+      sourcePath: `template.ports.${portName}`,
+      start: attribute.range.start,
+      end: attribute.range.end,
+    })
+    return false
+  }
+  return true
+}
+
+type RequiredPortBindingBranch = Omit<ComponentSFCRequiredPortBinding, 'port'>
 
 function parseRequiredPortBinding(
   attribute: RComponentSFC_AST_Attribute,
   expectedKind: ComponentSFCRequiredPortKind,
   diagnostics: RComponentDiagnostic[],
-): Omit<ComponentSFCRequiredPortBinding, 'port'> | null {
+): (RequiredPortBindingBranch & { variants?: RequiredPortBindingBranch[] }) | null {
   let expression: any
   try {
     expression = attribute.dynamic
@@ -576,6 +599,52 @@ function parseRequiredPortBinding(
   catch {
     expression = null
   }
+  const portName = normalizePublicBindingName(attribute.name)
+  const toDiagnostic = (code: string, message: string, severity: RComponentDiagnostic['severity'] = 'error'): RComponentDiagnostic => ({
+    severity,
+    code,
+    message,
+    sourcePath: `template.ports.${portName}`,
+    start: attribute.range.start,
+    end: attribute.range.end,
+  })
+
+  // :port="contextSwitch({ default: query('a'), cases: [{ when: { tenant: 'kzn' }, use: query('b') }] })"
+  if (attribute.dynamic && expression && isContextSwitchCall(expression)) {
+    const drafts: Parameters<typeof selectContextSwitchNode>[1] = []
+    const result = selectContextSwitchNode<RequiredPortBindingBranch>(expression, drafts, `template.ports.${portName}`, (branch, branchDiagnostics) => {
+      const parsed = readRequiredPortBranch(branch, expectedKind, attribute)
+      if (typeof parsed === 'string') {
+        branchDiagnostics.push({ severity: 'error', code: parsed === 'kind' ? 'sfc-template-port-binding-kind' : 'sfc-template-port-binding-shape', message: parsed === 'kind'
+          ? `Ветка contextSwitch required port "${portName}" должна иметь kind "${expectedKind}".`
+          : `Ветка contextSwitch required port "${portName}" должна иметь вид ${expectedKind}('provider-identity').` })
+        return null
+      }
+      return parsed
+    })
+    diagnostics.push(...drafts.map(draft => toDiagnostic(draft.code, draft.message, draft.severity)))
+    return result ? { ...result.selected, variants: result.variants } : null
+  }
+
+  const parsed = attribute.dynamic && expression ? readRequiredPortBranch(expression, expectedKind, attribute) : 'shape'
+  if (parsed === 'shape') {
+    diagnostics.push(toDiagnostic('sfc-template-port-binding-shape', `Required port "${portName}" переопределяется как ${expectedKind}('provider-identity') или contextSwitch({ default, cases }) таких ссылок.`))
+    return null
+  }
+  if (parsed === 'kind') {
+    const kind = expression.callee.name
+    diagnostics.push(toDiagnostic('sfc-template-port-binding-kind', `Required port "${portName}" имеет kind "${expectedKind}" и не может быть связан через ${kind}(...).`))
+    return null
+  }
+  return parsed
+}
+
+// Одна ссылка provider: kind('identity'); 'shape' — не ссылка, 'kind' — kind не совпадает с портом.
+function readRequiredPortBranch(
+  expression: any,
+  expectedKind: ComponentSFCRequiredPortKind,
+  attribute: RComponentSFC_AST_Attribute,
+): RequiredPortBindingBranch | 'shape' | 'kind' {
   const kind
     = expression?.type === 'CallExpression'
       && expression.callee?.type === 'Identifier'
@@ -586,32 +655,11 @@ function parseRequiredPortBinding(
       && expression.arguments[0]?.type === 'StringLiteral'
       ? String(expression.arguments[0].value ?? '').trim()
       : ''
-  if (
-    !attribute.dynamic
-    || !kind
-    || !['action', 'component', 'computation', 'query'].includes(kind)
-    || !identity
-  ) {
-    diagnostics.push({
-      severity: 'error',
-      code: 'sfc-template-port-binding-shape',
-      message: `Required port "${normalizePublicBindingName(attribute.name)}" переопределяется как ${expectedKind}('provider-identity').`,
-      sourcePath: `template.ports.${normalizePublicBindingName(attribute.name)}`,
-      start: attribute.range.start,
-      end: attribute.range.end,
-    })
-    return null
+  if (!kind || !['action', 'component', 'computation', 'query'].includes(kind) || !identity) {
+    return 'shape'
   }
   if (kind !== expectedKind) {
-    diagnostics.push({
-      severity: 'error',
-      code: 'sfc-template-port-binding-kind',
-      message: `Required port "${normalizePublicBindingName(attribute.name)}" имеет kind "${expectedKind}" и не может быть связан через ${kind}(...).`,
-      sourcePath: `template.ports.${normalizePublicBindingName(attribute.name)}`,
-      start: attribute.range.start,
-      end: attribute.range.end,
-    })
-    return null
+    return 'kind'
   }
   return { kind, identity, sourceRange: attribute.range }
 }

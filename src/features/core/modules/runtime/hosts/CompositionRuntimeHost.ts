@@ -94,6 +94,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   private _publicOutputs: Record<string, CompositionPublicOutputHandle> = {}
   private _scopes = new Map<string, RuntimeScope>()
   private _runtimeHandles = new Map<string, CompositionRuntimeActivationHandle>()
+  // Незавершённые переходы activateWhen: initial mount ожидает их, чтобы граф был согласован с данными.
+  private _conditionTransitions = new Set<Promise<void>>()
   private _outputBridges = new Map<string, string>()
   private _updateSourcePaths = new Map<string, string>()
   private _outputBridgeDisposers = new Map<string, () => void>()
@@ -203,6 +205,8 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       this._buildLifecycleScopes(payload)
       const rootScope = this._requireScope('scope_default')
       await rootScope.activate()
+      this._assertMountCurrent()
+      await this._settleConditionTransitions()
       this._assertMountCurrent()
       this._makeOutputs(payload)
       const now = new Date().toISOString()
@@ -520,11 +524,76 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       await this._requireScope(child.path).activate()
     }
     assertCurrent()
+    this._bindActivationConditions(descriptor, payload)
     this._bindHooks(payload)
+  }
+
+  /**
+   * `.activateWhen(expr)`: runtime и дочерние scope этого scope активируются, когда условие истинно,
+   * и деактивируются, когда ложно. Переходы идут через handle runtime и RuntimeScope, поэтому
+   * сериализуются их очередями; подписки живут, пока активен владелец (scope).
+   */
+  private _bindActivationConditions(
+    descriptor: CompositionProgramPayload['scopes'][number],
+    payload: CompositionProgramPayload,
+  ): void {
+    const owner = activationConditionOwner(descriptor.path)
+    this._disposeRuntimeBindings(owner)
+    for (const runtime of payload.runtimes) {
+      const handle = runtime.scopePath === descriptor.path && runtime.activateWhen ? this._runtimeHandles.get(runtime.path) : null
+      if (handle && runtime.activateWhen) {
+        this._watchActivationCondition(owner, runtime.path, runtime.activateWhen, () => handle.activate().then(() => undefined), () => handle.deactivate())
+      }
+    }
+    for (const child of payload.scopes) {
+      if (child.parentPath === descriptor.path && child.activateWhen) {
+        const scope = this._requireScope(child.path)
+        this._watchActivationCondition(owner, child.path, child.activateWhen, () => scope.activate(), () => scope.deactivate())
+      }
+    }
+  }
+
+  private _watchActivationCondition(
+    owner: string,
+    target: string,
+    binding: CompositionBindingValue,
+    activate: () => Promise<void>,
+    deactivate: () => Promise<void>,
+  ): void {
+    let active = false
+    const sync = (): void => {
+      const next = Boolean(this._readBinding(binding))
+      if (next === active) {
+        return
+      }
+      active = next
+      const transition = (next ? activate() : deactivate()).catch((error: unknown) => {
+        if (error instanceof Error && error.name === 'AbortError') {
+          return
+        }
+        Endge.diagnostics.error(`[Composition] activateWhen "${target}" не смог ${next ? 'активировать' : 'деактивировать'} элемент: ${error instanceof Error ? error.message : String(error)}`, {
+          scope: { name: 'endge.runtime.composition' },
+          phase: 'runtime',
+          eventName: 'endge.composition.activate-when.error',
+          attributes: { 'endge.runtime.id': this.id },
+        })
+      })
+      this._conditionTransitions.add(transition)
+      void transition.finally(() => this._conditionTransitions.delete(transition))
+    }
+    this._subscribeBinding(owner, binding, sync)
+    sync()
+  }
+
+  private async _settleConditionTransitions(): Promise<void> {
+    while (this._conditionTransitions.size) {
+      await Promise.all([...this._conditionTransitions])
+    }
   }
 
   private _forgetScopeRuntimes(scopePath: string): void {
     this._vocabDataModes.delete(scopePath)
+    this._disposeRuntimeBindings(activationConditionOwner(scopePath))
     for (const [path, descriptor] of this._childDescriptors) {
       if (descriptor.scopePath !== scopePath) {
         continue
@@ -693,8 +762,12 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   }
 
   private _prepareOutputBridges(payload: CompositionProgramPayload): void {
-    for (const connection of payload.graph.inputs) {
-      for (const binding of this._flattenBindings(connection.source)) {
+    const sources = [
+      ...payload.graph.inputs.map(connection => connection.source),
+      ...[...payload.runtimes, ...payload.scopes].flatMap(item => item.activateWhen ? [item.activateWhen] : []),
+    ]
+    for (const source of sources) {
+      for (const binding of this._flattenBindings(source)) {
         if (binding.kind === 'output') {
           this._requireOutputBridge(binding.runtime, binding.output)
         }
@@ -1366,7 +1439,17 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }
 
     if (descriptor.kind === 'stream') {
-      this._bindStreamDispatch(descriptor, child as unknown as StreamRuntimeHost)
+      const stream = child as unknown as StreamRuntimeHost
+      // Literal props переданы при создании; связанные props переоткрывают подписку при изменении запроса.
+      for (const [prop, binding] of Object.entries(inputBindings)) {
+        if (binding.kind === 'literal') {
+          continue
+        }
+        const sync = () => stream.setProps({ [prop]: this._readBinding(binding) })
+        sync()
+        this._subscribeBinding(descriptor.path, binding, sync)
+      }
+      this._bindStreamDispatch(descriptor, stream)
       return
     }
 
@@ -2309,4 +2392,9 @@ function readValuePath(value: unknown, path: string): unknown {
     }
     return (current as Record<string, unknown>)[segment]
   }, value)
+}
+
+// Владелец подписок activateWhen одного scope в общем реестре runtime disposers.
+function activationConditionOwner(scopePath: string): string {
+  return `\u0000activateWhen:${scopePath}`
 }

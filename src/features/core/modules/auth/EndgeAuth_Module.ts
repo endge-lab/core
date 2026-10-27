@@ -3,6 +3,7 @@ import type { AuthInteractionRequiredError } from '@/features/core/modules/auth/
 import type {
   AuthProfileSchema,
   EndgeAuthContext,
+  EndgeFacetClaimResolution,
   OidcBrowserSessionOptions,
 } from '@/features/core/modules/auth/domain/types/auth-profile.types'
 
@@ -14,6 +15,7 @@ import { OAuth2ClientCredentialsAuthAdapter } from '@/features/core/modules/auth
 import { OAuth2PasswordAuthAdapter } from '@/features/core/modules/auth/adapters/OAuth2PasswordAuthAdapter'
 import { OidcAuthAdapter } from '@/features/core/modules/auth/adapters/OidcAuthAdapter'
 import { OidcBrowserSession_Adapter } from '@/features/core/modules/auth/adapters/OidcBrowserSession_Adapter'
+import { describeFacetClaimIssue, normalizeFacetClaimMappings, resolveFacetSelectionsFromClaims } from '@/features/core/modules/auth/services/auth-facet-claims'
 import { AuthAdapterRegistry } from '@/features/core/modules/auth/services/AuthAdapterRegistry'
 import { AuthProfileRegistry } from '@/features/core/modules/auth/services/AuthProfileRegistry'
 import { AuthRequestResolver } from '@/features/core/modules/auth/services/AuthRequestResolver'
@@ -37,6 +39,8 @@ export class EndgeAuth_Module extends EndgeModule<EndgeBootContext> {
   private _abortController: AbortController | null = null
   private _detachHostAbort: (() => void) | null = null
   private _unregisterDiagnosticsContext: (() => void) | null = null
+  private _facetClaims: ReturnType<typeof normalizeFacetClaimMappings> = normalizeFacetClaimMappings(null)
+  private _reportedFacetClaimIssues = ''
   private readonly _store: AuthSessionStore
   private readonly _interactionRequiredListeners = new Set<AuthInteractionRequiredListener>()
 
@@ -113,11 +117,37 @@ export class EndgeAuth_Module extends EndgeModule<EndgeBootContext> {
       'auth',
       () => this._diagnosticsAttributes(),
     )
+    this._facetClaims = normalizeFacetClaimMappings(ctx.auth?.facetClaims)
+    this._reportedFacetClaimIssues = ''
     Endge.context.setSessionIdentityProvider({
-      getCurrentIdentity: () => ({
-        userId: this.session.context.subject ?? null,
-      }),
+      getCurrentIdentity: () => {
+        const resolution = this.facetClaimResolution()
+        const errors = resolution.issues.filter(issue => issue.missing === 'error').map(describeFacetClaimIssue)
+        return {
+          userId: this.session.context.subject ?? null,
+          ...(Object.keys(resolution.selections).length > 0 ? { facetSelections: resolution.selections } : {}),
+          ...(errors.length > 0 ? { facetErrors: errors } : {}),
+        }
+      },
     })
+  }
+
+  /**
+   * Сопоставляет claims авторизованной default session фасетам по опции boot auth.facetClaims.
+   * Claims используются только для выбора structural context, не для authorization decisions.
+   */
+  public facetClaimResolution(): EndgeFacetClaimResolution {
+    if (Object.keys(this._facetClaims).length === 0) {
+      return { selections: {}, issues: [] }
+    }
+    const context = this.session.context
+    const resolution = resolveFacetSelectionsFromClaims(
+      this._facetClaims,
+      { ...(this.session.userInfo ?? {}), ...this.session.claims },
+      context.authenticated,
+    )
+    this._reportFacetClaimIssues(resolution)
+    return resolution
   }
 
   /**
@@ -175,6 +205,22 @@ export class EndgeAuth_Module extends EndgeModule<EndgeBootContext> {
       profileIdentity: profile.identity,
       ...options,
     })
+  }
+
+  private _reportFacetClaimIssues(resolution: EndgeFacetClaimResolution): void {
+    const warnings = resolution.issues.filter(issue => issue.missing === 'default')
+    const key = warnings.map(issue => `${issue.facet}:${issue.reason}`).join('|')
+    if (key === this._reportedFacetClaimIssues) {
+      return
+    }
+    this._reportedFacetClaimIssues = key
+    for (const issue of warnings) {
+      Endge.diagnostics.warn(`[EndgeAuth] ${describeFacetClaimIssue(issue)}; facet selection falls back to boot context`, {
+        scope: { name: 'endge.auth' },
+        eventName: 'endge.auth.facet-claim',
+        attributes: { 'endge.facet': issue.facet, 'endge.auth.claim': issue.claim, 'endge.auth.claim_issue': issue.reason },
+      })
+    }
   }
 
   private _resolvePublicValue(raw: unknown): string {

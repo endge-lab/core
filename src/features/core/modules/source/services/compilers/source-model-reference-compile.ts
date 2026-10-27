@@ -1,8 +1,28 @@
+import type { ProgramDiagnostic } from '@/features/core/modules/program/domain/types/program.types'
+import type { DataViewExternalRef, DataViewInlineRef } from '@/features/core/modules/source/domain/types/data-view-source.types'
+
 import * as t from '@babel/types'
 
-export type ParsedSourceModelReference
+import { diagnostic, isContextSwitchCall, selectContextSwitchNode } from '@/features/core/modules/source/services/compilers/source-expression-compile'
+
+type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
+
+type ParsedSourceModelReferenceBranch
   = | { kind: 'external', identity: string }
     | { kind: 'inline', source: string, definition: t.CallExpression }
+
+// variants — все ветки contextSwitch (default первым); у обычной ссылки отсутствует.
+export type ParsedSourceModelReference = ParsedSourceModelReferenceBranch & { variants?: ParsedSourceModelReferenceBranch[] }
+
+// Ссылка на DataView в compiled Source: выбранная ветка и ветки contextSwitch для проверки при сборке.
+export function toDataViewRef(reference: ParsedSourceModelReference): DataViewExternalRef | DataViewInlineRef {
+  const strip = (branch: ParsedSourceModelReferenceBranch): DataViewExternalRef | DataViewInlineRef => branch.kind === 'external'
+    ? { kind: 'external', identity: branch.identity }
+    : { kind: 'inline', source: branch.source }
+  return reference.variants
+    ? { ...strip(reference), contextVariants: reference.variants.map(strip) }
+    : strip(reference)
+}
 
 // Читает canonical string identity или legacy wrapper model('identity').
 export function readSourceModelIdentity(
@@ -35,8 +55,24 @@ export function readSourceModelReference(
   options: {
     referenceCall: string
     defineCall: string
+    // Разрешает contextSwitch({ default, cases }) ссылок; без diagnostics contextSwitch не распознаётся.
+    diagnostics?: DiagnosticDraft[]
+    sourcePath?: string
   },
 ): ParsedSourceModelReference | null {
+  const switchNode = raw && t.isExpression(raw) ? unwrapExpression(raw) : null
+  if (options.diagnostics && switchNode && t.isCallExpression(switchNode) && isContextSwitchCall(switchNode)) {
+    const diagnostics = options.diagnostics
+    const sourcePath = options.sourcePath ?? options.referenceCall
+    const result = selectContextSwitchNode<ParsedSourceModelReferenceBranch>(switchNode, diagnostics, sourcePath, (branch, branchDiagnostics, branchPath) => {
+      const reference = readSourceModelReference(branch, source, { referenceCall: options.referenceCall, defineCall: options.defineCall })
+      if (!reference) {
+        branchDiagnostics.push(diagnostic('error', 'source-reference-context-switch-branch', `Ветка contextSwitch должна быть ссылкой "identity", ${options.referenceCall}('identity') или ${options.defineCall}({...}).`, branchPath, branch))
+      }
+      return reference
+    })
+    return result ? { ...result.selected, variants: result.variants } : null
+  }
   const identity = readSourceModelIdentity(raw, options.referenceCall)
   if (identity) {
     return { kind: 'external', identity }

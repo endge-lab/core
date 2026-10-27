@@ -80,6 +80,8 @@ import { createEmptyProgramMetadata } from '@/features/core/modules/program/doma
 import { compileTypeSource } from '@/features/core/modules/source/services/compilers/type-source-compile'
 import { resolveCompositionActivation } from '@/features/core/modules/source/services/composition-activation'
 import { inspectDocumentMetadata } from '@/features/core/modules/source/services/document-metadata'
+import { createSourceContextValues, runWithSourceContext } from '@/features/core/modules/source/services/source-context'
+import { resolveTypeDefinitionExtends } from '@/features/core/modules/source/services/type-extends'
 import { compileEndgeCSS } from '@/features/core/modules/styles/services/endgecss-compile'
 import { EndgeModule } from '@/features/federation/EndgeModule'
 import { createCompiledProgramCatalog } from './tools/compiled-program-catalog'
@@ -315,7 +317,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     if (!handler) {
       throw new Error('Compiler handler is not registered for "component-sfc"')
     }
-    return handler.compile(entity, this._createCompileContext())
+    return this._runHandler(handler, entity, this._createCompileContext())
   }
 
   /**
@@ -356,7 +358,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     if (!handler) {
       throw new Error('Compiler handler is not registered for "simulation"')
     }
-    return handler.compile(entity, this._createCompileContext())
+    return this._runHandler(handler, entity, this._createCompileContext())
   }
 
   /**
@@ -391,7 +393,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     if (!handler) {
       throw new Error('Compiler handler is not registered for "composition"')
     }
-    return handler.compile(entity, this._createCompileContext())
+    return this._runHandler(handler, entity, this._createCompileContext())
   }
 
   /**
@@ -485,6 +487,8 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
 
         const result = compileTypeSource(entity.source, entity.sourceVersion)
         const definition = result.document?.definition ?? null
+        // extends разворачивается в artifact: Simulation, mock и каталог видят унаследованные поля.
+        const extended = resolveTypeDefinitionExtends(definition, identity => this._authoredTypeDefinition(identity), entity.identity)
         const knownIdentities = new Set(Endge.types.listResolved().map(type => type.identity))
         const semanticDiagnostics = validateTypeDefinitionReferences(definition, knownIdentities)
         const dependencies = collectTypeDefinitionReferences(definition)
@@ -501,6 +505,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
         const diagnostics = [
           ...result.diagnostics,
           ...semanticDiagnostics,
+          ...extended.diagnostics,
           ...(!String(entity.source ?? '').trim()
             ? [{
                 severity: 'warning' as const,
@@ -523,7 +528,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
             ast: result.ast,
             category: 'user',
             sourceVersion: Number(entity.sourceVersion ?? 1) || 1,
-            definition,
+            definition: extended.definition,
           },
           dependencies,
           diagnostics,
@@ -828,18 +833,21 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
             ...(local.payload ?? artifact)?.props.flatMap(prop => [
               ...this._typeContractDiagnostics(prop.type, `props.${prop.key}.type`),
               ...this._typeContractDiagnostics(prop.typeExpression, `props.${prop.key}.typeExpression`),
+              ...this._typeContractDiagnostics(typeVariantsExpression(prop), `props.${prop.key}.type`),
             ]) ?? [],
             ...(local.payload ?? artifact)?.outputs.flatMap(output => [
               ...this._typeContractDiagnostics(output.contract?.type, `outputs.${output.key}.contract.type`),
               ...this._typeContractDiagnostics(output.contract?.typeExpression, `outputs.${output.key}.contract.typeExpression`),
+              ...this._typeContractDiagnostics(typeVariantsExpression(output.contract), `outputs.${output.key}.contract.type`),
             ]) ?? [],
           ],
           dependencies: [
             ...local.dependencies,
-            ...this._typeDependencies((local.payload ?? artifact)?.props.flatMap(prop => [prop.type, prop.typeExpression]) ?? []),
+            ...this._typeDependencies((local.payload ?? artifact)?.props.flatMap(prop => [prop.type, prop.typeExpression, typeVariantsExpression(prop)]) ?? []),
             ...this._typeDependencies((local.payload ?? artifact)?.outputs.flatMap(output => [
               output.contract?.type,
               output.contract?.typeExpression,
+              typeVariantsExpression(output.contract),
             ]) ?? []),
             ...this._queryAuthDependencies(local.payload ?? artifact),
           ],
@@ -1129,12 +1137,14 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
           payload?.data.flatMap(field => [
             field.contract?.type,
             field.contract?.typeExpression,
+            typeVariantsExpression(field.contract),
           ]) ?? [],
         ))
         for (const field of payload?.data ?? []) {
           ; (result.diagnostics ??= []).push(
             ...this._typeContractDiagnostics(field.contract?.type, `data.${field.key}.contract.type`),
             ...this._typeContractDiagnostics(field.contract?.typeExpression, `data.${field.key}.contract.typeExpression`),
+            ...this._typeContractDiagnostics(typeVariantsExpression(field.contract), `data.${field.key}.contract.type`),
           )
           if (field.kind === 'value' && field.initial.kind === 'mock') {
             dependencies.push({
@@ -1161,9 +1171,12 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
           if (field.kind !== 'derived') {
             continue
           }
+          // Ветки contextSwitch проверяются все; в artifact остаётся выбранная.
+          const checkedDataViews = field.dataViews.flatMap(ref => ref.kind !== 'local' && ref.contextVariants ? ref.contextVariants : [ref])
+          field.dataViews = field.dataViews.map(withoutDataViewVariants)
           field.materializationStrategy = this._resolveDataViewChainStrategy(field.dataViews, [])
-          for (const ref of field.dataViews) {
-            if (ref.kind !== 'external') {
+          for (const ref of checkedDataViews) {
+            if (ref.kind !== 'external' || dependencies.some(item => item.role === `store-derived:${field.key}` && item.identity === ref.identity)) {
               continue
             }
             dependencies.push({
@@ -1293,12 +1306,14 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
           payload: { ...(payload ?? this._makeEmptyFilterPayload(entity.sourceVersion)), ast: result.ast },
           dependencies: [
             ...dependencies,
-            ...this._typeDependencies(payload?.fields.map(field => field.type) ?? []),
+            ...this._typeDependencies(payload?.fields.flatMap(field => [field.type, typeVariantsExpression(field)]) ?? []),
           ],
           diagnostics: [
             ...((result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]),
-            ...(payload?.fields.flatMap(field =>
-              this._typeContractDiagnostics(field.type, `fields.${field.key}.type`)) ?? []),
+            ...(payload?.fields.flatMap(field => [
+              ...this._typeContractDiagnostics(field.type, `fields.${field.key}.type`),
+              ...this._typeContractDiagnostics(typeVariantsExpression(field), `fields.${field.key}.type`),
+            ]) ?? []),
           ],
         })
       },
@@ -1336,15 +1351,17 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
           dependencies: [
             ...i18n.dependencies,
             ...validation.dependencies,
-            ...this._typeDependencies(payload?.props.map(prop => prop.type) ?? []),
+            ...this._typeDependencies(payload?.props.flatMap(prop => [prop.type, typeVariantsExpression(prop)]) ?? []),
             ...this._compositionPreviewDependencies(payload),
           ],
           diagnostics: [
             ...((result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]),
             ...i18n.diagnostics,
             ...validation.diagnostics,
-            ...(payload?.props.flatMap(prop =>
-              this._typeContractDiagnostics(prop.type, `props.${prop.key}.type`)) ?? []),
+            ...(payload?.props.flatMap(prop => [
+              ...this._typeContractDiagnostics(prop.type, `props.${prop.key}.type`),
+              ...this._typeContractDiagnostics(typeVariantsExpression(prop), `props.${prop.key}.type`),
+            ]) ?? []),
             ...this._compositionPreviewDiagnostics(payload),
           ],
         })
@@ -1359,6 +1376,21 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
    */
   private _registerHandler<TEntity, TPayload>(handler: EntityCompilerHandler<TEntity, TPayload>): void {
     this._handlers.set(handler.entityType, handler as EntityCompilerHandler<any, any>)
+  }
+
+  /**
+   * Компилирует сущность в контексте сборки: facet()/config()/context()/contextSwitch выражений Source
+   * подставляются по immutable build context этой compile session.
+   */
+  private _runHandler<TEntity, TPayload>(
+    handler: EntityCompilerHandler<TEntity, TPayload>,
+    entity: TEntity,
+    context: ProgramCompileContext,
+  ): ProgramArtifact<TPayload> {
+    const knownFacets = Endge.domain.getFacets()
+      .filter(facet => facet.active !== false && !facet.deletedAt)
+      .map(facet => facet.identity)
+    return runWithSourceContext(createSourceContextValues(context.buildContext, knownFacets), () => handler.compile(entity, context))
   }
 
   /**
@@ -1442,7 +1474,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
       throw new Error(`Compiler handler is not registered for "${entityType}"`)
     }
 
-    const artifact = handler.compile(entity, context)
+    const artifact = this._runHandler(handler, entity, context)
     Endge.program.addArtifact(artifact, this._createFreshnessCheck(entity, artifact))
     const owner = createDiagnosticsEntityOwner(artifact.ref, 'build')
     const problems = artifact.diagnostics.map((diagnostic) => {
@@ -1989,11 +2021,23 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
       return compiled
     }
 
-    const type = Endge.domain.getType(identity)
-    if (!type || type.isPrimitive) {
+    const definition = this._authoredTypeDefinition(identity)
+    return definition ? resolveTypeDefinitionExtends(definition, base => this._authoredTypeDefinition(base), identity).definition : null
+  }
+
+  /**
+   * Authored definition Type для разворачивания extends: undefined — Type не найден или с ошибками Source.
+   */
+  private _authoredTypeDefinition(identity: string): TypeSourceDefinition | null | undefined {
+    const type = Endge.domain.getType(identity) ?? Endge.types.getDefinition(identity)
+    if (!type) {
+      return undefined
+    }
+    if (type.isPrimitive) {
       return null
     }
-    return compileTypeSource(type.source, type.sourceVersion).document?.definition ?? null
+    const result = compileTypeSource(type.source, type.sourceVersion)
+    return result.diagnostics.some(item => item.severity === 'error') ? undefined : result.document?.definition ?? undefined
   }
 
   /**
@@ -3439,7 +3483,30 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[],
     dependencies: ProgramArtifact['dependencies'],
   ): DataViewRef[] {
-    return refs.map((ref, index) => {
+    return refs.map((variantRef, index) => {
+      const ref = withoutDataViewVariants(variantRef)
+      // Невыбранные ветки contextSwitch: external — зависимости, inline — компилируются ради диагностик.
+      for (const [variantIndex, variant] of (variantRef.kind === 'local' ? [] : variantRef.contextVariants ?? []).entries()) {
+        if (variant.kind === 'external') {
+          if (!dependencies.some(item => item.entityType === 'data-view' && item.identity === variant.identity)) {
+            dependencies.push({ entityType: 'data-view', id: variant.identity, identity: variant.identity, role: 'data-view' })
+          }
+          continue
+        }
+        if (ref.kind === 'inline' && ref.source === variant.source) {
+          continue
+        }
+        const variantPath = `${sourcePath}.${index}.contextSwitch.${variantIndex}`
+        const child = this._compileLocalDataViewArtifact(variant.source, ownerIdentity, variantPath, context)
+        diagnostics.push(...child.diagnostics.map(diagnostic => ({
+          severity: diagnostic.severity,
+          code: diagnostic.code,
+          message: diagnostic.message,
+          sourcePath: `${variantPath}${diagnostic.sourcePath ? `.${diagnostic.sourcePath}` : ''}`,
+          start: diagnostic.start,
+          end: diagnostic.end,
+        })))
+      }
       if (ref.kind === 'external') {
         dependencies.push({
           entityType: 'data-view',
@@ -3961,4 +4028,18 @@ function readStaticDotPath(source: unknown, path: string): unknown | typeof MISS
     current = (current as Record<string, unknown>)[segment]
   }
   return current
+}
+
+// Ветки field(contextSwitch(...)) одним union-выражением: каждая ссылка проверяется и попадает в зависимости.
+function typeVariantsExpression(field: { typeVariants?: TypeSourceExpression[] } | null | undefined): TypeSourceExpression | null {
+  return field?.typeVariants?.length ? { kind: 'union', variants: field.typeVariants } : null
+}
+
+// Снимает ветки contextSwitch с DataView ref: runtime получает только выбранную ветку.
+function withoutDataViewVariants<T extends DataViewRef>(ref: T): T {
+  if (ref.kind === 'local' || !ref.contextVariants) {
+    return ref
+  }
+  const { contextVariants: _variants, ...rest } = ref
+  return rest as T
 }

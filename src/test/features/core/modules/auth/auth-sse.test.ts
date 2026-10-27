@@ -99,4 +99,26 @@ describe('авторизованный транспорт SSE', () => {
       { forceRefresh: false },
     )
   })
+
+  it('сохраняет имена событий авторизованного SSE вместо сведения к message', () => {
+    const compiled = compileStreamSource(`defineStream({
+      transport: sse({ url: '/events', withCredentials: true, auth: 'inherit' }),
+      events: {
+        snapshot: event('orders.snapshot'),
+        message: event('orders.changed'),
+      },
+    })`)
+    expect(compiled.diagnostics).toEqual([])
+    const callbacks = { message: vi.fn(), error: vi.fn(), open: vi.fn() }
+    new BrowserSseStreamTransportFactory(vi.fn()).open(compiled.artifact!, callbacks)
+
+    expect(sse.options?.withCredentials).toBe(true)
+    expect(sse.options?.onEvent).toBeUndefined()
+    sse.options?.onMessage({ event: 'snapshot', id: '42', data: { items: [] } })
+    sse.options?.onMessage({ event: 'message', id: null, data: 'plain' })
+    expect(callbacks.message.mock.calls.map(([message]) => message)).toEqual([
+      { sourceEvent: 'snapshot', id: '42', data: { items: [] } },
+      { sourceEvent: 'message', id: null, data: 'plain' },
+    ])
+  })
 })

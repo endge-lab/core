@@ -194,6 +194,9 @@ export function validateTypeCompatibility(
 
 function visitDefinition(definition: TypeSourceDefinition, visit: (identity: string) => void): void {
   if (definition.kind === 'object') {
+    if (definition.extends) {
+      visitExpression(definition.extends, visit)
+    }
     for (const field of definition.fields) {
       visitExpression(field.type, visit)
     }
@@ -211,6 +214,10 @@ function visitDefinition(definition: TypeSourceDefinition, visit: (identity: str
 }
 
 function visitExpression(expression: TypeSourceExpression, visit: (identity: string) => void): void {
+  // Невыбранные ветки contextSwitch проверяются и попадают в зависимости наравне с выбранной.
+  for (const variant of expression.contextVariants ?? []) {
+    visitExpression(variant, visit)
+  }
   if (expression.kind === 'reference') {
     visit(expression.identity)
     return

@@ -99,11 +99,16 @@ export class SimulationRuntimeHost extends RuntimeHostBase<'simulation', Runtime
   /**
    * Каждое выполнение получает новый response; mutation Query не меняет шаблон следующего вызова.
    */
-  public readResponse(host: RuntimeHost<any, any>): { value: unknown } | null {
+  public readResponse(host: RuntimeHost<any, any>): { value: unknown, errors?: readonly unknown[] } | null {
     const key = this._requestKey(host)
-    return key !== null && this._responses.has(key)
-      ? { value: JSON.parse(JSON.stringify(this._responses.get(key))) }
-      : null
+    if (key === null || !this._responses.has(key)) {
+      return null
+    }
+    const errors = this._overrides.requests.get(key)?.errors
+    return {
+      value: JSON.parse(JSON.stringify(this._responses.get(key))),
+      ...(errors ? { errors: JSON.parse(JSON.stringify(errors)) as unknown[] } : {}),
+    }
   }
 
   public streamOverride(host: RuntimeHost<any, any>) {

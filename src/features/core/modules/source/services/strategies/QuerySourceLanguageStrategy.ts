@@ -16,6 +16,17 @@ import { QUERY_DEFAULT_SOURCE, QUERY_GRAPHQL_DEFAULT_SOURCE } from '@/features/c
 
 const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
   {
+    label: 'request.fragments',
+    kind: 'property',
+    insertText: `fragments: {
+  FlightFields: contextSwitch({
+    default: gql\`fragment FlightFields on Flight { id gate }\`,
+    cases: [{ when: { tenant: 'kzn' }, use: gql\`fragment FlightFields on Flight { id stand }\` }],
+  }),
+},`,
+    detail: 'GraphQL fragments substituted at build time; contextSwitch picks a variant by facets',
+  },
+  {
     label: 'defineQuery',
     kind: 'snippet',
     insertText: QUERY_DEFAULT_SOURCE.trimEnd(),
@@ -136,10 +147,35 @@ const QUERY_SOURCE_COMPLETIONS: SourceLanguageCompletion[] = [
     detail: 'Selector GraphQL data',
   },
   {
+    label: 'errors',
+    kind: 'function',
+    insertText: `errors()`,
+    detail: 'Selector GraphQL errors (message, path, locations, extensions)',
+    documentation: 'Только для kind: \'graphql\'. Читает errors ответа при request.errorPolicy: \'all\' или \'ignore\'; при \'throw\' ответ с errors завершает Query ошибкой.',
+  },
+  {
     label: 'dataView',
     kind: 'function',
     insertText: `.dataView('data-view-identity')`,
     detail: 'Ссылка на доменный DataView',
+  },
+  {
+    label: 'dataView.contextSwitch',
+    kind: 'snippet',
+    insertText: `.dataView(contextSwitch({
+  default: 'data-view-identity',
+  cases: [{ when: { tenant: 'kzn' }, use: 'data-view-kzn' }],
+}))`,
+    detail: 'DataView по фасетам сборки',
+  },
+  {
+    label: 'field.contextSwitch',
+    kind: 'snippet',
+    insertText: `field(contextSwitch({
+  default: 'TypeIdentity',
+  cases: [{ when: { tenant: 'kzn' }, use: type('TenantType') }],
+}))`,
+    detail: 'Type поля по фасетам сборки',
   },
   {
     label: 'defineDataView',
@@ -223,6 +259,7 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
     alias: 'Endge Query Source',
     extension: '.endge-query.ts',
     keywords: [
+      'all',
       'auto',
       'body',
       'collectionByKey',
@@ -237,6 +274,7 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
       'defineQuery',
       'endgeVar',
       'env',
+      'errors',
       'field',
       'filter',
       'full',
@@ -281,6 +319,7 @@ export class QuerySourceLanguageStrategy implements SourceLanguageStrategy {
       'endpoint',
       'errorPolicy',
       'formUrlencoded',
+      'fragments',
       'headers',
       'incremental',
       'items',

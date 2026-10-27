@@ -228,6 +228,155 @@ defineQuery({
     })
   })
 
+  it.each(['throw', 'ignore', 'all'] as const)('принимает request.errorPolicy GraphQL: %s', (errorPolicy) => {
+    const result = Endge.source.compile('query', `
+defineQuery({
+  kind: 'graphql',
+  request: {
+    endpoint: 'https://graphql.example.test',
+    document: gql\`query Item { item { id } }\`,
+    errorPolicy: '${errorPolicy}',
+  },
+  outputs: { item: output().from(data('item')) },
+})
+`)
+
+    expect(result.ok).toBe(true)
+    expect(result.diagnostics).toEqual([])
+    expect(result.document).toMatchObject({ request: { errorPolicy } })
+    expect(result.artifact).toMatchObject({ type: 'query-gql', errorPolicy })
+  })
+
+  it('отклоняет неизвестный request.errorPolicy GraphQL', () => {
+    const result = Endge.source.compile('query', `
+defineQuery({
+  kind: 'graphql',
+  request: {
+    endpoint: 'https://graphql.example.test',
+    document: gql\`query Item { item { id } }\`,
+    errorPolicy: 'none',
+  },
+})
+`)
+
+    expect(result.ok).toBe(false)
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        severity: 'error',
+        code: 'query-source-graphql-error-policy',
+        message: 'request.errorPolicy поддерживает только "throw", "ignore" или "all".',
+      }),
+    ]))
+  })
+
+  it('компилирует reader errors(path?) GraphQL в чтение graphql-errors', () => {
+    const result = Endge.source.compile('query', `
+defineQuery({
+  kind: 'graphql',
+  request: {
+    endpoint: 'https://graphql.example.test',
+    document: gql\`query Item { item { id } }\`,
+    errorPolicy: 'all',
+  },
+  outputs: {
+    errors: output().from(errors()),
+    code: output().from(errors('0.extensions.code')),
+    combined: output().from({ item: data('item'), errors: errors() }),
+  },
+})
+`)
+
+    expect(result.ok).toBe(true)
+    expect(result.diagnostics).toEqual([])
+    expect(result.artifact).toMatchObject({
+      outputs: [
+        { key: 'errors', source: { type: 'response', path: null, expression: { type: 'read', source: 'graphql-errors', path: '' } } },
+        { key: 'code', source: { type: 'response', path: null, expression: { type: 'read', source: 'graphql-errors', path: '0.extensions.code' } } },
+        {
+          key: 'combined',
+          source: {
+            type: 'response',
+            expression: {
+              type: 'object',
+              properties: {
+                item: { type: 'read', source: 'response', path: 'item' },
+                errors: { type: 'read', source: 'graphql-errors', path: '' },
+              },
+            },
+          },
+        },
+      ],
+    })
+  })
+
+  it('предупреждает, что errors(...) пуст при errorPolicy throw', () => {
+    const result = Endge.source.compile('query', `
+defineQuery({
+  kind: 'graphql',
+  request: {
+    endpoint: 'https://graphql.example.test',
+    document: gql\`query Item { item { id } }\`,
+  },
+  outputs: { errors: output().from(errors()) },
+})
+`)
+
+    expect(result.ok).toBe(true)
+    expect(result.diagnostics).toEqual([
+      expect.objectContaining({
+        severity: 'warning',
+        code: 'query-source-graphql-errors-throw-policy',
+        sourcePath: 'outputs.errors.from',
+      }),
+    ])
+  })
+
+  it('предупреждает, что errors(...) пуст при errorPolicy ignore', () => {
+    const result = Endge.source.compile('query', `
+defineQuery({
+  kind: 'graphql',
+  request: {
+    endpoint: 'https://graphql.example.test',
+    document: gql\`query Item { item { id } }\`,
+    errorPolicy: 'ignore',
+  },
+  outputs: { errors: output().from(errors()) },
+})
+`)
+
+    expect(result.ok).toBe(true)
+    expect(result.diagnostics).toEqual([
+      expect.objectContaining({
+        severity: 'warning',
+        code: 'query-source-graphql-errors-ignore-policy',
+        sourcePath: 'outputs.errors.from',
+      }),
+    ])
+  })
+
+  it.each([
+    ['errors()', 'output().from(errors())'],
+    ['errors(path)', 'output().from(errors(\'0.message\'))'],
+    ['errors внутри выражения', 'output().from({ items: response(\'items\'), errors: errors() })'],
+    ['внутреннее имя reader', 'output().from(__graphqlErrors(\'0\'))'],
+  ])('отклоняет reader errors для REST Query: %s', (_name, outputSource) => {
+    const result = Endge.source.compile('query', `
+defineQuery({
+  request: { endpoint: 'https://rest.example.test', path: '/items' },
+  outputs: { problems: ${outputSource} },
+})
+`)
+
+    expect(result.ok).toBe(false)
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        severity: 'error',
+        code: 'query-source-graphql-errors-rest',
+        sourcePath: 'outputs.problems.from',
+      }),
+    ]))
+  })
+
   it('компилирует macro env и legacy macro endgeVar в tokens переменных', () => {
     const envResult = Endge.source.compile('query', `
 defineQuery({

@@ -5,14 +5,17 @@ import type {
   SourceFieldOption,
   SourceFieldType,
 } from '@/features/core/modules/source/domain/types/source-expression.types'
+import type { TypeSourceExpression } from '@/features/core/modules/source/domain/types/type-source.types'
 
 import * as t from '@babel/types'
 
 import {
   compileSourceExpression,
   diagnostic,
+  isContextSwitchCall,
   propertyName,
   readStringArgument,
+  selectContextSwitchNode,
   unwrapExpression,
 } from '@/features/core/modules/source/services/compilers/source-expression-compile'
 import { compileProgramMetadataExpression } from '@/features/core/modules/source/services/compilers/source-metadata-compile'
@@ -56,6 +59,10 @@ export function compileSourceField(
   }
 
   const typeArgument = current.arguments[0]
+  const switchNode = typeArgument && t.isExpression(typeArgument) ? unwrapExpression(typeArgument) : null
+  if (switchNode && t.isCallExpression(switchNode) && isContextSwitchCall(switchNode)) {
+    return compileSourceFieldContextSwitch(key, switchNode, modifiers, raw, source, diagnostics, sourcePath, options)
+  }
   const inlineTypeNode = typeArgument && t.isExpression(typeArgument)
     ? unwrapExpression(typeArgument)
     : null
@@ -79,13 +86,61 @@ export function compileSourceField(
     return null
   }
 
-  const field: SourceFieldDefinition = {
+  return applySourceFieldModifiers({
     key,
     type: typeExpression ? 'Object' : rawType as SourceFieldType,
     ...(typeExpression ? { typeExpression } : {}),
     optional: false,
     array: false,
+  }, modifiers, raw, source, diagnostics, sourcePath)
+}
+
+// field(contextSwitch({ default: 'A', cases: [{ when, use: type('B') }] })): все ветки типа проверяются,
+// в контракт попадает ветка, выбранная по фасетам сборки; typeVariants — для проверки ссылок и зависимостей.
+function compileSourceFieldContextSwitch(
+  key: string,
+  node: t.CallExpression,
+  modifiers: Array<{ name: string, call: t.CallExpression }>,
+  raw: t.Expression,
+  source: string,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+  options: SourceFieldCompileOptions,
+): SourceFieldParseResult | null {
+  const result = selectContextSwitchNode<TypeSourceExpression>(node, diagnostics, `${sourcePath}.type`, (branch, branchDiagnostics, branchPath) => {
+    const value = unwrapExpression(branch)
+    if (t.isStringLiteral(value) && value.value.trim()) {
+      return { kind: 'reference', identity: value.value.trim() }
+    }
+    const callee = t.isCallExpression(value) && t.isIdentifier(value.callee) ? value.callee.name : null
+    if (t.isIdentifier(value) || callee === 'type' || (options.allowInlineTypeExpressions === true && (callee === 'objectOf' || callee === 'recordOf'))) {
+      return compileTypeSourceExpression(value, branchDiagnostics, branchPath)
+    }
+    branchDiagnostics.push(diagnostic('error', 'source-field-type', `Ветка contextSwitch типа поля должна быть identity, type('X')${options.allowInlineTypeExpressions ? ' или inline objectOf/recordOf.' : '.'}`, branchPath, branch))
+    return null
+  })
+  if (!result) {
+    return null
   }
+  const selected = result.selected
+  return applySourceFieldModifiers({
+    key,
+    type: selected.kind === 'reference' ? selected.identity as SourceFieldType : 'Object',
+    ...(selected.kind === 'reference' ? {} : { typeExpression: selected }),
+    typeVariants: result.variants,
+    optional: false,
+    array: false,
+  }, modifiers, raw, source, diagnostics, sourcePath)
+}
+
+function applySourceFieldModifiers(
+  field: SourceFieldDefinition,
+  modifiers: Array<{ name: string, call: t.CallExpression }>,
+  raw: t.Expression,
+  source: string,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+): SourceFieldParseResult | null {
   let defaultSource: SourceFieldDefaultSource | undefined
 
   for (const modifier of modifiers) {

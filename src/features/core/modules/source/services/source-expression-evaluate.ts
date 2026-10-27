@@ -1,6 +1,7 @@
 import type { SourceExpressionContext, SourceExpressionIR } from '@/features/core/modules/source/domain/types/source-expression.types'
 
 import { readPath, VALUE_EXPRESSION_OPERATIONS } from './value-expression-operations'
+import { runWithValuePathScope } from './value-path'
 
 // Вычисляет общий безопасный ValueExpression без eval/new Function.
 export function evaluateSourceExpression(
@@ -43,9 +44,11 @@ export function evaluateSourceExpression(
             ? context.row
             : node.source === 'response'
               ? context.response
-              : node.source === 'store'
-                ? context.stores
-                : undefined
+              : node.source === 'graphql-errors'
+                ? context.graphQLErrors ?? []
+                : node.source === 'store'
+                  ? context.stores
+                  : undefined
       return readPath(source, node.path)
     }
 
@@ -76,7 +79,20 @@ export function evaluateSourceExpression(
     })
   }
 
-  return evaluate(expression)
+  // Переменные `$имя` в путях берутся из props выражения; предупреждение о пути — одно на вычисление.
+  let warnedPaths: Set<string> | undefined
+  return runWithValuePathScope({
+    vars: context.props,
+    warn: (issue) => {
+      const key = `${issue.code}\u0000${issue.path}`
+      warnedPaths ??= new Set()
+      if (warnedPaths.has(key)) {
+        return
+      }
+      warnedPaths.add(key)
+      context.onWarning?.({ code: issue.code, message: issue.message, data: { path: issue.path } })
+    },
+  }, () => evaluate(expression))
 }
 
 // Публичный alias общего DSL для новых domain source compiler-ов.

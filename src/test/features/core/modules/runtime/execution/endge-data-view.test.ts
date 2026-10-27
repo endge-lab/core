@@ -231,6 +231,27 @@ defineDataView({
     expect(JSON.stringify(output, null, 2)).not.toContain('attrTime')
   })
 
+  it('передаёт props DataView как переменные путей в path(), pick() и шаблоны map', () => {
+    const output = dataView.runSource(`
+defineDataView({
+  mode: 'pipeline',
+  steps: [
+    from('legs').as('leg'),
+    map({
+      value: path('leg.$field'),
+      status: path('input.statuses[legId=$legId].value'),
+      label: template('{leg.$field}'),
+    }),
+  ],
+})
+`, INPUT, undefined, { props: { field: 'id', legId: 'leg2' } })
+
+    expect(output).toEqual([
+      { value: 'leg1', status: 'Delayed', label: 'leg1' },
+      { value: 'leg2', status: 'Delayed', label: 'leg2' },
+    ])
+  })
+
   it('поддерживает литеральные поля map', () => {
     const output = dataView.runSource(`
 defineDataView({

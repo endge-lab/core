@@ -156,6 +156,37 @@ export interface EndgeAuthContext {
 export interface EndgeAuthBootOptions {
   // Host-owned namespace isolates sessions одинаковых Workspaces across backends.
   storageNamespace?: string
+
+  // Выбор документов фасетов по claims текущей session: { tenant: { claim: '/tenant' } }.
+  facetClaims?: Readonly<Record<string, EndgeFacetClaimMapping>>
+}
+
+// Сопоставление claim авторизованной session документу фасета.
+export interface EndgeFacetClaimMapping {
+  // JSON Pointer ('/org/tenant') либо имя claim верхнего уровня ('tenant').
+  claim: string
+
+  // Значение claim -> identity документа фасета; без map значение и есть identity.
+  map?: Readonly<Record<string, string>>
+
+  // Нет claim (или нет значения в map) в авторизованной session:
+  // 'default' — фасет не фиксируется session, warning; 'error' — boot завершается ошибкой.
+  missing?: 'default' | 'error'
+}
+
+export type EndgeFacetClaimIssueReason = 'missing' | 'unmapped' | 'invalid'
+
+// Результат сопоставления claims фасетам одной session.
+export interface EndgeFacetClaimResolution {
+  selections: Readonly<Record<string, string>>
+  issues: readonly EndgeFacetClaimIssue[]
+}
+
+export interface EndgeFacetClaimIssue {
+  facet: string
+  claim: string
+  reason: EndgeFacetClaimIssueReason
+  missing: 'default' | 'error'
 }
 
 export interface AuthAdapterContext {
