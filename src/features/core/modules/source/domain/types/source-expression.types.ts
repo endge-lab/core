@@ -20,6 +20,7 @@ export type SourceExpressionReadKind
     | 'value'
     | 'row'
     | 'response'
+    | 'graphql-errors'
     | 'store'
     | 'current'
     | 'scope'
@@ -213,6 +214,9 @@ export interface SourceFieldDefinition {
   type: SourceFieldType
   // Точный inline-контракт для objectOf/recordOf; type сохраняет coarse runtime identity.
   typeExpression?: TypeSourceExpression
+  // field(contextSwitch({...})): все ветки типа (default первым) для проверки ссылок и зависимостей;
+  // type/typeExpression содержат ветку, выбранную по фасетам сборки.
+  typeVariants?: TypeSourceExpression[]
   optional: boolean
   array: boolean
   defaultValue?: SourceExpressionIR
@@ -245,6 +249,8 @@ export interface SourceExpressionContext {
   values?: Record<string, unknown>
   row?: unknown
   response?: unknown
+  // Полные GraphQL errors ответа для reader errors(path?) в выходах GraphQL Query.
+  graphQLErrors?: readonly unknown[]
   stores?: Record<string, unknown>
   current?: unknown
   scope?: unknown

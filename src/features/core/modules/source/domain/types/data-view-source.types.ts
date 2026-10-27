@@ -65,12 +65,18 @@ export type DataViewRef
     | DataViewInlineRef
     | DataViewLocalRef
 
-export interface DataViewExternalRef {
+// `.dataView(contextSwitch({...}))`: все ветки (default первым) для проверки при сборке; ref содержит
+// ветку, выбранную по фасетам. Компилятор программы снимает поле с ref в artifact.
+export interface DataViewContextVariants {
+  contextVariants?: Array<DataViewExternalRef | DataViewInlineRef>
+}
+
+export interface DataViewExternalRef extends DataViewContextVariants {
   kind: 'external'
   identity: string
 }
 
-export interface DataViewInlineRef {
+export interface DataViewInlineRef extends DataViewContextVariants {
   kind: 'inline'
   source: string
 }

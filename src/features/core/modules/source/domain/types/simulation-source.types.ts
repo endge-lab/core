@@ -8,6 +8,8 @@ export interface SimulationMockRequest {
   // false исключает примеры Type из схемы; ограничения и enum сохраняются.
   useExamples?: boolean
   arrays: Record<string, number>
+  // Только GraphQL Query: errors сгенерированного ответа; обрабатываются по errorPolicy Query.
+  errors?: SimulationGraphQLError[]
 }
 
 // Ограничения сценария сужают существующий Type, не создавая новый Domain Type.
@@ -19,12 +21,23 @@ export interface SimulationFieldConstraints {
 
 export interface SimulationMockStream {
   kind: 'mock-stream'
+  // Для graphqlSse — Type объекта data события next; для sse/websocket — business payload.
   type: string
+  // Нормализованный тип события для sse/websocket. Для graphqlSse пуст: тип задаёт events.next Stream.
   event: string
   seed?: string
   intervalMs: number
   itemsPerMessage: number
   fields: Record<string, SimulationFieldConstraints>
+  // Только graphqlSse: errors каждого события next; обрабатываются по errorPolicy Stream.
+  errors?: SimulationGraphQLError[]
+}
+
+// GraphQL error события next в форме ответа сервера.
+export interface SimulationGraphQLError {
+  message: string
+  path?: Array<string | number>
+  [key: string]: unknown
 }
 
 export interface SimulationRuntimeOverride {
@@ -77,4 +90,6 @@ export interface SimulationSourceCatalog {
   compositions: readonly SimulationSourceInput[]
   queries: readonly SimulationSourceInput[]
   types: readonly SimulationSourceInput[]
+  // Stream Sources для проверки mockStream по виду transport; без каталога transport считается sse/websocket.
+  streams?: readonly SimulationSourceInput[]
 }

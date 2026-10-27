@@ -35,11 +35,13 @@ import {
   compileSourceExpression,
   diagnostic,
   propertyName,
+  readContextPatternNode,
   readStringArgument,
   unwrapExpression,
 } from '@/features/core/modules/source/services/compilers/source-expression-compile'
 import { compileSourceField } from '@/features/core/modules/source/services/compilers/source-field-compile'
 import { compileProgramMetadataProperty } from '@/features/core/modules/source/services/compilers/source-metadata-compile'
+import { findAmbiguousContextCases, getSourceContext, matchesContextPattern, selectContextCase } from '@/features/core/modules/source/services/source-context'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
@@ -125,6 +127,7 @@ export function compileCompositionSource(
     }]
     const runtimes: CompositionRuntimeDescriptor[] = []
     const order = { value: resources.length + 1 }
+    const conditions = createConditionState(executionContext)
     if (runtimesNode) {
       readRuntimes(
         runtimesNode,
@@ -139,23 +142,34 @@ export function compileCompositionSource(
         defaultActivation,
         order,
         executionContext,
+        conditions,
+        {},
       )
     }
     scopes[0].runtimes = runtimes.filter(item => item.scopePath === 'scope_default').map(item => item.path)
     scopes[0].children = scopes.filter(item => item.parentPath === 'scope_default').map(item => item.path)
-    const runtimeNames = new Set(runtimes.map(item => item.name))
-    const hooks = hooksNode
-      ? readHooks(hooksNode, runtimeNames, new Set(props.map(prop => prop.key)), runtimes, data, diagnostics)
+    // Исключённые enabledWhen элементы проверяются как обычные, чтобы ошибки не зависели от фасетов сборки.
+    const allRuntimes = [...runtimes, ...conditions.excludedRuntimes]
+    const runtimeNames = new Set(allRuntimes.map(item => item.name))
+    const allHooks = hooksNode
+      ? readHooks(hooksNode, runtimeNames, new Set(props.map(prop => prop.key)), allRuntimes, data, diagnostics)
       : []
-    const scopeNames = new Set(scopes.filter(item => item.path !== 'scope_default').map(item => item.path))
+    const scopeNames = new Set([
+      ...scopes.filter(item => item.path !== 'scope_default').map(item => item.path),
+      ...conditions.excludedScopes.keys(),
+    ])
     const outputs = outputsNode ? readOutputs(outputsNode, runtimeNames, scopeNames, diagnostics) : []
+    validateRuntimeConditions(allRuntimes, scopes, conditions, allHooks, outputs, diagnostics)
+    // Hooks исключённых runtime удаляются вместе с ними.
+    const excludedNames = new Set(conditions.excludedRuntimes.map(item => item.name))
+    const hooks = allHooks.filter(hook => !hookRuntimeNames(hook).some(name => excludedNames.has(name)))
 
     if (!runtimesNode) {
       diagnostics.push(diagnostic('error', 'composition-source-runtimes-missing', 'defineComposition требует runtimes.', 'runtimes', definition))
     }
     validatePersistKeys(runtimes, diagnostics)
-    validateBindingReferences(props, data, runtimes, diagnostics)
-    validateRuntimeCycles(runtimes, hooks, diagnostics)
+    validateBindingReferences(props, data, allRuntimes, diagnostics)
+    validateRuntimeCycles(allRuntimes, allHooks, diagnostics)
 
     const document: CompositionSourceDocument = { dataMode, activation, props, previewProps, data, resources, scopes, runtimes, hooks, outputs }
     const hasErrors = diagnostics.some(item => item.severity === 'error')
@@ -766,6 +780,8 @@ function readRuntimes(
   ownerActivation: CompositionActivationDescriptor,
   order: { value: number },
   executionContext: Readonly<Record<string, string>>,
+  conditions: CompositionConditionState,
+  ownerCondition: Readonly<Record<string, string>> | null,
 ): void {
   const declared = new Set<string>()
   for (const property of node.properties) {
@@ -791,15 +807,36 @@ function readRuntimes(
         continue
       }
       let activationOverride: CompositionActivationDescriptor | null = null
+      let enabledWhen: Record<string, string> | undefined
+      let activateWhen: CompositionBindingValue | undefined
+      let activateOnCall: t.CallExpression | null = null
       for (const modifier of chain.modifiers) {
+        if (modifier.name === 'enabledWhen') {
+          enabledWhen = readEnabledWhen(modifier.call, enabledWhen, diagnostics, `runtimes.${path}.enabledWhen`)
+          continue
+        }
+        if (modifier.name === 'activateWhen') {
+          activateWhen = readActivateWhen(modifier.call, activateWhen, visibleData, diagnostics, `runtimes.${path}`)
+          continue
+        }
         if (modifier.name !== 'activateOn') {
           diagnostics.push(diagnostic('error', 'composition-scope-method', `Scope method ".${modifier.name}" не поддерживается.`, `runtimes.${path}`, modifier.call))
           continue
         }
+        activateOnCall = modifier.call
         activationOverride = readActivation(modifier.call.arguments[0], diagnostics, `runtimes.${path}.activateOn`)
       }
       validateScopeProperties(definition, diagnostics, path)
-      const effectiveActivation = activationOverride ?? ownerActivation
+      reportActivationConflict(activateOnCall, activateWhen, diagnostics, `runtimes.${path}`)
+      const condition = mergeConditions(ownerCondition, enabledWhen, diagnostics, `runtimes.${path}.enabledWhen`)
+      const enabled = isConditionEnabled(condition, conditions, diagnostics, `runtimes.${path}.enabledWhen`, property.value)
+      // Исключённый scope разбирается в отдельные массивы: ошибки видны, но в программу он не попадает.
+      const sink = enabled
+        ? { data, runtimes, scopes, resources }
+        : { data: [] as CompositionDataDescriptor[], runtimes: [] as CompositionRuntimeDescriptor[], scopes: [] as CompositionScopeDescriptor[], resources: [] as CompositionResourceDescriptor[] }
+      // activateWhen делает scope manual для owner; содержимое стартует вместе с ним.
+      const effectiveActivation: CompositionActivationDescriptor = activateWhen ? { mode: 'manual' } : activationOverride ?? ownerActivation
+      const innerActivation: CompositionActivationDescriptor = activateWhen ? { mode: 'startup' } : effectiveActivation
       const scopeDataNode = propertyValue(definition, 'data')
       const scopeResourcesNode = propertyValue(definition, 'resources')
       const scopeRuntimesNode = propertyValue(definition, 'runtimes')
@@ -832,47 +869,69 @@ function readRuntimes(
           continue
         }
         scopeVisibleData.set(descriptor.name, descriptor.path ?? descriptor.name)
-        data.push(descriptor)
+        sink.data.push(descriptor)
         acceptedData.push(descriptor)
       }
-      resources.push(...ownedResources)
+      sink.resources.push(...ownedResources)
       const scope: CompositionScopeDescriptor = {
         name,
         path,
         parentPath: ownerScopePath,
         activationOverride,
         effectiveActivation,
+        ...(condition && Object.keys(condition).length ? { enabledWhen: condition } : {}),
+        ...(activateWhen ? { activateWhen } : {}),
         data: acceptedData.map(item => item.path ?? item.name),
         resources: ownedResources.map(item => item.path),
         runtimes: [],
         children: [],
         sourceOrder: order.value++,
       }
-      scopes.push(scope)
+      sink.scopes.push(scope)
       if (t.isObjectExpression(scopeRuntimesNode)) {
         readRuntimes(
           scopeRuntimesNode,
           scopeVisibleData,
           diagnostics,
-          data,
-          runtimes,
-          scopes,
-          resources,
+          sink.data,
+          sink.runtimes,
+          sink.scopes,
+          sink.resources,
           path,
           path,
-          effectiveActivation,
+          innerActivation,
           order,
           executionContext,
+          conditions,
+          condition,
         )
       }
-      scope.runtimes = runtimes.filter(item => item.scopePath === path).map(item => item.path)
-      scope.children = scopes.filter(item => item.parentPath === path).map(item => item.path)
+      scope.runtimes = sink.runtimes.filter(item => item.scopePath === path).map(item => item.path)
+      scope.children = sink.scopes.filter(item => item.parentPath === path).map(item => item.path)
+      if (!enabled) {
+        conditions.excludedRuntimes.push(...sink.runtimes)
+        for (const excluded of sink.scopes) {
+          conditions.excludedScopes.set(excluded.path, excluded)
+        }
+      }
       continue
     }
     const path = publicPrefix ? `${publicPrefix}.${name}` : name
     const runtime = readRuntime(path, property.value, visibleData, diagnostics, ownerScopePath, ownerActivation, executionContext)
     if (runtime) {
-      runtimes.push(runtime)
+      const condition = mergeConditions(ownerCondition, runtime.enabledWhen, diagnostics, `runtimes.${path}.enabledWhen`)
+      if (condition && Object.keys(condition).length) {
+        runtime.enabledWhen = condition
+      }
+      else {
+        delete runtime.enabledWhen
+      }
+      if (isConditionEnabled(condition, conditions, diagnostics, `runtimes.${path}.enabledWhen`, property.value)) {
+        runtimes.push(runtime)
+      }
+      else {
+        conditions.excludedRuntimes.push(runtime)
+      }
     }
   }
 }
@@ -926,10 +985,26 @@ function readRuntime(
     storeTo: [],
   }
 
+  let activateOnCall: t.CallExpression | null = null
   for (const modifier of chain.modifiers) {
     if (modifier.name === 'activateOn') {
+      activateOnCall = modifier.call
       descriptor.activationOverride = readActivation(modifier.call.arguments[0], diagnostics, `runtimes.${name}.activateOn`)
       descriptor.effectiveActivation = descriptor.activationOverride ?? ownerActivation
+      continue
+    }
+    if (modifier.name === 'enabledWhen') {
+      const condition = readEnabledWhen(modifier.call, descriptor.enabledWhen, diagnostics, `runtimes.${name}.enabledWhen`)
+      if (condition) {
+        descriptor.enabledWhen = condition
+      }
+      continue
+    }
+    if (modifier.name === 'activateWhen') {
+      const condition = readActivateWhen(modifier.call, descriptor.activateWhen, visibleData, diagnostics, `runtimes.${name}`)
+      if (condition) {
+        descriptor.activateWhen = condition
+      }
       continue
     }
     if (modifier.name === 'fields') {
@@ -1099,6 +1174,11 @@ function readRuntime(
 
     diagnostics.push(diagnostic('error', 'composition-runtime-method', `.${modifier.name}(...) не поддерживается runtime descriptor.`, `runtimes.${name}`, modifier.call))
   }
+  reportActivationConflict(activateOnCall, descriptor.activateWhen, diagnostics, `runtimes.${name}`)
+  if (descriptor.activateWhen) {
+    // Runtime с activateWhen не стартует вместе с scope: его включает и выключает условие.
+    descriptor.effectiveActivation = { mode: 'manual' }
+  }
   if (kind === 'filter-view' && descriptor.componentIdentity && Object.keys(descriptor.controls ?? {}).length) {
     diagnostics.push(diagnostic(
       'error',
@@ -1110,6 +1190,243 @@ function readRuntime(
   }
   return descriptor
 }
+
+// Состояние условий сборки enabledWhen одной компиляции Composition.
+interface CompositionConditionState {
+  facets: Readonly<Record<string, string>>
+  // false — Source компилируется вне сборки (редактор): элементы не исключаются.
+  bound: boolean
+  excludedRuntimes: CompositionRuntimeDescriptor[]
+  excludedScopes: Map<string, CompositionScopeDescriptor>
+}
+
+function createConditionState(executionContext: Readonly<Record<string, string>>): CompositionConditionState {
+  const sourceContext = getSourceContext()
+  const hasExecution = Object.keys(executionContext).length > 0
+  return {
+    facets: hasExecution ? executionContext : sourceContext?.facets ?? executionContext,
+    bound: hasExecution || Boolean(sourceContext),
+    excludedRuntimes: [],
+    excludedScopes: new Map(),
+  }
+}
+
+// .enabledWhen(context({ фасет: 'документ' })) — условие сборки по выбранным фасетам.
+function readEnabledWhen(
+  call: t.CallExpression,
+  previous: Record<string, string> | undefined,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+): Record<string, string> | undefined {
+  if (previous) {
+    diagnostics.push(diagnostic('error', 'composition-enabled-when-repeated', '.enabledWhen(...) указан повторно; объедините условия в один context({...}).', sourcePath, call))
+    return previous
+  }
+  const argument = call.arguments[0] && t.isExpression(call.arguments[0]) ? unwrapExpression(call.arguments[0]) : null
+  const patternNode = argument && t.isCallExpression(argument) && t.isIdentifier(argument.callee, { name: 'context' }) && argument.arguments.length === 1 && t.isExpression(argument.arguments[0])
+    ? unwrapExpression(argument.arguments[0])
+    : null
+  if (call.arguments.length !== 1 || !patternNode || !t.isObjectExpression(patternNode)) {
+    diagnostics.push(diagnostic('error', 'composition-enabled-when-shape', '.enabledWhen(...) принимает context({ фасет: \'документ\' }).', sourcePath, call))
+    return undefined
+  }
+  const pattern = readContextPatternNode(patternNode, diagnostics, sourcePath, {
+    entry: 'composition-enabled-when-entry',
+    duplicate: 'composition-enabled-when-duplicate',
+  })
+  if (!Object.keys(pattern).length) {
+    diagnostics.push(diagnostic('error', 'composition-enabled-when-empty', 'context({}) в .enabledWhen(...) требует хотя бы одно условие фасета.', sourcePath, patternNode))
+    return undefined
+  }
+  return { ...pattern }
+}
+
+// .activateWhen(выражение) — runtime-условие по fromData/fromStore/fromOutput/prop.
+function readActivateWhen(
+  call: t.CallExpression,
+  previous: CompositionBindingValue | undefined,
+  visibleData: ReadonlyMap<string, string>,
+  diagnostics: DiagnosticDraft[],
+  ownerPath: string,
+): CompositionBindingValue | undefined {
+  const sourcePath = `${ownerPath}.activateWhen`
+  if (previous) {
+    diagnostics.push(diagnostic('error', 'composition-activate-when-repeated', '.activateWhen(...) указан повторно; объедините условия в одно выражение.', sourcePath, call))
+    return previous
+  }
+  const argument = call.arguments[0]
+  if (call.arguments.length !== 1 || !argument || !t.isExpression(argument)) {
+    diagnostics.push(diagnostic('error', 'composition-activate-when-shape', '.activateWhen(...) принимает одно выражение.', sourcePath, call))
+    return undefined
+  }
+  const wrapper = t.objectExpression([t.objectProperty(t.identifier('activateWhen'), argument)])
+  const binding = resolveVisibleDataBindings(readBindings(wrapper, diagnostics, ownerPath), visibleData, diagnostics, ownerPath).activateWhen
+  if (!binding) {
+    return undefined
+  }
+  if (binding.kind === 'literal') {
+    diagnostics.push(diagnostic('warning', 'composition-activate-when-static', '.activateWhen(...) с константой не меняется во время работы; используйте .activateOn(startup()/manual()) или .enabledWhen(context(...)).', sourcePath, call))
+  }
+  if (binding.kind === 'data-view' || binding.kind === 'filter-fields' || binding.kind === 'runtime-metadata') {
+    diagnostics.push(diagnostic('error', 'composition-activate-when-binding', '.activateWhen(...) читает fromData, fromStore, fromOutput, prop или выражение над ними.', sourcePath, call))
+    return undefined
+  }
+  return binding
+}
+
+// activateOn и activateWhen взаимоисключающие: оба задают, когда элемент активируется.
+function reportActivationConflict(
+  activateOnCall: t.CallExpression | null,
+  activateWhen: CompositionBindingValue | undefined,
+  diagnostics: DiagnosticDraft[],
+  ownerPath: string,
+): void {
+  if (activateOnCall && activateWhen) {
+    diagnostics.push(diagnostic('error', 'composition-activate-when-conflict', '.activateOn(...) и .activateWhen(...) нельзя сочетать: activateWhen сам активирует и деактивирует элемент.', `${ownerPath}.activateWhen`, activateOnCall))
+  }
+}
+
+// Условие элемента = условия scope-предков + собственное; противоречие — элемент не включится никогда.
+function mergeConditions(
+  owner: Readonly<Record<string, string>> | null,
+  own: Readonly<Record<string, string>> | undefined,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+): Record<string, string> | null {
+  const merged: Record<string, string> = { ...owner }
+  for (const [key, value] of Object.entries(own ?? {})) {
+    if (merged[key] != null && merged[key] !== value) {
+      diagnostics.push(diagnostic('warning', 'composition-enabled-when-never', `Условие ${key}: '${value}' противоречит условию scope (${key}: '${merged[key]}'); элемент никогда не попадёт в программу.`, sourcePath))
+      return null
+    }
+    merged[key] = value
+  }
+  return merged
+}
+
+function isConditionEnabled(
+  condition: Readonly<Record<string, string>> | null,
+  conditions: CompositionConditionState,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+  node: t.Node,
+): boolean {
+  if (!condition) {
+    return false
+  }
+  if (!Object.keys(condition).length) {
+    return true
+  }
+  if (!conditions.bound) {
+    if (!diagnostics.some(item => item.code === 'composition-enabled-when-unbound')) {
+      diagnostics.push(diagnostic('info', 'composition-enabled-when-unbound', '.enabledWhen(...) применяется при сборке программы по выбранным фасетам; вне сборки все элементы остаются в документе.', sourcePath, node))
+    }
+    return true
+  }
+  return matchesContextPattern(condition, conditions.facets)
+}
+
+// Runtime-имена, на которые ссылается hook (источник и цель).
+function hookRuntimeNames(hook: CompositionHook): string[] {
+  if (hook.kind === 'mount') {
+    return [hook.target]
+  }
+  if (hook.kind === 'change') {
+    return hook.source.kind === 'runtime-output' ? [hook.target, hook.source.runtime] : [hook.target]
+  }
+  if (hook.kind === 'success') {
+    return [hook.runtime, hook.target]
+  }
+  return [hook.runtime]
+}
+
+// Runtime-имена, которые читает binding (fromOutput, filter fields, metadataOf, выражения над ними).
+function bindingRuntimeNames(binding: CompositionBindingValue): string[] {
+  return flattenCompositionBindings(binding).flatMap((item) => {
+    if (item.kind === 'output' || item.kind === 'outputs' || item.kind === 'filter-fields' || item.kind === 'runtime-metadata') {
+      return [item.runtime]
+    }
+    if (item.kind === 'expression') {
+      return collectExpressionReads(item.expression)
+        .filter(read => read.source === 'composition-output' || read.source === 'composition-outputs' || read.source === 'composition-filter-fields' || read.source === 'composition-runtime-metadata')
+        .map(read => read.parameters?.[0])
+        .filter((value): value is string => Boolean(value))
+    }
+    return []
+  })
+}
+
+/**
+ * Проверки enabledWhen/activateWhen, не зависящие от выбранных фасетов:
+ * - элемент может читать runtime с enabledWhen, только если сам включается не шире (его условие включает условие источника);
+ * - public outputs не могут ссылаться на элемент с enabledWhen (контракт Composition не зависит от фасетов);
+ * - onMount не может запускать runtime внутри scope с activateWhen.
+ */
+function validateRuntimeConditions(
+  runtimes: CompositionRuntimeDescriptor[],
+  scopes: CompositionScopeDescriptor[],
+  conditions: CompositionConditionState,
+  hooks: CompositionHook[],
+  outputs: CompositionOutputDescriptor[],
+  diagnostics: DiagnosticDraft[],
+): void {
+  const byName = new Map(runtimes.map(runtime => [runtime.name, runtime]))
+  const covers = (reader: Readonly<Record<string, string>> | undefined, source: Readonly<Record<string, string>> | undefined) =>
+    Object.entries(source ?? {}).every(([key, value]) => reader?.[key] === value)
+  for (const runtime of runtimes) {
+    const bindings = [...Object.values(runtime.props), ...(runtime.activateWhen ? [runtime.activateWhen] : [])]
+    const sources = new Set([...bindings.flatMap(bindingRuntimeNames), ...(runtime.kind === 'filter-view' ? [runtime.identity] : [])])
+    for (const name of sources) {
+      const source = byName.get(name)
+      if (source?.enabledWhen && !covers(runtime.enabledWhen, source.enabledWhen)) {
+        diagnostics.push(diagnostic(
+          'error',
+          'composition-enabled-when-reference',
+          `Runtime "${runtime.name}" читает "${name}", который есть в программе только при ${JSON.stringify(source.enabledWhen)}; добавьте "${runtime.name}" то же условие .enabledWhen(...).`,
+          `runtimes.${runtime.name}`,
+        ))
+      }
+    }
+  }
+
+  const allScopes = new Map([...scopes, ...conditions.excludedScopes.values()].map(scope => [scope.path, scope]))
+  for (const output of outputs) {
+    const guarded = output.kind === 'runtime' ? byName.get(output.runtime)?.enabledWhen : allScopes.get(output.scope)?.enabledWhen
+    if (guarded) {
+      const target = output.kind === 'runtime' ? output.runtime : output.scope
+      diagnostics.push(diagnostic(
+        'error',
+        'composition-enabled-when-output',
+        `Output "${output.key}" ссылается на "${target}" с .enabledWhen(...): public outputs не зависят от фасетов. Используйте contextSwitch(...) для выбора runtime.`,
+        `outputs.${output.key}`,
+      ))
+    }
+  }
+
+  const conditionalScope = (path: string): boolean => {
+    for (let scope = allScopes.get(path); scope; scope = scope.parentPath ? allScopes.get(scope.parentPath) : undefined) {
+      if (scope.activateWhen) {
+        return true
+      }
+    }
+    return false
+  }
+  for (const [index, hook] of hooks.entries()) {
+    if (hook.kind !== 'mount') {
+      continue
+    }
+    const target = byName.get(hook.target)
+    if (target && !target.activateWhen && conditionalScope(target.scopePath)) {
+      diagnostics.push(diagnostic('error', 'composition-activate-when-mount-hook', `onMount не может запускать "${hook.target}": его scope активируется условием .activateWhen(...).`, `hooks.${index}`))
+    }
+  }
+}
+
+// Коды диагностик условия when у contextSwitch ссылок Composition.
+const COMPOSITION_CONTEXT_PATTERN_CODES = {
+  entry: 'composition-context-switch-when-entry',
+  duplicate: 'composition-context-switch-when-duplicate',
+} as const
 
 function readContextSwitchRuntime(
   name: string,
@@ -1178,7 +1495,7 @@ function readContextSwitchRuntime(
       diagnostics.push(diagnostic('error', 'composition-context-switch-when-shape', 'case.when должен быть непустым object literal строковых context identities.', `${branchPath}.when`, whenNode ?? element))
       continue
     }
-    const when = readContextPattern(whenNode, diagnostics, `${branchPath}.when`)
+    const when = readContextPatternNode(whenNode, diagnostics, `${branchPath}.when`, COMPOSITION_CONTEXT_PATTERN_CODES)
     if (!Object.keys(when).length) {
       diagnostics.push(diagnostic('error', 'composition-context-switch-when-empty', 'Пустой when недопустим: используйте default.', `${branchPath}.when`, whenNode))
       continue
@@ -1190,20 +1507,14 @@ function readContextSwitchRuntime(
     branches.push({ when, use, node: element })
   }
 
-  for (let left = 0; left < branches.length; left++) {
-    for (let right = left + 1; right < branches.length; right++) {
-      const first = branches[left]!
-      const second = branches[right]!
-      if (Object.keys(first.when).length === Object.keys(second.when).length && contextPatternsOverlap(first.when, second.when)) {
-        diagnostics.push(diagnostic(
-          'error',
-          'composition-context-switch-ambiguous',
-          `Cases ${left} и ${right} пересекаются с одинаковой специфичностью; порядок строк не задаёт приоритет.`,
-          `${sourcePath}.cases.${right}`,
-          second.node,
-        ))
-      }
-    }
+  for (const [left, right] of findAmbiguousContextCases(branches)) {
+    diagnostics.push(diagnostic(
+      'error',
+      'composition-context-switch-ambiguous',
+      `Cases ${left} и ${right} пересекаются с одинаковой специфичностью; порядок строк не задаёт приоритет.`,
+      `${sourcePath}.cases.${right}`,
+      branches[right]!.node,
+    ))
   }
 
   const expressions = [defaultExpression, ...branches.map(branch => branch.use)]
@@ -1248,11 +1559,7 @@ function readContextSwitchRuntime(
     }
   }
 
-  const matches = branches
-    .map((branch, index) => ({ branch, index }))
-    .filter(({ branch }) => Object.entries(branch.when).every(([key, value]) => executionContext[key] === value))
-    .sort((left, right) => Object.keys(right.branch.when).length - Object.keys(left.branch.when).length)
-  const selectedIndex = matches[0]?.index
+  const selectedIndex = selectContextCase(branches, executionContext) ?? undefined
   const selected = selectedIndex == null ? defaultDescriptor : descriptors[selectedIndex + 1] ?? defaultDescriptor
   selected.sourceLocations = {
     runtime: sourceRange(raw),
@@ -1268,33 +1575,6 @@ function readContextSwitchRuntime(
     }),
   }
   return { handled: true, descriptor: selected }
-}
-
-function readContextPattern(node: t.ObjectExpression, diagnostics: DiagnosticDraft[], sourcePath: string): Record<string, string> {
-  const result: Record<string, string> = Object.create(null)
-  for (const property of node.properties) {
-    if (!t.isObjectProperty(property) || property.computed || property.shorthand || !t.isStringLiteral(property.value)) {
-      diagnostics.push(diagnostic('error', 'composition-context-switch-when-entry', 'when допускает только пары context-key: string identity.', sourcePath, property))
-      continue
-    }
-    const key = propertyName(property.key)?.trim() ?? ''
-    const value = property.value.value.trim()
-    if (!key || !value) {
-      diagnostics.push(diagnostic('error', 'composition-context-switch-when-entry', 'Context key и identity не должны быть пустыми.', sourcePath, property))
-      continue
-    }
-    if (Object.hasOwn(result, key)) {
-      diagnostics.push(diagnostic('error', 'composition-context-switch-when-duplicate', `Context key "${key}" указан повторно.`, `${sourcePath}.${key}`, property))
-      continue
-    }
-    result[key] = value
-  }
-  return result
-}
-
-function contextPatternsOverlap(left: Readonly<Record<string, string>>, right: Readonly<Record<string, string>>): boolean {
-  return Object.keys(left).every(key => right[key] == null || right[key] === left[key])
-    && Object.keys(right).every(key => left[key] == null || left[key] === right[key])
 }
 
 function appendRuntimeModifiers(
@@ -1670,8 +1950,12 @@ function readHooks(
       return
     }
     if (root === 'onMount') {
-      if (runtimes.find(item => item.name === target)?.effectiveActivation.mode === 'manual') {
-        diagnostics.push(diagnostic('error', 'composition-hook-manual-target', `onMount не может запускать manual runtime "${target}". Добавьте .activateOn(startup()) или активируйте runtime через API.`, `hooks.${index}`, element))
+      const mountTarget = runtimes.find(item => item.name === target)
+      if (mountTarget?.effectiveActivation.mode === 'manual') {
+        const advice = mountTarget.activateWhen
+          ? 'Runtime активируется условием .activateWhen(...): уберите hook или условие.'
+          : 'Добавьте .activateOn(startup()) или активируйте runtime через API.'
+        diagnostics.push(diagnostic('error', 'composition-hook-manual-target', `onMount не может запускать manual runtime "${target}". ${advice}`, `hooks.${index}`, element))
         return
       }
       hooks.push({ kind: 'mount', target })

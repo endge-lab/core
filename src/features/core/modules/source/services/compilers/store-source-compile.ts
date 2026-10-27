@@ -5,10 +5,10 @@ import type { StoreDataDescriptor, StoreSourceCompileResult, StoreValueInitializ
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
 
-import { diagnostic, propertyName, readStringArgument, unwrapExpression } from '@/features/core/modules/source/services/compilers/source-expression-compile'
+import { diagnostic, isContextSwitchCall, propertyName, readStringArgument, unwrapExpression } from '@/features/core/modules/source/services/compilers/source-expression-compile'
 import { compileSourceField } from '@/features/core/modules/source/services/compilers/source-field-compile'
 import { compileProgramMetadataProperty } from '@/features/core/modules/source/services/compilers/source-metadata-compile'
-import { readSourceModelReference } from '@/features/core/modules/source/services/compilers/source-model-reference-compile'
+import { readSourceModelReference, toDataViewRef } from '@/features/core/modules/source/services/compilers/source-model-reference-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
@@ -248,12 +248,14 @@ function readDataViewRef(
   const reference = readSourceModelReference(raw, source, {
     referenceCall: 'dataView',
     defineCall: 'defineDataView',
+    diagnostics,
+    sourcePath,
   })
-  if (reference?.kind === 'external') {
-    return reference
+  if (reference) {
+    return toDataViewRef(reference)
   }
-  if (reference?.kind === 'inline') {
-    return { kind: 'inline', source: reference.source }
+  if (isContextSwitchCall(unwrapExpression(raw))) {
+    return null
   }
 
   diagnostics.push(diagnostic('error', 'store-dataview-shape', '.dataView(...) поддерживает identity, dataView(identity) или defineDataView({...}).', sourcePath, unwrapExpression(raw)))

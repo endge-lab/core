@@ -88,6 +88,28 @@ describe('реестр UI-адаптеров', () => {
     })).toThrow('missing renderers: Select')
   })
 
+  it('повторная регистрация того же объекта идемпотентна и не вызывает onChange', () => {
+    const onChange = vi.fn()
+    const registry = new UIAdapterRegistry(onChange)
+    const input = {
+      id: 'json-like',
+      protocol: ENDGE_SFC_RENDER_ADAPTER_PROTOCOL,
+      protocolVersion: ENDGE_SFC_RENDER_ADAPTER_PROTOCOL_VERSION,
+      renderer: 'json',
+      renderers: { Input: () => null },
+    }
+    const first = registry.register(input)
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(registry.register(input)).toBe(first)
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(() => registry.register({ ...input })).toThrow('already registered')
+
+    registry.reset()
+    // После reset тот же объект регистрируется заново как новый.
+    expect(registry.register(input)).not.toBe(first)
+    expect(registry.has('json-like')).toBe(true)
+  })
+
   it('сообщает выбранный ID и фактически зарегистрированные адаптеры', () => {
     const registry = new UIAdapterRegistry()
     registry.register({

@@ -13,6 +13,11 @@ export function serializeTypeSourceDocument(document: TypeSourceDocument): strin
 }
 
 function serializeDefinition(definition: TypeSourceDefinition): string {
+  if (definition.kind === 'object' && definition.extends) {
+    // Унаследованные поля (inheritedFrom) принадлежат базовому Type и в Source не пишутся.
+    const own = { ...definition, fields: definition.fields.filter(field => !field.inheritedFrom) }
+    return `{\n  extends: type(${sourceString(definition.extends.identity)}),\n  fields: ${serializeObject(own, 2)},\n}`
+  }
   return definition.kind === 'object'
     ? serializeObject(definition, 0)
     : serializeTypeSourceExpression(definition, 0)

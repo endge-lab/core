@@ -2,6 +2,8 @@ import type { RaphDerivedHandle, RaphPhaseTask } from '@raphy-js/raph'
 import type { RFilter } from '@/features/core/modules/domain/entities/RFilter'
 import type { RQuery } from '@/features/core/modules/domain/entities/RQuery'
 import type { ProgramArtifact, QueryProgramPayload } from '@/features/core/modules/program/domain/types/program.types'
+import type { GraphQLResponseError } from '@/features/core/modules/runtime/domain/graphql-query-error'
+import type { QueryExecutionObserver } from '@/features/core/modules/runtime/domain/query-execution.types'
 import type {
   RuntimeArtifactReader,
   RuntimeHost,
@@ -217,7 +219,30 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     return Object.fromEntries([...this._outputPaths].map(([key, path]) => [key, Raph.get(path)]))
   }
 
-  public async run(propsPatch?: Record<string, unknown>): Promise<Record<string, unknown>> {
+  /**
+   * Ответ mockRequest: для GraphQL Query errors сценария (и пустые errors) проходят errorPolicy.
+   */
+  private _readSimulatedResponse(
+    payload: QueryProgramPayload,
+    simulated: { value: unknown, errors?: readonly unknown[] },
+    onGraphQLErrors: (errors: readonly GraphQLResponseError[]) => void,
+  ): unknown {
+    if (payload.type !== 'query-gql' || !simulated.errors?.length) {
+      return simulated.value
+    }
+    return Endge.runtime.query.applySimulatedGraphQLErrors({
+      payload,
+      data: simulated.value,
+      errors: simulated.errors,
+      props: this.readInputs(),
+      onGraphQLErrors,
+    })
+  }
+
+  public async run(
+    propsPatch?: Record<string, unknown>,
+    options: { observer?: QueryExecutionObserver } = {},
+  ): Promise<Record<string, unknown>> {
     if (propsPatch) {
       this._applyProps(propsPatch, false)
     }
@@ -246,12 +271,19 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     this.setContext({ status: 'running', startedAt, updatedAt: startedAt })
 
     try {
+      let graphQLErrors: readonly GraphQLResponseError[] = []
       const response = simulatedResponse
-        ? simulatedResponse.value
+        ? this._readSimulatedResponse(payload, simulatedResponse, (errors) => {
+            graphQLErrors = errors
+          })
         : await Endge.runtime.query.executeArtifact({
             payload,
             props: this.readInputs(),
             signal: this._abortController.signal,
+            onGraphQLErrors: (errors) => {
+              graphQLErrors = errors
+            },
+            observer: options.observer,
           })
       if (sequence !== this._runSequence) {
         throw new DOMException('Query execution was superseded.', 'AbortError')
@@ -272,7 +304,7 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
             const path = output.materialization.kind === 'source'
               ? this._requireOutputPath(output.key)
               : this._requireResponseInputPath(output.key)
-            Raph.set(path, Endge.runtime.query.readResponseOutput(output, response))
+            Raph.set(path, Endge.runtime.query.readResponseOutput(output, response, graphQLErrors))
           }
           // Ответ является новым поколением данных, даже когда его значения
           // ссылочно или структурно равны предыдущему поколению.

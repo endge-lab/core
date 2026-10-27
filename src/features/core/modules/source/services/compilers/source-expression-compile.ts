@@ -1,4 +1,6 @@
 import type { ProgramDiagnostic } from '@/features/core/modules/program/domain/types/program.types'
+import type { SourceContextPattern, SourceContextValues } from '@/features/core/modules/source/domain/types/source-context.types'
+
 import type {
   SourceExpressionIR,
   SourceExpressionOperation,
@@ -7,7 +9,29 @@ import type {
 
 import * as t from '@babel/types'
 
+import {
+  findAmbiguousContextCases,
+  getSourceContext,
+  matchesContextPattern,
+  selectContextCase,
+} from '@/features/core/modules/source/services/source-context'
+import { readValuePath, validateValuePath } from '@/features/core/modules/source/services/value-path'
+
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
+
+// Функции контекста сборки: значения фасетов и Configuration фиксированы на boot и подставляются при компиляции.
+const CONTEXT_FUNCTIONS = new Set(['facet', 'config', 'context', 'contextSwitch'])
+
+// Коды диагностик условия context(...) и when у contextSwitch значений.
+const CONTEXT_PATTERN_CODES = {
+  entry: 'source-expression-context-entry',
+  duplicate: 'source-expression-context-duplicate',
+} as const
+
+const CONTEXT_SWITCH_PATTERN_CODES = {
+  entry: 'source-expression-context-switch-when-entry',
+  duplicate: 'source-expression-context-switch-when-duplicate',
+} as const
 
 const READ_FUNCTIONS: Record<string, SourceExpressionReadKind> = {
   env: 'env',
@@ -19,6 +43,8 @@ const READ_FUNCTIONS: Record<string, SourceExpressionReadKind> = {
   store: 'store',
   path: 'scope',
   __computationOutput: 'computation-output',
+  // Внутренняя форма reader errors(path?) GraphQL Query; публичное имя переписывает компилятор Query.
+  __graphqlErrors: 'graphql-errors',
 }
 
 const OPERATION_FUNCTIONS: Record<string, SourceExpressionOperation> = Object.assign(Object.create(null), {
@@ -170,6 +196,12 @@ const IMPLICIT_CURRENT_OPERATIONS = new Set<SourceExpressionOperation>([
 ])
 
 const CHAIN_OPERATIONS = new Set(Object.values(OPERATION_FUNCTIONS))
+
+// Readers, второй аргумент которых — путь value DSL (env и computation-output читают имя, а не путь).
+const PATH_READ_SOURCES = new Set<SourceExpressionReadKind>(['prop', 'value', 'row', 'response', 'store', 'scope', 'graphql-errors'])
+
+// Операции, второй аргумент которых — путь чтения value DSL.
+const PATH_OPERATIONS = new Set<SourceExpressionOperation>(['get', 'get-or', 'has', 'pick'])
 
 const OPERATION_ARITY: Record<SourceExpressionOperation, { min: number, max?: number }> = {
   'merge': { min: 2 },
@@ -410,11 +442,15 @@ export function compileSourceExpression(
     }
     const args = compileArguments(node, diagnostics, sourcePath, method ?? operation)
     validateArity(operation, args.length + 1, method ?? operation, diagnostics, sourcePath, node)
+    validateOperationPath(operation, [base, ...args], diagnostics, sourcePath, node)
     return { type: 'operation', operation, arguments: [base, ...args] }
   }
 
   if (t.isCallExpression(node) && t.isIdentifier(node.callee)) {
     const calleeName = node.callee.name
+    if (CONTEXT_FUNCTIONS.has(calleeName)) {
+      return compileContextCall(node, calleeName, diagnostics, sourcePath)
+    }
     const updateRead = compileUpdateRead(node, diagnostics, sourcePath)
     if (updateRead) {
       return updateRead
@@ -423,7 +459,7 @@ export function compileSourceExpression(
       ? READ_FUNCTIONS[calleeName]
       : undefined
     if (readSource) {
-      if (readSource === 'response' && node.arguments.length === 0) {
+      if ((readSource === 'response' || readSource === 'graphql-errors') && node.arguments.length === 0) {
         return { type: 'read', source: readSource, path: '' }
       }
       const path = readStringArgument(node, 0)
@@ -433,6 +469,9 @@ export function compileSourceExpression(
       }
       if (node.arguments.length !== 1) {
         diagnostics.push(diagnostic('error', 'source-expression-read-arity', `${calleeName}(...) принимает ровно один path.`, sourcePath, node))
+      }
+      if (PATH_READ_SOURCES.has(readSource)) {
+        validateSourcePath(path, diagnostics, sourcePath, node.arguments[0])
       }
       return { type: 'read', source: readSource, path }
     }
@@ -452,6 +491,7 @@ export function compileSourceExpression(
         args.unshift({ type: 'read', source: 'current', path: '' })
       }
       validateArity(operation, args.length, calleeName, diagnostics, sourcePath, node)
+      validateOperationPath(operation, args, diagnostics, sourcePath, node)
       return { type: 'operation', operation, arguments: args }
     }
   }
@@ -464,6 +504,304 @@ export function compileSourceExpression(
     node,
   ))
   return null
+}
+
+// Компилирует facet/config/context/contextSwitch в константу IR по контексту текущей сборки.
+// Вне сборки (редактор, изолированный compile) подставляется значение по умолчанию и info-диагностика.
+function compileContextCall(
+  node: t.CallExpression,
+  name: string,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+): SourceExpressionIR | null {
+  const context = getSourceContext()
+  if (name === 'contextSwitch') {
+    return compileContextSwitch(node, diagnostics, sourcePath, context)
+  }
+  if (!context) {
+    pushContextUnbound(name, diagnostics, sourcePath, node)
+  }
+
+  if (name === 'facet') {
+    const identity = readStringArgument(node, 0)?.trim()
+    if (node.arguments.length !== 1 || !identity) {
+      diagnostics.push(diagnostic('error', 'source-expression-facet-argument', 'facet(...) принимает одну непустую строку — identity фасета.', sourcePath, node))
+      return { type: 'literal', value: null }
+    }
+    if (context?.knownFacets && !context.knownFacets.includes(identity)) {
+      diagnostics.push(diagnostic('warning', 'source-expression-facet-unknown', `Фасет "${identity}" не объявлен в домене (активные: ${context.knownFacets.join(', ') || 'нет'}); facet(...) вернёт null.`, sourcePath, node))
+    }
+    return { type: 'literal', value: context?.facets[identity] ?? null }
+  }
+
+  if (name === 'config') {
+    const path = readStringArgument(node, 0)
+    if (node.arguments.length !== 1 || path == null || !path.trim()) {
+      diagnostics.push(diagnostic('error', 'source-expression-config-argument', 'config(...) принимает одну непустую строку — путь в effective Configuration.', sourcePath, node))
+      return { type: 'literal', value: undefined }
+    }
+    validateSourcePath(path, diagnostics, sourcePath, node.arguments[0])
+    return { type: 'literal', value: context ? toPlainValue(readValuePath(context.config, path, {})) : undefined }
+  }
+
+  const patternNode = node.arguments[0] && t.isExpression(node.arguments[0]) ? unwrapExpression(node.arguments[0]) : null
+  if (node.arguments.length !== 1 || !patternNode || !t.isObjectExpression(patternNode)) {
+    diagnostics.push(diagnostic('error', 'source-expression-context-shape', 'context(...) принимает один object literal { фасет: \'документ\' }.', sourcePath, node))
+    return { type: 'literal', value: false }
+  }
+  const pattern = readContextPatternNode(patternNode, diagnostics, sourcePath, CONTEXT_PATTERN_CODES)
+  if (!Object.keys(pattern).length) {
+    diagnostics.push(diagnostic('error', 'source-expression-context-empty', 'context(...) требует хотя бы одно условие фасета.', sourcePath, patternNode))
+    return { type: 'literal', value: false }
+  }
+  return { type: 'literal', value: context ? matchesContextPattern(pattern, context.facets) : false }
+}
+
+// contextSwitch для значений: все ветки компилируются и проверяются, в IR остаётся выбранная.
+function compileContextSwitch(
+  node: t.CallExpression,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+  context: SourceContextValues | undefined,
+): SourceExpressionIR | null {
+  const parsed = readContextSwitchNode(node, diagnostics, `${sourcePath}.contextSwitch`, compileSourceExpression)
+  if (!parsed) {
+    return null
+  }
+  if (!context) {
+    pushContextUnbound('contextSwitch', diagnostics, sourcePath, node)
+    return parsed.defaultValue
+  }
+  const selected = selectContextCase(parsed.branches, context.facets)
+  return selected == null ? parsed.defaultValue : parsed.branches[selected]!.value
+}
+
+// Разобранный contextSwitch: значение default и ветки с условиями в порядке Source.
+export interface ContextSwitchNode<T> {
+  defaultValue: T
+  branches: Array<{ when: SourceContextPattern, value: T, node: t.Node }>
+}
+
+// Общий разбор contextSwitch({ default, cases: [{ when, use }] }) для значений и GraphQL fragments:
+// форма, условия when, неоднозначные cases. readBranch читает default и каждый use.
+export function readContextSwitchNode<T>(
+  node: t.CallExpression,
+  diagnostics: DiagnosticDraft[],
+  switchPath: string,
+  readBranch: (node: t.Expression, diagnostics: DiagnosticDraft[], sourcePath: string) => T,
+): ContextSwitchNode<T> | null {
+  const definition = node.arguments[0] && t.isExpression(node.arguments[0]) ? unwrapExpression(node.arguments[0]) : null
+  if (node.arguments.length !== 1 || !definition || !t.isObjectExpression(definition)) {
+    diagnostics.push(diagnostic('error', 'source-expression-context-switch-shape', 'contextSwitch принимает один object literal с default и cases.', switchPath, node))
+    return null
+  }
+
+  const seen = new Set<string>()
+  for (const property of definition.properties) {
+    const key = t.isObjectProperty(property) && !property.computed && !property.shorthand ? propertyName(property.key) : null
+    if (!key || !t.isObjectProperty(property) || !t.isExpression(property.value)) {
+      diagnostics.push(diagnostic('error', 'source-expression-context-switch-property', 'contextSwitch допускает только явные свойства default и cases.', switchPath, property))
+      continue
+    }
+    if (key !== 'default' && key !== 'cases') {
+      diagnostics.push(diagnostic('error', 'source-expression-context-switch-property', `Свойство "${key}" не поддерживается contextSwitch.`, switchPath, property))
+      continue
+    }
+    if (seen.has(key)) {
+      diagnostics.push(diagnostic('error', 'source-expression-context-switch-property', `Свойство "${key}" указано повторно.`, `${switchPath}.${key}`, property))
+    }
+    seen.add(key)
+  }
+
+  const defaultNode = objectPropertyValue(definition, 'default')
+  const casesNode = objectPropertyValue(definition, 'cases')
+  if (!defaultNode) {
+    diagnostics.push(diagnostic('error', 'source-expression-context-switch-default-required', 'contextSwitch требует default.', `${switchPath}.default`, definition))
+  }
+  if (!casesNode || !t.isArrayExpression(casesNode)) {
+    diagnostics.push(diagnostic('error', 'source-expression-context-switch-cases-shape', 'contextSwitch.cases должен быть массивом { when, use }.', `${switchPath}.cases`, casesNode ?? definition))
+  }
+  if (!defaultNode || !casesNode || !t.isArrayExpression(casesNode)) {
+    return null
+  }
+
+  const defaultValue = readBranch(defaultNode, diagnostics, `${switchPath}.default`)
+  const branches: ContextSwitchNode<T>['branches'] = []
+  for (const [index, element] of casesNode.elements.entries()) {
+    const branchPath = `${switchPath}.cases.${index}`
+    if (!element || !t.isObjectExpression(element)) {
+      diagnostics.push(diagnostic('error', 'source-expression-context-switch-case-shape', 'Каждый case должен иметь вид { when: {...}, use: значение }.', branchPath, element ?? casesNode))
+      continue
+    }
+    for (const property of element.properties) {
+      const key = t.isObjectProperty(property) && !property.computed ? propertyName(property.key) : null
+      if (key !== 'when' && key !== 'use') {
+        diagnostics.push(diagnostic('error', 'source-expression-context-switch-case-shape', 'Case contextSwitch допускает только when и use.', branchPath, property))
+      }
+    }
+    const whenNode = objectPropertyValue(element, 'when')
+    const useNode = objectPropertyValue(element, 'use')
+    if (!whenNode || !t.isObjectExpression(whenNode)) {
+      diagnostics.push(diagnostic('error', 'source-expression-context-switch-when-shape', 'case.when должен быть object literal { фасет: \'документ\' }.', `${branchPath}.when`, whenNode ?? element))
+      continue
+    }
+    const when = readContextPatternNode(whenNode, diagnostics, `${branchPath}.when`, CONTEXT_SWITCH_PATTERN_CODES)
+    if (!Object.keys(when).length) {
+      diagnostics.push(diagnostic('error', 'source-expression-context-switch-when-empty', 'Пустой when недопустим: используйте default.', `${branchPath}.when`, whenNode))
+      continue
+    }
+    if (!useNode) {
+      diagnostics.push(diagnostic('error', 'source-expression-context-switch-use-required', 'case.use должен содержать значение.', `${branchPath}.use`, element))
+      continue
+    }
+    branches.push({ when, value: readBranch(useNode, diagnostics, `${branchPath}.use`), node: element })
+  }
+
+  for (const [left, right] of findAmbiguousContextCases(branches)) {
+    diagnostics.push(diagnostic(
+      'error',
+      'source-expression-context-switch-ambiguous',
+      `Cases ${left} и ${right} пересекаются с одинаковой специфичностью; порядок строк не задаёт приоритет.`,
+      `${switchPath}.cases.${right}`,
+      branches[right]!.node,
+    ))
+  }
+
+  return { defaultValue, branches }
+}
+
+// contextSwitch в позиции ссылки (Type, DataView, provider порта SFC): все ветки читаются и проверяются
+// readBranch, выбирается ветка по фасетам сборки общим matcher. variants — default и все cases по порядку.
+// Вне сборки — default и info source-expression-context-unbound. null — ошибка формы или ветки.
+export function selectContextSwitchNode<T>(
+  node: t.CallExpression,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+  readBranch: (node: t.Expression, diagnostics: DiagnosticDraft[], sourcePath: string) => T | null,
+): { selected: T, variants: T[] } | null {
+  const parsed = readContextSwitchNode<T | null>(node, diagnostics, `${sourcePath}.contextSwitch`, readBranch)
+  if (!parsed || parsed.defaultValue == null || parsed.branches.some(branch => branch.value == null)) {
+    return null
+  }
+  const context = getSourceContext()
+  if (!context) {
+    pushContextUnbound('contextSwitch', diagnostics, sourcePath, node)
+  }
+  const index = context ? selectContextCase(parsed.branches, context.facets) : null
+  const variants = [parsed.defaultValue, ...parsed.branches.map(branch => branch.value)] as T[]
+  return { selected: index == null ? parsed.defaultValue : parsed.branches[index]!.value as T, variants }
+}
+
+// Проверяет, что выражение — вызов contextSwitch(...).
+export function isContextSwitchCall(node: t.Node | null | undefined): boolean {
+  return node != null && t.isCallExpression(node) && t.isIdentifier(node.callee, { name: 'contextSwitch' })
+}
+
+// Читает условие фасетов { facet: 'document' } из object literal; ключи и значения — непустые строки.
+export function readContextPatternNode(
+  node: t.ObjectExpression,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+  codes: { entry: string, duplicate: string },
+): Record<string, string> {
+  const result: Record<string, string> = Object.create(null)
+  for (const property of node.properties) {
+    if (!t.isObjectProperty(property) || property.computed || property.shorthand || !t.isStringLiteral(property.value)) {
+      diagnostics.push(diagnostic('error', codes.entry, 'when допускает только пары context-key: string identity.', sourcePath, property))
+      continue
+    }
+    const key = propertyName(property.key)?.trim() ?? ''
+    const value = property.value.value.trim()
+    if (!key || !value) {
+      diagnostics.push(diagnostic('error', codes.entry, 'Context key и identity не должны быть пустыми.', sourcePath, property))
+      continue
+    }
+    if (Object.hasOwn(result, key)) {
+      diagnostics.push(diagnostic('error', codes.duplicate, `Context key "${key}" указан повторно.`, `${sourcePath}.${key}`, property))
+      continue
+    }
+    result[key] = value
+    warnUnknownFacet(key, diagnostics, `${sourcePath}.${key}`, property)
+  }
+  return result
+}
+
+// Предупреждение о фасете, которого нет среди активных фасетов домена (только при сборке со списком фасетов).
+function warnUnknownFacet(identity: string, diagnostics: DiagnosticDraft[], sourcePath: string, node: t.Node): void {
+  const knownFacets = getSourceContext()?.knownFacets
+  if (knownFacets && !knownFacets.includes(identity)) {
+    diagnostics.push(diagnostic('warning', 'source-expression-facet-unknown', `Фасет "${identity}" не объявлен в домене (активные: ${knownFacets.join(', ') || 'нет'}); условие с ним никогда не совпадёт.`, sourcePath, node))
+  }
+}
+
+// Одна info-диагностика на документ: остальные вызовы того же Source ведут себя так же.
+export function pushContextUnbound(name: string, diagnostics: DiagnosticDraft[], sourcePath: string, node: t.Node): void {
+  if (diagnostics.some(item => item.code === 'source-expression-context-unbound')) {
+    return
+  }
+  diagnostics.push(diagnostic(
+    'info',
+    'source-expression-context-unbound',
+    `${name}(...) подставляется при сборке программы по выбранным фасетам; без контекста сборки используется значение по умолчанию.`,
+    sourcePath,
+    node,
+  ))
+}
+
+function objectPropertyValue(node: t.ObjectExpression, name: string): t.Expression | null {
+  for (const property of node.properties) {
+    if (t.isObjectProperty(property) && !property.computed && propertyName(property.key) === name && t.isExpression(property.value)) {
+      return unwrapExpression(property.value)
+    }
+  }
+  return null
+}
+
+// Копирует значение Configuration в простой JSON-объект для литерала IR (snapshot заморожен).
+function toPlainValue(value: unknown): unknown {
+  if (value === undefined || value === null || typeof value !== 'object') {
+    return value
+  }
+  try {
+    return structuredClone(value)
+  }
+  catch {
+    return value
+  }
+}
+
+// Проверяет литеральный путь value DSL грамматикой DataPath Raph при компиляции.
+export function validateSourcePath(
+  path: string,
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+  node?: t.Node | null,
+): void {
+  const issue = validateValuePath(path)
+  if (!issue) {
+    return
+  }
+  diagnostics.push(diagnostic(
+    'error',
+    issue.code === 'value-path-wildcard' ? 'source-expression-path-wildcard' : 'source-expression-path-invalid',
+    issue.message,
+    sourcePath,
+    node,
+  ))
+}
+
+// Литеральный путь get/getOr/has/pick проверяется сразу; путь из выражения — при вычислении.
+function validateOperationPath(
+  operation: SourceExpressionOperation,
+  args: SourceExpressionIR[],
+  diagnostics: DiagnosticDraft[],
+  sourcePath: string,
+  node: t.Node,
+): void {
+  const path = args[1]
+  if (PATH_OPERATIONS.has(operation) && path?.type === 'literal' && typeof path.value === 'string') {
+    validateSourcePath(path.value, diagnostics, sourcePath, node)
+  }
 }
 
 function compileUpdateRead(

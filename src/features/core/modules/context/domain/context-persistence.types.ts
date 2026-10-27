@@ -66,6 +66,8 @@ export type EndgePersistenceScopeResolver = () => EndgePersistenceScope
 export interface EndgeSessionIdentity {
   userId?: string | null
   facetSelections?: Readonly<Record<string, string>>
+  // Обязательные selections, которые session не смогла определить: boot завершается ошибкой.
+  facetErrors?: readonly string[]
 }
 
 export interface EndgeSessionIdentityProvider {

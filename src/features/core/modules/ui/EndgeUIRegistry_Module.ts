@@ -16,6 +16,7 @@ import type {
   UIResolveRendererOptions,
 } from '@/features/core/modules/ui/domain/types/ui-composition.types'
 
+import { EndgeUIJsonAdapter } from '@/features/core/modules/ui/adapters/json/endge-ui-json-adapter'
 import { UIAdapterRegistry } from '@/features/core/modules/ui/registry/UIAdapterRegistry'
 import {
   ENDGE_UI_DEFAULT_CONFIG_DEFINITIONS,
@@ -75,6 +76,16 @@ export class EndgeUIRegistry_Module extends EndgeModule {
     this.registerConfigDefinitions(ENDGE_UI_DEFAULT_CONFIG_DEFINITIONS)
     this.registerPresetComponents(ENDGE_UI_DEFAULT_PRESET_COMPONENTS)
     this.registerJsxComponents(ENDGE_UI_DEFAULT_JSX_COMPONENTS)
+  }
+
+  /**
+   * Регистрирует встроенный JSON-адаптер `endge-ui-json` при каждом boot. Он не
+   * активируется: `mountEndgeUIJson` работает параллельно активному Vue/DOM adapter-у.
+   */
+  public override setup(): void {
+    if (!this.adapters.has(EndgeUIJsonAdapter.id)) {
+      this.adapters.register(EndgeUIJsonAdapter)
+    }
   }
 
   /**

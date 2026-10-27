@@ -28,6 +28,18 @@ describe('проверка Source конфигурации v1', () => {
     ])
   })
 
+  it('отклоняет contextSwitch в value(Type): схема не зависит от фасетов', () => {
+    const result = compileConfigurationSource(`defineConfig({
+  page: value(contextSwitch({ default: Number, cases: [{ when: { tenant: 'kzn' }, use: String }] }), 10),
+  list: value(arrayOf(contextSwitch({ default: type('A'), cases: [{ when: { tenant: 'kzn' }, use: type('B') }] })), []),
+  title: value(String),
+})`)
+
+    expect(result.document).toBeNull()
+    expect(result.diagnostics.filter(item => item.code === 'configuration-value-context-switch').map(item => item.sourcePath)).toEqual(['page.type', 'list.type'])
+    expect(result.draftDocument?.values.map(item => item.key)).toEqual(['title'])
+  })
+
   it('отклоняет исполняемый синтаксис и небезопасные либо вычисляемые значения', () => {
     for (const source of [
       `import x from 'x'; defineConfig({ a: value(String, x) })`,

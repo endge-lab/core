@@ -13,7 +13,8 @@ export type ResolveAuthSession = (
 ) => Promise<AuthResolvedSession>
 
 /**
- * Браузерный адаптер, владеющий нативным EventSource и преобразующий его в транспортный порт Core.
+ * Браузерный адаптер SSE: без авторизации владеет нативным EventSource, с авторизацией —
+ * fetch-соединением SSEManager с Bearer token; оба сохраняют имена событий.
  */
 export class BrowserSseStreamTransportFactory implements StreamTransportFactory {
   public constructor(private readonly _resolveAuthSession: ResolveAuthSession) {}
@@ -24,42 +25,22 @@ export class BrowserSseStreamTransportFactory implements StreamTransportFactory 
       throw new Error(`Unsupported Stream transport: ${(transport as any).kind}`)
     }
     if (transport.authMode !== 'none') {
-      if (artifact.events.some(event => event.sourceEvent !== 'message')) {
-        throw new Error('Authenticated SSE transport supports only the default "message" event.')
-      }
-      let forceRefreshOnReconnect = false
+      const token = createSseAuthTokenProvider(this._resolveAuthSession, transport)
       const manager = new SSEManager({
         url: transport.url,
         retryInterval: 5000,
-        getToken: async () => {
-          const profileIdentity = String(transport.authProfileIdentity ?? '').trim()
-          if (transport.authMode === 'profile' && !profileIdentity) {
-            throw new Error('[BrowserSseStreamTransportFactory] Auth profile is required for profile mode.')
-          }
-          const session = await this._resolveAuthSession(
-            transport.authMode === 'profile'
-              ? { mode: 'profile', profile: profileIdentity }
-              : { mode: 'inherit' },
-            { forceRefresh: forceRefreshOnReconnect },
-          )
-          forceRefreshOnReconnect = false
-          const token = String(session.accessToken ?? '').trim()
-          if (!token) {
-            throw new Error(`[BrowserSseStreamTransportFactory] Auth profile "${session.profileIdentity ?? profileIdentity}" did not provide an access token.`)
-          }
-          return token
-        },
+        withCredentials: transport.withCredentials,
+        getToken: token.getToken,
         onOpen: callbacks.open,
         onError: (error) => {
-          if (isUnauthorizedSseError(error)) {
-            forceRefreshOnReconnect = true
-          }
+          token.onError(error)
           callbacks.error(error)
         },
-        onEvent: data => callbacks.message({
-          sourceEvent: 'message',
-          id: null,
-          data,
+        // Имя события сохраняется: events Source может объявлять не только message.
+        onMessage: message => callbacks.message({
+          sourceEvent: message.event,
+          id: message.id,
+          data: message.data,
         }),
       })
       manager.start()
@@ -98,6 +79,42 @@ export class BrowserSseStreamTransportFactory implements StreamTransportFactory 
         source.close()
       },
     }
+  }
+}
+
+/**
+ * Получает access token AuthProfile для SSE-запроса; после 401/403 следующий запрос
+ * принудительно обновляет сессию.
+ */
+export function createSseAuthTokenProvider(
+  resolveAuthSession: ResolveAuthSession,
+  transport: { authMode: 'inherit' | 'profile' | 'none', authProfileIdentity: string | null },
+): { getToken: () => Promise<string>, onError: (error: unknown) => void } {
+  let forceRefreshOnReconnect = false
+  return {
+    getToken: async () => {
+      const profileIdentity = String(transport.authProfileIdentity ?? '').trim()
+      if (transport.authMode === 'profile' && !profileIdentity) {
+        throw new Error('[BrowserSseStreamTransportFactory] Auth profile is required for profile mode.')
+      }
+      const session = await resolveAuthSession(
+        transport.authMode === 'profile'
+          ? { mode: 'profile', profile: profileIdentity }
+          : { mode: 'inherit' },
+        { forceRefresh: forceRefreshOnReconnect },
+      )
+      forceRefreshOnReconnect = false
+      const token = String(session.accessToken ?? '').trim()
+      if (!token) {
+        throw new Error(`[BrowserSseStreamTransportFactory] Auth profile "${session.profileIdentity ?? profileIdentity}" did not provide an access token.`)
+      }
+      return token
+    },
+    onError: (error) => {
+      if (isUnauthorizedSseError(error)) {
+        forceRefreshOnReconnect = true
+      }
+    },
   }
 }
 

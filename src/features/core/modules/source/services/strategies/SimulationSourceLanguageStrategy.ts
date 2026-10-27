@@ -62,7 +62,7 @@ export class SimulationSourceLanguageStrategy implements SourceLanguageStrategy 
           .map(child => ({
             label: child.alias,
             kind: 'property',
-            insertText: `${sourceKey(child.alias)}: ${child.kind === 'query' ? '{\n  request: mockRequest({ arrays: {} }),\n}' : child.kind === 'stream' ? '{\n  stream: mockStream({ type: \'\', event: \'\', intervalMs: 1000, itemsPerMessage: 1 }),\n}' : '{\n  runtimes: {},\n}'},`,
+            insertText: `${sourceKey(child.alias)}: ${child.kind === 'query' ? '{\n  request: mockRequest({ arrays: {} }),\n}' : child.kind === 'stream' ? `{\n  stream: ${mockStreamSnippet(resolver, child.identity)},\n}` : '{\n  runtimes: {},\n}'},`,
             detail: `${child.kind}: ${child.identity}`,
           }))
       }
@@ -70,7 +70,7 @@ export class SimulationSourceLanguageStrategy implements SourceLanguageStrategy 
         return resolver.queryContract(target.identity).paths.filter(path => !location.keys.includes(path)).map(path => ({ label: path || '(корневой массив)', kind: 'property', insertText: `${sourceKey(path)}: 50,`, detail: 'Количество элементов массива ответа Query' }))
       }
       if (target?.kind === 'stream' && remaining.length === 0) {
-        return [{ label: 'stream', kind: 'snippet', insertText: 'stream: mockStream({ type: \'\', event: \'\', intervalMs: 1000, itemsPerMessage: 1 }),', detail: 'Подмена SSE через mock generator' }]
+        return [{ label: 'stream', kind: 'snippet', insertText: `stream: ${mockStreamSnippet(resolver, target.identity)},`, detail: 'Подмена SSE через mock generator' }]
       }
       if (target?.kind === 'query' && remaining.length === 0) {
         return [{ label: 'request', kind: 'snippet', insertText: 'request: mockRequest({\n  arrays: {},\n}),', detail: 'Описание подмены Query request' }].filter(item => !location.keys.includes(item.label)) as SourceLanguageCompletion[]
@@ -90,6 +90,7 @@ export class SimulationSourceLanguageStrategy implements SourceLanguageStrategy 
       { label: 'seed', kind: 'property', insertText: 'seed: \'simulation\',', detail: 'Seed воспроизводимой генерации ответа' },
       { label: 'arrays', kind: 'property', insertText: 'arrays: {},', detail: 'Количество элементов массивов ответа' },
       { label: 'useExamples', kind: 'property', insertText: 'useExamples: false,', detail: 'Генерировать значения по Type без повторения его примеров' },
+      { label: 'errors', kind: 'property', insertText: 'errors: [{ message: \'\' }],', detail: 'GraphQL errors: каждого события next (mockStream, graphqlSse) или ответа (mockRequest, GraphQL Query)' },
     ]
   }
 
@@ -135,4 +136,11 @@ function objectAt(source: string, offset: number): { path: string[], keys: strin
   catch {
     return null
   }
+}
+
+// graphqlSse: Type описывает data события next, event задаёт сам Stream.
+function mockStreamSnippet(resolver: SimulationSourceResolver, identity: string): string {
+  return resolver.streamTransport(identity) === 'graphql-sse'
+    ? 'mockStream({ type: \'\', intervalMs: 1000, itemsPerMessage: 1 })'
+    : 'mockStream({ type: \'\', event: \'\', intervalMs: 1000, itemsPerMessage: 1 })'
 }

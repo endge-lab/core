@@ -10,20 +10,28 @@ import type {
  */
 export class UIAdapterRegistry {
   private _adapters = new Map<string, UIRenderAdapter>()
+  // Исходный объект регистрации: повторный register того же объекта идемпотентен.
+  private _sources = new Map<string, unknown>()
   private _activeAdapterId: string | null = null
 
   public constructor(private readonly _onChange: () => void = () => {}) {}
 
   /**
    * Регистрирует adapter и запрещает неявную замену implementation с тем же id.
+   * Повторная регистрация того же объекта возвращает уже зарегистрированный adapter.
    */
   public register<TImplementation>(input: UIRenderAdapter<TImplementation>): UIRenderAdapter<TImplementation> {
     const adapter = this._normalizeAdapter(input)
-    if (this._adapters.has(adapter.id)) {
+    const registered = this._adapters.get(adapter.id)
+    if (registered) {
+      if (this._sources.get(adapter.id) === input) {
+        return registered as UIRenderAdapter<TImplementation>
+      }
       throw new Error(`[UIAdapterRegistry] adapter "${adapter.id}" is already registered`)
     }
 
     this._adapters.set(adapter.id, adapter as UIRenderAdapter)
+    this._sources.set(adapter.id, input)
     this._onChange()
 
     return adapter
@@ -143,6 +151,7 @@ export class UIAdapterRegistry {
   public reset(): void {
     const changed = this._adapters.size > 0 || this._activeAdapterId !== null
     this._adapters.clear()
+    this._sources.clear()
     this._activeAdapterId = null
     if (changed) {
       this._onChange()

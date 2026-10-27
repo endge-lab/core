@@ -1,4 +1,5 @@
 import type { SimulationSourceCatalog, SimulationSourceInput } from '@/features/core/modules/source/domain/types/simulation-source.types'
+import type { SourceContextValues } from '@/features/core/modules/source/domain/types/source-context.types'
 import type {
   SourceDocumentReference,
   SourceEngineCompileContext,
@@ -19,9 +20,10 @@ import type {
 } from '@/features/core/modules/source/domain/types/source-engine.types'
 
 import { Endge } from '@/features/core/kernel/endge'
+import { createSourceContextValues, runWithSourceContext } from '@/features/core/modules/source/services/source-context'
 import { SourceEngineRegistry } from '@/features/core/modules/source/services/SourceEngineRegistry'
-import { SourceLanguageRegistry } from '@/features/core/modules/source/services/SourceLanguageRegistry'
 
+import { SourceLanguageRegistry } from '@/features/core/modules/source/services/SourceLanguageRegistry'
 import { SourcePatchRegistry } from '@/features/core/modules/source/services/SourcePatchRegistry'
 import { ActionSourceEngineStrategy } from '@/features/core/modules/source/services/strategies/ActionSourceEngineStrategy'
 import { ActionSourceLanguageStrategy } from '@/features/core/modules/source/services/strategies/ActionSourceLanguageStrategy'
@@ -166,7 +168,9 @@ export class EndgeSource_Module extends EndgeModule {
       }
     }
 
-    return strategy.compile(source, context)
+    return context?.sourceContext
+      ? runWithSourceContext(context.sourceContext, () => strategy.compile!(source, context))
+      : strategy.compile(source, context)
   }
 
   /**
@@ -209,7 +213,25 @@ export class EndgeSource_Module extends EndgeModule {
     source: string,
     context?: Omit<SourceLanguageContext, 'source'>,
   ): SourceLanguageValidationResult {
-    return this._resolveRequiredLanguageStrategy(sourceKind).validate(source, { source, ...context })
+    const strategy = this._resolveRequiredLanguageStrategy(sourceKind)
+    const languageContext = { source, ...context }
+    return context?.sourceContext
+      ? runWithSourceContext(context.sourceContext, () => strategy.validate(source, languageContext))
+      : strategy.validate(source, languageContext)
+  }
+
+  /**
+   * Возвращает фасеты и Configuration текущего boot для проверки Source в редакторе;
+   * null, пока configuration не разрешена.
+   */
+  public currentSourceContext(): SourceContextValues | null {
+    if (!Endge.configuration.isResolved) {
+      return null
+    }
+    const knownFacets = Endge.domain.getFacets()
+      .filter(facet => facet.active !== false && !facet.deletedAt)
+      .map(facet => facet.identity)
+    return createSourceContextValues(Endge.configuration.buildContext, knownFacets)
   }
 
   /**
@@ -251,7 +273,7 @@ export class EndgeSource_Module extends EndgeModule {
     const inputs = (entities: Array<SimulationSourceInput & { deletedAt?: unknown }>): SimulationSourceInput[] => entities
       .filter(entity => !entity.deletedAt)
       .map(entity => ({ id: entity.id, identity: entity.identity, displayName: entity.displayName, source: entity.source, sourceVersion: entity.sourceVersion, isPrimitive: entity.isPrimitive }))
-    return { compositions: inputs(Endge.domain.getCompositions()), queries: inputs(Endge.domain.getQueries()), types: inputs(Endge.types.listResolved()) }
+    return { compositions: inputs(Endge.domain.getCompositions()), queries: inputs(Endge.domain.getQueries()), types: inputs(Endge.types.listResolved()), streams: inputs(Endge.domain.getStreams()) }
   }
 
   /**

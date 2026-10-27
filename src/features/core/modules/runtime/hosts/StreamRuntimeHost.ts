@@ -1,13 +1,16 @@
 import type { RStream } from '@/features/core/modules/domain/entities/RStream'
 import type { RuntimeArtifactReader, RuntimeHost, RuntimeHostContext } from '@/features/core/modules/runtime/domain/runtime-host.types'
-import type { StreamTransportConnection, StreamTransportFactory, StreamTransportMessage } from '@/features/core/modules/runtime/domain/stream-runtime.types'
+import type { StreamTransportConnection, StreamTransportFactory, StreamTransportMessage, StreamTransportRequest } from '@/features/core/modules/runtime/domain/stream-runtime.types'
+import type { SourceExpressionIR } from '@/features/core/modules/source/domain/types/source-expression.types'
 import type { StreamEventEnvelope, StreamSourceArtifact } from '@/features/core/modules/source/domain/types/stream-source.types'
 
 import { Raph, RaphNode } from '@raphy-js/raph'
 
 import { Endge } from '@/features/core/kernel/endge'
+import { formatGraphQLResponseErrors, normalizeGraphQLResponseError, routeGraphQLNextResult } from '@/features/core/modules/runtime/domain/graphql-query-error'
 import { RuntimeHostBase } from '@/features/core/modules/runtime/RuntimeHostBase'
 import { findSimulationRuntime } from '@/features/core/modules/runtime/services/simulation/find-simulation-runtime'
+import { evaluateSourceExpression } from '@/features/core/modules/source/services/source-expression-evaluate'
 
 function defaultContext(): RuntimeHostContext<'stream'> {
   return {
@@ -28,6 +31,9 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
   private _closing: Promise<void> = Promise.resolve()
   private _contextOff: (() => void) | null = null
   private _dataMode: 'live' | 'mock' = 'live'
+  private _props: Record<string, unknown> = {}
+  // Запрос, с которым открыто текущее live-соединение; смена props переоткрывает его только при изменении.
+  private _requestKey: string | null = null
 
   public constructor(input: {
     id: string
@@ -83,7 +89,33 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
     host.addRaphNode(node)
     host.addResource({ id: `node:${node.id}`, kind: 'raph-node', title: node.id })
     host.addChannel({ id: 'stream:events', kind: 'external', name: 'Normalized events', direction: 'out' })
+    host._props = host._literalDefaults(artifact.payload)
+    host._applyProps((input.meta?.props ?? {}) as Record<string, unknown>)
     return host
+  }
+
+  /**
+   * Текущие props Stream: literal defaults, поверх них значения владельца (Composition withProps).
+   */
+  public getProps(): Readonly<Record<string, unknown>> {
+    return this._props
+  }
+
+  /**
+   * Обновляет props; активное live-соединение переоткрывается, если изменился вычисленный запрос.
+   */
+  public setProps(patch: Record<string, unknown>): void {
+    this._applyProps(patch)
+    if (!this._connection || this._requestKey === null || this.status !== 'active') {
+      return
+    }
+    const artifact = this.getArtifactPayload()
+    // Ключ включает url: graphqlSse может строить его из props.
+    if (!artifact || stableKey({ url: this._evaluateUrl(artifact), request: this._evaluateRequest(artifact) }) === this._requestKey) {
+      return
+    }
+    this._closeConnection()
+    this.start()
   }
 
   public override start(): void {
@@ -121,9 +153,15 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
           }
         },
         message: (message) => {
-          if (isCurrent()) {
-            this._dispatch({ type: override.options.event, payload: message.data, meta: { id: message.id, source: this.entityIdentity, sourceEvent: message.sourceEvent, occurredAt: new Date().toISOString() } })
+          if (!isCurrent()) {
+            return
           }
+          const artifact = this.getArtifactPayload()
+          if (artifact?.transport.kind === 'graphql-sse') {
+            this._receiveSimulatedNext(message, override.options.errors ?? [], artifact)
+            return
+          }
+          this._dispatch({ type: override.options.event, payload: message.data, meta: { id: message.id, source: this.entityIdentity, sourceEvent: message.sourceEvent, occurredAt: new Date().toISOString() } })
         },
       })
       if (isCurrent()) {
@@ -145,17 +183,19 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
       throw new Error(`[StreamRuntimeHost] Artifact is unavailable for "${this.entityIdentity}".`)
     }
     this.setContext({ status: 'running', startedAt: new Date().toISOString() })
+    const rawUrl = this._evaluateUrl(artifact)
     const resolvedUrl = String(
-      Endge.workspace.variables.resolve(artifact.transport.url)
-      ?? artifact.transport.url,
+      Endge.workspace.variables.resolve(rawUrl)
+      ?? rawUrl,
     ).trim()
     if (!resolvedUrl || /^\{\{?\s*[A-Z_][A-Z0-9_]*\s*\}?\}$/.test(resolvedUrl)) {
-      throw new Error(`[StreamRuntimeHost] Stream url "${artifact.transport.url}" is not resolved.`)
+      throw new Error(`[StreamRuntimeHost] Stream url "${rawUrl || 'expression'}" is not resolved.`)
     }
     const runtimeArtifact: StreamSourceArtifact = {
       ...artifact,
       transport: { ...artifact.transport, url: resolvedUrl },
     }
+    const request = this._evaluateRequest(artifact)
     const generation = ++this._generation
     const isCurrent = () => generation === this._generation && this.status === 'active'
     const connection = this._transportFactory.open(runtimeArtifact, {
@@ -176,9 +216,10 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
           this._receive(message, artifact)
         }
       },
-    })
+    }, request)
     if (isCurrent()) {
       this._connection = connection
+      this._requestKey = stableKey({ url: rawUrl, request })
     }
     else {
       this._disposeConnection(connection)
@@ -239,6 +280,7 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
 
   private _closeConnection(): void {
     this._generation += 1
+    this._requestKey = null
     const connection = this._connection
     this._connection = null
     if (connection) {
@@ -253,6 +295,13 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
   }
 
   private _receive(message: StreamTransportMessage, artifact: StreamSourceArtifact): void {
+    const graphQLErrors = message.graphQLErrors?.length ? message.graphQLErrors : undefined
+    if (graphQLErrors) {
+      this._reportGraphQLErrors(graphQLErrors, artifact)
+      if (message.data === undefined) {
+        return
+      }
+    }
     const descriptor = artifact.events.find(item => item.sourceEvent === message.sourceEvent)
     if (!descriptor) {
       return
@@ -286,8 +335,128 @@ export class StreamRuntimeHost extends RuntimeHostBase<'stream', RuntimeHostCont
           source: this.entityIdentity,
           sourceEvent: message.sourceEvent,
           occurredAt: now,
+          ...(graphQLErrors ? { graphQLErrors } : {}),
         },
       })
+    }
+  }
+
+  /**
+   * mockStream graphqlSse: каждый сгенерированный root — data события next (с errors сценария),
+   * дальше тот же путь, что у транспорта: errorPolicy, events.next (type/payloadFrom/eachFrom/match), Store.
+   */
+  private _receiveSimulatedNext(message: StreamTransportMessage, errors: readonly unknown[], artifact: StreamSourceArtifact): void {
+    if (artifact.transport.kind !== 'graphql-sse') {
+      return
+    }
+    const routing = routeGraphQLNextResult(
+      { data: message.data, errors: errors.map(normalizeGraphQLResponseError) },
+      artifact.transport.errorPolicy,
+      { url: artifact.transport.url, operationName: artifact.transport.operationName },
+    )
+    if (routing.kind === 'error') {
+      this.setContext({ status: 'error', updatedAt: new Date().toISOString() })
+      this.emit('transport:error', routing.error)
+      return
+    }
+    if (routing.kind === 'publish') {
+      this._receive({ sourceEvent: 'next', id: message.id, data: routing.data, ...(routing.graphQLErrors ? { graphQLErrors: routing.graphQLErrors } : {}) }, artifact)
+    }
+  }
+
+  /**
+   * errorPolicy: 'all' — errors события next попадают в diagnostics, как у GraphQL Query.
+   */
+  private _reportGraphQLErrors(errors: NonNullable<StreamTransportMessage['graphQLErrors']>, artifact: StreamSourceArtifact): void {
+    const transport = artifact.transport
+    if (!Endge.isConfigured) {
+      return
+    }
+    Endge.diagnostics.warn(`[Stream] GraphQL subscription "${this.entityIdentity}" returned ${errors.length} error(s): ${formatGraphQLResponseErrors(errors)}`, {
+      scope: { name: 'endge.runtime.stream' },
+      phase: 'runtime',
+      eventName: 'endge.stream.graphql-errors',
+      attributes: {
+        'endge.runtime.id': this.id,
+        'endge.stream.identity': this.entityIdentity,
+        ...(transport.kind === 'graphql-sse' && transport.operationName ? { 'endge.graphql.operation': transport.operationName } : {}),
+      },
+    })
+  }
+
+  /**
+   * url транспорта: строка/token или выражение graphqlSse по текущим props.
+   */
+  private _evaluateUrl(artifact: StreamSourceArtifact): string {
+    const transport = artifact.transport
+    if (transport.kind !== 'graphql-sse' || !transport.urlExpression) {
+      return transport.url
+    }
+    const value = this._evaluate(transport.urlExpression)
+    return value == null ? '' : String(value)
+  }
+
+  /**
+   * Вычисляет variables, headers и extensions graphqlSse по props и env; другие transport запроса не имеют.
+   */
+  private _evaluateRequest(artifact: StreamSourceArtifact): StreamTransportRequest | undefined {
+    const transport = artifact.transport
+    if (transport.kind !== 'graphql-sse') {
+      return undefined
+    }
+    return {
+      variables: asRecord(this._evaluate(transport.variables)),
+      headers: Object.fromEntries(
+        Object.entries(asRecord(this._evaluate(transport.headers)))
+          .filter(([, value]) => value != null)
+          .map(([name, value]) => [name, String(value)]),
+      ),
+      ...(transport.extensions ? { extensions: asRecord(this._evaluate(transport.extensions)) } : {}),
+    }
+  }
+
+  private _evaluate(expression: SourceExpressionIR | null): unknown {
+    if (!expression) {
+      return undefined
+    }
+    return evaluateSourceExpression(expression, {
+      props: this._props,
+      environment: name => Endge.workspace.variables.resolve(`{${name}}`) || `{${name}}`,
+      onWarning: warning => Endge.diagnostics.warn(`[Stream] ${warning.message}`, {
+        scope: { name: 'endge.runtime.stream' },
+        phase: 'runtime',
+        eventName: 'endge.expression.warning',
+        attributes: { 'endge.runtime.id': this.id },
+      }),
+    })
+  }
+
+  private _literalDefaults(artifact: StreamSourceArtifact): Record<string, unknown> {
+    const defaults: Record<string, unknown> = {}
+    for (const prop of artifact.props ?? []) {
+      if (prop.defaultValue) {
+        defaults[prop.key] = evaluateSourceExpression(prop.defaultValue)
+      }
+    }
+    return defaults
+  }
+
+  private _applyProps(patch: Record<string, unknown>): void {
+    const declared = new Set((this.getArtifactPayload()?.props ?? []).map(prop => prop.key))
+    for (const [key, value] of Object.entries(patch)) {
+      if (!declared.has(key)) {
+        // Раньше Stream не объявлял props, а withProps(...) молча игнорировался: не ломаем такие Composition.
+        if (Endge.isConfigured) {
+          Endge.diagnostics.warn(`[Stream] Prop "${key}" не объявлен в defineProps Stream "${this.entityIdentity}" и проигнорирован.`, {
+            scope: { name: 'endge.runtime.stream' },
+            phase: 'runtime',
+            eventName: 'endge.stream.prop-unknown',
+            attributes: { 'endge.runtime.id': this.id },
+          })
+        }
+        continue
+      }
+      this._props[key] = value
     }
   }
 
@@ -313,4 +482,12 @@ function readPayloadPath(value: unknown, path: string | null): unknown {
     }
     return Object.hasOwn(current, key) ? (current as Record<string, unknown>)[key] : undefined
   }, value)
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+}
+
+function stableKey(value: unknown): string {
+  return JSON.stringify(value ?? null)
 }

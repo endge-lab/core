@@ -8,6 +8,7 @@ import { Endge } from '@/features/core/kernel/endge'
 import { validateConfigurationValue } from '@/features/core/modules/configuration/domain/configuration-value'
 import { compileConfigurationSource } from '@/features/core/modules/source/services/compilers/configuration-source-compile'
 import { compileTypeSource } from '@/features/core/modules/source/services/compilers/type-source-compile'
+import { resolveTypeDefinitionExtends } from '@/features/core/modules/source/services/type-extends'
 import { EndgeModule } from '@/features/federation/EndgeModule'
 
 const PUBLIC_SYSTEM_KEYS = new Set([
@@ -163,7 +164,19 @@ export class EndgeConfigurationSchema_Module extends EndgeModule<EndgeBootContex
 }
 
 function buildEarlyTypeCatalog(): TypeProgramCatalogEntry[] {
-  return Endge.types.listResolved().map((type, index) => {
+  const types = Endge.types.listResolved()
+  const authored = (identity: string) => {
+    const type = types.find(item => item.identity === identity)
+    if (!type) {
+      return undefined
+    }
+    if (type.isPrimitive) {
+      return null
+    }
+    const compiled = compileTypeSource(type.source, type.sourceVersion)
+    return compiled.diagnostics.some(item => item.severity === 'error') ? undefined : compiled.document?.definition ?? undefined
+  }
+  return types.map((type, index) => {
     const primitiveKind = String(type.meta?.primitiveKind ?? '').trim()
     const category: TypeProgramCatalogEntry['category'] = primitiveKind === 'reference'
       ? 'reference'
@@ -178,7 +191,8 @@ function buildEarlyTypeCatalog(): TypeProgramCatalogEntry[] {
       displayName: type.displayName || type.name || type.identity,
       category,
       sourceVersion: Number(type.sourceVersion ?? 1) || 1,
-      definition: compiled?.document?.definition ?? null,
+      // extends разворачивается так же, как в artifact Type.
+      definition: resolveTypeDefinitionExtends(compiled?.document?.definition ?? null, authored, type.identity).definition,
       runtimeType: type.isPrimitive ? String(type.meta?.runtimeType ?? type.identity) : undefined,
       entityReference: category === 'reference'
         ? { target: String(type.meta?.target ?? ''), storage: type.meta?.storage === 'identity' ? 'identity' : 'id' }

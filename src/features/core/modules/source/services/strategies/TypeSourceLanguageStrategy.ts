@@ -19,7 +19,27 @@ const TYPE_COMPLETIONS: SourceLanguageCompletion[] = [
   { label: 'defineType.enum', kind: 'snippet', insertText: `defineType(enumOf([\n  'draft',\n  'active',\n]))`, detail: 'Enum Type source' },
   { label: 'defineType.union', kind: 'snippet', insertText: `defineType(unionOf(\n  FirstType,\n  SecondType,\n))`, detail: 'Union Type source' },
   { label: 'defineType.array', kind: 'snippet', insertText: `defineType(arrayOf(\n  ItemType,\n))`, detail: 'Array Type source' },
+  {
+    label: 'defineType.extends',
+    kind: 'snippet',
+    insertText: `defineType({
+  extends: type('BaseType'),
+  fields: {
+    property: field(String),
+  },
+})`,
+    detail: 'Object Type, наследующий поля базового Type',
+  },
   { label: 'field', kind: 'function', insertText: `field(String)`, detail: 'Object field type' },
+  {
+    label: 'contextSwitch',
+    kind: 'function',
+    insertText: `contextSwitch({
+  default: type('DefaultType'),
+  cases: [{ when: { tenant: 'kzn' }, use: type('TenantType') }],
+})`,
+    detail: 'Ссылка на Type по фасетам сборки',
+  },
   {
     label: 'field.object',
     kind: 'snippet',
@@ -58,8 +78,8 @@ export class TypeSourceLanguageStrategy implements SourceLanguageStrategy {
   public readonly syntax = createTypeScriptLikeSourceSyntax({
     alias: 'Endge Type Source',
     extension: '.endge-type.ts',
-    keywords: ['defineType', 'objectOf', 'recordOf', 'enumOf', 'unionOf', 'arrayOf'],
-    functions: ['field', 'type', 'description', 'min', 'max', 'example', 'array', 'optional'],
+    keywords: ['defineType', 'objectOf', 'recordOf', 'enumOf', 'unionOf', 'arrayOf', 'extends', 'fields'],
+    functions: ['field', 'type', 'contextSwitch', 'description', 'min', 'max', 'example', 'array', 'optional'],
   })
 
   public supports(sourceKind: SourceKind | string): boolean {

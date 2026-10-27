@@ -11,6 +11,7 @@ import type {
   DataViewRef,
   DataViewSourceDocument,
 } from '@/features/core/modules/source/domain/types/data-view-source.types'
+import type { QueryGraphQLErrorPolicy } from '@/features/core/modules/source/domain/types/query-source.types'
 import type { ResponseOutputTransform } from '@/features/core/modules/source/domain/types/response-output.types'
 import type { QueryProgramProp, SourceExpressionIR, SourceFieldDefinition } from '@/features/core/modules/source/domain/types/source-expression.types'
 import type { VocabProgramPayload } from '@/features/core/modules/source/domain/types/vocab-source.types'
@@ -197,7 +198,7 @@ export interface QueryProgramPayload {
   operationName?: string
 
   // Политика GraphQL errors в HTTP 2xx response.
-  errorPolicy?: 'throw' | 'ignore'
+  errorPolicy?: QueryGraphQLErrorPolicy
 
   // HTTP-заголовки транспорта Query.
   headers?: QueryProgramRequestValue<Record<string, string>>
@@ -225,6 +226,9 @@ export interface QueryProgramPayload {
 
   // Query с mock-payload.
   mockData?: unknown
+
+  // Только GraphQL: errors mock-ответа, применяются по errorPolicy. Отсутствие — ответ без errors.
+  mockErrors?: unknown[]
 
   // Ordered output graph, который runtime вычисляет после backend response.
   outputs: QueryProgramOutput[]

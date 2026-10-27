@@ -1,3 +1,4 @@
+import { buildSchema, introspectionFromSchema } from 'graphql'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { Endge } from '@/features/core/kernel/endge'
@@ -173,5 +174,117 @@ components:
         ],
       },
     })
+  })
+
+  it('импортирует input, interface и union GraphQL с пометкой в metadata', () => {
+    const plan = Endge.documentImport.prepare({
+      format: 'graphql',
+      source: `
+      interface Node { id: ID! }
+      interface Timestamped { updatedAt: String }
+      type Order implements Node & Timestamped { id: ID!, updatedAt: String, matrix: [[Int!]!], lines(first: Int): [String!]! }
+      type Refund implements Node { id: ID! }
+      union Payment = Order | Refund
+      union Lonely = Order
+      input OrderFilter { status: String!, limit: Int! = 10, tags: [String!] = ["a"] }
+      type Query { orders(filter: OrderFilter): [Order!]! }
+    `,
+    })
+
+    expect(plan.candidates.map(item => item.identity)).toEqual(['Node', 'Timestamped', 'Order', 'Refund', 'Payment', 'OrderFilter'])
+    expect(plan.candidates.every(item => item.status === 'ready')).toBe(true)
+    expect(plan.skipped).toContainEqual(expect.objectContaining({ identity: 'Lonely', reason: expect.stringContaining('unionOf') }))
+
+    const compile = (identity: string) => Endge.source.compile('type', plan.candidates.find(item => item.identity === identity)?.sourcePreview ?? '')
+
+    const node = compile('Node')
+    expect(node.diagnostics).toEqual([])
+    expect(node.metadata).toEqual({ graphql: { kind: 'interface', implementations: ['Order', 'Refund'] } })
+    expect(node.document).toMatchObject({ definition: { kind: 'object', fields: [{ key: 'id', optional: false }] } })
+
+    const order = compile('Order')
+    expect(order.metadata).toEqual({ graphql: { kind: 'object', interfaces: ['Node', 'Timestamped'] } })
+    expect(order.document).toMatchObject({
+      definition: {
+        fields: [
+          { key: 'id' },
+          { key: 'updatedAt', optional: true },
+          { key: 'matrix', array: true, optional: true, type: { kind: 'array', items: { kind: 'reference', identity: 'Number' } } },
+          { key: 'lines', array: true, optional: false },
+        ],
+      },
+    })
+    expect(plan.candidates.find(item => item.identity === 'Order')?.diagnostics).toContainEqual(expect.objectContaining({
+      severity: 'info',
+      code: 'document-import-graphql-field-arguments',
+      message: expect.stringContaining('lines'),
+    }))
+
+    const payment = compile('Payment')
+    expect(payment.diagnostics).toEqual([])
+    expect(payment.metadata).toEqual({ graphql: { kind: 'union' } })
+    expect(payment.document).toMatchObject({
+      definition: { kind: 'union', variants: [{ identity: 'Order' }, { identity: 'Refund' }] },
+    })
+
+    const filter = compile('OrderFilter')
+    expect(filter.diagnostics).toEqual([])
+    expect(filter.metadata).toEqual({ graphql: { kind: 'input', defaults: { limit: 10, tags: ['a'] } } })
+    expect(filter.document).toMatchObject({
+      definition: {
+        kind: 'object',
+        fields: [
+          { key: 'status', optional: false },
+          { key: 'limit', optional: true },
+          { key: 'tags', array: true, optional: true },
+        ],
+      },
+    })
+    expect(plan.candidates.find(item => item.identity === 'OrderFilter')?.summary).toEqual({ fields: 3, requiredFields: 1 })
+  })
+
+  it('импортирует Type из результата introspection так же, как из SDL', () => {
+    const schema = buildSchema(`
+      scalar DateTime
+      """Заказ"""
+      type Order { id: ID!, createdAt: DateTime!, status: Status }
+      enum Status { NEW DONE }
+      input OrderInput { id: ID! }
+      type Query { order(id: ID!): Order }
+    `)
+    const introspection = introspectionFromSchema(schema)
+
+    for (const source of [JSON.stringify({ data: introspection }), JSON.stringify(introspection)]) {
+      const plan = Endge.documentImport.prepare({ format: 'graphql', source })
+      expect(plan.diagnostics).toEqual([])
+      expect(plan.candidates.map(item => item.identity).sort()).toEqual(['Order', 'OrderInput', 'Status'])
+      expect(plan.skipped).toContainEqual(expect.objectContaining({ identity: 'Query', kind: 'graphql-operation-root' }))
+      const order = plan.candidates.find(item => item.identity === 'Order')
+      expect(order).toMatchObject({ status: 'ready', description: 'Заказ' })
+      expect(Endge.source.compile('type', order?.sourcePreview ?? '').document).toMatchObject({
+        definition: {
+          fields: [
+            { key: 'id', type: { identity: 'ID' } },
+            { key: 'createdAt', type: { identity: 'DateTime' }, optional: false },
+            { key: 'status', type: { identity: 'Status' }, optional: true },
+          ],
+        },
+      })
+    }
+  })
+
+  it('сообщает об ошибках introspection JSON без кандидатов', () => {
+    const invalidJson = Endge.documentImport.prepare({ format: 'graphql', source: '{ "data": ' })
+    expect(invalidJson.candidates).toEqual([])
+    expect(invalidJson.diagnostics).toEqual([expect.objectContaining({ code: 'document-import-graphql-introspection-json', severity: 'error' })])
+
+    const disabled = Endge.documentImport.prepare({
+      format: 'graphql',
+      source: JSON.stringify({ data: null, errors: [{ message: 'Introspection is disabled' }] }),
+    })
+    expect(disabled.diagnostics).toEqual([expect.objectContaining({
+      code: 'document-import-graphql-introspection-invalid',
+      message: expect.stringContaining('Introspection is disabled'),
+    })])
   })
 })
