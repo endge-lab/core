@@ -304,7 +304,8 @@ function compileUpdateExpression(
       hasData: '__updateHasData',
       hasMeta: '__updateHasMeta',
     }
-    const alias = aliases[name]
+    // Собственные ключи: `toString(...)` и другие имена Object.prototype не являются функциями чтения.
+    const alias = Object.hasOwn(aliases, name) ? aliases[name] : undefined
     if (!alias) {
       return
     }
