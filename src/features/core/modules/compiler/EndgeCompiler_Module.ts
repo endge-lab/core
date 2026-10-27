@@ -78,7 +78,7 @@ import { TABLE_EVENT_DEFINITIONS } from '@/features/core/modules/domain/types/co
 import { collectI18nMessageKeys, compileI18nLocales } from '@/features/core/modules/i18n/services/i18n-catalog'
 import { createEmptyProgramMetadata } from '@/features/core/modules/program/domain/types/program-metadata.types'
 import { compileTypeSource } from '@/features/core/modules/source/services/compilers/type-source-compile'
-import { resolveCompositionActivation } from '@/features/core/modules/source/services/composition-activation'
+import { resolveCompositionActivation, resolveScopeContentActivation } from '@/features/core/modules/source/services/composition-activation'
 import { inspectDocumentMetadata } from '@/features/core/modules/source/services/document-metadata'
 import { createSourceContextValues, runWithSourceContext } from '@/features/core/modules/source/services/source-context'
 import { resolveTypeDefinitionExtends } from '@/features/core/modules/source/services/type-extends'
@@ -2993,11 +2993,14 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
           diagnostics.push({ severity: 'error', code: 'composition-composition-invalid', message: `Composition "${runtime.identity}" содержит compile errors.`, sourcePath: `runtimes.${runtime.name}` })
           continue
         }
-        runtime.effectiveActivation = resolveCompositionActivation(
-          runtime.activationOverride,
-          artifact.payload.activation,
-          payload.scopes.find(scope => scope.path === runtime.scopePath)?.effectiveActivation,
-        )
+        // Runtime с activateWhen включает условие: корневая активация вложенной Composition его не запускает.
+        if (!runtime.activateWhen) {
+          runtime.effectiveActivation = resolveCompositionActivation(
+            runtime.activationOverride,
+            artifact.payload.activation,
+            resolveScopeContentActivation(payload.scopes.find(scope => scope.path === runtime.scopePath)),
+          )
+        }
         const propNames = new Set(artifact.payload.props.map(prop => prop.key))
         for (const propName of Object.keys(runtime.props)) {
           if (!propNames.has(propName)) {

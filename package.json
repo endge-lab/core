@@ -1,7 +1,7 @@
 {
   "name": "@endge/core",
   "type": "module",
-  "version": "1.0.0-dev.11",
+  "version": "1.0.0-dev.12",
   "private": false,
   "packageManager": "pnpm@8.8.0",
   "license": "Apache-2.0",

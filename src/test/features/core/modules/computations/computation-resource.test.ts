@@ -48,6 +48,25 @@ describe('состояние ресурса Computation', () => {
     expect(resource.value).toBe(2)
   })
 
+  it('не перезапускает асинхронное вычисление для нового объекта с тем же содержимым', async () => {
+    const run = vi.fn(async (input: any) => input.rows.length)
+    const rows = [{ id: 'a', status: 'created' }]
+    const resource = new ComputationResourceState<number>({ rows, filter: { search: undefined } }, run)
+    await vi.waitFor(() => expect(resource.status).toBe('success'))
+
+    // Renderer после уведомления о результате строит новый, но равный вход.
+    resource.updateInput({ rows: [{ id: 'a', status: 'created' }], filter: {} })
+    expect(run).toHaveBeenCalledTimes(1)
+    expect(resource.status).toBe('success')
+
+    // Изменение на месте после запуска остаётся видимым: сравнивается снимок входа запуска.
+    rows.push({ id: 'b', status: 'created' })
+    resource.updateInput({ rows, filter: {} })
+    expect(run).toHaveBeenCalledTimes(2)
+    await vi.waitFor(() => expect(resource.value).toBe(2))
+    resource.dispose()
+  })
+
   it('не инвалидирует renderer при синхронном обновлении input, полученном текущим render', () => {
     const onChange = vi.fn()
     const registry = new ComputationResourceRegistry()
