@@ -83,7 +83,8 @@ export const ENDGE_CORE_MODULES = [
   {
     key: 'configuration',
     create: () => new EndgeConfiguration_Module(),
-    after: ['workspace', 'domain', 'context', 'configurationSchema'],
+    // auth восстанавливает session раньше: claims выбирают документы фасетов (auth.facetClaims).
+    after: ['workspace', 'domain', 'context', 'configurationSchema', 'auth'],
   },
 
   // Объединяет историю телеметрии, актуальные проблемы
@@ -148,7 +149,7 @@ export const ENDGE_CORE_MODULES = [
 
   // Управляет профилями и сессиями аутентификации
   // и подготавливает данные авторизации для запросов через адаптеры.
-  { key: 'auth', create: () => new EndgeAuth_Module(), after: ['configuration', 'domain'] },
+  { key: 'auth', create: () => new EndgeAuth_Module(), after: ['workspace', 'domain', 'context'] },
 
   // Загружает справочные данные, хранит их в кэше Raph
   // и управляет повторной загрузкой и актуальностью значений.

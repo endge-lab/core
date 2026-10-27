@@ -1,5 +1,7 @@
 import type { SourceExpressionIR, SourceExpressionOperation, SourceExpressionWarning } from '@/features/core/modules/source/domain/types/source-expression.types'
 
+import { hasValuePath, readValuePath } from './value-path'
+
 export interface ValueOperationRuntime {
   evaluate: (expression: SourceExpressionIR, current?: unknown) => unknown
   memoize: <T>(owner: object, key: string, create: () => T) => T
@@ -309,7 +311,8 @@ function enrich(args: SourceExpressionIR[], runtime: ValueOperationRuntime): unk
       return cloneValue(row)
     }
 
-    const branch = readPath(row, branchPath)
+    // Ветка enrich одновременно путь записи, поэтому остаётся точечной.
+    const branch = readDotPath(row, branchPath)
     if (!isRecord(branch)) {
       return cloneValue(row)
     }
@@ -508,18 +511,9 @@ function isLookupBuilder(value: unknown): value is LookupBuilder {
     && Array.isArray(value.source)
 }
 
+// Читает путь value DSL: точечный путь прежней семантики или DataPath Raph (индексы, селекторы, `$имя`).
 export function readPath(source: unknown, path: string): unknown {
-  if (!path) {
-    return source
-  }
-  let current: any = source
-  for (const part of path.split('.').filter(Boolean)) {
-    if (current == null) {
-      return undefined
-    }
-    current = current[part]
-  }
-  return current
+  return readValuePath(source, path)
 }
 
 function setPath(source: Record<string, unknown>, path: string, value: unknown): Record<string, unknown> {
@@ -540,17 +534,7 @@ function setPath(source: Record<string, unknown>, path: string, value: unknown):
 }
 
 function hasPath(source: unknown, path: string): boolean {
-  if (!path) {
-    return source !== undefined
-  }
-  let current: any = source
-  for (const part of path.split('.').filter(Boolean)) {
-    if (current == null || !Object.hasOwn(new Object(current), part)) {
-      return false
-    }
-    current = current[part]
-  }
-  return true
+  return hasValuePath(source, path)
 }
 
 function defaultTo(value: unknown, fallback: unknown): unknown {
@@ -781,7 +765,7 @@ function immutableUnset(value: unknown, path: unknown): Record<string, unknown> 
   if (!parts.length) {
     return out
   }
-  const parent = parts.slice(0, -1).reduce<unknown>((current, part) => readPath(current, part), out)
+  const parent = readDotPath(out, parts.slice(0, -1).join('.'))
   if (isRecord(parent)) {
     delete parent[parts.at(-1)!]
   }
@@ -791,10 +775,26 @@ function immutableUnset(value: unknown, path: unknown): Record<string, unknown> 
 function immutableRename(value: unknown, from: unknown, to: unknown): Record<string, unknown> {
   const sourcePath = String(from ?? '')
   const targetPath = String(to ?? '')
-  if (!hasPath(value, sourcePath) || !targetPath) {
+  if (!hasDotPath(value, sourcePath) || !targetPath) {
     return cloneValue(asRecord(value))
   }
-  return immutableSet(immutableUnset(value, sourcePath), targetPath, readPath(value, sourcePath))
+  return immutableSet(immutableUnset(value, sourcePath), targetPath, readDotPath(value, sourcePath))
+}
+
+// Пути записи set/unset/rename остаются точечными, поэтому и их чтение не использует DataPath.
+function readDotPath(source: unknown, path: string): unknown {
+  return path.split('.').filter(Boolean).reduce<unknown>((current, part) => current == null ? undefined : (current as Record<string, unknown>)[part], source)
+}
+
+function hasDotPath(source: unknown, path: string): boolean {
+  let current: unknown = source
+  for (const part of path.split('.').filter(Boolean)) {
+    if (current == null || !Object.hasOwn(new Object(current), part)) {
+      return false
+    }
+    current = (current as Record<string, unknown>)[part]
+  }
+  return path.split('.').some(Boolean) || source !== undefined
 }
 
 function fromEntries(value: unknown): Record<string, unknown> {

@@ -1,7 +1,28 @@
 import type { SourceLanguageCompletion } from '@/features/core/modules/source/domain/types/source-engine.types'
 
+// Функции контекста сборки: значения фасетов и Configuration подставляются при компиляции.
+export const SOURCE_CONTEXT_FUNCTION_NAMES = ['facet', 'config', 'context', 'contextSwitch']
+
+export const SOURCE_CONTEXT_COMPLETIONS: SourceLanguageCompletion[] = [
+  { label: 'facet', kind: 'function', insertText: `facet('tenant')`, detail: 'Identity выбранного документа фасета (подставляется при сборке)' },
+  { label: 'config', kind: 'function', insertText: `config('configuration.key')`, detail: 'Значение effective Configuration, как $context.config (подставляется при сборке)' },
+  { label: 'context', kind: 'function', insertText: `context({ tenant: 'kzn' })`, detail: 'Условие по выбранным фасетам: true/false при сборке' },
+  {
+    label: 'contextSwitch',
+    kind: 'function',
+    insertText: `contextSwitch({
+  default: value,
+  cases: [
+    { when: { tenant: 'kzn' }, use: value },
+  ],
+})`,
+    detail: 'Значение по выбранным фасетам: наиболее специфичный case или default (при сборке)',
+  },
+]
+
 // Общий vocabulary ValueExpression, подключаемый всеми domain source languages.
 export const VALUE_EXPRESSION_FUNCTION_NAMES = [
+  ...SOURCE_CONTEXT_FUNCTION_NAMES,
   'get',
   'getOr',
   'pick',
@@ -200,6 +221,7 @@ export const VALUE_EXPRESSION_METHOD_NAMES = [
 ]
 
 export const VALUE_EXPRESSION_COMPLETIONS: SourceLanguageCompletion[] = [
+  ...SOURCE_CONTEXT_COMPLETIONS,
   { label: 'get', kind: 'function', insertText: `get('path')`, detail: 'Selector: читает путь текущего значения' },
   { label: 'match', kind: 'function', insertText: 'match({})', detail: 'Predicate: сопоставляет поля объекта' },
   { label: 'eq', kind: 'function', insertText: 'eq(get(\'path\'), value)', detail: 'Predicate: строгое равенство' },

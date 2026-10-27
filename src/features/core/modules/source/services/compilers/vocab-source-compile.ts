@@ -6,8 +6,9 @@ import type { VocabMockReference, VocabPayloadProvider, VocabSourceCompileResult
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
 
+import { isContextSwitchCall } from '@/features/core/modules/source/services/compilers/source-expression-compile'
 import { compileProgramMetadataProperty } from '@/features/core/modules/source/services/compilers/source-metadata-compile'
-import { readSourceModelReference } from '@/features/core/modules/source/services/compilers/source-model-reference-compile'
+import { readSourceModelReference, toDataViewRef } from '@/features/core/modules/source/services/compilers/source-model-reference-compile'
 
 type Diagnostic = Omit<ProgramDiagnostic, 'entityRef'>
 
@@ -239,12 +240,12 @@ function readDataView(node: t.CallExpression['arguments'][number] | undefined, s
     diagnostics.push(diagnostic('error', 'vocab-source-output-dataview', '.dataView(...) требует DataView.', sourcePath))
     return null
   }
-  const ref = readSourceModelReference(node, source, { referenceCall: 'dataView', defineCall: 'defineDataView' })
-  if (ref?.kind === 'external') {
-    return ref
+  const ref = readSourceModelReference(node, source, { referenceCall: 'dataView', defineCall: 'defineDataView', diagnostics, sourcePath })
+  if (ref) {
+    return toDataViewRef(ref)
   }
-  if (ref?.kind === 'inline') {
-    return { kind: 'inline', source: ref.source }
+  if (isContextSwitchCall(node)) {
+    return null
   }
   diagnostics.push(diagnostic('error', 'vocab-source-output-dataview', '.dataView(...) поддерживает identity или defineDataView({...}).', sourcePath, node))
   return null

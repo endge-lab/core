@@ -1,8 +1,14 @@
 import type { ProgramMetadataMap } from '@/features/core/modules/program/domain/types/program-metadata.types'
 import type { ProgramDiagnostic } from '@/features/core/modules/program/domain/types/program.types'
 
+// Все ветки contextSwitch, из которых выбрано выражение при компиляции (default первым).
+// Нужны только для проверки ссылок и зависимостей невыбранных веток; runtime их не читает.
+export interface TypeSourceContextVariants {
+  contextVariants?: TypeSourceExpression[]
+}
+
 // Ссылка Type Source на примитивный или пользовательский тип домена.
-export interface TypeSourceReference {
+export interface TypeSourceReference extends TypeSourceContextVariants {
   kind: 'reference'
   identity: string
 }
@@ -17,30 +23,35 @@ export interface TypeSourceField {
   min?: number
   max?: number
   examples: unknown[]
+  // Identity Type, от которого поле унаследовано через extends; у собственных полей отсутствует.
+  inheritedFrom?: string
 }
 
-export interface TypeSourceObjectDefinition {
+export interface TypeSourceObjectDefinition extends TypeSourceContextVariants {
   kind: 'object'
   fields: TypeSourceField[]
+  // `defineType({ extends: type('Base'), fields })`: базовый Type. В artifact поля уже развёрнуты
+  // (унаследованные первыми, с inheritedFrom); в authored document — только собственные.
+  extends?: TypeSourceReference
 }
 
-export interface TypeSourceEnumDefinition {
+export interface TypeSourceEnumDefinition extends TypeSourceContextVariants {
   kind: 'enum'
   values: Array<string | number | boolean>
 }
 
-export interface TypeSourceUnionDefinition {
+export interface TypeSourceUnionDefinition extends TypeSourceContextVariants {
   kind: 'union'
   variants: TypeSourceExpression[]
 }
 
-export interface TypeSourceArrayDefinition {
+export interface TypeSourceArrayDefinition extends TypeSourceContextVariants {
   kind: 'array'
   items: TypeSourceExpression
 }
 
 // Словарь с произвольными string-ключами и единым типом значений.
-export interface TypeSourceRecordDefinition {
+export interface TypeSourceRecordDefinition extends TypeSourceContextVariants {
   kind: 'record'
   values: TypeSourceExpression
 }

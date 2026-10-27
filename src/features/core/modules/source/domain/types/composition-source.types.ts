@@ -67,6 +67,10 @@ export interface CompositionScopeDescriptor {
   parentPath: string | null
   activationOverride: CompositionActivationDescriptor | null
   effectiveActivation: CompositionActivationDescriptor
+  // `.enabledWhen(context({...}))`: условие сборки (вместе с условиями предков). Scope в программе — условие выполнено.
+  enabledWhen?: Readonly<Record<string, string>>
+  // `.activateWhen(expr)`: runtime-условие; true → activate, false → deactivate. effectiveActivation при этом manual.
+  activateWhen?: CompositionBindingValue
   // Data dependencies, активируемые вместе с lifecycle scope.
   data?: string[]
   resources: string[]
@@ -159,6 +163,10 @@ export interface CompositionRuntimeDescriptor {
   activationOverride: CompositionActivationDescriptor | null
   // Compiler-linked activation, которую runtime применяет без интерпретации source.
   effectiveActivation: CompositionActivationDescriptor
+  // `.enabledWhen(context({...}))`: условие сборки (вместе с условиями scope-предков). Runtime в программе — условие выполнено.
+  enabledWhen?: Readonly<Record<string, string>>
+  // `.activateWhen(expr)`: runtime-условие; true → activate, false → deactivate. effectiveActivation при этом manual.
+  activateWhen?: CompositionBindingValue
   fields?: string[]
   controls?: Record<string, FilterViewControlDefinition>
   componentIdentity?: string

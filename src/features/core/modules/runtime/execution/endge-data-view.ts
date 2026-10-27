@@ -10,7 +10,9 @@ import type {
 import { Endge } from '@/features/core/kernel/endge'
 import { RDataView } from '@/features/core/modules/domain/entities/RDataView'
 import { compileDataViewSource } from '@/features/core/modules/source/services/compilers/data-view-source-compile'
+import { createSourceContextValues, getSourceContext, runWithSourceContext } from '@/features/core/modules/source/services/source-context'
 import { evaluateSourceExpression } from '@/features/core/modules/source/services/source-expression-evaluate'
+import { readValuePath, runWithValuePathScope } from '@/features/core/modules/source/services/value-path'
 
 /**
  * Сообщает, что persisted DataView не прошёл общий build pipeline.
@@ -87,7 +89,8 @@ export class EndgeDataView {
       return this._runExpression(artifact, input, props)
     }
 
-    return this._runPipeline(artifact, input, runTools, context, props)
+    // Props DataView — переменные `$имя` путей в `path()`, `.pick()`, шаблонах и map-выражениях.
+    return runWithValuePathScope({ vars: props }, () => this._runPipeline(artifact, input, runTools, context, props))
   }
 
   /**
@@ -174,7 +177,11 @@ export class EndgeDataView {
     tools?: Partial<DataViewRunTools>,
     context: DataViewRunContext = {},
   ): unknown {
-    const result = compileDataViewSource(source)
+    // Inline DataView компилируется при выполнении: facet()/config()/contextSwitch берутся из build context текущего boot.
+    const sourceContext = Endge.isConfigured && Endge.configuration.isResolved
+      ? createSourceContextValues(Endge.configuration.buildContext)
+      : getSourceContext()
+    const result = runWithSourceContext(sourceContext, () => compileDataViewSource(source))
     const error = result.diagnostics.find(diagnostic => diagnostic.severity === 'error')
     if (error) {
       throw new Error(error.message)
@@ -236,7 +243,7 @@ export class EndgeDataView {
     props: Record<string, unknown>,
   ): unknown {
     if (artifact.steps.some(step => step.type === 'select')) {
-      return this._runSelectPipeline(artifact, input)
+      return this._runSelectPipeline(artifact, input, props)
     }
 
     let rows: unknown[] = []
@@ -269,7 +276,7 @@ export class EndgeDataView {
 
           const output = this._createMapOutput(step.spreads ?? [], scope, tools)
           for (const [key, expression] of Object.entries(step.fields)) {
-            output[key] = this._evaluateExpression(expression, scope, tools)
+            output[key] = this._evaluateExpression(expression, scope, tools, props)
           }
 
           return output
@@ -314,7 +321,7 @@ export class EndgeDataView {
   /**
    * Последовательно вычисляет whole-value steps; каждый select получает результат предыдущего.
    */
-  private _runSelectPipeline(artifact: DataViewProgramPayload, input: unknown): unknown {
+  private _runSelectPipeline(artifact: DataViewProgramPayload, input: unknown, props: Record<string, unknown>): unknown {
     let value = input
 
     for (const step of artifact.steps) {
@@ -324,6 +331,7 @@ export class EndgeDataView {
 
       value = evaluateSourceExpression(step.expression, {
         scope: value,
+        props,
         onWarning: Endge.isConfigured
           ? warning => Endge.diagnostics.warn(`[DataView] ${warning.message}`, {
             scope: { name: 'endge.runtime.data-view' },
@@ -380,6 +388,7 @@ export class EndgeDataView {
     expression: DataViewExpression,
     scope: Record<string, unknown>,
     tools: DataViewRunTools,
+    props: Record<string, unknown>,
   ): unknown {
     if (expression.type === 'literal') {
       return expression.value
@@ -389,7 +398,7 @@ export class EndgeDataView {
     }
 
     if (expression.type !== 'path') {
-      return evaluateSourceExpression(expression, { scope })
+      return evaluateSourceExpression(expression, { scope, props })
     }
 
     let value = tools.path(scope, expression.path)
@@ -478,18 +487,10 @@ export class EndgeDataView {
   }
 
   /**
-   * Читает dot-path из object/array без выбрасывания ошибок.
+   * Читает путь value DSL (точечный или DataPath Raph) из object/array без выбрасывания ошибок.
    */
   private _path(source: unknown, path: string): unknown {
-    const parts = String(path ?? '').split('.').filter(Boolean)
-    let current: any = source
-    for (const part of parts) {
-      if (current == null) {
-        return undefined
-      }
-      current = current[part]
-    }
-    return current
+    return readValuePath(source, String(path ?? ''))
   }
 
   /**

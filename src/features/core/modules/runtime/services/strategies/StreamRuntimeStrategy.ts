@@ -3,6 +3,7 @@ import type { ResolveAuthSession } from '@/features/core/modules/runtime/service
 import type { StreamSourceArtifact } from '@/features/core/modules/source/domain/types/stream-source.types'
 import { RStream } from '@/features/core/modules/domain/entities/RStream'
 import { StreamRuntimeHost } from '@/features/core/modules/runtime/hosts/StreamRuntimeHost'
+import { BrowserGraphQLSseStreamTransportFactory } from '@/features/core/modules/runtime/services/transports/BrowserGraphQLSseStreamTransportFactory'
 import { BrowserSseStreamTransportFactory } from '@/features/core/modules/runtime/services/transports/BrowserSseStreamTransportFactory'
 import { BrowserWebSocketStreamTransportFactory } from '@/features/core/modules/runtime/services/transports/BrowserWebSocketStreamTransportFactory'
 
@@ -19,11 +20,14 @@ export class StreamRuntimeStrategy implements RuntimeStrategy<RStream, StreamRun
   public create(ctx: Parameters<RuntimeStrategy<RStream, StreamRuntimeHost>['create']>[0]) {
     const injectedFactory = ctx.meta.streamTransportFactory
     const artifact = ctx.artifacts.getArtifact<StreamSourceArtifact>('stream', ctx.model.id ?? ctx.model.identity)
+    const kind = artifact?.payload.transport.kind
     const transportFactory = injectedFactory && typeof injectedFactory.open === 'function'
       ? injectedFactory
-      : artifact?.payload.transport.kind === 'websocket'
+      : kind === 'websocket'
         ? new BrowserWebSocketStreamTransportFactory()
-        : new BrowserSseStreamTransportFactory(this._resolveAuthSession)
+        : kind === 'graphql-sse'
+          ? new BrowserGraphQLSseStreamTransportFactory(this._resolveAuthSession)
+          : new BrowserSseStreamTransportFactory(this._resolveAuthSession)
     return StreamRuntimeHost.createRuntime({
       id: ctx.id,
       model: ctx.model,

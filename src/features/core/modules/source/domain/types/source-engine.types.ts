@@ -1,4 +1,5 @@
 import type { I18nCatalogProvenance, I18nRuntimeCatalog } from '@/features/core/modules/i18n/domain/i18n.types'
+import type { SourceContextValues } from '@/features/core/modules/source/domain/types/source-context.types'
 import type { TypeSourceDefinition } from '@/features/core/modules/source/domain/types/type-source.types'
 
 // Канонический тип source-документа, для которого выбирается source strategy.
@@ -8,6 +9,8 @@ export type SourceKind = 'action' | 'query' | 'vocab' | 'data-view' | 'filter' |
 export interface SourceEngineCompileContext {
   sourceVersion?: number
   executionContext?: Readonly<Record<string, string>>
+  // Значения facet()/config()/context()/contextSwitch выражений; без него действует контекст текущей сборки.
+  sourceContext?: SourceContextValues
 }
 
 // Тип нейтральной source completion без привязки к Monaco или другому editor API.
@@ -54,6 +57,9 @@ export interface SourceLanguageContext {
 
   // Identity документа, владеющего текущей диагностикой Source.
   ownerIdentity?: string
+
+  // Фасеты и Configuration текущего boot: facet/config/contextSwitch проверяются как при сборке.
+  sourceContext?: SourceContextValues
 
   // Фактические каталоги переводов для всех текущих вхождений стартовой Composition.
   i18n?: SourceLanguageI18nContext

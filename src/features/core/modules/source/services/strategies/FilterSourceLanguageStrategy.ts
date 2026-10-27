@@ -10,6 +10,7 @@ import { validateTypeExpressionUsage } from '@/features/core/modules/compiler/se
 import { compileFilterSource } from '@/features/core/modules/source/services/compilers/filter-source-compile'
 import { resolveTypedSourceDocumentReference, typedSourceTypeReferenceHighlights } from '@/features/core/modules/source/services/source-document-reference'
 import { createTypeScriptLikeSourceSyntax } from '@/features/core/modules/source/services/source-language-syntax'
+import { SOURCE_CONTEXT_COMPLETIONS, SOURCE_CONTEXT_FUNCTION_NAMES } from '@/features/core/modules/source/services/value-expression-language'
 import { FILTER_DEFAULT_SOURCE } from '@/features/core/modules/source/templates/filter.default.source'
 
 const FILTER_COMPLETIONS: SourceLanguageCompletion[] = [
@@ -44,6 +45,7 @@ export class FilterSourceLanguageStrategy implements SourceLanguageStrategy {
       'relativeDateTime',
       'row',
       'value',
+      ...SOURCE_CONTEXT_FUNCTION_NAMES,
     ],
     functions: [
       'array',
@@ -53,6 +55,7 @@ export class FilterSourceLanguageStrategy implements SourceLanguageStrategy {
       'options',
       'predicate',
       'vocab',
+      ...SOURCE_CONTEXT_FUNCTION_NAMES,
     ],
     properties: ['fields', 'label', 'labelPath', 'metadata', 'outputs', 'value', 'valuePath'],
   })
@@ -90,6 +93,7 @@ export class FilterSourceLanguageStrategy implements SourceLanguageStrategy {
   public completions(context: SourceLanguageContext): SourceLanguageCompletion[] {
     return [
       ...FILTER_COMPLETIONS,
+      ...SOURCE_CONTEXT_COMPLETIONS,
       ...(context.typeSymbols ?? []).map(type => ({
         label: type.identity,
         kind: 'value' as const,

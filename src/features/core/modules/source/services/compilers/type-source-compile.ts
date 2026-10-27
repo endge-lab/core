@@ -13,7 +13,9 @@ import * as t from '@babel/types'
 
 import {
   diagnostic,
+  isContextSwitchCall,
   propertyName,
+  selectContextSwitchNode,
   unwrapExpression,
 } from '@/features/core/modules/source/services/compilers/source-expression-compile'
 import { compileProgramMetadataExpression } from '@/features/core/modules/source/services/compilers/source-metadata-compile'
@@ -104,7 +106,9 @@ function readRootMetadata(ast: t.File, diagnostics: DiagnosticDraft[]) {
 
 function readDefinition(node: t.Expression, diagnostics: DiagnosticDraft[], sourcePath = 'defineType'): TypeSourceDefinition | null {
   if (t.isObjectExpression(node)) {
-    return readObjectDefinition(node, diagnostics)
+    return sourcePath === 'defineType' && isExtendedDefinition(node)
+      ? readExtendedDefinition(node, diagnostics)
+      : readObjectDefinition(node, diagnostics)
   }
 
   if (!t.isCallExpression(node) || !t.isIdentifier(node.callee)) {
@@ -155,6 +159,70 @@ function readObjectDefinition(node: t.ObjectExpression, diagnostics: DiagnosticD
   }
 
   return { kind: 'object', fields }
+}
+
+// defineType({ extends: type('Base'), fields: {...} }): свойство extends не является field(...).
+function isExtendedDefinition(node: t.ObjectExpression): boolean {
+  return node.properties.some(property => t.isObjectProperty(property)
+    && !property.computed
+    && propertyName(property.key) === 'extends'
+    && t.isExpression(property.value)
+    && !isFieldChain(property.value))
+}
+
+function isFieldChain(raw: t.Expression): boolean {
+  let cursor = unwrapExpression(raw)
+  while (t.isCallExpression(cursor) && t.isMemberExpression(cursor.callee) && t.isExpression(cursor.callee.object)) {
+    cursor = unwrapExpression(cursor.callee.object)
+  }
+  return t.isCallExpression(cursor) && t.isIdentifier(cursor.callee, { name: 'field' })
+}
+
+// Наследование: собственные поля в fields; поля базового Type разворачиваются при сборке программы.
+function readExtendedDefinition(node: t.ObjectExpression, diagnostics: DiagnosticDraft[]): TypeSourceObjectDefinition | null {
+  const seen = new Set<string>()
+  let base: TypeSourceReference | null = null
+  let fields: TypeSourceObjectDefinition = { kind: 'object', fields: [] }
+  let valid = true
+  for (const property of node.properties) {
+    const key = t.isObjectProperty(property) && !property.computed ? propertyName(property.key) : null
+    if (!key || !t.isObjectProperty(property) || !isExpressionArgument(property.value) || (key !== 'extends' && key !== 'fields')) {
+      diagnostics.push(diagnostic('error', 'type-source-extends-property', 'defineType с extends допускает только свойства extends и fields: { поле: field(...) }.', 'defineType', property))
+      valid = false
+      continue
+    }
+    if (seen.has(key)) {
+      diagnostics.push(diagnostic('error', 'type-source-extends-property', `Свойство "${key}" указано повторно.`, key, property))
+      valid = false
+      continue
+    }
+    seen.add(key)
+    const value = unwrapExpression(property.value)
+    if (key === 'fields') {
+      if (!t.isObjectExpression(value)) {
+        diagnostics.push(diagnostic('error', 'type-source-extends-fields-shape', 'fields должен быть object literal { поле: field(...) }.', 'fields', value))
+        valid = false
+        continue
+      }
+      fields = readObjectDefinition(value, diagnostics)
+      continue
+    }
+    const expression = readTypeExpression(value, diagnostics, 'extends')
+    const variants = expression?.contextVariants ?? (expression ? [expression] : [])
+    if (!expression || expression.kind !== 'reference' || variants.some(item => item.kind !== 'reference')) {
+      diagnostics.push(diagnostic('error', 'type-source-extends-shape', 'extends принимает ссылку type(\'Base\') или contextSwitch таких ссылок.', 'extends', value))
+      valid = false
+      continue
+    }
+    base = expression
+  }
+  if (!valid || !base) {
+    if (valid) {
+      diagnostics.push(diagnostic('error', 'type-source-extends-shape', 'extends принимает ссылку type(\'Base\') или contextSwitch таких ссылок.', 'extends', node))
+    }
+    return null
+  }
+  return { kind: 'object', fields: fields.fields, extends: base }
 }
 
 function readObjectOfDefinition(
@@ -385,6 +453,11 @@ function readTypeExpression(
 
   if (t.isCallExpression(node) && t.isIdentifier(node.callee, { name: 'type' })) {
     return readReferenceCall(node, 'type', diagnostics, sourcePath)
+  }
+  if (t.isCallExpression(node) && isContextSwitchCall(node)) {
+    const result = selectContextSwitchNode(node, diagnostics, sourcePath, (branch, branchDiagnostics, branchPath) =>
+      readTypeExpression(branch, branchDiagnostics, branchPath))
+    return result ? { ...result.selected, contextVariants: result.variants } : null
   }
   if (t.isCallExpression(node) && t.isIdentifier(node.callee, { name: 'recordOf' })) {
     return readRecordDefinition(node, diagnostics, sourcePath)

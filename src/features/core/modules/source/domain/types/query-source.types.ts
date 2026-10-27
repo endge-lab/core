@@ -2,6 +2,7 @@ import type { RQueryAuth } from '@/features/core/modules/domain/types/document/q
 import type { ProgramMetadataMap } from '@/features/core/modules/program/domain/types/program-metadata.types'
 import type { ProgramDiagnostic, QueryProgramPayload } from '@/features/core/modules/program/domain/types/program.types'
 import type { DataViewRef } from '@/features/core/modules/source/domain/types/data-view-source.types'
+import type { GraphQLDocumentFragments } from '@/features/core/modules/source/domain/types/graphql-fragments.types'
 import type { ResponseOutputTransform } from '@/features/core/modules/source/domain/types/response-output.types'
 import type { QueryProgramProp, SourceExpressionIR, SourceFieldDefinition } from '@/features/core/modules/source/domain/types/source-expression.types'
 
@@ -9,7 +10,10 @@ import type { QueryProgramProp, SourceExpressionIR, SourceFieldDefinition } from
 export type QuerySourceKind = 'rest' | 'graphql'
 
 // Политика GraphQL errors в HTTP 2xx response.
-export type QueryGraphQLErrorPolicy = 'throw' | 'ignore'
+// throw: ответ с errors завершает Query ошибкой GraphQLQueryError с частичными data;
+// ignore: data возвращаются, errors доступны выходам через errors(path?) без отчёта;
+// all: data и errors возвращаются, errors доступны через errors(path?) и пишутся warning в diagnostics.
+export type QueryGraphQLErrorPolicy = 'throw' | 'ignore' | 'all'
 
 // Статическое значение запроса или безопасное выражение, вычисляемое из props Query в runtime.
 export type QuerySourceRequestValue<T> = T | SourceExpressionIR
@@ -46,8 +50,11 @@ export interface QuerySourceGraphQLRequest {
   // GraphQL endpoint или Endge var-token вида {API_URL}.
   endpoint: QuerySourceRequestValue<string>
 
-  // Статический GraphQL document из gql template.
+  // Статический GraphQL document из gql template; фрагменты из `fragments` уже подставлены.
   document: string
+
+  // Исходный document operation и все варианты фрагментов (`request.fragments`) — для проверки редактором.
+  fragments?: GraphQLDocumentFragments
 
   // Operation name для document с несколькими operations.
   operationName?: string
@@ -73,8 +80,11 @@ export interface QuerySourceMock {
   // Включены ли mock data.
   enabled: boolean
 
-  // Mock-данные.
+  // Mock-данные. Для GraphQL — data операции.
   data: unknown
+
+  // Только GraphQL: errors mock-ответа; обрабатываются по errorPolicy как ответ сервера.
+  errors?: unknown[]
 }
 
 export type QueryOutputSource

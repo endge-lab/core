@@ -6,8 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Endge } from '@/features/core/kernel/endge'
 import { RQuery } from '@/features/core/modules/domain/entities/RQuery'
+import { GraphQLQueryError } from '@/features/core/modules/runtime/domain/graphql-query-error'
 import { QueryRuntimeHost } from '@/features/core/modules/runtime/hosts/QueryRuntimeHost'
 import { compileFilterSource } from '@/features/core/modules/source/services/compilers/filter-source-compile'
+import { compileQuerySource } from '@/features/core/modules/source/services/compilers/query-source-compile'
 
 describe('проверка Host runtime для Query', () => {
   beforeEach(() => {
@@ -87,6 +89,52 @@ describe('проверка Host runtime для Query', () => {
     expect(outputChanges).toHaveBeenNthCalledWith(1, { key: 'raw', output: rows })
     expect(host.getOutput('raw')).toBe(rows)
     expect('_outputHashes' in (host as unknown as Record<string, unknown>)).toBe(false)
+  })
+
+  it('передаёт GraphQL errors в reader errors(path?) выходов Query при errorPolicy all', async () => {
+    const graphQLErrors = [{ message: 'Owner is not visible', path: ['item', 'owner'], extensions: { code: 'FORBIDDEN' } }]
+    vi.spyOn(Endge.runtime.query, 'executeArtifact').mockImplementation(async (input) => {
+      input.onGraphQLErrors?.(graphQLErrors)
+      return { item: { id: 'item-1', owner: null } }
+    })
+    const host = createGraphQLHost('all')
+
+    await host.run()
+
+    expect(host.getOutputs()).toEqual({
+      item: { id: 'item-1', owner: null },
+      errors: graphQLErrors,
+      code: 'FORBIDDEN',
+    })
+    expect(host.context.status).toBe('success')
+  })
+
+  it('передаёт наблюдатель запуска в исполнитель artifact', async () => {
+    const execute = vi.spyOn(Endge.runtime.query, 'executeArtifact').mockResolvedValue({ item: { id: 'item-1' } })
+    const host = createGraphQLHost('all')
+    const observer = { onRequest: vi.fn(), onResponse: vi.fn() }
+
+    await host.run(undefined, { observer })
+
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ observer }))
+  })
+
+  it('переводит Query в error и публикует GraphQLQueryError при errorPolicy throw', async () => {
+    const failure = new GraphQLQueryError(
+      [{ message: 'Owner is not visible', path: ['item', 'owner'] }],
+      { item: { id: 'item-1', owner: null } },
+      { url: 'https://graphql.example.test', operationName: 'Item', status: 200 },
+    )
+    vi.spyOn(Endge.runtime.query, 'executeArtifact').mockRejectedValue(failure)
+    const host = createGraphQLHost('throw')
+    const runError = vi.fn()
+    host.on('run:error', runError)
+
+    await expect(host.run()).rejects.toBe(failure)
+
+    expect(host.context.status).toBe('error')
+    expect(runError).toHaveBeenCalledWith(failure)
+    expect(failure.message).toBe('[GraphQL] Owner is not visible (path: item.owner)')
   })
 
   it('обновляет объявленные props без ограничений повторного монтирования по ключу Store', () => {
@@ -216,6 +264,49 @@ function createHost(props: Record<string, unknown> = {}, declaredOutput = false)
   })
   if (!host) {
     throw new Error('Query host was not created')
+  }
+  return host
+}
+
+function createGraphQLHost(errorPolicy: 'throw' | 'all'): QueryRuntimeHost {
+  const compiled = compileQuerySource(`
+defineQuery({
+  kind: 'graphql',
+  request: {
+    endpoint: 'https://graphql.example.test',
+    document: gql\`query Item { item { id owner { id } } }\`,
+    errorPolicy: '${errorPolicy}',
+  },
+  outputs: {
+    item: output().from(data('item')),
+    errors: output().from(errors()),
+    code: output().from(errors('0.extensions.code')),
+  },
+})
+`)
+  const artifact: ProgramArtifact<QueryProgramPayload> = {
+    ref: { entityType: 'query', id: 2, identity: 'graphql-query' },
+    sourceHash: 'test',
+    compilerVersion: 'test',
+    status: 'valid',
+    diagnostics: [],
+    dependencies: [],
+    capabilities: ['compilable', 'runnable', 'data-provider'],
+    metadata: { self: {}, nodes: [] },
+    payload: compiled.artifact!,
+  }
+  const model = new RQuery()
+  model.id = 2
+  model.identity = 'graphql-query'
+  model.name = 'GraphQL Query'
+  const host = QueryRuntimeHost.createRuntime({
+    id: 'graphql-query-runtime',
+    model,
+    meta: { props: {} },
+    artifacts: { getArtifact: () => artifact as any },
+  })
+  if (!host) {
+    throw new Error('GraphQL Query host was not created')
   }
   return host
 }

@@ -47,6 +47,12 @@ export class StoreSourceLanguageStrategy implements SourceLanguageStrategy {
         detail: 'Применить внешний DataView',
       },
       {
+        label: 'dataView.contextSwitch',
+        kind: 'snippet',
+        insertText: '.dataView(contextSwitch({\n  default: \'data-view-identity\',\n  cases: [{ when: { tenant: \'kzn\' }, use: \'data-view-kzn\' }],\n}))',
+        detail: 'DataView по фасетам сборки',
+      },
+      {
         label: 'contract',
         kind: 'function',
         insertText: '.contract(field(TypeIdentity).array())',

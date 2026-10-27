@@ -15,6 +15,7 @@ export default defineConfig({
       external: [
         '@endge/core',
         '@endge/utils',
+        '@typedworks/federation',
         '@raphy-js/raph',
         'reflect-metadata',
         'class-transformer',

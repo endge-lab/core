@@ -10,7 +10,7 @@ import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
 
 import { inferConfigurationDefault, isEndgeJSONValue, validateConfigurationValue } from '@/features/core/modules/configuration/domain/configuration-value'
-import { diagnostic, propertyName, unwrapExpression } from '@/features/core/modules/source/services/compilers/source-expression-compile'
+import { diagnostic, isContextSwitchCall, propertyName, unwrapExpression } from '@/features/core/modules/source/services/compilers/source-expression-compile'
 import { compileProgramMetadataExpression } from '@/features/core/modules/source/services/compilers/source-metadata-compile'
 import { compileTypeSourceExpression } from '@/features/core/modules/source/services/compilers/type-source-compile'
 
@@ -147,6 +147,13 @@ function readValue(
     diagnostics.push(diagnostic('error', 'configuration-value-type', `Настройка "${key}" не содержит Type expression.`, key, cursor))
     return null
   }
+  const contextSwitch = findContextSwitchCall(typeArgument)
+  if (contextSwitch) {
+    // Схема Configuration разрешается до build context: каскад фасетов сам зависит от неё,
+    // поэтому выбрать ветку по фасету здесь нельзя. Значения по фасетам задают документы фасетов.
+    diagnostics.push(diagnostic('error', 'configuration-value-context-switch', `Настройка "${key}": contextSwitch в value(Type) не поддерживается — схема Configuration не зависит от фасетов; задайте значения в Configuration документа фасета.`, `${key}.type`, contextSwitch))
+    return null
+  }
   const type = compileTypeSourceExpression(typeArgument, diagnostics, `${key}.type`)
   if (!type) {
     return null
@@ -189,6 +196,25 @@ function readValue(
   }
 
   return { key, type, defaultValue, defaultWasInferred, label, description, min, max, step }
+}
+
+function findContextSwitchCall(node: t.Node): t.CallExpression | null {
+  if (isContextSwitchCall(node)) {
+    return node as t.CallExpression
+  }
+  for (const key of t.VISITOR_KEYS[node.type] ?? []) {
+    const child = (node as unknown as Record<string, unknown>)[key]
+    const children = Array.isArray(child) ? child : [child]
+    for (const item of children) {
+      if (item && typeof item === 'object' && typeof (item as t.Node).type === 'string') {
+        const found = findContextSwitchCall(item as t.Node)
+        if (found) {
+          return found
+        }
+      }
+    }
+  }
+  return null
 }
 
 function readStaticJSON(node: t.Expression, diagnostics: DiagnosticDraft[], path: string): { ok: true, value: EndgeJSONValue } | { ok: false } {

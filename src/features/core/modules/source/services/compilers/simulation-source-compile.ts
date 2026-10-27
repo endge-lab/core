@@ -112,16 +112,27 @@ export function compileSimulationSource(source: string, sourceVersion = 1): Simu
 
   function readStream(node: t.Node | null | undefined, path: string): SimulationMockStream | undefined {
     if (!isCall(node, 'mockStream')) {
-      diagnostics.push(diagnostic('error', 'simulation-stream-shape', 'stream должен иметь вид mockStream({ type, event, intervalMs?, itemsPerMessage?, seed?, fields? }).', path, node))
+      diagnostics.push(diagnostic('error', 'simulation-stream-shape', 'stream должен иметь вид mockStream({ type, event?, intervalMs?, itemsPerMessage?, seed?, fields?, errors? }).', path, node))
       return undefined
     }
-    const options = object(node.arguments[0], path, ['type', 'event', 'intervalMs', 'itemsPerMessage', 'seed', 'fields'])
+    const options = object(node.arguments[0], path, ['type', 'event', 'intervalMs', 'itemsPerMessage', 'seed', 'fields', 'errors'])
     const type = options.get('type')
     const event = options.get('event')
     const identity = t.isIdentifier(type) ? type.name : t.isStringLiteral(type) ? type.value : ''
     const stream: SimulationMockStream = { kind: 'mock-stream', type: identity, event: t.isStringLiteral(event) ? event.value : '', intervalMs: 1000, itemsPerMessage: 1, fields: Object.create(null) }
-    if (!identity || !stream.event.trim()) {
+    // event обязателен для sse/websocket; для graphqlSse его не указывают — это проверяет resolver по transport Stream.
+    if (!identity || (event && !stream.event.trim())) {
       diagnostics.push(diagnostic('error', 'simulation-stream-contract', 'Укажите существующий Type и строковое имя event.', path, node))
+    }
+    const errors = options.get('errors')
+    if (errors) {
+      const value = readJson(errors)
+      if (Array.isArray(value) && value.length && value.every(isGraphQLError)) {
+        stream.errors = value as SimulationMockStream['errors']
+      }
+      else {
+        diagnostics.push(diagnostic('error', 'simulation-stream-errors', 'errors: непустой массив GraphQL errors [{ message: \'...\', path?: [...], extensions?: {...} }].', `${path}.errors`, errors))
+      }
     }
     for (const [key, min, max] of [['intervalMs', 100, 60000], ['itemsPerMessage', 1, 100]] as const) {
       const value = options.get(key)
@@ -164,13 +175,53 @@ export function compileSimulationSource(source: string, sourceVersion = 1): Simu
     return stream
   }
 
+  // Статический JSON literal; иное значение (вызов, идентификатор, шаблон с выражениями) даёт undefined.
+  function readJson(node: t.Node | null | undefined): unknown {
+    if (t.isStringLiteral(node) || t.isNumericLiteral(node) || t.isBooleanLiteral(node)) {
+      return node.value
+    }
+    if (t.isNullLiteral(node)) {
+      return null
+    }
+    if (t.isUnaryExpression(node, { operator: '-' }) && t.isNumericLiteral(node.argument)) {
+      return -node.argument.value
+    }
+    if (t.isArrayExpression(node)) {
+      const items = node.elements.map(item => readJson(item))
+      return items.includes(undefined) ? undefined : items
+    }
+    if (t.isObjectExpression(node)) {
+      const entries: Array<[string, unknown]> = []
+      for (const property of node.properties) {
+        const key = t.isObjectProperty(property) && !property.computed ? propertyName(property.key) : null
+        const value = key == null ? undefined : readJson((property as t.ObjectProperty).value)
+        if (value === undefined) {
+          return undefined
+        }
+        entries.push([key!, value])
+      }
+      return Object.fromEntries(entries)
+    }
+    return undefined
+  }
+
   function readRequest(node: t.Node | null | undefined, path: string): SimulationMockRequest | undefined {
     if (!isCall(node, 'mockRequest')) {
-      diagnostics.push(diagnostic('error', 'simulation-request-shape', 'request должен иметь вид mockRequest({ seed?, arrays?, useExamples? }).', path, node))
+      diagnostics.push(diagnostic('error', 'simulation-request-shape', 'request должен иметь вид mockRequest({ seed?, arrays?, useExamples?, errors? }).', path, node))
       return undefined
     }
-    const options = object(node.arguments[0], path, ['seed', 'arrays', 'useExamples'])
+    const options = object(node.arguments[0], path, ['seed', 'arrays', 'useExamples', 'errors'])
     const request: SimulationMockRequest = { kind: 'mock-request', arrays: Object.create(null) }
+    const errors = options.get('errors')
+    if (errors) {
+      const value = readJson(errors)
+      if (Array.isArray(value) && value.length && value.every(isGraphQLError)) {
+        request.errors = value as SimulationMockRequest['errors']
+      }
+      else {
+        diagnostics.push(diagnostic('error', 'simulation-request-errors', 'errors: непустой массив GraphQL errors [{ message: \'...\', path?: [...], extensions?: {...} }].', `${path}.errors`, errors))
+      }
+    }
     const useExamples = options.get('useExamples')
     if (useExamples) {
       if (t.isBooleanLiteral(useExamples)) {
@@ -205,4 +256,13 @@ export function compileSimulationSource(source: string, sourceVersion = 1): Simu
 
 function isCall(node: t.Node | null | undefined, name: string): node is t.CallExpression {
   return t.isCallExpression(node) && t.isIdentifier(node.callee, { name }) && node.arguments.length === 1 && !node.typeParameters && !node.typeArguments
+}
+
+function isGraphQLError(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false
+  }
+  const error = value as Record<string, unknown>
+  return typeof error.message === 'string'
+    && (error.path === undefined || (Array.isArray(error.path) && error.path.every(segment => typeof segment === 'string' || typeof segment === 'number')))
 }

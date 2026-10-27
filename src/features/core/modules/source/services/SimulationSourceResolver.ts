@@ -1,11 +1,14 @@
 import type { ProgramDependency } from '@/features/core/modules/program/domain/types/program.types'
 import type { CompositionSourceDocument } from '@/features/core/modules/source/domain/types/composition-source.types'
 import type { SimulationRuntimeOverride, SimulationSourceCatalog, SimulationSourceCompileResult, SimulationSourceInput, SimulationTargetReference } from '@/features/core/modules/source/domain/types/simulation-source.types'
+import type { StreamTransportDescriptor } from '@/features/core/modules/source/domain/types/stream-source.types'
 import type { TypeSourceExpression } from '@/features/core/modules/source/domain/types/type-source.types'
 
 import { compileCompositionSource } from '@/features/core/modules/source/services/compilers/composition-source-compile'
 import { compileQuerySource } from '@/features/core/modules/source/services/compilers/query-source-compile'
+import { compileStreamSource } from '@/features/core/modules/source/services/compilers/stream-source-compile'
 import { compileTypeSource } from '@/features/core/modules/source/services/compilers/type-source-compile'
+import { resolveSimulationResponseContract } from '@/features/core/modules/source/services/simulation-response-contract'
 
 interface SimulationCompositionBranch {
   owner: SimulationSourceInput
@@ -24,6 +27,8 @@ interface QueryArrayContract {
   paths: string[]
   dependencies: ProgramDependency[]
   errors: string[]
+  // GraphQL Query: mockRequest может задавать errors ответа.
+  graphql?: boolean
 }
 
 /**
@@ -102,15 +107,13 @@ export class SimulationSourceResolver {
       result.errors.push(`Query "${identity}" содержит ошибки Source.`)
       return result
     }
-    const contracts = document.outputs
-      .filter(output => output.source.type === 'response' && !output.source.path && !output.source.expression && !output.transforms.length && output.contract)
-      .map(output => output.contract!)
-    const unique = new Map(contracts.map(contract => [JSON.stringify({ type: contract.type, expression: contract.typeExpression, array: contract.array }), contract]))
-    if (unique.size !== 1) {
-      result.errors.push(unique.size ? `Query "${identity}" содержит неоднозначные контракты корневого response.` : `Query "${identity}" требует контракт output().from(response()).contract(field(Type)) для корневого ответа.`)
+    result.graphql = document.kind === 'graphql'
+    const resolved = resolveSimulationResponseContract(identity, document.outputs, document.kind === 'graphql')
+    if (!resolved.contract) {
+      result.errors.push(resolved.error)
       return result
     }
-    const contract = [...unique.values()][0]
+    const contract = resolved.contract
     const expression: TypeSourceExpression = contract.typeExpression ?? { kind: 'reference', identity: contract.type }
     const paths = new Set<string>()
     const dependencies = new Set<string>()
@@ -146,6 +149,10 @@ export class SimulationSourceResolver {
         walk(value.items, `${path}[]`, visited)
       }
       else if (value.kind === 'object') {
+        // Authored Type с extends: поля базовой цепочки — на том же пути, что и собственные.
+        if (value.extends) {
+          walk(value.extends, path, visited)
+        }
         for (const field of value.fields) {
           const fieldPath = path ? `${path}.${field.key}` : field.key
           walk(field.array ? { kind: 'array', items: field.type } : field.type, fieldPath, visited)
@@ -163,6 +170,14 @@ export class SimulationSourceResolver {
     result.paths = [...paths].filter(path => !path.includes('.*')).sort()
     result.errors = [...new Set(result.errors)]
     return result
+  }
+
+  /**
+   * Вид transport Stream из каталога; null — Stream отсутствует в каталоге или содержит ошибки Source.
+   */
+  public streamTransport(identity: string): StreamTransportDescriptor['kind'] | null {
+    const stream = this._catalog.streams?.find(item => item.identity === identity)
+    return stream ? compileStreamSource(stream.source, stream.sourceVersion).document?.transport.kind ?? null : null
   }
 
   public analyze(result: SimulationSourceCompileResult): SimulationSourceCompileResult {
@@ -210,6 +225,18 @@ export class SimulationSourceResolver {
           if (!type || (!type.isPrimitive && compileTypeSource(type.source, type.sourceVersion).diagnostics.some(item => item.severity === 'error'))) {
             report('simulation-stream-type', `Type "${override.stream.type}" отсутствует или содержит ошибки.`, `${currentPath}.stream.type`)
           }
+          if (target.kind === 'stream') {
+            const graphql = this.streamTransport(target.identity) === 'graphql-sse'
+            if (graphql && override.stream.event) {
+              report('simulation-stream-event-graphql', 'Для graphqlSse event не указывается: Type описывает data события next, тип события задаёт events.next Stream.', `${currentPath}.stream.event`)
+            }
+            if (!graphql && !override.stream.event.trim()) {
+              report('simulation-stream-contract', 'Укажите строковое имя event: нормализованный тип события, ожидаемый Update.', `${currentPath}.stream`)
+            }
+            if (!graphql && override.stream.errors) {
+              report('simulation-stream-errors-transport', 'errors поддерживается только для Stream с transport graphqlSse.', `${currentPath}.stream.errors`)
+            }
+          }
         }
         if (override.request) {
           if (target.kind !== 'query') {
@@ -219,6 +246,9 @@ export class SimulationSourceResolver {
             const contract = this.queryContract(target.identity)
             dependencies.push(...contract.dependencies)
             contract.errors.forEach(message => report('simulation-response-contract', message, `${currentPath}.request`))
+            if (override.request.errors && contract.graphql === false) {
+              report('simulation-request-errors-transport', 'errors поддерживается только для GraphQL Query.', `${currentPath}.request.errors`)
+            }
             if (!contract.errors.length) {
               for (const key of Object.keys(override.request.arrays)) {
                 if (!contract.paths.includes(key)) {

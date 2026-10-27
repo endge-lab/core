@@ -16,10 +16,10 @@ import type { SourceExpressionIR } from '@/features/core/modules/source/domain/t
 
 import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
-import { compileSourceCallback, compileSourceExpression } from '@/features/core/modules/source/services/compilers/source-expression-compile'
+import { compileSourceCallback, compileSourceExpression, validateSourcePath } from '@/features/core/modules/source/services/compilers/source-expression-compile'
 import { compileSourceField } from '@/features/core/modules/source/services/compilers/source-field-compile'
 import { compileProgramMetadataProperty } from '@/features/core/modules/source/services/compilers/source-metadata-compile'
-import { readSourceModelIdentity, readSourceModelReference } from '@/features/core/modules/source/services/compilers/source-model-reference-compile'
+import { readSourceModelIdentity, readSourceModelReference, toDataViewRef } from '@/features/core/modules/source/services/compilers/source-model-reference-compile'
 
 type DiagnosticDraft = Omit<ProgramDiagnostic, 'entityRef'>
 
@@ -641,13 +641,11 @@ function readDataViewRef(
   const reference = readSourceModelReference(node, source, {
     referenceCall: 'dataView',
     defineCall: 'defineDataView',
+    diagnostics,
+    sourcePath: 'steps',
   })
-  if (reference?.kind === 'external') {
-    return reference
-  }
-
-  if (reference?.kind === 'inline') {
-    if (isManualDataViewDefinition(reference.definition.arguments[0])) {
+  if (reference) {
+    if ((reference.variants ?? [reference]).some(branch => branch.kind === 'inline' && isManualDataViewDefinition(branch.definition.arguments[0]))) {
       diagnostics.push(createDiagnostic(
         'error',
         'data-view-source-local-dataview-manual-unsupported',
@@ -656,7 +654,7 @@ function readDataViewRef(
       ))
     }
 
-    return { kind: 'inline', source: reference.source }
+    return toDataViewRef(reference)
   }
 
   diagnostics.push(createDiagnostic(
@@ -761,6 +759,14 @@ function readExpression(node: t.Expression, diagnostics: DiagnosticDraft[], sour
 
   const pathExpression = readPathExpression(expression)
   if (pathExpression) {
+    if (pathExpression.type === 'path') {
+      validateSourcePath(pathExpression.path, diagnostics, sourcePath, expression)
+      for (const operation of pathExpression.operations) {
+        if (operation.type === 'pick') {
+          validateSourcePath(operation.path, diagnostics, sourcePath, expression)
+        }
+      }
+    }
     return pathExpression
   }
 

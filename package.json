@@ -1,7 +1,7 @@
 {
   "name": "@endge/core",
   "type": "module",
-  "version": "1.0.0-dev.5",
+  "version": "1.0.0-dev.11",
   "private": false,
   "packageManager": "pnpm@8.8.0",
   "license": "Apache-2.0",
@@ -34,7 +34,7 @@
     "lint-fix": "eslint . --fix --cache"
   },
   "peerDependencies": {
-    "@raphy-js/raph": "1.0.0-dev.18 || 1.0.1-dev.25",
+    "@raphy-js/raph": "1.0.0-dev.18 || 1.0.1-dev.25 || 1.0.1-dev.26 || 1.0.1-dev.54",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "reflect-metadata": "^0.2.2"
@@ -43,7 +43,8 @@
     "@babel/generator": "^7.29.7",
     "@babel/parser": "^7.27.2",
     "@babel/types": "^7.27.1",
-    "@endge/utils": "1.0.0-dev",
+    "@endge/utils": "1.0.0-dev.6",
+    "@typedworks/federation": "1.0.0-dev.1",
     "@vue/compiler-dom": "^3.5.24",
     "@vue/compiler-sfc": "^3.5.24",
     "axios": "^1.13.2",
@@ -62,9 +63,10 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "9.3.0",
-    "@raphy-js/raph": "1.0.1-dev.25",
+    "@raphy-js/raph": "1.0.1-dev.54",
     "@types/babel__generator": "^7.27.0",
     "@types/lodash": "^4.14.202",
+    "@vitest/coverage-v8": "2.1.9",
     "@vue/language-core": "^3.3.11",
     "eslint": "10.9.1",
     "rimraf": "^6.0.1",
