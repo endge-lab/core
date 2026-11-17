@@ -69,6 +69,10 @@ export interface ProgramRequirements {
 }
 
 export interface ExecutionBundle {
+  // Explicit execution/validation graph; absent in legacy programs.
+  executionGraphVersion?: 1
+  exportScope?: 'startup-composition'
+
   version: 1
   programId: string
   compilerVersion: string

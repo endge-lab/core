@@ -507,8 +507,11 @@ function compileRequiredPortBindings(
       continue
     }
 
+    appendRequiredPortBindingDependency(binding, dependencies)
     for (const variant of variants) {
-      appendRequiredPortBindingDependency(variant, dependencies)
+      if (variant.kind !== binding.kind || variant.identity !== binding.identity) {
+        (dependencies.contextValidation ??= []).push({ kind: variant.kind, identity: variant.identity })
+      }
     }
     result.push({ kind: binding.kind, identity: binding.identity, port: portName, sourceRange: attribute.range })
   }

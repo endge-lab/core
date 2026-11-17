@@ -293,7 +293,7 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
         compute: input => input === undefined
           ? undefined
           : field.dataViews.reduce<unknown>(
-              (value, ref) => Endge.runtime.dataView.runRef(ref, value),
+              (value, ref) => Endge.runtime.dataView.runRef(ref, value, undefined, { children: this.getArtifact()?.children }),
               input,
             ),
       })
