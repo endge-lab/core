@@ -38,6 +38,7 @@ import {
   packProgramArtifact,
   readExecutionBundle,
 } from './tools/execution-bundle'
+import { selectStartupBundle } from './tools/startup-bundle'
 
 /**
  * Хранилище compiled artifacts, полученных после компиляции домена.
@@ -58,6 +59,9 @@ export class EndgeProgram_Module extends EndgeModule {
   private _status: ProgramArtifactStatus = 'valid'
   private _compilerVersion = '0'
   private _programId: string | null = null
+  private _startupProgramId: string | null = null
+  private _executionGraphVersion: 1 | undefined
+  private _exportScope: 'startup-composition' | undefined
   private _createdAt = ''
   private _hostActions: ProgramHostActionRequirement[] = []
   private _catalog: CompiledProgramCatalog = { folders: {}, documents: {} }
@@ -93,14 +97,20 @@ export class EndgeProgram_Module extends EndgeModule {
     this._hostActions = copyBundleJson(hostActions) as unknown as ProgramHostActionRequirement[]
     this._catalogIsCurrent = isCurrent ?? null
     this._createdAt = new Date().toISOString()
+    this._exportScope = undefined
+    this._executionGraphVersion = 1
     this._programId = uuid()
+    this._startupProgramId = null
     this.notify()
   }
 
   /**
    * Упаковывает проверенную текущую программу без второго постоянного владельца artifacts.
    */
-  public exportBundle(options: { includeAst?: boolean } = {}): ExecutionBundle {
+  public exportBundle(options: { includeAst?: boolean, scope?: 'complete-model' | 'startup-composition' } = {}): ExecutionBundle {
+    if (options.scope !== undefined && !['complete-model', 'startup-composition'].includes(options.scope)) {
+      throw new Error('[Bundle] Unsupported export scope')
+    }
     for (const artifact of this._artifacts.values()) {
       this.getArtifactByRef(artifact.ref)
     }
@@ -112,7 +122,15 @@ export class EndgeProgram_Module extends EndgeModule {
     ) {
       throw new Error('[Bundle] Complete current compilation is required')
     }
-    return readExecutionBundle({
+    if (options.scope === 'startup-composition' && this._executionGraphVersion !== 1) {
+      throw new Error('[Bundle] Recompile the model before exporting a context-specific program')
+    }
+    if ((options.scope === 'startup-composition' || this._exportScope === 'startup-composition') && options.includeAst) {
+      throw new Error('[Bundle] AST is not allowed in a context-specific export')
+    }
+    const bundle: ExecutionBundle = {
+      ...(this._exportScope ? { exportScope: this._exportScope } : {}),
+      ...(this._executionGraphVersion ? { executionGraphVersion: this._executionGraphVersion } : {}),
       version: 1,
       programId: this._programId,
       compilerVersion: this._compilerVersion,
@@ -132,7 +150,12 @@ export class EndgeProgram_Module extends EndgeModule {
           packProgramArtifact(artifact, options.includeAst === true),
         ]),
       ),
-    })
+    }
+    if (options.scope === 'startup-composition') {
+      this._startupProgramId ??= uuid()
+      return readExecutionBundle(selectStartupBundle(bundle, this._startupProgramId))
+    }
+    return readExecutionBundle(bundle)
   }
 
   public prepareInstall(value: unknown): PreparedProgramInstall {
@@ -164,6 +187,9 @@ export class EndgeProgram_Module extends EndgeModule {
     this._catalog = value.catalog
     this._compiledContext = value.context
     this._compilerVersion = value.compilerVersion
+    this._exportScope = value.exportScope
+    this._executionGraphVersion = value.executionGraphVersion
+    this._startupProgramId = value.exportScope ? value.programId : null
     this._programId = value.programId
     this._createdAt = value.createdAt
     this.recalculateStatus()
@@ -555,6 +581,9 @@ export class EndgeProgram_Module extends EndgeModule {
    * Очищает compiled program и возвращает статус в `valid`.
    */
   public clear(): void {
+    this._startupProgramId = null
+    this._executionGraphVersion = undefined
+    this._exportScope = undefined
     this._hostActions = []
     this._programId = null
     this._compiledContext = null

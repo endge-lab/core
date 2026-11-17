@@ -160,7 +160,9 @@ const ports = definePorts({
     expect(codes(afl, 'error')).toEqual([])
     expect(afl.ir?.template.roots[0]).toMatchObject({ portBindings: [{ port: 'update', kind: 'query', identity: 'update-afl' }] })
     expect(kzn.ir?.template.roots[0]).toMatchObject({ portBindings: [{ port: 'update', kind: 'query', identity: 'update-kzn' }] })
-    expect(afl.dependencies.queries).toEqual(expect.arrayContaining(['update-afl', 'update-kzn']))
+    expect(afl.dependencies.queries).toContain('update-afl')
+    expect(afl.dependencies.contextValidation).toContainEqual({ kind: 'query', identity: 'update-kzn' })
+    expect(kzn.dependencies.contextValidation).toContainEqual({ kind: 'query', identity: 'update-afl' })
     expect(codes(compileParent(SWITCH))).toContain('source-expression-context-unbound')
   })
 

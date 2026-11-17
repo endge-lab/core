@@ -90,6 +90,9 @@ export interface ProgramDiagnostic {
 
 // Зависимость compiled artifact от другой доменной сущности или внешней capability.
 export interface ProgramDependency {
+  // Ссылка проверяется и участвует в freshness, но не нужна выбранному execution context.
+  validationOnly?: boolean
+
   // Тип зависимой сущности. Может быть расширен строкой для внешних источников.
   entityType: ProgramEntityType | string
 

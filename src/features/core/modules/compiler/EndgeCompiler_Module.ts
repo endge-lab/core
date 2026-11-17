@@ -33,8 +33,8 @@ import type {
 } from '@/features/core/modules/program/domain/types/program.types'
 import type { CompositionBindingValue, CompositionProgramPayload } from '@/features/core/modules/source/domain/types/composition-source.types'
 import type { DataViewMaterializationStrategy, DataViewPipelineStep, DataViewRef } from '@/features/core/modules/source/domain/types/data-view-source.types'
-
 import type { FilterProgramPayload } from '@/features/core/modules/source/domain/types/filter-source.types'
+
 import type { ResponseOutputTransform } from '@/features/core/modules/source/domain/types/response-output.types'
 import type { SimulationSourceArtifact } from '@/features/core/modules/source/domain/types/simulation-source.types'
 import type { SourceExpressionIR, SourceFieldDefinition } from '@/features/core/modules/source/domain/types/source-expression.types'
@@ -85,6 +85,7 @@ import { resolveTypeDefinitionExtends } from '@/features/core/modules/source/ser
 import { compileEndgeCSS } from '@/features/core/modules/styles/services/endgecss-compile'
 import { EndgeModule } from '@/features/federation/EndgeModule'
 import { createCompiledProgramCatalog } from './tools/compiled-program-catalog'
+import { selectTypeContext } from './tools/select-type-context'
 
 const MISSING_STATIC_PATH = Symbol('missing-static-path')
 
@@ -491,6 +492,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
         const extended = resolveTypeDefinitionExtends(definition, identity => this._authoredTypeDefinition(identity), entity.identity)
         const knownIdentities = new Set(Endge.types.listResolved().map(type => type.identity))
         const semanticDiagnostics = validateTypeDefinitionReferences(definition, knownIdentities)
+        const executionTypes = new Set(collectTypeDefinitionReferences(selectTypeContext(definition)))
         const dependencies = collectTypeDefinitionReferences(definition)
           .filter(identity => identity !== 'Any')
           .map((identity) => {
@@ -500,6 +502,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
               id: target?.id ?? identity,
               identity,
               role: 'type-reference',
+              validationOnly: !executionTypes.has(identity),
             }
           })
         const diagnostics = [
@@ -547,6 +550,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
         const schema = Endge.configurationSchema.get(entity.identity)
         const metadata = inspectDocumentMetadata('configuration', { source: entity.source, meta: entity.meta })
         const values = schema?.document?.values ?? []
+        const executionTypes = new Set(values.flatMap(value => collectTypeSourceExpressionReferences(selectTypeContext(value.type))))
         const dependencies = [...new Set(values.flatMap(value => collectTypeSourceExpressionReferences(value.type)))]
           .filter(identity => identity !== 'Any')
           .map((identity) => {
@@ -556,6 +560,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
               id: target?.id ?? identity,
               identity,
               role: 'configuration-value-type',
+              validationOnly: !executionTypes.has(identity),
             }
           })
         //
@@ -728,6 +733,13 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
                 ? 'port-default-action'
                 : 'component-action',
             })),
+            ...(result.dependencies.contextValidation ?? []).map(reference => ({
+              entityType: reference.kind === 'component' ? 'component-sfc' : reference.kind,
+              id: reference.identity,
+              identity: reference.identity,
+              role: 'context-validation',
+              validationOnly: true,
+            })),
             ...result.dependencies.queries.map(identity => ({
               entityType: 'query',
               id: identity,
@@ -843,11 +855,11 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
           ],
           dependencies: [
             ...local.dependencies,
-            ...this._typeDependencies((local.payload ?? artifact)?.props.flatMap(prop => [prop.type, prop.typeExpression, typeVariantsExpression(prop)]) ?? []),
+            ...this._typeDependencies((local.payload ?? artifact)?.props.flatMap(prop => [prop.type, prop.typeExpression, { validation: typeVariantsExpression(prop) }]) ?? []),
             ...this._typeDependencies((local.payload ?? artifact)?.outputs.flatMap(output => [
               output.contract?.type,
               output.contract?.typeExpression,
-              typeVariantsExpression(output.contract),
+              { validation: typeVariantsExpression(output.contract) },
             ]) ?? []),
             ...this._queryAuthDependencies(local.payload ?? artifact),
           ],
@@ -1054,6 +1066,8 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
         const result = Endge.source.compile('store', entity.source)
         const payload = result.artifact as StoreSourceArtifact | undefined
         const dependencies: ProgramArtifact['dependencies'] = []
+        const children: ProgramArtifact[] = []
+        const dataViewDiagnostics: Omit<ProgramDiagnostic, 'entityRef'>[] = []
         const updateHandlers = Endge.domain.getUpdatesByStoreIdentity(entity.identity)
           .map((update) => {
             const artifact = Endge.program.getUpdateArtifact(update.identity)
@@ -1137,7 +1151,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
           payload?.data.flatMap(field => [
             field.contract?.type,
             field.contract?.typeExpression,
-            typeVariantsExpression(field.contract),
+            { validation: typeVariantsExpression(field.contract) },
           ]) ?? [],
         ))
         for (const field of payload?.data ?? []) {
@@ -1173,8 +1187,16 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
           }
           // Ветки contextSwitch проверяются все; в artifact остаётся выбранная.
           const checkedDataViews = field.dataViews.flatMap(ref => ref.kind !== 'local' && ref.contextVariants ? ref.contextVariants : [ref])
-          field.dataViews = field.dataViews.map(withoutDataViewVariants)
-          field.materializationStrategy = this._resolveDataViewChainStrategy(field.dataViews, [])
+          field.dataViews = this._materializeDataViewRefs(
+            field.dataViews,
+            entity.identity,
+            `data.${field.key}.dataViews`,
+            context,
+            children,
+            dataViewDiagnostics,
+            dependencies,
+          )
+          field.materializationStrategy = this._resolveDataViewChainStrategy(field.dataViews, children)
           for (const ref of checkedDataViews) {
             if (ref.kind !== 'external' || dependencies.some(item => item.role === `store-derived:${field.key}` && item.identity === ref.identity)) {
               continue
@@ -1184,6 +1206,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
               id: ref.identity,
               identity: ref.identity,
               role: `store-derived:${field.key}`,
+              validationOnly: !field.dataViews.some(selected => selected.kind === 'external' && selected.identity === ref.identity),
             })
             const dataViewArtifact = Endge.program.getDataViewArtifact(ref.identity)
             if (!dataViewArtifact || dataViewArtifact.status === 'error') {
@@ -1207,7 +1230,8 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
             updateHandlers,
           },
           dependencies,
-          diagnostics: (result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[],
+          children,
+          diagnostics: [...(result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[], ...dataViewDiagnostics],
         })
       },
     })
@@ -1306,7 +1330,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
           payload: { ...(payload ?? this._makeEmptyFilterPayload(entity.sourceVersion)), ast: result.ast },
           dependencies: [
             ...dependencies,
-            ...this._typeDependencies(payload?.fields.flatMap(field => [field.type, typeVariantsExpression(field)]) ?? []),
+            ...this._typeDependencies(payload?.fields.flatMap(field => [field.type, field.typeExpression, { validation: typeVariantsExpression(field) }]) ?? []),
           ],
           diagnostics: [
             ...((result.diagnostics ?? []) as Omit<ProgramDiagnostic, 'entityRef'>[]),
@@ -1351,7 +1375,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
           dependencies: [
             ...i18n.dependencies,
             ...validation.dependencies,
-            ...this._typeDependencies(payload?.props.flatMap(prop => [prop.type, typeVariantsExpression(prop)]) ?? []),
+            ...this._typeDependencies(payload?.props.flatMap(prop => [prop.type, prop.typeExpression, { validation: typeVariantsExpression(prop) }]) ?? []),
             ...this._compositionPreviewDependencies(payload),
           ],
           diagnostics: [
@@ -1649,18 +1673,27 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
    * Создаёт стабильные зависимости Program для каждого выражения пользовательского типа.
    */
   private _typeDependencies(
-    expressions: Array<string | TypeSourceExpression | null | undefined>,
+    expressions: Array<string | TypeSourceExpression | { validation: TypeSourceExpression | null } | null | undefined>,
     excluded: ReadonlySet<string> = new Set(),
   ): ProgramArtifact['dependencies'] {
     const identities = new Set<string>()
-    for (const expression of expressions) {
-      const referenced = typeof expression === 'string' || expression == null
-        ? collectTypeExpressionReferences(expression)
-        : new Set(collectTypeSourceExpressionReferences(expression)
+    const executionTypes = new Set<string>()
+    for (const input of expressions) {
+      const validationOnly = input != null && typeof input === 'object' && 'validation' in input
+      const expression = validationOnly ? input.validation : input as string | TypeSourceExpression | null | undefined
+      const references = (value: typeof expression) => typeof value === 'string' || value == null
+        ? collectTypeExpressionReferences(value)
+        : new Set(collectTypeSourceExpressionReferences(value)
             .filter(identity => collectTypeExpressionReferences(identity).has(identity)))
-      for (const identity of referenced) {
+      for (const identity of references(expression)) {
         if (!excluded.has(identity)) {
           identities.add(identity)
+        }
+      }
+      if (!validationOnly) {
+        const selected = typeof expression === 'object' ? selectTypeContext(expression) : expression
+        for (const identity of references(selected)) {
+          executionTypes.add(identity)
         }
       }
     }
@@ -1671,6 +1704,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
         id: type?.id ?? identity,
         identity,
         role: 'type-contract',
+        validationOnly: !executionTypes.has(identity),
       }
     })
   }
@@ -2791,7 +2825,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
         if (!compiled || compiled.status === 'error') {
           diagnostics.push({ severity: 'error', code: 'composition-store-invalid', message: `Store "${data.identity}" содержит compile errors.`, sourcePath: `data.${dataPath}` })
         }
-        else { storeArtifacts.set(dataPath, compiled.payload) }
+        else {
+          storeArtifacts.set(dataPath, compiled.payload)
+        }
         dependencies.push({ entityType: 'store', id: store.id, identity: store.identity, role: 'composition-data' })
       }
       else {
@@ -2869,6 +2905,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
         id: dependencySource?.identity ?? runtime.identity,
         identity: dependencySource?.identity ?? runtime.identity,
         role: 'composition-runtime',
+        validationOnly: !payload.runtimes.some(selected => selected.kind === runtime.kind && selected.identity === runtime.identity),
       })
 
       if (runtime.kind === 'filter-view') {
@@ -3492,7 +3529,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
       for (const [variantIndex, variant] of (variantRef.kind === 'local' ? [] : variantRef.contextVariants ?? []).entries()) {
         if (variant.kind === 'external') {
           if (!dependencies.some(item => item.entityType === 'data-view' && item.identity === variant.identity)) {
-            dependencies.push({ entityType: 'data-view', id: variant.identity, identity: variant.identity, role: 'data-view' })
+            dependencies.push({ entityType: 'data-view', id: variant.identity, identity: variant.identity, role: 'data-view', validationOnly: true })
           }
           continue
         }

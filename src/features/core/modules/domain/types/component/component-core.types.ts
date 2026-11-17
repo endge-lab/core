@@ -94,6 +94,9 @@ export interface RComponentContract {
 
 // Набор внешних зависимостей, найденных при компиляции компонента.
 export interface RComponentDependencies {
+  // Невыбранные providers contextSwitch: проверяются, но не исполняются.
+  contextValidation?: Array<{ kind: string, identity: string }>
+
   // Дочерние компоненты, на которые ссылается template.
   components: RComponentRef[]
 

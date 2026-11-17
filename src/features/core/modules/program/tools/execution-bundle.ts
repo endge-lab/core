@@ -74,6 +74,12 @@ export function readExecutionBundle(input: unknown): ExecutionBundle {
   ) {
     throw new TypeError('[Bundle] Invalid creation time')
   }
+  if (value.executionGraphVersion !== undefined && value.executionGraphVersion !== 1) {
+    throw new Error('[Bundle] Unsupported execution dependency graph')
+  }
+  if (value.exportScope !== undefined && (value.exportScope !== 'startup-composition' || value.executionGraphVersion !== 1)) {
+    throw new Error('[Bundle] Invalid export scope')
+  }
   const context = bundleObject(value.context, 'context')
   normalizeEndgeConfiguration(context.configuration)
   const facets = bundleObject(context.facets, 'context facets')
@@ -182,6 +188,9 @@ export function readExecutionBundle(input: unknown): ExecutionBundle {
     for (const raw of item.dependencies) {
       const dependency = bundleObject(raw, 'dependency')
       bundleText(dependency.entityType, 'dependency type')
+      if (dependency.validationOnly !== undefined && typeof dependency.validationOnly !== 'boolean') {
+        throw new Error('[Bundle] Invalid dependency usage')
+      }
       if (
         typeof dependency.id !== 'string'
         && typeof dependency.id !== 'number'

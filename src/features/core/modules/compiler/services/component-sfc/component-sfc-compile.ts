@@ -368,6 +368,9 @@ function mergeDependencies(
   ...items: RComponentDependencies[]
 ): RComponentDependencies {
   for (const item of items) {
+    if (item.contextValidation?.length) {
+      (base.contextValidation ??= []).push(...item.contextValidation)
+    }
     base.components.push(...item.components)
     base.computations.push(...item.computations)
     base.actions.push(...item.actions)

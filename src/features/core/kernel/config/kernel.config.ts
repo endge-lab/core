@@ -8,7 +8,7 @@ export {
   DEFAULT_TIMEZONE,
 } from '@/features/core/kernel/constants/kernel.constants'
 
-export const ENDGE_COMPILER_VERSION = 'program-v4'
+export const ENDGE_COMPILER_VERSION = 'program-v5'
 
 // Стабильные scope groups для compiler spans.
 export const ENDGE_COMPILER_SPAN_GROUPS = {
