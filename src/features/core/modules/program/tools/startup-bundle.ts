@@ -2,6 +2,7 @@ import type { ExecutionBundle, PortableProgramArtifact } from '../domain/types/e
 import type { ComponentSFCProgramPayload, ProgramArtifact } from '../domain/types/program.types'
 import type { RComponentSFC_IR_Node } from '@/features/core/modules/domain/types/component/sfc/ir.types'
 import type { CompositionProgramPayload } from '@/features/core/modules/source/domain/types/composition-source.types'
+import { collectProgramArtifactTypes } from './execution-bundle'
 
 // A transport projection, never a second owner of Program state.
 export function selectStartupBundle(bundle: ExecutionBundle, programId: string): ExecutionBundle {
@@ -72,7 +73,8 @@ export function selectStartupBundle(bundle: ExecutionBundle, programId: string):
     catalog: { workspace: bundle.catalog.workspace, folders: {}, documents },
     artifacts,
     requirements: {
-      artifactTypes: [...new Set([...selected.values()].map(artifact => artifact.ref.entityType))],
+      hostControllers: (bundle.requirements.hostControllers ?? []).filter(requirement => [...selected.values()].some(artifact => artifact.ref.entityType === 'controller' && artifact.ref.identity === requirement.identity)),
+      artifactTypes: collectProgramArtifactTypes([...selected.values()]),
       componentTags: bundle.requirements.componentTags.filter(tag => componentIdentities.has(tag.identity)),
       ...(bundle.requirements.hostActions?.length
         ? {

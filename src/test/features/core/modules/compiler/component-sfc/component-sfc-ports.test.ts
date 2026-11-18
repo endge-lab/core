@@ -284,13 +284,14 @@ const ports = definePorts({
 <template><Table ref="departures" :rows="[]" /></template>`)
 
     expect(result.diagnostics.filter(item => item.severity === 'error')).toEqual([])
-    expect(result.ir?.script.ports.provides.actions).toHaveLength(10)
+    expect(result.ir?.script.ports.provides.actions).toHaveLength(11)
     expect(result.ir?.script.ports.provides.actions).toEqual(expect.arrayContaining([
       expect.objectContaining({
         name: 'table.column.pinLeft',
         forwardedFrom: expect.objectContaining({ ref: 'departures', componentTag: 'Table' }),
       }),
       expect.objectContaining({ name: 'table.sort.clearAll' }),
+      expect.objectContaining({ name: 'table.scrollToRow' }),
     ]))
   })
 

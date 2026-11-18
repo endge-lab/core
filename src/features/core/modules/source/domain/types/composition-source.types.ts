@@ -4,6 +4,7 @@ import type { I18nCompiledLocales } from '@/features/core/modules/i18n/domain/i1
 import type { EndgeMockReference } from '@/features/core/modules/mock/domain/types/mock-data.type'
 import type { ProgramMetadataMap } from '@/features/core/modules/program/domain/types/program-metadata.types'
 import type { ProgramDiagnostic } from '@/features/core/modules/program/domain/types/program.types'
+import type { ControllerDependencyBindings } from '@/features/core/modules/runtime/domain/controllers/controller.types'
 import type { RuntimeHost } from '@/features/core/modules/runtime/domain/runtime-host.types'
 import type { RuntimeScopeHandle } from '@/features/core/modules/runtime/domain/runtime-scope.types'
 import type { VocabLoadPolicy } from '@/features/core/modules/runtime/domain/vocab-cache.types'
@@ -12,7 +13,7 @@ import type { SourceExpressionIR, SourceFieldDefinition } from '@/features/core/
 import type { UpdateMutationStrategy } from '@/features/core/modules/source/domain/types/update-source.types'
 import type { EndgeDataMode } from '@/features/core/modules/workspace/domain/workspace.types'
 
-export type CompositionRuntimeKind = 'filter' | 'query' | 'component' | 'composition' | 'stream' | 'filter-view'
+export type CompositionRuntimeKind = 'controller' | 'filter' | 'query' | 'component' | 'composition' | 'stream' | 'filter-view'
 
 export type CompositionActivationMode = 'startup' | 'manual'
 
@@ -147,6 +148,7 @@ export interface CompositionRuntimeDescriptor {
     call: { start: number, end: number }
     withProps: { start: number, end: number } | null
   }
+  controllerDependencies?: ControllerDependencyBindings
   kind: CompositionRuntimeKind
   identity: string
   // Compiler-resolved selector metadata. Runtime executes only kind/identity above.
@@ -226,7 +228,8 @@ export interface ComponentEventExecuteActionEffect {
 }
 
 export type CompositionComponentEventEffect
-  = ComponentEventApplyUpdateEffect
+  = { kind: 'controller-command', runtime: string, command: string, input?: ComponentSFCEventInputValue }
+    | ComponentEventApplyUpdateEffect
     | ComponentEventStoreMutationEffect
     | ComponentEventExecuteActionEffect
 

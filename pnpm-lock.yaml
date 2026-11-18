@@ -44,6 +44,9 @@ dependencies:
   graphql:
     specifier: ^16.12.0
     version: 16.14.2
+  idb:
+    specifier: ^8.0.3
+    version: 8.0.3
   lodash:
     specifier: ^4.17.21
     version: 4.18.1
@@ -2897,6 +2900,10 @@ packages:
       debug: 4.4.3
     transitivePeerDependencies:
       - supports-color
+    dev: false
+
+  /idb@8.0.3:
+    resolution: {integrity: sha512-LtwtVyVYO5BqRvcsKuB2iUMnHwPVByPCXFXOpuU96IZPPoPN6xjOGxZQ74pgSVVLQWtUOYgyeL4GE98BY5D3wg==}
     dev: false
 
   /identifier-regex@1.1.0:

@@ -124,6 +124,7 @@ export interface PageRuntimeHostContext extends RuntimeHostContextBase {
 }
 
 export interface RuntimeHostContextMap {
+  'controller': RuntimeHostContextBase
   'simulation': RuntimeHostContextBase
   'action': ActionRuntimeHostContext
   'query': QueryRuntimeHostContext

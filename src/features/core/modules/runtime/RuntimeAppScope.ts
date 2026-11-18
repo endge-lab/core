@@ -165,6 +165,7 @@ export class RuntimeAppScope {
 
 function runtimeEntityCollection(entityType: RuntimeEntityType): string {
   const collections: Record<RuntimeEntityType, string> = {
+    'controller': 'controller',
     'simulation': 'simulations',
     'action': 'actions',
     'component-sfc': 'component-sfcs',

@@ -35,6 +35,7 @@ import { v4 as uuid } from 'uuid'
 import { copyBundleJson } from '@/features/core/kernel/tools/bundle-json'
 import { EndgeModule } from '@/features/federation/EndgeModule'
 import {
+  collectProgramArtifactTypes,
   packProgramArtifact,
   readExecutionBundle,
 } from './tools/execution-bundle'
@@ -128,6 +129,21 @@ export class EndgeProgram_Module extends EndgeModule {
     if ((options.scope === 'startup-composition' || this._exportScope === 'startup-composition') && options.includeAst) {
       throw new Error('[Bundle] AST is not allowed in a context-specific export')
     }
+    const controllerFeatures = new Set<'retention-v1' | 'page-cache-v1'>()
+    for (const artifact of this.getArtifacts()) {
+      if (artifact.ref.entityType !== 'composition') {
+        continue
+      }
+      for (const runtime of (artifact.payload as CompositionProgramPayload).runtimes) {
+        if (runtime.kind === 'controller' && runtime.identity === 'endge.collection-window' && runtime.props?.retention) {
+          controllerFeatures.add('retention-v1')
+        }
+        if (Object.values(runtime.controllerDependencies ?? {
+        }).some(binding => 'query' in binding && binding.cache)) {
+          controllerFeatures.add('page-cache-v1')
+        }
+      }
+    }
     const bundle: ExecutionBundle = {
       ...(this._exportScope ? { exportScope: this._exportScope } : {}),
       ...(this._executionGraphVersion ? { executionGraphVersion: this._executionGraphVersion } : {}),
@@ -138,10 +154,13 @@ export class EndgeProgram_Module extends EndgeModule {
       context: this._compiledContext,
       catalog: this._catalog,
       requirements: {
+        ...(controllerFeatures.size ? { controllerFeatures: [...controllerFeatures] } : {}),
+        hostControllers: this.getArtifacts().filter(artifact => artifact.ref.entityType === 'controller').map((artifact) => {
+          const definition = (artifact.payload as import('@/features/core/modules/runtime/domain/controllers/controller.types').ControllerProgramPayload).definition
+          return { identity: definition.identity, providerKey: definition.defaultProviderKey }
+        }),
         ...(this._hostActions.length ? { hostActions: this._hostActions } : {}),
-        artifactTypes: [
-          ...new Set(this.getArtifacts().map(item => item.ref.entityType)),
-        ],
+        artifactTypes: collectProgramArtifactTypes(this.getArtifacts()),
         componentTags: this.getComponentTags(),
       },
       artifacts: Object.fromEntries(

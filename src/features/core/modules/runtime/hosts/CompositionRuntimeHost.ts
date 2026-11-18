@@ -39,6 +39,7 @@ import { OperationHistory } from '@/features/core/modules/runtime/operation/oper
 import { RuntimeHostBase } from '@/features/core/modules/runtime/RuntimeHostBase'
 import { RuntimeScope } from '@/features/core/modules/runtime/RuntimeScope'
 import { evaluateSourceExpression } from '@/features/core/modules/source/services/source-expression-evaluate'
+import { ControllerRuntimeHost } from './ControllerRuntimeHost'
 
 function defaultContext(): RuntimeHostContext<'composition'> {
   return {
@@ -1328,7 +1329,10 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }
 
     let model: any = null
-    if (descriptor.kind === 'filter') {
+    if (descriptor.kind === 'controller') {
+      model = Endge.runtime.controllers.model(descriptor.identity)
+    }
+    else if (descriptor.kind === 'filter') {
       model = Endge.domain.getFilter(descriptor.identity)
     }
     else if (descriptor.kind === 'query') {
@@ -1362,6 +1366,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       runtimeScopeId: this._requireScope(descriptor.scopePath).id,
       i18nCatalog: this.getI18nCatalog(descriptor.scopePath),
       vocabCatalog: this.getVocabCatalog(descriptor.scopePath),
+    }
+    if (descriptor.kind === 'controller') {
+      meta.controllerDependencies = Object.fromEntries(Object.entries(descriptor.controllerDependencies ?? {}).map(([name, binding]) => [name, 'store' in binding ? { ...binding, store: this._requireStoreRuntime(binding.store) } : binding]))
     }
     if (descriptor.kind === 'composition') {
       meta.input = this._makeInputSource(descriptor.name)
@@ -1398,6 +1405,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     this._children.set(descriptor.name, child)
     this._childDescriptors.set(descriptor.name, descriptor)
     this._connectRuntimeOutputs(descriptor.name, child)
+    if (descriptor.kind === 'controller') {
+      await (child as ControllerRuntimeHost).whenReady()
+    }
     if (descriptor.kind === 'composition') {
       await (child as unknown as CompositionRuntimeHost).mountGraph()
     }
@@ -1410,6 +1420,19 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     }
     const inputBindings = this._compiledInputs(descriptor.name)
 
+    if (descriptor.kind === 'controller') {
+      const controller = child as ControllerRuntimeHost
+      for (
+        const [key, binding] of Object.entries(inputBindings)) {
+        if (binding.kind === 'literal') {
+          continue
+        }
+        this._subscribeBinding(descriptor.path, binding, () => {
+          void controller.setProps({ [key]: this._readBinding(binding) }).catch(error => this.emit('event:error', { error }))
+        })
+      }
+      return
+    }
     if (descriptor.kind === 'filter-view') {
       const filterView = child as unknown as FilterViewRuntimeHost
       for (const [prop, binding] of Object.entries(inputBindings)) {
@@ -1744,6 +1767,14 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
   ): Promise<void> {
     const evaluatedAt = new Date().toISOString()
     try {
+      if (effect.kind === 'controller-command') {
+        const controller = this._children.get(effect.runtime)
+        if (!(controller instanceof ControllerRuntimeHost)) {
+          throw new TypeError('controller-command-target-missing')
+        }
+        await controller.command(effect.command, effect.input ? evaluateComponentEventInput(effect.input, occurrence.payload, evaluatedAt) : occurrence.payload)
+        return
+      }
       if (effect.kind === 'apply-update') {
         this.applyStoreUpdate(
           effect.data,

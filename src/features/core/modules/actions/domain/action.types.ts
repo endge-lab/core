@@ -119,6 +119,7 @@ export type TableSortDirection = 'asc' | 'desc'
 export type TableSortMode = 'multiple' | 'single' | 'fixed' | 'disabled'
 
 export const TABLE_RUNTIME_ACTION_IDS = {
+  scrollToRow: 'table.scrollToRow',
   columnHide: 'table.column.hide',
   columnPinLeft: 'table.column.pinLeft',
   columnPinRight: 'table.column.pinRight',
@@ -141,6 +142,7 @@ export interface TableColumnSortState {
 
 // Операции, реализованные одним смонтированным экземпляром Table.
 export interface TableRuntimeActionTarget {
+  scrollToRow?: (rowId: string, align?: 'start' | 'center' | 'end' | 'auto') => void | Promise<void>
   setColumnVisibility?: (columnKey: string, visible: boolean) => void | Promise<void>
   setColumnPin?: (columnKey: string, side: TableColumnPinSide) => void | Promise<void>
   resetColumnPin?: (columnKey: string) => void | Promise<void>

@@ -453,7 +453,7 @@ export class QueryExecutor_Adapter {
       statusText,
       message: status ? undefined : String(error?.message ?? 'Network error'),
     })
-    throw new Error(`${message}\n${details}`)
+    throw Object.assign(new Error(`${message}\n${details}`), typeof status === 'number' ? { status } : {})
   }
 
   /**

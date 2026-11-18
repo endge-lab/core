@@ -63,6 +63,8 @@ export interface ProgramHostActionRequirement {
 }
 
 export interface ProgramRequirements {
+  controllerFeatures?: Array<'retention-v1' | 'page-cache-v1'>
+  hostControllers?: Array<{ identity: string, providerKey: string }>
   hostActions?: ProgramHostActionRequirement[]
   artifactTypes: string[]
   componentTags: ComponentSFCTagRegistryEntry[]

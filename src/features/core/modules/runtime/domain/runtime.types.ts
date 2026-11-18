@@ -1,3 +1,4 @@
+import type { ControllerModel } from './controllers/controller.types'
 import type { RAction } from '@/features/core/modules/domain/entities/RAction'
 import type { RComponentSFC } from '@/features/core/modules/domain/entities/RComponentSFC'
 import type { RComposition } from '@/features/core/modules/domain/entities/RComposition'
@@ -10,10 +11,11 @@ import type { RStream } from '@/features/core/modules/domain/entities/RStream'
 import type { RuntimeHostRegistrySnapshot } from '@/features/core/modules/runtime/domain/runtime-registry.types'
 
 // Виды runtime
-export type RuntimeKind = 'query' | 'filter' | 'composition' | 'store' | 'stream' | 'action' | 'simulation' | 'runtime'
+export type RuntimeKind = 'controller' | 'query' | 'filter' | 'composition' | 'store' | 'stream' | 'action' | 'simulation' | 'runtime'
 
 export type RuntimeExecutableModel
-  = | RQuery
+  = | ControllerModel
+    | RQuery
     | RAction
     | RPage
     | RComponentSFC

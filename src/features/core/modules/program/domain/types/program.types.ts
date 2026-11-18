@@ -24,7 +24,8 @@ export type ProgramArtifactKey = string
 
 // Тип доменной сущности, для которой compiler может построить program artifact.
 export type ProgramEntityType
-  = 'type'
+  = 'controller'
+    | 'type'
     | 'component-sfc'
     | 'computation'
     | 'action'

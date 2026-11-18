@@ -73,7 +73,20 @@ export interface TablePageChangedEvent extends TableEventBase {
   pageCount: number
 }
 
+export interface TableViewportChangedEvent extends TableEventBase {
+  rowsRevision: number
+  firstVisible: { key: string, index: number } | null
+  lastVisible: { key: string, index: number } | null
+  rowCount: number
+  reason: 'mount' | 'scroll' | 'data' | 'resize' | 'position'
+}
+export interface TableViewportOptions {
+  rowsRevision?: number
+  preserveScrollAnchor?: boolean
+}
+
 export interface TableEventMap {
+  viewportChanged: TableViewportChangedEvent
   rowActivated: TableRowActivatedEvent
   rowContextMenuRequested: TableRowContextMenuRequestedEvent
   selectionChanged: TableSelectionChangedEvent
@@ -97,6 +110,7 @@ export interface TableEventDefinition {
 
 // Канонический нейтральный к renderer манифест Event встроенного тега Table.
 export const TABLE_EVENT_DEFINITIONS: readonly TableEventDefinition[] = [
+  { name: 'viewportChanged', displayName: 'Видимый диапазон', payloadType: 'TableViewportChangedEvent', description: 'Изменились действительно видимые строки без overscan.' },
   { name: 'rowActivated', displayName: 'Активация строки', payloadType: 'TableRowActivatedEvent', description: 'Строка активирована указателем или клавиатурой.' },
   { name: 'rowContextMenuRequested', displayName: 'Контекстное меню строки', payloadType: 'TableRowContextMenuRequestedEvent', description: 'Для строки запрошено контекстное меню.' },
   { name: 'selectionChanged', displayName: 'Изменение выбора строк', payloadType: 'TableSelectionChangedEvent', description: 'Изменился выбор строк.' },

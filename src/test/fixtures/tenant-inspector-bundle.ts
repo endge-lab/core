@@ -4,7 +4,7 @@ import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
 // Сквозной пример АФЛ/КЗН: инспектор рейса с разной мета-конфигурацией по тенантам.
 // Тот же bundle опубликован для cookbook и ручной проверки UI:
-// web/apps/egorkozelskij-endge-web-configurator-docs/docs/public/examples/tenant-inspector.json
+// docs/public/examples/tenant-inspector.json в Configurator Docs
 // (формат GET /api/v1/domain/export, импорт через /api/v1/domain/import/plan + /api/v1/domain/import).
 
 export const TENANT_INSPECTOR_WORKSPACE_SCHEMA_VERSION = 10

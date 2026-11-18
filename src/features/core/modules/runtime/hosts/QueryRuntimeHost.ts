@@ -241,8 +241,11 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
 
   public async run(
     propsPatch?: Record<string, unknown>,
-    options: { observer?: QueryExecutionObserver } = {},
+    options: { observer?: QueryExecutionObserver, signal?: AbortSignal } = {},
   ): Promise<Record<string, unknown>> {
+    if (options.signal?.aborted) {
+      throw new DOMException('Query cancelled.', 'AbortError')
+    }
     if (propsPatch) {
       this._applyProps(propsPatch, false)
     }
@@ -267,6 +270,9 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
     const sequence = ++this._runSequence
     this._abortController?.abort()
     this._abortController = new AbortController()
+    const abort = this._abortController
+    const externalAbort = () => abort.abort()
+    options.signal?.addEventListener('abort', externalAbort, { once: true })
     const startedAt = new Date().toISOString()
     this.setContext({ status: 'running', startedAt, updatedAt: startedAt })
 
@@ -279,13 +285,13 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
         : await Endge.runtime.query.executeArtifact({
             payload,
             props: this.readInputs(),
-            signal: this._abortController.signal,
+            signal: abort.signal,
             onGraphQLErrors: (errors) => {
               graphQLErrors = errors
             },
             observer: options.observer,
           })
-      if (sequence !== this._runSequence) {
+      if (sequence !== this._runSequence || abort.signal.aborted) {
         throw new DOMException('Query execution was superseded.', 'AbortError')
       }
 
@@ -318,7 +324,7 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
       return outputs
     }
     catch (error: any) {
-      if (sequence !== this._runSequence || error?.name === 'CanceledError' || error?.name === 'AbortError') {
+      if (sequence !== this._runSequence || abort.signal.aborted || error?.name === 'CanceledError' || error?.name === 'AbortError') {
         throw new DOMException('Query execution was cancelled.', 'AbortError')
       }
       const updatedAt = new Date().toISOString()
@@ -327,6 +333,9 @@ export class QueryRuntimeHost extends RuntimeHostBase<'query', RuntimeHostContex
         this.emit('run:error', error)
       }
       throw error
+    }
+    finally {
+      options.signal?.removeEventListener('abort', externalAbort)
     }
   }
 

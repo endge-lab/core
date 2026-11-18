@@ -31,11 +31,11 @@ export class EndgeQuery {
     query: RQuery,
     params: Record<string, unknown> = {},
     parent?: RuntimeParentRef | null,
-    options: { observer?: QueryExecutionObserver } = {},
+    options: { observer?: QueryExecutionObserver, signal?: AbortSignal, artifactReader?: import('../domain/runtime-host.types').RuntimeArtifactReader } = {},
   ): Promise<any> {
     const idOrIdentity = query.id ?? query.identity
     const artifact = idOrIdentity != null
-      ? Endge.program.getQueryArtifact(idOrIdentity)
+      ? options.artifactReader?.getArtifact<QueryProgramPayload>('query', idOrIdentity) ?? Endge.program.getQueryArtifact(idOrIdentity)
       : null
     if (!artifact) {
       throw new Error(`Query artifact is missing for "${query.identity ?? query.name ?? query.id}". Compile domain before running query.`)
@@ -46,6 +46,7 @@ export class EndgeQuery {
 
     const host = Endge.runtime.execute(query, {
       parent,
+      artifactReader: options.artifactReader,
       persistence: 'disabled',
       meta: { props: params },
     }) as QueryRuntimeHost | null

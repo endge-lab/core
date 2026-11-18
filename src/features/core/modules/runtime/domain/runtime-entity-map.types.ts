@@ -1,3 +1,4 @@
+import type { ControllerModel } from './controllers/controller.types'
 import type { RAction } from '@/features/core/modules/domain/entities/RAction'
 import type { RComponentSFC } from '@/features/core/modules/domain/entities/RComponentSFC'
 import type { RComposition } from '@/features/core/modules/domain/entities/RComposition'
@@ -10,6 +11,7 @@ import type { RStream } from '@/features/core/modules/domain/entities/RStream'
 
 // Канонический перечень сущностей, для которых может существовать runtime-host.
 export interface RuntimeEntityModelMap {
+  'controller': ControllerModel
   // Владелец отдельного запуска target с локальными подменами.
   'simulation': RSimulation
   // Доменная модель страницы.
