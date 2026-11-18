@@ -303,6 +303,7 @@ export * from '@/features/core/modules/source/services/configuration-source-patc
 export * from '@/features/core/modules/source/services/typescript-type-source'
 export * from '@/features/core/modules/source/services/component-sfc/component-sfc-visual-projection'
 export * from '@/features/core/modules/source/services/component-sfc/component-sfc-table-source-patch'
+export * from '@/features/core/modules/source/services/component-sfc/component-sfc-timeline-source-patch'
 export * from '@/features/core/modules/source/services/component-sfc/component-sfc-ports-source-patch'
 export * from '@/features/core/modules/source/services/component-sfc/component-sfc-props-source-patch'
 export * from '@/features/core/modules/source/services/component-sfc/component-sfc-metadata-source-patch'

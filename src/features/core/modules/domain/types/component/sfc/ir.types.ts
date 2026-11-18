@@ -234,6 +234,8 @@ export type RComponentSFC_IR_Tag
     | 'TooltipContent'
     | 'Component'
     | 'Table'
+    | 'TimelineChart'
+    | 'TimelineGroup'
     | 'Column'
     | 'Cell'
     | 'ColumnMenu'

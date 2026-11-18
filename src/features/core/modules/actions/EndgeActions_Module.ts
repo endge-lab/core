@@ -23,6 +23,7 @@ import { createTableRuntimeActions } from '@/features/core/modules/actions/servi
 import { normalizeActionTargets, validateActionTarget } from '@/features/core/modules/compiler/services/action/action-target-validation'
 import { RAction } from '@/features/core/modules/domain/entities/RAction'
 import { RField } from '@/features/core/modules/domain/entities/RField'
+import { TIMELINE_FOCUS_TASK_ACTION } from '@/features/core/modules/domain/types/component/sfc/intrinsic-events.types'
 import { EndgeModule } from '@/features/federation/EndgeModule'
 
 const SOURCE_PROVIDER_KEY = 'core.action.source'
@@ -537,6 +538,21 @@ export class EndgeActions_Module extends EndgeModule {
   }
 
   private _registerCoreActions(): void {
+    this._defineCodeAction({
+      identity: TIMELINE_FOCUS_TASK_ACTION,
+      displayName: 'Показать задачу Timeline',
+      owner: 'TimelineChart',
+      target: [{ type: 'component.timeline' }],
+      contract: { input: { id: 'String' }, output: 'Boolean' },
+      execute: ({ input, target }) => {
+        const id = (input as { id?: unknown } | null)?.id
+        const chart = target?.value as { focusTask?: (id: string) => boolean } | null
+        if (typeof id !== 'string' || !id.trim() || typeof chart?.focusTask !== 'function') {
+          throw new Error('Timeline focusTask требует id задачи и смонтированный график.')
+        }
+        return chart.focusTask(id)
+      },
+    }, { kind: 'builtin', owner: 'TimelineChart' })
     this._defineCodeAction({
       identity: BUILTIN_ACTION_IDS.consoleLog,
       displayName: 'Вывод в консоль',

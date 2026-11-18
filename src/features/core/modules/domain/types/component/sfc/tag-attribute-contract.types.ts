@@ -51,6 +51,34 @@ export const ENDGE_SFC_TOOLTIP_ALIGNS = ['start', 'center', 'end'] as const
 
 // Конечные значения встроенных SFC tags. Свободные string/number props сюда не входят.
 export const ENDGE_SFC_TAG_ATTRIBUTE_CONTRACTS = {
+  TimelineChart: [
+    {
+      name: 'hidden',
+      values: [true, false],
+      defaultValue: false,
+      description: 'Скрыть диаграмму и исключить её из группы.',
+    },
+    {
+      name: 'collapsed',
+      values: [true, false],
+      defaultValue: false,
+      description: 'Оставить заголовок и компактное представление диаграммы.',
+    },
+  ],
+  TimelineGroup: [
+    {
+      name: 'splitter',
+      values: [true, false],
+      defaultValue: false,
+      description: 'Включить изменение высоты между видимыми диаграммами.',
+    },
+    {
+      name: 'sync',
+      values: ['time', 'none'],
+      defaultValue: 'none',
+      description: 'Связать диапазон и масштаб всех диаграмм группы.',
+    },
+  ],
   Table: [
     {
       name: 'selection-mode',

@@ -20,6 +20,9 @@ import { TABLE_RUNTIME_ACTION_IDS } from '@/features/core/modules/actions/domain
 import {
   getComponentSFCIntrinsicEventDefinitions,
   listComponentSFCEventCapableTags,
+  TIMELINE_CHART_EVENT,
+  TIMELINE_FOCUS_TASK_ACTION,
+  TIMELINE_GROUP_EVENT,
 } from '@/features/core/modules/domain/types/component/sfc/intrinsic-events.types'
 import { createEmptyComponentSFCPortManifest } from '@/features/core/modules/domain/types/component/sfc/ports.types'
 import { TABLE_EVENT_DEFINITIONS } from '@/features/core/modules/domain/types/component/sfc/table-events.types'
@@ -131,7 +134,18 @@ export function createBuiltInComponentPortManifest(tag: string): ComponentSFCPor
       outputType: 'void',
     }))
   }
+  if (normalizedTag === 'TimelineChart') {
+    manifest.provides.actions.push({
+      kind: 'action',
+      role: 'provides',
+      name: TIMELINE_FOCUS_TASK_ACTION,
+      inputType: '{ id: string }',
+      outputType: 'Boolean',
+    })
+  }
   const events = [
+    ...(normalizedTag === 'TimelineChart' ? [TIMELINE_CHART_EVENT] : []),
+    ...(normalizedTag === 'TimelineGroup' ? [TIMELINE_GROUP_EVENT] : []),
     ...getComponentSFCIntrinsicEventDefinitions(normalizedTag),
     ...(normalizedTag === 'Table' ? TABLE_EVENT_DEFINITIONS : []),
   ]

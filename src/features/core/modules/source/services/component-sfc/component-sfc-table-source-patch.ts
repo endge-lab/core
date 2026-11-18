@@ -1806,3 +1806,5 @@ function lineIndent(source: string, offset: number): string {
 function replaceRange(source: string, start: number, end: number, value: string): string {
   return `${source.slice(0, start)}${value}${source.slice(end)}`
 }
+
+export { setNodeAttributeValue as setComponentSFCNodeAttributeValue }

@@ -73,6 +73,8 @@ import { RStyle } from '@/features/core/modules/domain/entities/RStyle'
 import {
   COMPONENT_SFC_FORM_EVENT_DEFINITIONS,
   COMPONENT_SFC_INTERACTION_EVENT_DEFINITIONS,
+  TIMELINE_CHART_EVENT,
+  TIMELINE_GROUP_EVENT,
 } from '@/features/core/modules/domain/types/component/sfc/intrinsic-events.types'
 import { TABLE_EVENT_DEFINITIONS } from '@/features/core/modules/domain/types/component/sfc/table-events.types'
 import { collectI18nMessageKeys, compileI18nLocales } from '@/features/core/modules/i18n/services/i18n-catalog'
@@ -101,6 +103,8 @@ const COMPONENT_SFC_BUILTIN_EVENT_PAYLOAD_TYPES = new Set([
   ...COMPONENT_SFC_INTERACTION_EVENT_DEFINITIONS,
   ...COMPONENT_SFC_FORM_EVENT_DEFINITIONS,
   ...TABLE_EVENT_DEFINITIONS,
+  TIMELINE_CHART_EVENT,
+  TIMELINE_GROUP_EVENT,
 ].map(event => event.payloadType))
 
 /**

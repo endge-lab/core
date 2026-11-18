@@ -599,7 +599,7 @@ function readOutputExpression(node: any): string | null {
     : null
 }
 
-function readPreviewLiteral(node: any): { ok: true, value: ComponentSFCPreviewLiteral } | { ok: false } {
+export function readPreviewLiteral(node: any): { ok: true, value: ComponentSFCPreviewLiteral } | { ok: false } {
   node = unwrapPreviewExpression(node)
   if (!node) {
     return { ok: false }
