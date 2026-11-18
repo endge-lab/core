@@ -329,3 +329,9 @@ export { resolveRuntimeVocabOptions } from '@/features/core/modules/runtime/tool
 
 export * from '@/features/core/modules/domain/types/component/sfc/expression-ir.types'
 export * from '@/features/core/modules/runtime/services/component-sfc-expression-evaluate'
+
+export * from '@/features/core/modules/runtime/domain/controllers/controller.types'
+export * from '@/features/core/modules/runtime/domain/controllers/page-cache.types'
+export * from '@/features/core/modules/runtime/hosts/ControllerRuntimeHost'
+export * from '@/features/core/modules/runtime/EndgeControllers_Module'
+export * from '@/features/core/modules/runtime/services/controllers/builtins/collection-window.definition'

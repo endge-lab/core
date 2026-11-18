@@ -117,6 +117,10 @@ export class StoreRuntimeHost extends RuntimeHostBase<'store', RuntimeHostContex
   /**
    * Возвращает текущий снимок raw и derived Store fields.
    */
+  public get(path: string): unknown {
+    return cloneRuntimeValue(Raph.get(this.getDataPath(path)))
+  }
+
   public getDataSnapshot(): Readonly<Record<string, unknown>> {
     return cloneRuntimeValue(
       (Raph.get(this.getDataPath()) as Record<string, unknown> | undefined) ?? {},

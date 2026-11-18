@@ -50,6 +50,17 @@ export function validatePortableProgramPayload(
     throw new Error('[Bundle] Payload family mismatch')
   }
   switch (type) {
+    case 'controller':
+    {
+      objects(['definition'])
+      const definition = bundleObject(value.definition, 'controller definition')
+      bundleText(definition.identity, 'controller identity')
+      bundleText(definition.defaultProviderKey, 'controller provider')
+      const contract = bundleObject(definition.contract, 'controller contract')
+      arrays(['props', 'outputs'], contract)
+      objects(['commands', 'dependencies'], contract)
+      break
+    }
     case 'component-sfc': {
       const ir = bundleObject(value.ir, 'SFC IR')
       if (ir.version !== 2) {

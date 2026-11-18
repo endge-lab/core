@@ -415,3 +415,22 @@ defineQuery({
     expect(onResponse).not.toHaveBeenCalled()
   })
 })
+
+describe('structured HTTP status for page-cache fallback', () => {
+  it.each(['rest', 'graphql'] as const)('preserves status without copying transport credentials (%s)', async (kind) => {
+    for (const status of [401, 403, 503]) {
+      const request = vi.fn().mockRejectedValue({ response: { status, data: {} }, config: { headers: { Authorization: 'fixture-private' } } })
+      const executor = createQueryExecutor({ request } as any)
+      const source = kind === 'rest'
+        ? 'defineQuery({kind:\'rest\',request:{endpoint:\'https://api.example.test\',path:\'/rows\',method:\'GET\'},outputs:{page:output().from(response())}})'
+        : 'defineQuery({kind:\'graphql\',request:{endpoint:\'https://api.example.test\',document:gql`query Rows { rows { id } }`},outputs:{page:output().from(data())}})'
+      const payload = compileQuerySource(source).artifact!
+      const error = await executor.execute({ payload, vars: {} }).catch(error => error)
+      expect(error).toBeInstanceOf(Error)
+      expect(error.status).toBe(status)
+      expect(error.message).toContain(`HTTP ${status}`)
+      expect(error.config).toBeUndefined()
+      expect(error.response).toBeUndefined()
+    }
+  })
+})

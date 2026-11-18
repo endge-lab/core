@@ -1,7 +1,7 @@
 {
   "name": "@endge/core",
   "type": "module",
-  "version": "1.1.0-dev.13",
+  "version": "1.2.0-dev.15",
   "private": false,
   "packageManager": "pnpm@8.8.0",
   "license": "Apache-2.0",
@@ -31,7 +31,8 @@
     "bench:interactions": "vitest bench --run src/test/component-sfc-interactions.bench.ts",
     "typecheck": "tsc --noEmit",
     "lint-check": "eslint . --cache",
-    "lint-fix": "eslint . --fix --cache"
+    "lint-fix": "eslint . --fix --cache",
+    "bench:collection-window": "vitest bench --run src/test/features/core/modules/runtime/collection-window.bench.ts"
   },
   "peerDependencies": {
     "@raphy-js/raph": ">=1.0.0-dev.18 <2 || >=1.0.1-dev.25 <2",
@@ -51,6 +52,7 @@
     "date-fns": "^4.1.0",
     "fflate": "^0.8.3",
     "graphql": "^16.12.0",
+    "idb": "^8.0.3",
     "lodash": "^4.17.21",
     "mitt": "^3.0.1",
     "oidc-client-ts": "^3.5.0",

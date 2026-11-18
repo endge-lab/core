@@ -14,8 +14,16 @@ import {
 import { normalizeEndgeConfiguration } from '@/features/core/modules/configuration/domain/endge-configuration'
 import { validatePortableProgramPayload } from './portable-program-payload'
 
+// Requirements describe every executable artifact, including inline child payloads.
+export function collectProgramArtifactTypes(artifacts: readonly ProgramArtifact[]): ProgramEntityType[] {
+  return [...new Set(artifacts.flatMap(function types(artifact): ProgramEntityType[] {
+    return [artifact.ref.entityType, ...(artifact.children ?? []).flatMap(types)]
+  }))]
+}
+
 // Поддержанные compiler payload families; новые виды требуют явного добавления в wire contract.
 const PAYLOAD_TYPES: readonly ProgramEntityType[] = [
+  'controller',
   'type',
   'component-sfc',
   'computation',
@@ -92,6 +100,9 @@ export function readExecutionBundle(input: unknown): ExecutionBundle {
     }
   }
   const requirements = bundleObject(value.requirements, 'requirements')
+  if (requirements.controllerFeatures !== undefined && (!Array.isArray(requirements.controllerFeatures) || requirements.controllerFeatures.some(feature => !['retention-v1', 'page-cache-v1'].includes(String(feature))))) {
+    throw new Error('[Bundle] Unsupported controller feature requirement')
+  }
   if (
     !Array.isArray(requirements.artifactTypes)
     || !Array.isArray(requirements.componentTags)
@@ -104,6 +115,22 @@ export function readExecutionBundle(input: unknown): ExecutionBundle {
     )
   ) {
     throw new Error('[Bundle] Unsupported artifact requirement')
+  }
+  if (requirements.hostControllers !== undefined) {
+    if (!Array.isArray(requirements.hostControllers)) {
+      throw new TypeError('[Bundle] Invalid controller requirements')
+    }
+    const seen = new Set<string>()
+    for (
+      const item of requirements.hostControllers) {
+      const controller = bundleObject(item, 'controller requirement')
+      const identity = bundleText(controller.identity, 'controller identity')
+      bundleText(controller.providerKey, 'controller provider')
+      if (seen.has(identity)) {
+        throw new Error('[Bundle] Duplicate controller requirement')
+      }
+      seen.add(identity)
+    }
   }
   const hostActions = new Set<string>()
   if (requirements.hostActions !== undefined) {

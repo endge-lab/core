@@ -18,6 +18,12 @@ import { VALUE_EXPRESSION_COMPLETIONS, VALUE_EXPRESSION_FUNCTION_NAMES, VALUE_EX
 import { COMPOSITION_DEFAULT_SOURCE } from '@/features/core/modules/source/templates/composition.default.source'
 
 const COMPOSITION_COMPLETIONS: SourceLanguageCompletion[] = [
+  { label: 'controller', kind: 'function', insertText: `controller('endge.collection-window')`, detail: 'Code-owned controller runtime' },
+  { label: 'collection-window-cache', kind: 'function', insertText: `controller('endge.collection-window')
+  .withProps({ batchSize: 100, prefetchRows: 20, maxLoadedRows: 1000, retention: { beforeRows: 200, afterRows: 400 } })
+  .withDependencies({ state: { store: data('orders'), path: 'window', update: 'orders-window-commit' }, load: { query: 'orders-page', output: 'page', cache: { key: 'orders-pages-v1', storage: 'indexeddb', strategy: 'stale-while-revalidate', maxAgeMs: 60000, maxStaleMs: 600000, maxEntries: 500, maxBytes: 52428800 } } })`, detail: 'Bounded active window and optional memory/IndexedDB page cache' },
+  { label: 'withDependencies', kind: 'function', insertText: `.withDependencies({ state: { store: data('orders'), path: 'window', update: 'orders-window-commit' }, load: { query: 'orders-page', output: 'page' } })`, detail: 'Typed controller dependencies' },
+  { label: 'command', kind: 'function', insertText: `.command('controllerAlias', 'setViewport', event())`, detail: 'Route a Component event to a controller instance command' },
   { label: 'defineComposition', kind: 'snippet', insertText: COMPOSITION_DEFAULT_SOURCE.trimEnd(), detail: 'Создать Composition source' },
   { label: 'metadata', kind: 'property', insertText: `metadata: {\n  'namespace.feature': {},\n},`, detail: 'Статическая metadata Composition' },
   { label: 'dataMode', kind: 'property', insertText: `dataMode: 'mock',`, detail: 'Override runtime data mode for this Composition subtree' },
@@ -80,6 +86,9 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
     alias: 'Endge Composition Source',
     extension: '.endge-composition.ts',
     keywords: [
+      'controller',
+      'command',
+      'withDependencies',
       'component',
       'composition',
       'contextSwitch',
@@ -124,6 +133,9 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
       'activateWhen',
       'applyUpdate',
       'batch',
+      'controller',
+      'command',
+      'withDependencies',
       'component',
       'contextSwitch',
       'contextual',

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -11,10 +11,16 @@ import { createTenantInspectorBundle } from '@/test/fixtures/tenant-inspector-bu
 // теста: иначе пользователь импортирует не тот workspace, который проверяет core.
 // Документация — соседний репозиторий монорепозитория; в отдельном checkout core файла нет,
 // и сверка пропускается.
-const DOCS_EXAMPLE_PATH = resolve(
+const appsDirectory = resolve(
   dirname(fileURLToPath(import.meta.url)),
-  '../../../../../../../../../apps/egorkozelskij-endge-web-configurator-docs/docs/public/examples/tenant-inspector.json',
+  '../../../../../../../../../apps',
 )
+const docsApp = existsSync(appsDirectory)
+  ? readdirSync(appsDirectory).find(name => name.endsWith('endge-web-configurator-docs'))
+  : undefined
+const DOCS_EXAMPLE_PATH = docsApp
+  ? resolve(appsDirectory, docsApp, 'docs/public/examples/tenant-inspector.json')
+  : ''
 
 describe.skipIf(!existsSync(DOCS_EXAMPLE_PATH))('tenant inspector docs example', () => {
   it('matches the core fixture byte for byte', () => {

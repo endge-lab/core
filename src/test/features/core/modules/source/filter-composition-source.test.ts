@@ -5,6 +5,19 @@ import { compileFilterSource } from '@/features/core/modules/source/services/com
 import { compileQuerySource } from '@/features/core/modules/source/services/compilers/query-source-compile'
 
 describe('компилятор Source для Filter, Query v2 и Composition', () => {
+  it('подсказывает поддержанный controller в ошибке формы runtime', () => {
+    const malformed = compileCompositionSource(`defineComposition({ runtimes: { window: {} } })`)
+    const problem = malformed.diagnostics.find(item => item.code === 'composition-runtime-shape')
+
+    expect(malformed.artifact).toBeNull()
+    expect(problem).toMatchObject({ severity: 'error', sourcePath: 'runtimes.window' })
+    expect(problem?.message).toContain('controller(identity)')
+
+    const supported = compileCompositionSource(`defineComposition({ runtimes: { window: controller('endge.collection-window') } })`)
+    expect(supported.diagnostics).toEqual([])
+    expect(supported.artifact?.runtimes[0]?.kind).toBe('controller')
+  })
+
   it('компилирует поля, options, vocab, значения по умолчанию и outputs Filter в статический IR', () => {
     const result = compileFilterSource(`
 defineFilter({

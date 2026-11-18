@@ -2787,6 +2787,17 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
   /**
    * Проверяет domain/program references и stable-prop bindings Composition.
    */
+  public buildController(identity: string): ProgramArtifact<import('@/features/core/modules/runtime/domain/controllers/controller.types').ControllerProgramPayload> {
+    const definition = Endge.runtime.controllers.get(identity)
+    if (!definition) {
+      throw new Error(`controller-definition-missing: ${identity}`)
+    }
+    const fingerprint = this._hashString(JSON.stringify(definition))
+    const fields = [...definition.contract.props, ...definition.contract.outputs, ...Object.values(definition.contract.commands).flatMap(command => [command.input, command.output].filter((field): field is SourceFieldDefinition => Boolean(field)))]
+    const diagnostics = fields.flatMap(field => this._typeContractDiagnostics(field.typeExpression ?? field.type, `contract.${field.key}`))
+    return Endge.program.addArtifact({ ref: { entityType: 'controller', id: identity, identity }, sourceHash: fingerprint, compilerVersion: ENDGE_COMPILER_VERSION, status: diagnostics.some(item => item.severity === 'error') ? 'error' : 'valid', diagnostics, dependencies: this._typeDependencies(fields.flatMap(field => [field.type, field.typeExpression])), capabilities: ['runnable'], metadata: { self: {}, nodes: [] }, payload: { type: 'controller' as const, sourceVersion: 1 as const, definition } }, () => this._hashString(JSON.stringify(Endge.runtime.controllers.get(identity))) === fingerprint)
+  }
+
   private _validateComposition(payload: CompositionProgramPayload, owner: RComposition): {
     diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[]
     dependencies: ProgramArtifact['dependencies']
@@ -2794,6 +2805,7 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     const diagnostics: Omit<ProgramDiagnostic, 'entityRef'>[] = []
     const dependencies: ProgramArtifact['dependencies'] = []
     const storeArtifacts = new Map<string, StoreSourceArtifact>()
+    const controllerWriters = new Set<string>()
     diagnostics.push(...this._compositionI18nCollisionDiagnostics(payload, owner))
 
     for (const resource of payload.resources) {
@@ -2907,6 +2919,76 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
         role: 'composition-runtime',
         validationOnly: !payload.runtimes.some(selected => selected.kind === runtime.kind && selected.identity === runtime.identity),
       })
+
+      if (runtime.kind === 'controller') {
+        const definition = Endge.runtime.controllers.get(runtime.identity)
+        if (!definition) {
+          diagnostics.push({ severity: 'error', code: 'controller-definition-missing', message: `Controller "${runtime.identity}" is not registered.`, sourcePath: `runtimes.${runtime.name}` })
+          continue
+        }
+        this.buildController(runtime.identity)
+        for (
+          const prop of Object.keys(runtime.props)) {
+          if (!definition.contract.props.some(field => field.key === prop)) {
+            diagnostics.push({ severity: 'error', code: 'controller-prop-unknown', message: `Unknown controller prop "${prop}".`, sourcePath: `runtimes.${runtime.name}.withProps.${prop}` })
+          }
+        }
+        for (
+          const field of definition.contract.props) {
+          if (!field.optional && !field.defaultValue && !Object.hasOwn(runtime.props, field.key)) {
+            diagnostics.push({ severity: 'error', code: 'controller-prop-required', message: `Required controller prop "${field.key}".`, sourcePath: `runtimes.${runtime.name}` })
+          }
+        }
+        const bindings = runtime.controllerDependencies ?? {}
+        for (
+          const [name, contract] of Object.entries(definition.contract.dependencies)) {
+          const binding = bindings[name]
+          if (!binding && contract.optional) {
+            continue
+          }
+          if (!binding) {
+            diagnostics.push({ severity: 'error', code: 'controller-dependency-required', message: `Required controller dependency "${name}".`, sourcePath: `runtimes.${runtime.name}` })
+            continue
+          }
+          if (contract.kind === 'store' && 'store' in binding) {
+            const stateKey = `${binding.store}:${binding.path}`
+            if (controllerWriters.has(stateKey)) {
+              diagnostics.push({ severity: 'error', code: 'controller-state-already-owned', message: `Multiple controllers manage ${stateKey}.`, sourcePath: `runtimes.${runtime.name}` })
+            }
+            controllerWriters.add(stateKey)
+            const data = payload.data.find(item => (item.path ?? item.name) === binding.store)
+            const store = data ? storeArtifacts.get(binding.store) : null
+            const update = Endge.program.getUpdateArtifact(binding.update)
+            const writable = store?.data.some(field => field.kind === 'value' && field.key === binding.path.split(/[.[\]]/)[0])
+            if (!store || !writable || !update || update.status === 'error' || update.payload.storeIdentity !== data?.identity || !update.payload.mutations.some(mutation => mutation.target === binding.path)) {
+              diagnostics.push({ severity: 'error', code: 'controller-state-update-invalid', message: 'Controller state requires a writable Store path and an owned Update targeting it.', sourcePath: `runtimes.${runtime.name}.withDependencies.${name}` })
+            }
+            if (update) {
+              dependencies.push({ entityType: 'update', id: update.ref.id, identity: update.ref.identity, role: 'controller-state-update' })
+            }
+          }
+          else
+            if (contract.kind === 'query' && 'query' in binding) {
+              const query = Endge.program.getQueryArtifact(binding.query)
+              if (!query || query.status === 'error' || !query.payload.outputs.some(output => output.key === binding.output)) {
+                diagnostics.push({ severity: 'error', code: 'controller-query-output-missing', message: `Controller Query output "${binding.query}.${binding.output}" is missing.`, sourcePath: `runtimes.${runtime.name}.withDependencies.${name}` })
+              }
+              if (query) {
+                dependencies.push({ entityType: 'query', id: query.ref.id, identity: query.ref.identity, role: 'controller-load' })
+              }
+            }
+            else {
+              diagnostics.push({ severity: 'error', code: 'controller-dependency-kind', message: `Wrong kind for dependency "${name}".`, sourcePath: `runtimes.${runtime.name}` })
+            }
+        }
+        for (
+          const name of Object.keys(bindings)) {
+          if (!Object.hasOwn(definition.contract.dependencies, name)) {
+            diagnostics.push({ severity: 'error', code: 'controller-dependency-unknown', message: `Unknown dependency "${name}".`, sourcePath: `runtimes.${runtime.name}` })
+          }
+        }
+        continue
+      }
 
       if (runtime.kind === 'filter-view') {
         const source = payload.runtimes.find(item => item.name === runtime.identity)
@@ -3130,6 +3212,13 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
       if (!componentArtifact?.payload.ir?.script.ports.emits.events.some(event => event.name === hook.event)) {
         diagnostics.push({ severity: 'error', code: 'composition-event-port-missing', message: `Component runtime "${hook.runtime}" не публикует Event "${hook.event}".`, sourcePath: `hooks.${hook.runtime}.${hook.event}` })
       }
+      if (effect.kind === 'controller-command') {
+        const target = payload.runtimes.find(item => item.name === effect.runtime && item.kind === 'controller')
+        if (!target || !Object.hasOwn(Endge.runtime.controllers.get(target.identity)?.contract.commands ?? {}, effect.command)) {
+          diagnostics.push({ severity: 'error', code: 'controller-command-missing', message: `Controller command "${effect.runtime}.${effect.command}" is missing.`, sourcePath: `hooks.${hook.runtime}.${hook.event}` })
+        }
+        continue
+      }
       if (effect.kind === 'execute-action') {
         const action = Endge.domain.getAction(effect.action)
         if (!action) {
@@ -3173,6 +3262,9 @@ export class EndgeCompiler_Module extends EndgeModule<EndgeBootContext> {
     }
 
     const directRuntimeOutputNames = (runtime: CompositionProgramPayload['runtimes'][number] | undefined): string[] | null => {
+      if (runtime?.kind === 'controller') {
+        return Endge.runtime.controllers.get(runtime.identity)?.contract.outputs.map(field => field.key) ?? []
+      }
       if (runtime?.kind === 'filter') {
         const artifact = Endge.program.getFilterArtifact(runtime.identity)
         return artifact && artifact.status !== 'error'

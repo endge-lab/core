@@ -41,11 +41,14 @@ import { StoreRuntimeStrategy } from '@/features/core/modules/runtime/services/s
 import { StreamRuntimeStrategy } from '@/features/core/modules/runtime/services/strategies/StreamRuntimeStrategy'
 import { emptyRuntimeInspection, readRuntimeControlTarget, readRuntimeInspectionSnapshot, readRuntimeRenderInspection } from '@/features/core/modules/runtime/tools/runtime-inspection'
 import { EndgeModule } from '@/features/federation/EndgeModule'
+import { EndgeControllers_Module } from './EndgeControllers_Module'
+import { ControllerRuntimeStrategy } from './services/strategies/ControllerRuntimeStrategy'
 
 /**
  * Модуль создания, регистрации и уничтожения runtime hosts и app scopes.
  */
 export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
+  public readonly controllers = new EndgeControllers_Module()
   public readonly query = new EndgeQuery()
   public readonly dataView = new EndgeDataView()
   public readonly composition = new EndgeComposition()
@@ -876,6 +879,7 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
       await release(() => this._destroyRuntimeInternal(runtimeId, false))
     }
     await scopesReset
+    await release(() => this.controllers.resetPageCaches())
 
     if (this._appNode) {
       await release(() => this._appNode!.dispose())
@@ -1100,6 +1104,7 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
    * Регистрирует встроенные стратегии в порядке от специальных к общим.
    */
   private _registerDefaultStrategies(): void {
+    this.registerStrategy(new ControllerRuntimeStrategy(context => this.controllers.create(context)))
     this.registerStrategy(new SimulationRuntimeStrategy())
     this.registerStrategy(new CompositionRuntimeStrategy())
     this.registerStrategy(new StoreRuntimeStrategy())

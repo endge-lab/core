@@ -12,6 +12,16 @@ type TableTargetMethodName = keyof TableRuntimeActionTarget
 // Встроенные провайдеры Action, реализованные смонтированной целью Table.
 export function createTableRuntimeActions(): RuntimeAction<TableColumnActionContext>[] {
   return [
+    action(TABLE_RUNTIME_ACTION_IDS.scrollToRow, context => hasTargetMethod(context, 'scrollToRow'), async (context) => {
+      const input = context as TableColumnActionContext & { rowId?: unknown, align?: 'start' | 'center' | 'end' | 'auto' }
+      if (typeof input.rowId !== 'string' && typeof input.rowId !== 'number') {
+        throw new TypeError('table-row-key-required')
+      }
+      if (input.align && !['start', 'center', 'end', 'auto'].includes(input.align)) {
+        throw new Error('table-scroll-align-invalid')
+      }
+      await requireTargetMethod(context, 'scrollToRow')(String(input.rowId), input.align ?? 'auto')
+    }),
     action(TABLE_RUNTIME_ACTION_IDS.columnHide, context => context.hideable && hasTargetMethod(context, 'setColumnVisibility'), executeHideColumn),
     action(TABLE_RUNTIME_ACTION_IDS.columnPinLeft, context => canChangeColumnPin(context) && context.pinState !== 'left' && hasTargetMethod(context, 'setColumnPin'), context => executeSetColumnPin(context, 'left')),
     action(TABLE_RUNTIME_ACTION_IDS.columnPinRight, context => canChangeColumnPin(context) && context.pinState !== 'right' && hasTargetMethod(context, 'setColumnPin'), context => executeSetColumnPin(context, 'right')),

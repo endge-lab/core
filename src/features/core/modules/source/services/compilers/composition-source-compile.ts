@@ -30,6 +30,7 @@ import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
 
 import { normalizeComponentSFCInteractionTriggers } from '@/features/core/modules/domain/component/component-sfc-edit-trigger'
+import { normalizePageCacheOptions } from '@/features/core/modules/runtime/domain/controllers/page-cache.types'
 import { DEFAULT_VOCAB_LOAD_POLICY } from '@/features/core/modules/runtime/domain/vocab-cache.types'
 import {
   compileSourceExpression,
@@ -951,13 +952,13 @@ function readRuntime(
   }
   const chain = memberChain(raw)
   if (!chain || !t.isIdentifier(chain.base.callee)) {
-    diagnostics.push(diagnostic('error', 'composition-runtime-shape', `Runtime "${name}" должен начинаться с filter/query/component/composition/stream/filterView(identity).`, `runtimes.${name}`, raw))
+    diagnostics.push(diagnostic('error', 'composition-runtime-shape', `Runtime "${name}" должен начинаться с filter/query/component/composition/stream/filterView/controller(identity).`, `runtimes.${name}`, raw))
     return null
   }
 
   const rawKind = chain.base.callee.name
   const kind = (rawKind === 'filterView' ? 'filter-view' : rawKind) as CompositionRuntimeKind
-  if (kind !== 'filter' && kind !== 'query' && kind !== 'component' && kind !== 'composition' && kind !== 'stream' && kind !== 'filter-view') {
+  if (kind !== 'controller' && kind !== 'filter' && kind !== 'query' && kind !== 'component' && kind !== 'composition' && kind !== 'stream' && kind !== 'filter-view') {
     diagnostics.push(diagnostic('error', 'composition-runtime-kind', `Runtime kind "${rawKind}" не поддерживается.`, `runtimes.${name}`, chain.base))
     return null
   }
@@ -1080,6 +1081,52 @@ function readRuntime(
         diagnostics,
         `runtimes.${name}.withProps`,
       )
+      continue
+    }
+    if (modifier.name === 'withDependencies') {
+      const config = modifier.call.arguments[0]
+      if (kind !== 'controller' || !config || !t.isObjectExpression(config)) {
+        diagnostics.push(diagnostic('error', 'composition-controller-dependencies', '.withDependencies({...}) requires a controller runtime.', `runtimes.${name}`, modifier.call))
+        continue
+      }
+      descriptor.controllerDependencies = {}
+      for (
+        const property of config.properties) {
+        if (!t.isObjectProperty(property) || property.computed || !t.isObjectExpression(property.value)) {
+          diagnostics.push(diagnostic('error', 'composition-controller-dependency-shape', 'Dependency must be a literal object.', `runtimes.${name}`, property))
+          continue
+        }
+        const key = propertyName(property.key)
+        const node = property.value
+        const store = readDataTarget(propertyValue(node, 'store') ?? undefined)
+        const path = stringProperty(node, 'path')
+        const update = stringProperty(node, 'update')
+        const query = stringProperty(node, 'query')
+        const output = stringProperty(node, 'output')
+        if (key && store && visibleData.has(store) && path && update && !query) {
+          descriptor.controllerDependencies[key] = { store: visibleData.get(store)!, path, update }
+        }
+        else
+          if (key && query && output && !store) {
+            const fields = node.properties.map(property => t.isObjectProperty(property) ? propertyName(property.key) : null)
+            if (fields.some(field => !field || !['query', 'output', 'cache'].includes(field))) {
+              diagnostics.push(diagnostic('error', 'composition-controller-cache', 'Unknown Query dependency field.', `runtimes.${name}.${key}`, node))
+              continue
+            }
+            const cacheNode = propertyValue(node, 'cache')
+            try {
+              const cacheValue = cacheNode && t.isExpression(cacheNode) ? staticValue(unwrapExpression(cacheNode)) : null
+              const cache = cacheNode ? normalizePageCacheOptions(cacheValue?.ok ? cacheValue.value : undefined) : undefined
+              descriptor.controllerDependencies[key] = { query, output, ...(cache ? { cache } : {}) }
+            }
+            catch (error) {
+              diagnostics.push(diagnostic('error', 'composition-controller-cache', error instanceof Error ? error.message : 'Invalid page cache.', `runtimes.${name}.${key}.cache`, node))
+            }
+          }
+          else {
+            diagnostics.push(diagnostic('error', 'composition-controller-dependency-shape', 'Expected {store:data(alias),path,update} or {query,output}.', `runtimes.${name}`, node))
+          }
+      }
       continue
     }
     if (modifier.name === 'withData') {
@@ -1337,7 +1384,7 @@ function hookRuntimeNames(hook: CompositionHook): string[] {
   if (hook.kind === 'success') {
     return [hook.runtime, hook.target]
   }
-  return [hook.runtime]
+  return hook.effect.kind === 'controller-command' ? [hook.runtime, hook.effect.runtime] : [hook.runtime]
 }
 
 // Runtime-имена, которые читает binding (fromOutput, filter fields, metadataOf, выражения над ними).
@@ -2023,6 +2070,17 @@ function readComponentEventHook(
     }
     return { kind: 'event', runtime, event, effect: { kind: 'apply-update', data: resolvedData, update, ...(input ? { input } : {}) } }
   }
+  if (terminal.name === 'command') {
+    const target = readStringArgument(terminal.call, 0)
+    const command = readStringArgument(terminal.call, 1)
+    const node = terminal.call.arguments[2]
+    const input = node && t.isExpression(node) ? readCompositionEventInput(node, diagnostics, sourcePath) : undefined
+    if (!target || !command || terminal.call.arguments.length > 3 || (node && !input) || !runtimes.some(item => item.name === target && item.kind === 'controller')) {
+      diagnostics.push(diagnostic('error', 'composition-controller-command', '.command(controllerAlias, command, input?) requires a controller target.', sourcePath, terminal.call))
+      return null
+    }
+    return { kind: 'event', runtime, event, effect: { kind: 'controller-command', runtime: target, command, ...(input ? { input } : {}) } }
+  }
   if (terminal.name === 'executeAction') {
     const action = readIdentityCall(terminal.call.arguments[0], 'action')
     const inputNode = terminal.call.arguments[1]
@@ -2644,6 +2702,20 @@ function numberProperty(node: t.ObjectExpression, name: string): number | null {
 }
 
 function staticValue(node: t.Expression): { ok: true, value: unknown } | { ok: false } {
+  if (t.isBinaryExpression(node) && ['+', '-', '*', '/'].includes(node.operator) && t.isExpression(node.left)) {
+    const left = staticValue(unwrapExpression(node.left))
+    const right = staticValue(unwrapExpression(node.right))
+    if (left.ok && right.ok && typeof left.value === 'number' && typeof right.value === 'number') {
+      const value = node.operator === '+' ? left.value + right.value : node.operator === '-' ? left.value - right.value : node.operator === '*' ? left.value * right.value : left.value / right.value
+      if (Number.isFinite(value)) {
+        return {
+          ok: true,
+          value,
+        }
+      }
+    }
+    return { ok: false }
+  }
   if (t.isStringLiteral(node) || t.isNumericLiteral(node) || t.isBooleanLiteral(node)) {
     return { ok: true, value: node.value }
   }
