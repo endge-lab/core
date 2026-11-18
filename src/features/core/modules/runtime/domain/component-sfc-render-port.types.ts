@@ -9,6 +9,7 @@ export type ComponentSFCRenderPort = Pick<ComponentSFCRuntimeHost, | 'id' | 'ent
   | 'getEditSession' | 'beginEditSession' | 'updateEditDraft' | 'commitEditSession' | 'cancelEditSession'
   | 'executeEventPortAction' | 'publishEventPort'
   | 'setInputSource' | 'on' | 'off' | 'emit'> & {
+    registerNodeActionTarget?: ComponentSFCRuntimeHost['registerNodeActionTarget']
     readonly readonly?: boolean
     readonly styleArtifacts?: readonly EndgeStyleSheetArtifact[]
     readonly runtimeScopeIds?: readonly string[]

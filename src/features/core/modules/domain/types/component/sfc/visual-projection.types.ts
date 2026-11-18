@@ -370,11 +370,20 @@ export interface ComponentSFCTableVisualProjection {
   sourceRange: RComponentSFC_SourceRange
 }
 
+export interface ComponentSFCTimelineVisualNode {
+  tag: 'TimelineChart' | 'TimelineGroup'
+  attributes: ComponentSFCVisualAttribute[]
+  sourceRange: RComponentSFC_SourceRange
+  charts: ComponentSFCTimelineVisualNode[]
+}
+
 // Результат выбора специализированного visual editor для SFC source.
 export interface ComponentSFCVisualInspection {
   support:
     | { kind: 'table' }
+    | { kind: 'timeline-chart' | 'timeline-group' }
     | { kind: 'none', reason: 'source-empty' | 'template-missing' | 'root-count' | 'root-not-table' }
   projection: ComponentSFCTableVisualProjection | null
+  timeline?: ComponentSFCTimelineVisualNode
   diagnostics: RComponentDiagnostic[]
 }

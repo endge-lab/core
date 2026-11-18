@@ -454,6 +454,36 @@ function compileElementNode(
     )
   }
 
+  if (element.tag === 'TimelineGroup' || element.tag === 'TimelineChart') {
+    const children = element.children.filter(child => child.kind !== 'text' || Boolean(child.value.trim()))
+    const invalid = element.tag === 'TimelineChart'
+      ? children.length > 0
+      : children.some(child => child.kind !== 'element' || child.tag !== 'TimelineChart')
+    if (invalid) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'sfc-timeline-children',
+        message: element.tag === 'TimelineGroup'
+          ? 'TimelineGroup принимает только прямые дочерние TimelineChart.'
+          : 'TimelineChart не принимает дочерние узлы.',
+        sourcePath: `template.${id}`,
+        start: node.range.start,
+        end: node.range.end,
+      })
+    }
+    if (element.tag === 'TimelineGroup' && element.children.some(child => child.kind === 'element'
+      && child.tag === 'TimelineChart' && child.directives.for && !child.directives.key)) {
+      diagnostics.push({
+        severity: 'error',
+        code: 'sfc-timeline-member-key',
+        message: 'Повторяемому TimelineChart внутри группы нужен ключ :key.',
+        sourcePath: `template.${id}`,
+        start: node.range.start,
+        end: node.range.end,
+      })
+    }
+  }
+
   return element
 }
 

@@ -95,6 +95,20 @@ export const COMPONENT_SFC_FORM_EVENT_DEFINITIONS = [
   event('change', 'Изменение', 'ComponentSFCInputEventPayload', 'Изменение значения подтверждено.'),
 ] as const
 
+export interface TimelineTaskSelectedEvent {
+  taskId: string | null
+  taskIds: string[]
+}
+
+export interface TimelineRangeChangedEvent {
+  start: number
+  end: number
+}
+
+export const TIMELINE_CHART_EVENT = event('taskSelected', 'Выбор задачи', 'TimelineTaskSelectedEvent', 'Изменилось выделение задач Timeline.')
+export const TIMELINE_GROUP_EVENT = event('rangeChanged', 'Изменение диапазона времени', 'TimelineRangeChangedEvent', 'Пользователь изменил видимый диапазон группы.')
+export const TIMELINE_FOCUS_TASK_ACTION = 'timeline.focusTask'
+
 const EVENT_CAPABLE_TAGS = [
   'Text',
   'DateTime',
@@ -111,6 +125,8 @@ const EVENT_CAPABLE_TAGS = [
   'Checkbox',
   'Select',
   'Table',
+  'TimelineChart',
+  'TimelineGroup',
   'Cell',
 ] as const satisfies readonly RComponentSFC_IR_Tag[]
 

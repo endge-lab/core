@@ -1,3 +1,4 @@
+import type { ActionExecutionTarget } from '@/features/core/modules/actions/domain/action.types'
 import type { RComponentSFC } from '@/features/core/modules/domain/entities/RComponentSFC'
 import type {
   RComponentContract,
@@ -161,6 +162,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   private readonly _computationResources = new ComputationResourceRegistry()
   private readonly _computationErrorSignatures = new Map<string, string>()
   private _styleLease: EndgeStyleLease | null = null
+  private readonly _nodeActionTargets = new Map<string, ActionExecutionTarget>()
   private readonly _eventPortListeners = new Map<string, Set<(occurrence: ComponentSFCEventOccurrence) => void>>()
   private readonly _vocabDisposers = new Map<string, VoidFunction>()
   private _editSession: ComponentSFCEditSession | null = null
@@ -407,6 +409,22 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   /**
    * Выполняет одну связанную компилятором реакцию Event для границы renderer.
    */
+  public registerNodeActionTarget(ref: string, target: ActionExecutionTarget): VoidFunction {
+    if (this._nodeActionTargets.has(ref)) {
+      throw new Error(`Публичный ref "${ref}" уже используется в ${this.entityIdentity}.`)
+    }
+    this._nodeActionTargets.set(ref, target)
+    return () => {
+      if (this._nodeActionTargets.get(ref) === target) {
+        this._nodeActionTargets.delete(ref)
+      }
+    }
+  }
+
+  public getNodeActionTarget(ref: string): ActionExecutionTarget | undefined {
+    return this._nodeActionTargets.get(ref)
+  }
+
   public async executeEventPortAction(
     ownerIdentity: string,
     port: ComponentSFCEventPort,
@@ -733,6 +751,7 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     this._styleLease?.release()
     this._styleLease = null
     this._eventPortListeners.clear()
+    this._nodeActionTargets.clear()
     this._editSession = null
     super.destroy()
   }

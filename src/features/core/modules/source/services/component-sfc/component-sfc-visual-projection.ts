@@ -27,6 +27,7 @@ import type {
   ComponentSFCTableVisualCellSyntax,
   ComponentSFCTableVisualCellTag,
   ComponentSFCTableVisualProjection,
+  ComponentSFCTimelineVisualNode,
   ComponentSFCVisualAttribute,
   ComponentSFCVisualInspection,
   ComponentSFCVisualInspectionOptions,
@@ -35,6 +36,7 @@ import type {
 import { parseExpression } from '@babel/parser'
 import { BUILTIN_ACTION_IDS, TABLE_RUNTIME_ACTION_IDS } from '@/features/core/modules/actions/domain/action.types'
 import { compileComponentSFC } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-compile'
+import { readPreviewLiteral } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-script'
 import { readComponentSFCTableMenuActionPortReference } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-table-menu'
 import { isComponentSFCBuiltInTag } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-template'
 import { normalizeComponentSFCInteractionTriggers } from '@/features/core/modules/domain/component/component-sfc-edit-trigger'
@@ -93,6 +95,16 @@ export function inspectComponentSFCVisual(
   }
 
   const root = roots[0]
+  if (root.kind === 'element' && (root.tag === 'TimelineChart' || root.tag === 'TimelineGroup')) {
+    const element = compileResult.ir?.template.roots.find(node => node.kind === 'element' && node.tag === root.tag)
+    return {
+      support: { kind: root.tag === 'TimelineChart' ? 'timeline-chart' : 'timeline-group' },
+      projection: null,
+      timeline: projectTimeline(source, root, element?.kind === 'element' ? element : null),
+      diagnostics: compileResult.diagnostics,
+    }
+  }
+
   if (root.kind !== 'element' || root.tag !== 'Table') {
     return {
       support: { kind: 'none', reason: 'root-not-table' },
@@ -109,6 +121,37 @@ export function inspectComponentSFCVisual(
     support: { kind: 'table' },
     projection: projectTable(source, root, irRoot, compileResult.ir?.script.ports ?? null, options.actionIdentities),
     diagnostics: compileResult.diagnostics,
+  }
+}
+
+function projectTimeline(
+  source: string,
+  node: RComponentSFC_AST_ElementNode,
+  ir: RComponentSFC_IR_ElementNode | null,
+): ComponentSFCTimelineVisualNode {
+  return {
+    tag: node.tag === 'TimelineGroup' ? 'TimelineGroup' : 'TimelineChart',
+    attributes: projectAttributes(source, node, ir).map((attribute) => {
+      if (attribute.value.kind !== 'expression' || attribute.name === 'for' || /\/[*/]/.test(attribute.value.source)) {
+        return attribute
+      }
+      try {
+        const literal = readPreviewLiteral(parseExpression(attribute.value.source))
+        return literal.ok ? { ...attribute, value: { kind: 'literal', value: literal.value } } : attribute
+      }
+      catch {
+        return attribute
+      }
+    }),
+    sourceRange: node.range,
+    charts: node.children.flatMap((child) => {
+      if (child.kind !== 'element' || child.tag !== 'TimelineChart') {
+        return []
+      }
+      const next = ir?.children.find(candidate => candidate.kind === 'element'
+        && candidate.sourceRange?.start === child.range.start)
+      return [projectTimeline(source, child, next?.kind === 'element' ? next : null)]
+    }),
   }
 }
 
