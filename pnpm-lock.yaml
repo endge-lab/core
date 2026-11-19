@@ -15,8 +15,8 @@ dependencies:
     specifier: ^7.27.1
     version: 7.29.7
   '@endge/utils':
-    specifier: 1.0.0-dev.6
-    version: 1.0.0-dev.6
+    specifier: 1.0.0-dev.9
+    version: 1.0.0-dev.9
   '@typedworks/federation':
     specifier: 1.0.0-dev.1
     version: 1.0.0-dev.1
@@ -279,11 +279,6 @@ packages:
     dependencies:
       '@babel/types': 7.29.8
 
-  /@babel/runtime@7.29.7:
-    resolution: {integrity: sha512-Nq8OhGWiZIZGV6hLHoyAKLLcJihP/xFeBMGJoUrxTX2psI8dCifzLhZISFb+VWS3wFMRDmCGw5R+dOySCqPLhw==}
-    engines: {node: '>=6.9.0'}
-    dev: false
-
   /@babel/types@7.29.7:
     resolution: {integrity: sha512-4zBIxpPzowiZpusoFkyGVwakdRJUyuH5PxQ/PrqghfdFWWasvnCdPfQXHrenDai+gyLARulZjZowCOj6fjT4pA==}
     engines: {node: '>=6.9.0'}
@@ -320,6 +315,10 @@ packages:
       sisteransi: 1.0.5
     dev: true
 
+  /@date-fns/tz@1.5.0:
+    resolution: {integrity: sha512-lwYN/vDPeNRULcepoE/LO2Pgx+7/RV+S9ARfbc9lr2DtGkOD7pAiruHvbR1RX3Qyf6ja47EWJDMsNK5vK08DJg==}
+    dev: false
+
   /@e18e/eslint-plugin@0.6.0(eslint@10.9.1):
     resolution: {integrity: sha512-JQkeXoZA12f9WM2H4t4IobIRqlPvYLeNAjZF6raFu2vmD5YoyuzKmwsLZNJ4g/39c3v1Se2ad3o+oq4y2et/RA==}
     peerDependencies:
@@ -337,15 +336,15 @@ packages:
       semver: 7.8.5
     dev: true
 
-  /@endge/utils@1.0.0-dev.6:
-    resolution: {integrity: sha512-QmZVPxLVKpIYot9HD38w1CdIljtaa7OeZDe01+vLkvFIEy3umM6FqlUHJRDcxzyVSC/3ZODj96Oitg7q5+ZEOg==}
+  /@endge/utils@1.0.0-dev.9:
+    resolution: {integrity: sha512-UAt7gqYtOV6GFMfMtUvkUHoo2BBSFIqp9n9DadPCcEZsGjlc17ouEZZdDvgjdGc24VbH0wQcIZFBetPmN+nLXw==}
     dependencies:
+      '@date-fns/tz': 1.5.0
       '@microsoft/fetch-event-source': 2.0.1
       '@typedworks/federation': 1.0.0-dev.1
       class-transformer: 0.5.1
       class-validator: 0.14.4
-      date-fns: 2.30.0
-      date-fns-tz: 2.0.1(date-fns@2.30.0)
+      date-fns: 4.4.0
       lodash: 4.18.1
       reflect-metadata: 0.2.2
       ts-luxon: 6.2.0
@@ -1947,21 +1946,6 @@ packages:
     resolution: {integrity: sha512-/Tb/JcjK111nNScGob5MNtsntNM1aCNUDipB/TkwZFhyDrrE47SOx/18wF2bbjgc3ZzCSKW1T5nt5EbFoAz/Vg==}
     engines: {node: '>=4'}
     hasBin: true
-
-  /date-fns-tz@2.0.1(date-fns@2.30.0):
-    resolution: {integrity: sha512-fJCG3Pwx8HUoLhkepdsP7Z5RsucUi+ZBOxyM5d0ZZ6c4SdYustq0VMmOu6Wf7bli+yS/Jwp91TOCqn9jMcVrUA==}
-    peerDependencies:
-      date-fns: 2.x
-    dependencies:
-      date-fns: 2.30.0
-    dev: false
-
-  /date-fns@2.30.0:
-    resolution: {integrity: sha512-fnULvOpxnC5/Vg3NCiWelDsLiUc9bRwAPs/+LfTLNvetFCtCTN+yQz15C/fs4AwX1R9K5GLtLfn8QW+dWisaAw==}
-    engines: {node: '>=0.11'}
-    dependencies:
-      '@babel/runtime': 7.29.7
-    dev: false
 
   /date-fns@4.4.0:
     resolution: {integrity: sha512-+1UMbeh68lH1SegH83CGWwpb6OHHbpSgr3+s5Eww5M4CAgswBpoWS0AjTOfEJ33HiYKz1hdj/KTFprzXHmq/6w==}
