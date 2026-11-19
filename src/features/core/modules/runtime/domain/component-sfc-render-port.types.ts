@@ -13,4 +13,5 @@ export type ComponentSFCRenderPort = Pick<ComponentSFCRuntimeHost, | 'id' | 'ent
     readonly readonly?: boolean
     readonly styleArtifacts?: readonly EndgeStyleSheetArtifact[]
     readonly runtimeScopeIds?: readonly string[]
+    readonly rendererSelections?: ComponentSFCRuntimeHost['rendererSelections']
   }

@@ -1396,6 +1396,9 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
       }
     }
     if (descriptor.kind === 'component') {
+      if (descriptor.renderers) {
+        meta.rendererSelections = descriptor.renderers
+      }
       Raph.set(basePath, initialProps)
       this._bridgePaths.add(basePath)
     }

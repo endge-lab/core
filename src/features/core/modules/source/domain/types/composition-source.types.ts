@@ -1,5 +1,6 @@
 import type { ComponentSFCInteractionTrigger } from '@/features/core/modules/domain/types/component/sfc/ir.types'
 import type { ComponentSFCEventInputValue } from '@/features/core/modules/domain/types/component/sfc/ports.types'
+import type { EndgeSFCRendererTag } from '@/features/core/modules/domain/types/component/sfc/renderer-tags'
 import type { I18nCompiledLocales } from '@/features/core/modules/i18n/domain/i18n.types'
 import type { EndgeMockReference } from '@/features/core/modules/mock/domain/types/mock-data.type'
 import type { ProgramMetadataMap } from '@/features/core/modules/program/domain/types/program-metadata.types'
@@ -178,6 +179,7 @@ export interface CompositionRuntimeDescriptor {
   fields?: string[]
   controls?: Record<string, FilterViewControlDefinition>
   componentIdentity?: string
+  renderers?: Partial<Record<EndgeSFCRendererTag, string>>
   persistKey?: string
   props: Record<string, CompositionBindingValue>
   // Локальный data alias child -> data alias owner Composition.

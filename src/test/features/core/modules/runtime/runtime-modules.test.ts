@@ -39,6 +39,30 @@ function example(label: string, events: string[], fail = false): ModuleArtifact 
 }
 
 describe('composition modules', () => {
+  it('compiles the selected Table renderer for one component instance', () => {
+    const source = `defineComposition({
+      resources: { slotUi: module('slot-ui', '1.0.0') },
+      runtimes: {
+        inherit: component('table'),
+        selected: component('table').withRenderers({
+          Table: contextSwitch({
+            default: 'adapter:default',
+            cases: [{ when: { deployment: 'test' }, use: 'slotUi:slot' }],
+          }),
+        }),
+      },
+    })`
+    const normal = compileCompositionSource(source)
+    const test = compileCompositionSource(source, 1, { deployment: 'test' })
+    expect(normal.diagnostics).toEqual([])
+    expect(test.diagnostics).toEqual([])
+    expect(normal.artifact?.runtimes.map(runtime => runtime.renderers?.Table)).toEqual([undefined, 'adapter:default'])
+    expect(test.artifact?.runtimes.map(runtime => runtime.renderers?.Table)).toEqual([undefined, 'slotUi:slot'])
+    expect(compileCompositionSource(source.replace('slotUi:slot', 'broken')).diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'composition-renderer-reference' }),
+    ]))
+  })
+
   it('chooses a fixed version with contextSwitch and compiles a nested override', () => {
     const source = `defineComposition({
       resources: {
@@ -77,6 +101,8 @@ describe('composition modules', () => {
     expect(modules.resolve(overview, 'visual', 'Table')?.value).toBe('v1')
     expect(modules.resolve(review, 'visual', 'Table')?.value).toBe('v2')
     expect(modules.resolve(review, 'visual', 'TimelineOnlyInV1')).toBeUndefined()
+    expect(modules.resolveAttachment(review, 'slotUi', 'visual', 'Table')?.value).toBe('v2')
+    expect(modules.resolveAttachment(review, 'slotUi', 'visual', 'TimelineOnlyInV1')).toBeUndefined()
 
     await modules.replace(review, 'slotUi', first)
     expect(modules.resolve(review, 'visual', 'Table')?.visualToken).not.toBe(modules.resolve(overview, 'visual', 'Table')?.visualToken)

@@ -57,6 +57,17 @@ export class RuntimeModules {
     return entries
   }
 
+  public resolveAttachment<T>(scope: RuntimeScope | null, attachment: string, channel: string, key: string): ModuleContribution<T> | undefined {
+    for (let current = scope; current; current = current.parent) {
+      const module = this._scopes.get(current)?.get(attachment)?.current
+      if (module) {
+        const value = module.contributions.get(channel)?.get(key)
+        return value === undefined ? undefined : { value: value as T, visualToken: module.visualToken }
+      }
+    }
+    return undefined
+  }
+
   private* _visible(scope: RuntimeScope | null): Generator<PreparedModule> {
     const attachments = new Set<string>()
     for (let current = scope; current; current = current.parent) {

@@ -1104,6 +1104,16 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     return scope
   }
 
+  public async activateWorkspaceModuleScope(): Promise<RuntimeScope> {
+    const scope = this._ensureLifecycleAppScope(this._defaultAppScope)
+    await scope.activate()
+    return scope
+  }
+
+  public get workspaceModuleScope(): RuntimeScope | null {
+    return this.scopes.get(`runtime-scope:${this._defaultAppScope.id}`) ?? null
+  }
+
   /**
    * Регистрирует встроенные стратегии в порядке от специальных к общим.
    */

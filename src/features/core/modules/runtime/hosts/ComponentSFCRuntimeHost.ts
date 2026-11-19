@@ -45,6 +45,7 @@ import type {
 } from '@/features/core/modules/runtime/domain/vocab-cache.types'
 import type { SourceFieldOption } from '@/features/core/modules/source/domain/types/source-expression.types'
 import type { EndgeStyleLease } from '@/features/core/modules/styles/domain/types/style.types'
+import type { EndgeSFCRendererTag } from '@/features/core/modules/ui/domain/types/ui-render-adapter.type'
 
 import { DataPath, Raph, RaphNode } from '@raphy-js/raph'
 
@@ -191,6 +192,10 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
         identity: input.model.identity,
       },
     })
+  }
+
+  public get rendererSelections(): Readonly<Partial<Record<EndgeSFCRendererTag, string>>> | undefined {
+    return this.meta.rendererSelections as Readonly<Partial<Record<EndgeSFCRendererTag, string>>> | undefined
   }
 
   /**
