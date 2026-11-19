@@ -187,6 +187,9 @@ function getOperationSection(operation: CompositionSourcePatchOperation): Compos
 }
 
 function printOperationExpression(operation: CompositionSourcePatchOperation): string {
+  if (operation.type === 'add-resource' && operation.kind === 'module') {
+    return `module(${quote(operation.identity ?? '')}, ${quote(operation.version ?? '')})`
+  }
   const base = operation.kind === 'operation-history'
     ? 'operationHistory({ limit: 20 })'
     : `${operation.kind}(${quote(operation.identity ?? '')})`

@@ -24,6 +24,7 @@ import { EndgeQuery } from '@/features/core/modules/runtime/execution/endge-quer
 import { EndgeSimulation } from '@/features/core/modules/runtime/execution/endge-simulation'
 import { RuntimeBoundaryUpdatePhase } from '@/features/core/modules/runtime/helpers/raph-phases/runtime-boundary-update-phase'
 import { RuntimeNodeUpdatePhase } from '@/features/core/modules/runtime/helpers/raph-phases/runtime-node-update-phase'
+import { RuntimeModules } from '@/features/core/modules/runtime/module/RuntimeModules'
 import { EndgeOperations_Module } from '@/features/core/modules/runtime/operation/EndgeOperations_Module'
 import { RuntimeAppScope } from '@/features/core/modules/runtime/RuntimeAppScope'
 import { RuntimeHostRegistry } from '@/features/core/modules/runtime/RuntimeHostRegistry'
@@ -53,6 +54,7 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
   public readonly dataView = new EndgeDataView()
   public readonly composition = new EndgeComposition()
   public readonly simulation = new EndgeSimulation()
+  public readonly modules = new RuntimeModules()
   public readonly operations = new EndgeOperations_Module()
   public readonly scopes = new EndgeRuntimeScopes_Module(() => {
     if (this._inited) {
@@ -139,6 +141,7 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
    * Настраивает Raph runtime до загрузки и сборки домена.
    */
   public override setup(ctx: EndgeBootContext): void {
+    this.modules.setup(ctx.moduleLoader)
     this._inspectionMode = ctx.mode === 'debugger'
     this.clearInspection()
   }
@@ -851,6 +854,7 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
    */
   public override async reset(): Promise<void> {
     this._generation += 1
+    this.modules.setup(undefined)
     this._unsubscribeData?.()
     this._unsubscribeData = null
     this._dataLeases.clear()

@@ -465,6 +465,14 @@ export class CompositionRuntimeHost extends RuntimeHostBase<'composition', Runti
     await this._acquireScopeVocabs(descriptor, payload, signal)
     assertCurrent()
 
+    for (const resourcePath of descriptor.resources) {
+      const resource = payload.resources.find(item => item.path === resourcePath)
+      if (resource?.kind === 'module') {
+        await Endge.runtime.modules.attach(scope, resource.name, resource)
+        assertCurrent()
+      }
+    }
+
     Endge.styles.transaction(() => {
       for (const resourcePath of descriptor.resources) {
         const resource = payload.resources.find(item => item.path === resourcePath)

@@ -4,6 +4,7 @@ import type { EndgeCommandsBootOptions } from '@/features/core/modules/commands/
 import type { EndgeDomainBundle } from '@/features/core/modules/domain/types/document/domain-export.type'
 import type { EndgeDomainProvider } from '@/features/core/modules/domain/types/document/domain-provider.type'
 import type { EndgeExecutionContext } from '@/features/core/modules/runtime/domain/execution-context.types'
+import type { ModuleArtifactLoader } from '@/features/core/modules/runtime/module/module-artifact'
 import type { EndgeFederationContext } from '@/features/federation/types/federation.types'
 
 // Источник получения доменных данных
@@ -36,6 +37,8 @@ export type EndgeBootMode = 'application' | 'debugger'
 export interface EndgeBootContext extends EndgeFederationContext {
   // Immutable lifecycle profile; application is the default.
   mode?: EndgeBootMode
+
+  moduleLoader?: ModuleArtifactLoader
   // Источник получения доменных данных
   dataProvider?: EndgeDataProvider
 

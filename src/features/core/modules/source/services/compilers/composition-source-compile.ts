@@ -25,13 +25,14 @@ import type {
 import type { SourceFieldDefinition } from '@/features/core/modules/source/domain/types/source-expression.types'
 import type { UpdateMutationStrategy } from '@/features/core/modules/source/domain/types/update-source.types'
 import type { EndgeDataMode } from '@/features/core/modules/workspace/domain/workspace.types'
-
 import { parse as parseTS } from '@babel/parser'
-import * as t from '@babel/types'
 
+import * as t from '@babel/types'
 import { normalizeComponentSFCInteractionTriggers } from '@/features/core/modules/domain/component/component-sfc-edit-trigger'
+
 import { normalizePageCacheOptions } from '@/features/core/modules/runtime/domain/controllers/page-cache.types'
 import { DEFAULT_VOCAB_LOAD_POLICY } from '@/features/core/modules/runtime/domain/vocab-cache.types'
+import { isModuleReference } from '@/features/core/modules/runtime/module/module-reference'
 import {
   compileSourceExpression,
   diagnostic,
@@ -112,7 +113,7 @@ export function compileCompositionSource(
     const visibleData = new Map(data.map(item => [item.name, item.path ?? item.name]))
     const defaultActivation = activation ?? { mode: 'startup' as const }
     const resources = resourcesNode
-      ? readResources(resourcesNode, 'scope_default', '', diagnostics, { value: 0 })
+      ? readResources(resourcesNode, 'scope_default', '', diagnostics, { value: 0 }, executionContext)
       : []
     const scopes: CompositionScopeDescriptor[] = [{
       name: 'scope_default',
@@ -427,6 +428,7 @@ function readResources(
   publicPrefix: string,
   diagnostics: DiagnosticDraft[],
   order: { value: number },
+  executionContext: Readonly<Record<string, string>>,
 ): CompositionResourceDescriptor[] {
   const resources: CompositionResourceDescriptor[] = []
   const declared = new Set<string>()
@@ -444,12 +446,20 @@ function readResources(
       continue
     }
     declared.add(name)
+    if (t.isCallExpression(expression) && t.isIdentifier(expression.callee)
+      && ['module', 'contextSwitch'].includes(expression.callee.name)) {
+      const reference = readModuleResource(expression, diagnostics, `resources.${path}`, executionContext)
+      if (reference) {
+        resources.push({ name, path, scopePath, kind: 'module', ...reference, sourceOrder: order.value++ })
+      }
+      continue
+    }
     if (
       !t.isCallExpression(expression)
       || !t.isIdentifier(expression.callee)
       || (expression.callee.name !== 'style' && expression.callee.name !== 'i18n' && expression.callee.name !== 'operationHistory')
     ) {
-      diagnostics.push(diagnostic('error', 'composition-resource-kind', `Resource "${path}" должен иметь вид style(identity), i18n(identity) или operationHistory(options).`, `resources.${path}`, expression))
+      diagnostics.push(diagnostic('error', 'composition-resource-kind', `Resource "${path}" должен иметь вид style(identity), i18n(identity), operationHistory(options) или module(identity, version).`, `resources.${path}`, expression))
       continue
     }
     const kind = expression.callee.name
@@ -510,6 +520,39 @@ function readResources(
     })
   }
   return resources
+}
+
+function readModuleResource(
+  expression: t.CallExpression,
+  diagnostics: DiagnosticDraft[],
+  path: string,
+  executionContext: Readonly<Record<string, string>>,
+) {
+  if (!t.isIdentifier(expression.callee, { name: 'contextSwitch' })) {
+    return readModuleReference(expression, diagnostics, path)
+  }
+  const definition = readContextSwitchDefinition(expression, diagnostics, path)
+  if (!definition) {
+    return null
+  }
+  const { defaultExpression, branches } = definition
+  const fallback = readModuleReference(defaultExpression, diagnostics, `${path}.default`)
+  const alternatives = branches.map((branch, index) => readModuleReference(branch.use, diagnostics, `${path}.cases.${index}.use`))
+  const selectedIndex = selectContextCase(branches, executionContext)
+  return selectedIndex == null ? fallback : alternatives[selectedIndex]
+}
+
+function readModuleReference(raw: t.Expression, diagnostics: DiagnosticDraft[], path: string) {
+  const call = unwrapExpression(raw)
+  if (t.isCallExpression(call) && t.isIdentifier(call.callee, { name: 'module' }) && call.arguments.length === 2) {
+    const identity = readStringArgument(call, 0)
+    const version = readStringArgument(call, 1)
+    if (identity && version && isModuleReference(identity, version)) {
+      return { identity, version }
+    }
+  }
+  diagnostics.push(diagnostic('error', 'composition-resource-module', 'Используйте module(identity, version) с точной версией SemVer.', path, call))
+  return null
 }
 
 function readOperationHistoryShortcuts(
@@ -851,7 +894,7 @@ function readRuntimes(
         diagnostics.push(diagnostic('error', 'composition-scope-runtimes-shape', `runtimes scope "${path}" должен быть object literal.`, `runtimes.${path}.runtimes`, scopeRuntimesNode))
       }
       const ownedResources = t.isObjectExpression(scopeResourcesNode)
-        ? readResources(scopeResourcesNode, path, path, diagnostics, order)
+        ? readResources(scopeResourcesNode, path, path, diagnostics, order, executionContext)
         : []
       const ownedData = t.isObjectExpression(scopeDataNode)
         ? readData(scopeDataNode, path, path, diagnostics, false)
@@ -1489,81 +1532,11 @@ function readContextSwitchRuntime(
     return { handled: false }
   }
   const sourcePath = `runtimes.${name}.contextSwitch`
-  const definition = chain.base.arguments[0]
-  if (chain.base.arguments.length !== 1 || !definition || !t.isObjectExpression(definition)) {
-    diagnostics.push(diagnostic('error', 'composition-context-switch-shape', 'contextSwitch принимает один object literal с default и cases.', sourcePath, chain.base))
+  const definition = readContextSwitchDefinition(chain.base, diagnostics, sourcePath)
+  if (!definition) {
     return { handled: true, descriptor: null }
   }
-
-  const allowed = new Set(['default', 'cases'])
-  const seen = new Set<string>()
-  for (const property of definition.properties) {
-    if (!t.isObjectProperty(property) || property.computed || property.shorthand || !t.isExpression(property.value)) {
-      diagnostics.push(diagnostic('error', 'composition-context-switch-property', 'contextSwitch допускает только явные object properties.', sourcePath, property))
-      continue
-    }
-    const key = propertyName(property.key)
-    if (!key || !allowed.has(key)) {
-      diagnostics.push(diagnostic('error', 'composition-context-switch-property-unsupported', `Свойство "${key ?? ''}" не поддерживается contextSwitch.`, sourcePath, property))
-      continue
-    }
-    if (seen.has(key)) {
-      diagnostics.push(diagnostic('error', 'composition-context-switch-property-duplicate', `Свойство "${key}" указано повторно.`, `${sourcePath}.${key}`, property))
-    }
-    seen.add(key)
-  }
-
-  const defaultExpression = propertyValue(definition, 'default')
-  const casesNode = propertyValue(definition, 'cases')
-  if (!defaultExpression) {
-    diagnostics.push(diagnostic('error', 'composition-context-switch-default-required', 'contextSwitch требует default runtime reference.', `${sourcePath}.default`, definition))
-  }
-  if (!casesNode || !t.isArrayExpression(casesNode)) {
-    diagnostics.push(diagnostic('error', 'composition-context-switch-cases-shape', 'contextSwitch.cases должен быть массивом { when, use }.', `${sourcePath}.cases`, casesNode ?? definition))
-  }
-  if (!defaultExpression || !casesNode || !t.isArrayExpression(casesNode)) {
-    return { handled: true, descriptor: null }
-  }
-
-  const branches: Array<{ when: Readonly<Record<string, string>>, use: t.Expression, node: t.Node }> = []
-  for (const [index, element] of casesNode.elements.entries()) {
-    const branchPath = `${sourcePath}.cases.${index}`
-    if (!element || !t.isObjectExpression(element)) {
-      diagnostics.push(diagnostic('error', 'composition-context-switch-case-shape', 'Каждый case должен иметь вид { when: {...}, use: runtime(...) }.', branchPath, element ?? casesNode))
-      continue
-    }
-    const whenNode = propertyValue(element, 'when')
-    const use = propertyValue(element, 'use')
-    const extra = element.properties.filter(property => !t.isObjectProperty(property) || property.computed || !['when', 'use'].includes(propertyName(property.key) ?? ''))
-    for (const property of extra) {
-      diagnostics.push(diagnostic('error', 'composition-context-switch-case-property', 'Case contextSwitch допускает только when и use.', branchPath, property))
-    }
-    if (!whenNode || !t.isObjectExpression(whenNode)) {
-      diagnostics.push(diagnostic('error', 'composition-context-switch-when-shape', 'case.when должен быть непустым object literal строковых context identities.', `${branchPath}.when`, whenNode ?? element))
-      continue
-    }
-    const when = readContextPatternNode(whenNode, diagnostics, `${branchPath}.when`, COMPOSITION_CONTEXT_PATTERN_CODES)
-    if (!Object.keys(when).length) {
-      diagnostics.push(diagnostic('error', 'composition-context-switch-when-empty', 'Пустой when недопустим: используйте default.', `${branchPath}.when`, whenNode))
-      continue
-    }
-    if (!use) {
-      diagnostics.push(diagnostic('error', 'composition-context-switch-use-required', 'case.use должен содержать runtime reference.', `${branchPath}.use`, element))
-      continue
-    }
-    branches.push({ when, use, node: element })
-  }
-
-  for (const [left, right] of findAmbiguousContextCases(branches)) {
-    diagnostics.push(diagnostic(
-      'error',
-      'composition-context-switch-ambiguous',
-      `Cases ${left} и ${right} пересекаются с одинаковой специфичностью; порядок строк не задаёт приоритет.`,
-      `${sourcePath}.cases.${right}`,
-      branches[right]!.node,
-    ))
-  }
-
+  const { defaultExpression, branches } = definition
   const expressions = [defaultExpression, ...branches.map(branch => branch.use)]
   for (const [index, expression] of expressions.entries()) {
     const branchChain = memberChain(expression)
@@ -1622,6 +1595,85 @@ function readContextSwitchRuntime(
     }),
   }
   return { handled: true, descriptor: selected }
+}
+
+function readContextSwitchDefinition(call: t.CallExpression, diagnostics: DiagnosticDraft[], sourcePath: string) {
+  const definition = call.arguments[0]
+  if (call.arguments.length !== 1 || !definition || !t.isObjectExpression(definition)) {
+    diagnostics.push(diagnostic('error', 'composition-context-switch-shape', 'contextSwitch принимает один object literal с default и cases.', sourcePath, call))
+    return null
+  }
+
+  const allowed = new Set(['default', 'cases'])
+  const seen = new Set<string>()
+  for (const property of definition.properties) {
+    if (!t.isObjectProperty(property) || property.computed || property.shorthand || !t.isExpression(property.value)) {
+      diagnostics.push(diagnostic('error', 'composition-context-switch-property', 'contextSwitch допускает только явные object properties.', sourcePath, property))
+      continue
+    }
+    const key = propertyName(property.key)
+    if (!key || !allowed.has(key)) {
+      diagnostics.push(diagnostic('error', 'composition-context-switch-property-unsupported', `Свойство "${key ?? ''}" не поддерживается contextSwitch.`, sourcePath, property))
+      continue
+    }
+    if (seen.has(key)) {
+      diagnostics.push(diagnostic('error', 'composition-context-switch-property-duplicate', `Свойство "${key}" указано повторно.`, `${sourcePath}.${key}`, property))
+    }
+    seen.add(key)
+  }
+
+  const defaultExpression = propertyValue(definition, 'default')
+  const casesNode = propertyValue(definition, 'cases')
+  if (!defaultExpression) {
+    diagnostics.push(diagnostic('error', 'composition-context-switch-default-required', 'contextSwitch требует default.', `${sourcePath}.default`, definition))
+  }
+  if (!casesNode || !t.isArrayExpression(casesNode)) {
+    diagnostics.push(diagnostic('error', 'composition-context-switch-cases-shape', 'contextSwitch.cases должен быть массивом { when, use }.', `${sourcePath}.cases`, casesNode ?? definition))
+  }
+  if (!defaultExpression || !casesNode || !t.isArrayExpression(casesNode)) {
+    return null
+  }
+
+  const branches: Array<{ when: Readonly<Record<string, string>>, use: t.Expression, node: t.Node }> = []
+  for (const [index, element] of casesNode.elements.entries()) {
+    const branchPath = `${sourcePath}.cases.${index}`
+    if (!element || !t.isObjectExpression(element)) {
+      diagnostics.push(diagnostic('error', 'composition-context-switch-case-shape', 'Каждый case должен иметь вид { when: {...}, use: reference(...) }.', branchPath, element ?? casesNode))
+      continue
+    }
+    const whenNode = propertyValue(element, 'when')
+    const use = propertyValue(element, 'use')
+    const extra = element.properties.filter(property => !t.isObjectProperty(property) || property.computed || !['when', 'use'].includes(propertyName(property.key) ?? ''))
+    for (const property of extra) {
+      diagnostics.push(diagnostic('error', 'composition-context-switch-case-property', 'Case contextSwitch допускает только when и use.', branchPath, property))
+    }
+    if (!whenNode || !t.isObjectExpression(whenNode)) {
+      diagnostics.push(diagnostic('error', 'composition-context-switch-when-shape', 'case.when должен быть непустым object literal строковых context identities.', `${branchPath}.when`, whenNode ?? element))
+      continue
+    }
+    const when = readContextPatternNode(whenNode, diagnostics, `${branchPath}.when`, COMPOSITION_CONTEXT_PATTERN_CODES)
+    if (!Object.keys(when).length) {
+      diagnostics.push(diagnostic('error', 'composition-context-switch-when-empty', 'Пустой when недопустим: используйте default.', `${branchPath}.when`, whenNode))
+      continue
+    }
+    if (!use) {
+      diagnostics.push(diagnostic('error', 'composition-context-switch-use-required', 'case.use должен содержать ссылку.', `${branchPath}.use`, element))
+      continue
+    }
+    branches.push({ when, use, node: element })
+  }
+
+  for (const [left, right] of findAmbiguousContextCases(branches)) {
+    diagnostics.push(diagnostic(
+      'error',
+      'composition-context-switch-ambiguous',
+      `Cases ${left} и ${right} пересекаются с одинаковой специфичностью; порядок строк не задаёт приоритет.`,
+      `${sourcePath}.cases.${right}`,
+      branches[right]!.node,
+    ))
+  }
+
+  return { defaultExpression, branches }
 }
 
 function appendRuntimeModifiers(
