@@ -25,6 +25,11 @@ interface AuthSessionManagerDependencies {
 export class AuthSessionManager {
   private readonly _states = new Map<string, AuthSessionState>()
   private readonly _operations = new Map<string, Promise<AuthTokenSet | null>>()
+  private readonly _userInfoOperations = new Map<string, {
+    token: AuthTokenSet
+    pending: Promise<Record<string, unknown> | null>
+  }>()
+
   private readonly _sources = new Map<string, AuthSessionSource>()
   private readonly _sessionVersions = new Map<string, symbol>()
   private readonly _loggingOut = new Set<string>()
@@ -157,6 +162,24 @@ export class AuthSessionManager {
     if (state?.userInfo) {
       return state.userInfo
     }
+    const existing = this._userInfoOperations.get(profile.identity)
+    if (existing?.token === token) {
+      return existing.pending
+    }
+    const pending = this._loadUserInfo(profile, token, isCurrent).finally(() => {
+      if (this._userInfoOperations.get(profile.identity)?.pending === pending) {
+        this._userInfoOperations.delete(profile.identity)
+      }
+    })
+    this._userInfoOperations.set(profile.identity, { token, pending })
+    return pending
+  }
+
+  private async _loadUserInfo(
+    profile: AuthProfileSchema,
+    token: AuthTokenSet,
+    isCurrent: () => boolean,
+  ): Promise<Record<string, unknown> | null> {
     const source = this._sources.get(profile.identity)
     if (source?.loadUserInfo) {
       const userInfo = await source.loadUserInfo()
