@@ -41,6 +41,20 @@ export const TEST_ENDGE_WORKSPACE: EndgeWorkspaceDefinition = {
     },
     tooltips: { side: 'right', align: 'start', openDelay: 250, closeDelay: 100 },
     diagnostics: {
+      recording: {
+        enabled: false,
+        content: {
+          telemetry: true,
+          problems: true,
+          configuration: false,
+          effectiveConfiguration: false,
+          domain: false,
+          program: false,
+          runtime: true,
+          raphData: false,
+          raphGraph: false,
+        },
+      },
       telemetry: {
         collection: {
           enabled: true,
