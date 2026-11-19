@@ -8,6 +8,7 @@ import type { ControllerDependencyBindings } from '@/features/core/modules/runti
 import type { RuntimeHost } from '@/features/core/modules/runtime/domain/runtime-host.types'
 import type { RuntimeScopeHandle } from '@/features/core/modules/runtime/domain/runtime-scope.types'
 import type { VocabLoadPolicy } from '@/features/core/modules/runtime/domain/vocab-cache.types'
+import type { ModuleReference } from '@/features/core/modules/runtime/module/module-reference'
 import type { FilterViewControlDefinition } from '@/features/core/modules/source/domain/types/filter-view.type'
 import type { SourceExpressionIR, SourceFieldDefinition } from '@/features/core/modules/source/domain/types/source-expression.types'
 import type { UpdateMutationStrategy } from '@/features/core/modules/source/domain/types/update-source.types'
@@ -42,7 +43,12 @@ type CompositionOperationHistoryResourceDescriptor = CompositionResourceDescript
   }
 }
 
-export type CompositionResourceDescriptor = CompositionSourceAssetResourceDescriptor | CompositionOperationHistoryResourceDescriptor
+type CompositionModuleResourceDescriptor = CompositionResourceDescriptorBase & ModuleReference & { kind: 'module' }
+
+export type CompositionResourceDescriptor
+  = | CompositionSourceAssetResourceDescriptor
+    | CompositionOperationHistoryResourceDescriptor
+    | CompositionModuleResourceDescriptor
 
 export interface OperationHistoryShortcutDescriptor {
   command: 'undo' | 'redo'
@@ -301,6 +307,7 @@ export interface CompositionSourceAddResourcePatch {
   name: string
   kind: CompositionResourceDescriptor['kind']
   identity?: string
+  version?: string
 }
 
 // Добавление runtime dependency в canonical Composition source.
