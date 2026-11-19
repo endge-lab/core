@@ -44,7 +44,7 @@ describe('рабочее пространство Endge', () => {
       },
     })
 
-    expect(workspace.configuration.sfcAdapterIds).toEqual(['vue-native', 'vue-shadcn'])
+    expect(workspace.configuration.sfcAdapterIds).toEqual(['vue', 'vue-shadcn'])
     expect(workspace.configuration.defaultSfcAdapterId).toBe('vue-shadcn')
   })
 

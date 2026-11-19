@@ -4,6 +4,7 @@ import type {
   UIRenderAdapterDescriptor,
   UIRenderAdapterRequirement,
 } from '@/features/core/modules/ui/domain/types/ui-render-adapter.type'
+import { ENDGE_VUE_SFC_ADAPTER_ID, normalizeVueSfcAdapterId } from '@/features/core/modules/ui/domain/types/ui-render-adapter.type'
 
 /**
  * Хранит runtime implementations UI adapter-ов и выбранный adapter.
@@ -41,15 +42,25 @@ export class UIAdapterRegistry {
    * Проверяет наличие adapter-а по id.
    */
   public has(id: string | null | undefined): boolean {
-    return this._adapters.has(String(id ?? '').trim())
+    return this.get(id) !== null
   }
 
   /**
    * Возвращает adapter по id без проверки его контракта.
    */
   public get<TImplementation = unknown>(id: string | null | undefined): UIRenderAdapter<TImplementation> | null {
-    const adapter = this._adapters.get(String(id ?? '').trim())
-    return (adapter as UIRenderAdapter<TImplementation> | undefined) ?? null
+    const requestedId = String(id ?? '').trim()
+    const adapter = this._adapters.get(requestedId)
+    if (adapter) {
+      return adapter as UIRenderAdapter<TImplementation>
+    }
+    if (normalizeVueSfcAdapterId(requestedId) === ENDGE_VUE_SFC_ADAPTER_ID) {
+      const vueAdapter = this._adapters.get(ENDGE_VUE_SFC_ADAPTER_ID)
+        ?? this._adapters.get('vue-native')
+        ?? this._adapters.get('native-vue')
+      return (vueAdapter as UIRenderAdapter<TImplementation> | undefined) ?? null
+    }
+    return null
   }
 
   /**

@@ -32,11 +32,11 @@ import { DEFAULT_ENDGE_TOOLTIP_CONFIGURATION } from '@/features/core/modules/con
 import { DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION } from '@/features/core/modules/diagnostics/config/diagnostics.config'
 import { normalizeComponentSFCInteractionKeyboardCondition, normalizeComponentSFCInteractionTriggerActivation, normalizeComponentSFCInteractionTriggers } from '@/features/core/modules/domain/component/component-sfc-edit-trigger'
 import { DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION } from '@/features/core/modules/domain/component/sfc-editing.config'
+import { ENDGE_VUE_SFC_ADAPTER_ID, normalizeVueSfcAdapterId } from '@/features/core/modules/domain/types/component/sfc/renderer-adapter.constants'
 import { isEndgeSFCRendererTag } from '@/features/core/modules/domain/types/component/sfc/renderer-tags'
 import { isModuleReference, isModuleRendererId } from '@/features/core/modules/runtime/module/module-reference'
 
 const LEGACY_SFC_ADAPTER_IDS: Readonly<Record<string, string>> = {
-  'native-vue': 'vue-native',
   'shadcn-vue': 'vue-shadcn',
 }
 
@@ -59,8 +59,8 @@ const DEFAULT_CONFIGURATION_VALUE: EndgeConfiguration = {
   ],
   defaultTimezone: DEFAULT_TIMEZONE,
   defaultAuthProfileIdentity: null,
-  sfcAdapterIds: ['vue-native'],
-  defaultSfcAdapterId: 'vue-native',
+  sfcAdapterIds: [ENDGE_VUE_SFC_ADAPTER_ID],
+  defaultSfcAdapterId: ENDGE_VUE_SFC_ADAPTER_ID,
   sfcEditing: structuredCloneSafe(DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION),
   tooltips: structuredCloneSafe(DEFAULT_ENDGE_TOOLTIP_CONFIGURATION),
   diagnostics: structuredCloneSafe(DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION),
@@ -160,7 +160,7 @@ function normalizeSfcAdapterIds(input: unknown): string[] {
 
 function normalizeSfcAdapterId(input: unknown): string {
   const id = String(input ?? '').trim()
-  return LEGACY_SFC_ADAPTER_IDS[id] ?? id
+  return LEGACY_SFC_ADAPTER_IDS[id] ?? normalizeVueSfcAdapterId(id)
 }
 
 // Нормализует contribution сущности; пустое значение означает чистое наследование.
@@ -207,7 +207,9 @@ export function applyEndgeConfigurationContribution(
     next.timezones = applyCollectionPatch(next.timezones, patch.timezones, item => item.identity)
   }
   if (patch.sfcAdapterIds) {
-    next.sfcAdapterIds = applyCollectionPatch(next.sfcAdapterIds, patch.sfcAdapterIds, item => item)
+    next.sfcAdapterIds = applyCollectionPatch(next.sfcAdapterIds.map(normalizeSfcAdapterId), {
+      entries: (patch.sfcAdapterIds.entries ?? []).map(entry => ({ ...entry, key: normalizeSfcAdapterId(entry.key) })),
+    }, normalizeSfcAdapterId)
   }
   if (patch.diagnostics) {
     next.diagnostics = applyDiagnosticsPatch(next.diagnostics, patch.diagnostics)
