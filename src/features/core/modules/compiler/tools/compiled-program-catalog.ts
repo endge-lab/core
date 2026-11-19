@@ -4,7 +4,7 @@ import type { ProgramArtifact } from '@/features/core/modules/program/domain/typ
 
 import { Endge } from '@/features/core/kernel/endge'
 
-const COLLECTION_TYPES: Record<string, string> = {
+export const COLLECTION_TYPES: Record<string, string> = {
   componentSFCs: 'component-sfc',
   dataViews: 'data-view',
   queries: 'query',
@@ -44,38 +44,7 @@ export function createCompiledProgramCatalog(
     const workspace = Endge.workspace.current
     result.workspace = { identity: workspace.identity, displayName: workspace.displayName, startupCompositionIdentity: workspace.startupCompositionIdentity, documentStructure: workspace.documentStructure ?? 'frontend' }
   }
-  // Read navigation from loaded entities: authoring toPlain() intentionally omits
-  // placement or server IDs for some Source document families.
-  const loaded = {
-    folders: domain.getFolders(),
-    facets: domain.getFacets(),
-    facetDocuments: domain.getFacets().flatMap(facet => domain.getFacetDocuments(facet.identity)),
-    types: domain.getTypes(),
-    queries: domain.getQueries(),
-    dataViews: domain.getDataViews(),
-    compositions: domain.getCompositions(),
-    stores: domain.getStores(),
-    streams: domain.getStreams(),
-    simulations: domain.getSimulations(),
-    updates: domain.getUpdates(),
-    mocks: domain.getMocks(),
-    computations: domain.getComputations(),
-    components: domain.getComponents(),
-    componentSFCs: domain.getComponentSFCs(),
-    actions: domain.getActions(),
-    converters: domain.getConverters(),
-    integrations: domain.getIntegrations(),
-    filters: domain.getFilters(),
-    policies: domain.getPolicies(),
-    styles: domain.getStyles(),
-    configurations: domain.getConfigurations(),
-    vocabs: domain.getVocabs(),
-    authProfiles: domain.getAuthProfiles(),
-    i18nBundles: domain.getI18nBundles(),
-    pageTemplates: domain.getPageTemplates(),
-    pages: domain.getPages(),
-    navigations: domain.getNavigations(),
-  }
+  const loaded = readLoadedDomainCollections(domain)
   const collections = Object.fromEntries(Object.entries(loaded).map(([key, entities]) => [
     key,
     entities.filter(entity => entity.isTemporary !== true && (entity.origin?.kind ?? 'storage') === 'storage'),
@@ -134,4 +103,39 @@ export function createCompiledProgramCatalog(
     })
   }
   return result
+}
+
+export function readLoadedDomainCollections(domain: EndgeDomain_Module) {
+  // Read navigation from loaded entities: authoring toPlain() intentionally omits
+  // placement or server IDs for some Source document families.
+  return {
+    folders: domain.getFolders(),
+    facets: domain.getFacets(),
+    facetDocuments: domain.getFacets().flatMap(facet => domain.getFacetDocuments(facet.identity)),
+    types: domain.getTypes(),
+    queries: domain.getQueries(),
+    dataViews: domain.getDataViews(),
+    compositions: domain.getCompositions(),
+    stores: domain.getStores(),
+    streams: domain.getStreams(),
+    simulations: domain.getSimulations(),
+    updates: domain.getUpdates(),
+    mocks: domain.getMocks(),
+    computations: domain.getComputations(),
+    components: domain.getComponents(),
+    componentSFCs: domain.getComponentSFCs(),
+    actions: domain.getActions(),
+    converters: domain.getConverters(),
+    integrations: domain.getIntegrations(),
+    filters: domain.getFilters(),
+    policies: domain.getPolicies(),
+    styles: domain.getStyles(),
+    configurations: domain.getConfigurations(),
+    vocabs: domain.getVocabs(),
+    authProfiles: domain.getAuthProfiles(),
+    i18nBundles: domain.getI18nBundles(),
+    pageTemplates: domain.getPageTemplates(),
+    pages: domain.getPages(),
+    navigations: domain.getNavigations(),
+  }
 }

@@ -6,6 +6,8 @@ import type {
   EndgeDiagnosticsConfiguration,
 } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
 import { describe, expect, it, vi } from 'vitest'
+import { Endge } from '@/features/core/kernel/endge'
+import { BrowserDiagnosticsSnapshot_Adapter } from '@/features/core/modules/diagnostics/adapters/BrowserDiagnosticsSnapshot_Adapter'
 import { EndgeDiagnostics_Module } from '@/features/core/modules/diagnostics/EndgeDiagnostics_Module'
 
 // Создаёт независимую configuration для одного тестового diagnostics module.
@@ -42,6 +44,79 @@ function configuration(
 }
 
 describe('диагностика Endge', () => {
+  it('выгружает ручную запись при выключенном фоне без доставки в фоновые outputs', async () => {
+    const diagnostics = new EndgeDiagnostics_Module()
+    const download = vi.spyOn(BrowserDiagnosticsSnapshot_Adapter.prototype, 'downloadJson').mockImplementation(() => {})
+    const acceptRecord = vi.fn()
+    const acceptSnapshot = vi.fn()
+    const base = configuration({ enabled: false, maxRecords: 2 })
+    base.telemetry.routes = [{ id: 'all', name: 'All', enabled: true, match: {}, outputId: 'memory' }]
+    base.snapshots.automatic = { ...base.snapshots.automatic, enabled: true, errorCount: 1, outputIds: ['memory'] }
+    diagnostics.configure(base)
+    await diagnostics.start({ scope: {}, vars: {} })
+    diagnostics.registerAdapter({ id: 'memory', acceptRecord, acceptSnapshot })
+
+    try {
+      expect(() => diagnostics.startRecording()).toThrow('Manual recording is disabled')
+      expect(diagnostics.info('before recording')).toBeNull()
+      const config = { ...base, recording: { enabled: true, content: base.snapshots.content } }
+      diagnostics.configure(config)
+
+      const started = diagnostics.startRecording()
+      expect(started.status).toBe('recording')
+      expect(diagnostics.startRecording()).toEqual(started)
+      diagnostics.info('evicted')
+      diagnostics.startSpan('kept span').end()
+      const unfinished = diagnostics.startSpan('unfinished')
+      diagnostics.error('kept log', { attributes: { authorization: 'private' } })
+
+      expect(diagnostics.query()).toEqual([])
+      expect(acceptRecord).not.toHaveBeenCalled()
+      expect(acceptSnapshot).not.toHaveBeenCalled()
+      const stopped = diagnostics.stopRecording({
+        domain: false,
+        program: false,
+        effectiveConfiguration: false,
+        runtime: false,
+        raphData: false,
+        raphGraph: false,
+      })
+      expect(stopped).toMatchObject({ status: 'stopped', retainedRecords: 2, droppedRecords: 1 })
+      expect(unfinished.end()).toBeNull()
+      expect(diagnostics.error('after recording')).toBeNull()
+      expect(diagnostics.stopRecording()).toEqual(stopped)
+      const finished = diagnostics.downloadRecording()
+      expect(download).toHaveBeenCalledWith(expect.objectContaining({
+        recording: finished,
+        telemetry: expect.objectContaining({
+          records: [
+            expect.objectContaining({ name: 'kept span' }),
+            expect.objectContaining({ body: 'kept log', attributes: { authorization: '[REDACTED]' } }),
+          ],
+        }),
+      }))
+      diagnostics.downloadRecording(finished.id)
+      expect(download.mock.calls[0]).toEqual(download.mock.calls[1])
+      Endge.events.emitEvent('context:user-changed', { previous: 'one', value: 'two' })
+      expect(diagnostics.recordingState.status).toBe('idle')
+      expect(() => diagnostics.downloadRecording(finished.id)).toThrow('unavailable')
+
+      diagnostics.configure({
+        ...config,
+        telemetry: { ...base.telemetry, collection: { ...base.telemetry.collection, enabled: true } },
+      })
+      diagnostics.startRecording()
+      const regular = diagnostics.info('also collected in the background')
+      expect(acceptRecord).toHaveBeenCalledOnce()
+      expect(diagnostics.query()).toEqual([regular])
+      expect(diagnostics.stopRecording()).toMatchObject({ status: 'stopped', retainedRecords: 1 })
+    }
+    finally {
+      await diagnostics.reset()
+      download.mockRestore()
+    }
+  })
+
   it('применяет политику severity и сохраняет только ограниченный хвост истории', () => {
     const diagnostics = new EndgeDiagnostics_Module()
     diagnostics.configure(configuration({ minSeverity: 9, maxRecords: 2 }))

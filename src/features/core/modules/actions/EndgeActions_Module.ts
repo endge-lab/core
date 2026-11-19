@@ -11,6 +11,7 @@ import type {
   TableColumnActionContext,
 } from '@/features/core/modules/actions/domain/action.types'
 import type { ActionProgramExecutionOptions } from '@/features/core/modules/actions/services/ActionProgramExecutor'
+import type { DiagnosticsSnapshotOptions, EndgeDiagnosticsSnapshotContentConfiguration } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
 import type { EntityOrigin } from '@/features/core/modules/domain/types/document/entity-management.type'
 import type { ImplementationInvocation, ImplementationProvider } from '@/features/core/modules/implementations/domain/implementation.types'
 import type { EndgeImplementations_Module } from '@/features/core/modules/implementations/EndgeImplementations_Module'
@@ -95,6 +96,7 @@ export class EndgeActions_Module extends EndgeModule {
   public override setup(): void {
     this._registerCoreProviders()
     this._registerCoreActions()
+    this._registerDiagnosticsActions()
     this._registerTableActions()
   }
 
@@ -615,6 +617,55 @@ export class EndgeActions_Module extends EndgeModule {
     ]
     for (const definition of vocabActions) {
       this._defineCodeAction(definition, { kind: 'builtin', owner: '@endge/core' })
+    }
+  }
+
+  private _registerDiagnosticsActions(): void {
+    const owner = '@endge/core'
+    const catalogPath = ['Debug', 'Диагностика']
+    const actions: CodeActionDefinition[] = [
+      {
+        identity: BUILTIN_ACTION_IDS.diagnosticsStartRecording,
+        displayName: 'Начать запись диагностики',
+        contract: { output: 'Object' },
+        execute: () => Endge.diagnostics.startRecording(),
+        owner,
+        catalogPath,
+      },
+      {
+        identity: BUILTIN_ACTION_IDS.diagnosticsStopRecording,
+        displayName: 'Остановить запись диагностики',
+        description: 'Принимает необязательный объект content с переключателями секций отчёта.',
+        contract: { input: 'Object', output: 'Object' },
+        execute: ({ input }) => {
+          const options = input as { content?: Partial<EndgeDiagnosticsSnapshotContentConfiguration> } | undefined
+          return Endge.diagnostics.stopRecording(options?.content)
+        },
+        owner,
+        catalogPath,
+      },
+      {
+        identity: BUILTIN_ACTION_IDS.diagnosticsDownload,
+        displayName: 'Скачать диагностику',
+        description: 'Принимает source: snapshot или recording. Для snapshot доступны options, для recording — recordingId.',
+        contract: { input: 'Object', output: 'Object' },
+        execute: ({ input }) => {
+          const options = input as { source?: string, recordingId?: string, options?: DiagnosticsSnapshotOptions } | undefined
+          if (options?.source === 'recording') {
+            return Endge.diagnostics.downloadRecording(options.recordingId)
+          }
+          if (options?.source !== undefined && options.source !== 'snapshot') {
+            throw new Error('[EndgeDiagnostics] Unknown report source')
+          }
+          const snapshot = Endge.diagnostics.downloadSnapshot(options?.options)
+          return { generatedAt: snapshot.generatedAt }
+        },
+        owner,
+        catalogPath,
+      },
+    ]
+    for (const action of actions) {
+      this._defineCodeAction(action, { kind: 'builtin', owner })
     }
   }
 

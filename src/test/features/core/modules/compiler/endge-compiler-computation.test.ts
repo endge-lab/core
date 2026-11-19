@@ -99,6 +99,16 @@ describe('зависимости computation в EndgeCompiler', () => {
         expect.objectContaining({ code: 'computation-reference-missing' }),
       ]),
     }))
+
+    const problems = Endge.diagnostics.problems
+    const filter = { entityTypes: ['computation'], entityId: 4 }
+    expect(problems.query(filter)).toEqual([
+      expect.objectContaining({ code: 'computation-reference-missing', severity: 'error' }),
+    ])
+
+    Endge.domain.addComputation(computation(5, 'missing.target', 'defineComputation({ outputs: { value: 1 }, result: output("value") })'))
+    Endge.compiler.build({} as any)
+    expect(problems.query(filter)).toEqual([])
   })
 })
 

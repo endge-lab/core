@@ -12,4 +12,5 @@ export interface SourceContextValues {
 
   // Активные фасеты домена (identity); `undefined` — список неизвестен, проверка имени фасета пропускается.
   knownFacets?: readonly string[]
+  knownFacetDocuments?: ReadonlyMap<string, ReadonlySet<string>>
 }

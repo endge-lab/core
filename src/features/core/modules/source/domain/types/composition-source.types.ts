@@ -44,7 +44,13 @@ type CompositionOperationHistoryResourceDescriptor = CompositionResourceDescript
   }
 }
 
-type CompositionModuleResourceDescriptor = CompositionResourceDescriptorBase & ModuleReference & { kind: 'module' }
+type CompositionModuleResourceDescriptor = CompositionResourceDescriptorBase & ModuleReference & {
+  kind: 'module'
+  contextSwitch?: {
+    default: ModuleReference | null
+    cases: Array<{ when: Readonly<Record<string, string>>, reference: ModuleReference | null }>
+  }
+}
 
 export type CompositionResourceDescriptor
   = | CompositionSourceAssetResourceDescriptor

@@ -234,11 +234,16 @@ export interface EndgeDiagnosticsAutomaticSnapshotConfiguration {
   outputIds: string[]
 }
 
-// Настройки snapshot, скачиваемого глобальной комбинацией клавиш.
+export type DiagnosticsShortcutOperation = 'download' | 'start' | 'stop'
+
+// Настройки горячих клавиш диагностики и совместимость с одной старой привязкой.
 export interface EndgeDiagnosticsShortcutSnapshotConfiguration {
   // Legacy TriggerSet либо sequence-объект; массив сохраняется без миграции persisted документов.
   triggerSet: ComponentSFCInteractionTriggerActivation
   content: EndgeDiagnosticsSnapshotContentConfiguration
+  // Input is validated as JSON when resolving the persisted configuration.
+  action?: { identity: string, input?: unknown }
+  bindings?: Partial<Record<DiagnosticsShortcutOperation, ComponentSFCInteractionTriggerActivation>>
 }
 
 // Effective configuration ручных, shortcut и автоматических snapshots.
@@ -252,6 +257,10 @@ export interface EndgeDiagnosticsSnapshotsConfiguration {
 export interface EndgeDiagnosticsConfiguration {
   telemetry: EndgeDiagnosticsTelemetryConfiguration
   snapshots: EndgeDiagnosticsSnapshotsConfiguration
+  recording?: {
+    enabled: boolean
+    content: EndgeDiagnosticsSnapshotContentConfiguration
+  }
 }
 
 // Параметры записи log без выбранного уровня severity.
@@ -372,6 +381,7 @@ export interface DiagnosticsSnapshot {
   version?: 1 | 2
   generatedAt: number
   trigger: 'manual' | 'shortcut' | 'automatic'
+  recording?: DiagnosticsFinishedRecording
   telemetry?: DiagnosticsTelemetrySnapshot
   problems?: DiagnosticsProblemsSnapshot
   configuration?: EndgeDiagnosticsConfiguration
@@ -387,6 +397,19 @@ export interface DiagnosticsSnapshot {
     fields: number
   }
 }
+
+export interface DiagnosticsFinishedRecording {
+  id: string
+  startedAt: number
+  stoppedAt: number
+  retainedRecords: number
+  droppedRecords: number
+}
+
+export type DiagnosticsRecordingState
+  = | { status: 'idle' }
+    | { status: 'recording', id: string, startedAt: number }
+    | ({ status: 'stopped' } & DiagnosticsFinishedRecording)
 
 // Обработчик одной принятой диагностической записи.
 export type DiagnosticsListener = (record: DiagnosticsRecord) => void

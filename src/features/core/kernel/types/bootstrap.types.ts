@@ -3,6 +3,7 @@ import type { EndgeBridgeBootOptions } from '@/features/core/modules/bridge/doma
 import type { EndgeCommandsBootOptions } from '@/features/core/modules/commands/types/command-executor.type'
 import type { EndgeDomainBundle } from '@/features/core/modules/domain/types/document/domain-export.type'
 import type { EndgeDomainProvider } from '@/features/core/modules/domain/types/document/domain-provider.type'
+import type { ExecutionBundle } from '@/features/core/modules/program/domain/types/execution-bundle.types'
 import type { EndgeExecutionContext } from '@/features/core/modules/runtime/domain/execution-context.types'
 import type { ModuleArtifactLoader } from '@/features/core/modules/runtime/module/module-artifact'
 import type { EndgeFederationContext } from '@/features/federation/types/federation.types'
@@ -39,6 +40,7 @@ export interface EndgeBootContext extends EndgeFederationContext {
   mode?: EndgeBootMode
 
   moduleLoader?: ModuleArtifactLoader
+  deliveryProgram?: ExecutionBundle
   // Источник получения доменных данных
   dataProvider?: EndgeDataProvider
 

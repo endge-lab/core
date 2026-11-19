@@ -5,6 +5,7 @@ import type {
   EndgeConfigurationContribution,
   EndgeConfigurationLayer,
 } from '@/features/core/modules/configuration/domain/types/configuration.type'
+import type { EndgeExecutionContext } from '@/features/core/modules/runtime/domain/execution-context.types'
 
 import { Endge } from '@/features/core/kernel/endge'
 import {
@@ -30,16 +31,74 @@ export class EndgeConfiguration_Module extends EndgeModule<EndgeBootContext> {
     if (ctx.mode === 'debugger') {
       return
     }
+    const { configuration } = this._buildContext = ctx.deliveryProgram
+      ? this._resolveDeliveryContext(ctx.deliveryProgram)
+      : this._resolveBuildContext(ctx.context)
+    this._current = configuration
+    Endge.context.reconcileCurrentLocaleWithWorkspace(configuration)
+    Endge.context.reconcileCurrentThemeWithWorkspace(configuration)
+    Endge.context.reconcileCurrentTimezoneWithWorkspace(configuration)
+    this.notify()
+  }
+
+  private _resolveDeliveryContext(program: NonNullable<EndgeBootContext['deliveryProgram']>): EndgeBuildContext {
+    const facets = program.context.facets
     const execution = Endge.context.resolveExecutionContext({
-      explicit: ctx.context,
-      facets: this._activeFacets().map(facet => ({
-        identity: facet.identity,
-        position: facet.position,
-        documents: Endge.domain.getFacetDocuments(facet.identity)
-          .filter(document => document.active !== false && !document.deletedAt)
-          .map(document => document.identity),
-      })),
+      explicit: { facets },
+      facets: Object.entries(facets).map(([identity, value], position) => ({ identity, position, documents: [value] })),
     })
+    const workspaceIdentity = Endge.workspace.current.identity
+    const configuration = normalizeEndgeConfiguration(program.context.configuration)
+    return { workspaceIdentity, execution, configuration, contextHash: createEndgeContextHash({ workspaceIdentity, execution, configuration }) }
+  }
+
+  public availableFacets() {
+    return this._activeFacets().map(facet => ({
+      identity: facet.identity,
+      position: facet.position,
+      documents: Endge.domain.getFacetDocuments(facet.identity)
+        .filter(document => document.active !== false && !document.deletedAt)
+        .map(document => document.identity),
+    }))
+  }
+
+  public refreshRuntimeRenderers(): void {
+    if (!this._current || !this._buildContext || Endge.mode === 'debugger') {
+      return
+    }
+    let configuration = normalizeEndgeConfiguration(Endge.workspace.current.configuration)
+    for (const facet of this._activeFacets()) {
+      const identity = this._buildContext.execution.facets[facet.identity]
+      const document = identity ? Endge.domain.getFacetDocument(facet.identity, identity) : null
+      if (document?.active !== false && !document?.deletedAt) {
+        configuration = applyEndgeConfigurationContribution(configuration, document?.configuration ?? EMPTY_CONTRIBUTION)
+      }
+    }
+    if (JSON.stringify(configuration.defaultRenderers) !== JSON.stringify(this._current.defaultRenderers)) {
+      this._current = { ...this._current, defaultRenderers: configuration.defaultRenderers }
+      this.notify()
+    }
+  }
+
+  public withBuildContext<T>(facets: EndgeExecutionContext['facets'], compile: () => T): T {
+    const previous = this.buildContext
+    try {
+      this._buildContext = this._resolveBuildContext({ facets }, false)
+      this._current = this._buildContext.configuration
+      return compile()
+    }
+    finally {
+      this._buildContext = previous
+      this._current = previous.configuration
+      Endge.configurationSchema.resolveValues(previous.configuration.values)
+    }
+  }
+
+  private _resolveBuildContext(explicit?: Partial<EndgeExecutionContext>, persist = true): EndgeBuildContext {
+    const execution = Endge.context.resolveExecutionContext({ explicit, facets: this.availableFacets() }, { persist })
+    if (!persist && Object.entries(explicit?.facets ?? {}).some(([facet, value]) => execution.facets[facet] !== value)) {
+      throw new Error('[EndgeConfiguration] Build context conflicts with the session facets')
+    }
 
     let configuration = normalizeEndgeConfiguration(Endge.workspace.current.configuration)
     configuration.values = Endge.configurationSchema.resolveValues(configuration.values)
@@ -57,17 +116,12 @@ export class EndgeConfiguration_Module extends EndgeModule<EndgeBootContext> {
     }
 
     const workspaceIdentity = Endge.workspace.current.identity
-    this._current = configuration
-    this._buildContext = {
+    return {
       workspaceIdentity,
       execution: { ...execution },
       configuration,
       contextHash: createEndgeContextHash({ workspaceIdentity, execution, configuration }),
     }
-    Endge.context.reconcileCurrentLocaleWithWorkspace(configuration)
-    Endge.context.reconcileCurrentThemeWithWorkspace(configuration)
-    Endge.context.reconcileCurrentTimezoneWithWorkspace(configuration)
-    this.notify()
   }
 
   /**

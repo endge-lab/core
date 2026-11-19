@@ -541,7 +541,11 @@ function compileContextCall(
       return { type: 'literal', value: undefined }
     }
     validateSourcePath(path, diagnostics, sourcePath, node.arguments[0])
-    return { type: 'literal', value: context ? toPlainValue(readValuePath(context.config, path, {})) : undefined }
+    const value = context ? readValuePath(context.config, path, {}) : undefined
+    if (context && value === undefined) {
+      diagnostics.push(diagnostic('warning', 'source-expression-config-missing', `Путь Configuration "${path}" отсутствует в текущем контексте.`, sourcePath, node))
+    }
+    return { type: 'literal', value: toPlainValue(value) }
   }
 
   const patternNode = node.arguments[0] && t.isExpression(node.arguments[0]) ? unwrapExpression(node.arguments[0]) : null
@@ -722,6 +726,10 @@ export function readContextPatternNode(
     }
     result[key] = value
     warnUnknownFacet(key, diagnostics, `${sourcePath}.${key}`, property)
+    const documents = getSourceContext()?.knownFacetDocuments?.get(key)
+    if (documents && !documents.has(value)) {
+      diagnostics.push(diagnostic('warning', 'source-expression-facet-document-unknown', `Активный документ "${key}:${value}" отсутствует. Условие с ним не совпадёт.`, `${sourcePath}.${key}`, property))
+    }
   }
   return result
 }

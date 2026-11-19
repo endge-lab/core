@@ -7,6 +7,9 @@ export type RuntimeActionSurface = string
 export const BUILTIN_ACTION_IDS = {
   consoleLog: 'built-in-console-log',
   testAlert: 'built-in-test-alert',
+  diagnosticsStartRecording: 'built-in-diagnostics-start-recording',
+  diagnosticsStopRecording: 'built-in-diagnostics-stop-recording',
+  diagnosticsDownload: 'built-in-diagnostics-download',
   vocabAcquire: 'built-in-vocabs-acquire',
   vocabRefresh: 'built-in-vocabs-refresh',
   vocabInvalidate: 'built-in-vocabs-invalidate',

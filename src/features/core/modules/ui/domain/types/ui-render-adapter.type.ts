@@ -1,4 +1,3 @@
-export { ENDGE_VUE_SFC_ADAPTER_ID, normalizeVueSfcAdapterId } from '@/features/core/modules/domain/types/component/sfc/renderer-adapter.constants'
 export type { EndgeSFCRenderAdapterKey, EndgeSFCRendererTag } from '@/features/core/modules/domain/types/component/sfc/renderer-tags'
 export { ENDGE_SFC_RENDER_ADAPTER_REQUIRED_KEYS, ENDGE_SFC_RENDERER_TAGS, isEndgeSFCRendererTag } from '@/features/core/modules/domain/types/component/sfc/renderer-tags'
 

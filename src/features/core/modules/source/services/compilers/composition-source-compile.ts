@@ -540,7 +540,10 @@ function readModuleResource(
   const fallback = readModuleReference(defaultExpression, diagnostics, `${path}.default`)
   const alternatives = branches.map((branch, index) => readModuleReference(branch.use, diagnostics, `${path}.cases.${index}.use`))
   const selectedIndex = selectContextCase(branches, executionContext)
-  return selectedIndex == null ? fallback : alternatives[selectedIndex]
+  const selected = selectedIndex == null ? fallback : alternatives[selectedIndex]
+  return selected
+    ? { ...selected, contextSwitch: { default: fallback, cases: branches.map((branch, index) => ({ when: branch.when, reference: alternatives[index] ?? null })) } }
+    : null
 }
 
 function readModuleReference(raw: t.Expression, diagnostics: DiagnosticDraft[], path: string) {

@@ -5,6 +5,7 @@ import type {
 import { AsyncGunzip, gzip } from 'fflate'
 import { readInspectionRecording } from '@/features/core/modules/inspection/tools/inspection-recording'
 import { readExecutionBundle } from '@/features/core/modules/program/tools/execution-bundle'
+import { readBundleDelivery } from '../tools/bundle-delivery'
 import { bundleObject } from '../tools/bundle-json'
 
 export const ENDGE_BUNDLE_MAX_BYTES = 256 * 1024 * 1024
@@ -12,9 +13,14 @@ export const ENDGE_BUNDLE_MAX_BYTES = 256 * 1024 * 1024
 // Проверяет общий контейнер независимо от способа доставки и не устанавливает его.
 export function readEndgeBundle(input: unknown): EndgeBundle {
   const value = bundleObject(input, 'container')
+  if (value.format === 'endge-bundle' && value.version === 2 && value.bundle && !value.inspection) {
+    const bundle = readExecutionBundle(value.bundle)
+    return { format: 'endge-bundle', version: 2, bundle, delivery: readBundleDelivery(bundle, value.delivery) }
+  }
   if (
     value.format !== 'endge-bundle'
     || value.version !== 1
+    || value.delivery !== undefined
     || (!value.bundle && !value.inspection)
   ) {
     throw new Error('[Bundle] Unsupported or empty Endge Bundle')

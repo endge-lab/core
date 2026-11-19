@@ -1,5 +1,6 @@
 import type {
   DiagnosticsSeverityNumber,
+  DiagnosticsShortcutOperation,
   DiagnosticsSignal,
   EndgeDiagnosticsConfiguration,
   EndgeDiagnosticsOutputConfiguration,
@@ -114,6 +115,7 @@ export interface EndgeCollectionPatch<T> {
 
 // Локальные операции inherit-слоя. Отсутствующее поле наследуется без изменений.
 export interface EndgeConfigurationPatch {
+  defaultRenderers?: Partial<Record<EndgeSFCRendererTag, EndgeValueOverride<ModuleRendererReference>>>
   vars?: EndgeCollectionPatch<EndgeVariableDefinition>
   locales?: EndgeCollectionPatch<EndgeLocaleDefinition>
   defaultLocale?: EndgeValueOverride<string>
@@ -174,6 +176,8 @@ export interface EndgeDiagnosticsAutomaticSnapshotPatch {
 export interface EndgeDiagnosticsShortcutSnapshotPatch {
   triggerSet?: EndgeValueOverride<ComponentSFCInteractionTriggerActivation>
   content?: EndgeDiagnosticsSnapshotContentPatch
+  action?: EndgeValueOverride<NonNullable<EndgeDiagnosticsConfiguration['snapshots']['shortcut']['action']>>
+  bindings?: Partial<Record<DiagnosticsShortcutOperation, EndgeValueOverride<ComponentSFCInteractionTriggerActivation>>>
 }
 
 // Patch snapshots configuration текущего cascade layer.
@@ -187,6 +191,10 @@ export interface EndgeDiagnosticsSnapshotsPatch {
 export interface EndgeDiagnosticsConfigurationPatch {
   telemetry?: EndgeDiagnosticsTelemetryPatch
   snapshots?: EndgeDiagnosticsSnapshotsPatch
+  recording?: {
+    enabled?: EndgeValueOverride<boolean>
+    content?: EndgeDiagnosticsSnapshotContentPatch
+  }
 }
 
 export type EndgeConfigurationContribution

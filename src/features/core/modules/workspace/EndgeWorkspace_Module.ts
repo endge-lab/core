@@ -38,6 +38,14 @@ export class EndgeWorkspace_Module extends EndgeModule<EndgeBootContext> {
     if (ctx.mode === 'debugger') {
       return
     }
+    if (ctx.deliveryProgram?.catalog.workspace) {
+      this.apply({
+        ...ctx.deliveryProgram.catalog.workspace,
+        configuration: ctx.deliveryProgram.context.configuration,
+        installedIntegrations: [],
+      })
+      return
+    }
     if (ctx.dataProvider === 'bundle') {
       const bundle = ctx.bundleSource
       if (!bundle) {

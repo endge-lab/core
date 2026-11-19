@@ -9,6 +9,31 @@ import {
 } from '@/features/core/modules/configuration/domain/endge-configuration'
 
 describe('каскад Configuration Endge', () => {
+  it('наследует разрешение ручной записи, секции и Action горячей клавиши', () => {
+    const base = normalizeEndgeConfiguration({
+      ...createDefaultEndgeConfiguration(),
+      diagnostics: {
+        telemetry: { collection: { enabled: false } },
+        recording: { enabled: true, content: { raphData: true } },
+        snapshots: { shortcut: { action: { identity: 'my-recording', input: { source: 'recording' } } } },
+      },
+    })
+    const effective = applyEndgeConfigurationContribution(base, {
+      mode: 'inherit',
+      patch: {
+        diagnostics: {
+          recording: { content: { domain: { op: 'set', value: true } } },
+          snapshots: { shortcut: { action: { op: 'remove' } } },
+        },
+      },
+    })
+    expect(effective.diagnostics.telemetry.collection.enabled).toBe(false)
+    expect(effective.diagnostics.recording).toMatchObject({ enabled: true, content: { domain: true, raphData: true, raphGraph: false } })
+    expect(effective.diagnostics.snapshots.shortcut.action).toBeUndefined()
+    expect(base.diagnostics.snapshots.shortcut.action).toEqual({ identity: 'my-recording', input: { source: 'recording' } })
+    expect(normalizeEndgeConfiguration({ ...createDefaultEndgeConfiguration(), diagnostics: {} }).diagnostics.recording?.enabled).toBe(false)
+  })
+
   it('использует локаль en и тёмную тему, если значения по умолчанию не заданы', () => {
     const configuration = createDefaultEndgeConfiguration()
     const result = normalizeEndgeConfiguration({

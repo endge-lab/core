@@ -648,7 +648,7 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
    * Explicit и session coordinates обязательны; сохранённые preferences могут
    * безопасно перейти на первую доступную сущность, если Domain изменился.
    */
-  public resolveExecutionContext(input: EndgeExecutionContextResolutionInput): EndgeExecutionContext {
+  public resolveExecutionContext(input: EndgeExecutionContextResolutionInput, options: { persist?: boolean } = {}): EndgeExecutionContext {
     const explicit = normalizeRequestedFacetSelections(input.explicit?.facets, 'explicit')
     const sessionIdentity = this._sessionProvider?.getCurrentIdentity()
     if (sessionIdentity?.facetErrors?.length) {
@@ -696,6 +696,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
       })
     }
 
+    if (options.persist === false) {
+      return Object.freeze({ facets: freezeFacetSelections(next) })
+    }
     const changed = !sameFacetSelections(next, this._facetSelections)
     this._facetSelections = next
     this.saveToStorage()
