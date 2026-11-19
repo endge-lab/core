@@ -342,6 +342,7 @@ export class AuthSessionManager {
     this._loggingOut.clear()
     this._states.clear()
     this._operations.clear()
+    this._userInfoOperations.clear()
     this._sources.clear()
     this._defaultProfile = null
     this._store.resetRuntime()
@@ -468,6 +469,7 @@ export class AuthSessionManager {
   private _invalidateSession(identity: string): void {
     this._sessionVersions.set(identity, Symbol(identity))
     this._operations.delete(identity)
+    this._userInfoOperations.delete(identity)
   }
 
   /**
