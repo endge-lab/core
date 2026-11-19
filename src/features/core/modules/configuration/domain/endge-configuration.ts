@@ -24,6 +24,7 @@ import type {
   EndgeDiagnosticsRoute,
 } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
 import type { ComponentSFCInteractionTriggerActivation } from '@/features/core/modules/domain/types/component/sfc/ir.types'
+import type { ModuleRendererReference } from '@/features/core/modules/runtime/module/module-reference'
 import type { EndgeJSONValue } from '@/features/core/modules/source/domain/types/configuration-source.types'
 import { DEFAULT_FALLBACK_LOCALE, DEFAULT_LOCALE, DEFAULT_THEME, DEFAULT_TIMEZONE } from '@/features/core/kernel/constants/kernel.constants'
 import { isEndgeJSONValue } from '@/features/core/modules/configuration/domain/configuration-value'
@@ -31,6 +32,8 @@ import { DEFAULT_ENDGE_TOOLTIP_CONFIGURATION } from '@/features/core/modules/con
 import { DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION } from '@/features/core/modules/diagnostics/config/diagnostics.config'
 import { normalizeComponentSFCInteractionKeyboardCondition, normalizeComponentSFCInteractionTriggerActivation, normalizeComponentSFCInteractionTriggers } from '@/features/core/modules/domain/component/component-sfc-edit-trigger'
 import { DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION } from '@/features/core/modules/domain/component/sfc-editing.config'
+import { isEndgeSFCRendererTag } from '@/features/core/modules/domain/types/component/sfc/renderer-tags'
+import { isModuleReference, isModuleRendererId } from '@/features/core/modules/runtime/module/module-reference'
 
 const LEGACY_SFC_ADAPTER_IDS: Readonly<Record<string, string>> = {
   'native-vue': 'vue-native',
@@ -107,6 +110,7 @@ export function normalizeEndgeConfiguration(input: unknown): EndgeConfiguration 
     sfcAdapterIds,
     'defaultSfcAdapterId',
   )
+  const defaultRenderers = normalizeDefaultRenderers(input.defaultRenderers)
 
   return {
     vars: normalizeVars(input.vars),
@@ -120,11 +124,31 @@ export function normalizeEndgeConfiguration(input: unknown): EndgeConfiguration 
     defaultAuthProfileIdentity: normalizeNullableText(input.defaultAuthProfileIdentity),
     sfcAdapterIds,
     defaultSfcAdapterId,
+    ...(defaultRenderers ? { defaultRenderers } : {}),
     sfcEditing: normalizeSFCEditingConfiguration(input.sfcEditing),
     tooltips: normalizeTooltipConfiguration(input.tooltips),
     diagnostics: normalizeDiagnosticsConfiguration(input.diagnostics),
     values: normalizeConfigurationValues(input.values),
   }
+}
+
+function normalizeDefaultRenderers(input: unknown): EndgeConfiguration['defaultRenderers'] {
+  if (input === undefined) {
+    return undefined
+  }
+  if (!isRecord(input)) {
+    throw new Error('[EndgeConfiguration] defaultRenderers must map SFC tags to renderer references')
+  }
+  const renderers: NonNullable<EndgeConfiguration['defaultRenderers']> = {}
+  for (const [tag, entry] of Object.entries(input)) {
+    if (!isEndgeSFCRendererTag(tag) || !isRecord(entry) || typeof entry.identity !== 'string' || typeof entry.version !== 'string'
+      || !isModuleReference(entry.identity, entry.version) || !isModuleRendererId(entry.rendererId)) {
+      throw new Error(`[EndgeConfiguration] invalid renderer reference for "${tag}"`)
+    }
+    const reference: ModuleRendererReference = { identity: entry.identity, version: entry.version, rendererId: entry.rendererId }
+    renderers[tag] = reference
+  }
+  return Object.keys(renderers).length ? renderers : undefined
 }
 
 // Мигрирует сохранённые идентификаторы адаптеров, предоставляя только канонические runtime-id.

@@ -6,7 +6,9 @@ import type {
   EndgeDiagnosticsRoute,
 } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
 import type { ComponentSFCInteractionKeyboardCondition, ComponentSFCInteractionTrigger, ComponentSFCInteractionTriggerActivation } from '@/features/core/modules/domain/types/component/sfc/ir.types'
+import type { EndgeSFCRendererTag } from '@/features/core/modules/domain/types/component/sfc/renderer-tags'
 import type { EndgeExecutionContext } from '@/features/core/modules/runtime/domain/execution-context.types'
+import type { ModuleRendererReference } from '@/features/core/modules/runtime/module/module-reference'
 import type { EndgeJSONValue } from '@/features/core/modules/source/domain/types/configuration-source.types'
 
 export type EndgeConfigurationValues = Record<string, Record<string, EndgeJSONValue>>
@@ -66,6 +68,7 @@ export interface EndgeConfiguration {
   defaultAuthProfileIdentity: string | null
   sfcAdapterIds: string[]
   defaultSfcAdapterId: string
+  defaultRenderers?: Partial<Record<EndgeSFCRendererTag, ModuleRendererReference>>
   // Effective triggers, которые наследуют editable-узлы без локальных атрибутов.
   sfcEditing: EndgeSFCEditingConfiguration
   // Фактическое поведение tooltip. Визуальные стили принадлежат CSS и хукам адаптера.

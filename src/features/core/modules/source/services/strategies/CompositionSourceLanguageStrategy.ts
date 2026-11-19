@@ -161,6 +161,7 @@ export class CompositionSourceLanguageStrategy implements SourceLanguageStrategy
       'vocab',
       'withData',
       'withProps',
+      'withRenderers',
       ...VALUE_EXPRESSION_METHOD_NAMES,
     ],
     properties: ['activateOn', 'cases', 'data', 'dataMode', 'default', 'hooks', 'key', 'metadata', 'outputs', 'previewProps', 'props', 'resources', 'runtimes', 'use', 'when'],

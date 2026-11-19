@@ -1,30 +1,11 @@
-import type { RComponentSFC_IR_Tag } from '@/features/core/modules/domain/types/component/sfc/ir.types'
+export type { EndgeSFCRenderAdapterKey, EndgeSFCRendererTag } from '@/features/core/modules/domain/types/component/sfc/renderer-tags'
+export { ENDGE_SFC_RENDER_ADAPTER_REQUIRED_KEYS, ENDGE_SFC_RENDERER_TAGS, isEndgeSFCRendererTag } from '@/features/core/modules/domain/types/component/sfc/renderer-tags'
 
 // Протокол renderer-адаптеров для SFC v1.
 export const ENDGE_SFC_RENDER_ADAPTER_PROTOCOL = 'endge-sfc'
 
 // Текущая версия контракта renderer-адаптеров SFC.
 export const ENDGE_SFC_RENDER_ADAPTER_PROTOCOL_VERSION = 1
-
-// SFC primitives, внешний вид которых полностью определяет renderer-адаптер.
-export const ENDGE_SFC_RENDER_ADAPTER_REQUIRED_KEYS = [
-  'Text',
-  'DateTime',
-  'Number',
-  'Icon',
-  'Badge',
-  'Dot',
-  'Box',
-  'Flex',
-  'Grid',
-  'Divider',
-  'Input',
-  'Textarea',
-  'Checkbox',
-  'Select',
-] as const satisfies readonly RComponentSFC_IR_Tag[]
-
-export type EndgeSFCRenderAdapterKey = typeof ENDGE_SFC_RENDER_ADAPTER_REQUIRED_KEYS[number]
 
 // Renderer-neutral описание зарегистрированного UI adapter-а.
 export interface UIRenderAdapter<TImplementation = unknown> {

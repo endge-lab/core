@@ -23,6 +23,13 @@ export interface ModuleArtifact {
 export interface ModuleManifest extends ModuleReference {
   formatVersion: 1
   hostApi: 1
+  contributes?: { renderers?: ModuleRendererDescriptor[] }
+}
+
+export interface ModuleRendererDescriptor {
+  primitive: string
+  id: string
+  label: string
 }
 
 export type ModuleArtifactLoader = (reference: Readonly<ModuleReference>, signal: AbortSignal) => Promise<ModuleArtifact>

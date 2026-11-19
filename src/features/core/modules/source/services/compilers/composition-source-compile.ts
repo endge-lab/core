@@ -30,9 +30,10 @@ import { parse as parseTS } from '@babel/parser'
 import * as t from '@babel/types'
 import { normalizeComponentSFCInteractionTriggers } from '@/features/core/modules/domain/component/component-sfc-edit-trigger'
 
+import { isEndgeSFCRendererTag } from '@/features/core/modules/domain/types/component/sfc/renderer-tags'
 import { normalizePageCacheOptions } from '@/features/core/modules/runtime/domain/controllers/page-cache.types'
 import { DEFAULT_VOCAB_LOAD_POLICY } from '@/features/core/modules/runtime/domain/vocab-cache.types'
-import { isModuleReference } from '@/features/core/modules/runtime/module/module-reference'
+import { ADAPTER_RENDERER_SELECTION, isModuleReference, parseModuleRendererSelection } from '@/features/core/modules/runtime/module/module-reference'
 import {
   compileSourceExpression,
   diagnostic,
@@ -1101,6 +1102,28 @@ function readRuntime(
       else { descriptor.persistKey = key }
       continue
     }
+    if (modifier.name === 'withRenderers') {
+      const config = modifier.call.arguments[0]
+      const path = `runtimes.${name}.withRenderers`
+      if (kind !== 'component' || modifier.call.arguments.length !== 1 || !t.isObjectExpression(config)) {
+        diagnostics.push(diagnostic('error', 'composition-renderers-shape', '.withRenderers({...}) поддерживается только Component runtime.', path, modifier.call))
+        continue
+      }
+      const renderers: NonNullable<CompositionRuntimeDescriptor['renderers']> = {}
+      for (const property of config.properties) {
+        const tag = t.isObjectProperty(property) && !property.computed ? propertyName(property.key) : undefined
+        if (!isEndgeSFCRendererTag(tag) || !t.isObjectProperty(property) || !t.isExpression(property.value)) {
+          diagnostics.push(diagnostic('error', 'composition-renderers-primitive', '.withRenderers(...) принимает заменяемые SFC-теги.', path, property))
+          continue
+        }
+        const selected = readRendererSelection(property.value, executionContext, diagnostics, `${path}.${tag}`)
+        if (selected) {
+          renderers[tag] = selected
+        }
+      }
+      descriptor.renderers = renderers
+      continue
+    }
     if (modifier.name === 'withProps') {
       if (kind === 'filter') {
         diagnostics.push(diagnostic(
@@ -1510,6 +1533,34 @@ function validateRuntimeConditions(
       diagnostics.push(diagnostic('error', 'composition-activate-when-mount-hook', `onMount не может запускать "${hook.target}": его scope активируется условием .activateWhen(...).`, `hooks.${index}`))
     }
   }
+}
+
+function readRendererSelection(
+  expression: t.Expression,
+  executionContext: Readonly<Record<string, string>>,
+  diagnostics: DiagnosticDraft[],
+  path: string,
+): string | undefined {
+  const read = (raw: t.Expression, sourcePath: string): string | undefined => {
+    const node = unwrapExpression(raw)
+    if (t.isStringLiteral(node) && (node.value === ADAPTER_RENDERER_SELECTION || parseModuleRendererSelection(node.value))) {
+      return node.value
+    }
+    diagnostics.push(diagnostic('error', 'composition-renderer-reference', 'Укажите adapter:default или ссылку подключение:рендерер.', sourcePath, node))
+    return undefined
+  }
+  const node = unwrapExpression(expression)
+  if (!t.isCallExpression(node) || !t.isIdentifier(node.callee, { name: 'contextSwitch' })) {
+    return read(node, path)
+  }
+  const definition = readContextSwitchDefinition(node, diagnostics, path)
+  if (!definition) {
+    return undefined
+  }
+  const fallback = read(definition.defaultExpression, `${path}.default`)
+  const alternatives = definition.branches.map((branch, index) => read(branch.use, `${path}.cases.${index}.use`))
+  const selected = selectContextCase(definition.branches, executionContext)
+  return selected == null ? fallback : alternatives[selected]
 }
 
 // Коды диагностик условия when у contextSwitch ссылок Composition.
