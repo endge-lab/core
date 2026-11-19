@@ -1,7 +1,20 @@
 import type {
   DiagnosticsSeverityNumber,
   EndgeDiagnosticsConfiguration,
+  EndgeDiagnosticsSnapshotContentConfiguration,
 } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
+
+export const DEFAULT_ENDGE_DIAGNOSTICS_RECORDING_CONTENT: Readonly<EndgeDiagnosticsSnapshotContentConfiguration> = Object.freeze({
+  telemetry: true,
+  problems: true,
+  configuration: false,
+  effectiveConfiguration: false,
+  domain: false,
+  program: false,
+  runtime: true,
+  raphData: false,
+  raphGraph: false,
+})
 
 // Системная diagnostics configuration для workspace без явных настроек.
 export const DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION: Readonly<EndgeDiagnosticsConfiguration> = Object.freeze({
@@ -41,6 +54,7 @@ export const DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION: Readonly<EndgeDiagnosticsC
       },
     ],
   },
+  recording: { enabled: false, content: DEFAULT_ENDGE_DIAGNOSTICS_RECORDING_CONTENT },
   snapshots: {
     content: {
       telemetry: true,

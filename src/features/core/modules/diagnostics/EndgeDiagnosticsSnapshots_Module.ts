@@ -1,22 +1,29 @@
 import type { EndgeBootContext } from '@/features/core/kernel/types/bootstrap.types'
 import type { DiagnosticsSnapshotRuntimeAdapter } from '@/features/core/modules/diagnostics/domain/types/diagnostics-snapshot-runtime-adapter.type'
 import type {
+  DiagnosticsFinishedRecording,
   DiagnosticsRecord,
+  DiagnosticsRecordingState,
+  DiagnosticsShortcutOperation,
   DiagnosticsSnapshot,
   DiagnosticsSnapshotCaptureError,
   DiagnosticsSnapshotOptions,
+  DiagnosticsTelemetrySnapshot,
   EndgeDiagnosticsSnapshotContentConfiguration,
 } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
 import type { EndgeProblems_Module } from '@/features/core/modules/diagnostics/EndgeProblems_Module'
 import type { EndgeTelemetry_Module } from '@/features/core/modules/diagnostics/EndgeTelemetry_Module'
+import type { ComponentSFCInteractionTriggerActivation } from '@/features/core/modules/domain/types/component/sfc/ir.types'
 import type {
   EndgeFederationDiagnosticsSnapshot,
   EndgeFederationDiagnosticsSnapshotOptions,
   EndgeModuleDiagnosticsSnapshotNode,
 } from '@/features/federation/types/federation.types'
 import { Endge } from '@/features/core/kernel/endge'
+import { BUILTIN_ACTION_IDS } from '@/features/core/modules/actions/domain/action.types'
 import { BrowserDiagnosticsSnapshot_Adapter } from '@/features/core/modules/diagnostics/adapters/BrowserDiagnosticsSnapshot_Adapter'
-import { DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION } from '@/features/core/modules/diagnostics/config/diagnostics.config'
+import { DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION, DEFAULT_ENDGE_DIAGNOSTICS_RECORDING_CONTENT } from '@/features/core/modules/diagnostics/config/diagnostics.config'
+import { DIAGNOSTICS_SHORTCUT_OPERATIONS, legacyDiagnosticsShortcutOperation } from '@/features/core/modules/diagnostics/domain/diagnostics-shortcuts'
 import { serializeDiagnosticsJson } from '@/features/core/modules/diagnostics/domain/diagnostics-snapshot'
 import { ComponentSFCInteractionTriggerActivationMatcher, hasComponentSFCInteractionTriggerActivation, normalizeComponentSFCInteractionTriggerActivation } from '@/features/core/modules/domain/component/component-sfc-edit-trigger'
 import { EndgeModule } from '@/features/federation/EndgeModule'
@@ -29,8 +36,9 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
   private _automaticCooldownUntil = 0
   private _unsubscribeAutomaticRecords: (() => void) | null = null
   private _unsubscribeShortcut: (() => void) | null = null
-  private _shortcutMatcher: ComponentSFCInteractionTriggerActivationMatcher | null = null
+  private _unsubscribeRecordingContext: (() => void) | null = null
   private _started = false
+  private _finishedRecording: (DiagnosticsSnapshot & { recording: DiagnosticsFinishedRecording }) | null = null
 
   /**
    * Создаёт snapshots owner поверх telemetry, problems и platform adapter.
@@ -54,9 +62,14 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
   /**
    * Включает глобальную shortcut subscription только в live lifecycle.
    */
-  public override start(_ctx: EndgeBootContext): void {
-    this._started = true
+  public override start(ctx: EndgeBootContext): void {
+    this._started = ctx.mode !== 'debugger'
     this._syncShortcutSubscription()
+    this._unsubscribeRecordingContext?.()
+    this._unsubscribeRecordingContext = this._started
+      ? Endge.events.onEvent(['context:user-changed', 'context:workspace-changed'], () => this._clearRecording())
+      : null
+    this.notify()
   }
 
   /**
@@ -68,10 +81,12 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
     this._unsubscribeShortcut = null
     this._unsubscribeAutomaticRecords?.()
     this._unsubscribeAutomaticRecords = null
+    this._unsubscribeRecordingContext?.()
+    this._unsubscribeRecordingContext = null
     this._automaticErrorTimestamps = []
     this._automaticCooldownUntil = 0
-    this._shortcutMatcher?.reset()
-    this._shortcutMatcher = null
+    this._clearRecording()
+    this.notify()
   }
 
   /**
@@ -82,12 +97,98 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
     this._automaticCooldownUntil = 0
     this._subscribeAutomaticSnapshots()
     this._syncShortcutSubscription()
+    if (!this._telemetry.configuration.recording?.enabled) {
+      this._clearRecording()
+    }
+    this.notify()
+  }
+
+  public get recordingState(): DiagnosticsRecordingState {
+    const active = this._telemetry.localRecording
+    if (active) {
+      return { status: 'recording', ...active }
+    }
+    const finished = this._finishedRecording?.recording
+    return finished ? { status: 'stopped', ...finished } : { status: 'idle' }
+  }
+
+  public startRecording(): DiagnosticsRecordingState {
+    if (!this._started) {
+      throw new Error('[EndgeDiagnostics] A running application is required')
+    }
+    if (!this._telemetry.localRecording) {
+      this._telemetry.startLocalRecording()
+      this._finishedRecording = null
+      this.notify()
+    }
+    return this.recordingState
+  }
+
+  public stopRecording(content?: Partial<EndgeDiagnosticsSnapshotContentConfiguration>): DiagnosticsRecordingState {
+    const captured = this._telemetry.captureLocalRecording()
+    if (captured) {
+      const sections = {
+        ...(this._telemetry.configuration.recording?.content ?? DEFAULT_ENDGE_DIAGNOSTICS_RECORDING_CONTENT),
+        ...content,
+      }
+      const snapshot = this._snapshot(this._snapshotOptions(sections, 'manual'), captured)
+      if (this._telemetry.localRecording?.id === captured.recording.id) {
+        this._telemetry.clearLocalRecording()
+        this._finishedRecording = { ...snapshot, recording: captured.recording }
+        this.notify()
+      }
+    }
+    return this.recordingState
+  }
+
+  public downloadRecording(recordingId?: string): DiagnosticsFinishedRecording {
+    const snapshot = this._finishedRecording
+    if (!this._telemetry.configuration.recording?.enabled
+      || !snapshot || (recordingId !== undefined && recordingId !== snapshot.recording.id)) {
+      throw new Error('[EndgeDiagnostics] The finished recording is unavailable')
+    }
+    this._runtimeAdapter.downloadJson(snapshot)
+    return { ...snapshot.recording }
   }
 
   /**
    * Возвращает JSON-safe snapshot выбранных частей текущего состояния Core.
    */
   public snapshot(options: DiagnosticsSnapshotOptions = {}): DiagnosticsSnapshot {
+    return this._snapshot(options)
+  }
+
+  /**
+   * Создаёт snapshot и доставляет его в выбранные configured outputs.
+   */
+  public sendSnapshot(outputIds?: readonly string[], options: DiagnosticsSnapshotOptions = {}): DiagnosticsSnapshot {
+    const snapshot = this.snapshot(options)
+    const targets = outputIds ?? this._telemetry.configuration.snapshots.automatic.outputIds
+    this._telemetry.deliverSnapshot(snapshot, targets)
+    return snapshot
+  }
+
+  /**
+   * Создаёт snapshot и сохраняет его platform adapter-ом в JSON-файл.
+   */
+  public downloadSnapshot(options: DiagnosticsSnapshotOptions = {}): DiagnosticsSnapshot {
+    const snapshot = this.snapshot(options)
+    this._runtimeAdapter.downloadJson(snapshot)
+    return snapshot
+  }
+
+  private _clearRecording(): void {
+    if (this._telemetry.localRecording || this._finishedRecording) {
+      this._telemetry.clearLocalRecording()
+      this._finishedRecording = null
+      this.notify()
+    }
+  }
+
+  private _snapshot(
+    options: DiagnosticsSnapshotOptions,
+    captured?: { recording: DiagnosticsFinishedRecording, telemetry: DiagnosticsTelemetrySnapshot },
+  ): DiagnosticsSnapshot {
     const content = this._telemetry.configuration.snapshots.content
     const includeTelemetry = options.includeTelemetry ?? content.telemetry
     const includeProblems = options.includeProblems ?? content.problems
@@ -128,7 +229,8 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
       version: 2,
       generatedAt: Date.now(),
       trigger: options.trigger ?? 'manual',
-      ...(includeTelemetry ? { telemetry: this._telemetry.snapshot(options.filter) } : {}),
+      ...(captured ? { recording: captured.recording } : {}),
+      ...(includeTelemetry ? { telemetry: captured?.telemetry ?? this._telemetry.snapshot(options.filter) } : {}),
       ...(includeProblems ? { problems: this._problems.snapshot() } : {}),
       ...(includeConfiguration ? { configuration: this._telemetry.configuration } : {}),
       ...ownerSections,
@@ -153,25 +255,6 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
   }
 
   /**
-   * Создаёт snapshot и доставляет его в выбранные configured outputs.
-   */
-  public sendSnapshot(outputIds?: readonly string[], options: DiagnosticsSnapshotOptions = {}): DiagnosticsSnapshot {
-    const snapshot = this.snapshot(options)
-    const targets = outputIds ?? this._telemetry.configuration.snapshots.automatic.outputIds
-    this._telemetry.deliverSnapshot(snapshot, targets)
-    return snapshot
-  }
-
-  /**
-   * Создаёт snapshot и сохраняет его platform adapter-ом в JSON-файл.
-   */
-  public downloadSnapshot(options: DiagnosticsSnapshotOptions = {}): DiagnosticsSnapshot {
-    const snapshot = this.snapshot(options)
-    this._runtimeAdapter.downloadJson(snapshot)
-    return snapshot
-  }
-
-  /**
    * Восстанавливает внутреннюю подписку на ERROR/FATAL records после configure.
    */
   private _subscribeAutomaticSnapshots(): void {
@@ -188,36 +271,88 @@ export class EndgeDiagnosticsSnapshots_Module extends EndgeModule<EndgeBootConte
   private _syncShortcutSubscription(): void {
     this._unsubscribeShortcut?.()
     this._unsubscribeShortcut = null
-    this._shortcutMatcher?.reset()
-    this._shortcutMatcher = null
     if (!this._started) {
       return
     }
-    const activation = normalizeComponentSFCInteractionTriggerActivation(
-      this._telemetry.configuration.snapshots.shortcut.triggerSet,
-    )
-    if (!hasComponentSFCInteractionTriggerActivation(activation)) {
+    const configuration = this._telemetry.configuration
+    const shortcut = configuration.snapshots.shortcut
+    const matchers: Array<{ matcher: ComponentSFCInteractionTriggerActivationMatcher, run: () => void }> = []
+    const add = (trigger: ComponentSFCInteractionTriggerActivation, run: () => void): void => {
+      const activation = normalizeComponentSFCInteractionTriggerActivation(trigger)
+      if (hasComponentSFCInteractionTriggerActivation(activation)) {
+        matchers.push({ matcher: new ComponentSFCInteractionTriggerActivationMatcher(activation), run })
+      }
+    }
+    const enabled = (operation: DiagnosticsShortcutOperation) =>
+      operation === 'download' || configuration.recording?.enabled === true
+    for (const operation of DIAGNOSTICS_SHORTCUT_OPERATIONS) {
+      const trigger = shortcut.bindings?.[operation]
+      if (trigger && enabled(operation)) {
+        add(trigger, () => this._runShortcutOperation(operation, configuration.snapshots.content))
+      }
+    }
+    const legacy = legacyDiagnosticsShortcutOperation(shortcut)
+    if (legacy === null || (enabled(legacy) && shortcut.bindings?.[legacy] === undefined)) {
+      const action = shortcut.action
+      add(shortcut.triggerSet, () => {
+        if (action) {
+          this._executeShortcutAction(action.identity, action.input)
+        }
+        else {
+          this.downloadSnapshot(this._snapshotOptions(shortcut.content, 'shortcut'))
+        }
+      })
+    }
+    if (!matchers.length) {
       return
     }
-    this._shortcutMatcher = new ComponentSFCInteractionTriggerActivationMatcher(activation)
     this._unsubscribeShortcut = this._runtimeAdapter.subscribeShortcut((event) => {
-      const match = this._shortcutMatcher?.match(event.type, event.occurrence, event.platform)
-      if (!match || match.status === 'none') {
+      const matches = matchers.map(({ matcher, run }) => ({
+        match: matcher.match(event.type, event.occurrence, event.platform),
+        run,
+      }))
+      const winner = matches.find(item => item.match.status === 'complete')
+        ?? matches.find(item => item.match.status === 'progress')
+      if (!winner || winner.match.status === 'none') {
         return
       }
-      if (match.trigger.prevent) {
+      if (winner.match.trigger.prevent) {
         event.preventDefault()
       }
-      if (match.trigger.stop) {
+      if (winner.match.trigger.stop) {
         event.stopPropagation()
       }
-      if (match.status !== 'complete') {
-        return
+      if (winner.match.status === 'complete') {
+        matchers.forEach(({ matcher }) => matcher.reset())
+        winner.run()
       }
-      this.downloadSnapshot(this._snapshotOptions(
-        this._telemetry.configuration.snapshots.shortcut.content,
-        'shortcut',
-      ))
+    })
+  }
+
+  private _runShortcutOperation(
+    operation: DiagnosticsShortcutOperation,
+    content: EndgeDiagnosticsSnapshotContentConfiguration,
+  ): void {
+    if (operation === 'start') {
+      this._executeShortcutAction(BUILTIN_ACTION_IDS.diagnosticsStartRecording)
+    }
+    else if (operation === 'stop') {
+      this._executeShortcutAction(BUILTIN_ACTION_IDS.diagnosticsStopRecording)
+    }
+    else {
+      const recording = this._finishedRecording?.recording
+      this._executeShortcutAction(BUILTIN_ACTION_IDS.diagnosticsDownload, recording
+        ? { source: 'recording', recordingId: recording.id }
+        : { source: 'snapshot', options: this._snapshotOptions(content, 'shortcut') })
+    }
+  }
+
+  private _executeShortcutAction(identity: string, input?: unknown): void {
+    void Endge.actions.execute(identity, { input }).catch((error: unknown) => {
+      this._telemetry.warn('[EndgeDiagnostics] Shortcut action failed', {
+        eventName: 'endge.diagnostics.shortcut-failed',
+        attributes: { 'endge.action.identity': identity, 'error.message': error instanceof Error ? error.message : String(error) },
+      })
     })
   }
 

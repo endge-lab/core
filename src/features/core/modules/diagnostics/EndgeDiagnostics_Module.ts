@@ -8,11 +8,13 @@ import type {
   DiagnosticsContextProvider,
   DiagnosticsExceptionOptions,
   DiagnosticsFilter,
+  DiagnosticsFinishedRecording,
   DiagnosticsListener,
   DiagnosticsLogInput,
   DiagnosticsLogOptions,
   DiagnosticsLogRecord,
   DiagnosticsRecord,
+  DiagnosticsRecordingState,
   DiagnosticsResource,
   DiagnosticsSnapshot,
   DiagnosticsSnapshotOptions,
@@ -21,6 +23,7 @@ import type {
   DiagnosticsSpanRecord,
   DiagnosticsSubscribeOptions,
   EndgeDiagnosticsConfiguration,
+  EndgeDiagnosticsSnapshotContentConfiguration,
 } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
 import { CONSOLE_DIAGNOSTICS_ADAPTER_FACTORY } from '@/features/core/modules/diagnostics/adapters/ConsoleDiagnosticsAdapter'
 import { DiagnosticsAdapterRegistry } from '@/features/core/modules/diagnostics/adapters/DiagnosticsAdapterRegistry'
@@ -60,6 +63,7 @@ export class EndgeDiagnostics_Module extends EndgeModule<EndgeBootContext> {
     this.snapshots = new EndgeDiagnosticsSnapshots_Module(this.telemetry, this.problems)
     this.telemetry.subscribe(() => this.notify())
     this.problems.subscribe(() => this.notify())
+    this.snapshots.subscribe(() => this.notify())
   }
 
   // ---------------------------------------------
@@ -253,6 +257,22 @@ export class EndgeDiagnostics_Module extends EndgeModule<EndgeBootContext> {
    */
   public downloadSnapshot(options: DiagnosticsSnapshotOptions = {}): DiagnosticsSnapshot {
     return this.snapshots.downloadSnapshot(options)
+  }
+
+  public get recordingState(): DiagnosticsRecordingState {
+    return this.snapshots.recordingState
+  }
+
+  public startRecording(): DiagnosticsRecordingState {
+    return this.snapshots.startRecording()
+  }
+
+  public stopRecording(content?: Partial<EndgeDiagnosticsSnapshotContentConfiguration>): DiagnosticsRecordingState {
+    return this.snapshots.stopRecording(content)
+  }
+
+  public downloadRecording(recordingId?: string): DiagnosticsFinishedRecording {
+    return this.snapshots.downloadRecording(recordingId)
   }
 
   /**

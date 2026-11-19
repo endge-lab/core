@@ -4,6 +4,7 @@ import type {
   EndgeConfigurationContribution,
   EndgeConfigurationPatch,
   EndgeConfigurationValues,
+  EndgeDiagnosticsSnapshotContentPatch,
   EndgeLocaleDefinition,
   EndgePublicConfigurationSnapshot,
   EndgeSFCEditingConfiguration,
@@ -22,6 +23,7 @@ import type {
   EndgeDiagnosticsConfiguration,
   EndgeDiagnosticsOutputConfiguration,
   EndgeDiagnosticsRoute,
+  EndgeDiagnosticsSnapshotContentConfiguration,
 } from '@/features/core/modules/diagnostics/domain/types/diagnostics.types'
 import type { ComponentSFCInteractionTriggerActivation } from '@/features/core/modules/domain/types/component/sfc/ir.types'
 import type { ModuleRendererReference } from '@/features/core/modules/runtime/module/module-reference'
@@ -29,14 +31,15 @@ import type { EndgeJSONValue } from '@/features/core/modules/source/domain/types
 import { DEFAULT_FALLBACK_LOCALE, DEFAULT_LOCALE, DEFAULT_THEME, DEFAULT_TIMEZONE } from '@/features/core/kernel/constants/kernel.constants'
 import { isEndgeJSONValue } from '@/features/core/modules/configuration/domain/configuration-value'
 import { DEFAULT_ENDGE_TOOLTIP_CONFIGURATION } from '@/features/core/modules/configuration/domain/tooltip.config'
-import { DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION } from '@/features/core/modules/diagnostics/config/diagnostics.config'
+import { DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION, DEFAULT_ENDGE_DIAGNOSTICS_RECORDING_CONTENT } from '@/features/core/modules/diagnostics/config/diagnostics.config'
+import { DIAGNOSTICS_SHORTCUT_OPERATIONS } from '@/features/core/modules/diagnostics/domain/diagnostics-shortcuts'
 import { normalizeComponentSFCInteractionKeyboardCondition, normalizeComponentSFCInteractionTriggerActivation, normalizeComponentSFCInteractionTriggers } from '@/features/core/modules/domain/component/component-sfc-edit-trigger'
 import { DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION } from '@/features/core/modules/domain/component/sfc-editing.config'
-import { ENDGE_VUE_SFC_ADAPTER_ID, normalizeVueSfcAdapterId } from '@/features/core/modules/domain/types/component/sfc/renderer-adapter.constants'
 import { isEndgeSFCRendererTag } from '@/features/core/modules/domain/types/component/sfc/renderer-tags'
 import { isModuleReference, isModuleRendererId } from '@/features/core/modules/runtime/module/module-reference'
 
 const LEGACY_SFC_ADAPTER_IDS: Readonly<Record<string, string>> = {
+  'native-vue': 'vue-native',
   'shadcn-vue': 'vue-shadcn',
 }
 
@@ -59,8 +62,8 @@ const DEFAULT_CONFIGURATION_VALUE: EndgeConfiguration = {
   ],
   defaultTimezone: DEFAULT_TIMEZONE,
   defaultAuthProfileIdentity: null,
-  sfcAdapterIds: [ENDGE_VUE_SFC_ADAPTER_ID],
-  defaultSfcAdapterId: ENDGE_VUE_SFC_ADAPTER_ID,
+  sfcAdapterIds: ['vue-native'],
+  defaultSfcAdapterId: 'vue-native',
   sfcEditing: structuredCloneSafe(DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION),
   tooltips: structuredCloneSafe(DEFAULT_ENDGE_TOOLTIP_CONFIGURATION),
   diagnostics: structuredCloneSafe(DEFAULT_ENDGE_DIAGNOSTICS_CONFIGURATION),
@@ -160,7 +163,7 @@ function normalizeSfcAdapterIds(input: unknown): string[] {
 
 function normalizeSfcAdapterId(input: unknown): string {
   const id = String(input ?? '').trim()
-  return LEGACY_SFC_ADAPTER_IDS[id] ?? normalizeVueSfcAdapterId(id)
+  return LEGACY_SFC_ADAPTER_IDS[id] ?? id
 }
 
 // Нормализует contribution сущности; пустое значение означает чистое наследование.
@@ -194,6 +197,22 @@ export function applyEndgeConfigurationContribution(
   const next = cloneConfiguration(upstream)
   const patch = contribution.patch
 
+  if (patch.defaultRenderers) {
+    const renderers = { ...next.defaultRenderers }
+    for (const [tag, override] of Object.entries(patch.defaultRenderers)) {
+      if (!isEndgeSFCRendererTag(tag) || (override?.op !== 'set' && override?.op !== 'remove')) {
+        throw new Error('[EndgeConfiguration] Invalid renderer override')
+      }
+      if (override.op === 'remove') {
+        delete renderers[tag]
+      }
+      else {
+        renderers[tag] = override.value
+      }
+    }
+    next.defaultRenderers = renderers
+  }
+
   if (patch.vars) {
     next.vars = applyCollectionPatch(next.vars, patch.vars, item => item.name)
   }
@@ -207,9 +226,7 @@ export function applyEndgeConfigurationContribution(
     next.timezones = applyCollectionPatch(next.timezones, patch.timezones, item => item.identity)
   }
   if (patch.sfcAdapterIds) {
-    next.sfcAdapterIds = applyCollectionPatch(next.sfcAdapterIds.map(normalizeSfcAdapterId), {
-      entries: (patch.sfcAdapterIds.entries ?? []).map(entry => ({ ...entry, key: normalizeSfcAdapterId(entry.key) })),
-    }, normalizeSfcAdapterId)
+    next.sfcAdapterIds = applyCollectionPatch(next.sfcAdapterIds, patch.sfcAdapterIds, item => item)
   }
   if (patch.diagnostics) {
     next.diagnostics = applyDiagnosticsPatch(next.diagnostics, patch.diagnostics)
@@ -547,25 +564,33 @@ function applyDiagnosticsPatch(
   }
 
   const snapshots = patch.snapshots
-  applyDiagnosticsRequiredValue(next.snapshots.content, 'telemetry', snapshots?.content?.telemetry)
-  applyDiagnosticsRequiredValue(next.snapshots.content, 'problems', snapshots?.content?.problems)
-  applyDiagnosticsRequiredValue(next.snapshots.content, 'configuration', snapshots?.content?.configuration)
-  applyDiagnosticsRequiredValue(next.snapshots.content, 'effectiveConfiguration', snapshots?.content?.effectiveConfiguration)
-  applyDiagnosticsRequiredValue(next.snapshots.content, 'domain', snapshots?.content?.domain)
-  applyDiagnosticsRequiredValue(next.snapshots.content, 'program', snapshots?.content?.program)
-  applyDiagnosticsRequiredValue(next.snapshots.content, 'runtime', snapshots?.content?.runtime)
-  applyDiagnosticsRequiredValue(next.snapshots.content, 'raphData', snapshots?.content?.raphData)
-  applyDiagnosticsRequiredValue(next.snapshots.content, 'raphGraph', snapshots?.content?.raphGraph)
+  applyDiagnosticsContentPatch(next.snapshots.content, snapshots?.content)
   applyDiagnosticsRequiredValue(next.snapshots.shortcut, 'triggerSet', snapshots?.shortcut?.triggerSet)
-  applyDiagnosticsRequiredValue(next.snapshots.shortcut.content, 'telemetry', snapshots?.shortcut?.content?.telemetry)
-  applyDiagnosticsRequiredValue(next.snapshots.shortcut.content, 'problems', snapshots?.shortcut?.content?.problems)
-  applyDiagnosticsRequiredValue(next.snapshots.shortcut.content, 'configuration', snapshots?.shortcut?.content?.configuration)
-  applyDiagnosticsRequiredValue(next.snapshots.shortcut.content, 'effectiveConfiguration', snapshots?.shortcut?.content?.effectiveConfiguration)
-  applyDiagnosticsRequiredValue(next.snapshots.shortcut.content, 'domain', snapshots?.shortcut?.content?.domain)
-  applyDiagnosticsRequiredValue(next.snapshots.shortcut.content, 'program', snapshots?.shortcut?.content?.program)
-  applyDiagnosticsRequiredValue(next.snapshots.shortcut.content, 'runtime', snapshots?.shortcut?.content?.runtime)
-  applyDiagnosticsRequiredValue(next.snapshots.shortcut.content, 'raphData', snapshots?.shortcut?.content?.raphData)
-  applyDiagnosticsRequiredValue(next.snapshots.shortcut.content, 'raphGraph', snapshots?.shortcut?.content?.raphGraph)
+  const actionPatch = snapshots?.shortcut?.action
+  if (actionPatch?.op === 'set') {
+    next.snapshots.shortcut.action = actionPatch.value
+  }
+  else if (actionPatch?.op === 'remove') {
+    delete next.snapshots.shortcut.action
+  }
+  if (snapshots?.shortcut?.bindings) {
+    const bindings = next.snapshots.shortcut.bindings ??= {}
+    for (const operation of DIAGNOSTICS_SHORTCUT_OPERATIONS) {
+      const override = snapshots.shortcut.bindings[operation]
+      if (override?.op === 'set') {
+        bindings[operation] = override.value
+      }
+      else if (override?.op === 'remove') {
+        delete bindings[operation]
+      }
+    }
+  }
+  applyDiagnosticsContentPatch(next.snapshots.shortcut.content, snapshots?.shortcut?.content)
+  if (patch.recording) {
+    next.recording ??= { enabled: false, content: { ...DEFAULT_ENDGE_DIAGNOSTICS_RECORDING_CONTENT } }
+    applyDiagnosticsRequiredValue(next.recording, 'enabled', patch.recording.enabled)
+    applyDiagnosticsContentPatch(next.recording.content, patch.recording.content)
+  }
   applyDiagnosticsRequiredValue(next.snapshots.automatic, 'enabled', snapshots?.automatic?.enabled)
   applyDiagnosticsRequiredValue(next.snapshots.automatic, 'errorCount', snapshots?.automatic?.errorCount)
   applyDiagnosticsRequiredValue(next.snapshots.automatic, 'windowSeconds', snapshots?.automatic?.windowSeconds)
@@ -579,6 +604,15 @@ function applyDiagnosticsPatch(
   }
 
   return normalizeDiagnosticsConfiguration(next)
+}
+
+function applyDiagnosticsContentPatch(
+  target: EndgeDiagnosticsSnapshotContentConfiguration,
+  patch?: EndgeDiagnosticsSnapshotContentPatch,
+): void {
+  for (const key of Object.keys(DEFAULT_ENDGE_DIAGNOSTICS_RECORDING_CONTENT) as (keyof EndgeDiagnosticsSnapshotContentConfiguration)[]) {
+    applyDiagnosticsRequiredValue(target, key, patch?.[key])
+  }
 }
 
 // Применяет required diagnostics override и запрещает remove для scalar policy.
@@ -767,8 +801,33 @@ function normalizeDiagnosticsConfiguration(input: unknown): EndgeDiagnosticsConf
   const rawSnapshots = isRecord(input.snapshots) ? input.snapshots : {}
   const rawContent = isRecord(rawSnapshots.content) ? rawSnapshots.content : {}
   const rawShortcut = isRecord(rawSnapshots.shortcut) ? rawSnapshots.shortcut : {}
+  const rawShortcutBindings = isRecord(rawShortcut.bindings) ? rawShortcut.bindings : {}
+  const bindings: NonNullable<EndgeDiagnosticsConfiguration['snapshots']['shortcut']['bindings']> = {}
+  for (const operation of DIAGNOSTICS_SHORTCUT_OPERATIONS) {
+    if (rawShortcutBindings[operation] !== undefined) {
+      bindings[operation] = normalizeTriggerActivationConfiguration(
+        rawShortcutBindings[operation],
+        [],
+        `diagnostics.snapshots.shortcut.bindings.${operation}`,
+      )
+    }
+  }
   const rawShortcutContent = isRecord(rawShortcut.content) ? rawShortcut.content : {}
   const rawAutomatic = isRecord(rawSnapshots.automatic) ? rawSnapshots.automatic : {}
+  const rawRecording = isRecord(input.recording) ? input.recording : {}
+  const rawRecordingContent = isRecord(rawRecording.content) ? rawRecording.content : {}
+  const shortcutAction = rawShortcut.action
+  let action: EndgeDiagnosticsConfiguration['snapshots']['shortcut']['action']
+  if (shortcutAction !== undefined) {
+    if (!isRecord(shortcutAction) || typeof shortcutAction.identity !== 'string' || !shortcutAction.identity.trim()
+      || (shortcutAction.input !== undefined && !isEndgeJSONValue(shortcutAction.input))) {
+      throw new Error('[EndgeConfiguration] Invalid diagnostics shortcut action binding')
+    }
+    action = {
+      identity: shortcutAction.identity.trim(),
+      ...(shortcutAction.input !== undefined ? { input: structuredCloneSafe(shortcutAction.input) } : {}),
+    }
+  }
 
   return {
     telemetry: {
@@ -784,6 +843,15 @@ function normalizeDiagnosticsConfiguration(input: unknown): EndgeDiagnosticsConf
       routes: Array.isArray(rawTelemetry.routes)
         ? normalizeDiagnosticsRoutes(rawTelemetry.routes)
         : defaults.telemetry.routes,
+    },
+    recording: {
+      enabled: rawRecording.enabled === true,
+      content: {
+        ...DEFAULT_ENDGE_DIAGNOSTICS_RECORDING_CONTENT,
+        ...Object.fromEntries(Object.entries(rawRecordingContent).filter(
+          ([key, value]) => Object.hasOwn(DEFAULT_ENDGE_DIAGNOSTICS_RECORDING_CONTENT, key) && typeof value === 'boolean',
+        )),
+      },
     },
     snapshots: {
       content: {
@@ -801,6 +869,8 @@ function normalizeDiagnosticsConfiguration(input: unknown): EndgeDiagnosticsConf
         raphGraph: normalizeBoolean(rawContent.raphGraph, defaults.snapshots.content.raphGraph ?? true),
       },
       shortcut: {
+        ...(action ? { action } : {}),
+        ...(Object.keys(bindings).length ? { bindings } : {}),
         triggerSet: normalizeTriggerActivationConfiguration(
           rawShortcut.triggerSet,
           defaults.snapshots.shortcut.triggerSet,

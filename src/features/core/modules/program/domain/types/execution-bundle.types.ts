@@ -71,6 +71,7 @@ export interface ProgramRequirements {
 }
 
 export interface ExecutionBundle {
+  runtimeDocuments?: Partial<Record<'mocks' | 'authProfiles' | 'i18nBundles' | 'converters', Record<string, unknown>[]>>
   // Explicit execution/validation graph; absent in legacy programs.
   executionGraphVersion?: 1
   exportScope?: 'startup-composition'

@@ -11,6 +11,7 @@ import type {
   DiagnosticsCounters,
   DiagnosticsExceptionOptions,
   DiagnosticsFilter,
+  DiagnosticsFinishedRecording,
   DiagnosticsInstrumentationScope,
   DiagnosticsListener,
   DiagnosticsLogInput,
@@ -49,6 +50,11 @@ interface DiagnosticsSubscription {
   listener: DiagnosticsListener
 }
 
+interface DiagnosticsCollectionTargets {
+  background: boolean
+  recordingId?: string
+}
+
 /**
  * Telemetry-подмодуль диагностики Endge.
  * Собирает logs и завершённые spans, хранит bounded session history и маршрутизирует records в adapters.
@@ -61,7 +67,14 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
   private readonly _manualAdapters = new Map<string, DiagnosticsAdapter>()
   private readonly _contextProviders = new Map<string, DiagnosticsContextProvider>()
   private readonly _subscriptions = new Set<DiagnosticsSubscription>()
-  private readonly _activeSpans = new Map<string, DiagnosticsSpan>()
+  private readonly _activeSpans = new Map<string, { span: DiagnosticsSpan, targets: DiagnosticsCollectionTargets }>()
+  private _localRecording: {
+    id: string
+    startedAt: number
+    store: DiagnosticsRecordStore
+    droppedRecords: number
+  } | null = null
+
   private _sessionId = this._createSessionId()
   private _recordId = 0
   private _droppedByPolicy = 0
@@ -129,7 +142,8 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
    * После reset модуль готов к следующему boot lifecycle.
    */
   public override async reset(): Promise<void> {
-    for (const span of [...this._activeSpans.values()]) {
+    this.clearLocalRecording()
+    for (const { span } of [...this._activeSpans.values()]) {
       span.end({ status: 'error', message: 'Endge diagnostics session reset' })
     }
 
@@ -159,6 +173,7 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
    */
   public configure(configuration: EndgeDiagnosticsConfiguration, resource: DiagnosticsResource = this._resource): void {
     const signals = [...new Set(configuration.telemetry.collection.signals.filter(signal => signal === 'log' || signal === 'span'))]
+    const { recording, snapshots } = this._cloneConfiguration(configuration)
     this._configuration = {
       telemetry: {
         collection: {
@@ -176,7 +191,11 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
           match: this._cloneFilter(route.match),
         })),
       },
-      snapshots: this._cloneConfiguration(configuration).snapshots,
+      recording,
+      snapshots,
+    }
+    if (!this._configuration.recording?.enabled) {
+      this.clearLocalRecording()
     }
     this._resource = { attributes: this._normalizeAttributes(resource.attributes) }
     this._store.setCapacity(this._configuration.telemetry.collection.maxRecords)
@@ -189,7 +208,8 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
    */
   public log(input: DiagnosticsLogInput): DiagnosticsLogRecord | null {
     const severityNumber = this._normalizeSeverity(input.severityNumber)
-    if (!this._canCollect('log', severityNumber)) {
+    const targets = this._collectionTargets('log', severityNumber)
+    if (!targets.background && !targets.recordingId) {
       return null
     }
 
@@ -210,7 +230,7 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
       ...this._normalizeCorrelation(input),
     }
 
-    this._appendRecord(record)
+    this._appendRecord(record, targets)
     return record
   }
 
@@ -297,8 +317,9 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
       phase,
     )
 
-    if (this._canCollect('span')) {
-      this._activeSpans.set(spanId, span)
+    const targets = this._collectionTargets('span')
+    if (targets.background || targets.recordingId) {
+      this._activeSpans.set(spanId, { span, targets })
     }
 
     return span
@@ -319,7 +340,14 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
     attributes: DiagnosticsAttributes
     options?: DiagnosticsSpanEndOptions
   }): DiagnosticsSpanRecord | null {
-    if (!this._activeSpans.delete(input.spanId)) {
+    const active = this._activeSpans.get(input.spanId)
+    if (!active) {
+      return null
+    }
+    this._activeSpans.delete(input.spanId)
+    const background = active.targets.background && this._configuration.telemetry.collection.enabled
+    const recordingId = active.targets.recordingId === this._localRecording?.id ? active.targets.recordingId : undefined
+    if (!background && !recordingId) {
       return null
     }
 
@@ -345,7 +373,7 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
       attributes: this._normalizeAttributes({ ...input.attributes, ...input.options?.attributes }),
     }
 
-    this._appendRecord(record)
+    this._appendRecord(record, { background, recordingId })
     return record
   }
 
@@ -406,6 +434,59 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
       resource: this.resource,
       counters: this.getCounters(),
       records: this.query(filter),
+    }
+  }
+
+  public get localRecording(): Pick<DiagnosticsFinishedRecording, 'id' | 'startedAt'> | null {
+    const recording = this._localRecording
+    return recording ? { id: recording.id, startedAt: recording.startedAt } : null
+  }
+
+  public startLocalRecording(): void {
+    if (!this._configuration.recording?.enabled) {
+      throw new Error('[EndgeDiagnostics] Manual recording is disabled')
+    }
+    this._localRecording ??= {
+      id: this._createSessionId(),
+      startedAt: Date.now(),
+      store: new DiagnosticsRecordStore(this._configuration.telemetry.collection.maxRecords),
+      droppedRecords: 0,
+    }
+  }
+
+  public captureLocalRecording(): { recording: DiagnosticsFinishedRecording, telemetry: DiagnosticsTelemetrySnapshot } | null {
+    const recording = this._localRecording
+    if (!recording) {
+      return null
+    }
+    const { id, startedAt, store, droppedRecords } = recording
+    return {
+      recording: { id, startedAt, stoppedAt: Date.now(), retainedRecords: store.size, droppedRecords },
+      telemetry: {
+        sessionId: this._sessionId,
+        resource: this.resource,
+        records: store.toArray(),
+        counters: {
+          ...this.getCounters(),
+          totalRecords: store.size,
+          droppedByPolicy: 0,
+          droppedByCapacity: droppedRecords,
+          recordsBySignal: store.getRecordsBySignal(),
+          recordsByScope: store.getRecordsByScope(),
+        },
+      },
+    }
+  }
+
+  public clearLocalRecording(): void {
+    const recording = this._localRecording
+    if (recording) {
+      this._localRecording = null
+      for (const [id, { targets }] of this._activeSpans) {
+        if (targets.recordingId === recording.id && !targets.background) {
+          this._activeSpans.delete(id)
+        }
+      }
     }
   }
 
@@ -570,25 +651,31 @@ export class EndgeTelemetry_Module extends EndgeModule implements DiagnosticsSpa
   }
 
   /**
-   * Проверяет collection policy для signal и optional severity.
+   * Применяет общий фильтр и независимо определяет получателей принятой записи.
    */
-  private _canCollect(signal: DiagnosticsSignal, severity?: DiagnosticsSeverityNumber): boolean {
+  private _collectionTargets(signal: DiagnosticsSignal, severity?: DiagnosticsSeverityNumber): DiagnosticsCollectionTargets {
     const collection = this._configuration.telemetry.collection
-    const allowed = collection.enabled
-      && collection.signals.includes(signal)
+    const matches = collection.signals.includes(signal)
       && (signal !== 'log' || (severity ?? 1) >= collection.minSeverity)
-
-    if (!allowed) {
+    const background = matches && collection.enabled
+    if (!background) {
       this._droppedByPolicy += 1
     }
-    return allowed
+    return { background, recordingId: matches ? this._localRecording?.id : undefined }
   }
 
   /**
    * Добавляет record в store, subscribers и matching adapter routes.
    */
-  private _appendRecord(record: DiagnosticsRecord): void {
+  private _appendRecord(record: DiagnosticsRecord, targets: DiagnosticsCollectionTargets): void {
     const immutableRecord = this._freezeRecord(record)
+    const recording = this._localRecording
+    if (recording && targets.recordingId === recording.id && recording.store.append(immutableRecord)) {
+      recording.droppedRecords += 1
+    }
+    if (!targets.background) {
+      return
+    }
     if (this._store.append(immutableRecord)) {
       this._droppedByCapacity += 1
     }

@@ -30,8 +30,8 @@ export const TEST_ENDGE_WORKSPACE: EndgeWorkspaceDefinition = {
     ],
     defaultTimezone: 'local',
     defaultAuthProfileIdentity: null,
-    sfcAdapterIds: ['vue'],
-    defaultSfcAdapterId: 'vue',
+    sfcAdapterIds: ['vue-native'],
+    defaultSfcAdapterId: 'vue-native',
     sfcEditing: {
       cancelOn: [
         { event: 'keydown', key: ['Escape'], prevent: true, stop: true },

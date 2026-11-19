@@ -18,6 +18,7 @@ export * from '@/features/federation/types/federation.types'
 
 export * from '@/features/core/kernel/endge'
 export * from '@/features/core/kernel/types/endge-bundle.types'
+export { collectDeliveryModules, selectDeliveryProgram } from '@/features/core/kernel/tools/bundle-delivery'
 export * from '@/features/core/kernel/services/EndgeBundleCodec_Service'
 export * from '@/features/core/modules/program/domain/types/execution-bundle.types'
 export { restoreProgramArtifactSource } from '@/features/core/modules/program/tools/restore-program-source'
@@ -235,6 +236,7 @@ export * from '@/features/core/modules/updates/tools/ScheduleUpdate-sse-generato
 export * from '@/features/core/modules/domain/component/component-sfc-edit-trigger'
 
 export * from '@/features/core/modules/diagnostics/config/diagnostics.config'
+export * from '@/features/core/modules/diagnostics/domain/diagnostics-shortcuts'
 export * from '@/features/core/modules/diagnostics/adapters/ConsoleDiagnosticsAdapter'
 export * from '@/features/core/modules/diagnostics/adapters/DiagnosticsAdapterRegistry'
 export * from '@/features/core/modules/diagnostics/adapters/SentryDiagnosticsAdapter'

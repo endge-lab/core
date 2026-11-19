@@ -773,6 +773,7 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
       this._documentServerState.delete(this._facetDocumentServerStateKey(facetIdentity, previousIdentity))
     }
     this._documentServerState.set(this._facetDocumentServerStateKey(next.facetIdentity, next.identity), { ...document.state })
+    Endge.configuration.refreshRuntimeRenderers()
     this._notifyDomainChanged()
     return next
   }
@@ -924,6 +925,7 @@ export class EndgeDomainRepository_Module extends EndgeModule<EndgeBootContext> 
         ...result.workspace,
         dataMode: result.workspace.dataMode === 'development' ? 'mock' : 'live',
       }))
+      Endge.configuration.refreshRuntimeRenderers()
       this._notifyDomainChanged()
       return
     }

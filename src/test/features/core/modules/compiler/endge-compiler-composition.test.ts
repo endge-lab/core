@@ -45,6 +45,37 @@ describe('проверка Composition в EndgeCompiler', () => {
     ]))
   })
 
+  it('публикует ошибки входов Query и учитывает default', () => {
+    const query = new RQuery()
+    query.id = 118
+    query.identity = 'schedule'
+    query.name = 'Schedule'
+    query.sourceVersion = 2
+    query.source = `
+defineQuery({
+  kind: 'rest',
+  props: defineProps({ required: field('Number'), size: field('Number').default(10) }),
+  request: { endpoint: 'https://example.test', path: '/schedule', method: 'GET' },
+})
+`
+    Endge.domain.addQuery(query)
+    expect(Endge.compiler.buildQuery(query).diagnostics).toEqual([])
+
+    const composition = createComposition()
+    const missing = Endge.compiler.buildComposition(composition)
+    expect(missing.diagnostics.filter(item => item.code === 'composition-runtime-prop-required')).toEqual([
+      expect.objectContaining({ sourcePath: 'runtimes.query.withProps.required' }),
+    ])
+
+    composition.source = composition.source.replace('.withProps({})', '.withProps({ required: "str" })')
+    expect(Endge.compiler.buildComposition(composition).diagnostics).toContainEqual(
+      expect.objectContaining({ code: 'composition-runtime-prop-type-mismatch', sourcePath: 'runtimes.query.withProps.required' }),
+    )
+
+    composition.source = composition.source.replace('"str"', '1')
+    expect(Endge.compiler.buildComposition(composition).status).toBe('valid')
+  })
+
   it('собирает все runtime outputs, сохраняя явный выбор output', () => {
     const component = new RComponentSFC()
     component.id = 40
