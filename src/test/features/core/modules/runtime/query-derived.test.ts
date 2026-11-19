@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Endge } from '@/features/core/kernel/endge'
 import { timeStringToDate } from '@/features/core/modules/converters/tools/date/time-string-to-date'
 import { weekdaysRange } from '@/features/core/modules/converters/tools/date/weekdays-range'
+import { RAuthProfile } from '@/features/core/modules/domain/entities/RAuthProfile'
 import { RConverter } from '@/features/core/modules/domain/entities/RConverter'
 import { RFilter } from '@/features/core/modules/domain/entities/RFilter'
 import { RQuery } from '@/features/core/modules/domain/entities/RQuery'
@@ -19,6 +20,12 @@ describe('интеграция Query с производными данными 
     Endge.program.clear()
     Endge.domain.reset()
     prepareTestCompilerContext()
+    const profile = new RAuthProfile()
+    profile.id = 30
+    profile.identity = 'schedule-auth'
+    profile.name = 'Schedule auth'
+    Endge.domain.addAuthProfile(profile)
+
     Raph.reset()
     Raph.configure({ mode: 'runtime' })
     registerConverter(1, 'time-string-to-date', timeStringToDate)
@@ -218,7 +225,7 @@ defineQuery({
       Accept: 'application/json',
       'Content-Type': 'application/json',
     },
-    auth: { mode: 'profile', profile: 'keycloak-dev' },
+    auth: { mode: 'profile', profile: 'schedule-auth' },
     body: body(({ prop }) => merge({}, prop('filterPayload'))),
   },
   outputs: {

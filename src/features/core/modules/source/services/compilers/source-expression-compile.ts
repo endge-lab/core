@@ -540,7 +540,9 @@ function compileContextCall(
       diagnostics.push(diagnostic('error', 'source-expression-config-argument', 'config(...) принимает одну непустую строку — путь в effective Configuration.', sourcePath, node))
       return { type: 'literal', value: undefined }
     }
-    validateSourcePath(path, diagnostics, sourcePath, node.arguments[0])
+    if (!validateSourcePath(path, diagnostics, sourcePath, node.arguments[0])) {
+      return { type: 'literal', value: undefined }
+    }
     const value = context ? readValuePath(context.config, path, {}) : undefined
     if (context && value === undefined) {
       diagnostics.push(diagnostic('warning', 'source-expression-config-missing', `Путь Configuration "${path}" отсутствует в текущем контексте.`, sourcePath, node))
@@ -784,10 +786,10 @@ export function validateSourcePath(
   diagnostics: DiagnosticDraft[],
   sourcePath: string,
   node?: t.Node | null,
-): void {
+): boolean {
   const issue = validateValuePath(path)
   if (!issue) {
-    return
+    return true
   }
   diagnostics.push(diagnostic(
     'error',
@@ -796,6 +798,7 @@ export function validateSourcePath(
     sourcePath,
     node,
   ))
+  return false
 }
 
 // Литеральный путь get/getOr/has/pick проверяется сразу; путь из выражения — при вычислении.
