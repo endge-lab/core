@@ -246,6 +246,8 @@ export * from '@/features/core/modules/ui/ui-composition.config'
 export * from '@/features/core/modules/configuration/domain/tooltip.config'
 export { default as Config } from '@/features/core/kernel/config/kernel.config'
 
+export * from '@/features/core/modules/context/domain/workspace-state.types'
+export * from '@/features/core/modules/context/persistence/BackendWorkspaceStateTransport'
 export * from '@/features/core/modules/context/persistence/EndgeStorageAdapterRegistry'
 export * from '@/features/core/modules/context/persistence/RuntimeStateController'
 export * from '@/features/core/modules/context/persistence/adapters/DisabledContextAdapter'
