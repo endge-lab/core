@@ -43,6 +43,13 @@ const LEGACY_SFC_ADAPTER_IDS: Readonly<Record<string, string>> = {
   'shadcn-vue': 'vue-shadcn',
 }
 
+function normalizeUserStateDriver(value: unknown): EndgeConfiguration['userStateDriver'] {
+  if (value === undefined || value === 'local' || value === 'indexeddb' || value === 'backend' || value === 'disabled') {
+    return value
+  }
+  throw new Error('[EndgeConfiguration] Invalid user state driver')
+}
+
 const DEFAULT_CONFIGURATION_VALUE: EndgeConfiguration = {
   vars: [],
   locales: [
@@ -115,7 +122,9 @@ export function normalizeEndgeConfiguration(input: unknown): EndgeConfiguration 
   )
   const defaultRenderers = normalizeDefaultRenderers(input.defaultRenderers)
 
+  const userStateDriver = normalizeUserStateDriver(input.userStateDriver)
   return {
+    ...(userStateDriver ? { userStateDriver } : {}),
     vars: normalizeVars(input.vars),
     locales,
     defaultLocale,
@@ -239,6 +248,10 @@ export function applyEndgeConfigurationContribution(
   }
   if (patch.values) {
     next.values = applyConfigurationValuePatch(next.values, patch.values)
+  }
+
+  if (patch.userStateDriver?.op === 'set') {
+    next.userStateDriver = normalizeUserStateDriver(patch.userStateDriver.value)
   }
 
   applyRequiredValue(next, 'defaultLocale', patch.defaultLocale)

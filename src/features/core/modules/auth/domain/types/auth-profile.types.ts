@@ -149,6 +149,7 @@ export interface AuthSessionSource {
 export interface EndgeAuthContext {
   authenticated: boolean
   subject?: string
+  issuer?: string
   sessionId?: string
   profileIdentity?: string
 }

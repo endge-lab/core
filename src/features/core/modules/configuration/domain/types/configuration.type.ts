@@ -1,3 +1,5 @@
+import type { EndgeWorkspaceStateDriver } from '@/features/core/modules/context/domain/workspace-state.types'
+
 import type {
   DiagnosticsSeverityNumber,
   DiagnosticsShortcutOperation,
@@ -58,6 +60,7 @@ export interface EndgeTooltipConfiguration {
 
 // Полная конфигурация, с которой компилируется один Endge context.
 export interface EndgeConfiguration {
+  userStateDriver?: EndgeWorkspaceStateDriver
   vars: EndgeVariableDefinition[]
   locales: EndgeLocaleDefinition[]
   defaultLocale: string
@@ -115,6 +118,7 @@ export interface EndgeCollectionPatch<T> {
 
 // Локальные операции inherit-слоя. Отсутствующее поле наследуется без изменений.
 export interface EndgeConfigurationPatch {
+  userStateDriver?: EndgeValueOverride<EndgeWorkspaceStateDriver>
   defaultRenderers?: Partial<Record<EndgeSFCRendererTag, EndgeValueOverride<ModuleRendererReference>>>
   vars?: EndgeCollectionPatch<EndgeVariableDefinition>
   locales?: EndgeCollectionPatch<EndgeLocaleDefinition>

@@ -250,16 +250,18 @@ describe('сохранение EndgeContext', () => {
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
-  it('сохраняет текущую пользовательскую тему внутри snapshot контекста', async () => {
+  it('сохраняет явный выбор темы отдельно от snapshot контекста', async () => {
     const context = new EndgeContext_Module()
     context.deserialize(undefined)
     await Promise.resolve()
 
+    context.setCurrentUser('operator')
     context.setCurrentTheme('light')
 
     expect(context.currentTheme).toBe('light')
     expect(context.serialize().theme).toBe('light')
-    expect(JSON.parse(localStorage.getItem('endge:context:v2') ?? '{}').theme).toBe('light')
+    expect(context.getUserState(context.getCurrentUserStateId()!, 'appearance.theme')).toBe('light')
+    expect(JSON.parse(localStorage.getItem('endge:context:v2') ?? '{}').theme).toBeNull()
   })
 })
 

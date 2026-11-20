@@ -19,10 +19,7 @@ export interface EndgeContextSnapshot {
   timezone: string | null
 }
 
-// Данные хранилища, отличающие явный выбор темы от фактического default.
-export interface EndgePersistedContextSnapshot extends EndgeContextSnapshot {
-  themePreferenceVersion?: 1
-}
+export type EndgePersistedContextSnapshot = EndgeContextSnapshot
 
 // Временное состояние клавиатуры, предоставляемое активным UI-адаптером.
 export interface EndgeKeyboardContextSnapshot {
@@ -65,6 +62,8 @@ export type EndgePersistenceScopeResolver = () => EndgePersistenceScope
 
 export interface EndgeSessionIdentity {
   userId?: string | null
+  // Область уникальности ID, если один host принимает учётные записи из разных источников.
+  identityNamespace?: string | null
   facetSelections?: Readonly<Record<string, string>>
   // Обязательные selections, которые session не смогла определить: boot завершается ошибкой.
   facetErrors?: readonly string[]

@@ -40,6 +40,7 @@ export function createEndgeAuthContext(source: EndgeAuthContextSource): EndgeAut
   const accessClaims = decodeJwtClaims(source.accessToken)
   const userInfo = isRecord(source.userInfo) ? source.userInfo : null
   const subject = firstText(userInfo?.sub, idClaims?.sub, accessClaims?.sub)
+  const issuer = firstText(idClaims?.iss, accessClaims?.iss)
   const sessionId = firstText(
     idClaims?.sid,
     accessClaims?.sid,
@@ -52,6 +53,7 @@ export function createEndgeAuthContext(source: EndgeAuthContextSource): EndgeAut
   return {
     authenticated: true,
     ...(subject ? { subject } : {}),
+    ...(issuer ? { issuer } : {}),
     ...(sessionId ? { sessionId } : {}),
     ...(profileIdentity ? { profileIdentity } : {}),
   }

@@ -123,8 +123,10 @@ export class EndgeAuth_Module extends EndgeModule<EndgeBootContext> {
       getCurrentIdentity: () => {
         const resolution = this.facetClaimResolution()
         const errors = resolution.issues.filter(issue => issue.missing === 'error').map(describeFacetClaimIssue)
+        const { subject, issuer } = this.session.context
         return {
-          userId: this.session.context.subject ?? null,
+          userId: subject ?? null,
+          identityNamespace: issuer,
           ...(Object.keys(resolution.selections).length > 0 ? { facetSelections: resolution.selections } : {}),
           ...(errors.length > 0 ? { facetErrors: errors } : {}),
         }

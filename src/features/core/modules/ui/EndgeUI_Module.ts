@@ -192,7 +192,8 @@ export class EndgeUI_Module extends EndgeModule {
    */
   private _migrateLegacyZoom(): void {
     if (
-      Endge.context.getState<number>(this._ZOOM_STATE_KEY) !== undefined
+      Endge.context.workspaceStateDriver !== 'local'
+      || Endge.context.getState<number>(this._ZOOM_STATE_KEY) !== undefined
       || typeof localStorage === 'undefined'
     ) {
       return

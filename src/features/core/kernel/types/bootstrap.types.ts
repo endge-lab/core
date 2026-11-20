@@ -1,6 +1,8 @@
 import type { EndgeAuthBootOptions } from '@/features/core/modules/auth/domain/types/auth-profile.types'
+
 import type { EndgeBridgeBootOptions } from '@/features/core/modules/bridge/domain/bridge.type'
 import type { EndgeCommandsBootOptions } from '@/features/core/modules/commands/types/command-executor.type'
+import type { EndgeWorkspaceStateOptions } from '@/features/core/modules/context/domain/workspace-state.types'
 import type { EndgeDomainBundle } from '@/features/core/modules/domain/types/document/domain-export.type'
 import type { EndgeDomainProvider } from '@/features/core/modules/domain/types/document/domain-provider.type'
 import type { ExecutionBundle } from '@/features/core/modules/program/domain/types/execution-bundle.types'
@@ -36,6 +38,11 @@ export interface EndgeUIBootOptions {
 export type EndgeBootMode = 'application' | 'debugger'
 
 export interface EndgeBootContext extends EndgeFederationContext {
+  // Стабильное имя приложения для локальных пользовательских настроек.
+  appId?: string
+
+  workspaceState?: EndgeWorkspaceStateOptions
+
   // Immutable lifecycle profile; application is the default.
   mode?: EndgeBootMode
 

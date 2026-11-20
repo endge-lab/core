@@ -21,7 +21,7 @@ describe('контекст авторизации Endge', () => {
       sid: 'session-from-access',
       email: 'private@example.test',
     })
-    const idToken = createToken({ sub: 'user-from-id-token' })
+    const idToken = createToken({ sub: 'user-from-id-token', iss: 'https://sso.example/realms/dev' })
 
     expect(createEndgeAuthContext({
       authenticated: true,
@@ -31,6 +31,7 @@ describe('контекст авторизации Endge', () => {
     })).toEqual({
       authenticated: true,
       subject: 'user-from-id-token',
+      issuer: 'https://sso.example/realms/dev',
       sessionId: 'session-from-access',
       profileIdentity: 'keycloak-main',
     })

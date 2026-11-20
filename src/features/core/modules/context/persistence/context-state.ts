@@ -23,12 +23,19 @@ export function buildContextStateStorageKey(
 }
 
 // Личные настройки host-приложения не зависят от рабочего или инспектируемого context.
-export function buildUserContextStateStorageKey(userId: string, key: string): string {
+export function buildUserContextStateStorageKey(appId: string, userId: string, key: string): string {
   const identity = String(userId ?? '').trim()
   if (!identity) {
     throw new Error('[EndgeContext] User identity is required for personal state.')
   }
-  return ['endge', 'user-state', 'v1', `user:${encodePart(identity)}`, `key:${encodePart(normalizeContextStateKey(key))}`].join(':')
+  return [
+    'endge',
+    'user-state',
+    'v2',
+    `app:${encodePart(appId)}`,
+    `user:${encodePart(identity)}`,
+    `key:${encodePart(normalizeContextStateKey(key))}`,
+  ].join(':')
 }
 
 function serializeFacetSelections(
