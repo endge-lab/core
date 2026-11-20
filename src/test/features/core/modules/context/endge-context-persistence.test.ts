@@ -1,13 +1,88 @@
+import type { EndgeWorkspaceStateTransport } from '@/features/core/modules/context/domain/workspace-state.types'
+
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { Endge } from '@/features/core/kernel/endge'
 import { EndgeContext_Module } from '@/features/core/modules/context/EndgeContext_Module'
 import { DisabledContextAdapter } from '@/features/core/modules/context/persistence/adapters/DisabledContextAdapter'
 import { LocalStorageContextAdapter } from '@/features/core/modules/context/persistence/adapters/LocalStorageContextAdapter'
 import { buildRuntimeStateStorageKey, RuntimeStateController } from '@/features/core/modules/context/persistence/RuntimeStateController'
+import { TEST_ENDGE_WORKSPACE } from '@/test/fixtures/endge-workspace'
 
 describe('сохранение EndgeContext', () => {
   beforeEach(() => {
     installLocalStorageMock()
+  })
+
+  it('синхронизирует новые ключи без регистрации, сохраняя область приложения и локальные исключения', async () => {
+    const configuration = vi.spyOn(Endge.configuration, 'current', 'get').mockReturnValue({
+      ...TEST_ENDGE_WORKSPACE.configuration,
+      userStateDriver: 'backend',
+    })
+    const context = new EndgeContext_Module()
+    const save = vi.fn<EndgeWorkspaceStateTransport['save']>(async (_scope, batch) => ({
+      resetRevision: batch.resetRevision,
+      results: batch.operations.map(op => ({
+        key: op.key,
+        status: 'saved',
+        entry: { key: op.key, value: op.value ?? null, deleted: op.delete === true, revision: 1 },
+      })),
+    }))
+    const backend: EndgeWorkspaceStateTransport = {
+      namespace: 'settings-test',
+      read: async ({ workspace, application }) => ({
+        actorId: 'actor',
+        partition: application ?? workspace,
+        application,
+        resetRevision: 0,
+        entries: application
+          ? [{ key: 'appearance.locale', value: 'ru', deleted: false, revision: 1 }]
+          : [{ key: 'external.removed', value: null, deleted: true, revision: 1 }],
+      }),
+      save,
+    }
+    try {
+      context.setCurrentWorkspace('workspace-a')
+      context.setCurrentUser('user-a')
+      context.setup({ appId: 'test-app', scope: {}, vars: {} })
+      context.setState('external.legacy', { columns: 2 })
+      context.setState('external.removed', 'old')
+      await context.start({ scope: {}, vars: {}, workspaceState: { backend, localKeys: ['external.local'] } })
+
+      expect(context.currentLocale).toBe('ru')
+      expect(context.getState('external.legacy')).toEqual({ columns: 2 })
+      expect(context.getState('external.removed')).toBeUndefined()
+      context.setState('external.new', ['column'])
+      context.setState('external.local', 'browser-only')
+      context.setState('external.large-first', 'a'.repeat(40_000))
+      context.setState('external.large-second', 'b'.repeat(40_000))
+      context.setCurrentTheme('dark')
+      context.setCurrentLocale('en')
+      context.setCurrentTimezone('UTC')
+      expect(context.getState('external.local')).toBe('browser-only')
+
+      await vi.waitFor(() => {
+        const sent = save.mock.calls.flatMap(([scope, batch]) =>
+          batch.operations.map(op => [scope.application ?? 'workspace', op.key, op.value]),
+        )
+        expect(sent).toEqual(expect.arrayContaining([
+          ['workspace', 'external.legacy', { columns: 2 }],
+          ['workspace', 'external.new', ['column']],
+          ['test-app', 'appearance.theme', 'dark'],
+          ['test-app', 'appearance.locale', 'en'],
+          ['test-app', 'appearance.timezone', 'UTC'],
+        ]))
+        expect(sent.some(([, key]) => key === 'external.local' || key === 'external.removed')).toBe(false)
+        expect(sent.map(([, key]) => key)).toEqual(expect.arrayContaining(['external.large-first', 'external.large-second']))
+        for (const [, batch] of save.mock.calls) {
+          expect(new TextEncoder().encode(JSON.stringify(batch)).length).toBeLessThanOrEqual(64 * 1024)
+        }
+      })
+    }
+    finally {
+      context.reset()
+      configuration.mockRestore()
+    }
   })
 
   it('сохраняет личные настройки debugger отдельно от remote context и других пользователей', () => {
