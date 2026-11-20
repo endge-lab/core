@@ -25,6 +25,9 @@ export function createEndgeBackendWorkspaceStateTransport(options: {
       headers.set('Content-Type', 'application/json')
     }
     const query = new URLSearchParams({ facets: JSON.stringify(scope.facets) })
+    if (scope.application) {
+      query.set('application', scope.application)
+    }
     const response = await fetch(`${base}/api/v1/user-state?${query}`, {
       method: batch ? 'PATCH' : 'GET',
       headers,
@@ -43,7 +46,8 @@ export function createEndgeBackendWorkspaceStateTransport(options: {
     async read(scope, signal) {
       const expected = options.getUserId?.()
       const snapshot = await request<EndgeWorkspaceStateSnapshot>(scope, signal)
-      if (!snapshot.actorId || !snapshot.partition || (options.getUserId && (!expected || expected !== snapshot.actorId || expected !== options.getUserId()))) {
+      if (!snapshot.actorId || !snapshot.partition || snapshot.application !== scope.application
+        || (options.getUserId && (!expected || expected !== snapshot.actorId || expected !== options.getUserId()))) {
         throw new EndgeWorkspaceStateRequestError(403)
       }
       return snapshot

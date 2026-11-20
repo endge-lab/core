@@ -5,6 +5,7 @@ export type EndgeWorkspaceStateDriver = 'local' | 'indexeddb' | 'backend' | 'dis
 export interface EndgeWorkspaceStateScope {
   workspace: string
   facets: Readonly<Record<string, string>>
+  application?: string
 }
 
 export interface EndgeWorkspaceStateEntry {
@@ -17,6 +18,7 @@ export interface EndgeWorkspaceStateEntry {
 export interface EndgeWorkspaceStateSnapshot {
   partition: string
   actorId: string
+  application?: string
   resetRevision: number
   entries: EndgeWorkspaceStateEntry[]
 }
@@ -55,12 +57,15 @@ export interface EndgeWorkspaceStateOptions {
   backend?: EndgeWorkspaceStateTransport
   // Stable local identity from the host session, evaluated during boot and session changes.
   account?: () => string | null
-  // The server catalog must declare the same extra keys.
+  /** @deprecated Backend sync includes all workspace preferences by default. */
   backendKeys?: readonly string[]
+  /** Browser-only keys owned by this host. */
+  localKeys?: readonly string[]
 }
 
 export interface EndgeWorkspaceStateSyncStatus {
   pending: number
   error: 'network' | 'session' | 'storage' | null
   conflicts: readonly string[]
+  applicationConflicts?: readonly string[]
 }

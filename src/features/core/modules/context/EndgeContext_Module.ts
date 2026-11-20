@@ -68,9 +68,10 @@ interface ContextEventValues {
   dataMode: EndgeDataMode
 }
 
-const BACKEND_STATE_KEYS = ['endge.ui.zoom']
 const EMPTY_WORKSPACE_SYNC: EndgeWorkspaceStateSyncStatus = { pending: 0, conflicts: [], error: null }
 const THEME_STATE_KEY = 'appearance.theme'
+const LOCALE_STATE_KEY = 'appearance.locale'
+const TIMEZONE_STATE_KEY = 'appearance.timezone'
 const MAX_CONTEXT_EVENT_PASSES = 100
 const LEGACY_STORAGE_ADAPTER = new LocalStorageContextAdapter()
 
@@ -84,6 +85,9 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
   private readonly _stateListeners = new Map<string, Set<EndgeContextStateListener>>()
 
   private _workspaceState: WorkspaceStateStore | null = null
+  private _applicationState: WorkspaceStateStore | null = null
+  private _applyingApplicationPreferences = false
+  private _legacyAppearance?: EndgePersistedContextSnapshot
   private _workspaceStateDriver: EndgeWorkspaceStateDriver = 'local'
   private _workspaceStateOptions?: EndgeWorkspaceStateOptions
 
@@ -160,6 +164,8 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
   public override reset(): void {
     this._workspaceState?.dispose()
     this._workspaceState = null
+    this._applicationState?.dispose()
+    this._applicationState = null
     this._workspaceStateDriver = 'local'
     this._workspaceStateOptions = undefined
     if (this._beforeInspection) {
@@ -193,11 +199,16 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
   }
 
   public getWorkspaceStateSyncStatus(): EndgeWorkspaceStateSyncStatus {
-    return this._workspaceState?.status ?? EMPTY_WORKSPACE_SYNC
+    const workspace = this._workspaceState?.status ?? EMPTY_WORKSPACE_SYNC
+    const application = this._applicationState?.status
+    return application
+      ? { ...workspace, pending: workspace.pending + application.pending, error: workspace.error ?? application.error, applicationConflicts: application.conflicts }
+      : workspace
   }
 
-  public async resolveWorkspaceStateConflict(key: string, action: 'retry' | 'discard'): Promise<void> {
-    await this._workspaceState?.resolveConflict(key, action)
+  public async resolveWorkspaceStateConflict(key: string, action: 'retry' | 'discard', scope: 'workspace' | 'application' = 'workspace'): Promise<void> {
+    const store = scope === 'application' ? this._applicationState : this._workspaceState
+    await store?.resolveConflict(key, action)
   }
 
   private _workspaceStateId(): string | null {
@@ -217,34 +228,55 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
 
   private _syncWorkspaceState(): void | Promise<void> {
     const id = this._workspaceStateId()
-    if (id === (this._workspaceState?.id ?? null)) {
-      return
+    const workspace = this._currentWorkspace
+    const backend = this._workspaceStateDriver === 'backend' ? this._workspaceStateOptions?.backend ?? null : null
+    const account = this._workspaceStateOptions?.account?.() ?? this.getCurrentUserStateId()
+    const userStateId = this.getCurrentUserStateId()
+    const applicationId = id && userStateId
+      ? JSON.stringify(['application', this._workspaceStateDriver, backend?.namespace ?? '', this._appId, account, userStateId])
+      : null
+    const facets = freezeFacetSelections(this._facetSelections)
+    let loadWorkspace: Promise<void> | undefined
+    if (id !== (this._workspaceState?.id ?? null)) {
+      this._workspaceState?.dispose()
+      this._workspaceState = id && workspace
+        ? new WorkspaceStateStore(
+            id,
+            () => ({ workspace, facets }),
+            backend,
+            (keys) => {
+              keys.forEach(key => this._notifyState(key))
+              super.notify()
+            },
+          )
+        : null
+      loadWorkspace = this._workspaceState?.load()
     }
-    this._workspaceState?.dispose()
-    this._workspaceState = null
-    if (!id || !this._currentWorkspace) {
-      return
+    if (applicationId !== (this._applicationState?.id ?? null)) {
+      this._applicationState?.dispose()
+      this._applicationState = applicationId && workspace
+        ? new WorkspaceStateStore(
+            applicationId,
+            () => ({ workspace: this._currentWorkspace ?? workspace, facets: freezeFacetSelections(this._facetSelections), application: this._appId }),
+            backend,
+            () => this._applyApplicationPreferences(),
+          )
+        : null
+      const loadApplication = this._applicationState?.load()
+      if (loadApplication) {
+        return Promise.all([loadWorkspace, loadApplication]).then(() => {})
+      }
     }
-    const state = new WorkspaceStateStore(
-      id,
-      { workspace: this._currentWorkspace, facets: freezeFacetSelections(this._facetSelections) },
-      this._workspaceStateDriver === 'backend' ? this._workspaceStateOptions?.backend ?? null : null,
-      (keys) => {
-        if (this._workspaceState === state) {
-          keys.forEach(key => this._notifyState(key))
-          super.notify()
-        }
-      },
-    )
-    this._workspaceState = state
-    return state.load()
+    return loadWorkspace
   }
 
   private _usesWorkspaceState(key: string): boolean {
+    if (this._workspaceStateOptions?.localKeys?.includes(key)) {
+      return false
+    }
     return this._workspaceStateDriver === 'indexeddb'
       || this._workspaceStateDriver === 'disabled'
-      || (this._workspaceStateDriver === 'backend' && (BACKEND_STATE_KEYS.includes(key)
-        || this._workspaceStateOptions?.backendKeys?.includes(key) === true))
+      || (this._workspaceStateDriver === 'backend' && this._workspaceState !== null)
   }
 
   /**
@@ -451,7 +483,16 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
 
     try {
       // Тема хранится отдельно под ID приложения и учётной записи.
-      this._resolveAdapter(this._contextPersistence).write(CONTEXT_STORAGE_KEY, { ...this.serialize(), theme: null })
+      const snapshot = this.serialize()
+      if (this._workspaceStateDriver === 'disabled') {
+        if (!this._workspaceStateOptions?.localKeys?.includes(LOCALE_STATE_KEY)) {
+          snapshot.locale = null
+        }
+        if (!this._workspaceStateOptions?.localKeys?.includes(TIMEZONE_STATE_KEY)) {
+          snapshot.timezone = null
+        }
+      }
+      this._resolveAdapter(this._contextPersistence).write(CONTEXT_STORAGE_KEY, { ...snapshot, theme: null })
     }
     catch (error) {
       console.warn(`[EndgeContext] Failed to persist context: ${error instanceof Error ? error.message : String(error)}`)
@@ -469,6 +510,7 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
       const snapshot = adapter.read<EndgePersistedContextSnapshot>(CONTEXT_STORAGE_KEY)
         ?? adapter.read<EndgePersistedContextSnapshot>(LEGACY_CONTEXT_STORAGE_KEY)
 
+      this._legacyAppearance = snapshot
       this.deserialize(snapshot && { ...snapshot, theme: null })
       return this.serialize()
     }
@@ -501,9 +543,15 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
    * Читает личную настройку явно указанного пользователя host, в том числе в debugger.
    */
   public getUserState<T>(userId: string, key: string, transform?: EndgeContextStateTransform<T>): T | undefined {
-    const storageKey = buildUserContextStateStorageKey(this._appId, userId, key)
+    const normalizedKey = normalizeContextStateKey(key)
+    const storageKey = buildUserContextStateStorageKey(this._appId, userId, normalizedKey)
     try {
-      const value = this._resolveAdapter(this._contextPersistence).read<unknown>(storageKey)
+      if (this._personalStateDisabled(userId, normalizedKey)) {
+        return undefined
+      }
+      const read = () => this._resolveAdapter(this._contextPersistence).read<EndgeJSONValue>(storageKey)
+      const store = this._personalStateStore(userId, normalizedKey)
+      const value = store ? store.getWithLegacy(normalizedKey, read) : read()
       return value === undefined ? undefined : deserializeContextState(value, transform)
     }
     catch (error) {
@@ -516,16 +564,90 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
    * Сохраняет личную настройку host, не меняя контекст или данные инспектируемого приложения.
    */
   public setUserState<T>(userId: string, key: string, state: T, transform?: EndgeContextStateTransform<T>): void {
-    const storageKey = buildUserContextStateStorageKey(this._appId, userId, key)
+    const normalizedKey = normalizeContextStateKey(key)
+    const storageKey = buildUserContextStateStorageKey(this._appId, userId, normalizedKey)
     try {
+      if (this._personalStateDisabled(userId, normalizedKey)) {
+        return
+      }
       const value = serializeContextState(state, transform)
       if (value === undefined) {
         throw new Error('State serializer returned undefined.')
       }
-      this._resolveAdapter(this._contextPersistence).write(storageKey, value)
+      const store = this._personalStateStore(userId, normalizedKey)
+      if (store) {
+        this._writePreference(store, normalizedKey, value)
+      }
+      else {
+        this._resolveAdapter(this._contextPersistence).write(storageKey, value)
+      }
     }
     catch (error) {
       this._warnStateFailure('write', key, error)
+    }
+  }
+
+  private _personalStateStore(userId: string, key: string): WorkspaceStateStore | null {
+    return !this._workspaceStateOptions?.localKeys?.includes(key) && userId === this.getCurrentUserStateId()
+      ? this._applicationState
+      : null
+  }
+
+  private _personalStateDisabled(userId: string, key: string): boolean {
+    return this._workspaceStateDriver === 'disabled' && userId === this.getCurrentUserStateId()
+      && !this._workspaceStateOptions?.localKeys?.includes(key)
+  }
+
+  private _writePreference(store: WorkspaceStateStore, key: string, value: unknown): void {
+    const json = JSON.stringify(value)
+    if (json === undefined) {
+      throw new Error('Workspace state requires a JSON value.')
+    }
+    store.set(key, JSON.parse(json) as EndgeJSONValue)
+  }
+
+  private _applyApplicationPreferences(): void {
+    const userId = this.getCurrentUserStateId()
+    if (this._applyingApplicationPreferences || !userId || !this._applicationState) {
+      return
+    }
+    this._applyingApplicationPreferences = true
+    try {
+      const configuration = this._activeConfiguration()
+      const legacy = this._legacyAppearance?.user === this.getCurrentUser() ? this._legacyAppearance : undefined
+      const locale = this._readAppearancePreference(userId, LOCALE_STATE_KEY, legacy?.locale)
+      if (locale) {
+        this._hasLocalePreference = true
+        this._currentLocale = this._normalizeLocale(locale, configuration)
+        this._pendingLocale = configuration ? null : locale
+      }
+      const timezone = this._readAppearancePreference(userId, TIMEZONE_STATE_KEY, legacy?.timezone)
+      if (timezone) {
+        this._currentTimezone = this._normalizeTimezone(timezone, configuration)
+        this._pendingTimezone = configuration ? null : timezone
+      }
+      this._reloadThemePreference(true)
+      this._applyThemePreference(configuration)
+      this._syncPersistentContextToRaph()
+      this._publishContextChanges()
+      super.notify()
+    }
+    finally {
+      this._applyingApplicationPreferences = false
+    }
+  }
+
+  private _readAppearancePreference(userId: string, key: string, legacy: string | null | undefined): string | null {
+    const storageKey = buildUserContextStateStorageKey(this._appId, userId, key)
+    try {
+      const read = () => this._resolveAdapter(this._contextPersistence).read<EndgeJSONValue>(storageKey)
+      const store = this._personalStateStore(userId, key)
+      const value = store ? store.getWithLegacy(key, () => read() ?? legacy ?? undefined) : read()
+      return typeof value === 'string' ? normalizeOptionalText(value) : null
+    }
+    catch (error) {
+      this._warnStateFailure('read', key, error)
+      return null
     }
   }
 
@@ -541,10 +663,11 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
       return undefined
     }
     try {
+      const read = () => this._resolveAdapter(this._contextPersistence)
+        .read<EndgeJSONValue>(buildContextStateStorageKey(this.getPersistenceScope(), normalizedKey))
       const value = this._usesWorkspaceState(normalizedKey)
-        ? this._workspaceState?.get(normalizedKey)
-        : this._resolveAdapter(this._contextPersistence)
-            .read<unknown>(buildContextStateStorageKey(this.getPersistenceScope(), normalizedKey))
+        ? this._workspaceState?.getWithLegacy(normalizedKey, read)
+        : read()
       return value === undefined ? undefined : deserializeContextState(value, transform)
     }
     catch (error) {
@@ -573,11 +696,7 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
       }
       if (this._usesWorkspaceState(normalizedKey)) {
         if (this._workspaceState) {
-          const json = JSON.stringify(value)
-          if (json === undefined) {
-            throw new Error('Workspace state requires a JSON value.')
-          }
-          this._workspaceState.set(normalizedKey, JSON.parse(json) as EndgeJSONValue)
+          this._writePreference(this._workspaceState, normalizedKey, value)
         }
         return
       }
@@ -934,13 +1053,16 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     const raw = normalizeOptionalText(locale) ?? DEFAULT_LOCALE
     const next = this._normalizeLocale(raw, configuration)
     this._pendingLocale = configuration ? null : raw
-    if (next === this._currentLocale) {
-      return
-    }
-
+    const changed = next !== this._currentLocale
     this._currentLocale = next
-    this.saveToStorage()
-    this.notify()
+    const userId = this.getCurrentUserStateId()
+    if (userId && this.getUserState(userId, LOCALE_STATE_KEY) !== next) {
+      this.setUserState(userId, LOCALE_STATE_KEY, next)
+    }
+    if (changed) {
+      this.saveToStorage()
+      this.notify()
+    }
   }
 
   /**
@@ -1000,13 +1122,13 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     }
   }
 
-  /** Загружает тему только при смене приложения, пользователя или storage adapter. */
-  private _reloadThemePreference(): boolean {
+  /** Загружает тему после смены scope или обновления серверного снимка. */
+  private _reloadThemePreference(refresh = false): boolean {
     if (this._bootMode === 'debugger') {
       return false
     }
     const userStateId = this.getCurrentUserStateId()
-    if (this._themeUserStateId === userStateId) {
+    if (!refresh && this._themeUserStateId === userStateId) {
       return false
     }
     this._themeUserStateId = userStateId
@@ -1042,13 +1164,16 @@ export class EndgeContext_Module extends EndgeModule<EndgeBootContext> {
     const raw = normalizeOptionalText(timezone) ?? DEFAULT_TIMEZONE
     const next = this._normalizeTimezone(raw, configuration)
     this._pendingTimezone = configuration ? null : raw
-    if (next === this._currentTimezone) {
-      return
-    }
-
+    const changed = next !== this._currentTimezone
     this._currentTimezone = next
-    this.saveToStorage()
-    this.notify()
+    const userId = this.getCurrentUserStateId()
+    if (userId && this.getUserState(userId, TIMEZONE_STATE_KEY) !== next) {
+      this.setUserState(userId, TIMEZONE_STATE_KEY, next)
+    }
+    if (changed) {
+      this.saveToStorage()
+      this.notify()
+    }
   }
 
   /**

@@ -30,6 +30,8 @@ interface WorkspaceStateDatabase extends DBSchema {
 }
 
 const BATCH_SIZE = 32
+const MAX_BATCH_BYTES = 64 * 1024
+const MAX_VALUE_BYTES = 60 * 1024
 const DEBOUNCE_MS = 250
 const REQUEST_TIMEOUT_MS = 3000
 const RETRY_MAX_MS = 30000
@@ -51,6 +53,13 @@ function revision(record: WorkspaceStateRecord, key: string): number {
   return record.snapshot?.entries.find(entry => entry.key === key)?.revision ?? 0
 }
 
+function fitsServer(key: string, value: EndgeJSONValue | undefined): boolean {
+  const encoder = new TextEncoder()
+  return key.length > 0 && key.trim() === key && !/\p{Cc}/u.test(key)
+    && encoder.encode(key).length <= 512
+    && (value === undefined || encoder.encode(JSON.stringify(value)).length <= MAX_VALUE_BYTES)
+}
+
 export class WorkspaceStateStore {
   private readonly _abort = new AbortController()
   private _database: Promise<IDBPDatabase<WorkspaceStateDatabase>> | null = null
@@ -62,11 +71,12 @@ export class WorkspaceStateStore {
   private _synching = false
   private _inFlight = new Set<string>()
   private _retryMs = 1000
+  private _confirmedSnapshot = false
   private _error: EndgeWorkspaceStateSyncStatus['error'] = null
 
   public constructor(
     public readonly id: string,
-    private readonly _scope: EndgeWorkspaceStateScope,
+    private readonly _scope: () => EndgeWorkspaceStateScope,
     private readonly _transport: EndgeWorkspaceStateTransport | null,
     private readonly _onChange: (keys: readonly string[]) => void,
   ) {}
@@ -104,6 +114,21 @@ export class WorkspaceStateStore {
     return Object.hasOwn(this._record.values, key) ? this._record.values[key] : undefined
   }
 
+  public getWithLegacy(key: string, readLegacy: () => EndgeJSONValue | undefined): EndgeJSONValue | undefined {
+    const value = this.get(key)
+    if (!this._transport || this._error === 'session' || value !== undefined
+      || this._drafts.has(key) || this._record.queue.some(op => op.key === key)
+      || this._record.snapshot?.entries.some(entry => entry.key === key)
+      || (this._record.snapshot?.resetRevision ?? 0) > 0) {
+      return value
+    }
+    const legacy = readLegacy()
+    if (legacy !== undefined && this._confirmedSnapshot && fitsServer(key, legacy)) {
+      this.set(key, legacy)
+    }
+    return legacy
+  }
+
   public async load(): Promise<void> {
     await this._persist(() => {}, false)
     if (this._abort.signal.aborted) {
@@ -116,6 +141,9 @@ export class WorkspaceStateStore {
   }
 
   public set(key: string, value: EndgeJSONValue | undefined): void {
+    if (this._transport && !fitsServer(key, value)) {
+      throw new Error('[EndgeContext] A server setting requires a valid key and a value of at most 60 KiB.')
+    }
     const previous = this._drafts.get(key)?.operation ?? this._record.queue.find(op => op.key === key)
     const operation: QueuedSetting | undefined = this._transport
       ? {
@@ -210,16 +238,21 @@ export class WorkspaceStateStore {
     }
     this._synching = true
     try {
+      const scope = this._scope()
       await this._disk
       if (refresh || !this._record.snapshot) {
-        const snapshot = await transport.read(this._scope, this._requestSignal())
+        const snapshot = await transport.read(scope, this._requestSignal())
         this._abort.signal.throwIfAborted()
+        if (snapshot.application !== scope.application) {
+          throw new EndgeWorkspaceStateRequestError(403)
+        }
         const previous = this._record.snapshot
         // A cookie or token rotation must never move a queued write to a different account.
         if (previous && previous.actorId !== snapshot.actorId) {
           throw new EndgeWorkspaceStateRequestError(403)
         }
         this._error = null
+        this._confirmedSnapshot = true
         await this._persist(record => this._acceptSnapshot(record, snapshot))
       }
       const snapshot = this._record.snapshot
@@ -232,18 +265,41 @@ export class WorkspaceStateStore {
         }
         return
       }
-      const queue = this._record.queue.filter(op => !op.conflicted).slice(0, BATCH_SIZE)
+      const batch = {
+        actorId: snapshot.actorId,
+        partition: snapshot.partition,
+        resetRevision: snapshot.resetRevision,
+        operations: [] as EndgeWorkspaceStateOperation[],
+      }
+      const queue: QueuedSetting[] = []
+      const encoder = new TextEncoder()
+      let bytes = encoder.encode(JSON.stringify(batch)).length
+      for (const op of this._record.queue) {
+        if (op.conflicted) {
+          continue
+        }
+        const { key, id, baseRevision, value, delete: remove } = op
+        const operation = { key, id, baseRevision, value, delete: remove }
+        const nextBytes = bytes + encoder.encode(JSON.stringify(operation)).length + (queue.length ? 1 : 0)
+        if (nextBytes > MAX_BATCH_BYTES) {
+          if (!queue.length) {
+            throw new EndgeWorkspaceStateRequestError(413)
+          }
+          break
+        }
+        batch.operations.push(operation)
+        queue.push(op)
+        bytes = nextBytes
+        if (queue.length === BATCH_SIZE) {
+          break
+        }
+      }
       if (queue.length === 0) {
         this._error = null
         return
       }
       this._inFlight = new Set(queue.map(op => op.id))
-      const response = await transport.save(this._scope, {
-        actorId: snapshot.actorId,
-        partition: snapshot.partition,
-        resetRevision: snapshot.resetRevision,
-        operations: queue.map(({ key, id, baseRevision, value, delete: remove }) => ({ key, id, baseRevision, value, delete: remove })),
-      }, this._requestSignal())
+      const response = await transport.save(scope, batch, this._requestSignal())
       this._abort.signal.throwIfAborted()
       this._error = null
       await this._persist(record => this._applyResult(record, queue, response))
@@ -261,6 +317,7 @@ export class WorkspaceStateStore {
       }
       this._error = error instanceof EndgeWorkspaceStateRequestError && error.status < 500 && error.status !== 429 ? 'session' : 'network'
       if (this._error === 'session') {
+        this._confirmedSnapshot = false
         this._onChange(this._record.snapshot?.entries.map(entry => entry.key) ?? [])
       }
       else {
