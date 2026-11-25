@@ -21,6 +21,7 @@ import type {
 
 import { Endge } from '@/features/core/kernel/endge'
 import { createSourceContextValues, runWithSourceContext } from '@/features/core/modules/source/services/source-context'
+import { completeSourcePath } from '@/features/core/modules/source/services/source-path-completion'
 import { SourceEngineRegistry } from '@/features/core/modules/source/services/SourceEngineRegistry'
 
 import { SourceLanguageRegistry } from '@/features/core/modules/source/services/SourceLanguageRegistry'
@@ -238,7 +239,10 @@ export class EndgeSource_Module extends EndgeModule {
    * Возвращает editor-facing completion items для указанного source-kind.
    */
   public completions(sourceKind: SourceKind | string, context: SourceLanguageContext): SourceLanguageCompletion[] {
-    return this._resolveRequiredLanguageStrategy(sourceKind).completions(context)
+    const strategy = this._resolveRequiredLanguageStrategy(sourceKind)
+    const paths = completeSourcePath(sourceKind, context, source =>
+      this.compile(sourceKind, source, { sourceContext: context.sourceContext ?? this.currentSourceContext() ?? undefined }))
+    return paths ?? strategy.completions(context)
   }
 
   public signatureHelp(sourceKind: SourceKind | string, context: SourceLanguageContext): SourceLanguageSignatureHelp | null {

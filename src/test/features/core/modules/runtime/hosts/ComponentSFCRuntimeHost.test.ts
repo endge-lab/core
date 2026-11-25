@@ -96,6 +96,67 @@ const props = defineProps<{ report: { total: number, count: number } }>()
     expect(Endge.styles.getActivePlacements()).toEqual([])
   })
 
+  it.each([
+    { data: 'props.timeline', content: '', boundaries: true },
+    { data: 'props.timeline', content: '<Text>{{ props.timeline.tasks[0].label }}</Text>', boundaries: false },
+    { data: '{ tasks: props.timeline.tasks }', content: '<Table :rows="props.timeline.tasks" row-key="id" />', boundaries: false },
+  ])('обновляет данные Timeline с правильной границей ($data, $boundaries)', ({ data, content, boundaries }) => {
+    const source = `<script setup lang="ts">const props = defineProps<{ timeline: unknown }>()</script>
+<template><TimelineChart :data="${data}" />${content}</template>`
+    const artifact = createSFCArtifact(compileComponentSFC(source))
+    const input = { kind: 'raph', bindings: { timeline: { path: 'timelineTest.data' } } }
+    let host: ComponentSFCRuntimeHost | null = null
+    Raph.reset()
+    Raph.configure({ mode: 'runtime' })
+    Raph.definePhases([RuntimeBoundaryUpdatePhase.make({ resolveHost: () => host as unknown as RuntimeHost })])
+    Raph.set('timelineTest.data', {
+      tasks: [
+        { id: 'first', label: 'Before', custom: { delayMs: 30 } },
+        { id: 'second', label: 'Before' },
+      ],
+    })
+    host = ComponentSFCRuntimeHost.createRuntime({
+      id: 'timeline-runtime',
+      model: RComponentSFC.fromPlain({ id: 104, identity: 'timeline-test', name: 'Timeline', source }),
+      meta: { input },
+      artifactReader: { getArtifact: <TPayload>() => artifact as unknown as ProgramArtifact<TPayload> },
+    })
+    const dirty = vi.fn()
+    const patch = vi.fn()
+    host.on('props:dirty', dirty)
+    host.on('boundary:dirty', patch)
+
+    Raph.batch(() => {
+      Raph.set('timelineTest.data.tasks[0].label', 'After')
+      Raph.set('timelineTest.data.tasks[id="first"].custom.delayMs', 50)
+      Raph.merge('timelineTest.data.tasks[id="second"]', { label: 'Changed' })
+    })
+    if (boundaries) {
+      expect(dirty).not.toHaveBeenCalled()
+      expect(patch).toHaveBeenCalledTimes(1)
+      expect(patch).toHaveBeenCalledWith(expect.objectContaining({
+        kind: 'timeline-data-update',
+        updates: [
+          { collection: 'tasks', id: 'first', fields: { label: 'After', custom: { delayMs: 50 } } },
+          { collection: 'tasks', id: 'second', fields: { label: 'Changed' } },
+        ],
+      }))
+      patch.mockClear()
+      Raph.delete('timelineTest.data.tasks[0].custom')
+      expect(patch).toHaveBeenCalledTimes(1)
+      expect(patch).toHaveBeenCalledWith(expect.objectContaining({ updates: null }))
+      patch.mockClear()
+      Raph.set('timelineTest', { data: { tasks: [] } })
+      expect(patch).toHaveBeenCalledTimes(1)
+      expect(patch).toHaveBeenCalledWith(expect.objectContaining({ updates: null, dataSnapshot: { tasks: [] } }))
+    }
+    else {
+      expect(dirty).toHaveBeenCalledTimes(1)
+      expect(patch).not.toHaveBeenCalled()
+    }
+    host.destroy()
+  })
+
   it('отправляет boundary patch колонки таблицы при обновлении поля строки через Raph', () => {
     const source = `<script setup lang="ts">
 defineProps<{

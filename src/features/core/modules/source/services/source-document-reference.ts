@@ -242,7 +242,7 @@ function isNode(value: unknown): value is t.Node {
   return value != null && typeof value === 'object' && typeof (value as { type?: unknown }).type === 'string'
 }
 
-function positionToOffset(source: string, position: SourceLanguageContext['position']): number | null {
+export function positionToOffset(source: string, position: SourceLanguageContext['position']): number | null {
   if (!position) {
     return null
   }

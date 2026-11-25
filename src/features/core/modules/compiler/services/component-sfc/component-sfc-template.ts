@@ -46,7 +46,7 @@ import { normalizeComponentSFCTableColumnPin } from '@/features/core/modules/com
 import { normalizeComponentSFCTableSort } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-table-sort'
 import { normalizeComponentSFCTableColumnVisibility } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-table-visibility'
 import { DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION } from '@/features/core/modules/domain/component/sfc-editing.config'
-import { validateTimelineRecipeLayout } from '@/features/core/modules/domain/component/timeline-task-recipe'
+import { TIMELINE_RECIPE_EXPRESSION_PREFIX, timelineRecipeExpressions, validateTimelineRecipeLayout } from '@/features/core/modules/domain/component/timeline-task-recipe'
 import { createEmptyComponentDependencies } from '@/features/core/modules/domain/types/component/component-core.types'
 import { createEmptyComponentSFCPortManifest } from '@/features/core/modules/domain/types/component/sfc/ports.types'
 import { isContextSwitchCall, selectContextSwitchNode } from '@/features/core/modules/source/services/compilers/source-expression-compile'
@@ -608,6 +608,15 @@ function compileTimelineTaskRecipe(
     const layout = readComponentSFCTimelineRecipeLayout(recipe)
     props.id = { kind: 'literal', value: recipeId }
     props.recipe = { kind: 'literal', value: layout }
+    for (const expression of timelineRecipeExpressions(layout)) {
+      const result = compileComponentSFCExpression(expression, {
+        props: context.props,
+        locals: [...context.locals, '$task', '$group'],
+        sourcePath: `template.${id}.recipe`,
+      })
+      diagnostics.push(...result.diagnostics)
+      props[`${TIMELINE_RECIPE_EXPRESSION_PREFIX}${expression}`] = result.value
+    }
     if (kind) {
       props.kind = { kind: 'literal', value: kind }
     }

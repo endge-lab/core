@@ -7,6 +7,7 @@ import type {
   RComponentSFC_RuntimeTableColumnDependency,
   RComponentSFC_RuntimeVocabDependency,
 } from '@/features/core/modules/domain/types/component/sfc/dependencies.types'
+import type { ComponentSFCExpressionIR } from '@/features/core/modules/domain/types/component/sfc/expression-ir.types'
 import type {
   RComponentSFC_IR,
   RComponentSFC_IR_Directives,
@@ -30,6 +31,7 @@ export function analyzeComponentSFCRuntimeDependencies(
   const seen = new Set<string>()
   const seenContext = new Set<string>()
   const seenVocabs = new Set<string>()
+  const timelineData = new Map<string, RComponentSFC_IR_Value>()
 
   for (const call of ir.script.portCalls) {
     collectValueDependencies(call.input, props, result, seen, seenVocabs)
@@ -40,8 +42,48 @@ export function analyzeComponentSFCRuntimeDependencies(
   for (const node of ir.template.roots) {
     collectNodeDependencies(node, props, result, seen, seenVocabs)
     collectRootContextDependencies(node, props, result.context, seenContext)
-    collectBoundaryDependencies(node, props, result)
+    collectBoundaryDependencies(node, props, result, timelineData)
     collectMetaNodeDependencies(node, result.meta ??= [], null)
+  }
+
+  if (timelineData.size) {
+    // A patch must not hide a data change from other expressions in the same component.
+    const patchableData = new Set(result.boundaries.flatMap((boundary) => {
+      const value = timelineData.get(boundary.id)
+      return boundary.kind === 'timeline' && value ? [value] : []
+    }))
+    const other = createEmptyComponentSFCRuntimeDependencies()
+    const seenOther = new Set<string>()
+    const seenOtherVocabs = new Set<string>()
+    for (const call of ir.script.portCalls) {
+      collectValueDependencies(call.input, props, other, seenOther, seenOtherVocabs)
+    }
+    for (const node of ir.template.roots) {
+      collectNodeDependencies(node, props, other, seenOther, seenOtherVocabs, patchableData)
+    }
+    result.boundaries = result.boundaries.filter(boundary => boundary.kind !== 'timeline' || !other.props.some(dep => (
+      dep.prop === boundary.sourceProp
+      && dep.path.slice(0, boundary.sourcePath.length).every((part, index) => boundary.sourcePath[index] === part)
+    )))
+    const boundaries = new Set(result.boundaries.filter(boundary => boundary.kind === 'timeline').map(boundary => boundary.id))
+    const rootProps = new Map<string, RComponentSFC_RuntimeDependency>()
+    for (const [id, value] of timelineData) {
+      if (boundaries.has(id) || value.kind !== 'expression') {
+        continue
+      }
+      for (const read of value.reads) {
+        const dependency = normalizePropDependency(read, props)
+        if (dependency) {
+          rootProps.set(dependency.prop, { ...dependency, path: [] })
+        }
+      }
+    }
+    if (rootProps.size) {
+      result.rootProps = [...rootProps.values()]
+
+      // A root watch takes precedence over every boundary on that prop.
+      result.boundaries = result.boundaries.filter(boundary => boundary.kind !== 'timeline' || !rootProps.has(boundary.sourceProp))
+    }
   }
 
   result.props = prunePrefixDependencies(result.props)
@@ -178,6 +220,7 @@ function collectNodeDependencies(
   result: RComponentSFC_RuntimeDependencies,
   seen: Set<string>,
   seenVocabs: Set<string>,
+  skipValues?: ReadonlySet<RComponentSFC_IR_Value>,
 ): void {
   if (node.kind === 'expression') {
     collectValueDependencies(node.value, props, result, seen, seenVocabs)
@@ -189,7 +232,9 @@ function collectNodeDependencies(
   }
 
   for (const value of Object.values(node.props)) {
-    collectValueDependencies(value, props, result, seen, seenVocabs)
+    if (!skipValues?.has(value)) {
+      collectValueDependencies(value, props, result, seen, seenVocabs)
+    }
   }
 
   collectDirectiveDependencies(node.directives, props, result, seen, seenVocabs)
@@ -202,7 +247,7 @@ function collectNodeDependencies(
   }
 
   for (const child of node.children) {
-    collectNodeDependencies(child, props, result, seen, seenVocabs)
+    collectNodeDependencies(child, props, result, seen, seenVocabs, skipValues)
   }
 }
 
@@ -318,21 +363,59 @@ function collectBoundaryDependencies(
   node: RComponentSFC_IR_Node,
   props: Set<string>,
   result: RComponentSFC_RuntimeDependencies,
+  timelineData: Map<string, RComponentSFC_IR_Value>,
+  repeated = false,
 ): void {
   if (node.kind !== 'element') {
     return
   }
 
+  const insideLoop = repeated || Boolean(node.directives.for)
   if (node.tag === 'Table') {
     const boundary = createTableBoundaryDependency(node, props)
     if (boundary) {
       result.boundaries.push(boundary)
     }
   }
+  else if (node.tag === 'TimelineChart') {
+    const data = node.props.data
+    if (data?.kind === 'expression') {
+      timelineData.set(node.id, data)
+    }
+    const [sourceProp, ...sourcePath] = !insideLoop && data?.kind === 'expression' ? readDirectPropPath(data.expression) ?? [] : []
+    if (sourceProp && props.has(sourceProp)) {
+      result.boundaries.push({
+        id: node.id,
+        kind: 'timeline',
+        sourceProp,
+        sourcePath,
+        rowKey: null,
+        contextReads: [],
+        columns: [],
+      })
+    }
+  }
 
   for (const child of node.children) {
-    collectBoundaryDependencies(child, props, result)
+    collectBoundaryDependencies(child, props, result, timelineData, insideLoop)
   }
+}
+
+function readDirectPropPath(expression: ComponentSFCExpressionIR): string[] | null {
+  if (expression.kind === 'read') {
+    return expression.name === 'props' ? [] : [expression.name]
+  }
+  if (expression.kind === 'member') {
+    const { property } = expression
+    const name = !expression.computed && property.kind === 'read'
+      ? property.name
+      : property.kind === 'literal' && typeof property.value === 'string' ? property.value : null
+    if (name && /^[\w$-]+$/.test(name)) {
+      const path = readDirectPropPath(expression.object)
+      return path && [...path, name]
+    }
+  }
+  return null
 }
 
 function createTableBoundaryDependency(

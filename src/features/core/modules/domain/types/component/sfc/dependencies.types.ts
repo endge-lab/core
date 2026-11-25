@@ -31,7 +31,7 @@ export interface RComponentSFC_RuntimeContextDependency {
 }
 
 // Тип patchable runtime boundary внутри SFC IR.
-export type RComponentSFC_RuntimeBoundaryKind = 'table'
+export type RComponentSFC_RuntimeBoundaryKind = 'table' | 'timeline'
 
 // Runtime-зависимость колонки таблицы от полей текущей строки.
 export interface RComponentSFC_RuntimeTableColumnDependency {
@@ -53,7 +53,7 @@ export interface RComponentSFC_RuntimeBoundaryDependency {
   // Стабильный boundary-id, совпадает с id IR node.
   id: string
 
-  // Тип boundary. В v1 поддерживаем Table.
+  // Примитив, владеющий отображением коллекции.
   kind: RComponentSFC_RuntimeBoundaryKind
 
   // Имя prop, из которого boundary получает коллекцию.
@@ -100,6 +100,9 @@ export interface RComponentSFC_RuntimeMetaDependency {
 export interface RComponentSFC_RuntimeDependencies {
   // Зависимости от props, которые можно связать с внешним input source.
   props: RComponentSFC_RuntimeDependency[]
+
+  // Reads that must still refresh the root when another boundary observes the same source.
+  rootProps?: RComponentSFC_RuntimeDependency[]
 
   // Зависимости контекста за пределами изменяемых границ.
   context: RComponentSFC_RuntimeContextDependency[]
