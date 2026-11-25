@@ -107,6 +107,8 @@ const TIMELINE_RECIPE_MEMBER_DETAILS: Readonly<Record<string, string>> = {
   '$task.workStartTime': 'Начало рабочего участка в миллисекундах',
   '$task.workEndTime': 'Конец рабочего участка в миллисекундах',
   '$task.delayMs': 'Длительность задержки в миллисекундах',
+  '$task.takeoffDurationMinutes': 'Длительность взлёта в минутах',
+  '$task.landingDurationMinutes': 'Длительность посадки в минутах',
   '$group.id': 'Идентификатор группы',
   '$group.title': 'Название группы',
 }
@@ -166,9 +168,10 @@ export function resolveComponentSFCExpressionCompletions(
     return []
   }
 
-  const token = source.slice(0, cursor).match(/[$A-Z_][\w$]*(?:\.[\w$]*)*$/i)?.[0] ?? ''
+  const before = source.slice(0, cursor)
+  const token = before.match(/[$A-Z_][\w$]*(?:\.[\w$]*)*$/i)?.[0] ?? ''
   const timeline = request.scope.startsWith('timeline-')
-  if (!token && !timeline) {
+  if (!token && (!timeline || /[\w$"'`\])}]\s*$/.test(before))) {
     return []
   }
   const replacementEnd = cursor + (source.slice(cursor).match(/^[\w$]*/)?.[0].length ?? 0)
@@ -337,6 +340,7 @@ function isExpressionIdentifier(value: string): boolean {
 
 function isInsideQuotedExpression(source: string, cursor: number): boolean {
   let quote: '\'' | '"' | '`' | null = null
+  const interpolations: number[] = []
   for (let index = 0; index < cursor; index += 1) {
     const character = source[index]
     if (character === '\\') {
@@ -344,9 +348,24 @@ function isInsideQuotedExpression(source: string, cursor: number): boolean {
       continue
     }
     if (quote) {
+      if (quote === '`' && character === '$' && source[index + 1] === '{') {
+        interpolations.push(1)
+        quote = null
+        index += 1
+        continue
+      }
       if (character === quote) {
         quote = null
       }
+      continue
+    }
+    const depth = interpolations.length - 1
+    if (depth >= 0 && character === '{') {
+      interpolations[depth] += 1
+    }
+    else if (depth >= 0 && character === '}' && --interpolations[depth] === 0) {
+      interpolations.pop()
+      quote = '`'
       continue
     }
     if (character === '\'' || character === '"' || character === '`') {

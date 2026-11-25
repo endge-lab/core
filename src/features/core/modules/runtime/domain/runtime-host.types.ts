@@ -404,10 +404,31 @@ export interface RuntimeCollectionProjectionBatchPatch {
   node: RaphNode
 }
 
+export type RuntimeTimelineCollection = 'groups' | 'tasks' | 'backgrounds' | 'points' | 'links'
+
+export interface RuntimeTimelineEntityUpdate {
+  collection: RuntimeTimelineCollection
+  id: string
+  fields: Record<string, unknown>
+}
+
+export interface RuntimeTimelineDataPatch {
+  kind: 'timeline-data-update'
+  boundaryId: string
+  boundaryType: 'timeline'
+  sourcePath: string
+  dataSnapshot: unknown
+  // null requests replacement with the current source snapshot.
+  updates: RuntimeTimelineEntityUpdate[] | null
+  events: RuntimePhaseEvent[]
+  node: RaphNode
+}
+
 // Нейтральный patch runtime boundary для render adapter-а.
 export type RuntimeBoundaryPatch
   = RuntimeCollectionProjectionUpdatePatch
     | RuntimeCollectionProjectionBatchPatch
+    | RuntimeTimelineDataPatch
 
 export interface RuntimeHost<
   TType extends RuntimeEntityType = RuntimeEntityType,

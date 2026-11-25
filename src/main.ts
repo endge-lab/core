@@ -300,6 +300,8 @@ export * from '@/features/core/modules/compiler/services/computation/computation
 export * from '@/features/core/modules/styles/services/endgecss-compile'
 export * from '@/features/core/modules/styles/services/endgecss-match'
 export * from '@/features/core/modules/source/services/source-expression-evaluate'
+export { compositionCompletionTypes, storeCompletionType } from '@/features/core/modules/source/services/program-completion-types'
+export { computedCompletionType, readCompletionType, sampleCompletionType } from '@/features/core/modules/source/services/source-completion-types'
 export * from '@/features/core/modules/source/services/filter-source-patch'
 export * from '@/features/core/modules/source/services/vocab-source-patch'
 export * from '@/features/core/modules/source/services/compilers/vocab-source-compile'
@@ -346,3 +348,4 @@ export * from '@/features/core/modules/runtime/EndgeControllers_Module'
 export * from '@/features/core/modules/runtime/services/controllers/builtins/collection-window.definition'
 
 export * from '@/features/core/modules/domain/component/timeline-task-recipe'
+export * from '@/features/core/modules/domain/component/timeline-recipe-style'

@@ -58,6 +58,7 @@ import { executeRuntimeOperation } from '@/features/core/modules/runtime/operati
 import { RuntimeHostBase } from '@/features/core/modules/runtime/RuntimeHostBase'
 import { runtimeInspectionMetaKey } from '@/features/core/modules/runtime/tools/runtime-render-inspection'
 import { resolveRuntimeVocabOptions } from '@/features/core/modules/runtime/tools/runtime-render-values'
+import { createRuntimeTimelineDataPatch } from '@/features/core/modules/runtime/tools/runtime-timeline-data-patch'
 
 function createDefaultSFCContext(target: RComponentRenderTarget | null): RuntimeHostContext<'component-sfc'> {
   return {
@@ -994,16 +995,12 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
     const dependencies = this.getRuntimeDependencies()
 
     for (const boundary of dependencies.boundaries) {
-      if (boundary.kind !== 'table') {
-        continue
-      }
-
-      const tableNode = new RaphNode(Raph.runtime(), {
-        id: `${root.id}:table:${boundary.id}`,
+      const boundaryNode = new RaphNode(Raph.runtime(), {
+        id: `${root.id}:${boundary.kind}:${boundary.id}`,
         meta: {
           type: 'runtime-node',
           kind: 'boundary',
-          boundaryType: 'table',
+          boundaryType: boundary.kind,
           boundaryId: boundary.id,
           runtimeId: this.id,
           runtimeKind: 'runtime',
@@ -1015,18 +1012,18 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
         },
       })
 
-      root.addChild(tableNode)
-      this.addRaphNode(tableNode)
+      root.addChild(boundaryNode)
+      this.addRaphNode(boundaryNode)
       this.addResource({
-        id: `node:${tableNode.id}`,
+        id: `node:${boundaryNode.id}`,
         kind: 'raph-node',
-        title: tableNode.id,
-        subtitle: 'boundary:table',
-        payload: { meta: tableNode.meta ?? {} },
+        title: boundaryNode.id,
+        subtitle: `boundary:${boundary.kind}`,
+        payload: { meta: boundaryNode.meta ?? {} },
       })
 
       for (const column of boundary.columns) {
-        this._createTableColumnBoundaryNode(tableNode, boundary, column)
+        this._createTableColumnBoundaryNode(boundaryNode, boundary, column)
       }
     }
   }
@@ -1075,11 +1072,8 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
 
     const deps = this.getRuntimeDependencies()
     const observed = new Set<string>()
-    for (const dependency of deps.props) {
-      if (this._isCoveredByPatchableBoundary(dependency.prop, dependency.path)) {
-        continue
-      }
-
+    const rootDependencies = deps.props.filter(dependency => !this._isCoveredByPatchableBoundary(dependency.prop, dependency.path))
+    for (const dependency of [...rootDependencies, ...(deps.rootProps ?? [])]) {
       const binding = input.bindings[dependency.prop]
       if (!binding?.path) {
         continue
@@ -1263,9 +1257,9 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
         continue
       }
 
-      const tableNode = this._findRuntimeNodeByMeta('boundaryId', boundary.id)
-      if (tableNode) {
-        this._raphInputDisposers.push(tableNode.watch(
+      const boundaryNode = this._findRuntimeNodeByMeta('boundaryId', boundary.id)
+      if (boundaryNode) {
+        this._raphInputDisposers.push(boundaryNode.watch(
           Raph.runtime().path(sourcePath),
           RUNTIME_BOUNDARY_UPDATE_PHASE_NAME,
           () => {},
@@ -1303,6 +1297,11 @@ export class ComponentSFCRuntimeHost extends RuntimeHostBase<
   }
 
   private _makeBoundaryPatch(ctx: RuntimeHostUpdateContext): RuntimeBoundaryPatch | null {
+    const meta = ctx.node.meta ?? {}
+    if (meta.boundaryType === 'timeline') {
+      const sourcePath = this._resolveBoundarySourcePath(meta)
+      return sourcePath ? createRuntimeTimelineDataPatch(ctx, String(meta.boundaryId ?? ''), sourcePath) : null
+    }
     if (ctx.node.meta?.boundaryType === 'table-column') {
       return this._makeTableColumnPatch(ctx)
     }

@@ -95,6 +95,9 @@ export interface SourceLanguageCompletion {
 
   // Документация completion item.
   documentation?: string
+
+  // Абсолютный диапазон замены в исходном тексте для path completion.
+  replace?: { start: number, end: number }
 }
 
 export interface SourceLanguageSignatureHelp {

@@ -201,26 +201,29 @@ function readTypeSourceFields(
   })
 }
 
-function typeSourceExpressionToTypeScript(expression: TypeSourceExpression): string {
+export function typeSourceExpressionToTypeScript(
+  expression: TypeSourceExpression,
+  referenceName: (identity: string) => string = identity => identity,
+): string {
   if (expression.kind === 'reference') {
-    return expression.identity
+    return referenceName(expression.identity)
   }
   if (expression.kind === 'array') {
-    return `Array<${typeSourceExpressionToTypeScript(expression.items)}>`
+    return `Array<${typeSourceExpressionToTypeScript(expression.items, referenceName)}>`
   }
   if (expression.kind === 'union') {
-    return expression.variants.map(typeSourceExpressionToTypeScript).join(' | ')
+    return expression.variants.map(variant => typeSourceExpressionToTypeScript(variant, referenceName)).join(' | ') || 'never'
   }
   if (expression.kind === 'enum') {
-    return expression.values.map(value => JSON.stringify(value)).join(' | ')
+    return expression.values.map(value => JSON.stringify(value)).join(' | ') || 'never'
   }
   if (expression.kind === 'record') {
-    return `Record<string, ${typeSourceExpressionToTypeScript(expression.values)}>`
+    return `Record<string, ${typeSourceExpressionToTypeScript(expression.values, referenceName)}>`
   }
   const fields = expression.fields.map((field) => {
     const type = field.array
-      ? `Array<${typeSourceExpressionToTypeScript(field.type)}>`
-      : typeSourceExpressionToTypeScript(field.type)
+      ? `Array<${typeSourceExpressionToTypeScript(field.type, referenceName)}>`
+      : typeSourceExpressionToTypeScript(field.type, referenceName)
     return `${JSON.stringify(field.key)}${field.optional ? '?' : ''}: ${type}`
   })
   return `{ ${fields.join('; ')} }`
