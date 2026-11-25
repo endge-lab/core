@@ -1643,7 +1643,7 @@ function serializeAttributeValue(
   return `${prefix}${name}="${escapeAttribute(value)}"`
 }
 
-function escapeAttribute(value: string): string {
+export function escapeAttribute(value: string): string {
   return value
     .replace(/&/g, '&amp;')
     .replace(/"/g, '&quot;')
@@ -1689,7 +1689,7 @@ function inferAttributeIndent(source: string, node: RComponentSFC_AST_ElementNod
   return `${lineIndent(source, node.range.start)}  `
 }
 
-function insertChild(source: string, node: RComponentSFC_AST_ElementNode, markup: string): string {
+export function insertChild(source: string, node: RComponentSFC_AST_ElementNode, markup: string): string {
   const ownIndent = lineIndent(source, node.range.start)
   const childIndent = inferChildIndent(source, node, ownIndent)
   const indentedMarkup = markup

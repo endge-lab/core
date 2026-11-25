@@ -7,6 +7,7 @@ export interface SFCExpressionEvaluationContext {
   context: object
   host: Pick<ComponentSFCRenderPort, 'translate' | 'resolveVocabOptions' | 'readDataMeta'> | null
   dataScope: { boundaryId: string, rowKey: unknown } | null
+  translate?: (key: string, fallback?: string) => string | undefined
 }
 
 const UNSUPPORTED_EXPRESSION = Symbol('unsupported-sfc-expression')
@@ -346,7 +347,7 @@ function callSafeGlobal(
       return UNSUPPORTED_EXPRESSION
     }
     const fallback = args[1] == null ? undefined : String(args[1])
-    return context.host?.translate(args[0], fallback) ?? fallback ?? `{{${args[0]}}}`
+    return context.host?.translate(args[0], fallback) ?? context.translate?.(args[0], fallback) ?? fallback ?? `{{${args[0]}}}`
   }
   if (name === 'vocab') {
     if (

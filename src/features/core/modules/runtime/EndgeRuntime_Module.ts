@@ -24,6 +24,7 @@ import { EndgeQuery } from '@/features/core/modules/runtime/execution/endge-quer
 import { EndgeSimulation } from '@/features/core/modules/runtime/execution/endge-simulation'
 import { RuntimeBoundaryUpdatePhase } from '@/features/core/modules/runtime/helpers/raph-phases/runtime-boundary-update-phase'
 import { RuntimeNodeUpdatePhase } from '@/features/core/modules/runtime/helpers/raph-phases/runtime-node-update-phase'
+import { WORKSPACE_MODULE_ATTACHMENT_PREFIX, workspaceModuleAttachment } from '@/features/core/modules/runtime/module/module-artifact'
 import { RuntimeModules } from '@/features/core/modules/runtime/module/RuntimeModules'
 import { EndgeOperations_Module } from '@/features/core/modules/runtime/operation/EndgeOperations_Module'
 import { RuntimeAppScope } from '@/features/core/modules/runtime/RuntimeAppScope'
@@ -89,6 +90,7 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
   private _defaultAppScope: RuntimeAppScope
   private _unsubscribeWorkspace: (() => void) | null = null
   private _unsubscribeContext: (() => void) | null = null
+  private _unsubscribeConfiguration: (() => void) | null = null
   private _destroyedSnapshotLeases = new Map<symbol, number>()
   private _destroyingRuntimes = new Map<string, Promise<void>>()
   private _destroyingTrees = new Map<string, Promise<void>>()
@@ -170,6 +172,9 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
     })
     this._unsubscribeContext = Endge.context.subscribe(() => {
       this.invalidateApplicationScopes()
+    })
+    this._unsubscribeConfiguration = Endge.configuration.subscribe(() => {
+      void this.prepareWorkspaceModules()
     })
   }
 
@@ -854,6 +859,8 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
    */
   public override async reset(): Promise<void> {
     this._generation += 1
+    this._unsubscribeConfiguration?.()
+    this._unsubscribeConfiguration = null
     this.modules.setup(undefined)
     this._unsubscribeData?.()
     this._unsubscribeData = null
@@ -1112,6 +1119,30 @@ export class EndgeRuntime_Module extends EndgeModule<EndgeBootContext> {
 
   public get workspaceModuleScope(): RuntimeScope | null {
     return this.scopes.get(`runtime-scope:${this._defaultAppScope.id}`) ?? null
+  }
+
+  public async prepareWorkspaceModules(): Promise<void> {
+    if (this._inspectionMode || !Endge.configuration.isResolved) {
+      return
+    }
+    const generation = this._generation
+    let scope: RuntimeScope
+    try {
+      scope = await this.activateWorkspaceModuleScope()
+    }
+    catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
+        throw error
+      }
+      return
+    }
+    if (generation !== this._generation || !Endge.configuration.isResolved) {
+      return
+    }
+    const { defaultRenderers, timelinePresets } = Endge.configuration.current
+    const references = [...Object.values(defaultRenderers ?? {}), ...timelinePresets ?? []]
+    const desired = new Map(references.map(reference => [workspaceModuleAttachment(reference), reference]))
+    await this.modules.reconcile(scope, WORKSPACE_MODULE_ATTACHMENT_PREFIX, desired)
   }
 
   /**

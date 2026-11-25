@@ -39,6 +39,8 @@ it('packs and boots the selected tenant and all selected channels without foreig
   const deliveryFacets = { tenant: 'customer-a', deployment: 'production', channel: 'mobile' }
   const baseModule = { identity: 'foreign-module-b', version: '1.0.0', rendererId: 'foreign' }
   const selectedModule = { identity: 'selected-module-a', version: '2.0.0', rendererId: 'selected' }
+  const timelineModule = { identity: 'rms-ui', version: '1.0.0' }
+  const timelinePresets = ['rms-load', 'rms-shifts'].map(name => ({ ...timelineModule, name }))
   const rendererPatch = { defaultRenderers: { Table: { op: 'set', value: selectedModule } }, vars: { entries: [
     { op: 'upsert', key: 'selected-var', value: { name: 'selected-var', defaultValue: 'TENANT_A_PRIVATE' } },
   ] } }
@@ -58,6 +60,7 @@ it('packs and boots the selected tenant and all selected channels without foreig
         configuration: {
           ...workspace.configuration,
           defaultRenderers: { Table: baseModule, Badge: { identity: 'unused-badge', version: '1.0.0', rendererId: 'badge' } },
+          timelinePresets,
         },
       },
       installedIntegrations: [],
@@ -113,7 +116,8 @@ it('packs and boots the selected tenant and all selected channels without foreig
   expect(result.bundles).toHaveLength(2)
   for (const variant of result.bundles) {
     expect(variant.context.configuration.defaultRenderers?.Table).toEqual(selectedModule)
-    expect(collectDeliveryModules(variant)).toEqual([{ identity: selectedModule.identity, version: selectedModule.version }])
+    expect(variant.context.configuration.timelinePresets).toEqual(timelinePresets)
+    expect(collectDeliveryModules(variant)).toEqual([{ identity: selectedModule.identity, version: selectedModule.version }, timelineModule])
   }
   await expect(Endge.buildSavedDelivery({ tenant: { mode: 'all' }, channel: { mode: 'all' }, deployment: { mode: 'all' } })).rejects.toThrow('single tenant')
   const [bundle, ...variants] = result.bundles
@@ -132,6 +136,9 @@ it('packs and boots the selected tenant and all selected channels without foreig
           load() {}, build() {}, start() {}, reset() {},
         })`,
         css: ':scope { color: rgb(255, 0, 0); }',
+      }, {
+        manifest: { ...timelineModule, formatVersion: 1, hostApi: 1 },
+        js: 'export default () => ({})',
       }],
     },
   }
@@ -148,7 +155,7 @@ it('packs and boots the selected tenant and all selected channels without foreig
   }
   expect(serialized).toContain('TENANT_A_PRIVATE')
   expect(serialized).toContain('SELECTED_MODULE_PAYLOAD')
-  expect(decoded.delivery?.modules).toHaveLength(1)
+  expect(decoded.delivery?.modules).toHaveLength(2)
   const selected = selectDeliveryProgram(decoded.bundle!, decoded.delivery!, deliveryFacets)
   expect(Object.values(selected.artifacts).map(artifact => artifact.ref.identity)).toEqual(expect.arrayContaining(['app', 'customer-a-branch', 'selected-mobile']))
   expect(JSON.stringify(selected)).not.toContain('selected-web')
@@ -164,6 +171,10 @@ it('packs and boots the selected tenant and all selected channels without foreig
       { manifest: { identity: baseModule.identity, version: baseModule.version, formatVersion: 1, hostApi: 1 }, js: 'foreign' },
     ] },
   })).rejects.toThrow('unrelated delivery module')
+  await expect(codec.encode({
+    ...packed,
+    delivery: { ...packed.delivery!, modules: packed.delivery!.modules!.slice(0, 1) },
+  })).rejects.toThrow('Missing delivery modules')
 
   await Endge.reset()
   const moduleLoader = vi.fn(async () => ({ create: () => ({ setup() {}, load() {}, build() {}, start() {}, reset() {} }) }))
@@ -173,5 +184,7 @@ it('packs and boots the selected tenant and all selected channels without foreig
   expect(Endge.program.getQueryArtifact('customer-b-private')).toBeNull()
   expect(moduleLoader).toHaveBeenCalledTimes(1)
   expect(moduleLoader).toHaveBeenCalledWith({ identity: selectedModule.identity, version: selectedModule.version }, expect.any(AbortSignal))
+  await Endge.runtime.prepareWorkspaceModules()
+  expect(moduleLoader).toHaveBeenCalledWith(timelineModule, expect.any(AbortSignal))
   await session.unmount()
 })

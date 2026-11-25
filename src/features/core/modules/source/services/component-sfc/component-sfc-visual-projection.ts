@@ -38,7 +38,7 @@ import { BUILTIN_ACTION_IDS, TABLE_RUNTIME_ACTION_IDS } from '@/features/core/mo
 import { compileComponentSFC } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-compile'
 import { readPreviewLiteral } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-script'
 import { readComponentSFCTableMenuActionPortReference } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-table-menu'
-import { isComponentSFCBuiltInTag } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-template'
+import { isComponentSFCBuiltInTag, readComponentSFCTimelineRecipeLayout } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-template'
 import { normalizeComponentSFCInteractionTriggers } from '@/features/core/modules/domain/component/component-sfc-edit-trigger'
 
 const NON_VISUAL_CELL_TAGS = new Set([
@@ -132,7 +132,7 @@ function projectTimeline(
   return {
     tag: node.tag === 'TimelineGroup' ? 'TimelineGroup' : 'TimelineChart',
     attributes: projectAttributes(source, node, ir).map((attribute) => {
-      if (attribute.value.kind !== 'expression' || attribute.name === 'for' || /\/[*/]/.test(attribute.value.source)) {
+      if (attribute.value.kind !== 'expression' || attribute.name === 'for' || attribute.name === 'title' || /\/[*/]/.test(attribute.value.source)) {
         return attribute
       }
       try {
@@ -144,6 +144,52 @@ function projectTimeline(
       }
     }),
     sourceRange: node.range,
+    columns: node.children.flatMap((child) => {
+      if (child.kind !== 'element' || child.tag !== 'Column') {
+        return []
+      }
+      return [{
+        sourceRange: child.range,
+        attributes: child.attributes.map(attribute => ({
+          name: attribute.name,
+          value: attribute.dynamic
+            ? { kind: 'expression' as const, source: attribute.value ?? '' }
+            : attribute.value == null
+              ? { kind: 'boolean' as const, value: true }
+              : { kind: 'literal' as const, value: attribute.value },
+          sourceRange: attribute.range,
+        })).concat(child.directives.filter(directive => directive.name === 'key').map(directive => ({
+          name: 'key',
+          value: directive.argument
+            ? { kind: 'expression' as const, source: directive.expression ?? '' }
+            : { kind: 'literal' as const, value: directive.expression ?? '' },
+          sourceRange: directive.range,
+        }))),
+      }]
+    }),
+    recipes: node.children.flatMap((child) => {
+      if (child.kind !== 'element' || child.tag !== 'TimelineTaskRecipe') {
+        return []
+      }
+      const attribute = (name: string, dynamic = false) =>
+        child.attributes.find(item => item.name === name && item.dynamic === dynamic)?.value ?? ''
+      const authored = attribute('recipe', true)
+      let json = authored
+      try {
+        json = JSON.stringify(readComponentSFCTimelineRecipeLayout(authored))
+      }
+      catch {
+        // Keep invalid Source available for repair in the JSON editor.
+      }
+      return [{
+        id: attribute('id'),
+        name: attribute('name'),
+        kind: attribute('kind'),
+        when: attribute('when', true),
+        json,
+        sourceRange: child.range,
+      }]
+    }),
     charts: node.children.flatMap((child) => {
       if (child.kind !== 'element' || child.tag !== 'TimelineChart') {
         return []

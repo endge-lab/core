@@ -235,6 +235,7 @@ export type RComponentSFC_IR_Tag
     | 'Component'
     | 'Table'
     | 'TimelineChart'
+    | 'TimelineTaskRecipe'
     | 'TimelineGroup'
     | 'Column'
     | 'Cell'

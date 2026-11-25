@@ -17,7 +17,7 @@ interface PreparedModule {
 interface Attachment {
   current: PreparedModule | null
   pending: Promise<void>
-  disposed: boolean
+  controller: AbortController
 }
 
 export class RuntimeModules {
@@ -35,8 +35,8 @@ export class RuntimeModules {
     return () => this._listeners.delete(listener)
   }
 
-  public resolve<T>(scope: RuntimeScope | null, channel: string, key: string): ModuleContribution<T> | undefined {
-    for (const module of this._visible(scope)) {
+  public resolve<T>(scope: RuntimeScope | null, channel: string, key: string, before?: RuntimeScope | null): ModuleContribution<T> | undefined {
+    for (const module of this._visible(scope, before)) {
       const value = module.contributions.get(channel)?.get(key)
       if (value !== undefined) {
         return { value: value as T, visualToken: module.visualToken }
@@ -45,9 +45,9 @@ export class RuntimeModules {
     return undefined
   }
 
-  public list<T>(scope: RuntimeScope | null, channel: string): ReadonlyMap<string, ModuleContribution<T>> {
+  public list<T>(scope: RuntimeScope | null, channel: string, before?: RuntimeScope | null): ReadonlyMap<string, ModuleContribution<T>> {
     const entries = new Map<string, ModuleContribution<T>>()
-    for (const module of this._visible(scope)) {
+    for (const module of this._visible(scope, before)) {
       for (const [name, value] of module.contributions.get(channel) ?? []) {
         if (!entries.has(name)) {
           entries.set(name, { value: value as T, visualToken: module.visualToken })
@@ -68,9 +68,9 @@ export class RuntimeModules {
     return undefined
   }
 
-  private* _visible(scope: RuntimeScope | null): Generator<PreparedModule> {
+  private* _visible(scope: RuntimeScope | null, before?: RuntimeScope | null): Generator<PreparedModule> {
     const attachments = new Set<string>()
-    for (let current = scope; current; current = current.parent) {
+    for (let current = scope; current && current !== before; current = current.parent) {
       const scoped = this._scopes.get(current)
       if (scoped) {
         for (const [key, attachment] of [...scoped].reverse()) {
@@ -86,6 +86,19 @@ export class RuntimeModules {
   public attach(scope: RuntimeScope, attachment: string, reference: ModuleReference): Promise<void> {
     const state = this._getOrCreate(scope, attachment)
     return this._replace(scope, attachment, state, reference)
+  }
+
+  public async reconcile(
+    scope: RuntimeScope,
+    prefix: string,
+    desired: ReadonlyMap<string, ModuleReference>,
+  ): Promise<void> {
+    const obsolete = [...(this._scopes.get(scope)?.keys() ?? [])]
+      .filter(key => key.startsWith(prefix) && !desired.has(key))
+    await Promise.allSettled([
+      ...obsolete.map(key => scope.resources.remove(`${scope.id}:module:${key}`)),
+      ...Array.from(desired, ([key, reference]) => this.attach(scope, key, reference)),
+    ])
   }
 
   public replace(scope: RuntimeScope, attachment: string, reference: ModuleReference): Promise<void> {
@@ -106,14 +119,14 @@ export class RuntimeModules {
     if (previous) {
       return previous
     }
-    const state: Attachment = { current: null, pending: Promise.resolve(), disposed: false }
+    const state: Attachment = { current: null, pending: Promise.resolve(), controller: new AbortController() }
     scope.resources.add({
       id: `${scope.id}:module:${attachment}`,
       kind: 'module',
       pause: () => state.current?.instance.pause?.(),
       resume: () => state.current?.instance.resume?.(),
       dispose: async () => {
-        state.disposed = true
+        state.controller.abort()
         const old = state.current
         state.current = null
         scoped.delete(attachment)
@@ -126,17 +139,18 @@ export class RuntimeModules {
   }
 
   private _replace(scope: RuntimeScope, attachment: string, state: Attachment, reference: ModuleReference): Promise<void> {
-    const signal = scope.signal
+    const scopeSignal = scope.signal
+    const signal = scopeSignal && AbortSignal.any([scopeSignal, state.controller.signal])
     const nextReference = { identity: reference.identity, version: reference.version }
     const run = async () => {
-      if (!signal || signal.aborted || state.disposed) {
+      if (!signal || signal.aborted) {
         throw new DOMException('Module scope is inactive.', 'AbortError')
       }
       if (state.current?.reference === moduleReferenceKey(nextReference)) {
         return
       }
       const next = await this._prepare(scope, attachment, nextReference, signal)
-      if (signal.aborted || state.disposed) {
+      if (signal.aborted) {
         await next.dispose()
         throw new DOMException('Module scope was deactivated.', 'AbortError')
       }

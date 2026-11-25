@@ -47,6 +47,9 @@ export function collectDeliveryModules(bundle: ExecutionBundle): ModuleReference
   for (const reference of Object.values(bundle.context.configuration.defaultRenderers ?? {})) {
     add(reference)
   }
+  for (const reference of bundle.context.configuration.timelinePresets ?? []) {
+    add(reference)
+  }
   for (const artifact of Object.values(bundle.artifacts)) {
     if (artifact.ref.entityType === 'composition') {
       for (const resource of (artifact.payload as unknown as CompositionProgramPayload).resources) {

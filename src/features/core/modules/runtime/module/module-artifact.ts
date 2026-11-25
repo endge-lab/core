@@ -23,7 +23,21 @@ export interface ModuleArtifact {
 export interface ModuleManifest extends ModuleReference {
   formatVersion: 1
   hostApi: 1
-  contributes?: { renderers?: ModuleRendererDescriptor[] }
+  contributes?: {
+    renderers?: ModuleRendererDescriptor[]
+    timelinePresets?: ModuleTimelinePresetDescriptor[]
+  }
+}
+
+export interface ModuleTimelinePresetDescriptor {
+  name: string
+  label?: string
+}
+
+export const WORKSPACE_MODULE_ATTACHMENT_PREFIX = 'workspace-ui:'
+
+export function workspaceModuleAttachment(reference: ModuleReference): string {
+  return `${WORKSPACE_MODULE_ATTACHMENT_PREFIX}${moduleReferenceKey(reference)}`
 }
 
 export interface ModuleRendererDescriptor {

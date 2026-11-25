@@ -36,7 +36,7 @@ export interface ComponentSFCExpressionCompileResult {
   diagnostics: RComponentDiagnostic[]
 }
 
-export type ComponentSFCExpressionCompletionScope = 'table-row-menu' | 'table-column-menu'
+export type ComponentSFCExpressionCompletionScope = 'table-row-menu' | 'table-column-menu' | 'timeline-recipe' | 'timeline-column' | 'timeline-title'
 
 export interface ComponentSFCExpressionCompletionRequest {
   source: string
@@ -44,6 +44,7 @@ export interface ComponentSFCExpressionCompletionRequest {
   scope: ComponentSFCExpressionCompletionScope
   context?: Readonly<EndgeRuntimeContextSnapshot> | Record<string, unknown>
   configurations?: Iterable<EndgeConfigurationSchemaEntry>
+  bindings?: Readonly<Record<string, unknown>>
 }
 
 export interface ComponentSFCExpressionCompletion {
@@ -87,6 +88,39 @@ const TABLE_COLUMN_MENU_EXPRESSION_ROOTS: readonly ExpressionCompletionCandidate
   { label: '$data', kind: 'variable', detail: 'Read-only API метаданных входных данных' },
   { label: 'props', kind: 'variable', detail: 'Входные параметры Component SFC' },
 ]
+
+const TIMELINE_RECIPE_EXPRESSION_ROOTS: readonly ExpressionCompletionCandidate[] = [
+  { label: '$task', kind: 'variable', detail: 'Текущая задача на диаграмме' },
+  { label: '$group', kind: 'variable', detail: 'Группа текущей задачи' },
+  { label: '$context', kind: 'variable', detail: 'Контекст пользователя, рабочего пространства и конфигурации' },
+  { label: '$data', kind: 'variable', detail: 'Метаданные входных данных' },
+  { label: 'props', kind: 'variable', detail: 'Входные параметры компонента' },
+]
+
+const TIMELINE_RECIPE_MEMBER_DETAILS: Readonly<Record<string, string>> = {
+  '$task.id': 'Идентификатор задачи',
+  '$task.kind': 'Тип задачи',
+  '$task.title': 'Название задачи',
+  '$task.groupId': 'Идентификатор группы задачи',
+  '$task.startTime': 'Начало задачи в миллисекундах',
+  '$task.endTime': 'Конец задачи в миллисекундах',
+  '$task.workStartTime': 'Начало рабочего участка в миллисекундах',
+  '$task.workEndTime': 'Конец рабочего участка в миллисекундах',
+  '$task.delayMs': 'Длительность задержки в миллисекундах',
+  '$group.id': 'Идентификатор группы',
+  '$group.title': 'Название группы',
+}
+
+const RUNTIME_CONTEXT_DETAILS: Readonly<Record<string, string>> = {
+  workspace: 'Идентификатор рабочего пространства',
+  facets: 'Выбранные фасеты',
+  user: 'Идентификатор пользователя',
+  locale: 'Язык интерфейса',
+  theme: 'Цветовая тема',
+  timezone: 'Часовой пояс пользователя',
+  config: 'Действующая конфигурация рабочего пространства',
+  input: 'Текущее состояние ввода',
+}
 
 const STATIC_MEMBER_CANDIDATES: Readonly<Record<string, readonly ExpressionCompletionCandidate[]>> = {
   '$data': [
@@ -133,42 +167,60 @@ export function resolveComponentSFCExpressionCompletions(
   }
 
   const token = source.slice(0, cursor).match(/[$A-Z_][\w$]*(?:\.[\w$]*)*$/i)?.[0] ?? ''
-  if (!token) {
+  const timeline = request.scope.startsWith('timeline-')
+  if (!token && !timeline) {
     return []
   }
   const replacementEnd = cursor + (source.slice(cursor).match(/^[\w$]*/)?.[0].length ?? 0)
-
+  const roots = expressionRoots(request)
   const memberSeparator = token.lastIndexOf('.')
   if (memberSeparator < 0) {
-    if (!token.startsWith('$')) {
+    if (!timeline && !token.startsWith('$')) {
       return []
     }
-    return filterExpressionCompletionCandidates(
-      request.scope === 'table-row-menu'
-        ? TABLE_ROW_MENU_EXPRESSION_ROOTS
-        : TABLE_COLUMN_MENU_EXPRESSION_ROOTS,
-      token,
-      cursor - token.length,
-      replacementEnd,
-    )
+    return filterExpressionCompletionCandidates(roots, token, cursor - token.length, replacementEnd)
   }
 
   const parentPath = token.slice(0, memberSeparator)
+  const root = parentPath.split('.')[0] ?? ''
   const prefix = token.slice(memberSeparator + 1)
-  if (!expressionRootIsAvailable(parentPath, request.scope)) {
+  // Accept the familiar short names while inserting the actual SFC locals.
+  const alias = timeline && !Object.hasOwn(request.bindings ?? {}, root)
+    && (root === 'task' || root === 'group')
+    ? `$${parentPath}`
+    : undefined
+  const path = alias ?? parentPath
+  if (!roots.some(candidate => candidate.label === path.split('.')[0])) {
     return []
   }
 
-  const candidates = resolveMemberCompletionCandidates(parentPath, request)
-  return filterExpressionCompletionCandidates(candidates, prefix, cursor - prefix.length, replacementEnd)
+  const candidates = resolveMemberCompletionCandidates(path, request)
+  const suggestions = filterExpressionCompletionCandidates(candidates, prefix, cursor - prefix.length, replacementEnd)
+  return alias
+    ? suggestions.map(suggestion => ({
+        ...suggestion,
+        insertText: `${path}.${suggestion.insertText}`,
+        replace: { start: cursor - token.length, end: replacementEnd },
+      }))
+    : suggestions
 }
 
-function expressionRootIsAvailable(path: string, scope: ComponentSFCExpressionCompletionScope): boolean {
-  const root = path.split('.')[0] ?? ''
-  const candidates = scope === 'table-row-menu'
-    ? TABLE_ROW_MENU_EXPRESSION_ROOTS
-    : TABLE_COLUMN_MENU_EXPRESSION_ROOTS
-  return candidates.some(candidate => candidate.label === root)
+function expressionRoots(request: ComponentSFCExpressionCompletionRequest): readonly ExpressionCompletionCandidate[] {
+  if (request.scope === 'table-row-menu') {
+    return TABLE_ROW_MENU_EXPRESSION_ROOTS
+  }
+  if (request.scope === 'table-column-menu') {
+    return TABLE_COLUMN_MENU_EXPRESSION_ROOTS
+  }
+  const scopedRoots = TIMELINE_RECIPE_EXPRESSION_ROOTS.filter(candidate =>
+    (candidate.label !== '$task' || request.scope === 'timeline-recipe')
+    && (candidate.label !== '$group' || request.scope !== 'timeline-title'))
+  const reserved = new Set(TIMELINE_RECIPE_EXPRESSION_ROOTS.map(candidate => candidate.label))
+  const bindings = Object.keys(request.bindings ?? {}).filter(key => isExpressionIdentifier(key) && !reserved.has(key))
+  return [
+    ...scopedRoots,
+    ...bindings.map((label): ExpressionCompletionCandidate => ({ label, kind: 'variable', detail: 'Переменная компонента' })),
+  ]
 }
 
 function resolveMemberCompletionCandidates(
@@ -183,10 +235,28 @@ function resolveMemberCompletionCandidates(
     return [...staticCandidates]
   }
 
-  if (!parentPath.startsWith('$context')) {
-    return []
+  if (parentPath !== '$context' && !parentPath.startsWith('$context.')) {
+    if (!request.scope.startsWith('timeline-')) {
+      return []
+    }
+    const value = readExpressionMember(request.bindings, parentPath.split('.'))
+    if (Array.isArray(value) || typeof value === 'string') {
+      return [{ label: 'length', kind: 'property', detail: Array.isArray(value) ? 'Количество элементов' : 'Длина строки' }]
+    }
+    const detail = parentPath.startsWith('$task')
+      ? 'Поле текущей задачи'
+      : parentPath.startsWith('$group') ? 'Поле группы задачи' : 'Поле входных данных'
+    return objectMemberCompletionCandidates(value, detail).map(candidate => ({
+      ...candidate,
+      detail: TIMELINE_RECIPE_MEMBER_DETAILS[`${parentPath}.${candidate.label}`] ?? candidate.detail,
+    }))
   }
-  const runtimeCandidates = objectMemberCompletionCandidates(readContextPath(request.context, parentPath))
+  const value = readExpressionMember(request.context, parentPath.split('.').slice(1))
+  const timeline = request.scope.startsWith('timeline-')
+  const runtimeCandidates = objectMemberCompletionCandidates(value, timeline ? 'Поле контекста' : 'Context property')
+    .map(candidate => timeline && parentPath === '$context'
+      ? { ...candidate, detail: RUNTIME_CONTEXT_DETAILS[candidate.label] ?? candidate.detail }
+      : candidate)
   if (!parentPath.startsWith('$context.config')) {
     return runtimeCandidates
   }
@@ -227,28 +297,22 @@ function resolveMemberCompletionCandidates(
   })
 }
 
-function readContextPath(
-  context: ComponentSFCExpressionCompletionRequest['context'],
-  path: string,
-): unknown {
-  if (!context) {
-    return undefined
-  }
-  return path.split('.').slice(1).reduce<unknown>((current, segment) => {
-    if (!current || typeof current !== 'object') {
+function readExpressionMember(value: unknown, path: string[]): unknown {
+  return path.reduce<unknown>((current, segment) => {
+    if (!current || typeof current !== 'object' || !isExpressionIdentifier(segment) || !Object.hasOwn(current, segment)) {
       return undefined
     }
     return (current as Record<string, unknown>)[segment]
-  }, context)
+  }, value)
 }
 
-function objectMemberCompletionCandidates(value: unknown): ExpressionCompletionCandidate[] {
+function objectMemberCompletionCandidates(value: unknown, detail: string): ExpressionCompletionCandidate[] {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return []
   }
   return Object.keys(value)
     .filter(isExpressionIdentifier)
-    .map(label => ({ label, kind: 'property', detail: 'Context property' }))
+    .map(label => ({ label, kind: 'property', detail }))
 }
 
 function filterExpressionCompletionCandidates(
@@ -268,7 +332,7 @@ function filterExpressionCompletionCandidates(
 }
 
 function isExpressionIdentifier(value: string): boolean {
-  return /^[A-Z_$][\w$]*$/i.test(value)
+  return value !== '__proto__' && value !== 'constructor' && value !== 'prototype' && /^[A-Z_$][\w$]*$/i.test(value)
 }
 
 function isInsideQuotedExpression(source: string, cursor: number): boolean {

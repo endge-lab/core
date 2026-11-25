@@ -36,7 +36,7 @@ import { DIAGNOSTICS_SHORTCUT_OPERATIONS } from '@/features/core/modules/diagnos
 import { normalizeComponentSFCInteractionKeyboardCondition, normalizeComponentSFCInteractionTriggerActivation, normalizeComponentSFCInteractionTriggers } from '@/features/core/modules/domain/component/component-sfc-edit-trigger'
 import { DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION } from '@/features/core/modules/domain/component/sfc-editing.config'
 import { isEndgeSFCRendererTag } from '@/features/core/modules/domain/types/component/sfc/renderer-tags'
-import { isModuleReference, isModuleRendererId } from '@/features/core/modules/runtime/module/module-reference'
+import { isModuleReference, isModuleRendererId, isTimelinePresetName } from '@/features/core/modules/runtime/module/module-reference'
 
 const LEGACY_SFC_ADAPTER_IDS: Readonly<Record<string, string>> = {
   'native-vue': 'vue-native',
@@ -121,6 +121,7 @@ export function normalizeEndgeConfiguration(input: unknown): EndgeConfiguration 
     'defaultSfcAdapterId',
   )
   const defaultRenderers = normalizeDefaultRenderers(input.defaultRenderers)
+  const timelinePresets = normalizeTimelinePresets(input.timelinePresets)
 
   const userStateDriver = normalizeUserStateDriver(input.userStateDriver)
   return {
@@ -137,11 +138,31 @@ export function normalizeEndgeConfiguration(input: unknown): EndgeConfiguration 
     sfcAdapterIds,
     defaultSfcAdapterId,
     ...(defaultRenderers ? { defaultRenderers } : {}),
+    ...(timelinePresets?.length ? { timelinePresets } : {}),
     sfcEditing: normalizeSFCEditingConfiguration(input.sfcEditing),
     tooltips: normalizeTooltipConfiguration(input.tooltips),
     diagnostics: normalizeDiagnosticsConfiguration(input.diagnostics),
     values: normalizeConfigurationValues(input.values),
   }
+}
+
+function normalizeTimelinePresets(input: unknown): EndgeConfiguration['timelinePresets'] {
+  if (input === undefined) {
+    return undefined
+  }
+  if (!Array.isArray(input)) {
+    throw new Error('[EndgeConfiguration] timelinePresets must be an array of named module references')
+  }
+  const names = new Set<string>()
+  return input.map((item) => {
+    if (!isRecord(item) || !isTimelinePresetName(item.name)
+      || typeof item.identity !== 'string' || typeof item.version !== 'string'
+      || !isModuleReference(item.identity, item.version) || names.has(item.name)) {
+      throw new Error('[EndgeConfiguration] Invalid or duplicate Timeline preset reference')
+    }
+    names.add(item.name)
+    return { name: item.name, identity: item.identity, version: item.version }
+  })
 }
 
 function normalizeDefaultRenderers(input: unknown): EndgeConfiguration['defaultRenderers'] {

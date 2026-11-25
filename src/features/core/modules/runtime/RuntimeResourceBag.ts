@@ -23,6 +23,12 @@ export class RuntimeResourceBag {
     return this._resources.has(String(id ?? '').trim())
   }
 
+  public async remove(id: string): Promise<void> {
+    const resource = this._resources.get(id)
+    this._resources.delete(id)
+    await resource?.dispose()
+  }
+
   public async pause(): Promise<void> {
     if (this._paused) {
       return

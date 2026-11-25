@@ -62,7 +62,7 @@ export const ENDGE_SFC_TAG_ATTRIBUTE_CONTRACTS = {
       name: 'collapsed',
       values: [true, false],
       defaultValue: false,
-      description: 'Оставить заголовок и компактное представление диаграммы.',
+      description: 'Свернуть диаграмму. Пресет может оставить компактное представление.',
     },
   ],
   TimelineGroup: [
