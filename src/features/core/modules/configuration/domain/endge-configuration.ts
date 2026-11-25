@@ -151,14 +151,14 @@ function normalizeTimelinePresets(input: unknown): EndgeConfiguration['timelineP
     return undefined
   }
   if (!Array.isArray(input)) {
-    throw new Error('[EndgeConfiguration] timelinePresets must be an array of named module references')
+    throw new TypeError('[EndgeConfiguration] timelinePresets must be an array of named module references')
   }
   const names = new Set<string>()
   return input.map((item) => {
     if (!isRecord(item) || !isTimelinePresetName(item.name)
       || typeof item.identity !== 'string' || typeof item.version !== 'string'
       || !isModuleReference(item.identity, item.version) || names.has(item.name)) {
-      throw new Error('[EndgeConfiguration] Invalid or duplicate Timeline preset reference')
+      throw new TypeError('[EndgeConfiguration] Invalid or duplicate Timeline preset reference')
     }
     names.add(item.name)
     return { name: item.name, identity: item.identity, version: item.version }
